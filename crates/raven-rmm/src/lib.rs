@@ -57,8 +57,7 @@ impl PhysAddr {
 
 /// A virtual address.
 ///
-/// Constructors reject non-canonical values; `new_unchecked` exists only for addresses the
-/// caller knows are canonical, such as linker symbols.
+/// Constructors reject non-canonical values.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct VirtAddr(u64);
@@ -71,15 +70,6 @@ impl VirtAddr {
         } else {
             None
         }
-    }
-
-    /// Build a virtual address without checking canonicality.
-    ///
-    /// # Safety
-    ///
-    /// `address` must be canonical for the active paging mode.
-    pub const unsafe fn new_unchecked(address: u64) -> Self {
-        Self(address)
     }
 
     /// The numeric address.
