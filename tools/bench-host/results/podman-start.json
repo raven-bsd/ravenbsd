@@ -1,0 +1,19 @@
+{
+  "name": "podman-start",
+  "unit": "ns/op",
+  "n": 20,
+  "median": 257784638.5,
+  "p99": 367859496.0,
+  "min": 241279811.0,
+  "max": 367859496.0,
+  "host": {
+    "cpu": "12th Gen Intel(R) Core(TM) i7-12700H",
+    "kernel": "5.19.0-50-generic",
+    "qemu": "QEMU emulator version 6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.31)",
+    "kvm": true,
+    "governor": "powersave",
+    "arch": "x86_64",
+    "cpus": 20
+  },
+  "note": "image=docker.io/library/alpine:3.22; local image, --pull=never"
+}
