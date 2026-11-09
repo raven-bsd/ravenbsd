@@ -1,0 +1,18 @@
+{
+  "name": "syscall-rtt-clock_gettime",
+  "unit": "ns/op",
+  "n": 30,
+  "median": 80.38759,
+  "p99": 81.94034,
+  "min": 79.30454,
+  "max": 81.94034,
+  "host": {
+    "cpu": "12th Gen Intel(R) Core(TM) i7-12700H",
+    "kernel": "5.19.0-50-generic",
+    "qemu": "QEMU emulator version 6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.31)",
+    "kvm": true,
+    "governor": "powersave",
+    "arch": "x86_64",
+    "cpus": 20
+  }
+}

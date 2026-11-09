@@ -1,0 +1,19 @@
+{
+  "name": "ns-start",
+  "unit": "ns/op",
+  "n": 200,
+  "median": 373106.5,
+  "p99": 993719.0,
+  "min": 337087.0,
+  "max": 1079108.0,
+  "host": {
+    "cpu": "12th Gen Intel(R) Core(TM) i7-12700H",
+    "kernel": "5.19.0-50-generic",
+    "qemu": "QEMU emulator version 6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.31)",
+    "kvm": true,
+    "governor": "powersave",
+    "arch": "x86_64",
+    "cpus": 20
+  },
+  "note": "namespaces=user,pid,mnt,net"
+}

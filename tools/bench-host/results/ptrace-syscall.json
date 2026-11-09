@@ -1,0 +1,19 @@
+{
+  "name": "ptrace-syscall",
+  "unit": "ns/op",
+  "n": 30,
+  "median": 3648.82942,
+  "p99": 4008.97324,
+  "min": 3581.10212,
+  "max": 4008.97324,
+  "host": {
+    "cpu": "12th Gen Intel(R) Core(TM) i7-12700H",
+    "kernel": "5.19.0-50-generic",
+    "qemu": "QEMU emulator version 6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.31)",
+    "kvm": true,
+    "governor": "powersave",
+    "arch": "x86_64",
+    "cpus": 20
+  },
+  "note": "slowdown_vs_native=66.54x"
+}

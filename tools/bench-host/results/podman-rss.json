@@ -1,0 +1,19 @@
+{
+  "name": "podman-rss",
+  "unit": "bytes",
+  "n": 1,
+  "median": 299000.0,
+  "p99": 299000.0,
+  "min": 299000.0,
+  "max": 299000.0,
+  "host": {
+    "cpu": "12th Gen Intel(R) Core(TM) i7-12700H",
+    "kernel": "5.19.0-50-generic",
+    "qemu": "QEMU emulator version 6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.31)",
+    "kvm": true,
+    "governor": "powersave",
+    "arch": "x86_64",
+    "cpus": 20
+  },
+  "note": "image=docker.io/library/alpine:3.22; podman stats on a sleep container"
+}
