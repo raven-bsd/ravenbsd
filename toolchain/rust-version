@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Pinned Rust source release and the SHA-256 of rustc-<version>-src.tar.xz from
+# https://static.rust-lang.org/dist/. build.sh reads the two keys below.
+version = "1.97.1"
+sha256 = "0ed06fdaffd4722a7702e0b4eebfafc897ab8f513e8e1b247cdd7e5c6df6ded2"
