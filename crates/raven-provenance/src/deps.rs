@@ -29,6 +29,7 @@ pub(crate) const ALLOWED_LICENSES: &[&str] = &[
 
 /// Whether a licence expression is acceptable for a dependency.
 pub(crate) fn license_allowed(expression: &str, allow_mpl: bool) -> bool {
+    let expression = normalize_legacy_dependency_license(expression);
     let Ok(expression) = spdx::parse_expression(expression) else {
         return false;
     };
@@ -38,6 +39,19 @@ pub(crate) fn license_allowed(expression: &str, allow_mpl: bool) -> bool {
     alternatives
         .iter()
         .any(|alternative| alternative.iter().all(|term| term_allowed(term, allow_mpl)))
+}
+
+/// Map the one legacy Cargo licence spelling that is not valid SPDX.
+///
+/// `bit_field` 0.10.3 (a `uefi` dependency) declares `Apache-2.0/MIT`; Cargo
+/// metadata reports that string verbatim. Only this exact expression is
+/// translated, so unknown or malformed expressions still fail. This applies to
+/// dependency metadata, not to SPDX source-header validation.
+fn normalize_legacy_dependency_license(expression: &str) -> &str {
+    match expression {
+        "Apache-2.0/MIT" => "Apache-2.0 OR MIT",
+        other => other,
+    }
 }
 
 fn term_allowed(term: &str, allow_mpl: bool) -> bool {
@@ -251,5 +265,187 @@ mod tests {
         let (violations, warnings) = check(temp.path());
         assert!(violations.is_empty());
         assert!(warnings.is_empty(), "{warnings:?}");
+    }
+
+    fn fixture_repo(
+        label: &str,
+        package: &str,
+        version: &str,
+        license: &str,
+        allow: Option<&str>,
+    ) -> TempDir {
+        let temp = TempDir::new(label);
+        temp.write(
+            "Cargo.toml",
+            &format!(
+                "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n\
+                 [dependencies]\n{package} = {{ path = \"deps/{package}\" }}\n"
+            ),
+        );
+        temp.write(
+            &format!("deps/{package}/Cargo.toml"),
+            &format!(
+                "[package]\nname = \"{package}\"\nversion = \"{version}\"\n\
+                 edition = \"2021\"\nlicense = \"{license}\"\n"
+            ),
+        );
+        temp.write(&format!("deps/{package}/src/lib.rs"), "");
+        temp.write("src/lib.rs", "");
+        temp.write("PROVENANCE.toml", "# fixture\n");
+        temp.write(
+            ".provenance-ignore",
+            "Cargo.lock\nCargo.toml\nPROVENANCE.toml\n",
+        );
+        if let Some(lines) = allow {
+            temp.write(".provenance-allow-mpl", lines);
+        }
+        temp
+    }
+
+    fn dependency_violations(root: &Path) -> Vec<Violation> {
+        let (violations, warnings) = check(root);
+        assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+        violations
+            .into_iter()
+            .filter(|violation| violation.rule == "dependency-license")
+            .collect()
+    }
+
+    #[test]
+    fn legacy_apache_mit_slash_mapping_is_exact() {
+        assert!(license_allowed("Apache-2.0/MIT", false));
+        for expression in [
+            "apache-2.0/mit",
+            "Apache-2.0 / MIT",
+            "MIT/Apache-2.0",
+            "Apache-2.0/MIT OR MIT",
+        ] {
+            assert!(
+                !license_allowed(expression, false),
+                "{expression} must not be accepted by the exact mapping"
+            );
+        }
+    }
+
+    #[test]
+    fn approved_ucs2_mpl_dependency_passes() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let real_allow = fs::read_to_string(root.join(".provenance-allow-mpl"))
+            .expect("repository allow-list is readable");
+        let temp = fixture_repo("deps-ucs2", "ucs2", "0.3.3", "MPL-2.0", Some(&real_allow));
+        let violations = dependency_violations(temp.path());
+        assert!(violations.is_empty(), "{violations:?}");
+    }
+
+    #[test]
+    fn mpl_dependency_without_approval_fails() {
+        let temp = fixture_repo("deps-ucs2-noallow", "ucs2", "0.3.3", "MPL-2.0", None);
+        let violations = dependency_violations(temp.path());
+        assert!(violations.iter().any(|violation| violation.path == "ucs2"));
+    }
+
+    #[test]
+    fn approval_is_scoped_to_the_named_crate() {
+        let temp = fixture_repo(
+            "deps-other-mpl",
+            "other-crate",
+            "0.1.0",
+            "MPL-2.0",
+            Some("ucs2\n"),
+        );
+        let violations = dependency_violations(temp.path());
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.path == "other-crate")
+        );
+    }
+
+    #[test]
+    fn legacy_slash_metadata_passes_via_check() {
+        let temp = fixture_repo(
+            "deps-bit-field",
+            "bit_field",
+            "0.10.3",
+            "Apache-2.0/MIT",
+            None,
+        );
+        let violations = dependency_violations(temp.path());
+        assert!(violations.is_empty(), "{violations:?}");
+    }
+
+    #[test]
+    fn unknown_dependency_expression_still_fails() {
+        let temp = fixture_repo("deps-unknown", "bad-crate", "0.1.0", "FooBar-1.0", None);
+        let violations = dependency_violations(temp.path());
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.path == "bad-crate")
+        );
+    }
+
+    #[test]
+    fn gpl_dependency_still_fails() {
+        let temp = fixture_repo("deps-gpl", "gpl-crate", "0.1.0", "GPL-3.0-only", None);
+        let violations = dependency_violations(temp.path());
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.path == "gpl-crate")
+        );
+    }
+
+    #[test]
+    fn missing_spdx_header_still_fails() {
+        let temp = TempDir::new("deps-spdx");
+        temp.write("PROVENANCE.toml", "# fixture\n");
+        temp.write(
+            ".provenance-ignore",
+            "Cargo.lock\nCargo.toml\nPROVENANCE.toml\n",
+        );
+        temp.write("src/bad.rs", "fn main() {}\n");
+        let report = crate::check::check(&crate::model::CheckOptions::new(temp.path())).unwrap();
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|violation| violation.path == "src/bad.rs"
+                    && violation.rule == "spdx-missing"),
+            "{:?}",
+            report.violations
+        );
+    }
+
+    #[test]
+    fn legacy_slash_source_header_is_not_mapped() {
+        let temp = TempDir::new("deps-spdx-slash");
+        temp.write("PROVENANCE.toml", "# fixture\n");
+        temp.write(
+            ".provenance-ignore",
+            "Cargo.lock\nCargo.toml\nPROVENANCE.toml\n",
+        );
+        temp.write(
+            "src/bad.rs",
+            "// SPDX-License-Identifier: Apache-2.0/MIT\n\
+             // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors\n",
+        );
+        let report = crate::check::check(&crate::model::CheckOptions::new(temp.path())).unwrap();
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|violation| violation.path == "src/bad.rs"
+                    && violation.rule == "spdx-license"),
+            "{:?}",
+            report.violations
+        );
+    }
+
+    #[test]
+    fn repo_allow_file_names_ucs2() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let allowed = load_mpl_allow(&root);
+        assert!(allowed.contains("ucs2"), "{allowed:?}");
     }
 }
