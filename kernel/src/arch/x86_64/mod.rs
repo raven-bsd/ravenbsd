@@ -3,6 +3,7 @@
 
 //! x86-64 architecture support.
 
+pub mod serial;
 mod start;
 
 /// Halts the current CPU forever.

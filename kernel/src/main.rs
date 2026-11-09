@@ -7,19 +7,21 @@
 #![no_main]
 
 mod arch;
-mod panic;
+mod boot;
+mod cmdline;
+mod log;
+mod memory;
 
 // Force the `raven-mem` object code (including the exported C ABI symbols) into the link.
 use raven_mem as _;
 
-/// Kernel entry point, called by `_start` from `arch::x86_64::start`.
+/// Kernel entry point called by `_start` with the loader's `BootInfo` pointer in `rdi`.
 ///
 /// # Safety
 ///
-/// `boot` must be a valid, aligned pointer to a `raven_bootinfo::BootInfo` whose memory map and
-/// physical ranges the loader has already made readable in the current address space.
+/// `boot` must be a valid HHDM virtual pointer to a loader-built `raven_bootinfo::BootInfo`.
 #[unsafe(no_mangle)]
 pub extern "C" fn kmain(boot: *const raven_bootinfo::BootInfo) -> ! {
-    let _ = boot;
-    arch::halt()
+    arch::serial::init();
+    boot::run(boot)
 }
