@@ -20,6 +20,7 @@ members = [
     "tools/linux-corpus",
     "libc/spike/va",
     "userland/rt",
+    "userland/linux-shim",
     "tools/bench-host",
 ]
 default-members = ["crates/*"]
