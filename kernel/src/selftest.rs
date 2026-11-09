@@ -23,6 +23,7 @@ pub fn run(cmdline: &CmdLine) {
         Some("pagefault") => page_fault(),
         Some("doublefault") => double_fault(),
         Some(name @ ("heap" | "paging")) => memory(name),
+        Some("timer") => timer_selftest(),
         _ => {}
     }
 }
@@ -33,6 +34,10 @@ fn memory(name: &str) {
         "paging" => crate::memory::paging::selftest(),
         _ => {}
     }
+}
+
+fn timer_selftest() {
+    crate::time::selftest();
 }
 
 #[inline(never)]
