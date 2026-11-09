@@ -11,3 +11,14 @@
 # copied = "2026-11-09"
 # modified = true
 # notes = "..."
+
+[[import]]
+path = "crates/raven-linux-abi/src/sysnums.rs"
+upstream = "linux-raw-sys"
+upstream_path = "src/{x86_64,aarch64,riscv64}/general.rs"
+upstream_rev = "3b15c17f2688445cd3e9ef2907113829837773dd"
+license = "MIT"
+tier = "A"
+copied = "2026-11-09"
+modified = true
+notes = "Generated syscall tables; __NR_ prefix removed and entries sorted by name and by number. Generator: crates/raven-linux-abi/examples/gen_tables.rs"

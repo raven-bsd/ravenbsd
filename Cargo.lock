@@ -75,6 +75,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "linux-raw-sys"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
+
+[[package]]
 name = "log"
 version = "0.4.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -147,6 +153,14 @@ dependencies = [
  "raven-abi",
  "raven-bootinfo",
  "raven-mem",
+]
+
+[[package]]
+name = "raven-linux-abi"
+version = "0.1.0"
+dependencies = [
+ "linux-raw-sys",
+ "raven-abi",
 ]
 
 [[package]]
