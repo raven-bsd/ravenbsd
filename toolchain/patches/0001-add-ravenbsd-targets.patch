@@ -1,0 +1,642 @@
+# SPDX-License-Identifier: MIT OR Apache-2.0
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+diff --git a/compiler/rustc_target/src/spec/base/mod.rs b/compiler/rustc_target/src/spec/base/mod.rs
+index 9e7ff620..eeb7fa9a 100644
+--- a/compiler/rustc_target/src/spec/base/mod.rs
++++ b/compiler/rustc_target/src/spec/base/mod.rs
+@@ -28,6 +28,7 @@
+ pub(crate) mod netbsd;
+ pub(crate) mod nto_qnx;
+ pub(crate) mod openbsd;
++pub(crate) mod ravenbsd;
+ pub(crate) mod redox;
+ pub(crate) mod solaris;
+ pub(crate) mod solid;
+diff --git a/compiler/rustc_target/src/spec/base/ravenbsd.rs b/compiler/rustc_target/src/spec/base/ravenbsd.rs
+new file mode 100644
+index 00000000..8be7f781
+--- /dev/null
++++ b/compiler/rustc_target/src/spec/base/ravenbsd.rs
+@@ -0,0 +1,23 @@
++use crate::spec::{Cc, Env, LinkerFlavor, Lld, Os, PanicStrategy, RelroLevel, TargetOptions, cvs};
++
++pub(crate) fn opts() -> TargetOptions {
++    TargetOptions {
++        os: Os::Ravenbsd,
++        env: Env::Relibc,
++        // Phase 1 is static-only; the dynamic loader is a later milestone.
++        dynamic_linking: false,
++        families: cvs!["unix"],
++        position_independent_executables: true,
++        static_position_independent_executables: true,
++        relro_level: RelroLevel::Full,
++        // std's thread_local implementation needs TLS; ralibc will provide the block.
++        has_thread_local: true,
++        panic_strategy: PanicStrategy::Abort,
++        linker_flavor: LinkerFlavor::Gnu(Cc::No, Lld::Yes),
++        linker: Some("rust-lld".into()),
++        crt_static_default: true,
++        crt_static_respected: true,
++        crt_static_allows_dylibs: false,
++        ..Default::default()
++    }
++}
+diff --git a/compiler/rustc_target/src/spec/mod.rs b/compiler/rustc_target/src/spec/mod.rs
+index d6a9e27c..c00a091d 100644
+--- a/compiler/rustc_target/src/spec/mod.rs
++++ b/compiler/rustc_target/src/spec/mod.rs
+@@ -1590,6 +1590,10 @@ fn $module() {
+     ("riscv64gc-unknown-redox", riscv64gc_unknown_redox),
+     ("x86_64-unknown-redox", x86_64_unknown_redox),
+ 
++    ("aarch64-unknown-ravenbsd", aarch64_unknown_ravenbsd),
++    ("riscv64gc-unknown-ravenbsd", riscv64gc_unknown_ravenbsd),
++    ("x86_64-unknown-ravenbsd", x86_64_unknown_ravenbsd),
++
+     ("x86_64-unknown-managarm-mlibc", x86_64_unknown_managarm_mlibc),
+     ("aarch64-unknown-managarm-mlibc", aarch64_unknown_managarm_mlibc),
+     ("riscv64gc-unknown-managarm-mlibc", riscv64gc_unknown_managarm_mlibc),
+@@ -2011,6 +2015,7 @@ pub enum Os {
+         Psp = "psp",
+         Psx = "psx",
+         Qurt = "qurt",
++        Ravenbsd = "ravenbsd",
+         Redox = "redox",
+         Rtems = "rtems",
+         Solaris = "solaris",
+diff --git a/compiler/rustc_target/src/spec/targets/aarch64_unknown_ravenbsd.rs b/compiler/rustc_target/src/spec/targets/aarch64_unknown_ravenbsd.rs
+new file mode 100644
+index 00000000..59715be1
+--- /dev/null
++++ b/compiler/rustc_target/src/spec/targets/aarch64_unknown_ravenbsd.rs
+@@ -0,0 +1,24 @@
++use crate::spec::{Arch, StackProbeType, Target, TargetMetadata, base};
++
++pub(crate) fn target() -> Target {
++    let mut base = base::ravenbsd::opts();
++    base.max_atomic_width = Some(128);
++    base.stack_probes = StackProbeType::Inline;
++    base.features = "+v8a".into();
++
++    Target {
++        llvm_target: "aarch64-unknown-none".into(),
++        metadata: TargetMetadata {
++            description: Some("RavenBSD AArch64".into()),
++            tier: Some(3),
++            host_tools: Some(false),
++            std: Some(true),
++        },
++        pointer_width: 64,
++        data_layout:
++            "e-m:e-p270:32:32-p271:32:32-p272:64:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-Fn32"
++                .into(),
++        arch: Arch::AArch64,
++        options: base,
++    }
++}
+diff --git a/compiler/rustc_target/src/spec/targets/riscv64gc_unknown_ravenbsd.rs b/compiler/rustc_target/src/spec/targets/riscv64gc_unknown_ravenbsd.rs
+new file mode 100644
+index 00000000..21616b52
+--- /dev/null
++++ b/compiler/rustc_target/src/spec/targets/riscv64gc_unknown_ravenbsd.rs
+@@ -0,0 +1,25 @@
++use crate::spec::{Arch, CodeModel, LlvmAbi, Target, TargetMetadata, base};
++
++pub(crate) fn target() -> Target {
++    let mut base = base::ravenbsd::opts();
++    base.code_model = Some(CodeModel::Medium);
++    base.cpu = "generic-rv64".into();
++    base.features = "+m,+a,+f,+d,+c".into();
++    base.llvm_abiname = LlvmAbi::Lp64d;
++    base.plt_by_default = false;
++    base.max_atomic_width = Some(64);
++
++    Target {
++        llvm_target: "riscv64-unknown-none-elf".into(),
++        metadata: TargetMetadata {
++            description: Some("RavenBSD RISC-V 64".into()),
++            tier: Some(3),
++            host_tools: Some(false),
++            std: Some(true),
++        },
++        pointer_width: 64,
++        data_layout: "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128".into(),
++        arch: Arch::RiscV64,
++        options: base,
++    }
++}
+diff --git a/compiler/rustc_target/src/spec/targets/x86_64_unknown_ravenbsd.rs b/compiler/rustc_target/src/spec/targets/x86_64_unknown_ravenbsd.rs
+new file mode 100644
+index 00000000..ed90f149
+--- /dev/null
++++ b/compiler/rustc_target/src/spec/targets/x86_64_unknown_ravenbsd.rs
+@@ -0,0 +1,25 @@
++use crate::spec::{Arch, Cc, LinkerFlavor, Lld, StackProbeType, Target, TargetMetadata, base};
++
++pub(crate) fn target() -> Target {
++    let mut base = base::ravenbsd::opts();
++    base.cpu = "x86-64".into();
++    base.plt_by_default = false;
++    base.max_atomic_width = Some(64);
++    base.add_pre_link_args(LinkerFlavor::Gnu(Cc::Yes, Lld::No), &["-m64"]);
++    base.stack_probes = StackProbeType::Inline;
++
++    Target {
++        llvm_target: "x86_64-unknown-none".into(),
++        metadata: TargetMetadata {
++            description: Some("RavenBSD x86-64".into()),
++            tier: Some(3),
++            host_tools: Some(false),
++            std: Some(true),
++        },
++        pointer_width: 64,
++        data_layout:
++            "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128".into(),
++        arch: Arch::X86_64,
++        options: base,
++    }
++}
+diff --git a/library/std/build.rs b/library/std/build.rs
+index 5f2e441b..9f2f03ae 100644
+--- a/library/std/build.rs
++++ b/library/std/build.rs
+@@ -38,6 +38,7 @@ fn main() {
+         || target_os == "trusty"
+         || target_os == "l4re"
+         || target_os == "redox"
++        || target_os == "ravenbsd"
+         || target_os == "haiku"
+         || target_os == "vxworks"
+         || target_arch == "wasm32"
+diff --git a/library/std/src/fs/tests.rs b/library/std/src/fs/tests.rs
+index 25a5b767..5e33696d 100644
+--- a/library/std/src/fs/tests.rs
++++ b/library/std/src/fs/tests.rs
+@@ -1989,6 +1989,7 @@ fn test_file_times() {
+                 not(any(
+                     target_os = "android",
+                     target_os = "redox",
++                    target_os = "ravenbsd",
+                     target_os = "espidf",
+                     target_os = "horizon"
+                 ))
+@@ -2256,6 +2257,7 @@ fn test_fs_set_times() {
+                 not(any(
+                     target_os = "android",
+                     target_os = "redox",
++                    target_os = "ravenbsd",
+                     target_os = "espidf",
+                     target_os = "horizon"
+                 ))
+@@ -2307,6 +2309,7 @@ fn test_fs_set_times_on_dir() {
+                 not(any(
+                     target_os = "android",
+                     target_os = "redox",
++                    target_os = "ravenbsd",
+                     target_os = "espidf",
+                     target_os = "horizon"
+                 ))
+@@ -2377,6 +2380,7 @@ fn test_fs_set_times_follows_symlink() {
+                 not(any(
+                     target_os = "android",
+                     target_os = "redox",
++                    target_os = "ravenbsd",
+                     target_os = "espidf",
+                     target_os = "horizon"
+                 ))
+@@ -2469,6 +2473,7 @@ fn test_fs_set_times_nofollow() {
+                 not(any(
+                     target_os = "android",
+                     target_os = "redox",
++                    target_os = "ravenbsd",
+                     target_os = "espidf",
+                     target_os = "horizon"
+                 ))
+diff --git a/library/std/src/os/mod.rs b/library/std/src/os/mod.rs
+index 76374402..2d22c8a5 100644
+--- a/library/std/src/os/mod.rs
++++ b/library/std/src/os/mod.rs
+@@ -165,7 +165,7 @@ pub mod windows {}
+ pub mod nuttx;
+ #[cfg(target_os = "openbsd")]
+ pub mod openbsd;
+-#[cfg(target_os = "redox")]
++#[cfg(any(target_os = "redox", target_os = "ravenbsd"))]
+ pub mod redox;
+ #[cfg(target_os = "rtems")]
+ pub mod rtems;
+diff --git a/library/std/src/os/unix/mod.rs b/library/std/src/os/unix/mod.rs
+index 78c95727..203ed758 100644
+--- a/library/std/src/os/unix/mod.rs
++++ b/library/std/src/os/unix/mod.rs
+@@ -75,7 +75,7 @@ mod platform {
+     pub use crate::os::nuttx::*;
+     #[cfg(target_os = "openbsd")]
+     pub use crate::os::openbsd::*;
+-    #[cfg(target_os = "redox")]
++    #[cfg(any(target_os = "redox", target_os = "ravenbsd"))]
+     pub use crate::os::redox::*;
+     #[cfg(target_os = "rtems")]
+     pub use crate::os::rtems::*;
+diff --git a/library/std/src/os/unix/net/listener.rs b/library/std/src/os/unix/net/listener.rs
+index 99eef7f4..3f1f1c21 100644
+--- a/library/std/src/os/unix/net/listener.rs
++++ b/library/std/src/os/unix/net/listener.rs
+@@ -75,6 +75,7 @@ pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
+             #[cfg(any(
+                 target_os = "windows",
+                 target_os = "redox",
++                target_os = "ravenbsd",
+                 target_os = "espidf",
+                 target_os = "horizon"
+             ))]
+@@ -93,6 +94,7 @@ pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
+             #[cfg(not(any(
+                 target_os = "windows",
+                 target_os = "redox",
++                target_os = "ravenbsd",
+                 target_os = "espidf",
+                 target_os = "horizon",
+                 target_os = "linux",
+diff --git a/library/std/src/sys/args/unix.rs b/library/std/src/sys/args/unix.rs
+index 7a592c2b..8962fa4f 100644
+--- a/library/std/src/sys/args/unix.rs
++++ b/library/std/src/sys/args/unix.rs
+@@ -77,6 +77,7 @@ pub fn args() -> Args {
+     target_os = "l4re",
+     target_os = "fuchsia",
+     target_os = "redox",
++    target_os = "ravenbsd",
+     target_os = "vxworks",
+     target_os = "horizon",
+     target_os = "aix",
+diff --git a/library/std/src/sys/env_consts.rs b/library/std/src/sys/env_consts.rs
+index 573f5404..d654fbb4 100644
+--- a/library/std/src/sys/env_consts.rs
++++ b/library/std/src/sys/env_consts.rs
+@@ -257,6 +257,17 @@ pub mod os {
+     pub const EXE_EXTENSION: &str = "";
+ }
+ 
++#[cfg(target_os = "ravenbsd")]
++pub mod os {
++    pub const FAMILY: &str = "unix";
++    pub const OS: &str = "ravenbsd";
++    pub const DLL_PREFIX: &str = "lib";
++    pub const DLL_SUFFIX: &str = ".so";
++    pub const DLL_EXTENSION: &str = "so";
++    pub const EXE_SUFFIX: &str = "";
++    pub const EXE_EXTENSION: &str = "";
++}
++
+ #[cfg(target_os = "rtems")]
+ pub mod os {
+     pub const FAMILY: &str = "unix";
+diff --git a/library/std/src/sys/fd/unix.rs b/library/std/src/sys/fd/unix.rs
+index c5e8646d..4b54627d 100644
+--- a/library/std/src/sys/fd/unix.rs
++++ b/library/std/src/sys/fd/unix.rs
+@@ -559,6 +559,7 @@ fn pwritev(
+         target_os = "cygwin",
+         target_os = "haiku",
+         target_os = "redox",
++        target_os = "ravenbsd",
+         target_os = "vxworks",
+         target_os = "nto",
+         target_os = "wasi",
+@@ -583,6 +584,7 @@ pub fn set_cloexec(&self) -> io::Result<()> {
+         target_os = "cygwin",
+         target_os = "haiku",
+         target_os = "redox",
++        target_os = "ravenbsd",
+         target_os = "vxworks",
+         target_os = "nto",
+         target_os = "wasi",
+diff --git a/library/std/src/sys/fs/unix.rs b/library/std/src/sys/fs/unix.rs
+index a7cb9eba..d9e717cf 100644
+--- a/library/std/src/sys/fs/unix.rs
++++ b/library/std/src/sys/fs/unix.rs
+@@ -29,6 +29,7 @@
+     target_os = "illumos",
+     target_os = "nto",
+     target_os = "redox",
++    target_os = "ravenbsd",
+     target_os = "solaris",
+     target_os = "vita",
+     target_os = "wasi",
+@@ -46,6 +47,7 @@
+     target_os = "linux",
+     target_os = "nto",
+     target_os = "redox",
++    target_os = "ravenbsd",
+     target_os = "solaris",
+     target_os = "vita",
+     target_os = "wasi",
+@@ -278,6 +280,7 @@ fn new(inner: InnerReadDir) -> Self {
+ cfg_select! {
+     any(
+         target_os = "redox",
++        target_os = "ravenbsd",
+         target_os = "espidf",
+         target_os = "horizon",
+         target_os = "vita",
+@@ -411,6 +414,7 @@ fn get_path(_fd: c_int) -> Option<PathBuf> {
+     target_os = "linux",
+     target_os = "nto",
+     target_os = "redox",
++    target_os = "ravenbsd",
+     target_os = "solaris",
+     target_os = "vita",
+     target_os = "wasi",
+@@ -437,6 +441,7 @@ pub struct DirEntry {
+     target_os = "linux",
+     target_os = "nto",
+     target_os = "redox",
++    target_os = "ravenbsd",
+     target_os = "solaris",
+     target_os = "vita",
+     target_os = "wasi",
+@@ -463,6 +468,7 @@ struct dirent64_min {
+     target_os = "linux",
+     target_os = "nto",
+     target_os = "redox",
++    target_os = "ravenbsd",
+     target_os = "solaris",
+     target_os = "vita",
+     target_os = "wasi",
+@@ -855,6 +861,7 @@ impl Iterator for ReadDir {
+         target_os = "linux",
+         target_os = "nto",
+         target_os = "redox",
++        target_os = "ravenbsd",
+         target_os = "solaris",
+         target_os = "vita",
+         target_os = "wasi",
+@@ -953,6 +960,7 @@ fn next(&mut self) -> Option<io::Result<DirEntry>> {
+         target_os = "linux",
+         target_os = "nto",
+         target_os = "redox",
++        target_os = "ravenbsd",
+         target_os = "solaris",
+         target_os = "vita",
+         target_os = "wasi",
+@@ -1014,6 +1022,7 @@ fn drop(&mut self) {
+         #[cfg(not(any(
+             miri,
+             target_os = "redox",
++            target_os = "ravenbsd",
+             target_os = "nto",
+             target_os = "vita",
+             target_os = "hurd",
+@@ -1147,6 +1156,7 @@ pub fn file_type(&self) -> io::Result<FileType> {
+         target_os = "linux",
+         target_os = "nto",
+         target_os = "redox",
++        target_os = "ravenbsd",
+         target_os = "rtems",
+         target_os = "solaris",
+         target_os = "vita",
+@@ -1203,6 +1213,7 @@ fn name_bytes(&self) -> &[u8] {
+         target_os = "illumos",
+         target_os = "fuchsia",
+         target_os = "redox",
++        target_os = "ravenbsd",
+         target_os = "aix",
+         target_os = "nto",
+         target_os = "vita",
+@@ -1220,6 +1231,7 @@ fn name_cstr(&self) -> &CStr {
+         target_os = "illumos",
+         target_os = "fuchsia",
+         target_os = "redox",
++        target_os = "ravenbsd",
+         target_os = "aix",
+         target_os = "nto",
+         target_os = "vita",
+@@ -1791,7 +1803,7 @@ pub fn set_permissions(&self, perm: FilePermissions) -> io::Result<()> {
+ 
+     pub fn set_times(&self, times: FileTimes) -> io::Result<()> {
+         cfg_select! {
+-            any(target_os = "redox", target_os = "espidf", target_os = "horizon", target_os = "nuttx") => {
++            any(target_os = "redox", target_os = "ravenbsd", target_os = "espidf", target_os = "horizon", target_os = "nuttx") => {
+                 // Redox doesn't appear to support `UTIME_OMIT`.
+                 // ESP-IDF and HorizonOS do not support `futimens` at all and the behavior for those OS is therefore
+                 // the same as for Redox.
+@@ -1857,6 +1869,7 @@ pub fn set_times(&self, times: FileTimes) -> io::Result<()> {
+ 
+ #[cfg(not(any(
+     target_os = "redox",
++    target_os = "ravenbsd",
+     target_os = "espidf",
+     target_os = "horizon",
+     target_os = "nuttx",
+@@ -2143,6 +2156,7 @@ pub fn link(original: &CStr, link: &CStr) -> io::Result<()> {
+             // library/std/src/fs/tests.rs to check the behavior.
+             target_os = "vxworks",
+             target_os = "redox",
++            target_os = "ravenbsd",
+             target_os = "espidf",
+             // Android has `linkat` on newer versions, but we happen to know
+             // `link` always has the correct behavior, so it's here as well.
+@@ -2223,7 +2237,7 @@ fn open_from(from: &Path) -> io::Result<(crate::fs::File, crate::fs::Metadata)>
+ 
+ fn set_times_impl(p: &CStr, times: FileTimes, follow_symlinks: bool) -> io::Result<()> {
+     cfg_select! {
+-       any(target_os = "redox", target_os = "espidf", target_os = "horizon", target_os = "nuttx", target_os = "vita", target_os = "rtems") => {
++       any(target_os = "redox", target_os = "ravenbsd", target_os = "espidf", target_os = "horizon", target_os = "nuttx", target_os = "vita", target_os = "rtems") => {
+             let _ = (p, times, follow_symlinks);
+             Err(io::const_error!(
+                 io::ErrorKind::Unsupported,
+@@ -2512,6 +2526,7 @@ pub fn mkfifo(path: &Path, mode: u32) -> io::Result<()> {
+ // Fallback for REDOX, ESP-ID, Horizon, Vita, Vxworks and Miri
+ #[cfg(any(
+     target_os = "redox",
++    target_os = "ravenbsd",
+     target_os = "espidf",
+     target_os = "horizon",
+     target_os = "vita",
+@@ -2526,6 +2541,7 @@ mod remove_dir_impl {
+ // Modern implementation using openat(), unlinkat() and fdopendir()
+ #[cfg(not(any(
+     target_os = "redox",
++    target_os = "ravenbsd",
+     target_os = "espidf",
+     target_os = "horizon",
+     target_os = "vita",
+diff --git a/library/std/src/sys/io/error/unix.rs b/library/std/src/sys/io/error/unix.rs
+index b10343b2..f99b48b4 100644
+--- a/library/std/src/sys/io/error/unix.rs
++++ b/library/std/src/sys/io/error/unix.rs
+@@ -20,6 +20,7 @@
+             target_os = "cygwin",
+             target_os = "android",
+             target_os = "redox",
++            target_os = "ravenbsd",
+             target_os = "nuttx",
+             target_env = "newlib"
+         ),
+diff --git a/library/std/src/sys/pal/unix/mod.rs b/library/std/src/sys/pal/unix/mod.rs
+index cfd7acdb..75af27a6 100644
+--- a/library/std/src/sys/pal/unix/mod.rs
++++ b/library/std/src/sys/pal/unix/mod.rs
+@@ -83,6 +83,7 @@ unsafe fn sanitize_standard_fds() {
+             target_os = "fuchsia",
+             target_os = "vxworks",
+             target_os = "redox",
++            target_os = "ravenbsd",
+             target_os = "l4re",
+             target_os = "horizon",
+             target_os = "vita",
+diff --git a/library/std/src/sys/pal/unix/sync/condvar.rs b/library/std/src/sys/pal/unix/sync/condvar.rs
+index 73768860..e96b61d2 100644
+--- a/library/std/src/sys/pal/unix/sync/condvar.rs
++++ b/library/std/src/sys/pal/unix/sync/condvar.rs
+@@ -141,6 +141,7 @@ pub unsafe fn wait_timeout(&self, mutex: Pin<&Mutex>, dur: Duration) -> bool {
+     target_os = "horizon",
+     target_os = "l4re",
+     target_os = "redox",
++    target_os = "ravenbsd",
+     target_os = "teeos",
+ )))]
+ impl Condvar {
+@@ -196,6 +197,7 @@ pub unsafe fn init(self: Pin<&mut Self>) {
+     target_os = "horizon",
+     target_os = "l4re",
+     target_os = "redox",
++    target_os = "ravenbsd",
+     target_os = "teeos",
+ ))]
+ impl Condvar {
+diff --git a/library/std/src/sys/paths/unix.rs b/library/std/src/sys/paths/unix.rs
+index e0b1aafd..84de644f 100644
+--- a/library/std/src/sys/paths/unix.rs
++++ b/library/std/src/sys/paths/unix.rs
+@@ -257,7 +257,8 @@ pub fn current_exe() -> io::Result<PathBuf> {
+     target_os = "hurd",
+     target_os = "android",
+     target_os = "nuttx",
+-    target_os = "emscripten"
++    target_os = "emscripten",
++    target_os = "ravenbsd"
+ ))]
+ pub fn current_exe() -> io::Result<PathBuf> {
+     match crate::fs::read_link("/proc/self/exe") {
+@@ -424,6 +425,7 @@ pub fn home_dir() -> Option<PathBuf> {
+         target_os = "android",
+         target_os = "emscripten",
+         target_os = "redox",
++        target_os = "ravenbsd",
+         target_os = "vxworks",
+         target_os = "espidf",
+         target_os = "horizon",
+@@ -438,6 +440,7 @@ unsafe fn fallback() -> Option<OsString> {
+         target_os = "android",
+         target_os = "emscripten",
+         target_os = "redox",
++        target_os = "ravenbsd",
+         target_os = "vxworks",
+         target_os = "espidf",
+         target_os = "horizon",
+diff --git a/library/std/src/sys/pipe/unix.rs b/library/std/src/sys/pipe/unix.rs
+index bb97e806..eb50f847 100644
+--- a/library/std/src/sys/pipe/unix.rs
++++ b/library/std/src/sys/pipe/unix.rs
+@@ -22,7 +22,8 @@ pub fn pipe() -> io::Result<(Pipe, Pipe)> {
+             target_os = "netbsd",
+             target_os = "openbsd",
+             target_os = "cygwin",
+-            target_os = "redox"
++            target_os = "redox",
++            target_os = "ravenbsd"
+         ) => {
+             unsafe {
+                 cvt(libc::pipe2(fds.as_mut_ptr(), libc::O_CLOEXEC))?;
+diff --git a/library/std/src/sys/process/unix/unix.rs b/library/std/src/sys/process/unix/unix.rs
+index d476072a..d07e6e93 100644
+--- a/library/std/src/sys/process/unix/unix.rs
++++ b/library/std/src/sys/process/unix/unix.rs
+@@ -296,7 +296,7 @@ unsafe fn do_exec(
+         {
+             if let Some(_g) = self.get_groups() {
+                 //FIXME: Redox kernel does not support setgroups yet
+-                #[cfg(not(target_os = "redox"))]
++                #[cfg(not(any(target_os = "redox", target_os = "ravenbsd")))]
+                 cvt(libc::setgroups(_g.len().try_into().unwrap(), _g.as_ptr()))?;
+             }
+             if let Some(u) = self.get_gid() {
+@@ -310,7 +310,7 @@ unsafe fn do_exec(
+                 // uid has dropped, we may still have groups that enable us to
+                 // do super-user things.
+                 //FIXME: Redox kernel does not support setgroups yet
+-                #[cfg(not(target_os = "redox"))]
++                #[cfg(not(any(target_os = "redox", target_os = "ravenbsd")))]
+                 if self.get_groups().is_none() {
+                     let res = cvt(libc::setgroups(0, crate::ptr::null()));
+                     if let Err(e) = res {
+diff --git a/library/std/src/sys/random/mod.rs b/library/std/src/sys/random/mod.rs
+index 12346ef5..a6b3fbf9 100644
+--- a/library/std/src/sys/random/mod.rs
++++ b/library/std/src/sys/random/mod.rs
+@@ -54,6 +54,7 @@
+         target_os = "hurd",
+         target_os = "l4re",
+         target_os = "nto",
++        target_os = "ravenbsd",
+     ) => {
+         mod unix_legacy;
+         pub use unix_legacy::fill_bytes;
+diff --git a/library/std/src/sys/thread/mod.rs b/library/std/src/sys/thread/mod.rs
+index 9816981c..3c8115e0 100644
+--- a/library/std/src/sys/thread/mod.rs
++++ b/library/std/src/sys/thread/mod.rs
+@@ -56,6 +56,7 @@
+             target_os = "l4re",
+             target_os = "emscripten",
+             target_os = "redox",
++            target_os = "ravenbsd",
+             target_os = "hurd",
+             target_os = "aix",
+             target_os = "wasi",
+@@ -82,6 +83,7 @@
+             target_os = "l4re",
+             target_os = "emscripten",
+             target_os = "redox",
++            target_os = "ravenbsd",
+             target_os = "hurd",
+             target_os = "aix",
+             target_os = "wasi",
+diff --git a/library/std/src/sys/thread/unix.rs b/library/std/src/sys/thread/unix.rs
+index 81ef3958..37c11691 100644
+--- a/library/std/src/sys/thread/unix.rs
++++ b/library/std/src/sys/thread/unix.rs
+@@ -3,6 +3,7 @@
+     target_os = "l4re",
+     target_os = "emscripten",
+     target_os = "redox",
++    target_os = "ravenbsd",
+     target_os = "hurd",
+     target_os = "aix",
+     target_os = "wasi",
+diff --git a/library/std/src/sys/thread_local/mod.rs b/library/std/src/sys/thread_local/mod.rs
+index e88011aa..154b34f7 100644
+--- a/library/std/src/sys/thread_local/mod.rs
++++ b/library/std/src/sys/thread_local/mod.rs
+@@ -62,6 +62,7 @@ pub(crate) mod destructors {
+             target_os = "android",
+             target_os = "fuchsia",
+             target_os = "redox",
++            target_os = "ravenbsd",
+             target_os = "hurd",
+             target_os = "netbsd",
+             target_os = "dragonfly"
+diff --git a/library/std/tests/thread.rs b/library/std/tests/thread.rs
+index ef13ce44..04b83667 100644
+--- a/library/std/tests/thread.rs
++++ b/library/std/tests/thread.rs
+@@ -81,6 +81,7 @@ fn thread_local_hygeiene() {
+ #[cfg_attr(
+     any(
+         target_os = "redox",
++        target_os = "ravenbsd",
+         target_os = "l4re",
+         target_env = "sgx",
+         target_os = "solid_asp3",
