@@ -137,6 +137,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "linux-elf"
+version = "0.1.0"
+dependencies = [
+ "raven-elf",
+ "raven-linux-abi",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
