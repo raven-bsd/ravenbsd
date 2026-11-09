@@ -5,6 +5,8 @@
 
 use raven_linux_abi::errno;
 
+mod support;
+
 macro_rules! check_raven_abi {
     ($($name:ident),+ $(,)?) => {
         $(
@@ -101,6 +103,19 @@ fn every_value_has_a_matching_name() {
             .find(|(candidate, _)| *candidate == name)
             .expect("lookup returned an unknown name");
         assert_eq!(found.1, value, "lookup for {value} returned {name}");
+    }
+}
+
+#[test]
+fn every_value_matches_linux_raw_sys() {
+    let source = support::u32_consts("src/x86_64/errno.rs", "E");
+    assert_eq!(errno::ERRNOS.len(), source.len());
+    for &(name, value) in errno::ERRNOS {
+        assert_eq!(
+            source.get(name).copied(),
+            Some(u32::from(value)),
+            "errno {name}"
+        );
     }
 }
 
