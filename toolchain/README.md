@@ -93,8 +93,8 @@ Additions outside the 48 Redox sites:
   `redox` module and selected in `src/unix/mod.rs`; its link branch has no native `c`
   dependency. The `FD_CLOEXEC` constant carries a `dead_code` allowance because std does
   not use it yet.
-* The errno constants in the copied module are Redox's, which match Linux's values for the
-  constants used by DR-13; a differential audit is still required.
+* The errno constants in the copied module are Redox's; a differential audit against Linux's
+  values (DR-13) is required.
 
 ## Known unknowns
 
