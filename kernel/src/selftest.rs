@@ -22,6 +22,15 @@ pub fn run(cmdline: &CmdLine) {
         Some("div0") => divide_error(),
         Some("pagefault") => page_fault(),
         Some("doublefault") => double_fault(),
+        Some(name @ ("heap" | "paging")) => memory(name),
+        _ => {}
+    }
+}
+
+fn memory(name: &str) {
+    match name {
+        "heap" => crate::memory::heap::selftest(),
+        "paging" => crate::memory::paging::selftest(),
         _ => {}
     }
 }

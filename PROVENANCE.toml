@@ -22,3 +22,91 @@ tier = "A"
 copied = "2026-11-09"
 modified = true
 notes = "Generated syscall tables; __NR_ prefix removed and entries sorted by name and by number. Generator: crates/raven-linux-abi/examples/gen_tables.rs"
+
+[[import]]
+path = "crates/raven-rmm/src/lib.rs"
+upstream = "redox-kernel"
+upstream_path = "rmm/src/lib.rs"
+upstream_rev = "015af335c7bed8bfaa8c2ae8419ceba46fe0a227"
+license = "MIT"
+tier = "A"
+copied = "2026-11-09"
+modified = true
+notes = "Trimmed to the x86-64 types and traits required by S06; slice_shift gate removed; new PhysAddr/VirtAddr/PageFlags/PageSize API."
+
+[[import]]
+path = "crates/raven-rmm/src/arch/mod.rs"
+upstream = "redox-kernel"
+upstream_path = "rmm/src/arch/mod.rs"
+upstream_rev = "015af335c7bed8bfaa8c2ae8419ceba46fe0a227"
+license = "MIT"
+tier = "A"
+copied = "2026-11-09"
+modified = true
+notes = "Only the x86-64 backend is declared; other architecture modules are deferred to S14."
+
+[[import]]
+path = "crates/raven-rmm/src/arch/x86_64.rs"
+upstream = "redox-kernel"
+upstream_path = "rmm/src/arch/x86_64.rs"
+upstream_rev = "015af335c7bed8bfaa8c2ae8419ceba46fe0a227"
+license = "MIT"
+tier = "A"
+copied = "2026-11-09"
+modified = true
+notes = "Constants kept; canonical check uses the 17-bit shift test; TLB helpers moved to the kernel TlbFlusher implementation."
+
+[[import]]
+path = "crates/raven-rmm/src/page/mod.rs"
+upstream = "redox-kernel"
+upstream_path = "rmm/src/page/mod.rs"
+upstream_rev = "015af335c7bed8bfaa8c2ae8419ceba46fe0a227"
+license = "MIT"
+tier = "A"
+copied = "2026-11-09"
+modified = true
+notes = "Same module split; flush.rs is replaced by the caller-supplied TlbFlusher trait."
+
+[[import]]
+path = "crates/raven-rmm/src/page/entry.rs"
+upstream = "redox-kernel"
+upstream_path = "rmm/src/page/entry.rs"
+upstream_rev = "015af335c7bed8bfaa8c2ae8419ceba46fe0a227"
+license = "MIT"
+tier = "A"
+copied = "2026-11-09"
+modified = true
+notes = "Arch-generic PhantomData removed; entry accessors adapted to PhysAddr and PageFlags."
+
+[[import]]
+path = "crates/raven-rmm/src/page/flags.rs"
+upstream = "redox-kernel"
+upstream_path = "rmm/src/page/flags.rs"
+upstream_rev = "015af335c7bed8bfaa8c2ae8419ceba46fe0a227"
+license = "MIT"
+tier = "A"
+copied = "2026-11-09"
+modified = true
+notes = "Arch-generic and bitflags dependencies removed; x86-64 bits and the ticket helper constructors written explicitly."
+
+[[import]]
+path = "crates/raven-rmm/src/page/table.rs"
+upstream = "redox-kernel"
+upstream_path = "rmm/src/page/table.rs"
+upstream_rev = "015af335c7bed8bfaa8c2ae8419ceba46fe0a227"
+license = "MIT"
+tier = "A"
+copied = "2026-11-09"
+modified = true
+notes = "Table access goes through the PhysMemory trait instead of the global Arch implementation."
+
+[[import]]
+path = "crates/raven-rmm/src/page/mapper.rs"
+upstream = "redox-kernel"
+upstream_path = "rmm/src/page/mapper.rs"
+upstream_rev = "015af335c7bed8bfaa8c2ae8419ceba46fe0a227"
+license = "MIT"
+tier = "A"
+copied = "2026-11-09"
+modified = true
+notes = "Trimmed to the ticket API; MapError results replace Option/panic, table freeing added, W^X checks and huge-page conflicts enforced, emulate backend not ported."

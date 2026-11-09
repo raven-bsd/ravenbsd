@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "kernel-paging"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 60
+boot_cmdline = "console=ttyS0 test-exit=1 selftest=heap"
+expect_exit = "success"
+
+[[expect]]
+regex = '^paging: kernel tables active \(HHDM \d+ MiB, reclaimed \d+ MiB\)$'
+
+[[expect]]
+regex = '^heap: \d+ KiB$'
+
+[[expect]]
+regex = '^selftest: heap ok used=\d+ free=\d+$'
