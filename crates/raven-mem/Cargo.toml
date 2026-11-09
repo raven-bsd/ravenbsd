@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-mem"
+version = "0.1.0"
+description = "memcpy-family routines for RavenBSD, built with #[no_builtins]."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[features]
+# Export the C ABI `memcpy`, `memmove`, `memset`, `memcmp` and `bcmp` symbols for the kernel.
+export-symbols = []
+
+[lints]
+workspace = true
