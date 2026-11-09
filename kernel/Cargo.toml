@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-kernel"
+version = "0.1.0"
+description = "RavenBSD microkernel."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "raven-kernel"
+path = "src/main.rs"
+
+[dependencies]
+raven-abi = { path = "../crates/raven-abi" }
+raven-bootinfo = { path = "../crates/raven-bootinfo" }
+raven-mem = { path = "../crates/raven-mem", features = ["export-symbols"] }
+
+[build-dependencies]
+raven-abi = { path = "../crates/raven-abi" }
+
+# A crate cannot combine `workspace = true` with extra lints: copy the workspace tables and add
+# the two kernel-specific ones.
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
+indexing_slicing = "warn"
+arithmetic_side_effects = "warn"
