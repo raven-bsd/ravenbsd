@@ -26,11 +26,20 @@ missing_docs = "warn"
 undocumented_unsafe_blocks = "deny"
 # The kernel crate additionally opts in to `indexing_slicing` and `arithmetic_side_effects` (warn).
 
+# dev: "fat" on purpose: no optimisation, full debug info, overflow checks. Easy to debug, big binaries.
 [profile.dev]
+opt-level = 0
+debug = 2
+overflow-checks = true
 panic = "abort"
 
+# release: smallest binaries: size optimisation, fat LTO, one codegen unit, no unwinding, symbols stripped.
 [profile.release]
-panic = "abort"
-lto = true
+opt-level = "z"
+lto = "fat"
 codegen-units = 1
-debug = 1
+panic = "abort"
+debug = false
+strip = "symbols"
+overflow-checks = false
+incremental = false

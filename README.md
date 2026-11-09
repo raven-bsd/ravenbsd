@@ -12,5 +12,13 @@ You type `uname -a` and see `RavenBSD`.
 Planning, architecture and tickets live in the separate private `ravenbsd-prjmgmt` repository; donor
 reference sources live in `ravenbsd-resources` and are never vendored here.
 
-    make check        # once the build system lands (ticket K01)
-    make image run    # boot in QEMU (milestone M1)
+Quick start (Ubuntu/Debian or Fedora):
+
+    make setup      # install packages, Rust toolchain, firmware paths; verifies everything
+    make dev        # debug build of everything that exists (ARCH=x86_64|aarch64|riscv64)
+    make release    # smallest optimised build
+    make check      # stable guard, fmt, clippy, tests
+    make clean      # remove build output and start over
+    make doctor     # what is installed / missing
+
+`SETUP_ARGS="--dry-run" make setup` prints what would be installed. Scripts live in `scripts/`; the Makefile only calls them.
