@@ -387,6 +387,7 @@ mod tests {
             reason: None,
             timed_out: false,
             setup_failed: false,
+            capture_error: None,
             duration_ms: 1,
             syscalls_used: map.len(),
             strace: format!("out/{id}.strace"),

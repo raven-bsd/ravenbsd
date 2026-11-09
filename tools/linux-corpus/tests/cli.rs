@@ -61,6 +61,50 @@ fn corpus_with_one(temp: &TempDir) -> PathBuf {
     temp.path().join("corpus.toml")
 }
 
+fn fake_strace(temp: &TempDir, body: &str) -> PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+    let bin = temp.path().join("fakebin");
+    fs::create_dir_all(&bin).expect("create fake bin");
+    let path = bin.join("strace");
+    fs::write(
+        &path,
+        format!(
+            "#!/bin/sh\nout=\"\"\nwhile [ \"$#\" -gt 0 ]; do\n\
+             if [ \"$1\" = \"-o\" ]; then shift; out=\"$1\"; fi\n\
+             shift\ndone\n{body}\nexit 0\n"
+        ),
+    )
+    .expect("write fake strace");
+    let mut permissions = fs::metadata(&path).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&path, permissions).unwrap();
+    bin
+}
+
+fn run_with_fake_strace(temp: &TempDir, corpus: &Path, fake_bin: &Path) -> PathBuf {
+    let out = temp.path().join("out");
+    let path = format!(
+        "{}:{}",
+        fake_bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let result = Command::new(BIN)
+        .args(["run", "--corpus"])
+        .arg(corpus)
+        .args(["--out"])
+        .arg(&out)
+        .env("PATH", path)
+        .output()
+        .expect("run linux-corpus");
+    assert_eq!(
+        result.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    out
+}
+
 fn run_success(temp: &TempDir, corpus: &Path) -> PathBuf {
     let out = temp.path().join("out");
     let result = Command::new(BIN)
@@ -207,4 +251,46 @@ fn merge_with_implemented_writes_the_missing_section() {
     let text = temp.read("coverage.md");
     assert!(text.contains("## Not yet implemented"));
     assert!(text.contains("`write`"));
+}
+
+#[test]
+fn malformed_trace_is_reported_as_capture_failure() {
+    let temp = TempDir::new("fake-malformed");
+    let corpus = corpus_with_one(&temp);
+    let fake_bin = fake_strace(
+        &temp,
+        "[ -n \"$out\" ] && printf '\\377\\376\\012' > \"$out\"",
+    );
+    let _out = run_with_fake_strace(&temp, &corpus, &fake_bin);
+    let json: Value = serde_json::from_str(&temp.read("out/one.json")).unwrap();
+    assert_eq!(json["exit"], 0);
+    assert!(json["capture_error"].as_str().unwrap().contains("UTF-8"));
+    assert_eq!(json["syscalls_used"], 0);
+}
+
+#[test]
+fn missing_trace_is_reported_as_capture_failure() {
+    let temp = TempDir::new("fake-missing");
+    let corpus = corpus_with_one(&temp);
+    let fake_bin = fake_strace(&temp, "");
+    let _out = run_with_fake_strace(&temp, &corpus, &fake_bin);
+    let json: Value = serde_json::from_str(&temp.read("out/one.json")).unwrap();
+    assert!(
+        json["capture_error"]
+            .as_str()
+            .unwrap()
+            .contains("cannot read trace")
+    );
+}
+
+#[test]
+fn empty_readable_trace_is_not_a_capture_failure() {
+    let temp = TempDir::new("fake-empty");
+    let corpus = corpus_with_one(&temp);
+    let fake_bin = fake_strace(&temp, "[ -n \"$out\" ] && : > \"$out\"");
+    let _out = run_with_fake_strace(&temp, &corpus, &fake_bin);
+    let json: Value = serde_json::from_str(&temp.read("out/one.json")).unwrap();
+    assert!(json["capture_error"].is_null());
+    assert_eq!(json["syscalls_used"], 0);
+    assert_eq!(json["unparsed_lines"], 0);
 }

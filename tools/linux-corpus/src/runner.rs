@@ -8,6 +8,8 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::mpsc::{self, TryRecvError};
+use std::thread;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
@@ -46,6 +48,9 @@ pub struct ProgramResult {
     pub timed_out: bool,
     /// A setup command failed.
     pub setup_failed: bool,
+    /// The trace could not be read or was not valid UTF-8.
+    #[serde(default)]
+    pub capture_error: Option<String>,
     /// Wall-clock duration of setup plus the traced run.
     pub duration_ms: u64,
     /// Number of distinct syscalls parsed from the trace.
@@ -67,6 +72,8 @@ impl ProgramResult {
             "setup-failed"
         } else if self.timed_out {
             "timeout"
+        } else if self.capture_error.is_some() {
+            "capture-failed"
         } else if self.exit == Some(self.expected_exit) {
             "ok"
         } else {
@@ -79,6 +86,7 @@ impl ProgramResult {
         !self.skipped
             && !self.setup_failed
             && !self.timed_out
+            && self.capture_error.is_none()
             && self.exit == Some(self.expected_exit)
     }
 }
@@ -146,6 +154,7 @@ fn run_program(program: &Program, corpus_dir: &Path, out: &Path) -> Result<Progr
             reason: Some(format!("not installed: {missing}")),
             timed_out: false,
             setup_failed: false,
+            capture_error: None,
             duration_ms: elapsed_ms(started),
             syscalls_used: 0,
             strace: trace_path.display().to_string(),
@@ -176,6 +185,7 @@ fn run_program(program: &Program, corpus_dir: &Path, out: &Path) -> Result<Progr
                 }),
                 timed_out: outcome.timed_out,
                 setup_failed: true,
+                capture_error: None,
                 duration_ms: elapsed_ms(started),
                 syscalls_used: 0,
                 strace: trace_path.display().to_string(),
@@ -211,6 +221,7 @@ fn run_program(program: &Program, corpus_dir: &Path, out: &Path) -> Result<Progr
                 reason: Some(format!("could not run strace: {error:#}")),
                 timed_out: false,
                 setup_failed: false,
+                capture_error: Some(format!("could not run strace: {error:#}")),
                 duration_ms: elapsed_ms(started),
                 syscalls_used: 0,
                 strace: trace_path.display().to_string(),
@@ -223,8 +234,8 @@ fn run_program(program: &Program, corpus_dir: &Path, out: &Path) -> Result<Progr
         }
     };
 
-    let trace = fs::read_to_string(&trace_path).unwrap_or_default();
-    let parsed = parse_trace(&trace);
+    let trace = read_trace(&trace_path);
+    let parsed = parse_trace(&trace.text);
     let result = ProgramResult {
         id: program.id.clone(),
         category: program.category.clone(),
@@ -233,6 +244,8 @@ fn run_program(program: &Program, corpus_dir: &Path, out: &Path) -> Result<Progr
         skipped: false,
         reason: if outcome.timed_out {
             Some(format!("timed out after {} s", program.timeout_secs))
+        } else if let Some(error) = &trace.error {
+            Some(error.clone())
         } else if outcome.status != Some(program.expect_exit) {
             Some(format!(
                 "exit {:?}, expected {}",
@@ -243,6 +256,7 @@ fn run_program(program: &Program, corpus_dir: &Path, out: &Path) -> Result<Progr
         },
         timed_out: outcome.timed_out,
         setup_failed: false,
+        capture_error: trace.error,
         duration_ms: elapsed_ms(started),
         syscalls_used: parsed.syscalls.len(),
         strace: trace_path.display().to_string(),
@@ -252,6 +266,31 @@ fn run_program(program: &Program, corpus_dir: &Path, out: &Path) -> Result<Progr
     write_result(out, &result)?;
     let _ = fs::remove_dir_all(&work);
     Ok(result)
+}
+
+struct TraceInput {
+    text: String,
+    error: Option<String>,
+}
+
+fn read_trace(path: &Path) -> TraceInput {
+    match fs::read(path) {
+        Ok(bytes) => match String::from_utf8(bytes) {
+            Ok(text) => TraceInput { text, error: None },
+            Err(error) => {
+                let offset = error.utf8_error().valid_up_to();
+                let text = String::from_utf8_lossy(error.as_bytes()).into_owned();
+                TraceInput {
+                    text,
+                    error: Some(format!("trace is not valid UTF-8 at byte {offset}")),
+                }
+            }
+        },
+        Err(error) => TraceInput {
+            text: String::new(),
+            error: Some(format!("cannot read trace {}: {error}", path.display())),
+        },
+    }
 }
 
 fn write_result(out: &Path, result: &ProgramResult) -> Result<()> {
@@ -315,31 +354,65 @@ fn execute(
         use std::os::unix::process::CommandExt;
         command.process_group(0);
     }
+
+    let started = Instant::now();
     let mut child = command
         .spawn()
         .with_context(|| format!("starting `{program}`"))?;
-    if let Some(text) = stdin
-        && let Some(mut pipe) = child.stdin.take()
-    {
-        let _ = pipe.write_all(text.as_bytes());
-    }
 
-    let started = Instant::now();
-    loop {
-        if let Some(_status) = child.try_wait()? {
-            break;
+    let (stdin_result, stdin_writer) = if let Some(text) = stdin {
+        let mut pipe = child
+            .stdin
+            .take()
+            .context("child stdin pipe was not created")?;
+        let text = text.to_string();
+        let (sender, receiver) = mpsc::channel();
+        let writer = thread::spawn(move || {
+            let _ = sender.send(pipe.write_all(text.as_bytes()));
+        });
+        (Some(receiver), Some(writer))
+    } else {
+        (None, None)
+    };
+
+    let mut timed_out = false;
+    let status = loop {
+        if let Some(exit) = child.try_wait()? {
+            break exit.code();
         }
         if started.elapsed() >= timeout {
+            timed_out = true;
             kill_tree(&mut child);
-            break;
+            break child.wait()?.code();
         }
-        std::thread::sleep(Duration::from_millis(5));
+        let remaining = timeout.saturating_sub(started.elapsed());
+        thread::sleep(remaining.min(Duration::from_millis(10)));
+    };
+
+    if let Some(receiver) = stdin_result {
+        let mut writer_done = match receiver.try_recv() {
+            Ok(_) | Err(TryRecvError::Disconnected) => true,
+            Err(TryRecvError::Empty) => false,
+        };
+        if !writer_done {
+            // The child exited (or timed out) while a descendant still holds
+            // the stdin read end. Kill the group so the writer cannot block
+            // forever, then give it a bounded grace period.
+            kill_tree(&mut child);
+            writer_done = receiver.recv_timeout(Duration::from_secs(1)).is_ok();
+        }
+        if let Some(writer) = stdin_writer {
+            if writer_done {
+                let _ = writer.join();
+            } else {
+                drop(writer);
+            }
+        }
+    } else if let Some(writer) = stdin_writer {
+        let _ = writer.join();
     }
-    let status = child.wait()?.code();
-    Ok(CommandOutcome {
-        status,
-        timed_out: started.elapsed() >= timeout && status.is_none(),
-    })
+
+    Ok(CommandOutcome { status, timed_out })
 }
 
 #[cfg(unix)]
@@ -496,5 +569,87 @@ mod tests {
         .unwrap();
         assert!(results[0].setup_failed);
         assert_eq!(results[0].status(), "setup-failed");
+    }
+
+    #[test]
+    fn stdin_backpressure_respects_timeout_and_cleans_descendants() {
+        let temp = TempDir::new("runner-stdin-timeout");
+        let corpus = temp.path().join("corpus.toml");
+        let text = format!(
+            "[[program]]\nid = \"blocked-stdin\"\ncategory = \"shell\"\n\
+             argv = [\"sh\", \"-c\", \"sleep 30 & echo $! > {{corpus}}/child.pid; wait\"]\n\
+             timeout_secs = 1\nstdin = \"{}\"\n",
+            "x".repeat(1024 * 1024)
+        );
+        temp.write("corpus.toml", &text);
+        let out = temp.path().join("out");
+        let started = Instant::now();
+        let results = run_corpus(&RunOptions {
+            corpus,
+            out,
+            only: Vec::new(),
+        })
+        .unwrap();
+        assert!(results[0].timed_out, "{:?}", results[0]);
+        assert!(
+            started.elapsed() < Duration::from_secs(3),
+            "took {:?}",
+            started.elapsed()
+        );
+
+        let pid = temp.read("child.pid");
+        let pid: u32 = pid.trim().parse().expect("valid descendant pid");
+        let mut alive = true;
+        for _ in 0..40 {
+            let status = Command::new("kill")
+                .arg("-0")
+                .arg(pid.to_string())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .unwrap();
+            if !status.success() {
+                alive = false;
+                break;
+            }
+            thread::sleep(Duration::from_millis(25));
+        }
+        assert!(!alive, "descendant process {pid} survived the timeout");
+    }
+
+    #[test]
+    fn read_trace_missing_records_capture_error() {
+        let temp = TempDir::new("runner-trace-missing");
+        let input = read_trace(&temp.path().join("missing.strace"));
+        assert!(input.error.is_some());
+        assert!(input.text.is_empty());
+    }
+
+    #[test]
+    fn read_trace_directory_records_capture_error() {
+        let temp = TempDir::new("runner-trace-dir");
+        let input = read_trace(temp.path());
+        assert!(input.error.is_some());
+    }
+
+    #[test]
+    fn read_trace_malformed_records_error_and_lossy_text() {
+        let temp = TempDir::new("runner-trace-malformed");
+        let path = temp.path().join("bad.strace");
+        fs::write(&path, [0xffu8, 0xfe, b'\n']).unwrap();
+        let input = read_trace(&path);
+        assert!(input.error.as_deref().unwrap().contains("UTF-8"));
+        let parsed = parse_trace(&input.text);
+        assert!(parsed.unparsed_lines >= 1);
+    }
+
+    #[test]
+    fn read_trace_empty_is_a_valid_empty_trace() {
+        let temp = TempDir::new("runner-trace-empty");
+        temp.write("empty.strace", "");
+        let input = read_trace(&temp.path().join("empty.strace"));
+        assert!(input.error.is_none());
+        assert!(input.text.is_empty());
+        assert_eq!(parse_trace(&input.text).unparsed_lines, 0);
     }
 }

@@ -609,7 +609,7 @@
         "wc-etc-passwd"
       ],
       "program_count": 49,
-      "total_calls": 386,
+      "total_calls": 388,
       "errors": 0,
       "patterns": {}
     },
@@ -668,7 +668,7 @@
         "wc-etc-passwd"
       ],
       "program_count": 49,
-      "total_calls": 918,
+      "total_calls": 937,
       "errors": 0,
       "patterns": {}
     },
@@ -848,8 +848,8 @@
       "patterns": {
         "flags": {
           "MAP_ANONYMOUS|MAP_FIXED|MAP_PRIVATE": 122,
-          "MAP_ANONYMOUS|MAP_NORESERVE|MAP_PRIVATE": 74,
-          "MAP_ANONYMOUS|MAP_PRIVATE": 275,
+          "MAP_ANONYMOUS|MAP_NORESERVE|MAP_PRIVATE": 75,
+          "MAP_ANONYMOUS|MAP_PRIVATE": 274,
           "MAP_ANONYMOUS|MAP_PRIVATE|MAP_STACK": 98,
           "MAP_DENYWRITE|MAP_FIXED|MAP_PRIVATE": 856,
           "MAP_DENYWRITE|MAP_PRIVATE": 277,
@@ -1033,7 +1033,7 @@
         "wc-etc-passwd"
       ],
       "program_count": 46,
-      "total_calls": 245,
+      "total_calls": 242,
       "errors": 0,
       "patterns": {}
     },
@@ -1145,7 +1145,7 @@
         "wc-etc-passwd"
       ],
       "program_count": 46,
-      "total_calls": 3182,
+      "total_calls": 3181,
       "errors": 0,
       "patterns": {}
     },
@@ -1744,16 +1744,16 @@
         "threads-rust-musl"
       ],
       "program_count": 25,
-      "total_calls": 2332,
-      "errors": 90,
+      "total_calls": 2303,
+      "errors": 75,
       "patterns": {
         "op": {
-          "FUTEX_WAIT": 2,
+          "FUTEX_WAIT": 6,
           "FUTEX_WAIT_BITSET_PRIVATE": 58,
-          "FUTEX_WAIT_BITSET_PRIVATE|FUTEX_CLOCK_REALTIME": 366,
+          "FUTEX_WAIT_BITSET_PRIVATE|FUTEX_CLOCK_REALTIME": 349,
           "FUTEX_WAIT_BITSET|FUTEX_CLOCK_REALTIME": 5,
-          "FUTEX_WAIT_PRIVATE": 41,
-          "FUTEX_WAKE_PRIVATE": 1860
+          "FUTEX_WAIT_PRIVATE": 34,
+          "FUTEX_WAKE_PRIVATE": 1851
         }
       }
     },
@@ -2041,7 +2041,7 @@
         "threads-rust-musl"
       ],
       "program_count": 15,
-      "total_calls": 345,
+      "total_calls": 346,
       "errors": 0,
       "patterns": {}
     },
@@ -2087,7 +2087,7 @@
         "threads-rust-musl"
       ],
       "program_count": 13,
-      "total_calls": 142,
+      "total_calls": 144,
       "errors": 0,
       "patterns": {}
     },
@@ -2244,7 +2244,7 @@
         "threads-rust-musl"
       ],
       "program_count": 8,
-      "total_calls": 64,
+      "total_calls": 65,
       "errors": 0,
       "patterns": {}
     },
@@ -2395,7 +2395,7 @@
       ],
       "program_count": 6,
       "total_calls": 16,
-      "errors": 0,
+      "errors": 1,
       "patterns": {}
     },
     {
@@ -2818,7 +2818,7 @@
         "hello-go-static"
       ],
       "program_count": 2,
-      "total_calls": 41,
+      "total_calls": 39,
       "errors": 0,
       "patterns": {}
     },
