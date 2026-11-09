@@ -285,3 +285,65 @@ fn list_prints_case_names() {
     assert!(stdout.contains("one"), "{stdout}");
     assert!(stdout.contains("two"), "{stdout}");
 }
+
+#[test]
+fn run_accepts_no_build_without_a_prebuilt_image() {
+    let temp = TempDir::new("no-build");
+    let case = temp.path().join("no-build.toml");
+    temp.write("no-build.toml", &basic_case("no-build", 5, "success"));
+    let out = temp.path().join("out");
+    let result = Command::new(BIN)
+        .args(["run", "--case"])
+        .arg(&case)
+        .args(["--out"])
+        .arg(&out)
+        .arg("--no-build")
+        .output()
+        .expect("run raven-qtest");
+    assert_eq!(
+        result.status.code(),
+        Some(1),
+        "stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    assert!(stdout.contains("image not found (--no-build)"), "{stdout}");
+    assert!(!stdout.contains("unexpected argument"), "{stdout}");
+    assert!(!stderr.contains("unexpected argument"), "{stderr}");
+    let json: Value = serde_json::from_str(&temp.read("out/no-build.json")).unwrap();
+    assert_eq!(json["result"], "error");
+    assert_eq!(json["case"], "no-build");
+}
+
+#[test]
+fn run_rejects_unknown_flags() {
+    let temp = TempDir::new("unknown-flag");
+    let case = temp.path().join("case.toml");
+    temp.write("case.toml", &basic_case("unknown", 5, "success"));
+    let result = Command::new(BIN)
+        .args(["run", "--case"])
+        .arg(&case)
+        .arg("--wat")
+        .output()
+        .expect("run raven-qtest");
+    assert_eq!(result.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    assert!(stderr.contains("unexpected argument `--wat`"), "{stderr}");
+}
+
+#[test]
+fn help_documents_no_build_on_the_run_line() {
+    let result = Command::new(BIN)
+        .arg("--help")
+        .output()
+        .expect("run raven-qtest");
+    assert_eq!(result.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    assert!(
+        stdout
+            .lines()
+            .any(|line| line.contains("run --case") && line.contains("[--no-build]")),
+        "{stdout}"
+    );
+}
