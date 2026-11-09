@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-loader"
+version = "0.1.0"
+description = "RavenBSD UEFI loader: reads the ESP, parses boot.toml and loads the kernel ELF."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "raven_loader"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raven-loader"
+path = "src/main.rs"
+
+[dependencies]
+uefi = { version = "0.41", default-features = false, features = ["alloc"] }
+raven-elf = { path = "../../crates/raven-elf" }
+raven-bootinfo = { path = "../../crates/raven-bootinfo" }
+
+[lints]
+workspace = true
