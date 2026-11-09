@@ -17,7 +17,10 @@ path = "src/main.rs"
 [dependencies]
 raven-abi = { path = "../crates/raven-abi" }
 raven-bootinfo = { path = "../crates/raven-bootinfo" }
+raven-cmdline = { path = "../crates/raven-cmdline" }
+raven-frames = { path = "../crates/raven-frames" }
 raven-mem = { path = "../crates/raven-mem", features = ["export-symbols"] }
+spin = { version = "0.9", default-features = false, features = ["spin_mutex"] }
 
 [build-dependencies]
 raven-abi = { path = "../crates/raven-abi" }
