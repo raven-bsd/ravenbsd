@@ -1,0 +1,73 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 10, 2026
+.Dt UNAME 1
+.Os RavenBSD
+.Sh NAME
+.Nm uname
+.Nd print system identification
+.Sh SYNOPSIS
+.Nm
+.Op Fl amnoprsv
+.Sh DESCRIPTION
+The
+.Nm
+utility writes selected fields of the system identification to standard output.
+The fields are separated by a single space and the output ends with a newline.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl a
+Print all of
+.Fl s ,
+.Fl n ,
+.Fl r ,
+.Fl v
+and
+.Fl m ,
+in that order.
+.It Fl m
+Print the machine hardware name.
+.It Fl n
+Print the nodename.
+.It Fl o
+Print the operating system name
+.Pq Dq RavenBSD .
+.It Fl p
+Print the processor type.
+On RavenBSD this is the same value as
+.Fl m .
+.It Fl r
+Print the operating system release.
+.It Fl s
+Print the operating system name.
+.It Fl v
+Print the operating system version.
+.El
+.Pp
+With no options,
+.Fl s
+is assumed.
+The fields are always written in the order
+.Fl s ,
+.Fl n ,
+.Fl r ,
+.Fl v ,
+.Fl m ,
+.Fl p ,
+.Fl o ,
+regardless of the order in which the options were given.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+A failure to read the system identification exits with status 1.
+.Sh STANDARDS
+The
+.Fl amnrsv
+options conform to
+.St -p1003.1-2008 .
+The
+.Fl o
+and
+.Fl p
+options are NetBSD-compatible extensions.
