@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "exc-div0"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 30
+boot_cmdline = "console=ttyS0 test-exit=1 selftest=div0"
+expect_exit = "failure"
+
+[[expect]]
+regex = 'EXCEPTION: divide error'
+
+[[expect]]
+regex = 'rip='
+
+[[expect]]
+regex = '^bt\[0\]'
+
+[[expect]]
+regex = '^bt\[1\]'
