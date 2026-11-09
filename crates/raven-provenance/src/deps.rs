@@ -41,15 +41,18 @@ pub(crate) fn license_allowed(expression: &str, allow_mpl: bool) -> bool {
         .any(|alternative| alternative.iter().all(|term| term_allowed(term, allow_mpl)))
 }
 
-/// Map the one legacy Cargo licence spelling that is not valid SPDX.
+/// Map the legacy Cargo slash spellings that are not valid SPDX.
 ///
-/// `bit_field` 0.10.3 (a `uefi` dependency) declares `Apache-2.0/MIT`; Cargo
-/// metadata reports that string verbatim. Only this exact expression is
-/// translated, so unknown or malformed expressions still fail. This applies to
-/// dependency metadata, not to SPDX source-header validation.
+/// `bit_field` 0.10.3 (a `uefi` dependency) declares `Apache-2.0/MIT` and
+/// `bitflags` 1.3.2 declares `MIT/Apache-2.0`; Cargo metadata reports those
+/// strings verbatim. Both orders name the same allow-listed alternative, so
+/// exactly these two expressions are translated, so unknown or malformed
+/// expressions still fail. This applies to dependency metadata, not to SPDX
+/// source-header validation.
 fn normalize_legacy_dependency_license(expression: &str) -> &str {
     match expression {
         "Apache-2.0/MIT" => "Apache-2.0 OR MIT",
+        "MIT/Apache-2.0" => "MIT OR Apache-2.0",
         other => other,
     }
 }
@@ -314,11 +317,14 @@ mod tests {
     #[test]
     fn legacy_apache_mit_slash_mapping_is_exact() {
         assert!(license_allowed("Apache-2.0/MIT", false));
+        assert!(license_allowed("MIT/Apache-2.0", false));
         for expression in [
             "apache-2.0/mit",
             "Apache-2.0 / MIT",
-            "MIT/Apache-2.0",
+            "MIT / Apache-2.0",
             "Apache-2.0/MIT OR MIT",
+            "MIT/GPL-2.0",
+            "GPL-2.0/MIT",
         ] {
             assert!(
                 !license_allowed(expression, false),

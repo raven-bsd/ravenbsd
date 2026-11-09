@@ -18,6 +18,7 @@ members = [
     "tests/qtest",
     "tools/linux-corpus",
     "libc/spike/va",
+    "userland/rt",
 ]
 default-members = ["crates/*"]
 

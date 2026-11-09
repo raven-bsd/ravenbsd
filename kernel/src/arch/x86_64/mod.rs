@@ -3,7 +3,12 @@
 
 //! x86-64 architecture support.
 
+pub mod exception;
+pub mod gdt;
+pub mod idt;
+pub mod serial;
 mod start;
+pub mod trapframe;
 
 /// Halts the current CPU forever.
 ///
