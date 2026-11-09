@@ -333,6 +333,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-svc-manifest"
+version = "0.1.0"
+
+[[package]]
 name = "raven-testkernel"
 version = "0.1.0"
 dependencies = [
