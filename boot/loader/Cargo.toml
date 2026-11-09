@@ -20,6 +20,7 @@ path = "src/main.rs"
 
 [dependencies]
 uefi = { version = "0.41", default-features = false, features = ["alloc"] }
+raven-abi = { path = "../../crates/raven-abi" }
 raven-elf = { path = "../../crates/raven-elf" }
 raven-bootinfo = { path = "../../crates/raven-bootinfo" }
 

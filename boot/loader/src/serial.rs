@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! COM1 (16550) polled serial output, mirrored to the UEFI console.
+//! COM1 (16550) polled serial output, mirrored to the UEFI console before boot services exit.
 
-use alloc::format;
 use core::arch::asm;
-use core::fmt;
+use core::fmt::{self, Write};
+use core::sync::atomic::{AtomicBool, Ordering};
 
 /// Base I/O port of the legacy COM1 UART.
 const COM1: u16 = 0x3f8;
@@ -14,8 +14,16 @@ const LSR: u16 = COM1 + 5;
 /// Transmitter holding register empty.
 const LSR_THRE: u8 = 1 << 5;
 
-/// Initialise COM1 for 115200 baud, 8 data bits, no parity, one stop bit.
+static CONOUT: AtomicBool = AtomicBool::new(false);
+
+/// Initialise COM1 and enable the UEFI ConOut mirror.
 pub fn init() {
+    init_serial_only();
+    CONOUT.store(true, Ordering::Release);
+}
+
+/// Initialise COM1 without touching UEFI services (safe after `ExitBootServices` and in panics).
+pub fn init_serial_only() {
     // SAFETY: COM1 is the legacy 16550 UART on x86-64; these are the standard polled-mode
     // initialisation writes from the UART programming sequence.
     unsafe {
@@ -29,6 +37,11 @@ pub fn init() {
     }
 }
 
+/// Stop mirroring log lines to the UEFI console. Call before `ExitBootServices`.
+pub fn disable_conout() {
+    CONOUT.store(false, Ordering::Release);
+}
+
 /// Write one byte to COM1, waiting until the transmitter is empty.
 pub fn write_byte(byte: u8) {
     // SAFETY: reading the line status register and writing the data register is the polled UART
@@ -39,16 +52,53 @@ pub fn write_byte(byte: u8) {
     }
 }
 
-/// Print one `loader: `-prefixed line to COM1 and then to the UEFI console.
+/// Print one `loader: `-prefixed line to COM1 and, before boot services exit, to ConOut.
 ///
-/// The line is rendered once and written to each console as a whole. On QEMU both consoles can
-/// be the same serial device, so the line is expected to appear twice there.
+/// The line is rendered into a fixed stack buffer; no allocation happens here, so this remains
+/// valid after `ExitBootServices`.
 pub fn log(args: fmt::Arguments<'_>) {
-    let line = format!("loader: {args}\n");
-    for &byte in line.as_bytes() {
+    let mut line = LineBuffer::new();
+    let _ = write!(&mut line, "loader: {args}");
+    line.push(b'\n');
+
+    for &byte in &line.bytes[..line.len] {
         write_byte(byte);
     }
-    uefi::print!("{line}");
+    if CONOUT.load(Ordering::Acquire)
+        && let Ok(text) = core::str::from_utf8(&line.bytes[..line.len])
+    {
+        uefi::print!("{text}");
+    }
+}
+
+struct LineBuffer {
+    bytes: [u8; 512],
+    len: usize,
+}
+
+impl LineBuffer {
+    const fn new() -> Self {
+        Self {
+            bytes: [0; 512],
+            len: 0,
+        }
+    }
+
+    fn push(&mut self, byte: u8) {
+        if self.len < self.bytes.len() {
+            self.bytes[self.len] = byte;
+            self.len += 1;
+        }
+    }
+}
+
+impl Write for LineBuffer {
+    fn write_str(&mut self, text: &str) -> fmt::Result {
+        for &byte in text.as_bytes() {
+            self.push(byte);
+        }
+        Ok(())
+    }
 }
 
 unsafe fn outb(port: u16, value: u8) {

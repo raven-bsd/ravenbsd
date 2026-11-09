@@ -142,6 +142,7 @@ dependencies = [
 name = "raven-loader"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
  "raven-bootinfo",
  "raven-elf",
  "uefi",
