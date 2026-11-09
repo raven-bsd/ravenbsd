@@ -1,0 +1,22 @@
+1745552 execve("/usr/bin/busybox", ["/usr/bin/busybox", "true"], 0x7fff075082e8 /* 68 vars */) = 0
+1745552 arch_prctl(0x3001 /* ARCH_??? */, 0x7ffd2b110f30) = -1 EINVAL (Invalid argument)
+1745552 brk(NULL)                       = 0x1e71000
+1745552 brk(0x1e71dc0)                  = 0x1e71dc0
+1745552 arch_prctl(ARCH_SET_FS, 0x1e713c0) = 0
+1745552 set_tid_address(0x1e71690)      = 1745552
+1745552 set_robust_list(0x1e716a0, 24)  = 0
+1745552 rseq(0x1e71d60, 0x20, 0, 0x53053053) = 0
+1745552 uname({sysname="Linux", nodename="alien", ...}) = 0
+1745552 prlimit64(0, RLIMIT_STACK, NULL, {rlim_cur=8192*1024, rlim_max=RLIM64_INFINITY}) = 0
+1745552 readlink("/proc/self/exe", "/usr/bin/busybox", 4096) = 16
+1745552 getrandom("\xf8\x56\x39\x81\x15\xde\xf4\x4e", 8, GRND_NONBLOCK) = 8
+1745552 brk(0x1e92dc0)                  = 0x1e92dc0
+1745552 brk(0x1e93000)                  = 0x1e93000
+1745552 mprotect(0x60d000, 28672, PROT_READ) = 0
+1745552 prctl(PR_SET_NAME, "busybox")   = 0
+1745552 getuid()                        = 1000
+1745552 newfstatat(AT_FDCWD, "/etc/busybox.conf", 0x7ffd2b110be8, 0) = -1 ENOENT (No such file or directory)
+1745552 getgid()                        = 1000
+1745552 setgid(1000)                    = 0
+1745552 setuid(1000)                    = 0
+1745552 exit_group(0)                   = ?

@@ -1,0 +1,43 @@
+982729 rt_sigprocmask(SIG_SETMASK, [], NULL, 8) = 0
+982729 rt_sigprocmask(SIG_UNBLOCK, [RT_1 RT_2], NULL, 8) = 0
+982729 mmap(NULL, 2109440, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7ff85a500000
+982729 mprotect(0x7ff85a502000, 2101248, PROT_READ|PROT_WRITE) = 0
+982729 rt_sigprocmask(SIG_BLOCK, ~[RTMIN RT_1 RT_2], [], 8) = 0
+982729 clone(child_stack=0x7ff85a702a98, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID|0x400000, parent_tid=[982730], tls=0x7ff85a702b38, child_tidptr=0x7ff85a77c358) = 982730
+982729 rt_sigprocmask(SIG_SETMASK, [], NULL, 8) = 0
+982729 mmap(NULL, 2109440, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7ff85a2fd000
+982729 mprotect(0x7ff85a2ff000, 2101248, PROT_READ|PROT_WRITE <unfinished ...>
+982730 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+982729 <... mprotect resumed>)          = 0
+982729 rt_sigprocmask(SIG_BLOCK, ~[RTMIN RT_1 RT_2], [], 8) = 0
+982729 clone(child_stack=0x7ff85a4ffa98, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID|0x400000, parent_tid=[982731], tls=0x7ff85a4ffb38, child_tidptr=0x7ff85a77c358) = 982731
+982729 rt_sigprocmask(SIG_SETMASK, [], NULL, 8) = 0
+982729 mmap(NULL, 2109440, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7ff85a0fa000
+982729 mprotect(0x7ff85a0fc000, 2101248, PROT_READ|PROT_WRITE) = 0
+982729 rt_sigprocmask(SIG_BLOCK, ~[RTMIN RT_1 RT_2], [], 8) = 0
+982729 clone(child_stack=0x7ff85a2fca98, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID|0x400000, parent_tid=[982732], tls=0x7ff85a2fcb38, child_tidptr=0x7ff85a77c358) = 982732
+982730 <... rt_sigprocmask resumed>NULL, 8) = 0
+982729 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+982731 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+982729 <... rt_sigprocmask resumed>NULL, 8) = 0
+982730 gettid( <unfinished ...>
+982729 mmap(NULL, 2109440, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0 <unfinished ...>
+982731 <... rt_sigprocmask resumed>NULL, 8) = 0
+982729 <... mmap resumed>)              = 0x7ff859ef7000
+982730 <... gettid resumed>)            = 982730
+982729 mprotect(0x7ff859ef9000, 2101248, PROT_READ|PROT_WRITE <unfinished ...>
+982731 gettid( <unfinished ...>
+982729 <... mprotect resumed>)          = 0
+982730 mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0 <unfinished ...>
+982731 <... gettid resumed>)            = 982731
+982729 rt_sigprocmask(SIG_BLOCK, ~[RTMIN RT_1 RT_2], [], 8) = 0
+982731 futex(0x7ff85a77abc8, FUTEX_WAIT_BITSET_PRIVATE, 2, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+982729 clone(child_stack=0x7ff85a0f9a98, flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID|0x400000 <unfinished ...>
+982732 rt_sigprocmask(SIG_SETMASK, [], NULL, 8) = 0
+982729 <... clone resumed>, parent_tid=[982733], tls=0x7ff85a0f9b38, child_tidptr=0x7ff85a77c358) = 982733
+982732 gettid( <unfinished ...>
+982729 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+982732 <... gettid resumed>)            = 982732
+982729 <... rt_sigprocmask resumed>NULL, 8) = 0
+982732 futex(0x7ff85a77abc8, FUTEX_WAIT_BITSET_PRIVATE, 2, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+982729 futex(0x7ff85a702b70, FUTEX_WAIT_PRIVATE, 2, NULL <unfinished ...>

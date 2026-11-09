@@ -1,0 +1,18 @@
+2001 execve("/usr/bin/tricky", ["tricky", "a,b", "c)d"], 0x7ffd1 /* 10 vars */) = 0
+2001 openat(AT_FDCWD, "/tmp/we)ird, \"name\"", O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 0666) = 3
+2001 write(3, "x = 1, y = (2)\n", 15)  = 15
+2001 ioctl(1, _IOC(_IOC_NONE, 0x54, 0x2, 0), 0x7ffc) = -1 ENOTTY (Inappropriate ioctl for device)
+2001 ioctl(0, TCGETS, {c_iflag=ICRNL|IXON, c_oflag=NL0, c_lflag=ISIG|ICANON, c_cc="\x03\x1c"}) = 0
+2001 socket(AF_INET, SOCK_STREAM|SOCK_CLOEXEC, IPPROTO_IP) = 4
+2001 fcntl(4, F_GETFL)                 = 0x2 (flags O_RDWR)
+2001 prctl(PR_SET_NAME, "tricky")      = 0
+2001 syscall_0x1b3(0x1, 0x2)          = -1 ENOSYS (Function not implemented)
+2001 read(0, 0x7ffc0, 4096)            = ? ERESTARTSYS (To be restarted if SA_RESTART is set)
+--- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=2002, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+2001 read(0, "", 4096)                 = 0
+[pid  2003] mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f0000001000
+mmap(NULL, 4096, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7f0000002000
+2001 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f0) = 2002
+2001 futex(0x7f1, FUTEX_WAIT_BITSET_PRIVATE|FUTEX_CLOCK_REALTIME, 2, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+2001 <... futex resumed>)              = -1 EAGAIN (Resource temporarily unavailable)
++++ exited with 0 +++

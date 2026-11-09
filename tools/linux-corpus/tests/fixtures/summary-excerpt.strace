@@ -1,0 +1,9 @@
+1001 execve("/bin/true", ["true"], 0x7ffd0 /* 3 vars */) = 0
+1001 openat(AT_FDCWD, "/nonexistent", O_RDONLY) = -1 ENOENT (No such file or directory)
+1001 exit_group(0)                    = ?
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+  0.00    0.000000           0         1         1 openat
+  0.00    0.000000           0         1           execve
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.000000           0         2         1 total
