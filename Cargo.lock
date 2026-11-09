@@ -367,6 +367,8 @@ name = "raven-rt"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-elf",
+ "raven-initfs",
 ]
 
 [[package]]

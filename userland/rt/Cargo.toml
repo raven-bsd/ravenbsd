@@ -17,10 +17,22 @@ alloc = []
 
 [dependencies]
 raven-abi = { path = "../../crates/raven-abi" }
+raven-elf = { path = "../../crates/raven-elf" }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-initfs = { path = "../../crates/raven-initfs" }
+
+[dev-dependencies]
+raven-initfs = { path = "../../crates/raven-initfs", default-features = false }
 
 [[example]]
 name = "hello"
 path = "examples/hello.rs"
+required-features = ["panic-handler"]
+
+[[example]]
+name = "spawn_demo"
+path = "tests/spawn_demo/spawn_demo.rs"
 required-features = ["panic-handler"]
 
 [lints]
