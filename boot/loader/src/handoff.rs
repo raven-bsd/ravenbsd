@@ -6,6 +6,20 @@
 use core::arch::asm;
 use core::arch::x86_64::{__cpuid, __cpuid_count, _rdtsc};
 
+use crate::paging::{MAX_PHYSICAL_BITS, MIN_PHYSICAL_BITS};
+
+/// MAXPHYADDR reported by CPUID leaf 0x8000_0008, or 36 when the leaf is unavailable.
+pub fn physical_bits() -> u32 {
+    let max_extended = __cpuid(0x8000_0000).eax;
+    if max_extended >= 0x8000_0008 {
+        let bits = __cpuid(0x8000_0008).eax & 0xff;
+        if (MIN_PHYSICAL_BITS..=MAX_PHYSICAL_BITS).contains(&bits) {
+            return bits;
+        }
+    }
+    36
+}
+
 /// Initial APIC id of the boot CPU.
 ///
 /// Use leaf 0xB (extended topology) when the firmware advertises it, otherwise leaf 1 EBX[31:24].

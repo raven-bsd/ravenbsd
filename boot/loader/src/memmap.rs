@@ -73,6 +73,7 @@ impl fmt::Display for MemMapError {
 /// Preallocated scratch space for [`convert_into`].
 pub struct MemMapBuffers {
     spans: Vec<(u64, u64, MemoryKind)>,
+    tracked: Vec<(u64, u64)>,
     boundaries: Vec<u64>,
     entries: Vec<(u64, u64, MemoryKind)>,
 }
@@ -83,6 +84,7 @@ impl MemMapBuffers {
         let boundary_capacity = max_entries.saturating_mul(2).saturating_add(8);
         Self {
             spans: Vec::with_capacity(max_entries.saturating_add(4)),
+            tracked: Vec::with_capacity(8),
             boundaries: Vec::with_capacity(boundary_capacity),
             entries: Vec::with_capacity(boundary_capacity),
         }
@@ -154,6 +156,7 @@ pub fn convert_into(
     buffers: &mut MemMapBuffers,
 ) -> Result<(), MemMapError> {
     buffers.spans.clear();
+    buffers.tracked.clear();
     buffers.boundaries.clear();
     buffers.entries.clear();
 
@@ -199,6 +202,13 @@ pub fn convert_into(
                 .ok_or(MemMapError::Overflow)?,
         )
         .ok_or(MemMapError::Overflow)?;
+        if end <= start {
+            continue;
+        }
+        if buffers.tracked.len() == buffers.tracked.capacity() {
+            return Err(MemMapError::Capacity);
+        }
+        buffers.tracked.push((start, end));
         if buffers.boundaries.len() + 2 > buffers.boundaries.capacity() {
             return Err(MemMapError::Capacity);
         }
@@ -220,9 +230,10 @@ pub fn convert_into(
             continue;
         }
 
-        let in_tracked = tracked.iter().any(|range| {
-            range.len != 0 && range.base <= start && range.base.saturating_add(range.len) >= end
-        });
+        let in_tracked = buffers
+            .tracked
+            .iter()
+            .any(|&(tracked_start, tracked_end)| tracked_start <= start && tracked_end >= end);
         let covered = buffers
             .spans
             .iter()
@@ -452,6 +463,49 @@ mod tests {
         assert_eq!(mapped[0].kind(), Some(MemoryKind::KernelAndModules));
         assert_eq!(mapped[0].base, 0x20_0000);
         assert_eq!(mapped[0].len, 0x2000);
+    }
+
+    #[test]
+    fn tracked_partial_page_protects_the_whole_page() {
+        let tracked = PhysRange {
+            base: 0x20_0000,
+            len: 4097,
+        };
+        let mapped = convert(
+            &[descriptor(MemoryType::LOADER_DATA, 0x20_0000, 2)],
+            &[tracked],
+        )
+        .unwrap();
+        assert_eq!(mapped.len(), 1);
+        assert_eq!(mapped[0].kind(), Some(MemoryKind::KernelAndModules));
+        assert_eq!(mapped[0].base, 0x20_0000);
+        assert_eq!(mapped[0].len, 0x2000);
+    }
+
+    #[test]
+    fn tracked_unaligned_range_is_page_rounded() {
+        let tracked = PhysRange {
+            base: 0x20_0123,
+            len: 1,
+        };
+        let mapped = convert(
+            &[descriptor(MemoryType::LOADER_DATA, 0x20_0000, 1)],
+            &[tracked],
+        )
+        .unwrap();
+        assert_eq!(mapped.len(), 1);
+        assert_eq!(mapped[0].kind(), Some(MemoryKind::KernelAndModules));
+        assert_eq!(mapped[0].base, 0x20_0000);
+        assert_eq!(mapped[0].len, 0x1000);
+    }
+
+    #[test]
+    fn tracked_range_overflow_is_rejected() {
+        let tracked = PhysRange {
+            base: u64::MAX - 0x1000,
+            len: 0x2000,
+        };
+        assert_eq!(convert(&[], &[tracked]), Err(MemMapError::Overflow));
     }
 
     #[test]

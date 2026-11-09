@@ -291,10 +291,11 @@ fn finish(prepared: Prepared, memory_map: &MemoryMapOwned) -> ! {
 
     let pool_base = pool.base();
     let pool_size = pool.size();
-    let mut tables = match paging::PageTables::new(pool) {
-        Ok(tables) => tables,
-        Err(error) => fail(format_args!("cannot create the page tables: {error}")),
-    };
+    let mut tables =
+        match paging::PageTables::new_with_physical_bits(pool, handoff::physical_bits()) {
+            Ok(tables) => tables,
+            Err(error) => fail(format_args!("cannot create the page tables: {error}")),
+        };
 
     for region in &regions {
         let result = match region.kind() {
