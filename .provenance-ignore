@@ -1,0 +1,9 @@
+# Paths exempt from the SPDX header rule: generated files, legal boilerplate and
+# documentation entry points. One glob-like prefix per line; `#` starts a comment.
+Cargo.lock
+LICENSE
+NOTICE
+PROVENANCE.toml
+AI_POLICY.md
+README.md
+docs/man
