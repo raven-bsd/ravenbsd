@@ -12,6 +12,7 @@ resolver = "3"
 members = [
     "crates/*",
     "kernel",
+    "xtask",
 ]
 default-members = ["crates/*"]
 
