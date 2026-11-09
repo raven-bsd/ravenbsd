@@ -1,0 +1,8 @@
+# SYNTHETIC pjdfstest direct output. Hand-written from tests/misc.sh conventions;
+# it was not produced by running pjdfstest. No GPL code was copied.
+1..5
+ok 1 - direct pass
+not ok 2 - direct fail
+ok 3 # SKIP not supported on this platform
+ok 4 # TODO expected failure
+not ok 5 # TODO expected failure

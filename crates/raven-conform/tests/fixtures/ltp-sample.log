@@ -1,0 +1,14 @@
+# SYNTHETIC LTP output. Hand-written from the ltp-pan tag=... result format and
+# the TPASS/TFAIL/TCONF/TBROK/TWARN/TINFO conventions in lib/tst_res.c and
+# doc/old/Shell-Test-API.asciidoc. It was not produced by running LTP.
+tag=open01 stime=1700000000 dur=1 exit=exited stat=0 core=no cu=1 cs=0
+tag=open02 stime=1700000000 dur=2 exit=exited stat=1 core=no cu=1 cs=0
+tag=open03 stime=1700000000 dur=0 exit=exited stat=32 core=no cu=1 cs=0
+tag=open04 stime=1700000000 dur=1 exit=exited stat=2 core=no cu=1 cs=0
+tag=open05 stime=1700000000 dur=1 exit=signaled stat=9 core=yes cu=1 cs=0
+open01 1 TPASS: open O_RDONLY
+open02 1 TFAIL: open expected EACCES
+open03 1 TCONF: not supported
+open04 1 TBROK: harness failed
+open05 1 TINFO: informational line
+open05 2 TWARN: warning line

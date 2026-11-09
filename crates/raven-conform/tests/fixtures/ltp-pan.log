@@ -1,0 +1,6 @@
+# SYNTHETIC LTP ltp-pan output. Hand-written from the tag=... result format;
+# it was not produced by running LTP.
+tag=fs_acl01 stime=1700000000 dur=3 exit=exited stat=0 core=no cu=1 cs=0
+tag=fs_acl02 stime=1700000000 dur=1 exit=exited stat=1 core=no cu=1 cs=0
+tag=fs_acl03 stime=1700000000 dur=0 exit=exited stat=32 core=no cu=1 cs=0
+tag=fs_acl04 stime=1700000000 dur=1 exit=exited stat=2 core=no cu=1 cs=0
