@@ -17,6 +17,8 @@ use crate::memory::mmio;
 const IOREGSEL: usize = 0x00;
 /// IOAPIC data window offset.
 const IOWIN: usize = 0x10;
+/// Maximum IOAPICs retained, matching the MADT parser.
+const MAX_IOAPICS: usize = 8;
 
 #[derive(Clone, Copy)]
 struct State {
@@ -25,14 +27,16 @@ struct State {
     max_entry: u8,
 }
 
-static IOAPIC: Mutex<Option<State>> = Mutex::new(None);
+const NO_STATE: Option<State> = None;
+
+static IOAPICS: Mutex<[Option<State>; MAX_IOAPICS]> = Mutex::new([NO_STATE; MAX_IOAPICS]);
 
 /// Why an IOAPIC operation failed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IoApicError {
     /// No IOAPIC was mapped.
     NotMapped,
-    /// The GSI is outside this IOAPIC's redirection table.
+    /// The GSI is outside every mapped IOAPIC's redirection table.
     OutOfRange,
     /// The MMIO page could not be mapped.
     Map(MapError),
@@ -42,29 +46,48 @@ impl fmt::Display for IoApicError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             IoApicError::NotMapped => f.write_str("no IOAPIC mapped"),
-            IoApicError::OutOfRange => f.write_str("GSI outside the IOAPIC table"),
+            IoApicError::OutOfRange => f.write_str("GSI outside the IOAPIC tables"),
             IoApicError::Map(error) => write!(f, "IOAPIC MMIO map failed: {error}"),
         }
     }
 }
 
-/// Map the first MADT IOAPIC and mask every redirection entry.
+/// Map every MADT IOAPIC and mask all redirection entries.
 pub fn init() -> Result<(), IoApicError> {
     let info = acpi::info();
-    let Some(first) = info.io_apics.first() else {
-        return Ok(());
-    };
-    let base = mmio::map_mmio(first.address, 0x1000).map_err(IoApicError::Map)? as usize;
-    let version = read_reg(base, 1);
-    let max_entry = ((version >> 16) & 0xFF) as u8;
-    let state = State {
-        base,
-        gsi_base: first.gsi_base,
-        max_entry,
-    };
-    mask_all_state(&state);
-    *IOAPIC.lock() = Some(state);
-    Ok(())
+    let mut guard = IOAPICS.lock();
+    let mut stored = 0usize;
+    let mut first_error = None;
+
+    for entry in info.io_apics.iter().take(info.io_apic_count) {
+        let base = match mmio::map_mmio(entry.address, 0x1000) {
+            Ok(base) => base as usize,
+            Err(error) => {
+                if first_error.is_none() {
+                    first_error = Some(IoApicError::Map(error));
+                }
+                continue;
+            }
+        };
+        let version = read_reg(base, 1);
+        let max_entry = ((version >> 16) & 0xFF) as u8;
+        let state = State {
+            base,
+            gsi_base: entry.gsi_base,
+            max_entry,
+        };
+        mask_all_state(&state);
+        if let Some(slot) = guard.get_mut(stored) {
+            *slot = Some(state);
+            stored = stored.saturating_add(1);
+        }
+    }
+
+    if stored == 0 {
+        Err(first_error.unwrap_or(IoApicError::NotMapped))
+    } else {
+        Ok(())
+    }
 }
 
 /// Translate an ISA IRQ through the MADT overrides.
@@ -80,14 +103,8 @@ pub fn route(
     active_low: bool,
     level: bool,
 ) -> Result<(), IoApicError> {
-    let guard = IOAPIC.lock();
-    let state = guard.as_ref().ok_or(IoApicError::NotMapped)?;
-    let index = gsi
-        .checked_sub(state.gsi_base)
-        .ok_or(IoApicError::OutOfRange)?;
-    if index > u32::from(state.max_entry) {
-        return Err(IoApicError::OutOfRange);
-    }
+    let guard = IOAPICS.lock();
+    let (index, state) = find_state(&guard, gsi)?;
 
     let mut low = u32::from(vector);
     if active_low {
@@ -97,31 +114,46 @@ pub fn route(
         low |= 1 << 15;
     }
     let high = (destination & 0xFF) << 24;
-    write_redirection(state, index as u8, low, high);
+    write_redirection(state, index, low, high);
     Ok(())
 }
 
 /// Mask one GSI.
 pub fn mask(gsi: u32) -> Result<(), IoApicError> {
-    let guard = IOAPIC.lock();
-    let state = guard.as_ref().ok_or(IoApicError::NotMapped)?;
-    let index = gsi
-        .checked_sub(state.gsi_base)
-        .ok_or(IoApicError::OutOfRange)?;
-    if index > u32::from(state.max_entry) {
-        return Err(IoApicError::OutOfRange);
-    }
-    let mut entry = read_redirection(state, index as u8);
+    let guard = IOAPICS.lock();
+    let (index, state) = find_state(&guard, gsi)?;
+    let mut entry = read_redirection(state, index);
     entry |= 1 << 16;
-    write_redirection(state, index as u8, entry as u32, (entry >> 32) as u32);
+    write_redirection(state, index, entry as u32, (entry >> 32) as u32);
     Ok(())
 }
 
-/// Mask every redirection entry of the mapped IOAPIC.
+/// Mask every redirection entry of every mapped IOAPIC.
 pub fn mask_all() {
-    let guard = IOAPIC.lock();
-    if let Some(state) = guard.as_ref() {
+    let guard = IOAPICS.lock();
+    for state in guard.iter().flatten() {
         mask_all_state(state);
+    }
+}
+
+fn find_state(
+    states: &[Option<State>; MAX_IOAPICS],
+    gsi: u32,
+) -> Result<(u8, &State), IoApicError> {
+    let mut any = false;
+    for state in states.iter().flatten() {
+        any = true;
+        let Some(offset) = gsi.checked_sub(state.gsi_base) else {
+            continue;
+        };
+        if offset <= u32::from(state.max_entry) {
+            return Ok((offset as u8, state));
+        }
+    }
+    if any {
+        Err(IoApicError::OutOfRange)
+    } else {
+        Err(IoApicError::NotMapped)
     }
 }
 
