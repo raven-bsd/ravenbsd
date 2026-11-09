@@ -11,25 +11,3 @@
 # copied = "2026-11-09"
 # modified = true
 # notes = "..."
-
-[[import]]
-path = "toolchain/patches/0001-add-ravenbsd-targets.patch"
-upstream = "rust"
-upstream_path = "compiler/rustc_target/src/spec and library/std"
-upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
-license = "MIT OR Apache-2.0"
-tier = "A"
-copied = "2026-11-09"
-modified = true
-notes = "RavenBSD target specs, Os::Ravenbsd registration and std cfg changes against Rust 1.97.1."
-
-[[import]]
-path = "toolchain/patches/0002-libc-ravenbsd.patch"
-upstream = "rust-libc"
-upstream_path = "src/unix/redox/mod.rs and the libc 0.2.185 crate sources"
-upstream_rev = "7631ff2ae852bdef359933b65349773f58733ece"
-license = "MIT OR Apache-2.0"
-tier = "A"
-copied = "2026-11-09"
-modified = true
-notes = "Vendored libc 0.2.185 from the crates.io source matching library/Cargo.lock; ravenbsd module derived from redox/mod.rs; donor revision is the project reference."
