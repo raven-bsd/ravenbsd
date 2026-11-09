@@ -329,13 +329,10 @@ mod tests {
 
     #[test]
     fn approved_ucs2_mpl_dependency_passes() {
-        let temp = fixture_repo(
-            "deps-ucs2",
-            "ucs2",
-            "0.3.3",
-            "MPL-2.0",
-            Some("# approved\nucs2\n"),
-        );
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let real_allow = fs::read_to_string(root.join(".provenance-allow-mpl"))
+            .expect("repository allow-list is readable");
+        let temp = fixture_repo("deps-ucs2", "ucs2", "0.3.3", "MPL-2.0", Some(&real_allow));
         let violations = dependency_violations(temp.path());
         assert!(violations.is_empty(), "{violations:?}");
     }
