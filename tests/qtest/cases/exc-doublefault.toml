@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "exc-doublefault"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 30
+boot_cmdline = "console=ttyS0 test-exit=1 selftest=doublefault"
+expect_exit = "failure"
+
+[[expect]]
+regex = 'EXCEPTION: double fault'
+
+[[expect]]
+regex = 'handler_rsp=0x'

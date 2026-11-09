@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "exc-pagefault"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 30
+boot_cmdline = "console=ttyS0 test-exit=1 selftest=pagefault"
+expect_exit = "failure"
+
+[[expect]]
+regex = 'EXCEPTION: page fault'
+
+[[expect]]
+regex = 'cr2=0x00000000dead0000'
+
+[[expect]]
+regex = 'page-fault: present=0'
