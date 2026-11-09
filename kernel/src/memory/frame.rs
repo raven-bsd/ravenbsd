@@ -47,8 +47,6 @@ pub struct FrameStats {
 /// Why the frame allocator could not be initialised.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FrameInitError {
-    /// The allocator has already been initialised.
-    AlreadyInitialized,
     /// The memory map is empty.
     EmptyMap,
     /// No Usable region above 1 MiB is large enough for the bitmap.
@@ -62,9 +60,6 @@ pub enum FrameInitError {
 impl fmt::Display for FrameInitError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            FrameInitError::AlreadyInitialized => {
-                f.write_str("frame allocator already initialised")
-            }
             FrameInitError::EmptyMap => f.write_str("memory map is empty"),
             FrameInitError::NoUsableRegion => {
                 f.write_str("no Usable region is large enough for the frame bitmap")
@@ -84,12 +79,16 @@ static ALLOCATOR: SpinMutex<Option<State>> = SpinMutex::new(None);
 static HHDM_OFFSET: AtomicU64 = AtomicU64::new(0);
 
 /// Build the global allocator from `map` and return its initial statistics.
+///
+/// Calling this again after a successful initialisation returns the current statistics; boot
+/// stages that need the allocator early (S06 paging) rely on this idempotent behaviour.
 pub fn init(hhdm_offset: u64, map: &[MemoryRegion]) -> Result<FrameStats, FrameInitError> {
     if !hhdm_offset.is_multiple_of(PAGE_SIZE) || hhdm_offset == 0 {
         return Err(FrameInitError::BadHhdm);
     }
-    if ALLOCATOR.lock().is_some() {
-        return Err(FrameInitError::AlreadyInitialized);
+    let already_initialized = ALLOCATOR.lock().is_some();
+    if already_initialized {
+        return Ok(stats());
     }
     if map.is_empty() {
         return Err(FrameInitError::EmptyMap);
@@ -205,6 +204,36 @@ pub fn phys_to_virt(phys: PhysAddr) -> *mut u8 {
     hhdm.checked_add(phys.0)
         .map(|address| address as *mut u8)
         .unwrap_or(core::ptr::null_mut())
+}
+
+/// The HHDM base recorded at initialisation; zero before initialisation.
+pub fn hhdm_offset() -> u64 {
+    HHDM_OFFSET.load(Ordering::Acquire)
+}
+
+/// Free every frame in `base..base + len`, returning how many frames became free.
+///
+/// Frames that are already free are skipped. The range is expected to be page aligned; a
+/// misaligned base frees nothing.
+pub fn free_range(base: u64, len: u64) -> u64 {
+    if !base.is_multiple_of(PAGE_SIZE) {
+        return 0;
+    }
+    let frames = len >> 12;
+    let mut freed = 0u64;
+    let mut state = ALLOCATOR.lock();
+    let Some(state) = state.as_mut() else {
+        return 0;
+    };
+    let mut offset = 0u64;
+    while offset < frames {
+        let frame = base.saturating_add(offset << 12);
+        if state.allocator.free(frame >> 12).is_ok() {
+            freed = freed.saturating_add(1);
+        }
+        offset = offset.saturating_add(1);
+    }
+    freed
 }
 
 fn stats_for(allocator: &FrameAllocator<'_>, usable_regions: u64) -> FrameStats {

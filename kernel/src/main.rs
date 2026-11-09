@@ -6,6 +6,8 @@
 #![no_std]
 #![no_main]
 
+extern crate alloc;
+
 mod arch;
 mod backtrace;
 mod boot;
@@ -26,17 +28,45 @@ use raven_mem as _;
 pub extern "C" fn kmain(boot: *const raven_bootinfo::BootInfo) -> ! {
     arch::serial::init();
 
-    // S05 installs the CPU tables and runs the optional self-test before S04's banner path.
-    // `boot::run` validates the handoff again; this early validation only supplies the command
-    // line to the self-test runner.
-    if let Ok(data) = boot::validate(boot) {
-        let cmdline = cmdline::CmdLine::parse(data.cmdline);
-        log::init(cmdline.loglevel());
-        log::set_test_exit(cmdline.test_exit());
-        arch::gdt::init();
-        arch::idt::init();
-        selftest::run(&cmdline);
+    let data = match boot::validate(boot) {
+        Ok(data) => data,
+        Err(error) => {
+            kprintln!("kernel: error: {error}");
+            boot::exit_qemu(0x11);
+        }
+    };
+    {
+        let initial_cmdline = cmdline::CmdLine::parse(data.cmdline);
+        log::init(initial_cmdline.loglevel());
+        log::set_test_exit(initial_cmdline.test_exit());
     }
 
-    boot::run(boot)
+    // S05 installs the CPU tables before any exception can be reported.
+    arch::gdt::init();
+    arch::idt::init();
+
+    if let Err(error) = memory::frame::init(data.info.hhdm_offset, data.memory_map) {
+        kprintln!("kernel: error: {error}");
+        boot::exit_qemu(0x11);
+    }
+    let boot_info = match memory::paging::init(&data) {
+        Ok(boot_info) => boot_info,
+        Err(error) => {
+            kprintln!("kernel: error: {error}");
+            boot::exit_qemu(0x11);
+        }
+    };
+    if let Err(error) = memory::heap::init() {
+        kprintln!("kernel: error: {error}");
+        boot::exit_qemu(0x11);
+    }
+
+    // `data` still points at loader memory that paging just reclaimed. Re-parse the command line
+    // from the kernel-owned copy before running the self-tests.
+    let cmdline = cmdline::CmdLine::parse(memory::paging::cmdline());
+    selftest::run(&cmdline);
+
+    // `boot::run` re-validates the copied handoff, finds the frame allocator already initialised,
+    // prints the S04 banner and exits through the test-exit port.
+    boot::run(boot_info)
 }

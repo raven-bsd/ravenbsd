@@ -137,6 +137,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
 
 [[package]]
+name = "linked_list_allocator"
+version = "0.10.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b23ac50abb8261cb38c6e2a7192d3302e0836dac1628f6a93b82b4fad185897"
+
+[[package]]
 name = "linux-corpus"
 version = "0.1.0"
 dependencies = [
@@ -255,9 +261,12 @@ version = "0.1.0"
 name = "raven-kernel"
 version = "0.1.0"
 dependencies = [
+ "linked_list_allocator",
  "raven-abi",
  "raven-bootinfo",
  "raven-mem",
+ "raven-rmm",
+ "spin",
 ]
 
 [[package]]
@@ -311,6 +320,10 @@ dependencies = [
  "serde_json",
  "toml",
 ]
+
+[[package]]
+name = "raven-rmm"
+version = "0.1.0"
 
 [[package]]
 name = "raven-rt"
@@ -424,6 +437,12 @@ dependencies = [
  "heapless",
  "managed",
 ]
+
+[[package]]
+name = "spin"
+version = "0.9.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
 
 [[package]]
 name = "stable_deref_trait"
