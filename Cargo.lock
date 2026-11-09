@@ -82,6 +82,10 @@ name = "raven-elf"
 version = "0.1.0"
 
 [[package]]
+name = "raven-initfs"
+version = "0.1.0"
+
+[[package]]
 name = "raven-kernel"
 version = "0.1.0"
 dependencies = [

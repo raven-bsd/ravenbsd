@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-initfs"
+version = "0.1.0"
+description = "Strict, deterministic initfs boot-archive reader and builder."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+# Enables `InitfsBuilder` and the `std::error::Error` implementations. The reader stays no_std.
+std = []
+
+[[example]]
+name = "mkinitfs"
+path = "examples/mkinitfs.rs"
+required-features = ["std"]
+
+[[example]]
+name = "lsinitfs"
+path = "examples/lsinitfs.rs"
+required-features = ["std"]
+
+[lints]
+workspace = true
