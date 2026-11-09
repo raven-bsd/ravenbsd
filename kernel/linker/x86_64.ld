@@ -42,6 +42,11 @@ SECTIONS {
 
     .bss ALIGN(4096) (NOLOAD) : AT(ADDR(.bss) - KERNEL_OFFSET) {
         __bss_start = .;
+        /* The boot stack must start on a page boundary (checked in memory::paging), so it gets
+         * its own page-aligned slot at the start of .bss, before any other .bss input section. */
+        . = ALIGN(4096);
+        KEEP(*(.bss.__boot_stack))
+        . = ALIGN(4096);
         *(.bss .bss.*)
         *(COMMON)
         __bss_end = .;
