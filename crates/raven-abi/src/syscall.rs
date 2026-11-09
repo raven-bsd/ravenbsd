@@ -81,6 +81,12 @@ syscalls! {
     /// `protect(proc: Handle, addr: usize, len: usize, prot: usize) -> 0`.
     PROTECT = 0x42;
 
+    /// `memobj_create(len: usize, flags: usize) -> Handle` creates an anonymous, zero-filled memory object of `len` bytes
+    /// (page multiple, `flags` must be 0) with rights `READ | WRITE | MAP | DUP | TRANSFER`. Map it into any process
+    /// with [`Syscall::MAP`] (`map::SHARED` shares the frames, otherwise copy-on-write). This is how a parent
+    /// writes a child's stack and segments: map the object into itself, fill it, map the same object into the child.
+    MEMOBJ_CREATE = 0x43;
+
     /// `handle_close(h: Handle) -> 0`.
     HANDLE_CLOSE = 0x50;
     /// `handle_dup(h: Handle, rights_mask: u32) -> Handle`; new rights = old rights AND mask. Requires `DUP`.
@@ -117,6 +123,7 @@ mod tests {
         assert_eq!(Syscall::PROC_CREATE as usize, 0x30);
         assert_eq!(Syscall::PROC_WAIT as usize, 0x31);
         assert_eq!(Syscall::MAP as usize, 0x40);
+        assert_eq!(Syscall::MEMOBJ_CREATE as usize, 0x43);
         assert_eq!(Syscall::HANDLE_DUP as usize, 0x51);
     }
 
