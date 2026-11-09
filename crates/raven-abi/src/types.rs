@@ -110,6 +110,14 @@ pub mod map {
     }
 }
 
+/// Futex operations.
+pub mod futex {
+    /// Sleep while the word at the address equals `val`.
+    pub const WAIT: u32 = 0;
+    /// Wake up to `val` waiters.
+    pub const WAKE: u32 = 1;
+}
+
 /// Clock identifiers (Linux numbering).
 pub mod clock {
     /// Wall-clock time since the Unix epoch.

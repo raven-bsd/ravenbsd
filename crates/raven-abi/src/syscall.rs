@@ -59,10 +59,17 @@ syscalls! {
     THREAD_CREATE = 0x20;
     /// `thread_exit(code: i32) -> !` terminates the calling thread.
     THREAD_EXIT = 0x21;
+    /// `futex(addr: *const u32, op: u32, val: u32, timeout_ns: u64) -> isize`. `op` is
+    /// [`crate::types::futex::WAIT`] (sleep while `*addr == val`; `-EAGAIN` if it differs, `-ETIMEDOUT` on
+    /// timeout, `timeout_ns == 0` means no timeout) or [`crate::types::futex::WAKE`] (wake up to `val`
+    /// waiters, returns the number woken).
+    FUTEX = 0x22;
 
     /// `proc_create(flags: usize) -> Handle` creates an empty process (no threads) and returns a
     /// handle with all rights.
     PROC_CREATE = 0x30;
+    /// `proc_wait(proc: Handle, out_code: *mut i32) -> 0` blocks until the process has exited and stores its exit code.
+    PROC_WAIT = 0x31;
 
     /// `map(proc: Handle, memobj: Handle, offset: usize, addr: usize, len: usize, flags: usize) -> addr`
     /// maps `len` bytes (page multiple) of `memobj` (or fresh zeroed memory when `memobj ==
@@ -106,7 +113,9 @@ mod tests {
         assert_eq!(Syscall::EXIT as usize, 0x01);
         assert_eq!(Syscall::DEBUG_WRITE as usize, 0x03);
         assert_eq!(Syscall::UNAME as usize, 0x06);
+        assert_eq!(Syscall::FUTEX as usize, 0x22);
         assert_eq!(Syscall::PROC_CREATE as usize, 0x30);
+        assert_eq!(Syscall::PROC_WAIT as usize, 0x31);
         assert_eq!(Syscall::MAP as usize, 0x40);
         assert_eq!(Syscall::HANDLE_DUP as usize, 0x51);
     }
