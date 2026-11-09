@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# Test fixtures for the stable guard. One repository-relative path per line.
+xtask/tests/guard/feature_positive.rs.txt
+xtask/tests/guard/feature_negative.rs.txt
+xtask/tests/guard/bootstrap_positive.sh
+xtask/tests/guard/bootstrap_negative.sh
+xtask/tests/guard/zflag_positive.sh
+xtask/tests/guard/zflag_negative.sh
+xtask/tests/guard/nightly_positive.sh
+xtask/tests/guard/nightly_negative.sh
+xtask/tests/guard/toolchain_nightly_positive.toml
+xtask/tests/guard/toolchain_good.toml
+xtask/tests/guard/toolchain_channel_positive.toml
+xtask/tests/guard/cargo_plus_positive.txt
+xtask/tests/guard/cargo_plus_negative.txt
+xtask/tests/guard/unstable_allow_positive.rs.txt
+xtask/tests/guard/unstable_allow_negative.rs.txt
