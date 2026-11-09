@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-qtest"
+version = "0.1.0"
+description = "QEMU test harness: case files, serial matching, timeouts and JSON results."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow = "1.0"
+regex = "1.13"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "1.2"
+
+[lints]
+workspace = true
