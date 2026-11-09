@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-netcore"
+version = "0.1.0"
+description = "OS-independent smoltcp socket layer: nonblocking TCP/UDP sockets, readiness events and interface configuration."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+# Builds the in-memory PairDevice used by integration tests and host harnesses.
+testutil = []
+
+[[test]]
+name = "core"
+required-features = ["testutil"]
+
+[[test]]
+name = "tcp"
+required-features = ["testutil"]
+
+[[test]]
+name = "udp"
+required-features = ["testutil"]
+
+[dependencies]
+smoltcp = { version = "0.14", default-features = false, features = [
+    "alloc",
+    "medium-ethernet",
+    "proto-ipv4",
+    "socket-tcp",
+    "socket-udp",
+    "socket-dhcpv4",
+] }
+raven-abi = { path = "../raven-abi" }
