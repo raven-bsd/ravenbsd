@@ -13,6 +13,7 @@ members = [
     "crates/*",
     "kernel",
     "xtask",
+    "tests/qtest",
 ]
 default-members = ["crates/*"]
 
