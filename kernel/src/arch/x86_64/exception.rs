@@ -60,7 +60,11 @@ core::arch::global_asm!(
     .global isr_common
     .type isr_common, @function
 isr_common:
-    /* TODO(S08): handle swapgs when user mode starts. S05 is kernel-only. */
+    /* Saved CS is at [rsp+24] for both error-code and dummy-error stubs. */
+    test byte ptr [rsp+24], 3
+    jz 1f
+    swapgs
+1:
     cld
     push rax
     push rbx
@@ -98,6 +102,11 @@ isr_common:
     pop rbx
     pop rax
     add rsp, 16
+    /* Saved CS is at [rsp+8] now; pair the entry swapgs for ring 3. */
+    test byte ptr [rsp+8], 3
+    jz 2f
+    swapgs
+2:
     iretq
 
     .macro isr n
@@ -143,9 +152,22 @@ pub fn isr_address(vector: u16) -> u64 {
 #[unsafe(no_mangle)]
 pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
     let vector = frame.vector as usize;
+    let from_user = frame.cs & 3 == 3;
     if vector == 3 {
         kprintln!("EXCEPTION: breakpoint");
         return;
+    }
+    if vector == 14 {
+        let cr2 = read_cr2();
+        if crate::usercopy::handle_page_fault(frame, cr2) {
+            return;
+        }
+        if from_user {
+            crate::process::page_fault(cr2);
+        }
+    }
+    if from_user {
+        crate::process::user_exception(vector);
     }
     if vector >= 32 {
         unexpected_interrupt(vector);

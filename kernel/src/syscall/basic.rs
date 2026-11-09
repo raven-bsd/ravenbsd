@@ -1,0 +1,135 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+//! The M1 syscall subset.
+
+use alloc::format;
+use alloc::string::String;
+
+use raven_abi::errno::Errno;
+use raven_abi::syscall::Syscall;
+use raven_abi::types::{Handle, Timespec, clock};
+use raven_abi::uname::Uname;
+use raven_usercopy::UserSlice;
+
+use crate::arch::x86_64::serial;
+use crate::arch::x86_64::trapframe::TrapFrame;
+use crate::cmdline::CmdLine;
+use crate::process;
+use crate::time;
+use crate::usercopy::{copy_from_user, copy_to_user};
+
+/// Dispatch one decoded syscall.
+pub fn dispatch(call: Syscall, frame: &mut TrapFrame) -> Result<usize, Errno> {
+    match call {
+        Syscall::EXIT => process::exit_current(frame.rdi as i32),
+        Syscall::YIELD => Ok(0),
+        Syscall::DEBUG_WRITE => debug_write(frame.rdi, frame.rsi),
+        Syscall::CLOCK_GET => clock_get(frame.rdi as u32, frame.rsi),
+        Syscall::NANOSLEEP => nanosleep(frame.rdi),
+        Syscall::UNAME => uname(frame.rdi),
+        Syscall::HANDLE_CLOSE => handle_close(frame.rdi as u32),
+        Syscall::HANDLE_DUP => handle_dup(frame.rdi as u32, frame.rsi as u32),
+        _ => Err(Errno::ENOSYS),
+    }
+}
+
+fn debug_write(pointer: u64, length: u64) -> Result<usize, Errno> {
+    let length = usize::try_from(length).map_err(|_| Errno::EINVAL)?;
+    if length > 4096 {
+        return Err(Errno::EINVAL);
+    }
+    if length == 0 {
+        return Ok(0);
+    }
+    let source = UserSlice::new(pointer, length as u64)?;
+    let mut buffer = [0u8; 4096];
+    let destination = buffer.get_mut(..length).ok_or(Errno::EINVAL)?;
+    copy_from_user(destination, source)?;
+    let written = buffer.get(..length).ok_or(Errno::EINVAL)?;
+    serial::write_bytes(written);
+    Ok(length)
+}
+
+fn clock_get(clock_id: u32, pointer: u64) -> Result<usize, Errno> {
+    let ns = match clock_id {
+        clock::MONOTONIC => time::now_ns(),
+        clock::REALTIME => time::boot_realtime_ns(),
+        _ => return Err(Errno::EINVAL),
+    };
+    let timespec = Timespec {
+        tv_sec: (ns / 1_000_000_000) as i64,
+        tv_nsec: (ns % 1_000_000_000) as i64,
+    };
+    let destination = UserSlice::new(
+        pointer,
+        u64::try_from(core::mem::size_of::<Timespec>()).map_err(|_| Errno::EFAULT)?,
+    )?;
+    // SAFETY: `timespec` is a live stack value and the slice covers exactly its bytes.
+    let bytes = unsafe {
+        core::slice::from_raw_parts(
+            core::ptr::addr_of!(timespec).cast::<u8>(),
+            core::mem::size_of::<Timespec>(),
+        )
+    };
+    copy_to_user(destination, bytes)?;
+    Ok(0)
+}
+
+fn nanosleep(ns: u64) -> Result<usize, Errno> {
+    if ns == 0 {
+        return Ok(0);
+    }
+    let deadline = time::now_ns().saturating_add(ns);
+    while time::now_ns() < deadline {
+        // SAFETY: the timer and spurious gates are installed before user mode; `sti` lets the
+        // timer wake `hlt`, then `cli` restores the kernel's interrupted-syscall flag state.
+        unsafe {
+            core::arch::asm!("sti", "hlt", "cli", options(nomem, nostack),);
+        }
+    }
+    Ok(0)
+}
+
+fn uname(pointer: u64) -> Result<usize, Errno> {
+    let cmdline = CmdLine::parse(crate::memory::paging::cmdline());
+    let profile = cmdline.get("profile").unwrap_or("base");
+    let profile: String = profile.chars().map(|ch| ch.to_ascii_uppercase()).collect();
+    let version = format!("RavenBSD 0.1 ({profile}) #1: {}", env!("RAVEN_BUILD_ID"));
+
+    let mut uname = Uname::zeroed();
+    Uname::set_field(&mut uname.sysname, raven_abi::uname::SYSNAME);
+    Uname::set_field(&mut uname.nodename, "raven");
+    Uname::set_field(&mut uname.release, raven_abi::uname::RELEASE);
+    Uname::set_field(&mut uname.version, &version);
+    Uname::set_field(&mut uname.machine, "x86_64");
+
+    let destination = UserSlice::new(
+        pointer,
+        u64::try_from(core::mem::size_of::<Uname>()).map_err(|_| Errno::EFAULT)?,
+    )?;
+    // SAFETY: `uname` is a live stack value and the slice covers exactly its bytes.
+    let bytes = unsafe {
+        core::slice::from_raw_parts(
+            core::ptr::addr_of!(uname).cast::<u8>(),
+            core::mem::size_of::<Uname>(),
+        )
+    };
+    copy_to_user(destination, bytes)?;
+    Ok(0)
+}
+
+fn handle_close(raw: u32) -> Result<usize, Errno> {
+    let process = process::current().ok_or(Errno::ESRCH)?;
+    process.handles.lock().close(Handle(raw))?;
+    Ok(0)
+}
+
+fn handle_dup(raw: u32, mask: u32) -> Result<usize, Errno> {
+    let process = process::current().ok_or(Errno::ESRCH)?;
+    let duplicate = process
+        .handles
+        .lock()
+        .dup(Handle(raw), raven_abi::types::Rights(mask))?;
+    Ok(duplicate.0 as usize)
+}

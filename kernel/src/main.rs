@@ -12,10 +12,14 @@ mod arch;
 mod backtrace;
 mod boot;
 mod cmdline;
+mod initfs;
 mod log;
 mod memory;
+mod process;
 mod selftest;
+mod syscall;
 mod time;
+mod usercopy;
 
 // Force the `raven-mem` object code (including the exported C ABI symbols) into the link.
 use raven_mem as _;
@@ -61,6 +65,7 @@ pub extern "C" fn kmain(boot: *const raven_bootinfo::BootInfo) -> ! {
         kprintln!("kernel: error: {error}");
         boot::exit_qemu(0x11);
     }
+    initfs::init();
 
     arch::acpi::init();
     arch::pic::remap_and_mask();
@@ -78,11 +83,26 @@ pub extern "C" fn kmain(boot: *const raven_bootinfo::BootInfo) -> ! {
     arch::enable_interrupts();
 
     // `data` still points at loader memory that paging just reclaimed. Re-parse the command line
-    // from the kernel-owned copy before running the self-tests.
+    // from the kernel-owned copy.
     let cmdline = cmdline::CmdLine::parse(memory::paging::cmdline());
-    selftest::run(&cmdline);
+    if cmdline.get("selftest").is_some() {
+        selftest::run(&cmdline);
+    } else if process::init_available(&cmdline) {
+        let printable = boot::BootData {
+            // SAFETY: paging published the copied BootInfo before the banner path.
+            info: unsafe { *memory::paging::boot_info_ptr() },
+            memory_map: memory::paging::memory_map(),
+            cmdline: memory::paging::cmdline(),
+        };
+        boot::print_banner(&printable);
+        if let Err(error) = process::start_init(&cmdline) {
+            kprintln!("kernel: error: {error}");
+            boot::exit_qemu(0x11);
+        }
+    }
 
     // `boot::run` re-validates the copied handoff, finds the frame allocator already initialised,
-    // prints the S04 banner and exits through the test-exit port.
+    // prints the S04 banner and exits through the test-exit port. It is reached for the legacy
+    // no-initfs tests and after a self-test; a successful `/init` exit never returns here.
     boot::run(boot_info)
 }
