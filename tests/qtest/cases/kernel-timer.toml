@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "kernel-timer"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 60
+boot_cmdline = "console=ttyS0 test-exit=1 selftest=timer"
+expect_exit = "success"
+
+[[expect]]
+regex = '^acpi: \d+ cpus, \d+ ioapics, \d+ overrides$'
+
+[[expect]]
+regex = '^apic: id \d+ \((x2apic|xapic)\)$'
+
+[[expect]]
+regex = '^time: tsc \d+ MHz \((cpuid|pit)\)$'
+
+[[expect]]
+regex = '^timer: 1000 Hz$'
+
+[[expect]]
+regex = '^selftest: timer 100 ticks in (9[0-9]|1[0-1][0-9]) ms$'
+
+[[forbid]]
+regex = '(?i)panic'

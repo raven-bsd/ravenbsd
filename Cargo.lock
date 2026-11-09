@@ -3,6 +3,17 @@
 version = 4
 
 [[package]]
+name = "acpi"
+version = "5.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94476c7ef97af4c4d998b3f422c1b01d5211aad57c80ed200baf148d1f1efab6"
+dependencies = [
+ "bit_field",
+ "bitflags 2.13.2",
+ "log",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -261,11 +272,13 @@ version = "0.1.0"
 name = "raven-kernel"
 version = "0.1.0"
 dependencies = [
+ "acpi",
  "linked_list_allocator",
  "raven-abi",
  "raven-bootinfo",
  "raven-mem",
  "raven-rmm",
+ "raven-timemath",
  "spin",
 ]
 
@@ -338,6 +351,10 @@ version = "0.1.0"
 dependencies = [
  "raven-bootinfo",
 ]
+
+[[package]]
+name = "raven-timemath"
+version = "0.1.0"
 
 [[package]]
 name = "raven-va-spike"

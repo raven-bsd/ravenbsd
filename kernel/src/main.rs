@@ -15,6 +15,7 @@ mod cmdline;
 mod log;
 mod memory;
 mod selftest;
+mod time;
 
 // Force the `raven-mem` object code (including the exported C ABI symbols) into the link.
 use raven_mem as _;
@@ -60,6 +61,21 @@ pub extern "C" fn kmain(boot: *const raven_bootinfo::BootInfo) -> ! {
         kprintln!("kernel: error: {error}");
         boot::exit_qemu(0x11);
     }
+
+    arch::acpi::init();
+    arch::pic::remap_and_mask();
+    if let Err(error) = arch::apic::init_bsp() {
+        kprintln!("kernel: error: {error:?}");
+        boot::exit_qemu(0x11);
+    }
+    if let Err(error) = arch::ioapic::init() {
+        kprintln!("ioapic: unavailable ({error})");
+    }
+    if let Err(error) = arch::timer::init() {
+        kprintln!("kernel: error: {error}");
+        boot::exit_qemu(0x11);
+    }
+    arch::enable_interrupts();
 
     // `data` still points at loader memory that paging just reclaimed. Re-parse the command line
     // from the kernel-owned copy before running the self-tests.

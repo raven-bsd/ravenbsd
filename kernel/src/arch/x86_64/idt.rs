@@ -49,6 +49,12 @@ impl IdtEntry {
             reserved: 0,
         }
     }
+
+    fn set_handler(&mut self, handler: u64) {
+        self.offset_low = handler as u16;
+        self.offset_mid = (handler >> 16) as u16;
+        self.offset_high = (handler >> 32) as u32;
+    }
 }
 
 struct IdtCell(UnsafeCell<[IdtEntry; IDT_ENTRIES]>);
@@ -97,4 +103,24 @@ pub fn init() {
             options(nostack, preserves_flags),
         );
     }
+}
+
+/// Replace the handler address of one IDT gate.
+///
+/// Used by the timer and spurious-interrupt stubs before interrupts are enabled. Returns false
+/// for an out-of-range vector.
+pub fn set_handler(vector: u16, handler: u64) -> bool {
+    let index = vector as usize;
+    if index >= IDT_ENTRIES {
+        return false;
+    }
+    let idt = IDT.0.get();
+    // SAFETY: single-CPU early init writes the gate before `sti`; no reader runs concurrently.
+    unsafe {
+        let Some(entry) = (*idt).get_mut(index) else {
+            return false;
+        };
+        entry.set_handler(handler);
+    }
+    true
 }

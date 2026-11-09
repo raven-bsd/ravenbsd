@@ -3,12 +3,30 @@
 
 //! x86-64 architecture support.
 
+pub mod acpi;
+pub mod apic;
 pub mod exception;
 pub mod gdt;
 pub mod idt;
+pub mod ioapic;
+pub mod pic;
 pub mod serial;
 mod start;
+pub mod timer;
 pub mod trapframe;
+pub mod tsc;
+
+/// Enable maskable interrupts.
+///
+/// Must only be called after the timer and spurious IDT gates are installed and the legacy PIC is
+/// masked.
+pub fn enable_interrupts() {
+    // SAFETY: `sti` is a ring-0 instruction that only sets IF; all interrupt gates are installed
+    // by the caller before this point.
+    unsafe {
+        core::arch::asm!("sti", options(nomem, nostack, preserves_flags));
+    }
+}
 
 /// Halts the current CPU forever.
 ///
