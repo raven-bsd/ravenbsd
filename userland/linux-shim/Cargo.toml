@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "linux-shim"
+version = "0.1.0"
+description = "Pure in-process Linux shim logic: memory, futex, time and x86-64 signal frames."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+raven-abi = { path = "../../crates/raven-abi" }
+raven-linux-abi = { path = "../../crates/raven-linux-abi" }
+
+[dev-dependencies]
+linux-raw-sys = { version = "0.12", default-features = false, features = [
+    "std",
+    "general",
+    "net",
+] }
