@@ -10,11 +10,15 @@
 
 extern crate alloc;
 
+pub mod bootinfo;
 pub mod config;
-
 #[cfg(target_os = "uefi")]
 pub mod fs;
 #[cfg(target_os = "uefi")]
+pub mod handoff;
+#[cfg(target_os = "uefi")]
 pub mod image;
+pub mod memmap;
+pub mod paging;
 #[cfg(target_os = "uefi")]
 pub mod serial;

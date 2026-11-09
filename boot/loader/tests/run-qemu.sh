@@ -4,7 +4,7 @@
 #
 # usage: run-qemu.sh <loader.efi> <kernel.elf> <initfs.img> [boot.toml]
 # Builds a temporary ESP, runs OVMF + QEMU with a 20 second timeout, and forwards QEMU's exit
-# status (33 = success from the C5 test-exit protocol).
+# status (33 = success from the C5 test-exit protocol). QEMU_MEMORY overrides the default 512M.
 
 set -u
 
@@ -17,6 +17,7 @@ loader=$1
 kernel=$2
 initfs=$3
 boot_toml=${4:-}
+memory=${QEMU_MEMORY:-512M}
 
 esp=$(mktemp -d)
 vars=$(mktemp)
@@ -32,7 +33,7 @@ fi
 cp /usr/share/OVMF/OVMF_VARS_4M.fd "$vars"
 
 timeout 20s qemu-system-x86_64 \
-    -machine q35 -m 512M \
+    -machine q35 -m "$memory" \
     -serial stdio -display none -monitor none -no-reboot \
     -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
     -drive if=pflash,format=raw,file="$vars" \
