@@ -1,0 +1,11 @@
+[package]
+name = "raven-elf"
+version = "0.1.0"
+description = "Strict no_std ELF64 parser and page-level load planner"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
