@@ -51,12 +51,13 @@ unsafe extern "C" {
 
 /// The Rust entry point called by `_start`.
 ///
-/// This is not `unsafe fn`: only the assembly `_start` trampoline calls it, and it always passes
-/// the valid C8 process stack pointer. The raw-pointer lint is allowed for that reason.
+/// # Safety
+///
+/// `sp0` must be the C8 process stack pointer built by the kernel or `spawn`. Only the assembly
+/// `_start` trampoline calls this with that pointer.
 #[cfg(not(test))]
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
 #[unsafe(no_mangle)]
-pub extern "C" fn __raven_start(sp0: *const usize) -> ! {
+pub unsafe extern "C" fn __raven_start(sp0: *const usize) -> ! {
     // SAFETY: `_start` passes the C8 stack pointer in the argument register.
     let args = unsafe { parse_stack(sp0) };
     // SAFETY: `entry!` defines `__raven_main` with this exact C signature in the final program.

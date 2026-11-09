@@ -90,10 +90,14 @@ impl Args {
     }
 
     /// Return the value of auxv key `key`, if present before the terminating `(0, 0)`.
+    ///
+    /// Returns `None` when the array has no `(0, 0)` terminator within 64 entries.
     pub fn auxv(&self, key: usize) -> Option<usize> {
         if self.auxv.is_null() {
             return None;
         }
+        let mut matched = None;
+        let mut terminated = false;
         for index in 0..MAX_AUXV {
             // SAFETY: `self.auxv` points at the C8 auxv array, a sequence of (key, value) usize
             // pairs terminated by (0, 0); `index < MAX_AUXV` bounds the scan.
@@ -102,14 +106,15 @@ impl Args {
             let entry_key = unsafe { *pair };
             // SAFETY: each pair is two readable words within the auxv array.
             let value = unsafe { *pair.add(1) };
-            if entry_key == 0 {
-                return None;
+            if entry_key == 0 && value == 0 {
+                terminated = true;
+                break;
             }
             if entry_key == key {
-                return Some(value);
+                matched = Some(value);
             }
         }
-        None
+        if terminated { matched } else { None }
     }
 }
 
@@ -383,7 +388,7 @@ mod tests {
     }
 
     #[test]
-    fn auxv_without_terminator_is_bounded() {
+    fn auxv_without_terminator_is_rejected() {
         let mut stack = Stack::new();
         stack.word(0);
         stack.word(0);
@@ -393,7 +398,7 @@ mod tests {
             stack.word(index);
         }
         let args = stack.parse();
-        assert_eq!(args.auxv(1), Some(0));
+        assert_eq!(args.auxv(1), None);
         assert_eq!(args.auxv(1000), None);
     }
 
