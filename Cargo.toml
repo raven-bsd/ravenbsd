@@ -17,6 +17,7 @@ members = [
     "xtask",
     "tests/qtest",
     "tools/linux-corpus",
+    "libc/spike/va",
 ]
 default-members = ["crates/*"]
 
