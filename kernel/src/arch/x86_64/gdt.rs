@@ -183,6 +183,18 @@ pub fn init() {
     }
 }
 
+/// Set the TSS `rsp0` slot used for ring-3 to ring-0 transitions.
+pub fn set_rsp0(value: u64) {
+    let tss = TSS.0.get();
+    // SAFETY: the TSS is a kernel static written before user mode is entered; `rsp[0]` is the
+    // architectural RSP0 field.
+    unsafe {
+        core::ptr::addr_of_mut!((*tss).rsp)
+            .cast::<u64>()
+            .write_unaligned(value);
+    }
+}
+
 unsafe fn load_gdt(pointer: &DescriptorTablePointer) {
     // SAFETY: `pointer` is a valid 10-byte descriptor-table pointer and the GDT memory is mapped.
     unsafe {

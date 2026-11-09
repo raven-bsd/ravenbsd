@@ -195,6 +195,10 @@ core::arch::global_asm!(
     .global \name
     .type \name, @function
 \name:
+    test byte ptr [rsp+8], 3
+    jz 1f
+    swapgs
+1:
     cld
     push rax
     push rcx
@@ -220,6 +224,10 @@ core::arch::global_asm!(
     pop rdx
     pop rcx
     pop rax
+    test byte ptr [rsp+8], 3
+    jz 2f
+    swapgs
+2:
     iretq
     .size \name, . - \name
     .endm

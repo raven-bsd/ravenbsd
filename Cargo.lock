@@ -290,6 +290,13 @@ name = "raven-frames"
 version = "0.1.0"
 
 [[package]]
+name = "raven-handles"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
+
+[[package]]
 name = "raven-initfs"
 version = "0.1.0"
 
@@ -301,9 +308,13 @@ dependencies = [
  "linked_list_allocator",
  "raven-abi",
  "raven-bootinfo",
+ "raven-elf",
+ "raven-handles",
+ "raven-initfs",
  "raven-mem",
  "raven-rmm",
  "raven-timemath",
+ "raven-usercopy",
  "spin",
 ]
 
@@ -379,6 +390,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-s08-init"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
+
+[[package]]
 name = "raven-svc-manifest"
 version = "0.1.0"
 
@@ -392,6 +410,13 @@ dependencies = [
 [[package]]
 name = "raven-timemath"
 version = "0.1.0"
+
+[[package]]
+name = "raven-usercopy"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
 
 [[package]]
 name = "raven-va-spike"

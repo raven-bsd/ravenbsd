@@ -12,9 +12,11 @@ pub mod ioapic;
 pub mod pic;
 pub mod serial;
 mod start;
+pub mod syscall;
 pub mod timer;
 pub mod trapframe;
 pub mod tsc;
+pub mod usermode;
 
 /// Enable maskable interrupts.
 ///

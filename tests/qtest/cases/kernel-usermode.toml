@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "kernel-usermode"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 60
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\) '
+
+[[expect]]
+regex = '^process: starting /init$'
+
+[[expect]]
+regex = '^s08-init: hello$'
+
+[[expect]]
+regex = '^RavenBSD raven 0\.1 RavenBSD 0\.1 \(\S+\) #\d+: .+ x86_64$'
+
+[[expect]]
+regex = '^s08-init: negatives ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic'

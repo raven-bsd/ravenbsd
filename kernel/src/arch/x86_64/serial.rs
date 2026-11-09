@@ -57,6 +57,16 @@ fn write_byte(byte: u8) {
     }
 }
 
+/// Write raw bytes to COM1, translating LF to CRLF.
+pub fn write_bytes(bytes: &[u8]) {
+    for &byte in bytes {
+        if byte == b'\n' {
+            write_byte(b'\r');
+        }
+        write_byte(byte);
+    }
+}
+
 unsafe fn outb(port: u16, value: u8) {
     // SAFETY: `out` writes the given I/O port; callers pass a valid UART register.
     unsafe {
