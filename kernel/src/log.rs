@@ -7,16 +7,75 @@
 //! writes directly to a fresh [`Serial`] so it cannot deadlock on a lock held by the panicking
 //! thread.
 
+use core::cell::UnsafeCell;
 use core::fmt::{self, Write};
+use core::ops::{Deref, DerefMut};
 use core::panic::PanicInfo;
 use core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-
-use spin::Mutex;
 
 use crate::arch::serial::Serial;
 use crate::cmdline::LogLevel;
 
-static SERIAL: Mutex<Serial> = Mutex::new(Serial);
+/// A small spin lock used by the kernel. Interrupts are not disabled (S04 runs with them off).
+pub struct SpinMutex<T> {
+    locked: AtomicBool,
+    value: UnsafeCell<T>,
+}
+
+// SAFETY: the value is only accessed through the guard returned by `lock`, which holds the lock
+// until it is dropped.
+unsafe impl<T: Send> Sync for SpinMutex<T> {}
+
+impl<T> SpinMutex<T> {
+    /// Create an unlocked mutex.
+    pub const fn new(value: T) -> Self {
+        Self {
+            locked: AtomicBool::new(false),
+            value: UnsafeCell::new(value),
+        }
+    }
+
+    /// Acquire the lock, spinning until it is free.
+    pub fn lock(&self) -> SpinGuard<'_, T> {
+        while self
+            .locked
+            .compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            core::hint::spin_loop();
+        }
+        SpinGuard { mutex: self }
+    }
+}
+
+/// Guard returned by [`SpinMutex::lock`].
+pub struct SpinGuard<'a, T> {
+    mutex: &'a SpinMutex<T>,
+}
+
+impl<T> Deref for SpinGuard<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        // SAFETY: the guard holds the lock, so this is the only access to the value.
+        unsafe { &*self.mutex.value.get() }
+    }
+}
+
+impl<T> DerefMut for SpinGuard<'_, T> {
+    fn deref_mut(&mut self) -> &mut T {
+        // SAFETY: the guard holds the lock, so this is the only mutable access to the value.
+        unsafe { &mut *self.mutex.value.get() }
+    }
+}
+
+impl<T> Drop for SpinGuard<'_, T> {
+    fn drop(&mut self) {
+        self.mutex.locked.store(false, Ordering::Release);
+    }
+}
+
+static SERIAL: SpinMutex<Serial> = SpinMutex::new(Serial);
 static LEVEL: AtomicU8 = AtomicU8::new(LogLevel::Info as u8);
 static TEST_EXIT: AtomicBool = AtomicBool::new(false);
 

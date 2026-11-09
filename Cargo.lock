@@ -154,10 +154,7 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-bootinfo",
- "raven-cmdline",
- "raven-frames",
  "raven-mem",
- "spin",
 ]
 
 [[package]]
@@ -283,12 +280,6 @@ checksum = "9c187e0a369471c550af028cba56d4f4fa2a489ad28151ae95a4d340a2a8b782"
 dependencies = [
  "serde_core",
 ]
-
-[[package]]
-name = "spin"
-version = "0.9.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
 
 [[package]]
 name = "syn"

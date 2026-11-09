@@ -11,11 +11,18 @@
 use core::fmt;
 use core::sync::atomic::{AtomicU64, Ordering};
 
+use crate::log::SpinMutex;
 use raven_bootinfo::{MemoryKind, MemoryRegion};
-use raven_frames::FrameAllocator;
 
-pub use raven_frames::FreeError;
-use spin::Mutex;
+#[path = "../../../crates/raven-frames/src/imp.rs"]
+#[allow(dead_code)] // Shared crate source includes helpers used by its own tests.
+#[allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
+// The shared source is audited and linted in raven-frames' own host build.
+mod allocator;
+
+use allocator::FrameAllocator;
+
+pub use allocator::FreeError;
 
 /// Physical page size.
 pub const PAGE_SIZE: u64 = 4096;
@@ -73,7 +80,7 @@ struct State {
     usable_regions: u64,
 }
 
-static ALLOCATOR: Mutex<Option<State>> = Mutex::new(None);
+static ALLOCATOR: SpinMutex<Option<State>> = SpinMutex::new(None);
 static HHDM_OFFSET: AtomicU64 = AtomicU64::new(0);
 
 /// Build the global allocator from `map` and return its initial statistics.
