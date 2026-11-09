@@ -1,0 +1,1240 @@
+1745556 execve("/usr/bin/ls", ["/usr/bin/ls", "-la", "/etc"], 0x7fffcc076f70 /* 68 vars */) = 0
+1745556 brk(NULL)                       = 0x561e25e7c000
+1745556 arch_prctl(0x3001 /* ARCH_??? */, 0x7ffd54e8b210) = -1 EINVAL (Invalid argument)
+1745556 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f2170962000
+1745556 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+1745556 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=108276, ...}, AT_EMPTY_PATH) = 0
+1745556 mmap(NULL, 108276, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7f2170947000
+1745556 close(3)                        = 0
+1745556 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libselinux.so.1", O_RDONLY|O_CLOEXEC) = 3
+1745556 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\310\201\2\0\0\0\0\0\0\0\0\0@\08\0\f\0@\0\37\0\36\0"..., 832) = 832
+1745556 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=166280, ...}, AT_EMPTY_PATH) = 0
+1745556 mmap(NULL, 177672, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7f217091b000
+1745556 mprotect(0x7f2170921000, 139264, PROT_NONE) = 0
+1745556 mmap(0x7f2170921000, 106496, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x6000) = 0x7f2170921000
+1745556 mmap(0x7f217093b000, 28672, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x20000) = 0x7f217093b000
+1745556 mmap(0x7f2170943000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x27000) = 0x7f2170943000
+1745556 mmap(0x7f2170945000, 5640, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7f2170945000
+1745556 close(3)                        = 0
+1745556 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+1745556 read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0P\237\2\0\0\0\0\0@\0\0\0\0\0\0\0\360\320!\0\0\0\0\0\0\0\0\0@\08\0\16\0@\0B\0A\0"..., 832) = 832
+1745556 pread64(3, "\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\20\3\0\0\0\0\0\0\20\3\0\0\0\0\0\0\10\0\0\0\0\0\0\0\3\0\0\0\4\0\0\0"..., 784, 64) = 784
+1745556 pread64(3, "\4\0\0\0 \0\0\0\5\0\0\0GNU\0\2\0\0\300\4\0\0\0\3\0\0\0\0\0\0\0\2\200\0\300\4\0\0\0\1\0\0\0\0\0\0\0", 48, 848) = 48
+1745556 pread64(3, "\4\0\0\0\24\0\0\0\3\0\0\0GNU\0jl\265\250\17\325\345\273[\363\256\252\21\32\335\230\350\210C\245\4\0\0\0\20\0\0\0\1\0\0\0GNU\0\0\0\0\0\3\0\0\0\2\0\0\0"..., 68, 896) = 68
+1745556 newfstatat(3, "", {st_mode=S_IFREG|0755, st_size=2220400, ...}, AT_EMPTY_PATH) = 0
+1745556 pread64(3, "\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\20\3\0\0\0\0\0\0\20\3\0\0\0\0\0\0\10\0\0\0\0\0\0\0\3\0\0\0\4\0\0\0"..., 784, 64) = 784
+1745556 mmap(NULL, 2264656, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7f2170600000
+1745556 mprotect(0x7f2170628000, 2023424, PROT_NONE) = 0
+1745556 mmap(0x7f2170628000, 1658880, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x28000) = 0x7f2170628000
+1745556 mmap(0x7f21707bd000, 360448, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1bd000) = 0x7f21707bd000
+1745556 mmap(0x7f2170816000, 24576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x215000) = 0x7f2170816000
+1745556 mmap(0x7f217081c000, 52816, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7f217081c000
+1745556 close(3)                        = 0
+1745556 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libpcre2-8.so.0", O_RDONLY|O_CLOEXEC) = 3
+1745556 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\210S\t\0\0\0\0\0\0\0\0\0@\08\0\v\0@\0\35\0\34\0"..., 832) = 832
+1745556 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=613064, ...}, AT_EMPTY_PATH) = 0
+1745556 mmap(NULL, 615216, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7f2170884000
+1745556 mmap(0x7f2170886000, 438272, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7f2170886000
+1745556 mmap(0x7f21708f1000, 163840, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x6d000) = 0x7f21708f1000
+1745556 mmap(0x7f2170919000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x94000) = 0x7f2170919000
+1745556 close(3)                        = 0
+1745556 mmap(NULL, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f2170881000
+1745556 arch_prctl(ARCH_SET_FS, 0x7f2170881800) = 0
+1745556 set_tid_address(0x7f2170881ad0) = 1745556
+1745556 set_robust_list(0x7f2170881ae0, 24) = 0
+1745556 rseq(0x7f21708821a0, 0x20, 0, 0x53053053) = 0
+1745556 mprotect(0x7f2170816000, 16384, PROT_READ) = 0
+1745556 mprotect(0x7f2170919000, 4096, PROT_READ) = 0
+1745556 mprotect(0x7f2170943000, 4096, PROT_READ) = 0
+1745556 mprotect(0x561e24cf5000, 8192, PROT_READ) = 0
+1745556 mprotect(0x7f217099c000, 8192, PROT_READ) = 0
+1745556 prlimit64(0, RLIMIT_STACK, NULL, {rlim_cur=8192*1024, rlim_max=RLIM64_INFINITY}) = 0
+1745556 munmap(0x7f2170947000, 108276)  = 0
+1745556 statfs("/sys/fs/selinux", 0x7ffd54e8b250) = -1 ENOENT (No such file or directory)
+1745556 statfs("/selinux", 0x7ffd54e8b250) = -1 ENOENT (No such file or directory)
+1745556 getrandom("\x0a\xd3\x55\x84\x93\xa4\xf4\xdf", 8, GRND_NONBLOCK) = 8
+1745556 brk(NULL)                       = 0x561e25e7c000
+1745556 brk(0x561e25e9d000)             = 0x561e25e9d000
+1745556 openat(AT_FDCWD, "/proc/filesystems", O_RDONLY|O_CLOEXEC) = 3
+1745556 newfstatat(3, "", {st_mode=S_IFREG|0444, st_size=0, ...}, AT_EMPTY_PATH) = 0
+1745556 read(3, "nodev\tsysfs\nnodev\ttmpfs\nnodev\tbdev\nnodev\tproc\nnodev\tcgroup\nnodev"..., 1024) = 419
+1745556 read(3, "", 1024)               = 0
+1745556 close(3)                        = 0
+1745556 access("/etc/selinux/config", F_OK) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/lib/locale/locale-archive", O_RDONLY|O_CLOEXEC) = 3
+1745556 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=6070224, ...}, AT_EMPTY_PATH) = 0
+1745556 mmap(NULL, 6070224, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7f2170000000
+1745556 close(3)                        = 0
+1745556 ioctl(1, TCGETS, 0x7ffd54e8b180) = -1 ENOTTY (Inappropriate ioctl for device)
+1745556 ioctl(1, TIOCGWINSZ, 0x7ffd54e8b270) = -1 ENOTTY (Inappropriate ioctl for device)
+1745556 openat(AT_FDCWD, "/usr/share/locale/locale.alias", O_RDONLY|O_CLOEXEC) = 3
+1745556 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=2996, ...}, AT_EMPTY_PATH) = 0
+1745556 read(3, "# Locale name alias data base.\n# Copyright (C) 1996-2022 Free So"..., 4096) = 2996
+1745556 read(3, "", 4096)               = 0
+1745556 close(3)                        = 0
+1745556 openat(AT_FDCWD, "/usr/share/locale/de_DE.UTF-8/LC_TIME/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/share/locale/de_DE.utf8/LC_TIME/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/share/locale/de_DE/LC_TIME/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/share/locale/de.UTF-8/LC_TIME/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/share/locale/de.utf8/LC_TIME/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/share/locale/de/LC_TIME/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/lib/x86_64-linux-gnu/gconv/gconv-modules.cache", O_RDONLY) = 3
+1745556 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=27002, ...}, AT_EMPTY_PATH) = 0
+1745556 mmap(NULL, 27002, PROT_READ, MAP_SHARED, 3, 0) = 0x7f217095b000
+1745556 close(3)                        = 0
+1745556 futex(0x7f217081ba6c, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745556 statx(AT_FDCWD, "/etc", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=8192, ...}) = 0
+1745556 lgetxattr("/etc", "security.selinux", 0x561e25e7f380, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0) = 3
+1745556 connect(3, {sa_family=AF_UNIX, sun_path="/var/run/nscd/socket"}, 110) = -1 ENOENT (No such file or directory)
+1745556 close(3)                        = 0
+1745556 socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0) = 3
+1745556 connect(3, {sa_family=AF_UNIX, sun_path="/var/run/nscd/socket"}, 110) = -1 ENOENT (No such file or directory)
+1745556 close(3)                        = 0
+1745556 newfstatat(AT_FDCWD, "/etc/nsswitch.conf", {st_mode=S_IFREG|0644, st_size=553, ...}, 0) = 0
+1745556 newfstatat(AT_FDCWD, "/", {st_mode=S_IFDIR|0755, st_size=276, ...}, 0) = 0
+1745556 openat(AT_FDCWD, "/etc/nsswitch.conf", O_RDONLY|O_CLOEXEC) = 3
+1745556 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=553, ...}, AT_EMPTY_PATH) = 0
+1745556 read(3, "# /etc/nsswitch.conf\n#\n# Example configuration of GNU Name Servi"..., 4096) = 553
+1745556 read(3, "", 4096)               = 0
+1745556 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=553, ...}, AT_EMPTY_PATH) = 0
+1745556 close(3)                        = 0
+1745556 openat(AT_FDCWD, "/etc/passwd", O_RDONLY|O_CLOEXEC) = 3
+1745556 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=3489, ...}, AT_EMPTY_PATH) = 0
+1745556 lseek(3, 0, SEEK_SET)           = 0
+1745556 read(3, "root:x:0:0:root:/root:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/u"..., 4096) = 3489
+1745556 close(3)                        = 0
+1745556 socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0) = 3
+1745556 connect(3, {sa_family=AF_UNIX, sun_path="/var/run/nscd/socket"}, 110) = -1 ENOENT (No such file or directory)
+1745556 close(3)                        = 0
+1745556 socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0) = 3
+1745556 connect(3, {sa_family=AF_UNIX, sun_path="/var/run/nscd/socket"}, 110) = -1 ENOENT (No such file or directory)
+1745556 close(3)                        = 0
+1745556 newfstatat(AT_FDCWD, "/etc/nsswitch.conf", {st_mode=S_IFREG|0644, st_size=553, ...}, 0) = 0
+1745556 openat(AT_FDCWD, "/etc/group", O_RDONLY|O_CLOEXEC) = 3
+1745556 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=1259, ...}, AT_EMPTY_PATH) = 0
+1745556 lseek(3, 0, SEEK_SET)           = 0
+1745556 read(3, "root:x:0:\ndaemon:x:1:\nbin:x:2:\nsys:x:3:\nadm:x:4:syslog,bo\ntty:x:"..., 4096) = 1259
+1745556 close(3)                        = 0
+1745556 openat(AT_FDCWD, "/etc", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+1745556 newfstatat(3, "", {st_mode=S_IFDIR|0755, st_size=8192, ...}, AT_EMPTY_PATH) = 0
+1745556 getdents64(3, 0x561e25e87600 /* 294 entries */, 32768) = 9560
+1745556 statx(AT_FDCWD, "/etc/.", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=8192, ...}) = 0
+1745556 lgetxattr("/etc/.", "security.selinux", 0x561e25e85cf0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/.", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/.", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/..", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=STATX_ATTR_MOUNT_ROOT, stx_mode=S_IFDIR|0755, stx_size=276, ...}) = 0
+1745556 lgetxattr("/etc/..", "security.selinux", 0x561e25e85e00, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/..", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/..", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/fstab", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0664, stx_size=864, ...}) = 0
+1745556 lgetxattr("/etc/fstab", "security.selinux", 0x561e25e85f30, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/fstab", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ModemManager", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=46, ...}) = 0
+1745556 lgetxattr("/etc/ModemManager", "security.selinux", 0x561e25e86060, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ModemManager", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ModemManager", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/NetworkManager", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=134, ...}) = 0
+1745556 lgetxattr("/etc/NetworkManager", "security.selinux", 0x561e25e86190, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/NetworkManager", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/NetworkManager", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/PackageKit", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=48, ...}) = 0
+1745556 lgetxattr("/etc/PackageKit", "security.selinux", 0x561e25e862c0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/PackageKit", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/PackageKit", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/UPower", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=25, ...}) = 0
+1745556 lgetxattr("/etc/UPower", "security.selinux", 0x561e25e863f0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/UPower", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/UPower", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/X11", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=301, ...}) = 0
+1745556 lgetxattr("/etc/X11", "security.selinux", 0x561e25e86410, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/X11", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/X11", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/acpi", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=142, ...}) = 0
+1745556 lgetxattr("/etc/acpi", "security.selinux", 0x561e25e86430, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/acpi", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/acpi", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/alsa", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=20, ...}) = 0
+1745556 lgetxattr("/etc/alsa", "security.selinux", 0x561e25e86450, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/alsa", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/alsa", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/alternatives", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=8192, ...}) = 0
+1745556 lgetxattr("/etc/alternatives", "security.selinux", 0x561e25e86470, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/alternatives", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/alternatives", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/apm", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=56, ...}) = 0
+1745556 lgetxattr("/etc/apm", "security.selinux", 0x561e25e86490, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/apm", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/apm", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/apparmor", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=37, ...}) = 0
+1745556 lgetxattr("/etc/apparmor", "security.selinux", 0x561e25e864b0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/apparmor", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/apparmor", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/apparmor.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/apparmor.d", "security.selinux", 0x561e25e864d0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/apparmor.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/apparmor.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/apport", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=69, ...}) = 0
+1745556 lgetxattr("/etc/apport", "security.selinux", 0x561e25e864f0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/apport", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/apport", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/apt", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=208, ...}) = 0
+1745556 lgetxattr("/etc/apt", "security.selinux", 0x561e25e86510, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/apt", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/apt", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/avahi", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=88, ...}) = 0
+1745556 lgetxattr("/etc/avahi", "security.selinux", 0x561e25e86530, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/avahi", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/avahi", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/bash_completion.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=93, ...}) = 0
+1745556 lgetxattr("/etc/bash_completion.d", "security.selinux", 0x561e25e86550, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/bash_completion.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/bash_completion.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/binfmt.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=6, ...}) = 0
+1745556 lgetxattr("/etc/binfmt.d", "security.selinux", 0x561e25e86570, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/binfmt.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/binfmt.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/bluetooth", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=61, ...}) = 0
+1745556 lgetxattr("/etc/bluetooth", "security.selinux", 0x561e25e86590, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/bluetooth", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/bluetooth", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/brltty", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=84, ...}) = 0
+1745556 lgetxattr("/etc/brltty", "security.selinux", 0x561e25e865b0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/brltty", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/brltty", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ca-certificates", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=22, ...}) = 0
+1745556 lgetxattr("/etc/ca-certificates", "security.selinux", 0x561e25e865d0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ca-certificates", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ca-certificates", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/chatscripts", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|S_ISGID|0750, stx_size=45, ...}) = 0
+1745556 lgetxattr("/etc/chatscripts", "security.selinux", 0x561e25e865f0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/chatscripts", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/chatscripts", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 newfstatat(AT_FDCWD, "/etc/nsswitch.conf", {st_mode=S_IFREG|0644, st_size=553, ...}, 0) = 0
+1745556 openat(AT_FDCWD, "/etc/group", O_RDONLY|O_CLOEXEC) = 4
+1745556 newfstatat(4, "", {st_mode=S_IFREG|0644, st_size=1259, ...}, AT_EMPTY_PATH) = 0
+1745556 lseek(4, 0, SEEK_SET)           = 0
+1745556 read(4, "root:x:0:\ndaemon:x:1:\nbin:x:2:\nsys:x:3:\nadm:x:4:syslog,bo\ntty:x:"..., 4096) = 1259
+1745556 close(4)                        = 0
+1745556 statx(AT_FDCWD, "/etc/OpenCL", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=21, ...}) = 0
+1745556 lgetxattr("/etc/OpenCL", "security.selinux", 0x561e25e86630, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/OpenCL", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/OpenCL", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/console-setup", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/console-setup", "security.selinux", 0x561e25e86650, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/console-setup", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/console-setup", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/cracklib", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=27, ...}) = 0
+1745556 lgetxattr("/etc/cracklib", "security.selinux", 0x561e25e86670, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cracklib", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cracklib", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/cron.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=60, ...}) = 0
+1745556 lgetxattr("/etc/cron.d", "security.selinux", 0x561e25e86690, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cron.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cron.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/cron.daily", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=193, ...}) = 0
+1745556 lgetxattr("/etc/cron.daily", "security.selinux", 0x561e25e866b0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cron.daily", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cron.daily", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/cron.hourly", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=26, ...}) = 0
+1745556 lgetxattr("/etc/cron.hourly", "security.selinux", 0x561e25e866d0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cron.hourly", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cron.hourly", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/cron.monthly", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=42, ...}) = 0
+1745556 lgetxattr("/etc/cron.monthly", "security.selinux", 0x561e25e866f0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cron.monthly", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cron.monthly", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/cron.weekly", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=56, ...}) = 0
+1745556 lgetxattr("/etc/cron.weekly", "security.selinux", 0x561e25e86710, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cron.weekly", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cron.weekly", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/vdpau_wrapper.cfg", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=51, ...}) = 0
+1745556 lgetxattr("/etc/vdpau_wrapper.cfg", "security.selinux", 0x561e25e86730, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/vdpau_wrapper.cfg", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/cups", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=303, ...}) = 0
+1745556 lgetxattr("/etc/cups", "security.selinux", 0x561e25e86750, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cups", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cups", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 newfstatat(AT_FDCWD, "/etc/nsswitch.conf", {st_mode=S_IFREG|0644, st_size=553, ...}, 0) = 0
+1745556 openat(AT_FDCWD, "/etc/group", O_RDONLY|O_CLOEXEC) = 4
+1745556 newfstatat(4, "", {st_mode=S_IFREG|0644, st_size=1259, ...}, AT_EMPTY_PATH) = 0
+1745556 lseek(4, 0, SEEK_SET)           = 0
+1745556 read(4, "root:x:0:\ndaemon:x:1:\nbin:x:2:\nsys:x:3:\nadm:x:4:syslog,bo\ntty:x:"..., 4096) = 1259
+1745556 close(4)                        = 0
+1745556 statx(AT_FDCWD, "/etc/cupshelpers", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=34, ...}) = 0
+1745556 lgetxattr("/etc/cupshelpers", "security.selinux", 0x561e25e8f610, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cupshelpers", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cupshelpers", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/dbus-1", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=39, ...}) = 0
+1745556 lgetxattr("/etc/dbus-1", "security.selinux", 0x561e25e8f610, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dbus-1", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dbus-1", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/dconf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=31, ...}) = 0
+1745556 lgetxattr("/etc/dconf", "security.selinux", 0x561e25e8f610, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dconf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dconf", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/default", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/default", "security.selinux", 0x561e25e8f610, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/default", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/default", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/depmod.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=25, ...}) = 0
+1745556 lgetxattr("/etc/depmod.d", "security.selinux", 0x561e25e8f610, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/depmod.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/depmod.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/dhcp", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=99, ...}) = 0
+1745556 lgetxattr("/etc/dhcp", "security.selinux", 0x561e25e8f610, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dhcp", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dhcp", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/dictionaries-common", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=41, ...}) = 0
+1745556 lgetxattr("/etc/dictionaries-common", "security.selinux", 0x561e25e8f610, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dictionaries-common", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dictionaries-common", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/dpkg", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=100, ...}) = 0
+1745556 lgetxattr("/etc/dpkg", "security.selinux", 0x561e25e8f630, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dpkg", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dpkg", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/emacs", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=26, ...}) = 0
+1745556 lgetxattr("/etc/emacs", "security.selinux", 0x561e25e8f650, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/emacs", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/emacs", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/environment.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=54, ...}) = 0
+1745556 lgetxattr("/etc/environment.d", "security.selinux", 0x561e25e8f670, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/environment.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/environment.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/firefox", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=18, ...}) = 0
+1745556 lgetxattr("/etc/firefox", "security.selinux", 0x561e25e8f690, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/firefox", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/firefox", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/fonts", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=56, ...}) = 0
+1745556 lgetxattr("/etc/fonts", "security.selinux", 0x561e25e8f6b0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/fonts", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/fonts", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/fwupd", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=64, ...}) = 0
+1745556 lgetxattr("/etc/fwupd", "security.selinux", 0x561e25e8f6d0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/fwupd", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/fwupd", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/gdb", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=38, ...}) = 0
+1745556 lgetxattr("/etc/gdb", "security.selinux", 0x561e25e8f6f0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gdb", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gdb", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/gdm3", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=196, ...}) = 0
+1745556 lgetxattr("/etc/gdm3", "security.selinux", 0x561e25e8f710, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gdm3", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gdm3", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/geoclue", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=26, ...}) = 0
+1745556 lgetxattr("/etc/geoclue", "security.selinux", 0x561e25e8f730, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/geoclue", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/geoclue", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ghostscript", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=40, ...}) = 0
+1745556 lgetxattr("/etc/ghostscript", "security.selinux", 0x561e25e8f750, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ghostscript", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ghostscript", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/glvnd", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=26, ...}) = 0
+1745556 lgetxattr("/etc/glvnd", "security.selinux", 0x561e25e8f770, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/glvnd", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/glvnd", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/gnome", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=50, ...}) = 0
+1745556 lgetxattr("/etc/gnome", "security.selinux", 0x561e25e8f790, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gnome", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gnome", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/groff", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=41, ...}) = 0
+1745556 lgetxattr("/etc/groff", "security.selinux", 0x561e25e8f7b0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/groff", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/groff", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/grub.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=231, ...}) = 0
+1745556 lgetxattr("/etc/grub.d", "security.selinux", 0x561e25e8f7d0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/grub.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/grub.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/gss", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=20, ...}) = 0
+1745556 lgetxattr("/etc/gss", "security.selinux", 0x561e25e8f7f0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gss", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gss", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/gtk-2.0", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=32, ...}) = 0
+1745556 lgetxattr("/etc/gtk-2.0", "security.selinux", 0x561e25e8f810, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gtk-2.0", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gtk-2.0", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/gtk-3.0", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=52, ...}) = 0
+1745556 lgetxattr("/etc/gtk-3.0", "security.selinux", 0x561e25e8f830, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gtk-3.0", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gtk-3.0", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/hp", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=24, ...}) = 0
+1745556 lgetxattr("/etc/hp", "security.selinux", 0x561e25e8f850, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/hp", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/hp", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ifplugd", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=22, ...}) = 0
+1745556 lgetxattr("/etc/ifplugd", "security.selinux", 0x561e25e8f870, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ifplugd", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ifplugd", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/init", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=27, ...}) = 0
+1745556 lgetxattr("/etc/init", "security.selinux", 0x561e25e8f890, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/init", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/init", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/init.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/init.d", "security.selinux", 0x561e25e8f8b0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/init.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/init.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/initramfs-tools", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=114, ...}) = 0
+1745556 lgetxattr("/etc/initramfs-tools", "security.selinux", 0x561e25e8f8d0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/initramfs-tools", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/initramfs-tools", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/insserv.conf.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=18, ...}) = 0
+1745556 lgetxattr("/etc/insserv.conf.d", "security.selinux", 0x561e25e8f8f0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/insserv.conf.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/insserv.conf.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ipp-usb", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=26, ...}) = 0
+1745556 lgetxattr("/etc/ipp-usb", "security.selinux", 0x561e25e8f910, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ipp-usb", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ipp-usb", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/iproute2", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=197, ...}) = 0
+1745556 lgetxattr("/etc/iproute2", "security.selinux", 0x561e25e8f930, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/iproute2", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/iproute2", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/kernel", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=114, ...}) = 0
+1745556 lgetxattr("/etc/kernel", "security.selinux", 0x561e25e8f950, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/kernel", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/kernel", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/openfortivpn", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=20, ...}) = 0
+1745556 lgetxattr("/etc/openfortivpn", "security.selinux", 0x561e25e8f970, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/openfortivpn", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/openfortivpn", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ld.so.conf.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=151, ...}) = 0
+1745556 lgetxattr("/etc/ld.so.conf.d", "security.selinux", 0x561e25e8f990, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ld.so.conf.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ld.so.conf.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ldap", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=23, ...}) = 0
+1745556 lgetxattr("/etc/ldap", "security.selinux", 0x561e25e8f9b0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ldap", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ldap", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/libblockdev", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=20, ...}) = 0
+1745556 lgetxattr("/etc/libblockdev", "security.selinux", 0x561e25e8f9d0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/libblockdev", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/libblockdev", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/libnl-3", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=35, ...}) = 0
+1745556 lgetxattr("/etc/libnl-3", "security.selinux", 0x561e25e8f9f0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/libnl-3", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/libnl-3", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/libpaper.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=26, ...}) = 0
+1745556 lgetxattr("/etc/libpaper.d", "security.selinux", 0x561e25e8fa10, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/libpaper.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/libpaper.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/libreoffice", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=77, ...}) = 0
+1745556 lgetxattr("/etc/libreoffice", "security.selinux", 0x561e25e8fa30, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/libreoffice", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/libreoffice", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/logcheck", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=74, ...}) = 0
+1745556 lgetxattr("/etc/logcheck", "security.selinux", 0x561e25e8fa50, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/logcheck", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/logcheck", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/logrotate.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/logrotate.d", "security.selinux", 0x561e25e8fa70, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/logrotate.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/logrotate.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/eb", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=67, ...}) = 0
+1745556 lgetxattr("/etc/eb", "security.selinux", 0x561e25e8fa90, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/eb", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/eb", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/modprobe.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/modprobe.d", "security.selinux", 0x561e25e8fab0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/modprobe.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/modprobe.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/modules-load.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=75, ...}) = 0
+1745556 lgetxattr("/etc/modules-load.d", "security.selinux", 0x561e25e8fad0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/modules-load.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/modules-load.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/netplan", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=41, ...}) = 0
+1745556 lgetxattr("/etc/netplan", "security.selinux", 0x561e25e8faf0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/netplan", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/netplan", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/network", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=79, ...}) = 0
+1745556 lgetxattr("/etc/network", "security.selinux", 0x561e25e8fb10, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/network", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/network", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/networkd-dispatcher", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=109, ...}) = 0
+1745556 lgetxattr("/etc/networkd-dispatcher", "security.selinux", 0x561e25e8fb30, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/networkd-dispatcher", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/networkd-dispatcher", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/newt", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=67, ...}) = 0
+1745556 lgetxattr("/etc/newt", "security.selinux", 0x561e25e8fb50, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/newt", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/newt", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/openvpn", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=60, ...}) = 0
+1745556 lgetxattr("/etc/openvpn", "security.selinux", 0x561e25e8fb70, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/openvpn", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/openvpn", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/opt", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=20, ...}) = 0
+1745556 lgetxattr("/etc/opt", "security.selinux", 0x561e25e8fb90, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/opt", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/opt", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/pam.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/pam.d", "security.selinux", 0x561e25e8fbb0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/pam.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/pam.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/pcmcia", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=25, ...}) = 0
+1745556 lgetxattr("/etc/pcmcia", "security.selinux", 0x561e25e8fbd0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/pcmcia", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/pcmcia", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/perl", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=28, ...}) = 0
+1745556 lgetxattr("/etc/perl", "security.selinux", 0x561e25e8fbf0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/perl", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/perl", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/pki", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=41, ...}) = 0
+1745556 lgetxattr("/etc/pki", "security.selinux", 0x561e25e8fc10, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/pki", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/pki", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/pm", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=21, ...}) = 0
+1745556 lgetxattr("/etc/pm", "security.selinux", 0x561e25e8fc30, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/pm", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/pm", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/polkit-1", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=72, ...}) = 0
+1745556 lgetxattr("/etc/polkit-1", "security.selinux", 0x561e25e8fc50, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/polkit-1", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/polkit-1", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ppp", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=257, ...}) = 0
+1745556 lgetxattr("/etc/ppp", "security.selinux", 0x561e25e8fc70, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ppp", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ppp", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/profile.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/profile.d", "security.selinux", 0x561e25e8fc90, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/profile.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/profile.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/pulse", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=120, ...}) = 0
+1745556 lgetxattr("/etc/pulse", "security.selinux", 0x561e25e8fcb0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/pulse", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/pulse", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/python3", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=27, ...}) = 0
+1745556 lgetxattr("/etc/python3", "security.selinux", 0x561e25e8fcd0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/python3", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/python3", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/python3.10", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=30, ...}) = 0
+1745556 lgetxattr("/etc/python3.10", "security.selinux", 0x561e25e8fcf0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/python3.10", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/python3.10", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/rc0.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/rc0.d", "security.selinux", 0x561e25e8fd10, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rc0.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rc0.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/rc1.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/rc1.d", "security.selinux", 0x561e25e8fd30, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rc1.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rc1.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/rc2.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/rc2.d", "security.selinux", 0x561e25e8fd50, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rc2.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rc2.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/rc3.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/rc3.d", "security.selinux", 0x561e25e8fd70, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rc3.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rc3.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/rc4.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/rc4.d", "security.selinux", 0x561e25e8fd90, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rc4.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rc4.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/rc5.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/rc5.d", "security.selinux", 0x561e25e80a20, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rc5.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rc5.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/rc6.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/rc6.d", "security.selinux", 0x561e25e80a40, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rc6.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rc6.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/rcS.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=288, ...}) = 0
+1745556 lgetxattr("/etc/rcS.d", "security.selinux", 0x561e25e80a60, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rcS.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rcS.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ca-certificates.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=7620, ...}) = 0
+1745556 lgetxattr("/etc/ca-certificates.conf", "security.selinux", 0x561e25e80a80, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ca-certificates.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/rsyslog.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=48, ...}) = 0
+1745556 lgetxattr("/etc/rsyslog.d", "security.selinux", 0x561e25e80aa0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rsyslog.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rsyslog.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/sane.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/sane.d", "security.selinux", 0x561e25e80ac0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sane.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sane.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/security", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=280, ...}) = 0
+1745556 lgetxattr("/etc/security", "security.selinux", 0x561e25e80ae0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/security", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/security", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/selinux", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=27, ...}) = 0
+1745556 lgetxattr("/etc/selinux", "security.selinux", 0x561e25e80b00, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/selinux", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/selinux", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/sensors.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=26, ...}) = 0
+1745556 lgetxattr("/etc/sensors.d", "security.selinux", 0x561e25e80b20, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sensors.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sensors.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/sgml", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=131, ...}) = 0
+1745556 lgetxattr("/etc/sgml", "security.selinux", 0x561e25e80b40, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sgml", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sgml", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/skel", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=57, ...}) = 0
+1745556 lgetxattr("/etc/skel", "security.selinux", 0x561e25e80b60, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/skel", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/skel", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/snmp", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=23, ...}) = 0
+1745556 lgetxattr("/etc/snmp", "security.selinux", 0x561e25e80b80, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/snmp", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/snmp", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/speech-dispatcher", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=56, ...}) = 0
+1745556 lgetxattr("/etc/speech-dispatcher", "security.selinux", 0x561e25e80ba0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/speech-dispatcher", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/speech-dispatcher", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ssh", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=287, ...}) = 0
+1745556 lgetxattr("/etc/ssh", "security.selinux", 0x561e25e80bc0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ssh", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ssh", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ssl", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=53, ...}) = 0
+1745556 lgetxattr("/etc/ssl", "security.selinux", 0x561e25e80be0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ssl", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ssl", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/dkms", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=52, ...}) = 0
+1745556 lgetxattr("/etc/dkms", "security.selinux", 0x561e25e80c00, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dkms", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dkms", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/sudoers.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=20, ...}) = 0
+1745556 lgetxattr("/etc/sudoers.d", "security.selinux", 0x561e25e80c20, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sudoers.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sudoers.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/sysctl.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=267, ...}) = 0
+1745556 lgetxattr("/etc/sysctl.d", "security.selinux", 0x561e25e80c40, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sysctl.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sysctl.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/systemd", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=263, ...}) = 0
+1745556 lgetxattr("/etc/systemd", "security.selinux", 0x561e25e80c60, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/systemd", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/systemd", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/terminfo", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=20, ...}) = 0
+1745556 lgetxattr("/etc/terminfo", "security.selinux", 0x561e25e80c80, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/terminfo", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/terminfo", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/thermald", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=40, ...}) = 0
+1745556 lgetxattr("/etc/thermald", "security.selinux", 0x561e25e80ca0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/thermald", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/thermald", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/thunderbird", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=24, ...}) = 0
+1745556 lgetxattr("/etc/thunderbird", "security.selinux", 0x561e25e80cc0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/thunderbird", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/thunderbird", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/tmpfiles.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=33, ...}) = 0
+1745556 lgetxattr("/etc/tmpfiles.d", "security.selinux", 0x561e25e80ce0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/tmpfiles.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/tmpfiles.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ubuntu-advantage", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=27, ...}) = 0
+1745556 lgetxattr("/etc/ubuntu-advantage", "security.selinux", 0x561e25e80d00, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ubuntu-advantage", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ubuntu-advantage", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/udev", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=52, ...}) = 0
+1745556 lgetxattr("/etc/udev", "security.selinux", 0x561e25e80d20, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/udev", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/udev", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/udisks2", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=60, ...}) = 0
+1745556 lgetxattr("/etc/udisks2", "security.selinux", 0x561e25e80d40, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/udisks2", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/udisks2", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ufw", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=217, ...}) = 0
+1745556 lgetxattr("/etc/ufw", "security.selinux", 0x561e25e80d60, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ufw", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ufw", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/update-manager", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=76, ...}) = 0
+1745556 lgetxattr("/etc/update-manager", "security.selinux", 0x561e25e80d80, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/update-manager", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/update-manager", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/update-motd.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=265, ...}) = 0
+1745556 lgetxattr("/etc/update-motd.d", "security.selinux", 0x561e25e80da0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/update-motd.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/update-motd.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/update-notifier", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=6, ...}) = 0
+1745556 lgetxattr("/etc/update-notifier", "security.selinux", 0x561e25e80dc0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/update-notifier", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/update-notifier", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/usb_modeswitch.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=6, ...}) = 0
+1745556 lgetxattr("/etc/usb_modeswitch.d", "security.selinux", 0x561e25e80de0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/usb_modeswitch.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/usb_modeswitch.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/vim", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=37, ...}) = 0
+1745556 lgetxattr("/etc/vim", "security.selinux", 0x561e25e80e00, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/vim", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/vim", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/vulkan", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=67, ...}) = 0
+1745556 lgetxattr("/etc/vulkan", "security.selinux", 0x561e25e80e20, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/vulkan", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/vulkan", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/wpa_supplicant", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=66, ...}) = 0
+1745556 lgetxattr("/etc/wpa_supplicant", "security.selinux", 0x561e25e80e40, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/wpa_supplicant", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/wpa_supplicant", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/xdg", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=140, ...}) = 0
+1745556 lgetxattr("/etc/xdg", "security.selinux", 0x561e25e80e60, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/xdg", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/xdg", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/xml", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=238, ...}) = 0
+1745556 lgetxattr("/etc/xml", "security.selinux", 0x561e25e80e80, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/xml", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/xml", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/zsh", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=111, ...}) = 0
+1745556 lgetxattr("/etc/zsh", "security.selinux", 0x561e25e80ea0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/zsh", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/zsh", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/.pwd.lock", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0600, stx_size=0, ...}) = 0
+1745556 lgetxattr("/etc/.pwd.lock", "security.selinux", 0x561e25e80ec0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/.pwd.lock", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/adduser.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=3028, ...}) = 0
+1745556 lgetxattr("/etc/adduser.conf", "security.selinux", 0x561e25e80ee0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/adduser.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/anacrontab", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=335, ...}) = 0
+1745556 lgetxattr("/etc/anacrontab", "security.selinux", 0x561e25e80f00, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/anacrontab", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/apg.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=433, ...}) = 0
+1745556 lgetxattr("/etc/apg.conf", "security.selinux", 0x561e25e80f20, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/apg.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/appstream.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=769, ...}) = 0
+1745556 lgetxattr("/etc/appstream.conf", "security.selinux", 0x561e25e80f40, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/appstream.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/bash.bashrc", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=2319, ...}) = 0
+1745556 lgetxattr("/etc/bash.bashrc", "security.selinux", 0x561e25e80f60, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/bash.bashrc", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/bash_completion", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=45, ...}) = 0
+1745556 lgetxattr("/etc/bash_completion", "security.selinux", 0x561e25e80f80, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/bash_completion", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/bindresvport.blacklist", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=367, ...}) = 0
+1745556 lgetxattr("/etc/bindresvport.blacklist", "security.selinux", 0x561e25e80fa0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/bindresvport.blacklist", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/brlapi.key", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0640, stx_size=33, ...}) = 0
+1745556 lgetxattr("/etc/brlapi.key", "security.selinux", 0x561e25e80fc0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/brlapi.key", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/brltty.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=29219, ...}) = 0
+1745556 lgetxattr("/etc/brltty.conf", "security.selinux", 0x561e25e80fe0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/brltty.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ImageMagick-6", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/ImageMagick-6", "security.selinux", 0x561e25e81000, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ImageMagick-6", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ImageMagick-6", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/crontab", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=1136, ...}) = 0
+1745556 lgetxattr("/etc/crontab", "security.selinux", 0x561e25e81020, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/crontab", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/debconf.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=2969, ...}) = 0
+1745556 lgetxattr("/etc/debconf.conf", "security.selinux", 0x561e25e81040, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/debconf.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/debian_version", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=13, ...}) = 0
+1745556 lgetxattr("/etc/debian_version", "security.selinux", 0x561e25e81060, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/debian_version", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/deluser.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=604, ...}) = 0
+1745556 lgetxattr("/etc/deluser.conf", "security.selinux", 0x561e25e81080, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/deluser.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/e2scrub.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=685, ...}) = 0
+1745556 lgetxattr("/etc/e2scrub.conf", "security.selinux", 0x561e25e810a0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/e2scrub.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/environment", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=106, ...}) = 0
+1745556 lgetxattr("/etc/environment", "security.selinux", 0x561e25e810c0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/environment", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ethertypes", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=1816, ...}) = 0
+1745556 lgetxattr("/etc/ethertypes", "security.selinux", 0x561e25e810e0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ethertypes", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/fprintd.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=20, ...}) = 0
+1745556 lgetxattr("/etc/fprintd.conf", "security.selinux", 0x561e25e81100, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/fprintd.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/fuse.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=694, ...}) = 0
+1745556 lgetxattr("/etc/fuse.conf", "security.selinux", 0x561e25e81120, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/fuse.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/gai.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=2584, ...}) = 0
+1745556 lgetxattr("/etc/gai.conf", "security.selinux", 0x561e25e81140, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gai.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/group", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=1259, ...}) = 0
+1745556 lgetxattr("/etc/group", "security.selinux", 0x561e25e81160, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/group", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/gshadow", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0640, stx_size=1040, ...}) = 0
+1745556 lgetxattr("/etc/gshadow", "security.selinux", 0x561e25e81180, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gshadow", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 newfstatat(AT_FDCWD, "/etc/nsswitch.conf", {st_mode=S_IFREG|0644, st_size=553, ...}, 0) = 0
+1745556 openat(AT_FDCWD, "/etc/group", O_RDONLY|O_CLOEXEC) = 4
+1745556 newfstatat(4, "", {st_mode=S_IFREG|0644, st_size=1259, ...}, AT_EMPTY_PATH) = 0
+1745556 lseek(4, 0, SEEK_SET)           = 0
+1745556 read(4, "root:x:0:\ndaemon:x:1:\nbin:x:2:\nsys:x:3:\nadm:x:4:syslog,bo\ntty:x:"..., 4096) = 1259
+1745556 close(4)                        = 0
+1745556 statx(AT_FDCWD, "/etc/hdparm.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=4436, ...}) = 0
+1745556 lgetxattr("/etc/hdparm.conf", "security.selinux", 0x561e25e811c0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/hdparm.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/host.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=92, ...}) = 0
+1745556 lgetxattr("/etc/host.conf", "security.selinux", 0x561e25e811e0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/host.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/hostid", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=4, ...}) = 0
+1745556 lgetxattr("/etc/hostid", "security.selinux", 0x561e25e81200, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/hostid", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/hostname", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=6, ...}) = 0
+1745556 lgetxattr("/etc/hostname", "security.selinux", 0x561e25e81220, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/hostname", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/hosts", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=242, ...}) = 0
+1745556 lgetxattr("/etc/hosts", "security.selinux", 0x561e25e81240, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/hosts", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/hosts.allow", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=411, ...}) = 0
+1745556 lgetxattr("/etc/hosts.allow", "security.selinux", 0x561e25e81260, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/hosts.allow", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/hosts.deny", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=711, ...}) = 0
+1745556 lgetxattr("/etc/hosts.deny", "security.selinux", 0x561e25e81280, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/hosts.deny", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/inputrc", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=1748, ...}) = 0
+1745556 lgetxattr("/etc/inputrc", "security.selinux", 0x561e25e812a0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/inputrc", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/issue", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=26, ...}) = 0
+1745556 lgetxattr("/etc/issue", "security.selinux", 0x561e25e812c0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/issue", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/issue.net", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=19, ...}) = 0
+1745556 lgetxattr("/etc/issue.net", "security.selinux", 0x561e25e812e0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/issue.net", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/kernel-img.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=110, ...}) = 0
+1745556 lgetxattr("/etc/kernel-img.conf", "security.selinux", 0x561e25e81300, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/kernel-img.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/kerneloops.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=1308, ...}) = 0
+1745556 lgetxattr("/etc/kerneloops.conf", "security.selinux", 0x561e25e81320, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/kerneloops.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ld.so.cache", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=108276, ...}) = 0
+1745556 lgetxattr("/etc/ld.so.cache", "security.selinux", 0x561e25e81340, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ld.so.cache", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ld.so.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=34, ...}) = 0
+1745556 lgetxattr("/etc/ld.so.conf", "security.selinux", 0x561e25e81360, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ld.so.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/legal", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=267, ...}) = 0
+1745556 lgetxattr("/etc/legal", "security.selinux", 0x561e25e81380, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/legal", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/libao.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=27, ...}) = 0
+1745556 lgetxattr("/etc/libao.conf", "security.selinux", 0x561e25e813a0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/libao.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/libaudit.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=191, ...}) = 0
+1745556 lgetxattr("/etc/libaudit.conf", "security.selinux", 0x561e25e813c0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/libaudit.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/locale.alias", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=2996, ...}) = 0
+1745556 lgetxattr("/etc/locale.alias", "security.selinux", 0x561e25e813e0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/locale.alias", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/locale.gen", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=9454, ...}) = 0
+1745556 lgetxattr("/etc/locale.gen", "security.selinux", 0x561e25e81400, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/locale.gen", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/login.defs", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=10734, ...}) = 0
+1745556 lgetxattr("/etc/login.defs", "security.selinux", 0x561e25e81420, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/login.defs", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/logrotate.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=592, ...}) = 0
+1745556 lgetxattr("/etc/logrotate.conf", "security.selinux", 0x561e25e81440, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/logrotate.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/lsb-release", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=104, ...}) = 0
+1745556 lgetxattr("/etc/lsb-release", "security.selinux", 0x561e25e81460, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/lsb-release", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/machine-id", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0444, stx_size=33, ...}) = 0
+1745556 lgetxattr("/etc/machine-id", "security.selinux", 0x561e25e81480, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/machine-id", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/magic", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=111, ...}) = 0
+1745556 lgetxattr("/etc/magic", "security.selinux", 0x561e25e814a0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/magic", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/magic.mime", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=111, ...}) = 0
+1745556 lgetxattr("/etc/magic.mime", "security.selinux", 0x561e25e814c0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/magic.mime", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/mailcap", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=64492, ...}) = 0
+1745556 lgetxattr("/etc/mailcap", "security.selinux", 0x561e25e814e0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/mailcap", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/mailcap.order", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=449, ...}) = 0
+1745556 lgetxattr("/etc/mailcap.order", "security.selinux", 0x561e25e81500, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/mailcap.order", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/manpath.config", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=5217, ...}) = 0
+1745556 lgetxattr("/etc/manpath.config", "security.selinux", 0x561e25e81520, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/manpath.config", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/mime.types", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=72029, ...}) = 0
+1745556 lgetxattr("/etc/mime.types", "security.selinux", 0x561e25e81540, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/mime.types", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/mke2fs.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=744, ...}) = 0
+1745556 lgetxattr("/etc/mke2fs.conf", "security.selinux", 0x561e25e81560, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/mke2fs.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/modules", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=195, ...}) = 0
+1745556 lgetxattr("/etc/modules", "security.selinux", 0x561e25e81580, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/modules", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/nanorc", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=11204, ...}) = 0
+1745556 lgetxattr("/etc/nanorc", "security.selinux", 0x561e25e815a0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/nanorc", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/netconfig", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=767, ...}) = 0
+1745556 lgetxattr("/etc/netconfig", "security.selinux", 0x561e25e815c0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/netconfig", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/networks", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=91, ...}) = 0
+1745556 lgetxattr("/etc/networks", "security.selinux", 0x561e25e815e0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/networks", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/nftables.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0755, stx_size=228, ...}) = 0
+1745556 lgetxattr("/etc/nftables.conf", "security.selinux", 0x561e25e81600, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/nftables.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/nsswitch.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=553, ...}) = 0
+1745556 lgetxattr("/etc/nsswitch.conf", "security.selinux", 0x561e25e81620, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/nsswitch.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/os-release", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFLNK|0777, stx_size=21, ...}) = 0
+1745556 lgetxattr("/etc/os-release", "security.selinux", 0x561e25e81640, 255) = -1 ENODATA (No data available)
+1745556 readlink("/etc/os-release", "../usr/lib/os-release", 22) = 21
+1745556 statx(AT_FDCWD, "/etc/pam.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=552, ...}) = 0
+1745556 lgetxattr("/etc/pam.conf", "security.selinux", 0x561e25e816b0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/pam.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/passwd", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=3489, ...}) = 0
+1745556 lgetxattr("/etc/passwd", "security.selinux", 0x561e25e816d0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/passwd", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/pnm2ppa.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=7649, ...}) = 0
+1745556 lgetxattr("/etc/pnm2ppa.conf", "security.selinux", 0x561e25e816f0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/pnm2ppa.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 brk(0x561e25ece000)             = 0x561e25ece000
+1745556 brk(0x561e25ec4000)             = 0x561e25ec4000
+1745556 statx(AT_FDCWD, "/etc/profile", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=582, ...}) = 0
+1745556 lgetxattr("/etc/profile", "security.selinux", 0x561e25e81710, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/profile", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/protocols", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=2932, ...}) = 0
+1745556 lgetxattr("/etc/protocols", "security.selinux", 0x561e25e81730, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/protocols", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/rmt", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFLNK|0777, stx_size=13, ...}) = 0
+1745556 lgetxattr("/etc/rmt", "security.selinux", 0x561e25e81750, 255) = -1 ENODATA (No data available)
+1745556 readlink("/etc/rmt", "/usr/sbin/rmt", 14) = 13
+1745556 statx(AT_FDCWD, "/etc/rpc", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=887, ...}) = 0
+1745556 lgetxattr("/etc/rpc", "security.selinux", 0x561e25e81790, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rpc", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/rsyslog.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=1382, ...}) = 0
+1745556 lgetxattr("/etc/rsyslog.conf", "security.selinux", 0x561e25e817b0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rsyslog.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/rygel.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=5620, ...}) = 0
+1745556 lgetxattr("/etc/rygel.conf", "security.selinux", 0x561e25e817d0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/rygel.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/sensors3.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=10593, ...}) = 0
+1745556 lgetxattr("/etc/sensors3.conf", "security.selinux", 0x561e25e817f0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sensors3.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/services", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=12813, ...}) = 0
+1745556 lgetxattr("/etc/services", "security.selinux", 0x561e25e81810, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/services", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/shadow", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0640, stx_size=1721, ...}) = 0
+1745556 lgetxattr("/etc/shadow", "security.selinux", 0x561e25e81830, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/shadow", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/shells", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=180, ...}) = 0
+1745556 lgetxattr("/etc/shells", "security.selinux", 0x561e25e81850, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/shells", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/subgid", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=16, ...}) = 0
+1745556 lgetxattr("/etc/subgid", "security.selinux", 0x561e25e81870, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/subgid", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/subuid", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=16, ...}) = 0
+1745556 lgetxattr("/etc/subuid", "security.selinux", 0x561e25e81890, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/subuid", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/sudo.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=4573, ...}) = 0
+1745556 lgetxattr("/etc/sudo.conf", "security.selinux", 0x561e25e818b0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sudo.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/sudo_logsrvd.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=9390, ...}) = 0
+1745556 lgetxattr("/etc/sudo_logsrvd.conf", "security.selinux", 0x561e25e818d0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sudo_logsrvd.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/sudoers", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0440, stx_size=1698, ...}) = 0
+1745556 lgetxattr("/etc/sudoers", "security.selinux", 0x561e25e818f0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sudoers", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/sysctl.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=2355, ...}) = 0
+1745556 lgetxattr("/etc/sysctl.conf", "security.selinux", 0x561e25e81910, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sysctl.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/timezone", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=14, ...}) = 0
+1745556 lgetxattr("/etc/timezone", "security.selinux", 0x561e25e81930, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/timezone", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ucf.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=1260, ...}) = 0
+1745556 lgetxattr("/etc/ucf.conf", "security.selinux", 0x561e25e81950, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ucf.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/usb_modeswitch.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=1523, ...}) = 0
+1745556 lgetxattr("/etc/usb_modeswitch.conf", "security.selinux", 0x561e25e81970, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/usb_modeswitch.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/vtrgb", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFLNK|0777, stx_size=23, ...}) = 0
+1745556 lgetxattr("/etc/vtrgb", "security.selinux", 0x561e25e81990, 255) = -1 ENODATA (No data available)
+1745556 readlink("/etc/vtrgb", "/etc/alternatives/vtrgb", 24) = 23
+1745556 statx(AT_FDCWD, "/etc/wgetrc", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=4942, ...}) = 0
+1745556 lgetxattr("/etc/wgetrc", "security.selinux", 0x561e25e819d0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/wgetrc", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/xattr.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=681, ...}) = 0
+1745556 lgetxattr("/etc/xattr.conf", "security.selinux", 0x561e25e819f0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/xattr.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/zsh_command_not_found", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=460, ...}) = 0
+1745556 lgetxattr("/etc/zsh_command_not_found", "security.selinux", 0x561e25e81a10, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/zsh_command_not_found", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/resolv.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFLNK|0777, stx_size=39, ...}) = 0
+1745556 lgetxattr("/etc/resolv.conf", "security.selinux", 0x561e25e81a30, 255) = -1 ENODATA (No data available)
+1745556 readlink("/etc/resolv.conf", "../run/systemd/resolve/stub-resolv.conf", 40) = 39
+1745556 statx(AT_FDCWD, "/etc/localtime", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFLNK|0777, stx_size=33, ...}) = 0
+1745556 lgetxattr("/etc/localtime", "security.selinux", 0x561e25e81a90, 255) = -1 ENODATA (No data available)
+1745556 readlink("/etc/localtime", "/usr/share/zoneinfo/Europe/Berlin", 34) = 33
+1745556 statx(AT_FDCWD, "/etc/screenrc", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=3663, ...}) = 0
+1745556 lgetxattr("/etc/screenrc", "security.selinux", 0x561e25e81b10, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/screenrc", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/forticlient", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=72, ...}) = 0
+1745556 lgetxattr("/etc/forticlient", "security.selinux", 0x561e25e81b30, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/forticlient", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/forticlient", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/calendar", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=21, ...}) = 0
+1745556 lgetxattr("/etc/calendar", "security.selinux", 0x561e25e81b50, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/calendar", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/calendar", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/containerd", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=25, ...}) = 0
+1745556 lgetxattr("/etc/containerd", "security.selinux", 0x561e25e81b70, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/containerd", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/containerd", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/gshadow-", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0640, stx_size=1038, ...}) = 0
+1745556 lgetxattr("/etc/gshadow-", "security.selinux", 0x561e25e81b90, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gshadow-", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/group-", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=1257, ...}) = 0
+1745556 lgetxattr("/etc/group-", "security.selinux", 0x561e25e81bb0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/group-", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/quilt.quiltrc", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=1236, ...}) = 0
+1745556 lgetxattr("/etc/quilt.quiltrc", "security.selinux", 0x561e25e81bd0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/quilt.quiltrc", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ld-musl-x86_64.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=36, ...}) = 0
+1745556 lgetxattr("/etc/ld-musl-x86_64.d", "security.selinux", 0x561e25e81bf0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ld-musl-x86_64.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ld-musl-x86_64.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/passwd-", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=3442, ...}) = 0
+1745556 lgetxattr("/etc/passwd-", "security.selinux", 0x561e25e81c10, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/passwd-", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/shadow-", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0640, stx_size=1700, ...}) = 0
+1745556 lgetxattr("/etc/shadow-", "security.selinux", 0x561e25e81c30, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/shadow-", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/cni", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=19, ...}) = 0
+1745556 lgetxattr("/etc/cni", "security.selinux", 0x561e25e81c50, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cni", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cni", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/macchanger", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=25, ...}) = 0
+1745556 lgetxattr("/etc/macchanger", "security.selinux", 0x561e25e81c70, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/macchanger", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/macchanger", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/odbc.ini", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=0, ...}) = 0
+1745556 lgetxattr("/etc/odbc.ini", "security.selinux", 0x561e25e81c90, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/odbc.ini", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/crypttab", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=54, ...}) = 0
+1745556 lgetxattr("/etc/crypttab", "security.selinux", 0x561e25e81cb0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/crypttab", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/cowpoke.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=6543, ...}) = 0
+1745556 lgetxattr("/etc/cowpoke.conf", "security.selinux", 0x561e25e81cd0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cowpoke.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/hosts~", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=220, ...}) = 0
+1745556 lgetxattr("/etc/hosts~", "security.selinux", 0x561e25e81cf0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/hosts~", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/java-11-openjdk", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/java-11-openjdk", "security.selinux", 0x561e25e81d10, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/java-11-openjdk", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/java-11-openjdk", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/subuid-", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=0, ...}) = 0
+1745556 lgetxattr("/etc/subuid-", "security.selinux", 0x561e25e81d30, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/subuid-", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/subgid-", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=0, ...}) = 0
+1745556 lgetxattr("/etc/subgid-", "security.selinux", 0x561e25e81d50, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/subgid-", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/mtab", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFLNK|0777, stx_size=19, ...}) = 0
+1745556 lgetxattr("/etc/mtab", "security.selinux", 0x561e25e81d70, 255) = -1 ENODATA (No data available)
+1745556 readlink("/etc/mtab", "../proc/self/mounts", 20) = 19
+1745556 statx(AT_FDCWD, "/etc/papersize", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0664, stx_size=3, ...}) = 0
+1745556 lgetxattr("/etc/papersize", "security.selinux", 0x561e25e81db0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/papersize", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/mysql", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=57, ...}) = 0
+1745556 lgetxattr("/etc/mysql", "security.selinux", 0x561e25e81dd0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/mysql", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/mysql", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/odbcinst.ini", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=0, ...}) = 0
+1745556 lgetxattr("/etc/odbcinst.ini", "security.selinux", 0x561e25e81df0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/odbcinst.ini", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/cryptsetup-initramfs", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=23, ...}) = 0
+1745556 lgetxattr("/etc/cryptsetup-initramfs", "security.selinux", 0x561e25e81e10, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cryptsetup-initramfs", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/cryptsetup-initramfs", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/dput.cf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=3119, ...}) = 0
+1745556 lgetxattr("/etc/dput.cf", "security.selinux", 0x561e25e81e30, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dput.cf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/sysinspect", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0700, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/sysinspect", "security.selinux", 0x561e25e81e50, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sysinspect", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sysinspect", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 newfstatat(AT_FDCWD, "/etc/nsswitch.conf", {st_mode=S_IFREG|0644, st_size=553, ...}, 0) = 0
+1745556 openat(AT_FDCWD, "/etc/passwd", O_RDONLY|O_CLOEXEC) = 4
+1745556 newfstatat(4, "", {st_mode=S_IFREG|0644, st_size=3489, ...}, AT_EMPTY_PATH) = 0
+1745556 lseek(4, 0, SEEK_SET)           = 0
+1745556 read(4, "root:x:0:0:root:/root:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/u"..., 4096) = 3489
+1745556 close(4)                        = 0
+1745556 newfstatat(AT_FDCWD, "/etc/nsswitch.conf", {st_mode=S_IFREG|0644, st_size=553, ...}, 0) = 0
+1745556 openat(AT_FDCWD, "/etc/group", O_RDONLY|O_CLOEXEC) = 4
+1745556 newfstatat(4, "", {st_mode=S_IFREG|0644, st_size=1259, ...}, AT_EMPTY_PATH) = 0
+1745556 lseek(4, 0, SEEK_SET)           = 0
+1745556 read(4, "root:x:0:\ndaemon:x:1:\nbin:x:2:\nsys:x:3:\nadm:x:4:syslog,bo\ntty:x:"..., 4096) = 1259
+1745556 close(4)                        = 0
+1745556 statx(AT_FDCWD, "/etc/java", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=22, ...}) = 0
+1745556 lgetxattr("/etc/java", "security.selinux", 0x561e25e81eb0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/java", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/java", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ca-certificates.conf.dpkg-old", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=7464, ...}) = 0
+1745556 lgetxattr("/etc/ca-certificates.conf.dpkg-old", "security.selinux", 0x561e25e81ed0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ca-certificates.conf.dpkg-old", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/tigrc", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=17816, ...}) = 0
+1745556 lgetxattr("/etc/tigrc", "security.selinux", 0x561e25e81ed0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/tigrc", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/i8kmon.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=1097, ...}) = 0
+1745556 lgetxattr("/etc/i8kmon.conf", "security.selinux", 0x561e25e81ef0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/i8kmon.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/texmf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=90, ...}) = 0
+1745556 lgetxattr("/etc/texmf", "security.selinux", 0x561e25e81f10, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/texmf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/texmf", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/bogofilter.cf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=7374, ...}) = 0
+1745556 lgetxattr("/etc/bogofilter.cf", "security.selinux", 0x561e25e81f30, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/bogofilter.cf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/whoopsie", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=30, ...}) = 0
+1745556 lgetxattr("/etc/whoopsie", "security.selinux", 0x561e25e81f50, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/whoopsie", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/mdadm", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=24, ...}) = 0
+1745556 lgetxattr("/etc/mdadm", "security.selinux", 0x561e25e81f70, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/mdadm", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/mdadm", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/u-d-c-nvidia-runtimepm-override", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=33, ...}) = 0
+1745556 lgetxattr("/etc/u-d-c-nvidia-runtimepm-override", "security.selinux", 0x561e25e81f90, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/u-d-c-nvidia-runtimepm-override", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/kata-containers", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=32, ...}) = 0
+1745556 lgetxattr("/etc/kata-containers", "security.selinux", 0x561e25e81fc0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/kata-containers", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/kata-containers", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/linuxptp", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=47, ...}) = 0
+1745556 lgetxattr("/etc/linuxptp", "security.selinux", 0x561e25e81fe0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/linuxptp", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/linuxptp", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/gjackclockrc", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=1255, ...}) = 0
+1745556 lgetxattr("/etc/gjackclockrc", "security.selinux", 0x561e25e82000, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gjackclockrc", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/gjacktransportrc", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=1665, ...}) = 0
+1745556 lgetxattr("/etc/gjacktransportrc", "security.selinux", 0x561e25e82020, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gjacktransportrc", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/libibverbs.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/libibverbs.d", "security.selinux", 0x561e25e82040, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/libibverbs.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/libibverbs.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ld-musl-x86_64.path", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=50, ...}) = 0
+1745556 lgetxattr("/etc/ld-musl-x86_64.path", "security.selinux", 0x561e25e82060, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ld-musl-x86_64.path", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/qemu-ifdown", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0755, stx_size=163, ...}) = 0
+1745556 lgetxattr("/etc/qemu-ifdown", "security.selinux", 0x561e25e82080, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/qemu-ifdown", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/qemu-ifup", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0755, stx_size=1148, ...}) = 0
+1745556 lgetxattr("/etc/qemu-ifup", "security.selinux", 0x561e25e820a0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/qemu-ifup", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/lvm", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=58, ...}) = 0
+1745556 lgetxattr("/etc/lvm", "security.selinux", 0x561e25e820c0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/lvm", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/lvm", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/libvirt", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=4096, ...}) = 0
+1745556 lgetxattr("/etc/libvirt", "security.selinux", 0x561e25e820e0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/libvirt", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/libvirt", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/smartmontools", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=43, ...}) = 0
+1745556 lgetxattr("/etc/smartmontools", "security.selinux", 0x561e25e82100, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/smartmontools", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/smartmontools", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/dnsmasq.d-available", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=28, ...}) = 0
+1745556 lgetxattr("/etc/dnsmasq.d-available", "security.selinux", 0x561e25e82120, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dnsmasq.d-available", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dnsmasq.d-available", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/sasl2", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=26, ...}) = 0
+1745556 lgetxattr("/etc/sasl2", "security.selinux", 0x561e25e82140, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sasl2", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/sasl2", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/mdevctl.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=6, ...}) = 0
+1745556 lgetxattr("/etc/mdevctl.d", "security.selinux", 0x561e25e82160, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/mdevctl.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/mdevctl.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/kiwi.yml", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=6134, ...}) = 0
+1745556 lgetxattr("/etc/kiwi.yml", "security.selinux", 0x561e25e82180, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/kiwi.yml", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/devscripts.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=17921, ...}) = 0
+1745556 lgetxattr("/etc/devscripts.conf", "security.selinux", 0x561e25e821a0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/devscripts.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/timidity", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=26, ...}) = 0
+1745556 lgetxattr("/etc/timidity", "security.selinux", 0x561e25e821c0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/timidity", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/timidity", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/printcap", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFLNK|0777, stx_size=18, ...}) = 0
+1745556 lgetxattr("/etc/printcap", "security.selinux", 0x561e25e821e0, 255) = -1 ENODATA (No data available)
+1745556 readlink("/etc/printcap", "/run/cups/printcap", 19) = 18
+1745556 statx(AT_FDCWD, "/etc/swtpm-localca.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=180, ...}) = 0
+1745556 lgetxattr("/etc/swtpm-localca.conf", "security.selinux", 0x561e25e82220, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/swtpm-localca.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/swtpm-localca.options", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=76, ...}) = 0
+1745556 lgetxattr("/etc/swtpm-localca.options", "security.selinux", 0x561e25e82240, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/swtpm-localca.options", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/swtpm_setup.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=215, ...}) = 0
+1745556 lgetxattr("/etc/swtpm_setup.conf", "security.selinux", 0x561e25e82260, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/swtpm_setup.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/dnsmasq.d", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=28, ...}) = 0
+1745556 lgetxattr("/etc/dnsmasq.d", "security.selinux", 0x561e25e82280, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dnsmasq.d", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/dnsmasq.d", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/gconf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=68, ...}) = 0
+1745556 lgetxattr("/etc/gconf", "security.selinux", 0x561e25e822a0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gconf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gconf", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/chromium", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=36, ...}) = 0
+1745556 lgetxattr("/etc/chromium", "security.selinux", 0x561e25e822c0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/chromium", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/chromium", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/apache2", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=28, ...}) = 0
+1745556 lgetxattr("/etc/apache2", "security.selinux", 0x561e25e822e0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/apache2", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/apache2", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/lighttpd", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=48, ...}) = 0
+1745556 lgetxattr("/etc/lighttpd", "security.selinux", 0x561e25e82300, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/lighttpd", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/lighttpd", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/containers", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=92, ...}) = 0
+1745556 lgetxattr("/etc/containers", "security.selinux", 0x561e25e82320, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/containers", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/containers", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/openal", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=25, ...}) = 0
+1745556 lgetxattr("/etc/openal", "security.selinux", 0x561e25e82340, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/openal", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/openal", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/mplayer", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=61, ...}) = 0
+1745556 lgetxattr("/etc/mplayer", "security.selinux", 0x561e25e82360, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/mplayer", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/mplayer", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/gamin", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=21, ...}) = 0
+1745556 lgetxattr("/etc/gamin", "security.selinux", 0x561e25e82380, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gamin", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/gamin", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/ODBCDataSources", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=6, ...}) = 0
+1745556 lgetxattr("/etc/ODBCDataSources", "security.selinux", 0x561e25e823a0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ODBCDataSources", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/ODBCDataSources", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/mtools.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=624, ...}) = 0
+1745556 lgetxattr("/etc/mtools.conf", "security.selinux", 0x561e25e823c0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/mtools.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/.java", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0755, stx_size=26, ...}) = 0
+1745556 lgetxattr("/etc/.java", "security.selinux", 0x561e25e823e0, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/.java", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/.java", "system.posix_acl_default", NULL, 0) = -1 ENODATA (No data available)
+1745556 statx(AT_FDCWD, "/etc/smartd.conf", AT_STATX_SYNC_AS_STAT|AT_SYMLINK_NOFOLLOW|AT_NO_AUTOMOUNT, STATX_MODE|STATX_NLINK|STATX_UID|STATX_GID|STATX_MTIME|STATX_SIZE, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=7042, ...}) = 0
+1745556 lgetxattr("/etc/smartd.conf", "security.selinux", 0x561e25e82400, 255) = -1 ENODATA (No data available)
+1745556 getxattr("/etc/smartd.conf", "system.posix_acl_access", NULL, 0) = -1 ENODATA (No data available)
+1745556 getdents64(3, 0x561e25e87600 /* 0 entries */, 32768) = 0
+1745556 close(3)                        = 0
+1745556 openat(AT_FDCWD, "/usr/share/locale/en_US.UTF-8/LC_MESSAGES/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/share/locale/en_US.utf8/LC_MESSAGES/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/share/locale/en_US/LC_MESSAGES/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/share/locale/en.UTF-8/LC_MESSAGES/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/share/locale/en.utf8/LC_MESSAGES/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/share/locale/en/LC_MESSAGES/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/share/locale-langpack/en_US.UTF-8/LC_MESSAGES/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/share/locale-langpack/en_US.utf8/LC_MESSAGES/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/share/locale-langpack/en_US/LC_MESSAGES/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/share/locale-langpack/en.UTF-8/LC_MESSAGES/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/share/locale-langpack/en.utf8/LC_MESSAGES/coreutils.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745556 openat(AT_FDCWD, "/usr/share/locale-langpack/en/LC_MESSAGES/coreutils.mo", O_RDONLY) = 3
+1745556 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=613, ...}, AT_EMPTY_PATH) = 0
+1745556 mmap(NULL, 613, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7f217099b000
+1745556 close(3)                        = 0
+1745556 newfstatat(1, "", {st_mode=S_IFSOCK|0777, st_size=0, ...}, AT_EMPTY_PATH) = 0
+1745556 openat(AT_FDCWD, "/etc/localtime", O_RDONLY|O_CLOEXEC) = 3
+1745556 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=2298, ...}, AT_EMPTY_PATH) = 0
+1745556 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=2298, ...}, AT_EMPTY_PATH) = 0
+1745556 read(3, "TZif2\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\t\0\0\0\t\0\0\0\0\0\0\0\217\0\0\0\t\0\0\0\22\200\0\0\0\233\f\27`\233\325\332\360\234\331\256\220\235\244\265\220"..., 4096) = 2298
+1745556 lseek(3, -1449, SEEK_CUR)       = 849
+1745556 read(3, "TZif2\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\t\0\0\0\t\0\0\0\0\0\0\0\217\0\0\0\t\0\0\0\22\377\377\377\377o\242a\370\377\377\377\377\233\f\27`\377\377\377\377"..., 4096) = 1449
+1745556 close(3)                        = 0
+1745556 write(1, "total 952\ndrwxr-xr-x 169 root root     8192 Nov  7 06:14 .\ndrwxr"..., 4096) = 4096
+1745556 write(1, "  9  2022 fonts\ndrwxr-xr-x   2 root root       72 Aug 30  2024 f"..., 4096) = 4096
+1745556 write(1, "as\n-rw-r--r--   1 root root     9454 Sep  9 06:02 locale.gen\nlrw"..., 4096) = 4096
+1745556 write(1, "-x   2 root root     4096 Jun 29 01:46 rc0.d\ndrwxr-xr-x   2 root"..., 4096) = 4096
+1745556 write(1, " /etc/alternatives/vtrgb\ndrwxr-xr-x   5 root root       67 Aug  "..., 584) = 584
+1745556 close(1)                        = 0
+1745556 close(2)                        = 0
+1745556 exit_group(0)                   = ?

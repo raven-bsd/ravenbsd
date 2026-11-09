@@ -1,0 +1,54 @@
+1745581 execve("/usr/bin/dash", ["/usr/bin/dash", "-c", "echo hi"], 0x7ffcc679e410 /* 68 vars */) = 0
+1745581 brk(NULL)                       = 0x55ffb04e0000
+1745581 arch_prctl(0x3001 /* ARCH_??? */, 0x7fff425740f0) = -1 EINVAL (Invalid argument)
+1745581 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fd472d89000
+1745581 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+1745581 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+1745581 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=108276, ...}, AT_EMPTY_PATH) = 0
+1745581 mmap(NULL, 108276, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7fd472d6e000
+1745581 close(3)                        = 0
+1745581 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+1745581 read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0P\237\2\0\0\0\0\0@\0\0\0\0\0\0\0\360\320!\0\0\0\0\0\0\0\0\0@\08\0\16\0@\0B\0A\0"..., 832) = 832
+1745581 pread64(3, "\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\20\3\0\0\0\0\0\0\20\3\0\0\0\0\0\0\10\0\0\0\0\0\0\0\3\0\0\0\4\0\0\0"..., 784, 64) = 784
+1745581 pread64(3, "\4\0\0\0 \0\0\0\5\0\0\0GNU\0\2\0\0\300\4\0\0\0\3\0\0\0\0\0\0\0\2\200\0\300\4\0\0\0\1\0\0\0\0\0\0\0", 48, 848) = 48
+1745581 pread64(3, "\4\0\0\0\24\0\0\0\3\0\0\0GNU\0jl\265\250\17\325\345\273[\363\256\252\21\32\335\230\350\210C\245\4\0\0\0\20\0\0\0\1\0\0\0GNU\0\0\0\0\0\3\0\0\0\2\0\0\0"..., 68, 896) = 68
+1745581 newfstatat(3, "", {st_mode=S_IFREG|0755, st_size=2220400, ...}, AT_EMPTY_PATH) = 0
+1745581 pread64(3, "\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\20\3\0\0\0\0\0\0\20\3\0\0\0\0\0\0\10\0\0\0\0\0\0\0\3\0\0\0\4\0\0\0"..., 784, 64) = 784
+1745581 mmap(NULL, 2264656, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7fd472a00000
+1745581 mprotect(0x7fd472a28000, 2023424, PROT_NONE) = 0
+1745581 mmap(0x7fd472a28000, 1658880, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x28000) = 0x7fd472a28000
+1745581 mmap(0x7fd472bbd000, 360448, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1bd000) = 0x7fd472bbd000
+1745581 mmap(0x7fd472c16000, 24576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x215000) = 0x7fd472c16000
+1745581 mmap(0x7fd472c1c000, 52816, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7fd472c1c000
+1745581 close(3)                        = 0
+1745581 mmap(NULL, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fd472d6b000
+1745581 arch_prctl(ARCH_SET_FS, 0x7fd472d6b740) = 0
+1745581 set_tid_address(0x7fd472d6ba10) = 1745581
+1745581 set_robust_list(0x7fd472d6ba20, 24) = 0
+1745581 rseq(0x7fd472d6c0e0, 0x20, 0, 0x53053053) = 0
+1745581 mprotect(0x7fd472c16000, 16384, PROT_READ) = 0
+1745581 mprotect(0x55ffb00be000, 8192, PROT_READ) = 0
+1745581 mprotect(0x7fd472dc3000, 8192, PROT_READ) = 0
+1745581 prlimit64(0, RLIMIT_STACK, NULL, {rlim_cur=8192*1024, rlim_max=RLIM64_INFINITY}) = 0
+1745581 munmap(0x7fd472d6e000, 108276)  = 0
+1745581 getuid()                        = 1000
+1745581 getgid()                        = 1000
+1745581 getpid()                        = 1745581
+1745581 rt_sigaction(SIGCHLD, {sa_handler=0x55ffb00b4aa0, sa_mask=~[RTMIN RT_1], sa_flags=SA_RESTORER, sa_restorer=0x7fd472a42520}, NULL, 8) = 0
+1745581 geteuid()                       = 1000
+1745581 getrandom("\x99\xb2\xfd\xa8\xc2\x87\xed\xaf", 8, GRND_NONBLOCK) = 8
+1745581 brk(NULL)                       = 0x55ffb04e0000
+1745581 brk(0x55ffb0501000)             = 0x55ffb0501000
+1745581 getppid()                       = 1745578
+1745581 newfstatat(AT_FDCWD, "/home/bo/work/ravenos-workspace/minions/bob/ravenbsd", {st_mode=S_IFDIR|0775, st_size=4096, ...}, 0) = 0
+1745581 newfstatat(AT_FDCWD, ".", {st_mode=S_IFDIR|0775, st_size=4096, ...}, 0) = 0
+1745581 geteuid()                       = 1000
+1745581 getegid()                       = 1000
+1745581 rt_sigaction(SIGINT, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+1745581 rt_sigaction(SIGINT, {sa_handler=0x55ffb00b4aa0, sa_mask=~[RTMIN RT_1], sa_flags=SA_RESTORER, sa_restorer=0x7fd472a42520}, NULL, 8) = 0
+1745581 rt_sigaction(SIGQUIT, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+1745581 rt_sigaction(SIGQUIT, {sa_handler=SIG_DFL, sa_mask=~[RTMIN RT_1], sa_flags=SA_RESTORER, sa_restorer=0x7fd472a42520}, NULL, 8) = 0
+1745581 rt_sigaction(SIGTERM, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+1745581 rt_sigaction(SIGTERM, {sa_handler=SIG_DFL, sa_mask=~[RTMIN RT_1], sa_flags=SA_RESTORER, sa_restorer=0x7fd472a42520}, NULL, 8) = 0
+1745581 write(1, "hi\n", 3)             = 3
+1745581 exit_group(0)                   = ?

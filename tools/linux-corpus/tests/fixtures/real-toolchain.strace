@@ -1,0 +1,951 @@
+1745568 execve("/home/bo/.cargo/bin/rustc", ["/home/bo/.cargo/bin/rustc", "--version"], 0x7fff43c30778 /* 68 vars */) = 0
+1745568 brk(NULL)                       = 0x561e4ae7d000
+1745568 arch_prctl(0x3001 /* ARCH_??? */, 0x7fffef597810) = -1 EINVAL (Invalid argument)
+1745568 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc8541b7000
+1745568 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=108276, ...}, AT_EMPTY_PATH) = 0
+1745568 mmap(NULL, 108276, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7fc85419c000
+1745568 close(3)                        = 0
+1745568 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = 3
+1745568 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\360\342\1\0\0\0\0\0\0\0\0\0@\08\0\v\0@\0\35\0\34\0"..., 832) = 832
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=125488, ...}, AT_EMPTY_PATH) = 0
+1745568 mmap(NULL, 127720, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7fc85417c000
+1745568 mmap(0x7fc85417f000, 94208, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x3000) = 0x7fc85417f000
+1745568 mmap(0x7fc854196000, 16384, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1a000) = 0x7fc854196000
+1745568 mmap(0x7fc85419a000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1d000) = 0x7fc85419a000
+1745568 close(3)                        = 0
+1745568 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/librt.so.1", O_RDONLY|O_CLOEXEC) = 3
+1745568 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\2101\0\0\0\0\0\0\0\0\0\0@\08\0\v\0@\0\37\0\36\0"..., 832) = 832
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=14664, ...}, AT_EMPTY_PATH) = 0
+1745568 mmap(NULL, 16440, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7fc854177000
+1745568 mmap(0x7fc854178000, 4096, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1000) = 0x7fc854178000
+1745568 mmap(0x7fc854179000, 4096, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7fc854179000
+1745568 mmap(0x7fc85417a000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7fc85417a000
+1745568 close(3)                        = 0
+1745568 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libpthread.so.0", O_RDONLY|O_CLOEXEC) = 3
+1745568 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\210J\0\0\0\0\0\0\0\0\0\0@\08\0\v\0@\0%\0$\0"..., 832) = 832
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=21448, ...}, AT_EMPTY_PATH) = 0
+1745568 mmap(NULL, 16424, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7fc854172000
+1745568 mmap(0x7fc854173000, 4096, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1000) = 0x7fc854173000
+1745568 mmap(0x7fc854174000, 4096, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7fc854174000
+1745568 mmap(0x7fc854175000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7fc854175000
+1745568 close(3)                        = 0
+1745568 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libm.so.6", O_RDONLY|O_CLOEXEC) = 3
+1745568 read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0@\0\0\0\0\0\0\0PR\16\0\0\0\0\0\0\0\0\0@\08\0\v\0@\0\37\0\36\0"..., 832) = 832
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=940560, ...}, AT_EMPTY_PATH) = 0
+1745568 mmap(NULL, 942344, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7fc85408b000
+1745568 mmap(0x7fc854099000, 507904, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0xe000) = 0x7fc854099000
+1745568 mmap(0x7fc854115000, 372736, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x8a000) = 0x7fc854115000
+1745568 mmap(0x7fc854170000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0xe4000) = 0x7fc854170000
+1745568 close(3)                        = 0
+1745568 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libdl.so.2", O_RDONLY|O_CLOEXEC) = 3
+1745568 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0@\0\0\0\0\0\0\0`1\0\0\0\0\0\0\0\0\0\0@\08\0\v\0@\0\34\0\33\0"..., 832) = 832
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=14432, ...}, AT_EMPTY_PATH) = 0
+1745568 mmap(NULL, 16424, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7fc854086000
+1745568 mmap(0x7fc854087000, 4096, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1000) = 0x7fc854087000
+1745568 mmap(0x7fc854088000, 4096, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7fc854088000
+1745568 mmap(0x7fc854089000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7fc854089000
+1745568 close(3)                        = 0
+1745568 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+1745568 read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0P\237\2\0\0\0\0\0@\0\0\0\0\0\0\0\360\320!\0\0\0\0\0\0\0\0\0@\08\0\16\0@\0B\0A\0"..., 832) = 832
+1745568 pread64(3, "\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\20\3\0\0\0\0\0\0\20\3\0\0\0\0\0\0\10\0\0\0\0\0\0\0\3\0\0\0\4\0\0\0"..., 784, 64) = 784
+1745568 pread64(3, "\4\0\0\0 \0\0\0\5\0\0\0GNU\0\2\0\0\300\4\0\0\0\3\0\0\0\0\0\0\0\2\200\0\300\4\0\0\0\1\0\0\0\0\0\0\0", 48, 848) = 48
+1745568 pread64(3, "\4\0\0\0\24\0\0\0\3\0\0\0GNU\0jl\265\250\17\325\345\273[\363\256\252\21\32\335\230\350\210C\245\4\0\0\0\20\0\0\0\1\0\0\0GNU\0\0\0\0\0\3\0\0\0\2\0\0\0"..., 68, 896) = 68
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0755, st_size=2220400, ...}, AT_EMPTY_PATH) = 0
+1745568 pread64(3, "\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\20\3\0\0\0\0\0\0\20\3\0\0\0\0\0\0\10\0\0\0\0\0\0\0\3\0\0\0\4\0\0\0"..., 784, 64) = 784
+1745568 mmap(NULL, 2264656, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7fc853e00000
+1745568 mprotect(0x7fc853e28000, 2023424, PROT_NONE) = 0
+1745568 mmap(0x7fc853e28000, 1658880, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x28000) = 0x7fc853e28000
+1745568 mmap(0x7fc853fbd000, 360448, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1bd000) = 0x7fc853fbd000
+1745568 mmap(0x7fc854016000, 24576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x215000) = 0x7fc854016000
+1745568 mmap(0x7fc85401c000, 52816, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7fc85401c000
+1745568 close(3)                        = 0
+1745568 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc854084000
+1745568 mmap(NULL, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc854081000
+1745568 arch_prctl(ARCH_SET_FS, 0x7fc8540819c0) = 0
+1745568 set_tid_address(0x7fc854081c90) = 1745568
+1745568 set_robust_list(0x7fc854081ca0, 24) = 0
+1745568 rseq(0x7fc854082360, 0x20, 0, 0x53053053) = 0
+1745568 mprotect(0x7fc854016000, 16384, PROT_READ) = 0
+1745568 mprotect(0x7fc854089000, 4096, PROT_READ) = 0
+1745568 mprotect(0x7fc854170000, 4096, PROT_READ) = 0
+1745568 mprotect(0x7fc854175000, 4096, PROT_READ) = 0
+1745568 mprotect(0x7fc85417a000, 4096, PROT_READ) = 0
+1745568 mprotect(0x7fc85419a000, 4096, PROT_READ) = 0
+1745568 mprotect(0x561e4a8d2000, 983040, PROT_READ) = 0
+1745568 mprotect(0x7fc8541f1000, 8192, PROT_READ) = 0
+1745568 prlimit64(0, RLIMIT_STACK, NULL, {rlim_cur=8192*1024, rlim_max=RLIM64_INFINITY}) = 0
+1745568 munmap(0x7fc85419c000, 108276)  = 0
+1745568 getrandom("\x65\x00\x65\xfa\xeb\xde\x55\xdf", 8, GRND_NONBLOCK) = 8
+1745568 brk(NULL)                       = 0x561e4ae7d000
+1745568 brk(0x561e4ae9e000)             = 0x561e4ae9e000
+1745568 futex(0x561e4a9ccce8, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 futex(0x561e4a9ccc70, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 futex(0x561e4a9ccc78, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 futex(0x561e4a9ccc80, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 futex(0x561e4a9ccd74, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 futex(0x561e4a9ccc98, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 futex(0x561e4a9ccca0, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 futex(0x561e4a9cc91c, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 futex(0x561e4a9ccd68, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 futex(0x561e4a9cccf0, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 futex(0x561e4a9cc7c0, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 futex(0x561e4a9ccc88, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 openat(AT_FDCWD, "/usr/local/ssl/openssl.cnf", O_RDONLY) = -1 ENOENT (No such file or directory)
+1745568 futex(0x561e4a9ccca8, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 futex(0x561e4a9cc728, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 futex(0x561e4a9cccc8, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 futex(0x561e4a9cccd0, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 futex(0x561e4a9cccd8, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 sysinfo({uptime=791717, loads=[71648, 88928, 202944], totalram=33316499456, freeram=4048904192, sharedram=3591184384, bufferram=221184, totalswap=16000217088, freeswap=13460566016, procs=2392, totalhigh=0, freehigh=0, mem_unit=1}) = 0
+1745568 futex(0x561e4a9cc6d8, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 poll([{fd=0, events=0}, {fd=1, events=0}, {fd=2, events=0}], 3, 0) = 0 (Timeout)
+1745568 rt_sigaction(SIGPIPE, {sa_handler=SIG_IGN, sa_mask=[PIPE], sa_flags=SA_RESTORER|SA_RESTART, sa_restorer=0x7fc853e42520}, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+1745568 openat(AT_FDCWD, "/proc/self/maps", O_RDONLY|O_CLOEXEC) = 3
+1745568 prlimit64(0, RLIMIT_STACK, NULL, {rlim_cur=8192*1024, rlim_max=RLIM64_INFINITY}) = 0
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0444, st_size=0, ...}, AT_EMPTY_PATH) = 0
+1745568 read(3, "561e49600000-561e4a6d2000 r-xp 00000000 103:04 340620557        "..., 1024) = 1024
+1745568 read(3, "623215                 /usr/lib/x86_64-linux-gnu/libc.so.6\n7fc85"..., 1024) = 1024
+1745568 read(3, "libm.so.6\n7fc854170000-7fc854171000 r--p 000e4000 103:02 2686232"..., 1024) = 1024
+1745568 read(3, "fc854179000-7fc85417a000 r--p 00002000 103:02 268623267         "..., 1024) = 1024
+1745568 read(3, "/x86_64-linux-gnu/ld-linux-x86-64.so.2\n7fc8541bb000-7fc8541e5000"..., 1024) = 844
+1745568 close(3)                        = 0
+1745568 sched_getaffinity(1745568, 32, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) = 8
+1745568 rt_sigaction(SIGSEGV, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+1745568 sigaltstack(NULL, {ss_sp=NULL, ss_flags=SS_DISABLE, ss_size=0}) = 0
+1745568 mmap(NULL, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0) = 0x7fc8541b4000
+1745568 mprotect(0x7fc8541b4000, 4096, PROT_NONE) = 0
+1745568 sigaltstack({ss_sp=0x7fc8541b5000, ss_flags=0, ss_size=8192}, NULL) = 0
+1745568 gettid()                        = 1745568
+1745568 rt_sigaction(SIGSEGV, {sa_handler=0x561e49d20fa0, sa_mask=[], sa_flags=SA_RESTORER|SA_ONSTACK|SA_SIGINFO, sa_restorer=0x7fc853e42520}, NULL, 8) = 0
+1745568 rt_sigaction(SIGBUS, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+1745568 rt_sigaction(SIGBUS, {sa_handler=0x561e49d20fa0, sa_mask=[], sa_flags=SA_RESTORER|SA_ONSTACK|SA_SIGINFO, sa_restorer=0x7fc853e42520}, NULL, 8) = 0
+1745568 ioctl(2, TCGETS, 0x7fffef5952e0) = -1 ENOTTY (Inappropriate ioctl for device)
+1745568 ioctl(1, TCGETS, 0x7fffef5952e0) = -1 ENOTTY (Inappropriate ioctl for device)
+1745568 getrandom("\x4a\x84\x90\x52\x61\x50\xaf\x49\xce\xbd\x25\xca\x4d\x80\x39\x54", 16, GRND_INSECURE) = 16
+1745568 openat(AT_FDCWD, "/proc/self/cgroup", O_RDONLY|O_CLOEXEC) = 3
+1745568 statx(3, "", AT_STATX_SYNC_AS_STAT|AT_EMPTY_PATH, STATX_ALL, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0444, stx_size=0, ...}) = 0
+1745568 lseek(3, 0, SEEK_CUR)           = 0
+1745568 read(3, "0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-o"..., 128) = 128
+1745568 read(3, "288428.scope\n", 32)   = 13
+1745568 read(3, "", 115)                = 0
+1745568 close(3)                        = 0
+1745568 statx(AT_FDCWD, "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.gnome.Terminal.slice/vte-spawn-32cb7ede-9e40-4bc1-a2b0-db907c288428.scope/cgroup.controllers", AT_STATX_SYNC_AS_STAT, STATX_ALL, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0444, stx_size=0, ...}) = 0
+1745568 openat(AT_FDCWD, "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.gnome.Terminal.slice/vte-spawn-32cb7ede-9e40-4bc1-a2b0-db907c288428.scope/cpu.max", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.gnome.Terminal.slice/cpu.max", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/cpu.max", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/cpu.max", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/sys/fs/cgroup/user.slice/user-1000.slice/cpu.max", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/sys/fs/cgroup/user.slice/cpu.max", O_RDONLY|O_CLOEXEC) = 3
+1745568 statx(3, "", AT_STATX_SYNC_AS_STAT|AT_EMPTY_PATH, STATX_ALL, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=0, ...}) = 0
+1745568 lseek(3, 0, SEEK_CUR)           = 0
+1745568 read(3, "max 100000\n", 32)     = 11
+1745568 read(3, "", 32)                 = 0
+1745568 close(3)                        = 0
+1745568 openat(AT_FDCWD, "/sys/fs/cgroup/cpu.max", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 sched_getaffinity(0, 128, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) = 8
+1745568 epoll_create1(EPOLL_CLOEXEC)    = 3
+1745568 eventfd2(0, EFD_CLOEXEC|EFD_NONBLOCK) = 4
+1745568 epoll_ctl(3, EPOLL_CTL_ADD, 4, {events=EPOLLIN|EPOLLRDHUP|EPOLLET, data={u32=0, u64=0}}) = 0
+1745568 fcntl(3, F_DUPFD_CLOEXEC, 3)    = 5
+1745568 brk(0x561e4aebf000)             = 0x561e4aebf000
+1745568 rt_sigaction(SIGRT_1, {sa_handler=0x7fc853e91830, sa_mask=[], sa_flags=SA_RESTORER|SA_ONSTACK|SA_RESTART|SA_SIGINFO, sa_restorer=0x7fc853e42520}, NULL, 8) = 0
+1745568 rt_sigprocmask(SIG_UNBLOCK, [RTMIN RT_1], NULL, 8) = 0
+1745568 mmap(NULL, 2101248, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0) = 0x7fc853bff000
+1745568 mprotect(0x7fc853c00000, 2097152, PROT_READ|PROT_WRITE) = 0
+1745568 rt_sigprocmask(SIG_BLOCK, ~[], [], 8) = 0
+1745568 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc853dff910, parent_tid=0x7fc853dff910, exit_signal=0, stack=0x7fc853bff000, stack_size=0x1ffc80, tls=0x7fc853dff640} => {parent_tid=[1745569]}, 88) = 1745569
+1745568 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+1745569 rseq(0x7fc853dfffe0, 0x20, 0, 0x53053053 <unfinished ...>
+1745568 <... rt_sigprocmask resumed>NULL, 8) = 0
+1745569 <... rseq resumed>)             = 0
+1745568 mmap(NULL, 2101248, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0 <unfinished ...>
+1745569 set_robust_list(0x7fc853dff920, 24 <unfinished ...>
+1745568 <... mmap resumed>)             = 0x7fc8539fe000
+1745569 <... set_robust_list resumed>)  = 0
+1745568 mprotect(0x7fc8539ff000, 2097152, PROT_READ|PROT_WRITE <unfinished ...>
+1745569 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+1745568 <... mprotect resumed>)         = 0
+1745569 <... rt_sigprocmask resumed>NULL, 8) = 0
+1745568 rt_sigprocmask(SIG_BLOCK, ~[],  <unfinished ...>
+1745569 prctl(PR_SET_NAME, "tokio-rt-worker"... <unfinished ...>
+1745568 <... rt_sigprocmask resumed>[], 8) = 0
+1745569 <... prctl resumed>)            = 0
+1745568 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc853bfe910, parent_tid=0x7fc853bfe910, exit_signal=0, stack=0x7fc8539fe000, stack_size=0x1ffc80, tls=0x7fc853bfe640} <unfinished ...>
+1745569 mmap(NULL, 134217728, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0) = 0x7fc84b9fe000
+1745569 munmap(0x7fc84b9fe000, 6299648 <unfinished ...>
+1745568 <... clone3 resumed> => {parent_tid=[1745570]}, 88) = 1745570
+1745569 <... munmap resumed>)           = 0
+1745568 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+1745569 munmap(0x7fc850000000, 60809216 <unfinished ...>
+1745568 <... rt_sigprocmask resumed>NULL, 8) = 0
+1745569 <... munmap resumed>)           = 0
+1745568 mmap(NULL, 2101248, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0 <unfinished ...>
+1745569 mprotect(0x7fc84c000000, 135168, PROT_READ|PROT_WRITE <unfinished ...>
+1745568 <... mmap resumed>)             = 0x7fc8537fd000
+1745568 mprotect(0x7fc8537fe000, 2097152, PROT_READ|PROT_WRITE <unfinished ...>
+1745569 <... mprotect resumed>)         = 0
+1745568 <... mprotect resumed>)         = 0
+1745569 sched_getaffinity(1745569, 32,  <unfinished ...>
+1745568 rt_sigprocmask(SIG_BLOCK, ~[],  <unfinished ...>
+1745569 <... sched_getaffinity resumed>[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) = 8
+1745568 <... rt_sigprocmask resumed>[], 8) = 0
+1745570 rseq(0x7fc853bfefe0, 0x20, 0, 0x53053053 <unfinished ...>
+1745569 gettid( <unfinished ...>
+1745568 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc8539fd910, parent_tid=0x7fc8539fd910, exit_signal=0, stack=0x7fc8537fd000, stack_size=0x1ffc80, tls=0x7fc8539fd640} <unfinished ...>
+1745570 <... rseq resumed>)             = 0
+1745569 <... gettid resumed>)           = 1745569
+1745569 sigaltstack(NULL,  <unfinished ...>
+1745570 set_robust_list(0x7fc853bfe920, 24 <unfinished ...>
+1745569 <... sigaltstack resumed>{ss_sp=NULL, ss_flags=SS_DISABLE, ss_size=0}) = 0
+1745568 <... clone3 resumed> => {parent_tid=[1745571]}, 88) = 1745571
+1745570 <... set_robust_list resumed>)  = 0
+1745571 rseq(0x7fc8539fdfe0, 0x20, 0, 0x53053053 <unfinished ...>
+1745568 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+1745569 mmap(NULL, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0 <unfinished ...>
+1745568 <... rt_sigprocmask resumed>NULL, 8) = 0
+1745571 <... rseq resumed>)             = 0
+1745569 <... mmap resumed>)             = 0x7fc8541b1000
+1745571 set_robust_list(0x7fc8539fd920, 24 <unfinished ...>
+1745568 mmap(NULL, 2101248, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0 <unfinished ...>
+1745571 <... set_robust_list resumed>)  = 0
+1745569 mprotect(0x7fc8541b1000, 4096, PROT_NONE <unfinished ...>
+1745568 <... mmap resumed>)             = 0x7fc8535fc000
+1745571 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+1745568 mprotect(0x7fc8535fd000, 2097152, PROT_READ|PROT_WRITE <unfinished ...>
+1745569 <... mprotect resumed>)         = 0
+1745571 <... rt_sigprocmask resumed>NULL, 8) = 0
+1745568 <... mprotect resumed>)         = 0
+1745569 sigaltstack({ss_sp=0x7fc8541b2000, ss_flags=0, ss_size=8192},  <unfinished ...>
+1745571 prctl(PR_SET_NAME, "tokio-rt-worker"... <unfinished ...>
+1745568 rt_sigprocmask(SIG_BLOCK, ~[],  <unfinished ...>
+1745569 <... sigaltstack resumed>NULL)  = 0
+1745568 <... rt_sigprocmask resumed>[], 8) = 0
+1745571 <... prctl resumed>)            = 0
+1745568 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc8537fc910, parent_tid=0x7fc8537fc910, exit_signal=0, stack=0x7fc8535fc000, stack_size=0x1ffc80, tls=0x7fc8537fc640} <unfinished ...>
+1745571 mmap(NULL, 134217728, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0 <unfinished ...>
+1745569 futex(0x561e4ae9e778, FUTEX_WAIT_BITSET_PRIVATE, 2, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745571 <... mmap resumed>)             = 0x7fc844000000
+1745571 munmap(0x7fc848000000, 67108864 <unfinished ...>
+1745568 <... clone3 resumed> => {parent_tid=[1745572]}, 88) = 1745572
+1745572 rseq(0x7fc8537fcfe0, 0x20, 0, 0x53053053 <unfinished ...>
+1745571 <... munmap resumed>)           = 0
+1745568 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+1745572 <... rseq resumed>)             = 0
+1745570 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+1745568 <... rt_sigprocmask resumed>NULL, 8) = 0
+1745572 set_robust_list(0x7fc8537fc920, 24 <unfinished ...>
+1745571 mprotect(0x7fc844000000, 135168, PROT_READ|PROT_WRITE <unfinished ...>
+1745568 futex(0x561e4ae9e778, FUTEX_WAKE_PRIVATE, 1 <unfinished ...>
+1745572 <... set_robust_list resumed>)  = 0
+1745571 <... mprotect resumed>)         = 0
+1745568 <... futex resumed>)            = 1
+1745569 <... futex resumed>)            = 0
+1745572 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+1745568 mmap(NULL, 2101248, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0 <unfinished ...>
+1745571 sched_getaffinity(1745571, 32,  <unfinished ...>
+1745568 <... mmap resumed>)             = 0x7fc8533fb000
+1745572 <... rt_sigprocmask resumed>NULL, 8) = 0
+1745569 futex(0x561e4ae9e778, FUTEX_WAIT_BITSET_PRIVATE, 2, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745568 mprotect(0x7fc8533fc000, 2097152, PROT_READ|PROT_WRITE <unfinished ...>
+1745572 prctl(PR_SET_NAME, "tokio-rt-worker"... <unfinished ...>
+1745571 <... sched_getaffinity resumed>[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) = 8
+1745568 <... mprotect resumed>)         = 0
+1745572 <... prctl resumed>)            = 0
+1745571 gettid( <unfinished ...>
+1745572 mmap(0x7fc848000000, 67108864, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0 <unfinished ...>
+1745568 rt_sigprocmask(SIG_BLOCK, ~[],  <unfinished ...>
+1745572 <... mmap resumed>)             = 0x7fc848000000
+1745571 <... gettid resumed>)           = 1745571
+1745568 <... rt_sigprocmask resumed>[], 8) = 0
+1745572 mprotect(0x7fc848000000, 135168, PROT_READ|PROT_WRITE <unfinished ...>
+1745568 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc8535fb910, parent_tid=0x7fc8535fb910, exit_signal=0, stack=0x7fc8533fb000, stack_size=0x1ffc80, tls=0x7fc8535fb640} <unfinished ...>
+1745571 sigaltstack(NULL,  <unfinished ...>
+1745572 <... mprotect resumed>)         = 0
+1745571 <... sigaltstack resumed>{ss_sp=NULL, ss_flags=SS_DISABLE, ss_size=0}) = 0
+1745572 sched_getaffinity(1745572, 32,  <unfinished ...>
+1745570 <... rt_sigprocmask resumed>NULL, 8) = 0
+1745571 mmap(NULL, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0 <unfinished ...>
+1745572 <... sched_getaffinity resumed>[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) = 8
+1745568 <... clone3 resumed> => {parent_tid=[1745573]}, 88) = 1745573
+1745573 rseq(0x7fc8535fbfe0, 0x20, 0, 0x53053053 <unfinished ...>
+1745571 <... mmap resumed>)             = 0x7fc8541ae000
+1745570 prctl(PR_SET_NAME, "tokio-rt-worker"... <unfinished ...>
+1745568 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+1745573 <... rseq resumed>)             = 0
+1745572 gettid( <unfinished ...>
+1745571 mprotect(0x7fc8541ae000, 4096, PROT_NONE <unfinished ...>
+1745568 <... rt_sigprocmask resumed>NULL, 8) = 0
+1745573 set_robust_list(0x7fc8535fb920, 24 <unfinished ...>
+1745572 <... gettid resumed>)           = 1745572
+1745570 <... prctl resumed>)            = 0
+1745568 futex(0x561e4ae9e778, FUTEX_WAKE_PRIVATE, 1 <unfinished ...>
+1745573 <... set_robust_list resumed>)  = 0
+1745572 sigaltstack(NULL,  <unfinished ...>
+1745571 <... mprotect resumed>)         = 0
+1745568 <... futex resumed>)            = 1
+1745573 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+1745572 <... sigaltstack resumed>{ss_sp=NULL, ss_flags=SS_DISABLE, ss_size=0}) = 0
+1745570 mmap(NULL, 134217728, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0 <unfinished ...>
+1745569 <... futex resumed>)            = 0
+1745571 sigaltstack({ss_sp=0x7fc8541af000, ss_flags=0, ss_size=8192},  <unfinished ...>
+1745568 mmap(NULL, 2101248, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0 <unfinished ...>
+1745573 <... rt_sigprocmask resumed>NULL, 8) = 0
+1745572 mmap(NULL, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0 <unfinished ...>
+1745570 <... mmap resumed>)             = 0x7fc83c000000
+1745571 <... sigaltstack resumed>NULL)  = 0
+1745569 futex(0x561e4ae9e778, FUTEX_WAIT_BITSET_PRIVATE, 2, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745568 <... mmap resumed>)             = 0x7fc8531fa000
+1745573 prctl(PR_SET_NAME, "tokio-rt-worker"... <unfinished ...>
+1745572 <... mmap resumed>)             = 0x7fc8541ab000
+1745571 futex(0x561e4ae9e778, FUTEX_WAIT_BITSET_PRIVATE, 2, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745570 munmap(0x7fc840000000, 67108864 <unfinished ...>
+1745568 mprotect(0x7fc8531fb000, 2097152, PROT_READ|PROT_WRITE <unfinished ...>
+1745573 <... prctl resumed>)            = 0
+1745572 mprotect(0x7fc8541ab000, 4096, PROT_NONE <unfinished ...>
+1745568 <... mprotect resumed>)         = 0
+1745573 mmap(0x7fc840000000, 67108864, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0 <unfinished ...>
+1745570 <... munmap resumed>)           = 0
+1745572 <... mprotect resumed>)         = 0
+1745568 rt_sigprocmask(SIG_BLOCK, ~[],  <unfinished ...>
+1745573 <... mmap resumed>)             = 0x7fc840000000
+1745570 mprotect(0x7fc83c000000, 135168, PROT_READ|PROT_WRITE <unfinished ...>
+1745568 <... rt_sigprocmask resumed>[], 8) = 0
+1745573 mprotect(0x7fc840000000, 135168, PROT_READ|PROT_WRITE <unfinished ...>
+1745572 sigaltstack({ss_sp=0x7fc8541ac000, ss_flags=0, ss_size=8192},  <unfinished ...>
+1745568 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc8533fa910, parent_tid=0x7fc8533fa910, exit_signal=0, stack=0x7fc8531fa000, stack_size=0x1ffc80, tls=0x7fc8533fa640} <unfinished ...>
+1745570 <... mprotect resumed>)         = 0
+1745573 <... mprotect resumed>)         = 0
+1745572 <... sigaltstack resumed>NULL)  = 0
+1745573 sched_getaffinity(1745573, 32,  <unfinished ...>
+1745572 futex(0x561e4ae9e778, FUTEX_WAIT_BITSET_PRIVATE, 2, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745570 sched_getaffinity(1745570, 32,  <unfinished ...>
+1745573 <... sched_getaffinity resumed>[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) = 8
+1745568 <... clone3 resumed> => {parent_tid=[1745574]}, 88) = 1745574
+1745570 <... sched_getaffinity resumed>[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) = 8
+1745568 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+1745573 gettid( <unfinished ...>
+1745568 <... rt_sigprocmask resumed>NULL, 8) = 0
+1745570 gettid( <unfinished ...>
+1745573 <... gettid resumed>)           = 1745573
+1745568 futex(0x561e4ae9e778, FUTEX_WAKE_PRIVATE, 1 <unfinished ...>
+1745570 <... gettid resumed>)           = 1745570
+1745573 sigaltstack(NULL,  <unfinished ...>
+1745568 <... futex resumed>)            = 1
+1745569 <... futex resumed>)            = 0
+1745570 sigaltstack(NULL,  <unfinished ...>
+1745573 <... sigaltstack resumed>{ss_sp=NULL, ss_flags=SS_DISABLE, ss_size=0}) = 0
+1745568 mmap(NULL, 2101248, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0 <unfinished ...>
+1745574 rseq(0x7fc8533fafe0, 0x20, 0, 0x53053053 <unfinished ...>
+1745570 <... sigaltstack resumed>{ss_sp=NULL, ss_flags=SS_DISABLE, ss_size=0}) = 0
+1745568 <... mmap resumed>)             = 0x7fc852ff9000
+1745574 <... rseq resumed>)             = 0
+1745573 mmap(NULL, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0 <unfinished ...>
+1745569 futex(0x561e4ae9e778, FUTEX_WAIT_BITSET_PRIVATE, 2, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745568 mprotect(0x7fc852ffa000, 2097152, PROT_READ|PROT_WRITE <unfinished ...>
+1745574 set_robust_list(0x7fc8533fa920, 24 <unfinished ...>
+1745570 mmap(NULL, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0 <unfinished ...>
+1745568 <... mprotect resumed>)         = 0
+1745574 <... set_robust_list resumed>)  = 0
+1745573 <... mmap resumed>)             = 0x7fc8541a8000
+1745570 <... mmap resumed>)             = 0x7fc8541a5000
+1745568 rt_sigprocmask(SIG_BLOCK, ~[],  <unfinished ...>
+1745574 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+1745573 mprotect(0x7fc8541a8000, 4096, PROT_NONE <unfinished ...>
+1745568 <... rt_sigprocmask resumed>[], 8) = 0
+1745574 <... rt_sigprocmask resumed>NULL, 8) = 0
+1745570 mprotect(0x7fc8541a5000, 4096, PROT_NONE <unfinished ...>
+1745568 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc8531f9910, parent_tid=0x7fc8531f9910, exit_signal=0, stack=0x7fc852ff9000, stack_size=0x1ffc80, tls=0x7fc8531f9640} <unfinished ...>
+1745574 prctl(PR_SET_NAME, "tokio-rt-worker"... <unfinished ...>
+1745573 <... mprotect resumed>)         = 0
+1745570 <... mprotect resumed>)         = 0
+1745574 <... prctl resumed>)            = 0
+1745573 sigaltstack({ss_sp=0x7fc8541a9000, ss_flags=0, ss_size=8192},  <unfinished ...>
+1745574 mmap(NULL, 134217728, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0 <unfinished ...>
+1745570 sigaltstack({ss_sp=0x7fc8541a6000, ss_flags=0, ss_size=8192},  <unfinished ...>
+1745568 <... clone3 resumed> => {parent_tid=[1745575]}, 88) = 1745575
+1745575 rseq(0x7fc8531f9fe0, 0x20, 0, 0x53053053 <unfinished ...>
+1745573 <... sigaltstack resumed>NULL)  = 0
+1745568 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+1745575 <... rseq resumed>)             = 0
+1745574 <... mmap resumed>)             = 0x7fc834000000
+1745570 <... sigaltstack resumed>NULL)  = 0
+1745568 <... rt_sigprocmask resumed>NULL, 8) = 0
+1745575 set_robust_list(0x7fc8531f9920, 24 <unfinished ...>
+1745574 munmap(0x7fc838000000, 67108864 <unfinished ...>
+1745573 futex(0x561e4ae9e778, FUTEX_WAIT_BITSET_PRIVATE, 2, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745568 futex(0x561e4ae9e778, FUTEX_WAKE_PRIVATE, 1 <unfinished ...>
+1745575 <... set_robust_list resumed>)  = 0
+1745570 futex(0x561e4ae9e778, FUTEX_WAIT_BITSET_PRIVATE, 2, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745568 <... futex resumed>)            = 1
+1745575 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+1745574 <... munmap resumed>)           = 0
+1745573 <... futex resumed>)            = -1 EAGAIN (Resource temporarily unavailable)
+1745570 <... futex resumed>)            = -1 EAGAIN (Resource temporarily unavailable)
+1745568 mmap(NULL, 2101248, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0 <unfinished ...>
+1745575 <... rt_sigprocmask resumed>NULL, 8) = 0
+1745574 mprotect(0x7fc834000000, 135168, PROT_READ|PROT_WRITE <unfinished ...>
+1745571 <... futex resumed>)            = 0
+1745568 <... mmap resumed>)             = 0x7fc852df8000
+1745575 prctl(PR_SET_NAME, "tokio-rt-worker"... <unfinished ...>
+1745573 futex(0x561e4ae9e778, FUTEX_WAIT_BITSET_PRIVATE, 2, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745570 futex(0x561e4ae9e778, FUTEX_WAIT_BITSET_PRIVATE, 2, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745568 mprotect(0x7fc852df9000, 2097152, PROT_READ|PROT_WRITE <unfinished ...>
+1745575 <... prctl resumed>)            = 0
+1745574 <... mprotect resumed>)         = 0
+1745571 futex(0x561e4ae9e778, FUTEX_WAIT_BITSET_PRIVATE, 2, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745568 <... mprotect resumed>)         = 0
+1745575 mmap(0x7fc838000000, 67108864, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0 <unfinished ...>
+1745574 sched_getaffinity(1745574, 32,  <unfinished ...>
+1745568 rt_sigprocmask(SIG_BLOCK, ~[],  <unfinished ...>
+1745575 <... mmap resumed>)             = 0x7fc838000000
+1745574 <... sched_getaffinity resumed>[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) = 8
+1745568 <... rt_sigprocmask resumed>[], 8) = 0
+1745575 mprotect(0x7fc838000000, 135168, PROT_READ|PROT_WRITE <unfinished ...>
+1745574 gettid( <unfinished ...>
+1745568 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc852ff8910, parent_tid=0x7fc852ff8910, exit_signal=0, stack=0x7fc852df8000, stack_size=0x1ffc80, tls=0x7fc852ff8640} <unfinished ...>
+1745575 <... mprotect resumed>)         = 0
+1745574 <... gettid resumed>)           = 1745574
+1745575 sched_getaffinity(1745575, 32,  <unfinished ...>
+1745574 sigaltstack(NULL,  <unfinished ...>
+1745575 <... sched_getaffinity resumed>[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) = 8
+1745574 <... sigaltstack resumed>{ss_sp=NULL, ss_flags=SS_DISABLE, ss_size=0}) = 0
+1745568 <... clone3 resumed> => {parent_tid=[1745576]}, 88) = 1745576
+1745576 rseq(0x7fc852ff8fe0, 0x20, 0, 0x53053053 <unfinished ...>
+1745575 gettid( <unfinished ...>
+1745568 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+1745576 <... rseq resumed>)             = 0
+1745574 mmap(NULL, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0 <unfinished ...>
+1745568 <... rt_sigprocmask resumed>NULL, 8) = 0
+1745576 set_robust_list(0x7fc852ff8920, 24 <unfinished ...>
+1745575 <... gettid resumed>)           = 1745575
+1745568 futex(0x561e4ae9e778, FUTEX_WAKE_PRIVATE, 1 <unfinished ...>
+1745576 <... set_robust_list resumed>)  = 0
+1745574 <... mmap resumed>)             = 0x7fc8541a2000
+1745568 <... futex resumed>)            = 1
+1745576 rt_sigprocmask(SIG_SETMASK, [],  <unfinished ...>
+1745575 sigaltstack(NULL,  <unfinished ...>
+1745572 <... futex resumed>)            = 0
+1745574 mprotect(0x7fc8541a2000, 4096, PROT_NONE <unfinished ...>
+1745576 <... rt_sigprocmask resumed>NULL, 8) = 0
+1745575 <... sigaltstack resumed>{ss_sp=NULL, ss_flags=SS_DISABLE, ss_size=0}) = 0
+1745572 futex(0x561e4ae9e778, FUTEX_WAKE_PRIVATE, 1 <unfinished ...>
+1745576 prctl(PR_SET_NAME, "tokio-rt-worker"... <unfinished ...>
+1745575 mmap(NULL, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0 <unfinished ...>
+1745574 <... mprotect resumed>)         = 0
+1745576 <... prctl resumed>)            = 0
+1745572 <... futex resumed>)            = 1
+1745569 <... futex resumed>)            = 0
+1745574 sigaltstack({ss_sp=0x7fc8541a3000, ss_flags=0, ss_size=8192},  <unfinished ...>
+1745575 <... mmap resumed>)             = 0x7fc85419f000
+1745576 mmap(NULL, 134217728, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0 <unfinished ...>
+1745574 <... sigaltstack resumed>NULL)  = 0
+1745572 getrandom( <unfinished ...>
+1745575 mprotect(0x7fc85419f000, 4096, PROT_NONE <unfinished ...>
+1745569 futex(0x561e4ae9e778, FUTEX_WAKE_PRIVATE, 1 <unfinished ...>
+1745576 <... mmap resumed>)             = 0x7fc82c000000
+1745574 getrandom( <unfinished ...>
+1745572 <... getrandom resumed>"\xf1\x97\x5e\xd7\x56\xcc\x64\xf0\xe0\x96\xc8\x8f\x47\x4f\x71\x2c", 16, GRND_INSECURE) = 16
+1745576 munmap(0x7fc830000000, 67108864 <unfinished ...>
+1745575 <... mprotect resumed>)         = 0
+1745574 <... getrandom resumed>"\x95\x87\x2f\xbd\xeb\x38\x58\x74\xb8\xe9\x32\xbf\x1e\xc3\xe6\xe2", 16, GRND_INSECURE) = 16
+1745573 <... futex resumed>)            = 0
+1745569 <... futex resumed>)            = 1
+1745576 <... munmap resumed>)           = 0
+1745575 sigaltstack({ss_sp=0x7fc8541a0000, ss_flags=0, ss_size=8192},  <unfinished ...>
+1745574 futex(0x561e4aea0b48, FUTEX_WAIT_BITSET_PRIVATE, 0, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745573 futex(0x561e4ae9e778, FUTEX_WAKE_PRIVATE, 1 <unfinished ...>
+1745572 epoll_wait(3,  <unfinished ...>
+1745576 mprotect(0x7fc82c000000, 135168, PROT_READ|PROT_WRITE <unfinished ...>
+1745575 <... sigaltstack resumed>NULL)  = 0
+1745573 <... futex resumed>)            = 1
+1745569 getrandom( <unfinished ...>
+1745576 <... mprotect resumed>)         = 0
+1745575 getrandom( <unfinished ...>
+1745573 getrandom( <unfinished ...>
+1745570 <... futex resumed>)            = 0
+1745569 <... getrandom resumed>"\x51\x8d\x13\x3a\xb1\x68\x34\xd9\x1e\xe0\xce\x55\x20\x44\x6f\x9e", 16, GRND_INSECURE) = 16
+1745568 getcwd( <unfinished ...>
+1745576 sched_getaffinity(1745576, 32,  <unfinished ...>
+1745575 <... getrandom resumed>"\xf3\xa2\x1d\x44\x10\x31\x8f\xee\xd4\xc8\x38\xf3\x1c\xff\x4e\x87", 16, GRND_INSECURE) = 16
+1745573 <... getrandom resumed>"\x73\xef\xb2\x7f\x54\x05\xaa\x86\x03\xcf\x3f\xe6\x8a\x77\xfa\x3c", 16, GRND_INSECURE) = 16
+1745570 futex(0x561e4ae9e778, FUTEX_WAKE_PRIVATE, 1 <unfinished ...>
+1745568 <... getcwd resumed>"/home/bo/work/ravenos-workspace/minions/bob/ravenbsd", 512) = 53
+1745576 <... sched_getaffinity resumed>[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) = 8
+1745575 futex(0x561e4aea1d48, FUTEX_WAIT_BITSET_PRIVATE, 0, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745569 futex(0x561e4aea0248, FUTEX_WAIT_BITSET_PRIVATE, 0, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745568 readlink("/proc/self/exe",  <unfinished ...>
+1745576 gettid( <unfinished ...>
+1745573 futex(0x561e4aea1448, FUTEX_WAIT_BITSET_PRIVATE, 0, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745571 <... futex resumed>)            = 0
+1745570 <... futex resumed>)            = 1
+1745576 <... gettid resumed>)           = 1745576
+1745568 <... readlink resumed>"/home/bo/.cargo/bin/rustup", 256) = 26
+1745571 futex(0x561e4ae9e778, FUTEX_WAKE_PRIVATE, 1 <unfinished ...>
+1745570 getrandom( <unfinished ...>
+1745576 sigaltstack(NULL,  <unfinished ...>
+1745571 <... futex resumed>)            = 0
+1745570 <... getrandom resumed>"\x4c\x2b\x24\xb2\xa1\xbc\x89\x92\x92\x72\x58\xca\x97\x50\x79\x12", 16, GRND_INSECURE) = 16
+1745576 <... sigaltstack resumed>{ss_sp=NULL, ss_flags=SS_DISABLE, ss_size=0}) = 0
+1745571 getrandom( <unfinished ...>
+1745570 futex(0x561e4aea2648, FUTEX_WAIT_BITSET_PRIVATE, 0, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745576 mmap(NULL, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0 <unfinished ...>
+1745571 <... getrandom resumed>"\xbc\x29\x3a\xec\x2a\xf1\x89\x96\x28\xb4\xc4\x79\x50\x98\x3f\xdb", 16, GRND_INSECURE) = 16
+1745568 getcwd( <unfinished ...>
+1745576 <... mmap resumed>)             = 0x7fc85419c000
+1745571 futex(0x561e4aea2f48, FUTEX_WAIT_BITSET_PRIVATE, 0, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745568 <... getcwd resumed>"/home/bo/work/ravenos-workspace/minions/bob/ravenbsd", 512) = 53
+1745576 mprotect(0x7fc85419c000, 4096, PROT_NONE) = 0
+1745568 statx(AT_FDCWD, "/home/bo/.cargo/bin/rustup-init", AT_STATX_SYNC_AS_STAT, STATX_ALL,  <unfinished ...>
+1745576 sigaltstack({ss_sp=0x7fc85419d000, ss_flags=0, ss_size=8192},  <unfinished ...>
+1745568 <... statx resumed>0x7fffef577860) = -1 ENOENT (No such file or directory)
+1745576 <... sigaltstack resumed>NULL)  = 0
+1745568 getcwd( <unfinished ...>
+1745576 getrandom( <unfinished ...>
+1745568 <... getcwd resumed>"/home/bo/work/ravenos-workspace/minions/bob/ravenbsd", 512) = 53
+1745576 <... getrandom resumed>"\x84\x06\xc1\x84\x14\xcb\x82\x73\xd4\x83\x6d\x07\xf8\x0c\xc2\xc1", 16, GRND_INSECURE) = 16
+1745576 futex(0x561e4aea3848, FUTEX_WAIT_BITSET_PRIVATE, 0, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745568 statx(AT_FDCWD, "/home/bo/.rustup", AT_STATX_SYNC_AS_STAT, STATX_ALL, {stx_mask=STATX_ALL|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0775, stx_size=94, ...}) = 0
+1745568 statx(AT_FDCWD, "/home/bo/.rustup/settings.toml", AT_STATX_SYNC_AS_STAT, STATX_ALL, {stx_mask=STATX_ALL|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0664, stx_size=165, ...}) = 0
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/settings.toml", O_RDONLY|O_CLOEXEC) = 6
+1745568 flock(6, LOCK_SH)               = 0
+1745568 statx(6, "", AT_STATX_SYNC_AS_STAT|AT_EMPTY_PATH, STATX_ALL, {stx_mask=STATX_ALL|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0664, stx_size=165, ...}) = 0
+1745568 statx(6, "", AT_STATX_SYNC_AS_STAT|AT_EMPTY_PATH, STATX_ALL, {stx_mask=STATX_ALL|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0664, stx_size=165, ...}) = 0
+1745568 lseek(6, 0, SEEK_CUR)           = 0
+1745568 read(6, "version = \"12\"\ndefault_toolchain = \"stable-x86_64-unknown-linux-"..., 165) = 165
+1745568 read(6, "", 32)                 = 0
+1745568 close(6)                        = 0
+1745568 openat(AT_FDCWD, "/etc/rustup/settings.toml", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 uname({sysname="Linux", nodename="alien", ...}) = 0
+1745568 mmap(NULL, 323584, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc854032000
+1745568 munmap(0x7fc854032000, 323584)  = 0
+1745568 brk(0x561e4aee0000)             = 0x561e4aee0000
+1745568 openat(AT_FDCWD, "/proc/self/cgroup", O_RDONLY|O_CLOEXEC) = 6
+1745568 statx(6, "", AT_STATX_SYNC_AS_STAT|AT_EMPTY_PATH, STATX_ALL, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0444, stx_size=0, ...}) = 0
+1745568 lseek(6, 0, SEEK_CUR)           = 0
+1745568 read(6, "0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-o"..., 128) = 128
+1745568 read(6, "288428.scope\n", 32)   = 13
+1745568 read(6, "", 115)                = 0
+1745568 close(6)                        = 0
+1745568 statx(AT_FDCWD, "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.gnome.Terminal.slice/vte-spawn-32cb7ede-9e40-4bc1-a2b0-db907c288428.scope/cgroup.controllers", AT_STATX_SYNC_AS_STAT, STATX_ALL, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0444, stx_size=0, ...}) = 0
+1745568 openat(AT_FDCWD, "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.gnome.Terminal.slice/vte-spawn-32cb7ede-9e40-4bc1-a2b0-db907c288428.scope/cpu.max", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.gnome.Terminal.slice/cpu.max", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/app.slice/cpu.max", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/cpu.max", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/sys/fs/cgroup/user.slice/user-1000.slice/cpu.max", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/sys/fs/cgroup/user.slice/cpu.max", O_RDONLY|O_CLOEXEC) = 6
+1745568 statx(6, "", AT_STATX_SYNC_AS_STAT|AT_EMPTY_PATH, STATX_ALL, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0644, stx_size=0, ...}) = 0
+1745568 lseek(6, 0, SEEK_CUR)           = 0
+1745568 read(6, "max 100000\n", 32)     = 11
+1745568 read(6, "", 32)                 = 0
+1745568 close(6)                        = 0
+1745568 openat(AT_FDCWD, "/sys/fs/cgroup/cpu.max", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 sched_getaffinity(0, 128, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) = 8
+1745568 uname({sysname="Linux", nodename="alien", ...}) = 0
+1745568 brk(0x561e4af01000)             = 0x561e4af01000
+1745568 brk(0x561e4af6d000)             = 0x561e4af6d000
+1745568 brk(0x561e4af96000)             = 0x561e4af96000
+1745568 statx(AT_FDCWD, "/home/bo/work/ravenos-workspace/minions/bob/ravenbsd", AT_STATX_SYNC_AS_STAT, STATX_ALL, {stx_mask=STATX_ALL|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0775, stx_size=4096, ...}) = 0
+1745568 readlink("/home", 0x7fffef5710c0, 1023) = -1 EINVAL (Invalid argument)
+1745568 readlink("/home/bo", 0x7fffef5710c0, 1023) = -1 EINVAL (Invalid argument)
+1745568 readlink("/home/bo/work", 0x7fffef5710c0, 1023) = -1 EINVAL (Invalid argument)
+1745568 readlink("/home/bo/work/ravenos-workspace", 0x7fffef5710c0, 1023) = -1 EINVAL (Invalid argument)
+1745568 readlink("/home/bo/work/ravenos-workspace/minions", 0x7fffef5710c0, 1023) = -1 EINVAL (Invalid argument)
+1745568 readlink("/home/bo/work/ravenos-workspace/minions/bob", 0x7fffef5710c0, 1023) = -1 EINVAL (Invalid argument)
+1745568 readlink("/home/bo/work/ravenos-workspace/minions/bob/ravenbsd", 0x7fffef5710c0, 1023) = -1 EINVAL (Invalid argument)
+1745568 openat(AT_FDCWD, "/home/bo/work/ravenos-workspace/minions/bob/ravenbsd/rust-toolchain", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/work/ravenos-workspace/minions/bob/ravenbsd/rust-toolchain.toml", O_RDONLY|O_CLOEXEC) = 6
+1745568 statx(6, "", AT_STATX_SYNC_AS_STAT|AT_EMPTY_PATH, STATX_ALL, {stx_mask=STATX_ALL|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0664, stx_size=467, ...}) = 0
+1745568 read(6, "# SPDX-License-Identifier: BSD-3-Clause\n# Copyright (c) 2026, Bo"..., 467) = 467
+1745568 read(6, "", 32)                 = 0
+1745568 close(6)                        = 0
+1745568 uname({sysname="Linux", nodename="alien", ...}) = 0
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains", O_RDONLY|O_CLOEXEC) = 6
+1745568 openat(6, "1.97.1-x86_64-unknown-linux-gnu", O_RDONLY|O_NOCTTY|O_CLOEXEC) = 7
+1745568 close(7)                        = 0
+1745568 close(6)                        = 0
+1745568 uname({sysname="Linux", nodename="alien", ...}) = 0
+1745568 uname({sysname="Linux", nodename="alien", ...}) = 0
+1745568 statx(AT_FDCWD, "/home/bo/.rustup/update-hashes", AT_STATX_SYNC_AS_STAT, STATX_ALL, {stx_mask=STATX_ALL|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFDIR|0775, stx_size=4096, ...}) = 0
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains", O_RDONLY|O_CLOEXEC) = 6
+1745568 openat(6, "1.97.1-x86_64-unknown-linux-gnu", O_RDONLY|O_NOCTTY|O_CLOEXEC) = 7
+1745568 close(7)                        = 0
+1745568 close(6)                        = 0
+1745568 statx(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/rust-installer-version", AT_STATX_SYNC_AS_STAT, STATX_ALL, {stx_mask=STATX_ALL|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0664, stx_size=1, ...}) = 0
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/rust-installer-version", O_RDONLY|O_CLOEXEC) = 6
+1745568 statx(6, "", AT_STATX_SYNC_AS_STAT|AT_EMPTY_PATH, STATX_ALL, {stx_mask=STATX_ALL|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0664, stx_size=1, ...}) = 0
+1745568 read(6, "3", 32)                = 1
+1745568 read(6, "", 32)                 = 0
+1745568 close(6)                        = 0
+1745568 statx(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/multirust-channel-manifest.toml", AT_STATX_SYNC_AS_STAT, STATX_ALL, {stx_mask=STATX_ALL|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0664, stx_size=972396, ...}) = 0
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/multirust-channel-manifest.toml", O_RDONLY|O_CLOEXEC) = 6
+1745568 statx(6, "", AT_STATX_SYNC_AS_STAT|AT_EMPTY_PATH, STATX_ALL, {stx_mask=STATX_ALL|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0664, stx_size=972396, ...}) = 0
+1745568 mmap(NULL, 974848, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc852d0a000
+1745568 read(6, "manifest-version = \"2\"\ndate = \"2026-07-16\"\n\n[pkg.cargo]\nversion "..., 972396) = 972396
+1745568 read(6, "", 32)                 = 0
+1745568 close(6)                        = 0
+1745568 mmap(NULL, 6668288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc8526ae000
+1745568 mmap(NULL, 5062656, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fc8521da000
+1745568 brk(0x561e4afb7000)             = 0x561e4afb7000
+1745568 brk(0x561e4afd8000)             = 0x561e4afd8000
+1745568 brk(0x561e4aff9000)             = 0x561e4aff9000
+1745568 brk(0x561e4b01a000)             = 0x561e4b01a000
+1745568 brk(0x561e4b03b000)             = 0x561e4b03b000
+1745568 brk(0x561e4b05c000)             = 0x561e4b05c000
+1745568 brk(0x561e4b07d000)             = 0x561e4b07d000
+1745568 brk(0x561e4b09e000)             = 0x561e4b09e000
+1745568 brk(0x561e4b0bf000)             = 0x561e4b0bf000
+1745568 brk(0x561e4b0e0000)             = 0x561e4b0e0000
+1745568 brk(0x561e4b101000)             = 0x561e4b101000
+1745568 brk(0x561e4b122000)             = 0x561e4b122000
+1745568 brk(0x561e4b146000)             = 0x561e4b146000
+1745568 brk(0x561e4b167000)             = 0x561e4b167000
+1745568 brk(0x561e4b188000)             = 0x561e4b188000
+1745568 brk(0x561e4b1a9000)             = 0x561e4b1a9000
+1745568 brk(0x561e4b1ca000)             = 0x561e4b1ca000
+1745568 brk(0x561e4b1eb000)             = 0x561e4b1eb000
+1745568 brk(0x561e4b20c000)             = 0x561e4b20c000
+1745568 brk(0x561e4b22d000)             = 0x561e4b22d000
+1745568 brk(0x561e4b24e000)             = 0x561e4b24e000
+1745568 brk(0x561e4b26f000)             = 0x561e4b26f000
+1745568 brk(0x561e4b290000)             = 0x561e4b290000
+1745568 brk(0x561e4b2b1000)             = 0x561e4b2b1000
+1745568 brk(0x561e4b2d2000)             = 0x561e4b2d2000
+1745568 brk(0x561e4b2f3000)             = 0x561e4b2f3000
+1745568 brk(0x561e4b314000)             = 0x561e4b314000
+1745568 brk(0x561e4b335000)             = 0x561e4b335000
+1745568 brk(0x561e4b356000)             = 0x561e4b356000
+1745568 brk(0x561e4b378000)             = 0x561e4b378000
+1745568 brk(0x561e4b399000)             = 0x561e4b399000
+1745568 brk(0x561e4b3ba000)             = 0x561e4b3ba000
+1745568 brk(0x561e4b3db000)             = 0x561e4b3db000
+1745568 brk(0x561e4b3fc000)             = 0x561e4b3fc000
+1745568 brk(0x561e4b41d000)             = 0x561e4b41d000
+1745568 brk(0x561e4b43e000)             = 0x561e4b43e000
+1745568 brk(0x561e4b45f000)             = 0x561e4b45f000
+1745568 brk(0x561e4b480000)             = 0x561e4b480000
+1745568 brk(0x561e4b4a1000)             = 0x561e4b4a1000
+1745568 brk(0x561e4b4c2000)             = 0x561e4b4c2000
+1745568 brk(0x561e4b4e3000)             = 0x561e4b4e3000
+1745568 brk(0x561e4b504000)             = 0x561e4b504000
+1745568 brk(0x561e4b525000)             = 0x561e4b525000
+1745568 brk(0x561e4b546000)             = 0x561e4b546000
+1745568 brk(0x561e4b567000)             = 0x561e4b567000
+1745568 brk(0x561e4b588000)             = 0x561e4b588000
+1745568 brk(0x561e4b5a9000)             = 0x561e4b5a9000
+1745568 brk(0x561e4b5ca000)             = 0x561e4b5ca000
+1745568 brk(0x561e4b5eb000)             = 0x561e4b5eb000
+1745568 munmap(0x7fc8521da000, 5062656) = 0
+1745568 munmap(0x7fc8526ae000, 6668288) = 0
+1745568 munmap(0x7fc852d0a000, 974848)  = 0
+1745568 statx(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/multirust-config.toml", AT_STATX_SYNC_AS_STAT, STATX_ALL, {stx_mask=STATX_ALL|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0664, stx_size=1204, ...}) = 0
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/rustlib/multirust-config.toml", O_RDONLY|O_CLOEXEC) = 6
+1745568 statx(6, "", AT_STATX_SYNC_AS_STAT|AT_EMPTY_PATH, STATX_ALL, {stx_mask=STATX_ALL|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0664, stx_size=1204, ...}) = 0
+1745568 read(6, "config_version = \"1\"\n\n[[components]]\npkg = \"clippy-preview\"\ntarg"..., 1204) = 1204
+1745568 read(6, "", 32)                 = 0
+1745568 close(6)                        = 0
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains", O_RDONLY|O_CLOEXEC) = 6
+1745568 openat(6, "1.97.1-x86_64-unknown-linux-gnu", O_RDONLY|O_NOCTTY|O_CLOEXEC) = 7
+1745568 close(7)                        = 0
+1745568 close(6)                        = 0
+1745568 statx(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc", AT_STATX_SYNC_AS_STAT, STATX_ALL, {stx_mask=STATX_ALL|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0755, stx_size=645000, ...}) = 0
+1745568 getcwd("/home/bo/work/ravenos-workspace/minions/bob/ravenbsd", 512) = 53
+1745568 getcwd("/home/bo/work/ravenos-workspace/minions/bob/ravenbsd", 512) = 53
+1745568 rt_sigaction(SIGPIPE, {sa_handler=SIG_DFL, sa_mask=[PIPE], sa_flags=SA_RESTORER|SA_RESTART, sa_restorer=0x7fc853e42520}, {sa_handler=SIG_IGN, sa_mask=[PIPE], sa_flags=SA_RESTORER|SA_RESTART, sa_restorer=0x7fc853e42520}, 8) = 0
+1745568 execve("/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc", ["/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/"..., "--version"], 0x561e4aef60a0 /* 74 vars */ <unfinished ...>
+1745576 <... futex resumed>)            = ?
+1745574 <... futex resumed>)            = ?
+1745575 <... futex resumed>)            = ?
+1745573 <... futex resumed>)            = ?
+1745572 <... epoll_wait resumed> <unfinished ...>) = ?
+1745571 <... futex resumed>)            = ?
+1745570 <... futex resumed>)            = ?
+1745569 <... futex resumed>)            = ?
+1745568 <... execve resumed>)           = 0
+1745568 brk(NULL)                       = 0x55ed28553000
+1745568 arch_prctl(0x3001 /* ARCH_??? */, 0x7ffde52642b0) = -1 EINVAL (Invalid argument)
+1745568 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f81461d3000
+1745568 readlink("/proc/self/exe", "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/"..., 4096) = 69
+1745568 access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/glibc-hwcaps/x86-64-v3/librustc_driver-832cf6cfb1386559.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/glibc-hwcaps/x86-64-v3", 0x7ffde52634d0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/glibc-hwcaps/x86-64-v2/librustc_driver-832cf6cfb1386559.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/glibc-hwcaps/x86-64-v2", 0x7ffde52634d0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/tls/haswell/x86_64/librustc_driver-832cf6cfb1386559.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/tls/haswell/x86_64", 0x7ffde52634d0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/tls/haswell/librustc_driver-832cf6cfb1386559.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/tls/haswell", 0x7ffde52634d0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/tls/x86_64/librustc_driver-832cf6cfb1386559.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/tls/x86_64", 0x7ffde52634d0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/tls/librustc_driver-832cf6cfb1386559.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/tls", 0x7ffde52634d0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/haswell/x86_64/librustc_driver-832cf6cfb1386559.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/haswell/x86_64", 0x7ffde52634d0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/haswell/librustc_driver-832cf6cfb1386559.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/haswell", 0x7ffde52634d0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/x86_64/librustc_driver-832cf6cfb1386559.so", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/x86_64", 0x7ffde52634d0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/librustc_driver-832cf6cfb1386559.so", O_RDONLY|O_CLOEXEC) = 3
+1745568 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0\0\0@\5\0\0\0\0\0\325g\t\0\0\0\0\0\0\0\0@\08\0\v\0@\0,\0*\0"..., 832) = 832
+1745568 pread64(3, "\6\0\0\0\4\0\0\0\0\0@\5\0\0\0\0\0\0@\5\0\0\0\0\0\0@\5\0\0\0\0h\2\0\0\0\0\0\0h\2\0\0\0\0\0\0\10\0\0\0\0\0\0\0\1\0\0\0\4\0\0\0"..., 616, 88080384) = 616
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=157802496, ...}, AT_EMPTY_PATH) = 0
+1745568 pread64(3, "\6\0\0\0\4\0\0\0\0\0@\5\0\0\0\0\0\0@\5\0\0\0\0\0\0@\5\0\0\0\0h\2\0\0\0\0\0\0h\2\0\0\0\0\0\0\10\0\0\0\0\0\0\0\1\0\0\0\4\0\0\0"..., 616, 88080384) = 616
+1745568 mmap(NULL, 135918680, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f813e033000
+1745568 mmap(0x7f813e200000, 133821528, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0) = 0x7f813e200000
+1745568 munmap(0x7f813e033000, 1888256) = 0
+1745568 munmap(0x7f81461a0000, 205912)  = 0
+1745568 mprotect(0x7f813f3b9000, 69496832, PROT_NONE) = 0
+1745568 mmap(0x7f813f3b9000, 65024000, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x11b8000) = 0x7f813f3b9000
+1745568 mmap(0x7f81431bc000, 2383872, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x4fba000) = 0x7f81431bc000
+1745568 mmap(0x7f8143402000, 32768, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x51ff000) = 0x7f8143402000
+1745568 mmap(0x7f814340a000, 19747, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7f814340a000
+1745568 mmap(0x7f8143600000, 45744128, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x5400000) = 0x7f8143600000
+1745568 close(3)                        = 0
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/libdl.so.2", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/glibc-hwcaps/x86-64-v3/libdl.so.2", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/glibc-hwcaps/x86-64-v3", 0x7ffde52634b0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/glibc-hwcaps/x86-64-v2/libdl.so.2", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/glibc-hwcaps/x86-64-v2", 0x7ffde52634b0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/tls/haswell/x86_64/libdl.so.2", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/tls/haswell/x86_64", 0x7ffde52634b0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/tls/haswell/libdl.so.2", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/tls/haswell", 0x7ffde52634b0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/tls/x86_64/libdl.so.2", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/tls/x86_64", 0x7ffde52634b0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/tls/libdl.so.2", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/tls", 0x7ffde52634b0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/haswell/x86_64/libdl.so.2", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/haswell/x86_64", 0x7ffde52634b0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/haswell/libdl.so.2", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/haswell", 0x7ffde52634b0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/x86_64/libdl.so.2", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/x86_64", 0x7ffde52634b0, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/libdl.so.2", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib", {st_mode=S_IFDIR|0775, st_size=146, ...}, 0) = 0
+1745568 openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=108276, ...}, AT_EMPTY_PATH) = 0
+1745568 mmap(NULL, 108276, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7f81461b8000
+1745568 close(3)                        = 0
+1745568 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libdl.so.2", O_RDONLY|O_CLOEXEC) = 3
+1745568 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0@\0\0\0\0\0\0\0`1\0\0\0\0\0\0\0\0\0\0@\08\0\v\0@\0\34\0\33\0"..., 832) = 832
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=14432, ...}, AT_EMPTY_PATH) = 0
+1745568 mmap(NULL, 16424, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7f81461b3000
+1745568 mmap(0x7f81461b4000, 4096, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1000) = 0x7f81461b4000
+1745568 mmap(0x7f81461b5000, 4096, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7f81461b5000
+1745568 mmap(0x7f81461b6000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7f81461b6000
+1745568 close(3)                        = 0
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/librt.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/librt.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/librt.so.1", O_RDONLY|O_CLOEXEC) = 3
+1745568 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\2101\0\0\0\0\0\0\0\0\0\0@\08\0\v\0@\0\37\0\36\0"..., 832) = 832
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=14664, ...}, AT_EMPTY_PATH) = 0
+1745568 mmap(NULL, 16440, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7f81461ae000
+1745568 mmap(0x7f81461af000, 4096, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1000) = 0x7f81461af000
+1745568 mmap(0x7f81461b0000, 4096, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7f81461b0000
+1745568 mmap(0x7f81461b1000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7f81461b1000
+1745568 close(3)                        = 0
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/libpthread.so.0", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/libpthread.so.0", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libpthread.so.0", O_RDONLY|O_CLOEXEC) = 3
+1745568 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\210J\0\0\0\0\0\0\0\0\0\0@\08\0\v\0@\0%\0$\0"..., 832) = 832
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=21448, ...}, AT_EMPTY_PATH) = 0
+1745568 mmap(NULL, 16424, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7f81461a9000
+1745568 mmap(0x7f81461aa000, 4096, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1000) = 0x7f81461aa000
+1745568 mmap(0x7f81461ab000, 4096, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7f81461ab000
+1745568 mmap(0x7f81461ac000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7f81461ac000
+1745568 close(3)                        = 0
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/libc.so.6", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/../lib/libc.so.6", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+1745568 read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0P\237\2\0\0\0\0\0@\0\0\0\0\0\0\0\360\320!\0\0\0\0\0\0\0\0\0@\08\0\16\0@\0B\0A\0"..., 832) = 832
+1745568 pread64(3, "\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\20\3\0\0\0\0\0\0\20\3\0\0\0\0\0\0\10\0\0\0\0\0\0\0\3\0\0\0\4\0\0\0"..., 784, 64) = 784
+1745568 pread64(3, "\4\0\0\0 \0\0\0\5\0\0\0GNU\0\2\0\0\300\4\0\0\0\3\0\0\0\0\0\0\0\2\200\0\300\4\0\0\0\1\0\0\0\0\0\0\0", 48, 848) = 48
+1745568 pread64(3, "\4\0\0\0\24\0\0\0\3\0\0\0GNU\0jl\265\250\17\325\345\273[\363\256\252\21\32\335\230\350\210C\245\4\0\0\0\20\0\0\0\1\0\0\0GNU\0\0\0\0\0\3\0\0\0\2\0\0\0"..., 68, 896) = 68
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0755, st_size=2220400, ...}, AT_EMPTY_PATH) = 0
+1745568 pread64(3, "\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\20\3\0\0\0\0\0\0\20\3\0\0\0\0\0\0\10\0\0\0\0\0\0\0\3\0\0\0\4\0\0\0"..., 784, 64) = 784
+1745568 mmap(NULL, 2264656, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7f813de00000
+1745568 mprotect(0x7f813de28000, 2023424, PROT_NONE) = 0
+1745568 mmap(0x7f813de28000, 1658880, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x28000) = 0x7f813de28000
+1745568 mmap(0x7f813dfbd000, 360448, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1bd000) = 0x7f813dfbd000
+1745568 mmap(0x7f813e016000, 24576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x215000) = 0x7f813e016000
+1745568 mmap(0x7f813e01c000, 52816, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7f813e01c000
+1745568 close(3)                        = 0
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/libLLVM.so.22.1-rust-1.97.1-stable", O_RDONLY|O_CLOEXEC) = 3
+1745568 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0\0\0`\10\0\0\0\0p\377\343\v\0\0\0\0\0\0\0\0@\08\0\v\0@\0+\0)\0"..., 832) = 832
+1745568 pread64(3, "\6\0\0\0\4\0\0\0\0\0`\10\0\0\0\0\0\0`\10\0\0\0\0\0\0`\10\0\0\0\0h\2\0\0\0\0\0\0h\2\0\0\0\0\0\0\10\0\0\0\0\0\0\0\1\0\0\0\4\0\0\0"..., 616, 140509184) = 616
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=199494192, ...}, AT_EMPTY_PATH) = 0
+1745568 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f81461a7000
+1745568 pread64(3, "\6\0\0\0\4\0\0\0\0\0`\10\0\0\0\0\0\0`\10\0\0\0\0\0\0`\10\0\0\0\0h\2\0\0\0\0\0\0h\2\0\0\0\0\0\0\10\0\0\0\0\0\0\0\1\0\0\0\4\0\0\0"..., 616, 140509184) = 616
+1745568 mmap(NULL, 177453684, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f81334c4000
+1745568 mmap(0x7f8133600000, 175356532, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0) = 0x7f8133600000
+1745568 munmap(0x7f81334c4000, 1294336) = 0
+1745568 munmap(0x7f813dd3c000, 801396)  = 0
+1745568 mprotect(0x7f8137a9b000, 68571136, PROT_NONE) = 0
+1745568 mmap(0x7f8137a9b000, 65904640, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x449a000) = 0x7f8137a9b000
+1745568 mmap(0x7f813b975000, 1851392, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x8373000) = 0x7f813b975000
+1745568 mmap(0x7f813bb39000, 45056, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x8536000) = 0x7f813bb39000
+1745568 mmap(0x7f813bb44000, 706626, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7f813bb44000
+1745568 mmap(0x7f813bc00000, 34848768, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x8600000) = 0x7f813bc00000
+1745568 close(3)                        = 0
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/glibc-hwcaps/x86-64-v3/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/glibc-hwcaps/x86-64-v3", 0x7ffde5263410, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/glibc-hwcaps/x86-64-v2/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/glibc-hwcaps/x86-64-v2", 0x7ffde5263410, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/tls/haswell/x86_64/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/tls/haswell/x86_64", 0x7ffde5263410, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/tls/haswell/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/tls/haswell", 0x7ffde5263410, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/tls/x86_64/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/tls/x86_64", 0x7ffde5263410, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/tls/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/tls", 0x7ffde5263410, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/haswell/x86_64/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/haswell/x86_64", 0x7ffde5263410, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/haswell/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/haswell", 0x7ffde5263410, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/x86_64/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/x86_64", 0x7ffde5263410, 0) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 newfstatat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib", {st_mode=S_IFDIR|0775, st_size=146, ...}, 0) = 0
+1745568 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libgcc_s.so.1", O_RDONLY|O_CLOEXEC) = 3
+1745568 read(3, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\360\342\1\0\0\0\0\0\0\0\0\0@\08\0\v\0@\0\35\0\34\0"..., 832) = 832
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=125488, ...}, AT_EMPTY_PATH) = 0
+1745568 mmap(NULL, 127720, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7f813e1e0000
+1745568 mmap(0x7f813e1e3000, 94208, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x3000) = 0x7f813e1e3000
+1745568 mmap(0x7f813e1fa000, 16384, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1a000) = 0x7f813e1fa000
+1745568 mmap(0x7f813e1fe000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1d000) = 0x7f813e1fe000
+1745568 close(3)                        = 0
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/libm.so.6", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/libm.so.6", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libm.so.6", O_RDONLY|O_CLOEXEC) = 3
+1745568 read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0@\0\0\0\0\0\0\0PR\16\0\0\0\0\0\0\0\0\0@\08\0\v\0@\0\37\0\36\0"..., 832) = 832
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=940560, ...}, AT_EMPTY_PATH) = 0
+1745568 mmap(NULL, 942344, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7f813e0f9000
+1745568 mmap(0x7f813e107000, 507904, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0xe000) = 0x7f813e107000
+1745568 mmap(0x7f813e183000, 372736, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x8a000) = 0x7f813e183000
+1745568 mmap(0x7f813e1de000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0xe4000) = 0x7f813e1de000
+1745568 close(3)                        = 0
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/libz.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/../lib/libz.so.1", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)
+1745568 openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libz.so.1", O_RDONLY|O_CLOEXEC) = 3
+1745568 read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\10\242\1\0\0\0\0\0\0\0\0\0@\08\0\v\0@\0\36\0\35\0"..., 832) = 832
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0644, st_size=108936, ...}, AT_EMPTY_PATH) = 0
+1745568 mmap(NULL, 110776, PROT_READ, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7f813e0dd000
+1745568 mprotect(0x7f813e0df000, 98304, PROT_NONE) = 0
+1745568 mmap(0x7f813e0df000, 69632, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x2000) = 0x7f813e0df000
+1745568 mmap(0x7f813e0f0000, 24576, PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x13000) = 0x7f813e0f0000
+1745568 mmap(0x7f813e0f7000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x19000) = 0x7f813e0f7000
+1745568 close(3)                        = 0
+1745568 mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f81461a5000
+1745568 mmap(NULL, 24576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f813e0d7000
+1745568 arch_prctl(ARCH_SET_FS, 0x7f813e0db380) = 0
+1745568 set_tid_address(0x7f813e0db650) = 1745568
+1745568 set_robust_list(0x7f813e0db660, 24) = 0
+1745568 rseq(0x7f813e0dbd20, 0x20, 0, 0x53053053) = 0
+1745568 mprotect(0x7f813e016000, 16384, PROT_READ) = 0
+1745568 mprotect(0x7f813e0f7000, 4096, PROT_READ) = 0
+1745568 mprotect(0x7f813e1de000, 4096, PROT_READ) = 0
+1745568 mprotect(0x7f813e1fe000, 4096, PROT_READ) = 0
+1745568 mprotect(0x7f81461b1000, 4096, PROT_READ) = 0
+1745568 mprotect(0x7f81461b6000, 4096, PROT_READ) = 0
+1745568 mprotect(0x7f81461ac000, 4096, PROT_READ) = 0
+1745568 mprotect(0x7f813b975000, 1851392, PROT_READ) = 0
+1745568 mprotect(0x7f81431bc000, 2383872, PROT_READ) = 0
+1745568 mprotect(0x55ed27355000, 28672, PROT_READ) = 0
+1745568 mprotect(0x7f814620d000, 8192, PROT_READ) = 0
+1745568 prlimit64(0, RLIMIT_STACK, NULL, {rlim_cur=8192*1024, rlim_max=RLIM64_INFINITY}) = 0
+1745568 munmap(0x7f81461b8000, 108276)  = 0
+1745568 readlink("/etc/malloc.conf", 0x7ffde5261900, 4096) = -1 ENOENT (No such file or directory)
+1745568 mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f814620c000
+1745568 madvise(0x7f814620c000, 4096, MADV_DONTNEED) = 0
+1745568 munmap(0x7f814620c000, 4096)    = 0
+1745568 open("/proc/sys/vm/overcommit_memory", O_RDONLY|O_CLOEXEC) = 3
+1745568 read(3, "0", 1)                 = 1
+1745568 close(3)                        = 0
+1745568 open("/sys/kernel/mm/transparent_hugepage/enabled", O_RDONLY) = 3
+1745568 read(3, "always [madvise] never\n", 24) = 23
+1745568 close(3)                        = 0
+1745568 mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0) = 0x7f814620c000
+1745568 madvise(0x7f814620c000, 4096, MADV_FREE) = 0
+1745568 munmap(0x7f814620c000, 4096)    = 0
+1745568 mmap(NULL, 2097152, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0) = 0x7f8133400000
+1745568 brk(NULL)                       = 0x55ed28553000
+1745568 mmap(NULL, 2097152, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0) = 0x7f8133200000
+1745568 mmap(NULL, 4194304, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0) = 0x7f8132e00000
+1745568 sched_getaffinity(0, 128, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) = 8
+1745568 lseek(2, 0, SEEK_CUR)           = -1 ESPIPE (Illegal seek)
+1745568 fstat(2, {st_mode=S_IFSOCK|0777, st_size=0, ...}) = 0
+1745568 futex(0x7f814340d15c, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 futex(0x7f814340d168, FUTEX_WAKE_PRIVATE, 2147483647) = 0
+1745568 poll([{fd=0, events=0}, {fd=1, events=0}, {fd=2, events=0}], 3, 0) = 0 (Timeout)
+1745568 rt_sigaction(SIGPIPE, {sa_handler=SIG_DFL, sa_mask=[PIPE], sa_flags=SA_RESTORER|SA_RESTART, sa_restorer=0x7f813de42520}, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+1745568 openat(AT_FDCWD, "/proc/self/maps", O_RDONLY|O_CLOEXEC) = 3
+1745568 prlimit64(0, RLIMIT_STACK, NULL, {rlim_cur=8192*1024, rlim_max=RLIM64_INFINITY}) = 0
+1745568 newfstatat(3, "", {st_mode=S_IFREG|0444, st_size=0, ...}, AT_EMPTY_PATH) = 0
+1745568 read(3, "55ed272cb000-55ed272dd000 r--p 00000000 103:04 554055445        "..., 1024) = 1024
+1745568 read(3, "00-7f813bb39000 r--p 08373000 103:04 554055447                 /"..., 1024) = 1024
+1745568 read(3, "ib/x86_64-linux-gnu/libc.so.6\n7f813e015000-7f813e016000 ---p 002"..., 1024) = 1024
+1745568 read(3, "\n7f813e0f8000-7f813e0f9000 rw-p 0001a000 103:02 268572827       "..., 1024) = 1024
+1745568 read(3, " r--p 0001d000 103:02 268800194                 /usr/lib/x86_64-"..., 1024) = 1024
+1745568 read(3, ".rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/lib/librustc_"..., 1024) = 1024
+1745568 read(3, "r-xp 00001000 103:02 268623267                 /usr/lib/x86_64-l"..., 1024) = 1024
+1745568 read(3, "0-7f81461d7000 r--p 00000000 103:02 268486448                 /u"..., 1024) = 914
+1745568 close(3)                        = 0
+1745568 sched_getaffinity(1745568, 32, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) = 8
+1745568 rt_sigaction(SIGSEGV, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+1745568 sigaltstack(NULL, {ss_sp=NULL, ss_flags=SS_DISABLE, ss_size=0}) = 0
+1745568 mmap(NULL, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0) = 0x7f81461d0000
+1745568 mprotect(0x7f81461d0000, 4096, PROT_NONE) = 0
+1745568 sigaltstack({ss_sp=0x7f81461d1000, ss_flags=0, ss_size=8192}, NULL) = 0
+1745568 gettid()                        = 1745568
+1745568 rt_sigaction(SIGSEGV, {sa_handler=0x7f814308d5a0, sa_mask=[], sa_flags=SA_RESTORER|SA_ONSTACK|SA_SIGINFO, sa_restorer=0x7f813de42520}, NULL, 8) = 0
+1745568 rt_sigaction(SIGBUS, NULL, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+1745568 rt_sigaction(SIGBUS, {sa_handler=0x7f814308d5a0, sa_mask=[], sa_flags=SA_RESTORER|SA_ONSTACK|SA_SIGINFO, sa_restorer=0x7f813de42520}, NULL, 8) = 0
+1745568 openat(AT_FDCWD, "/proc/self/statm", O_RDONLY|O_CLOEXEC) = 3
+1745568 statx(3, "", AT_STATX_SYNC_AS_STAT|AT_EMPTY_PATH, STATX_ALL, {stx_mask=STATX_BASIC_STATS|STATX_MNT_ID, stx_attributes=0, stx_mode=S_IFREG|0444, stx_size=0, ...}) = 0
+1745568 read(3, "79172 6169 4785 120 0 2838 0\n", 32) = 29
+1745568 read(3, "", 32)                 = 0
+1745568 close(3)                        = 0
+1745568 ioctl(2, TCGETS, 0x7ffde5263b10) = -1 ENOTTY (Inappropriate ioctl for device)
+1745568 getrandom("\x27\x42\x6b\x1a\xf5\x8e\xfd\x5d\x65\x10\x77\x74\x0f\x8e\xdd\x08", 16, GRND_INSECURE) = 16
+1745568 ioctl(2, TCGETS, 0x7ffde5261900) = -1 ENOTTY (Inappropriate ioctl for device)
+1745568 ioctl(2, TCGETS, 0x7ffde5261900) = -1 ENOTTY (Inappropriate ioctl for device)
+1745568 sigaltstack({ss_sp=0x7f813330f400, ss_flags=0, ss_size=69168}, NULL) = 0
+1745568 rt_sigaction(SIGILL, {sa_handler=0x7f8141e7ce60, sa_mask=[], sa_flags=SA_RESTORER|SA_ONSTACK|SA_NODEFER|SA_RESETHAND|0xffffffff00000000, sa_restorer=0x7f813de42520}, NULL, 8) = 0
+1745568 rt_sigaction(SIGBUS, {sa_handler=0x7f8141e7ce60, sa_mask=[], sa_flags=SA_RESTORER|SA_ONSTACK|SA_NODEFER|SA_RESETHAND|0xffffffff00000000, sa_restorer=0x7f813de42520}, NULL, 8) = 0
+1745568 rt_sigaction(SIGSEGV, {sa_handler=0x7f8141e7ce60, sa_mask=[], sa_flags=SA_RESTORER|SA_ONSTACK|SA_NODEFER|SA_RESETHAND|0xffffffff00000000, sa_restorer=0x7f813de42520}, NULL, 8) = 0
+1745568 rt_sigaction(SIGINT, {sa_handler=0x7f81417baa50, sa_mask=[], sa_flags=SA_RESTORER|SA_RESTART, sa_restorer=0x7f813de42520}, {sa_handler=SIG_DFL, sa_mask=[], sa_flags=0}, 8) = 0
+1745568 rt_sigaction(SIGRT_1, {sa_handler=0x7f813de91830, sa_mask=[], sa_flags=SA_RESTORER|SA_ONSTACK|SA_RESTART|SA_SIGINFO, sa_restorer=0x7f813de42520}, NULL, 8) = 0
+1745568 rt_sigprocmask(SIG_UNBLOCK, [RTMIN RT_1], NULL, 8) = 0
+1745568 mmap(NULL, 2101248, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0) = 0x7f8132bff000
+1745568 mprotect(0x7f8132c00000, 2097152, PROT_READ|PROT_WRITE) = 0
+1745568 rt_sigprocmask(SIG_BLOCK, ~[], [], 8) = 0
+1745568 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7f8132dff910, parent_tid=0x7f8132dff910, exit_signal=0, stack=0x7f8132bff000, stack_size=0x1fc2c0, tls=0x7f8132dff640} => {parent_tid=[1745577]}, 88) = 1745577
+1745568 rt_sigprocmask(SIG_SETMASK, [], NULL, 8) = 0
+1745568 ioctl(2, TCGETS, 0x7ffde525a740) = -1 ENOTTY (Inappropriate ioctl for device)
+1745577 rseq(0x7f8132dfffe0, 0x20, 0, 0x53053053) = 0
+1745577 set_robust_list(0x7f8132dff920, 24) = 0
+1745577 rt_sigprocmask(SIG_SETMASK, [], NULL, 8) = 0
+1745577 prctl(PR_SET_NAME, "ctrl-c")    = 0
+1745577 mmap(NULL, 2097152, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0) = 0x7f81329ff000
+1745577 munmap(0x7f81329ff000, 2097152) = 0
+1745577 mmap(NULL, 4190208, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0 <unfinished ...>
+1745568 write(1, "rustc 1.97.1 (8bab26f4f 2026-07-14)\n", 36 <unfinished ...>
+1745577 <... mmap resumed>)             = 0x7f8132800000
+1745577 munmap(0x7f8132a00000, 2093056 <unfinished ...>
+1745568 <... write resumed>)            = 36
+1745577 <... munmap resumed>)           = 0
+1745568 sigaltstack({ss_sp=NULL, ss_flags=SS_DISABLE, ss_size=8192}, NULL) = 0
+1745568 munmap(0x7f81461d0000, 12288)   = 0
+1745577 mmap(NULL, 2097152, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE, -1, 0) = 0x7f8132600000
+1745577 sched_getaffinity(1745577, 32, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) = 8
+1745577 gettid()                        = 1745577
+1745577 sigaltstack(NULL, {ss_sp=NULL, ss_flags=SS_DISABLE, ss_size=0}) = 0
+1745577 mmap(NULL, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_STACK, -1, 0) = 0x7f81461d0000
+1745577 mprotect(0x7f81461d0000, 4096, PROT_NONE) = 0
+1745577 sigaltstack({ss_sp=0x7f81461d1000, ss_flags=0, ss_size=8192}, NULL) = 0
+1745577 futex(0x7f814340b590, FUTEX_WAIT_BITSET_PRIVATE|FUTEX_CLOCK_REALTIME, 0, NULL, FUTEX_BITSET_MATCH_ANY <unfinished ...>
+1745568 exit_group(0)                   = ?
+1745577 <... futex resumed>)            = ?

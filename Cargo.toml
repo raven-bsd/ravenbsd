@@ -16,6 +16,7 @@ members = [
     "tests/fixtures/testkernel",
     "xtask",
     "tests/qtest",
+    "tools/linux-corpus",
 ]
 default-members = ["crates/*"]
 

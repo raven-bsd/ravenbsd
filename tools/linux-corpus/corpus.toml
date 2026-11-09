@@ -1,0 +1,433 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Initial Linux syscall corpus. Placeholders in argv/setup/env values: {work} = per-program scratch dir
+# (created fresh, removed after the run), {corpus} = directory containing this file.
+# Categories: static | dynamic | service | language | toolchain.
+
+[[program]]
+id = "hello-rust-musl"
+category = "static"
+requires = ["rustc"]
+setup = [["rustc", "--target", "x86_64-unknown-linux-musl", "-O", "{corpus}/programs/hello.rs", "-o", "{work}/hello"]]
+argv = ["{work}/hello"]
+expect_exit = 0
+timeout_secs = 120
+
+[[program]]
+id = "threads-rust-musl"
+category = "static"
+requires = ["rustc"]
+setup = [["rustc", "--target", "x86_64-unknown-linux-musl", "-O", "{corpus}/programs/threads.rs", "-o", "{work}/threads"]]
+argv = ["{work}/threads"]
+expect_exit = 0
+timeout_secs = 120
+
+[[program]]
+id = "files-rust-musl"
+category = "static"
+requires = ["rustc"]
+setup = [["rustc", "--target", "x86_64-unknown-linux-musl", "-O", "{corpus}/programs/files.rs", "-o", "{work}/files"]]
+argv = ["{work}/files", "{work}/fdir"]
+expect_exit = 0
+timeout_secs = 120
+
+[[program]]
+id = "net-loopback-rust-musl"
+category = "static"
+requires = ["rustc"]
+setup = [["rustc", "--target", "x86_64-unknown-linux-musl", "-O", "{corpus}/programs/net_loopback.rs", "-o", "{work}/net_loopback"]]
+argv = ["{work}/net_loopback"]
+expect_exit = 0
+timeout_secs = 120
+
+[[program]]
+id = "hello-c-glibc-static"
+category = "static"
+requires = ["gcc"]
+setup = [["gcc", "-static", "{corpus}/programs/hello.c", "-o", "{work}/hello_c_static"]]
+argv = ["{work}/hello_c_static"]
+expect_exit = 0
+timeout_secs = 60
+
+[[program]]
+id = "hello-go-static"
+category = "static"
+requires = ["go"]
+setup = [["go", "build", "-o", "{work}/hello_go", "{corpus}/programs/hello.go"]]
+argv = ["{work}/hello_go"]
+env = { CGO_ENABLED = "0", GOCACHE = "{work}/gocache", GOFLAGS = "-mod=mod" }
+expect_exit = 0
+timeout_secs = 180
+
+[[program]]
+id = "busybox-ls"
+category = "static"
+requires = ["busybox"]
+argv = ["busybox", "ls", "-la", "/"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "busybox-sh-pipe"
+category = "static"
+requires = ["busybox"]
+argv = ["busybox", "sh", "-c", "echo hello | busybox wc -c"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "ls-root"
+category = "dynamic"
+requires = ["ls"]
+argv = ["ls", "-la", "/"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "cat-os-release"
+category = "dynamic"
+requires = ["cat"]
+argv = ["cat", "/etc/os-release"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "cp-file"
+category = "dynamic"
+requires = ["cp"]
+setup = [["sh", "-c", "echo data > {work}/src.txt"]]
+argv = ["cp", "{work}/src.txt", "{work}/dst.txt"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "grep-passwd"
+category = "dynamic"
+requires = ["grep"]
+argv = ["grep", "-c", "root", "/etc/passwd"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "sed-substitute"
+category = "dynamic"
+requires = ["sed"]
+argv = ["sed", "-n", "s/root/ROOT/p", "/etc/passwd"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "awk-sum"
+category = "dynamic"
+requires = ["awk"]
+argv = ["awk", "BEGIN { s = 0; for (i = 1; i <= 100; i++) s += i; print s }"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "sort-file"
+category = "dynamic"
+requires = ["sort"]
+argv = ["sort", "/etc/passwd"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "find-etc"
+category = "dynamic"
+requires = ["find"]
+argv = ["find", "/etc", "-maxdepth", "1", "-name", "*.conf"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "tar-list"
+category = "dynamic"
+requires = ["tar"]
+setup = [["sh", "-c", "mkdir -p {work}/d && echo x > {work}/d/f && tar -cf {work}/a.tar -C {work} d"]]
+argv = ["tar", "tf", "{work}/a.tar"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "gzip-stdout"
+category = "dynamic"
+requires = ["gzip"]
+setup = [["sh", "-c", "seq 1 1000 > {work}/n.txt"]]
+argv = ["gzip", "-c", "{work}/n.txt"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "wc-etc-passwd"
+category = "dynamic"
+requires = ["wc"]
+argv = ["wc", "-l", "/etc/passwd"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "uname-a"
+category = "dynamic"
+requires = ["uname"]
+argv = ["uname", "-a"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "id-self"
+category = "dynamic"
+requires = ["id"]
+argv = ["id"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "stat-etc"
+category = "dynamic"
+requires = ["stat"]
+argv = ["stat", "/etc/passwd"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "date-utc"
+category = "dynamic"
+requires = ["date"]
+argv = ["date", "-u"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "bash-arith-loop"
+category = "dynamic"
+requires = ["bash"]
+argv = ["bash", "-c", "for i in 1 2 3; do echo $((i * 2)); done"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "sh-pipeline"
+category = "dynamic"
+requires = ["sh"]
+argv = ["sh", "-c", "ls /etc | sort | head -n 3 | wc -l"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "curl-version"
+category = "dynamic"
+requires = ["curl"]
+argv = ["curl", "--version"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "curl-file-url"
+category = "dynamic"
+requires = ["curl"]
+argv = ["curl", "-s", "file:///etc/hostname"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "git-version"
+category = "dynamic"
+requires = ["git"]
+argv = ["git", "--version"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "python3-print"
+category = "language"
+requires = ["python3"]
+argv = ["python3", "-c", "print(sum(range(100)))"]
+expect_exit = 0
+timeout_secs = 60
+
+[[program]]
+id = "python3-threads"
+category = "language"
+requires = ["python3"]
+argv = ["python3", "-c", "import threading; t = threading.Thread(target=lambda: None); t.start(); t.join(); print('ok')"]
+expect_exit = 0
+timeout_secs = 60
+
+[[program]]
+id = "perl-print"
+category = "language"
+requires = ["perl"]
+argv = ["perl", "-e", "print 6 * 7, qq(\\n)"]
+expect_exit = 0
+timeout_secs = 60
+
+[[program]]
+id = "ruby-print"
+category = "language"
+requires = ["ruby"]
+argv = ["ruby", "-e", "puts 6 * 7"]
+expect_exit = 0
+timeout_secs = 60
+
+[[program]]
+id = "go-version"
+category = "language"
+requires = ["go"]
+argv = ["go", "version"]
+expect_exit = 0
+timeout_secs = 60
+
+[[program]]
+id = "python3-epoll-echo"
+category = "service"
+requires = ["python3"]
+argv = ["python3", "{corpus}/programs/echo_epoll.py"]
+expect_exit = 0
+timeout_secs = 60
+
+[[program]]
+id = "python3-sqlite"
+category = "service"
+requires = ["python3"]
+argv = ["python3", "-c", "import sqlite3; c = sqlite3.connect('{work}/t.db'); c.execute('create table t(a)'); c.execute('insert into t values (1)'); c.commit(); print(c.execute('select count(*) from t').fetchone()[0])"]
+expect_exit = 0
+timeout_secs = 60
+
+[[program]]
+id = "ssh-keygen-ed25519"
+category = "service"
+requires = ["ssh-keygen"]
+argv = ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", "{work}/k"]
+expect_exit = 0
+timeout_secs = 60
+
+[[program]]
+id = "openssl-version"
+category = "service"
+requires = ["openssl"]
+argv = ["openssl", "version"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "gcc-version"
+category = "toolchain"
+requires = ["gcc"]
+argv = ["gcc", "--version"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "gcc-compile-object"
+category = "toolchain"
+requires = ["gcc"]
+argv = ["gcc", "-c", "{corpus}/programs/hello.c", "-o", "{work}/hello.o"]
+expect_exit = 0
+timeout_secs = 120
+
+[[program]]
+id = "make-version"
+category = "toolchain"
+requires = ["make"]
+argv = ["make", "--version"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "rustc-version"
+category = "toolchain"
+requires = ["rustc"]
+argv = ["rustc", "--version"]
+expect_exit = 0
+timeout_secs = 60
+
+[[program]]
+id = "cargo-version"
+category = "toolchain"
+requires = ["cargo"]
+argv = ["cargo", "--version"]
+expect_exit = 0
+timeout_secs = 60
+
+[[program]]
+id = "rustc-compile-hello"
+category = "toolchain"
+requires = ["rustc"]
+argv = ["rustc", "-O", "{corpus}/programs/hello.rs", "-o", "{work}/hello_host"]
+expect_exit = 0
+timeout_secs = 180
+
+[[program]]
+id = "ls-la"
+category = "dynamic"
+requires = ["ls"]
+argv = ["ls", "-la", "/usr"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "dash-shell"
+category = "shell"
+requires = ["dash"]
+argv = ["dash", "-c", "echo dash; test -f /etc/os-release"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "sh-mv-rm-workflow"
+category = "shell"
+requires = ["sh"]
+setup = [["sh", "-c", "mkdir -p {work}/src && echo data > {work}/src/a"]]
+argv = ["sh", "-c", "mv {work}/src/a {work}/src/b && rm {work}/src/b && test -d {work}/src"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "grep-recursive"
+category = "dynamic"
+requires = ["grep", "sh"]
+argv = ["sh", "-c", "grep -r -l root /etc | head -n 5"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "git-init-commit"
+category = "toolchain"
+requires = ["git", "sh"]
+argv = ["sh", "-c", "d={work}/repo; mkdir -p \"$d\"; cd \"$d\"; git init -q; echo x > f; git add f; git -c user.name=b05 -c user.email=b05@example.invalid commit -qm init"]
+expect_exit = 0
+timeout_secs = 60
+
+[[program]]
+id = "jq-version"
+category = "dynamic"
+requires = ["jq"]
+argv = ["jq", "--version"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "sqlite3-version"
+category = "service"
+requires = ["sqlite3"]
+argv = ["sqlite3", "--version"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "ssh-version"
+category = "dynamic"
+requires = ["ssh"]
+argv = ["ssh", "-V"]
+expect_exit = 0
+timeout_secs = 30
+
+[[program]]
+id = "python3-net-loopback"
+category = "net"
+requires = ["python3"]
+argv = ["python3", "-c", "import socket; s=socket.socket(); s.bind(('127.0.0.1',0)); s.listen(1); a=s.getsockname(); c=socket.create_connection(a); x,_=s.accept(); c.sendall(b'x'); assert x.recv(1)==b'x'; x.close(); c.close()"]
+expect_exit = 0
+timeout_secs = 30
