@@ -1,2 +1,7 @@
 # MPL-2.0 dependency exceptions. One crate name per line; `#` starts a comment.
 # Add a line here only with lead approval (architecture/12 section 5).
+#
+# ucs2 0.3.3 (MPL-2.0): approved for the S02 UEFI loader as an unmodified
+# transitive dependency of uefi 0.41 (checkpoint 002 / REVIEW-002,
+# architecture/12 section 5; owner approval).
+ucs2
