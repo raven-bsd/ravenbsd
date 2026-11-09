@@ -120397,7 +120397,7 @@ index 00000000..150dc435
 +}
 diff --git a/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
 new file mode 100644
-index 00000000..72756983
+index 00000000..24a45f52
 --- /dev/null
 +++ b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
 @@ -0,0 +1,1434 @@
@@ -120801,7 +120801,7 @@ index 00000000..72756983
 +pub const ENOSYS: c_int = 38; /* Function not implemented */
 +pub const ENOTEMPTY: c_int = 39; /* Directory not empty */
 +pub const ELOOP: c_int = 40; /* Too many symbolic links encountered */
-+pub const EWOULDBLOCK: c_int = 41; /* Operation would block */
++pub const EWOULDBLOCK: c_int = EAGAIN; /* Operation would block */
 +pub const ENOMSG: c_int = 42; /* No message of desired type */
 +pub const EIDRM: c_int = 43; /* Identifier removed */
 +pub const ECHRNG: c_int = 44; /* Channel number out of range */
@@ -120818,7 +120818,7 @@ index 00000000..72756983
 +pub const ENOANO: c_int = 55; /* No anode */
 +pub const EBADRQC: c_int = 56; /* Invalid request code */
 +pub const EBADSLT: c_int = 57; /* Invalid slot */
-+pub const EDEADLOCK: c_int = 58; /* Resource deadlock would occur */
++pub const EDEADLOCK: c_int = EDEADLK; /* Resource deadlock would occur */
 +pub const EBFONT: c_int = 59; /* Bad font file format */
 +pub const ENOSTR: c_int = 60; /* Device not a stream */
 +pub const ENODATA: c_int = 61; /* No data available */

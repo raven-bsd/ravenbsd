@@ -27,6 +27,9 @@ bootstrap configuration and the build wrapper for `make toolchain` (ticket K19).
 * The target is registered in `rustc_target` (`Os::Ravenbsd`) and the stage1 compiler built from
   the patched source knows it. The stage0 compiler does not, so bootstrap's target sanity check
   must be skipped; `build.sh` sets `BOOTSTRAP_SKIP_TARGET_SANITY=1` for that reason.
+* `python3 toolchain/audit-errno.py` checks the RavenBSD libc errno table against
+  `crates/raven-abi/src/errno.rs` and the musl donor oracle; the reviewer's
+  `k02-errno-audit.py` also reports no numeric mismatches.
 * `bootstrap.toml` with `llvm.download-ci-llvm = true`, `rust.channel = "stable"`, the host and
   `x86_64-unknown-ravenbsd` targets, and `build.extended = true` is accepted by bootstrap. A full
   toolchain build (and therefore the actual LLVM download) was not run; the ticket forbids a full
@@ -41,6 +44,9 @@ bootstrap configuration and the build wrapper for `make toolchain` (ticket K19).
 | `patches/0001-add-ravenbsd-targets.patch` | target specs, `Os::Ravenbsd`, supported-target registration, std cfg changes |
 | `patches/0002-libc-ravenbsd.patch` | vendored `libc` 0.2.185 with a `ravenbsd` unix module, plus `library/Cargo.toml`/`Cargo.lock` |
 | `build.sh` | POSIX wrapper: download, verify, extract, patch, `x.py install`, `rustup toolchain link` |
+| `audit-errno.py` | repeatable errno audit against `raven-abi` and the musl donor oracle |
+| `libc-0.2.185-provenance.md` | exact registry/donor identities, license texts and modified file groups |
+| `licenses/` | libc 0.2.185 and Rust 1.97.1 MIT/Apache license texts |
 | `ralibc-symbols.txt` | top libc symbols referenced by `library/std` (raw material for K20-K22) |
 
 `build.sh --dry-run` prints the steps without network, extraction or installation.
@@ -107,8 +113,11 @@ Additions outside the 48 Redox sites:
   = false`).
 * `llvm.download-ci-llvm = true` was accepted by bootstrap but the actual download was not
   exercised; a full toolchain build is required to confirm it.
-* The vendored libc is the exact 0.2.185 source from crates.io (matching `library/Cargo.lock`),
-  not the donor `rust-libc` 1.0.0-alpha.5 checkout; the PROVENANCE entry records both.
+* The vendored libc is the exact 0.2.185 registry release (archive SHA-256
+  `52ff2c0fe9bc6cb6b14a0592c2ff4fa9ceb83eea9db979b0487cd054946a2b8f`, cached
+  `.cargo_vcs_info.json` SHA `71d5bfcc1bda05da1783666fc2cd7d9669c9c4c8`), not the different
+  `rust-libc` donor checkout at `7631ff2...` (`1.0.0-alpha.5`). Exact identities, license texts
+  and modified file groups are recorded in `libc-0.2.185-provenance.md`.
 
 ## Estimate for K19
 
