@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # raven-linux-abi
 
 Linux userspace ABI data for the RavenBSD Linux personality: syscall numbers, errno values,
