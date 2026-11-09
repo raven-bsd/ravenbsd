@@ -287,6 +287,7 @@ fn finish(prepared: Prepared, memory_map: &MemoryMapOwned) -> ! {
             kernel.virt_base, kernel.phys_base
         ));
     }
+    serial::log(format_args!("memory map: {} regions", regions.len()));
 
     let pool_base = pool.base();
     let pool_size = pool.size();
