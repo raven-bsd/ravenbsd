@@ -55,6 +55,15 @@ if have rustup; then
 		if printf '%s\n' "$installed" | grep -qx "$t"; then printf '  ok       %-22s\n' "target $t"
 		else printf '  MISSING  %-22s (run: make setup)\n' "target $t"; missing=1; fi
 	done
+	# cargo must also work OUTSIDE the repo (scratch dirs): a corrupt default toolchain breaks it there.
+	tmpd=$(mktemp -d)
+	if (cd "$tmpd" && cargo --version >/dev/null 2>&1 && rustc --version >/dev/null 2>&1); then
+		printf '  ok       %-22s %s\n' "cargo outside repo" "$(cd "$tmpd" && cargo --version)"
+	else
+		printf '  MISSING  %-22s (run: make setup; setup-rust.sh reinstalls the default toolchain)\n' "cargo outside repo"
+		missing=1
+	fi
+	rm -rf "$tmpd"
 fi
 
 if [ "$WRITE" -eq 1 ]; then
