@@ -1,0 +1,4 @@
+# Cargo aliases. Per-target flags are set by xtask (architecture/10-build-and-release.md), not here,
+# because the kernel and userland need different code models.
+[alias]
+xtask = "run --package xtask --"

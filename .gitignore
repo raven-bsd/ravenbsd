@@ -1,0 +1,15 @@
+# Build outputs and local scratch
+/target/
+/build/
+/vendor/
+/out/
+/artifacts/
+/tmp/
+*.o
+*.a
+*.so
+*.elf
+*.img
+*.bin
+*.swp
+.DS_Store

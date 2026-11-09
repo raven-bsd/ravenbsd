@@ -1,0 +1,11 @@
+[package]
+name = "raven-bootinfo"
+version = "0.1.0"
+description = "Loader-to-kernel handoff structure (BootInfo). LEAD-OWNED CONTRACT."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true

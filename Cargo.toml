@@ -1,0 +1,36 @@
+# RavenBSD workspace. Host-testable crates are the default members (`cargo test` on the host); kernel,
+# loader and userland programs are built for their own targets by `cargo xtask` (architecture/10).
+[workspace]
+resolver = "3"
+# A ticket that creates a new top-level crate appends ONE line to `members` (and nothing else here).
+# Planned members: "kernel", "boot/loader", "userland/rt", "userland/init", "userland/bin/<tool>",
+# "userland/servers/<server>", "userland/drivers/<driver>", "userland/linux-shim", "libc/ralibc",
+# "xtask", "tests/qtest", "tests/fixtures/<name>".
+members = [
+    "crates/*",
+]
+default-members = ["crates/*"]
+
+[workspace.package]
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+repository = "https://example.invalid/ravenbsd"
+rust-version = "1.97"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "deny"
+# The kernel crate additionally opts in to `indexing_slicing` and `arithmetic_side_effects` (warn).
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+debug = 1

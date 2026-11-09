@@ -1,0 +1,7 @@
+RavenBSD
+Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors.
+Licensed under the BSD 3-Clause License (see LICENSE).
+
+Third-party code included in this repository is listed in PROVENANCE.toml together with its
+upstream project, revision and licence. Each such file keeps its original copyright notice.
+No third-party code has been imported yet.

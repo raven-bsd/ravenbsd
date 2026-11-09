@@ -1,0 +1,11 @@
+[package]
+name = "raven-abi"
+version = "0.1.0"
+description = "RavenBSD native kernel ABI: syscall numbers, errno, handles, rights, uname. LEAD-OWNED CONTRACT."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true

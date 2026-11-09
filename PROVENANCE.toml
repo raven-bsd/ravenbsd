@@ -1,0 +1,13 @@
+# Provenance of every file copied from a donor. Format and rules: ravenbsd-prjmgmt/architecture/12-licensing-and-provenance.md
+# One [[import]] table per copied file group. `make provenance` validates this file.
+#
+# [[import]]
+# path = "crates/raven-rmm/src/lib.rs"
+# upstream = "redox-kernel"            # name in ravenbsd-resources/donors.list
+# upstream_path = "rmm/src/lib.rs"
+# upstream_rev = "<sha from donors.lock>"
+# license = "MIT"
+# tier = "A"
+# copied = "2026-11-09"
+# modified = true
+# notes = "..."
