@@ -1,0 +1,8 @@
+# SYNTHETIC LTP plain-output log. Hand-written from the tag conventions in
+# lib/tst_res.c and doc/old/Shell-Test-API.asciidoc; not produced by running LTP.
+open01 1 TPASS: open O_RDONLY
+open01 2 TFAIL: open expected EACCES
+open02 1 TCONF: not supported
+open03 1 TBROK: harness failed
+open03 2 TINFO: diagnostic only
+open03 3 TWARN: warning only

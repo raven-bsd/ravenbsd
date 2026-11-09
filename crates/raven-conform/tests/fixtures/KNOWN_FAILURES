@@ -1,0 +1,4 @@
+# SYNTHETIC known-failure list for the tests. Format:
+# <suite>:<test name>  # <reason>
+tests/chmod/00.t:chmod: expected mode 0644  # known chmod difference
+tests/chmod/00.t:test 3  # skipped in this environment

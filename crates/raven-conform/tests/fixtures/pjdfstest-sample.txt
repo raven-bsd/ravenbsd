@@ -1,0 +1,21 @@
+# SYNTHETIC pjdfstest output. Hand-written from the donor conventions in
+# tests/misc.sh (ok/not ok, # SKIP) and prove(1) summaries; it was not produced
+# by running pjdfstest. No GPL code or test script was copied.
+tests/chmod/00.t ..
+1..6
+ok 1
+not ok 2 - chmod: expected mode 0644
+ok 3 # SKIP chflags not supported on this platform
+ok 4 - chmod: symlink
+not ok 5 - chmod: expected EACCES
+ok 6
+tests/chmod/00.t .. Failed 2/6 subtests
+tests/open/00.t ..
+1..4
+ok 1 - open O_RDONLY
+ok 2 - open O_WRONLY
+ok 3 - open O_RDWR
+ok 4 - open O_CREAT
+tests/open/00.t .. ok
+Result: FAIL
+Files=2, Tests=10

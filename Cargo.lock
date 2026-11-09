@@ -219,6 +219,16 @@ name = "raven-cmdline"
 version = "0.1.0"
 
 [[package]]
+name = "raven-conform"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "regex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "raven-elf"
 version = "0.1.0"
 

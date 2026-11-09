@@ -1,0 +1,15 @@
+{
+  "tool": "pjdfstest",
+  "tool_version": null,
+  "target": "raven-test",
+  "unparsed": 0,
+  "results": [
+    {
+      "suite": "tests/chmod/00.t",
+      "name": "chmod: expected mode 0644",
+      "status": "pass",
+      "duration_ms": null,
+      "message": null
+    }
+  ]
+}

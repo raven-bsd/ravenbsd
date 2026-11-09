@@ -1,0 +1,29 @@
+{
+  "tool": "pjdfstest",
+  "tool_version": null,
+  "target": "raven-test",
+  "unparsed": 0,
+  "results": [
+    {
+      "suite": "tests/chmod/00.t",
+      "name": "chmod: expected mode 0644",
+      "status": "fail",
+      "duration_ms": null,
+      "message": "known difference"
+    },
+    {
+      "suite": "tests/chmod/00.t",
+      "name": "test 3",
+      "status": "skip",
+      "duration_ms": null,
+      "message": "SKIP chflags not supported on this platform"
+    },
+    {
+      "suite": "tests/chmod/00.t",
+      "name": "chmod: expected EACCES",
+      "status": "fail",
+      "duration_ms": null,
+      "message": "new regression"
+    }
+  ]
+}

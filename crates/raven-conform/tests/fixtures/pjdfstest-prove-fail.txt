@@ -1,0 +1,8 @@
+# SYNTHETIC prove(1)-style pjdfstest output. Hand-written from the donor
+# conventions; it was not produced by running pjdfstest.
+tests/misc/00.t ..
+1..3
+ok 1
+not ok 2 - mismatch
+ok 3
+tests/misc/00.t .. Failed 1/3 subtests
