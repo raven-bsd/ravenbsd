@@ -208,6 +208,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-rt"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
+
+[[package]]
 name = "raven-testkernel"
 version = "0.1.0"
 dependencies = [
