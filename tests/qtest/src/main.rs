@@ -17,7 +17,7 @@ use raven_qtest::{
 
 const USAGE: &str = "\
 usage:
-  raven-qtest run --case <file.toml> [--image <img>] [--arch <a>] [--out <dir>]
+  raven-qtest run --case <file.toml> [--no-build] [--image <img>] [--arch <a>] [--out <dir>]
                   [--ovmf-code <p>] [--ovmf-vars <p>] [--runner <command...>]
   raven-qtest list [--cases <dir>]
   raven-qtest all [--arch <a>] [--no-build]";
@@ -49,7 +49,7 @@ fn run() -> Result<u8> {
     }
 }
 
-fn run_one(args: &[String]) -> Result<u8> {
+fn parse_run_args(args: &[String]) -> Result<RunArgs> {
     let mut case_path = None;
     let mut options = ExecuteOptions::new();
     let mut index = 0;
@@ -88,6 +88,7 @@ fn run_one(args: &[String]) -> Result<u8> {
                 index = args.len();
                 continue;
             }
+            "--no-build" => options.no_build = true,
             other => bail!("unexpected argument `{other}`\n{USAGE}"),
         }
         index += 1;
@@ -98,6 +99,17 @@ fn run_one(args: &[String]) -> Result<u8> {
     {
         bail!("arch must be one of x86_64, aarch64, riscv64\n{USAGE}");
     }
+    Ok(RunArgs {
+        case_path,
+        execute: options,
+    })
+}
+
+fn run_one(args: &[String]) -> Result<u8> {
+    let RunArgs {
+        case_path,
+        execute: options,
+    } = parse_run_args(args)?;
     let case = Case::load(&case_path)?;
     let outcome = execute(&case, &options);
     write_outcome(&outcome, &options.out_dir)?;
@@ -107,6 +119,11 @@ fn run_one(args: &[String]) -> Result<u8> {
         ResultKind::Skipped => 77,
         _ => 1,
     })
+}
+
+struct RunArgs {
+    case_path: PathBuf,
+    execute: ExecuteOptions,
 }
 
 fn list(args: &[String]) -> Result<u8> {
@@ -218,4 +235,64 @@ fn value<'a>(args: &'a [String], index: usize, flag: &str) -> Result<&'a str> {
     args.get(index)
         .map(String::as_str)
         .ok_or_else(|| anyhow!("{flag} needs a value"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(items: &[&str]) -> Vec<String> {
+        items.iter().map(|item| item.to_string()).collect()
+    }
+
+    #[test]
+    fn run_accepts_no_build() {
+        let parsed = parse_run_args(&args(&["--case", "case.toml", "--no-build"])).unwrap();
+        assert_eq!(parsed.case_path, PathBuf::from("case.toml"));
+        assert!(parsed.execute.no_build);
+    }
+
+    #[test]
+    fn run_defaults_to_building() {
+        let parsed = parse_run_args(&args(&["--case", "case.toml"])).unwrap();
+        assert!(!parsed.execute.no_build);
+    }
+
+    #[test]
+    fn run_no_build_can_appear_before_the_case() {
+        let parsed = parse_run_args(&args(&["--no-build", "--case", "case.toml"])).unwrap();
+        assert!(parsed.execute.no_build);
+        assert_eq!(parsed.case_path, PathBuf::from("case.toml"));
+    }
+
+    #[test]
+    fn run_rejects_unknown_flags() {
+        let error = match parse_run_args(&args(&["--case", "case.toml", "--wat"])) {
+            Ok(_) => panic!("unknown flag must be rejected"),
+            Err(error) => error,
+        };
+        assert!(
+            error.to_string().contains("unexpected argument `--wat`"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn run_requires_a_case() {
+        let error = match parse_run_args(&args(&["--no-build"])) {
+            Ok(_) => panic!("missing --case must be rejected"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("--case is required"), "{error}");
+    }
+
+    #[test]
+    fn usage_documents_no_build_for_run() {
+        assert!(
+            USAGE
+                .lines()
+                .any(|line| line.contains("run --case") && line.contains("[--no-build]")),
+            "{USAGE}"
+        );
+    }
 }
