@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-rt"
+version = "0.1.0"
+description = "RavenBSD no_std userland runtime: entry, syscalls, printing, panic, allocator."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[features]
+default = ["panic-handler"]
+panic-handler = []
+alloc = []
+
+[dependencies]
+raven-abi = { path = "../../crates/raven-abi" }
+
+[[example]]
+name = "hello"
+path = "examples/hello.rs"
+required-features = ["panic-handler"]
+
+[lints]
+workspace = true

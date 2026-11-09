@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+//! RavenBSD no_std userland runtime.
+//!
+//! This crate provides the first userland ABI surface: `_start`, `args`, raw syscall wrappers,
+//! printing, the panic handler, an optional allocator and the `entry!` macro. It deliberately has
+//! no dependencies except the `raven-abi` contract crate.
+
+#![cfg_attr(not(test), no_std)]
+#![allow(unsafe_code)] // asm, the C8 stack parser and the allocator; every block has SAFETY.
+#![deny(unsafe_op_in_unsafe_fn)]
+
+#[cfg(feature = "alloc")]
+extern crate alloc as alloc_crate;
+
+#[cfg(feature = "alloc")]
+pub mod alloc;
+pub mod args;
+pub mod entry;
+pub mod print;
+pub mod spawn;
+pub mod sys;
+
+#[cfg(all(feature = "panic-handler", not(test)))]
+mod panic;
+
+/// The runtime's argument view over the C8 process stack.
+pub use args::Args;
+/// The runtime's process entry point.
+#[cfg(not(test))]
+pub use entry::__raven_start;
+pub use sys::{
+    clock_get, debug_write, exit, futex_wait, futex_wake, handle_close, handle_dup, nanosleep,
+    uname, yield_now,
+};
+
+/// `entry!(main)` registers the program's `main(args: Args) -> i32` function.
+#[macro_export]
+macro_rules! entry {
+    ($main:path) => {
+        #[allow(missing_docs)] // generated symbol, not public API
+        #[unsafe(no_mangle)]
+        pub extern "C" fn __raven_main(args: $crate::Args) -> i32 {
+            $main(args)
+        }
+    };
+}
