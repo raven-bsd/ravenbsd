@@ -282,6 +282,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-echo"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-elf"
 version = "0.1.0"
 
@@ -294,6 +301,14 @@ name = "raven-handles"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+]
+
+[[package]]
+name = "raven-init"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-uname",
 ]
 
 [[package]]
@@ -412,6 +427,14 @@ dependencies = [
 [[package]]
 name = "raven-timemath"
 version = "0.1.0"
+
+[[package]]
+name = "raven-uname"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
 
 [[package]]
 name = "raven-usercopy"

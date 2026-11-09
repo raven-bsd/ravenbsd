@@ -21,6 +21,9 @@ members = [
     "libc/spike/va",
     "userland/rt",
     "userland/linux-shim",
+    "userland/init",
+    "userland/bin/uname",
+    "userland/bin/echo",
     "tools/bench-host",
 ]
 default-members = ["crates/*"]
