@@ -16,6 +16,7 @@ mod boot;
 mod cmdline;
 #[cfg(target_arch = "x86_64")]
 mod initfs;
+#[cfg(target_arch = "x86_64")]
 mod ipc;
 mod log;
 mod memory;
