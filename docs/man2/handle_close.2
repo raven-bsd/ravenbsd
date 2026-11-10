@@ -1,0 +1,21 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 10, 2026
+.Dt HANDLE_CLOSE 2
+.Os RavenBSD
+.Sh NAME
+.Nm handle_close
+.Nd close a handle
+.Sh SYNOPSIS
+.Ft int
+.Fn handle_close "Handle handle"
+.Sh DESCRIPTION
+The .Nm system call closes .Fa handle in the caller's handle table.
+.Pp
+This page documents the native RavenBSD ABI; see the
+.Pa raven-abi
+crate for the exact numeric value and types.
+.Sh RETURN VALUES
+On success .Nm returns a non-negative value; on failure it returns a negative error number.
+.Sh STANDARDS
+RavenBSD ABI v1.

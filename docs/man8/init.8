@@ -1,0 +1,25 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 10, 2026
+.Dt INIT 8
+.Os RavenBSD
+.Sh NAME
+.Nm init
+.Nd RavenBSD PID 1
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+The
+.Nm
+program is the first user process started by the kernel.
+In the M1 milestone it prints the boot banner and the
+.Xr uname 1
+identification line, then exits.
+.Pp
+Later milestones supervise the service manifests described in
+.Xr service 5
+and the system servers.
+.Sh EXIT STATUS
+.Ex -std
+.Sh STANDARDS
+RavenBSD.

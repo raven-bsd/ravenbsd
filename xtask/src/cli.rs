@@ -10,7 +10,7 @@ use anyhow::{Result, anyhow, bail};
 
 use crate::build::{self, Arch, Component};
 use crate::process::{CommandSpec, run as run_command};
-use crate::{check, guard, image, initfs, qtest, repo, run as run_image};
+use crate::{check, docs, guard, image, initfs, qtest, repo, run as run_image};
 
 /// Stable `make help` text. The Makefile prints this through `cargo run -q -p xtask -- help`.
 pub(crate) const HELP: &str = "\
@@ -46,6 +46,7 @@ cargo xtask commands:
   run     --arch <a> [--profile <p>] [--no-build] [-- <qemu args>]
   qtest   [--case <name> | --all] [--arch <a>] [--no-build]
   provenance
+  docs
 ";
 
 #[derive(Debug, PartialEq, Eq)]
@@ -81,6 +82,7 @@ enum Command {
         args: Vec<String>,
     },
     Provenance,
+    Docs,
 }
 
 /// Parse and execute a command line. Errors are usage or infrastructure errors and exit 2.
@@ -108,6 +110,10 @@ fn parse_args(args: &[String]) -> Result<Command> {
         "provenance" => {
             reject_extra(rest, "provenance")?;
             Ok(Command::Provenance)
+        }
+        "docs" => {
+            reject_extra(rest, "docs")?;
+            Ok(Command::Docs)
         }
         "check" => {
             let mut fast = false;
@@ -300,6 +306,10 @@ fn execute(command: Command) -> Result<u8> {
             qtest::run(&root, &args)
         }
         Command::Provenance => provenance(),
+        Command::Docs => {
+            let root = root()?;
+            docs::run(&root)
+        }
     }
 }
 
