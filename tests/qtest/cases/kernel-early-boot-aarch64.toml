@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "kernel-early-boot-aarch64"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 90
+boot_cmdline = "console=ttyAMA0 test-exit=1 loglevel=debug"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(aarch64\) '
+
+[[expect]]
+regex = '^mem: \d+ MiB usable in \d+ regions$'
+
+[[expect]]
+regex = '^cmdline: '
+
+[[forbid]]
+regex = '(?i)panic'
