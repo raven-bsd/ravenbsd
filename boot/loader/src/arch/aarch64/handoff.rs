@@ -131,6 +131,18 @@ pub unsafe fn jump(
 ) -> ! {
     clean_kernel_cache(kernel_phys, kernel_size);
     let tcr = tcr(physical_bits());
+    // Register budget for the trampoline:
+    // - `x0` carries the kernel's `BootInfo` argument. It is an `in("x0")` operand and no
+    //   instruction here writes it, so it still holds that value at the final branch.
+    // - `x16` carries the kernel entry point. It is an `in("x16")` operand and is only read by
+    //   the final `br`; `x16`/`x17` are the AAPCS64 intra-procedure-call scratch registers.
+    // - `{scratch}` is a compiler-allocated output used for the SCTLR_EL1 read-modify-write.
+    //   An output cannot share a register with a live input, so it can never alias `bootinfo`,
+    //   `entry` or any other operand, whatever register LLVM picks for it.
+    // - MAIR/TCR/TTBR0/TTBR1/stack are read-only inputs consumed by `msr`/`mov sp`. The only
+    //   general-purpose register written inside this block is the scratch (`mov sp` writes SP,
+    //   not a GPR); `x0` is pinned by its operand constraint and set by the compiler before the
+    //   block. The clobber set is therefore explicit and identical in debug and release builds.
     // SAFETY: the caller guarantees the tables and addresses; these are EL1 system-register
     // writes and the final `br` leaves the loader permanently.
     unsafe {
@@ -147,25 +159,27 @@ pub unsafe fn jump(
             "isb",
             // UEFI leaves the MMU on. Re-assert M/C/I so a firmware that disabled one of them
             // cannot leave the kernel running uncached; the new TTBR0 identity map is active.
-            "mrs x9, sctlr_el1",
-            "orr x9, x9, #1",
-            "orr x9, x9, #4",
-            "orr x9, x9, #0x1000",
-            "msr sctlr_el1, x9",
+            "mrs {scratch}, sctlr_el1",
+            "orr {scratch}, {scratch}, #1",
+            "orr {scratch}, {scratch}, #4",
+            "orr {scratch}, {scratch}, #0x1000",
+            "msr sctlr_el1, {scratch}",
             "isb",
             "mov sp, {stack}",
-            "mov x0, {bootinfo}",
-            "br {entry}",
+            "br x16",
             mair = in(reg) MAIR,
             tcr = in(reg) tcr,
             ttbr0 = in(reg) roots.ttbr0,
             ttbr1 = in(reg) roots.ttbr1,
             stack = in(reg) stack_top,
-            bootinfo = in(reg) bootinfo,
-            entry = in(reg) entry,
-            options(noreturn),
+            in("x0") bootinfo,
+            in("x16") entry,
+            scratch = out(reg) _,
         );
     }
+    // The asm only leaves through `br x16`; this is the defensive path for a compiler that
+    // thinks the block can fall through.
+    halt()
 }
 
 /// Power the machine off through PSCI.
