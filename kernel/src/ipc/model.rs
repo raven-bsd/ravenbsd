@@ -73,6 +73,8 @@ pub struct Namespace {
     pub wildcard: bool,
     /// Explicitly allowed scheme names.
     pub names: Vec<String>,
+    /// Allowed scheme-name prefixes.
+    pub prefixes: Vec<String>,
 }
 
 impl Namespace {
@@ -81,6 +83,7 @@ impl Namespace {
         Self {
             wildcard: true,
             names: Vec::new(),
+            prefixes: Vec::new(),
         }
     }
 
@@ -91,18 +94,33 @@ impl Namespace {
             Self {
                 wildcard: false,
                 names: registered.to_vec(),
+                prefixes: Vec::new(),
             }
         } else {
             Self {
                 wildcard: false,
                 names: self.names.clone(),
+                prefixes: self.prefixes.clone(),
             }
         }
     }
 
     /// True when `scheme` is visible.
     pub fn allows(&self, scheme: &str) -> bool {
-        self.wildcard || self.names.iter().any(|name| name == scheme)
+        self.wildcard
+            || self.names.iter().any(|name| name == scheme)
+            || self
+                .prefixes
+                .iter()
+                .any(|prefix| !prefix.is_empty() && scheme.starts_with(prefix))
+    }
+
+    /// Allow every scheme name beginning with `prefix`.
+    #[allow(dead_code)] // exercised by the host model; no namespace syscall sets prefixes yet
+    pub fn allow_prefix(&mut self, prefix: &str) {
+        if !prefix.is_empty() && !self.prefixes.iter().any(|item| item == prefix) {
+            self.prefixes.push(prefix.to_string());
+        }
     }
 
     /// Add a scheme name if it is not already visible.
@@ -183,6 +201,14 @@ mod tests {
         let grandchild = child.child_snapshot(&[]);
         assert!(grandchild.allows("echo"));
         assert!(grandchild.allows("file"));
+
+        let mut prefixed = Namespace::default();
+        prefixed.allow_prefix("net");
+        assert!(prefixed.allows("net"));
+        assert!(prefixed.allows("net-tcp"));
+        assert!(!prefixed.allows("file"));
+        let inherited = prefixed.child_snapshot(&[]);
+        assert!(inherited.allows("net-tcp"));
     }
 
     #[test]
