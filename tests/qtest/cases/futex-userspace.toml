@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "futex-userspace"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^futex: pingpong ok rounds=10000$'
+
+[[expect]]
+regex = '^futex: eagain ok$'
+
+[[expect]]
+regex = '^futex: timeout ok$'
+
+[[expect]]
+regex = '^futex: wake count 3$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|s09-futex: failed'

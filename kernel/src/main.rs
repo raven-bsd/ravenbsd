@@ -16,7 +16,9 @@ mod initfs;
 mod log;
 mod memory;
 mod process;
+mod sched;
 mod selftest;
+mod sync;
 mod syscall;
 mod time;
 mod usercopy;
@@ -66,6 +68,10 @@ pub extern "C" fn kmain(boot: *const raven_bootinfo::BootInfo) -> ! {
         boot::exit_qemu(0x11);
     }
     initfs::init();
+    if let Err(error) = sched::init() {
+        kprintln!("kernel: scheduler init failed: {error:?}");
+        boot::exit_qemu(0x11);
+    }
 
     arch::acpi::init();
     arch::pic::remap_and_mask();

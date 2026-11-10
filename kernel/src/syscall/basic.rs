@@ -23,10 +23,16 @@ use crate::usercopy::{copy_from_user, copy_to_user};
 pub fn dispatch(call: Syscall, frame: &mut TrapFrame) -> Result<usize, Errno> {
     match call {
         Syscall::EXIT => process::exit_current(frame.rdi as i32),
-        Syscall::YIELD => Ok(0),
+        Syscall::YIELD => {
+            crate::sched::yield_now();
+            Ok(0)
+        }
         Syscall::DEBUG_WRITE => debug_write(frame.rdi, frame.rsi),
         Syscall::CLOCK_GET => clock_get(frame.rdi as u32, frame.rsi),
-        Syscall::NANOSLEEP => nanosleep(frame.rdi),
+        Syscall::NANOSLEEP => {
+            let _ = crate::sched::sleep::sleep_ns(frame.rdi);
+            Ok(0)
+        }
         Syscall::UNAME => uname(frame.rdi),
         Syscall::HANDLE_CLOSE => handle_close(frame.rdi as u32),
         Syscall::HANDLE_DUP => handle_dup(frame.rdi as u32, frame.rsi as u32),
@@ -73,21 +79,6 @@ fn clock_get(clock_id: u32, pointer: u64) -> Result<usize, Errno> {
         )
     };
     copy_to_user(destination, bytes)?;
-    Ok(0)
-}
-
-fn nanosleep(ns: u64) -> Result<usize, Errno> {
-    if ns == 0 {
-        return Ok(0);
-    }
-    let deadline = time::now_ns().saturating_add(ns);
-    while time::now_ns() < deadline {
-        // SAFETY: the timer and spurious gates are installed before user mode; `sti` lets the
-        // timer wake `hlt`, then `cli` restores the kernel's interrupted-syscall flag state.
-        unsafe {
-            core::arch::asm!("sti", "hlt", "cli", options(nomem, nostack),);
-        }
-    }
     Ok(0)
 }
 

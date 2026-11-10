@@ -211,6 +211,7 @@ core::arch::global_asm!(
     push r11
     push rbp
     mov rbp, rsp
+    mov rdi, rbp
     and rsp, -16
     call \target
     mov rsp, rbp
@@ -251,11 +252,17 @@ fn spurious_isr_address() -> u64 {
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn timer_interrupt() {
+extern "C" fn timer_interrupt(rsp: u64) {
+    // The stub saves ten GPRs above the CPU frame: RIP is at `rsp + 80`, CS at `rsp + 88`.
+    // SAFETY: `rsp` is the interrupted kernel stack pointer passed by the stub; the CPU frame is
+    // present and the read is a plain aligned read.
+    let cs = unsafe { core::ptr::read_volatile(rsp.saturating_add(88) as *const u64) };
     time::on_tick();
+    crate::sched::tick();
+    crate::sched::timer_return(cs & 3 == 3);
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn spurious_interrupt() {
+extern "C" fn spurious_interrupt(_rsp: u64) {
     apic::on_spurious();
 }
