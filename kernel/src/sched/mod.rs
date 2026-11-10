@@ -190,8 +190,9 @@ pub fn new_user_thread(
 ) -> Result<Arc<Thread>, Errno> {
     let cr3 = process
         .address_space
+        .lock()
         .as_ref()
-        .map(|address_space| address_space.lock().root().0)
+        .map(|address_space| address_space.root().0)
         .ok_or(Errno::EINVAL)?;
     let name = format!("{}-thread", process.id);
     Thread::new_user(name, Arc::clone(process), entry, stack_top, arg, cr3)
@@ -510,7 +511,7 @@ pub fn exit_thread(code: i32) -> ! {
     };
     thread.exit_code.store(code, Ordering::SeqCst);
     if thread.process.thread_exited() {
-        crate::process::exit_process(code);
+        crate::process::notify_exit(code);
     }
     let _guard = sync::critical();
     let next = {

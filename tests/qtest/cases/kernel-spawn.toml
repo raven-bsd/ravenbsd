@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "kernel-spawn"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+boot_cmdline = "console=ttyS0 test-exit=1 s24-framecheck=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^child: hello world$'
+
+[[expect]]
+regex = '^s24: negatives ok$'
+
+[[expect]]
+regex = '^s24: child exit code 7$'
+
+[[expect]]
+regex = '^s24: cow ok$'
+
+[[expect]]
+regex = '^s24: frames free=\d+$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|killed by page fault|s24: .*failed'

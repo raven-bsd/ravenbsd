@@ -27,6 +27,7 @@ raven-rmm = { path = "../crates/raven-rmm" }
 raven-sched-core = { path = "../crates/raven-sched-core" }
 raven-timemath = { path = "../crates/raven-timemath" }
 raven-usercopy = { path = "../crates/raven-usercopy" }
+raven-vma = { path = "../crates/raven-vma" }
 spin = { version = "0.9", default-features = false, features = ["spin_mutex"] }
 
 [build-dependencies]

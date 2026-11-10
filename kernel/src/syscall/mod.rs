@@ -5,6 +5,8 @@
 
 pub mod basic;
 pub mod futex;
+pub mod memory_ctl;
+pub mod process_ctl;
 pub mod thread;
 
 use raven_abi::errno::Errno;
@@ -24,6 +26,12 @@ pub extern "C" fn syscall_dispatch(frame: &mut TrapFrame) {
         Some(Syscall::FUTEX) => futex::dispatch(frame),
         Some(Syscall::THREAD_CREATE) => thread::create(frame),
         Some(Syscall::THREAD_EXIT) => thread::exit(frame),
+        Some(Syscall::PROC_CREATE) => process_ctl::create(frame),
+        Some(Syscall::PROC_WAIT) => process_ctl::wait(frame),
+        Some(Syscall::MEMOBJ_CREATE) => memory_ctl::memobj_create(frame),
+        Some(Syscall::MAP) => memory_ctl::map(frame),
+        Some(Syscall::UNMAP) => memory_ctl::unmap(frame),
+        Some(Syscall::PROTECT) => memory_ctl::protect(frame),
         Some(call) => basic::dispatch(call, frame),
         None => Err(Errno::ENOSYS),
     };

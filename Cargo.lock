@@ -331,6 +331,7 @@ dependencies = [
  "raven-sched-core",
  "raven-timemath",
  "raven-usercopy",
+ "raven-vma",
  "spin",
 ]
 
@@ -434,6 +435,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-s24-child"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-s24-parent"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-elf",
+ "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-sched-core"
 version = "0.1.0"
 
@@ -469,6 +488,10 @@ dependencies = [
 
 [[package]]
 name = "raven-va-spike"
+version = "0.1.0"
+
+[[package]]
+name = "raven-vma"
 version = "0.1.0"
 
 [[package]]
