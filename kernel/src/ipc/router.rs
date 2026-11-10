@@ -430,7 +430,7 @@ fn write_reply_buffer(request: &Arc<PendingRequest>, packet: &SchemePacket) -> R
         return Err(Errno::E2BIG);
     }
 
-    let (capture_address, data_len, capacity, copy_data) = {
+    let (capture_address, mut data_len, capacity, copy_data) = {
         let request_packet = request.packet.lock();
         let buffers = request.buffers.lock();
         match request.opcode {
@@ -440,7 +440,19 @@ fn write_reply_buffer(request: &Arc<PendingRequest>, packet: &SchemePacket) -> R
                 request_packet.buffer_len,
                 false,
             ),
-            Opcode::Call | Opcode::Fstat => (
+            // A `Call` reply without attachments keeps the S11 semantics: the server already
+            // wrote the response buffer itself, so inline data is not kernel-delivered.
+            Opcode::Call => (
+                buffers.response.as_ref().map(capture::Capture::address),
+                if count == 0 {
+                    0
+                } else {
+                    u64::from(packet.data_len)
+                },
+                request_packet.response_len,
+                true,
+            ),
+            Opcode::Fstat => (
                 buffers.response.as_ref().map(capture::Capture::address),
                 u64::from(packet.data_len),
                 request_packet.response_len,
@@ -455,6 +467,10 @@ fn write_reply_buffer(request: &Arc<PendingRequest>, packet: &SchemePacket) -> R
             Opcode::Open => return Err(Errno::EPROTO),
         }
     };
+    // Fstat without a captured buffer keeps the S11 truncation semantics: no bytes delivered.
+    if request.opcode == Opcode::Fstat && capture_address.is_none() {
+        data_len = 0;
+    }
     let pairs_len = u64::try_from(count)
         .map_err(|_| Errno::E2BIG)?
         .checked_mul(8)
