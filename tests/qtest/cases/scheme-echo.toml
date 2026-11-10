@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "scheme-echo"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^scheme-echo: 1 MiB ok$'
+
+[[expect]]
+regex = '^scheme-echo: eio ok$'
+
+[[forbid]]
+regex = '(?i)panic'

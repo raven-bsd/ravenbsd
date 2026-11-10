@@ -5,6 +5,7 @@
 
 pub mod basic;
 pub mod futex;
+pub mod ipc;
 pub mod memory_ctl;
 pub mod process_ctl;
 pub mod thread;
@@ -32,6 +33,18 @@ pub extern "C" fn syscall_dispatch(frame: &mut TrapFrame) {
         Some(Syscall::MAP) => memory_ctl::map(frame),
         Some(Syscall::UNMAP) => memory_ctl::unmap(frame),
         Some(Syscall::PROTECT) => memory_ctl::protect(frame),
+        Some(
+            call @ (Syscall::SCHEME_REGISTER
+            | Syscall::OPEN
+            | Syscall::READ
+            | Syscall::WRITE
+            | Syscall::CLOSE
+            | Syscall::DUP
+            | Syscall::FSTAT
+            | Syscall::CALL
+            | Syscall::RECV
+            | Syscall::SEND),
+        ) => ipc::dispatch(call, frame),
         Some(call) => basic::dispatch(call, frame),
         None => Err(Errno::ENOSYS),
     };

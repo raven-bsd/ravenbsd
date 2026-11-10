@@ -12,6 +12,7 @@ pub mod thread;
 use core::fmt;
 use core::sync::atomic::{AtomicI32, AtomicU32, AtomicU64, Ordering};
 
+use alloc::collections::VecDeque;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec;
@@ -28,6 +29,9 @@ use spin::Mutex;
 use crate::arch::x86_64::{syscall, tsc};
 use crate::cmdline::CmdLine;
 use crate::initfs;
+use crate::ipc::capture::CaptureSlots;
+use crate::ipc::model::Namespace;
+use crate::ipc::{self, PendingRequest, SchemeServer};
 use crate::kprintln;
 use crate::memory::aspace::AddressSpace;
 use crate::memory::uspace::UserAddressSpace;
@@ -39,7 +43,10 @@ use self::handle::Object;
 /// Page size used by the user loader and stack.
 const PAGE: u64 = 4096;
 /// Size of the user stack mapping.
-const USER_STACK_SIZE: u64 = 64 * 1024;
+///
+/// S11's controller uses `raven_rt::spawn`, which builds a child stack in a 64 KiB buffer;
+/// 128 KiB leaves room for that buffer and the call frames.
+const USER_STACK_SIZE: u64 = 128 * 1024;
 /// Guard page at the top of the user range.
 const USER_GUARD: u64 = 4096;
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
@@ -73,6 +80,20 @@ pub struct Process {
     pub state: Mutex<ProcessState>,
     /// Threads blocked in `PROC_WAIT` on this process.
     pub waiters: WaitQueue,
+    /// Visible scheme names (per-process namespace).
+    pub namespace: Mutex<Namespace>,
+    /// Scheme names registered by this process.
+    pub schemes: Mutex<alloc::vec::Vec<Arc<SchemeServer>>>,
+    /// Packets waiting for this process's `RECV`.
+    pub scheme_queue: Mutex<VecDeque<Arc<PendingRequest>>>,
+    /// Server threads blocked in `RECV`.
+    pub scheme_waiters: WaitQueue,
+    /// Requests received by this process and not yet replied to.
+    pub active_requests: Mutex<alloc::vec::Vec<Arc<PendingRequest>>>,
+    /// Requests this process is waiting for as a client.
+    pub client_requests: Mutex<alloc::vec::Vec<Arc<PendingRequest>>>,
+    /// Capture-window slots owned by this process as a server.
+    pub capture_slots: Mutex<CaptureSlots>,
 }
 
 /// Why the first process could not be created.
@@ -130,12 +151,25 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         threads: AtomicU32::new(0),
         state: Mutex::new(ProcessState::Running),
         waiters: WaitQueue::new(),
+        namespace: Mutex::new(Namespace::root()),
+        schemes: Mutex::new(alloc::vec::Vec::new()),
+        scheme_queue: Mutex::new(VecDeque::new()),
+        scheme_waiters: WaitQueue::new(),
+        active_requests: Mutex::new(alloc::vec::Vec::new()),
+        client_requests: Mutex::new(alloc::vec::Vec::new()),
+        capture_slots: Mutex::new(CaptureSlots::new()),
     }))
 }
 
 /// Create an empty process for `PROC_CREATE`, with the well-known handles installed.
 pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
+    let namespace = if let Some(parent) = current() {
+        let snapshot = parent.namespace.lock().clone();
+        snapshot.child_snapshot(&ipc::registry::names())
+    } else {
+        Namespace::root()
+    };
     let process = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         path: String::from("child"),
@@ -145,6 +179,13 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         threads: AtomicU32::new(0),
         state: Mutex::new(ProcessState::Created),
         waiters: WaitQueue::new(),
+        namespace: Mutex::new(namespace),
+        schemes: Mutex::new(alloc::vec::Vec::new()),
+        scheme_queue: Mutex::new(VecDeque::new()),
+        scheme_waiters: WaitQueue::new(),
+        active_requests: Mutex::new(alloc::vec::Vec::new()),
+        client_requests: Mutex::new(alloc::vec::Vec::new()),
+        capture_slots: Mutex::new(CaptureSlots::new()),
     });
     handle::install_initial(&mut process.handles.lock(), &process, false)?;
     Ok(process)
@@ -203,6 +244,13 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         threads: AtomicU32::new(0),
         state: Mutex::new(ProcessState::Running),
         waiters: WaitQueue::new(),
+        namespace: Mutex::new(Namespace::root()),
+        schemes: Mutex::new(alloc::vec::Vec::new()),
+        scheme_queue: Mutex::new(VecDeque::new()),
+        scheme_waiters: WaitQueue::new(),
+        active_requests: Mutex::new(alloc::vec::Vec::new()),
+        client_requests: Mutex::new(alloc::vec::Vec::new()),
+        capture_slots: Mutex::new(CaptureSlots::new()),
     });
     handle::install_initial(&mut process.handles.lock(), &process, true)
         .map_err(ProcessError::Handle)?;
@@ -530,6 +578,9 @@ pub fn notify_exit(code: i32) {
         crate::arch::halt()
     };
     process.mark_exited(code);
+    // Fail pending scheme requests and remove the registry entries while the server page tables
+    // still exist, so capture mappings can be removed before the address space is released.
+    ipc::on_process_exit(&process);
     let address_space = process.address_space.lock().take();
     if let Some(address_space) = address_space {
         address_space.release();
@@ -594,5 +645,5 @@ pub fn bad_sysret(rip: u64) -> ! {
 
 const _: () = {
     assert!(PAGE == 4096);
-    assert!(USER_STACK_SIZE == 64 * 1024);
+    assert!(USER_STACK_SIZE == 128 * 1024);
 };
