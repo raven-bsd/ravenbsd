@@ -22,7 +22,7 @@ reports what is installed or missing.
 | `make loader ARCH=x86_64` | `build/<arch>/loader.efi` |
 | `make dev` / `make release` | debug / smallest build of every component that exists |
 | `make image PROFILE=base` | bootable image (ticket K05, not implemented yet) |
-| `make run` | QEMU boot (ticket K05, not implemented yet) |
+| `make run PROFILE=shell` | interactive serial QEMU boot; use `Ctrl-A x` to quit |
 | `make test` | `make check` plus the QEMU integration tests |
 | `make provenance` | SPDX headers, `PROVENANCE.toml` and dependency licences |
 | `make clean` / `make distclean` | remove build output / also local caches |
@@ -48,9 +48,30 @@ Builds are reproducible: `SOURCE_DATE_EPOCH` is the `HEAD` commit timestamp and
 
 ## Profiles
 
-`profiles/<name>.toml` lists the programs packed into the initial filesystem and the boot
-command line. The shipped profiles are `base`, `tiny` and `dev`. Unknown keys, a mismatched
-`name` field, duplicate paths and invalid log levels are rejected when the profile is parsed.
+`profiles/<name>.toml` lists the programs and files packed into the initial filesystem and the
+boot command line. The shipped profiles are `base`, `tiny`, `dev` and `shell`. Unknown keys, a
+mismatched `name` field, duplicate paths and invalid log levels are rejected when the profile is
+parsed.
+
+Profiles may set `extends = "parent"` to inherit the parent's entries (including its fragments)
+and replace its `[boot]` table. One inheritance level is intended; cycles are rejected. A ticket
+adds independent shell content in a sorted fragment such as `profiles/shell.d/20-service.toml`:
+
+```toml
+[[initfs.programs]]
+package = "raven-logd"
+path = "/bin/logd"
+
+[[initfs.files]]
+src = "services/logd.toml"
+path = "/etc/services.d/logd.toml"
+mode = 0o644
+```
+
+Fragment entries merge in filename order. File `src` paths are repository-relative and must exist;
+programs default to mode `0o755`, files to `0o644`, and duplicate initfs paths name both sources.
+`PROFILE=shell` makes x86-64 `make run` use QEMU's `-serial mon:stdio` interactive multiplexor;
+type into the serial console and press `Ctrl-A x` to exit.
 
 ## Continuous checking
 

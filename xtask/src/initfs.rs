@@ -55,6 +55,15 @@ pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathB
         })?;
         builder.add_file(&program.path, &data, 0o755)?;
     }
+    for file in &profile.initfs.files {
+        let data = fs::read(root.join(&file.src)).with_context(|| {
+            format!(
+                "cannot read profile file {} for initfs path {}",
+                file.src, file.path
+            )
+        })?;
+        builder.add_file(&file.path, &data, file.mode)?;
+    }
     let image = builder.build();
     let output = root.join("build").join(arch.as_str()).join("initfs.img");
     if let Some(parent) = output.parent() {
@@ -101,5 +110,16 @@ mod tests {
         assert!(!release_user_programs_from_env(None));
         assert!(!release_user_programs_from_env(Some("true")));
         assert!(!release_user_programs_from_env(Some("0")));
+    }
+
+    #[test]
+    fn extra_file_keeps_its_mode_and_contents() {
+        let mut builder = InitfsBuilder::new();
+        builder.add_file("/etc/example", b"value\n", 0o640).unwrap();
+        let image = builder.build();
+        let parsed = Initfs::parse(&image).unwrap();
+        let file = parsed.get("/etc/example").unwrap();
+        assert_eq!(file.data, b"value\n");
+        assert_eq!(file.mode, 0o640);
     }
 }

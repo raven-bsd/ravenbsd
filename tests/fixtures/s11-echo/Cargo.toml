@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-s11-echo"
+version = "0.1.0"
+description = "S11 scheme echo fixture: controller, server and client."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[lib]
+name = "raven_s11_echo"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raven-s11-init"
+path = "src/bin/init.rs"
+
+[[bin]]
+name = "raven-s11-server"
+path = "src/bin/server.rs"
+
+[[bin]]
+name = "raven-s11-client"
+path = "src/bin/client.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-elf = { path = "../../../crates/raven-elf" }
+raven-initfs = { path = "../../../crates/raven-initfs" }
+raven-ipc = { path = "../../../crates/raven-ipc" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc"] }
+
+[lints]
+workspace = true
