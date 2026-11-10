@@ -31,7 +31,13 @@ pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathB
         .map(|program| program.package.clone())
         .collect();
     if !packages.is_empty() {
-        let code = build::run(&workspace, Component::User, arch, false, &packages)?;
+        let code = build::run(
+            &workspace,
+            Component::User,
+            arch,
+            release_user_programs_from_env(std::env::var("RAVEN_USER_RELEASE").ok().as_deref()),
+            &packages,
+        )?;
         if code != 0 {
             bail!("user program build failed with exit code {code}");
         }
@@ -59,6 +65,14 @@ pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathB
     Ok(output)
 }
 
+/// Select release user programs for a manually requested image build.
+///
+/// This is deliberately opt-in: normal images retain their debug user programs, while the K63
+/// regression matrix can exercise the release user binary in the same image path.
+fn release_user_programs_from_env(value: Option<&str>) -> bool {
+    matches!(value, Some("1"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -79,5 +93,13 @@ mod tests {
         assert_eq!(init.mode, 0o755);
         let uname = parsed.get("/bin/uname").unwrap();
         assert_eq!(uname.data, b"uname-binary");
+    }
+
+    #[test]
+    fn release_user_programs_requires_an_explicit_one() {
+        assert!(release_user_programs_from_env(Some("1")));
+        assert!(!release_user_programs_from_env(None));
+        assert!(!release_user_programs_from_env(Some("true")));
+        assert!(!release_user_programs_from_env(Some("0")));
     }
 }

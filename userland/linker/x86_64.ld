@@ -23,6 +23,9 @@ SECTIONS {
 
     .data ALIGN(4096) : {
         *(.data .data.*)
+        *(.data.rel.ro .data.rel.ro.*)
+        /* Rust formatting uses GOT indirections for vtables. They must be loaded. */
+        *(.got .got.*)
         . = ALIGN(4096);
     } :data
 
@@ -35,7 +38,6 @@ SECTIONS {
         *(.eh_frame*)
         *(.comment)
         *(.note*)
-        *(.got*)
         *(.plt*)
     }
 }

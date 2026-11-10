@@ -182,6 +182,37 @@ mod tests {
     }
 
     #[test]
+    fn formatting_covers_common_userland_argument_types() {
+        let slice: &[u8] = &[1, 2];
+        let option = Some(7u32);
+        assert_eq!(
+            collect(format_args!(
+                "{} {} {:x} {:>8} {:?} {:?}",
+                "str", 255u32, 255u32, 255u32, slice, option
+            ))
+            .concat(),
+            b"str 255 ff      255 [1, 2] Some(7)"
+        );
+    }
+
+    #[test]
+    fn formatting_uses_dyn_trait_and_closure_dispatch() {
+        trait Value {
+            fn value(&self) -> u32;
+        }
+        struct Number(u32);
+        impl Value for Number {
+            fn value(&self) -> u32 {
+                self.0
+            }
+        }
+        let value: &dyn Value = &Number(7);
+        let mut closure = |number: u32| number + value.value();
+        let function: &mut dyn FnMut(u32) -> u32 = &mut closure;
+        assert_eq!(function(1), 8);
+    }
+
+    #[test]
     fn raw_writer_does_not_interpret_format_placeholders() {
         let mut chunks = Vec::new();
         let written = write_str_with("{text} {}", &mut |bytes| {
