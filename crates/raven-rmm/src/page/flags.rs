@@ -27,7 +27,12 @@ pub const DIRTY: u64 = 1 << 6;
 pub const HUGE: u64 = 1 << 7;
 /// Global translation.
 pub const GLOBAL: u64 = 1 << 8;
-/// No execute (requires EFER.NXE).
+/// Normal non-cacheable attribute on aarch64 (`MAIR_EL1` attr2, reserved for DMA buffers).
+///
+/// Bit 9 is software-available on x86-64 and never set there; the aarch64 encoding reads it and
+/// never copies it into a descriptor.
+pub const NON_CACHEABLE: u64 = 1 << 9;
+/// No execute (requires EFER.NXE; on aarch64 the logical bit maps to PXN/UXN).
 pub const NO_EXECUTE: u64 = 1 << 63;
 
 /// A set of x86-64 page flags.
@@ -137,8 +142,22 @@ impl PageFlags {
     }
 
     /// Uncached device-memory flags (no execute).
+    ///
+    /// On aarch64 the cache-disable + write-through pair (the ticket's "NO_CACHE" case) selects
+    /// the `MAIR_EL1` attr3 device-nGnRE attribute.
     pub const fn mmio() -> Self {
         Self(PRESENT | WRITABLE | GLOBAL | NO_EXECUTE | CACHE_DISABLE | WRITE_THROUGH)
+    }
+
+    /// The device-attribute bits alone (cache-disable + write-through), without presence, write,
+    /// global or execute bits. The aarch64 encoding uses this pair to select attr3.
+    pub const fn mmio_attribute() -> Self {
+        Self(CACHE_DISABLE | WRITE_THROUGH)
+    }
+
+    /// Kernel RW mapping for memory-map MMIO regions (device-nGnRnE on aarch64).
+    pub const fn kernel_device() -> Self {
+        Self(PRESENT | WRITABLE | GLOBAL | NO_EXECUTE | CACHE_DISABLE)
     }
 }
 

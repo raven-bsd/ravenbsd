@@ -4,13 +4,14 @@
 
 //! Page-table mapping for RavenBSD.
 //!
-//! This crate is a port and trim of Redox's `rmm` for x86-64 four-level paging. The original
-//! architecture-generic table, entry and mapper machinery is kept; the buddy/bump allocators,
-//! the emulated architecture and the non-x86 ports are dropped. Callers supply physical memory
-//! access, frame allocation and TLB flushing through the three traits below so the mapper is
-//! host-testable.
+//! This crate is a port and trim of Redox's `rmm`. The original architecture-generic table,
+//! entry and mapper machinery is kept; the buddy/bump allocators, the emulated architecture and
+//! its own backends are dropped. Callers supply physical memory access, frame allocation and TLB
+//! flushing through the three traits below so the mapper is host-testable.
 //!
-//! TODO(S14): port the aarch64 and riscv64 backends when those architectures land.
+//! Descriptor bits are behind the [`Encoding`] trait: [`X86_64Encoding`] is the historical S06
+//! behaviour and [`Aarch64Encoding`] implements the ARMv8-A 4 KiB-granule format added in S14a.
+//! riscv64 (S19) will add its own backend.
 
 #![no_std]
 
@@ -21,7 +22,9 @@ pub use arch::x86_64::{
     ENTRY_ADDRESS_WIDTH, PAGE_ENTRIES, PAGE_ENTRY_SHIFT, PAGE_LEVELS, PAGE_SHIFT, PAGE_SIZE,
     PHYS_ADDR_MASK, entry_address, entry_flags, is_canonical,
 };
-pub use page::{Entry, Mapper, PageFlags, PageSize, PageTable};
+pub use page::{
+    Aarch64Encoding, Encoding, Entry, Mapper, PageFlags, PageSize, PageTable, X86_64Encoding,
+};
 
 use core::fmt;
 
@@ -64,12 +67,29 @@ pub struct VirtAddr(u64);
 
 impl VirtAddr {
     /// Build a canonical virtual address.
+    ///
+    /// The check is the x86-64 48-bit rule. aarch64 TTBR0/TTBR1 48-bit addresses in the
+    /// `0x0000_8000_0000_0000..0xFFFF_7FFF_FFFF_FFFF` band are legal there but rejected here;
+    /// aarch64 callers that need such addresses must validate canonicity themselves (per the
+    /// active [`Encoding`]) and use [`VirtAddr::new_raw`].
     pub const fn new(address: u64) -> Option<Self> {
         if is_canonical(address) {
             Some(Self(address))
         } else {
             None
         }
+    }
+
+    /// Build a virtual address without a canonicity check.
+    ///
+    /// The caller must have validated the address for the architecture it targets; the mapper
+    /// re-checks with its [`Encoding`] before use.
+    pub const fn new_raw(address: u64) -> Option<Self> {
+        if address == u64::MAX {
+            // Reserved as the crate's "invalid address" sentinel.
+            return None;
+        }
+        Some(Self(address))
     }
 
     /// The numeric address.

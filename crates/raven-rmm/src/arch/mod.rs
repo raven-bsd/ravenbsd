@@ -4,7 +4,8 @@
 
 //! Architecture-specific page-table constants.
 //!
-//! TODO(S14): aarch64 and riscv64 backends are not ported yet. The Redox originals stay in the
-//! donor tree and will be quarried by their architecture tickets.
+//! The x86-64 backend is the original S06 port. The aarch64 backend (S14a) implements the same
+//! encoding trait with the ARMv8-A 4 KiB-granule descriptor format.
 
+pub mod aarch64;
 pub mod x86_64;
