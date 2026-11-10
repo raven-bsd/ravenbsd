@@ -599,6 +599,15 @@ pub fn notify_exit(code: i32) {
     {
         kprintln!("s24: frames free={}", frame::stats().free_bytes);
     }
+    // S25 handle-transfer leak evidence: the dying process's live handle count. A transferred
+    // handle that survived process death, or a slot leaked by the transfer path, drifts this
+    // number across repeated spawn/exit cycles.
+    if CmdLine::parse(paging::cmdline())
+        .get("s25-handlecheck")
+        .is_some()
+    {
+        kprintln!("s25: exit handles={}", process.handles.lock().len());
+    }
 }
 
 /// Terminate the calling process (`EXIT`).

@@ -5,7 +5,7 @@ name = "handle-transfer"
 arch = "x86_64"
 profile = "base"
 timeout_secs = 120
-boot_cmdline = "console=ttyS0 test-exit=1"
+boot_cmdline = "console=ttyS0 test-exit=1 s25-handlecheck=1"
 expect_exit = "success"
 
 [[expect]]
