@@ -191,6 +191,14 @@ fn build_steps(workspace: &Workspace, fast: bool) -> Result<Vec<Step>> {
             workspace,
             "clippy kernel x86_64",
             Component::Kernel,
+            Arch::X86_64,
+            std::slice::from_ref(&kernel.name),
+        )?);
+        target_steps.push(target_clippy_step(
+            workspace,
+            "clippy kernel aarch64",
+            Component::Kernel,
+            Arch::Aarch64,
             std::slice::from_ref(&kernel.name),
         )?);
     }
@@ -206,6 +214,7 @@ fn build_steps(workspace: &Workspace, fast: bool) -> Result<Vec<Step>> {
             workspace,
             "clippy user programs x86_64",
             Component::User,
+            Arch::X86_64,
             &names,
         )?);
     }
@@ -214,6 +223,7 @@ fn build_steps(workspace: &Workspace, fast: bool) -> Result<Vec<Step>> {
             workspace,
             "clippy loader x86_64",
             Component::Loader,
+            Arch::X86_64,
             std::slice::from_ref(&loader.name),
         )?);
     }
@@ -254,9 +264,9 @@ fn target_clippy_step(
     workspace: &Workspace,
     name: &str,
     component: Component,
+    arch: Arch,
     packages: &[String],
 ) -> Result<Step> {
-    let arch = Arch::X86_64;
     let target = build::target_for(component, arch)?;
     let target_dir = workspace.root.join("build/cargo").join(format!(
         "{}-{}",
@@ -364,5 +374,23 @@ mod tests {
             .find(|step| step.name == "clippy kernel x86_64")
             .unwrap();
         assert!(matches!(kernel.kind, StepKind::Command(_)));
+    }
+
+    #[test]
+    fn normal_mode_runs_aarch64_kernel_clippy() {
+        let steps = build_steps(&workspace(), false).unwrap();
+        let kernel = steps
+            .iter()
+            .find(|step| step.name == "clippy kernel aarch64")
+            .unwrap();
+        let StepKind::Command(spec) = &kernel.kind else {
+            panic!("aarch64 kernel clippy step is not a command");
+        };
+        assert!(
+            spec.args
+                .windows(2)
+                .any(|pair| pair == ["--target", "aarch64-unknown-none-softfloat"])
+        );
+        assert!(spec.args.iter().any(|arg| arg == "raven-kernel"));
     }
 }

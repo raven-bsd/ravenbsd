@@ -15,10 +15,21 @@ name = "raven-kernel"
 path = "src/main.rs"
 
 [dependencies]
-acpi = { version = "5.2.0", default-features = false }
-linked_list_allocator = { version = "0.10", default-features = false }
 raven-abi = { path = "../crates/raven-abi" }
 raven-bootinfo = { path = "../crates/raven-bootinfo" }
+raven-esr = { path = "../crates/raven-esr" }
+
+# `raven-mem` exports the C `memcpy` family for x86-64. On aarch64 the same export makes the
+# debug build recurse (core's `write_unaligned` calls `memcpy`, which is `raven_mem::memcpy`),
+# so aarch64 uses the compiler-builtins routines instead.
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+raven-mem = { path = "../crates/raven-mem" }
+
+# Everything below is used by the x86-64 modules only; the aarch64 early-boot image (S13) does not
+# link them until the MMU and the rest of the kernel land in S14.
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+acpi = { version = "5.2.0", default-features = false }
+linked_list_allocator = { version = "0.10", default-features = false }
 raven-elf = { path = "../crates/raven-elf" }
 raven-handles = { path = "../crates/raven-handles" }
 raven-initfs = { path = "../crates/raven-initfs" }

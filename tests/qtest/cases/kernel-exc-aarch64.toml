@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "kernel-exc-aarch64"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 90
+boot_cmdline = "console=ttyAMA0 test-exit=1 loglevel=debug selftest=brk"
+qemu_extra = []
+expect_exit = "failure"
+
+[[expect]]
+regex = '^exception: sync-cur-spx EC=0x3c \(BRK'
+
+[[expect]]
+regex = '^exception: halted$'

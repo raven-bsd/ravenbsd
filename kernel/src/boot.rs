@@ -6,11 +6,11 @@
 use core::fmt;
 use core::mem::{align_of, size_of};
 
-use raven_abi::layout::x86_64::HHDM_BASE;
 use raven_bootinfo::{
     BootInfo, BootInfoError, MemoryKind, MemoryMapError, MemoryRegion, validate_memory_map,
 };
 
+use crate::arch::{ARCH_NAME, HHDM_BASE};
 use crate::cmdline::CmdLine;
 use crate::{kprintln, memory::frame};
 
@@ -196,7 +196,11 @@ fn usable_stats(map: &[MemoryRegion]) -> (u64, u64) {
 /// Print the C4 banner and the command line.
 pub fn print_banner(data: &BootData) {
     let (usable_bytes, usable_regions) = usable_stats(data.memory_map);
-    kprintln!("RavenBSD kernel 0.1 (x86_64) {}", env!("RAVEN_BUILD_ID"));
+    kprintln!(
+        "RavenBSD kernel 0.1 ({}) {}",
+        ARCH_NAME,
+        env!("RAVEN_BUILD_ID")
+    );
     kprintln!(
         "mem: {} MiB usable in {} regions",
         usable_bytes / (1024 * 1024),
@@ -206,6 +210,7 @@ pub fn print_banner(data: &BootData) {
 }
 
 /// Validate the handoff, initialise the frame allocator and either exit the test or halt.
+#[cfg_attr(target_arch = "aarch64", allow(dead_code))] // x86-64 `kmain` calls this; aarch64 has its own flow.
 pub fn run(boot: *const BootInfo) -> ! {
     let data = match validate(boot) {
         Ok(data) => data,
@@ -234,17 +239,36 @@ pub fn run(boot: *const BootInfo) -> ! {
     crate::arch::halt()
 }
 
-/// Signal a QEMU test result through the C5 port and halt.
+/// Signal a QEMU test result through the C5 exit protocol and halt.
 pub fn exit_qemu(code: u8) -> ! {
-    // SAFETY: QEMU's isa-debug-exit device watches port 0xf4; on real hardware this is an
-    // unused port and the CPU halts afterwards.
-    unsafe {
-        core::arch::asm!(
-            "out dx, al",
-            in("dx") 0xf4u16,
-            in("al") code,
-            options(nomem, nostack, preserves_flags),
-        );
+    #[cfg(target_arch = "x86_64")]
+    {
+        // SAFETY: QEMU's isa-debug-exit device watches port 0xf4; on real hardware this is an
+        // unused port and the CPU halts afterwards.
+        unsafe {
+            core::arch::asm!(
+                "out dx, al",
+                in("dx") 0xf4u16,
+                in("al") code,
+                options(nomem, nostack, preserves_flags),
+            );
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        // Semihosting SYS_EXIT_EXTENDED (0x20): `x1` points at {ADP_Stopped_ApplicationExit,
+        // status}. The status keeps the C5 numbers: 0x10 -> 33 success, 0x11 -> 35 failure.
+        let status = [0x20026u64, (u64::from(code) << 1) | 1];
+        // SAFETY: `halt #0xf000` is the AArch64 semihosting call; with
+        // `-semihosting-config enable=on,target=native` QEMU reads the two-word block and exits.
+        unsafe {
+            core::arch::asm!(
+                "hlt #0xf000",
+                in("x0") 0x20u64,
+                in("x1") status.as_ptr(),
+                options(nostack),
+            );
+        }
     }
     crate::arch::halt()
 }

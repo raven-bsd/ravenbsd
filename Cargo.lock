@@ -328,6 +328,10 @@ name = "raven-elf"
 version = "0.1.0"
 
 [[package]]
+name = "raven-esr"
+version = "0.1.0"
+
+[[package]]
 name = "raven-frames"
 version = "0.1.0"
 
@@ -366,6 +370,7 @@ dependencies = [
  "raven-abi",
  "raven-bootinfo",
  "raven-elf",
+ "raven-esr",
  "raven-handles",
  "raven-initfs",
  "raven-mem",

@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 
 const OVMF_CODE: &str = "/usr/share/OVMF/OVMF_CODE_4M.fd";
 const OVMF_VARS: &str = "/usr/share/OVMF/OVMF_VARS_4M.fd";
+const AAVMF_CODE: &str = "/usr/share/AAVMF/AAVMF_CODE.fd";
+const AAVMF_VARS: &str = "/usr/share/AAVMF/AAVMF_VARS.fd";
 
 /// Paired pflash images for one run.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,6 +46,15 @@ pub(crate) fn resolve_firmware(
     )
 }
 
+/// Default pflash images for an architecture, when the CLI and environment are silent.
+pub(crate) fn default_firmware(arch: &str) -> Option<(&'static str, &'static str)> {
+    match arch {
+        "x86_64" => Some((OVMF_CODE, OVMF_VARS)),
+        "aarch64" => Some((AAVMF_CODE, AAVMF_VARS)),
+        _ => None,
+    }
+}
+
 /// Pure firmware selection, separated from the environment for tests.
 pub(crate) fn select_firmware(
     arch: &str,
@@ -52,26 +63,16 @@ pub(crate) fn select_firmware(
     env_code: Option<&Path>,
     env_vars: Option<&Path>,
 ) -> Result<Firmware, String> {
-    let (code, vars) = match arch {
-        "x86_64" => (
-            cli_code
-                .or(env_code)
-                .map_or_else(|| PathBuf::from(OVMF_CODE), Path::to_path_buf),
-            cli_vars
-                .or(env_vars)
-                .map_or_else(|| PathBuf::from(OVMF_VARS), Path::to_path_buf),
-        ),
-        "aarch64" => {
-            let code = cli_code.or(env_code).ok_or_else(|| {
-                "AAVMF code not configured (set --ovmf-code or RAVEN_AAVMF_CODE)".to_string()
-            })?;
-            let vars = cli_vars.or(env_vars).ok_or_else(|| {
-                "AAVMF vars not configured (set --ovmf-vars or RAVEN_AAVMF_VARS)".to_string()
-            })?;
-            (code.to_path_buf(), vars.to_path_buf())
-        }
-        other => return Err(format!("no firmware discovery rule for arch `{other}`")),
-    };
+    let (default_code, default_vars) = default_firmware(arch)
+        .ok_or_else(|| format!("no firmware discovery rule for arch `{arch}`"))?;
+    let (code, vars) = (
+        cli_code
+            .or(env_code)
+            .map_or_else(|| PathBuf::from(default_code), Path::to_path_buf),
+        cli_vars
+            .or(env_vars)
+            .map_or_else(|| PathBuf::from(default_vars), Path::to_path_buf),
+    );
     if !code.is_file() {
         return Err(format!("firmware code not found: {}", code.display()));
     }
@@ -143,6 +144,8 @@ pub(crate) fn qemu_command(
                 "-m",
                 "512M",
                 "-nographic",
+                "-semihosting-config",
+                "enable=on,target=native",
             ] {
                 args.push(argument.to_string());
             }
@@ -269,6 +272,8 @@ mod tests {
                 "-m",
                 "512M",
                 "-nographic",
+                "-semihosting-config",
+                "enable=on,target=native",
                 "-drive",
                 "if=pflash,format=raw,readonly=on,file=<CODE>",
                 "-drive",
@@ -350,9 +355,26 @@ mod tests {
     }
 
     #[test]
-    fn aarch64_requires_explicit_firmware() {
-        let error = select_firmware("aarch64", None, None, None, None).unwrap_err();
-        assert!(error.contains("AAVMF code"), "{error}");
+    fn aarch64_missing_firmware_is_a_reason() {
+        let error = select_firmware(
+            "aarch64",
+            Some(Path::new("/no/such/code.fd")),
+            Some(Path::new("/no/such/vars.fd")),
+            None,
+            None,
+        )
+        .unwrap_err();
+        assert!(error.contains("firmware code not found"), "{error}");
+    }
+
+    #[test]
+    fn aarch64_defaults_are_aavmf() {
+        let (code, vars) = default_firmware("aarch64").unwrap();
+        assert_eq!(code, "/usr/share/AAVMF/AAVMF_CODE.fd");
+        assert_eq!(vars, "/usr/share/AAVMF/AAVMF_VARS.fd");
+        let (code, vars) = default_firmware("x86_64").unwrap();
+        assert_eq!(code, OVMF_CODE);
+        assert_eq!(vars, OVMF_VARS);
     }
 
     #[test]
