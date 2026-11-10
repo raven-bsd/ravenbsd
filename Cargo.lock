@@ -328,6 +328,7 @@ dependencies = [
  "raven-initfs",
  "raven-mem",
  "raven-rmm",
+ "raven-sched-core",
  "raven-timemath",
  "raven-usercopy",
  "spin",
@@ -412,6 +413,17 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
 ]
+
+[[package]]
+name = "raven-s09-futex"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
+
+[[package]]
+name = "raven-sched-core"
+version = "0.1.0"
 
 [[package]]
 name = "raven-svc-manifest"

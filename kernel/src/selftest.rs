@@ -24,6 +24,7 @@ pub fn run(cmdline: &CmdLine) {
         Some("doublefault") => double_fault(),
         Some(name @ ("heap" | "paging")) => memory(name),
         Some("timer") => timer_selftest(),
+        Some("sched") => crate::sched::selftest::run(),
         _ => {}
     }
 }

@@ -16,6 +16,7 @@ pub mod syscall;
 pub mod timer;
 pub mod trapframe;
 pub mod tsc;
+#[allow(dead_code)] // `enter` is replaced by the S09 scheduler trampoline; kept for the S08 ABI.
 pub mod usermode;
 
 /// Enable maskable interrupts.

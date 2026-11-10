@@ -9,7 +9,8 @@ use raven_abi::errno::Errno;
 use raven_abi::types::Rights;
 use raven_handles::HandleTable;
 
-use super::{Process, Thread};
+use super::Process;
+use super::thread::Thread;
 
 /// Objects a handle can refer to in S08.
 #[allow(dead_code)] // Object access is used by later MAP/THREAD tickets; PID 1 only closes/dups now.

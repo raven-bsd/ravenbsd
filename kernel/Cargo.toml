@@ -24,6 +24,7 @@ raven-handles = { path = "../crates/raven-handles" }
 raven-initfs = { path = "../crates/raven-initfs" }
 raven-mem = { path = "../crates/raven-mem", features = ["export-symbols"] }
 raven-rmm = { path = "../crates/raven-rmm" }
+raven-sched-core = { path = "../crates/raven-sched-core" }
 raven-timemath = { path = "../crates/raven-timemath" }
 raven-usercopy = { path = "../crates/raven-usercopy" }
 spin = { version = "0.9", default-features = false, features = ["spin_mutex"] }
