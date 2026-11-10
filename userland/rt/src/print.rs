@@ -28,6 +28,21 @@ pub fn _print(args: fmt::Arguments<'_>) {
     write_formatted(args, &mut |bytes| crate::sys::debug_write(bytes));
 }
 
+/// Write `text` to the debug console without invoking `core::fmt` formatting.
+///
+/// Use this for raw strings in code that must not depend on `Display` thunks; it emits the UTF-8
+/// bytes directly through [`crate::sys::debug_write`].
+pub fn write_str(text: &str) -> Result<usize, Errno> {
+    write_str_with(text, &mut |bytes| crate::sys::debug_write(bytes))
+}
+
+pub(crate) fn write_str_with(
+    text: &str,
+    emit: &mut dyn FnMut(&[u8]) -> Result<usize, Errno>,
+) -> Result<usize, Errno> {
+    emit(text.as_bytes())
+}
+
 struct Writer<'a> {
     buffer: [u8; BUFFER_SIZE],
     len: usize,
@@ -164,5 +179,17 @@ mod tests {
             Err(Errno::EIO)
         });
         assert_eq!(calls, 1);
+    }
+
+    #[test]
+    fn raw_writer_does_not_interpret_format_placeholders() {
+        let mut chunks = Vec::new();
+        let written = write_str_with("{text} {}", &mut |bytes| {
+            chunks.push(bytes.to_vec());
+            Ok(bytes.len())
+        })
+        .unwrap();
+        assert_eq!(written, 9);
+        assert_eq!(chunks.concat(), b"{text} {}");
     }
 }
