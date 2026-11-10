@@ -97,6 +97,8 @@ pub fn platform_init() {
         }
         if !started {
             kprintln!("smp: cpu {apic_id} did not start");
+            // The APs that did start are spinning with interrupts off; let them enter idle.
+            ap_start::start_ap_timers();
             set_online(cpu);
             kprintln!("smp: {cpu} cpus online");
             return;
