@@ -1,0 +1,435 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+//! Packed directory entries returned by `READ` on a directory handle.
+//!
+//! One entry is a 16-byte header followed by `name_len` name bytes, padded with zeroes to the
+//! next 8-byte boundary. `READ`'s `offset` is an opaque byte cookie into the server's packed
+//! directory stream: the next cookie is the previous cookie plus the number of bytes returned.
+//! Zero returned bytes mean end of directory.
+
+use crate::ProtoError;
+use crate::flags::{DT_BLK, DT_CHR, DT_DIR, DT_FIFO, DT_LNK, DT_REG, DT_SOCK, DT_UNKNOWN};
+use crate::wire::{Reader, Writer};
+
+/// Encoded size of a [`DirEntryHeader`] in bytes.
+pub const DIRENT_HEADER_LEN: usize = 16;
+/// Alignment of one packed directory entry.
+pub const DIRENT_ALIGN: usize = 8;
+/// Maximum name length in bytes.
+pub const MAX_NAME: usize = 255;
+
+/// The fixed header of a packed directory entry.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DirEntryHeader {
+    /// Inode number.
+    pub ino: u64,
+    /// Directory-entry type (`DT_*`).
+    pub kind: u8,
+    /// Length of the following name in bytes.
+    pub name_len: u8,
+    /// Zero padding.
+    pub pad: [u8; 6],
+}
+
+impl DirEntryHeader {
+    /// Encode the header into exactly [`DIRENT_HEADER_LEN`] bytes.
+    pub fn encode(&self, out: &mut [u8]) -> Result<(), ProtoError> {
+        if out.len() < DIRENT_HEADER_LEN {
+            return Err(ProtoError::Truncated);
+        }
+        if !valid_kind(self.kind) || self.name_len == 0 || self.pad != [0; 6] {
+            return Err(ProtoError::Malformed);
+        }
+        let mut writer = Writer::new(out);
+        writer.put_u64(self.ino)?;
+        writer.put_u8(self.kind)?;
+        writer.put_u8(self.name_len)?;
+        writer.put_bytes(&self.pad)?;
+        Ok(())
+    }
+
+    /// Decode exactly one header.
+    pub fn decode(input: &[u8]) -> Result<Self, ProtoError> {
+        if input.len() != DIRENT_HEADER_LEN {
+            return Err(if input.len() < DIRENT_HEADER_LEN {
+                ProtoError::Truncated
+            } else {
+                ProtoError::TrailingBytes
+            });
+        }
+        let mut reader = Reader::new(input);
+        let header = Self {
+            ino: reader.get_u64()?,
+            kind: reader.get_u8()?,
+            name_len: reader.get_u8()?,
+            pad: {
+                let bytes = reader.get_bytes(6)?;
+                let mut pad = [0u8; 6];
+                pad.copy_from_slice(bytes);
+                pad
+            },
+        };
+        if !valid_kind(header.kind) || header.name_len == 0 {
+            return Err(ProtoError::Malformed);
+        }
+        if header.pad != [0; 6] {
+            return Err(ProtoError::Malformed);
+        }
+        Ok(header)
+    }
+}
+
+/// One packed directory entry with a borrowed name.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DirEntry<'a> {
+    /// Fixed header.
+    pub header: DirEntryHeader,
+    /// Name bytes, valid UTF-8 without `/` or NUL.
+    pub name: &'a [u8],
+}
+
+impl<'a> DirEntry<'a> {
+    /// Encoded record length for this entry.
+    pub const fn encoded_len(&self) -> usize {
+        record_len(self.name.len())
+    }
+
+    /// The cookie to pass to the next `READ`, given the cookie of this record.
+    pub fn next_cookie(&self, current: u64) -> Result<u64, ProtoError> {
+        next_dir_cookie(current, self.encoded_len())
+    }
+
+    /// Encode the entry into `out`; returns the number of bytes written.
+    pub fn encode(&self, out: &mut [u8]) -> Result<usize, ProtoError> {
+        if self.header.name_len as usize != self.name.len() {
+            return Err(ProtoError::Malformed);
+        }
+        validate_name(self.name)?;
+        let length = self.encoded_len();
+        if out.len() < length {
+            return Err(ProtoError::Truncated);
+        }
+        if !valid_kind(self.header.kind) || self.header.pad != [0; 6] {
+            return Err(ProtoError::Malformed);
+        }
+        let mut writer = Writer::new(out);
+        writer.put_u64(self.header.ino)?;
+        writer.put_u8(self.header.kind)?;
+        writer.put_u8(self.header.name_len)?;
+        writer.put_bytes(&self.header.pad)?;
+        writer.put_bytes(self.name)?;
+        let padding = length - DIRENT_HEADER_LEN - self.name.len();
+        let zeroes = [0u8; DIRENT_ALIGN];
+        writer.put_bytes(&zeroes[..padding])?;
+        Ok(length)
+    }
+
+    /// Decode one entry, returning it and the number of bytes consumed.
+    pub fn decode(input: &'a [u8]) -> Result<(Self, usize), ProtoError> {
+        let header = DirEntryHeader::decode_prefix(input)?;
+        let total = DIRENT_HEADER_LEN + header.name_len as usize;
+        let length = record_len(header.name_len as usize);
+        if input.len() < length {
+            return Err(ProtoError::Truncated);
+        }
+        let name = input
+            .get(DIRENT_HEADER_LEN..total)
+            .ok_or(ProtoError::Truncated)?;
+        validate_name(name)?;
+        let padding = input.get(total..length).ok_or(ProtoError::Truncated)?;
+        if padding.iter().any(|byte| *byte != 0) {
+            return Err(ProtoError::Malformed);
+        }
+        Ok((Self { header, name }, length))
+    }
+}
+
+/// Iterator over a packed sequence of directory entries.
+pub struct DirEntryIter<'a> {
+    rest: &'a [u8],
+}
+
+impl<'a> DirEntryIter<'a> {
+    /// Wrap one `READ` result buffer.
+    pub const fn new(input: &'a [u8]) -> Self {
+        Self { rest: input }
+    }
+
+    /// The bytes not yet decoded.
+    pub const fn rest(&self) -> &'a [u8] {
+        self.rest
+    }
+}
+
+impl<'a> Iterator for DirEntryIter<'a> {
+    type Item = Result<DirEntry<'a>, ProtoError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.rest.is_empty() {
+            return None;
+        }
+        match DirEntry::decode(self.rest) {
+            Ok((entry, consumed)) => {
+                self.rest = self.rest.get(consumed..).unwrap_or(&[]);
+                Some(Ok(entry))
+            }
+            Err(error) => {
+                self.rest = &[];
+                Some(Err(error))
+            }
+        }
+    }
+}
+
+/// Encoded length of a directory record with `name_len` name bytes.
+///
+/// `name_len` must not exceed [`MAX_NAME`]; the caller checks that before encoding.
+pub const fn record_len(name_len: usize) -> usize {
+    (DIRENT_HEADER_LEN + name_len + (DIRENT_ALIGN - 1)) & !(DIRENT_ALIGN - 1)
+}
+
+/// Compute the cookie for the next `READ`.
+///
+/// The cookie is the byte offset into the server's packed directory stream; zero returned bytes
+/// means end of directory.
+pub fn next_dir_cookie(current: u64, consumed: usize) -> Result<u64, ProtoError> {
+    let consumed = u64::try_from(consumed).map_err(|_| ProtoError::LengthOutOfRange)?;
+    current
+        .checked_add(consumed)
+        .ok_or(ProtoError::LengthOutOfRange)
+}
+
+/// Whether `kind` is one of the documented `DT_*` values.
+pub const fn valid_kind(kind: u8) -> bool {
+    matches!(
+        kind,
+        DT_UNKNOWN | DT_FIFO | DT_CHR | DT_DIR | DT_BLK | DT_REG | DT_LNK | DT_SOCK
+    )
+}
+
+fn validate_name(name: &[u8]) -> Result<(), ProtoError> {
+    if name.is_empty() || name.len() > MAX_NAME {
+        return Err(ProtoError::InvalidName);
+    }
+    if name.contains(&b'/') || name.contains(&0) {
+        return Err(ProtoError::InvalidName);
+    }
+    core::str::from_utf8(name).map_err(|_| ProtoError::InvalidUtf8)?;
+    Ok(())
+}
+
+impl DirEntryHeader {
+    fn decode_prefix(input: &[u8]) -> Result<Self, ProtoError> {
+        let header = input
+            .get(..DIRENT_HEADER_LEN)
+            .ok_or(ProtoError::Truncated)?;
+        let mut reader = Reader::new(header);
+        let header = Self {
+            ino: reader.get_u64()?,
+            kind: reader.get_u8()?,
+            name_len: reader.get_u8()?,
+            pad: {
+                let bytes = reader.get_bytes(6)?;
+                let mut pad = [0u8; 6];
+                pad.copy_from_slice(bytes);
+                pad
+            },
+        };
+        if !valid_kind(header.kind) || header.name_len == 0 || header.pad != [0; 6] {
+            return Err(ProtoError::Malformed);
+        }
+        Ok(header)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn header() -> DirEntryHeader {
+        DirEntryHeader {
+            ino: 0x0102_0304_0506_0708,
+            kind: DT_REG,
+            name_len: 3,
+            pad: [0; 6],
+        }
+    }
+
+    fn entry(name: &[u8]) -> DirEntry<'_> {
+        DirEntry {
+            header: DirEntryHeader {
+                ino: 7,
+                kind: DT_REG,
+                name_len: name.len() as u8,
+                pad: [0; 6],
+            },
+            name,
+        }
+    }
+
+    #[test]
+    fn header_golden_bytes() {
+        let mut bytes = [0u8; DIRENT_HEADER_LEN];
+        header().encode(&mut bytes).unwrap();
+        assert_eq!(
+            bytes,
+            [
+                0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x08, 0x03, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00
+            ]
+        );
+    }
+
+    #[test]
+    fn entry_golden_bytes_include_alignment_padding() {
+        let mut bytes = [0u8; 24];
+        assert_eq!(entry(b"abc").encode(&mut bytes).unwrap(), 24);
+        assert_eq!(
+            bytes,
+            [
+                0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x03, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, b'a', b'b', b'c', 0x00, 0x00, 0x00, 0x00, 0x00
+            ]
+        );
+    }
+
+    #[test]
+    fn record_length_aligns_to_eight() {
+        assert_eq!(record_len(1), 24);
+        assert_eq!(record_len(8), 24);
+        assert_eq!(record_len(9), 32);
+        assert_eq!(record_len(255), 272);
+        assert_eq!(record_len(0), 16);
+    }
+
+    #[test]
+    fn header_and_entry_roundtrip() {
+        let mut bytes = [0u8; 24];
+        let written = entry(b"abc").encode(&mut bytes).unwrap();
+        assert_eq!(
+            DirEntryHeader::decode(&bytes[..DIRENT_HEADER_LEN]),
+            Ok(entry(b"abc").header)
+        );
+        let (decoded, consumed) = DirEntry::decode(&bytes[..written]).unwrap();
+        assert_eq!(decoded, entry(b"abc"));
+        assert_eq!(consumed, written);
+    }
+
+    #[test]
+    fn short_entry_is_truncated() {
+        let mut bytes = [0u8; 24];
+        entry(b"abc").encode(&mut bytes).unwrap();
+        assert_eq!(DirEntry::decode(&bytes[..23]), Err(ProtoError::Truncated));
+        assert_eq!(
+            DirEntryHeader::decode(&bytes[..15]),
+            Err(ProtoError::Truncated)
+        );
+    }
+
+    #[test]
+    fn trailing_header_bytes_are_rejected() {
+        let mut bytes = [0u8; 24];
+        header().encode(&mut bytes[..DIRENT_HEADER_LEN]).unwrap();
+        assert_eq!(
+            DirEntryHeader::decode(&bytes[..17]),
+            Err(ProtoError::TrailingBytes)
+        );
+    }
+
+    #[test]
+    fn unknown_kind_is_rejected() {
+        let mut bytes = [0u8; DIRENT_HEADER_LEN];
+        header().encode(&mut bytes).unwrap();
+        bytes[8] = 3;
+        assert_eq!(DirEntryHeader::decode(&bytes), Err(ProtoError::Malformed));
+    }
+
+    #[test]
+    fn zero_name_length_is_rejected() {
+        let mut bytes = [0u8; DIRENT_HEADER_LEN];
+        header().encode(&mut bytes).unwrap();
+        bytes[9] = 0;
+        assert_eq!(DirEntryHeader::decode(&bytes), Err(ProtoError::Malformed));
+    }
+
+    #[test]
+    fn nonzero_header_padding_is_rejected() {
+        let mut bytes = [0u8; DIRENT_HEADER_LEN];
+        header().encode(&mut bytes).unwrap();
+        bytes[10] = 1;
+        assert_eq!(DirEntryHeader::decode(&bytes), Err(ProtoError::Malformed));
+    }
+
+    #[test]
+    fn bad_names_are_rejected() {
+        let mut bytes = [0u8; 32];
+        assert_eq!(
+            entry(b"a/b").encode(&mut bytes),
+            Err(ProtoError::InvalidName)
+        );
+        assert_eq!(
+            entry(b"a\0b").encode(&mut bytes),
+            Err(ProtoError::InvalidName)
+        );
+        assert_eq!(
+            entry(&[0xff, 0xfe]).encode(&mut bytes),
+            Err(ProtoError::InvalidUtf8)
+        );
+    }
+
+    #[test]
+    fn nonzero_record_padding_is_rejected() {
+        let mut bytes = [0u8; 24];
+        entry(b"abc").encode(&mut bytes).unwrap();
+        bytes[20] = 1;
+        assert_eq!(DirEntry::decode(&bytes), Err(ProtoError::Malformed));
+    }
+
+    #[test]
+    fn iterator_walks_multiple_entries() {
+        let mut bytes = [0u8; 48];
+        let first = entry(b"a");
+        let second = entry(b"bb");
+        let first_len = first.encode(&mut bytes).unwrap();
+        let second_len = second.encode(&mut bytes[first_len..]).unwrap();
+        let entries: Vec<DirEntry<'_>> = DirEntryIter::new(&bytes[..first_len + second_len])
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].name, b"a");
+        assert_eq!(entries[1].name, b"bb");
+    }
+
+    #[test]
+    fn iterator_stops_after_an_error() {
+        let mut bytes = [0u8; 24];
+        entry(b"abc").encode(&mut bytes).unwrap();
+        bytes[20] = 1;
+        let mut iter = DirEntryIter::new(&bytes);
+        assert!(iter.next().unwrap().is_err());
+        assert!(iter.next().is_none());
+    }
+
+    #[test]
+    fn cookie_is_bytes_consumed() {
+        let first = entry(b"a");
+        let second = entry(b"bb");
+        let mut bytes = [0u8; 48];
+        let first_len = first.encode(&mut bytes).unwrap();
+        let second_len = second.encode(&mut bytes[first_len..]).unwrap();
+        assert_eq!(first_len, 24);
+        assert_eq!(second_len, 24);
+        assert_eq!(first.next_cookie(0).unwrap(), 24);
+        assert_eq!(second.next_cookie(24).unwrap(), 48);
+        assert_eq!(next_dir_cookie(48, 0).unwrap(), 48);
+    }
+
+    #[test]
+    fn cookie_overflow_is_rejected() {
+        assert_eq!(
+            next_dir_cookie(u64::MAX, 1),
+            Err(ProtoError::LengthOutOfRange)
+        );
+    }
+}
