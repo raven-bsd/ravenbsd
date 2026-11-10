@@ -1,0 +1,22 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 10, 2026
+.Dt THREAD_EXIT 2
+.Os RavenBSD
+.Sh NAME
+.Nm thread_exit
+.Nd terminate the calling thread
+.Sh SYNOPSIS
+.Ft void
+.Fn thread_exit "int code"
+.Sh DESCRIPTION
+The .Nm system call terminates the calling thread.
+.Pp
+This page documents the native RavenBSD ABI; see the
+.Pa raven-abi
+crate for the exact numeric value and types.
+.Sh RETURN VALUES
+.Fn thread_exit
+ does not return.
+.Sh STANDARDS
+RavenBSD ABI v1.

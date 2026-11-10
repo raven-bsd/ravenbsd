@@ -1,0 +1,21 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 10, 2026
+.Dt FUTEX 2
+.Os RavenBSD
+.Sh NAME
+.Nm futex
+.Nd wait on or wake a futex
+.Sh SYNOPSIS
+.Ft isize
+.Fn futex "const u32 *addr" "u32 op" "u32 val" "u64 timeout_ns"
+.Sh DESCRIPTION
+The .Nm system call waits on or wakes the futex at .Fa addr according to .Fa op.
+.Pp
+This page documents the native RavenBSD ABI; see the
+.Pa raven-abi
+crate for the exact numeric value and types.
+.Sh RETURN VALUES
+On success .Nm returns a non-negative value; on failure it returns a negative error number.
+.Sh STANDARDS
+RavenBSD ABI v1.

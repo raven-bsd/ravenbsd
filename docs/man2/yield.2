@@ -1,0 +1,21 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 10, 2026
+.Dt YIELD 2
+.Os RavenBSD
+.Sh NAME
+.Nm yield
+.Nd yield the processor
+.Sh SYNOPSIS
+.Ft int
+.Fn yield
+.Sh DESCRIPTION
+The .Nm system call voluntarily gives up the processor.
+.Pp
+This page documents the native RavenBSD ABI; see the
+.Pa raven-abi
+crate for the exact numeric value and types.
+.Sh RETURN VALUES
+The .Nm system call returns 0.
+.Sh STANDARDS
+RavenBSD ABI v1.

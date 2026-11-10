@@ -12,6 +12,7 @@ use std::time::Instant;
 use anyhow::{Context, Result};
 
 use crate::build::{self, Arch, Component};
+use crate::docs;
 use crate::guard;
 use crate::process::{CommandSpec, run as run_command};
 use crate::repo::Workspace;
@@ -24,6 +25,7 @@ struct Step {
 enum StepKind {
     Guard,
     Command(CommandSpec),
+    Docs,
     Skipped(String),
 }
 
@@ -82,6 +84,19 @@ pub(crate) fn run(workspace: &Workspace, fast: bool) -> Result<u8> {
                 println!("==> {}", step.name);
                 let code = run_command(&spec)
                     .with_context(|| format!("cannot run check step `{}`", step.name))?;
+                let seconds = started.elapsed().as_secs_f64();
+                if code != 0 {
+                    failed = true;
+                }
+                summaries.push(Summary {
+                    name: step.name,
+                    status: status_for(code),
+                    seconds,
+                });
+            }
+            StepKind::Docs => {
+                println!("==> {}", step.name);
+                let code = i32::from(docs::run(&workspace.root)?);
                 let seconds = started.elapsed().as_secs_f64();
                 if code != 0 {
                     failed = true;
@@ -212,6 +227,10 @@ fn build_steps(workspace: &Workspace, fast: bool) -> Result<Vec<Step>> {
     } else {
         steps.extend(target_steps);
     }
+    steps.push(Step {
+        name: "docs".to_string(),
+        kind: StepKind::Docs,
+    });
     Ok(steps)
 }
 

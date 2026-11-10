@@ -13,6 +13,7 @@
 mod build;
 mod check;
 mod cli;
+mod docs;
 mod fat;
 mod gpt;
 mod guard;

@@ -1,0 +1,21 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 10, 2026
+.Dt PROC_CREATE 2
+.Os RavenBSD
+.Sh NAME
+.Nm proc_create
+.Nd create an empty process
+.Sh SYNOPSIS
+.Ft Handle
+.Fn proc_create "usize flags"
+.Sh DESCRIPTION
+The .Nm system call creates an empty process with no threads.
+.Pp
+This page documents the native RavenBSD ABI; see the
+.Pa raven-abi
+crate for the exact numeric value and types.
+.Sh RETURN VALUES
+On success .Nm returns a non-negative value; on failure it returns a negative error number.
+.Sh STANDARDS
+RavenBSD ABI v1.
