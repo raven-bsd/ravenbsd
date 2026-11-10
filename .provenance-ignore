@@ -7,3 +7,4 @@ PROVENANCE.toml
 AI_POLICY.md
 README.md
 docs/man
+tests/ufs-vectors/golden/
