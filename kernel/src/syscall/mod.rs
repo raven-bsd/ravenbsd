@@ -5,6 +5,7 @@
 
 pub mod basic;
 pub mod futex;
+pub mod handle_xfer;
 pub mod ipc;
 pub mod memory_ctl;
 pub mod process_ctl;
@@ -33,6 +34,7 @@ pub extern "C" fn syscall_dispatch(frame: &mut TrapFrame) {
         Some(Syscall::MAP) => memory_ctl::map(frame),
         Some(Syscall::UNMAP) => memory_ctl::unmap(frame),
         Some(Syscall::PROTECT) => memory_ctl::protect(frame),
+        Some(Syscall::HANDLE_TRANSFER) => handle_xfer::transfer(frame),
         Some(
             call @ (Syscall::SCHEME_REGISTER
             | Syscall::OPEN

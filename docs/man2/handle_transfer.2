@@ -7,15 +7,52 @@
 .Nm handle_transfer
 .Nd installs a handle in another process
 .Sh SYNOPSIS
-See the
-.Pa raven-abi
-crate (syscall number 0x52).
+.Ft Handle
+.Fn handle_transfer "Handle dest_proc" "Handle handle" "u32 rights_mask"
 .Sh DESCRIPTION
-The
 .Nm
-system call is part of RavenBSD ABI v1. It is implemented by ticket S25; this page is the contract placeholder and will be
-completed when S25 lands. The authoritative signature is the doc comment of the syscall in the
-.Pa raven-abi
-crate.
+installs an independent duplicate of
+.Fa handle
+in the handle table of the process named by
+.Fa dest_proc .
+The returned handle value is valid only in that destination table.
+.Pp
+.Fa dest_proc
+must name a Process object and carry
+.Dv WRITE .
+.Fa handle
+must carry
+.Dv TRANSFER .
+The new handle rights are the source rights intersected with the nonzero
+.Fa rights_mask ;
+rights never grow.
+.Pp
+Memory objects, SchemeFile objects, and SchemeServer objects are transferable.
+Process, Namespace, and request handles are not transferable.
+The source handle remains valid, and either process may close its own handle independently.
+The kernel releases the source table lock before acquiring the destination table lock, including
+when the destination is the caller.
+.Sh RETURN VALUES
+On success,
+.Nm
+returns the destination-table handle.
+On failure it returns a negative error number.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Bq Er EBADF
+The source or destination handle is stale, or the source object kind is not transferable.
+.It Bq Er EPERM
+The destination Process lacks
+.Dv WRITE
+or the source handle lacks
+.Dv TRANSFER .
+.It Bq Er EINVAL
+.Fa rights_mask
+is zero, or
+.Fa dest_proc
+does not name a Process object.
+.It Bq Er EMFILE
+The destination handle table is full.
+.El
 .Sh STANDARDS
 RavenBSD ABI v1.

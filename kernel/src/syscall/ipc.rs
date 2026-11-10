@@ -44,8 +44,16 @@ fn register(caller: &Arc<Process>, frame: &TrapFrame) -> Result<usize, Errno> {
             _ => return Err(Errno::EACCES),
         }
     }
-    registry::register(caller, &name)?;
-    Ok(0)
+    let server = registry::register(caller, &name)?;
+    let rights = Rights::READ
+        .union(Rights::WRITE)
+        .union(Rights::DUP)
+        .union(Rights::TRANSFER);
+    let handle = caller
+        .handles
+        .lock()
+        .insert(Object::SchemeServer(server), rights)?;
+    Ok(handle.0 as usize)
 }
 
 fn open(caller: &Arc<Process>, frame: &TrapFrame) -> Result<usize, Errno> {

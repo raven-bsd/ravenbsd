@@ -17,6 +17,8 @@
 use alloc::vec::Vec;
 use core::mem::{offset_of, size_of};
 
+use raven_abi::types::Rights;
+
 /// Current packet version.
 pub const VERSION: u32 = 1;
 /// Maximum path suffix carried by an `Open` packet.
@@ -25,6 +27,29 @@ pub const MAX_PATH: usize = 256;
 pub const MAX_DATA: usize = 64;
 /// Maximum payload captured for one request or response.
 pub const MAX_TRANSFER: u64 = 4 * 1024 * 1024;
+/// Maximum handles attached to one reply.
+pub const MAX_ATTACHMENTS: usize = 4;
+/// An `Open` response returns its single attachment directly.
+pub const REPLY_HANDLE: u16 = 1 << 15;
+
+/// One reply attachment: a server-table handle and a rights-reduction mask.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Attachment {
+    /// Handle value in the sender's table.
+    pub handle: u32,
+    /// Rights mask; zero retains all of the sender's current rights.
+    pub rights_mask: u32,
+}
+
+/// Reduce `source` by an attachment mask; zero means all current rights.
+pub const fn attachment_rights(source: Rights, mask: u32) -> Rights {
+    if mask == 0 {
+        source
+    } else {
+        source.intersect(Rights(mask))
+    }
+}
 
 /// Packet opcode.
 #[repr(u16)]
@@ -101,6 +126,10 @@ pub struct SchemePacket {
     pub path: [u8; MAX_PATH],
     /// Small inline payload.
     pub data: [u8; MAX_DATA],
+    /// Number of populated reply attachments.
+    pub attach_count: u32,
+    /// Reply attachments, encoded after inline data.
+    pub attach: [Attachment; MAX_ATTACHMENTS],
 }
 
 impl Default for SchemePacket {
@@ -121,6 +150,8 @@ impl Default for SchemePacket {
             data_len: 0,
             path: [0; MAX_PATH],
             data: [0; MAX_DATA],
+            attach_count: 0,
+            attach: [Attachment::default(); MAX_ATTACHMENTS],
         }
     }
 }
@@ -129,7 +160,7 @@ impl Default for SchemePacket {
 pub const PACKET_SIZE: usize = size_of::<SchemePacket>();
 
 const _: () = {
-    assert!(PACKET_SIZE == 400);
+    assert!(PACKET_SIZE == 440);
     assert!(offset_of!(SchemePacket, version) == 0);
     assert!(offset_of!(SchemePacket, opcode) == 4);
     assert!(offset_of!(SchemePacket, flags) == 6);
@@ -145,6 +176,8 @@ const _: () = {
     assert!(offset_of!(SchemePacket, data_len) == 76);
     assert!(offset_of!(SchemePacket, path) == 80);
     assert!(offset_of!(SchemePacket, data) == 336);
+    assert!(offset_of!(SchemePacket, attach_count) == 400);
+    assert!(offset_of!(SchemePacket, attach) == 404);
 };
 
 /// Why a packet could not be decoded or validated.
@@ -198,6 +231,19 @@ pub fn encode(packet: &SchemePacket, out: &mut [u8]) -> Result<(), PacketError> 
     put_u32(out, offset_of!(SchemePacket, data_len), packet.data_len);
     put_bytes(out, offset_of!(SchemePacket, path), &packet.path);
     put_bytes(out, offset_of!(SchemePacket, data), &packet.data);
+    put_u32(
+        out,
+        offset_of!(SchemePacket, attach_count),
+        packet.attach_count,
+    );
+    let mut index = 0usize;
+    while index < MAX_ATTACHMENTS {
+        let offset = offset_of!(SchemePacket, attach).saturating_add(index.saturating_mul(8));
+        let attachment = packet.attach.get(index).ok_or(PacketError::TooShort)?;
+        put_u32(out, offset, attachment.handle);
+        put_u32(out, offset.saturating_add(4), attachment.rights_mask);
+        index = index.saturating_add(1);
+    }
     Ok(())
 }
 
@@ -218,6 +264,16 @@ pub fn decode(input: &[u8]) -> Result<SchemePacket, PacketError> {
             .get(offset_of!(SchemePacket, data)..offset_of!(SchemePacket, data) + MAX_DATA)
             .ok_or(PacketError::TooShort)?,
     );
+    let attach_count = get_u32(input, offset_of!(SchemePacket, attach_count))?;
+    let mut attach = [Attachment::default(); MAX_ATTACHMENTS];
+    let mut index = 0usize;
+    while index < MAX_ATTACHMENTS {
+        let offset = offset_of!(SchemePacket, attach).saturating_add(index.saturating_mul(8));
+        let slot = attach.get_mut(index).ok_or(PacketError::TooShort)?;
+        slot.handle = get_u32(input, offset)?;
+        slot.rights_mask = get_u32(input, offset.saturating_add(4))?;
+        index = index.saturating_add(1);
+    }
     Ok(SchemePacket {
         version: get_u32(input, offset_of!(SchemePacket, version))?,
         opcode: get_u16(input, offset_of!(SchemePacket, opcode))?,
@@ -234,6 +290,8 @@ pub fn decode(input: &[u8]) -> Result<SchemePacket, PacketError> {
         data_len: get_u32(input, offset_of!(SchemePacket, data_len))?,
         path,
         data,
+        attach_count,
+        attach,
     })
 }
 
@@ -265,6 +323,9 @@ impl SchemePacket {
             return Err(PacketError::BadLength);
         }
         if self.buffer_len > MAX_TRANSFER || self.response_len > MAX_TRANSFER {
+            return Err(PacketError::BadLength);
+        }
+        if self.attach_count as usize > MAX_ATTACHMENTS {
             return Err(PacketError::BadLength);
         }
         if response && !(0..=4095).contains(&self.status) {
@@ -395,7 +456,7 @@ mod tests {
 
     #[test]
     fn packet_size_and_offsets_are_stable() {
-        assert_eq!(PACKET_SIZE, 400);
+        assert_eq!(PACKET_SIZE, 440);
         assert_eq!(size_of::<Opcode>(), 2);
     }
 
@@ -481,6 +542,84 @@ mod tests {
             packet.set_path(&[b'a'; MAX_PATH + 1]),
             Err(PacketError::BadLength)
         );
+    }
+
+    #[test]
+    fn attachment_roundtrip_preserves_handle_and_mask() {
+        let mut packet = SchemePacket::request(Opcode::Open, 1, 2);
+        packet.attach[0] = Attachment {
+            handle: 7,
+            rights_mask: 3,
+        };
+        packet.attach_count = 1;
+        let decoded = decode(&to_vec(&packet).unwrap()).unwrap();
+        assert_eq!(decoded.attach_count, 1);
+        assert_eq!(decoded.attach[0], packet.attach[0]);
+    }
+
+    #[test]
+    fn attachment_count_is_bounded() {
+        let packet = SchemePacket {
+            attach_count: (MAX_ATTACHMENTS + 1) as u32,
+            ..SchemePacket::request(Opcode::Read, 1, 2)
+        };
+        assert_eq!(packet.validate(true), Err(PacketError::BadLength));
+    }
+
+    #[test]
+    fn first_attachment_sets_count_to_one() {
+        let mut packet = SchemePacket::default();
+        packet.attach[0] = Attachment::default();
+        packet.attach_count = 1;
+        assert_eq!(packet.attach_count, 1);
+    }
+
+    #[test]
+    fn later_attachment_sets_count_to_index_plus_one() {
+        let mut packet = SchemePacket::default();
+        packet.attach[3] = Attachment::default();
+        packet.attach_count = 4;
+        assert_eq!(packet.attach_count, 4);
+    }
+
+    #[test]
+    fn attachment_count_past_limit_is_rejected() {
+        let packet = SchemePacket {
+            attach_count: (MAX_ATTACHMENTS + 1) as u32,
+            ..SchemePacket::request(Opcode::Call, 1, 2)
+        };
+        assert_eq!(packet.validate(true), Err(PacketError::BadLength));
+    }
+
+    #[test]
+    fn zero_attachment_mask_retains_source_rights() {
+        let rights = Rights::READ.union(Rights::TRANSFER);
+        assert_eq!(attachment_rights(rights, 0), rights);
+    }
+
+    #[test]
+    fn attachment_mask_only_reduces_rights() {
+        let rights = Rights::READ.union(Rights::WRITE).union(Rights::TRANSFER);
+        assert_eq!(attachment_rights(rights, Rights::READ.bits()), Rights::READ);
+    }
+
+    #[test]
+    fn attachment_mask_cannot_grow_rights() {
+        assert_eq!(
+            attachment_rights(Rights::READ, Rights::ALL.bits()),
+            Rights::READ
+        );
+    }
+
+    #[test]
+    fn reply_handle_flag_is_distinct_from_open_flags() {
+        assert_eq!(REPLY_HANDLE & 0x7fff, 0);
+    }
+
+    #[test]
+    fn empty_attachment_tail_is_valid() {
+        let packet = SchemePacket::request(Opcode::Call, 1, 2);
+        assert_eq!(packet.validate(true), Ok(()));
     }
 
     #[test]
