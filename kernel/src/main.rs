@@ -9,18 +9,27 @@
 extern crate alloc;
 
 mod arch;
+#[cfg(target_arch = "x86_64")]
 mod backtrace;
 mod boot;
 mod cmdline;
+#[cfg(target_arch = "x86_64")]
 mod initfs;
 mod log;
 mod memory;
+#[cfg(target_arch = "x86_64")]
 mod process;
+#[cfg(target_arch = "x86_64")]
 mod sched;
+#[cfg(target_arch = "x86_64")]
 mod selftest;
+#[cfg(target_arch = "x86_64")]
 mod sync;
+#[cfg(target_arch = "x86_64")]
 mod syscall;
+#[cfg(target_arch = "x86_64")]
 mod time;
+#[cfg(target_arch = "x86_64")]
 mod usercopy;
 
 // Force the `raven-mem` object code (including the exported C ABI symbols) into the link.
@@ -31,6 +40,7 @@ use raven_mem as _;
 /// # Safety
 ///
 /// `boot` must be a valid HHDM virtual pointer to a loader-built `raven_bootinfo::BootInfo`.
+#[cfg(target_arch = "x86_64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn kmain(boot: *const raven_bootinfo::BootInfo) -> ! {
     arch::serial::init();
