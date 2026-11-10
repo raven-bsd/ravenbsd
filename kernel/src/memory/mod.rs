@@ -9,3 +9,4 @@ pub mod frame;
 pub mod heap;
 pub mod mmio;
 pub mod paging;
+pub mod uspace;

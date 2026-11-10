@@ -22,6 +22,7 @@ use raven_abi::types::prot;
 use raven_elf::{Elf, ElfError, LoadMode, Machine, MapStep, StepKind};
 use raven_handles::HandleTable;
 use raven_rmm::{MapError, PageFlags, PageSize, PhysAddr, VirtAddr};
+use raven_vma::Backing;
 use spin::Mutex;
 
 use crate::arch::x86_64::{syscall, tsc};
@@ -29,7 +30,9 @@ use crate::cmdline::CmdLine;
 use crate::initfs;
 use crate::kprintln;
 use crate::memory::aspace::AddressSpace;
+use crate::memory::uspace::UserAddressSpace;
 use crate::memory::{frame, paging};
+use crate::sched::wait::WaitQueue;
 
 use self::handle::Object;
 
@@ -41,20 +44,35 @@ const USER_STACK_SIZE: u64 = 64 * 1024;
 const USER_GUARD: u64 = 4096;
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
+/// Process lifecycle state.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProcessState {
+    /// `PROC_CREATE` made the process but it has no thread yet.
+    Created,
+    /// At least one thread has been created and the process has not exited.
+    Running,
+    /// All threads are gone; waiters have been woken and the address space is released.
+    Exited,
+}
+
 /// A process.
 pub struct Process {
     /// Process id (PID 1 for the first process).
     pub id: u64,
     /// Path used to start the process.
     pub path: String,
-    /// User address space (`None` for the kernel process).
-    pub address_space: Option<Mutex<AddressSpace>>,
+    /// User address space (`None` for the kernel process or an exited process).
+    pub address_space: Mutex<Option<UserAddressSpace>>,
     /// Handle table.
     pub handles: Mutex<HandleTable<Object>>,
     /// Exit code once the process exits.
     pub exit_code: AtomicI32,
     /// Live thread count.
     pub threads: AtomicU32,
+    /// Lifecycle state, guarded so `PROC_WAIT` cannot lose an exit wakeup.
+    pub state: Mutex<ProcessState>,
+    /// Threads blocked in `PROC_WAIT` on this process.
+    pub waiters: WaitQueue,
 }
 
 /// Why the first process could not be created.
@@ -106,11 +124,30 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
     Ok(Arc::new(Process {
         id: 0,
         path: String::from("/kernel"),
-        address_space: None,
+        address_space: Mutex::new(None),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        state: Mutex::new(ProcessState::Running),
+        waiters: WaitQueue::new(),
     }))
+}
+
+/// Create an empty process for `PROC_CREATE`, with the well-known handles installed.
+pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
+    let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
+    let process = Arc::new(Process {
+        id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+        path: String::from("child"),
+        address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
+        handles: Mutex::new(HandleTable::new()),
+        exit_code: AtomicI32::new(0),
+        threads: AtomicU32::new(0),
+        state: Mutex::new(ProcessState::Created),
+        waiters: WaitQueue::new(),
+    });
+    handle::install_initial(&mut process.handles.lock(), &process, false)?;
+    Ok(process)
 }
 
 impl Process {
@@ -122,6 +159,17 @@ impl Process {
     /// Account for one exiting thread; true when it was the last one.
     pub fn thread_exited(&self) -> bool {
         self.threads.fetch_sub(1, Ordering::AcqRel) <= 1
+    }
+
+    /// Mark the process exited, publish the code and wake every waiter exactly once.
+    pub fn mark_exited(&self, code: i32) {
+        self.exit_code.store(code, Ordering::Release);
+        let mut state = self.state.lock();
+        if *state == ProcessState::Exited {
+            return;
+        }
+        *state = ProcessState::Exited;
+        let _ = self.waiters.wake_all();
     }
 }
 
@@ -141,19 +189,23 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         return Err(ProcessError::Interpreter);
     }
 
-    let mut address_space = AddressSpace::new().map_err(ProcessError::Map)?;
-    load_segments(&mut address_space, &elf, data)?;
-    let user_stack = build_stack(&mut address_space, path, elf.entry(), &elf)?;
+    let address_space = AddressSpace::new().map_err(ProcessError::Map)?;
+    let mut user_address_space = UserAddressSpace::new(address_space);
+    load_segments(&mut user_address_space, &elf, data)?;
+    let user_stack = build_stack(&mut user_address_space, path, elf.entry(), &elf)?;
 
     let process = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         path: String::from(path),
-        address_space: Some(Mutex::new(address_space)),
+        address_space: Mutex::new(Some(user_address_space)),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        state: Mutex::new(ProcessState::Running),
+        waiters: WaitQueue::new(),
     });
-    handle::install_initial(&mut process.handles.lock(), &process).map_err(ProcessError::Handle)?;
+    handle::install_initial(&mut process.handles.lock(), &process, true)
+        .map_err(ProcessError::Handle)?;
     crate::sched::init().map_err(ProcessError::Sched)?;
     let thread = crate::sched::new_user_thread(&process, elf.entry(), user_stack, user_stack)
         .map_err(ProcessError::Sched)?;
@@ -170,13 +222,17 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
 }
 
 fn load_segments(
-    address_space: &mut AddressSpace,
+    address_space: &mut UserAddressSpace,
     elf: &Elf<'_>,
     data: &[u8],
 ) -> Result<(), ProcessError> {
     let plan = raven_elf::plan_load(elf, PAGE, LoadMode::Copy).map_err(ProcessError::Elf)?;
-    let mut mapper = address_space.mapper().map_err(ProcessError::Map)?;
     for step in plan {
+        address_space
+            .vmas_mut()
+            .insert(step.vaddr, step.len, step.prot, Backing::Anonymous)
+            .map_err(|_| ProcessError::BadAddress)?;
+        let mut mapper = address_space.mapper().map_err(ProcessError::Map)?;
         map_step(&mut mapper, data, step)?;
     }
     Ok(())
@@ -260,7 +316,7 @@ fn prot_flags(bits: u8) -> Result<PageFlags, ProcessError> {
 }
 
 fn build_stack(
-    address_space: &mut AddressSpace,
+    address_space: &mut UserAddressSpace,
     path: &str,
     entry: u64,
     elf: &Elf<'_>,
@@ -342,6 +398,15 @@ fn build_stack(
     write_word(&mut buffer, &mut cursor, 0)?;
     write_word(&mut buffer, &mut cursor, 0)?;
 
+    address_space
+        .vmas_mut()
+        .insert(
+            stack_base,
+            USER_STACK_SIZE,
+            (prot::READ | prot::WRITE) as u8,
+            Backing::Anonymous,
+        )
+        .map_err(|_| ProcessError::BadAddress)?;
     let mut mapper = address_space.mapper().map_err(ProcessError::Map)?;
     let pages = USER_STACK_SIZE / PAGE;
     let mut page = 0u64;
@@ -452,27 +517,54 @@ fn random16() -> [u8; 16] {
     bytes
 }
 
-/// Terminate the current process. PID 1 follows the C5 test-exit protocol.
-pub fn exit_process(code: i32) -> ! {
-    if let Some(process) = current() {
-        process.exit_code.store(code, Ordering::Release);
-        if process.id == 1 {
-            kprintln!("init exited ({code})");
-        } else {
-            kprintln!("process: {} exited ({code})", process.path);
-        }
-    } else {
+/// Mark the current process exited, release its address space and wake waiters.
+///
+/// PID 1 follows the C5 test-exit protocol and never returns; a child process returns to the
+/// scheduler after its address space has been switched away from.
+pub fn notify_exit(code: i32) {
+    let Some(process) = current() else {
         kprintln!("init exited ({code})");
+        if crate::log::test_exit() {
+            crate::boot::exit_qemu(if code == 0 { 0x10 } else { 0x11 });
+        }
+        crate::arch::halt()
+    };
+    process.mark_exited(code);
+    let address_space = process.address_space.lock().take();
+    if let Some(address_space) = address_space {
+        address_space.release();
     }
-    if crate::log::test_exit() {
-        crate::boot::exit_qemu(if code == 0 { 0x10 } else { 0x11 });
+    if process.id == 1 {
+        kprintln!("init exited ({code})");
+        if crate::log::test_exit() {
+            crate::boot::exit_qemu(if code == 0 { 0x10 } else { 0x11 });
+        }
+        crate::arch::halt()
     }
-    crate::arch::halt()
+    kprintln!("process: {} exited ({code})", process.path);
+    if CmdLine::parse(paging::cmdline())
+        .get("s24-framecheck")
+        .is_some()
+    {
+        kprintln!("s24: frames free={}", frame::stats().free_bytes);
+    }
 }
 
 /// Terminate the calling process (`EXIT`).
 pub fn exit_current(code: i32) -> ! {
-    exit_process(code)
+    crate::sched::exit_thread(code)
+}
+
+/// Try to resolve a user page fault. Returns true when the faulting instruction can be retried.
+pub fn handle_page_fault(cr2: u64) -> bool {
+    let Some(process) = current() else {
+        return false;
+    };
+    let mut address_space = process.address_space.lock();
+    let Some(address_space) = address_space.as_mut() else {
+        return false;
+    };
+    address_space.handle_fault(cr2).is_ok()
 }
 
 /// Terminate the current process because of a user page fault.

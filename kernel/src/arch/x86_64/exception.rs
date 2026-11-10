@@ -163,6 +163,9 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
             return;
         }
         if from_user {
+            if crate::process::handle_page_fault(cr2) {
+                return;
+            }
             crate::process::page_fault(cr2);
         }
     }
