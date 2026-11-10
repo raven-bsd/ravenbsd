@@ -120,6 +120,56 @@ pub(crate) fn rustflags_string(
     rustflags_for(component, arch, root, user_linker).join(" ")
 }
 
+/// A non-default code model for a component/target (CONTRACTS C2), if the target uses one.
+///
+/// Only user programs on x86-64 override the target's default code model today. Such a target
+/// ships a precompiled `core` built with the default code model, so LTO must not merge the two.
+pub(crate) fn code_model_for(component: Component, arch: Arch) -> Option<&'static str> {
+    match (component, arch) {
+        (Component::User, Arch::X86_64) => Some("small"),
+        _ => None,
+    }
+}
+
+/// The strongest release LTO that links for a component/target (DR-22).
+///
+/// Kernel, loader and host crates keep the workspace `lto = "fat"`. User programs on x86-64 use a
+/// non-default code model while `core` is precompiled with the target default; fat and thin LTO
+/// both fail on the conflicting `Code Model` module flag, so the dynamic fallback is `false`.
+/// Revisit this mapping if a future toolchain or target links with thin LTO.
+pub(crate) fn release_lto_for(component: Component, arch: Arch) -> &'static str {
+    if code_model_for(component, arch).is_some() {
+        "false"
+    } else {
+        "fat"
+    }
+}
+
+/// The `lto=… (code-model=…)` fragment logged for a release build.
+pub(crate) fn release_summary(component: Component, arch: Arch) -> String {
+    match code_model_for(component, arch) {
+        Some(model) => format!(
+            "lto={} (code-model={model})",
+            release_lto_for(component, arch)
+        ),
+        None => format!("lto={}", release_lto_for(component, arch)),
+    }
+}
+
+/// Caller `CARGO_PROFILE_*` keys; xtask drops them so builds are reproducible.
+fn caller_profile_vars<I>(vars: I) -> Vec<String>
+where
+    I: IntoIterator<Item = (String, String)>,
+{
+    let mut keys: Vec<String> = vars
+        .into_iter()
+        .map(|(key, _)| key)
+        .filter(|key| key.starts_with("CARGO_PROFILE_"))
+        .collect();
+    keys.sort();
+    keys
+}
+
 /// The uname build id: `<short>[-dirty] <YYYY-MM-DD>` derived from the commit timestamp.
 pub(crate) fn build_id_from(epoch: i64, short: &str, dirty: bool) -> String {
     let days = epoch.div_euclid(86_400);
@@ -187,13 +237,29 @@ pub(crate) fn run(
             build_id_from(head.epoch, &head.short, head.dirty),
         );
     spec = spec.env_remove("CARGO_ENCODED_RUSTFLAGS");
+    // A caller's cargo profile overrides must not change a component build: drop them all and
+    // set the release LTO explicitly (DR-22).
+    for key in caller_profile_vars(std::env::vars()) {
+        spec = spec.env_remove(key);
+    }
+    if release {
+        spec = spec.env(
+            "CARGO_PROFILE_RELEASE_LTO",
+            release_lto_for(component, arch),
+        );
+    }
 
+    let details = if release {
+        format!(", release, {}", release_summary(component, arch))
+    } else {
+        String::new()
+    };
     println!(
         "==> build {} {} ({}{})",
         component.as_str(),
         arch.as_str(),
         target,
-        if release { ", release" } else { "" }
+        details
     );
     let code = run_command(&spec)?;
     if code != 0 {
@@ -426,6 +492,60 @@ mod tests {
         assert_eq!(
             artifact_path(root, Arch::Riscv64, Component::User, "raven-init"),
             Path::new("/repo/build/riscv64/user/raven-init")
+        );
+    }
+
+    #[test]
+    fn release_lto_keeps_fat_for_kernel_and_loader() {
+        for arch in [Arch::X86_64, Arch::Aarch64] {
+            assert_eq!(release_lto_for(Component::Kernel, arch), "fat");
+            assert_eq!(release_lto_for(Component::Loader, arch), "fat");
+        }
+        assert_eq!(release_lto_for(Component::Kernel, Arch::Riscv64), "fat");
+    }
+
+    #[test]
+    fn release_lto_follows_the_code_model_table() {
+        assert_eq!(code_model_for(Component::User, Arch::X86_64), Some("small"));
+        assert_eq!(code_model_for(Component::User, Arch::Aarch64), None);
+        assert_eq!(code_model_for(Component::User, Arch::Riscv64), None);
+        assert_eq!(code_model_for(Component::Kernel, Arch::X86_64), None);
+        assert_eq!(code_model_for(Component::Loader, Arch::X86_64), None);
+    }
+
+    #[test]
+    fn release_lto_falls_back_for_user_x86_64() {
+        // Both fat and thin LTO reject the conflicting `Code Model` flag on this target, so the
+        // DR-22 dynamic fallback is the only selection that links.
+        assert_eq!(release_lto_for(Component::User, Arch::X86_64), "false");
+        assert_eq!(release_lto_for(Component::User, Arch::Aarch64), "fat");
+        assert_eq!(release_lto_for(Component::User, Arch::Riscv64), "fat");
+    }
+
+    #[test]
+    fn release_summary_names_the_code_model() {
+        assert_eq!(
+            release_summary(Component::User, Arch::X86_64),
+            "lto=false (code-model=small)"
+        );
+        assert_eq!(release_summary(Component::Kernel, Arch::X86_64), "lto=fat");
+        assert_eq!(release_summary(Component::Loader, Arch::Aarch64), "lto=fat");
+    }
+
+    #[test]
+    fn caller_profile_vars_are_dropped() {
+        let vars = vec![
+            ("PATH".to_string(), "/bin".to_string()),
+            ("CARGO_PROFILE_RELEASE_LTO".to_string(), "fat".to_string()),
+            ("CARGO_PROFILE_DEV_OPT_LEVEL".to_string(), "0".to_string()),
+            ("RUSTFLAGS".to_string(), "-Cfoo".to_string()),
+        ];
+        assert_eq!(
+            caller_profile_vars(vars),
+            vec![
+                "CARGO_PROFILE_DEV_OPT_LEVEL".to_string(),
+                "CARGO_PROFILE_RELEASE_LTO".to_string(),
+            ]
         );
     }
 }
