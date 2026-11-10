@@ -18,9 +18,14 @@ extern crate alloc as alloc_crate;
 pub mod alloc;
 pub mod args;
 pub mod entry;
+#[cfg(feature = "alloc")]
+pub mod fs;
 pub mod print;
 pub mod spawn;
+pub mod sync;
 pub mod sys;
+#[cfg(feature = "alloc")]
+pub mod thread;
 
 #[cfg(all(feature = "panic-handler", not(test)))]
 mod panic;

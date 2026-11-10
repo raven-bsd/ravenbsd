@@ -12,6 +12,36 @@ const MAX_ENV: usize = 4096;
 const MAX_AUXV: usize = 64;
 const MAX_STRING: usize = 64 * 1024;
 
+static CURRENT_ARGC: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+static CURRENT_ARGV: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+static CURRENT_ENVP: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+static CURRENT_ENV_COUNT: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+static CURRENT_AUXV: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+
+/// Remember the C8 stack view for `cwd()` and other environment lookups.
+#[cfg(not(test))]
+pub(crate) fn set_current(args: Args) {
+    use core::sync::atomic::Ordering;
+    CURRENT_ARGC.store(args.argc, Ordering::Relaxed);
+    CURRENT_ARGV.store(args.argv as usize, Ordering::Relaxed);
+    CURRENT_ENVP.store(args.envp as usize, Ordering::Relaxed);
+    CURRENT_ENV_COUNT.store(args.env_count, Ordering::Relaxed);
+    CURRENT_AUXV.store(args.auxv as usize, Ordering::Relaxed);
+}
+
+/// The current process argument view, or an empty view before `__raven_start` records it.
+#[cfg(feature = "alloc")]
+pub(crate) fn current() -> Args {
+    use core::sync::atomic::Ordering;
+    Args {
+        argc: CURRENT_ARGC.load(Ordering::Relaxed),
+        argv: CURRENT_ARGV.load(Ordering::Relaxed) as *const *const usize,
+        envp: CURRENT_ENVP.load(Ordering::Relaxed) as *const *const usize,
+        env_count: CURRENT_ENV_COUNT.load(Ordering::Relaxed),
+        auxv: CURRENT_AUXV.load(Ordering::Relaxed) as *const usize,
+    }
+}
+
 /// A view over the process stack built by the kernel.
 #[repr(C)]
 #[derive(Clone, Copy)]
