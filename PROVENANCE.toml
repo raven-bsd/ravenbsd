@@ -110,3 +110,102 @@ tier = "A"
 copied = "2026-11-09"
 modified = true
 notes = "Trimmed to the ticket API; MapError results replace Option/panic, table freeing added, W^X checks and huge-page conflicts enforced, emulate backend not ported."
+
+[[import]]
+path = "crates/ufs-core/src/fs.rs"
+upstream = "netbsd"
+upstream_path = "sys/ufs/ffs/fs.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-10"
+modified = true
+notes = "Superblock constants and cylinder-group arithmetic ported to Rust; struct fs field decode uses explicit little-endian reads, kernel pointer fields dropped."
+
+[[import]]
+path = "crates/ufs-core/src/dinode.rs"
+upstream = "netbsd"
+upstream_path = "sys/ufs/ufs/dinode.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-10"
+modified = true
+notes = "ufs1_dinode and ufs2_dinode field layouts ported to explicit little-endian decode; no struct transmute."
+
+[[import]]
+path = "crates/ufs-core/src/dir.rs"
+upstream = "netbsd"
+upstream_path = "sys/ufs/ufs/dir.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-10"
+modified = true
+notes = "struct direct decode and ufs_dirbadentry checks ported; whiteout entries are skipped."
+
+[[import]]
+path = "crates/ufs-core/src/inode.rs"
+upstream = "netbsd"
+upstream_path = "sys/ufs/ffs/ffs_subr.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-10"
+modified = true
+notes = "Inode location and ffs_load_inode decode path ported; block cache lives in ufs.rs; ffs_fragacct/ffs_isblock are not needed by the read core."
+
+[[import]]
+path = "crates/ufs-core/src/ffs_vfsops.rs"
+upstream = "netbsd"
+upstream_path = "sys/ufs/ffs/ffs_vfsops.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-10"
+modified = true
+notes = "Superblock probe order, ffs_superblock_validate checks and ffs_statvfs counters ported; kernel mount/WAPBL glue removed."
+
+[[import]]
+path = "crates/ufs-core/src/ufs_bmap.rs"
+upstream = "netbsd"
+upstream_path = "sys/ufs/ufs/ufs_bmap.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-10"
+modified = true
+notes = "Logical-to-physical block mapping and bounded direct/single/double/triple indirect walk ported; buffer cache and run-length hints removed."
+
+[[import]]
+path = "crates/ufs-core/src/ufs_lookup.rs"
+upstream = "netbsd"
+upstream_path = "sys/ufs/ufs/ufs_lookup.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-10"
+modified = true
+notes = "Linear directory lookup and cookie iteration ported; name cache and dirhash are not ported."
+
+[[import]]
+path = "crates/ufs-core/src/ufs_readwrite.rs"
+upstream = "netbsd"
+upstream_path = "sys/ufs/ufs/ufs_readwrite.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-10"
+modified = true
+notes = "Read path and fragment/EOF handling ported; uio and buffer-cache glue removed."
+
+[[import]]
+path = "crates/ufs-core/src/ufs.rs"
+upstream = "netbsd"
+upstream_path = "sys/ufs/ufs/ufs_vnops.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-10"
+modified = true
+notes = "getattr field mapping and the fast/slow symlink selection are ported from ufs_getattr/ufs_readlink; caches and public API are fresh."
