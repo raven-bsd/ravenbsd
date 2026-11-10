@@ -18,6 +18,8 @@ impl Handle {
     pub const INITFS: Handle = Handle(1);
     /// In the first process: root namespace.
     pub const ROOT_NAMESPACE: Handle = Handle(2);
+    /// In the first process only: the root device capability (`ADMIN`); the source of `MmioRegion`, `DmaBuffer`, `Irq` and boot blobs (ticket S21a).
+    pub const ROOT_DEVICE: Handle = Handle(3);
 
     /// Build a handle from table index and generation.
     pub const fn new(index: u32, generation: u8) -> Handle {

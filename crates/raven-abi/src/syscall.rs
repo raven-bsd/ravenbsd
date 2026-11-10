@@ -52,6 +52,10 @@ syscalls! {
     NANOSLEEP = 0x05;
     /// `uname(out: *mut Uname) -> 0` fills the system identification record.
     UNAME = 0x06;
+    /// `debug_read(buf: *mut u8, len: usize, timeout_ns: u64) -> isize` reads bytes typed on the debug console (serial input).
+    /// Blocks until at least one byte is available or `timeout_ns` (0 = wait forever) expires (returns 0 on timeout); returns
+    /// the number of bytes stored (at most `len`). Open in this version; will need `ADMIN` like `DEBUG_WRITE`. Ticket S27.
+    DEBUG_READ = 0x07;
 
     /// `thread_create(proc: Handle, entry: usize, stack_top: usize, arg: usize, flags: usize) -> Handle`
     /// creates a thread in `proc` starting at `entry` with the stack pointer at `stack_top`;
@@ -91,6 +95,28 @@ syscalls! {
     HANDLE_CLOSE = 0x50;
     /// `handle_dup(h: Handle, rights_mask: u32) -> Handle`; new rights = old rights AND mask. Requires `DUP`.
     HANDLE_DUP = 0x51;
+    /// `handle_transfer(dest_proc: Handle, h: Handle, rights_mask: u32) -> Handle` installs a duplicate of `h` in the handle table of
+    /// the process `dest_proc` (which needs the `WRITE` right) and returns the handle value valid IN THE DESTINATION. `h` needs
+    /// `TRANSFER`; new rights = old rights AND mask (rights never grow). Used for spawn-time grants (before the child's first thread
+    /// runs) and by servers. Ticket S25.
+    HANDLE_TRANSFER = 0x52;
+
+    /// `evq_create(flags: u32) -> Handle` creates an event queue (wait-for-many). Ticket S26.
+    EVQ_CREATE = 0x58;
+    /// `evq_ctl(evq: Handle, op: u32, h: Handle, events: u32, cookie: u64) -> 0`; `op` ADD=1, MOD=2, DEL=3; `events` is a mask of
+    /// READABLE=1, WRITABLE=2, HUP=4, SIGNALED=8 (timer expired, event signalled, IRQ fired) plus EDGE=0x8000_0000 for edge-triggered. Ticket S26.
+    EVQ_CTL = 0x59;
+    /// `evq_wait(evq: Handle, out: *mut EvqEvent, max: usize, timeout_ns: u64) -> count`; `EvqEvent` is `{ cookie: u64, events: u32, _pad: u32 }`;
+    /// `timeout_ns == 0` waits forever, a timeout returns 0. Ticket S26.
+    EVQ_WAIT = 0x5A;
+    /// `timer_create(clock_id: u32, flags: u32) -> Handle` creates a disarmed timer object usable as an event source. Ticket S26.
+    TIMER_CREATE = 0x5B;
+    /// `event_create(flags: u32) -> Handle` creates a user event (doorbell) that another process can signal. Ticket S26.
+    EVENT_CREATE = 0x5C;
+    /// `event_signal(h: Handle, value: u64) -> 0` sets the signalled state of a user event and wakes its waiters. Ticket S26.
+    EVENT_SIGNAL = 0x5D;
+    /// `timer_set(timer: Handle, initial_ns: u64, interval_ns: u64) -> 0` arms (`initial_ns != 0`) or disarms (0) a timer; `interval_ns != 0` repeats. Ticket S26.
+    TIMER_SET = 0x5E;
 
     /// `scheme_register(name: &str, handle: Handle) -> 0`; register a scheme server handle under a name.
     SCHEME_REGISTER = 0x60;
@@ -112,6 +138,24 @@ syscalls! {
     RECV = 0x68;
     /// Server side: `send(handle: Handle, packet: &[u8]) -> 0`; reply to a packet.
     SEND = 0x69;
+
+    /// `mmio_create(root_dev: Handle, phys: u64, len: usize, attrs: u32) -> Handle` returns an `MmioRegion` (map it with [`Syscall::MAP`]);
+    /// needs the `ADMIN` root device capability (`Handle::ROOT_DEVICE`); RAM and kernel memory are refused. Ticket S21a.
+    MMIO_CREATE = 0x70;
+    /// `boot_blob(root_dev: Handle, kind: u32) -> Handle` returns a read-only memory object with a boot-time blob: kind 1 = ACPI tables
+    /// bundle, 2 = device tree (DTB), 3 = memory map summary. Ticket S21a.
+    BOOT_BLOB = 0x71;
+    /// `dma_alloc(root_dev: Handle, len: usize, align: usize, mask_bits: u32, flags: u32) -> Handle` allocates device-visible memory
+    /// (physically contiguous, bus address below `1 << mask_bits`); freed on close or process exit. Ticket S21b.
+    DMA_ALLOC = 0x72;
+    /// `dma_info(h: Handle, out: *mut DmaInfo) -> 0`; `DmaInfo` is `{ bus_addr: u64, len: u64, flags: u32, _pad: u32 }`. Ticket S21b.
+    DMA_INFO = 0x73;
+    /// `irq_create(root_dev: Handle, kind: u32, number: u32, flags: u32) -> Handle`; kind LEGACY=1 (IOAPIC pin), MSI=2, MSIX=3 (vector allocation). Ticket S21c.
+    IRQ_CREATE = 0x74;
+    /// `irq_wait(irq: Handle, timeout_ns: u64) -> count` blocks until the interrupt fired since the last wait/ack, returns the pending count. Ticket S21c.
+    IRQ_WAIT = 0x75;
+    /// `irq_ack(irq: Handle) -> 0` re-enables (unmasks) the interrupt after the driver handled it. Ticket S21c.
+    IRQ_ACK = 0x76;
 }
 
 #[cfg(test)]
