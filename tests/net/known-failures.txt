@@ -1,0 +1,6 @@
+# Known failures for the packetdrill harness.
+#
+# One entry per line: <script-name> <reason>
+#
+# Keep this list shrinking: a listed script that starts passing fails the run so the stale
+# entry is removed. There are currently no known failures.

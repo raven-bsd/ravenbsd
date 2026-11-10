@@ -373,6 +373,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-netcore-packetdrill-harness"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "raven-conform",
+ "raven-netcore",
+ "serde",
+ "serde_json",
+ "smoltcp",
+]
+
+[[package]]
 name = "raven-provenance"
 version = "0.1.0"
 dependencies = [

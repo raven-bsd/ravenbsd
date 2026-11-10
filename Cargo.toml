@@ -25,6 +25,7 @@ members = [
     "userland/init",
     "userland/bin/uname",
     "userland/bin/echo",
+    "tests/net/packetdrill-harness",
     "tools/bench-host",
 ]
 default-members = ["crates/*"]
