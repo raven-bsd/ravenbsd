@@ -10,6 +10,7 @@ use raven_abi::errno::Errno;
 use raven_abi::types::Rights;
 use raven_handles::HandleTable;
 
+use crate::ipc::{PendingRequest, SchemeFile};
 use crate::memory::frame;
 
 use super::Process;
@@ -75,6 +76,10 @@ pub enum Object {
     Namespace,
     /// A thread object (created by later tickets).
     Thread(Arc<Thread>),
+    /// An open scheme file.
+    SchemeFile(Arc<SchemeFile>),
+    /// A server-side request handle returned by `RECV`.
+    SchemeRequest(Arc<PendingRequest>),
 }
 
 /// The kernel's handle table type.

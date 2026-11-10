@@ -13,6 +13,7 @@ mod backtrace;
 mod boot;
 mod cmdline;
 mod initfs;
+mod ipc;
 mod log;
 mod memory;
 mod process;

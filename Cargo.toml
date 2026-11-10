@@ -17,6 +17,7 @@ members = [
     "tests/fixtures/s09-futex",
     "tests/fixtures/s24-spawn/parent",
     "tests/fixtures/s24-spawn/child",
+    "tests/fixtures/s11-echo",
     "tests/fixtures/testkernel",
     "xtask",
     "tests/qtest",
