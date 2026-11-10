@@ -8,8 +8,11 @@ use crate::kprintln;
 
 /// Run the self-test named by `selftest=`, if any.
 pub fn run(cmdline: &CmdLine) {
-    if cmdline.get("selftest") == Some("brk") {
-        breakpoint();
+    match cmdline.get("selftest") {
+        Some("brk") => breakpoint(),
+        // Behaves as on x86-64: allocate, free and grow, then report the heap statistics.
+        Some("heap") => crate::memory::heap::selftest(),
+        _ => {}
     }
 }
 

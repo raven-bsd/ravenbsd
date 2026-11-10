@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! aarch64 early-boot `kmain`: validate the handoff, bring up the frame allocator, print the C4
-//! banner and either run the requested self-test or exit the QEMU test.
+//! aarch64 early-boot `kmain`: validate the handoff, bring up the frame allocator, build the
+//! kernel's own page tables and heap, run the requested self-test and exit with the test status.
 //!
-//! There is no heap, no scheduler and no MMU setup here yet (S14a): the kernel runs on the
-//! loader's page tables and only uses statically sized state.
+//! After `memory::paging::init` the kernel runs on its own TTBR1 tables and the loader's frames
+//! are reclaimed, exactly as the x86-64 `kmain` does. There is no scheduler or user mode here
+//! yet (S14b/S14c).
 
 use raven_bootinfo::BootInfo;
 
@@ -38,15 +39,24 @@ pub extern "C" fn kmain(boot: *const BootInfo) -> ! {
         kprintln!("kernel: error: {error}");
         boot::exit_qemu(0x11);
     }
+    let boot_info = match memory::paging::init(&data) {
+        Ok(boot_info) => boot_info,
+        Err(error) => {
+            kprintln!("kernel: error: {error}");
+            boot::exit_qemu(0x11);
+        }
+    };
+    if let Err(error) = memory::heap::init() {
+        kprintln!("kernel: error: {error}");
+        boot::exit_qemu(0x11);
+    }
 
-    boot::print_banner(&data);
-
-    let cmdline = CmdLine::parse(data.cmdline);
+    // `data` still points at loader memory that paging just reclaimed. Re-parse the command
+    // line from the kernel-owned copy.
+    let cmdline = CmdLine::parse(memory::paging::cmdline());
     crate::arch::aarch64::selftest::run(&cmdline);
 
-    if log::test_exit() {
-        boot::exit_qemu(0x10);
-    }
-    kprintln!("boot: early init complete, halting");
-    crate::arch::halt()
+    // `boot::run` re-validates the copied handoff, finds the frame allocator already
+    // initialised, prints the C4 banner and exits through the test-exit protocol.
+    boot::run(boot_info)
 }

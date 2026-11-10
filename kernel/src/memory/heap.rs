@@ -3,15 +3,18 @@
 
 //! Kernel heap.
 //!
-//! A linked-list allocator over a contiguous virtual range starting at
-//! [`raven_abi::layout::x86_64::KERNEL_HEAP_BASE`]. The initial 4 MiB are mapped from fresh
-//! frames; allocation failures grow the heap by 1 MiB and retry. The allocator never panics: it
-//! returns null and the stable runtime raises its allocation-error panic.
+//! A linked-list allocator over a contiguous virtual range starting at the architecture's
+//! `KERNEL_HEAP_BASE` (the same constant on x86-64 and aarch64). The initial 4 MiB are mapped
+//! from fresh frames; allocation failures grow the heap by 1 MiB and retry. The allocator never
+//! panics: it returns null and the stable runtime raises its allocation-error panic.
 
 use core::alloc::{GlobalAlloc, Layout};
 use core::ptr;
 
 use linked_list_allocator::Heap;
+#[cfg(target_arch = "aarch64")]
+use raven_abi::layout::aarch64::{KERNEL_HEAP_BASE, KERNEL_HEAP_END};
+#[cfg(target_arch = "x86_64")]
 use raven_abi::layout::x86_64::{KERNEL_HEAP_BASE, KERNEL_HEAP_END};
 use spin::Mutex;
 

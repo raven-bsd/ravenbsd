@@ -4,6 +4,7 @@
 //! aarch64 architecture support.
 
 pub mod kmain;
+pub mod mmu;
 pub mod selftest;
 pub mod serial;
 pub mod start;
