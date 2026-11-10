@@ -161,6 +161,8 @@ pub enum MapError {
     OutOfFrames,
     /// A huge page or a subtable conflicts with the requested mapping.
     HugePageConflict,
+    /// The caller asked to map physical RAM as device memory (or vice versa).
+    NotDeviceMemory,
 }
 
 impl fmt::Display for MapError {
@@ -173,6 +175,7 @@ impl fmt::Display for MapError {
             MapError::WriteExecute => f.write_str("refusing a writable executable page"),
             MapError::OutOfFrames => f.write_str("out of page-table frames"),
             MapError::HugePageConflict => f.write_str("huge page conflicts with the mapping"),
+            MapError::NotDeviceMemory => f.write_str("refusing to map RAM as device memory"),
         }
     }
 }
