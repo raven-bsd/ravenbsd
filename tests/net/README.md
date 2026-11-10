@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # packetdrill-compatible harness for `raven-netcore`
 
 This directory contains a host-side harness that runs a small, hand-written subset of
