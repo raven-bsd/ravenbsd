@@ -14,7 +14,7 @@ rust-version.workspace = true
 raven-uname = { path = "../bin/uname" }
 
 [target.'cfg(target_os = "none")'.dependencies]
-raven-rt = { path = "../rt" }
+raven-rt = { path = "../rt", features = ["alloc"] }
 
 [lints]
 workspace = true

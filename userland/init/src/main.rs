@@ -14,7 +14,12 @@
 
 #[cfg(target_os = "none")]
 mod program {
+    extern crate alloc;
+
+    use alloc::string::String;
+    use alloc::vec::Vec;
     use core::fmt;
+    use core::fmt::Write;
     use core::sync::atomic::{AtomicU32, Ordering};
 
     use raven_rt::entry;
@@ -32,6 +37,64 @@ mod program {
 
     struct Writer;
 
+    struct Probe(usize);
+
+    impl fmt::Write for Probe {
+        fn write_str(&mut self, text: &str) -> fmt::Result {
+            self.0 += text.len();
+            Ok(())
+        }
+    }
+
+    trait Value {
+        fn value(&self) -> u32;
+    }
+
+    struct Number(u32);
+
+    impl Value for Number {
+        fn value(&self) -> u32 {
+            self.0
+        }
+    }
+
+    fn format_probe() -> Result<(), fmt::Error> {
+        let mut probe = Probe(0);
+        probe.write_fmt(format_args!(
+            "{} {:x} {:>8} {:?} {:?}",
+            "str",
+            255u32,
+            255u32,
+            [1u8, 2],
+            Some(7u32)
+        ))?;
+        let object: &dyn Value = &Number(7);
+        if object.value() != 7 {
+            return Err(fmt::Error);
+        }
+        let mut closure = |value: u32| value + 1;
+        let function: &mut dyn FnMut(u32) -> u32 = &mut closure;
+        if function(7) != 8 || probe.0 == 0 {
+            return Err(fmt::Error);
+        }
+        Ok(())
+    }
+
+    fn allocation_probe() -> Result<(), fmt::Error> {
+        let text: String = alloc::format!("{} {:x}", "fmt", 255u32);
+        if text.as_str() != "fmt ff" {
+            return Err(fmt::Error);
+        }
+        let mut values = Vec::new();
+        for value in 0..64u32 {
+            values.push(value);
+        }
+        if values.len() != 64 || values[63] != 63 {
+            return Err(fmt::Error);
+        }
+        Ok(())
+    }
+
     impl fmt::Write for Writer {
         fn write_str(&mut self, text: &str) -> fmt::Result {
             // Emit bytes directly. `print!("{text}")` would go through `Display for str`,
@@ -46,6 +109,10 @@ mod program {
             BSS_MARKER.load(Ordering::Relaxed),
         );
         let _ = write_str("init: starting\n");
+        if format_probe().is_err() || allocation_probe().is_err() {
+            return 1;
+        }
+        raven_rt::println!("init: fmt ok {} {:x} {}", 255u32, 255u32, "str");
         let options = Options {
             sysname: true,
             nodename: true,
