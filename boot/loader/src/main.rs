@@ -23,9 +23,9 @@ use alloc::vec::Vec;
 use core::fmt;
 
 #[cfg(target_os = "uefi")]
-use raven_abi::layout::x86_64::HHDM_BASE;
+use raven_bootinfo::{BootInfo, Framebuffer, MemoryRegion, PhysRange};
 #[cfg(target_os = "uefi")]
-use raven_bootinfo::{BootInfo, Framebuffer, MemoryKind, MemoryRegion, PhysRange};
+use raven_loader::layout::HHDM_BASE;
 #[cfg(target_os = "uefi")]
 use raven_loader::{bootinfo, config, fs, handoff, image, memmap, paging, serial};
 #[cfg(target_os = "uefi")]
@@ -40,6 +40,11 @@ use uefi::proto::console::gop::{GraphicsOutput, PixelFormat};
 use uefi::proto::loaded_image::LoadedImage;
 #[cfg(target_os = "uefi")]
 use uefi::table::cfg::ConfigTableEntry;
+
+#[cfg(all(target_os = "uefi", target_arch = "x86_64"))]
+const ARCH_NAME: &str = "x86_64";
+#[cfg(all(target_os = "uefi", target_arch = "aarch64"))]
+const ARCH_NAME: &str = "aarch64";
 
 #[cfg(target_os = "uefi")]
 const STACK_SIZE: u64 = 0x4000;
@@ -64,7 +69,13 @@ fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
 #[uefi::entry]
 fn main() -> uefi::Status {
     serial::init();
-    serial::log(format_args!("RavenBSD loader 0.1 (x86_64)"));
+    serial::log(format_args!("RavenBSD loader 0.1 ({ARCH_NAME})"));
+    if !handoff::at_el1() {
+        serial::log(format_args!(
+            "error: the loader must run at EL1 (CurrentEL is EL2 or EL3)"
+        ));
+        exit_qemu(0x11);
+    }
 
     match run() {
         Ok(()) => {
@@ -95,6 +106,7 @@ struct Prepared {
     old_stack_start: u64,
     old_stack_end: u64,
     acpi_rsdp: u64,
+    dtb: PhysRange,
     framebuffer: Framebuffer,
     boot_cpu_id: u64,
     counter_freq: u64,
@@ -189,11 +201,18 @@ fn prepare(
 
     let framebuffer = framebuffer();
     let acpi_rsdp = acpi_rsdp();
+    let dtb = dtb();
     let uefi_system_table = uefi::table::system_table_raw()
         .map(|table| table.as_ptr() as usize as u64)
         .unwrap_or(0);
     let boot_cpu_id = handoff::boot_cpu_id();
     let counter_freq = handoff::counter_freq();
+    if verbose {
+        serial::log(format_args!(
+            "dtb {:#x}+{:#x} counter_freq={} boot_cpu_id={:#x}",
+            dtb.base, dtb.len, counter_freq, boot_cpu_id
+        ));
+    }
 
     let stack_pointer = handoff::stack_pointer();
     let old_stack_start = stack_pointer.saturating_sub(OLD_STACK_WINDOW) & !(paging::PAGE_SIZE - 1);
@@ -218,6 +237,7 @@ fn prepare(
         old_stack_start,
         old_stack_end,
         acpi_rsdp,
+        dtb,
         framebuffer,
         boot_cpu_id,
         counter_freq,
@@ -245,6 +265,7 @@ fn finish(prepared: Prepared, memory_map: &MemoryMapOwned) -> ! {
         old_stack_start,
         old_stack_end,
         acpi_rsdp,
+        dtb,
         framebuffer,
         boot_cpu_id,
         counter_freq,
@@ -288,43 +309,17 @@ fn finish(prepared: Prepared, memory_map: &MemoryMapOwned) -> ! {
         ));
     }
     serial::log(format_args!("memory map: {} regions", regions.len()));
-
-    let pool_base = pool.base();
-    let pool_size = pool.size();
-    let mut tables =
-        match paging::PageTables::new_with_physical_bits(pool, handoff::physical_bits()) {
-            Ok(tables) => tables,
-            Err(error) => fail(format_args!("cannot create the page tables: {error}")),
-        };
-
-    for region in &regions {
-        let result = match region.kind() {
-            Some(MemoryKind::Mmio) => {
-                let virtual_address = match HHDM_BASE.checked_add(region.base) {
-                    Some(address) => address,
-                    None => fail(format_args!("MMIO address overflow")),
-                };
-                tables.map_range_4k(
-                    virtual_address,
-                    region.base,
-                    region.len,
-                    paging::WRITABLE | paging::NO_EXECUTE,
-                )
-            }
-            Some(MemoryKind::BadMemory) => Ok(()),
-            _ => tables.map_hhdm_region(
-                HHDM_BASE,
-                region.base,
-                region.len,
-                paging::WRITABLE | paging::NO_EXECUTE,
-            ),
-        };
-        if let Err(error) = result {
-            fail(format_args!(
-                "cannot map HHDM region {:#x}+{:#x}: {error}",
-                region.base, region.len
-            ));
-        }
+    if verbose {
+        serial::log(format_args!(
+            "loader image {:#x}+{:#x} stack {:#x}..{:#x} pool {:#x} kernel {:#x}+{:#x}",
+            image_base,
+            image_size,
+            old_stack_start,
+            old_stack_end,
+            stack_base_phys,
+            kernel.phys_base,
+            kernel.size
+        ));
     }
 
     for segment in &kernel.segments {
@@ -334,83 +329,28 @@ fn finish(prepared: Prepared, memory_map: &MemoryMapOwned) -> ! {
                 segment.vaddr
             ));
         }
-        let page_vaddr = segment.vaddr & !(paging::PAGE_SIZE - 1);
-        let page_paddr = segment.paddr & !(paging::PAGE_SIZE - 1);
-        let length = match (segment.vaddr & (paging::PAGE_SIZE - 1))
-            .checked_add(segment.len)
-            .and_then(align_up)
-        {
-            Some(length) => length,
-            None => fail(format_args!(
-                "kernel segment {:#x} length overflows",
-                segment.vaddr
-            )),
-        };
-        let flags = (if segment.prot & 0b010 != 0 {
-            paging::WRITABLE
-        } else {
-            0
-        }) | (if segment.prot & 0b100 != 0 {
-            0
-        } else {
-            paging::NO_EXECUTE
-        });
-        if let Err(error) = tables.map_range_4k(page_vaddr, page_paddr, length, flags) {
-            fail(format_args!(
-                "cannot map kernel segment {:#x}: {error}",
-                segment.vaddr
-            ));
-        }
     }
 
-    let image_start = image_base & !(paging::PAGE_SIZE - 1);
-    let image_length = match (image_base & (paging::PAGE_SIZE - 1))
-        .checked_add(image_size)
-        .and_then(align_up)
-    {
-        Some(length) => length,
-        None => fail(format_args!("loader image size overflows")),
+    if verbose {
+        serial::log(format_args!("page tables: building"));
+    }
+    let roots = match paging::build_loader_tables(paging::LoaderMap {
+        pool,
+        regions: &regions,
+        kernel: &kernel,
+        image_base,
+        image_size,
+        old_stack_start,
+        old_stack_end,
+        stack_base_phys,
+        stack_size: STACK_SIZE,
+    }) {
+        Ok(roots) => roots,
+        Err(error) => fail(format_args!("cannot build the page tables: {error}")),
     };
-    if let Err(error) = tables.map_range_4k(image_start, image_start, image_length, 0) {
-        fail(format_args!(
-            "cannot identity-map the loader image: {error}"
-        ));
+    if verbose {
+        serial::log(format_args!("page tables: built"));
     }
-
-    if let Err(error) = tables.map_range_4k(
-        old_stack_start,
-        old_stack_start,
-        old_stack_end.saturating_sub(old_stack_start),
-        paging::WRITABLE | paging::NO_EXECUTE,
-    ) {
-        fail(format_args!(
-            "cannot identity-map the loader stack: {error}"
-        ));
-    }
-
-    if let Err(error) = tables.map_range_4k(
-        stack_base_phys,
-        stack_base_phys,
-        STACK_SIZE,
-        paging::WRITABLE | paging::NO_EXECUTE,
-    ) {
-        fail(format_args!(
-            "cannot identity-map the kernel stack: {error}"
-        ));
-    }
-
-    if let Err(error) = tables.map_range_4k(
-        pool_base,
-        pool_base,
-        pool_size,
-        paging::WRITABLE | paging::NO_EXECUTE,
-    ) {
-        fail(format_args!(
-            "cannot identity-map the page-table pool: {error}"
-        ));
-    }
-
-    let (_pool_meta, root) = tables.into_parts();
 
     let info = bootinfo::assemble(bootinfo::BootInfoParts {
         kernel_phys_base: kernel.phys_base,
@@ -420,6 +360,7 @@ fn finish(prepared: Prepared, memory_map: &MemoryMapOwned) -> ! {
         memory_map_len: regions.len() as u64,
         initfs,
         cmdline,
+        dtb,
         acpi_rsdp,
         framebuffer,
         boot_cpu_id,
@@ -438,22 +379,86 @@ fn finish(prepared: Prepared, memory_map: &MemoryMapOwned) -> ! {
         None => fail(format_args!("BootInfo address overflow")),
     };
 
-    let entry_counter = handoff::rdtsc();
+    let entry_counter = handoff::read_counter();
     // SAFETY: the pointer is valid; this is the last write before the jump.
     unsafe {
         (*bootinfo_ptr).entry_counter = entry_counter;
     }
 
     let entry = kernel.entry;
+    let kernel_phys = kernel.phys_base;
+    let kernel_size = kernel.size;
     core::mem::forget(regions);
     core::mem::forget(descriptors);
     core::mem::forget(map_buffers);
     core::mem::forget(kernel);
 
-    // SAFETY: `root` maps the kernel at `entry`, the identity-mapped loader code and stack, and the
-    // HHDM containing `bootinfo_virtual`; interrupts are disabled inside `jump`.
+    if verbose {
+        serial::log(format_args!("jumping to kernel entry {entry:#x}"));
+    }
+    // SAFETY: the roots map the kernel at `entry`, the identity-mapped loader code and stack, and
+    // the HHDM containing `bootinfo_virtual`; interrupts are disabled inside `jump`.
     unsafe {
-        handoff::jump(entry, root, stack_top_virt, bootinfo_virtual);
+        handoff::jump(
+            entry,
+            roots,
+            stack_top_virt,
+            bootinfo_virtual,
+            kernel_phys,
+            kernel_size,
+        );
+    }
+}
+
+#[cfg(all(target_os = "uefi", target_arch = "x86_64"))]
+fn dtb() -> PhysRange {
+    PhysRange { base: 0, len: 0 }
+}
+
+#[cfg(all(target_os = "uefi", target_arch = "aarch64"))]
+fn dtb() -> PhysRange {
+    // EFI_DTB_TABLE_GUID b1b621d5-f19c-41a5-830b-d9152c69aae0.
+    const DTB_GUID: uefi::Guid = uefi::Guid::new(
+        [0xd5, 0x21, 0xb6, 0xb1],
+        [0x9c, 0xf1],
+        [0xa5, 0x41],
+        0x83,
+        0x0b,
+        [0xd9, 0x15, 0x2c, 0x69, 0xaa, 0xe0],
+    );
+    uefi::system::with_config_table(|entries| {
+        for entry in entries {
+            if entry.guid != DTB_GUID {
+                continue;
+            }
+            let base = entry.address as usize as u64;
+            // SAFETY: the configuration table points at an FDT; the first eight bytes are the
+            // big-endian magic and totalsize, and UEFI keeps the table mapped until boot exit.
+            let (magic, size) = unsafe {
+                let pointer = entry.address as *const u8;
+                (read_be32(pointer), read_be32(pointer.add(4)))
+            };
+            if magic == 0xd00d_feed && size >= 0x40 {
+                return PhysRange {
+                    base,
+                    len: u64::from(size),
+                };
+            }
+        }
+        PhysRange { base: 0, len: 0 }
+    })
+}
+
+#[cfg(all(target_os = "uefi", target_arch = "aarch64"))]
+unsafe fn read_be32(pointer: *const u8) -> u32 {
+    // SAFETY: the caller guarantees four readable bytes.
+    unsafe {
+        u32::from_be_bytes([
+            pointer.read(),
+            pointer.add(1).read(),
+            pointer.add(2).read(),
+            pointer.add(3).read(),
+        ])
     }
 }
 
@@ -566,22 +571,7 @@ fn fail(message: fmt::Arguments<'_>) -> ! {
 
 #[cfg(target_os = "uefi")]
 fn exit_qemu(code: u8) -> ! {
-    // SAFETY: QEMU's isa-debug-exit device watches port 0xf4. On real hardware the port write is
-    // harmless; the CPU then halts in a loop.
-    unsafe {
-        core::arch::asm!(
-            "out dx, al",
-            in("dx") 0xf4u16,
-            in("al") code,
-            options(nomem, nostack, preserves_flags),
-        );
-    }
-    loop {
-        // SAFETY: `cli; hlt` is valid in ring 0, touches no memory and preserves flags.
-        unsafe {
-            core::arch::asm!("cli", "hlt", options(nomem, nostack, preserves_flags));
-        }
-    }
+    handoff::exit_qemu(code)
 }
 
 #[cfg(not(target_os = "uefi"))]

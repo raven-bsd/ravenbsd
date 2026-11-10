@@ -15,8 +15,12 @@ use uefi::boot::{self, AllocateType, MemoryType};
 /// Page size used for kernel allocations.
 const PAGE_SIZE: u64 = 4096;
 
-/// User/kernel virtual range accepted for the kernel image (CONTRACTS C9).
-const KERNEL_RANGE: core::ops::Range<u64> = 0xFFFF_FFFF_8000_0000..0xFFFF_FFFF_FFFF_F000;
+/// ELF machine expected for the loader's target architecture.
+#[cfg(target_arch = "x86_64")]
+const MACHINE: Machine = Machine::X86_64;
+/// ELF machine expected for the loader's target architecture.
+#[cfg(target_arch = "aarch64")]
+const MACHINE: Machine = Machine::Aarch64;
 
 /// One loaded `PT_LOAD` segment.
 #[derive(Clone, Copy, Debug)]
@@ -78,7 +82,7 @@ impl From<ElfError> for LoadError {
 
 /// Parse and load a kernel ELF into freshly allocated, zeroed `LOADER_DATA` pages.
 pub fn load(data: &[u8]) -> Result<LoadedKernel, LoadError> {
-    let elf = Elf::parse(data, Machine::X86_64, KERNEL_RANGE)?;
+    let elf = Elf::parse(data, MACHINE, crate::layout::KERNEL_RANGE)?;
 
     let mut iterator = elf.segments();
     let first: Segment = iterator.next().ok_or(LoadError::NoSegments)?;

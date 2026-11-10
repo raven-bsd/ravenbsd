@@ -3,10 +3,17 @@
 
 //! Pure assembly of the `raven_bootinfo::BootInfo` handed to the kernel.
 
-use raven_abi::layout::x86_64::HHDM_BASE;
+use crate::layout::HHDM_BASE;
 use raven_bootinfo::{
     BOOTINFO_MAGIC, BOOTINFO_VERSION, BootInfo, Framebuffer, PhysRange, arch, flags,
 };
+
+/// Architecture id written into `BootInfo`.
+#[cfg(target_arch = "x86_64")]
+const BOOT_ARCH: u32 = arch::X86_64;
+/// Architecture id written into `BootInfo`.
+#[cfg(target_arch = "aarch64")]
+const BOOT_ARCH: u32 = arch::AARCH64;
 
 /// The values gathered before and after `ExitBootServices`.
 #[derive(Clone, Copy, Debug)]
@@ -25,6 +32,8 @@ pub struct BootInfoParts {
     pub initfs: PhysRange,
     /// Copied kernel command line.
     pub cmdline: PhysRange,
+    /// Flattened device tree supplied by firmware, or an empty range.
+    pub dtb: PhysRange,
     /// Physical address of the ACPI RSDP, or 0.
     pub acpi_rsdp: u64,
     /// GOP framebuffer description, or an empty one.
@@ -47,7 +56,7 @@ pub fn assemble(parts: BootInfoParts) -> BootInfo {
         magic: BOOTINFO_MAGIC,
         version: BOOTINFO_VERSION,
         size: core::mem::size_of::<BootInfo>() as u32,
-        arch: arch::X86_64,
+        arch: BOOT_ARCH,
         flags: flags::SERIAL_READY | if parts.verbose { flags::VERBOSE } else { 0 },
         hhdm_offset: HHDM_BASE,
         kernel_phys_base: parts.kernel_phys_base,
@@ -58,7 +67,7 @@ pub fn assemble(parts: BootInfoParts) -> BootInfo {
         memory_map_entry_size: core::mem::size_of::<raven_bootinfo::MemoryRegion>() as u64,
         initfs: parts.initfs,
         cmdline: parts.cmdline,
-        dtb: PhysRange { base: 0, len: 0 },
+        dtb: parts.dtb,
         acpi_rsdp: parts.acpi_rsdp,
         uefi_system_table: parts.uefi_system_table,
         boot_cpu_id: parts.boot_cpu_id,
@@ -88,6 +97,7 @@ mod tests {
                 base: 0x50_0000,
                 len: 23,
             },
+            dtb: PhysRange { base: 0, len: 0 },
             acpi_rsdp: 0x60_0000,
             framebuffer: Framebuffer {
                 base: 0xE000_0000,
@@ -112,7 +122,7 @@ mod tests {
         assert_eq!(info.magic, BOOTINFO_MAGIC);
         assert_eq!(info.version, BOOTINFO_VERSION);
         assert_eq!(info.size as usize, core::mem::size_of::<BootInfo>());
-        assert_eq!(info.arch, arch::X86_64);
+        assert_eq!(info.arch, BOOT_ARCH);
         assert_eq!(info.hhdm_offset, HHDM_BASE);
         assert_eq!(info.kernel_phys_base, 0x20_0000);
         assert_eq!(info.kernel_virt_base, 0xFFFF_FFFF_8020_0000);
