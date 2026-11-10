@@ -18,6 +18,7 @@ mod program {
     use core::sync::atomic::{AtomicU32, Ordering};
 
     use raven_rt::entry;
+    use raven_rt::print::write_str;
     use raven_uname::{Options, format};
 
     entry!(main);
@@ -33,8 +34,9 @@ mod program {
 
     impl fmt::Write for Writer {
         fn write_str(&mut self, text: &str) -> fmt::Result {
-            raven_rt::print!("{text}");
-            Ok(())
+            // Emit bytes directly. `print!("{text}")` would go through `Display for str`,
+            // whose debug-build thunk is a GOT/PLT call that the user linker script discards.
+            write_str(text).map(|_| ()).map_err(|_| fmt::Error)
         }
     }
 
@@ -43,7 +45,7 @@ mod program {
             DATA_MARKER.load(Ordering::Relaxed),
             BSS_MARKER.load(Ordering::Relaxed),
         );
-        raven_rt::println!("init: starting");
+        let _ = write_str("init: starting\n");
         let options = Options {
             sysname: true,
             nodename: true,
@@ -56,7 +58,9 @@ mod program {
         let uname = match raven_rt::uname() {
             Ok(uname) => uname,
             Err(error) => {
-                raven_rt::eprintln!("init: uname: {}", error.description());
+                let _ = write_str("init: uname: ");
+                let _ = write_str(error.description());
+                let _ = write_str("\n");
                 return 1;
             }
         };
@@ -64,7 +68,7 @@ mod program {
         if format(&options, &uname, &mut writer).is_err() {
             return 1;
         }
-        raven_rt::println!("init: done");
+        let _ = write_str("init: done\n");
         0
     }
 }
