@@ -4,11 +4,13 @@
 //! x86-64 architecture support.
 
 pub mod acpi;
+pub mod ap_start;
 pub mod apic;
 pub mod exception;
 pub mod gdt;
 pub mod idt;
 pub mod ioapic;
+pub mod ipi;
 pub mod pic;
 pub mod serial;
 mod start;
@@ -22,13 +24,16 @@ pub mod usermode;
 /// Enable maskable interrupts.
 ///
 /// Must only be called after the timer and spurious IDT gates are installed and the legacy PIC is
-/// masked.
+/// masked. This is the last point at which the BSP has the local APIC, timer and scheduler ready
+/// with interrupts still off, so it is also where the application processors are brought online.
 pub fn enable_interrupts() {
+    crate::sched::smp::platform_init();
     // SAFETY: `sti` is a ring-0 instruction that only sets IF; all interrupt gates are installed
     // by the caller before this point.
     unsafe {
         core::arch::asm!("sti", options(nomem, nostack, preserves_flags));
     }
+    crate::sched::smp::after_enable_interrupts();
 }
 
 /// Halts the current CPU forever.

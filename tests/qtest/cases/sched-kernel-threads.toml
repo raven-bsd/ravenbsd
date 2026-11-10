@@ -9,7 +9,7 @@ boot_cmdline = "console=ttyS0 test-exit=1 selftest=sched"
 expect_exit = "success"
 
 [[expect]]
-regex = '^sched: running \(1 cpu, slice 10 ms\)$'
+regex = '^sched: running \(\d+ cpus?, slice 10 ms\)$'
 
 [[expect]]
 regex = '^selftest: sched ok switches=\d+$'

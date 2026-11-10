@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "smp-boot"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+boot_cmdline = "console=ttyS0 test-exit=1 selftest=smp"
+expect_exit = "success"
+
+[[expect]]
+regex = '^smp: 4 cpus online$'
+
+[[expect]]
+regex = '^selftest: smp tlb ok cpus=4$'
+
+[[expect]]
+regex = '^selftest: smp counter ok cpus=4 counter=800$'
+
+[[expect]]
+regex = '^selftest: smp ok cpus=4 switches=\d+$'
+
+[[forbid]]
+regex = '(?i)panic'
