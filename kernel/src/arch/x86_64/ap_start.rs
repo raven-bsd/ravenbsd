@@ -663,8 +663,8 @@ pub extern "C" fn ap_entry(cpu: u64) -> ! {
         write_cr3(root.0);
     }
     install_gs(cpu);
-    // Load the boot processor's IDT base. The table content is shared, so the IPI gates that the
-    // BSP installs after all APs are online are visible here without rebuilding the table.
+    // Load the boot processor's IDT base. The table content is shared and the BSP has already
+    // installed the IPI and AP-timer gates, so this AP sees them without rebuilding the table.
     load_bsp_idt();
     lapic_init_ap();
     block(cpu).online.store(1, Ordering::Release);
