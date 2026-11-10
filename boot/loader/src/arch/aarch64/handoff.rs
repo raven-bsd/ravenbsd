@@ -132,26 +132,27 @@ pub unsafe fn jump(
     clean_kernel_cache(kernel_phys, kernel_size);
     let tcr = tcr(physical_bits());
     // Register budget for the trampoline:
-    // - `x0` carries the kernel's `BootInfo` argument. It is an `in("x0")` operand and no
-    //   instruction here writes it, so it still holds that value at the final branch.
-    // - `x16` carries the kernel entry point. It is an `in("x16")` operand and is only read by
-    //   the final `br`; `x16`/`x17` are the AAPCS64 intra-procedure-call scratch registers.
-    // - `{scratch}` is a compiler-allocated output used for the SCTLR_EL1 read-modify-write.
-    //   An output cannot share a register with a live input, so it can never alias `bootinfo`,
-    //   `entry` or any other operand, whatever register LLVM picks for it.
-    // - MAIR/TCR/TTBR0/TTBR1/stack are read-only inputs consumed by `msr`/`mov sp`. The only
-    //   general-purpose register written inside this block is the scratch (`mov sp` writes SP,
-    //   not a GPR); `x0` is pinned by its operand constraint and set by the compiler before the
-    //   block. The clobber set is therefore explicit and identical in debug and release builds.
+    // - `x0` carries the kernel's `BootInfo` argument; it is a pinned operand and no
+    //   instruction in this block writes it.
+    // - `x16` carries the kernel entry point; it is a pinned operand and only the final `br`
+    //   reads it. `x16`/`x17` are the AAPCS64 intra-procedure-call scratch registers.
+    // - `x1`/`x2`/`x3`/`x4`/`x5` carry MAIR/TCR/TTBR0/TTBR1/stack; each is consumed by its
+    //   `msr` or by `mov sp`, and none is written by the block.
+    // - `x9` is the SCTLR_EL1 read-modify-write scratch. It is not an operand, and because
+    //   this block is `noreturn` the compiler keeps no live value in any register past it, so
+    //   `x9` is dead at that point. (Rust forbids output operands on a `noreturn` asm block,
+    //   which is why the scratch is a fixed register instead of an `out(reg)` operand.)
+    // Every input is pinned to a register other than x9, so the clobber cannot hit an operand
+    // in either the debug or the release build.
     // SAFETY: the caller guarantees the tables and addresses; these are EL1 system-register
     // writes and the final `br` leaves the loader permanently.
     unsafe {
         asm!(
             "msr daifset, #0xf",
-            "msr mair_el1, {mair}",
-            "msr tcr_el1, {tcr}",
-            "msr ttbr0_el1, {ttbr0}",
-            "msr ttbr1_el1, {ttbr1}",
+            "msr mair_el1, x1",
+            "msr tcr_el1, x2",
+            "msr ttbr0_el1, x3",
+            "msr ttbr1_el1, x4",
             "dsb sy",
             "isb",
             "tlbi vmalle1",
@@ -159,27 +160,24 @@ pub unsafe fn jump(
             "isb",
             // UEFI leaves the MMU on. Re-assert M/C/I so a firmware that disabled one of them
             // cannot leave the kernel running uncached; the new TTBR0 identity map is active.
-            "mrs {scratch}, sctlr_el1",
-            "orr {scratch}, {scratch}, #1",
-            "orr {scratch}, {scratch}, #4",
-            "orr {scratch}, {scratch}, #0x1000",
-            "msr sctlr_el1, {scratch}",
+            "mrs x9, sctlr_el1",
+            "orr x9, x9, #1",
+            "orr x9, x9, #4",
+            "orr x9, x9, #0x1000",
+            "msr sctlr_el1, x9",
             "isb",
-            "mov sp, {stack}",
+            "mov sp, x5",
             "br x16",
-            mair = in(reg) MAIR,
-            tcr = in(reg) tcr,
-            ttbr0 = in(reg) roots.ttbr0,
-            ttbr1 = in(reg) roots.ttbr1,
-            stack = in(reg) stack_top,
             in("x0") bootinfo,
+            in("x1") MAIR,
+            in("x2") tcr,
+            in("x3") roots.ttbr0,
+            in("x4") roots.ttbr1,
+            in("x5") stack_top,
             in("x16") entry,
-            scratch = out(reg) _,
+            options(noreturn),
         );
     }
-    // The asm only leaves through `br x16`; this is the defensive path for a compiler that
-    // thinks the block can fall through.
-    halt()
 }
 
 /// Power the machine off through PSCI.
