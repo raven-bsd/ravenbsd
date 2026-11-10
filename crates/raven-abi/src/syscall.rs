@@ -91,6 +91,27 @@ syscalls! {
     HANDLE_CLOSE = 0x50;
     /// `handle_dup(h: Handle, rights_mask: u32) -> Handle`; new rights = old rights AND mask. Requires `DUP`.
     HANDLE_DUP = 0x51;
+
+    /// `scheme_register(name: &str, handle: Handle) -> 0`; register a scheme server handle under a name.
+    SCHEME_REGISTER = 0x60;
+    /// `open(path: &str, flags: u32, mode: u32) -> Handle`; scheme-routed open (file/scheme namespace).
+    OPEN = 0x61;
+    /// `read(h: Handle, buf: &mut [u8]) -> usize`.
+    READ = 0x62;
+    /// `write(h: Handle, buf: &[u8]) -> usize`.
+    WRITE = 0x63;
+    /// `close(h: Handle) -> 0`.
+    CLOSE = 0x64;
+    /// `dup(h: Handle, rights_mask: u32) -> Handle` (scheme-file variant of HANDLE_DUP).
+    DUP = 0x65;
+    /// `fstat(h: Handle, buf: &mut Stat) -> 0`.
+    FSTAT = 0x66;
+    /// `call(h: Handle, request: &[u8]) -> (u32, response buffer)`; typed RPC escape hatch.
+    CALL = 0x67;
+    /// Server side: `recv() -> (Handle, packet)`; receive the next scheme packet.
+    RECV = 0x68;
+    /// Server side: `send(handle: Handle, packet: &[u8]) -> 0`; reply to a packet.
+    SEND = 0x69;
 }
 
 #[cfg(test)]
