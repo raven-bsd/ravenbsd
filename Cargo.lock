@@ -386,6 +386,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-proto-audio"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
+
+[[package]]
 name = "raven-proto-net"
 version = "0.1.0"
 dependencies = [
