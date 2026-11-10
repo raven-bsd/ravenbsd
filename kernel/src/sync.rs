@@ -15,11 +15,11 @@
 
 use core::cell::UnsafeCell;
 use core::ops::{Deref, DerefMut};
-use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use core::sync::atomic::{AtomicBool, Ordering};
+
+use crate::sched::smp::percpu;
 
 const RFLAGS_IF: u64 = 1 << 9;
-
-static PREEMPT_COUNT: AtomicU32 = AtomicU32::new(0);
 
 /// Disable interrupts and return the previous flags.
 #[inline]
@@ -51,10 +51,10 @@ fn restore_interrupts(flags: u64) {
     }
 }
 
-/// Current preemption nesting depth of the running thread.
+/// Current preemption nesting depth of the running thread on this CPU.
 #[inline]
 pub fn preempt_count() -> u32 {
-    PREEMPT_COUNT.load(Ordering::SeqCst)
+    percpu::preempt_count()
 }
 
 /// Install a thread's saved preemption depth during a context switch.
@@ -65,7 +65,7 @@ pub fn preempt_count() -> u32 {
 /// access to the run queue.
 #[inline]
 pub(crate) unsafe fn set_preempt_count(value: u32) {
-    PREEMPT_COUNT.store(value, Ordering::SeqCst);
+    percpu::set_preempt_count(value);
 }
 
 /// True when no lock or scheduler critical section is held.
@@ -101,7 +101,7 @@ impl CriticalGuard {
     /// Enter the critical section.
     pub fn new() -> Self {
         let flags = disable_interrupts();
-        PREEMPT_COUNT.fetch_add(1, Ordering::SeqCst);
+        percpu::preempt_inc();
         Self { flags }
     }
 }
@@ -114,7 +114,7 @@ impl Default for CriticalGuard {
 
 impl Drop for CriticalGuard {
     fn drop(&mut self) {
-        PREEMPT_COUNT.fetch_sub(1, Ordering::SeqCst);
+        percpu::preempt_dec();
         restore_interrupts(self.flags);
     }
 }
@@ -150,7 +150,7 @@ impl<T> IrqSpinLock<T> {
         while self.locked.swap(true, Ordering::Acquire) {
             core::hint::spin_loop();
         }
-        PREEMPT_COUNT.fetch_add(1, Ordering::SeqCst);
+        percpu::preempt_inc();
         IrqGuard { lock: self, flags }
     }
 }
@@ -179,7 +179,7 @@ impl<T> DerefMut for IrqGuard<'_, T> {
 
 impl<T> Drop for IrqGuard<'_, T> {
     fn drop(&mut self) {
-        PREEMPT_COUNT.fetch_sub(1, Ordering::SeqCst);
+        percpu::preempt_dec();
         self.lock.locked.store(false, Ordering::Release);
         restore_interrupts(self.flags);
     }

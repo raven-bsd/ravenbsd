@@ -12,6 +12,8 @@ use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use crate::boot;
 use crate::kprintln;
 use crate::sched::sleep;
+use crate::sched::smp;
+use crate::sync::IrqSpinLock;
 
 /// Iterations per worker.
 const ITERATIONS: u32 = 100;
@@ -33,6 +35,9 @@ static ACTIVE: AtomicU32 = AtomicU32::new(0);
 static OVERLAP: AtomicBool = AtomicBool::new(false);
 static SLEEP_ELAPSED: AtomicU64 = AtomicU64::new(0);
 static SLEEP_SHORT: AtomicBool = AtomicBool::new(false);
+static COUNTER_LOCK: IrqSpinLock<()> = IrqSpinLock::new(());
+static CPU_SEEN: [AtomicU32; crate::sched::MAX_CPUS] =
+    [const { AtomicU32::new(0) }; crate::sched::MAX_CPUS];
 
 /// Run the scheduler self-test; on success this never returns.
 pub fn run() -> ! {
@@ -78,13 +83,24 @@ fn worker3() {
 fn worker(index: usize) {
     let mut iteration = 0u32;
     while iteration < ITERATIONS {
-        if ACTIVE.fetch_add(1, Ordering::SeqCst) != 0 {
-            OVERLAP.store(true, Ordering::SeqCst);
+        // The counter section is a real critical section: on SMP the original unprotected
+        // increment could legitimately overlap between CPUs, which would make the check
+        // meaningless rather than detect a scheduler bug.
+        {
+            let _guard = COUNTER_LOCK.lock();
+            if ACTIVE.fetch_add(1, Ordering::SeqCst) != 0 {
+                OVERLAP.store(true, Ordering::SeqCst);
+            }
+            if let Some(count) = COUNTS.get(index) {
+                count.fetch_add(1, Ordering::SeqCst);
+            }
+            ACTIVE.fetch_sub(1, Ordering::SeqCst);
         }
-        if let Some(count) = COUNTS.get(index) {
-            count.fetch_add(1, Ordering::SeqCst);
+
+        let cpu = smp::percpu::this_cpu();
+        if let Some(seen) = CPU_SEEN.get(cpu) {
+            seen.fetch_add(1, Ordering::SeqCst);
         }
-        ACTIVE.fetch_sub(1, Ordering::SeqCst);
 
         let sequence = STARTED.fetch_add(1, Ordering::SeqCst);
         if sequence < 8 {
@@ -92,6 +108,11 @@ fn worker(index: usize) {
             ORDER.fetch_or(byte << sequence.wrapping_mul(8), Ordering::SeqCst);
         }
 
+        // The first few iterations sleep so the application processors get a chance to steal
+        // work; otherwise the tiny kernel workload can finish before their 1 ms tick.
+        if iteration < 8 {
+            sleep::sleep_ns(500_000);
+        }
         crate::sched::yield_now();
         iteration = iteration.saturating_add(1);
     }
@@ -129,10 +150,23 @@ fn monitor() {
             ok = false;
         }
     }
+    let cpus = smp::online_cpus();
     let order = ORDER.load(Ordering::SeqCst) & 0xffff_ffff;
-    if order != 0x0403_0201 {
+    if cpus == 1 && order != 0x0403_0201 {
         kprintln!("selftest: sched start order {order:#x}");
         ok = false;
+    }
+    let active_cpus = cpus.min(COUNTS.len());
+    let mut cpu = 0usize;
+    while cpu < active_cpus {
+        if CPU_SEEN
+            .get(cpu)
+            .is_some_and(|seen| seen.load(Ordering::SeqCst) == 0)
+        {
+            kprintln!("selftest: sched cpu {cpu} did not run a worker");
+            ok = false;
+        }
+        cpu = cpu.saturating_add(1);
     }
     if SLEEP_ELAPSED.load(Ordering::SeqCst) < SLEEP_NS {
         kprintln!(

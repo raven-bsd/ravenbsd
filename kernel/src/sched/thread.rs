@@ -132,6 +132,10 @@ pub struct Thread {
     pub pending_wake: AtomicBool,
     /// True for the per-CPU idle thread.
     pub idle: bool,
+    /// CPU this thread last ran on (used to route wakeups).
+    pub last_cpu: AtomicU32,
+    /// Pinned threads are never stolen by another CPU (deterministic SMP self-test workers).
+    pub pinned: AtomicBool,
 }
 
 // SAFETY: all interior mutability is accessed from scheduler critical sections (interrupts off)
@@ -214,6 +218,8 @@ impl Thread {
             wake_status: AtomicI64::new(0),
             pending_wake: AtomicBool::new(false),
             idle,
+            last_cpu: AtomicU32::new(0),
+            pinned: AtomicBool::new(false),
         });
         Ok(thread)
     }
@@ -298,7 +304,44 @@ impl Thread {
             wake_status: AtomicI64::new(0),
             pending_wake: AtomicBool::new(false),
             idle: true,
+            last_cpu: AtomicU32::new(0),
+            pinned: AtomicBool::new(false),
         })
+    }
+
+    /// Create the idle thread for an application processor.
+    ///
+    /// The AP is already executing on the returned kernel stack when this object is published, so
+    /// the stack is not prepared with [`crate::sched::context::prepare_stack`]: the first
+    /// `sched_switch` saves the live stack pointer.
+    pub fn new_idle_ap(process: Arc<Process>, cr3: u64) -> Result<Arc<Thread>, Errno> {
+        let (base, top) = allocate_kernel_stack().ok_or(Errno::ENOMEM)?;
+        Ok(Arc::new(Thread {
+            id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
+            name: String::from("idle-ap"),
+            process,
+            state: AtomicU8::new(ThreadState::Running as u8),
+            priority: PRIORITY_IDLE,
+            sched: SchedContext::fair(PRIORITY_IDLE),
+            kernel_stack_base: base,
+            kernel_stack_top: top,
+            saved_rsp: core::cell::UnsafeCell::new(0),
+            user: false,
+            user_entry: 0,
+            user_stack: 0,
+            arg: 0,
+            kernel_entry: None,
+            cr3,
+            exit_code: AtomicI32::new(0),
+            preempt_count: AtomicU32::new(0),
+            slice_ticks: AtomicU32::new(crate::sched::SLICE_TICKS),
+            block_token: AtomicU64::new(0),
+            wake_status: AtomicI64::new(0),
+            pending_wake: AtomicBool::new(false),
+            idle: true,
+            last_cpu: AtomicU32::new(0),
+            pinned: AtomicBool::new(false),
+        }))
     }
 }
 

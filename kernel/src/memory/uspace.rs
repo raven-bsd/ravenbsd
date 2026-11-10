@@ -254,6 +254,7 @@ impl UserAddressSpace {
             return Err(Errno::EINVAL);
         }
         let pages = pages_in(len)?;
+        let mut to_free: Vec<u64> = Vec::with_capacity(usize::try_from(pages).unwrap_or(0));
         {
             let mut mapper = self.aspace.mapper().map_err(map_errno)?;
             let mut owned = Vec::with_capacity(usize::try_from(pages).unwrap_or(0));
@@ -275,12 +276,20 @@ impl UserAddressSpace {
             for (virt, physical, owns) in owned {
                 mapper.unmap(virt).map_err(map_errno)?;
                 if owns {
-                    let _ = frame::free_frame(frame::PhysAddr(physical));
+                    to_free.push(physical);
                 }
             }
         }
         self.vmas.remove(start, len).map_err(vma_errno)?;
         self.remove_object_range(start, len);
+        // Do not recycle frames until every CPU has dropped its translation: a stale TLB entry
+        // could otherwise reach a frame that was already handed to another address space.
+        let flushed = crate::sched::smp::shootdown::flush_range(start, len);
+        if flushed {
+            for physical in to_free {
+                let _ = frame::free_frame(frame::PhysAddr(physical));
+            }
+        }
         Ok(())
     }
 
@@ -343,6 +352,7 @@ impl UserAddressSpace {
             }
         }
         self.vmas.protect(start, len, new_prot).map_err(vma_errno)?;
+        let _ = crate::sched::smp::shootdown::flush_range(start, len);
         Ok(())
     }
 
@@ -386,7 +396,11 @@ impl UserAddressSpace {
         };
         if already_private {
             let flags = leaf_flags(vma.prot(), true);
-            return mapper.protect(virt, flags).map_err(map_errno);
+            let result = mapper.protect(virt, flags).map_err(map_errno);
+            if result.is_ok() {
+                let _ = crate::sched::smp::shootdown::flush_range(page, PAGE_SIZE);
+            }
+            return result;
         }
         // Copy-on-write: the faulting page still points into the initfs or the memory object.
         let Some(new_frame) = frame::alloc_zeroed_frame() else {
@@ -415,6 +429,7 @@ impl UserAddressSpace {
             let _ = frame::free_frame(new_frame);
             return Err(Errno::EFAULT);
         }
+        let _ = crate::sched::smp::shootdown::flush_range(page, PAGE_SIZE);
         Ok(())
     }
 

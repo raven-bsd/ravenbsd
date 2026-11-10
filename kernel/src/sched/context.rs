@@ -13,8 +13,8 @@ use core::sync::atomic::Ordering;
 
 use raven_abi::errno::Errno;
 
+use crate::arch::x86_64::ap_start;
 use crate::arch::x86_64::gdt::{self, USER_CS, USER_SS};
-use crate::arch::x86_64::usermode;
 use crate::sched::thread::Thread;
 use crate::sync;
 
@@ -99,9 +99,13 @@ pub unsafe fn switch(from: &Thread, to: &Thread) {
         sync::set_preempt_count(to.preempt_count.load(Ordering::SeqCst));
     }
 
-    usermode::set_kernel_rsp(to.kernel_stack_top);
-    usermode::set_current_thread(to as *const Thread as u64);
-    gdt::set_rsp0(to.kernel_stack_top);
+    ap_start::set_kernel_rsp(to.kernel_stack_top);
+    ap_start::set_current_thread(to as *const Thread as u64);
+    // The single TSS belongs to the boot processor; application processors only run kernel
+    // threads in S10 and never take a ring-3 to ring-0 transition.
+    if crate::sched::smp::percpu::this_cpu() == 0 {
+        gdt::set_rsp0(to.kernel_stack_top);
+    }
 
     let current = read_cr3();
     if current != to.cr3 {
@@ -160,7 +164,7 @@ fn idle_forever() -> ! {
 ///
 /// `entry` and `stack` must be valid user addresses in the active address space.
 unsafe fn enter_user(entry: u64, stack: u64, arg: u64) -> ! {
-    let percpu = usermode::percpu_address();
+    let percpu = ap_start::percpu_address(crate::sched::smp::percpu::this_cpu());
     let gs_base = rdmsr(IA32_GS_BASE);
     if gs_base == percpu {
         // The kernel arrived from ring 3 through a syscall/trap and is in swapped state.
