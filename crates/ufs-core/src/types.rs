@@ -3,7 +3,7 @@
 
 //! Public value types of the read-only API.
 
-use alloc::vec::Vec;
+use alloc_crate::vec::Vec;
 
 /// An inode number.
 pub type Ino = u32;

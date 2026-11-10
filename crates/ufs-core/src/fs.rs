@@ -33,6 +33,8 @@
 
 //! UFS superblock constants, decoding and cylinder-group arithmetic.
 
+use alloc_crate::vec::Vec;
+
 use crate::dinode::{UFS1_MAXSYMLINKLEN, UFS2_MAXSYMLINKLEN};
 use crate::error::UfsError;
 use crate::types::Ino;
@@ -74,6 +76,7 @@ const O_NCG: usize = 44;
 const O_BSIZE: usize = 48;
 const O_FSIZE: usize = 52;
 const O_FRAG: usize = 56;
+const O_MINFREE: usize = 60;
 const O_BMASK: usize = 72;
 const O_FMASK: usize = 76;
 const O_BSHIFT: usize = 80;
@@ -83,6 +86,7 @@ const O_FRAGSHIFT: usize = 96;
 const O_SBSIZE: usize = 104;
 const O_NINDIR: usize = 116;
 const O_INOPB: usize = 120;
+const O_OPTIM: usize = 128;
 const O_OLD_INODEFMT: usize = 1324;
 const O_OLD_CSADDR: usize = 152;
 const O_CSSIZE: usize = 156;
@@ -95,9 +99,14 @@ const O_SBLOCKLOC: usize = 1000;
 const O_SIZE: usize = 1080;
 const O_DSIZE: usize = 1088;
 const O_CSADDR: usize = 1096;
+const O_TIME: usize = 1072;
+const O_AVGFILESIZE: usize = 1196;
+const O_AVGFPDIR: usize = 1200;
+const O_FMOD: usize = 208;
 const O_CLEAN: usize = 209;
 const O_OLD_FLAGS: usize = 211;
 const O_FLAGS: usize = 1312;
+const O_CONTIGSUMSIZE: usize = 1316;
 const O_MAXSYMLINKLEN: usize = 1320;
 const O_MAGIC: usize = 1372;
 
@@ -108,6 +117,55 @@ pub(crate) struct Csum {
     pub(crate) nbfree: i64,
     pub(crate) nifree: i64,
     pub(crate) nffree: i64,
+}
+
+/// On-disk per-cylinder-group `struct csum` (32-bit counters).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Csum32 {
+    pub(crate) ndir: i32,
+    pub(crate) nbfree: i32,
+    pub(crate) nifree: i32,
+    pub(crate) nffree: i32,
+}
+
+impl Csum32 {
+    pub(crate) fn widen(self) -> Csum {
+        Csum {
+            ndir: i64::from(self.ndir),
+            nbfree: i64::from(self.nbfree),
+            nifree: i64::from(self.nifree),
+            nffree: i64::from(self.nffree),
+        }
+    }
+
+    pub(crate) fn from_le_bytes(bytes: &[u8]) -> Result<Self, UfsError> {
+        if bytes.len() < 16 {
+            return Err(UfsError::Corrupt("short csum"));
+        }
+        let mut ndir = [0u8; 4];
+        let mut nbfree = [0u8; 4];
+        let mut nifree = [0u8; 4];
+        let mut nffree = [0u8; 4];
+        ndir.copy_from_slice(&bytes[0..4]);
+        nbfree.copy_from_slice(&bytes[4..8]);
+        nifree.copy_from_slice(&bytes[8..12]);
+        nffree.copy_from_slice(&bytes[12..16]);
+        Ok(Self {
+            ndir: i32::from_le_bytes(ndir),
+            nbfree: i32::from_le_bytes(nbfree),
+            nifree: i32::from_le_bytes(nifree),
+            nffree: i32::from_le_bytes(nffree),
+        })
+    }
+
+    pub(crate) fn to_le_bytes(self) -> [u8; 16] {
+        let mut out = [0u8; 16];
+        out[0..4].copy_from_slice(&self.ndir.to_le_bytes());
+        out[4..8].copy_from_slice(&self.nbfree.to_le_bytes());
+        out[8..12].copy_from_slice(&self.nifree.to_le_bytes());
+        out[12..16].copy_from_slice(&self.nffree.to_le_bytes());
+        out
+    }
 }
 
 /// A decoded, structurally checked UFS superblock.
@@ -144,6 +202,14 @@ pub(crate) struct Superblock {
     pub(crate) clean: u8,
     pub(crate) cstotal: Csum,
     pub(crate) maxsymlinklen: i32,
+    pub(crate) time: i64,
+    pub(crate) minfree: i32,
+    pub(crate) optim: i32,
+    pub(crate) avgfilesize: u32,
+    pub(crate) avgfpdir: u32,
+    pub(crate) contigsumsize: i32,
+    pub(crate) old_flags: u8,
+    pub(crate) raw: Vec<u8>,
 }
 
 impl Superblock {
@@ -236,6 +302,14 @@ impl Superblock {
             clean: read_u8(buf, O_CLEAN)?,
             cstotal,
             maxsymlinklen,
+            time: read_i64(buf, O_TIME)?,
+            minfree: read_i32(buf, O_MINFREE)?,
+            optim: read_i32(buf, O_OPTIM)?,
+            avgfilesize: read_u32(buf, O_AVGFILESIZE)?,
+            avgfpdir: read_u32(buf, O_AVGFPDIR)?,
+            contigsumsize: read_i32(buf, O_CONTIGSUMSIZE)?,
+            old_flags,
+            raw: buf.to_vec(),
         };
         Ok(sb)
     }
@@ -315,6 +389,39 @@ impl Superblock {
     pub(crate) fn frag_offset(&self, frag: u64) -> Result<u64, UfsError> {
         frag.checked_mul(u64::from(self.fsize))
             .ok_or(UfsError::Corrupt("fragment address overflow"))
+    }
+
+    /// Update the in-memory clean flag and its superblock byte.
+    pub(crate) fn set_clean_raw(&mut self, clean: u8) {
+        self.clean = clean;
+        if let Some(byte) = self.raw.get_mut(O_CLEAN) {
+            *byte = clean;
+        }
+    }
+
+    /// Update the in-memory timestamp and its superblock bytes.
+    pub(crate) fn set_time_raw(&mut self, time: i64) {
+        self.time = time;
+        if let Some(bytes) = self.raw.get_mut(O_TIME..O_TIME + 8) {
+            bytes.copy_from_slice(&time.to_le_bytes());
+        }
+    }
+
+    /// Clear the on-disk `fs_fmod` byte; the in-memory value is not stored.
+    pub(crate) fn clear_fmod_raw(&mut self) {
+        if let Some(byte) = self.raw.get_mut(O_FMOD) {
+            *byte = 0;
+        }
+    }
+
+    /// Encode the aggregate summary counters into the raw superblock.
+    pub(crate) fn write_cstotal_raw(&mut self) {
+        if let Some(bytes) = self.raw.get_mut(O_CSTOTAL..O_CSTOTAL + 32) {
+            bytes[0..8].copy_from_slice(&self.cstotal.ndir.to_le_bytes());
+            bytes[8..16].copy_from_slice(&self.cstotal.nbfree.to_le_bytes());
+            bytes[16..24].copy_from_slice(&self.cstotal.nifree.to_le_bytes());
+            bytes[24..32].copy_from_slice(&self.cstotal.nffree.to_le_bytes());
+        }
     }
 }
 

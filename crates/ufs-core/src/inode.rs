@@ -40,24 +40,27 @@ use crate::types::Ino;
 
 /// Decode the inode at `slot` in a full filesystem block.
 pub(crate) fn decode_from_block(
-    fs: &Superblock,
+    ufs2: bool,
+    bsize: u32,
+    inode_size: usize,
+    inopb: u32,
     block: &[u8],
     slot: usize,
     ino: Ino,
 ) -> Result<Inode, UfsError> {
-    if block.len() != fs.bsize as usize || slot >= fs.inopb as usize {
+    if block.len() != bsize as usize || slot >= inopb as usize {
         return Err(UfsError::Corrupt("inode slot"));
     }
     let offset = slot
-        .checked_mul(fs.inode_size())
+        .checked_mul(inode_size)
         .ok_or(UfsError::Corrupt("inode offset"))?;
     let end = offset
-        .checked_add(fs.inode_size())
+        .checked_add(inode_size)
         .ok_or(UfsError::Corrupt("inode offset"))?;
     let raw = block
         .get(offset..end)
         .ok_or(UfsError::Corrupt("inode outside block"))?;
-    let inode = Inode::decode(fs.ufs2, raw)?;
+    let inode = Inode::decode(ufs2, raw)?;
     if ino == 0 {
         return Err(UfsError::Invalid);
     }

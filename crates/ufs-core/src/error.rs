@@ -38,6 +38,8 @@ pub enum UfsError {
     Invalid,
     /// The operation needs a writable mount; this core is read-only.
     ReadOnly,
+    /// The filesystem has no free block, fragment or inode.
+    NoSpace,
 }
 
 impl fmt::Display for UfsError {
@@ -53,6 +55,7 @@ impl fmt::Display for UfsError {
             Self::NameTooLong => f.write_str("name too long"),
             Self::Invalid => f.write_str("invalid argument"),
             Self::ReadOnly => f.write_str("read-only filesystem"),
+            Self::NoSpace => f.write_str("no space left"),
         }
     }
 }
