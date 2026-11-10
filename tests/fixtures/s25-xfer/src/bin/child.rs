@@ -19,7 +19,12 @@ const PAGE: usize = 4096;
 const TRANSFERRED: Handle = Handle::new(3, 0);
 const PATTERN: u8 = 0xa5;
 
-fn map_memory(protection: usize) -> Result<usize, Errno> {
+fn map_memory(protection: usize, shared: bool) -> Result<usize, Errno> {
+    let flags = if shared {
+        map::pack(protection, map::SHARED)
+    } else {
+        map::pack(protection, 0)
+    };
     // SAFETY: MAP follows the stable syscall ABI; the kernel validates every argument.
     let result = unsafe {
         syscall6(
@@ -29,14 +34,14 @@ fn map_memory(protection: usize) -> Result<usize, Errno> {
             0,
             0,
             PAGE,
-            map::pack(protection, 0),
+            flags,
         )
     };
     Errno::from_ret(result)
 }
 
 fn main(_args: raven_rt::Args) -> i32 {
-    let address = match map_memory(prot::READ) {
+    let address = match map_memory(prot::READ, false) {
         Ok(address) => address,
         Err(_) => return 1,
     };
@@ -45,7 +50,9 @@ fn main(_args: raven_rt::Args) -> i32 {
     if first != PATTERN {
         return 2;
     }
-    match map_memory(prot::READ | prot::WRITE) {
+    // The handle carries READ|MAP without WRITE: a shared writable mapping must be refused.
+    // (A private writable mapping is copy-on-write and needs only MAP, by design.)
+    match map_memory(prot::READ | prot::WRITE, true) {
         Err(Errno::EACCES) => 7,
         _ => 3,
     }

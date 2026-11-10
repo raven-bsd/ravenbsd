@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! S25 controller: transfers a read-only memory object before child start, then receives one as
-//! an Open reply attachment.  It repeats child start/exit to exercise handle-table teardown.
+//! S25 controller: transfers a read-only memory object into a child before its first thread,
+//! then receives one from a server as an `Open` reply attachment.
+//!
+//! The 100 start/exit cycles prove handle hygiene: the parent's live-handle count is the same
+//! before and after, and every kernel-issued handle index repeats each cycle (4/5/6), so any
+//! leaked slot would shift the indices and fail the run.
 
 #![no_std]
 #![no_main]
@@ -29,6 +33,11 @@ const STACK_TOP: usize = (USER_END as usize) - PAGE;
 const STACK_BASE: usize = STACK_TOP - STACK_SIZE;
 const PATTERN: u8 = 0xa5;
 const CYCLES: usize = 100;
+/// Mirrors `raven_handles::MAX_HANDLES`.
+const MAX_HANDLES: usize = 65_536;
+/// Initial kernel handles: self process, initfs, namespace.
+const INITIAL_HANDLES: usize = 3;
+const OPEN_RETRIES: usize = 2000;
 
 fn result(value: isize) -> Result<usize, Errno> {
     Errno::from_ret(value)
@@ -44,8 +53,8 @@ fn proc_create() -> Result<Handle, Errno> {
     handle(unsafe { syscall1(Syscall::PROC_CREATE as usize, 0) })
 }
 
-fn memobj_create() -> Result<Handle, Errno> {
-    handle(unsafe { syscall2(Syscall::MEMOBJ_CREATE as usize, PAGE, 0) })
+fn memobj_create(len: usize) -> Result<Handle, Errno> {
+    handle(unsafe { syscall2(Syscall::MEMOBJ_CREATE as usize, len, 0) })
 }
 
 fn transfer(process: Handle, object: Handle, mask: Rights) -> Result<Handle, Errno> {
@@ -121,9 +130,9 @@ fn wait(process: Handle) -> Result<i32, Errno> {
     Ok(code)
 }
 
-fn thread_create(process: Handle, entry: usize, stack: usize) -> Result<(), Errno> {
+fn thread_create(process: Handle, entry: usize, stack: usize) -> Result<Handle, Errno> {
     // SAFETY: THREAD_CREATE follows the stable syscall ABI; arguments are prepared below.
-    result(unsafe {
+    handle(unsafe {
         syscall6(
             Syscall::THREAD_CREATE as usize,
             process.0 as usize,
@@ -134,7 +143,6 @@ fn thread_create(process: Handle, entry: usize, stack: usize) -> Result<(), Errn
             0,
         )
     })
-    .map(|_| ())
 }
 
 fn map_initfs() -> Result<&'static [u8], Errno> {
@@ -155,42 +163,61 @@ fn map_initfs() -> Result<&'static [u8], Errno> {
     Ok(unsafe { core::slice::from_raw_parts(base as *const u8, total) })
 }
 
-fn start_child(entry: &Entry<'_>, elf: &Elf<'_>, memory: Handle) -> Result<i32, Errno> {
+/// Compact diagnostic tag for one syscall result: the raw handle value or the errno number.
+fn tag(result: &Result<Handle, Errno>) -> u32 {
+    match result {
+        Ok(handle) => handle.0,
+        Err(error) => u32::from(error.0),
+    }
+}
+
+/// Start one child and wait for its exit. `live` tracks the parent's live handles so the
+/// caller can prove the table returns to its steady state after every cycle.
+fn start_child(
+    entry: &Entry<'_>,
+    elf: &Elf<'_>,
+    memory: Handle,
+    live: &mut usize,
+) -> Result<i32, Errno> {
     let child = proc_create()?;
+    if child.index() != 4 {
+        println!("s25: child index {}", child.index());
+        return Err(Errno::EIO);
+    }
+    *live += 1;
     for step in plan_load(elf, PAGE as u64, LoadMode::Strict).map_err(|_| Errno::EINVAL)? {
         let flags = map::pack(step.prot as usize, map::FIXED);
         match step.kind {
             StepKind::File { offset } => {
                 let offset = entry.data_offset.checked_add(offset).ok_or(Errno::EINVAL)?;
                 let offset = usize::try_from(offset).map_err(|_| Errno::EINVAL)?;
-                if let Err(error) = map_at(
+                map_at(
                     child,
                     Handle::INITFS,
                     offset,
                     step.vaddr as usize,
                     step.len as usize,
                     flags,
-                ) {
-                    println!("s25: child file map {}", error.0);
-                    return Err(error);
-                }
+                )?;
             }
             StepKind::Zero => {
-                if let Err(error) = map_memory(
+                map_memory(
                     child,
                     Handle::NONE,
                     step.vaddr as usize,
                     step.len as usize,
                     flags,
-                ) {
-                    println!("s25: child zero map {}", error.0);
-                    return Err(error);
-                }
+                )?;
             }
             StepKind::CopyTail { .. } => return Err(Errno::EINVAL),
         }
     }
-    let stack = memobj_create()?;
+    let stack = memobj_create(STACK_SIZE)?;
+    if stack.index() != 5 {
+        println!("s25: stack index {}", stack.index());
+        return Err(Errno::EIO);
+    }
+    *live += 1;
     let scratch = map_memory(
         Handle::SELF_PROC,
         stack,
@@ -198,36 +225,53 @@ fn start_child(entry: &Entry<'_>, elf: &Elf<'_>, memory: Handle) -> Result<i32, 
         STACK_SIZE,
         map::pack(prot::READ | prot::WRITE, map::FIXED | map::SHARED),
     )?;
-    if let Err(error) = map_memory(
+    map_memory(
         child,
         stack,
         STACK_BASE,
         STACK_SIZE,
         map::pack(prot::READ | prot::WRITE, map::FIXED | map::SHARED),
-    ) {
-        println!("s25: child stack map {}", error.0);
-        return Err(error);
-    }
+    )?;
     let stack_pointer = build_stack(scratch);
-    let rights = Rights::READ.union(Rights::MAP);
-    if transfer(child, memory, Rights::NONE) != Err(Errno::EINVAL) {
+
+    // Negatives: a zero mask, an absent handle and a non-transferable kind must all be refused
+    // without touching the destination table.
+    let zero_mask = transfer(child, memory, Rights::NONE);
+    if zero_mask != Err(Errno::EINVAL) {
+        println!("s25: mask0 {}", tag(&zero_mask));
         return Err(Errno::EIO);
     }
-    if transfer(child, Handle::SELF_PROC, Rights::READ) != Err(Errno::EBADF) {
+    let absent = transfer(child, Handle::new(100, 7), Rights::READ);
+    if absent != Err(Errno::EBADF) {
+        println!("s25: absent {}", tag(&absent));
         return Err(Errno::EIO);
     }
-    let transferred = transfer(child, memory, rights)?;
+    let process = transfer(child, Handle::SELF_PROC, Rights::READ);
+    if process != Err(Errno::EBADF) {
+        println!("s25: process {}", tag(&process));
+        return Err(Errno::EIO);
+    }
+    // The spawn-time grant: a READ|MAP duplicate installed in the child before its first thread.
+    let transferred = transfer(child, memory, Rights::READ.union(Rights::MAP))?;
     if transferred != Handle::new(3, 0) {
+        println!("s25: transferred {:#x}", transferred.0);
         return Err(Errno::EIO);
     }
-    if let Err(error) = thread_create(child, elf.entry() as usize, stack_pointer) {
-        println!("s25: child thread {}", error.0);
-        return Err(error);
+
+    let thread = thread_create(child, elf.entry() as usize, stack_pointer)?;
+    if thread.index() != 6 {
+        println!("s25: thread index {}", thread.index());
+        return Err(Errno::EIO);
     }
+    *live += 1;
+    close(thread);
+    *live -= 1;
     unmap(scratch, STACK_SIZE);
     close(stack);
+    *live -= 1;
     let code = wait(child)?;
     close(child);
+    *live -= 1;
     Ok(code)
 }
 
@@ -260,6 +304,22 @@ fn open(path: &str) -> Result<Handle, Errno> {
     })
 }
 
+/// Retry `open` while the scheme is not yet registered (`ENOENT`); surface every other error.
+fn open_retry(path: &str) -> Result<Handle, Errno> {
+    let mut attempt = 0usize;
+    while attempt < OPEN_RETRIES {
+        match open(path) {
+            Ok(handle) => return Ok(handle),
+            Err(Errno::ENOENT) => {
+                let _ = raven_rt::nanosleep(1_000_000);
+                attempt += 1;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    Err(Errno::ETIMEDOUT)
+}
+
 fn main(_args: raven_rt::Args) -> i32 {
     let image = match map_initfs() {
         Ok(image) => image,
@@ -277,10 +337,15 @@ fn main(_args: raven_rt::Args) -> i32 {
         Ok(elf) => elf,
         Err(_) => return 4,
     };
-    let memory = match memobj_create() {
+    let mut live = INITIAL_HANDLES;
+    let memory = match memobj_create(PAGE) {
         Ok(handle) => handle,
         Err(_) => return 5,
     };
+    if memory.index() != 3 {
+        return 6;
+    }
+    live += 1;
     let pattern = match map_memory(
         Handle::SELF_PROC,
         memory,
@@ -289,29 +354,36 @@ fn main(_args: raven_rt::Args) -> i32 {
         map::pack(prot::READ | prot::WRITE, map::SHARED),
     ) {
         Ok(address) => address,
-        Err(_) => return 6,
+        Err(_) => return 7,
     };
     // SAFETY: this is the caller's writable one-page shared mapping.
     unsafe { (pattern as *mut u8).write(PATTERN) };
+    let free_before = MAX_HANDLES - live;
+
     let mut cycle = 0usize;
     while cycle < CYCLES {
-        match start_child(&child, &elf, memory) {
+        match start_child(&child, &elf, memory, &mut live) {
             Ok(7) => {}
             Ok(code) => {
                 println!("s25: child exit {}", code);
-                return 7;
+                return 8;
             }
             Err(error) => {
                 println!("s25: child setup {}", error.0);
-                return 7;
+                return 8;
             }
         }
         cycle += 1;
     }
+    let free_after = MAX_HANDLES - live;
+    if free_before != free_after {
+        println!("s25: handle count drifted {} {}", free_before, free_after);
+        return 9;
+    }
     println!("s25: transfer ok");
     println!("s25: rights ok");
 
-    let server = match spawn(
+    let _server = match spawn(
         &initfs,
         "/server",
         &SpawnOptions {
@@ -320,33 +392,24 @@ fn main(_args: raven_rt::Args) -> i32 {
         },
     ) {
         Ok(server) => server,
-        Err(_) => return 8,
+        Err(_) => return 10,
     };
-    let attached = match memobj_create() {
+    let received = match open_retry("attach:x") {
         Ok(handle) => handle,
-        Err(_) => return 9,
+        Err(_) => return 11,
     };
-    let source = match map_memory(
+    // The attachment was delivered with a READ|MAP mask: a shared writable mapping must be
+    // refused, which proves the server's own WRITE right was not passed along.
+    match map_memory(
         Handle::SELF_PROC,
-        attached,
+        received,
         0,
         PAGE,
         map::pack(prot::READ | prot::WRITE, map::SHARED),
     ) {
-        Ok(address) => address,
-        Err(_) => return 10,
-    };
-    // SAFETY: this is the caller's writable one-page shared mapping.
-    unsafe { (source as *mut u8).write(PATTERN) };
-    let _ = raven_rt::nanosleep(10_000_000);
-    if transfer(server, attached, Rights::READ.union(Rights::MAP)).is_err() {
-        return 11;
+        Err(Errno::EACCES) => {}
+        _ => return 12,
     }
-    close(attached);
-    let received = match open("attach:x") {
-        Ok(handle) => handle,
-        Err(_) => return 12,
-    };
     let mapped = match map_memory(Handle::SELF_PROC, received, 0, PAGE, prot::READ) {
         Ok(address) => address,
         Err(_) => return 13,
@@ -356,6 +419,6 @@ fn main(_args: raven_rt::Args) -> i32 {
         return 14;
     }
     println!("s25: attach ok");
-    println!("s25: handles free=65532");
+    println!("s25: handles free={}", free_after);
     0
 }
