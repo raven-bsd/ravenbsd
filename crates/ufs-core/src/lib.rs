@@ -21,7 +21,9 @@
 #![no_std]
 #![forbid(unsafe_code)]
 
-extern crate alloc;
+extern crate alloc as alloc_crate;
+
+pub mod alloc;
 
 #[cfg(test)]
 extern crate std;
@@ -30,6 +32,7 @@ mod blockio;
 mod dinode;
 mod dir;
 mod error;
+mod ffs_bitmap;
 mod ffs_vfsops;
 mod fs;
 mod inode;

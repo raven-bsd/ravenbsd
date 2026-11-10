@@ -33,7 +33,7 @@
 
 //! UFS directory entry decoding and `ufs_dirbadentry` validation.
 
-use alloc::vec::Vec;
+use alloc_crate::vec::Vec;
 
 use crate::error::UfsError;
 use crate::fs::{FFS_MAXNAMLEN, UFS_DIRBLKSIZ};

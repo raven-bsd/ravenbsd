@@ -209,3 +209,25 @@ tier = "A"
 copied = "2026-11-10"
 modified = true
 notes = "getattr field mapping and the fast/slow symlink selection are ported from ufs_getattr/ufs_readlink; caches and public API are fresh."
+
+[[import]]
+path = "crates/ufs-core/src/alloc.rs"
+upstream = "netbsd"
+upstream_path = "sys/ufs/ffs/ffs_alloc.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-10"
+modified = true
+notes = "Block/fragment/inode allocation, free, realloc, hashalloc policy and lazy UFS2 inode initialization ported; summary and cylinder-group write-back follow ffs_vfsops.c but are driven by the ticket's synchronous-write contract."
+
+[[import]]
+path = "crates/ufs-core/src/ffs_bitmap.rs"
+upstream = "netbsd"
+upstream_path = "sys/ufs/ffs/ffs_subr.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-10"
+modified = true
+notes = "Free-map bit operations, ffs_isblock/isfreeblock/clrblock/setblock, ffs_fragacct and the mapsearch policy ported with bounds checks instead of panics; the fragtbl124/fragtbl8, around and inside tables are the verbatim ffs_tables.c constants noted in the header."

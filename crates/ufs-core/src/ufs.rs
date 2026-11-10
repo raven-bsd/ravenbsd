@@ -65,14 +65,14 @@
 
 //! Mounted filesystem, caches and the public read-only operations.
 
-use alloc::vec;
-use alloc::vec::Vec;
+use alloc_crate::vec;
+use alloc_crate::vec::Vec;
 
 use crate::blockio::BlockIo;
 use crate::dinode::Inode;
 use crate::error::UfsError;
 use crate::ffs_vfsops;
-use crate::fs::{Superblock, UFS_ROOTINO};
+use crate::fs::{Csum32, Superblock, UFS_ROOTINO};
 use crate::inode as inode_load;
 use crate::types::{Attr, DirEntry, FileType, Ino, MountOptions, StatFs};
 use crate::ufs_bmap;
@@ -81,15 +81,15 @@ const INODE_CACHE_SIZE: usize = 64;
 const BLOCK_CACHE_SIZE: usize = 32;
 
 #[derive(Clone, Debug)]
-struct CachedInode {
-    ino: Ino,
-    inode: Inode,
+pub(crate) struct CachedInode {
+    pub(crate) ino: Ino,
+    pub(crate) inode: Inode,
 }
 
 #[derive(Debug)]
-struct CachedBlock {
-    frag: u64,
-    data: Vec<u8>,
+pub(crate) struct CachedBlock {
+    pub(crate) frag: u64,
+    pub(crate) data: Vec<u8>,
 }
 
 /// A mounted UFS1/UFS2 filesystem.
@@ -98,25 +98,48 @@ struct CachedBlock {
 /// state, no locking and no background thread. Drop the value through [`Ufs::into_inner`] to get
 /// the device back.
 pub struct Ufs<D: BlockIo> {
-    disk: D,
+    pub(crate) disk: D,
     pub(crate) fs: Superblock,
-    inodes: Vec<CachedInode>,
-    blocks: Vec<CachedBlock>,
+    pub(crate) read_only: bool,
+    pub(crate) cs: Vec<Csum32>,
+    pub(crate) dirty_cgs: Vec<u32>,
+    pub(crate) inodes: Vec<CachedInode>,
+    pub(crate) blocks: Vec<CachedBlock>,
 }
 
 impl<D: BlockIo> Ufs<D> {
-    /// Mount an image. Only read-only mounts are supported in this ticket.
+    /// Mount an image. Read-only mounts are the default; `read_only: false` enables the K52
+    /// allocator and marks the superblock not-clean before the first modification.
     ///
     /// The superblock is probed at the upstream locations (`SBLOCK_UFS2`, `SBLOCK_UFS1`,
     /// `SBLOCK_FLOPPY`, `SBLOCK_PIGGY`) and validated before any inode is read.
     pub fn mount(mut disk: D, opts: MountOptions) -> Result<Self, UfsError> {
-        if !opts.read_only {
-            return Err(UfsError::Unsupported("read-write mount"));
-        }
         let fs = ffs_vfsops::probe(&mut disk)?;
+        if opts.read_only {
+            return Ok(Self {
+                disk,
+                fs,
+                read_only: true,
+                cs: Vec::new(),
+                dirty_cgs: Vec::new(),
+                inodes: Vec::new(),
+                blocks: Vec::new(),
+            });
+        }
+        if !fs.ufs2 && fs.old_flags & crate::fs::FS_FLAGS_UPDATED == 0 {
+            return Err(UfsError::Unsupported("old UFS1 cylinder groups"));
+        }
+        let cs = ffs_vfsops::load_summaries(&mut disk, &fs)?;
+        let mut fs = fs;
+        fs.set_clean_raw(0);
+        fs.clear_fmod_raw();
+        ffs_vfsops::write_superblock(&mut disk, &fs)?;
         Ok(Self {
             disk,
             fs,
+            read_only: false,
+            cs,
+            dirty_cgs: Vec::new(),
             inodes: Vec::new(),
             blocks: Vec::new(),
         })
@@ -214,11 +237,15 @@ impl<D: BlockIo> Ufs<D> {
             return Ok(entry.inode.clone());
         }
         let (fsba, slot) = inode_load::location(&self.fs, ino)?;
-        let fs = self.fs.clone();
+        let ufs2 = self.fs.ufs2;
+        let bsize = self.fs.bsize;
+        let inode_size = self.fs.inode_size();
+        let inopb = self.fs.inopb;
         let block = self
             .block_data(fsba)?
             .ok_or(UfsError::Corrupt("inode block is a hole"))?;
-        let inode = inode_load::decode_from_block(&fs, block, slot, ino)?;
+        let inode =
+            inode_load::decode_from_block(ufs2, bsize, inode_size, inopb, block, slot, ino)?;
         if self.inodes.len() >= INODE_CACHE_SIZE {
             self.inodes.remove(0);
         }

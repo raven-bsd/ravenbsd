@@ -134,7 +134,7 @@ fn nonzero(value: u64) -> Option<u64> {
 mod tests {
     use super::*;
     use crate::types::Timespec;
-    use alloc::vec::Vec;
+    use alloc_crate::vec::Vec;
     use std::collections::BTreeMap;
 
     fn inode(db: [u64; 12], ib: [u64; 3]) -> Inode {

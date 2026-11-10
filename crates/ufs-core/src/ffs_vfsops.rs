@@ -60,13 +60,14 @@
 
 //! Superblock probing, mount validation and `statfs` counters.
 
-use alloc::vec;
+use alloc_crate::vec;
+use alloc_crate::vec::Vec;
 
 use crate::blockio::BlockIo;
 use crate::error::UfsError;
 use crate::fs::{
-    MAXBSIZE, MAXFRAG, MINBSIZE, SBLOCK_FLOPPY, SBLOCK_PIGGY, SBLOCK_UFS1, SBLOCK_UFS2, SBLOCKSIZE,
-    Superblock, UFS_ROOTINO,
+    Csum32, MAXBSIZE, MAXFRAG, MINBSIZE, SBLOCK_FLOPPY, SBLOCK_PIGGY, SBLOCK_UFS1, SBLOCK_UFS2,
+    SBLOCKSIZE, Superblock, UFS_ROOTINO,
 };
 use crate::types::StatFs;
 
@@ -114,8 +115,17 @@ pub(crate) fn validate(fs: &Superblock, device_size: u64) -> Result<(), UfsError
         return Err(UfsError::BadSuperblock("block/fragment ratio"));
     }
     let frag = fs.bsize / fs.fsize;
-    if frag == 0 || frag > MAXFRAG || fs.frag != frag {
+    if frag == 0 || frag > MAXFRAG || fs.frag != frag || !frag.is_power_of_two() {
         return Err(UfsError::BadSuperblock("bad fragments per block"));
+    }
+    if !(0..100).contains(&fs.minfree) {
+        return Err(UfsError::BadSuperblock("bad minfree"));
+    }
+    if fs.optim != 0 && fs.optim != 1 {
+        return Err(UfsError::BadSuperblock("bad optimization"));
+    }
+    if fs.contigsumsize < 0 || fs.contigsumsize > 64 {
+        return Err(UfsError::BadSuperblock("bad cluster summary size"));
     }
     if fs.bshift != log2(fs.bsize) || fs.fshift != log2(fs.fsize) || fs.fragshift != log2(frag) {
         return Err(UfsError::BadSuperblock("bad shift fields"));
@@ -143,6 +153,9 @@ pub(crate) fn validate(fs: &Superblock, device_size: u64) -> Result<(), UfsError
     }
     if fs.cssize == 0 {
         return Err(UfsError::BadSuperblock("zero summary size"));
+    }
+    if (fs.cssize as usize) < (fs.ncg as usize) * 16 {
+        return Err(UfsError::BadSuperblock("summary array too small"));
     }
     let cg_blocks = u64::from(fs.ncg)
         .checked_mul(u64::from(fs.fpg))
@@ -222,6 +235,65 @@ fn validate_csum(fs: &Superblock, cg_blocks: u64) -> Result<(), UfsError> {
         return Err(UfsError::BadSuperblock("inode counter beyond filesystem"));
     }
     let _ = cg_blocks;
+    Ok(())
+}
+
+/// Write the raw superblock to its on-disk location.
+pub(crate) fn write_superblock<D: BlockIo>(disk: &mut D, fs: &Superblock) -> Result<(), UfsError> {
+    let len = fs.sbsize as usize;
+    if len == 0 || len > fs.raw.len() {
+        return Err(UfsError::BadSuperblock("bad superblock write size"));
+    }
+    disk.write_at(fs.sblockloc, &fs.raw[..len])
+        .map_err(|_| UfsError::Io)
+}
+
+/// Load the per-cylinder-group `struct csum` array from `fs_csaddr`.
+pub(crate) fn load_summaries<D: BlockIo>(
+    disk: &mut D,
+    fs: &Superblock,
+) -> Result<Vec<Csum32>, UfsError> {
+    let count = fs.ncg as usize;
+    let needed = count
+        .checked_mul(16)
+        .ok_or(UfsError::BadSuperblock("summary size overflow"))?;
+    if needed > fs.cssize as usize {
+        return Err(UfsError::BadSuperblock("summary array too small"));
+    }
+    let base = u64::from(fs.csaddr)
+        .checked_mul(u64::from(fs.fsize))
+        .ok_or(UfsError::BadSuperblock("summary offset overflow"))?;
+    let mut out = Vec::with_capacity(count);
+    for cg in 0..count {
+        let offset = base
+            .checked_add((cg as u64) * 16)
+            .ok_or(UfsError::BadSuperblock("summary offset overflow"))?;
+        let mut bytes = [0u8; 16];
+        disk.read_at(offset, &mut bytes).map_err(|_| UfsError::Io)?;
+        out.push(Csum32::from_le_bytes(&bytes)?);
+    }
+    Ok(out)
+}
+
+/// Write the per-cylinder-group `struct csum` array.
+pub(crate) fn write_summaries<D: BlockIo>(
+    disk: &mut D,
+    fs: &Superblock,
+    cs: &[Csum32],
+) -> Result<(), UfsError> {
+    if cs.len() != fs.ncg as usize {
+        return Err(UfsError::Corrupt("summary array length"));
+    }
+    let base = u64::from(fs.csaddr)
+        .checked_mul(u64::from(fs.fsize))
+        .ok_or(UfsError::BadSuperblock("summary offset overflow"))?;
+    for (cg, entry) in cs.iter().enumerate() {
+        let offset = base
+            .checked_add((cg as u64) * 16)
+            .ok_or(UfsError::BadSuperblock("summary offset overflow"))?;
+        disk.write_at(offset, &entry.to_le_bytes())
+            .map_err(|_| UfsError::Io)?;
+    }
     Ok(())
 }
 

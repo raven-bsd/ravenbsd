@@ -47,7 +47,7 @@
 
 //! UFS1 and UFS2 on-disk inode decoding.
 
-use alloc::vec::Vec;
+use alloc_crate::vec::Vec;
 
 use crate::error::UfsError;
 use crate::types::{FileType, Timespec};
