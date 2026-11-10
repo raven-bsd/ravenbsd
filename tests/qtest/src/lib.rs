@@ -17,6 +17,7 @@ mod case;
 mod execute;
 mod exitmap;
 mod matcher;
+mod oracle;
 mod qemu;
 mod report;
 mod runner;
@@ -25,5 +26,8 @@ mod runner;
 mod testutil;
 
 pub use case::{Case, CaseSpec, Expect, ExpectExit, Forbid, is_valid_arch, list_case_files};
-pub use execute::{ExecuteOptions, execute};
+pub use execute::{ExecuteOptions, Executed, execute, execute_with_oracles};
+pub use oracle::{
+    OracleCheck, OracleReport, OracleSpec, Wav, analyze as analyze_oracle, parse_wav, write_reports,
+};
 pub use report::{CaseOutcome, CaseReport, ResultKind, write_outcome};
