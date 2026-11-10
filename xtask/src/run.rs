@@ -55,7 +55,15 @@ pub(crate) fn run(
         false
     };
     let mut command = Command::new(program(arch));
-    let args = qemu_args(arch, &image, &code, &copied_vars, kvm, &extra);
+    let args = qemu_args(
+        arch,
+        &image,
+        &code,
+        &copied_vars,
+        kvm,
+        profile == "shell",
+        &extra,
+    );
     command.args(&args);
     println!("==> {} {}", program(arch), args.join(" "));
     let status = command
@@ -121,6 +129,7 @@ fn qemu_args(
     code: &Path,
     vars: &Path,
     kvm: bool,
+    interactive: bool,
     extra: &[String],
 ) -> Vec<String> {
     let mut args = match arch {
@@ -132,10 +141,8 @@ fn qemu_args(
             "-smp".to_string(),
             "4".to_string(),
             "-serial".to_string(),
-            "stdio".to_string(),
+            if interactive { "mon:stdio" } else { "stdio" }.to_string(),
             "-display".to_string(),
-            "none".to_string(),
-            "-monitor".to_string(),
             "none".to_string(),
             "-no-reboot".to_string(),
             "-drive".to_string(),
@@ -169,6 +176,10 @@ fn qemu_args(
     if kvm {
         args.push("-enable-kvm".to_string());
     }
+    if arch == Arch::X86_64 && !interactive {
+        args.insert(12, "none".to_string());
+        args.insert(12, "-monitor".to_string());
+    }
     args.extend(extra.iter().cloned());
     args
 }
@@ -194,6 +205,7 @@ mod tests {
             Path::new("/code"),
             Path::new("/vars"),
             false,
+            false,
             &[],
         );
         assert_eq!(args[0], "-machine");
@@ -212,6 +224,7 @@ mod tests {
             Path::new("/code"),
             Path::new("/vars"),
             true,
+            false,
             &["-display".to_string(), "gtk".to_string()],
         );
         assert!(args.iter().any(|arg| arg == "-enable-kvm"));
@@ -226,6 +239,7 @@ mod tests {
             Path::new("/img"),
             Path::new("/code"),
             Path::new("/vars"),
+            false,
             false,
             &[],
         );
@@ -243,5 +257,20 @@ mod tests {
         assert_eq!(map_exit(Some(0)), 0);
         assert_eq!(map_exit(Some(1)), 1);
         assert_eq!(map_exit(None), 1);
+    }
+
+    #[test]
+    fn shell_uses_multiplexed_serial_without_a_separate_monitor() {
+        let args = qemu_args(
+            Arch::X86_64,
+            Path::new("/img"),
+            Path::new("/code"),
+            Path::new("/vars"),
+            false,
+            true,
+            &[],
+        );
+        assert!(args.windows(2).any(|pair| pair == ["-serial", "mon:stdio"]));
+        assert!(!args.windows(2).any(|pair| pair == ["-monitor", "none"]));
     }
 }
