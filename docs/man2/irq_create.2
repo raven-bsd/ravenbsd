@@ -53,12 +53,25 @@ The message always targets the boot processor's APIC.  For destination ids
 and
 .Sy address_hi = 0
 in both xAPIC and x2APIC mode; the id is never placed in the upper half.
+.Pp
+A driver that programs the returned message must call
+.Xr irq_wait 2
+or
+.Xr irq_ack 2
+at least once before closing the handle; that marks the source live.
+Closing a live MSI source without a final
+.Xr irq_ack 2
+quarantines its vector permanently, so a device that still points at the old
+message can never reach a new
+.Em Irq .
+An MSI object that was never armed is treated as inert and its vector may be
+reused.
 The returned handle carries
 .Dv READ ,
 .Dv DUP
 and
 .Dv TRANSFER .
-Closing the last handle masks the source (legacy) and returns the vector to
+Closing the last legacy handle masks the source and returns the vector to
 the pool.
 .Sh ERRORS
 .Bl -tag -width Er

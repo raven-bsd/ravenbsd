@@ -15,8 +15,20 @@ line after the driver has acknowledged the interrupt at the device.
 The line is also unmasked on the first
 .Nm
 before any interrupt fired.
-For MSI/MSI-X the call does nothing: edge-triggered messages never need a
-re-arm.
+For
+.Dv MSI
+and
+.Dv MSIX
+the call is the driver's quiesce barrier: it reports that the driver handled
+the last firing and disabled the source in the device (for example by
+clearing the MSI enable bit).
+A live MSI source closed without a final
+.Nm
+cannot be proven quiet, so the kernel quarantines its vector permanently
+instead of handing it to a new
+.Em Irq .
+An MSI object that was never waited on is treated as inert and may release
+its vector immediately.
 .Sh ERRORS
 .Bl -tag -width Er
 .It Er EBADF

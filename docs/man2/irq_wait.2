@@ -23,9 +23,18 @@ A level-triggered
 line is masked after delivery until
 .Xr irq_ack 2 ,
 so a device that keeps its line asserted cannot storm the CPU.
-MSI/MSI-X are edge-triggered and need no re-arm, though
+MSI/MSI-X are edge-triggered and need no re-arm, but
 .Xr irq_ack 2
-remains harmless.
+is still the driver's quiesce barrier before the handle is closed.
+.Pp
+If another thread closes the last handle while
+.Nm
+is blocked, every waiter is woken; the one whose handle is gone returns
+.Er EIO .
+The
+.Em Irq
+object stays alive until the waiter returns, and the wait-queue entry is
+removed, so no stale waiter is left behind.
 .Pp
 The
 .Em Irq
@@ -45,6 +54,9 @@ is not an interrupt handle.
 The handle lacks the
 .Dv READ
 right.
+.It Er EIO
+The handle was closed while the thread was blocked in
+.Nm .
 .El
 .Sh STANDARDS
 RavenBSD ABI v1.
