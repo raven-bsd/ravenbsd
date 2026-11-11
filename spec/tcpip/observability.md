@@ -135,6 +135,18 @@ The defaults below are the **production** defaults. Several are deliberately
 different from a general-purpose BSD: the stack is a library with a caller
 that owns memory, so buffer sizes are explicit and bounded.
 
+Cross-field constraints are checked atomically by `set_property` and return
+`EINVAL` without applying any part of the change:
+
+* `tcp.rto_min <= tcp.rto_max`.
+* `tcp.port_range_first <= tcp.port_range_last`.
+* `tcp.send_buffer_default <= tcp.send_buffer_max` and
+  `tcp.recv_buffer_default <= tcp.recv_buffer_max`.
+* `tcp.half_open_limit <= tcp.connection_max` and
+  `tcp.accept_queue_limit <= tcp.connection_max`.
+* `tcp.timewait_max` may exceed `connection_max`; TIME-WAIT entries are not
+  live connections.
+
 ### 4.1 Lifetimes and queues
 
 | Name | Type | Min | Max | Default | Unit | Stability | Meaning |
