@@ -252,7 +252,11 @@ pub fn init(data: &BootData) -> Result<*const BootInfo, PagingError> {
     activate(root);
     KERNEL_ROOT.store(root.0, Ordering::Release);
 
-    let reclaimed_frames = reclaim_loader();
+    let reclaimed_frames = {
+        #[cfg(target_arch = "x86_64")]
+        crate::arch::acpi::capture_early(data.info.acpi_rsdp);
+        reclaim_loader()
+    };
     let reclaimed_bytes = reclaimed_frames.saturating_mul(frame::PAGE_SIZE);
     kprintln!(
         "paging: kernel tables active (HHDM {} MiB, reclaimed {} MiB)",
