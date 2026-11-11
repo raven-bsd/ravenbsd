@@ -86,6 +86,7 @@ pub fn init() -> Result<(), IoApicError> {
     if stored == 0 {
         Err(first_error.unwrap_or(IoApicError::NotMapped))
     } else {
+        publish_isr_view(&guard);
         Ok(())
     }
 }
@@ -126,6 +127,89 @@ pub fn mask(gsi: u32) -> Result<(), IoApicError> {
     entry |= 1 << 16;
     write_redirection(state, index, entry as u32, (entry >> 32) as u32);
     Ok(())
+}
+
+/// Unmask one GSI (process context; called by IRQ_WAIT/IRQ_ACK).
+pub fn unmask(gsi: u32) -> Result<(), IoApicError> {
+    let guard = IOAPICS.lock();
+    let (index, state) = find_state(&guard, gsi)?;
+    let mut entry = read_redirection(state, index);
+    entry &= !(1u64 << 16);
+    write_redirection(state, index, entry as u32, (entry >> 32) as u32);
+    Ok(())
+}
+
+/// One IOAPIC as the interrupt handler sees it.
+#[derive(Clone, Copy)]
+struct IsrState {
+    base: usize,
+    gsi_base: u32,
+    max_entry: u8,
+}
+
+struct IsrViewCell(core::cell::UnsafeCell<[Option<IsrState>; MAX_IOAPICS]>);
+
+// SAFETY: the view is written once during init, before interrupts are enabled, and read-only
+// afterwards from the interrupt handler.
+unsafe impl Sync for IsrViewCell {}
+
+static ISR_VIEW: IsrViewCell = IsrViewCell(core::cell::UnsafeCell::new([None; MAX_IOAPICS]));
+
+/// Record the IOAPIC state for the lock-free interrupt-handler view. Called from [`init`].
+fn publish_isr_view(states: &[Option<State>; MAX_IOAPICS]) {
+    // SAFETY: single-CPU init before `sti`; published only here.
+    unsafe {
+        let view = &mut *ISR_VIEW.0.get();
+        for (index, state) in states.iter().enumerate() {
+            if let Some(slot) = view.get_mut(index) {
+                *slot = state.map(|state| IsrState {
+                    base: state.base,
+                    gsi_base: state.gsi_base,
+                    max_entry: state.max_entry,
+                });
+            }
+        }
+    }
+}
+
+/// Mask a level-triggered GSI from the interrupt handler without taking a process-context lock.
+pub fn mask_gsi_isr(gsi: u32) {
+    // SAFETY: the view was published before interrupts were enabled and is never modified.
+    let view = unsafe { &*ISR_VIEW.0.get() };
+    for state in view.iter().flatten() {
+        let Some(offset) = gsi.checked_sub(state.gsi_base) else {
+            continue;
+        };
+        if offset > u32::from(state.max_entry) {
+            continue;
+        }
+        let mut entry = read_redirection_isr(state.base, offset as u8);
+        entry |= 1 << 16;
+        write_redirection_isr(state.base, offset as u8, entry as u32, (entry >> 32) as u32);
+        return;
+    }
+}
+
+fn read_redirection_isr(base: usize, index: u8) -> u64 {
+    let low = read_reg(base, 0x10u8.saturating_add(index.saturating_mul(2)));
+    let high = read_reg(
+        base,
+        0x10u8
+            .saturating_add(index.saturating_mul(2))
+            .saturating_add(1),
+    );
+    u64::from(low) | (u64::from(high) << 32)
+}
+
+fn write_redirection_isr(base: usize, index: u8, low: u32, high: u32) {
+    write_reg(base, 0x10u8.saturating_add(index.saturating_mul(2)), low);
+    write_reg(
+        base,
+        0x10u8
+            .saturating_add(index.saturating_mul(2))
+            .saturating_add(1),
+        high,
+    );
 }
 
 /// Mask every redirection entry of every mapped IOAPIC.
