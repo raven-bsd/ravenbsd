@@ -10,6 +10,9 @@
 //! register.
 
 pub mod basic;
+/// Console input is a COM1 device path; aarch64 reports `ENOSYS`.
+#[cfg(target_arch = "x86_64")]
+pub mod debug_read;
 #[cfg(target_arch = "x86_64")]
 pub mod driver;
 pub mod event;
@@ -53,6 +56,8 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     let number = usize::try_from(frame.rax).unwrap_or(usize::MAX);
     match Syscall::from_usize(number) {
         Some(Syscall::FUTEX) => futex::dispatch(frame),
+        #[cfg(target_arch = "x86_64")]
+        Some(Syscall::DEBUG_READ) => debug_read::handle(frame),
         Some(Syscall::THREAD_CREATE) => thread::create(frame),
         Some(Syscall::THREAD_EXIT) => thread::exit(frame),
         Some(Syscall::PROC_CREATE) => process_ctl::create(frame),
