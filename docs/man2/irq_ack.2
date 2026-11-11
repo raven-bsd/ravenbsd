@@ -1,21 +1,31 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt IRQ_ACK 2
 .Os RavenBSD
 .Sh NAME
 .Nm irq_ack
-.Nd re-enables an interrupt
+.Nd acknowledge a device interrupt
 .Sh SYNOPSIS
-See the
-.Pa raven-abi
-crate (syscall number 0x76).
+.Fn irq_ack irq
 .Sh DESCRIPTION
-The
+.Nm re-enables a level-triggered
+.Dv LEGACY
+line after the driver has acknowledged the interrupt at the device.
+The line is also unmasked on the first
 .Nm
-system call is part of RavenBSD ABI v1. It is implemented by ticket S21c; this page is the contract placeholder and will be
-completed when S21c lands. The authoritative signature is the doc comment of the syscall in the
-.Pa raven-abi
-crate.
+before any interrupt fired.
+For MSI/MSI-X the call does nothing: edge-triggered messages never need a
+re-arm.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EBADF
+.Fa irq
+is not an interrupt handle.
+.It Er EACCES
+The handle lacks the
+.Dv READ
+right.
+.El
 .Sh STANDARDS
 RavenBSD ABI v1.

@@ -1,21 +1,73 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt IRQ_CREATE 2
 .Os RavenBSD
 .Sh NAME
 .Nm irq_create
-.Nd creates an interrupt object
+.Nd create an interrupt source
 .Sh SYNOPSIS
-See the
-.Pa raven-abi
-crate (syscall number 0x74).
+.Fn irq_create root_dev kind number flags
 .Sh DESCRIPTION
-The
-.Nm
-system call is part of RavenBSD ABI v1. It is implemented by ticket S21c; this page is the contract placeholder and will be
-completed when S21c lands. The authoritative signature is the doc comment of the syscall in the
-.Pa raven-abi
-crate.
+.Nm creates an
+.Em Irq
+handle a driver can wait on with
+.Xr irq_wait 2 .
+.Fa root_dev
+must be the
+.Em RootDevice
+capability with
+.Dv ADMIN .
+.Bl -tag -width Ds
+.It Fa kind
+.Dv LEGACY (1):
+.Fa number
+is the ISA IRQ; the kernel translates it through the MADT interrupt-source
+overrides and honours the polarity and trigger the override declares.  The
+line stays masked until the first
+.Xr irq_wait 2
+or
+.Xr irq_ack 2 ;
+.Fa flags
+must be 0.
+.It Fa kind
+.Dv MSI (2) or MSIX (3):
+the kernel allocates a free vector from its pool of 128 vectors (0x40..0xBF)
+and fills the
+.Em IrqInfo
+record
+.Sy { vector: u32, address_lo: u32, address_hi: u32, data: u32 }
+at the user pointer given in
+.Fa flags .
+The driver programs the returned address and data into its device's MSI
+capability or MSI-X table entry; MSI and MSI-X share one encoding.
+.El
+The returned handle carries
+.Dv READ ,
+.Dv DUP
+and
+.Dv TRANSFER .
+Closing the last handle masks the source (legacy) and returns the vector to
+the pool.
+The interrupt is delivered to the boot CPU (where user threads run); the
+destination APIC id is encoded in
+.Em address_lo
+bits 19..12.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EPERM
+No root capability with
+.Dv ADMIN .
+.It Er EINVAL
+Unknown kind, invalid number, a non-zero legacy
+.Fa flags ,
+or a bad IrqInfo pointer.
+.It Er ENOSPC
+The vector pool is exhausted.
+.It Er EFAULT
+The IrqInfo pointer is not writable user memory.
+.It Er EMFILE
+The process handle table is full.
+.El
 .Sh STANDARDS
 RavenBSD ABI v1.

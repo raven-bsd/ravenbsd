@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "driver-irq"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/s21-edu/build.sh"]
+initfs = "build/fixtures/s21-edu/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s21-framecheck=1"
+qemu_extra = ["-device", "edu"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^s21: irq msi ok count=10000$'
+
+[[expect]]
+regex = '^s21: irq event ok$'
+
+[[expect]]
+regex = '^s21: irq pool ok$'
+
+[[expect]]
+regex = '^s21: dma leak ok$'
+
+[[forbid]]
+regex = '(?i)panic'
