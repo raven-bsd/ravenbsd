@@ -62,6 +62,28 @@ struct DmaMapping {
     buffer: Arc<crate::driver::DmaBuffer>,
 }
 
+/// Reserved virtual window for kernel-owned IPC capture buffers.
+///
+/// The range is inserted as a zero-protection VMA in every user address space, so the normal
+/// `MAP` allocator never hands it out and `UNMAP`/`PROTECT` reject it. The kernel maps its own
+/// frames into individual slots on demand; those frames are not owned by the address space.
+#[cfg(target_arch = "x86_64")]
+pub mod capture_window {
+    /// First address of the window.
+    pub const BASE: u64 = 0x0000_6000_0000_0000;
+    /// Size of one capture slot (the largest capture is `MAX_TRANSFER`).
+    pub const SLOT_SIZE: u64 = 4 * 1024 * 1024;
+    /// Number of concurrent captures per server process.
+    pub const SLOTS: usize = 8;
+    /// Total reserved size.
+    pub const SIZE: u64 = SLOT_SIZE * SLOTS as u64;
+
+    const _: () = {
+        assert!(BASE + SIZE <= super::USER_END);
+        assert!(SLOT_SIZE.is_multiple_of(super::PAGE_SIZE));
+    };
+}
+
 /// A user address space: page tables, VMAs and memory-object ownership.
 pub struct UserAddressSpace {
     aspace: AddressSpace,
@@ -70,19 +92,49 @@ pub struct UserAddressSpace {
     mmio: Vec<MmioMapping>,
     #[cfg(target_arch = "x86_64")]
     dma: Vec<DmaMapping>,
+    /// Bumped on every mapping change. A capture records it at create and only copies back when
+    /// the client's mapping has not been replaced meanwhile.
+    mapping_generation: u64,
 }
 
 impl UserAddressSpace {
     /// Wrap a fresh page-table root with an empty VMA tree.
     pub fn new(aspace: AddressSpace) -> Self {
+        #[cfg(target_arch = "x86_64")]
+        let vmas = {
+            let mut vmas = Vmas::new(USER_MIN..USER_END);
+            // The window is a compile-time constant inside `USER_MIN..USER_END` and the tree is
+            // empty, so the insert cannot fail; keeping the VMA makes `MAP` skip and `UNMAP`/
+            // `PROTECT` reject the range.
+            let _ = vmas.insert(
+                capture_window::BASE,
+                capture_window::SIZE,
+                0,
+                Backing::Anonymous,
+            );
+            vmas
+        };
+        #[cfg(not(target_arch = "x86_64"))]
+        let vmas = Vmas::new(USER_MIN..USER_END);
         Self {
             aspace,
-            vmas: Vmas::new(USER_MIN..USER_END),
+            vmas,
             objects: Vec::new(),
             mmio: Vec::new(),
             #[cfg(target_arch = "x86_64")]
             dma: Vec::new(),
+            mapping_generation: 0,
         }
+    }
+
+    /// Monotonic mapping generation, bumped by every map/unmap/protect.
+    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S32 captures are x86-64 only.
+    pub fn generation(&self) -> u64 {
+        self.mapping_generation
+    }
+
+    fn bump_generation(&mut self) {
+        self.mapping_generation = self.mapping_generation.wrapping_add(1);
     }
 
     /// Address-space root for the scheduler.
@@ -145,6 +197,7 @@ impl UserAddressSpace {
             let _ = self.vmas.remove(vaddr, len);
             return Err(error);
         }
+        self.bump_generation();
         Ok(())
     }
 
@@ -200,6 +253,7 @@ impl UserAddressSpace {
             let _ = self.vmas.remove(vaddr, len);
             return Err(error);
         }
+        self.bump_generation();
         Ok(())
     }
 
@@ -264,6 +318,7 @@ impl UserAddressSpace {
             object,
             shared,
         });
+        self.bump_generation();
         Ok(())
     }
 
@@ -329,6 +384,7 @@ impl UserAddressSpace {
             return Err(error);
         }
         self.mmio.push(MmioMapping { start: vaddr, len });
+        self.bump_generation();
         Ok(())
     }
 
@@ -411,12 +467,19 @@ impl UserAddressSpace {
             offset,
             buffer,
         });
+        self.bump_generation();
         Ok(())
     }
 
     /// Remove a fully mapped range, splitting VMAs and releasing object references.
     pub fn unmap(&mut self, start: u64, len: u64) -> Result<(), Errno> {
         if len == 0 || !start.is_multiple_of(PAGE_SIZE) || !len.is_multiple_of(PAGE_SIZE) {
+            return Err(Errno::EINVAL);
+        }
+        #[cfg(target_arch = "x86_64")]
+        if overlaps_capture_window(start, len) {
+            // The window is kernel-owned; a user unmap would free capture frames the IPC layer
+            // still owns and could recycle them under a live server.
             return Err(Errno::EINVAL);
         }
         if !self.vmas.is_fully_mapped(start, len) {
@@ -477,12 +540,17 @@ impl UserAddressSpace {
                 let _ = frame::free_frame(frame::PhysAddr(physical));
             }
         }
+        self.bump_generation();
         Ok(())
     }
 
     /// Change protections over a fully mapped range.
     pub fn protect(&mut self, start: u64, len: u64, new_prot: u8) -> Result<(), Errno> {
         if len == 0 || !start.is_multiple_of(PAGE_SIZE) || !len.is_multiple_of(PAGE_SIZE) {
+            return Err(Errno::EINVAL);
+        }
+        #[cfg(target_arch = "x86_64")]
+        if overlaps_capture_window(start, len) {
             return Err(Errno::EINVAL);
         }
         if self.overlaps_mmio(start, len) {
@@ -545,6 +613,7 @@ impl UserAddressSpace {
         }
         self.vmas.protect(start, len, new_prot).map_err(vma_errno)?;
         let _ = crate::sched::smp::shootdown::flush_range(start, len);
+        self.bump_generation();
         Ok(())
     }
 
@@ -591,6 +660,7 @@ impl UserAddressSpace {
             let result = mapper.protect(virt, flags).map_err(map_errno);
             if result.is_ok() {
                 let _ = crate::sched::smp::shootdown::flush_range(page, PAGE_SIZE);
+                self.bump_generation();
             }
             return result;
         }
@@ -622,6 +692,7 @@ impl UserAddressSpace {
             return Err(Errno::EFAULT);
         }
         let _ = crate::sched::smp::shootdown::flush_range(page, PAGE_SIZE);
+        self.bump_generation();
         Ok(())
     }
 
@@ -650,7 +721,8 @@ impl UserAddressSpace {
                     let in_device_range = mmio.iter().any(|mapping| mapping.contains(address))
                         || dma.iter().any(|(map_start, map_len)| {
                             address >= *map_start && address < map_start.saturating_add(*map_len)
-                        });
+                        })
+                        || is_capture_address(address);
                     if let Some((physical, _, _)) = mapper.translate(virt)
                         && !in_device_range
                         && page_owned(vma, &objects, address, physical.0)
@@ -867,6 +939,23 @@ fn initfs_physical_range() -> Option<(u64, u64)> {
 fn initfs_contains(physical: u64) -> bool {
     initfs_physical_range()
         .is_some_and(|(base, len)| physical >= base && physical < base.saturating_add(len))
+}
+
+#[cfg(target_arch = "x86_64")]
+fn is_capture_address(address: u64) -> bool {
+    address >= capture_window::BASE
+        && address < capture_window::BASE.saturating_add(capture_window::SIZE)
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+fn is_capture_address(_address: u64) -> bool {
+    false
+}
+
+#[cfg(target_arch = "x86_64")]
+fn overlaps_capture_window(start: u64, len: u64) -> bool {
+    let end = start.saturating_add(len);
+    start < capture_window::BASE.saturating_add(capture_window::SIZE) && capture_window::BASE < end
 }
 
 fn vma_errno(error: VmaError) -> Errno {

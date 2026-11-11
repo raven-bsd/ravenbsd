@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S32 capture lifetime: copy-backed 1 MiB round trips, unmap-during-request, capture-window
+# collision, client cancellation and server death with a capture installed.
+
+name = "capture-lifetime"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/s32-capture/build.sh"]
+initfs = "build/fixtures/s32-capture/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s32-capturecheck"
+expect_exit = "success"
+
+[[expect]]
+regex = '^s32: canceller done$'
+
+[[expect]]
+regex = '^s32: cancel ok$'
+
+[[expect]]
+regex = '^s32: roundtrip ok$'
+
+[[expect]]
+regex = '^s32: frame loop ok$'
+
+[[expect]]
+regex = '^s32: unmap-write ok$'
+
+[[expect]]
+regex = '^s32: unmap-read ok$'
+
+[[expect]]
+regex = '^s32: window ok$'
+
+[[expect]]
+regex = '^s32: server death ok$'
+
+[[expect]]
+regex = '^s32: capture frames=0 free_bytes=[0-9]+$'
+
+[[expect]]
+regex = '^s32: lifecycle ok$'
+
+[[forbid]]
+regex = '^s32: capture frames=[1-9][0-9]* free_bytes='
+
+[[forbid]]
+regex = 's32: server saw a wrong write snapshot'
+
+[[forbid]]
+regex = '(?i)panic'

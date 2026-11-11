@@ -1,6 +1,6 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt SEND 2
 .Os RavenBSD
 .Sh NAME
@@ -30,6 +30,16 @@ handle rights intersected with
 .Va rights_mask .
 A zero mask means all current source rights.
 .Pp
+The request's captured buffers are kernel-owned copies of the client range (see
+.Pa docs/design/capture.md ) .
+.Va buffer_addr
+and
+.Va response_addr
+are virtual addresses in the server's address space; reading or writing them touches the
+kernel's snapshot, never the client's pages.
+A successful read or call response is copied back to the client only if the client's mapping
+is still the one captured at request time.
+.Pp
 For replies other than the
 .Dv REPLY_HANDLE
 form of
@@ -45,6 +55,38 @@ for Call and Fstat replies it is the inline
 .Pp
 The kernel validates every attachment before taking the client handle-table lock.
 If destination insertion or reply-buffer delivery fails, it removes any attachments already
-installed for that reply.
+installed for that reply and completes the client with the error.
+.Pp
+A successful reply may report at most the client's captured input length for
+.Dv WRITE
+and
+.Dv READ ,
+and at most the captured response capacity for
+.Dv CALL
+and
+.Dv FSTAT .
+A reply that reports more is a protocol violation:
+.Nm
+returns
+.Er EPROTO ,
+the client's operation completes with
+.Er EPROTO
+(never a silent clamp and never a hang), and the server's request handle is closed.
+Zero-length and exactly-at-capacity replies are valid.
+.Sh RETURN VALUES
+.Rv -std send
+.Sh ERRORS
+.Bl -tag -width Er
+.It Bq Er EBADF
+The request handle is not a request owned by this server.
+.It Bq Er EACCES
+The handle belongs to another server process.
+.It Bq Er EIO
+The request was already completed, for example because its client was cancelled.
+.It Bq Er EPROTO
+The packet, request id, opcode or reported result length is invalid.
+.It Bq Er E2BIG
+The inline data plus attachments do not fit the captured buffer.
+.El
 .Sh STANDARDS
 RavenBSD ABI v1.

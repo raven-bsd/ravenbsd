@@ -1,6 +1,6 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt CALL 2
 .Os RavenBSD
 .Sh NAME
@@ -11,11 +11,45 @@ See the
 .Pa raven-abi
 crate (syscall number 0x67).
 .Sh DESCRIPTION
-The .Nm system call is part of the scheme IPC protocol (see
-.Xr scheme 7
-and
-.Pa architecture/03-system-servers.md ).
-It is implemented by ticket S11; this page is the contract placeholder and will be completed
-when S11 lands.
+.Nm
+sends an opaque request of
+.Fa request_len
+bytes with an optional response buffer of
+.Fa response_len
+bytes to the server owning a scheme-file handle, and blocks until the server replies.
+It returns the number of response bytes the server reported.
+The request and response ranges are captured as kernel-owned copies; the server addresses in
+the packet point at those copies, never at the client's pages
+.Pq see Pa docs/design/capture.md .
+The request capture is read-only for the server; the response capture is writable.
+On completion the kernel copies the response back to the client only if the client's mapping is
+still the one captured at request time.
+.Pp
+A successful reply may report at most
+.Fa response_len
+bytes; a larger result is a protocol violation and the call returns
+.Er EPROTO ,
+never a silently clamped length.
+Zero-length and exactly-at-capacity replies are valid.
+.Pp
+If the server exits while the call is pending, the call returns
+.Er EIO .
+The kernel releases the captured frames after the server has retired the request; a server
+still touching a cancelled capture sees kernel-owned memory, not a recycled client frame.
+.Sh RETURN VALUES
+The reported response length on success.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Bq Er EIO
+The server died before replying.
+.It Bq Er EPROTO
+The reply was malformed or reported more than the response capacity.
+.It Bq Er EFAULT
+A request or response range is not mapped, or a writable response range is read-only.
+.El
+.Sh SEE ALSO
+.Xr send 2 ,
+.Xr recv 2 ,
+.Xr open 2
 .Sh STANDARDS
 RavenBSD ABI v1.

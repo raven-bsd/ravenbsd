@@ -1,21 +1,72 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt RECV 2
 .Os RavenBSD
 .Sh NAME
 .Nm recv
-.Nd server
+.Nd receive a scheme-server request
 .Sh SYNOPSIS
 See the
 .Pa raven-abi
 crate (syscall number 0x68).
 .Sh DESCRIPTION
-The .Nm system call is part of the scheme IPC protocol (see
-.Xr scheme 7
+.Nm
+pops the next request queued for a process that registered a scheme
+.Pq Xr scheme_register 2
+and writes its 440-byte packet to
+.Fa packet_address
+.Fa capacity
+must be at least that size.
+The packet's
+.Va buffer_addr ,
+.Va buffer_len ,
+.Va response_addr
 and
-.Pa architecture/03-system-servers.md ).
-It is implemented by ticket S11; this page is the contract placeholder and will be completed
-when S11 lands.
+.Va response_len
+describe the request's captured buffers in the server's address space.
+The returned handle is a server-side request handle; pass it to
+.Xr send 2
+to complete the request.
+.Pp
+The captured buffers are kernel-owned copies of the client range, not mappings of the client's
+frames.  A
+.Dv READ
+capture is writable and is copied back to the client on completion when the client's mapping
+is unchanged; a
+.Dv WRITE
+or
+.Dv CALL
+request capture is read-only for the server.
+The server sees the bytes as they were when the syscall started.
+.Pp
+The destination address is validated when a request is dequeued.  If it is not a valid user
+range, the request is completed with
+.Er EPROTO
+(so its client never waits forever) and
+.Nm
+returns
+.Er EFAULT .
+A request whose client exited while it was queued is skipped and its capture is released.
+.Pp
+.Nm
+blocks until a request is available.
+An empty scheme registration list returns
+.Er EINVAL .
+.Sh RETURN VALUES
+A request handle is returned on success.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Bq Er EINVAL
+.Fa capacity
+is smaller than one packet, or the caller has no registered scheme.
+.It Bq Er EFAULT
+.Fa packet_address
+is not a valid user destination.
+.El
+.Sh SEE ALSO
+.Xr send 2 ,
+.Xr call 2 ,
+.Xr scheme 7
 .Sh STANDARDS
 RavenBSD ABI v1.
