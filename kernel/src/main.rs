@@ -19,6 +19,7 @@ mod cmdline;
 mod fdt {
     pub use crate::arch::aarch64::fdt::*;
 }
+mod event;
 mod initfs;
 #[cfg(target_arch = "x86_64")]
 mod ipc;

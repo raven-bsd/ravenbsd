@@ -1,21 +1,15 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt TIMER_SET 2
 .Os RavenBSD
 .Sh NAME
 .Nm timer_set
-.Nd arms or disarms a timer
+.Nd arm or disarm a timer
 .Sh SYNOPSIS
-See the
-.Pa raven-abi
-crate (syscall number 0x5E).
+.Fn timer_set timer initial_ns interval_ns
 .Sh DESCRIPTION
-The
-.Nm
-system call is part of RavenBSD ABI v1. It is implemented by ticket S26; this page is the contract placeholder and will be
-completed when S26 lands. The authoritative signature is the doc comment of the syscall in the
-.Pa raven-abi
-crate.
+An initial value of zero disarms the timer.  A nonzero interval makes it
+periodic; periodic deadlines advance from the prior deadline to avoid drift.
 .Sh STANDARDS
 RavenBSD ABI v1.

@@ -1,21 +1,24 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt TIMER_CREATE 2
 .Os RavenBSD
 .Sh NAME
 .Nm timer_create
-.Nd creates a timer object
+.Nd create a disarmed monotonic timer
 .Sh SYNOPSIS
-See the
-.Pa raven-abi
-crate (syscall number 0x5B).
+.Fn timer_create clock_id flags
 .Sh DESCRIPTION
-The
-.Nm
-system call is part of RavenBSD ABI v1. It is implemented by ticket S26; this page is the contract placeholder and will be
-completed when S26 lands. The authoritative signature is the doc comment of the syscall in the
-.Pa raven-abi
-crate.
+Only CLOCK_MONOTONIC and zero flags are accepted.  The returned timer is an
+event source and is armed by
+.Xr timer_set 2 .
+At most 1024 live timer objects may be created by one process.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EINVAL
+The clock is not CLOCK_MONOTONIC or flags is nonzero.
+.It Er ENOSPC
+The per-process timer limit has been reached.
+.El
 .Sh STANDARDS
 RavenBSD ABI v1.

@@ -99,6 +99,7 @@ pub fn on_tick() {
     TICKS.fetch_add(1, Ordering::Relaxed);
     #[cfg(target_arch = "x86_64")]
     apic::eoi();
+    crate::event::notify_all();
 }
 
 /// Uptime as `(seconds, nanoseconds)`.

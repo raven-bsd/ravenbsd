@@ -157,6 +157,7 @@ pub fn close(caller: &Arc<Process>, handle: Handle) -> Result<(), Errno> {
             _ => return Err(Errno::EBADF),
         }
     };
+    crate::event::on_handle_close(caller, handle);
     caller.handles.lock().close(handle)?;
     one_way(&file, Opcode::Close);
     Ok(())
@@ -576,6 +577,7 @@ fn submit(request: &Arc<PendingRequest>) -> Result<(), Errno> {
         .server
         .scheme_waiters
         .wake(request.server.id, 0, usize::MAX);
+    crate::event::notify_all();
     Ok(())
 }
 

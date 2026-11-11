@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "evq"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/s26-evq/build.sh"]
+initfs = "build/fixtures/s26-evq/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^s26: dereg ok$'
+
+[[expect]]
+regex = '^s26: server ready$'
+
+[[expect]]
+regex = '^s26: requests=10003 timer=12000 events=77997 lost=0$'
+
+[[expect]]
+regex = '^s26: total=100000$'
+
+[[expect]]
+regex = '^s26: client0 hup ok$'
+
+[[expect]]
+regex = '^s26: client1 hup ok$'
+
+[[expect]]
+regex = '^s26: hup ok$'
+
+[[forbid]]
+regex = '(?i)panic'

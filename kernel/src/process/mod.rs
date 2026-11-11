@@ -92,6 +92,8 @@ pub struct Process {
     pub exit_code: AtomicI32,
     /// Live thread count.
     pub threads: AtomicU32,
+    /// Number of timer objects created by this process and still alive.
+    pub timer_count: Arc<AtomicU32>,
     /// Lifecycle state, guarded so `PROC_WAIT` cannot lose an exit wakeup.
     pub state: Mutex<ProcessState>,
     /// Threads blocked in `PROC_WAIT` on this process.
@@ -172,6 +174,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        timer_count: Arc::new(AtomicU32::new(0)),
         state: Mutex::new(ProcessState::Running),
         waiters: WaitQueue::new(),
         #[cfg(target_arch = "x86_64")]
@@ -208,6 +211,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        timer_count: Arc::new(AtomicU32::new(0)),
         state: Mutex::new(ProcessState::Created),
         waiters: WaitQueue::new(),
         #[cfg(target_arch = "x86_64")]
@@ -249,6 +253,7 @@ impl Process {
         }
         *state = ProcessState::Exited;
         let _ = self.waiters.wake_all();
+        crate::event::notify_all();
     }
 }
 
@@ -280,6 +285,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        timer_count: Arc::new(AtomicU32::new(0)),
         state: Mutex::new(ProcessState::Running),
         waiters: WaitQueue::new(),
         #[cfg(target_arch = "x86_64")]
