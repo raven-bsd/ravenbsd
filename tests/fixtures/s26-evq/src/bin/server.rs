@@ -38,7 +38,7 @@ const CLIENT_WRITES: u64 = 5_000;
 /// Scheme requests the server must answer.
 const REQUESTS_TOTAL: u64 = OPENS + 2 * CLIENT_WRITES;
 /// Doorbell round trips the signaler performs.
-const EVENTS_TOTAL: u64 = 79_997;
+const EVENTS_TOTAL: u64 = 77_997;
 /// Total wakeups the loop must count.
 const WAKES_TOTAL: u64 = 100_000;
 

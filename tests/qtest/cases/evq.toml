@@ -18,7 +18,7 @@ regex = '^s26: dereg ok$'
 regex = '^s26: server ready$'
 
 [[expect]]
-regex = '^s26: requests=10003 timer=10000 events=79997 lost=0$'
+regex = '^s26: requests=10003 timer=12000 events=77997 lost=0$'
 
 [[expect]]
 regex = '^s26: total=100000$'

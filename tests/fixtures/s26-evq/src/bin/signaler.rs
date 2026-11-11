@@ -18,7 +18,7 @@ const ACK_EVENT: Handle = Handle::new(4, 0);
 
 const ADD: usize = 1;
 const ACK_COOKIE: u64 = 0xA1;
-const EVENTS: u64 = 79_997;
+const EVENTS: u64 = 77_997;
 
 fn main(_args: raven_rt::Args) -> i32 {
     let queue = match evq_create() {
