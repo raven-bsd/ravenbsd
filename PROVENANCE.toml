@@ -231,3 +231,25 @@ tier = "A"
 copied = "2026-11-10"
 modified = true
 notes = "Free-map bit operations, ffs_isblock/isfreeblock/clrblock/setblock, ffs_fragacct and the mapsearch policy ported with bounds checks instead of panics; the fragtbl124/fragtbl8, around and inside tables are the verbatim ffs_tables.c constants noted in the header."
+
+[[import]]
+path = "crates/ufs-core/src/balloc.rs"
+upstream = "netbsd"
+upstream_path = "sys/ufs/ffs/ffs_balloc.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-11"
+modified = true
+notes = "ffs_balloc_ufs1/ffs_balloc_ufs2 growth logic ported to safe Rust: direct, single, double and triple indirect block allocation, fragment growth and block-pointer updates. Buffer cache, credentials and ffs_extb skipped as the ticket requires."
+
+[[import]]
+path = "crates/ufs-core/src/files.rs"
+upstream = "netbsd"
+upstream_path = "sys/ufs/ffs/ffs_inode.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-11"
+modified = true
+notes = "ffs_truncate, ffs_indirtrunc and inode update ordering ported. The write growth/extend rules follow sys/ufs/ufs/ufs_readwrite.c (ffs_write) and setattr follows sys/ufs/ufs/ufs_inode.c; both notices are carried in the file header because the provenance format allows one entry per destination path. UBC, uio, WAPBL and snapshot handling removed."

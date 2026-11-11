@@ -428,7 +428,7 @@ fn ino_to_cg(fs: &Superblock, ino: Ino) -> u32 {
 }
 
 impl<D: BlockIo> Ufs<D> {
-    fn ensure_writable(&self) -> Result<(), UfsError> {
+    pub(crate) fn ensure_writable(&self) -> Result<(), UfsError> {
         if self.read_only {
             Err(UfsError::ReadOnly)
         } else {
@@ -1118,7 +1118,7 @@ impl<D: BlockIo> Ufs<D> {
         Ok(())
     }
 
-    fn write_block_at(&mut self, frag: u64, data: &[u8]) -> Result<(), UfsError> {
+    pub(crate) fn write_block_at(&mut self, frag: u64, data: &[u8]) -> Result<(), UfsError> {
         let offset = self.fs.frag_offset(frag)?;
         if data.len() != self.fs.bsize as usize {
             return Err(UfsError::Invalid);

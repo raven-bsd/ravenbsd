@@ -100,6 +100,23 @@ pub struct StatFs {
 /// Options for [`crate::Ufs::mount`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MountOptions {
-    /// K51 accepts only read-only mounts.
+    /// Read-only mounts reject every modification; writable mounts use the K52 allocator.
     pub read_only: bool,
+}
+
+/// Attributes to change in [`crate::Ufs::setattr`]; `None` leaves a field unchanged.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SetAttr {
+    /// Permission and set-id bits (`0o7777`).
+    pub mode: Option<u16>,
+    /// Owner user id.
+    pub uid: Option<u32>,
+    /// Owner group id.
+    pub gid: Option<u32>,
+    /// Last access time.
+    pub atime: Option<Timespec>,
+    /// Last modification time.
+    pub mtime: Option<Timespec>,
+    /// New file size; shrinking frees blocks, growing creates a hole.
+    pub size: Option<u64>,
 }

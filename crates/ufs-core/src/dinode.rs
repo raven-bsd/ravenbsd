@@ -291,6 +291,116 @@ fn read_i64(raw: &[u8], off: usize) -> Result<i64, UfsError> {
     Ok(i64::from_le_bytes(value))
 }
 
+/// Encode the decoded inode fields back into its on-disk bytes, preserving other fields.
+pub(crate) fn encode(ufs2: bool, raw: &mut [u8], inode: &Inode) -> Result<(), UfsError> {
+    let expected = if ufs2 { 256 } else { 128 };
+    if raw.len() != expected {
+        return Err(UfsError::Corrupt("inode encode size"));
+    }
+    write_u16(raw, 0, inode.mode)?;
+    write_i16(raw, 2, i16::try_from(inode.nlink).unwrap_or(i16::MAX))?;
+    if ufs2 {
+        write_u32(raw, 4, inode.uid)?;
+        write_u32(raw, 8, inode.gid)?;
+        write_u64(raw, 16, inode.size)?;
+        write_u64(raw, 24, inode.blocks)?;
+        write_i64(raw, 32, inode.atime.sec)?;
+        write_i64(raw, 40, inode.mtime.sec)?;
+        write_i64(raw, 48, inode.ctime.sec)?;
+        write_i32(raw, 68, inode.atime.nsec as i32)?;
+        write_i32(raw, 64, inode.mtime.nsec as i32)?;
+        write_i32(raw, 72, inode.ctime.nsec as i32)?;
+        write_i32(raw, 80, inode.r#gen as i32)?;
+        write_u32(raw, 88, inode.flags)?;
+        for (i, value) in inode.db.iter().enumerate() {
+            write_u64(raw, 112 + i * 8, *value)?;
+        }
+        for (i, value) in inode.ib.iter().enumerate() {
+            write_u64(raw, 208 + i * 8, *value)?;
+        }
+    } else {
+        write_u32(raw, 112, inode.uid)?;
+        write_u32(raw, 116, inode.gid)?;
+        write_u64(raw, 8, inode.size)?;
+        write_u32(raw, 104, u32::try_from(inode.blocks).unwrap_or(u32::MAX))?;
+        write_i32(raw, 16, sec32(inode.atime.sec))?;
+        write_i32(raw, 24, sec32(inode.mtime.sec))?;
+        write_i32(raw, 32, sec32(inode.ctime.sec))?;
+        write_i32(raw, 20, inode.atime.nsec as i32)?;
+        write_i32(raw, 28, inode.mtime.nsec as i32)?;
+        write_i32(raw, 36, inode.ctime.nsec as i32)?;
+        write_i32(raw, 108, inode.r#gen as i32)?;
+        write_u32(raw, 100, inode.flags)?;
+        for (i, value) in inode.db.iter().enumerate() {
+            write_u32(
+                raw,
+                40 + i * 4,
+                u32::try_from(*value).map_err(|_| UfsError::Corrupt("32-bit block pointer"))?,
+            )?;
+        }
+        for (i, value) in inode.ib.iter().enumerate() {
+            write_u32(
+                raw,
+                88 + i * 4,
+                u32::try_from(*value).map_err(|_| UfsError::Corrupt("32-bit indirect pointer"))?,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn sec32(value: i64) -> i32 {
+    i32::try_from(value).unwrap_or(if value < 0 { i32::MIN } else { i32::MAX })
+}
+
+fn write_u16(raw: &mut [u8], off: usize, value: u16) -> Result<(), UfsError> {
+    let dst = raw
+        .get_mut(off..off + 2)
+        .ok_or(UfsError::Corrupt("truncated inode"))?;
+    dst.copy_from_slice(&value.to_le_bytes());
+    Ok(())
+}
+
+fn write_i16(raw: &mut [u8], off: usize, value: i16) -> Result<(), UfsError> {
+    let dst = raw
+        .get_mut(off..off + 2)
+        .ok_or(UfsError::Corrupt("truncated inode"))?;
+    dst.copy_from_slice(&value.to_le_bytes());
+    Ok(())
+}
+
+fn write_u32(raw: &mut [u8], off: usize, value: u32) -> Result<(), UfsError> {
+    let dst = raw
+        .get_mut(off..off + 4)
+        .ok_or(UfsError::Corrupt("truncated inode"))?;
+    dst.copy_from_slice(&value.to_le_bytes());
+    Ok(())
+}
+
+fn write_i32(raw: &mut [u8], off: usize, value: i32) -> Result<(), UfsError> {
+    let dst = raw
+        .get_mut(off..off + 4)
+        .ok_or(UfsError::Corrupt("truncated inode"))?;
+    dst.copy_from_slice(&value.to_le_bytes());
+    Ok(())
+}
+
+fn write_u64(raw: &mut [u8], off: usize, value: u64) -> Result<(), UfsError> {
+    let dst = raw
+        .get_mut(off..off + 8)
+        .ok_or(UfsError::Corrupt("truncated inode"))?;
+    dst.copy_from_slice(&value.to_le_bytes());
+    Ok(())
+}
+
+fn write_i64(raw: &mut [u8], off: usize, value: i64) -> Result<(), UfsError> {
+    let dst = raw
+        .get_mut(off..off + 8)
+        .ok_or(UfsError::Corrupt("truncated inode"))?;
+    dst.copy_from_slice(&value.to_le_bytes());
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -28,12 +28,14 @@ pub mod alloc;
 #[cfg(test)]
 extern crate std;
 
+mod balloc;
 mod blockio;
 mod dinode;
 mod dir;
 mod error;
 mod ffs_bitmap;
 mod ffs_vfsops;
+mod files;
 mod fs;
 mod inode;
 mod types;
@@ -44,5 +46,5 @@ mod ufs_readwrite;
 
 pub use blockio::BlockIo;
 pub use error::{IoError, UfsError};
-pub use types::{Attr, DirEntry, FileType, Ino, MountOptions, StatFs, Timespec};
+pub use types::{Attr, DirEntry, FileType, Ino, MountOptions, SetAttr, StatFs, Timespec};
 pub use ufs::Ufs;
