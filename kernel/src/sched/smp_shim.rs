@@ -63,3 +63,15 @@ pub mod bringup {
     /// Request a reschedule on another CPU.
     pub fn send_reschedule(_cpu: usize) {}
 }
+
+/// Single-CPU TLB shootdown stand-in.
+///
+/// There is no other CPU to notify, so a "shootdown" is one local flush. The boolean result keeps
+/// the shared caller contract: when false, the caller must not recycle frames.
+pub mod shootdown {
+    /// Flush the translation for `[start, start + len)` after a mapping change.
+    pub fn flush_range(_start: u64, _len: u64) -> bool {
+        crate::arch::mmu::tlb_flush_all();
+        true
+    }
+}

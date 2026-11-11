@@ -3,18 +3,27 @@
 
 //! Fault-safe copies between kernel buffers and user addresses.
 //!
-//! No user pointer is dereferenced in Rust. The byte copies are `rep movsb` assembly routines
-//! bracketed by a fixup table; if the page fault handler sees a faulting instruction inside one of
-//! those brackets and a user CR2, it redirects the instruction pointer to the fixup label, which
+//! No user pointer is dereferenced in Rust. The byte copies are assembly routines bracketed by a
+//! fixup table; if the exception handler sees a faulting instruction inside one of those brackets
+//! and a user fault address, it redirects the instruction pointer to the fixup label, which
 //! returns `-EFAULT` to the Rust wrapper.
+//!
+//! * x86-64 uses `rep movsb`; a missing user page raises a page fault that the trap handler fixes
+//!   up.
+//! * aarch64 uses the unprivileged `ldtrb`/`sttrb` accesses. They are subject to the EL0
+//!   permission checks regardless of `PAN`/`SCTLR_EL1.SPAN`, so usercopy needs neither `stac`/
+//!   `clac` nor a PAN toggle: a bad user page raises a same-EL data abort that is fixed up.
 
 use raven_abi::errno::Errno;
 use raven_usercopy::{UserSlice, is_user_address};
 
-use crate::arch::x86_64::trapframe::TrapFrame;
-
 /// Length of one fixup table entry: `(start_ip, end_ip, fixup_ip)`.
 const FIXUP_ENTRY_BYTES: u64 = 24;
+
+#[cfg(target_arch = "aarch64")]
+use crate::arch::aarch64::vectors::TrapFrame;
+#[cfg(target_arch = "x86_64")]
+use crate::arch::x86_64::trapframe::TrapFrame;
 
 unsafe extern "C" {
     fn copy_from_user_asm(destination: *mut u8, source: *const u8, length: usize) -> isize;
@@ -24,6 +33,7 @@ unsafe extern "C" {
     static __usercopy_fixup_end: u8;
 }
 
+#[cfg(target_arch = "x86_64")]
 core::arch::global_asm!(
     r#"
     .section .text
@@ -54,6 +64,73 @@ copy_to_user_end:
     ret
 copy_to_user_fault:
     mov rax, -14
+    ret
+    .size copy_to_user_asm, . - copy_to_user_asm
+
+    .section .rodata.usercopy_fixup, "a"
+    .global __usercopy_fixup_start
+__usercopy_fixup_start:
+    .quad copy_from_user_start
+    .quad copy_from_user_end
+    .quad copy_from_user_fault
+    .quad copy_to_user_start
+    .quad copy_to_user_end
+    .quad copy_to_user_fault
+    .global __usercopy_fixup_end
+__usercopy_fixup_end:
+"#
+);
+
+#[cfg(target_arch = "aarch64")]
+core::arch::global_asm!(
+    r#"
+    .section .text
+
+    /* x0 = kernel destination, x1 = user source, x2 = length. Only the `ldtrb` can fault. */
+    .global copy_from_user_asm
+    .type copy_from_user_asm, %function
+copy_from_user_asm:
+    mov x9, #0
+1:
+    cmp x9, x2
+    b.hs 3f
+    add x11, x1, x9
+copy_from_user_start:
+    ldtrb w10, [x11]
+copy_from_user_end:
+    strb w10, [x0, x9]
+    add x9, x9, #1
+    b 1b
+3:
+    mov x0, #0
+    ret
+copy_from_user_fault:
+    mov x0, #14
+    neg x0, x0
+    ret
+    .size copy_from_user_asm, . - copy_from_user_asm
+
+    /* x0 = user destination, x1 = kernel source, x2 = length. Only the `sttrb` can fault. */
+    .global copy_to_user_asm
+    .type copy_to_user_asm, %function
+copy_to_user_asm:
+    mov x9, #0
+1:
+    cmp x9, x2
+    b.hs 3f
+    ldrb w10, [x1, x9]
+    add x11, x0, x9
+copy_to_user_start:
+    sttrb w10, [x11]
+copy_to_user_end:
+    add x9, x9, #1
+    b 1b
+3:
+    mov x0, #0
+    ret
+copy_to_user_fault:
+    mov x0, #14
+    neg x0, x0
     ret
     .size copy_to_user_asm, . - copy_to_user_asm
 
@@ -173,6 +250,7 @@ pub fn fixup_for(return_address: u64) -> Option<u64> {
 /// Handle a page fault that happened inside a usercopy critical section.
 ///
 /// Returns true when the frame's instruction pointer was moved to the fixup label.
+#[cfg(target_arch = "x86_64")]
 pub fn handle_page_fault(frame: &mut TrapFrame, cr2: u64) -> bool {
     if !is_user_address(cr2) {
         return false;
@@ -181,6 +259,22 @@ pub fn handle_page_fault(frame: &mut TrapFrame, cr2: u64) -> bool {
         return false;
     };
     frame.rip = fixup;
+    true
+}
+
+/// Handle an aarch64 same-EL data abort inside a usercopy critical section.
+///
+/// Returns true when `ELR_EL1` was redirected to the fixup label; the vector then returns and the
+/// routine delivers `-EFAULT` to its Rust wrapper.
+#[cfg(target_arch = "aarch64")]
+pub fn handle_fault_aarch64(frame: &mut TrapFrame) -> bool {
+    if !is_user_address(frame.far) {
+        return false;
+    }
+    let Some(fixup) = fixup_for(frame.elr) else {
+        return false;
+    };
+    frame.elr = fixup;
     true
 }
 

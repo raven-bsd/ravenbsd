@@ -11,9 +11,12 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
+#[cfg(target_arch = "aarch64")]
+use raven_abi::layout::aarch64::{USER_END, USER_MIN};
+#[cfg(target_arch = "x86_64")]
 use raven_abi::layout::x86_64::{USER_END, USER_MIN};
 use raven_abi::types::prot;
-use raven_rmm::{MapError, Mapper, PageFlags, PageSize, PhysAddr, VirtAddr};
+use raven_rmm::{MapError, PageFlags, PageSize, PhysAddr, VirtAddr};
 use raven_vma::{Backing, PAGE_SIZE, Vma, VmaError, Vmas};
 
 use crate::memory::aspace::AddressSpace;
@@ -59,17 +62,7 @@ impl UserAddressSpace {
     }
 
     /// A mapper over this address space's root.
-    pub fn mapper(
-        &mut self,
-    ) -> Result<
-        Mapper<
-            '_,
-            crate::memory::paging::KernelFrameAllocator,
-            crate::memory::paging::KernelPhysMemory,
-            crate::memory::paging::KernelTlb,
-        >,
-        MapError,
-    > {
+    pub fn mapper(&mut self) -> Result<paging::KernelMapper<'_>, MapError> {
         self.aspace.mapper()
     }
 
@@ -460,15 +453,10 @@ impl UserAddressSpace {
     }
 
     /// Release an address space that is currently active: free its data frames, switch back to the
-    /// kernel root and then free its page tables while running on the kernel stack.
+    /// kernel address space and then free its page tables while running on the kernel stack.
     pub fn release(mut self) {
         self.free_user_frames();
-        match paging::kernel_root() {
-            // SAFETY: `active_root` is the kernel page-table root; the current kernel stack and
-            // code are mapped in the kernel half of every address space.
-            Some(root) => unsafe { activate_root(root.0) },
-            None => crate::arch::halt(),
-        }
+        activate_kernel_space();
         drop(self);
     }
 
@@ -618,6 +606,29 @@ fn map_errno(error: MapError) -> Errno {
     }
 }
 
+/// Switch to the kernel address space (x86-64: the kernel CR3).
+#[cfg(target_arch = "x86_64")]
+fn activate_kernel_space() {
+    let Some(root) = paging::kernel_root() else {
+        crate::arch::halt();
+    };
+    // SAFETY: `root` is the kernel page-table root; the current kernel stack and code are mapped
+    // in the kernel half of every address space.
+    unsafe {
+        activate_root(root.0);
+    }
+}
+
+/// Switch to the kernel address space (aarch64: the empty TTBR0 root; TTBR1 is always kernel).
+#[cfg(target_arch = "aarch64")]
+fn activate_kernel_space() {
+    let Some(root) = paging::empty_user_root() else {
+        crate::arch::halt();
+    };
+    crate::arch::mmu::switch_ttbr0(root.0, 0);
+}
+
+#[cfg(target_arch = "x86_64")]
 unsafe fn activate_root(root: u64) {
     // SAFETY: `root` is the kernel page-table root; the current kernel stack and code are mapped
     // in the kernel half of every address space.

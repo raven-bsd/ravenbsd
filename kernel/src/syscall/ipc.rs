@@ -8,13 +8,13 @@ use alloc::sync::Arc;
 use raven_abi::errno::Errno;
 use raven_abi::types::{Handle, Rights};
 
-use crate::arch::x86_64::trapframe::TrapFrame;
 use crate::ipc::model::{self, NAME_MAX, PATH_MAX};
 use crate::ipc::{self, registry, router};
 use crate::process::{self, Process, handle::Object};
+use crate::syscall::SyscallFrame;
 
 /// Dispatch one scheme IPC syscall.
-pub fn dispatch(call: raven_abi::syscall::Syscall, frame: &TrapFrame) -> Result<usize, Errno> {
+pub fn dispatch(call: raven_abi::syscall::Syscall, frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     match call {
         raven_abi::syscall::Syscall::SCHEME_REGISTER => register(&caller, frame),
@@ -31,7 +31,7 @@ pub fn dispatch(call: raven_abi::syscall::Syscall, frame: &TrapFrame) -> Result<
     }
 }
 
-fn register(caller: &Arc<Process>, frame: &TrapFrame) -> Result<usize, Errno> {
+fn register(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let name = router::user_string(frame.rdi, frame.rsi, NAME_MAX)?;
     if !model::valid_scheme_name(&name) {
         return Err(Errno::EINVAL);
@@ -56,7 +56,7 @@ fn register(caller: &Arc<Process>, frame: &TrapFrame) -> Result<usize, Errno> {
     Ok(handle.0 as usize)
 }
 
-fn open(caller: &Arc<Process>, frame: &TrapFrame) -> Result<usize, Errno> {
+fn open(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let path = router::user_string(frame.rdi, frame.rsi, PATH_MAX)?;
     let (scheme, suffix) = model::split_path(&path).map_err(|_| Errno::EINVAL)?;
     let flags = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
@@ -65,50 +65,50 @@ fn open(caller: &Arc<Process>, frame: &TrapFrame) -> Result<usize, Errno> {
     Ok(handle.0 as usize)
 }
 
-fn read(caller: &Arc<Process>, frame: &TrapFrame) -> Result<usize, Errno> {
+fn read(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let file = ipc::file_from_handle(caller, handle, Rights::READ)?;
     router::read(caller, &file, frame.rsi, frame.rdx)
 }
 
-fn write(caller: &Arc<Process>, frame: &TrapFrame) -> Result<usize, Errno> {
+fn write(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let file = ipc::file_from_handle(caller, handle, Rights::WRITE)?;
     router::write(caller, &file, frame.rsi, frame.rdx)
 }
 
-fn close(caller: &Arc<Process>, frame: &TrapFrame) -> Result<usize, Errno> {
+fn close(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     router::close(caller, handle)?;
     Ok(0)
 }
 
-fn dup(caller: &Arc<Process>, frame: &TrapFrame) -> Result<usize, Errno> {
+fn dup(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let mask = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
     let duplicate = router::dup(caller, handle, mask)?;
     Ok(duplicate.0 as usize)
 }
 
-fn fstat(caller: &Arc<Process>, frame: &TrapFrame) -> Result<usize, Errno> {
+fn fstat(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let file = ipc::file_from_handle(caller, handle, Rights::READ)?;
     router::fstat(caller, &file, frame.rsi, frame.rdx)?;
     Ok(0)
 }
 
-fn call_scheme(caller: &Arc<Process>, frame: &TrapFrame) -> Result<usize, Errno> {
+fn call_scheme(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let file = ipc::file_from_handle(caller, handle, Rights::READ)?;
     router::call(caller, &file, frame.rsi, frame.rdx, frame.r10, frame.r8)
 }
 
-fn recv(caller: &Arc<Process>, frame: &TrapFrame) -> Result<usize, Errno> {
+fn recv(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = router::recv(caller, frame.rdi, frame.rsi)?;
     Ok(handle.0 as usize)
 }
 
-fn send(caller: &Arc<Process>, frame: &TrapFrame) -> Result<usize, Errno> {
+fn send(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     router::send(caller, handle, frame.rsi, frame.rdx)?;
     Ok(0)

@@ -13,22 +13,18 @@ mod arch;
 mod backtrace;
 mod boot;
 mod cmdline;
-#[cfg(target_arch = "x86_64")]
 mod initfs;
 #[cfg(target_arch = "x86_64")]
 mod ipc;
 mod log;
 mod memory;
-#[cfg(target_arch = "x86_64")]
 mod process;
 mod sched;
 #[cfg(target_arch = "x86_64")]
 mod selftest;
 mod sync;
-#[cfg(target_arch = "x86_64")]
 mod syscall;
 mod time;
-#[cfg(target_arch = "x86_64")]
 mod usercopy;
 
 // Force the `raven-mem` object code (including the exported C ABI symbols) into the link.

@@ -12,6 +12,7 @@ pub mod percpu;
 pub mod selftest;
 pub mod serial;
 pub mod start;
+pub mod syscall;
 pub mod timer;
 pub mod vectors;
 
