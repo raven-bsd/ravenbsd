@@ -4,11 +4,18 @@
 //! Uncached kernel mappings for device MMIO.
 //!
 //! S07 uses [`map_mmio`] to reach device registers. The mappings live in a dedicated 64 GiB
-//! window above the growable heap part of the kernel heap region and are never unmapped.
+//! window above the growable heap part of the kernel heap region and are never unmapped. On
+//! aarch64 the device-attribute bits select `MAIR_EL1` attr3 (device-nGnRE); on x86-64 they are
+//! PCD+PWT. Physical RAM is refused: only memory that the memory map does not report as usable
+//! may be mapped through this window.
 
 #![allow(dead_code)] // S07 maps device registers through this module.
 
+#[cfg(target_arch = "aarch64")]
+use raven_abi::layout::aarch64::KERNEL_HEAP_BASE;
+#[cfg(target_arch = "x86_64")]
 use raven_abi::layout::x86_64::KERNEL_HEAP_BASE;
+use raven_bootinfo::MemoryKind;
 use raven_rmm::{
     MapError, PageFlags, PageSize, PhysAddr, VirtAddr, page_align_down, page_align_up,
 };
@@ -40,6 +47,8 @@ pub fn map_mmio(physical: u64, len: usize) -> Result<*mut u8, MapError> {
     let span = offset.checked_add(len).ok_or(MapError::NotCanonical)?;
     let map_len = page_align_up(span).ok_or(MapError::NotCanonical)?;
 
+    refuse_physical_ram(base, span)?;
+
     let mut cursor = CURSOR.lock();
     let start = *cursor;
     let end = start.checked_add(map_len).ok_or(MapError::NotCanonical)?;
@@ -68,6 +77,27 @@ pub fn map_mmio(physical: u64, len: usize) -> Result<*mut u8, MapError> {
 
     let address = start.checked_add(offset).ok_or(MapError::NotCanonical)?;
     Ok(address as *mut u8)
+}
+
+/// Refuse to map memory the memory map reports as usable RAM: device mappings are for device
+/// windows, and a driver that MMIO-maps ordinary RAM would bypass every memory accounting rule.
+fn refuse_physical_ram(base: u64, span: u64) -> Result<(), MapError> {
+    let request_start = base;
+    let request_end = base
+        .checked_add(span)
+        .ok_or(MapError::NotCanonical)?
+        .saturating_sub(1);
+    for region in crate::memory::paging::memory_map() {
+        if region.kind() != Some(MemoryKind::Usable) {
+            continue;
+        }
+        let region_start = region.base;
+        let region_end = region.base.saturating_add(region.len).saturating_sub(1);
+        if request_start <= region_end && region_start <= request_end {
+            return Err(MapError::NotDeviceMemory);
+        }
+    }
+    Ok(())
 }
 
 const _: () = {

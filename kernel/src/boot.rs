@@ -210,7 +210,9 @@ pub fn print_banner(data: &BootData) {
 }
 
 /// Validate the handoff, initialise the frame allocator and either exit the test or halt.
-#[cfg_attr(target_arch = "aarch64", allow(dead_code))] // x86-64 `kmain` calls this; aarch64 has its own flow.
+///
+/// Called by both architectures' `kmain` after their own table/heap bring-up: it re-validates the
+/// kernel-owned handoff copy, prints the banner and finishes the test-exit flow.
 pub fn run(boot: *const BootInfo) -> ! {
     let data = match validate(boot) {
         Ok(data) => data,

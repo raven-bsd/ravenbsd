@@ -9,6 +9,11 @@
 //! final permissions, and the boot stack (inside `.bss`, so it is part of the data mapping; no
 //! separate guard page is possible without unmapping unrelated `.bss` objects).
 //!
+//! x86-64 switches `CR3` to a single new root; aarch64 switches `TTBR1_EL1` to the new kernel
+//! root and points `TTBR0_EL1` at a zeroed table (no user half yet), through the break-before-make
+//! sequence in `arch::aarch64::mmu`, and marks memory-map MMIO regions with the device-nGnRnE
+//! attribute instead of normal memory.
+//!
 //! The `BootInfo`, command line and memory map are copied into kernel-owned statics before
 //! `LoaderReclaimable` frames are returned to the frame allocator. The initfs stays
 //! `KernelAndModules` and is never freed.
@@ -17,6 +22,9 @@ use core::cell::UnsafeCell;
 use core::fmt;
 use core::sync::atomic::{AtomicU64, Ordering};
 
+#[cfg(target_arch = "aarch64")]
+use raven_abi::layout::aarch64::HHDM_BASE;
+#[cfg(target_arch = "x86_64")]
 use raven_abi::layout::x86_64::HHDM_BASE;
 use raven_bootinfo::{BootInfo, MemoryKind, MemoryRegion, PhysRange};
 use raven_rmm::{
@@ -82,6 +90,10 @@ pub enum PagingError {
     Overflow,
     /// The HHDM base does not match the architecture contract.
     HhdmMismatch,
+    /// The freshly built kernel tables contain a writable and executable page.
+    #[cfg_attr(target_arch = "x86_64", allow(dead_code))]
+    // Only the aarch64 init audits tables.
+    WxViolation,
 }
 
 impl fmt::Display for PagingError {
@@ -94,6 +106,7 @@ impl fmt::Display for PagingError {
             PagingError::BadKernelAddress => f.write_str("kernel static outside the image"),
             PagingError::Overflow => f.write_str("address overflow"),
             PagingError::HhdmMismatch => f.write_str("HHDM base mismatch"),
+            PagingError::WxViolation => f.write_str("writable executable page in kernel tables"),
         }
     }
 }
@@ -129,6 +142,7 @@ impl PhysMemory for KernelPhysMemory {
 /// TLB invalidation for the active kernel tables.
 pub struct KernelTlb;
 
+#[cfg(target_arch = "x86_64")]
 impl TlbFlusher for KernelTlb {
     fn flush(&mut self, virt: VirtAddr) {
         // SAFETY: `invlpg` is a ring-0 instruction that only invalidates one TLB entry.
@@ -155,8 +169,25 @@ impl TlbFlusher for KernelTlb {
     }
 }
 
+#[cfg(target_arch = "aarch64")]
+impl TlbFlusher for KernelTlb {
+    fn flush(&mut self, virt: VirtAddr) {
+        crate::arch::mmu::tlb_flush_page(virt.data());
+    }
+
+    fn flush_all(&mut self) {
+        crate::arch::mmu::tlb_flush_all();
+    }
+}
+
 /// The kernel mapper over the active root.
+#[cfg(target_arch = "x86_64")]
 pub type KernelMapper<'a> = Mapper<'a, KernelFrameAllocator, KernelPhysMemory, KernelTlb>;
+
+/// The kernel mapper over the active TTBR1 root.
+#[cfg(target_arch = "aarch64")]
+pub type KernelMapper<'a> =
+    Mapper<'a, KernelFrameAllocator, KernelPhysMemory, KernelTlb, raven_rmm::Aarch64Encoding>;
 
 /// Run `operation` with a mapper over the active kernel root.
 pub fn with_kernel_mapper<R>(
@@ -166,7 +197,10 @@ pub fn with_kernel_mapper<R>(
     let mut allocator = KernelFrameAllocator;
     let memory = KernelPhysMemory;
     let mut tlb = KernelTlb;
+    #[cfg(target_arch = "x86_64")]
     let mut mapper = Mapper::new(root, &mut allocator, &memory, &mut tlb)?;
+    #[cfg(target_arch = "aarch64")]
+    let mut mapper = Mapper::with_encoding(root, &mut allocator, &memory, &mut tlb)?;
     Ok(operation(&mut mapper))
 }
 
@@ -174,6 +208,7 @@ pub fn with_kernel_mapper<R>(
 ///
 /// Must be called after [`crate::memory::frame::init`]. Returns the pointer to the copied
 /// `BootInfo` that later boot stages must use.
+#[cfg(target_arch = "x86_64")]
 pub fn init(data: &BootData) -> Result<*const BootInfo, PagingError> {
     if data.info.hhdm_offset != HHDM_BASE {
         return Err(PagingError::HhdmMismatch);
@@ -223,6 +258,95 @@ pub fn init(data: &BootData) -> Result<*const BootInfo, PagingError> {
     Ok(boot_info_ptr())
 }
 
+/// Build and activate the kernel address space (aarch64).
+///
+/// Builds a kernel-owned TTBR1 root with the HHDM (device attributes for the memory map's MMIO
+/// regions), remaps the kernel image segments with their final permissions, then switches both
+/// TTBRs through the break-before-make sequence and reclaims the loader's frames. TTBR0 receives
+/// a zeroed table: the kernel has no user half until S14c, and the loader's tables (which the
+/// reclaim frees) must stop being reachable.
+#[cfg(target_arch = "aarch64")]
+pub fn init(data: &BootData) -> Result<*const BootInfo, PagingError> {
+    if data.info.hhdm_offset != HHDM_BASE {
+        return Err(PagingError::HhdmMismatch);
+    }
+    copy_boot_data(data)?;
+    let kernel_offset = data
+        .info
+        .kernel_virt_base
+        .checked_sub(data.info.kernel_phys_base)
+        .ok_or(PagingError::BadKernelAddress)?;
+
+    crate::arch::mmu::init_mair_tcr();
+
+    let root = frame::alloc_zeroed_frame().ok_or(PagingError::OutOfFrames)?;
+    let user_root = frame::alloc_zeroed_frame().ok_or(PagingError::OutOfFrames)?;
+    let mut allocator = KernelFrameAllocator;
+    let memory = KernelPhysMemory;
+    let mut tlb = KernelTlb;
+    let mut mapper = Mapper::with_encoding(rmm_phys(root), &mut allocator, &memory, &mut tlb)?;
+
+    let mut hhdm_bytes = 0u64;
+    for region in data.memory_map {
+        if region.len == 0 || region.kind() == Some(MemoryKind::BadMemory) {
+            continue;
+        }
+        let virt = HHDM_BASE
+            .checked_add(region.base)
+            .ok_or(PagingError::Overflow)?;
+        let virt = VirtAddr::new(virt).ok_or(MapError::NotCanonical)?;
+        // MMIO regions keep the loader's device-nGnRnE attribute; RAM is normal write-back.
+        let flags = if region.kind() == Some(MemoryKind::Mmio) {
+            PageFlags::kernel_device()
+        } else {
+            PageFlags::kernel_rw()
+        };
+        mapper.map_range(
+            virt,
+            rmm_phys(frame::PhysAddr(region.base)),
+            region.len,
+            flags,
+        )?;
+        hhdm_bytes = hhdm_bytes.saturating_add(region.len);
+    }
+
+    // AAVMF does not describe the platform UART frame in the UEFI memory map, but the console is
+    // reached through the HHDM: map it with device attributes when the map lacks it, exactly as
+    // the S12 loader does before the handoff.
+    const PL011_PHYS: u64 = 0x0900_0000;
+    let pl011_virt = HHDM_BASE
+        .checked_add(PL011_PHYS)
+        .ok_or(PagingError::Overflow)?;
+    let pl011_virt = VirtAddr::new(pl011_virt).ok_or(MapError::NotCanonical)?;
+    if mapper.translate(pl011_virt).is_none() {
+        mapper.map(
+            pl011_virt,
+            rmm_phys(frame::PhysAddr(PL011_PHYS)),
+            PageFlags::kernel_device(),
+            PageSize::Size4K,
+        )?;
+    }
+
+    map_kernel_image(&mut mapper, kernel_offset)?;
+    // The switch runs in the kernel image mapping, which is identical in the old (loader) and new
+    // tables, so instruction fetch cannot miss while the roots change.
+    activate(root, user_root);
+    KERNEL_ROOT.store(root.0, Ordering::Release);
+
+    if wx_violations() != 0 {
+        return Err(PagingError::WxViolation);
+    }
+
+    let reclaimed_frames = reclaim_loader();
+    let reclaimed_bytes = reclaimed_frames.saturating_mul(frame::PAGE_SIZE);
+    kprintln!(
+        "paging: kernel tables active (HHDM {} MiB, reclaimed {} MiB)",
+        hhdm_bytes >> 20,
+        reclaimed_bytes >> 20
+    );
+    Ok(boot_info_ptr())
+}
+
 /// The active kernel root frame.
 pub fn kernel_root() -> Option<PhysAddr> {
     let root = KERNEL_ROOT.load(Ordering::Acquire);
@@ -260,11 +384,29 @@ pub fn cmdline() -> &'static str {
 }
 
 /// Map `len` bytes of freshly allocated frames at `HEAP_BASE + offset` with RW+NX flags.
+#[cfg(target_arch = "x86_64")]
 pub fn map_heap_range(offset: u64, len: u64) -> Result<(), MapError> {
     let length = page_align_up(len).ok_or(MapError::NotCanonical)?;
     let base = raven_abi::layout::x86_64::KERNEL_HEAP_BASE
         .checked_add(offset)
         .ok_or(MapError::NotCanonical)?;
+    heap_frames(offset, length, base)
+}
+
+/// Map `len` bytes of freshly allocated frames at the aarch64 `HEAP_BASE + offset` with RW+NX
+/// flags.
+#[cfg(target_arch = "aarch64")]
+pub fn map_heap_range(offset: u64, len: u64) -> Result<(), MapError> {
+    let length = page_align_up(len).ok_or(MapError::NotCanonical)?;
+    let base = raven_abi::layout::aarch64::KERNEL_HEAP_BASE
+        .checked_add(offset)
+        .ok_or(MapError::NotCanonical)?;
+    heap_frames(offset, length, base)
+}
+
+/// Shared body of [`map_heap_range`]: map `length` bytes of fresh frames at `base + offset`.
+fn heap_frames(offset: u64, length: u64, base: u64) -> Result<(), MapError> {
+    let _ = offset;
     let mut mapped = 0u64;
     while mapped < length {
         let virt = VirtAddr::new(base.checked_add(mapped).ok_or(MapError::NotCanonical)?)
@@ -288,6 +430,7 @@ pub fn map_heap_range(offset: u64, len: u64) -> Result<(), MapError> {
 }
 
 /// Count pages that are both writable and executable in the active kernel tables.
+#[cfg(target_arch = "x86_64")]
 pub fn wx_violations() -> u64 {
     let Some(root) = kernel_root() else {
         return u64::MAX;
@@ -298,7 +441,20 @@ pub fn wx_violations() -> u64 {
     count
 }
 
-/// Run the `selftest=paging` checks.
+/// Count pages that are both writable and executable in the active kernel tables (aarch64).
+#[cfg(target_arch = "aarch64")]
+pub fn wx_violations() -> u64 {
+    let Some(root) = kernel_root() else {
+        return u64::MAX;
+    };
+    let memory = KernelPhysMemory;
+    let mut count = 0u64;
+    walk_wx_aarch64(PageTable::new(root, 3), &memory, &mut count);
+    count
+}
+
+/// Run the `selftest=paging` checks (x86-64; the aarch64 paging checks run in `init`).
+#[cfg(target_arch = "x86_64")]
 pub fn selftest() {
     let test_address = match VirtAddr::new(0x0000_0000_5000_0000) {
         Some(address) => address,
@@ -358,6 +514,7 @@ pub fn selftest() {
 /// Free the user half of an address-space root, including the root frame.
 ///
 /// Mapped data frames are not freed; their ownership belongs to the address space owner.
+#[cfg(target_arch = "x86_64")]
 #[allow(dead_code)] // Consumed by `AddressSpace::drop` in S08/S24.
 pub fn free_user_tables(root: PhysAddr) {
     let memory = KernelPhysMemory;
@@ -373,6 +530,7 @@ pub fn free_user_tables(root: PhysAddr) {
     let _ = frame::free_frame(frame_phys(root));
 }
 
+#[cfg(target_arch = "x86_64")]
 #[allow(dead_code)] // Called by `free_user_tables`; reachable once S08/S24 use address spaces.
 fn free_table(table_phys: PhysAddr, level: u8, memory: &KernelPhysMemory) {
     let table = PageTable::new(table_phys, level);
@@ -389,6 +547,7 @@ fn free_table(table_phys: PhysAddr, level: u8, memory: &KernelPhysMemory) {
     let _ = frame::free_frame(frame_phys(table_phys));
 }
 
+#[cfg(target_arch = "x86_64")]
 fn walk_wx(table: PageTable, memory: &KernelPhysMemory, count: &mut u64) {
     for index in 0..512 {
         let Some(entry) = table.entry(memory, index) else {
@@ -404,6 +563,36 @@ fn walk_wx(table: PageTable, memory: &KernelPhysMemory, count: &mut u64) {
             }
         } else if let Some(child) = table.next(memory, index) {
             walk_wx(child, memory, count);
+        }
+    }
+}
+
+/// aarch64 W^X audit: walk the TTBR1 root and count writable executable leaves.
+///
+/// Uses the aarch64 encoding helpers because the raw descriptor bits (UXN/PXN) differ from the
+/// x86-64 NX bit that [`Entry::flags`] exposes.
+#[cfg(target_arch = "aarch64")]
+fn walk_wx_aarch64(table: PageTable, memory: &KernelPhysMemory, count: &mut u64) {
+    use raven_rmm::Aarch64Encoding as E;
+    use raven_rmm::Encoding;
+    for index in 0..512 {
+        let Some(entry) = table.entry(memory, index) else {
+            continue;
+        };
+        if !E::is_present(entry.raw()) {
+            continue;
+        }
+        if table.level() == 0 || !E::is_table(entry.raw(), table.level()) {
+            let (_address, flags, _size) = E::decode(entry.raw(), table.level());
+            if flags.is_writable() && flags.is_executable() {
+                *count = count.saturating_add(1);
+            }
+        } else {
+            walk_wx_aarch64(
+                PageTable::new(entry.address(), table.level().saturating_sub(1)),
+                memory,
+                count,
+            );
         }
     }
 }
@@ -558,6 +747,7 @@ fn map_segment(
         .map_err(PagingError::Map)
 }
 
+#[cfg(target_arch = "x86_64")]
 fn activate(root: frame::PhysAddr) {
     // SAFETY: `wrmsr`/`rdmsr`/CR manipulation are ring-0 operations; the root was built by the
     // mapper, EFER.NXE is already set by the loader and is set idempotently here, and CR0.WP only
@@ -591,6 +781,22 @@ fn activate(root: frame::PhysAddr) {
             out("rax") _,
             options(nostack, preserves_flags),
         );
+    }
+}
+
+/// aarch64: install the new roots through the break-before-make sequence.
+///
+/// # Safety
+///
+/// The caller must be executing in the kernel image mapping, which is identical in the old and
+/// new tables; `root` is the kernel TTBR1 root and `user_root` a zeroed table.
+#[cfg(target_arch = "aarch64")]
+fn activate(root: frame::PhysAddr, user_root: frame::PhysAddr) {
+    // SAFETY: both roots were just built by this init; the switch runs from the kernel image
+    // mapping, present in the loader's and the kernel's tables, so no fetch can miss while the
+    // roots change.
+    unsafe {
+        crate::arch::mmu::switch_tables(user_root.0, root.0);
     }
 }
 
