@@ -317,7 +317,7 @@ impl<D: BlockIo> Ufs<D> {
             .get_mut(start..end)
             .ok_or(UfsError::Corrupt("directory block offset"))?;
         dst.copy_from_slice(buf);
-        self.write_frags(addr, &data)
+        self.write_meta_frags(addr, &data)
     }
 
     /// Update a directory's modification times and write the inode.

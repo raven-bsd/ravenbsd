@@ -273,6 +273,7 @@ impl<D: BlockIo> Ufs<D> {
     /// Flush the inode and the underlying device.
     pub fn fsync(&mut self, ino: Ino) -> Result<(), UfsError> {
         self.sync_inode(ino)?;
+        self.commit_journal()?;
         self.disk.flush().map_err(|_| UfsError::Io)
     }
 

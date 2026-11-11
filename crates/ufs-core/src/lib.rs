@@ -47,6 +47,7 @@ mod ufs;
 mod ufs_bmap;
 mod ufs_lookup;
 mod ufs_readwrite;
+pub(crate) mod wapbl;
 
 pub use blockio::BlockIo;
 pub use error::{IoError, UfsError};

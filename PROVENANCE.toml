@@ -286,3 +286,14 @@ tier = "A"
 copied = "2026-11-11"
 modified = true
 notes = "Rename replacement, directory reparenting, target rewrite, link-count and dotdot updates ported. Credential checks and vnode locking removed; the temporary source link count and target-rewrite order are kept."
+
+[[import]]
+path = "crates/ufs-core/src/wapbl.rs"
+upstream = "netbsd"
+upstream_path = "sys/kern/vfs_wapbl.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-11"
+modified = true
+notes = "WAPBL port group. vfs_wapbl.c supplied the record write order, circular queue advance/read/write, commit-header selection, replay block/revocation/inode processing and tail handling; sys/sys/wapbl.h the public transaction/replay API; sys/sys/wapbl_replay.h the on-disk wc_header/wc_blocklist/wc_inodelist layouts; sys/ufs/ffs/ffs_wapbl.c the location discovery, start/stop ordering and inode cleanup; sys/ufs/ufs/ufs_wapbl.h the fs_journal_* fields and SF_LOG semantics. All five carry the NetBSD Foundation BSD-2-Clause notice. wapbl_replay.h was not in B63's 107-file audit list but has the same notice as wapbl.h. Kernel buffers, vnodes, credentials, cache sync and locking are replaced by Journal over BlockIo; each committed transaction is checkpointed synchronously, and an end-of-partition log is reserved at format time instead of allocating an in-filesystem log inode."
