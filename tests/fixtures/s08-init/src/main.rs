@@ -202,10 +202,11 @@ fn main() {
     );
     ok &= check("unknown syscall", syscall1(0x7777, 0), Errno::ENOSYS);
     ok &= check(
-        "map unimplemented",
+        "map invalid args",
         // SAFETY: the negative test only needs the ABI register convention with zero args.
+        // S24 implemented MAP: zero args are now EINVAL, not ENOSYS.
         unsafe { syscall6(Syscall::MAP as usize, 0, 0, 0, 0, 0, 0) },
-        Errno::ENOSYS,
+        Errno::EINVAL,
     );
 
     if ok {
