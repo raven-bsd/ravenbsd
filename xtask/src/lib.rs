@@ -23,6 +23,9 @@ mod process;
 mod profiles;
 mod qtest;
 mod repo;
+mod rootfs;
 mod run;
+
+pub use rootfs::build_ufs_root;
 
 pub use cli::run_cli;

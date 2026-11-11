@@ -244,8 +244,20 @@ pub(crate) fn write_superblock<D: BlockIo>(disk: &mut D, fs: &Superblock) -> Res
     if len == 0 || len > fs.raw.len() {
         return Err(UfsError::BadSuperblock("bad superblock write size"));
     }
-    disk.write_at(fs.sblockloc, &fs.raw[..len])
-        .map_err(|_| UfsError::Io)
+    let raw = &fs.raw[..len];
+    disk.write_at(fs.sblockloc, raw).map_err(|_| UfsError::Io)?;
+    // NetBSD writes a copy in every cylinder group; keep the backups current too.
+    for cg in 0..fs.ncg {
+        let frag = fs
+            .cgstart(cg)?
+            .checked_add(fs.sblkno as u64)
+            .ok_or(UfsError::BadSuperblock("superblock backup offset"))?;
+        let offset = frag
+            .checked_mul(u64::from(fs.fsize))
+            .ok_or(UfsError::BadSuperblock("superblock backup offset"))?;
+        disk.write_at(offset, raw).map_err(|_| UfsError::Io)?;
+    }
+    Ok(())
 }
 
 /// Load the per-cylinder-group `struct csum` array from `fs_csaddr`.

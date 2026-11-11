@@ -422,6 +422,14 @@ impl Superblock {
             bytes[16..24].copy_from_slice(&self.cstotal.nifree.to_le_bytes());
             bytes[24..32].copy_from_slice(&self.cstotal.nffree.to_le_bytes());
         }
+        if !self.ufs2
+            && let Some(bytes) = self.raw.get_mut(O_OLD_CSTOTAL..O_OLD_CSTOTAL + 16)
+        {
+            bytes[0..4].copy_from_slice(&(self.cstotal.ndir as i32).to_le_bytes());
+            bytes[4..8].copy_from_slice(&(self.cstotal.nbfree as i32).to_le_bytes());
+            bytes[8..12].copy_from_slice(&(self.cstotal.nifree as i32).to_le_bytes());
+            bytes[12..16].copy_from_slice(&(self.cstotal.nffree as i32).to_le_bytes());
+        }
     }
 }
 

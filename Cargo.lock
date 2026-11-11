@@ -847,6 +847,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ufs-mkfs"
+version = "0.1.0"
+dependencies = [
+ "ufs-core",
+]
+
+[[package]]
 name = "ufs-oracle-tests"
 version = "0.1.0"
 dependencies = [
@@ -887,6 +894,7 @@ dependencies = [
  "raven-initfs",
  "serde",
  "toml",
+ "ufs-mkfs",
 ]
 
 [[package]]
