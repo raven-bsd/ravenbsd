@@ -45,6 +45,8 @@ members = [
     "userland/servers/nulld",
     "userland/servers/ramfsd",
     "userland/servers/ramfsd-probe",
+    "userland/servers/initfsd",
+    "userland/servers/initfsd-probe",
     "userland/servers/coretest",
     "tests/net/packetdrill-harness",
     "tools/bench-host",

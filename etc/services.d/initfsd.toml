@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "initfsd"
+exec = "/sbin/initfsd"
+needs = ["logd"]
+provides = ["scheme:initfs"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "on-failure"
+
+# Every process created by the kernel already has the initfs MemObject at handle 1 with
+# READ|MAP rights. The child does not need a transferred copy; the server maps handle 1 and
+# records that fact here. (A grants = ["initfs"] transfer is not used because PID 1's own
+# initfs handle has no TRANSFER right in this milestone.)
+[env]
+INITFS_HANDLE = "1"

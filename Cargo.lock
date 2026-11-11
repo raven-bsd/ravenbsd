@@ -397,6 +397,27 @@ name = "raven-initfs"
 version = "0.1.0"
 
 [[package]]
+name = "raven-initfsd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-initfsd-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-ipc"
 version = "0.1.0"
 dependencies = [
