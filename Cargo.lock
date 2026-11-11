@@ -418,6 +418,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-integration-inventory"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "toml",
+]
+
+[[package]]
 name = "raven-ipc"
 version = "0.1.0"
 dependencies = [
