@@ -147,8 +147,19 @@ __exception_restore:
 );
 
 /// Rust side of every vector slot.
+///
+/// IRQ slots dispatch through [`crate::arch::irq`] and return to the vector's restore path; every
+/// other slot prints the trap frame and exits the test with failure.
 #[unsafe(no_mangle)]
-pub extern "C" fn exception_dispatch(slot: u64, frame: *const TrapFrame) -> ! {
+pub extern "C" fn exception_dispatch(slot: u64, frame: *const TrapFrame) {
+    // IRQ slots: 1 (current-EL SP0), 5 (current-EL SPx), 9 (lower EL AArch64), 13 (lower EL
+    // AArch32). The CPU masks IRQ on exception entry, so the handler never nests. Slots 9/13
+    // interrupted EL0, which is what enables return-to-user preemption (x86-64's
+    // `timer_return(from_user)` policy).
+    if matches!(slot, 1 | 5 | 9 | 13) {
+        crate::arch::irq::dispatch(matches!(slot, 9 | 13));
+        return;
+    }
     // SAFETY: `__exception_vectors` built this frame on the boot stack and passes its address.
     // The frame is valid for the whole handler and is not aliased by other Rust code.
     let frame = unsafe { &*frame };
