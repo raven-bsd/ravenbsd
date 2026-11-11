@@ -98,6 +98,9 @@ pub extern "C" fn kmain(boot: *const BootInfo) -> ! {
             memory_map: memory::paging::memory_map(),
             cmdline: memory::paging::cmdline(),
         };
+        if let Some(model) = platform.board_model() {
+            kprintln!("board: {model}");
+        }
         boot::print_banner(&printable);
         if let Err(error) = crate::process::start_init(&cmdline) {
             kprintln!("kernel: error: {error}");

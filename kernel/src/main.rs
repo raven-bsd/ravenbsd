@@ -13,6 +13,12 @@ mod arch;
 mod backtrace;
 mod boot;
 mod cmdline;
+/// FDT types under the path the shared `raven-bootinfo-fdt` source expects when it is compiled
+/// into the kernel with `#[path]`.
+#[cfg(target_arch = "aarch64")]
+mod fdt {
+    pub use crate::arch::aarch64::fdt::*;
+}
 mod initfs;
 #[cfg(target_arch = "x86_64")]
 mod ipc;
