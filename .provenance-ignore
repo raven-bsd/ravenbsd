@@ -8,9 +8,3 @@ AI_POLICY.md
 README.md
 docs/man
 tests/ufs-vectors/golden/
-# linux-corpus programme fixtures: tiny inputs compiled and run by
-# tools/linux-corpus/corpus.toml, not ravenbsd sources. They carry no header yet; adding one is a
-# one-line change outside B38's Owns (follow-up ticket), after which these three lines go away.
-tools/linux-corpus/programs/echo_epoll.py
-tools/linux-corpus/programs/hello.c
-tools/linux-corpus/programs/hello.go
