@@ -13,12 +13,32 @@ rust-version.workspace = true
 [package.metadata.raven]
 target = "none"
 
+[lib]
+name = "raven_s26_evq"
+path = "src/lib.rs"
+
 [[bin]]
-name = "raven-s26-evq"
-path = "src/main.rs"
+name = "raven-s26-init"
+path = "src/bin/init.rs"
+
+[[bin]]
+name = "raven-s26-server"
+path = "src/bin/server.rs"
+
+[[bin]]
+name = "raven-s26-client"
+path = "src/bin/client.rs"
+
+[[bin]]
+name = "raven-s26-signaler"
+path = "src/bin/signaler.rs"
 
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
+raven-elf = { path = "../../../crates/raven-elf" }
+raven-initfs = { path = "../../../crates/raven-initfs" }
+raven-ipc = { path = "../../../crates/raven-ipc" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc"] }
 
 [lints]
 workspace = true

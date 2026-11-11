@@ -10,8 +10,11 @@ cd "$root"
 
 out=build/fixtures/s26-evq
 mkdir -p "$out"
-RUSTFLAGS="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=-T$root/userland/linker/x86_64.ld" \
+RUSTFLAGS="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=-T$root/tests/fixtures/s26-evq/linker.ld" \
     cargo build -p raven-s26-evq --target x86_64-unknown-none --release
 cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "$out/initfs.img" \
-    /init=target/x86_64-unknown-none/release/raven-s26-evq
+    /init=target/x86_64-unknown-none/release/raven-s26-init \
+    /server=target/x86_64-unknown-none/release/raven-s26-server \
+    /client=target/x86_64-unknown-none/release/raven-s26-client \
+    /signaler=target/x86_64-unknown-none/release/raven-s26-signaler
