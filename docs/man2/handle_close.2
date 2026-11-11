@@ -1,6 +1,6 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt HANDLE_CLOSE 2
 .Os RavenBSD
 .Sh NAME
@@ -11,6 +11,16 @@
 .Fn handle_close "Handle handle"
 .Sh DESCRIPTION
 The .Nm system call closes .Fa handle in the caller's handle table.
+.Pp
+A handle packs a 24-bit table index and an 8-bit generation. A successful close increments the
+generation, so every earlier handle value for that slot fails with
+.Er EBADF .
+When the closing generation is 255 the slot is retired instead of wrapping to generation 0: the
+slot is never reused and stale handles stay invalid permanently.
+.Pp
+Closing also removes .Fa handle from the caller's event-queue registrations, but only after the
+close commits. A close that fails, for example with a stale generation, leaves every registration
+intact.
 .Pp
 This page documents the native RavenBSD ABI; see the
 .Pa raven-abi

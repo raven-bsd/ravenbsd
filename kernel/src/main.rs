@@ -60,6 +60,11 @@ pub extern "C" fn kmain(boot: *const raven_bootinfo::BootInfo) -> ! {
         let initial_cmdline = cmdline::CmdLine::parse(data.cmdline);
         log::init(initial_cmdline.loglevel());
         log::set_test_exit(initial_cmdline.test_exit());
+        // S35: a deterministic panic entry lets the qtest prove that the single live handler
+        // (`log.rs`) reports the panic and halts/exits through the C5 protocol.
+        if initial_cmdline.get("panic-test").is_some() {
+            panic!("S35 deliberate panic");
+        }
     }
 
     // S05 installs the CPU tables before any exception can be reported.

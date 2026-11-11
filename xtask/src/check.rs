@@ -15,6 +15,7 @@ use crate::build::{self, Arch, Component};
 use crate::docs;
 use crate::guard;
 use crate::process::{CommandSpec, run as run_command};
+use crate::profiles;
 use crate::repo::Workspace;
 
 struct Step {
@@ -26,6 +27,7 @@ enum StepKind {
     Guard,
     Command(CommandSpec),
     Docs,
+    Profiles,
     Skipped(String),
 }
 
@@ -107,6 +109,23 @@ pub(crate) fn run(workspace: &Workspace, fast: bool) -> Result<u8> {
                     seconds,
                 });
             }
+            StepKind::Profiles => {
+                println!("==> {}", step.name);
+                let violations = profiles::one_shot_restart_violations(&workspace.root)?;
+                for violation in &violations {
+                    println!("{violation}");
+                }
+                let code = i32::from(!violations.is_empty());
+                let seconds = started.elapsed().as_secs_f64();
+                if code != 0 {
+                    failed = true;
+                }
+                summaries.push(Summary {
+                    name: step.name,
+                    status: status_for(code),
+                    seconds,
+                });
+            }
         }
     }
     print_summary(&summaries);
@@ -161,6 +180,10 @@ fn build_steps(workspace: &Workspace, fast: bool) -> Result<Vec<Step>> {
         ),
         command_step("clippy (host)", root, "cargo", host_clippy_args(workspace)),
         command_step("tests (host)", root, "cargo", vec!["test".into()]),
+        Step {
+            name: "profiles".to_string(),
+            kind: StepKind::Profiles,
+        },
     ];
     if root.join("crates/raven-provenance/Cargo.toml").is_file() {
         steps.push(command_step(
@@ -393,6 +416,16 @@ mod tests {
                 .any(|pair| pair == ["--target", "aarch64-unknown-none-softfloat"])
         );
         assert!(spec.args.iter().any(|arg| arg == "raven-kernel"));
+    }
+
+    #[test]
+    fn profiles_step_is_part_of_the_gate() {
+        let steps = build_steps(&workspace(), false).unwrap();
+        let profiles = steps
+            .iter()
+            .find(|step| step.name == "profiles")
+            .expect("the gate has a profiles step");
+        assert!(matches!(profiles.kind, StepKind::Profiles));
     }
 
     #[test]
