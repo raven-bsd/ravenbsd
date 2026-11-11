@@ -870,6 +870,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ufs-fsck"
+version = "0.1.0"
+dependencies = [
+ "ufs-core",
+]
+
+[[package]]
 name = "ufs-mkfs"
 version = "0.1.0"
 dependencies = [

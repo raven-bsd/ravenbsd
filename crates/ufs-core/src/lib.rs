@@ -30,6 +30,7 @@ extern crate std;
 
 mod balloc;
 mod blockio;
+pub mod check;
 mod dinode;
 mod dir;
 mod dirwrite;
