@@ -49,6 +49,7 @@ pub fn platform_init() {
 /// Run the optional `selftest=smp` workload after the BSP has enabled interrupts.
 pub fn after_enable_interrupts() {
     let cmdline = crate::cmdline::CmdLine::parse(crate::memory::paging::cmdline());
+    shootdown::set_failure_injection(cmdline.flag("s34-tlb-fail"));
     if cmdline.get("selftest") == Some("smp") {
         selftest::run();
     }

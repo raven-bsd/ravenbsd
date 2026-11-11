@@ -6,6 +6,14 @@
 //! One CPU at a time publishes a virtual address, IPIs the target and waits for the target to
 //! read the byte. The handler runs with interrupts disabled, so the probe must stay short.
 //!
+//! # Locking and timeout discipline
+//!
+//! `LOCK` is an [`IrqSpinLock`], so the shooting CPU waits with interrupts masked.  The target's
+//! handler only touches this module's atomics and reads one byte; it never depends on the shooter
+//! taking an interrupt.  A missing acknowledgement is a 100 ms timeout: the per-CPU pending slot
+//! is cleared, the failure is logged, and `None` is returned.  No frame or slot is allocated, so a
+//! timeout cannot leak, and a late IPI sees an idle mailbox.
+//!
 //! Every index is bounded by `online_cpus() <= MAX_CPUS`, so the fixed per-CPU arrays are safe.
 
 #![allow(clippy::indexing_slicing)]
@@ -13,6 +21,7 @@
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use crate::arch::x86_64::{ap_start, ipi};
+use crate::kprintln;
 use crate::sched::smp::percpu;
 use crate::sync::IrqSpinLock;
 use crate::time;
@@ -47,6 +56,9 @@ pub fn probe(cpu: usize, address: u64) -> Option<u8> {
     let deadline = time::now_ns().saturating_add(100_000_000);
     while ACKED[cpu].load(Ordering::SeqCst) != sequence {
         if time::now_ns() > deadline {
+            // Idle the mailbox so a late IPI is ignored; the next probe uses a new sequence.
+            PENDING[cpu].store(0, Ordering::SeqCst);
+            kprintln!("smp: call probe timeout on cpu {cpu}");
             return None;
         }
         core::hint::spin_loop();

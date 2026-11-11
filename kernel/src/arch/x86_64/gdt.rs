@@ -5,6 +5,14 @@
 //!
 //! The GDT is deliberately fixed at seven entries so the `STAR` arithmetic used by `sysret` in
 //! S08 is stable: `STAR[63:48] = 0x13` yields `SS = 0x1B`, `CS = 0x23`.
+//!
+//! # Per-CPU TSS requirement
+//!
+//! The kernel currently has one TSS shared by every CPU, and `set_rsp0` is called only on the
+//! ring-3 entry path, which the current execution model pins to CPU 0.  `rsp0` is architectural
+//! per-CPU state: before user threads run on application processors, every CPU needs its own TSS
+//! descriptor (and `tr` load), its own `rsp0` slot and its own IST stacks.  APs today run kernel
+//! threads only and never load a user `rsp0`.
 
 use core::cell::UnsafeCell;
 use core::mem::size_of;
@@ -112,8 +120,9 @@ static IST3: Stack = Stack::new();
 struct TssCell(UnsafeCell<Tss>);
 struct GdtCell(UnsafeCell<[u64; GDT_ENTRIES]>);
 
-// SAFETY: both cells are written only during single-CPU early init and afterwards read by the CPU
-// and the scheduler through the architectural descriptor tables.
+// SAFETY: the TSS is written during early init and by `set_rsp0`.  `set_rsp0` runs only on the
+// CPU that enters ring 3 (CPU 0 in the current model), so there is one writer at a time.  The
+// per-CPU TSS requirement above must be met before user threads run on APs.
 unsafe impl Sync for TssCell {}
 // SAFETY: the GDT is written once during early init and then only read by the CPU.
 unsafe impl Sync for GdtCell {}
@@ -186,8 +195,9 @@ pub fn init() {
 /// Set the TSS `rsp0` slot used for ring-3 to ring-0 transitions.
 pub fn set_rsp0(value: u64) {
     let tss = TSS.0.get();
-    // SAFETY: the TSS is a kernel static written before user mode is entered; `rsp[0]` is the
-    // architectural RSP0 field.
+    // SAFETY: the TSS is a kernel static; `rsp[0]` is the architectural RSP0 field.  Only the
+    // user-entry CPU (CPU 0 today) calls this, which is why one shared TSS is sufficient until
+    // the per-CPU TSS requirement in the module documentation is implemented.
     unsafe {
         core::ptr::addr_of_mut!((*tss).rsp)
             .cast::<u64>()
