@@ -23,6 +23,7 @@ pub fn result(value: isize) -> Result<usize, Errno> {
 
 /// Create one page-sized memory object.
 pub fn memobj_create() -> Result<Handle, Errno> {
+    // SAFETY: MEMOBJ_CREATE takes scalar length and flags; the kernel validates both.
     let value = result(unsafe { syscall2(Syscall::MEMOBJ_CREATE as usize, PAGE, 0) })?;
     u32::try_from(value).map(Handle).map_err(|_| Errno::EINVAL)
 }
