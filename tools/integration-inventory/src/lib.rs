@@ -634,7 +634,9 @@ fn read_profiles(root: &Path, packages: &[Package]) -> Result<Profiles> {
     };
     let mut names = Vec::new();
     for entry in entries {
-        let path = entry?.path();
+        let entry =
+            entry.with_context(|| format!("cannot read an entry of {}", directory.display()))?;
+        let path = entry.path();
         if path.extension().and_then(|extension| extension.to_str()) == Some("toml")
             && let Some(stem) = path.file_stem().and_then(|stem| stem.to_str())
         {
@@ -725,7 +727,9 @@ fn list_toml(directory: &Path) -> Result<Vec<PathBuf>> {
         return Ok(paths);
     };
     for entry in entries {
-        let path = entry?.path();
+        let entry =
+            entry.with_context(|| format!("cannot read an entry of {}", directory.display()))?;
+        let path = entry.path();
         if path.is_file()
             && path.extension().and_then(|extension| extension.to_str()) == Some("toml")
         {
@@ -796,7 +800,9 @@ fn read_cases(root: &Path) -> Result<Vec<Case>> {
     };
     let mut cases = Vec::new();
     for entry in entries {
-        let path = entry?.path();
+        let entry =
+            entry.with_context(|| format!("cannot read an entry of {}", directory.display()))?;
+        let path = entry.path();
         if path.extension().and_then(|extension| extension.to_str()) != Some("toml") {
             continue;
         }

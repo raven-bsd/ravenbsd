@@ -35,9 +35,9 @@ cargo run -p raven-integration-inventory -- --check         # exit 1 when this f
 ## Counts
 
 The generated block ends with the counts per kind and per target execution. They describe **what
-exists**, not how mature it is: a "host test" count of 59 says that 59 packages are compiled and
-tested on the host, it says nothing about coverage or quality. Line counts are deliberately absent
-for the same reason.
+exists**, not how mature it is: a high "host test" count only says that those packages are
+compiled and tested on the host, it says nothing about coverage or quality. Line counts are
+deliberately absent for the same reason.
 
 <!-- integration-inventory:begin -->
 
@@ -48,14 +48,14 @@ for the same reason.
 | `linux-corpus` | `tools/linux-corpus` | tool | host test | - | - | - |
 | `linux-elf` | `crates/linux-elf` | core library | host test | - | - | host tests only; no target consumer |
 | `linux-shim` | `userland/linux-shim` | userspace program | host test | - | - | host tests only; no target consumer |
-| `raven-abi` | `crates/raven-abi` | core library | host test, QEMU guest | packages: raven-loader, raven-handles, raven-ipc, raven-linux-dispatch, raven-netcore, raven-proto-audio, raven-proto-fs, raven-proto-net, raven-scheme, raven-usercopy, raven-kernel, raven-echo-dialogue, raven-s08-init, raven-s09-futex, raven-s11-echo, raven-s21-edu, raven-s24-child, raven-s24-parent, raven-s25-xfer, raven-s26-evq, raven-svcctl, raven-uname, raven-init, linux-shim, raven-rt, raven-coretest, raven-initfsd, raven-initfsd-probe, raven-logd, raven-nulld, raven-ramfsd, raven-ramfsd-probe, raven-randd, raven-sysd, raven-zerod | - | - |
+| `raven-abi` | `crates/raven-abi` | core library | host test, QEMU guest | packages: raven-loader, raven-handles, raven-ipc, raven-linux-dispatch, raven-netcore, raven-proto-audio, raven-proto-fs, raven-proto-net, raven-scheme, raven-usercopy, raven-kernel, raven-echo-dialogue, raven-s08-init, raven-s09-futex, raven-s11-echo, raven-s21-edu, raven-s24-child, raven-s24-parent, raven-s25-xfer, raven-s26-evq, raven-s35-handles, raven-svcctl, raven-uname, raven-init, linux-shim, raven-rt, raven-coretest, raven-initfsd, raven-initfsd-probe, raven-logd, raven-nulld, raven-ramfsd, raven-ramfsd-probe, raven-randd, raven-sysd, raven-zerod | - | - |
 | `raven-audio-core` | `crates/raven-audio-core` | core library | host test | - | - | host tests only; no target consumer |
 | `raven-bootinfo` | `crates/raven-bootinfo` | core library | host test, QEMU guest | packages: raven-loader, raven-bootinfo-fdt, raven-kernel, raven-testkernel | - | - |
 | `raven-bootinfo-fdt` | `crates/raven-bootinfo-fdt` | host test mirror | host test, QEMU guest | source included by: kernel | - | - |
 | `raven-cmdline` | `crates/raven-cmdline` | host test mirror | host test, QEMU guest | source included by: kernel | - | - |
 | `raven-conform` | `crates/raven-conform` | tool | host test | packages: raven-netcore-packetdrill-harness | - | - |
 | `raven-coretest` | `userland/servers/coretest` | server | QEMU guest | profiles: core-test; cases: core-servers | on-failure | - |
-| `raven-echo` | `userland/bin/echo` | userspace program | host test, QEMU guest | profiles: base, core-test, dev, initfsd-test, ramfsd-test, shell; cases: boot-uname, boot-uname-aarch64, core-servers, dialogue-echo, driver-dma, driver-irq, driver-mmio, evq, exc-div0, exc-doublefault, exc-int3, exc-pagefault, futex-userspace, handle-transfer, initfsd, kernel-early-boot, kernel-early-boot-aarch64, kernel-exc-aarch64, kernel-paging, kernel-paging-aarch64, kernel-spawn, kernel-timer, kernel-timer-aarch64, kernel-usermode, loader-testkernel, ramfsd, sched-kernel-threads, sched-kernel-threads-aarch64, scheme-echo, smp-boot, user-fmt | - | - |
+| `raven-echo` | `userland/bin/echo` | userspace program | host test, QEMU guest | profiles: base, core-test, dev, initfsd-test, ramfsd-test, shell; cases: boot-uname, boot-uname-aarch64, core-servers, dialogue-echo, driver-dma, driver-irq, driver-mmio, evq, exc-div0, exc-doublefault, exc-int3, exc-pagefault, futex-userspace, handle-stale, handle-transfer, initfsd, kernel-early-boot, kernel-early-boot-aarch64, kernel-exc-aarch64, kernel-paging, kernel-paging-aarch64, kernel-spawn, kernel-timer, kernel-timer-aarch64, kernel-usermode, loader-testkernel, ramfsd, sched-kernel-threads, sched-kernel-threads-aarch64, scheme-echo, smp-boot, user-fmt | - | - |
 | `raven-echo-dialogue` | `tests/fixtures/echo-dialogue` | test fixture | - | - | - | no qtest case builds this fixture |
 | `raven-elf` | `crates/raven-elf` | core library | host test, QEMU guest | packages: raven-loader, linux-elf, raven-kernel, raven-s11-echo, raven-s21-edu, raven-s24-parent, raven-s25-xfer, raven-s26-evq, raven-rt | - | - |
 | `raven-esr` | `crates/raven-esr` | core library | host test, QEMU guest | packages: raven-kernel | - | - |
@@ -63,16 +63,16 @@ for the same reason.
 | `raven-fdt-lite` | `crates/raven-fdt-lite` | host test mirror | host test, QEMU guest | packages: raven-bootinfo-fdt; source included by: kernel | - | - |
 | `raven-frames` | `crates/raven-frames` | host test mirror | host test, QEMU guest | source included by: kernel | - | - |
 | `raven-handles` | `crates/raven-handles` | core library | host test, QEMU guest | packages: raven-kernel | - | - |
-| `raven-init` | `userland/init` | userspace program | host test, QEMU guest | profiles: base, core-test, dev, initfsd-test, ramfsd-test, shell, svcd-test, tiny; cases: all 32 | - | - |
+| `raven-init` | `userland/init` | userspace program | host test, QEMU guest | profiles: base, core-test, dev, initfsd-test, ramfsd-test, shell, svcd-test, tiny; cases: all 33 | - | - |
 | `raven-initfs` | `crates/raven-initfs` | core library | host test, QEMU guest | packages: raven-kernel, raven-s11-echo, raven-s21-edu, raven-s24-parent, raven-s25-xfer, raven-s26-evq, raven-init, raven-rt, raven-initfsd, xtask | - | - |
 | `raven-initfsd` | `userland/servers/initfsd` | server | host test, QEMU guest | profiles: core-test, initfsd-test, ramfsd-test, shell; cases: core-servers, initfsd, ramfsd | on-failure | - |
 | `raven-initfsd-probe` | `userland/servers/initfsd-probe` | server | QEMU guest | profiles: initfsd-test; cases: initfsd | on-failure | - |
 | `raven-integration-inventory` | `tools/integration-inventory` | tool | host test | - | - | - |
 | `raven-ipc` | `crates/raven-ipc` | host test mirror | QEMU guest | packages: raven-scheme, raven-s11-echo, raven-s25-xfer, raven-s26-evq; includes source: kernel | - | - |
-| `raven-kernel` | `kernel` | kernel | host test, QEMU guest | source included by: crates/raven-ipc; includes source: crates/raven-bootinfo-fdt, crates/raven-cmdline, crates/raven-evq-core, crates/raven-fdt-lite, crates/raven-frames, crates/raven-msi; cases: all 32 | - | - |
+| `raven-kernel` | `kernel` | kernel | host test, QEMU guest | source included by: crates/raven-ipc; includes source: crates/raven-bootinfo-fdt, crates/raven-cmdline, crates/raven-evq-core, crates/raven-fdt-lite, crates/raven-frames, crates/raven-msi; cases: all 33 | - | - |
 | `raven-linux-abi` | `crates/raven-linux-abi` | core library | host test | packages: linux-elf, raven-linux-dispatch, linux-shim | - | host tests only; no target consumer |
 | `raven-linux-dispatch` | `crates/raven-linux-dispatch` | core library | host test | - | - | host tests only; no target consumer |
-| `raven-loader` | `boot/loader` | loader | host test, QEMU guest | cases: all 32 | - | - |
+| `raven-loader` | `boot/loader` | loader | host test, QEMU guest | cases: all 33 | - | - |
 | `raven-logd` | `userland/servers/logd` | server | host test, QEMU guest | profiles: core-test, initfsd-test, ramfsd-test, shell; cases: core-servers, initfsd, ramfsd | on-failure | - |
 | `raven-mem` | `crates/raven-mem` | core library | host test, QEMU guest | packages: raven-kernel | - | - |
 | `raven-msi` | `crates/raven-msi` | host test mirror | host test, QEMU guest | source included by: kernel | - | - |
@@ -91,7 +91,7 @@ for the same reason.
 | `raven-ramfsd-probe` | `userland/servers/ramfsd-probe` | server | QEMU guest | profiles: ramfsd-test; cases: ramfsd | on-failure | - |
 | `raven-randd` | `userland/servers/randd` | server | host test, QEMU guest | profiles: core-test, initfsd-test, ramfsd-test, shell; cases: core-servers, initfsd, ramfsd | on-failure | - |
 | `raven-rmm` | `crates/raven-rmm` | core library | host test, QEMU guest | packages: raven-kernel | - | - |
-| `raven-rt` | `userland/rt` | userspace program | host test, QEMU guest | packages: raven-s11-echo, raven-s21-edu, raven-s24-child, raven-s24-parent, raven-s25-xfer, raven-s26-evq, raven-echo, raven-svcctl, raven-uname, raven-init, raven-testsvc, raven-coretest, raven-initfsd, raven-initfsd-probe, raven-logd, raven-nulld, raven-ramfsd, raven-ramfsd-probe, raven-randd, raven-sysd, raven-zerod | - | - |
+| `raven-rt` | `userland/rt` | userspace program | host test, QEMU guest | packages: raven-s11-echo, raven-s21-edu, raven-s24-child, raven-s24-parent, raven-s25-xfer, raven-s26-evq, raven-s35-handles, raven-echo, raven-svcctl, raven-uname, raven-init, raven-testsvc, raven-coretest, raven-initfsd, raven-initfsd-probe, raven-logd, raven-nulld, raven-ramfsd, raven-ramfsd-probe, raven-randd, raven-sysd, raven-zerod | - | - |
 | `raven-s08-init` | `tests/fixtures/s08-init` | test fixture | QEMU guest | cases: kernel-usermode | - | fixture for kernel-usermode |
 | `raven-s09-futex` | `tests/fixtures/s09-futex` | test fixture | QEMU guest | cases: futex-userspace | - | fixture for futex-userspace |
 | `raven-s11-echo` | `tests/fixtures/s11-echo` | test fixture | QEMU guest | cases: scheme-echo | - | fixture for scheme-echo |
@@ -100,6 +100,7 @@ for the same reason.
 | `raven-s24-parent` | `tests/fixtures/s24-spawn/parent` | test fixture | QEMU guest | cases: kernel-spawn | - | fixture for kernel-spawn |
 | `raven-s25-xfer` | `tests/fixtures/s25-xfer` | test fixture | QEMU guest | cases: handle-transfer | - | fixture for handle-transfer |
 | `raven-s26-evq` | `tests/fixtures/s26-evq` | test fixture | QEMU guest | cases: evq | - | fixture for evq |
+| `raven-s35-handles` | `tests/fixtures/s35-handles` | test fixture | QEMU guest | cases: handle-stale | - | fixture for handle-stale |
 | `raven-sched-core` | `crates/raven-sched-core` | core library | host test, QEMU guest | packages: raven-kernel | - | - |
 | `raven-scheme` | `crates/raven-scheme` | core library | host test, QEMU guest | packages: raven-svcctl, raven-init, raven-rt, raven-coretest, raven-initfsd, raven-initfsd-probe, raven-logd, raven-nulld, raven-ramfsd, raven-ramfsd-probe, raven-randd, raven-sysd, raven-zerod | - | - |
 | `raven-svc-manifest` | `crates/raven-svc-manifest` | core library | host test, QEMU guest | packages: raven-init | - | - |
@@ -108,7 +109,7 @@ for the same reason.
 | `raven-testkernel` | `tests/fixtures/testkernel` | test fixture | QEMU guest | cases: loader-testkernel | - | fixture for loader-testkernel |
 | `raven-testsvc` | `userland/init/testsvc` | userspace program | QEMU guest | profiles: svcd-test; cases: svcd-test | on-failure | - |
 | `raven-timemath` | `crates/raven-timemath` | core library | host test, QEMU guest | packages: raven-kernel | - | - |
-| `raven-uname` | `userland/bin/uname` | userspace program | host test, QEMU guest | packages: raven-init; profiles: base, core-test, dev, initfsd-test, ramfsd-test, shell, tiny; cases: boot-uname, boot-uname-aarch64, core-servers, dialogue-echo, driver-dma, driver-irq, driver-mmio, evq, exc-div0, exc-doublefault, exc-int3, exc-pagefault, futex-userspace, handle-transfer, initfsd, kernel-early-boot, kernel-early-boot-aarch64, kernel-exc-aarch64, kernel-paging, kernel-paging-aarch64, kernel-spawn, kernel-timer, kernel-timer-aarch64, kernel-usermode, loader-testkernel, ramfsd, sched-kernel-threads, sched-kernel-threads-aarch64, scheme-echo, smp-boot, user-fmt | - | - |
+| `raven-uname` | `userland/bin/uname` | userspace program | host test, QEMU guest | packages: raven-init; profiles: base, core-test, dev, initfsd-test, ramfsd-test, shell, tiny; cases: boot-uname, boot-uname-aarch64, core-servers, dialogue-echo, driver-dma, driver-irq, driver-mmio, evq, exc-div0, exc-doublefault, exc-int3, exc-pagefault, futex-userspace, handle-stale, handle-transfer, initfsd, kernel-early-boot, kernel-early-boot-aarch64, kernel-exc-aarch64, kernel-paging, kernel-paging-aarch64, kernel-spawn, kernel-timer, kernel-timer-aarch64, kernel-usermode, loader-testkernel, ramfsd, sched-kernel-threads, sched-kernel-threads-aarch64, scheme-echo, smp-boot, user-fmt | - | - |
 | `raven-usercopy` | `crates/raven-usercopy` | core library | host test, QEMU guest | packages: raven-kernel | - | - |
 | `raven-va-spike` | `libc/spike/va` | spike | host test | - | - | host tests only; no target consumer |
 | `raven-vma` | `crates/raven-vma` | core library | host test, QEMU guest | packages: raven-kernel | - | - |
@@ -122,9 +123,9 @@ for the same reason.
 ```
 
 ```
-packages: 75
-by kind: core library 26; host test mirror 7; kernel 1; loader 1; server 10; spike 1; test fixture 10; test harness 4; tool 8; userspace program 7;
-by target execution: - 1; QEMU guest 52; host test 59;
+packages: 76
+by kind: core library 26; host test mirror 7; kernel 1; loader 1; server 10; spike 1; test fixture 11; test harness 4; tool 8; userspace program 7;
+by target execution: - 1; QEMU guest 53; host test 59;
 ```
 
 <!-- integration-inventory:end -->
