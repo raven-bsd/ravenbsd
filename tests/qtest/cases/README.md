@@ -24,6 +24,7 @@ format; `raven-qtest list` prints every case it can parse.
 | `qemu_extra` | array of strings | Extra QEMU arguments appended after the fixed ones. |
 | `[[expect]]` | table | `regex` plus optional `unordered` (bool, default `false`). |
 | `[[forbid]]` | table | `regex`; any matching serial line fails the case. |
+| `[[oracle]]` | table | Host-side artifact check; see below. |
 
 Unknown keys and invalid regexes are errors.
 
@@ -47,6 +48,60 @@ regex = '^RavenBSD \S+ 0\.1 RavenBSD 0\.1 \(\S+\) #\d+: .+ x86_64$'
 [[forbid]]
 regex = '(?i)panic'
 ```
+
+## Audio oracle
+
+A case can ask the harness to judge a file QEMU wrote. The case passes the `-audiodev` options
+itself; after QEMU exits the harness parses the WAV and runs every requested check:
+
+```toml
+qemu_extra = ["-audiodev", "wav,id=a0,path=build/qtest/x.wav", "-device", "intel-hda", "-device", "hda-output,audiodev=a0"]
+
+[[oracle]]
+kind = "wav"
+path = "build/qtest/x.wav"
+min_duration_ms = 500
+min_rms = 0.01
+tone_hz = 440.0
+tolerance_percent = 2.0
+max_gap_ms = 50
+```
+
+| Key | Type | Meaning |
+|---|---|---|
+| `kind` | string | Only `wav` is implemented. |
+| `path` | string | Artifact path relative to the harness working directory, or absolute. |
+| `min_duration_ms` | integer | File duration in milliseconds must be at least this. |
+| `min_rms` | float | RMS over all samples, normalised to `0.0..=1.0`, must be at least this. |
+| `tone_hz` | float | Expected dominant frequency; requires `tolerance_percent`. |
+| `tolerance_percent` | float | Allowed frequency error as a percentage of `tone_hz`. |
+| `max_gap_ms` | integer | Longest run of exactly-zero frames after the first non-zero frame. |
+
+Only uncompressed PCM16 mono/stereo WAV is accepted. `data` size 0 or `0xFFFFFFFF` is treated as
+"use the rest of the file", as QEMU writes it while the file is open. The dominant frequency is
+estimated with a Hann-windowed FFT and parabolic interpolation. A missing or malformed file fails
+the case with the reason.
+
+Each check is printed after the case line and written to `build/qtest/<name>.oracle.json`:
+
+```json
+{
+  "case": "audio",
+  "oracles": [
+    {
+      "path": "build/qtest/audio.wav",
+      "checks": [
+        {"check": "min_duration_ms", "passed": true, "detail": "520.0 ms >= 500 ms"},
+        {"check": "tone_hz", "passed": true, "detail": "dominant 440.02 Hz ..."}
+      ],
+      "error": null
+    }
+  ]
+}
+```
+
+Any failed check turns a passing case into `fail`; the exit status is then 1 and the reason is in
+the result detail.
 
 ## Matching
 

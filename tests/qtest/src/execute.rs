@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 use crate::case::Case;
 use crate::exitmap::{self, ExitKind};
 use crate::matcher;
+use crate::oracle::{self, OracleReport};
 use crate::qemu;
 use crate::report::{CaseOutcome, CaseReport, ResultKind};
 use crate::runner::{self, RunSpec};
@@ -60,8 +61,52 @@ enum PrepareError {
     Error(String),
 }
 
+/// Everything produced by one case execution, including host-side oracle reports.
+#[derive(Debug, Clone)]
+pub struct Executed {
+    /// Serial matching, exit status and final verdict.
+    pub outcome: CaseOutcome,
+    /// Oracle reports in case-file order; empty when the case declares none.
+    pub oracles: Vec<OracleReport>,
+}
+
 /// Execute one case and return its outcome. Harness errors become `Error` results.
 pub fn execute(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
+    execute_with_oracles(case, options).outcome
+}
+
+/// Execute one case, then run every declared host-side oracle.
+pub fn execute_with_oracles(case: &Case, options: &ExecuteOptions) -> Executed {
+    let mut outcome = run_case(case, options);
+    let mut oracles = Vec::new();
+    if matches!(
+        outcome.report.result,
+        ResultKind::Pass | ResultKind::Fail | ResultKind::Timeout | ResultKind::Crash
+    ) {
+        for spec in &case.oracles {
+            oracles.push(oracle::analyze(spec));
+        }
+    }
+    if oracles.iter().any(|report| !report.passed()) {
+        let mut reasons = Vec::new();
+        for report in &oracles {
+            for failure in report.failures() {
+                reasons.push(format!("oracle {}: {failure}", report.path));
+            }
+        }
+        if outcome.report.result == ResultKind::Pass {
+            outcome.report.result = ResultKind::Fail;
+        }
+        let reason = reasons.join("; ");
+        outcome.detail = Some(match outcome.detail {
+            Some(existing) => format!("{existing}; {reason}"),
+            None => reason,
+        });
+    }
+    Executed { outcome, oracles }
+}
+
+fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
     let started = Instant::now();
     let arch = options
         .arch

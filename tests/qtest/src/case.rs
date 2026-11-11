@@ -10,6 +10,8 @@ use anyhow::{Context, Result, bail};
 use regex::Regex;
 use serde::Deserialize;
 
+use crate::oracle::OracleSpec;
+
 const VALID_ARCHES: &[&str] = &["x86_64", "aarch64", "riscv64"];
 
 /// Whether `arch` is a supported case architecture.
@@ -100,6 +102,8 @@ pub struct Case {
     pub expects: Vec<Expect>,
     /// Forbid tables in file order.
     pub forbids: Vec<Forbid>,
+    /// Host-side artifact checks run after the process exits.
+    pub oracles: Vec<OracleSpec>,
     expect_regexes: Vec<Regex>,
     forbid_regexes: Vec<Regex>,
 }
@@ -155,6 +159,11 @@ impl Case {
                 .with_context(|| format!("forbid[{index}] has an invalid regex"))?;
             forbid_regexes.push(regex);
         }
+        for (index, oracle) in raw.oracle.iter().enumerate() {
+            oracle
+                .validate()
+                .with_context(|| format!("oracle[{index}] is invalid"))?;
+        }
         Ok(Self {
             spec: CaseSpec {
                 name: raw.name,
@@ -167,6 +176,7 @@ impl Case {
             },
             expects: raw.expect,
             forbids: raw.forbid,
+            oracles: raw.oracle,
             expect_regexes,
             forbid_regexes,
         })
@@ -221,6 +231,8 @@ struct RawCase {
     expect: Vec<Expect>,
     #[serde(default, rename = "forbid")]
     forbid: Vec<Forbid>,
+    #[serde(default, rename = "oracle")]
+    oracle: Vec<OracleSpec>,
 }
 
 #[cfg(test)]

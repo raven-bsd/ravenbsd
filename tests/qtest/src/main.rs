@@ -11,8 +11,8 @@ use std::process::ExitCode;
 
 use anyhow::{Result, anyhow, bail};
 use raven_qtest::{
-    Case, CaseOutcome, ExecuteOptions, ResultKind, execute, is_valid_arch, list_case_files,
-    write_outcome,
+    Case, CaseOutcome, ExecuteOptions, OracleReport, ResultKind, execute_with_oracles,
+    is_valid_arch, list_case_files, write_outcome, write_reports,
 };
 
 const USAGE: &str = "\
@@ -111,10 +111,11 @@ fn run_one(args: &[String]) -> Result<u8> {
         execute: options,
     } = parse_run_args(args)?;
     let case = Case::load(&case_path)?;
-    let outcome = execute(&case, &options);
-    write_outcome(&outcome, &options.out_dir)?;
-    print_outcome(&outcome, true);
-    Ok(match outcome.report.result {
+    let executed = execute_with_oracles(&case, &options);
+    write_outcome(&executed.outcome, &options.out_dir)?;
+    write_reports(&options.out_dir, &case.spec.name, &executed.oracles)?;
+    print_outcome(&executed.outcome, &executed.oracles, true);
+    Ok(match executed.outcome.report.result {
         ResultKind::Pass => 0,
         ResultKind::Skipped => 77,
         _ => 1,
@@ -174,11 +175,12 @@ fn run_all(args: &[String]) -> Result<u8> {
         }
         let mut options = ExecuteOptions::new();
         options.no_build = no_build;
-        let outcome = execute(&case, &options);
-        write_outcome(&outcome, &options.out_dir)?;
-        print_outcome(&outcome, true);
+        let result = execute_with_oracles(&case, &options);
+        write_outcome(&result.outcome, &options.out_dir)?;
+        write_reports(&options.out_dir, &case.spec.name, &result.oracles)?;
+        print_outcome(&result.outcome, &result.oracles, true);
         executed += 1;
-        if !outcome.report.result.is_success() {
+        if !result.outcome.report.result.is_success() {
             failed += 1;
         }
     }
@@ -188,12 +190,30 @@ fn run_all(args: &[String]) -> Result<u8> {
     Ok(u8::from(failed > 0))
 }
 
-fn print_outcome(outcome: &CaseOutcome, print_detail: bool) {
+fn print_outcome(outcome: &CaseOutcome, oracles: &[OracleReport], print_detail: bool) {
     println!(
         "{}: {}",
         outcome.report.case,
         outcome.report.result.as_str()
     );
+    for report in oracles {
+        println!(
+            "oracle {}: {}",
+            report.path,
+            if report.passed() { "pass" } else { "fail" }
+        );
+        for check in &report.checks {
+            println!(
+                "  {}: {} ({})",
+                check.check,
+                if check.passed { "pass" } else { "fail" },
+                check.detail
+            );
+        }
+        if let Some(error) = &report.error {
+            println!("  file: fail ({error})");
+        }
+    }
     if print_detail
         && let Some(detail) = &outcome.detail
         && matches!(
