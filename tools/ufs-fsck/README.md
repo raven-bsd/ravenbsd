@@ -17,8 +17,8 @@ ufs-fsck -n build/root.img     # report only; never writes
 ufs-fsck -p build/root.img     # preen: repair and verify
 ```
 
-Exit status: `0` clean, `1` repaired (or repairable with `-n`), `4` unrepairable,
-`8` usage or open error.
+Exit status: `0` clean, `1` repaired, `4` unrepairable or uncorrected (also what `-n`
+returns when it finds something), `8` usage or open error.
 
 `-p` repairs the normal preen inconsistencies: wrong link counts, block counts,
 missing or wrong `.`/`..`, entries to unallocated inodes, orphaned directories

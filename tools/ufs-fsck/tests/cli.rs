@@ -123,7 +123,7 @@ fn check_only_reports_and_does_not_write() {
     fs::write(&image, &data).expect("write");
     let before = fs::read(&image).expect("read");
     let output = run(&["-n", image.to_str().expect("path")]);
-    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(output.status.code(), Some(4));
     assert_eq!(fs::read(&image).expect("read"), before);
     let _ = fs::remove_dir_all(&dir);
 }

@@ -66,17 +66,9 @@ fn run(args: Vec<String>) -> Result<u8, String> {
         }
     };
     print_report(&image, &report);
-    if repair {
-        if report.clean_after {
-            if report.fixed.is_empty() {
-                Ok(0)
-            } else {
-                Ok(1)
-            }
-        } else {
-            Ok(4)
-        }
-    } else if report.findings.is_empty() {
+    if !report.clean_after {
+        Ok(4)
+    } else if report.fixed.is_empty() {
         Ok(0)
     } else {
         Ok(1)
