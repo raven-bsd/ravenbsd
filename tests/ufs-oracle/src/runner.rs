@@ -64,8 +64,8 @@ pub struct SeedReport {
 impl SeedReport {
     /// True when every available oracle accepted the final image.
     pub fn ok(&self) -> bool {
-        self.fsck == "absent"
-            || self.fsck == "ok" && (self.image_check == "absent" || self.image_check == "ok")
+        (self.fsck == "absent" || self.fsck == "ok")
+            && (self.image_check == "absent" || self.image_check == "ok")
     }
 
     /// One report line.
@@ -500,4 +500,27 @@ pub fn run(config: &Config) -> Result<Summary, String> {
         )?);
     }
     Ok(Summary { seeds })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SeedReport;
+
+    fn report(fsck: &str, image: &str) -> SeedReport {
+        SeedReport {
+            seed: 0,
+            operations: 1,
+            checks: 1,
+            fsck: fsck.to_string(),
+            image_check: image.to_string(),
+        }
+    }
+
+    #[test]
+    fn every_available_oracle_must_pass() {
+        assert!(report("absent", "ok").ok());
+        assert!(report("ok", "absent").ok());
+        assert!(!report("absent", "failed").ok());
+        assert!(!report("failed", "ok").ok());
+    }
 }
