@@ -1,0 +1,60 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 11, 2026
+.Dt INITFSD 8
+.Os RavenBSD
+.Sh NAME
+.Nm initfsd
+.Nd RavenBSD read-only filesystem server over the initfs
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+maps the initfs MemObject at handle 1, validates it once with the
+.Sy raven-initfs
+reader and registers the
+.Dq initfs:
+scheme.
+It synthesises a directory tree from the sorted initfs paths: every prefix is a directory with mode
+0755 and files keep their archive mode.
+.Pp
+The server is strictly read-only.
+.Dv OPEN
+with
+.Dv WRITE
+or
+.Dv CREATE
+returns
+.Er EROFS
+and every mutating
+.Dv CALL
+operation returns
+.Er EROFS .
+Only
+.Dv STATFS
+is accepted through
+.Dv CALL .
+.Pp
+.Dv READ
+of a file copies bytes at the requested offset and returns a short read at end of file.
+.Dv READ
+of a directory returns packed K60 directory entries in sorted order without
+.Pa .
+or
+.Pa .. .
+.Dv FSTAT
+reports the file size and archive mode, inode numbers (entry index plus one for files), link count
+one for files and two for directories, and zero timestamps.
+.Sh FILES
+.Bl -tag -width /etc/services.d -compact
+.It Pa /etc/services.d/initfsd.toml
+Service manifest; it sets the environment variable
+.Dv INITFS_HANDLE=1 .
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr init 8 ,
+.Xr ramfsd 8
+.Sh STANDARDS
+RavenBSD.
