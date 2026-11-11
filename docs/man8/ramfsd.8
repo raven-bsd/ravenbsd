@@ -1,0 +1,49 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 11, 2026
+.Dt RAMFSD 8
+.Os RavenBSD
+.Sh NAME
+.Nm ramfsd
+.Nd RavenBSD in-memory writable filesystem server
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+registers the
+.Dq ramfs:
+scheme and serves a writable in-memory filesystem through the
+.Xr open 2
+protocol.
+It supports regular files, directories and symbolic links.
+.Pp
+The default limits are 16 MiB of file data, 4096 inodes, 255-byte names and a path depth of 32
+components.
+File data beyond the limit is rejected with
+.Er ENOSPC
+before memory is grown.
+Hard links are not supported and return
+.Er EPERM .
+.Pp
+Unlinking an open file removes its name immediately and keeps the inode until the last open handle
+closes.
+Directories must be empty before
+.Fn rmdir .
+Rename replaces an existing file, or an empty directory of the same kind, and rejects moving a
+directory into itself.
+.Pp
+All content is lost when
+.Nm
+restarts; this is intentional for the first in-memory filesystem.
+.Sh FILES
+.Bl -tag -width /etc/services.d -compact
+.It Pa /etc/services.d/ramfsd.toml
+Service manifest.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr init 8 ,
+.Xr svcctl 1
+.Sh STANDARDS
+RavenBSD.

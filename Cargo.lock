@@ -546,6 +546,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-ramfs-core"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+]
+
+[[package]]
+name = "raven-ramfsd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-ramfs-core",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-ramfsd-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-randd"
 version = "0.1.0"
 dependencies = [
