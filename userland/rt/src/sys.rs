@@ -8,7 +8,7 @@ use core::sync::atomic::AtomicU32;
 
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
-use raven_abi::types::{Handle, Rights, Timespec, futex};
+use raven_abi::types::{Handle, Rights, Timespec, futex, map, prot};
 use raven_abi::uname::Uname;
 
 /// Raw syscall with no arguments.
@@ -567,6 +567,186 @@ pub fn handle_dup(handle: Handle, rights: Rights) -> Result<Handle, Errno> {
         )
     })?;
     u32::try_from(value).map(Handle).map_err(|_| Errno::EINVAL)
+}
+
+fn handle_from_ret(value: isize) -> Result<Handle, Errno> {
+    let value = Errno::from_ret(value)?;
+    u32::try_from(value).map(Handle).map_err(|_| Errno::EINVAL)
+}
+
+/// Register a scheme name for the calling process.
+pub fn scheme_register(name: &str) -> Result<(), Errno> {
+    // SAFETY: SCHEME_REGISTER reads `name.len()` bytes and takes the scalar self-process handle.
+    checked(unsafe {
+        syscall3(
+            Syscall::SCHEME_REGISTER as usize,
+            name.as_ptr() as usize,
+            name.len(),
+            Handle::SELF_PROC.0 as usize,
+        )
+    })
+    .map(|_| ())
+}
+
+/// Open a scheme path with S11 open flags.
+pub fn open(path: &str, flags: u32) -> Result<Handle, Errno> {
+    // SAFETY: OPEN reads `path.len()` bytes and takes scalar flags.
+    handle_from_ret(unsafe {
+        syscall3(
+            Syscall::OPEN as usize,
+            path.as_ptr() as usize,
+            path.len(),
+            flags as usize,
+        )
+    })
+}
+
+/// Read from a scheme file.
+pub fn read(handle: Handle, buffer: &mut [u8]) -> Result<usize, Errno> {
+    // SAFETY: READ writes at most `buffer.len()` bytes into the valid buffer.
+    checked(unsafe {
+        syscall3(
+            Syscall::READ as usize,
+            handle.0 as usize,
+            buffer.as_mut_ptr() as usize,
+            buffer.len(),
+        )
+    })
+}
+
+/// Write to a scheme file.
+pub fn write(handle: Handle, buffer: &[u8]) -> Result<usize, Errno> {
+    // SAFETY: WRITE reads `buffer.len()` bytes from the valid buffer.
+    checked(unsafe {
+        syscall3(
+            Syscall::WRITE as usize,
+            handle.0 as usize,
+            buffer.as_ptr() as usize,
+            buffer.len(),
+        )
+    })
+}
+
+/// Close a scheme file.
+pub fn close(handle: Handle) -> Result<(), Errno> {
+    // SAFETY: CLOSE takes a scalar scheme-file handle.
+    checked(unsafe { syscall1(Syscall::CLOSE as usize, handle.0 as usize) }).map(|_| ())
+}
+
+/// Duplicate a scheme file with a rights mask.
+pub fn dup(handle: Handle, rights: u32) -> Result<Handle, Errno> {
+    // SAFETY: DUP takes a scalar handle and rights mask.
+    handle_from_ret(unsafe { syscall2(Syscall::DUP as usize, handle.0 as usize, rights as usize) })
+}
+
+/// Read the 64-byte `FSTAT` record into `out`.
+pub fn fstat(handle: Handle, out: &mut [u8; 64]) -> Result<(), Errno> {
+    // SAFETY: FSTAT writes at most 64 bytes into the valid output record.
+    checked(unsafe {
+        syscall3(
+            Syscall::FSTAT as usize,
+            handle.0 as usize,
+            out.as_mut_ptr() as usize,
+            out.len(),
+        )
+    })
+    .map(|_| ())
+}
+
+/// Send a typed `CALL` request with a response buffer.
+pub fn call(handle: Handle, request: &[u8], response: &mut [u8]) -> Result<usize, Errno> {
+    // SAFETY: CALL reads the request slice and writes at most `response.len()` bytes.
+    checked(unsafe {
+        syscall6(
+            Syscall::CALL as usize,
+            handle.0 as usize,
+            request.as_ptr() as usize,
+            request.len(),
+            response.as_mut_ptr() as usize,
+            response.len(),
+            0,
+        )
+    })
+}
+
+/// Receive one request packet and return the server-side request handle.
+pub fn recv(packet: &mut [u8]) -> Result<Handle, Errno> {
+    // SAFETY: RECV writes one packet into the valid packet buffer.
+    handle_from_ret(unsafe {
+        syscall2(
+            Syscall::RECV as usize,
+            packet.as_mut_ptr() as usize,
+            packet.len(),
+        )
+    })
+}
+
+/// Send one response packet for a server-side request handle.
+pub fn send(request: Handle, packet: &[u8]) -> Result<(), Errno> {
+    // SAFETY: SEND reads one encoded packet from the valid slice.
+    checked(unsafe {
+        syscall3(
+            Syscall::SEND as usize,
+            request.0 as usize,
+            packet.as_ptr() as usize,
+            packet.len(),
+        )
+    })
+    .map(|_| ())
+}
+
+/// Create a thread in `process` at `entry` with `stack_top` and one argument.
+pub fn thread_create(
+    process: Handle,
+    entry: usize,
+    stack_top: usize,
+    arg: usize,
+) -> Result<Handle, Errno> {
+    // SAFETY: THREAD_CREATE takes scalar addresses; the kernel validates the entry and stack VMAs.
+    handle_from_ret(unsafe {
+        syscall5(
+            Syscall::THREAD_CREATE as usize,
+            process.0 as usize,
+            entry,
+            stack_top,
+            arg,
+            0,
+        )
+    })
+}
+
+/// Terminate the calling thread (and process if it is the last thread).
+pub fn thread_exit(code: i32) -> ! {
+    // SAFETY: THREAD_EXIT takes only the scalar exit code and never returns.
+    unsafe {
+        let _ = syscall1(Syscall::THREAD_EXIT as usize, code as usize);
+    }
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
+/// Map anonymous read/write memory and return its base address.
+pub fn map_anonymous(len: usize) -> Result<usize, Errno> {
+    // SAFETY: MAP takes scalar arguments only; the kernel validates the length and flags.
+    checked(unsafe {
+        syscall6(
+            Syscall::MAP as usize,
+            Handle::SELF_PROC.0 as usize,
+            Handle::NONE.0 as usize,
+            0,
+            0,
+            len,
+            map::pack(prot::READ | prot::WRITE, 0),
+        )
+    })
+}
+
+/// Unmap a range in `process`.
+pub fn unmap(process: Handle, address: usize, len: usize) -> Result<(), Errno> {
+    // SAFETY: UNMAP takes scalar arguments only; the kernel validates the range.
+    checked(unsafe { syscall3(Syscall::UNMAP as usize, process.0 as usize, address, len) })
+        .map(|_| ())
 }
 
 #[cfg(test)]

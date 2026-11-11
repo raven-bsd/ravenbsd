@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-scheme"
+version = "0.1.0"
+description = "Scheme server/client framework over the RavenBSD S11 IPC packets."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+testing = []
+
+[dependencies]
+raven-abi = { path = "../raven-abi" }
+raven-ipc = { path = "../raven-ipc" }
+raven-proto-fs = { path = "../raven-proto-fs" }
+
+[[example]]
+name = "scheme_demo"
+required-features = ["testing"]
+
+[lints]
+workspace = true

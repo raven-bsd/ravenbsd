@@ -11,13 +11,15 @@ authors.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["panic-handler"]
+default = ["panic-handler", "alloc"]
 panic-handler = []
 alloc = []
 
 [dependencies]
 raven-abi = { path = "../../crates/raven-abi" }
 raven-elf = { path = "../../crates/raven-elf" }
+raven-proto-fs = { path = "../../crates/raven-proto-fs" }
+raven-scheme = { path = "../../crates/raven-scheme" }
 
 [target.'cfg(target_os = "none")'.dependencies]
 raven-initfs = { path = "../../crates/raven-initfs" }

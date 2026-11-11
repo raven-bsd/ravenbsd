@@ -60,6 +60,7 @@ unsafe extern "C" {
 pub unsafe extern "C" fn __raven_start(sp0: *const usize) -> ! {
     // SAFETY: `_start` passes the C8 stack pointer in the argument register.
     let args = unsafe { parse_stack(sp0) };
+    crate::args::set_current(args);
     // SAFETY: `entry!` defines `__raven_main` with this exact C signature in the final program.
     let code = unsafe { __raven_main(args) };
     crate::sys::exit(code)

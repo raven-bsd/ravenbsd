@@ -486,6 +486,8 @@ dependencies = [
  "raven-abi",
  "raven-elf",
  "raven-initfs",
+ "raven-proto-fs",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -534,6 +536,15 @@ dependencies = [
 [[package]]
 name = "raven-sched-core"
 version = "0.1.0"
+
+[[package]]
+name = "raven-scheme"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-ipc",
+ "raven-proto-fs",
+]
 
 [[package]]
 name = "raven-svc-manifest"
