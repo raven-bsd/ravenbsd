@@ -77,6 +77,24 @@ pub struct RequestBuffers {
 }
 
 impl RequestBuffers {
+    fn copy_back(&mut self) {
+        if let Some(capture) = self.buffer.as_mut() {
+            capture.copy_back();
+        }
+        if let Some(capture) = self.response.as_mut() {
+            capture.copy_back();
+        }
+    }
+
+    fn cancel_copy_back(&mut self) {
+        if let Some(capture) = self.buffer.as_mut() {
+            capture.cancel_copy_back();
+        }
+        if let Some(capture) = self.response.as_mut() {
+            capture.cancel_copy_back();
+        }
+    }
+
     fn release(&mut self) {
         self.buffer.take();
         self.response.take();
@@ -164,7 +182,14 @@ impl PendingRequest {
         if let Some(response) = response {
             *self.response.lock() = response;
         }
-        self.buffers.lock().release();
+        if self.cancelled.load(Ordering::Acquire) {
+            // The client is gone. Keep the copy-backed frames mapped until the server retires
+            // the request; a server still touching the buffer must see live kernel-owned memory.
+            self.buffers.lock().cancel_copy_back();
+        } else {
+            self.buffers.lock().copy_back();
+            self.buffers.lock().release();
+        }
         if self
             .done
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
@@ -251,6 +276,20 @@ pub fn on_process_exit(process: &Arc<Process>) {
     }
 
     process.scheme_waiters.wake_all();
+
+    // S32 leak probe: capture frames still owned after the process's requests were drained.
+    // Zero means every copy-backed capture was released exactly once.
+    if crate::memory::paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "s32-capturecheck")
+    {
+        let stats = crate::memory::frame::stats();
+        crate::kprintln!(
+            "s32: capture frames={} free_bytes={}",
+            capture::frames_in_use(),
+            stats.free_bytes
+        );
+    }
 }
 
 /// Look up a scheme-file object through a handle with the required rights.
