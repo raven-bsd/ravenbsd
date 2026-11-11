@@ -8,7 +8,8 @@
 //! 1. an MSI vector closed while its source is still armed is quarantined; a new IRQ gets a
 //!    different vector and none of the old device's messages reach it;
 //! 2. closing a handle while a second thread blocks in `IRQ_WAIT` wakes that thread with `EIO`,
-//!    the process stays alive and can create a new IRQ;
+//!    the process stays alive and can create a new IRQ (the waiter blocks with a bounded
+//!    timeout and revalidates, so a lost wake cannot strand it);
 //! 3. closing and reopening a legacy GSI leaves the line masked after the last close.
 //!
 //! The kernel's `s30-irq-probe` and spurious-vector reports supply the serial evidence; the
@@ -291,12 +292,23 @@ fn waiter_stack_top() -> usize {
 }
 
 /// Second thread: block in `IRQ_WAIT` until the main thread closes the handle.
+///
+/// The close is expected to wake the blocked waiter; the bounded timeout is a safety net, not
+/// the mechanism: it guarantees that a lost wake revalidates the handle instead of stranding
+/// the thread (and the case) forever.  Each new `IRQ_WAIT` re-checks the cancel state first,
+/// so the waiter still reports the close as `EIO`.
 extern "C" fn waiter_thread(_argument: usize) -> ! {
     WAIT_STARTED.store(true, Ordering::Release);
     let handle = Handle(WAIT_HANDLE.load(Ordering::Acquire) as u32);
-    let code = match irq_wait(handle, 0) {
-        Ok(_) => 0,
-        Err(error) => i32::from(error.0),
+    let code = loop {
+        match irq_wait(handle, 250_000_000) {
+            Err(error) => break i32::from(error.0),
+            // Timeout: revalidate and block again.
+            Ok(0) => continue,
+            // The victim source never fires; a positive count means a foreign message reached
+            // this object, which the errno assertion below turns into a test failure.
+            Ok(count) => break i32::try_from(count).unwrap_or(i32::MAX),
+        }
     };
     WAIT_RESULT.store(code, Ordering::Release);
     WAIT_DONE.store(true, Ordering::Release);
