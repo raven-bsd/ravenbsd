@@ -11,7 +11,7 @@ use alloc_crate::string::{String, ToString};
 use alloc_crate::vec::Vec;
 
 use raven_abi::errno::Errno;
-use raven_abi::types::Handle;
+use raven_abi::types::{Handle, Rights};
 use raven_proto_fs::{
     Call, CallRequest, CallResponse, DirEntry as ProtoDirEntry, DirEntryIter, MAX_PATH,
     O_DIRECTORY, O_RDONLY, O_WRONLY, OP_READLINK, OpenFlags, Stat, StatFs, normalize_absolute,
@@ -43,7 +43,7 @@ impl File {
     /// and therefore the cursor; each handle closes independently.
     pub fn try_clone(&self) -> Result<Self, Errno> {
         let handle = self.handle.ok_or(Errno::EBADF)?;
-        let duplicate = raven_scheme::Client::new().dup(handle, 0)?;
+        let duplicate = raven_scheme::Client::new().dup(handle, Rights::ALL.bits())?;
         Ok(Self {
             handle: Some(duplicate),
         })
