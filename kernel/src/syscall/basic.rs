@@ -112,6 +112,7 @@ fn uname(pointer: u64) -> Result<usize, Errno> {
 
 fn handle_close(raw: u32) -> Result<usize, Errno> {
     let process = process::current().ok_or(Errno::ESRCH)?;
+    crate::event::on_handle_close(&process, Handle(raw));
     process.handles.lock().close(Handle(raw))?;
     Ok(0)
 }

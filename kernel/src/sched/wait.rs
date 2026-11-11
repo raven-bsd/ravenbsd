@@ -96,6 +96,26 @@ impl WaitQueue {
         count
     }
 
+    /// Wake one waiter for a key without allocating temporary storage.
+    ///
+    /// Event queues allow exactly one blocking waiter, and timer interrupt delivery must not
+    /// allocate.  The waiter is removed before scheduler state is touched, preserving the usual
+    /// wait-queue-to-scheduler lock order.
+    pub fn wake_one(&self, space: u64, addr: u64) -> usize {
+        let waiter = {
+            let mut waiters = self.waiters.lock();
+            waiters
+                .iter()
+                .position(|waiter| waiter.space == space && waiter.addr == addr)
+                .map(|index| waiters.remove(index).thread)
+        };
+        if let Some(thread) = waiter {
+            usize::from(super::wake(thread, None, 0))
+        } else {
+            0
+        }
+    }
+
     /// Wake every waiter, returning how many actually woke.
     #[allow(dead_code)] // used by PROC_WAIT in S24
     pub fn wake_all(&self) -> usize {

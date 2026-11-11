@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-s26-evq"
+version = "0.1.0"
+description = "S26 event queue, timer and user-event fixture."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "raven-s26-evq"
+path = "src/main.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+
+[lints]
+workspace = true

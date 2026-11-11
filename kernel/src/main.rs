@@ -13,6 +13,7 @@ mod arch;
 mod backtrace;
 mod boot;
 mod cmdline;
+mod event;
 mod initfs;
 #[cfg(target_arch = "x86_64")]
 mod ipc;

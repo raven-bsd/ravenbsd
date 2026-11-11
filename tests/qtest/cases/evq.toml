@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "evq"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/s26-evq/build.sh"]
+initfs = "build/fixtures/s26-evq/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^s26: requests=0 timer=1 events=100000 lost=0$'
+
+[[forbid]]
+regex = '(?i)panic'

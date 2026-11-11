@@ -10,6 +10,7 @@ use raven_abi::errno::Errno;
 use raven_abi::types::Rights;
 use raven_handles::HandleTable;
 
+use crate::event::{EventQueue, Timer, UserEvent};
 #[cfg(target_arch = "x86_64")]
 use crate::ipc::{PendingRequest, SchemeFile, SchemeServer};
 use crate::memory::frame;
@@ -77,6 +78,12 @@ pub enum Object {
     Namespace,
     /// A thread object (created by later tickets).
     Thread(Arc<Thread>),
+    /// A wait-for-many event queue.
+    EventQueue(Arc<EventQueue>),
+    /// A monotonic timer event source.
+    Timer(Arc<Timer>),
+    /// A user-space doorbell event source.
+    UserEvent(Arc<UserEvent>),
     /// An open scheme file.
     #[cfg(target_arch = "x86_64")]
     SchemeFile(Arc<SchemeFile>),

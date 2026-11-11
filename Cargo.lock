@@ -343,6 +343,10 @@ name = "raven-esr"
 version = "0.1.0"
 
 [[package]]
+name = "raven-evq-core"
+version = "0.1.0"
+
+[[package]]
 name = "raven-fdt-lite"
 version = "0.1.0"
 
@@ -557,6 +561,13 @@ dependencies = [
  "raven-initfs",
  "raven-ipc",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-s26-evq"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
 ]
 
 [[package]]
