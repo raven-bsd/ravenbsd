@@ -11,6 +11,8 @@ use raven_abi::syscall::Syscall;
 use raven_abi::types::{Handle, Rights, Timespec, futex, map, prot};
 use raven_abi::uname::Uname;
 
+use crate::sync::Mutex;
+
 /// Raw syscall with no arguments.
 ///
 /// # Safety
@@ -749,6 +751,134 @@ pub fn unmap(process: Handle, address: usize, len: usize) -> Result<(), Errno> {
         .map(|_| ())
 }
 
+/// Fixed user window where [`map_initfs`] maps the boot archive.
+///
+/// The value is the one the S11 fixture uses: above the normal program load address and below
+/// the stack at the top of the user range.
+const INITFS_WINDOW: usize = 0x1000_0000;
+/// `MAP`/`UNMAP` granularity.
+const PAGE_SIZE: usize = 4096;
+/// End of the canonical user window; ABI v1 uses the same split on every architecture.
+const USER_END: usize = 0x0000_7FFF_FFFF_F000;
+/// Offset of the little-endian C7 `total_size` field in the initfs header.
+const INITFS_TOTAL_SIZE_OFFSET: usize = 40;
+/// Length of the C7 archive magic.
+const INITFS_MAGIC: &[u8] = b"RAVENFS1";
+
+const _: () = {
+    assert!(INITFS_WINDOW.is_multiple_of(PAGE_SIZE));
+    assert!(INITFS_WINDOW > PAGE_SIZE);
+    assert!(INITFS_WINDOW < USER_END);
+};
+
+/// Cached `(address, length)` of the initfs mapping; `None` before the first call.
+static INITFS_IMAGE: Mutex<Option<(usize, usize)>> = Mutex::new(None);
+
+/// Map the boot initfs (`Handle::INITFS`) read-only into the calling process.
+///
+/// The archive is mapped at the fixed [`INITFS_WINDOW`] address for the process lifetime; repeated
+/// calls return the same slice. The first page is checked for the C7 magic and a page-aligned
+/// `total_size` that fits the user window. The slice is not a validated archive: pass it to
+/// `raven_initfs::Initfs::parse` before reading entries.
+pub fn map_initfs() -> Result<&'static [u8], Errno> {
+    let mut cached = INITFS_IMAGE.lock();
+    if let Some((address, length)) = *cached {
+        // SAFETY: `address` is the fixed initfs window mapped read-only for `length` bytes by a
+        // previous successful call; that mapping is never unmapped and outlives this slice.
+        return Ok(unsafe { core::slice::from_raw_parts(address as *const u8, length) });
+    }
+
+    let probe = map_initfs_window(PAGE_SIZE)?;
+    let total = {
+        // SAFETY: `probe` is a one-page read-only initfs mapping created immediately above.
+        let header = unsafe { core::slice::from_raw_parts(probe as *const u8, PAGE_SIZE) };
+        match initfs_total_size(header) {
+            Ok(total) => total,
+            Err(error) => {
+                let _ = unmap(Handle::SELF_PROC, probe, PAGE_SIZE);
+                return Err(error);
+            }
+        }
+    };
+    unmap(Handle::SELF_PROC, probe, PAGE_SIZE)?;
+    let image = map_initfs_window(total)?;
+    *cached = Some((image, total));
+    // SAFETY: `image` is the fixed initfs window mapped read-only for `total` bytes; the mapping
+    // is never unmapped and stays valid for the process lifetime.
+    Ok(unsafe { core::slice::from_raw_parts(image as *const u8, total) })
+}
+
+/// Map `len` bytes of the initfs at [`INITFS_WINDOW`] and return the base address.
+fn map_initfs_window(len: usize) -> Result<usize, Errno> {
+    // SAFETY: MAP takes scalar arguments only; the kernel checks the handle rights, the fixed
+    // user range and the fact that the window is still free.
+    checked(unsafe {
+        syscall6(
+            Syscall::MAP as usize,
+            Handle::SELF_PROC.0 as usize,
+            Handle::INITFS.0 as usize,
+            0,
+            INITFS_WINDOW,
+            len,
+            map::pack(prot::READ, map::FIXED),
+        )
+    })
+}
+
+/// Read and validate the C7 `total_size` from a mapped first page.
+fn initfs_total_size(header: &[u8]) -> Result<usize, Errno> {
+    let magic = header.get(..INITFS_MAGIC.len()).ok_or(Errno::EINVAL)?;
+    if magic != INITFS_MAGIC {
+        return Err(Errno::EINVAL);
+    }
+    let field = header
+        .get(INITFS_TOTAL_SIZE_OFFSET..INITFS_TOTAL_SIZE_OFFSET + 8)
+        .ok_or(Errno::EINVAL)?;
+    let mut bytes = [0u8; 8];
+    bytes.copy_from_slice(field);
+    validate_initfs_size(u64::from_le_bytes(bytes))
+}
+
+/// Validate a C7 `total_size` against the page granularity and the fixed window.
+fn validate_initfs_size(total: u64) -> Result<usize, Errno> {
+    if total == 0 || !total.is_multiple_of(PAGE_SIZE as u64) {
+        return Err(Errno::EINVAL);
+    }
+    let total = usize::try_from(total).map_err(|_| Errno::ENOMEM)?;
+    let end = INITFS_WINDOW.checked_add(total).ok_or(Errno::ENOMEM)?;
+    if end > USER_END {
+        return Err(Errno::ENOMEM);
+    }
+    Ok(total)
+}
+
+/// Install a duplicate of `source` in `dest` with `rights`, returning the destination's handle.
+///
+/// This is the safe form of C14 `HANDLE_TRANSFER`: rights never grow (`new = source AND rights`),
+/// and the destination process must have `WRITE`. `Handle::NONE` and an empty rights mask are
+/// rejected before the syscall. Transferring to the calling process is `HANDLE_DUP`.
+pub fn handle_transfer(dest: Handle, source: Handle, rights: Rights) -> Result<Handle, Errno> {
+    validate_transfer(dest, source, rights)?;
+    // SAFETY: HANDLE_TRANSFER takes scalar arguments only; the kernel validates both handles, the
+    // destination's WRITE right and the source's TRANSFER right, and never grows rights.
+    handle_from_ret(unsafe {
+        syscall3(
+            Syscall::HANDLE_TRANSFER as usize,
+            dest.0 as usize,
+            source.0 as usize,
+            rights.0 as usize,
+        )
+    })
+}
+
+/// Reject the arguments C14 defines as invalid before entering the kernel.
+fn validate_transfer(dest: Handle, source: Handle, rights: Rights) -> Result<(), Errno> {
+    if dest == Handle::NONE || source == Handle::NONE || rights == Rights::NONE {
+        return Err(Errno::EINVAL);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -764,5 +894,79 @@ mod tests {
     fn handle_conversion_keeps_abi_bits() {
         let handle = Handle(0x1234_5678);
         assert_eq!(handle.0 as usize, 0x1234_5678);
+    }
+
+    fn initfs_header(total: u64) -> [u8; 48] {
+        let mut header = [0u8; 48];
+        header[..8].copy_from_slice(INITFS_MAGIC);
+        header[INITFS_TOTAL_SIZE_OFFSET..INITFS_TOTAL_SIZE_OFFSET + 8]
+            .copy_from_slice(&total.to_le_bytes());
+        header
+    }
+
+    #[test]
+    fn initfs_header_reads_the_total_size() {
+        assert_eq!(initfs_total_size(&initfs_header(8192)), Ok(8192));
+    }
+
+    #[test]
+    fn initfs_header_rejects_bad_magic_and_short_input() {
+        let mut header = initfs_header(4096);
+        header[0] = b'X';
+        assert_eq!(initfs_total_size(&header), Err(Errno::EINVAL));
+        assert_eq!(initfs_total_size(&[]), Err(Errno::EINVAL));
+        assert_eq!(initfs_total_size(&header[..40]), Err(Errno::EINVAL));
+    }
+
+    #[test]
+    fn initfs_header_rejects_bad_total_size() {
+        assert_eq!(initfs_total_size(&initfs_header(0)), Err(Errno::EINVAL));
+        assert_eq!(initfs_total_size(&initfs_header(4097)), Err(Errno::EINVAL));
+    }
+
+    #[test]
+    fn initfs_size_must_fit_the_fixed_window() {
+        let window = USER_END - INITFS_WINDOW;
+        assert_eq!(validate_initfs_size(window as u64), Ok(window));
+        assert_eq!(
+            validate_initfs_size(window as u64 + PAGE_SIZE as u64),
+            Err(Errno::ENOMEM)
+        );
+        let huge = 0xFFFF_FFFF_FFFF_F000u64;
+        assert_eq!(validate_initfs_size(huge), Err(Errno::ENOMEM));
+    }
+
+    #[test]
+    fn transfer_rejects_none_handles_and_empty_rights() {
+        assert_eq!(
+            handle_transfer(Handle::NONE, Handle(1), Rights::READ),
+            Err(Errno::EINVAL)
+        );
+        assert_eq!(
+            handle_transfer(Handle(1), Handle::NONE, Rights::READ),
+            Err(Errno::EINVAL)
+        );
+        assert_eq!(
+            handle_transfer(Handle(1), Handle(2), Rights::NONE),
+            Err(Errno::EINVAL)
+        );
+    }
+
+    #[test]
+    fn transfer_validation_accepts_real_arguments() {
+        assert_eq!(
+            validate_transfer(
+                Handle::SELF_PROC,
+                Handle::INITFS,
+                Rights::READ.union(Rights::MAP)
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn handle_return_maps_errno_and_values() {
+        assert_eq!(handle_from_ret(Errno::EPERM.to_ret()), Err(Errno::EPERM));
+        assert_eq!(handle_from_ret(7), Ok(Handle(7)));
     }
 }

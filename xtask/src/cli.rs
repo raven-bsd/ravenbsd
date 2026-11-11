@@ -41,7 +41,7 @@ cargo xtask commands:
   check [--fast]
   guard
   build <kernel|loader|user> --arch <a> [--release] [-p <package>]...
-  image   --arch <a> [--profile <p>] [--cmdline <s>] [--output <path>]
+  image   --arch <a> [--profile <p>] [--cmdline <s>] [--initfs <p>] [--kernel <p>] [--output <path>]
   initfs  --arch <a> [--profile <p>]
   run     --arch <a> [--profile <p>] [--no-build] [-- <qemu args>]
   qtest   [--case <name> | --all] [--arch <a>] [--no-build]
@@ -70,6 +70,8 @@ enum Command {
         arch: Arch,
         profile: String,
         cmdline: Option<String>,
+        initfs: Option<String>,
+        kernel: Option<String>,
         output: Option<String>,
     },
     Run {
@@ -191,12 +193,16 @@ fn parse_image(args: &[String]) -> Result<Command> {
     let mut arch = None;
     let mut profile = "base".to_string();
     let mut cmdline = None;
+    let mut initfs = None;
+    let mut kernel = None;
     let mut output = None;
     while let Some(arg) = parser.next() {
         match arg.as_str() {
             "--arch" => arch = Some(parse_arch(&parser.value("--arch")?)?),
             "--profile" => profile = parser.value("--profile")?,
             "--cmdline" => cmdline = Some(parser.value("--cmdline")?),
+            "--initfs" => initfs = Some(parser.value("--initfs")?),
+            "--kernel" => kernel = Some(parser.value("--kernel")?),
             "--output" => output = Some(parser.value("--output")?),
             other => bail!("unknown image option `{other}`"),
         }
@@ -205,6 +211,8 @@ fn parse_image(args: &[String]) -> Result<Command> {
         arch: arch.ok_or_else(|| anyhow!("--arch is required"))?,
         profile,
         cmdline,
+        initfs,
+        kernel,
         output,
     })
 }
@@ -281,14 +289,18 @@ fn execute(command: Command) -> Result<u8> {
             arch,
             profile,
             cmdline,
+            initfs,
+            kernel,
             output,
         } => {
             let root = root()?;
-            image::run(
+            image::run_with_overrides(
                 &root,
                 arch,
                 &profile,
                 cmdline.as_deref(),
+                initfs.as_deref().map(Path::new),
+                kernel.as_deref().map(Path::new),
                 output.as_deref().map(Path::new),
             )
         }
@@ -489,7 +501,34 @@ mod tests {
                 arch: Arch::Aarch64,
                 profile: "tiny".into(),
                 cmdline: Some("console=ttyS0".into()),
+                initfs: None,
+                kernel: None,
                 output: Some("build/out.img".into()),
+            }
+        );
+    }
+
+    #[test]
+    fn image_initfs_and_kernel_overrides_are_parsed() {
+        let command = parse_args(&args(&[
+            "image",
+            "--arch",
+            "x86_64",
+            "--initfs",
+            "build/fixtures/s24-spawn/initfs.img",
+            "--kernel",
+            "build/fixtures/testkernel/kernel.elf",
+        ]))
+        .unwrap();
+        assert_eq!(
+            command,
+            Command::Image {
+                arch: Arch::X86_64,
+                profile: "base".into(),
+                cmdline: None,
+                initfs: Some("build/fixtures/s24-spawn/initfs.img".into()),
+                kernel: Some("build/fixtures/testkernel/kernel.elf".into()),
+                output: None,
             }
         );
     }

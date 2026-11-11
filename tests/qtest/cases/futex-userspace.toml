@@ -5,6 +5,8 @@ name = "futex-userspace"
 arch = "x86_64"
 profile = "base"
 timeout_secs = 120
+pre = ["sh tests/fixtures/s09-futex/build.sh"]
+initfs = "build/fixtures/s09-futex/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 expect_exit = "success"
 

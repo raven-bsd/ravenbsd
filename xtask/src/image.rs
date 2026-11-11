@@ -23,7 +23,7 @@ const ROOT_START_LBA: u64 = ESP_START_LBA + ESP_SECTORS;
 const ROOT_SECTORS: u64 = 64 * 1024 * 1024 / SECTOR_SIZE;
 const GPT_ENTRY_SECTORS: u64 = 32;
 
-/// Build a bootable image and return 0 on success.
+/// Build a bootable image from the profile and return 0 on success.
 pub(crate) fn run(
     root: &Path,
     arch: Arch,
@@ -31,25 +31,55 @@ pub(crate) fn run(
     cmdline: Option<&str>,
     output: Option<&Path>,
 ) -> Result<u8> {
+    run_with_overrides(root, arch, profile_name, cmdline, None, None, output)
+}
+
+/// Build a bootable image and return 0 on success.
+///
+/// `initfs_override` and `kernel_override` install a prepared file instead of the profile's
+/// initfs and the freshly built kernel (fixture cases and the loader test kernel). Relative
+/// paths are resolved against the repository root.
+pub(crate) fn run_with_overrides(
+    root: &Path,
+    arch: Arch,
+    profile_name: &str,
+    cmdline: Option<&str>,
+    initfs_override: Option<&Path>,
+    kernel_override: Option<&Path>,
+    output: Option<&Path>,
+) -> Result<u8> {
     let profile = Profile::load(root, profile_name)?;
     let workspace = Workspace::load(root)?;
 
-    for component in [Component::Loader, Component::Kernel] {
-        let code = build::run(&workspace, component, arch, false, &[])?;
+    // The loader is always needed. A test kernel override replaces the real kernel, so there is
+    // no reason to build it.
+    let code = build::run(&workspace, Component::Loader, arch, false, &[])?;
+    if code != 0 {
+        bail!("loader build failed with exit code {code}");
+    }
+    if kernel_override.is_none() {
+        let code = build::run(&workspace, Component::Kernel, arch, false, &[])?;
         if code != 0 {
-            bail!("{} build failed with exit code {code}", component.as_str());
+            bail!("kernel build failed with exit code {code}");
         }
     }
-    let initfs = crate::initfs::build(root, arch, profile_name)?;
+
+    let initfs_path = match initfs_override {
+        Some(path) => resolve_override(root, path),
+        None => crate::initfs::build(root, arch, profile_name)?,
+    };
+    let kernel_path = match kernel_override {
+        Some(path) => resolve_override(root, path),
+        None => build::artifact_path(root, arch, Component::Kernel, ""),
+    };
 
     let loader = build::artifact_path(root, arch, Component::Loader, "");
-    let kernel = build::artifact_path(root, arch, Component::Kernel, "");
     let loader_bytes =
         fs::read(&loader).with_context(|| format!("cannot read {}", loader.display()))?;
     let kernel_bytes =
-        fs::read(&kernel).with_context(|| format!("cannot read {}", kernel.display()))?;
+        fs::read(&kernel_path).with_context(|| format!("cannot read {}", kernel_path.display()))?;
     let initfs_bytes =
-        fs::read(&initfs).with_context(|| format!("cannot read {}", initfs.display()))?;
+        fs::read(&initfs_path).with_context(|| format!("cannot read {}", initfs_path.display()))?;
 
     let boot_toml = boot_toml(&profile, cmdline);
     let loader_name = match arch {
@@ -109,6 +139,15 @@ fn default_output(root: &Path, arch: Arch) -> PathBuf {
     root.join("build")
         .join(arch.as_str())
         .join(format!("ravenbsd-{}.img", arch.as_str()))
+}
+
+/// Absolute path of an image override; relative paths are anchored at the repository root.
+fn resolve_override(root: &Path, path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        root.join(path)
+    }
 }
 
 fn write_image(path: &Path, gpt: &GptLayout, esp: &[u8]) -> Result<()> {
@@ -204,6 +243,19 @@ mod tests {
         assert_eq!(
             default_output(Path::new("/repo"), Arch::X86_64),
             Path::new("/repo/build/x86_64/ravenbsd-x86_64.img")
+        );
+    }
+
+    #[test]
+    fn relative_overrides_are_anchored_at_the_root() {
+        let root = Path::new("/repo");
+        assert_eq!(
+            resolve_override(root, Path::new("build/fixtures/s24-spawn/initfs.img")),
+            Path::new("/repo/build/fixtures/s24-spawn/initfs.img")
+        );
+        assert_eq!(
+            resolve_override(root, Path::new("/tmp/kernel.elf")),
+            Path::new("/tmp/kernel.elf")
         );
     }
 }
