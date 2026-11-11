@@ -55,7 +55,7 @@ pub fn check(options: &CheckOptions) -> Result<CheckReport> {
         check_file(root, file, &loaded.imports, &mut report);
     }
 
-    let (dependency_violations, dependency_warnings) = deps::check(root);
+    let (dependency_violations, dependency_warnings) = deps::check(root, options.strict);
     report.violations.extend(dependency_violations);
     report.warnings.extend(dependency_warnings);
     report.violations.sort();
@@ -148,7 +148,39 @@ fn lock_path(root: &Path, explicit: Option<&Path>) -> PathBuf {
     if let Some(path) = std::env::var_os("RAVEN_DONORS_LOCK") {
         return PathBuf::from(path);
     }
-    root.join("../ravenbsd-resources/donors.lock")
+    // `--root .` is the normal invocation; make the walk absolute so it can leave the current
+    // directory instead of stopping at the empty parent of ".".
+    let base = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    match discover_lock(&base) {
+        Some(path) => path,
+        // Nothing found: keep the historical sibling path so the warning names a plausible
+        // location instead of an empty string.
+        None => sibling_lock(&base),
+    }
+}
+
+/// Nearest `ravenbsd-resources/donors.lock` at or above `root`.
+///
+/// The lead's layout keeps the resource checkouts beside `ravenbsd/`; a minion clone lives at
+/// `minions/<name>/ravenbsd`, three levels lower, so a fixed `../` cannot reach them.
+fn discover_lock(root: &Path) -> Option<PathBuf> {
+    let mut directory = Some(root);
+    while let Some(current) = directory {
+        let candidate = current.join("ravenbsd-resources").join("donors.lock");
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+        directory = current.parent();
+    }
+    None
+}
+
+/// The historical default, `<root>/../ravenbsd-resources/donors.lock`.
+fn sibling_lock(root: &Path) -> PathBuf {
+    root.parent()
+        .unwrap_or(root)
+        .join("ravenbsd-resources")
+        .join("donors.lock")
 }
 
 /// List every checked file with the licence that applies to it.
@@ -395,5 +427,117 @@ mod tests {
         temp.write("src/bad.rs", content);
         let _ = run(&temp);
         assert_eq!(temp.read("src/bad.rs"), content);
+    }
+
+    #[test]
+    fn donors_lock_is_found_above_a_minion_clone() {
+        let temp = TempDir::new("lock-upward");
+        temp.write(
+            "ravenbsd-resources/donors.lock",
+            "redox-kernel  0123456789abcdef0123456789abcdef01234567  A  u\n",
+        );
+        temp.write("minions/bob/ravenbsd/Cargo.toml", "# clone\n");
+        let root = temp.path().join("minions/bob/ravenbsd");
+        assert_eq!(
+            discover_lock(&root),
+            Some(temp.path().join("ravenbsd-resources/donors.lock"))
+        );
+    }
+
+    #[test]
+    fn donors_lock_discovery_prefers_the_nearest_checkout() {
+        let temp = TempDir::new("lock-nearest");
+        temp.write("ravenbsd-resources/donors.lock", "outer\n");
+        temp.write("minions/ravenbsd-resources/donors.lock", "inner\n");
+        let root = temp.path().join("minions/bob/ravenbsd");
+        temp.write("minions/bob/ravenbsd/Cargo.toml", "# clone\n");
+        assert_eq!(
+            discover_lock(&root),
+            Some(temp.path().join("minions/ravenbsd-resources/donors.lock"))
+        );
+    }
+
+    #[test]
+    fn donors_lock_discovery_reports_nothing_when_absent() {
+        let temp = TempDir::new("lock-absent");
+        temp.write("repo/Cargo.toml", "# clone\n");
+        let root = temp.path().join("repo");
+        // A stray checkout above the temp tree would make this vacuous, but none exists.
+        assert_eq!(discover_lock(&root), None);
+    }
+
+    #[test]
+    fn an_explicit_lock_path_wins_over_discovery() {
+        let temp = TempDir::new("lock-explicit");
+        temp.write("ravenbsd-resources/donors.lock", "outer\n");
+        temp.write("repo/Cargo.toml", "# clone\n");
+        let root = temp.path().join("repo");
+        let explicit = temp.path().join("custom.lock");
+        assert_eq!(lock_path(&root, Some(&explicit)), explicit);
+    }
+
+    #[test]
+    fn strict_turns_a_broken_dependency_scan_into_a_violation() {
+        let temp = repo();
+        temp.write(
+            "Cargo.toml",
+            "[package]\nname = \"probe\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n\
+             [dependencies]\nmissing = { path = \"deps/missing\" }\n",
+        );
+        temp.write("src/main.rs", &format!("{HEADER}fn main() {{}}\n"));
+        let mut options = CheckOptions::new(temp.path());
+        options.donors_lock = Some(temp.path().join("no-such-lock"));
+
+        let report = check(&options).unwrap();
+        assert!(
+            !report
+                .violations
+                .iter()
+                .any(|v| v.rule == "dependency-metadata")
+        );
+        assert!(
+            report
+                .warnings
+                .iter()
+                .any(|warning| warning.contains("cargo metadata"))
+        );
+
+        options.strict = true;
+        let report = check(&options).unwrap();
+        assert!(
+            report
+                .violations
+                .iter()
+                .any(|v| v.rule == "dependency-metadata")
+        );
+        assert!(
+            !report
+                .warnings
+                .iter()
+                .any(|warning| warning.contains("cargo metadata"))
+        );
+    }
+
+    #[test]
+    fn addon_sources_without_headers_are_reported() {
+        let temp = repo();
+        temp.write("tools/oracle/audit.py", "print(1)\n");
+        temp.write("addons/driver/net.c", "int x;\n");
+        temp.write("tests/bench/load.yaml", "key: value\n");
+        let report = run(&temp);
+        for path in [
+            "tools/oracle/audit.py",
+            "addons/driver/net.c",
+            "tests/bench/load.yaml",
+        ] {
+            assert!(
+                report
+                    .violations
+                    .iter()
+                    .any(|v| v.path == path && v.rule == "spdx-missing"),
+                "{path}: {:?}",
+                report.violations
+            );
+        }
     }
 }
