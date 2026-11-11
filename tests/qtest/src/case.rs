@@ -74,6 +74,31 @@ pub struct Forbid {
     pub regex: String,
 }
 
+/// One `[[step]]` table: a scripted serial interaction.
+///
+/// A step waits for a line (or the current partial line) and/or writes text to the guest serial
+/// input. Steps run in file order while the process is alive; `[[expect]]` matching still runs
+/// after the process exits and is not affected by steps.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Step {
+    /// Regex that a serial line must match. A line matched by a wait is consumed.
+    #[serde(default)]
+    pub wait: Option<String>,
+    /// Text written to the guest serial input, verbatim (`\n` in TOML is a newline).
+    #[serde(default)]
+    pub send: Option<String>,
+    /// Pause before writing `send`, in milliseconds; default [`DEFAULT_STEP_DELAY_MS`].
+    #[serde(default)]
+    pub delay_ms: Option<u64>,
+    /// How long `wait` may take before the case fails, in seconds; default the case timeout.
+    #[serde(default)]
+    pub timeout_secs: Option<u64>,
+}
+
+/// Default pause before a step's `send`, in milliseconds.
+pub const DEFAULT_STEP_DELAY_MS: u64 = 50;
+
 /// Raw case fields, with compiled regexes stripped.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CaseSpec {
@@ -91,6 +116,8 @@ pub struct CaseSpec {
     pub qemu_extra: Vec<String>,
     /// Expected exit condition.
     pub expect_exit: ExpectExit,
+    /// When set, the case is not executed and reports this reason as `skipped`.
+    pub skip: Option<String>,
 }
 
 /// A validated case with compiled regexes.
@@ -104,8 +131,11 @@ pub struct Case {
     pub forbids: Vec<Forbid>,
     /// Host-side artifact checks run after the process exits.
     pub oracles: Vec<OracleSpec>,
+    /// Scripted serial steps in file order.
+    pub steps: Vec<Step>,
     expect_regexes: Vec<Regex>,
     forbid_regexes: Vec<Regex>,
+    step_regexes: Vec<Option<Regex>>,
 }
 
 impl Case {
@@ -130,6 +160,11 @@ impl Case {
     /// Regexes for [`Self::forbids`], same order.
     pub(crate) fn forbid_regexes(&self) -> &[Regex] {
         &self.forbid_regexes
+    }
+
+    /// Compiled `wait` regexes for [`Self::steps`], same order; `None` for a send-only step.
+    pub(crate) fn step_regexes(&self) -> &[Option<Regex>] {
+        &self.step_regexes
     }
 
     fn from_raw(raw: RawCase) -> Result<Self> {
@@ -164,6 +199,40 @@ impl Case {
                 .validate()
                 .with_context(|| format!("oracle[{index}] is invalid"))?;
         }
+        let timeout_ms = raw.timeout_secs.saturating_mul(1000);
+        let mut step_regexes = Vec::with_capacity(raw.step.len());
+        for (index, step) in raw.step.iter().enumerate() {
+            if step.wait.is_none() && step.send.is_none() {
+                bail!("step[{index}] needs wait, send or both");
+            }
+            let regex = match &step.wait {
+                Some(pattern) => Some(
+                    Regex::new(pattern)
+                        .with_context(|| format!("step[{index}] has an invalid wait regex"))?,
+                ),
+                None => None,
+            };
+            if step.timeout_secs == Some(0) {
+                bail!("step[{index}] timeout_secs must be greater than zero");
+            }
+            if step
+                .timeout_secs
+                .is_some_and(|secs| secs > raw.timeout_secs)
+            {
+                bail!("step[{index}] timeout_secs must not exceed the case timeout");
+            }
+            if let Some(delay) = step.delay_ms
+                && delay >= timeout_ms
+            {
+                bail!("step[{index}] delay_ms must be shorter than the case timeout");
+            }
+            step_regexes.push(regex);
+        }
+        if let Some(skip) = &raw.skip
+            && skip.trim().is_empty()
+        {
+            bail!("skip needs a reason");
+        }
         Ok(Self {
             spec: CaseSpec {
                 name: raw.name,
@@ -173,12 +242,15 @@ impl Case {
                 boot_cmdline: raw.boot_cmdline,
                 qemu_extra: raw.qemu_extra,
                 expect_exit,
+                skip: raw.skip,
             },
             expects: raw.expect,
             forbids: raw.forbid,
             oracles: raw.oracle,
+            steps: raw.step,
             expect_regexes,
             forbid_regexes,
+            step_regexes,
         })
     }
 }
@@ -227,12 +299,16 @@ struct RawCase {
     #[serde(default)]
     qemu_extra: Vec<String>,
     expect_exit: String,
+    #[serde(default)]
+    skip: Option<String>,
     #[serde(default, rename = "expect")]
     expect: Vec<Expect>,
     #[serde(default, rename = "forbid")]
     forbid: Vec<Forbid>,
     #[serde(default, rename = "oracle")]
     oracle: Vec<OracleSpec>,
+    #[serde(default, rename = "step")]
+    step: Vec<Step>,
 }
 
 #[cfg(test)]
@@ -385,5 +461,106 @@ regex = '(?i)panic'
             .unwrap_err()
             .to_string();
         assert!(error.contains("bad.toml"), "{error}");
+    }
+
+    #[test]
+    fn step_section_parses_with_defaults() {
+        let text = format!(
+            "{}[[step]]\nwait = '^ready> $'\nsend = \"uname\\n\"\n",
+            minimal()
+        );
+        let case = Case::parse(&text).unwrap();
+        assert_eq!(case.steps.len(), 1);
+        assert_eq!(case.steps[0].wait.as_deref(), Some("^ready> $"));
+        assert_eq!(case.steps[0].send.as_deref(), Some("uname\n"));
+        assert_eq!(case.steps[0].delay_ms, None);
+        assert_eq!(case.steps[0].timeout_secs, None);
+        let regexes = case.step_regexes();
+        assert!(regexes[0].as_ref().unwrap().is_match("ready> "));
+    }
+
+    #[test]
+    fn steps_keep_file_order_between_expects() {
+        let text = format!(
+            "{}[[step]]\nwait = \"^one$\"\n[[expect]]\nregex = '^x$'\n\
+             [[step]]\nsend = \"two\\n\"\n[[step]]\nwait = \"^three$\"\n",
+            minimal()
+        );
+        let case = Case::parse(&text).unwrap();
+        assert_eq!(case.expects.len(), 1);
+        let waits: Vec<&str> = case
+            .steps
+            .iter()
+            .map(|step| step.wait.as_deref().unwrap_or("<send>"))
+            .collect();
+        assert_eq!(waits, vec!["^one$", "<send>", "^three$"]);
+    }
+
+    #[test]
+    fn a_step_needs_wait_send_or_both() {
+        let text = format!("{}[[step]]\ndelay_ms = 10\n", minimal());
+        let error = format!("{:#}", Case::parse(&text).unwrap_err());
+        assert!(
+            error.contains("step[0] needs wait, send or both"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn invalid_step_wait_regex_is_rejected() {
+        let text = format!("{}[[step]]\nwait = \"(unclosed\"\n", minimal());
+        let error = format!("{:#}", Case::parse(&text).unwrap_err());
+        assert!(error.contains("step[0]"), "{error}");
+        assert!(error.contains("wait regex"), "{error}");
+    }
+
+    #[test]
+    fn unknown_step_key_is_rejected() {
+        let text = format!("{}[[step]]\nwait = \"a\"\nmystery = 1\n", minimal());
+        let error = format!("{:#}", Case::parse(&text).unwrap_err());
+        assert!(error.contains("unknown field"), "{error}");
+    }
+
+    #[test]
+    fn step_timeout_bounds_are_enforced() {
+        let text = format!("{}[[step]]\nwait = \"a\"\ntimeout_secs = 0\n", minimal());
+        let error = format!("{:#}", Case::parse(&text).unwrap_err());
+        assert!(error.contains("timeout_secs"), "{error}");
+
+        let text = format!("{}[[step]]\nwait = \"a\"\ntimeout_secs = 11\n", minimal());
+        let error = format!("{:#}", Case::parse(&text).unwrap_err());
+        assert!(error.contains("case timeout"), "{error}");
+
+        let text = format!("{}[[step]]\nwait = \"a\"\ntimeout_secs = 10\n", minimal());
+        assert!(Case::parse(&text).is_ok());
+    }
+
+    #[test]
+    fn step_delay_must_be_shorter_than_the_case_timeout() {
+        let text = format!("{}[[step]]\nsend = \"x\"\ndelay_ms = 10000\n", minimal());
+        let error = format!("{:#}", Case::parse(&text).unwrap_err());
+        assert!(error.contains("delay_ms"), "{error}");
+        let text = format!("{}[[step]]\nsend = \"x\"\ndelay_ms = 9999\n", minimal());
+        assert!(Case::parse(&text).is_ok());
+    }
+
+    #[test]
+    fn skip_is_optional_and_needs_a_reason() {
+        assert_eq!(Case::parse(minimal()).unwrap().spec.skip, None);
+        let text = format!("{}skip = \"needs S27\"\n", minimal());
+        assert_eq!(
+            Case::parse(&text).unwrap().spec.skip.as_deref(),
+            Some("needs S27")
+        );
+        let text = format!("{}skip = \"  \"\n", minimal());
+        let error = format!("{:#}", Case::parse(&text).unwrap_err());
+        assert!(error.contains("skip needs a reason"), "{error}");
+    }
+
+    #[test]
+    fn a_case_without_steps_has_none() {
+        let case = Case::parse(minimal()).unwrap();
+        assert!(case.steps.is_empty());
+        assert!(case.step_regexes().is_empty());
     }
 }

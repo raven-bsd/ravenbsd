@@ -15,6 +15,7 @@ members = [
     "boot/loader",
     "tests/fixtures/s08-init",
     "tests/fixtures/s09-futex",
+    "tests/fixtures/echo-dialogue",
     "tests/fixtures/s24-spawn/parent",
     "tests/fixtures/s24-spawn/child",
     "tests/fixtures/s11-echo",

@@ -14,6 +14,7 @@
 #![forbid(unsafe_code)]
 
 mod case;
+mod dialogue;
 mod execute;
 mod exitmap;
 mod matcher;
@@ -25,7 +26,10 @@ mod runner;
 #[cfg(test)]
 mod testutil;
 
-pub use case::{Case, CaseSpec, Expect, ExpectExit, Forbid, is_valid_arch, list_case_files};
+pub use case::{
+    Case, CaseSpec, DEFAULT_STEP_DELAY_MS, Expect, ExpectExit, Forbid, Step, is_valid_arch,
+    list_case_files,
+};
 pub use execute::{ExecuteOptions, Executed, execute, execute_with_oracles};
 pub use oracle::{
     OracleCheck, OracleReport, OracleSpec, Wav, analyze as analyze_oracle, parse_wav, write_reports,

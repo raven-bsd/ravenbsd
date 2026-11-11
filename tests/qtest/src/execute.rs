@@ -9,6 +9,7 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 use crate::case::Case;
+use crate::dialogue::Dialogue;
 use crate::exitmap::{self, ExitKind};
 use crate::matcher;
 use crate::oracle::{self, OracleReport};
@@ -124,6 +125,16 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
     };
     let arch = report.arch.clone();
 
+    if let Some(reason) = &case.spec.skip {
+        return finish(
+            report,
+            Vec::new(),
+            Some(reason.clone()),
+            ResultKind::Skipped,
+            started,
+        );
+    }
+
     let (program, args) = match &options.runner {
         Some(runner) if runner.is_empty() => {
             return finish(
@@ -153,11 +164,17 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
     };
 
     let timeout = Duration::from_secs(case.spec.timeout_secs);
-    let run = match runner::run(&RunSpec {
+    let spec = RunSpec {
         program,
         args,
         timeout,
-    }) {
+    };
+    let mut dialogue = Dialogue::from_case(case);
+    let run = match dialogue.as_mut() {
+        Some(active) => runner::run_dialogue(&spec, active),
+        None => runner::run(&spec),
+    };
+    let run = match run {
         Ok(run) => run,
         Err(error) => {
             return finish(
@@ -184,7 +201,10 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
         exitmap::expected_matches(case.spec.expect_exit, exit)
     };
     let passed = exit_ok && report.unmatched.is_empty() && report.forbidden_hits.is_empty();
-    let result = if passed {
+    let step_failure = run.step_failure;
+    let result = if step_failure.is_some() {
+        ResultKind::Fail
+    } else if passed {
         ResultKind::Pass
     } else if run.timed_out {
         ResultKind::Timeout
@@ -193,10 +213,10 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
     } else {
         ResultKind::Fail
     };
-    let detail = if passed {
-        None
-    } else {
-        Some(describe_failure(case, &report, run.timed_out, exit))
+    let detail = match &step_failure {
+        Some(failure) => Some(describe_step_failure(failure)),
+        None if passed => None,
+        None => Some(describe_failure(case, &report, run.timed_out, exit)),
     };
     finish(report, run.lines, detail, result, started)
 }
@@ -334,6 +354,25 @@ fn describe_failure(case: &Case, report: &CaseReport, timed_out: bool, exit: Exi
         ));
     }
     parts.join("; ")
+}
+
+fn describe_step_failure(failure: &runner::StepFailure) -> String {
+    let mut text = format!(
+        "step {} ({}) failed: {}",
+        failure.index + 1,
+        failure.pattern,
+        failure.reason
+    );
+    if failure.lines.is_empty() {
+        text.push_str("\nno serial output before the failure");
+    } else {
+        text.push_str(&format!("\nlast {} serial line(s):", failure.lines.len()));
+        for line in &failure.lines {
+            text.push('\n');
+            text.push_str(line);
+        }
+    }
+    text
 }
 
 fn finish(
@@ -495,5 +534,52 @@ mod tests {
         let outcome = execute(&case, &options);
         assert_eq!(outcome.report.arch, "aarch64");
         assert_eq!(outcome.report.result, ResultKind::Pass);
+    }
+
+    #[test]
+    fn a_skipped_case_does_not_run() {
+        let text = "name = \"skipped\"\narch = \"x86_64\"\nprofile = \"base\"\n\
+                    timeout_secs = 5\nexpect_exit = \"success\"\n\
+                    skip = \"needs S27 (DEBUG_READ)\"\n";
+        let case = Case::parse(text).unwrap();
+        let outcome = execute(&case, &runner("printf 'must not run\\n'; exit 1"));
+        assert_eq!(outcome.report.result, ResultKind::Skipped);
+        assert!(outcome.lines.is_empty());
+        assert!(outcome.detail.unwrap().contains("S27"));
+    }
+
+    #[test]
+    fn steps_run_against_the_fake_runner() {
+        let case = case(
+            5,
+            "success",
+            "[[expect]]\nregex = \"^got: uname$\"\n\
+             [[step]]\nwait = \"^ready$\"\nsend = \"uname\\n\"\ndelay_ms = 0\n",
+        );
+        let outcome = execute(
+            &case,
+            &runner("printf 'ready\\n'; read line; printf 'got: %s\\n' \"$line\"; exit 33"),
+        );
+        assert_eq!(
+            outcome.report.result,
+            ResultKind::Pass,
+            "{:?}",
+            outcome.detail
+        );
+    }
+
+    #[test]
+    fn a_step_failure_fails_the_case_and_reports_the_step() {
+        let case = case(
+            5,
+            "success",
+            "[[step]]\nwait = \"^never$\"\ntimeout_secs = 1\n",
+        );
+        let outcome = execute(&case, &runner("printf 'started\\n'; sleep 5"));
+        assert_eq!(outcome.report.result, ResultKind::Fail);
+        let detail = outcome.detail.expect("detail");
+        assert!(detail.contains("step 1"), "{detail}");
+        assert!(detail.contains("^never$"), "{detail}");
+        assert!(detail.contains("started"), "{detail}");
     }
 }
