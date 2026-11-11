@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "handle-transfer"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+boot_cmdline = "console=ttyS0 test-exit=1 s25-handlecheck=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^s25: transfer ok$'
+
+[[expect]]
+regex = '^s25: rights ok$'
+
+[[expect]]
+regex = '^s25: attach ok$'
+
+[[expect]]
+regex = '^s25: handles free=[0-9]+$'
+
+[[forbid]]
+regex = '(?i)panic'

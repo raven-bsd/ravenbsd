@@ -19,7 +19,7 @@ use crate::usercopy::{copy_from_user, copy_to_user};
 
 use super::capture;
 use super::model;
-use super::protocol::{self, Opcode, PACKET_SIZE, SchemePacket};
+use super::protocol::{self, Opcode, PACKET_SIZE, REPLY_HANDLE, SchemePacket, attachment_rights};
 use super::{PendingRequest, RequestBuffers, SchemeFile};
 use super::{next_file_id, next_request_id, registry};
 
@@ -61,6 +61,12 @@ pub fn open(
     match result {
         Ok((0, _)) => {
             let response = *request.response.lock();
+            if response.flags & REPLY_HANDLE != 0 && response.attach_count == 1 {
+                let attached = response.attach[0].handle;
+                let attached = Handle(attached);
+                let _ = caller.handles.lock().close(handle);
+                return Ok(attached);
+            }
             file.server_cookie
                 .store(response.server_cookie, Ordering::Release);
             Ok(handle)
@@ -177,25 +183,29 @@ pub fn fstat(
     address: u64,
     len: u64,
 ) -> Result<(), Errno> {
+    let response = if len > 0 {
+        Some(capture::create(caller, &file.server, address, len, true)?)
+    } else {
+        None
+    };
     let mut packet = SchemePacket::request(Opcode::Fstat, next_request_id(), file.id);
     packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
+    packet.response_len = len;
     let request = PendingRequest::new(
         Arc::clone(caller),
         Arc::clone(&file.server),
         Some(Arc::clone(file)),
         Opcode::Fstat,
         packet,
-        RequestBuffers::default(),
+        RequestBuffers {
+            buffer: None,
+            response,
+        },
     );
     let (status, _) = submit(&request).and_then(|_| wait(caller, &request))?;
     if status != 0 {
         return Err(status_errno(status));
     }
-    let response = *request.response.lock();
-    let bytes = response.data_bytes();
-    let length = usize::try_from(len).unwrap_or(usize::MAX).min(bytes.len());
-    let destination = UserSlice::new(address, length as u64)?;
-    copy_to_user(destination, bytes.get(..length).unwrap_or(&[]))?;
     Ok(())
 }
 
@@ -316,7 +326,7 @@ pub fn send(
     let mut bytes = [0u8; PACKET_SIZE];
     let source = UserSlice::new(packet_address, PACKET_SIZE as u64)?;
     copy_from_user(&mut bytes, source)?;
-    let packet = protocol::decode(&bytes).map_err(|_| Errno::EPROTO)?;
+    let mut packet = protocol::decode(&bytes).map_err(|_| Errno::EPROTO)?;
     packet.validate(true).map_err(|_| Errno::EPROTO)?;
 
     let request = {
@@ -334,6 +344,11 @@ pub fn send(
     }
     if packet.request_id != request.id || packet.opcode != request.opcode.as_u16() {
         return Err(Errno::EPROTO);
+    }
+    let installed = install_attachments(caller, &request, &mut packet)?;
+    if let Err(error) = write_reply_buffer(&request, &packet) {
+        rollback_attachments(&request.client, &installed);
+        return Err(error);
     }
     if request.opcode == Opcode::Open
         && packet.status == 0
@@ -354,6 +369,157 @@ pub fn send(
         .retain(|item| !Arc::ptr_eq(item, &request));
     let _ = caller.handles.lock().close(request_handle);
     Ok(())
+}
+
+fn install_attachments(
+    server: &Arc<Process>,
+    request: &Arc<PendingRequest>,
+    packet: &mut SchemePacket,
+) -> Result<[Option<Handle>; 4], Errno> {
+    let count = usize::try_from(packet.attach_count).map_err(|_| Errno::EPROTO)?;
+    let mut source = [None, None, None, None];
+    let mut index = 0usize;
+    while index < count {
+        let attachment = packet.attach.get(index).ok_or(Errno::EPROTO)?;
+        let slot = source.get_mut(index).ok_or(Errno::EPROTO)?;
+        *slot = Some(crate::syscall::handle_xfer::clone_transferable(
+            server,
+            Handle(attachment.handle),
+        )?);
+        index = index.saturating_add(1);
+    }
+    let mut installed = [None; 4];
+    let mut client = request.client.handles.lock();
+    index = 0;
+    while index < count {
+        let (object, rights) = source
+            .get_mut(index)
+            .and_then(Option::take)
+            .ok_or(Errno::EPROTO)?;
+        let attachment = packet.attach.get_mut(index).ok_or(Errno::EPROTO)?;
+        match client.insert(object, attachment_rights(rights, attachment.rights_mask)) {
+            Ok(handle) => {
+                attachment.handle = handle.0;
+                let slot = installed.get_mut(index).ok_or(Errno::EPROTO)?;
+                *slot = Some(handle);
+            }
+            Err(error) => {
+                for handle in installed.iter().flatten() {
+                    let _ = client.close(*handle);
+                }
+                return Err(error);
+            }
+        }
+        index = index.saturating_add(1);
+    }
+    Ok(installed)
+}
+
+/// Put a non-Open reply's inline data and attachment pairs in the client reply buffer while its
+/// capture is still mapped into the server. `SEND` rolls back newly installed handles if this
+/// fails, so no unreachable client capabilities are left behind.
+fn write_reply_buffer(request: &Arc<PendingRequest>, packet: &SchemePacket) -> Result<(), Errno> {
+    let count = usize::try_from(packet.attach_count).map_err(|_| Errno::EPROTO)?;
+    if request.opcode == Opcode::Open {
+        if count == 0 {
+            return Ok(());
+        }
+        if packet.flags & REPLY_HANDLE != 0 && count == 1 {
+            return Ok(());
+        }
+        return Err(Errno::E2BIG);
+    }
+
+    let (capture_address, mut data_len, capacity, copy_data) = {
+        let request_packet = request.packet.lock();
+        let buffers = request.buffers.lock();
+        match request.opcode {
+            Opcode::Read => (
+                buffers.buffer.as_ref().map(capture::Capture::address),
+                packet.buffer_len,
+                request_packet.buffer_len,
+                false,
+            ),
+            // A `Call` reply without attachments keeps the S11 semantics: the server already
+            // wrote the response buffer itself, so inline data is not kernel-delivered.
+            Opcode::Call => (
+                buffers.response.as_ref().map(capture::Capture::address),
+                if count == 0 {
+                    0
+                } else {
+                    u64::from(packet.data_len)
+                },
+                request_packet.response_len,
+                true,
+            ),
+            Opcode::Fstat => (
+                buffers.response.as_ref().map(capture::Capture::address),
+                u64::from(packet.data_len),
+                request_packet.response_len,
+                true,
+            ),
+            Opcode::Write | Opcode::Close | Opcode::Dup => {
+                if count == 0 {
+                    return Ok(());
+                }
+                return Err(Errno::E2BIG);
+            }
+            Opcode::Open => return Err(Errno::EPROTO),
+        }
+    };
+    // Fstat without a captured buffer keeps the S11 truncation semantics: no bytes delivered.
+    if request.opcode == Opcode::Fstat && capture_address.is_none() {
+        data_len = 0;
+    }
+    let pairs_len = u64::try_from(count)
+        .map_err(|_| Errno::E2BIG)?
+        .checked_mul(8)
+        .ok_or(Errno::E2BIG)?;
+    let total = data_len.checked_add(pairs_len).ok_or(Errno::E2BIG)?;
+    if total > capacity {
+        return Err(Errno::E2BIG);
+    }
+    if total == 0 {
+        return Ok(());
+    }
+    let start = capture_address.ok_or(Errno::E2BIG)?;
+    if copy_data && data_len > 0 {
+        let bytes = packet.data_bytes();
+        copy_to_user(UserSlice::new(start, data_len)?, bytes)?;
+    }
+    if count == 0 {
+        return Ok(());
+    }
+    let mut pairs = [0u8; 32];
+    let mut index = 0usize;
+    while index < count {
+        let attachment = packet.attach.get(index).ok_or(Errno::EPROTO)?;
+        let offset = index.saturating_mul(8);
+        let handle = attachment.handle.to_le_bytes();
+        let mask = attachment.rights_mask.to_le_bytes();
+        let handle_destination = pairs
+            .get_mut(offset..offset.saturating_add(4))
+            .ok_or(Errno::EPROTO)?;
+        handle_destination.copy_from_slice(&handle);
+        let mask_destination = pairs
+            .get_mut(offset.saturating_add(4)..offset.saturating_add(8))
+            .ok_or(Errno::EPROTO)?;
+        mask_destination.copy_from_slice(&mask);
+        index = index.saturating_add(1);
+    }
+    let destination = start.checked_add(data_len).ok_or(Errno::E2BIG)?;
+    let length = usize::try_from(pairs_len).map_err(|_| Errno::E2BIG)?;
+    copy_to_user(
+        UserSlice::new(destination, pairs_len)?,
+        pairs.get(..length).ok_or(Errno::EPROTO)?,
+    )
+}
+
+fn rollback_attachments(client: &Arc<Process>, installed: &[Option<Handle>; 4]) {
+    let mut handles = client.handles.lock();
+    for handle in installed.iter().flatten() {
+        let _ = handles.close(*handle);
+    }
 }
 
 fn deliver(

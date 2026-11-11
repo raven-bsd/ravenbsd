@@ -18,7 +18,7 @@ use super::SchemeServer;
 static REGISTRY: Mutex<BTreeMap<String, Arc<SchemeServer>>> = Mutex::new(BTreeMap::new());
 
 /// Register `name` for `process`.
-pub fn register(process: &Arc<Process>, name: &str) -> Result<(), Errno> {
+pub fn register(process: &Arc<Process>, name: &str) -> Result<Arc<SchemeServer>, Errno> {
     let mut registry = REGISTRY.lock();
     if let Some(existing) = registry.get(name) {
         if existing.is_live() {
@@ -33,8 +33,8 @@ pub fn register(process: &Arc<Process>, name: &str) -> Result<(), Errno> {
     });
     process.schemes.lock().push(Arc::clone(&server));
     process.namespace.lock().add(name);
-    registry.insert(name.to_string(), server);
-    Ok(())
+    registry.insert(name.to_string(), Arc::clone(&server));
+    Ok(server)
 }
 
 /// Resolve `name` for `process`, enforcing the process namespace.

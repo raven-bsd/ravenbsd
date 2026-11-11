@@ -5,17 +5,46 @@
 .Os RavenBSD
 .Sh NAME
 .Nm send
-.Nd server
+.Nd send a scheme-server reply
 .Sh SYNOPSIS
 See the
 .Pa raven-abi
 crate (syscall number 0x69).
 .Sh DESCRIPTION
-The .Nm system call is part of the scheme IPC protocol (see
-.Xr scheme 7
-and
-.Pa architecture/03-system-servers.md ).
-It is implemented by ticket S11; this page is the contract placeholder and will be completed
-when S11 lands.
+.Nm
+completes a request returned by
+.Xr recv 2 .
+The reply packet is version 1 and has an appended attachment tail:
+.Bd -literal -offset indent
+u32 attach_count
+struct { u32 handle; u32 rights_mask; } attach[attach_count]
+.Ed
+.Pp
+All fields are little-endian.  At most four attachments are accepted.
+Each
+.Va handle
+is looked up in the replying server's table and must carry
+.Dv TRANSFER .
+The kernel installs a duplicate in the requesting client's table with rights equal to the server
+handle rights intersected with
+.Va rights_mask .
+A zero mask means all current source rights.
+.Pp
+For replies other than the
+.Dv REPLY_HANDLE
+form of
+.Xr open 2 ,
+the client reply buffer contains the inline data bytes followed immediately by
+.Va attach_count
+little-endian pairs of the client-table handle and the original rights mask.
+The caller must reserve eight bytes per attachment after the data.
+For a read reply, the data length is the reply's
+.Va buffer_len ;
+for Call and Fstat replies it is the inline
+.Va data_len .
+.Pp
+The kernel validates every attachment before taking the client handle-table lock.
+If destination insertion or reply-buffer delivery fails, it removes any attachments already
+installed for that reply.
 .Sh STANDARDS
 RavenBSD ABI v1.

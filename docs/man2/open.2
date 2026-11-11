@@ -11,11 +11,24 @@ See the
 .Pa raven-abi
 crate (syscall number 0x61).
 .Sh DESCRIPTION
-The .Nm system call is part of the scheme IPC protocol (see
-.Xr scheme 7
-and
-.Pa architecture/03-system-servers.md ).
-It is implemented by ticket S11; this page is the contract placeholder and will be completed
-when S11 lands.
+.Nm
+routes a path of the form
+.Dq scheme:suffix
+to the server registered for
+.Va scheme .
+Normally a successful reply creates and returns a new SchemeFile handle.
+.Pp
+A server may instead set the reply flag
+.Dv REPLY_HANDLE
+and provide exactly one attachment (see
+.Xr send 2 ) .
+In that form,
+.Nm
+returns the transferred client-table attachment directly and discards the provisional SchemeFile
+handle.  Subsequent operations apply to the returned object; they are not routed through the
+opening scheme server.
+.Pp
+The attachment must be transferable by the replying server.  Its rights are reduced by the
+attachment rights mask, with a zero mask retaining all of the server's current rights.
 .Sh STANDARDS
 RavenBSD ABI v1.
