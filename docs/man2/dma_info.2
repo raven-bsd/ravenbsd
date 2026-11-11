@@ -1,21 +1,44 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt DMA_INFO 2
 .Os RavenBSD
 .Sh NAME
 .Nm dma_info
-.Nd describes a DMA buffer
+.Nd describe a DMA buffer
 .Sh SYNOPSIS
-See the
-.Pa raven-abi
-crate (syscall number 0x73).
+.Fn dma_info h out
 .Sh DESCRIPTION
-The
-.Nm
-system call is part of RavenBSD ABI v1. It is implemented by ticket S21b; this page is the contract placeholder and will be
-completed when S21b lands. The authoritative signature is the doc comment of the syscall in the
-.Pa raven-abi
-crate.
+.Nm fills the
+.Em DmaInfo
+record
+.Sy { bus_addr: u64, len: u64, flags: u32, _pad: u32 }
+for the DMA buffer handle
+.Fa h :
+.Bl -tag -width Ds
+.It Fa bus_addr
+The bus address of the first byte (physical address plus the device domain's
+offset; the identity domain has offset 0).
+.It Fa len
+The allocation length in bytes.
+.It Fa flags
+Bit 0
+.Dv UNPROTECTED :
+set on every buffer while no IOMMU domain protects the device (always,
+today).  The kernel never claims DMA isolation.
+.El
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EBADF
+.Fa h
+is not a DMA buffer handle.
+.It Er EACCES
+The handle lacks the
+.Dv READ
+right.
+.It Er EFAULT
+.Fa out
+is not writable user memory.
+.El
 .Sh STANDARDS
 RavenBSD ABI v1.

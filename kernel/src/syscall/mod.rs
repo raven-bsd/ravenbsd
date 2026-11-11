@@ -64,6 +64,8 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
         Some(Syscall::HANDLE_TRANSFER) => handle_xfer::transfer(frame),
         #[cfg(target_arch = "x86_64")]
         Some(call @ (Syscall::MMIO_CREATE | Syscall::BOOT_BLOB)) => driver::dispatch(call, frame),
+        #[cfg(target_arch = "x86_64")]
+        Some(call @ (Syscall::DMA_ALLOC | Syscall::DMA_INFO)) => driver::dispatch(call, frame),
         Some(
             call @ (Syscall::EVQ_CREATE
             | Syscall::EVQ_CTL

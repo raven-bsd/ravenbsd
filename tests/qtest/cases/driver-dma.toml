@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "driver-dma"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/s21-edu/build.sh"]
+initfs = "build/fixtures/s21-edu/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s21-framecheck=1"
+qemu_extra = ["-device", "edu"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^s21: dma ok bus=0x[0-9a-f]+ len=1048576$'
+
+[[expect]]
+regex = '^s21: dma roundtrip ok$'
+
+[[expect]]
+regex = '^s21: dma negatives ok$'
+
+[[expect]]
+regex = '^s21: frames free=\d+$'
+
+[[expect]]
+regex = '^s21: frames free=\d+$'
+
+[[expect]]
+regex = '^s21: frames free=\d+$'
+
+[[expect]]
+regex = '^s21: dma leak ok$'
+
+[[forbid]]
+regex = '(?i)panic'

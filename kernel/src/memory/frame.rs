@@ -179,6 +179,17 @@ pub fn alloc_zeroed_frame() -> Option<PhysAddr> {
     Some(phys)
 }
 
+/// Allocate `pages` contiguous frames whose first frame is `align_pages`-aligned and whose last
+/// frame is below `max_frame` (the DMA mask expressed in frame numbers).
+pub fn alloc_contiguous(pages: u64, align_pages: u64, max_frame: u64) -> Option<PhysAddr> {
+    let mut state = ALLOCATOR.lock();
+    let state = state.as_mut()?;
+    state
+        .allocator
+        .alloc_contiguous_bounded(pages, align_pages, max_frame)
+        .map(|frame| PhysAddr(frame.saturating_mul(PAGE_SIZE)))
+}
+
 /// Free one frame.
 pub fn free_frame(phys: PhysAddr) -> Result<(), FreeError> {
     if !phys.0.is_multiple_of(PAGE_SIZE) {

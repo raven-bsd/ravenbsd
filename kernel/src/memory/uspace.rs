@@ -52,12 +52,24 @@ impl MmioMapping {
     }
 }
 
+/// One DMA-buffer mapping: the frames are owned by the buffer object, which the mapping keeps
+/// alive until it is unmapped.
+#[cfg(target_arch = "x86_64")]
+struct DmaMapping {
+    start: u64,
+    len: u64,
+    offset: u64,
+    buffer: Arc<crate::driver::DmaBuffer>,
+}
+
 /// A user address space: page tables, VMAs and memory-object ownership.
 pub struct UserAddressSpace {
     aspace: AddressSpace,
     vmas: Vmas,
     objects: Vec<ObjectMapping>,
     mmio: Vec<MmioMapping>,
+    #[cfg(target_arch = "x86_64")]
+    dma: Vec<DmaMapping>,
 }
 
 impl UserAddressSpace {
@@ -68,6 +80,8 @@ impl UserAddressSpace {
             vmas: Vmas::new(USER_MIN..USER_END),
             objects: Vec::new(),
             mmio: Vec::new(),
+            #[cfg(target_arch = "x86_64")]
+            dma: Vec::new(),
         }
     }
 
@@ -318,6 +332,88 @@ impl UserAddressSpace {
         Ok(())
     }
 
+    /// Map a DMA buffer at `offset` for `len` bytes.
+    ///
+    /// The frames are owned by the buffer object; the mapping keeps the buffer alive and unmapping
+    /// never returns the frames to the frame allocator. Cached write-back is used unless the
+    /// buffer was created with the non-cacheable flag.
+    #[cfg(target_arch = "x86_64")]
+    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S21b DMA mappings are x86-64.
+    pub fn map_dma(
+        &mut self,
+        vaddr: u64,
+        len: u64,
+        offset: u64,
+        writable: bool,
+        non_cacheable: bool,
+        buffer: Arc<crate::driver::DmaBuffer>,
+    ) -> Result<(), Errno> {
+        if len == 0 || !vaddr.is_multiple_of(PAGE_SIZE) || !offset.is_multiple_of(PAGE_SIZE) {
+            return Err(Errno::EINVAL);
+        }
+        let end = offset.checked_add(len).ok_or(Errno::EINVAL)?;
+        if end > buffer.len() {
+            return Err(Errno::EINVAL);
+        }
+        let protection = if writable {
+            (prot::READ | prot::WRITE) as u8
+        } else {
+            prot::READ as u8
+        };
+        self.vmas
+            .insert(vaddr, len, protection, Backing::Anonymous)
+            .map_err(vma_errno)?;
+        let pages = pages_in(len)?;
+        let mut flags = if writable {
+            PageFlags::user_rw()
+        } else {
+            PageFlags::user_ro()
+        };
+        if non_cacheable {
+            flags = flags.union(PageFlags::mmio_attribute());
+        }
+        let mut mapped = 0u64;
+        let mut failure = None;
+        if let Ok(mut mapper) = self.aspace.mapper() {
+            let mut page = 0u64;
+            while page < pages {
+                let Some(virt) =
+                    VirtAddr::new(vaddr.saturating_add(page.saturating_mul(PAGE_SIZE)))
+                else {
+                    failure = Some(Errno::EINVAL);
+                    break;
+                };
+                let Some(physical) = buffer.frame_at((offset / PAGE_SIZE).saturating_add(page))
+                else {
+                    failure = Some(Errno::EINVAL);
+                    break;
+                };
+                match mapper.map(virt, PhysAddr(physical), flags, PageSize::Size4K) {
+                    Ok(()) => mapped = mapped.saturating_add(1),
+                    Err(error) => {
+                        failure = Some(map_errno(error));
+                        break;
+                    }
+                }
+                page = page.saturating_add(1);
+            }
+        } else {
+            failure = Some(Errno::ENOMEM);
+        }
+        if let Some(error) = failure {
+            self.rollback_foreign(vaddr, mapped);
+            let _ = self.vmas.remove(vaddr, len);
+            return Err(error);
+        }
+        self.dma.push(DmaMapping {
+            start: vaddr,
+            len,
+            offset,
+            buffer,
+        });
+        Ok(())
+    }
+
     /// Remove a fully mapped range, splitting VMAs and releasing object references.
     pub fn unmap(&mut self, start: u64, len: u64) -> Result<(), Errno> {
         if len == 0 || !start.is_multiple_of(PAGE_SIZE) || !len.is_multiple_of(PAGE_SIZE) {
@@ -328,6 +424,14 @@ impl UserAddressSpace {
         }
         let pages = pages_in(len)?;
         let mmio = self.mmio.clone();
+        #[cfg(target_arch = "x86_64")]
+        let dma = self
+            .dma
+            .iter()
+            .map(|mapping| (mapping.start, mapping.len))
+            .collect::<Vec<_>>();
+        #[cfg(not(target_arch = "x86_64"))]
+        let dma = Vec::<(u64, u64)>::new();
         let mut to_free: Vec<u64> = Vec::with_capacity(usize::try_from(pages).unwrap_or(0));
         {
             let mut mapper = self.aspace.mapper().map_err(map_errno)?;
@@ -343,8 +447,13 @@ impl UserAddressSpace {
                     return Err(Errno::EINVAL);
                 };
                 let vma = self.vmas.find(virt.data()).ok_or(Errno::EINVAL)?;
-                let owns = !mmio.iter().any(|m| m.contains(virt.data()))
-                    && page_owned(vma, &self.objects, virt.data(), physical.0);
+                let in_device_range = mmio.iter().any(|m| m.contains(virt.data()))
+                    || dma.iter().any(|(map_start, map_len)| {
+                        virt.data() >= *map_start
+                            && virt.data() < map_start.saturating_add(*map_len)
+                    });
+                let owns =
+                    !in_device_range && page_owned(vma, &self.objects, virt.data(), physical.0);
                 owned.push((virt, physical.0, owns));
                 page = page.saturating_add(1);
             }
@@ -358,6 +467,8 @@ impl UserAddressSpace {
         self.vmas.remove(start, len).map_err(vma_errno)?;
         self.remove_object_range(start, len);
         self.remove_mmio_range(start, len);
+        #[cfg(target_arch = "x86_64")]
+        self.remove_dma_range(start, len);
         // Do not recycle frames until every CPU has dropped its translation: a stale TLB entry
         // could otherwise reach a frame that was already handed to another address space.
         let flushed = crate::sched::smp::shootdown::flush_range(start, len);
@@ -519,6 +630,14 @@ impl UserAddressSpace {
         let vmas: Vec<Vma> = self.vmas.iter().copied().collect();
         let objects = self.objects.clone();
         let mmio = self.mmio.clone();
+        #[cfg(target_arch = "x86_64")]
+        let dma = self
+            .dma
+            .iter()
+            .map(|mapping| (mapping.start, mapping.len))
+            .collect::<Vec<_>>();
+        #[cfg(not(target_arch = "x86_64"))]
+        let dma = Vec::<(u64, u64)>::new();
         if let Ok(mut mapper) = self.aspace.mapper() {
             for vma in vmas {
                 let pages = pages_in(vma.len()).unwrap_or(0);
@@ -528,8 +647,12 @@ impl UserAddressSpace {
                     let Some(virt) = VirtAddr::new(address) else {
                         break;
                     };
+                    let in_device_range = mmio.iter().any(|mapping| mapping.contains(address))
+                        || dma.iter().any(|(map_start, map_len)| {
+                            address >= *map_start && address < map_start.saturating_add(*map_len)
+                        });
                     if let Some((physical, _, _)) = mapper.translate(virt)
-                        && !mmio.iter().any(|mapping| mapping.contains(address))
+                        && !in_device_range
                         && page_owned(vma, &objects, address, physical.0)
                     {
                         let _ = frame::free_frame(frame::PhysAddr(physical.0));
@@ -541,6 +664,8 @@ impl UserAddressSpace {
         self.vmas = Vmas::new(USER_MIN..USER_END);
         self.objects.clear();
         self.mmio.clear();
+        #[cfg(target_arch = "x86_64")]
+        self.dma.clear();
     }
 
     /// Release an address space that is currently active: free its data frames, switch back to the
@@ -642,6 +767,38 @@ impl UserAddressSpace {
             }
         }
         self.mmio = next;
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    fn remove_dma_range(&mut self, start: u64, len: u64) {
+        let end = start.saturating_add(len);
+        let mut next = Vec::with_capacity(self.dma.len().saturating_add(2));
+        for mapping in self.dma.drain(..) {
+            let mapping_end = mapping.start.saturating_add(mapping.len);
+            if mapping_end <= start || mapping.start >= end {
+                next.push(mapping);
+                continue;
+            }
+            if mapping.start < start {
+                next.push(DmaMapping {
+                    start: mapping.start,
+                    len: start.saturating_sub(mapping.start),
+                    offset: mapping.offset,
+                    buffer: Arc::clone(&mapping.buffer),
+                });
+            }
+            if mapping_end > end {
+                next.push(DmaMapping {
+                    start: end,
+                    len: mapping_end.saturating_sub(end),
+                    offset: mapping
+                        .offset
+                        .saturating_add(end.saturating_sub(mapping.start)),
+                    buffer: mapping.buffer,
+                });
+            }
+        }
+        self.dma = next;
     }
 }
 

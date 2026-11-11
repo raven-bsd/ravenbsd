@@ -94,6 +94,9 @@ pub struct Process {
     pub threads: AtomicU32,
     /// Number of timer objects created by this process and still alive.
     pub timer_count: Arc<AtomicU32>,
+    /// Bytes of DMA buffers created by this process and still alive.
+    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S21b DMA syscalls are x86-64.
+    pub dma_bytes: Arc<AtomicU64>,
     /// Lifecycle state, guarded so `PROC_WAIT` cannot lose an exit wakeup.
     pub state: Mutex<ProcessState>,
     /// Threads blocked in `PROC_WAIT` on this process.
@@ -175,6 +178,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
         timer_count: Arc::new(AtomicU32::new(0)),
+        dma_bytes: Arc::new(AtomicU64::new(0)),
         state: Mutex::new(ProcessState::Running),
         waiters: WaitQueue::new(),
         #[cfg(target_arch = "x86_64")]
@@ -212,6 +216,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
         timer_count: Arc::new(AtomicU32::new(0)),
+        dma_bytes: Arc::new(AtomicU64::new(0)),
         state: Mutex::new(ProcessState::Created),
         waiters: WaitQueue::new(),
         #[cfg(target_arch = "x86_64")]
@@ -286,6 +291,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
         timer_count: Arc::new(AtomicU32::new(0)),
+        dma_bytes: Arc::new(AtomicU64::new(0)),
         state: Mutex::new(ProcessState::Running),
         waiters: WaitQueue::new(),
         #[cfg(target_arch = "x86_64")]
@@ -665,6 +671,10 @@ pub fn notify_exit(code: i32) {
     if let Some(address_space) = address_space {
         address_space.release();
     }
+    // A dead process can no longer call syscalls: drop its handle table so DMA buffers and
+    // every other object release their resources even while a last reference to the process
+    // survives elsewhere (for example on the abandoned stack of its dead thread).
+    *process.handles.lock() = HandleTable::new();
     if process.id == 1 {
         kprintln!("init exited ({code})");
         if crate::log::test_exit() {
@@ -687,6 +697,14 @@ pub fn notify_exit(code: i32) {
         .is_some()
     {
         kprintln!("s25: exit handles={}", process.handles.lock().len());
+    }
+    // S21b DMA leak evidence: the free-frame count after every child exit. Consecutive exits
+    // print the same number when allocation and release are balanced.
+    if CmdLine::parse(paging::cmdline())
+        .get("s21-framecheck")
+        .is_some()
+    {
+        kprintln!("s21: frames free={}", frame::stats().free_bytes);
     }
 }
 

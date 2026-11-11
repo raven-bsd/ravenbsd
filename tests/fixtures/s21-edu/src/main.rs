@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! S21a `/init` fixture: driver objects, the ECAM window, the edu device and the negative matrix.
+//! S21a/S21b `/init` fixture: driver objects, the ECAM window, the edu device, DMA buffers and
+//! the negative matrix.
 //!
 //! The controller holds `Handle::ROOT_DEVICE` (handle 3). It reads the ECAM base from the ACPI
-//! blob, maps it through `MMIO_CREATE`, finds the q35 host bridge (`8086:29c0`) and the `edu`
-//! device (`1234:11e8`), reads its BAR0 and checks the identification register, then runs the
-//! negative cases.
+//! blob, finds the q35 host bridge and the `edu` device, runs a DMA round trip through the edu
+//! DMA engine against a 1 MiB buffer with a 28-bit mask, then the negative cases and the leak
+//! test (children spawned with a reduced root capability).
 
 #![no_std]
 #![no_main]
@@ -14,16 +15,25 @@
 use core::arch::asm;
 
 use raven_abi::errno::Errno;
+use raven_abi::layout::x86_64::{USER_END, USER_MIN};
 use raven_abi::syscall::Syscall;
 use raven_abi::types::{Handle, Rights, map, prot};
+use raven_elf::{Elf, LoadMode, Machine, StepKind, plan_load};
+use raven_initfs::Initfs;
 use raven_rt::entry;
 use raven_rt::println;
 
 entry!(main);
 
 const PAGE: usize = 4096;
+const INITFS_BASE: usize = 0x1000_0000;
+const STACK_SCRATCH: usize = 0x2000_0000;
+const STACK_SIZE: usize = 64 * 1024;
+const STACK_TOP: usize = (USER_END as usize) - PAGE;
+const STACK_BASE: usize = STACK_TOP - STACK_SIZE;
 const ECAM_BUS_BYTES: u64 = 1 << 20;
 const ECAM_DEVICE_STRIDE: usize = 0x8000;
+const MIB: u64 = 1 << 20;
 
 const BLOB_MAGIC: u32 = 0x3143_4152;
 const BLOB_HEADER: usize = 24;
@@ -37,6 +47,29 @@ const EDU_VENDOR: u16 = 0x1234;
 const EDU_DEVICE: u16 = 0x11e8;
 const Q35_VENDOR: u16 = 0x8086;
 const Q35_DEVICE: u16 = 0x29c0;
+
+/// edu DMA registers and device buffer.
+const EDU_DMA_SRC: usize = 0x80;
+const EDU_DMA_DST: usize = 0x88;
+const EDU_DMA_CNT: usize = 0x90;
+const EDU_DMA_CMD: usize = 0x98;
+const EDU_BUFFER: u32 = 0x40000;
+/// Bytes transferred per direction. QEMU 6.2 rejects a range that ends exactly at the device
+/// buffer limit, so stay one page below the 4096-byte buffer.
+const EDU_DMA_COUNT: u32 = 2048;
+const EDU_CMD_RUN: u32 = 1;
+const EDU_CMD_FROM: u32 = 2;
+
+const DMA_FLAG_NON_CACHEABLE: u32 = 1;
+const DMA_INFO_UNPROTECTED: u32 = 1;
+
+#[repr(C)]
+struct DmaInfo {
+    bus_addr: u64,
+    len: u64,
+    flags: u32,
+    pad: u32,
+}
 
 #[inline(always)]
 unsafe fn syscall6(
@@ -105,6 +138,10 @@ fn exit(code: i32) -> ! {
     }
 }
 
+fn yield_now() {
+    let _ = syscall1(Syscall::YIELD as usize, 0);
+}
+
 fn mmio_create(root: Handle, phys: u64, len: usize, attrs: u32) -> Result<Handle, Errno> {
     handle(unsafe {
         syscall6(
@@ -125,6 +162,35 @@ fn boot_blob(root: Handle, kind: u32) -> Result<Handle, Errno> {
         root.0 as usize,
         kind as usize,
     ))
+}
+
+fn dma_alloc(
+    root: Handle,
+    len: usize,
+    align: usize,
+    mask_bits: u32,
+    flags: u32,
+) -> Result<Handle, Errno> {
+    handle(unsafe {
+        syscall6(
+            Syscall::DMA_ALLOC as usize,
+            root.0 as usize,
+            len,
+            align,
+            mask_bits as usize,
+            flags as usize,
+            0,
+        )
+    })
+}
+
+fn dma_info(buffer: Handle, out: &mut DmaInfo) -> Result<(), Errno> {
+    result(syscall2(
+        Syscall::DMA_INFO as usize,
+        buffer.0 as usize,
+        (out as *mut DmaInfo) as usize,
+    ))
+    .map(|_| ())
 }
 
 fn map_memory(
@@ -177,6 +243,44 @@ fn proc_create() -> Result<Handle, Errno> {
     handle(syscall1(Syscall::PROC_CREATE as usize, 0))
 }
 
+fn memobj_create(len: usize) -> Result<Handle, Errno> {
+    handle(syscall2(Syscall::MEMOBJ_CREATE as usize, len, 0))
+}
+
+fn unmap(process: Handle, address: usize, len: usize) -> Result<(), Errno> {
+    result(syscall3(
+        Syscall::UNMAP as usize,
+        process.0 as usize,
+        address,
+        len,
+    ))
+    .map(|_| ())
+}
+
+fn thread_create(process: Handle, entry: usize, stack: usize) -> Result<Handle, Errno> {
+    handle(unsafe {
+        syscall6(
+            Syscall::THREAD_CREATE as usize,
+            process.0 as usize,
+            entry,
+            stack,
+            stack,
+            0,
+            0,
+        )
+    })
+}
+
+fn proc_wait(process: Handle) -> Result<i32, Errno> {
+    let mut code = -1i32;
+    result(syscall2(
+        Syscall::PROC_WAIT as usize,
+        process.0 as usize,
+        &mut code as *mut i32 as usize,
+    ))?;
+    Ok(code)
+}
+
 fn read_u16(address: usize) -> u16 {
     // SAFETY: the fixture reads its own device mappings, which the kernel mapped read/write.
     u16::from_le(unsafe { (address as *const u16).read_unaligned() })
@@ -192,13 +296,38 @@ fn read_u64(address: usize) -> u64 {
     u64::from_le(unsafe { (address as *const u64).read_unaligned() })
 }
 
-fn main(_args: raven_rt::Args) -> i32 {
+fn write_u32(address: usize, value: u32) {
+    // SAFETY: the fixture writes its own device mappings, which the kernel mapped read/write.
+    unsafe { (address as *mut u32).write_unaligned(value.to_le()) }
+}
+
+/// The child role selected by `argv[1]`: the leak test children only run this path.
+fn child_main(role: &str) -> i32 {
+    match role {
+        "clean" => 0,
+        "holder" => {
+            // The transferred root capability lives at handle 3 in the child.
+            match dma_alloc(Handle::new(3, 0), MIB as usize, 0, 28, 0) {
+                Ok(_) => 0,
+                Err(_) => 1,
+            }
+        }
+        _ => 2,
+    }
+}
+
+fn main(args: raven_rt::Args) -> i32 {
+    if let Some(role) = args.get(1) {
+        return child_main(role);
+    }
+
     let root = Handle::ROOT_DEVICE;
     let admin = match handle_dup(root, Rights::ADMIN.union(Rights::DUP).0) {
         Ok(handle) => handle,
         Err(_) => fail("root dup"),
     };
 
+    // Part 1: ACPI blob, ECAM, edu identification.
     let acpi_blob = match boot_blob(admin, BLOB_ACPI) {
         Ok(blob) => blob,
         Err(_) => fail("acpi blob"),
@@ -338,7 +467,330 @@ fn main(_args: raven_rt::Args) -> i32 {
         fail(message);
     }
     println!("s21: negatives ok");
+
+    // Part 2: DMA buffers.
+    if let Err(message) = dma_part(admin, edu) {
+        fail(message);
+    }
+
+    // Leak test: 200 balanced cycles, then clean/holder/clean children. The kernel prints
+    // `s21: frames free=` on every child exit (s21-framecheck cmdline).
+    let image = match map_initfs_image() {
+        Ok(image) => image,
+        Err(_) => fail("initfs map"),
+    };
+    let initfs = match Initfs::parse(image) {
+        Ok(initfs) => initfs,
+        Err(_) => fail("initfs parse"),
+    };
+    let mut cycle = 0usize;
+    while cycle < 200 {
+        match dma_alloc(root, MIB as usize, 0, 28, 0) {
+            Ok(buffer) => handle_close(buffer),
+            Err(_) => fail("cycle alloc"),
+        }
+        cycle = cycle.saturating_add(1);
+    }
+    // Spawn, wait and close one child at a time so that each exit's frame print reflects the
+    // previous child's released buffers.
+    let mut ok = true;
+    for (role, name) in [
+        ("clean", "clean0"),
+        ("holder", "holder"),
+        ("clean", "clean1"),
+    ] {
+        let child = match spawn_role(&initfs, root, role) {
+            Ok(child) => child,
+            Err(_) => {
+                println!("s21: failed spawn {name}");
+                ok = false;
+                break;
+            }
+        };
+        let code = match proc_wait(child) {
+            Ok(code) => code,
+            Err(_) => {
+                ok = false;
+                break;
+            }
+        };
+        if code != 0 {
+            println!("s21: failed {name} exit={}", code);
+            ok = false;
+            break;
+        }
+        handle_close(child);
+    }
+    if !ok {
+        return 62;
+    }
+    println!("s21: dma leak ok");
     0
+}
+
+fn dma_part(admin: Handle, edu: usize) -> Result<(), &'static str> {
+    let buffer = dma_alloc(admin, MIB as usize, 0, 28, 0).map_err(|_| "dma alloc")?;
+    let mut info = DmaInfo {
+        bus_addr: 0,
+        len: 0,
+        flags: 0,
+        pad: 0,
+    };
+    dma_info(buffer, &mut info).map_err(|_| "dma info")?;
+    if info.len != MIB || info.flags & DMA_INFO_UNPROTECTED == 0 {
+        return Err("dma info fields");
+    }
+    let pointer = map_memory(
+        Handle::SELF_PROC,
+        buffer,
+        0,
+        0,
+        MIB as usize,
+        map::pack(prot::READ | prot::WRITE, 0),
+    )
+    .map_err(|_| "dma map")?;
+    // SAFETY: the kernel mapped the 1 MiB DMA buffer read/write at `pointer`.
+    let bytes = unsafe { core::slice::from_raw_parts_mut(pointer as *mut u8, MIB as usize) };
+    let mut i = 0usize;
+    while i < bytes.len() {
+        *bytes.get_mut(i).ok_or("dma pattern")? = (i as u8).wrapping_mul(31).wrapping_add(7);
+        i = i.saturating_add(1);
+    }
+    println!("s21: dma ok bus={:#x} len={}", info.bus_addr, info.len);
+
+    // RAM -> edu (cmd 1): the device reads the first EDU_DMA_COUNT bytes from the bus address.
+    write_u32(edu + EDU_DMA_SRC, info.bus_addr as u32);
+    write_u32(edu + EDU_DMA_DST, EDU_BUFFER);
+    write_u32(edu + EDU_DMA_CNT, EDU_DMA_COUNT);
+    write_u32(edu + EDU_DMA_CMD, EDU_CMD_RUN);
+    if !dma_poll(edu) {
+        return Err("dma to device timeout");
+    }
+    // Clear the copied region, then edu -> RAM (cmd 3) must restore the pattern.
+    let mut i = 0usize;
+    while i < EDU_DMA_COUNT as usize {
+        *bytes.get_mut(i).ok_or("dma clear")? = 0;
+        i = i.saturating_add(1);
+    }
+    write_u32(edu + EDU_DMA_SRC, EDU_BUFFER);
+    write_u32(edu + EDU_DMA_DST, info.bus_addr as u32);
+    write_u32(edu + EDU_DMA_CNT, EDU_DMA_COUNT);
+    write_u32(edu + EDU_DMA_CMD, EDU_CMD_RUN | EDU_CMD_FROM);
+    if !dma_poll(edu) {
+        return Err("dma from device timeout");
+    }
+    let mut i = 0usize;
+    while i < EDU_DMA_COUNT as usize {
+        let expected = (i as u8).wrapping_mul(31).wrapping_add(7);
+        if *bytes.get(i).ok_or("dma verify")? != expected {
+            return Err("dma data mismatch");
+        }
+        i = i.saturating_add(1);
+    }
+    println!("s21: dma roundtrip ok");
+    unmap(Handle::SELF_PROC, pointer, MIB as usize).map_err(|_| "dma unmap")?;
+    handle_close(buffer);
+
+    // Negatives.
+    let no_admin = handle_dup(Handle::ROOT_DEVICE, Rights::DUP.0).map_err(|_| "dup rights")?;
+    if dma_alloc(no_admin, PAGE, 0, 32, 0) != Err(Errno::EPERM) {
+        return Err("dma without capability accepted");
+    }
+    if dma_alloc(admin, 0, 0, 32, 0) != Err(Errno::EINVAL) {
+        return Err("zero len accepted");
+    }
+    if dma_alloc(admin, PAGE + 1, 0, 32, 0) != Err(Errno::EINVAL) {
+        return Err("misaligned len accepted");
+    }
+    if dma_alloc(admin, PAGE, 0x3000, 32, 0) != Err(Errno::EINVAL) {
+        return Err("non power of two align accepted");
+    }
+    if dma_alloc(admin, PAGE, 0x800, 32, 0) != Err(Errno::EINVAL) {
+        return Err("sub-page align accepted");
+    }
+    if dma_alloc(admin, PAGE, 0, 19, 0) != Err(Errno::EINVAL) {
+        return Err("low mask accepted");
+    }
+    if dma_alloc(admin, PAGE, 0, 65, 0) != Err(Errno::EINVAL) {
+        return Err("high mask accepted");
+    }
+    if dma_alloc(admin, PAGE, 0, 32, 0x2) != Err(Errno::EINVAL) {
+        return Err("unknown flags accepted");
+    }
+    // A 28-bit mask cannot hold 2 MiB.
+    if dma_alloc(admin, 2 * MIB as usize, 0, 20, 0) != Err(Errno::ENOMEM) {
+        return Err("above-mask allocation accepted");
+    }
+    // The per-process budget (64 MiB) is enforced.
+    let first = dma_alloc(admin, 32 * MIB as usize, 0, 32, 0).map_err(|_| "limit a")?;
+    let second = dma_alloc(admin, 32 * MIB as usize, 0, 32, 0).map_err(|_| "limit b")?;
+    if dma_alloc(admin, PAGE, 0, 32, 0) != Err(Errno::ENOMEM) {
+        return Err("per-process limit accepted");
+    }
+    handle_close(first);
+    handle_close(second);
+    let small = dma_alloc(admin, PAGE, 0, 32, 0).map_err(|_| "limit released")?;
+    handle_close(small);
+    // Non-cacheable buffers round trip through the CPU mapping.
+    let uncached = dma_alloc(admin, PAGE, 0, 32, DMA_FLAG_NON_CACHEABLE).map_err(|_| "uncached")?;
+    let uncached_ptr = map_memory(
+        Handle::SELF_PROC,
+        uncached,
+        0,
+        0,
+        PAGE,
+        map::pack(prot::READ | prot::WRITE, 0),
+    )
+    .map_err(|_| "uncached map")?;
+    // SAFETY: the kernel mapped one page read/write at `uncached_ptr`.
+    unsafe { (uncached_ptr as *mut u32).write_unaligned(0xDEAD_BEEF) };
+    // SAFETY: the kernel mapped one page read/write at `uncached_ptr`.
+    if unsafe { (uncached_ptr as *const u32).read_unaligned() } != 0xDEAD_BEEF {
+        return Err("uncached roundtrip");
+    }
+    unmap(Handle::SELF_PROC, uncached_ptr, PAGE).map_err(|_| "uncached unmap")?;
+    handle_close(uncached);
+    // DMA_INFO requires a DMA buffer handle: the read-only Namespace handle is not one.
+    let mut info = DmaInfo {
+        bus_addr: 0,
+        len: 0,
+        flags: 0,
+        pad: 0,
+    };
+    if dma_info(Handle::new(2, 0), &mut info) != Err(Errno::EBADF) {
+        return Err("dma_info on non-buffer accepted");
+    }
+    println!("s21: dma negatives ok");
+    Ok(())
+}
+
+fn dma_poll(edu: usize) -> bool {
+    let mut spins = 0usize;
+    while read_u32(edu + EDU_DMA_CMD) & EDU_CMD_RUN != 0 {
+        spins = spins.saturating_add(1);
+        if spins > 10_000_000 {
+            return false;
+        }
+        yield_now();
+    }
+    true
+}
+
+fn map_initfs_image() -> Result<&'static [u8], Errno> {
+    let page = map_memory(Handle::SELF_PROC, Handle::INITFS, 0, 0, PAGE, prot::READ)?;
+    // SAFETY: the mapping is one readable page; the initfs header stores total_size at byte 40.
+    let total = unsafe { ((page + 40) as *const u64).read_unaligned() as usize };
+    let _ = unmap(Handle::SELF_PROC, page, PAGE);
+    if total == 0 || !total.is_multiple_of(PAGE) {
+        return Err(Errno::EINVAL);
+    }
+    let base = map_memory(
+        Handle::SELF_PROC,
+        Handle::INITFS,
+        0,
+        INITFS_BASE,
+        total,
+        map::pack(prot::READ, map::FIXED),
+    )?;
+    // SAFETY: the kernel mapped the validated initfs bytes at `base` for `total` bytes.
+    Ok(unsafe { core::slice::from_raw_parts(base as *const u8, total) })
+}
+
+/// Spawn a child running this binary with `argv[1] = role` and a reduced root capability.
+fn spawn_role(initfs: &Initfs<'_>, root: Handle, role: &str) -> Result<Handle, Errno> {
+    let entry = initfs.get("/init").ok_or(Errno::ENOENT)?;
+    let elf =
+        Elf::parse(entry.data, Machine::X86_64, USER_MIN..USER_END).map_err(|_| Errno::EINVAL)?;
+    let child = proc_create()?;
+    let steps = plan_load(&elf, PAGE as u64, LoadMode::Strict).map_err(|_| Errno::EINVAL)?;
+    for step in steps {
+        let flags = map::pack(step.prot as usize, map::FIXED);
+        match step.kind {
+            StepKind::File { offset } => {
+                let offset = entry.data_offset.checked_add(offset).ok_or(Errno::EINVAL)?;
+                let offset = usize::try_from(offset).map_err(|_| Errno::EINVAL)?;
+                map_memory(
+                    child,
+                    Handle::INITFS,
+                    offset,
+                    step.vaddr as usize,
+                    step.len as usize,
+                    flags,
+                )?;
+            }
+            StepKind::Zero => {
+                map_memory(
+                    child,
+                    Handle::NONE,
+                    0,
+                    step.vaddr as usize,
+                    step.len as usize,
+                    flags,
+                )?;
+            }
+            StepKind::CopyTail { .. } => return Err(Errno::EINVAL),
+        }
+    }
+    let stack = memobj_create(STACK_SIZE)?;
+    let scratch = map_memory(
+        Handle::SELF_PROC,
+        stack,
+        0,
+        STACK_SCRATCH,
+        STACK_SIZE,
+        map::pack(prot::READ | prot::WRITE, map::FIXED | map::SHARED),
+    )?;
+    map_memory(
+        child,
+        stack,
+        0,
+        STACK_BASE,
+        STACK_SIZE,
+        map::pack(prot::READ | prot::WRITE, map::FIXED | map::SHARED),
+    )?;
+    let stack_pointer = build_stack(scratch, role.as_bytes());
+    let _ = handle_transfer(child, root, Rights::ADMIN.0)?;
+    let thread = thread_create(child, elf.entry() as usize, stack_pointer)?;
+    let _ = handle_close(thread);
+    unmap(Handle::SELF_PROC, STACK_SCRATCH, STACK_SIZE)?;
+    let _ = handle_close(stack);
+    Ok(child)
+}
+
+fn build_stack(base: usize, role: &[u8]) -> usize {
+    let stack = STACK_TOP - 0x100;
+    let argv0 = STACK_TOP - 0x40;
+    let argv1 = argv0 + 2;
+    let mut offset = stack - STACK_BASE;
+    let words = [
+        2u64,
+        argv0 as u64,
+        argv1 as u64,
+        0u64,
+        0u64,
+        6u64,
+        PAGE as u64,
+        0u64,
+        0u64,
+    ];
+    for value in words {
+        // SAFETY: the shared stack mapping is writable and `offset` stays inside its fixed size.
+        unsafe { ((base + offset) as *mut u64).write_unaligned(value.to_le()) };
+        offset += 8;
+    }
+    // SAFETY: the strings are inside the writable shared stack mapping.
+    unsafe {
+        ((base + STACK_TOP - STACK_BASE - 0x40) as *mut u8).write(b'x');
+        ((base + STACK_TOP - STACK_BASE - 0x3f) as *mut u8).write(0);
+        let role_start = base + STACK_TOP - STACK_BASE - 0x40 + 2;
+        let mut index = 0usize;
+        while index < role.len() {
+            ((role_start + index) as *mut u8).write(*role.get(index).unwrap_or(&0));
+            index = index.saturating_add(1);
+        }
+        ((role_start + role.len()) as *mut u8).write(0);
+    }
+    stack
 }
 
 fn negatives(
