@@ -19,6 +19,7 @@ members = [
     "tests/fixtures/s24-spawn/parent",
     "tests/fixtures/s24-spawn/child",
     "tests/fixtures/s11-echo",
+    "tests/fixtures/s33-ipc",
     "tests/fixtures/s25-xfer",
     "tests/fixtures/s26-evq",
     "tests/fixtures/s35-handles",

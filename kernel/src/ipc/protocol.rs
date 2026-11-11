@@ -180,6 +180,57 @@ const _: () = {
     assert!(offset_of!(SchemePacket, attach) == 404);
 };
 
+/// Why a reply's reported result length is not acceptable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReplyBoundError {
+    /// The result is larger than the buffer the request captured for it.
+    ExceedsCapacity,
+}
+
+/// The result length a reply reports for `opcode`.
+///
+/// `Read`, `Write` and `Call` report their `buffer_len`; every other opcode reports inline
+/// `data_len`. This is the value the client's syscall returns on success.
+pub const fn reported_result(opcode: Opcode, packet: &SchemePacket) -> u64 {
+    match opcode {
+        Opcode::Read | Opcode::Write | Opcode::Call => packet.buffer_len,
+        _ => packet.data_len as u64,
+    }
+}
+
+/// Validate a successful reply's reported result against the request's capacities.
+///
+/// `Write` may report at most the client's input length, `Read` at most the captured buffer
+/// length, and `Call`/`Fstat` at most the response capacity. Equal and zero lengths are valid.
+/// Error replies keep their reported length for diagnostics; the client returns the status
+/// without using it. Open/Close/Dup have no client-side result bound.
+pub fn reply_result(
+    opcode: Opcode,
+    request_buffer_len: u64,
+    request_response_len: u64,
+    packet: &SchemePacket,
+) -> Result<u64, ReplyBoundError> {
+    let result = reported_result(opcode, packet);
+    if packet.status != 0 {
+        return Ok(result);
+    }
+    let allowed = match opcode {
+        Opcode::Read | Opcode::Write => request_buffer_len,
+        Opcode::Call => {
+            if u64::from(packet.data_len) > request_response_len {
+                return Err(ReplyBoundError::ExceedsCapacity);
+            }
+            request_response_len
+        }
+        Opcode::Fstat => request_response_len,
+        Opcode::Open | Opcode::Close | Opcode::Dup => return Ok(result),
+    };
+    if result > allowed {
+        return Err(ReplyBoundError::ExceedsCapacity);
+    }
+    Ok(result)
+}
+
 /// Why a packet could not be decoded or validated.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PacketError {
@@ -644,5 +695,84 @@ mod tests {
                 }
             }
         }
+    }
+
+    fn reply(opcode: Opcode, status: i32, buffer_len: u64, data_len: u32) -> SchemePacket {
+        SchemePacket {
+            status,
+            buffer_len,
+            data_len,
+            ..SchemePacket::request(opcode, 1, 2)
+        }
+    }
+
+    #[test]
+    fn write_result_is_bounded_by_the_client_input() {
+        let equal = reply(Opcode::Write, 0, 8, 0);
+        assert_eq!(reply_result(Opcode::Write, 8, 0, &equal), Ok(8));
+        let zero = reply(Opcode::Write, 0, 0, 0);
+        assert_eq!(reply_result(Opcode::Write, 8, 0, &zero), Ok(0));
+        let over = reply(Opcode::Write, 0, 9, 0);
+        assert_eq!(
+            reply_result(Opcode::Write, 8, 0, &over),
+            Err(ReplyBoundError::ExceedsCapacity)
+        );
+    }
+
+    #[test]
+    fn read_result_is_bounded_by_the_captured_buffer() {
+        let equal = reply(Opcode::Read, 0, 4096, 0);
+        assert_eq!(reply_result(Opcode::Read, 4096, 0, &equal), Ok(4096));
+        let over = reply(Opcode::Read, 0, 4097, 0);
+        assert_eq!(
+            reply_result(Opcode::Read, 4096, 0, &over),
+            Err(ReplyBoundError::ExceedsCapacity)
+        );
+    }
+
+    #[test]
+    fn call_result_is_bounded_by_the_response_capacity() {
+        let equal = reply(Opcode::Call, 0, 16, 0);
+        assert_eq!(reply_result(Opcode::Call, 0, 16, &equal), Ok(16));
+        let zero = reply(Opcode::Call, 0, 0, 0);
+        assert_eq!(reply_result(Opcode::Call, 0, 16, &zero), Ok(0));
+        let over = reply(Opcode::Call, 0, 17, 0);
+        assert_eq!(
+            reply_result(Opcode::Call, 0, 16, &over),
+            Err(ReplyBoundError::ExceedsCapacity)
+        );
+        let inline = reply(Opcode::Call, 0, 8, 16);
+        assert_eq!(reply_result(Opcode::Call, 0, 16, &inline), Ok(8));
+        let inline_over = reply(Opcode::Call, 0, 8, 17);
+        assert_eq!(
+            reply_result(Opcode::Call, 0, 16, &inline_over),
+            Err(ReplyBoundError::ExceedsCapacity)
+        );
+    }
+
+    #[test]
+    fn fstat_inline_result_is_bounded_by_the_response_capacity() {
+        let equal = reply(Opcode::Fstat, 0, 0, 16);
+        assert_eq!(reply_result(Opcode::Fstat, 0, 16, &equal), Ok(16));
+        let over = reply(Opcode::Fstat, 0, 0, 17);
+        assert_eq!(
+            reply_result(Opcode::Fstat, 0, 16, &over),
+            Err(ReplyBoundError::ExceedsCapacity)
+        );
+    }
+
+    #[test]
+    fn error_replies_are_not_bounded() {
+        let error = reply(Opcode::Write, 5, u64::MAX, 0);
+        assert_eq!(reply_result(Opcode::Write, 8, 0, &error), Ok(u64::MAX));
+    }
+
+    #[test]
+    fn open_and_one_way_replies_have_no_result_bound() {
+        let open = reply(Opcode::Open, 0, u64::MAX, 0);
+        assert_eq!(reported_result(Opcode::Open, &open), 0);
+        assert_eq!(reply_result(Opcode::Open, 0, 0, &open), Ok(0));
+        let close = reply(Opcode::Close, 0, u64::MAX, 0);
+        assert_eq!(reply_result(Opcode::Close, 0, 0, &close), Ok(0));
     }
 }

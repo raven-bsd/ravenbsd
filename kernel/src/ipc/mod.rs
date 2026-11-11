@@ -172,6 +172,13 @@ impl PendingRequest {
         {
             return;
         }
+        // Drop the completed request from the client's outstanding list. One-way requests
+        // (CLOSE/DUP) have no waiter to remove them, so without this a long-lived client would
+        // accumulate every completed notification in kernel memory.
+        self.client
+            .client_requests
+            .lock()
+            .retain(|item| item.id != self.id);
         self.waiters.wake_all();
     }
 
@@ -206,6 +213,17 @@ pub fn next_file_id() -> u64 {
 /// Called from `process::notify_exit` before the address space is released, so capture mappings
 /// can still be removed.
 pub fn on_process_exit(process: &Arc<Process>) {
+    // S33 leak evidence: the exiting process's outstanding client requests. A completed request
+    // is removed from the list, so a long OPEN/CLOSE/DUP loop leaves this at zero; the fixture
+    // prints it for the loop client. Gated by a boot command-line flag like s24/s25.
+    if crate::memory::paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "s33-ipccheck")
+    {
+        let outstanding = process.client_requests.lock().len();
+        crate::kprintln!("s33: {} outstanding={}", process.path, outstanding);
+    }
+
     registry::on_process_exit(process);
 
     let queued: Vec<Arc<PendingRequest>> = {
