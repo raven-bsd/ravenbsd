@@ -54,6 +54,7 @@ const WAITER_STACK_SIZE: usize = 16 * 1024;
 
 static WAIT_HANDLE: AtomicUsize = AtomicUsize::new(usize::MAX);
 static WAIT_STARTED: AtomicBool = AtomicBool::new(false);
+static CLOSE_STARTED: AtomicBool = AtomicBool::new(false);
 static WAIT_DONE: AtomicBool = AtomicBool::new(false);
 static WAIT_RESULT: AtomicI32 = AtomicI32::new(-1);
 
@@ -303,13 +304,33 @@ fn waiter_stack_top() -> usize {
 extern "C" fn waiter_thread(_argument: usize) -> ! {
     WAIT_STARTED.store(true, Ordering::Release);
     let handle = Handle(WAIT_HANDLE.load(Ordering::Acquire) as u32);
-    let code = match irq_wait(handle, 60_000_000_000) {
-        Err(error) => i32::from(error.0),
-        // The safety net fired: the close never reached the blocked waiter.
-        Ok(0) => 0,
-        // The victim source never fires; a positive count means a foreign message reached
-        // this object, which the verdict assertion below turns into a test failure.
-        Ok(count) => i32::try_from(count).unwrap_or(i32::MAX),
+    // Bounded waits are a safety net, not the mechanism: the close must wake the blocked
+    // waiter with EIO.  If a host stall lets the close win before the waiter enqueues, the
+    // next call sees the closed handle as EBADF; after CLOSE_STARTED that is the cancelled
+    // case for this fixture, not a foreign errno.
+    let code = loop {
+        match irq_wait(handle, 250_000_000) {
+            Ok(0) => {
+                if CLOSE_STARTED.load(Ordering::Acquire) {
+                    match irq_wait(handle, 250_000_000) {
+                        Err(error) if error.0 == Errno::EBADF.0 => {
+                            break i32::from(Errno::EIO.0)
+                        }
+                        Err(error) => break i32::from(error.0),
+                        Ok(0) => continue,
+                        Ok(count) => break i32::try_from(count).unwrap_or(i32::MAX),
+                    }
+                }
+                continue;
+            }
+            Err(error) if error.0 == Errno::EBADF.0 && CLOSE_STARTED.load(Ordering::Acquire) => {
+                break i32::from(Errno::EIO.0)
+            }
+            Err(error) => break i32::from(error.0),
+            // The victim source never fires; a positive count means a foreign message reached
+            // this object, which the verdict assertion below turns into a test failure.
+            Ok(count) => break i32::try_from(count).unwrap_or(i32::MAX),
+        }
     };
     WAIT_RESULT.store(code, Ordering::Release);
     WAIT_DONE.store(true, Ordering::Release);
@@ -563,6 +584,7 @@ fn cancel_part(admin: Handle) -> Result<(), &'static str> {
     // The source was never programmed.  Acknowledge it so the close can release the vector
     // instead of quarantining it, then close the last handle under the blocked waiter.
     irq_ack(victim).map_err(|_| "victim ack")?;
+    CLOSE_STARTED.store(true, Ordering::Release);
     handle_close(victim);
 
     let mut waits = 0usize;
