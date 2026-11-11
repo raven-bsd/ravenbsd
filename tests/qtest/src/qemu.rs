@@ -136,9 +136,11 @@ pub(crate) fn qemu_command(
             args.push("isa-debug-exit,iobase=0xf4,iosize=0x04".to_string());
         }
         "aarch64" => {
+            // GICv2 matches the Pi 4 GIC-400 this driver targets; the default `virt` GICv3
+            // would exercise a different device.
             for argument in [
                 "-M",
-                "virt",
+                "virt,gic-version=2",
                 "-cpu",
                 "cortex-a72",
                 "-m",
@@ -266,7 +268,7 @@ mod tests {
             command.args,
             vec![
                 "-M",
-                "virt",
+                "virt,gic-version=2",
                 "-cpu",
                 "cortex-a72",
                 "-m",
