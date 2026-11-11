@@ -307,6 +307,14 @@ name = "raven-bootinfo"
 version = "0.1.0"
 
 [[package]]
+name = "raven-bootinfo-fdt"
+version = "0.1.0"
+dependencies = [
+ "raven-bootinfo",
+ "raven-fdt-lite",
+]
+
+[[package]]
 name = "raven-cmdline"
 version = "0.1.0"
 

@@ -78,6 +78,7 @@ pub struct Fdt<'a> {
     size_struct: usize,
     off_strings: usize,
     size_strings: usize,
+    off_rsv: usize,
 }
 
 impl<'a> Fdt<'a> {
@@ -100,6 +101,7 @@ impl<'a> Fdt<'a> {
         }
         let off_struct = read_be_u32(data, 8).ok_or(FdtError::TooShort)? as usize;
         let off_strings = read_be_u32(data, 12).ok_or(FdtError::TooShort)? as usize;
+        let off_rsv = read_be_u32(data, 16).ok_or(FdtError::TooShort)? as usize;
         let size_strings = read_be_u32(data, 32).ok_or(FdtError::TooShort)? as usize;
         let size_struct = read_be_u32(data, 36).ok_or(FdtError::TooShort)? as usize;
         if off_struct
@@ -108,6 +110,7 @@ impl<'a> Fdt<'a> {
             || off_strings
                 .checked_add(size_strings)
                 .is_none_or(|end| end > totalsize)
+            || off_rsv >= totalsize
         {
             return Err(FdtError::BadOffsets);
         }
@@ -117,7 +120,19 @@ impl<'a> Fdt<'a> {
             size_struct,
             off_strings,
             size_strings,
+            off_rsv,
         })
+    }
+
+    /// Iterate over the memory reservation block.
+    ///
+    /// Each item is a `(physical address, length)` pair; the terminating all-zero pair is not
+    /// yielded. The iterator stops at a truncated entry.
+    pub fn reservations(&self) -> Reservations<'a> {
+        Reservations {
+            fdt: *self,
+            position: self.off_rsv,
+        }
     }
 
     /// The root node.
@@ -221,6 +236,32 @@ impl<'a> Fdt<'a> {
         let value = offset.checked_add(12)?;
         align4(value.checked_add(len)?)
     }
+
+    fn skip_subtree(&self, start: usize) -> Option<usize> {
+        let mut pos = start;
+        let mut depth = 1usize;
+        loop {
+            let token = self.struct_u32(pos)?;
+            match token {
+                FDT_BEGIN_NODE => {
+                    let (_, after) = self.struct_name(pos.checked_add(4)?)?;
+                    depth = depth.checked_add(1)?;
+                    pos = after;
+                }
+                FDT_END_NODE => {
+                    depth = depth.checked_sub(1)?;
+                    pos = pos.checked_add(4)?;
+                    if depth == 0 {
+                        return Some(pos);
+                    }
+                }
+                FDT_PROP => pos = self.after_property(pos)?,
+                FDT_NOP => pos = pos.checked_add(4)?,
+                FDT_END => return None,
+                _ => return None,
+            }
+        }
+    }
 }
 
 fn align4(value: usize) -> Option<usize> {
@@ -322,6 +363,23 @@ impl<'a> Node<'a> {
             value: self.property(name),
             cell_bytes,
             position: 0,
+        }
+    }
+
+    /// Iterate over the direct child nodes in tree order.
+    ///
+    /// Properties and NOP tokens are skipped; grandchildren are not yielded. A malformed tree
+    /// ends the iteration.
+    pub fn children(&self) -> Children<'a> {
+        let start = self
+            .fdt
+            .struct_name(self.name_start)
+            .map(|(_, after)| after);
+        Children {
+            fdt: self.fdt,
+            position: start,
+            skip: None,
+            done: false,
         }
     }
 
@@ -462,6 +520,75 @@ impl Iterator for Reg<'_> {
     }
 }
 
+/// Iterator over the direct children of a node.
+#[derive(Clone, Copy, Debug)]
+pub struct Children<'a> {
+    fdt: Fdt<'a>,
+    position: Option<usize>,
+    skip: Option<usize>,
+    done: bool,
+}
+
+impl<'a> Iterator for Children<'a> {
+    type Item = Node<'a>;
+
+    fn next(&mut self) -> Option<Node<'a>> {
+        if self.done {
+            return None;
+        }
+        let mut position = self.position?;
+        if let Some(skip) = self.skip.take() {
+            position = self.fdt.skip_subtree(skip)?;
+        }
+        loop {
+            let token = self.fdt.struct_u32(position)?;
+            match token {
+                FDT_PROP => position = self.fdt.after_property(position)?,
+                FDT_NOP => position = position.checked_add(4)?,
+                FDT_BEGIN_NODE => {
+                    let name_start = position.checked_add(4)?;
+                    let (_, after_name) = self.fdt.struct_name(name_start)?;
+                    self.position = Some(position);
+                    self.skip = Some(after_name);
+                    return Some(Node {
+                        fdt: self.fdt,
+                        name_start,
+                    });
+                }
+                FDT_END_NODE | FDT_END => {
+                    self.done = true;
+                    return None;
+                }
+                _ => {
+                    self.done = true;
+                    return None;
+                }
+            }
+        }
+    }
+}
+
+/// Iterator over the memory reservation block.
+#[derive(Clone, Copy, Debug)]
+pub struct Reservations<'a> {
+    fdt: Fdt<'a>,
+    position: usize,
+}
+
+impl Iterator for Reservations<'_> {
+    type Item = (u64, u64);
+
+    fn next(&mut self) -> Option<(u64, u64)> {
+        let address = read_be_u64(self.fdt.data, self.position)?;
+        let size = read_be_u64(self.fdt.data, self.position.checked_add(8)?)?;
+        self.position = self.position.checked_add(16)?;
+        if address == 0 && size == 0 {
+            return None;
+        }
+        Some((address, size))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -470,6 +597,7 @@ mod tests {
     struct Builder {
         structure: Vec<u8>,
         strings: Vec<u8>,
+        reservations: Vec<(u64, u64)>,
     }
 
     impl Builder {
@@ -477,7 +605,12 @@ mod tests {
             Self {
                 structure: Vec::new(),
                 strings: Vec::new(),
+                reservations: Vec::new(),
             }
+        }
+
+        fn reservation(&mut self, address: u64, size: u64) {
+            self.reservations.push((address, size));
         }
 
         fn token(&mut self, token: u32) {
@@ -526,7 +659,8 @@ mod tests {
 
         fn finish(&mut self) -> Vec<u8> {
             self.token(FDT_END);
-            let struct_offset = 48usize;
+            let reservation_bytes = (self.reservations.len() + 1) * 16;
+            let struct_offset = 40 + reservation_bytes;
             let strings_offset = struct_offset + self.structure.len();
             let totalsize = strings_offset + self.strings.len();
             let mut blob = Vec::with_capacity(totalsize);
@@ -540,7 +674,11 @@ mod tests {
             blob.extend_from_slice(&0u32.to_be_bytes()); // boot cpuid
             blob.extend_from_slice(&(self.strings.len() as u32).to_be_bytes());
             blob.extend_from_slice(&(self.structure.len() as u32).to_be_bytes());
-            blob.extend_from_slice(&[0u8; 8]); // empty memory reservation entry
+            for (address, size) in &self.reservations {
+                blob.extend_from_slice(&address.to_be_bytes());
+                blob.extend_from_slice(&size.to_be_bytes());
+            }
+            blob.extend_from_slice(&[0u8; 16]); // terminator
             blob.extend_from_slice(&self.structure);
             blob.extend_from_slice(&self.strings);
             blob
@@ -839,8 +977,9 @@ mod tests {
     #[test]
     fn unknown_token_stops_the_walk() {
         let mut blob = sample();
-        // The first structure token is at offset 48; make it unknown.
-        blob[48..52].copy_from_slice(&0xffff_ffffu32.to_be_bytes());
+        // The first structure token follows the reservation block: 40-byte header, one 16-byte
+        // terminator, so the root BEGIN_NODE is at offset 56.
+        blob[56..60].copy_from_slice(&0xffff_ffffu32.to_be_bytes());
         let fdt = Fdt::parse(&blob).unwrap();
         assert!(fdt.root().is_none());
         assert!(fdt.find_node("/intc").is_none());
@@ -871,11 +1010,69 @@ mod tests {
     #[test]
     fn property_name_offsets_are_bounds_checked() {
         let mut blob = sample();
-        // Corrupt the first property's name offset in the root node.
-        // Root BEGIN_NODE is at 48, name is one NUL padded to 4, so the PROP token is at 56.
-        let name_offset_at = 64;
+        // Root BEGIN_NODE is at 56, its name is one NUL padded to 4, so the PROP token is at 64
+        // and the name-offset field is at 72.
+        let name_offset_at = 72;
         blob[name_offset_at..name_offset_at + 4].copy_from_slice(&0x7fff_ffffu32.to_be_bytes());
         let fdt = Fdt::parse(&blob).unwrap();
         assert!(fdt.root().unwrap().property("compatible").is_none());
+    }
+
+    #[test]
+    fn children_are_direct_and_in_tree_order() {
+        let blob = sample();
+        let fdt = Fdt::parse(&blob).unwrap();
+        let names: Vec<&str> = fdt
+            .root()
+            .unwrap()
+            .children()
+            .map(|node| node.name())
+            .collect();
+        assert_eq!(names, vec!["intc@8000000", "timer", "serial@9000000"]);
+        let nested: Vec<&str> = fdt
+            .find_node("/intc")
+            .unwrap()
+            .children()
+            .map(|node| node.name())
+            .collect();
+        assert_eq!(nested, vec!["nested"]);
+    }
+
+    #[test]
+    fn children_of_a_leaf_are_empty() {
+        let blob = sample();
+        let fdt = Fdt::parse(&blob).unwrap();
+        assert_eq!(fdt.find_node("/timer").unwrap().children().count(), 0);
+    }
+
+    #[test]
+    fn reservations_are_listed() {
+        let mut builder = Builder::new();
+        builder.reservation(0x1000, 0x2000);
+        builder.reservation(0x4000_0000, 0x1000);
+        builder.begin("");
+        builder.end();
+        builder.token(FDT_END);
+        let blob = builder.finish();
+        let fdt = Fdt::parse(&blob).unwrap();
+        let entries: Vec<(u64, u64)> = fdt.reservations().collect();
+        assert_eq!(entries, vec![(0x1000, 0x2000), (0x4000_0000, 0x1000)]);
+    }
+
+    #[test]
+    fn empty_reservation_block_yields_nothing() {
+        let blob = sample();
+        let fdt = Fdt::parse(&blob).unwrap();
+        assert_eq!(fdt.reservations().count(), 0);
+    }
+
+    #[test]
+    fn truncated_reservation_block_stops() {
+        let mut blob = sample();
+        // Cut the blob inside the reservation terminator; parse truncates `totalsize` to the
+        // original value, so the blob must still parse but the iterator must stop.
+        let len = blob.len();
+        blob.truncate(len.saturating_sub(8));
+        assert!(Fdt::parse(&blob).is_err());
     }
 }
