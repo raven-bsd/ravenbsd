@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The ramfsd integration profile. It inherits the shell profile (including the core servers and
+# ramfsd) and adds the one-shot probe.
+
+name = "ramfsd-test"
+
+extends = "shell"
+
+[boot]
+cmdline = "console=ttyS0 loglevel=info"
+log_level = "info"
