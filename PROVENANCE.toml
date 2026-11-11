@@ -253,3 +253,36 @@ tier = "A"
 copied = "2026-11-11"
 modified = true
 notes = "ffs_truncate, ffs_indirtrunc and inode update ordering ported. The write growth/extend rules follow sys/ufs/ufs/ufs_readwrite.c (ffs_write) and setattr follows sys/ufs/ufs/ufs_inode.c; both notices are carried in the file header because the provenance format allows one entry per destination path. UBC, uio, WAPBL and snapshot handling removed."
+
+[[import]]
+path = "crates/ufs-core/src/dirwrite.rs"
+upstream = "netbsd"
+upstream_path = "sys/ufs/ufs/ufs_lookup.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-11"
+modified = true
+notes = "ufs_makedirentry, ufs_dirgrow, ufs_dircompact, ufs_direnter, ufs_dirremove, ufs_dirrewrite and ufs_dirempty ported to safe Rust. Directory blocks are 512 bytes; insertion reuses free records and compacts within a block before growing by one block. Dirhash, buffers and credentials removed."
+
+[[import]]
+path = "crates/ufs-core/src/namespace.rs"
+upstream = "netbsd"
+upstream_path = "sys/ufs/ufs/ufs_vnops.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-11"
+modified = true
+notes = "create, mkdir, remove/unlink, rmdir, link and symlink semantics ported from ufs_vnops.c and ufs_makeinode. Privilege checks, ACL inheritance, vnode locking and WAPBL removed; inode-before-entry and entry-before-deallocation ordering kept."
+
+[[import]]
+path = "crates/ufs-core/src/rename.rs"
+upstream = "netbsd"
+upstream_path = "sys/ufs/ufs/ufs_rename.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-11"
+modified = true
+notes = "Rename replacement, directory reparenting, target rewrite, link-count and dotdot updates ported. Credential checks and vnode locking removed; the temporary source link count and target-rewrite order are kept."

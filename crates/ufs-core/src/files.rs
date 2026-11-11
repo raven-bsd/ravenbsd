@@ -105,21 +105,30 @@ impl<D: BlockIo> Ufs<D> {
         self.ensure_writable()?;
         let mut inode = self.load_inode(ino)?;
         match inode.file_type()? {
-            FileType::Regular => {}
-            FileType::Symlink => return self.truncate_symlink(ino, &mut inode, size),
-            FileType::Directory => return Err(UfsError::IsDir),
-            _ => return Err(UfsError::Invalid),
+            FileType::Regular => self.truncate_inode(ino, &mut inode, size),
+            FileType::Symlink => self.truncate_symlink(ino, &mut inode, size),
+            FileType::Directory => Err(UfsError::IsDir),
+            _ => Err(UfsError::Invalid),
         }
+    }
+
+    /// Truncate an already loaded inode; directories use this only with `size == 0`.
+    pub(crate) fn truncate_inode(
+        &mut self,
+        ino: Ino,
+        inode: &mut Inode,
+        size: u64,
+    ) -> Result<(), UfsError> {
         let now = self.next_time();
         inode.mtime = Timespec { sec: now, nsec: 0 };
         inode.ctime = inode.mtime;
         if size >= inode.size {
             if size > inode.size {
-                self.grow_file(ino, &mut inode, size)?;
-                inode.blocks = self.count_file_blocks(&inode, size)?;
+                self.grow_file(ino, inode, size)?;
+                inode.blocks = self.count_file_blocks(inode, size)?;
             }
             inode.size = size;
-            return self.store_inode(ino, &inode);
+            return self.store_inode(ino, inode);
         }
         let old_size = inode.size;
         let bsize = u64::from(self.fs.bsize);
@@ -143,7 +152,7 @@ impl<D: BlockIo> Ufs<D> {
             let new_off = size - last * bsize;
             let new_alloc = fragroundup(self.fs.fsize, new_off as u32);
             if (new_alloc < old_alloc || new_off < u64::from(new_alloc))
-                && let Some(addr) = self.bmap(&inode, last)?
+                && let Some(addr) = self.bmap(inode, last)?
             {
                 // Zero the bytes between the new EOF and the retained fragment end so a
                 // later grow cannot expose stale data.
@@ -198,7 +207,7 @@ impl<D: BlockIo> Ufs<D> {
         inode.size = size;
         // The shortened inode (size, cleared direct pointers and dropped top pointers) is
         // written before any block is released, as classic FFS orders it.
-        self.store_inode(ino, &inode)?;
+        self.store_inode(ino, inode)?;
 
         if let Some((addr, len)) = tail_free {
             self.free_frags(addr, len)?;
@@ -217,8 +226,8 @@ impl<D: BlockIo> Ufs<D> {
                 empty_tops.push((top, level));
             }
         }
-        inode.blocks = self.count_file_blocks(&inode, size)?;
-        self.store_inode(ino, &inode)?;
+        inode.blocks = self.count_file_blocks(inode, size)?;
+        self.store_inode(ino, inode)?;
         for (top, _) in empty_tops {
             self.free_frags(top, self.fs.bsize)?;
         }
@@ -442,7 +451,7 @@ impl<D: BlockIo> Ufs<D> {
     }
 
     /// Extend `lbn` so it owns at least `desired` bytes, zero-filling the new space.
-    fn ensure_block(
+    pub(crate) fn ensure_block(
         &mut self,
         ino: Ino,
         inode: &mut Inode,
@@ -634,7 +643,7 @@ impl<D: BlockIo> Ufs<D> {
         Ok(total)
     }
 
-    fn next_time(&mut self) -> i64 {
+    pub(crate) fn next_time(&mut self) -> i64 {
         let now = self.fs.time.saturating_add(1);
         self.fs.set_time_raw(now);
         now
