@@ -444,6 +444,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-k71-scheme"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-kernel"
 version = "0.1.0"
 dependencies = [

@@ -44,5 +44,8 @@ mod sys;
 pub use client::Client;
 pub use kernel::{Kernel, RtKernel};
 pub use ofd::{OpenFile, OpenTable};
-pub use server::{Completer, Ctx, Handler, HandlerError, HandlerResult, Opened, Packet, Server};
+pub use raven_ipc::protocol::Attachment;
+pub use server::{
+    CallReply, Completer, Ctx, Handler, HandlerError, HandlerResult, Opened, Packet, Server,
+};
 pub use sync::{SpinGuard, SpinLock};

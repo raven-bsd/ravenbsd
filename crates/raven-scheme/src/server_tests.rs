@@ -4,14 +4,14 @@
 //! Host tests for the server loop, dispatch and deferred replies.
 
 use crate::testing::FakeKernel;
-use crate::{Ctx, Handler, HandlerError, HandlerResult, Opened, Packet, Server};
+use crate::{CallReply, Ctx, Handler, HandlerError, HandlerResult, Opened, Packet, Server};
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::time::Duration;
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
-use raven_ipc::protocol::{self, Opcode, PACKET_SIZE, SchemePacket};
+use raven_ipc::protocol::{self, Attachment, Opcode, PACKET_SIZE, REPLY_HANDLE, SchemePacket};
 use raven_proto_fs::Stat;
 
 #[derive(Default)]
@@ -132,11 +132,11 @@ fn open_file_returns_a_server_cookie() {
     assert_eq!(sent[0].status, 0);
     assert_eq!(sent[0].server_cookie, 0x1234);
     assert_eq!(handler.calls, vec!["open hello 1"]);
-    assert!(kernel.attachments().is_empty());
+    assert!(kernel.sent_attachments().is_empty());
 }
 
 #[test]
-fn open_attach_uses_reply_attach() {
+fn open_attach_uses_send_attach() {
     let kernel = FakeKernel::new();
     let mut server = Server::register_with(kernel.clone(), "file").unwrap();
     let mut handler = TestHandler {
@@ -148,8 +148,19 @@ fn open_attach_uses_reply_attach() {
         packet: open_packet("hello"),
     };
     server.dispatch(packet, &mut handler).unwrap();
-    assert_eq!(kernel.attachments(), vec![(Handle(9), Handle(0x44))]);
-    assert_eq!(decode_sent(&kernel)[0].status, 0);
+    let sent = kernel.sent_attachments();
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0].0, Handle(9));
+    assert_eq!(
+        sent[0].2,
+        vec![Attachment {
+            handle: 0x44,
+            rights_mask: 0,
+        }]
+    );
+    let response = protocol::decode(&sent[0].1).unwrap();
+    assert_eq!(response.flags & REPLY_HANDLE, REPLY_HANDLE);
+    assert!(kernel.sent().is_empty());
 }
 
 #[test]
@@ -295,6 +306,64 @@ fn call_uses_both_captures() {
     assert_eq!(&response_bytes[..5], b"reply");
     assert_eq!(decode_sent(&kernel)[0].buffer_len, 5);
     assert_eq!(handler.calls, vec!["call 7 7"]);
+}
+
+#[test]
+fn call_attach_carries_data_and_two_handles() {
+    struct AttachCallHandler;
+
+    impl Handler for AttachCallHandler {
+        fn call_attach(
+            &mut self,
+            _file: u64,
+            _request: &[u8],
+            _response: &mut [u8],
+        ) -> HandlerResult<CallReply> {
+            let mut reply = CallReply::with_data(b"ok")?;
+            reply.attach(Handle(0x51), 0)?;
+            reply.attach(Handle(0x52), 0x11)?;
+            Ok(reply)
+        }
+    }
+
+    let kernel = FakeKernel::new();
+    let mut server = Server::register_with(kernel.clone(), "echo").unwrap();
+    let mut handler = AttachCallHandler;
+    let request_bytes = b"attach";
+    let mut response_bytes = [0u8; 128];
+    let mut packet = request(Opcode::Call);
+    packet.buffer_addr = request_bytes.as_ptr() as u64;
+    packet.buffer_len = request_bytes.len() as u64;
+    packet.response_addr = response_bytes.as_mut_ptr() as u64;
+    packet.response_len = response_bytes.len() as u64;
+    server
+        .dispatch(
+            Packet {
+                handle: Handle(9),
+                packet,
+            },
+            &mut handler,
+        )
+        .unwrap();
+    let sent = kernel.sent_attachments();
+    assert_eq!(sent.len(), 1);
+    assert_eq!(
+        sent[0].2,
+        vec![
+            Attachment {
+                handle: 0x51,
+                rights_mask: 0,
+            },
+            Attachment {
+                handle: 0x52,
+                rights_mask: 0x11,
+            },
+        ]
+    );
+    let response = protocol::decode(&sent[0].1).unwrap();
+    assert_eq!(response.data_len, 2);
+    assert_eq!(response.data_bytes(), b"ok");
+    assert!(kernel.sent().is_empty());
 }
 
 #[test]
