@@ -3,24 +3,34 @@
 
 //! Low-level context switching and the new-thread trampoline.
 //!
-//! `sched_switch` saves the System V callee-saved registers on the outgoing kernel stack and
-//! publishes its stack pointer, then loads the incoming stack pointer and returns on it. A new
-//! thread's stack is prepared with the same frame shape, but its return address is
-//! `sched_thread_start`. No FP/SIMD state is saved: the kernel and phase-1 userland are soft-float
-//! (DR-14), and CR0.TS is never set by the kernel (S05 leaves the boot value, with CR0.EM clear).
+//! `sched_switch` saves the callee-saved registers on the outgoing kernel stack and publishes its
+//! stack pointer, then loads the incoming stack pointer and returns on it. A new thread's stack is
+//! prepared with the same frame shape, but its return address is `sched_thread_start`.
+//!
+//! * x86-64 saves `rbx, rbp, r12..r15` and switches CR3/TSS/GS state.
+//! * aarch64 saves `x19..x30` (96 bytes, SP stays 16-byte aligned) and publishes the thread
+//!   pointer in `TPIDR_EL1`; S14b is single-CPU and kernel-threads-only, so there is no address
+//!   space or user-entry path yet.
+//!
+//! No FP/SIMD state is saved: the kernel and phase-1 userland are soft-float (DR-14).
 
 use core::sync::atomic::Ordering;
 
 use raven_abi::errno::Errno;
 
+#[cfg(target_arch = "x86_64")]
 use crate::arch::x86_64::ap_start;
+#[cfg(target_arch = "x86_64")]
 use crate::arch::x86_64::gdt::{self, USER_CS, USER_SS};
 use crate::sched::thread::Thread;
 use crate::sync;
 
+#[cfg(target_arch = "x86_64")]
 const IA32_GS_BASE: u32 = 0xC000_0101;
+#[cfg(target_arch = "x86_64")]
 const IA32_KERNEL_GS_BASE: u32 = 0xC000_0102;
 
+#[cfg(target_arch = "x86_64")]
 core::arch::global_asm!(
     r#"
     .section .text
@@ -56,16 +66,69 @@ sched_thread_start:
 "#
 );
 
+#[cfg(target_arch = "aarch64")]
+core::arch::global_asm!(
+    r#"
+    .section .text
+
+    /* x0 = &outgoing.saved_sp, x1 = incoming.saved_sp
+     *
+     * The frame holds the twelve callee-saved registers x19..x30 in 96 bytes; every push/pop is
+     * 16-byte aligned, so the AAPCS64 stack alignment holds across a switch. */
+    .global sched_switch
+    .type sched_switch, %function
+sched_switch:
+    sub sp, sp, #96
+    stp x19, x20, [sp, #0]
+    stp x21, x22, [sp, #16]
+    stp x23, x24, [sp, #32]
+    stp x25, x26, [sp, #48]
+    stp x27, x28, [sp, #64]
+    stp x29, x30, [sp, #80]
+    mov x9, sp
+    str x9, [x0]
+    mov sp, x1
+    ldp x19, x20, [sp, #0]
+    ldp x21, x22, [sp, #16]
+    ldp x23, x24, [sp, #32]
+    ldp x25, x26, [sp, #48]
+    ldp x27, x28, [sp, #64]
+    ldp x29, x30, [sp, #80]
+    add sp, sp, #96
+    ret
+    .size sched_switch, . - sched_switch
+
+    /* New-thread trampoline: the prepared frame pops into this address with SP at the stack top
+     * (16-byte aligned). x29/x30 are zeroed for clean frame-pointer walks. */
+    .global sched_thread_start
+    .type sched_thread_start, %function
+sched_thread_start:
+    mov x29, #0
+    mov x30, #0
+    bl sched_thread_entry
+    brk #0
+    .size sched_thread_start, . - sched_thread_start
+"#
+);
+
+#[cfg(target_arch = "x86_64")]
 unsafe extern "C" {
     fn sched_switch(saved_rsp: *mut u64, next_rsp: u64);
     fn sched_thread_start();
 }
 
-/// Build the initial kernel stack for a new thread and return its saved `rsp`.
+#[cfg(target_arch = "aarch64")]
+unsafe extern "C" {
+    fn sched_switch(saved_sp: *mut u64, next_sp: u64);
+    fn sched_thread_start();
+}
+
+/// Build the initial kernel stack for a new thread and return its saved stack pointer.
 ///
-/// The frame is `[r15 r14 r13 r12 rbp rbx return-address unused]`; the return address points at
-/// `sched_thread_start`. The dummy qword keeps the trampoline's entry stack alignment equal to
-/// the System V call convention (8 mod 16).
+/// x86-64: the frame is `[r15 r14 r13 r12 rbp rbx return-address unused]`; the return address
+/// points at `sched_thread_start`. The dummy qword keeps the trampoline's entry stack alignment
+/// equal to the System V call convention (8 mod 16).
+#[cfg(target_arch = "x86_64")]
 pub fn prepare_stack(top: u64) -> Result<u64, Errno> {
     let saved = top.checked_sub(64).ok_or(Errno::ENOMEM)?;
     let trampoline = sched_thread_start as *const () as u64;
@@ -84,6 +147,27 @@ pub fn prepare_stack(top: u64) -> Result<u64, Errno> {
     Ok(saved)
 }
 
+/// Build the initial kernel stack for a new thread and return its saved stack pointer.
+///
+/// aarch64: the frame is the twelve callee-saved registers `x19..x30` (96 bytes); `x30` is the
+/// trampoline address and the rest are zero.
+#[cfg(target_arch = "aarch64")]
+pub fn prepare_stack(top: u64) -> Result<u64, Errno> {
+    let saved = top.checked_sub(96).ok_or(Errno::ENOMEM)?;
+    let trampoline = sched_thread_start as *const () as u64;
+    let frame = saved as *mut u64;
+    // SAFETY: `saved..top` is inside the freshly allocated, page-aligned kernel stack.
+    unsafe {
+        let mut index = 0usize;
+        while index < 11 {
+            core::ptr::write_unaligned(frame.add(index), 0); // x19..x29
+            index = index.saturating_add(1);
+        }
+        core::ptr::write_unaligned(frame.add(11), trampoline); // x30
+    }
+    Ok(saved)
+}
+
 /// Switch from `from` to `to`.
 ///
 /// # Safety
@@ -91,6 +175,7 @@ pub fn prepare_stack(top: u64) -> Result<u64, Errno> {
 /// Both threads must be alive and owned by the caller for the duration of the call. The caller
 /// must hold the scheduler critical section; the preemption counter and per-CPU pointers are
 /// transferred here.
+#[cfg(target_arch = "x86_64")]
 pub unsafe fn switch(from: &Thread, to: &Thread) {
     from.preempt_count
         .store(sync::preempt_count(), Ordering::SeqCst);
@@ -120,12 +205,38 @@ pub unsafe fn switch(from: &Thread, to: &Thread) {
     }
 }
 
-/// Rust entry point of a newly switched-in thread.
+/// Switch from `from` to `to` (aarch64, single CPU, one kernel address space).
+///
+/// # Safety
+///
+/// Both threads must be alive and owned by the caller for the duration of the call. The caller
+/// must hold the scheduler critical section with interrupts masked.
+#[cfg(target_arch = "aarch64")]
+pub unsafe fn switch(from: &Thread, to: &Thread) {
+    from.preempt_count
+        .store(sync::preempt_count(), Ordering::SeqCst);
+    // SAFETY: the scheduler critical section gives exclusive access to the CPU state.
+    unsafe {
+        sync::set_preempt_count(to.preempt_count.load(Ordering::SeqCst));
+    }
+    crate::arch::percpu::set_current_thread(to as *const Thread as u64);
+
+    let next_sp = to.saved_rsp();
+    // SAFETY: the frame layout was prepared by `prepare_stack` or by a previous `sched_switch`;
+    // the caller keeps both threads alive across the switch.
+    unsafe {
+        sched_switch(from.saved_rsp_slot(), next_sp);
+    }
+}
+
+/// Rust entry point of a newly switched-in x86-64 thread.
+#[cfg(target_arch = "x86_64")]
 #[unsafe(no_mangle)]
 extern "C" fn sched_thread_entry() -> ! {
     thread_entry()
 }
 
+#[cfg(target_arch = "x86_64")]
 fn thread_entry() -> ! {
     let thread = match crate::sched::current_thread() {
         Some(thread) => thread,
@@ -149,6 +260,23 @@ fn thread_entry() -> ! {
     crate::sched::exit_thread(0)
 }
 
+/// Rust entry point of a newly switched-in aarch64 kernel thread.
+#[cfg(target_arch = "aarch64")]
+#[unsafe(no_mangle)]
+extern "C" fn sched_thread_entry() -> ! {
+    // SAFETY: the vector table and the GIC/timer are initialised before the scheduler starts.
+    unsafe {
+        sync::enable_interrupts();
+    }
+    if let Some(thread) = crate::sched::current_thread()
+        && let Some(entry) = thread.kernel_entry
+    {
+        entry();
+    }
+    crate::sched::exit_thread(0)
+}
+
+#[cfg(target_arch = "x86_64")]
 fn idle_forever() -> ! {
     loop {
         // SAFETY: `hlt` is ring-0 and interrupts are enabled by the caller's iret path.
@@ -163,6 +291,7 @@ fn idle_forever() -> ! {
 /// # Safety
 ///
 /// `entry` and `stack` must be valid user addresses in the active address space.
+#[cfg(target_arch = "x86_64")]
 unsafe fn enter_user(entry: u64, stack: u64, arg: u64) -> ! {
     let percpu = ap_start::percpu_address(crate::sched::smp::percpu::this_cpu());
     let gs_base = rdmsr(IA32_GS_BASE);
@@ -217,6 +346,7 @@ unsafe fn enter_user(entry: u64, stack: u64, arg: u64) -> ! {
 }
 
 /// Read CR3.
+#[cfg(target_arch = "x86_64")]
 pub(crate) fn read_cr3() -> u64 {
     let value: u64;
     // SAFETY: ring-0 CR3 read.
@@ -230,11 +360,19 @@ pub(crate) fn read_cr3() -> u64 {
     value
 }
 
+/// The kernel address space is a single TTBR1 root on aarch64; thread switching does not change
+/// it until user processes arrive (S14c).
+#[cfg(target_arch = "aarch64")]
+pub(crate) fn read_cr3() -> u64 {
+    0
+}
+
 /// True when CR0 has neither `EM` nor `TS` set.
 ///
 /// S05/S08 leave the boot policy: no x87 emulation and no lazy task switch. S09 does not save
 /// FP/SIMD state, so a TS/EM bit appearing later is a kernel bug and the scheduler refuses to
 /// start.
+#[cfg(target_arch = "x86_64")]
 pub(crate) fn fpu_state_ok() -> bool {
     let value: u64;
     // SAFETY: ring-0 CR0 read.
@@ -249,6 +387,7 @@ pub(crate) fn fpu_state_ok() -> bool {
 }
 
 /// Read the current stack pointer.
+#[cfg(target_arch = "x86_64")]
 pub(crate) fn read_rsp() -> u64 {
     let value: u64;
     // SAFETY: reading rsp has no memory side effects.
@@ -262,7 +401,23 @@ pub(crate) fn read_rsp() -> u64 {
     value
 }
 
+/// Read the current stack pointer.
+#[cfg(target_arch = "aarch64")]
+pub(crate) fn read_rsp() -> u64 {
+    let value: u64;
+    // SAFETY: reading SP has no memory side effects.
+    unsafe {
+        core::arch::asm!(
+            "mov {}, sp",
+            out(reg) value,
+            options(nomem, nostack, preserves_flags),
+        );
+    }
+    value
+}
+
 /// Write CR3 (flushes non-global TLB entries).
+#[cfg(target_arch = "x86_64")]
 fn write_cr3(value: u64) {
     // SAFETY: the value is a page-table root installed by the kernel.
     unsafe {
@@ -274,6 +429,7 @@ fn write_cr3(value: u64) {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 fn rdmsr(msr: u32) -> u64 {
     let low: u32;
     let high: u32;
@@ -290,6 +446,7 @@ fn rdmsr(msr: u32) -> u64 {
     (u64::from(high) << 32) | u64::from(low)
 }
 
+#[cfg(target_arch = "x86_64")]
 fn wrmsr(msr: u32, value: u64) {
     // SAFETY: ring-0 MSR write of an architectural address.
     unsafe {

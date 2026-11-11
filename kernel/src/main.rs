@@ -21,15 +21,12 @@ mod log;
 mod memory;
 #[cfg(target_arch = "x86_64")]
 mod process;
-#[cfg(target_arch = "x86_64")]
 mod sched;
 #[cfg(target_arch = "x86_64")]
 mod selftest;
-#[cfg(target_arch = "x86_64")]
 mod sync;
 #[cfg(target_arch = "x86_64")]
 mod syscall;
-#[cfg(target_arch = "x86_64")]
 mod time;
 #[cfg(target_arch = "x86_64")]
 mod usercopy;

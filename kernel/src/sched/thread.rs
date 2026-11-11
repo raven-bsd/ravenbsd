@@ -20,7 +20,10 @@ use raven_abi::errno::Errno;
 use raven_rmm::VirtAddr;
 
 use crate::memory::paging;
+#[cfg(target_arch = "x86_64")]
 use crate::process::Process;
+#[cfg(target_arch = "aarch64")]
+use crate::sched::SchedProcess as Process;
 
 /// Lowest priority (idle).
 pub const PRIORITY_MAX: u8 = 31;
@@ -86,6 +89,10 @@ impl SchedContext {
 }
 
 /// A schedulable kernel or user thread.
+///
+/// The user-thread fields (`user_entry`, `user_stack`, `arg`, `cr3`, and `id` for process
+/// accounting) are only read by the x86-64 user path; aarch64 has kernel threads until S14c.
+#[cfg_attr(target_arch = "aarch64", allow(dead_code))]
 pub struct Thread {
     /// Monotonic thread id.
     pub id: u64,
@@ -225,6 +232,7 @@ impl Thread {
     }
 
     /// Create a ring-3 thread in `process`.
+    #[cfg(target_arch = "x86_64")]
     pub fn new_user(
         name: String,
         process: Arc<Process>,
@@ -314,6 +322,7 @@ impl Thread {
     /// The AP is already executing on the returned kernel stack when this object is published, so
     /// the stack is not prepared with [`crate::sched::context::prepare_stack`]: the first
     /// `sched_switch` saves the live stack pointer.
+    #[cfg(target_arch = "x86_64")]
     pub fn new_idle_ap(process: Arc<Process>, cr3: u64) -> Result<Arc<Thread>, Errno> {
         let (base, top) = allocate_kernel_stack().ok_or(Errno::ENOMEM)?;
         Ok(Arc::new(Thread {
