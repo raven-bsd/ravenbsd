@@ -198,7 +198,7 @@ pub fn install_initial(
     table.insert(Object::Process(Arc::clone(process)), Rights::ALL)?;
     let mut initfs = Rights::READ.union(Rights::MAP);
     if initfs_exec {
-        initfs = initfs.union(Rights::EXEC);
+        initfs = initfs.union(Rights::EXEC).union(Rights::TRANSFER);
     }
     table.insert(Object::MemObjectInitfs, initfs)?;
     table.insert(Object::Namespace, Rights::READ)?;

@@ -38,6 +38,10 @@ const MAX_HANDLES: usize = 65_536;
 /// Initial kernel handles: self process, initfs, namespace, RootDevice (well-known, see
 /// architecture/01-kernel.md — handle 3 is reserved for it since S21a).
 const INITIAL_HANDLES: usize = 4;
+/// Parent table slots after the pattern memory object: child, stack, thread.
+const CHILD_HANDLE_INDEX: u32 = (INITIAL_HANDLES + 1) as u32;
+const STACK_HANDLE_INDEX: u32 = CHILD_HANDLE_INDEX + 1;
+const THREAD_HANDLE_INDEX: u32 = STACK_HANDLE_INDEX + 1;
 const OPEN_RETRIES: usize = 2000;
 
 fn result(value: isize) -> Result<usize, Errno> {
@@ -181,7 +185,7 @@ fn start_child(
     live: &mut usize,
 ) -> Result<i32, Errno> {
     let child = proc_create()?;
-    if child.index() != 4 {
+    if child.index() != CHILD_HANDLE_INDEX {
         println!("s25: child index {}", child.index());
         return Err(Errno::EIO);
     }
@@ -214,7 +218,7 @@ fn start_child(
         }
     }
     let stack = memobj_create(STACK_SIZE)?;
-    if stack.index() != 5 {
+    if stack.index() != STACK_HANDLE_INDEX {
         println!("s25: stack index {}", stack.index());
         return Err(Errno::EIO);
     }
@@ -258,9 +262,15 @@ fn start_child(
         println!("s25: transferred {:#x}", transferred.0);
         return Err(Errno::EIO);
     }
+    // S29: the first process must be able to grant the initfs to a child.
+    let initfs = transfer(child, Handle::INITFS, Rights::READ.union(Rights::MAP))?;
+    if initfs != Handle::new(4, 0) {
+        println!("s25: initfs transfer {:#x}", initfs.0);
+        return Err(Errno::EIO);
+    }
 
     let thread = thread_create(child, elf.entry() as usize, stack_pointer)?;
-    if thread.index() != 6 {
+    if thread.index() != THREAD_HANDLE_INDEX {
         println!("s25: thread index {}", thread.index());
         return Err(Errno::EIO);
     }
@@ -343,7 +353,7 @@ fn main(_args: raven_rt::Args) -> i32 {
         Ok(handle) => handle,
         Err(_) => return 5,
     };
-    if memory.index() != INITIAL_HANDLES {
+    if memory.index() != INITIAL_HANDLES as u32 {
         return 6;
     }
     live += 1;
