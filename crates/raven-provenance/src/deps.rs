@@ -75,7 +75,11 @@ pub(crate) fn load_mpl_allow(root: &Path) -> HashSet<String> {
 }
 
 /// Run the dependency check over `root`; returns violations and non-fatal warnings.
-pub(crate) fn check(root: &Path) -> (Vec<Violation>, Vec<String>) {
+///
+/// A broken dependency scan (`cargo metadata` fails, or it returns no package list) is only a
+/// warning by default. With `strict` — what the gate uses — it is a violation, because a check
+/// that cannot run must not silently pass.
+pub(crate) fn check(root: &Path, strict: bool) -> (Vec<Violation>, Vec<String>) {
     let mut violations = Vec::new();
     let mut warnings = Vec::new();
     match cargo_metadata(root) {
@@ -120,17 +124,42 @@ pub(crate) fn check(root: &Path) -> (Vec<Violation>, Vec<String>) {
                     }
                 }
             } else {
-                warnings.push(
+                report_broken_scan(
+                    strict,
+                    &mut violations,
+                    &mut warnings,
                     "cargo metadata returned no packages list; dependency licence check skipped"
                         .to_string(),
                 );
             }
         }
-        Err(error) => warnings.push(format!(
-            "cargo metadata --offline failed; dependency licence check skipped: {error}"
-        )),
+        Err(error) => report_broken_scan(
+            strict,
+            &mut violations,
+            &mut warnings,
+            format!("cargo metadata --offline failed; dependency licence check skipped: {error}"),
+        ),
     }
     (violations, warnings)
+}
+
+/// Record a dependency scan that could not produce an answer: a warning normally, a violation
+/// when the caller asked for `--strict`.
+fn report_broken_scan(
+    strict: bool,
+    violations: &mut Vec<Violation>,
+    warnings: &mut Vec<String>,
+    message: String,
+) {
+    if strict {
+        violations.push(Violation::new(
+            "cargo metadata",
+            "dependency-metadata",
+            message,
+        ));
+    } else {
+        warnings.push(message);
+    }
 }
 
 fn cargo_metadata(root: &Path) -> Result<Value, String> {
@@ -250,9 +279,60 @@ mod tests {
     #[test]
     fn missing_manifest_is_a_warning_not_a_violation() {
         let temp = TempDir::new("deps-no-manifest");
-        let (violations, warnings) = check(temp.path());
+        let (violations, warnings) = check(temp.path(), false);
         assert!(violations.is_empty());
         assert!(!warnings.is_empty());
+    }
+
+    #[test]
+    fn missing_manifest_is_a_violation_under_strict() {
+        let temp = TempDir::new("deps-no-manifest-strict");
+        let (violations, warnings) = check(temp.path(), true);
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.rule == "dependency-metadata"),
+            "{violations:?}"
+        );
+        assert!(warnings.is_empty(), "{warnings:?}");
+    }
+
+    #[test]
+    fn broken_dependency_scan_is_a_warning_by_default() {
+        let temp = TempDir::new("deps-broken-manifest");
+        temp.write(
+            "Cargo.toml",
+            "[package]\nname = \"probe\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n\
+             [dependencies]\nmissing = { path = \"deps/missing\" }\n",
+        );
+        temp.write("src/lib.rs", "");
+        let (violations, warnings) = check(temp.path(), false);
+        assert!(violations.is_empty(), "{violations:?}");
+        assert!(
+            warnings
+                .iter()
+                .any(|warning| warning.contains("cargo metadata")),
+            "{warnings:?}"
+        );
+    }
+
+    #[test]
+    fn broken_dependency_scan_is_a_violation_under_strict() {
+        let temp = TempDir::new("deps-broken-manifest-strict");
+        temp.write(
+            "Cargo.toml",
+            "[package]\nname = \"probe\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n\
+             [dependencies]\nmissing = { path = \"deps/missing\" }\n",
+        );
+        temp.write("src/lib.rs", "");
+        let (violations, warnings) = check(temp.path(), true);
+        assert!(
+            violations.iter().any(|violation| {
+                violation.rule == "dependency-metadata" && violation.path == "cargo metadata"
+            }),
+            "{violations:?}"
+        );
+        assert!(warnings.is_empty(), "{warnings:?}");
     }
 
     #[test]
@@ -265,7 +345,7 @@ mod tests {
             "[package]\nname = \"probe\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
         );
         temp.write("src/lib.rs", "");
-        let (violations, warnings) = check(temp.path());
+        let (violations, warnings) = check(temp.path(), false);
         assert!(violations.is_empty());
         assert!(warnings.is_empty(), "{warnings:?}");
     }
@@ -306,7 +386,7 @@ mod tests {
     }
 
     fn dependency_violations(root: &Path) -> Vec<Violation> {
-        let (violations, warnings) = check(root);
+        let (violations, warnings) = check(root, false);
         assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
         violations
             .into_iter()

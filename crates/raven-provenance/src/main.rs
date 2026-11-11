@@ -14,9 +14,12 @@ use raven_provenance::{CheckOptions, check, fix_spdx, list};
 
 const USAGE: &str = "\
 usage:
-  raven-provenance check [--root <dir>] [--json] [--donors-lock <path>]
+  raven-provenance check [--root <dir>] [--json] [--donors-lock <path>] [--strict]
   raven-provenance list [--root <dir>]
-  raven-provenance fix-spdx [--root <dir>]";
+  raven-provenance fix-spdx [--root <dir>]
+
+`--strict` makes a dependency scan that cannot run (`cargo metadata --offline` fails or
+returns no package list) a violation instead of a warning; the gate uses it.";
 
 fn main() -> ExitCode {
     match run() {
@@ -74,6 +77,7 @@ fn run_check(args: &[String]) -> Result<u8> {
                 options.donors_lock = Some(PathBuf::from(value(args, index, "--donors-lock")?));
             }
             "--json" => json = true,
+            "--strict" => options.strict = true,
             other => bail!("unexpected argument `{other}`\n{USAGE}"),
         }
         index += 1;
