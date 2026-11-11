@@ -727,6 +727,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-s31-irq"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-s32-capture"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "driver-irq-lifecycle"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/s31-irq/build.sh"]
+initfs = "build/fixtures/s31-irq/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s30-irq-probe=1"
+qemu_extra = ["-device", "edu"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^s31: msi fired count=10000$'
+
+# The late message from the closed source is flushed by the next irq_create.
+[[expect]]
+regex = '^irq: unclaimed vector 0x[0-9a-f]{2} \(eoi\)$'
+
+[[expect]]
+regex = '^s31: quarantine ok old=0x[0-9a-f]{2} new=0x[0-9a-f]{2}$'
+
+# The isolation probe's IRQ_WAIT flushes the records from the old source's burst.
+[[expect]]
+regex = '^irq: unclaimed vector 0x[0-9a-f]{2} \(eoi\)$'
+
+[[expect]]
+regex = '^s31: isolation ok$'
+
+[[expect]]
+regex = '^s31: spurious logged$'
+
+[[expect]]
+regex = '^s31: source disabled$'
+
+[[expect]]
+regex = '^s31: waiter cancelled errno=5$'
+
+[[expect]]
+regex = '^s31: process alive$'
+
+# The legacy reopen must start masked; closing the first handle masked it.
+[[expect]]
+regex = '^s30: legacy gsi=\d+ vector=0x[0-9a-f]{2} masked=1$'
+
+[[expect]]
+regex = '^s30: legacy gsi=\d+ masked=0$'
+
+[[expect]]
+regex = '^s30: legacy gsi=\d+ vector=0x[0-9a-f]{2} masked=1$'
+
+[[expect]]
+regex = '^s31: legacy close masked$'
+
+[[expect]]
+regex = '^s31: lifecycle ok$'
+
+[[forbid]]
+regex = '(?i)panic'
