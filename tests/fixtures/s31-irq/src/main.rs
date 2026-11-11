@@ -8,8 +8,8 @@
 //! 1. an MSI vector closed while its source is still armed is quarantined; a new IRQ gets a
 //!    different vector and none of the old device's messages reach it;
 //! 2. closing a handle while a second thread blocks in `IRQ_WAIT` wakes that thread with `EIO`,
-//!    the process stays alive and can create a new IRQ (the waiter blocks with a bounded
-//!    timeout and revalidates, so a lost wake cannot strand it);
+//!    the process stays alive and can create a new IRQ (the waiter blocks in one call with a
+//!    60 s anti-hang timeout; only the close's wake may complete it);
 //! 3. closing and reopening a legacy GSI leaves the line masked after the last close.
 //!
 //! The kernel's `s30-irq-probe` and spurious-vector reports supply the serial evidence; the
@@ -291,24 +291,25 @@ fn waiter_stack_top() -> usize {
     base.saturating_add(WAITER_STACK_SIZE)
 }
 
-/// Second thread: block in `IRQ_WAIT` until the main thread closes the handle.
+/// Second thread: block in one `IRQ_WAIT` call until the main thread closes the handle.
 ///
-/// The close is expected to wake the blocked waiter; the bounded timeout is a safety net, not
-/// the mechanism: it guarantees that a lost wake revalidates the handle instead of stranding
-/// the thread (and the case) forever.  Each new `IRQ_WAIT` re-checks the cancel state first,
-/// so the waiter still reports the close as `EIO`.
+/// One call only: the close must wake the blocked waiter with `EIO`.  A call that re-entered
+/// after a timeout would take the handle lookup before the cancellation check and report
+/// `EBADF` once the close had committed, which is not the contract under test.  The kernel
+/// refuses to enqueue a waiter whose handle is closing, so a waiter that is inside this call
+/// when the close runs is always woken (or never blocks and re-checks); the 60 s timeout is
+/// purely an anti-hang net, and if it ever fires the close never landed, which the verdict
+/// print exposes.
 extern "C" fn waiter_thread(_argument: usize) -> ! {
     WAIT_STARTED.store(true, Ordering::Release);
     let handle = Handle(WAIT_HANDLE.load(Ordering::Acquire) as u32);
-    let code = loop {
-        match irq_wait(handle, 250_000_000) {
-            Err(error) => break i32::from(error.0),
-            // Timeout: revalidate and block again.
-            Ok(0) => continue,
-            // The victim source never fires; a positive count means a foreign message reached
-            // this object, which the errno assertion below turns into a test failure.
-            Ok(count) => break i32::try_from(count).unwrap_or(i32::MAX),
-        }
+    let code = match irq_wait(handle, 60_000_000_000) {
+        Err(error) => i32::from(error.0),
+        // The safety net fired: the close never reached the blocked waiter.
+        Ok(0) => 0,
+        // The victim source never fires; a positive count means a foreign message reached
+        // this object, which the verdict assertion below turns into a test failure.
+        Ok(count) => i32::try_from(count).unwrap_or(i32::MAX),
     };
     WAIT_RESULT.store(code, Ordering::Release);
     WAIT_DONE.store(true, Ordering::Release);
@@ -574,6 +575,9 @@ fn cancel_part(admin: Handle) -> Result<(), &'static str> {
     }
     let code = WAIT_RESULT.load(Ordering::Acquire);
     if code != i32::from(Errno::EIO.0) {
+        // Print the actual verdict: 0 is the safety net, 9 (EBADF) would mean the close beat
+        // the waiter's entry, anything else is a foreign errno.
+        println!("s31: waiter verdict={}", code);
         return Err("waiter errno");
     }
     println!("s31: waiter cancelled errno={}", code);
