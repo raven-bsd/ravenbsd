@@ -4,7 +4,9 @@
 name = "boot-uname"
 arch = "x86_64"
 profile = "base"
-timeout_secs = 20
+# Debug QEMU boots through OVMF and the kernel's initfs validation; the legacy path itself no
+# longer pays the userspace CRC pass. Keep a wide margin for loaded CI hosts.
+timeout_secs = 120
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
