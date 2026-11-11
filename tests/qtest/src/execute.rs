@@ -4,7 +4,7 @@
 //! Case execution: image preparation, process launch, matching and result classification.
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
 
@@ -133,6 +133,10 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
             ResultKind::Skipped,
             started,
         );
+    }
+
+    if let Err(reason) = run_pre_commands(case) {
+        return finish(report, Vec::new(), Some(reason), ResultKind::Error, started);
     }
 
     let (program, args) = match &options.runner {
@@ -296,6 +300,8 @@ fn prepare_image(
         arch,
         &case.spec.profile,
         case.spec.boot_cmdline.as_deref(),
+        case.spec.initfs.as_deref().map(Path::new),
+        case.spec.loader_kernel.as_deref().map(Path::new),
         &image,
     );
     let output = Command::new(&program)
@@ -322,6 +328,37 @@ fn prepare_image(
         )));
     }
     Ok(image)
+}
+
+fn last_line(text: &str) -> Option<&str> {
+    text.lines().rev().find(|line| !line.trim().is_empty())
+}
+
+/// Run the case's `pre` commands in order with `sh -c`.
+///
+/// They run from the harness working directory (the repository root for `cargo xtask qtest`)
+/// and before the image build. A non-zero exit turns the case into `error`.
+fn run_pre_commands(case: &Case) -> Result<(), String> {
+    for (index, command) in case.spec.pre.iter().enumerate() {
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(command)
+            .output()
+            .map_err(|error| format!("pre[{index}] `{command}` could not start: {error}"))?;
+        if output.status.success() {
+            continue;
+        }
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let message = last_line(&stderr)
+            .or_else(|| last_line(&stdout))
+            .unwrap_or("no output");
+        return Err(format!(
+            "pre[{index}] `{command}` failed with {}: {message}",
+            output.status
+        ));
+    }
+    Ok(())
 }
 
 fn describe_failure(case: &Case, report: &CaseReport, timed_out: bool, exit: ExitKind) -> String {
@@ -581,5 +618,58 @@ mod tests {
         assert!(detail.contains("step 1"), "{detail}");
         assert!(detail.contains("^never$"), "{detail}");
         assert!(detail.contains("started"), "{detail}");
+    }
+
+    #[test]
+    fn pre_commands_run_in_order() {
+        let temp = TempDir::new("execute-pre");
+        let marker = temp.path().join("order.txt");
+        let text = format!(
+            "name = \"pre\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = 5\n\
+             expect_exit = \"success\"\n\
+             pre = [\"echo one >> {}\", \"echo two >> {}\"]\n",
+            marker.display(),
+            marker.display()
+        );
+        let case = Case::parse(&text).unwrap();
+        let outcome = execute(&case, &runner("exit 33"));
+        assert_eq!(
+            outcome.report.result,
+            ResultKind::Pass,
+            "{:?}",
+            outcome.detail
+        );
+        assert_eq!(std::fs::read_to_string(&marker).unwrap(), "one\ntwo\n");
+    }
+
+    #[test]
+    fn a_failing_pre_command_is_an_error() {
+        let temp = TempDir::new("execute-pre-fail");
+        let marker = temp.path().join("ran.txt");
+        let text = "name = \"pre-fail\"\narch = \"x86_64\"\nprofile = \"base\"\n\
+                    timeout_secs = 5\nexpect_exit = \"success\"\n\
+                    pre = [\"echo broken >&2; exit 7\"]\n";
+        let case = Case::parse(text).unwrap();
+        let outcome = execute(&case, &runner(&format!("touch {}", marker.display())));
+        assert_eq!(outcome.report.result, ResultKind::Error);
+        let detail = outcome.detail.expect("detail");
+        assert!(detail.contains("pre[0]"), "{detail}");
+        assert!(detail.contains("broken"), "{detail}");
+        assert!(!marker.exists(), "the runner must not start");
+    }
+
+    #[test]
+    fn a_skipped_case_does_not_run_pre_commands() {
+        let temp = TempDir::new("execute-skip-pre");
+        let marker = temp.path().join("ran.txt");
+        let text = format!(
+            "name = \"skip-pre\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = 5\n\
+             expect_exit = \"success\"\nskip = \"later\"\npre = [\"touch {}\"]\n",
+            marker.display()
+        );
+        let case = Case::parse(&text).unwrap();
+        let outcome = execute(&case, &runner("exit 33"));
+        assert_eq!(outcome.report.result, ResultKind::Skipped);
+        assert!(!marker.exists(), "a skipped case must not run pre commands");
     }
 }
