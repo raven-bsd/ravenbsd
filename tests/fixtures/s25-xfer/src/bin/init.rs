@@ -35,8 +35,9 @@ const PATTERN: u8 = 0xa5;
 const CYCLES: usize = 100;
 /// Mirrors `raven_handles::MAX_HANDLES`.
 const MAX_HANDLES: usize = 65_536;
-/// Initial kernel handles: self process, initfs, namespace.
-const INITIAL_HANDLES: usize = 3;
+/// Initial kernel handles: self process, initfs, namespace, RootDevice (well-known, see
+/// architecture/01-kernel.md — handle 3 is reserved for it since S21a).
+const INITIAL_HANDLES: usize = 4;
 const OPEN_RETRIES: usize = 2000;
 
 fn result(value: isize) -> Result<usize, Errno> {
@@ -342,7 +343,7 @@ fn main(_args: raven_rt::Args) -> i32 {
         Ok(handle) => handle,
         Err(_) => return 5,
     };
-    if memory.index() != 3 {
+    if memory.index() != INITIAL_HANDLES {
         return 6;
     }
     live += 1;
