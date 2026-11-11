@@ -639,6 +639,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-ringbuf"
+version = "0.1.0"
+
+[[package]]
 name = "raven-rmm"
 version = "0.1.0"
 
@@ -725,6 +729,14 @@ dependencies = [
  "raven-elf",
  "raven-initfs",
  "raven-ipc",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-s27-echo"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
  "raven-rt",
 ]
 

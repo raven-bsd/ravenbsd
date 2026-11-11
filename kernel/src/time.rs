@@ -99,6 +99,9 @@ pub fn on_tick() {
     TICKS.fetch_add(1, Ordering::Relaxed);
     #[cfg(target_arch = "x86_64")]
     apic::eoi();
+    // S27 fallback: drain COM1 from the tick when the IOAPIC line is unavailable.
+    #[cfg(target_arch = "x86_64")]
+    crate::console::poll();
     crate::event::notify_all();
 }
 

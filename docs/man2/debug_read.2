@@ -1,21 +1,59 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 12, 2026
 .Dt DEBUG_READ 2
 .Os RavenBSD
 .Sh NAME
 .Nm debug_read
-.Nd reads bytes typed on the debug console
+.Nd read raw bytes from the debug console
 .Sh SYNOPSIS
-See the
-.Pa raven-abi
-crate (syscall number 0x07).
+.Fn debug_read buf len timeout_ns
 .Sh DESCRIPTION
-The
 .Nm
-system call is part of RavenBSD ABI v1. It is implemented by ticket S27; this page is the contract placeholder and will be
-completed when S27 lands. The authoritative signature is the doc comment of the syscall in the
-.Pa raven-abi
-crate.
+copies up to
+.Fa len
+raw bytes from the console receiver into
+.Fa buf
+and returns the number copied, which may be less than
+.Fa len .
+On x86-64 the console is COM1; each received byte is placed in a 4 KiB ring buffer by the
+.Fn received-data-available
+interrupt and the call blocks on a wait queue until at least one byte is available.
+Bytes are delivered exactly as received: there is no line buffering and no CR/LF translation.
+Several threads may call
+.Nm
+concurrently; the receiver wakes one waiter at a time and every waiter re-checks the ring, so a
+byte is handed to exactly one reader and a wakeup cannot be lost.
+.Pp
+A
+.Fa timeout_ns
+of zero waits forever; otherwise an elapsed timeout returns 0.
+.Fa len
+of zero returns 0 without blocking.
+.Pp
+The receive line is ISA IRQ 4, routed through the IOAPIC with the MADT interrupt-source override
+when one exists.  If the IOAPIC is unavailable the kernel polls the UART from the timer tick and
+notes the fallback in the boot log.  If the ring overruns, the oldest bytes are dropped and the
+kernel reports the accumulated count as
+.Ql console: rx dropped N
+from the reader path, at most once per second; the interrupt handler never writes to the log.
+.Sh RETURN VALUES
+The number of bytes copied, or 0 on timeout or when
+.Fa len
+is zero.  Errors are returned as a negative
+.Va errno .
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EFAULT
+.Fa buf
+is not writable user memory.
+.It Er EINVAL
+.Fa len
+does not fit the address space.
+.It Er ENOSYS
+The architecture has no console receive path.
+.El
+.Sh SEE ALSO
+.Xr debug_write 2
 .Sh STANDARDS
 RavenBSD ABI v1.
