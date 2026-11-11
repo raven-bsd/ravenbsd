@@ -13,14 +13,19 @@ PHDRS {
 SECTIONS {
     . = 0x00400000;
 
+    /* The R E LOAD file part must be a page multiple: spawn(Strict) rejects a partial tail. */
     .text ALIGN(4096) : {
         *(.text .text.*)
+        . = ALIGN(4096);
     } :text
 
+    /* The R LOAD file part must be a page multiple: spawn(Strict) rejects a partial tail. */
     .rodata ALIGN(4096) : {
         *(.rodata .rodata.*)
+        . = ALIGN(4096);
     } :rodata
 
+    /* The RW LOAD file part must be a page multiple: the end alignment below guarantees it. */
     .data ALIGN(4096) : {
         *(.data .data.*)
         *(.data.rel.ro .data.rel.ro.*)
@@ -29,6 +34,7 @@ SECTIONS {
         . = ALIGN(4096);
     } :data
 
+    /* .bss is NOLOAD: it has no file part; spawn maps its zero tail to the page boundary. */
     .bss ALIGN(4096) (NOLOAD) : {
         *(.bss .bss.*)
         *(COMMON)

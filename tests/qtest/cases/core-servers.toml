@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "core-servers"
+arch = "x86_64"
+profile = "core-test"
+timeout_secs = 120
+pre = ["sh userland/servers/coretest/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: logd up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: nulld up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: zerod up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: randd up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: sysd up$'
+unordered = true
+
+[[expect]]
+regex = '^coretest: ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

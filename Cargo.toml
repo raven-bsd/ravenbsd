@@ -38,6 +38,12 @@ members = [
     "userland/bin/uname",
     "userland/bin/echo",
     "userland/bin/svcctl",
+    "userland/servers/logd",
+    "userland/servers/sysd",
+    "userland/servers/randd",
+    "userland/servers/zerod",
+    "userland/servers/nulld",
+    "userland/servers/coretest",
     "tests/net/packetdrill-harness",
     "tools/bench-host",
 ]

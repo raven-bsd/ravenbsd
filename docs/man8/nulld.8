@@ -1,0 +1,32 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 11, 2026
+.Dt NULLD 8
+.Os RavenBSD
+.Sh NAME
+.Nm nulld
+.Nd RavenBSD null device server
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+registers the
+.Dq null:
+scheme.
+Every read is end-of-file (zero bytes); writes are accepted and discarded.
+The file mode reported by
+.Dv FSTAT
+is a character device with mode 0666.
+.Sh FILES
+.Bl -tag -width /etc/services.d -compact
+.It Pa /etc/services.d/nulld.toml
+Service manifest.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr zerod 8 ,
+.Xr randd 8 ,
+.Xr init 8
+.Sh STANDARDS
+RavenBSD.

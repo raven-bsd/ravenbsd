@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "zerod"
+exec = "/sbin/zerod"
+needs = ["logd"]
+provides = ["scheme:zero"]
+readiness = "scheme"
+restart = "on-failure"

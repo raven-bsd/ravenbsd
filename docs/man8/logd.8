@@ -1,0 +1,51 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 11, 2026
+.Dt LOGD 8
+.Os RavenBSD
+.Sh NAME
+.Nm logd
+.Nd RavenBSD system log server
+.Sh SYNOPSIS
+.Nm
+.Op Ar console=0
+.Sh DESCRIPTION
+.Nm
+registers the
+.Dq log:
+scheme.
+Opening
+.Pa log:<name>
+and writing appends a record of the form
+.D1 Ar seconds . Ns Ar millis Ar name : Ar message
+to a fixed 64 KiB ring.
+The writer name is the path suffix; opening
+.Pa log:
+uses
+.Dq log .
+Reads return the retained text from a per-handle cursor starting at the oldest byte, so a slow
+reader sees the retained tail after an overwrite.
+.Pp
+Records are limited to 1 KiB; a longer message is truncated and ends with
+.Dq ... .
+Each record is also copied to the console with
+.Xr debug_write 2
+unless the argument
+.Ar console=0
+is present.
+.Pp
+The log is in memory only and is lost when
+.Nm
+restarts.
+.Sh FILES
+.Bl -tag -width /etc/services.d -compact
+.It Pa /etc/services.d/logd.toml
+Service manifest.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr sysd 8 ,
+.Xr init 8
+.Sh STANDARDS
+RavenBSD.
