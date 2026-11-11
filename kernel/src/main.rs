@@ -13,6 +13,9 @@ mod arch;
 mod backtrace;
 mod boot;
 mod cmdline;
+/// COM1 console input (x86-64 serial only).
+#[cfg(target_arch = "x86_64")]
+mod console;
 /// FDT types under the path the shared `raven-bootinfo-fdt` source expects when it is compiled
 /// into the kernel with `#[path]`.
 #[cfg(target_arch = "aarch64")]
@@ -102,6 +105,9 @@ pub extern "C" fn kmain(boot: *const raven_bootinfo::BootInfo) -> ! {
     if let Err(error) = arch::ioapic::init() {
         kprintln!("ioapic: unavailable ({error})");
     }
+    // S27: route COM1 receive before interrupts are enabled; falls back to tick polling.
+    #[cfg(target_arch = "x86_64")]
+    console::init();
     if let Err(error) = arch::timer::init() {
         kprintln!("kernel: error: {error}");
         boot::exit_qemu(0x11);
