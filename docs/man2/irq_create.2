@@ -24,12 +24,17 @@ capability with
 .Fa number
 is the ISA IRQ; the kernel translates it through the MADT interrupt-source
 overrides and honours the polarity and trigger the override declares.  The
-line stays masked until the first
+redirection entry is programmed masked and stays masked until the first
 .Xr irq_wait 2
 or
 .Xr irq_ack 2 ;
 .Fa flags
 must be 0.
+A GSI has one owner: a second
+.Nm
+for a line that is already owned fails with
+.Er EBUSY ,
+and closing the last handle masks the line and releases the claim.
 .It Fa kind
 .Dv MSI (2) or MSIX (3):
 the kernel allocates a free vector from its pool of 128 vectors (0x40..0xBF)
@@ -42,6 +47,12 @@ at the user pointer given in
 The driver programs the returned address and data into its device's MSI
 capability or MSI-X table entry; MSI and MSI-X share one encoding.
 .El
+The message always targets the boot processor's APIC.  For destination ids
+0..255 the encoding is
+.Sy address_lo = 0xFEE00000 | (id << 12)
+and
+.Sy address_hi = 0
+in both xAPIC and x2APIC mode; the id is never placed in the upper half.
 The returned handle carries
 .Dv READ ,
 .Dv DUP
@@ -49,10 +60,6 @@ and
 .Dv TRANSFER .
 Closing the last handle masks the source (legacy) and returns the vector to
 the pool.
-The interrupt is delivered to the boot CPU (where user threads run); the
-destination APIC id is encoded in
-.Em address_lo
-bits 19..12.
 .Sh ERRORS
 .Bl -tag -width Er
 .It Er EPERM
@@ -62,8 +69,13 @@ No root capability with
 Unknown kind, invalid number, a non-zero legacy
 .Fa flags ,
 or a bad IrqInfo pointer.
+.It Er EBUSY
+The legacy GSI already has an owner.
 .It Er ENOSPC
 The vector pool is exhausted.
+.It Er EOPNOTSUPP
+The boot APIC id is above 255; the extended-destination MSI format is not
+implemented.
 .It Er EFAULT
 The IrqInfo pointer is not writable user memory.
 .It Er EMFILE
