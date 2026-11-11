@@ -18,7 +18,7 @@ pub mod protocol;
 pub mod registry;
 pub mod router;
 
-use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
 
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
@@ -59,12 +59,42 @@ impl SchemeServer {
 
 /// One open scheme file.
 pub struct SchemeFile {
-    /// Kernel-assigned file id (also the packet `file_id`).
+    /// Kernel-assigned file id (also the `file_id` of the `OPEN` packet).
     pub id: u64,
     /// Owning server process.
     pub server: Arc<Process>,
-    /// Opaque cookie returned by the server's `Open` response.
+    /// Server file id returned by the server's `Open` response.
     pub server_cookie: AtomicU64,
+    /// Server-side references this kernel object accounts for: one successful `OPEN` plus one
+    /// `DUP` notification per duplicate. `CLOSE` is delivered for this many references only when
+    /// the last kernel handle (and in-flight request) is gone.
+    pub server_refs: AtomicU32,
+}
+
+impl SchemeFile {
+    /// The server file id carried on the wire after `OPEN`.
+    ///
+    /// The server keys its open-file description by this value. A zero cookie falls back to the
+    /// kernel id for servers that do not return one.
+    pub fn server_id(&self) -> u64 {
+        let cookie = self.server_cookie.load(Ordering::Acquire);
+        if cookie != 0 { cookie } else { self.id }
+    }
+}
+
+impl Drop for SchemeFile {
+    fn drop(&mut self) {
+        let references = self.server_refs.swap(0, Ordering::AcqRel);
+        if references == 0 {
+            return;
+        }
+        router::defer_close(
+            &self.server,
+            self.server_id(),
+            self.server_cookie.load(Ordering::Acquire),
+            references,
+        );
+    }
 }
 
 /// Captures owned by one request.
@@ -272,6 +302,12 @@ pub fn on_process_exit(process: &Arc<Process>) {
         client.drain(..).collect()
     };
     for request in client {
+        if matches!(request.opcode, Opcode::Close | Opcode::Dup) {
+            // One-way notifications must still reach the server after the client is gone: the
+            // server releases the open-file description on the last CLOSE, and DUP updates its
+            // reference count. They are the client's last words, not cancellable work.
+            continue;
+        }
         request.cancel();
     }
 

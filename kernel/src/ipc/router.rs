@@ -3,14 +3,16 @@
 
 //! Packet routing between scheme clients and servers.
 
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 use alloc::borrow::ToOwned;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 use raven_abi::types::{Handle, Rights};
 use raven_usercopy::UserSlice;
+use spin::Mutex;
 
 use crate::process::handle::Object;
 use crate::process::{self, Process};
@@ -26,6 +28,33 @@ use super::{next_file_id, next_request_id, registry};
 /// Maximum outstanding client requests one process may hold.
 const MAX_CLIENT_REQUESTS: usize = 1024;
 
+/// K66 wire open-flag bits (`raven-proto-fs::WIRE_OPEN_*`). The kernel carries the set and
+/// rejects unknown bits; combination checks are the server's typed `OpenFlags` job.
+const WIRE_OPEN_MASK: u32 = 0xFF;
+/// Read access bit.
+const WIRE_OPEN_READ: u32 = 1;
+/// Write access bit.
+const WIRE_OPEN_WRITE: u32 = 2;
+/// Access-mode mask.
+const WIRE_OPEN_ACCESS: u32 = WIRE_OPEN_READ | WIRE_OPEN_WRITE;
+
+/// One deferred last-close notification: one `CLOSE` per server reference, delivered when the
+/// queue is drained from a shallow server context.
+struct CloseNotice {
+    client: Arc<Process>,
+    server: Arc<Process>,
+    id: u64,
+    cookie: u64,
+    count: u32,
+}
+
+/// Last-close notifications produced by `SchemeFile::drop`.
+///
+/// A drop can run inside the deep server `SEND` path (when an in-flight request was the last
+/// holder), so the notice is queued instead of building requests there. `recv` drains it before
+/// taking the next request.
+static CLOSE_NOTICES: Mutex<Vec<CloseNotice>> = Mutex::new(Vec::new());
+
 /// Open a path on `server` and return a new scheme-file handle.
 pub fn open(
     caller: &Arc<Process>,
@@ -33,14 +62,21 @@ pub fn open(
     path: &str,
     flags: u32,
 ) -> Result<Handle, Errno> {
-    let rights = model::open_rights(flags).ok_or(Errno::EINVAL)?;
-    if flags > u32::from(u16::MAX) {
+    if flags & !WIRE_OPEN_MASK != 0 {
         return Err(Errno::EINVAL);
     }
+    // Rights follow only the access bits; O_TRUNC/O_APPEND/O_EXCL/O_DIRECTORY/O_NOFOLLOW travel
+    // through the wire flags and are validated by the server's `OpenFlags`. A SchemeFile is a
+    // transferable capability (C14), so retain TRANSFER for attachments and cross-process
+    // references.
+    let rights = model::open_rights(flags & WIRE_OPEN_ACCESS)
+        .ok_or(Errno::EINVAL)?
+        .union(Rights::TRANSFER);
     let file = Arc::new(SchemeFile {
         id: next_file_id(),
         server: Arc::clone(&server),
         server_cookie: AtomicU64::new(0),
+        server_refs: AtomicU32::new(1),
     });
     let handle = caller
         .handles
@@ -49,6 +85,8 @@ pub fn open(
     let mut packet = SchemePacket::request(Opcode::Open, next_request_id(), file.id);
     packet.flags = flags as u16;
     if packet.set_path(path.as_bytes()).is_err() {
+        // The server never saw an OPEN, so no CLOSE is owed.
+        file.server_refs.store(0, Ordering::Release);
         let _ = caller.handles.lock().close(handle);
         return Err(Errno::ENAMETOOLONG);
     }
@@ -67,6 +105,8 @@ pub fn open(
             if response.flags & REPLY_HANDLE != 0 && response.attach_count == 1 {
                 let attached = response.attach[0].handle;
                 let attached = Handle(attached);
+                // The attachment replaces this provisional SchemeFile; it owns no server state.
+                file.server_refs.store(0, Ordering::Release);
                 let _ = caller.handles.lock().close(handle);
                 return Ok(attached);
             }
@@ -75,10 +115,14 @@ pub fn open(
             Ok(handle)
         }
         Ok((status, _)) => {
+            // The server rejected the OPEN; it created no description to close.
+            file.server_refs.store(0, Ordering::Release);
             let _ = caller.handles.lock().close(handle);
             Err(status_errno(status))
         }
         Err(error) => {
+            // The OPEN may have reached the server before the wait failed; send one CLOSE so a
+            // description the client cannot see is not leaked. An unknown id is harmless.
             let _ = caller.handles.lock().close(handle);
             Err(error)
         }
@@ -97,8 +141,9 @@ pub fn read(
     }
     ensure_server(&file.server)?;
     let capture = capture::create(caller, &file.server, address, len, true)?;
-    let mut packet = SchemePacket::request(Opcode::Read, next_request_id(), file.id);
+    let mut packet = SchemePacket::request(Opcode::Read, next_request_id(), file.server_id());
     packet.buffer_len = len;
+    packet.offset = 0;
     packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
     let request = PendingRequest::new(
         Arc::clone(caller),
@@ -130,8 +175,9 @@ pub fn write(
     }
     ensure_server(&file.server)?;
     let capture = capture::create(caller, &file.server, address, len, false)?;
-    let mut packet = SchemePacket::request(Opcode::Write, next_request_id(), file.id);
+    let mut packet = SchemePacket::request(Opcode::Write, next_request_id(), file.server_id());
     packet.buffer_len = len;
+    packet.offset = 0;
     packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
     let request = PendingRequest::new(
         Arc::clone(caller),
@@ -151,7 +197,8 @@ pub fn write(
     Ok(usize::try_from(result).unwrap_or(usize::MAX))
 }
 
-/// Close a scheme file (the local handle is always closed; the packet is best effort).
+/// Close a scheme file (the local handle is always closed; the server sees the CLOSE only when
+/// the last kernel reference goes away).
 pub fn close(caller: &Arc<Process>, handle: Handle) -> Result<(), Errno> {
     let file = {
         let handles = caller.handles.lock();
@@ -162,7 +209,20 @@ pub fn close(caller: &Arc<Process>, handle: Handle) -> Result<(), Errno> {
     };
     crate::event::on_handle_close(caller, handle);
     caller.handles.lock().close(handle)?;
-    one_way(&file, Opcode::Close);
+    if Arc::strong_count(&file) == 1 {
+        // No other handle, transfer or in-flight request references this open-file description.
+        // Build the CLOSE requests here, in the shallow close-syscall context, so they are
+        // queued before the caller's next request.
+        let references = file.server_refs.swap(0, Ordering::AcqRel);
+        if references > 0 {
+            close_notify(
+                &file.server,
+                file.server_id(),
+                file.server_cookie.load(Ordering::Acquire),
+                references,
+            );
+        }
+    }
     Ok(())
 }
 
@@ -176,7 +236,24 @@ pub fn dup(caller: &Arc<Process>, handle: Handle, mask: u32) -> Result<Handle, E
         }
     };
     let duplicate = caller.handles.lock().dup(handle, Rights(mask))?;
-    one_way(&file, Opcode::Dup);
+    let mut packet = SchemePacket::request(Opcode::Dup, next_request_id(), file.server_id());
+    packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
+    let request = PendingRequest::new(
+        Arc::clone(caller),
+        Arc::clone(&file.server),
+        Some(Arc::clone(&file)),
+        Opcode::Dup,
+        packet,
+        RequestBuffers::default(),
+    );
+    // One server reference per duplicate. The notification must be enqueued; a failed submit
+    // rolls the duplicate back instead of leaving the server's count short.
+    file.server_refs.fetch_add(1, Ordering::AcqRel);
+    if let Err(error) = submit(&request) {
+        file.server_refs.fetch_sub(1, Ordering::AcqRel);
+        let _ = caller.handles.lock().close(duplicate);
+        return Err(error);
+    }
     Ok(duplicate)
 }
 
@@ -192,7 +269,7 @@ pub fn fstat(
     } else {
         None
     };
-    let mut packet = SchemePacket::request(Opcode::Fstat, next_request_id(), file.id);
+    let mut packet = SchemePacket::request(Opcode::Fstat, next_request_id(), file.server_id());
     packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
     packet.response_len = len;
     let request = PendingRequest::new(
@@ -245,7 +322,7 @@ pub fn call(
     } else {
         None
     };
-    let mut packet = SchemePacket::request(Opcode::Call, next_request_id(), file.id);
+    let mut packet = SchemePacket::request(Opcode::Call, next_request_id(), file.server_id());
     packet.buffer_len = request_len;
     packet.response_len = response_len;
     packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
@@ -276,6 +353,9 @@ pub fn recv(caller: &Arc<Process>, packet_address: u64, capacity: u64) -> Result
         return Err(Errno::EINVAL);
     }
     loop {
+        // Last-close notifications can be produced by a drop in the deep SEND path; submit them
+        // here, where the stack is shallow, before looking for the next request.
+        drain_close_notices();
         let request = {
             let mut queue = caller.scheme_queue.lock();
             queue.pop_front()
@@ -595,6 +675,16 @@ fn deliver(
 }
 
 fn submit(request: &Arc<PendingRequest>) -> Result<(), Errno> {
+    submit_checked(request, true)
+}
+
+/// Enqueue one close notification without the client-request cap: the last-close handoff must
+/// not be dropped because the dying process has many other requests in flight.
+fn submit_close(request: &Arc<PendingRequest>) -> Result<(), Errno> {
+    submit_checked(request, false)
+}
+
+fn submit_checked(request: &Arc<PendingRequest>, bounded: bool) -> Result<(), Errno> {
     // Hold the server state lock while enqueueing: `notify_exit` marks the process Exited under
     // the same lock and only then drains the queue, so a request cannot be pushed into a dead
     // server's queue after the drain.
@@ -606,7 +696,7 @@ fn submit(request: &Arc<PendingRequest>) -> Result<(), Errno> {
     // loops one-way CLOSE/DUP against a slow server cannot grow kernel memory without limit.
     {
         let mut client_requests = request.client.client_requests.lock();
-        if client_requests.len() >= MAX_CLIENT_REQUESTS {
+        if bounded && client_requests.len() >= MAX_CLIENT_REQUESTS {
             return Err(Errno::EAGAIN);
         }
         client_requests.push(Arc::clone(request));
@@ -663,23 +753,75 @@ fn wait(caller: &Arc<Process>, request: &Arc<PendingRequest>) -> Result<(i32, u6
     Ok((status, request.result_len.load(Ordering::Acquire)))
 }
 
-fn one_way(file: &Arc<SchemeFile>, opcode: Opcode) {
-    if !registry::owner_running(&file.server) {
+/// Deliver one `CLOSE` per server reference when the last kernel handle is released.
+///
+/// Called from an explicit `close` syscall (shallow context); the requests are queued before the
+/// caller's next request.
+pub(crate) fn close_notify(server: &Arc<Process>, id: u64, cookie: u64, count: u32) {
+    let client = process::current().unwrap_or_else(|| Arc::clone(server));
+    close_requests(client, server, id, cookie, count);
+}
+
+/// Queue a last-close notification for a server-side drain.
+///
+/// `SchemeFile::drop` can run inside the deep `SEND` path when an in-flight request is the last
+/// holder; building requests there overflows the kernel stack. `recv` drains the queue before it
+/// takes the next request.
+pub(crate) fn defer_close(server: &Arc<Process>, id: u64, cookie: u64, count: u32) {
+    if count == 0 || !registry::owner_running(server) {
         return;
     }
-    let mut packet = SchemePacket::request(opcode, next_request_id(), file.id);
-    packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
-    let request = PendingRequest::new(
-        process::current().unwrap_or_else(|| Arc::clone(&file.server)),
-        Arc::clone(&file.server),
-        Some(Arc::clone(file)),
-        opcode,
-        packet,
-        RequestBuffers::default(),
-    );
-    if submit(&request).is_ok() {
-        // The server will complete the request through SEND; if it never does, server exit
-        // completes it.
+    let client = process::current().unwrap_or_else(|| Arc::clone(server));
+    CLOSE_NOTICES.lock().push(CloseNotice {
+        client,
+        server: Arc::clone(server),
+        id,
+        cookie,
+        count,
+    });
+    server.scheme_waiters.wake_all();
+}
+
+/// Submit every queued last-close notification. Called at the top of the `RECV` loop.
+pub(crate) fn drain_close_notices() {
+    let notices = {
+        let mut queue = CLOSE_NOTICES.lock();
+        if queue.is_empty() {
+            return;
+        }
+        core::mem::take(&mut *queue)
+    };
+    for notice in notices {
+        close_requests(
+            notice.client,
+            &notice.server,
+            notice.id,
+            notice.cookie,
+            notice.count,
+        );
+    }
+}
+
+fn close_requests(client: Arc<Process>, server: &Arc<Process>, id: u64, cookie: u64, count: u32) {
+    if count == 0 || !registry::owner_running(server) {
+        return;
+    }
+    let mut remaining = count;
+    while remaining > 0 {
+        let mut packet = SchemePacket::request(Opcode::Close, next_request_id(), id);
+        packet.server_cookie = cookie;
+        let request = PendingRequest::new(
+            Arc::clone(&client),
+            Arc::clone(server),
+            None,
+            Opcode::Close,
+            packet,
+            RequestBuffers::default(),
+        );
+        if submit_close(&request).is_err() {
+            break;
+        }
+        remaining = remaining.saturating_sub(1);
     }
 }
 

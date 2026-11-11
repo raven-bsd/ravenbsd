@@ -22,7 +22,8 @@ is sequential.  The server writes at the cursor in the open-file description and
 advances it by the number of bytes written.  The wire offset must be zero; a
 server returns
 .Er EINVAL
-for a nonzero offset.
+for a nonzero offset.  The kernel has no offset argument for this syscall and
+always sends zero.
 .Pp
 With
 .Dv WIRE_OPEN_APPEND

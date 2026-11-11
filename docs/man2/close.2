@@ -23,6 +23,13 @@ description and its cursor only when the last reference is closed.  A
 .Xr dup 2
 duplicate or a transferred reference keeps the description alive.
 .Pp
+The kernel closes the local handle immediately but sends the protocol CLOSE only
+when the last kernel reference (including attachments, transfers and in-flight
+requests) is gone.  It sends one CLOSE per server reference, so the server's
+reference count reaches zero at the same time.  A dying process closes every
+handle it owned exactly once; one-way CLOSE notifications are delivered even
+after the client is gone.
+.Pp
 When the last reference to an unlinked file is closed, the server releases the
 inode and its data.  A process that dies closes every handle it owned exactly
 once; a transferred reference in another process still keeps the description

@@ -85,6 +85,18 @@ uses mode
 (0o666 masked by the server umask 0o022); use
 .Xr chmod 2
 to change it.
+.Pp
+The kernel carries all eight wire bits, rejects unknown bits with
+.Er EINVAL ,
+and derives the new handle's
+.Dv READ / WRITE / DUP / TRANSFER
+rights from the access bits only.  Combination checks and the atomic
+.Dv O_EXCL / O_APPEND / O_TRUNC
+operations are the server's.  The successful reply's server file id (the
+.Va server_cookie )
+is used as the wire
+.Va file_id
+for every later request on the handle; the handle itself is transferable.
 .Sh PATHS
 An absolute path is normalized by
 .Nm vfsd :

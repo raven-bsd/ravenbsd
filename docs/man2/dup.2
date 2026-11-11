@@ -28,6 +28,14 @@ description's reference count and releases it only at the last
 .Pp
 The rights mask reduces the rights of the new kernel handle.  It does not create
 a new server file id and it does not reset the cursor.
+.Pp
+The kernel sends a reliable
+.Dv Dup
+notification before it returns; if the notification cannot be queued, the
+duplicate is closed and the syscall fails.  The server increments the
+open-file-description reference count.  The kernel's last close sends one CLOSE
+per server reference, so the description is released only after every duplicate
+and transferred reference is gone.
 .Sh RETURN VALUES
 A new SchemeFile handle on success.
 .Sh ERRORS
