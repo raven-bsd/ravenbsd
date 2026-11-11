@@ -68,6 +68,7 @@
 use alloc_crate::vec;
 use alloc_crate::vec::Vec;
 
+use crate::alloc::csum_total;
 use crate::blockio::BlockIo;
 use crate::dinode::Inode;
 use crate::error::UfsError;
@@ -76,9 +77,11 @@ use crate::fs::{Csum32, Superblock, UFS_ROOTINO};
 use crate::inode as inode_load;
 use crate::types::{Attr, DirEntry, FileType, Ino, MountOptions, StatFs};
 use crate::ufs_bmap;
+use crate::wapbl::Journal;
 
 const INODE_CACHE_SIZE: usize = 64;
 const BLOCK_CACHE_SIZE: usize = 32;
+const DEV_BSIZE: usize = 512;
 
 #[derive(Clone, Debug)]
 pub(crate) struct CachedInode {
@@ -105,6 +108,8 @@ pub struct Ufs<D: BlockIo> {
     pub(crate) dirty_cgs: Vec<u32>,
     pub(crate) inodes: Vec<CachedInode>,
     pub(crate) blocks: Vec<CachedBlock>,
+    pub(crate) journal: Option<Journal>,
+    pub(crate) sync_staging: bool,
 }
 
 impl<D: BlockIo> Ufs<D> {
@@ -114,8 +119,15 @@ impl<D: BlockIo> Ufs<D> {
     /// The superblock is probed at the upstream locations (`SBLOCK_UFS2`, `SBLOCK_UFS1`,
     /// `SBLOCK_FLOPPY`, `SBLOCK_PIGGY`) and validated before any inode is read.
     pub fn mount(mut disk: D, opts: MountOptions) -> Result<Self, UfsError> {
-        let fs = ffs_vfsops::probe(&mut disk)?;
+        let mut fs = ffs_vfsops::probe(&mut disk)?;
         if opts.read_only {
+            if fs.has_journal() {
+                let journal = Journal::from_super(&fs, disk.size_bytes())?
+                    .ok_or(UfsError::BadSuperblock("missing WAPBL journal"))?;
+                if journal.is_dirty(&mut disk)? {
+                    return Err(UfsError::Unsupported("dirty journal on read-only mount"));
+                }
+            }
             return Ok(Self {
                 disk,
                 fs,
@@ -124,17 +136,32 @@ impl<D: BlockIo> Ufs<D> {
                 dirty_cgs: Vec::new(),
                 inodes: Vec::new(),
                 blocks: Vec::new(),
+                journal: None,
+                sync_staging: false,
             });
         }
         if !fs.ufs2 && fs.old_flags & crate::fs::FS_FLAGS_UPDATED == 0 {
             return Err(UfsError::Unsupported("old UFS1 cylinder groups"));
         }
+
+        let mut journal = Journal::from_super(&fs, disk.size_bytes())?;
+        let mut replay_inodes = Vec::new();
+        if let Some(active) = journal.as_mut()
+            && active.is_dirty(&mut disk)?
+        {
+            let fs_bytes = fs
+                .size
+                .checked_mul(u64::from(fs.fsize))
+                .ok_or(UfsError::BadSuperblock("filesystem size"))?;
+            replay_inodes = active.replay(&mut disk, fs_bytes)?;
+            fs = ffs_vfsops::probe(&mut disk)?;
+        }
+
         let cs = ffs_vfsops::load_summaries(&mut disk, &fs)?;
-        let mut fs = fs;
         fs.set_clean_raw(0);
         fs.clear_fmod_raw();
         ffs_vfsops::write_superblock(&mut disk, &fs)?;
-        Ok(Self {
+        let mut ufs = Self {
             disk,
             fs,
             read_only: false,
@@ -142,7 +169,28 @@ impl<D: BlockIo> Ufs<D> {
             dirty_cgs: Vec::new(),
             inodes: Vec::new(),
             blocks: Vec::new(),
-        })
+            journal: None,
+            sync_staging: false,
+        };
+        let mut cleaned = false;
+        for (ino, mode) in replay_inodes {
+            if mode == 0 {
+                ufs.free_inode(ino, 0)?;
+                cleaned = true;
+            }
+        }
+        if cleaned {
+            ufs.sync()?;
+        }
+        if let Some(mut active) = journal {
+            active.start(&mut ufs.disk)?;
+            ufs.fs.set_flags_raw(ufs.fs.flags | crate::fs::FS_DOWAPBL);
+            ufs.fs.set_clean_raw(0);
+            ufs.fs.clear_fmod_raw();
+            ffs_vfsops::write_superblock(&mut ufs.disk, &ufs.fs)?;
+            ufs.journal = Some(active);
+        }
+        Ok(ufs)
     }
 
     /// Root inode number (always [`UFS_ROOTINO`]).
@@ -223,6 +271,162 @@ impl<D: BlockIo> Ufs<D> {
         self.fs.is_clean()
     }
 
+    /// Whether this mount is writing through a WAPBL journal.
+    pub fn is_journaled(&self) -> bool {
+        self.journal.is_some()
+    }
+
+    /// Enable WAPBL on a writable mount whose superblock records a journal.
+    pub fn enable_journal(&mut self) -> Result<(), UfsError> {
+        self.ensure_writable()?;
+        if self.journal.is_some() {
+            return Ok(());
+        }
+        let mut active = Journal::from_super(&self.fs, self.disk.size_bytes())?
+            .ok_or(UfsError::Unsupported("no journal space in superblock"))?;
+        if active.is_dirty(&mut self.disk)? {
+            return Err(UfsError::Corrupt("journal is dirty; remount to replay"));
+        }
+        active.start(&mut self.disk)?;
+        self.fs.set_flags_raw(self.fs.flags | crate::fs::FS_DOWAPBL);
+        self.fs.set_clean_raw(0);
+        self.fs.clear_fmod_raw();
+        ffs_vfsops::write_superblock(&mut self.disk, &self.fs)?;
+        self.journal = Some(active);
+        Ok(())
+    }
+
+    /// Stop journaling.  Pending metadata is committed before the flag is cleared.
+    pub fn disable_journal(&mut self) -> Result<(), UfsError> {
+        self.ensure_writable()?;
+        if self.journal.is_some() {
+            self.commit_journal()?;
+        }
+        if let Some(mut active) = self.journal.take() {
+            active.active = false;
+            self.fs
+                .set_flags_raw(self.fs.flags & !crate::fs::FS_DOWAPBL);
+            ffs_vfsops::write_superblock(&mut self.disk, &self.fs)?;
+        }
+        self.disk.flush().map_err(|_| UfsError::Io)
+    }
+
+    /// Read from the device, preferring blocks staged in the current transaction.
+    pub(crate) fn read_disk_at(&mut self, offset: u64, buf: &mut [u8]) -> Result<(), UfsError> {
+        let Self { disk, journal, .. } = self;
+        match journal.as_ref() {
+            Some(active) => active.read(disk, offset, buf).map_err(|_| UfsError::Io),
+            None => disk.read_at(offset, buf).map_err(|_| UfsError::Io),
+        }
+    }
+
+    /// Write a metadata block through the journal, or directly when it is off.
+    pub(crate) fn write_metadata(&mut self, offset: u64, data: &[u8]) -> Result<(), UfsError> {
+        self.invalidate_blocks(offset, data.len() as u64)?;
+        let staging = self.sync_staging;
+        if let Some(active) = self.journal.as_ref() {
+            let room = if staging {
+                active.has_room_full(data.len())
+            } else {
+                active.has_room(data.len())
+            };
+            if !room {
+                if staging {
+                    return Err(UfsError::NoSpace);
+                }
+                self.commit_journal()?;
+            }
+        }
+        let Self { disk, journal, .. } = self;
+        if let Some(active) = journal.as_mut()
+            && active.stage(offset, data)
+        {
+            return Ok(());
+        }
+        disk.write_at(offset, data).map_err(|_| UfsError::Io)
+    }
+
+    /// Commit the current transaction, including the summary array and all
+    /// superblock copies so every committed transaction is self-consistent.
+    pub(crate) fn commit_journal(&mut self) -> Result<(), UfsError> {
+        if self.journal.is_none() {
+            return Ok(());
+        }
+        self.fs.cstotal = csum_total(&self.cs);
+        self.fs.write_cstotal_raw();
+        let mut summary_bytes = vec![0u8; self.fs.cssize as usize];
+        for (index, entry) in self.cs.iter().enumerate() {
+            let offset = index * 16;
+            if let Some(slot) = summary_bytes.get_mut(offset..offset + 16) {
+                slot.copy_from_slice(&entry.to_le_bytes());
+            }
+        }
+        let summary_off = u64::from(self.fs.csaddr)
+            .checked_mul(u64::from(self.fs.fsize))
+            .ok_or(UfsError::BadSuperblock("summary offset"))?;
+        let raw = self.fs.raw[..self.fs.sbsize as usize].to_vec();
+        let mut backups = Vec::new();
+        for cg in 0..self.fs.ncg {
+            let frag = self
+                .fs
+                .cgstart(cg)?
+                .checked_add(self.fs.sblkno as u64)
+                .ok_or(UfsError::BadSuperblock("superblock backup"))?;
+            backups.push(self.fs.frag_offset(frag)?);
+        }
+        let sblockloc = self.fs.sblockloc;
+        let Self { disk, journal, .. } = self;
+        let Some(active) = journal.as_mut() else {
+            return Ok(());
+        };
+        let _ = active.stage(summary_off, &summary_bytes);
+        let _ = active.stage(sblockloc, &raw);
+        for offset in backups {
+            let _ = active.stage(offset, &raw);
+        }
+        active.commit(disk)
+    }
+
+    fn invalidate_blocks(&mut self, offset: u64, len: u64) -> Result<(), UfsError> {
+        let end = offset.checked_add(len).ok_or(UfsError::Invalid)?;
+        let bsize = u64::from(self.fs.bsize);
+        self.blocks.retain(|entry| {
+            let start = self.fs.frag_offset(entry.frag).unwrap_or(u64::MAX);
+            let block_end = start.saturating_add(bsize);
+            block_end <= offset || start >= end
+        });
+        Ok(())
+    }
+
+    /// Write a metadata extent at a fragment address.
+    pub(crate) fn write_meta_frags(&mut self, frag: u64, data: &[u8]) -> Result<(), UfsError> {
+        let offset = self.fs.frag_offset(frag)?;
+        if !data.len().is_multiple_of(DEV_BSIZE) {
+            return Err(UfsError::Invalid);
+        }
+        self.write_metadata(offset, data)
+    }
+
+    /// Stage/write the primary superblock and every cylinder-group copy.
+    pub(crate) fn stage_superblock(&mut self) -> Result<(), UfsError> {
+        let len = self.fs.sbsize as usize;
+        if len == 0 || len > self.fs.raw.len() {
+            return Err(UfsError::BadSuperblock("bad superblock size"));
+        }
+        let raw = self.fs.raw[..len].to_vec();
+        self.write_metadata(self.fs.sblockloc, &raw)?;
+        for cg in 0..self.fs.ncg {
+            let frag = self
+                .fs
+                .cgstart(cg)?
+                .checked_add(self.fs.sblkno as u64)
+                .ok_or(UfsError::BadSuperblock("superblock backup"))?;
+            let offset = self.fs.frag_offset(frag)?;
+            self.write_metadata(offset, &raw)?;
+        }
+        Ok(())
+    }
+
     /// Return the block device.
     pub fn into_inner(self) -> D {
         self.disk
@@ -282,9 +486,7 @@ impl<D: BlockIo> Ufs<D> {
             return Err(UfsError::Corrupt("block beyond device"));
         }
         let mut data = vec![0u8; self.fs.bsize as usize];
-        self.disk
-            .read_at(offset, &mut data)
-            .map_err(|_| UfsError::Io)?;
+        self.read_disk_at(offset, &mut data)?;
         if self.blocks.len() >= BLOCK_CACHE_SIZE {
             self.blocks.remove(0);
         }
