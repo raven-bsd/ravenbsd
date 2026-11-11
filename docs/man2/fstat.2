@@ -1,6 +1,6 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt FSTAT 2
 .Os RavenBSD
 .Sh NAME
@@ -15,7 +15,42 @@ The .Nm system call is part of the scheme IPC protocol (see
 .Xr scheme 7
 and
 .Pa architecture/03-system-servers.md ).
-It is implemented by ticket S11; this page is the contract placeholder and will be completed
-when S11 lands.
+.Pp
+For a filesystem handle,
+.Nm
+returns the 64-byte
+.Vt Stat
+record defined by
+.Pa raven-proto-fs :
+inode number, size, block count, timestamps, mode, link count and owner/group.
+.Pp
+Mode type bits come from
+.Dv S_IFMT :
+.Dv S_IFREG ,
+.Dv S_IFDIR ,
+.Dv S_IFLNK
+and the device types.  Permission bits are stored and returned.  They are
+.B not
+enforced in this protocol version: there are no credentials on the wire and
+.Dv uid
+and
+.Dv gid
+are reported as zero.  Do not treat this as POSIX permission behaviour.
+.Pp
+A directory description has no `.` or `..` entries; the reader synthesizes
+them.  The stat record does not expose the description's cursor.
+.Sh RETURN VALUES
+Zero on success with the record written to the response buffer.
+.Sh ERRORS
+.Bl -tag -width Er -offset indent
+.It Er EBADF
+The handle is not a scheme-file handle.
+.It Er EPROTO
+The server returned a malformed record.
+.El
+.Sh SEE ALSO
+.Xr open 2 ,
+.Xr read 2 ,
+.Xr write 2
 .Sh STANDARDS
 RavenBSD ABI v1.

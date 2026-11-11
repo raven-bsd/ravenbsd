@@ -1,6 +1,6 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt OPEN 2
 .Os RavenBSD
 .Sh NAME
@@ -30,5 +30,117 @@ opening scheme server.
 .Pp
 The attachment must be transferable by the replying server.  Its rights are reduced by the
 attachment rights mask, with a zero mask retaining all of the server's current rights.
+.Sh OPEN FLAGS
+The protocol
+.Va flags
+word is a 16-bit wire bit set, not the Linux
+.Vt O_*
+numbering.
+.Bl -tag -width WIRE_OPEN_NOFOLLOW -offset indent
+.It Dv WIRE_OPEN_READ
+Read access; set for
+.Dv O_RDONLY
+and for the read half of
+.Dv O_RDWR .
+.It Dv WIRE_OPEN_WRITE
+Write access; set for
+.Dv O_WRONLY
+and for the write half of
+.Dv O_RDWR .
+.It Dv WIRE_OPEN_CREATE
+Create a missing regular file.
+.It Dv WIRE_OPEN_EXCL
+Require
+.Dv WIRE_OPEN_CREATE
+and fail with
+.Er EEXIST
+when the path exists.  The test and the create are one server operation.
+.It Dv WIRE_OPEN_TRUNC
+Truncate a regular file to zero length.  Requires write access and is
+incompatible with
+.Dv WIRE_OPEN_DIRECTORY .
+.It Dv WIRE_OPEN_APPEND
+Place every write at the current end of the file.  Requires write access and
+is atomic at the server.
+.It Dv WIRE_OPEN_DIRECTORY
+Require the resolved path to be a directory; a non-directory returns
+.Er ENOTDIR .
+.It Dv WIRE_OPEN_NOFOLLOW
+Fail with
+.Er ELOOP
+when the final component is a symbolic link.  Intermediate links are still
+followed.
+.El
+.Pp
+At least one of
+.Dv WIRE_OPEN_READ
+and
+.Dv WIRE_OPEN_WRITE
+is required.  Unknown bits and invalid combinations are rejected with
+.Er EINVAL .
+A creation with
+.Dv WIRE_OPEN_CREATE
+uses mode
+.Li 0o644
+(0o666 masked by the server umask 0o022); use
+.Xr chmod 2
+to change it.
+.Sh PATHS
+An absolute path is normalized by
+.Nm vfsd :
+repeated separators and
+.Ql .\&
+components are removed,
+.Ql ..\&
+pops the previous component, and
+.Ql ..\&
+above
+.Pa /
+is
+.Er EINVAL .
+A trailing slash or a final
+.Ql .\&
+or
+.Ql ..\&
+requires the result to be a directory; a trailing slash on a regular file is
+.Er ENOTDIR .
+Servers receive the path relative to their mount root and must reject
+.Ql .\&
+and
+.Ql ..\&
+components.
+.Sh FILES
+The open-file description, cursor and reference count are server state.  A
+successful
+.Xr dup 2
+shares them; the server releases the description only at the last
+.Xr close 2 .
+.Sh RETURN VALUES
+A non-negative SchemeFile handle on success.  The protocol status is a positive
+errno on failure.
+.Sh ERRORS
+.Bl -tag -width Er -offset indent
+.It Er EINVAL
+Unknown or invalid open flags, or an invalid path.
+.It Er ENOENT
+A path component does not exist.
+.It Er ENOTDIR
+.Dv WIRE_OPEN_DIRECTORY
+or a trailing slash named a non-directory.
+.It Er EEXIST
+.Dv WIRE_OPEN_CREATE | WIRE_OPEN_EXCL
+and the path exists.
+.It Er ELOOP
+.Dv WIRE_OPEN_NOFOLLOW
+found a final symbolic link, or too many links were followed.
+.It Er EISDIR
+Write or truncate was requested on a directory.
+.El
+.Sh SEE ALSO
+.Xr close 2 ,
+.Xr dup 2 ,
+.Xr fstat 2 ,
+.Xr read 2 ,
+.Xr write 2
 .Sh STANDARDS
 RavenBSD ABI v1.

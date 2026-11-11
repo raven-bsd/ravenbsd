@@ -13,8 +13,8 @@ use alloc_crate::vec::Vec;
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 use raven_proto_fs::{
-    Call, CallRequest, CallResponse, DirEntry as ProtoDirEntry, DirEntryIter, MAX_PATH, O_ACCMODE,
-    O_CREAT, O_RDONLY, O_RDWR, O_WRONLY, OP_READLINK, Stat, StatFs, normalize_absolute,
+    Call, CallRequest, CallResponse, DirEntry as ProtoDirEntry, DirEntryIter, MAX_PATH,
+    O_DIRECTORY, O_RDONLY, O_WRONLY, OP_READLINK, OpenFlags, Stat, StatFs, normalize_absolute,
 };
 
 /// One owned directory entry.
@@ -28,37 +28,37 @@ pub struct DirEntry {
     pub name: String,
 }
 
-/// An open `file:` handle with a client-side offset.
+/// An open `file:` handle.
+///
+/// The filesystem contract is sequential: the server owns the open-file
+/// description cursor and advances it on each `READ`/`WRITE`.  The client does
+/// not keep a second offset; a duplicate made with [`File::try_clone`] shares the
+/// server-side cursor because `DUP` shares the open-file description.
 pub struct File {
     handle: Option<Handle>,
-    offset: u64,
 }
 
 impl File {
-    /// Current client-side offset.
-    pub const fn offset(&self) -> u64 {
-        self.offset
+    /// Duplicate the handle.  The new handle shares the open-file description
+    /// and therefore the cursor; each handle closes independently.
+    pub fn try_clone(&self) -> Result<Self, Errno> {
+        let handle = self.handle.ok_or(Errno::EBADF)?;
+        let duplicate = raven_scheme::Client::new().dup(handle, 0)?;
+        Ok(Self {
+            handle: Some(duplicate),
+        })
     }
 
-    /// Set the client offset for the next positioned read/write.
-    pub fn seek(&mut self, offset: u64) {
-        self.offset = offset;
-    }
-
-    /// Read up to `buffer.len()` bytes and advance the offset.
+    /// Read up to `buffer.len()` bytes from the current cursor.
     pub fn read(&mut self, buffer: &mut [u8]) -> Result<usize, Errno> {
         let handle = self.handle.ok_or(Errno::EBADF)?;
-        let read = raven_scheme::Client::new().read(handle, self.offset, buffer)?;
-        self.offset = self.offset.saturating_add(read as u64);
-        Ok(read)
+        raven_scheme::Client::new().read(handle, 0, buffer)
     }
 
-    /// Write `buffer` and advance the offset.
+    /// Write `buffer` at the current cursor.
     pub fn write(&mut self, buffer: &[u8]) -> Result<usize, Errno> {
         let handle = self.handle.ok_or(Errno::EBADF)?;
-        let written = raven_scheme::Client::new().write(handle, self.offset, buffer)?;
-        self.offset = self.offset.saturating_add(written as u64);
-        Ok(written)
+        raven_scheme::Client::new().write(handle, 0, buffer)
     }
 
     /// Read the `FSTAT` record.
@@ -145,39 +145,35 @@ pub fn normalize(path: &str) -> Result<String, Errno> {
         .map_err(|error| error.errno())
 }
 
-/// Open a path with K60/Linux open flags.
+/// Open a path with Linux-valued open flags.
 ///
-/// The S11 `OPEN` syscall currently carries only read/write/create bits. `O_EXCL`, `O_TRUNC`,
-/// `O_APPEND`, `O_DIRECTORY` and `O_NOFOLLOW` are accepted by this client API but cannot be
-/// transmitted; servers that need them should use a `CALL` operation.
+/// [`OpenFlags::from_linux`] validates the flags and translates them to the K66
+/// wire encoding.  The kernel must carry that encoding before S37 lands; until
+/// then a flag outside the legacy READ/WRITE/CREATE bits is rejected with
+/// `EINVAL` by the kernel.
 pub fn open(path: &str, flags: u32) -> Result<File, Errno> {
     let resolved = resolve(path);
-    let s11 = s11_flags(flags)?;
-    let handle = raven_scheme::Client::new().open(&resolved, s11)?;
+    let wire = OpenFlags::from_linux(flags).map_err(|error| error.errno())?;
+    let handle = raven_scheme::Client::new().open(&resolved, u32::from(wire.to_wire()))?;
     Ok(File {
         handle: Some(handle),
-        offset: 0,
     })
 }
 
-/// Translate K60/Linux open flags to the S11 flag bits.
+/// Translate Linux open flags to the raw wire bits.
 pub fn s11_flags(flags: u32) -> Result<u32, Errno> {
-    let mut result = 0u32;
-    match flags & O_ACCMODE {
-        O_RDONLY => result |= 1,
-        O_WRONLY => result |= 2,
-        O_RDWR => result |= 3,
-        _ => return Err(Errno::EINVAL),
-    }
-    if flags & O_CREAT != 0 {
-        result |= 4;
-    }
-    Ok(result)
+    OpenFlags::from_linux(flags)
+        .map(|wire| u32::from(wire.to_wire()))
+        .map_err(|error| error.errno())
 }
 
 /// Read the entries of a directory path.
+///
+/// Directory reads are sequential per open-file description.  The server
+/// invalidates the description's cursor with `EINVAL` if the directory changes
+/// between pages; reopen the path to restart from the beginning.
 pub fn read_dir(path: &str) -> Result<Vec<DirEntry>, Errno> {
-    let mut file = open(path, O_RDONLY)?;
+    let mut file = open(path, O_RDONLY | O_DIRECTORY)?;
     let mut entries = Vec::new();
     let mut buffer = [0u8; 4096];
     loop {
@@ -365,7 +361,10 @@ fn errno_from_status(status: i32) -> Errno {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use raven_proto_fs::{DIRENT_HEADER_LEN, DT_DIR, DT_REG, S_IFDIR, S_IFREG};
+    use raven_proto_fs::{
+        DIRENT_HEADER_LEN, DT_DIR, DT_REG, O_APPEND, O_CREAT, O_EXCL, O_RDWR, O_TRUNC, S_IFDIR,
+        S_IFREG,
+    };
 
     #[test]
     fn resolve_absolute_path() {
@@ -405,7 +404,12 @@ mod tests {
         assert_eq!(s11_flags(O_WRONLY).unwrap(), 2);
         assert_eq!(s11_flags(O_RDWR).unwrap(), 3);
         assert_eq!(s11_flags(O_RDWR | O_CREAT).unwrap(), 7);
+        assert_eq!(
+            s11_flags(O_RDWR | O_CREAT | O_EXCL | O_TRUNC | O_APPEND).unwrap(),
+            0x3f
+        );
         assert_eq!(s11_flags(3), Err(Errno::EINVAL));
+        assert_eq!(s11_flags(O_RDONLY | 0o2000000), Err(Errno::EINVAL));
     }
 
     #[test]

@@ -4,9 +4,12 @@
 //! Packed directory entries returned by `READ` on a directory handle.
 //!
 //! One entry is a 16-byte header followed by `name_len` name bytes, padded with zeroes to the
-//! next 8-byte boundary. `READ`'s `offset` is an opaque byte cookie into the server's packed
-//! directory stream: the next cookie is the previous cookie plus the number of bytes returned.
-//! Zero returned bytes mean end of directory.
+//! next 8-byte boundary. Protocol version 1 uses sequential directory reads: the server keeps the
+//! per-open-file-description cursor and the wire `offset` must be zero. A server represents that
+//! cursor as a [`DirCursor`] `(generation, index)`: it records the directory generation on the
+//! first read and rejects a later read through the same description with `EINVAL` when a
+//! create/unlink changed the generation. [`DirCursor`] is a server-side encoding; it is not sent
+//! on the wire in protocol version 1.
 
 use crate::ProtoError;
 use crate::flags::{DT_BLK, DT_CHR, DT_DIR, DT_FIFO, DT_LNK, DT_REG, DT_SOCK, DT_UNKNOWN};
@@ -93,11 +96,6 @@ impl<'a> DirEntry<'a> {
     /// Encoded record length for this entry.
     pub const fn encoded_len(&self) -> usize {
         record_len(self.name.len())
-    }
-
-    /// The cookie to pass to the next `READ`, given the cookie of this record.
-    pub fn next_cookie(&self, current: u64) -> Result<u64, ProtoError> {
-        next_dir_cookie(current, self.encoded_len())
     }
 
     /// Encode the entry into `out`; returns the number of bytes written.
@@ -189,15 +187,72 @@ pub const fn record_len(name_len: usize) -> usize {
     (DIRENT_HEADER_LEN + name_len + (DIRENT_ALIGN - 1)) & !(DIRENT_ALIGN - 1)
 }
 
-/// Compute the cookie for the next `READ`.
+/// Server-side directory cursor: a generation and an entry index.
 ///
-/// The cookie is the byte offset into the server's packed directory stream; zero returned bytes
-/// means end of directory.
-pub fn next_dir_cookie(current: u64, consumed: usize) -> Result<u64, ProtoError> {
-    let consumed = u64::try_from(consumed).map_err(|_| ProtoError::LengthOutOfRange)?;
-    current
-        .checked_add(consumed)
-        .ok_or(ProtoError::LengthOutOfRange)
+/// The high 32 bits are the directory generation and the low 32 bits are the
+/// zero-based entry index in the server's name order.  Generation 0 with index 0
+/// is the start cursor; it selects the directory's current generation.  A server
+/// increments the generation on every namespace change, which invalidates old
+/// cursors instead of returning moved entries.  Protocol version 1 does not carry
+/// this value on the wire; servers keep it in the open-file description.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DirCookie {
+    generation: u32,
+    index: u32,
+}
+
+impl DirCookie {
+    /// The start-of-directory cookie (`0`), valid for the current generation.
+    pub const START: Self = Self {
+        generation: 0,
+        index: 0,
+    };
+
+    /// Build a cookie for `index` in `generation`.
+    pub const fn new(generation: u32, index: u32) -> Self {
+        Self { generation, index }
+    }
+
+    /// Whether this is the start cookie rather than an entry index.
+    pub const fn is_start(self) -> bool {
+        self.generation == 0 && self.index == 0
+    }
+
+    /// The generation this cookie belongs to.
+    pub const fn generation(self) -> u32 {
+        self.generation
+    }
+
+    /// The zero-based entry index.
+    pub const fn index(self) -> u32 {
+        self.index
+    }
+
+    /// Encode the cookie for the wire `offset` field.
+    pub const fn encode(self) -> u64 {
+        ((self.generation as u64) << 32) | self.index as u64
+    }
+
+    /// Decode a wire `offset` value.  Every `u64` is a syntactically valid cookie;
+    /// the server validates the generation.
+    pub const fn decode(raw: u64) -> Self {
+        Self {
+            generation: (raw >> 32) as u32,
+            index: raw as u32,
+        }
+    }
+
+    /// The cookie for the next entry in the same generation.
+    pub fn next(self) -> Result<Self, ProtoError> {
+        let index = self
+            .index
+            .checked_add(1)
+            .ok_or(ProtoError::LengthOutOfRange)?;
+        Ok(Self {
+            generation: self.generation,
+            index,
+        })
+    }
 }
 
 /// Whether `kind` is one of the documented `DT_*` values.
@@ -412,23 +467,27 @@ mod tests {
     }
 
     #[test]
-    fn cookie_is_bytes_consumed() {
-        let first = entry(b"a");
-        let second = entry(b"bb");
-        let mut bytes = [0u8; 48];
-        let first_len = first.encode(&mut bytes).unwrap();
-        let second_len = second.encode(&mut bytes[first_len..]).unwrap();
-        assert_eq!(first_len, 24);
-        assert_eq!(second_len, 24);
-        assert_eq!(first.next_cookie(0).unwrap(), 24);
-        assert_eq!(second.next_cookie(24).unwrap(), 48);
-        assert_eq!(next_dir_cookie(48, 0).unwrap(), 48);
+    fn dir_cookie_round_trips() {
+        let cookie = DirCookie::new(7, 12);
+        assert_eq!(cookie.generation(), 7);
+        assert_eq!(cookie.index(), 12);
+        assert_eq!(DirCookie::decode(cookie.encode()), cookie);
+        assert_eq!(cookie.encode(), (7u64 << 32) | 12);
+        assert_eq!(DirCookie::START.encode(), 0);
+        assert!(DirCookie::START.is_start());
+        assert!(!cookie.is_start());
     }
 
     #[test]
-    fn cookie_overflow_is_rejected() {
+    fn dir_cookie_next_advances_the_index() {
+        let cookie = DirCookie::new(3, 8);
+        assert_eq!(cookie.next().unwrap(), DirCookie::new(3, 9));
+    }
+
+    #[test]
+    fn dir_cookie_overflow_is_rejected() {
         assert_eq!(
-            next_dir_cookie(u64::MAX, 1),
+            DirCookie::new(1, u32::MAX).next(),
             Err(ProtoError::LengthOutOfRange)
         );
     }

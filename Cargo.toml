@@ -22,6 +22,7 @@ members = [
     "tests/fixtures/s25-xfer",
     "tests/fixtures/s26-evq",
     "tests/fixtures/s21-edu",
+    "tests/fixtures/k66-fs",
     "tests/fixtures/testkernel",
     "xtask",
     "tests/qtest",

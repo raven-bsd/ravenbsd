@@ -1,6 +1,6 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt WRITE 2
 .Os RavenBSD
 .Sh NAME
@@ -15,7 +15,43 @@ The .Nm system call is part of the scheme IPC protocol (see
 .Xr scheme 7
 and
 .Pa architecture/03-system-servers.md ).
-It is implemented by ticket S11; this page is the contract placeholder and will be completed
-when S11 lands.
+.Pp
+Filesystem
+.Nm
+is sequential.  The server writes at the cursor in the open-file description and
+advances it by the number of bytes written.  The wire offset must be zero; a
+server returns
+.Er EINVAL
+for a nonzero offset.
+.Pp
+With
+.Dv WIRE_OPEN_APPEND
+(see
+.Xr open 2 )
+each write is placed at the file's length at the time of that write, atomically
+at the server even when other descriptions write concurrently.  The writing
+description's cursor is left at the end of the write.
+.Pp
+A
+.Xr dup 2
+or a transferred reference shares the description and its cursor.  The server
+releases unlinked data only at the last
+.Xr close 2 .
+.Sh RETURN VALUES
+The number of bytes written.
+.Sh ERRORS
+.Bl -tag -width Er -offset indent
+.It Er EINVAL
+The wire offset was nonzero.
+.It Er EBADF
+The handle is not open for writing.
+.It Er EISDIR
+The handle names a directory.
+.El
+.Sh SEE ALSO
+.Xr close 2 ,
+.Xr dup 2 ,
+.Xr open 2 ,
+.Xr read 2
 .Sh STANDARDS
 RavenBSD ABI v1.
