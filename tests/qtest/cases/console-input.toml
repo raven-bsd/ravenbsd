@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "console-input"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 60
+skip = "needs the B65 serial-input harness"
+pre = ["sh tests/fixtures/s27-echo/build.sh"]
+initfs = "build/fixtures/s27-echo/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+# The fixture echoes every received byte upper-cased: `hello\nq` prints `HELLO` (with CRLF) and
+# then `Q`, after which it exits 0.
+[[expect]]
+regex = '^HELLO'
+
+[[expect]]
+regex = '^Q$'
+
+[[forbid]]
+regex = '(?i)panic'
