@@ -69,6 +69,7 @@ fn main(_args: raven_rt::Args) -> i32 {
         println!("s25: initfs magic");
         return 9;
     }
+    println!("s25: initfs map ok");
     // The handle carries READ|MAP without WRITE: a shared writable mapping must be refused.
     // (A private writable mapping is copy-on-write and needs only MAP, by design.)
     match map_memory(prot::READ | prot::WRITE, true) {
