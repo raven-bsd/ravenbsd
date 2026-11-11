@@ -3,12 +3,9 @@
 
 //! Exception and interrupt stubs and reporting.
 
-use core::sync::atomic::{AtomicU8, AtomicU64, Ordering};
-
-use raven_abi::layout::x86_64::HHDM_BASE;
-
 use crate::arch::x86_64::trapframe::TrapFrame;
 use crate::{backtrace, kprintln};
+use raven_abi::layout::x86_64::HHDM_BASE;
 
 /// Direct-map window above [`HHDM_BASE`] valid for PC/return-address checks.
 const HHDM_WINDOW: u64 = 1 << 47;
@@ -173,7 +170,9 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
         if crate::driver::irq::handle_interrupt(vector as u8) {
             return;
         }
-        unexpected_interrupt(vector);
+        // An interrupt outside the driver pool.  Do not take the serial lock here: record the
+        // vector and let the next IRQ syscall report it from process context.
+        crate::driver::irq::note_unexpected(vector as u8);
         return;
     }
     if from_user {
@@ -242,21 +241,6 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
         crate::boot::exit_qemu(0x11);
     }
     crate::arch::halt();
-}
-
-fn unexpected_interrupt(vector: usize) {
-    static SEEN: [AtomicU64; 4] = [const { AtomicU64::new(0) }; 4];
-    static COUNT: AtomicU8 = AtomicU8::new(0);
-    let word = vector >> 6;
-    let bit = (vector & 63) as u32;
-    if let Some(seen) = SEEN.get(word) {
-        let mask = 1u64 << bit;
-        if seen.fetch_or(mask, Ordering::Relaxed) & mask == 0
-            && COUNT.fetch_add(1, Ordering::Relaxed) < 3
-        {
-            kprintln!("unexpected interrupt {}", vector);
-        }
-    }
 }
 
 fn read_cr2() -> u64 {

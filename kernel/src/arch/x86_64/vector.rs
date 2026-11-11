@@ -5,28 +5,32 @@
 //!
 //! Device vectors live above the exception (0..32), timer (0x20/0x21) and IPI (0x30..0x32)
 //! vectors.  Each vector has exactly one owner (the `Irq` object); closing the object returns
-//! the vector to the pool.  The bitmap and the owner table are lock-free because allocation,
-//! owner publication and release only happen in process context, while the interrupt handler
-//! only reads the owner table.
+//! the vector to the pool or quarantines it.  The bitmap and the owner table are lock-free
+//! because allocation, owner publication and release only happen in process context, while the
+//! interrupt handler only reads the owner table.
 //!
 //! Owner protocol (current execution model):
 //!
 //! * [`allocate`] claims the bitmap bit.
-//! * [`install_owner`] publishes the raw owner with `Release` before the interrupt source is
-//!   armed, so the handler sees either zero or a live object.
-//! * [`release`] clears the owner with `Release` *before* it publishes the slot as free, so a
-//!   new owner is never mistaken for the old one.
-//! * The handler reads the owner with `Acquire` and only dereferences a non-zero pointer.
+//! * [`install_owner`] publishes the typed owner pointer with `Release` before the interrupt
+//!   source is armed, so the handler sees either null or a live object.
+//! * [`release`] and [`quarantine`] clear the owner with `Release` *before* the slot is made
+//!   available again.  A quarantined vector keeps its bitmap bit forever, so a still-enabled
+//!   device cannot deliver an old message to a new `Irq`.
+//! * The handler reads the owner with `Acquire` and only dereferences a non-null pointer.
 //!
-//! This is safe only while the kernel is non-preemptible, user threads and process-context
-//! closes run on CPU 0, and device delivery is routed to that same CPU: release therefore cannot
-//! run concurrently with the handler that may still dereference the object.  Enabling user-thread
-//! SMP, kernel preemption or delivery on another CPU invalidates the argument and needs a typed
-//! owning reference or a documented quarantine.
+//! The slot does not own a reference to the object.  The lifetime argument is the execution
+//! model: the kernel is non-preemptible, user threads and process-context closes run on CPU 0,
+//! and device delivery is routed to that same CPU.  The handler therefore cannot run while
+//! `Irq::drop` clears the slot, and the object stays alive until `drop` returns.  Enabling
+//! user-thread SMP, kernel preemption or delivery on another CPU invalidates the argument and
+//! needs an owning reference or a different reclamation protocol.
 
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::ptr;
+use core::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
 
 use crate::arch::x86_64::msi::vector_in_pool;
+use crate::driver::irq::Irq;
 
 /// First device vector.
 pub const VECTOR_BASE: u8 = 0x40;
@@ -36,9 +40,9 @@ pub const VECTOR_COUNT: u8 = 128;
 /// Allocation bitmap: one bit per device vector.
 static TAKEN: [AtomicU64; 2] = [const { AtomicU64::new(0) }; 2];
 
-/// Owner of one device vector: the raw `Arc<Irq>` pointer, or null.
-static OWNERS: [AtomicU64; VECTOR_COUNT as usize] =
-    [const { AtomicU64::new(0) }; VECTOR_COUNT as usize];
+/// Owner of one device vector: a typed pointer to the `Irq`, or null.
+static OWNERS: [AtomicPtr<Irq>; VECTOR_COUNT as usize] =
+    [const { AtomicPtr::new(ptr::null_mut()) }; VECTOR_COUNT as usize];
 
 /// True when `vector` belongs to the device pool.
 pub fn is_driver_vector(vector: u8) -> bool {
@@ -66,15 +70,16 @@ pub fn allocate() -> Option<u8> {
     None
 }
 
-/// Publish the raw `Arc<Irq>` pointer owning `vector`.
+/// Publish the owner pointer of `vector`.
 ///
 /// Called after [`allocate`] and before the source can fire, so the interrupt handler always
-/// finds either the valid owner or an empty slot.
-pub fn install_owner(vector: u8, owner: u64) {
+/// finds either the live object or an empty slot.  The caller keeps the object alive until
+/// [`release`] or [`quarantine`] clears the slot (see the module documentation).
+pub fn install_owner(vector: u8, owner: *const Irq) {
     if let Some(index) = slot(vector)
         && let Some(owner_slot) = OWNERS.get(index)
     {
-        owner_slot.store(owner, Ordering::Release);
+        owner_slot.store(owner.cast_mut(), Ordering::Release);
     }
 }
 
@@ -82,15 +87,12 @@ pub fn install_owner(vector: u8, owner: u64) {
 ///
 /// The owner is cleared before the allocation bit is published as free.  The reverse order
 /// would let the next allocator install its owner and then have this release erase it, leaving a
-/// live interrupt source with no owner.  See the module documentation for the execution-model
-/// prerequisites that make the clear-then-free window safe.
+/// live interrupt source with no owner.
 pub fn release(vector: u8) -> bool {
     let Some(index) = slot(vector) else {
         return false;
     };
-    if let Some(owner_slot) = OWNERS.get(index) {
-        owner_slot.store(0, Ordering::Release);
-    }
+    clear_owner(index);
     let word = index / 64;
     let bit = (index % 64) as u32;
     let mask = 1u64 << bit;
@@ -100,16 +102,36 @@ pub fn release(vector: u8) -> bool {
     true
 }
 
-/// The raw owner pointer of a device vector, or null when it is unowned or not in the pool.
+/// Retire a vector whose source could not be proven quiescent.
 ///
-/// Called from the interrupt handler, which never blocks.  See the module documentation for the
-/// protocol that keeps the pointer valid: release clears the slot before the object is freed and
-/// runs on the same CPU that receives the interrupt.
-pub fn owner(vector: u8) -> u64 {
+/// The owner is cleared (late messages are dropped as unclaimed) and the allocation bit stays
+/// set, so the vector is never handed out again.  This is the fail-safe path: a driver that
+/// closes a live MSI source without the documented final `IRQ_ACK` costs one vector instead of
+/// letting an old device message reach a new `Irq`.
+pub fn quarantine(vector: u8) -> bool {
+    let Some(index) = slot(vector) else {
+        return false;
+    };
+    clear_owner(index);
+    true
+}
+
+fn clear_owner(index: usize) {
+    if let Some(owner_slot) = OWNERS.get(index) {
+        owner_slot.store(ptr::null_mut(), Ordering::Release);
+    }
+}
+
+/// The owner pointer of a device vector, or null when it is unowned or not in the pool.
+///
+/// Called from the interrupt handler, which never blocks.  The returned pointer must only be
+/// dereferenced while the execution model keeps `Irq::drop` from running on another CPU; see the
+/// module documentation.
+pub fn owner(vector: u8) -> *const Irq {
     match slot(vector) {
-        Some(index) => OWNERS
-            .get(index)
-            .map_or(0, |slot| slot.load(Ordering::Acquire)),
-        None => 0,
+        Some(index) => OWNERS.get(index).map_or(ptr::null(), |slot| {
+            slot.load(Ordering::Acquire).cast_const()
+        }),
+        None => ptr::null(),
     }
 }

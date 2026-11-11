@@ -134,7 +134,26 @@ pub fn notify_all() {
 }
 
 /// Remove a closing handle from every queue in its process before the close returns.
+/// Remove `handle` from every registered event queue and cancel a blocked IRQ waiter.
+///
+/// Called before the handle table drops the object.  For an `Irq`, every waiter is woken and
+/// revalidates its own handle: the closing thread runs the close syscall to completion on the
+/// non-preemptible CPU, so a waiter that resumes afterwards sees `EBADF` (or its own cancelled
+/// handle) and returns `EIO`.  The waiter's `Arc` keeps the object alive until it returns.
 pub fn on_handle_close(process: &Arc<crate::process::Process>, handle: raven_abi::types::Handle) {
+    #[cfg(target_arch = "x86_64")]
+    {
+        let irq = {
+            let table = process.handles.lock();
+            match table.get(handle, raven_abi::types::Rights::NONE) {
+                Ok(crate::process::handle::Object::Irq(irq)) => Some(Arc::clone(irq)),
+                _ => None,
+            }
+        };
+        if let Some(irq) = irq {
+            irq.cancel_waiters(handle.0);
+        }
+    }
     let queues: Vec<Arc<EventQueue>> = QUEUES
         .lock()
         .iter()
