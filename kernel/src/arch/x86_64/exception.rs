@@ -169,12 +169,15 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
             crate::process::page_fault(cr2);
         }
     }
-    if from_user {
-        crate::process::user_exception(vector);
-    }
     if vector >= 32 {
+        if crate::driver::irq::handle_interrupt(vector as u8) {
+            return;
+        }
         unexpected_interrupt(vector);
         return;
+    }
+    if from_user {
+        crate::process::user_exception(vector);
     }
 
     let name = NAMES.get(vector).copied().unwrap_or("unknown");
