@@ -8,11 +8,11 @@ use alloc::sync::Arc;
 use raven_abi::errno::Errno;
 use raven_abi::types::{Handle, Rights};
 
-use crate::arch::x86_64::trapframe::TrapFrame;
 use crate::process::{self, Process, handle::Object};
+use crate::syscall::SyscallFrame;
 
 /// Dispatch `handle_transfer(dest_proc, handle, rights_mask)`.
-pub fn transfer(frame: &TrapFrame) -> Result<usize, Errno> {
+pub fn transfer(frame: &SyscallFrame) -> Result<usize, Errno> {
     let destination_handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let source_handle = Handle(u32::try_from(frame.rsi).map_err(|_| Errno::EBADF)?);
     let mask = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
@@ -50,7 +50,9 @@ pub fn clone_transferable(
     let object = match table.get(handle, Rights::TRANSFER) {
         Ok(Object::MemObjectInitfs) => Object::MemObjectInitfs,
         Ok(Object::Memory(object)) => Object::Memory(Arc::clone(object)),
+        #[cfg(target_arch = "x86_64")]
         Ok(Object::SchemeFile(object)) => Object::SchemeFile(Arc::clone(object)),
+        #[cfg(target_arch = "x86_64")]
         Ok(Object::SchemeServer(object)) => Object::SchemeServer(Arc::clone(object)),
         Ok(_) => return Err(Errno::EBADF),
         Err(Errno::EACCES) => return Err(Errno::EPERM),

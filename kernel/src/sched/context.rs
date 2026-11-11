@@ -8,9 +8,10 @@
 //! prepared with the same frame shape, but its return address is `sched_thread_start`.
 //!
 //! * x86-64 saves `rbx, rbp, r12..r15` and switches CR3/TSS/GS state.
-//! * aarch64 saves `x19..x30` (96 bytes, SP stays 16-byte aligned) and publishes the thread
-//!   pointer in `TPIDR_EL1`; S14b is single-CPU and kernel-threads-only, so there is no address
-//!   space or user-entry path yet.
+//! * aarch64 saves `x19..x30` (96 bytes, SP stays 16-byte aligned), publishes the thread pointer
+//!   in `TPIDR_EL1`, and switches TTBR0 with a fixed per-process ASID. A user thread starts in
+//!   EL0 through `eret` with `SP_EL0`/`ELR_EL1`/`SPSR_EL1`; kernel threads keep the empty user
+//!   root.
 //!
 //! No FP/SIMD state is saved: the kernel and phase-1 userland are soft-float (DR-14).
 
@@ -205,7 +206,7 @@ pub unsafe fn switch(from: &Thread, to: &Thread) {
     }
 }
 
-/// Switch from `from` to `to` (aarch64, single CPU, one kernel address space).
+/// Switch from `from` to `to` (aarch64).
 ///
 /// # Safety
 ///
@@ -218,6 +219,17 @@ pub unsafe fn switch(from: &Thread, to: &Thread) {
     // SAFETY: the scheduler critical section gives exclusive access to the CPU state.
     unsafe {
         sync::set_preempt_count(to.preempt_count.load(Ordering::SeqCst));
+    }
+    let current = read_cr3();
+    if current != to.cr3 {
+        // User pages carry `nG`; a fixed per-process ASID avoids a full flush on every switch.
+        // Kernel threads use ASID 0 with the empty TTBR0 root.
+        let asid = if to.user {
+            u16::try_from(to.process.id).unwrap_or(0) & 0xff
+        } else {
+            0
+        };
+        crate::arch::mmu::switch_ttbr0(to.cr3, asid);
     }
     crate::arch::percpu::set_current_thread(to as *const Thread as u64);
 
@@ -260,17 +272,26 @@ fn thread_entry() -> ! {
     crate::sched::exit_thread(0)
 }
 
-/// Rust entry point of a newly switched-in aarch64 kernel thread.
+/// Rust entry point of a newly switched-in aarch64 thread.
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]
 extern "C" fn sched_thread_entry() -> ! {
+    let thread = match crate::sched::current_thread() {
+        Some(thread) => thread,
+        None => idle_forever(),
+    };
+    if thread.user {
+        // SAFETY: the address space, kernel stack and per-CPU state were installed by `switch`;
+        // the user range was validated before the thread was created.
+        unsafe {
+            enter_user(thread.user_entry, thread.user_stack, thread.arg);
+        }
+    }
     // SAFETY: the vector table and the GIC/timer are initialised before the scheduler starts.
     unsafe {
         sync::enable_interrupts();
     }
-    if let Some(thread) = crate::sched::current_thread()
-        && let Some(entry) = thread.kernel_entry
-    {
+    if let Some(entry) = thread.kernel_entry {
         entry();
     }
     crate::sched::exit_thread(0)
@@ -282,6 +303,16 @@ fn idle_forever() -> ! {
         // SAFETY: `hlt` is ring-0 and interrupts are enabled by the caller's iret path.
         unsafe {
             core::arch::asm!("hlt", options(nomem, nostack, preserves_flags));
+        }
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+fn idle_forever() -> ! {
+    loop {
+        // SAFETY: `wfi` is valid at EL1 and wakes on the timer IRQ.
+        unsafe {
+            core::arch::asm!("wfi", options(nomem, nostack, preserves_flags));
         }
     }
 }
@@ -345,6 +376,66 @@ unsafe fn enter_user(entry: u64, stack: u64, arg: u64) -> ! {
     }
 }
 
+/// Enter EL0 on the current thread's initial user context.
+///
+/// The kernel runs on SP_EL1, so the user stack and return state go into `SP_EL0`, `ELR_EL1` and
+/// `SPSR_EL1`; `SPSR_EL1 = 0` selects `EL0t` with interrupts enabled. Every general-purpose
+/// register except `x0` (the first-argument slot the C8 entry ignores) is cleared so no kernel
+/// pointer leaks into user mode.
+///
+/// # Safety
+///
+/// `entry` and `stack` must be valid user addresses in the active address space.
+#[cfg(target_arch = "aarch64")]
+unsafe fn enter_user(entry: u64, stack: u64, arg: u64) -> ! {
+    // SAFETY: the caller installed the process TTBR0 and the thread's kernel stack; the user
+    // range was validated before thread creation.
+    unsafe {
+        core::arch::asm!(
+            "msr sp_el0, {stack}",
+            "msr elr_el1, {entry}",
+            "msr spsr_el1, xzr",
+            "isb",
+            "mov x0, {arg}",
+            "mov x1, xzr",
+            "mov x2, xzr",
+            "mov x3, xzr",
+            "mov x4, xzr",
+            "mov x5, xzr",
+            "mov x6, xzr",
+            "mov x7, xzr",
+            "mov x8, xzr",
+            "mov x9, xzr",
+            "mov x10, xzr",
+            "mov x11, xzr",
+            "mov x12, xzr",
+            "mov x13, xzr",
+            "mov x14, xzr",
+            "mov x15, xzr",
+            "mov x16, xzr",
+            "mov x17, xzr",
+            "mov x18, xzr",
+            "mov x19, xzr",
+            "mov x20, xzr",
+            "mov x21, xzr",
+            "mov x22, xzr",
+            "mov x23, xzr",
+            "mov x24, xzr",
+            "mov x25, xzr",
+            "mov x26, xzr",
+            "mov x27, xzr",
+            "mov x28, xzr",
+            "mov x29, xzr",
+            "mov x30, xzr",
+            "eret",
+            stack = in(reg) stack,
+            entry = in(reg) entry,
+            arg = in(reg) arg,
+            options(noreturn),
+        );
+    }
+}
+
 /// Read CR3.
 #[cfg(target_arch = "x86_64")]
 pub(crate) fn read_cr3() -> u64 {
@@ -360,11 +451,19 @@ pub(crate) fn read_cr3() -> u64 {
     value
 }
 
-/// The kernel address space is a single TTBR1 root on aarch64; thread switching does not change
-/// it until user processes arrive (S14c).
+/// Read the active TTBR0 root (the ASID bits are masked off).
 #[cfg(target_arch = "aarch64")]
 pub(crate) fn read_cr3() -> u64 {
-    0
+    let value: u64;
+    // SAFETY: TTBR0_EL1 is readable at EL1.
+    unsafe {
+        core::arch::asm!(
+            "mrs {}, ttbr0_el1",
+            out(reg) value,
+            options(nomem, nostack, preserves_flags),
+        );
+    }
+    value & 0x0000_FFFF_FFFF_F000
 }
 
 /// True when CR0 has neither `EM` nor `TS` set.

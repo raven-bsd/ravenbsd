@@ -10,13 +10,13 @@ use raven_abi::errno::Errno;
 use raven_abi::types::{Handle, Rights};
 use raven_usercopy::UserSlice;
 
-use crate::arch::x86_64::trapframe::TrapFrame;
 use crate::process::{self, ProcessState, handle::Object};
 use crate::sched;
+use crate::syscall::SyscallFrame;
 use crate::usercopy::copy_to_user;
 
 /// `proc_create(flags) -> Handle`.
-pub fn create(frame: &TrapFrame) -> Result<usize, Errno> {
+pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
     if frame.rdi != 0 {
         return Err(Errno::EINVAL);
     }
@@ -30,7 +30,7 @@ pub fn create(frame: &TrapFrame) -> Result<usize, Errno> {
 }
 
 /// `proc_wait(proc, out_code) -> 0`.
-pub fn wait(frame: &TrapFrame) -> Result<usize, Errno> {
+pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let handle = Handle(frame.rdi as u32);
     let target = {

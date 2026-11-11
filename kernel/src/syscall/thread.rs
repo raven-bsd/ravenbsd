@@ -9,16 +9,16 @@ use raven_abi::errno::Errno;
 use raven_abi::types::{Handle, Rights, prot};
 use raven_usercopy::is_user_address;
 
-use crate::arch::x86_64::trapframe::TrapFrame;
 use crate::process::{self, ProcessState, handle::Object};
 use crate::sched;
+use crate::syscall::SyscallFrame;
 
 /// `thread_create(proc, entry, stack_top, arg, flags) -> Thread handle`.
 ///
 /// `proc` is any process handle with `Rights::MAP`; the entry must be inside an executable VMA of
 /// that process and the initial stack pointer must lie in a writable VMA. All flag bits are
 /// reserved and must be zero.
-pub fn create(frame: &TrapFrame) -> Result<usize, Errno> {
+pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let handle = Handle(frame.rdi as u32);
     let target = {
@@ -76,6 +76,6 @@ pub fn create(frame: &TrapFrame) -> Result<usize, Errno> {
 }
 
 /// `thread_exit(code) -> !`.
-pub fn exit(frame: &TrapFrame) -> ! {
+pub fn exit(frame: &SyscallFrame) -> ! {
     sched::exit_thread(frame.rdi as i32)
 }

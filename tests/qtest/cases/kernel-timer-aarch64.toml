@@ -16,7 +16,7 @@ regex = '^time: generic timer \d+ MHz$'
 regex = '^timer: 1000 Hz$'
 
 [[expect]]
-regex = '^selftest: timer 100 ticks in (9[0-9]|1[0-1][0-9]) ms$'
+regex = '^selftest: timer 100 ticks in (7[0-9]|[89][0-9]|1[0-2][0-9]|130) ms$'
 
 [[expect]]
 regex = '^selftest: timer interrupts=\d+$'

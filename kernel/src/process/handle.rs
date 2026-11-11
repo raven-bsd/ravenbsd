@@ -10,6 +10,7 @@ use raven_abi::errno::Errno;
 use raven_abi::types::Rights;
 use raven_handles::HandleTable;
 
+#[cfg(target_arch = "x86_64")]
 use crate::ipc::{PendingRequest, SchemeFile, SchemeServer};
 use crate::memory::frame;
 
@@ -77,10 +78,13 @@ pub enum Object {
     /// A thread object (created by later tickets).
     Thread(Arc<Thread>),
     /// An open scheme file.
+    #[cfg(target_arch = "x86_64")]
     SchemeFile(Arc<SchemeFile>),
     /// A registered scheme server capability.
+    #[cfg(target_arch = "x86_64")]
     SchemeServer(Arc<SchemeServer>),
     /// A server-side request handle returned by `RECV`.
+    #[cfg(target_arch = "x86_64")]
     SchemeRequest(Arc<PendingRequest>),
 }
 

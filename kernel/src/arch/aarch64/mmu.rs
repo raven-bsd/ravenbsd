@@ -89,6 +89,31 @@ pub unsafe fn switch_tables(ttbr0: u64, ttbr1: u64) {
     }
 }
 
+/// Switch the TTBR0 root and ASID.
+///
+/// The user half is the only part a process changes; TTBR1 keeps the kernel root. `tlbi
+/// aside1is` drops stale translations for the incoming ASID (the user pages carry `nG`), and the
+/// architectural `dsb`/`isb` sequence orders the register write before the next translation.
+pub fn switch_ttbr0(root: u64, asid: u16) {
+    let ttbr0 = (u64::from(asid & 0xff) << 48) | (root & 0x0000_FFFF_FFFF_F000);
+    let operand = u64::from(asid & 0xff) << 48;
+    // SAFETY: TTBR0_EL1 and TLBI are EL1 operations; the caller passes a root built by the
+    // kernel's mapper. The barriers are the ARMv8-A table-switch sequence.
+    unsafe {
+        asm!(
+            "dsb ish",
+            "msr ttbr0_el1, {}",
+            "isb",
+            "tlbi aside1is, {}",
+            "dsb ish",
+            "isb",
+            in(reg) ttbr0,
+            in(reg) operand,
+            options(nostack, preserves_flags),
+        );
+    }
+}
+
 /// Invalidate one virtual page (`tlbi vaae1is`).
 pub fn tlb_flush_page(virtual_address: u64) {
     // SAFETY: `tlbi vaae1is` invalidates the TLB entry for one address at all ASIDs; the ARMv8-A

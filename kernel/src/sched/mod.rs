@@ -55,7 +55,6 @@ pub mod smp;
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-#[cfg(target_arch = "x86_64")]
 use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -64,21 +63,7 @@ use raven_abi::errno::Errno;
 use spin::{Mutex as SpinMutex, MutexGuard as SpinMutexGuard};
 
 use crate::kprintln;
-#[cfg(target_arch = "x86_64")]
-pub use crate::process::Process as SchedProcess;
-#[cfg(target_arch = "aarch64")]
-/// The aarch64 scheduler runs kernel threads of one implicit kernel process; user processes and
-/// address spaces arrive with S14c.
-pub struct SchedProcess;
-#[cfg(target_arch = "aarch64")]
-impl SchedProcess {
-    /// Account a started thread (no-op until user processes exist).
-    pub fn thread_started(&self) {}
-    /// Account an exited thread; the implicit kernel process never exits.
-    pub fn thread_exited(&self) -> bool {
-        true
-    }
-}
+use crate::process::Process;
 use crate::sync;
 use crate::time;
 
@@ -119,7 +104,7 @@ impl CpuSched {
 
 /// CPU-independent scheduler data.
 struct Global {
-    kernel_process: Arc<SchedProcess>,
+    kernel_process: Arc<Process>,
     kernel_cr3: u64,
 }
 
@@ -144,10 +129,7 @@ pub fn init() -> Result<(), Errno> {
     if !context::fpu_state_ok() {
         return Err(Errno::EINVAL);
     }
-    #[cfg(target_arch = "x86_64")]
     let kernel_process = crate::process::new_kernel_process()?;
-    #[cfg(target_arch = "aarch64")]
-    let kernel_process = Arc::new(SchedProcess);
     let kernel_cr3 = context::read_cr3();
     let idle = Thread::new_idle(Arc::clone(&kernel_process), context::read_rsp(), kernel_cr3);
     // SAFETY: the scheduler has not been published yet; this is the only writer.
@@ -170,7 +152,7 @@ fn global() -> Option<&'static Global> {
 
 /// Kernel process used by kernel threads.
 #[cfg(target_arch = "x86_64")]
-pub fn kernel_process() -> Option<Arc<SchedProcess>> {
+pub fn kernel_process() -> Option<Arc<Process>> {
     global().map(|global| Arc::clone(&global.kernel_process))
 }
 
@@ -236,8 +218,7 @@ pub fn current_thread() -> Option<Arc<Thread>> {
 }
 
 /// The process owning the current thread.
-#[cfg(target_arch = "x86_64")]
-pub fn current_process() -> Option<Arc<SchedProcess>> {
+pub fn current_process() -> Option<Arc<Process>> {
     current_thread().map(|thread| Arc::clone(&thread.process))
 }
 
@@ -316,9 +297,8 @@ fn new_kernel_thread(name: &str, entry: fn()) -> Result<Arc<Thread>, Errno> {
 }
 
 /// Create a ring-3 thread in `process`, without enqueueing it.
-#[cfg(target_arch = "x86_64")]
 pub fn new_user_thread(
-    process: &Arc<SchedProcess>,
+    process: &Arc<Process>,
     entry: u64,
     stack_top: u64,
     arg: u64,
@@ -334,12 +314,14 @@ pub fn new_user_thread(
 }
 
 /// Start the scheduler with `thread` as the first runnable user thread.
-#[cfg(target_arch = "x86_64")]
 pub fn start_user(thread: Arc<Thread>) -> ! {
-    // `syscall::init` installs the legacy single-CPU GS block; restore the real one and drop the
-    // temporary null-page mapping that made the GS window fault-free.
-    smp::percpu::install_bsp_gs();
-    crate::arch::x86_64::ap_start::remove_null_page();
+    #[cfg(target_arch = "x86_64")]
+    {
+        // `syscall::init` installs the legacy single-CPU GS block; restore the real one and drop
+        // the temporary null-page mapping that made the GS window fault-free.
+        smp::percpu::install_bsp_gs();
+        crate::arch::x86_64::ap_start::remove_null_page();
+    }
     if !enqueue(thread) {
         kprintln!("sched: initial thread queue is full");
         crate::boot::exit_qemu(0x11);
@@ -481,7 +463,10 @@ pub fn timer_return(from_user: bool) {
 }
 
 /// Return-to-user hook called after a syscall.
-#[cfg(target_arch = "x86_64")]
+///
+/// x86-64 calls it before `sysretq`; aarch64 calls it from `svc_dispatch` before the vector
+/// restores the EL0 frame. A switch here is safe on both: the trap frame lives on the current
+/// thread's kernel stack, which the context switch preserves.
 pub fn syscall_return() {
     if !sync::preemption_enabled() {
         return;
@@ -788,14 +773,9 @@ pub fn exit_thread(code: i32) -> ! {
         None => crate::arch::halt(),
     };
     thread.exit_code.store(code, Ordering::SeqCst);
-    // The x86-64 path reports a dead process to the supervisor; aarch64 has no user processes
-    // yet (S14c), and its `SchedProcess::thread_exited` is always true.
-    #[cfg(target_arch = "x86_64")]
     if thread.process.thread_exited() {
         crate::process::notify_exit(code);
     }
-    #[cfg(target_arch = "aarch64")]
-    let _ = thread.process.thread_exited();
     let _guard = sync::critical();
     let cpu = this_cpu();
     let (from, to) = {

@@ -39,6 +39,7 @@ mod ffs_vfsops;
 mod files;
 mod fs;
 mod inode;
+pub mod mkfs;
 mod namespace;
 mod rename;
 mod types;

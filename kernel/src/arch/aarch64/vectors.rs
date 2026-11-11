@@ -146,12 +146,23 @@ __exception_restore:
 "#
 );
 
+/// Exception class: SVC from AArch64.
+const EC_SVC64: u8 = 0x15;
+/// Exception class: instruction abort from a lower exception level.
+const EC_IABT_LOWER: u8 = 0x20;
+/// Exception class: data abort from a lower exception level.
+const EC_DABT_LOWER: u8 = 0x24;
+/// Exception class: data abort taken without a change in exception level.
+const EC_DABT_SAME: u8 = 0x25;
+
 /// Rust side of every vector slot.
 ///
-/// IRQ slots dispatch through [`crate::arch::irq`] and return to the vector's restore path; every
-/// other slot prints the trap frame and exits the test with failure.
+/// IRQ slots dispatch through [`crate::arch::irq`] and return to the vector's restore path. The
+/// lower-EL synchronous slot handles `svc #0` (EC 0x15) and user faults; the current-EL
+/// synchronous slot checks the usercopy fixup table before treating a data abort as fatal. Every
+/// unhandled slot prints the trap frame and exits the test with failure.
 #[unsafe(no_mangle)]
-pub extern "C" fn exception_dispatch(slot: u64, frame: *const TrapFrame) {
+pub extern "C" fn exception_dispatch(slot: u64, frame: *mut TrapFrame) {
     // IRQ slots: 1 (current-EL SP0), 5 (current-EL SPx), 9 (lower EL AArch64), 13 (lower EL
     // AArch32). The CPU masks IRQ on exception entry, so the handler never nests. Slots 9/13
     // interrupted EL0, which is what enables return-to-user preemption (x86-64's
@@ -160,17 +171,46 @@ pub extern "C" fn exception_dispatch(slot: u64, frame: *const TrapFrame) {
         crate::arch::irq::dispatch(matches!(slot, 9 | 13));
         return;
     }
-    // SAFETY: `__exception_vectors` built this frame on the boot stack and passes its address.
-    // The frame is valid for the whole handler and is not aliased by other Rust code.
-    let frame = unsafe { &*frame };
+    // SAFETY: `__exception_vectors` built this frame on the current kernel stack and passes its
+    // address; it is exclusively owned by this handler for the duration of the call.
+    let frame = unsafe { &mut *frame };
     let esr = Esr::new(frame.esr);
     let ec = esr.ec();
+
+    match slot {
+        // Lower EL, AArch64.
+        8 => match ec {
+            EC_SVC64 => crate::syscall::svc_dispatch(frame),
+            EC_DABT_LOWER => {
+                if crate::process::handle_page_fault(frame.far) {
+                    return;
+                }
+                crate::process::page_fault(frame.far)
+            }
+            EC_IABT_LOWER => crate::process::page_fault(frame.far),
+            _ => crate::process::user_exception(usize::from(ec)),
+        },
+        // Lower EL, AArch32: no 32-bit userland exists.
+        12 => crate::process::user_exception(usize::from(ec)),
+        // Current EL, SP0 (0) or SPx (4): only a usercopy fault at an instruction in the fixup
+        // table may recover. Anything else is a kernel bug.
+        0 | 4 => {
+            if ec == EC_DABT_SAME && crate::usercopy::handle_fault_aarch64(frame) {
+                return;
+            }
+            fatal(slot, frame, esr, ec)
+        }
+        _ => fatal(slot, frame, esr, ec),
+    }
+}
+
+fn fatal(slot: u64, frame: &TrapFrame, esr: Esr, ec: u8) -> ! {
     kprintln!(
         "exception: {} EC=0x{:02x} ({}) ESR=0x{:016x} ELR=0x{:016x} FAR=0x{:016x} SPSR=0x{:016x}",
         slot_name(slot as usize),
         ec,
         ec_name(ec),
-        frame.esr,
+        esr.raw(),
         frame.elr,
         frame.far,
         frame.spsr

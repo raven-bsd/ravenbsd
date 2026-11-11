@@ -12,15 +12,15 @@ use raven_abi::types::{Handle, Timespec, clock};
 use raven_abi::uname::Uname;
 use raven_usercopy::UserSlice;
 
-use crate::arch::x86_64::serial;
-use crate::arch::x86_64::trapframe::TrapFrame;
+use crate::arch::serial;
 use crate::cmdline::CmdLine;
 use crate::process;
+use crate::syscall::SyscallFrame;
 use crate::time;
 use crate::usercopy::{copy_from_user, copy_to_user};
 
 /// Dispatch one decoded syscall.
-pub fn dispatch(call: Syscall, frame: &mut TrapFrame) -> Result<usize, Errno> {
+pub fn dispatch(call: Syscall, frame: &SyscallFrame) -> Result<usize, Errno> {
     match call {
         Syscall::EXIT => process::exit_current(frame.rdi as i32),
         Syscall::YIELD => {
@@ -93,7 +93,7 @@ fn uname(pointer: u64) -> Result<usize, Errno> {
     Uname::set_field(&mut uname.nodename, "raven");
     Uname::set_field(&mut uname.release, raven_abi::uname::RELEASE);
     Uname::set_field(&mut uname.version, &version);
-    Uname::set_field(&mut uname.machine, "x86_64");
+    Uname::set_field(&mut uname.machine, crate::arch::ARCH_NAME);
 
     let destination = UserSlice::new(
         pointer,
