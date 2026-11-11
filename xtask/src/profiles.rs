@@ -44,6 +44,10 @@ pub(crate) struct File {
     pub(crate) path: String,
     #[serde(default = "default_file_mode")]
     pub(crate) mode: u32,
+    /// The source is a generated build artifact under `build/`; profile validation does not
+    /// require it to exist yet. The image build still reads it, after the ticket's pre step.
+    #[serde(default)]
+    pub(crate) generated: bool,
 }
 
 const fn default_file_mode() -> u32 {
@@ -199,7 +203,13 @@ impl EntrySet {
                     file.src
                 );
             }
-            if file.src.is_empty() || !root.join(source).is_file() {
+            if file.generated && !source.starts_with("build") {
+                bail!(
+                    "profile `{name}` generated file source `{}` is not under build/",
+                    file.src
+                );
+            }
+            if file.src.is_empty() || (!file.generated && !root.join(source).is_file()) {
                 bail!("profile `{name}` file source `{}` does not exist", file.src);
             }
         }
@@ -383,6 +393,39 @@ mod tests {
         tree.write(
             "profiles/base.d/file.toml",
             "[[initfs.files]]\nsrc = \"missing\"\npath = \"/missing\"\n",
+        );
+        assert!(Profile::load(&tree.root, "base").is_err());
+    }
+    #[test]
+    fn generated_file_source_may_be_missing() {
+        let tree = Tree::new();
+        tree.profile("base", BASE);
+        tree.write(
+            "profiles/base.d/file.toml",
+            "[[initfs.files]]\nsrc = \"build/fixtures/tool\"\npath = \"/tool\"\ngenerated = true\n",
+        );
+        let profile = Profile::load(&tree.root, "base").unwrap();
+        assert!(profile.initfs.files[0].generated);
+    }
+    #[test]
+    fn generated_files_must_live_under_build() {
+        let tree = Tree::new();
+        tree.profile("base", BASE);
+        tree.write("etc/a", "a");
+        tree.write(
+            "profiles/base.d/file.toml",
+            "[[initfs.files]]\nsrc = \"etc/a\"\npath = \"/a\"\ngenerated = true\n",
+        );
+        let error = Profile::load(&tree.root, "base").unwrap_err().to_string();
+        assert!(error.contains("under build/"));
+    }
+    #[test]
+    fn regular_file_source_is_still_required() {
+        let tree = Tree::new();
+        tree.profile("base", BASE);
+        tree.write(
+            "profiles/base.d/file.toml",
+            "[[initfs.files]]\nsrc = \"build/fixtures/tool\"\npath = \"/tool\"\n",
         );
         assert!(Profile::load(&tree.root, "base").is_err());
     }

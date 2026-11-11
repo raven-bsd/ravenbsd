@@ -4,17 +4,23 @@
 [package]
 name = "raven-init"
 version = "0.1.0"
-description = "RavenBSD PID 1: M1 uname banner, later service supervision."
+description = "RavenBSD PID 1 service manager and M1 uname banner."
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+raven-abi = { path = "../../crates/raven-abi" }
+raven-initfs = { path = "../../crates/raven-initfs" }
+raven-proto-fs = { path = "../../crates/raven-proto-fs" }
+raven-proto-svc = { path = "../../crates/raven-proto-svc" }
+raven-svc-manifest = { path = "../../crates/raven-svc-manifest" }
 raven-uname = { path = "../bin/uname" }
 
 [target.'cfg(target_os = "none")'.dependencies]
 raven-rt = { path = "../rt", features = ["alloc"] }
+raven-scheme = { path = "../../crates/raven-scheme" }
 
 [lints]
 workspace = true

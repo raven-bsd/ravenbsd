@@ -1,25 +1,120 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt INIT 8
 .Os RavenBSD
 .Sh NAME
 .Nm init
-.Nd RavenBSD PID 1
+.Nd RavenBSD PID 1 service manager
 .Sh SYNOPSIS
 .Nm
 .Sh DESCRIPTION
 The
 .Nm
 program is the first user process started by the kernel.
-In the M1 milestone it prints the boot banner and the
-.Xr uname 1
-identification line, then exits.
+It maps the boot archive from handle 1 and reads the service manifests under
+.Pa /etc/services.d/ .
+Each manifest is a small TOML file with the service name, executable, arguments,
+environment, dependencies, restart policy and readiness mode.
 .Pp
-Later milestones supervise the service manifests described in
-.Xr service 5
-and the system servers.
+Services start in dependency order computed at boot.
+A missing dependency or a dependency cycle is fatal:
+.Nm
+prints
+.Dq svcd: <reason>
+and exits 1.
+A malformed manifest is reported as
+.Dq svcd: <file>: <error>
+and that service is skipped; if another service needs it, the missing dependency
+is fatal.
+.Pp
+.Nm
+prints
+.Dq svcd: <name> up
+when a service is ready,
+.Dq svcd: <name> failed: <reason>
+when readiness times out, and
+.Dq svcd: all services up
+once every required service (or a service with a restart policy other than
+.Dq never )
+is running.
+A service that exits is restarted according to
+.Va restart ,
+.Va restart_delay_ms ,
+.Va max_restarts
+and
+.Va window_ms .
+When the crash-loop limit is reached,
+.Nm
+prints
+.Dq svcd: <name> crash loop, giving up
+and stops restarting it.
+.Pp
+.Nm
+registers the
+.Dq svc:
+scheme.
+Its directory lists the services and
+.Pa svc:/<name>
+returns one status line
+.Dq <name> <state> <pid-or-handle> <restarts> .
+See
+.Xr svcctl 1 .
+.Pp
+When no service manifests are present,
+.Nm
+keeps the M1 behaviour: it prints
+.Dq init: starting ,
+the
+.Xr uname 1
+line and
+.Dq init: done ,
+then exits 0.
+.Pp
+Test mode is configured by
+.Pa /etc/svcd.conf :
+.Bl -tag -width "exit_when_settled"
+.It Cm exit_when_exits No = Ar service
+Exit with that service's status as soon as it terminates.
+.It Cm exit_when_settled No = true
+Once every service is up or has given up, print
+.Dq svcd: settled
+and exit 0 if no required service failed, otherwise 1.
+.El
+Unknown keys are reported as
+.Dq svcd: /etc/svcd.conf: unknown key <key>
+and ignored.
+The normal profile has no such file, so
+.Nm
+runs forever.
+.Pp
+There are no signals yet.
+.Dq STOP
+drops
+.Nm Ns 's
+process handle for the service and stops supervising it, but the child process
+keeps running until it exits by itself.
+.Sh FILES
+.Bl -tag -width /etc/services.d -compact
+.It Pa /etc/services.d/*.toml
+Service manifests.
+.It Pa /etc/rc.conf
+Optional
+.Dq NAME_enable
+and
+.Dq NAME_restart
+overrides.
+.It Pa /etc/svcd.conf
+Optional test-mode settings.
+.El
 .Sh EXIT STATUS
 .Ex -std
+.Nm
+exits non-zero when the initfs, a manifest, the dependency graph or the
+.Dq svc:
+scheme cannot be initialised, or when a test-mode setting asks for a failure
+exit.
+.Sh SEE ALSO
+.Xr svcctl 1
 .Sh STANDARDS
 RavenBSD.

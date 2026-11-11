@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Standalone test profile for K11. It deliberately does not extend `shell`: the test needs exactly
+# `raven-init` and the test service, with its own manifests and svcd.conf.
+
+name = "svcd-test"
+
+[initfs]
+programs = [
+    { package = "raven-init", path = "/init" },
+]
+
+files = [
+    { src = "build/fixtures/svcd-test/testsvc", path = "/sbin/testsvc", mode = 0o755, generated = true },
+    { src = "etc/svcd-test/a.toml", path = "/etc/services.d/a.toml" },
+    { src = "etc/svcd-test/b.toml", path = "/etc/services.d/b.toml" },
+    { src = "etc/svcd-test/c.toml", path = "/etc/services.d/c.toml" },
+    { src = "etc/svcd-test/x.toml", path = "/etc/services.d/x.toml" },
+    { src = "etc/svcd-test/svcd.conf", path = "/etc/svcd.conf" },
+]
+
+[boot]
+cmdline = "console=ttyS0 loglevel=info"
+log_level = "info"
