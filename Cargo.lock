@@ -486,6 +486,10 @@ name = "raven-mem"
 version = "0.1.0"
 
 [[package]]
+name = "raven-msi"
+version = "0.1.0"
+
+[[package]]
 name = "raven-netcore"
 version = "0.1.0"
 dependencies = [

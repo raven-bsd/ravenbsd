@@ -71,6 +71,25 @@ struct DmaInfo {
     pad: u32,
 }
 
+#[repr(C)]
+struct IrqInfo {
+    vector: u32,
+    address_lo: u32,
+    address_hi: u32,
+    data: u32,
+}
+
+#[repr(C)]
+struct EvqEvent {
+    cookie: u64,
+    events: u32,
+    pad: u32,
+}
+
+const IRQ_MSI: u32 = 2;
+const SIGNALED: usize = 8;
+const EVQ_ADD: usize = 1;
+
 #[inline(always)]
 unsafe fn syscall6(
     number: usize,
@@ -193,6 +212,80 @@ fn dma_info(buffer: Handle, out: &mut DmaInfo) -> Result<(), Errno> {
     .map(|_| ())
 }
 
+fn irq_create(
+    root: Handle,
+    kind: u32,
+    number: u32,
+    info: Option<&mut IrqInfo>,
+) -> Result<Handle, Errno> {
+    let flags = match info {
+        Some(info) => (info as *mut IrqInfo) as usize,
+        None => 0,
+    };
+    handle(unsafe {
+        syscall6(
+            Syscall::IRQ_CREATE as usize,
+            root.0 as usize,
+            kind as usize,
+            number as usize,
+            flags,
+            0,
+            0,
+        )
+    })
+}
+
+fn irq_wait(irq: Handle, timeout_ns: u64) -> Result<usize, Errno> {
+    result(syscall2(
+        Syscall::IRQ_WAIT as usize,
+        irq.0 as usize,
+        timeout_ns as usize,
+    ))
+}
+
+fn irq_ack(irq: Handle) -> Result<(), Errno> {
+    result(syscall1(Syscall::IRQ_ACK as usize, irq.0 as usize)).map(|_| ())
+}
+
+fn evq_create() -> Result<Handle, Errno> {
+    handle(syscall1(Syscall::EVQ_CREATE as usize, 0))
+}
+
+fn evq_ctl(
+    queue: Handle,
+    operation: usize,
+    source: Handle,
+    events: usize,
+    cookie: u64,
+) -> Result<(), Errno> {
+    result(unsafe {
+        syscall6(
+            Syscall::EVQ_CTL as usize,
+            queue.0 as usize,
+            operation,
+            source.0 as usize,
+            events,
+            cookie as usize,
+            0,
+        )
+    })
+    .map(|_| ())
+}
+
+fn evq_wait(queue: Handle, out: &mut [EvqEvent], timeout_ns: u64) -> Result<usize, Errno> {
+    result(unsafe {
+        syscall6(
+            Syscall::EVQ_WAIT as usize,
+            queue.0 as usize,
+            out.as_mut_ptr() as usize,
+            out.len(),
+            timeout_ns as usize,
+            0,
+            0,
+        )
+    })
+}
+
 fn map_memory(
     process: Handle,
     object: Handle,
@@ -286,6 +379,11 @@ fn read_u16(address: usize) -> u16 {
     u16::from_le(unsafe { (address as *const u16).read_unaligned() })
 }
 
+fn read_u8(address: usize) -> u8 {
+    // SAFETY: the fixture reads its own device mappings, which the kernel mapped read/write.
+    unsafe { (address as *const u8).read() }
+}
+
 fn read_u32(address: usize) -> u32 {
     // SAFETY: the fixture reads its own device mappings, which the kernel mapped read/write.
     u32::from_le(unsafe { (address as *const u32).read_unaligned() })
@@ -301,6 +399,11 @@ fn write_u32(address: usize, value: u32) {
     unsafe { (address as *mut u32).write_unaligned(value.to_le()) }
 }
 
+fn write_u16(address: usize, value: u16) {
+    // SAFETY: the fixture writes its own device mappings, which the kernel mapped read/write.
+    unsafe { (address as *mut u16).write_unaligned(value.to_le()) }
+}
+
 /// The child role selected by `argv[1]`: the leak test children only run this path.
 fn child_main(role: &str) -> i32 {
     match role {
@@ -308,6 +411,19 @@ fn child_main(role: &str) -> i32 {
         "holder" => {
             // The transferred root capability lives at handle 3 in the child.
             match dma_alloc(Handle::new(3, 0), MIB as usize, 0, 28, 0) {
+                Ok(_) => 0,
+                Err(_) => 1,
+            }
+        }
+        "irqholder" => {
+            // Hold an MSI vector until exit; the pool must return it afterwards.
+            let mut info = IrqInfo {
+                vector: 0,
+                address_lo: 0,
+                address_hi: 0,
+                data: 0,
+            };
+            match irq_create(Handle::new(3, 0), IRQ_MSI, 0, Some(&mut info)) {
                 Ok(_) => 0,
                 Err(_) => 1,
             }
@@ -468,13 +584,7 @@ fn main(args: raven_rt::Args) -> i32 {
     }
     println!("s21: negatives ok");
 
-    // Part 2: DMA buffers.
-    if let Err(message) = dma_part(admin, edu) {
-        fail(message);
-    }
-
-    // Leak test: 200 balanced cycles, then clean/holder/clean children. The kernel prints
-    // `s21: frames free=` on every child exit (s21-framecheck cmdline).
+    // The initfs is mapped once: the DMA leak test and the interrupt pool test spawn children.
     let image = match map_initfs_image() {
         Ok(image) => image,
         Err(_) => fail("initfs map"),
@@ -483,6 +593,19 @@ fn main(args: raven_rt::Args) -> i32 {
         Ok(initfs) => initfs,
         Err(_) => fail("initfs parse"),
     };
+
+    // Part 2: DMA buffers.
+    if let Err(message) = dma_part(admin, edu) {
+        fail(message);
+    }
+
+    // Part 3: interrupts and MSI.
+    if let Err(message) = irq_part(admin, edu, edu_config, &initfs) {
+        fail(message);
+    }
+
+    // Leak test: 200 balanced cycles, then clean/holder/clean children. The kernel prints
+    // `s21: frames free=` on every child exit (s21-framecheck cmdline).
     let mut cycle = 0usize;
     while cycle < 200 {
         match dma_alloc(root, MIB as usize, 0, 28, 0) {
@@ -887,6 +1010,130 @@ fn negatives(
     if boot_blob(admin, BLOB_DTB) != Err(Errno::ENOENT) {
         return Err("dtb blob expected ENOENT");
     }
+    Ok(())
+}
+
+/// Locate the MSI capability of the edu device and program it with the kernel's message.
+fn program_msi(config: usize, info: &IrqInfo) -> Result<(), &'static str> {
+    let mut cap = usize::from(read_u8(config + 0x34) & 0xFC);
+    let mut msi = 0usize;
+    while cap != 0 {
+        if read_u8(config + cap) == 0x05 {
+            msi = cap;
+            break;
+        }
+        cap = usize::from(read_u8(config + cap + 1) & 0xFC);
+    }
+    if msi == 0 {
+        return Err("no msi capability");
+    }
+    let control = read_u16(config + msi + 2);
+    let wide = control & (1 << 7) != 0;
+    write_u32(config + msi + 4, info.address_lo);
+    if wide {
+        write_u32(config + msi + 8, info.address_hi);
+        write_u32(config + msi + 12, info.data);
+    } else {
+        write_u32(config + msi + 8, info.data);
+    }
+    write_u16(config + msi + 2, control | 1);
+    Ok(())
+}
+
+/// Acknowledge one device interrupt in the edu status register.
+fn device_ack(edu: usize) {
+    write_u32(edu + 0x64, 0x1);
+}
+
+fn irq_part(
+    admin: Handle,
+    edu: usize,
+    edu_config: usize,
+    initfs: &Initfs<'_>,
+) -> Result<(), &'static str> {
+    // MSI: one vector, 10,000 counted firings.
+    let mut info = IrqInfo {
+        vector: 0,
+        address_lo: 0,
+        address_hi: 0,
+        data: 0,
+    };
+    let msi = match irq_create(admin, IRQ_MSI, 0, Some(&mut info)) {
+        Ok(msi) => msi,
+        Err(error) => {
+            println!("s21: failed msi create errno={}", error.0);
+            return Err("msi create");
+        }
+    };
+    program_msi(edu_config, &info)?;
+    let mut count = 0u64;
+    while count < 10_000 {
+        write_u32(edu + 0x60, 0x1);
+        let got = irq_wait(msi, 5_000_000_000).map_err(|_| "msi wait")?;
+        if got == 0 {
+            return Err("msi timeout");
+        }
+        device_ack(edu);
+        count = count.saturating_add(got as u64);
+    }
+    if count != 10_000 {
+        return Err("msi count drift");
+    }
+    println!("s21: irq msi ok count={}", count);
+
+    // The same Irq is an event-queue source with SIGNALED.
+    let queue = evq_create().map_err(|_| "evq create")?;
+    evq_ctl(queue, EVQ_ADD, msi, SIGNALED, 0x1C).map_err(|_| "evq add")?;
+    write_u32(edu + 0x60, 0x1);
+    let mut event = [EvqEvent {
+        cookie: 0,
+        events: 0,
+        pad: 0,
+    }];
+    let got = evq_wait(queue, &mut event, 5_000_000_000).map_err(|_| "evq wait")?;
+    if got != 1 || event[0].cookie != 0x1C || event[0].events != SIGNALED as u32 {
+        return Err("evq delivery");
+    }
+    let pending = irq_wait(msi, 5_000_000_000).map_err(|_| "irq wait")?;
+    if pending == 0 {
+        return Err("irq pending");
+    }
+    device_ack(edu);
+    let _ = irq_ack(msi);
+    println!("s21: irq event ok");
+
+    // Closing the last handle returns the vector; a killed owner returns it too.
+    let first = info.vector;
+    handle_close(msi);
+    let mut again = IrqInfo {
+        vector: 0,
+        address_lo: 0,
+        address_hi: 0,
+        data: 0,
+    };
+    let second = irq_create(admin, IRQ_MSI, 0, Some(&mut again)).map_err(|_| "pool create")?;
+    if again.vector != first {
+        return Err("pool reuse");
+    }
+    handle_close(second);
+
+    let child = spawn_role(initfs, Handle::ROOT_DEVICE, "irqholder").map_err(|_| "spawn")?;
+    if proc_wait(child).map_err(|_| "wait")? != 0 {
+        return Err("irqholder exit");
+    }
+    handle_close(child);
+    let mut after = IrqInfo {
+        vector: 0,
+        address_lo: 0,
+        address_hi: 0,
+        data: 0,
+    };
+    let third = irq_create(admin, IRQ_MSI, 0, Some(&mut after)).map_err(|_| "pool after kill")?;
+    if after.vector != first {
+        return Err("pool after kill");
+    }
+    handle_close(third);
+    println!("s21: irq pool ok");
     Ok(())
 }
 

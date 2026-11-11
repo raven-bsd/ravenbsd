@@ -11,6 +11,7 @@ pub mod gdt;
 pub mod idt;
 pub mod ioapic;
 pub mod ipi;
+pub mod msi;
 pub mod pic;
 pub mod serial;
 mod start;
@@ -20,6 +21,7 @@ pub mod trapframe;
 pub mod tsc;
 #[allow(dead_code)] // `enter` is replaced by the S09 scheduler trampoline; kept for the S08 ABI.
 pub mod usermode;
+pub mod vector;
 
 /// Enable maskable interrupts.
 ///

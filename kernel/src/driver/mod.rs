@@ -125,6 +125,7 @@ static GLOBAL_USED: AtomicU64 = AtomicU64::new(0);
 /// Size of one local APIC / IOAPIC window the kernel owns.
 const APIC_WINDOW: u64 = 0x1000;
 
+pub(crate) mod irq;
 /// Boot blobs built once during init.
 struct BlobSet {
     acpi: Option<Arc<MemObject>>,
@@ -176,13 +177,16 @@ fn write_region(bytes: &mut Vec<u8>, region: raven_bootinfo::MemoryRegion) {
     bytes.extend_from_slice(&region.reserved.to_le_bytes());
 }
 
-/// Dispatch an S21a/S21b syscall.
+/// Dispatch an S21a/S21b/S21c syscall.
 pub fn dispatch(call: Syscall, frame: &SyscallFrame) -> Result<usize, Errno> {
     match call {
         Syscall::MMIO_CREATE => create_mmio(frame),
         Syscall::BOOT_BLOB => boot_blob(frame),
         Syscall::DMA_ALLOC => dma_alloc(frame),
         Syscall::DMA_INFO => dma_info(frame),
+        Syscall::IRQ_CREATE => irq::create(frame),
+        Syscall::IRQ_WAIT => irq::wait(frame),
+        Syscall::IRQ_ACK => irq::ack(frame),
         _ => Err(Errno::ENOSYS),
     }
 }
@@ -247,7 +251,7 @@ pub fn boot_blob(frame: &SyscallFrame) -> Result<usize, Errno> {
 }
 
 /// The caller must hold a `RootDevice` capability with `ADMIN`.
-fn require_root(caller: &Arc<Process>, handle: Handle) -> Result<(), Errno> {
+pub(crate) fn require_root(caller: &Arc<Process>, handle: Handle) -> Result<(), Errno> {
     let table = caller.handles.lock();
     match table.get(handle, Rights::ADMIN) {
         Ok(Object::RootDevice) => Ok(()),

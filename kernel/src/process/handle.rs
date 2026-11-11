@@ -12,6 +12,8 @@ use raven_handles::HandleTable;
 
 #[cfg(target_arch = "x86_64")]
 use crate::driver::DmaBuffer;
+#[cfg(target_arch = "x86_64")]
+use crate::driver::irq::Irq;
 use crate::event::{EventQueue, Timer, UserEvent};
 #[cfg(target_arch = "x86_64")]
 use crate::ipc::{PendingRequest, SchemeFile, SchemeServer};
@@ -166,6 +168,9 @@ pub enum Object {
     /// A physically contiguous device buffer (`DMA_ALLOC`).
     #[cfg(target_arch = "x86_64")]
     DmaBuffer(Arc<DmaBuffer>),
+    /// A device interrupt source (`IRQ_CREATE`).
+    #[cfg(target_arch = "x86_64")]
+    Irq(Arc<Irq>),
     /// An open scheme file.
     #[cfg(target_arch = "x86_64")]
     SchemeFile(Arc<SchemeFile>),
