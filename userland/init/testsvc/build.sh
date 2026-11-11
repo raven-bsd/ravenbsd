@@ -17,4 +17,6 @@ mkdir -p "$out"
 RUSTFLAGS="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=-T$root/userland/init/testsvc/linker.ld" \
     cargo build -p raven-testsvc --target x86_64-unknown-none
 
-cp target/x86_64-unknown-none/debug/raven-testsvc "$out/testsvc"
+# Honour CARGO_TARGET_DIR: the gate/ci runs cargo with a shared target directory.
+target_dir=${CARGO_TARGET_DIR:-$root/target}
+cp "$target_dir/x86_64-unknown-none/debug/raven-testsvc" "$out/testsvc"
