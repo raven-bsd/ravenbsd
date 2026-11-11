@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: BSD-2-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //
 // Ported from NetBSD sys/ufs/ufs/ufs_rename.c (revision
