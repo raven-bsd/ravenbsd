@@ -347,3 +347,56 @@ fn help_documents_no_build_on_the_run_line() {
         "{stdout}"
     );
 }
+
+#[test]
+fn step_dialogue_passes_through_the_cli() {
+    let temp = TempDir::new("dialogue-pass");
+    let case = temp.path().join("dialogue.toml");
+    temp.write(
+        "dialogue.toml",
+        &format!(
+            "{}[[step]]\nwait = '^ready$'\nsend = \"uname\\n\"\ndelay_ms = 0\n\
+             [[expect]]\nregex = '^got: uname$'\n",
+            basic_case("dialogue", 5, "success")
+        ),
+    );
+    let out = temp.path().join("out");
+    let result = run(
+        &case,
+        &out,
+        "printf 'ready\\n'; read line; printf 'got: %s\\n' \"$line\"; exit 33",
+    );
+    assert_eq!(
+        result.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    assert!(stdout.contains("dialogue: pass"), "{stdout}");
+    assert_eq!(temp.read("out/dialogue.log"), "ready\ngot: uname\n");
+    let json: Value = serde_json::from_str(&temp.read("out/dialogue.json")).unwrap();
+    assert_eq!(json["result"], "pass");
+}
+
+#[test]
+fn step_failure_exits_one_and_is_printed() {
+    let temp = TempDir::new("dialogue-fail");
+    let case = temp.path().join("stuck.toml");
+    temp.write(
+        "stuck.toml",
+        &format!(
+            "{}[[step]]\nwait = '^never$'\ntimeout_secs = 1\n",
+            basic_case("stuck", 5, "success")
+        ),
+    );
+    let out = temp.path().join("out");
+    let result = run(&case, &out, "printf 'started\\n'; sleep 5");
+    assert_eq!(result.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    assert!(stderr.contains("step 1"), "{stderr}");
+    assert!(stderr.contains("^never$"), "{stderr}");
+    assert!(stderr.contains("started"), "{stderr}");
+    let json: Value = serde_json::from_str(&temp.read("out/stuck.json")).unwrap();
+    assert_eq!(json["result"], "fail");
+}

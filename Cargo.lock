@@ -328,6 +328,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-echo-dialogue"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
+
+[[package]]
 name = "raven-elf"
 version = "0.1.0"
 

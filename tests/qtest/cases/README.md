@@ -22,9 +22,11 @@ format; `raven-qtest list` prints every case it can parse.
 |---|---|---|
 | `boot_cmdline` | string | Passed to `cargo xtask image --cmdline`. |
 | `qemu_extra` | array of strings | Extra QEMU arguments appended after the fixed ones. |
+| `skip` | string | Do not run the case; report `skipped` with this reason. |
 | `[[expect]]` | table | `regex` plus optional `unordered` (bool, default `false`). |
 | `[[forbid]]` | table | `regex`; any matching serial line fails the case. |
 | `[[oracle]]` | table | Host-side artifact check; see below. |
+| `[[step]]` | table | Scripted serial dialogue step; see below. |
 
 Unknown keys and invalid regexes are errors.
 
@@ -48,6 +50,69 @@ regex = '^RavenBSD \S+ 0\.1 RavenBSD 0\.1 \(\S+\) #\d+: .+ x86_64$'
 [[forbid]]
 regex = '(?i)panic'
 ```
+
+## Serial dialogue
+
+A case can type into the guest while it runs. `[[step]]` tables are executed in file order: a
+`wait` regex matches a serial line (or the current partial line, so an unterminated prompt such as
+`raven# ` works), and `send` writes the text to the guest's serial input. The harness starts the
+process with a stdin pipe; under QEMU that is the same byte stream as `-serial stdio` (x86-64) and
+the `-nographic` serial (aarch64), so the typed text reaches the guest console.
+
+```toml
+name = "shell-uname"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 60
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[step]]
+wait = '^RavenBSD login: $'
+timeout_secs = 30
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+send = "uname\n"
+delay_ms = 0
+
+[[step]]
+wait = '^RavenBSD \S+ 0\.1'
+send = "exit\n"
+
+[[expect]]
+regex = '^RavenBSD \S+ 0\.1'
+
+[[forbid]]
+regex = '(?i)panic'
+```
+
+| Key | Type | Meaning |
+|---|---|---|
+| `wait` | string | Regex that a serial line or the current partial line must match. A matched line (or matched partial prefix and the rest of that line) is consumed and is not offered to a later `wait`. |
+| `send` | string | Text written verbatim to the guest serial input; `\n` in TOML is a newline. |
+| `delay_ms` | integer | Pause before `send`, in milliseconds. Default 50; must be shorter than the case timeout. |
+| `timeout_secs` | integer | How long `wait` may take. Default the case timeout; must not exceed it. |
+
+A step needs `wait`, `send` or both. Steps are matched against the live stream in order; a line
+before a match is skipped, just like the ordered `[[expect]]` matching. A step that cannot finish
+(either timeout) kills the process and fails the case with the step number, its regex and the last
+20 serial lines. If the process exits first, the pending step is reported the same way.
+
+Steps and `[[expect]]` coexist: `[[expect]]` still matches over every captured line after the run,
+including lines a step consumed, so the two features do not interfere.
+
+When the guest cannot be typed into yet (S27 `DEBUG_READ` not merged), use `skip`:
+
+```toml
+skip = "needs S27 (DEBUG_READ) and the echo-dialogue fixture image"
+```
+
+The case then reports `skipped` (exit status 77) with that note and never starts QEMU.
 
 ## Audio oracle
 

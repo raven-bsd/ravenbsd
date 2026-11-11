@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The guest side is tests/fixtures/echo-dialogue: it prints `ready> `, reads a console line with
+# DEBUG_READ (S27) and answers `got: <line>`.
+#
+# S27 (console input, DEBUG_READ) is not merged in this revision, so the case is skipped: the
+# base image cannot be typed into and this fixture needs its own initfs (built like the S11
+# fixture: see tickets/stuart/reports/S11.md). Remove `skip` and add the image plumbing when S27
+# lands.
+
+name = "dialogue-echo"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 60
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+skip = "needs S27 (DEBUG_READ) and the echo-dialogue fixture image; see tests/fixtures/echo-dialogue"
+
+[[step]]
+wait = '^ready> $'
+timeout_secs = 30
+
+[[step]]
+send = "hello\n"
+delay_ms = 100
+
+[[step]]
+wait = '^got: hello$'
+
+[[step]]
+send = "quit\n"
+
+[[expect]]
+regex = '^got: hello$'
+
+[[forbid]]
+regex = '(?i)panic'
