@@ -15,7 +15,7 @@ use raven_bootinfo::{
     BOOTINFO_MAGIC, BOOTINFO_VERSION, BootInfo, MemoryKind, MemoryRegion, PhysRange, arch,
 };
 
-use crate::fdt::{Cells, Fdt, Node};
+use crate::fdt::{Fdt, Node};
 
 /// Maximum memory-map entries a caller must provide.
 pub const MAX_REGIONS: usize = 64;
@@ -27,8 +27,6 @@ const MAX_INTERVALS: usize = 128;
 const MODEL_MAX: usize = 64;
 /// Page size used by the memory map.
 const PAGE_SIZE: u64 = 4096;
-/// Number of `ranges` entries parsed for a bus.
-const MAX_RANGES: usize = 8;
 
 /// Caller-supplied addresses and kernel parameters.
 #[derive(Clone, Copy, Debug, Default)]
@@ -108,6 +106,12 @@ pub struct Platform {
     pub uart_clock_hz: u32,
     /// True when at least one value came from the FDT.
     pub from_dtb: bool,
+    /// True when the GIC distributor and CPU interface came from the FDT.
+    pub gic_from_dtb: bool,
+    /// True when the PL011 node came from the FDT.
+    pub uart_from_dtb: bool,
+    /// True when a missing node left at least one value at the board fallback.
+    pub fallback: bool,
     model: Model,
 }
 
@@ -165,6 +169,29 @@ impl Platform {
             uart: 0x0900_0000,
             uart_clock_hz: 24_000_000,
             from_dtb: false,
+            gic_from_dtb: false,
+            uart_from_dtb: false,
+            fallback: true,
+            model: Model::empty(),
+        }
+    }
+
+    /// The documented Raspberry Pi 4 fallback, used only when the board is a Pi and the DTB
+    /// lacks the GIC or PL011 node.
+    ///
+    /// GICD/GICC are the low-peripheral aliases of the GIC-400 (`0xFF84_1000`/`0xFF84_2000`).
+    /// The PL011 is `0xFE20_1000` at the firmware's 48 MHz UART clock.
+    pub const fn pi4_fallback() -> Self {
+        Self {
+            gicd: 0xFF84_1000,
+            gicc: 0xFF84_2000,
+            timer_ppi: 30,
+            uart: 0xFE20_1000,
+            uart_clock_hz: 48_000_000,
+            from_dtb: false,
+            gic_from_dtb: false,
+            uart_from_dtb: false,
+            fallback: true,
             model: Model::empty(),
         }
     }
@@ -188,46 +215,60 @@ impl Default for Platform {
 
 /// Parse the platform devices from a validated FDT.
 ///
-/// Missing or malformed nodes leave their values at the QEMU defaults. The function never panics
-/// and never trusts the property lengths beyond the FDT reader's checks.
+/// The board model selects the fallback table: a Raspberry Pi tree falls back to the documented
+/// Pi 4 GIC/PL011 addresses, everything else to the QEMU `virt` defaults. A node that is present
+/// always overrides the fallback. The function never panics and never trusts the property lengths
+/// beyond the FDT reader's checks.
 pub fn platform(fdt: &Fdt<'_>) -> Platform {
-    let mut result = Platform::qemu_virt();
-    if let Some(root) = fdt.root()
-        && let Some(model) = root.property_str("model")
-    {
+    let model = fdt.root().and_then(|root| root.property_str("model"));
+    let mut result = if model.is_some_and(|text| text.contains("Raspberry Pi")) {
+        Platform::pi4_fallback()
+    } else {
+        Platform::qemu_virt()
+    };
+    if let Some(model) = model {
         result.model.set(model);
     }
 
+    let mut uart_from_dtb = false;
     let mut entries = [(0u64, 0u64); 4];
     if let Some(node) = fdt.find_compatible(&["arm,pl011", "arm,pl011-axi"])
-        && let Some(count) = reg_entries(fdt, &node, &mut entries)
+        && let Some(count) = reg_entries(&node, &mut entries)
         && count > 0
         && entries[0].1 != 0
     {
         result.uart = entries[0].0;
-        result.from_dtb = true;
+        uart_from_dtb = true;
     }
-    if result.is_raspberry_pi() || result.uart >= 0xFE00_0000 {
-        result.uart_clock_hz = 48_000_000;
+    if uart_from_dtb {
+        result.uart_clock_hz = if result.is_raspberry_pi() || result.uart >= 0xFE00_0000 {
+            48_000_000
+        } else {
+            24_000_000
+        };
     }
 
-    if let Some(node) = fdt.find_compatible(&["arm,cortex-a15-gic", "arm,gic-400"])
-        && reg_entries(fdt, &node, &mut entries).is_some()
+    let mut gic_from_dtb = false;
+    if let Some(node) = fdt.find_compatible(&["arm,gic-400", "arm,cortex-a15-gic"])
+        && reg_entries(&node, &mut entries).is_some()
     {
+        let mut blocks = 0u8;
         if let Some((base, size)) = entries.first().copied()
             && size != 0
         {
             result.gicd = base;
-            result.from_dtb = true;
+            blocks = blocks.saturating_add(1);
         }
         if let Some((base, size)) = entries.get(1).copied()
             && size != 0
         {
             result.gicc = base;
-            result.from_dtb = true;
+            blocks = blocks.saturating_add(1);
         }
+        gic_from_dtb = blocks == 2;
     }
 
+    let mut timer_from_dtb = false;
     if let Some(timer) = fdt.find_compatible(&["arm,armv8-timer", "arm,armv7-timer"]) {
         let mut cells = timer.cells("interrupts", 4);
         let mut index = 0usize;
@@ -237,12 +278,16 @@ pub fn platform(fdt: &Fdt<'_>) -> Platform {
             let Some(_flags) = cells.next() else { break };
             if index == 1 && kind == 1 && number < 16 {
                 result.timer_ppi = u32::try_from(number).unwrap_or(0).saturating_add(16);
-                result.from_dtb = true;
+                timer_from_dtb = true;
             }
             index = index.saturating_add(1);
         }
     }
 
+    result.uart_from_dtb = uart_from_dtb;
+    result.gic_from_dtb = gic_from_dtb;
+    result.from_dtb = uart_from_dtb || gic_from_dtb || timer_from_dtb;
+    result.fallback = !uart_from_dtb || !gic_from_dtb;
     result
 }
 
@@ -423,14 +468,6 @@ impl Interval {
     }
 }
 
-/// One `ranges` entry.
-#[derive(Clone, Copy)]
-struct RangeMap {
-    child: u64,
-    parent: u64,
-    len: u64,
-}
-
 fn push_interval(
     intervals: &mut [Interval; MAX_INTERVALS],
     count: &mut usize,
@@ -473,7 +510,7 @@ fn add_device_ranges(
         return Ok(());
     };
     let mut entries = [(0u64, 0u64); 4];
-    let Some(found) = reg_entries(fdt, &node, &mut entries) else {
+    let Some(found) = reg_entries(&node, &mut entries) else {
         return Ok(());
     };
     for (base, size) in entries.iter().take(found.min(entries.len())) {
@@ -659,115 +696,20 @@ fn node_cells(node: &Node<'_>) -> (u32, u32) {
     )
 }
 
-fn node_parent<'a>(fdt: &Fdt<'a>, node: &Node<'a>) -> Option<Node<'a>> {
-    if let Some(soc) = fdt.find_node("/soc")
-        && soc.children().any(|child| {
-            child.name() == node.name() && child.property("reg") == node.property("reg")
-        })
-    {
-        return Some(soc);
-    }
-    fdt.root()
-}
-
-fn reg_entries(fdt: &Fdt<'_>, node: &Node<'_>, out: &mut [(u64, u64); 4]) -> Option<usize> {
-    let parent = node_parent(fdt, node)?;
-    let (address_cells, size_cells) = node_cells(&parent);
-    let (parent_address_cells, _) = node_cells(&fdt.root()?);
-    let ranges = parse_ranges(
-        fdt,
-        &parent,
-        address_cells,
-        size_cells,
-        parent_address_cells,
-    );
-    let regs = node.reg_checked(address_cells, size_cells).ok()?;
+fn reg_entries(node: &Node<'_>, out: &mut [(u64, u64); 4]) -> Option<usize> {
     let mut count = 0usize;
-    for (address, size) in regs {
-        if count >= out.len() {
-            break;
+    for (base, size) in node.reg_translated() {
+        if size == 0 {
+            continue;
         }
-        let translated = translate_ranges(&ranges, address, size);
-        if let Some((base, length)) = translated
-            && let Some(slot) = out.get_mut(count)
-        {
-            *slot = (base, length);
-            count = count.saturating_add(1);
+        let slot = out.get_mut(count)?;
+        *slot = (base, size);
+        count = count.saturating_add(1);
+        if count == out.len() {
+            break;
         }
     }
     Some(count)
-}
-
-fn parse_ranges(
-    fdt: &Fdt<'_>,
-    parent: &Node<'_>,
-    child_address_cells: u32,
-    child_size_cells: u32,
-    parent_address_cells: u32,
-) -> ([RangeMap; MAX_RANGES], usize) {
-    let mut ranges = [RangeMap {
-        child: 0,
-        parent: 0,
-        len: 0,
-    }; MAX_RANGES];
-    let mut count = 0usize;
-    let _ = fdt;
-    if parent.property("ranges").is_none() {
-        return (ranges, 0);
-    }
-    let mut cells = parent.cells("ranges", 4);
-    loop {
-        if count >= MAX_RANGES {
-            break;
-        }
-        let Some(child) = read_cells(&mut cells, child_address_cells) else {
-            break;
-        };
-        let Some(parent_address) = read_cells(&mut cells, parent_address_cells) else {
-            break;
-        };
-        let Some(length) = read_cells(&mut cells, child_size_cells) else {
-            break;
-        };
-        if let Some(slot) = ranges.get_mut(count) {
-            *slot = RangeMap {
-                child,
-                parent: parent_address,
-                len: length,
-            };
-        }
-        count = count.saturating_add(1);
-    }
-    (ranges, count)
-}
-
-fn translate_ranges(
-    ranges: &([RangeMap; MAX_RANGES], usize),
-    address: u64,
-    size: u64,
-) -> Option<(u64, u64)> {
-    if ranges.1 == 0 {
-        return Some((address, size));
-    }
-    for range in ranges.0.iter().take(ranges.1) {
-        let end = range.child.checked_add(range.len)?;
-        if address >= range.child && address < end {
-            let offset = address.checked_sub(range.child)?;
-            let base = range.parent.checked_add(offset)?;
-            return Some((base, size));
-        }
-    }
-    None
-}
-
-fn read_cells(cells: &mut Cells<'_>, count: u32) -> Option<u64> {
-    let mut value = 0u64;
-    let mut index = 0u32;
-    while index < count {
-        value = value.checked_shl(32)?.checked_add(cells.next()?)?;
-        index = index.saturating_add(1);
-    }
-    Some(value)
 }
 
 #[cfg(test)]
@@ -1230,6 +1172,9 @@ mod tests {
         assert_eq!(platform.uart_clock_hz, 48_000_000);
         assert_eq!(platform.timer_ppi, 30);
         assert!(platform.is_raspberry_pi());
+        assert!(platform.gic_from_dtb);
+        assert!(platform.uart_from_dtb);
+        assert!(!platform.fallback);
         assert_eq!(
             platform.board_model(),
             Some("Raspberry Pi 4 Model B Rev 1.4")
@@ -1247,6 +1192,9 @@ mod tests {
         assert_eq!(platform.uart_clock_hz, 24_000_000);
         assert_eq!(platform.timer_ppi, 30);
         assert!(!platform.is_raspberry_pi());
+        assert!(platform.gic_from_dtb);
+        assert!(platform.uart_from_dtb);
+        assert!(!platform.fallback);
     }
 
     #[test]
@@ -1260,6 +1208,27 @@ mod tests {
         assert_eq!(platform.gicd, 0x0800_0000);
         assert_eq!(platform.uart, 0x0900_0000);
         assert_eq!(platform.timer_ppi, 30);
+        assert!(!platform.from_dtb);
+        assert!(platform.fallback);
+        assert!(!platform.gic_from_dtb);
+    }
+
+    #[test]
+    fn platform_pi_without_devices_uses_pi_fallback() {
+        let mut builder = Builder::new();
+        builder.begin("");
+        builder.string_prop("model", "Raspberry Pi 4 Model B Rev 1.5");
+        builder.end();
+        let blob = builder.finish();
+        let fdt = Fdt::parse(&blob).unwrap();
+        let platform = platform(&fdt);
+        assert_eq!(platform.gicd, 0xff84_1000);
+        assert_eq!(platform.gicc, 0xff84_2000);
+        assert_eq!(platform.uart, 0xfe20_1000);
+        assert_eq!(platform.uart_clock_hz, 48_000_000);
+        assert_eq!(platform.timer_ppi, 30);
+        assert!(platform.is_raspberry_pi());
+        assert!(platform.fallback);
         assert!(!platform.from_dtb);
     }
 

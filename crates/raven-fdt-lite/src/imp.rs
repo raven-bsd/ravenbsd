@@ -5,8 +5,9 @@
 //!
 //! Supports the parts of the Devicetree Specification v0.4 the kernel needs: header validation,
 //! node lookup by path, compatible-string search, property access and `reg`/`interrupts` cell
-//! decoding. The structure and strings blocks are bounds-checked on every access; no allocation,
-//! no panics. Memory-reservation entries are skipped, not interpreted.
+//! decoding, address translation through `ranges`, and DMA windows from `dma-ranges`. The
+//! structure and strings blocks are bounds-checked on every access; no allocation, no panics.
+//! Memory-reservation entries are exposed as read-only `(address, size)` pairs.
 
 use core::fmt;
 
@@ -29,6 +30,31 @@ const HEADER_BYTES: usize = 40;
 const MAX_VERSION: u32 = 17;
 /// Minimum structure version.
 const MIN_VERSION: u32 = 16;
+/// Deepest node nesting the parent scan accepts; real trees are far shallower.
+const MAX_NODE_DEPTH: usize = 32;
+
+/// One DMA address window declared by a bus node's `dma-ranges`.
+///
+/// Devices behind the bus see `bus_base`; the CPU sees the same bytes at `cpu_base`. `size` is
+/// the window length in bytes. A driver must place DMA buffers in the CPU range or bounce them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DmaWindow {
+    /// Address as seen by the device on the bus.
+    pub bus_base: u64,
+    /// Address in the CPU's physical address space.
+    pub cpu_base: u64,
+    /// Window length in bytes.
+    pub size: u64,
+}
+
+impl DmaWindow {
+    /// A zero-sized window, used as an array initialiser.
+    pub const EMPTY: Self = Self {
+        bus_base: 0,
+        cpu_base: 0,
+        size: 0,
+    };
+}
 
 /// Why the blob could not be read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -197,6 +223,77 @@ impl<'a> Fdt<'a> {
         }
     }
 
+    /// The parent of the node whose name starts at `node_name`, or `None` for the root.
+    ///
+    /// The structure block is scanned once with a fixed-depth stack; no allocation. A tree deeper
+    /// than [`MAX_NODE_DEPTH`] is treated as having no parent.
+    fn parent_of(&self, node_name: usize) -> Option<usize> {
+        let mut stack = [0usize; MAX_NODE_DEPTH];
+        let mut depth = 0usize;
+        let mut position = 0usize;
+        loop {
+            let token = self.struct_u32(position)?;
+            match token {
+                FDT_BEGIN_NODE => {
+                    let name_start = position.checked_add(4)?;
+                    if name_start == node_name {
+                        return if depth == 0 {
+                            None
+                        } else {
+                            stack.get(depth.checked_sub(1)?).copied()
+                        };
+                    }
+                    let (_, after) = self.struct_name(name_start)?;
+                    let slot = stack.get_mut(depth)?;
+                    *slot = name_start;
+                    depth = depth.checked_add(1)?;
+                    position = after;
+                }
+                FDT_END_NODE => {
+                    depth = depth.checked_sub(1)?;
+                    position = position.checked_add(4)?;
+                    if depth == 0 {
+                        return None;
+                    }
+                }
+                FDT_PROP => position = self.after_property(position)?,
+                FDT_NOP => position = position.checked_add(4)?,
+                FDT_END => return None,
+                _ => return None,
+            }
+        }
+    }
+
+    /// Fill `out` with the `dma-ranges` windows of the nearest ancestor that declares them.
+    ///
+    /// Returns `None` when no ancestor has the property, `Some(0)` when the nearest declaration is
+    /// empty (identity), and otherwise the number of windows written. Zero-sized entries are
+    /// skipped; a malformed property yields `Some(0)`.
+    pub fn dma_windows_for(&self, path: &str, out: &mut [DmaWindow]) -> Option<usize> {
+        let node = self.find_node(path)?;
+        let mut bus = node.parent();
+        while let Some(current) = bus {
+            if let Some(count) = dma_windows_of(&current, out) {
+                return Some(count);
+            }
+            bus = current.parent();
+        }
+        None
+    }
+
+    /// The first DMA window of the nearest ancestor that declares `dma-ranges`.
+    ///
+    /// `None` means either no ancestor declares the property or the nearest declaration is empty
+    /// (an identity mapping).
+    pub fn dma_window_for(&self, path: &str) -> Option<DmaWindow> {
+        let mut windows = [DmaWindow::EMPTY; 8];
+        let count = self.dma_windows_for(path, &mut windows)?;
+        if count == 0 {
+            return None;
+        }
+        windows.first().copied()
+    }
+
     fn struct_u32(&self, offset: usize) -> Option<u32> {
         let end = offset.checked_add(4)?;
         if end > self.size_struct {
@@ -298,6 +395,25 @@ impl<'a> Node<'a> {
     /// The node name including any unit address, e.g. `intc@8000000`.
     pub fn full_name(&self) -> &'a str {
         self.name()
+    }
+
+    /// The parent node, or `None` for the root.
+    pub fn parent(&self) -> Option<Node<'a>> {
+        let name_start = self.fdt.parent_of(self.name_start)?;
+        Some(Node {
+            fdt: self.fdt,
+            name_start,
+        })
+    }
+
+    /// `#address-cells` of this node, defaulting to the specification's 2.
+    pub fn address_cells(&self) -> u32 {
+        self.u32_property("#address-cells").unwrap_or(2)
+    }
+
+    /// `#size-cells` of this node, defaulting to the specification's 1.
+    pub fn size_cells(&self) -> u32 {
+        self.u32_property("#size-cells").unwrap_or(1)
     }
 
     /// A property's raw value.
@@ -456,6 +572,24 @@ impl<'a> Node<'a> {
         }
         Ok(self.reg(address_cells, size_cells))
     }
+
+    /// `reg` entries translated to the CPU physical address space through every parent `ranges`.
+    ///
+    /// The cell counts come from the parent, as the specification defines them for a child's
+    /// `reg`. A parent range that does not cover the address ends the iterator; an invalid cell
+    /// count (more than two cells) yields nothing. No allocation and no panics.
+    pub fn reg_translated(&self) -> TranslatedReg<'a> {
+        let (address_cells, size_cells) = match self.parent() {
+            Some(parent) => (parent.address_cells(), parent.size_cells()),
+            None => (2, 1),
+        };
+        let valid = address_cells <= 2 && size_cells <= 2;
+        TranslatedReg {
+            node: *self,
+            regs: self.reg(address_cells, size_cells),
+            done: !valid,
+        }
+    }
 }
 
 fn matches_component(name: &str, component: &str) -> bool {
@@ -518,6 +652,129 @@ impl Iterator for Reg<'_> {
         }
         Some((address, size))
     }
+}
+
+/// Iterator over `reg` entries already translated through the parent `ranges`.
+#[derive(Clone, Copy, Debug)]
+pub struct TranslatedReg<'a> {
+    node: Node<'a>,
+    regs: Reg<'a>,
+    done: bool,
+}
+
+impl Iterator for TranslatedReg<'_> {
+    type Item = (u64, u64);
+
+    fn next(&mut self) -> Option<(u64, u64)> {
+        if self.done {
+            return None;
+        }
+        let (address, size) = self.regs.next()?;
+        match translate_address(&self.node, address) {
+            Some(cpu_address) => Some((cpu_address, size)),
+            None => {
+                self.done = true;
+                None
+            }
+        }
+    }
+}
+
+/// Translate one address through the `ranges` of `bus` into the parent's address space.
+///
+/// An absent or empty `ranges` property is an identity mapping. `None` means the address is
+/// outside every declared window, the cell counts are unsupported, or the arithmetic overflowed.
+pub fn translate_ranges(bus: &Node<'_>, address: u64) -> Option<u64> {
+    let Some(value) = bus.property("ranges") else {
+        return Some(address);
+    };
+    if value.is_empty() {
+        return Some(address);
+    }
+    let child_cells = bus.address_cells();
+    let parent_cells = bus.parent().map_or(2, |parent| parent.address_cells());
+    let size_cells = bus.size_cells();
+    if child_cells > 2 || parent_cells > 2 || size_cells > 2 {
+        return None;
+    }
+    let mut cells = bus.cells("ranges", 4);
+    loop {
+        let child = read_cells(&mut cells, child_cells)?;
+        let parent = read_cells(&mut cells, parent_cells)?;
+        let size = read_cells(&mut cells, size_cells)?;
+        if size == 0 {
+            continue;
+        }
+        let end = child.checked_add(size)?;
+        if address >= child && address < end {
+            return parent.checked_add(address.checked_sub(child)?);
+        }
+    }
+}
+
+/// Translate a node's `address` from its parent's bus space to the CPU physical address space.
+///
+/// Walks the parent chain from the immediate parent upwards, applying each `ranges`. The root has
+/// no parent and needs no translation.
+pub fn translate_address(node: &Node<'_>, address: u64) -> Option<u64> {
+    let mut bus = node.parent()?;
+    let mut current = address;
+    loop {
+        current = translate_ranges(&bus, current)?;
+        let Some(parent) = bus.parent() else {
+            return Some(current);
+        };
+        bus = parent;
+    }
+}
+
+/// Fill `out` with `bus`'s `dma-ranges` windows.
+///
+/// `None` when the property is absent; `Some(0)` when it is empty or malformed.
+fn dma_windows_of(bus: &Node<'_>, out: &mut [DmaWindow]) -> Option<usize> {
+    let value = bus.property("dma-ranges")?;
+    if value.is_empty() {
+        return Some(0);
+    }
+    let child_cells = bus.address_cells();
+    let parent_cells = bus.parent().map_or(2, |parent| parent.address_cells());
+    let size_cells = bus.size_cells();
+    if child_cells > 2 || parent_cells > 2 || size_cells > 2 {
+        return Some(0);
+    }
+    let mut cells = bus.cells("dma-ranges", 4);
+    let mut count = 0usize;
+    while let Some(bus_base) = read_cells(&mut cells, child_cells) {
+        let Some(cpu_base) = read_cells(&mut cells, parent_cells) else {
+            break;
+        };
+        let Some(size) = read_cells(&mut cells, size_cells) else {
+            break;
+        };
+        if size == 0 {
+            continue;
+        }
+        let Some(slot) = out.get_mut(count) else {
+            break;
+        };
+        *slot = DmaWindow {
+            bus_base,
+            cpu_base,
+            size,
+        };
+        count = count.saturating_add(1);
+    }
+    Some(count)
+}
+
+fn read_cells(cells: &mut Cells<'_>, count: u32) -> Option<u64> {
+    let mut value = 0u64;
+    let mut index = 0u32;
+    while index < count {
+        value = value.checked_shl(32)?.checked_add(cells.next()?)?;
+        index = index.saturating_add(1);
+    }
+    Some(value)
 }
 
 /// Iterator over the direct children of a node.
@@ -592,6 +849,14 @@ impl Iterator for Reservations<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Big-endian cells for the test builder.
+    fn be32(values: &[u32]) -> Vec<u8> {
+        values
+            .iter()
+            .flat_map(|value| value.to_be_bytes())
+            .collect()
+    }
 
     /// Tiny FDT writer used only by the tests.
     struct Builder {
@@ -1074,5 +1339,603 @@ mod tests {
         let len = blob.len();
         blob.truncate(len.saturating_sub(8));
         assert!(Fdt::parse(&blob).is_err());
+    }
+
+    #[allow(clippy::too_many_arguments)] // Test fixture; the arguments mirror the tree shape.
+    fn node_tree(
+        root_address_cells: u32,
+        root_size_cells: u32,
+        bus: &str,
+        bus_address_cells: u32,
+        bus_size_cells: u32,
+        ranges: &[u32],
+        device: &str,
+        reg: &[u32],
+    ) -> Vec<u8> {
+        let mut builder = Builder::new();
+        builder.begin("");
+        builder.u32_prop("#address-cells", root_address_cells);
+        builder.u32_prop("#size-cells", root_size_cells);
+        builder.begin(bus);
+        builder.u32_prop("#address-cells", bus_address_cells);
+        builder.u32_prop("#size-cells", bus_size_cells);
+        if !ranges.is_empty() {
+            builder.prop("ranges", &be32(ranges));
+        }
+        builder.begin(device);
+        builder.prop("reg", &be32(reg));
+        builder.end();
+        builder.end();
+        builder.end();
+        builder.finish()
+    }
+
+    #[test]
+    fn parent_chain_is_recovered() {
+        let mut builder = Builder::new();
+        builder.begin("");
+        builder.begin("a");
+        builder.begin("b");
+        builder.begin("c@1");
+        builder.end();
+        builder.end();
+        builder.end();
+        builder.end();
+        let blob = builder.finish();
+        let fdt = Fdt::parse(&blob).unwrap();
+        let c = fdt.find_node("/a/b/c@1").unwrap();
+        let b = c.parent().unwrap();
+        let a = b.parent().unwrap();
+        let root = a.parent().unwrap();
+        assert_eq!(b.name(), "b");
+        assert_eq!(a.name(), "a");
+        assert_eq!(root.name(), "");
+        assert!(root.parent().is_none());
+    }
+
+    #[test]
+    fn cell_count_defaults_are_two_and_one() {
+        let blob = sample();
+        let fdt = Fdt::parse(&blob).unwrap();
+        let timer = fdt.find_node("/timer").unwrap();
+        assert_eq!(timer.address_cells(), 2);
+        assert_eq!(timer.size_cells(), 1);
+    }
+
+    #[test]
+    fn absent_ranges_are_identity() {
+        let blob = node_tree(2, 1, "bus", 1, 1, &[], "dev@1000", &[0x1000, 0x100]);
+        let fdt = Fdt::parse(&blob).unwrap();
+        let device = fdt.find_node("/bus/dev@1000").unwrap();
+        assert_eq!(
+            device.reg_translated().collect::<Vec<_>>(),
+            vec![(0x1000, 0x100)]
+        );
+    }
+
+    #[test]
+    fn empty_ranges_are_identity() {
+        let mut builder = Builder::new();
+        builder.begin("");
+        builder.u32_prop("#address-cells", 2);
+        builder.u32_prop("#size-cells", 1);
+        builder.begin("bus");
+        builder.u32_prop("#address-cells", 1);
+        builder.u32_prop("#size-cells", 1);
+        builder.prop("ranges", &[]);
+        builder.begin("dev@1000");
+        builder.prop("reg", &be32(&[0x1000, 0x100]));
+        builder.end();
+        builder.end();
+        builder.end();
+        let blob = builder.finish();
+        let fdt = Fdt::parse(&blob).unwrap();
+        let device = fdt.find_node("/bus/dev@1000").unwrap();
+        assert_eq!(
+            device.reg_translated().collect::<Vec<_>>(),
+            vec![(0x1000, 0x100)]
+        );
+    }
+
+    #[test]
+    fn one_cell_soc_range_translates_uart() {
+        let blob = node_tree(
+            2,
+            1,
+            "soc",
+            1,
+            1,
+            &[0x7e00_0000, 0x0, 0xfe00_0000, 0x0180_0000],
+            "serial@7e201000",
+            &[0x7e20_1000, 0x200],
+        );
+        let fdt = Fdt::parse(&blob).unwrap();
+        let device = fdt.find_node("/soc/serial@7e201000").unwrap();
+        assert_eq!(
+            device.reg_translated().collect::<Vec<_>>(),
+            vec![(0xfe20_1000, 0x200)]
+        );
+    }
+
+    #[test]
+    fn bcm2711_soc_ranges_fixture() {
+        // The three real /soc windows from bcm2711-rpi-4-b.dtb.
+        let blob = node_tree(
+            2,
+            1,
+            "soc",
+            1,
+            1,
+            &[
+                0x7e00_0000,
+                0x0,
+                0xfe00_0000,
+                0x0180_0000,
+                0x7c00_0000,
+                0x0,
+                0xfc00_0000,
+                0x0200_0000,
+                0x4000_0000,
+                0x0,
+                0xff80_0000,
+                0x0080_0000,
+            ],
+            "serial@7e201000",
+            &[0x7e20_1000, 0x200],
+        );
+        let fdt = Fdt::parse(&blob).unwrap();
+        let device = fdt.find_node("/soc/serial@7e201000").unwrap();
+        assert_eq!(
+            device.reg_translated().collect::<Vec<_>>(),
+            vec![(0xfe20_1000, 0x200)]
+        );
+
+        let mut builder = Builder::new();
+        builder.begin("");
+        builder.u32_prop("#address-cells", 2);
+        builder.u32_prop("#size-cells", 1);
+        builder.begin("soc");
+        builder.u32_prop("#address-cells", 1);
+        builder.u32_prop("#size-cells", 1);
+        builder.prop(
+            "ranges",
+            &be32(&[
+                0x7e00_0000,
+                0x0,
+                0xfe00_0000,
+                0x0180_0000,
+                0x7c00_0000,
+                0x0,
+                0xfc00_0000,
+                0x0200_0000,
+                0x4000_0000,
+                0x0,
+                0xff80_0000,
+                0x0080_0000,
+            ]),
+        );
+        builder.begin("rng@7e104000");
+        builder.prop("reg", &be32(&[0x7e10_4000, 0x28]));
+        builder.end();
+        builder.begin("local@40041000");
+        builder.prop("reg", &be32(&[0x4004_1000, 0x1000]));
+        builder.end();
+        builder.end();
+        builder.end();
+        let blob = builder.finish();
+        let fdt = Fdt::parse(&blob).unwrap();
+        assert_eq!(
+            fdt.find_node("/soc/rng@7e104000")
+                .unwrap()
+                .reg_translated()
+                .collect::<Vec<_>>(),
+            vec![(0xfe10_4000, 0x28)]
+        );
+        assert_eq!(
+            fdt.find_node("/soc/local@40041000")
+                .unwrap()
+                .reg_translated()
+                .collect::<Vec<_>>(),
+            vec![(0xff84_1000, 0x1000)]
+        );
+    }
+
+    #[test]
+    fn two_cell_address_emmc2bus_fixture() {
+        let blob = node_tree(
+            2,
+            1,
+            "emmc2bus",
+            2,
+            1,
+            &[0x0, 0x7e00_0000, 0x0, 0xfe00_0000, 0x0180_0000],
+            "mmc@7e340000",
+            &[0x0, 0x7e34_0000, 0x100],
+        );
+        let fdt = Fdt::parse(&blob).unwrap();
+        let device = fdt.find_node("/emmc2bus/mmc@7e340000").unwrap();
+        assert_eq!(
+            device.reg_translated().collect::<Vec<_>>(),
+            vec![(0xfe34_0000, 0x100)]
+        );
+    }
+
+    #[test]
+    fn bcm2711_scb_ranges_fixture() {
+        let blob = node_tree(
+            2,
+            1,
+            "scb",
+            2,
+            2,
+            &[
+                0x0,
+                0x7c00_0000,
+                0x0,
+                0xfc00_0000,
+                0x0,
+                0x0380_0000,
+                0x0,
+                0x4000_0000,
+                0x0,
+                0xff80_0000,
+                0x0,
+                0x0080_0000,
+                0x6,
+                0x0,
+                0x6,
+                0x0,
+                0x0,
+                0x4000_0000,
+            ],
+            "ethernet@7d580000",
+            &[0x0, 0x7d58_0000, 0x0, 0x0001_0000],
+        );
+        let fdt = Fdt::parse(&blob).unwrap();
+        let device = fdt.find_node("/scb/ethernet@7d580000").unwrap();
+        assert_eq!(
+            device.reg_translated().collect::<Vec<_>>(),
+            vec![(0xfd58_0000, 0x1_0000)]
+        );
+    }
+
+    #[test]
+    fn nested_ranges_compose() {
+        let mut builder = Builder::new();
+        builder.begin("");
+        builder.u32_prop("#address-cells", 2);
+        builder.u32_prop("#size-cells", 1);
+        builder.begin("bus1");
+        builder.u32_prop("#address-cells", 2);
+        builder.u32_prop("#size-cells", 1);
+        builder.prop(
+            "ranges",
+            &be32(&[0x0, 0x1000_0000, 0x0, 0x2000_0000, 0x0010_0000]),
+        );
+        builder.begin("bus2");
+        builder.u32_prop("#address-cells", 2);
+        builder.u32_prop("#size-cells", 1);
+        builder.prop("ranges", &be32(&[0x0, 0x0, 0x0, 0x1000_0000, 0x0000_1000]));
+        builder.begin("dev@100");
+        builder.prop("reg", &be32(&[0x0, 0x100, 0x10]));
+        builder.end();
+        builder.end();
+        builder.end();
+        builder.end();
+        let blob = builder.finish();
+        let fdt = Fdt::parse(&blob).unwrap();
+        let device = fdt.find_node("/bus1/bus2/dev@100").unwrap();
+        assert_eq!(
+            device.reg_translated().collect::<Vec<_>>(),
+            vec![(0x2000_0100, 0x10)]
+        );
+    }
+
+    #[test]
+    fn address_outside_every_window_stops() {
+        let blob = node_tree(
+            2,
+            1,
+            "soc",
+            1,
+            1,
+            &[0x7e00_0000, 0x0, 0xfe00_0000, 0x0180_0000],
+            "dev@dead0000",
+            &[0xdead_0000, 0x100],
+        );
+        let fdt = Fdt::parse(&blob).unwrap();
+        let device = fdt.find_node("/soc/dev@dead0000").unwrap();
+        assert_eq!(device.reg_translated().next(), None);
+    }
+
+    #[test]
+    fn zero_sized_range_is_skipped() {
+        let blob = node_tree(
+            2,
+            1,
+            "soc",
+            1,
+            1,
+            &[
+                0x7e00_0000,
+                0x0,
+                0xfe00_0000,
+                0x0,
+                0x4000_0000,
+                0x0,
+                0xff80_0000,
+                0x0080_0000,
+            ],
+            "local@40041000",
+            &[0x4004_1000, 0x1000],
+        );
+        let fdt = Fdt::parse(&blob).unwrap();
+        let device = fdt.find_node("/soc/local@40041000").unwrap();
+        assert_eq!(
+            device.reg_translated().collect::<Vec<_>>(),
+            vec![(0xff84_1000, 0x1000)]
+        );
+    }
+
+    #[test]
+    fn malformed_cell_counts_yield_nothing() {
+        let mut builder = Builder::new();
+        builder.begin("");
+        builder.u32_prop("#address-cells", 2);
+        builder.u32_prop("#size-cells", 1);
+        builder.begin("bus");
+        builder.u32_prop("#address-cells", 3);
+        builder.u32_prop("#size-cells", 1);
+        builder.prop("ranges", &be32(&[0x0, 0x0, 0x1000, 0x0, 0x2000, 0x100]));
+        builder.begin("dev@1000");
+        builder.prop("reg", &be32(&[0x0, 0x0, 0x1000, 0x100]));
+        builder.end();
+        builder.end();
+        builder.end();
+        let blob = builder.finish();
+        let fdt = Fdt::parse(&blob).unwrap();
+        let bus = fdt.find_node("/bus").unwrap();
+        assert_eq!(translate_ranges(&bus, 0x1000), None);
+        assert_eq!(
+            fdt.find_node("/bus/dev@1000")
+                .unwrap()
+                .reg_translated()
+                .next(),
+            None
+        );
+    }
+
+    #[test]
+    fn dma_window_soc_shape() {
+        let mut builder = Builder::new();
+        builder.begin("");
+        builder.u32_prop("#address-cells", 2);
+        builder.u32_prop("#size-cells", 1);
+        builder.begin("soc");
+        builder.u32_prop("#address-cells", 1);
+        builder.u32_prop("#size-cells", 1);
+        builder.prop(
+            "dma-ranges",
+            &be32(&[0xc000_0000, 0x0, 0x0000_0000, 0x4000_0000]),
+        );
+        builder.begin("rng@7e104000");
+        builder.prop("reg", &be32(&[0x7e10_4000, 0x28]));
+        builder.end();
+        builder.end();
+        builder.end();
+        let blob = builder.finish();
+        let fdt = Fdt::parse(&blob).unwrap();
+        assert_eq!(
+            fdt.dma_window_for("/soc/rng@7e104000"),
+            Some(DmaWindow {
+                bus_base: 0xc000_0000,
+                cpu_base: 0,
+                size: 0x4000_0000,
+            })
+        );
+    }
+
+    #[test]
+    fn dma_window_emmc2bus_shape() {
+        let mut builder = Builder::new();
+        builder.begin("");
+        builder.u32_prop("#address-cells", 2);
+        builder.u32_prop("#size-cells", 1);
+        builder.begin("emmc2bus");
+        builder.u32_prop("#address-cells", 2);
+        builder.u32_prop("#size-cells", 1);
+        builder.prop(
+            "dma-ranges",
+            &be32(&[0x0, 0xc000_0000, 0x0, 0x0000_0000, 0x4000_0000]),
+        );
+        builder.begin("mmc@7e340000");
+        builder.prop("reg", &be32(&[0x0, 0x7e34_0000, 0x100]));
+        builder.end();
+        builder.end();
+        builder.end();
+        let blob = builder.finish();
+        let fdt = Fdt::parse(&blob).unwrap();
+        assert_eq!(
+            fdt.dma_window_for("/emmc2bus/mmc@7e340000"),
+            Some(DmaWindow {
+                bus_base: 0xc000_0000,
+                cpu_base: 0,
+                size: 0x4000_0000,
+            })
+        );
+    }
+
+    #[test]
+    fn dma_window_scb_shape_skips_zero_size() {
+        let mut builder = Builder::new();
+        builder.begin("");
+        builder.u32_prop("#address-cells", 2);
+        builder.u32_prop("#size-cells", 1);
+        builder.begin("scb");
+        builder.u32_prop("#address-cells", 2);
+        builder.u32_prop("#size-cells", 2);
+        builder.prop(
+            "dma-ranges",
+            &be32(&[
+                0x4,
+                0x7c00_0000,
+                0x0,
+                0xfc00_0000,
+                0x0,
+                0x0380_0000,
+                0x0,
+                0x0,
+                0x0,
+                0x4,
+                0x0,
+                0x0,
+            ]),
+        );
+        builder.begin("ethernet@7d580000");
+        builder.prop("reg", &be32(&[0x0, 0x7d58_0000, 0x0, 0x0001_0000]));
+        builder.end();
+        builder.end();
+        builder.end();
+        let blob = builder.finish();
+        let fdt = Fdt::parse(&blob).unwrap();
+        assert_eq!(
+            fdt.dma_window_for("/scb/ethernet@7d580000"),
+            Some(DmaWindow {
+                bus_base: 0x4_7c00_0000,
+                cpu_base: 0xfc00_0000,
+                size: 0x0380_0000,
+            })
+        );
+    }
+
+    #[test]
+    fn dma_windows_lists_multiple_entries() {
+        let mut builder = Builder::new();
+        builder.begin("");
+        builder.u32_prop("#address-cells", 2);
+        builder.u32_prop("#size-cells", 1);
+        builder.begin("soc");
+        builder.u32_prop("#address-cells", 1);
+        builder.u32_prop("#size-cells", 1);
+        builder.prop(
+            "dma-ranges",
+            &be32(&[
+                0xc000_0000,
+                0x0,
+                0x0000_0000,
+                0x4000_0000,
+                0x7c00_0000,
+                0x0,
+                0xfc00_0000,
+                0x0380_0000,
+            ]),
+        );
+        builder.begin("dev@7e000000");
+        builder.prop("reg", &be32(&[0x7e00_0000, 0x100]));
+        builder.end();
+        builder.end();
+        builder.end();
+        let blob = builder.finish();
+        let fdt = Fdt::parse(&blob).unwrap();
+        let mut windows = [DmaWindow::EMPTY; 4];
+        assert_eq!(
+            fdt.dma_windows_for("/soc/dev@7e000000", &mut windows),
+            Some(2)
+        );
+        assert_eq!(windows[0].bus_base, 0xc000_0000);
+        assert_eq!(windows[1].bus_base, 0x7c00_0000);
+        assert_eq!(
+            fdt.dma_window_for("/soc/dev@7e000000").unwrap().bus_base,
+            0xc000_0000
+        );
+    }
+
+    #[test]
+    fn dma_window_uses_nearest_ancestor() {
+        let mut builder = Builder::new();
+        builder.begin("");
+        builder.u32_prop("#address-cells", 2);
+        builder.u32_prop("#size-cells", 1);
+        builder.begin("soc");
+        builder.u32_prop("#address-cells", 1);
+        builder.u32_prop("#size-cells", 1);
+        builder.prop(
+            "dma-ranges",
+            &be32(&[0xc000_0000, 0x0, 0x0000_0000, 0x4000_0000]),
+        );
+        builder.begin("bus");
+        builder.u32_prop("#address-cells", 1);
+        builder.u32_prop("#size-cells", 1);
+        builder.prop("dma-ranges", &be32(&[0x8000_0000, 0x0, 0x8000_0000]));
+        builder.begin("dev@1000");
+        builder.prop("reg", &be32(&[0x1000, 0x100]));
+        builder.end();
+        builder.end();
+        builder.end();
+        builder.end();
+        let blob = builder.finish();
+        let fdt = Fdt::parse(&blob).unwrap();
+        assert_eq!(
+            fdt.dma_window_for("/soc/bus/dev@1000"),
+            Some(DmaWindow {
+                bus_base: 0x8000_0000,
+                cpu_base: 0,
+                size: 0x8000_0000,
+            })
+        );
+    }
+
+    #[test]
+    fn dma_window_absent_or_empty_is_none() {
+        let blob = sample();
+        let fdt = Fdt::parse(&blob).unwrap();
+        assert_eq!(fdt.dma_window_for("/intc@8000000"), None);
+
+        let mut builder = Builder::new();
+        builder.begin("");
+        builder.begin("bus");
+        builder.prop("dma-ranges", &[]);
+        builder.begin("dev@1");
+        builder.prop("reg", &be32(&[0x1, 0x10]));
+        builder.end();
+        builder.end();
+        builder.end();
+        let blob = builder.finish();
+        let fdt = Fdt::parse(&blob).unwrap();
+        assert_eq!(fdt.dma_window_for("/bus/dev@1"), None);
+    }
+
+    #[test]
+    fn reg_translated_yields_every_entry() {
+        let mut builder = Builder::new();
+        builder.begin("");
+        builder.u32_prop("#address-cells", 2);
+        builder.u32_prop("#size-cells", 1);
+        builder.begin("soc");
+        builder.u32_prop("#address-cells", 1);
+        builder.u32_prop("#size-cells", 1);
+        builder.prop(
+            "ranges",
+            &be32(&[0x7e00_0000, 0x0, 0xfe00_0000, 0x0180_0000]),
+        );
+        builder.begin("dev@7e000000");
+        builder.prop("reg", &be32(&[0x7e00_0000, 0x1000, 0x7e00_1000, 0x2000]));
+        builder.end();
+        builder.end();
+        builder.end();
+        let blob = builder.finish();
+        let fdt = Fdt::parse(&blob).unwrap();
+        let device = fdt.find_node("/soc/dev@7e000000").unwrap();
+        assert_eq!(
+            device.reg_translated().collect::<Vec<_>>(),
+            vec![(0xfe00_0000, 0x1000), (0xfe00_1000, 0x2000)]
+        );
+    }
+
+    #[test]
+    fn dma_window_missing_path_is_none() {
+        let blob = sample();
+        let fdt = Fdt::parse(&blob).unwrap();
+        assert_eq!(fdt.dma_window_for("/not/present"), None);
     }
 }

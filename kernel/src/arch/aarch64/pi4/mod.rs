@@ -149,6 +149,55 @@ pub extern "C" fn pi4_main(dtb_phys: u64, bias: u64) -> ! {
     crate::arch::aarch64::kmain::kmain(boot)
 }
 
+/// Map the Pi device windows that the platform record and the next driver tickets consume.
+///
+/// Runs from `kmain` after the kernel's own page tables and MMIO window exist, so the DTB is read
+/// again through the copied `BootInfo`. Each node's `reg` entries are translated through the
+/// parent `ranges` and mapped device-nGnRE by [`fdt::map_node_regs`]. The DMA window, when the
+/// tree declares one, is logged for S21d; no driver uses it yet.
+pub fn map_platform_devices() {
+    // SAFETY: paging::init published the kernel-owned BootInfo copy before kmain continues.
+    let info = unsafe { *crate::memory::paging::boot_info_ptr() };
+    let Some(fdt) = fdt::dtb(info.dtb.base, info.dtb.len) else {
+        kprintln!("platform: no device tree for device mapping");
+        return;
+    };
+    const NODES: [(&str, &str); 5] = [
+        ("/emmc2bus/mmc@7e340000", "emmc2"),
+        ("/scb/ethernet@7d580000", "genet"),
+        ("/soc/pwm@7e20c800", "pwm1"),
+        ("/soc/rng@7e104000", "rng200"),
+        ("/soc/mailbox@7e00b880", "mailbox"),
+    ];
+    for (path, label) in NODES {
+        let Some(node) = fdt.find_node(path) else {
+            continue;
+        };
+        let mut mapped = [fdt::MappedReg::EMPTY; 4];
+        match fdt::map_node_regs(&node, &mut mapped) {
+            Ok(count) => {
+                for reg in mapped.iter().take(count) {
+                    kprintln!(
+                        "platform: {label} reg 0x{:x}+0x{:x} -> 0x{:x}",
+                        reg.physical,
+                        reg.length,
+                        reg.virtual_address as usize
+                    );
+                }
+            }
+            Err(error) => kprintln!("platform: {label} map failed: {error:?}"),
+        }
+        if let Some(window) = fdt.dma_window_for(path) {
+            kprintln!(
+                "platform: {label} dma bus=0x{:x} cpu=0x{:x} size=0x{:x}",
+                window.bus_base,
+                window.cpu_base,
+                window.size
+            );
+        }
+    }
+}
+
 fn physical_addresses(kernel_offset: u64) -> Option<(u64, u64, u64)> {
     let bootinfo = symbol(&BOOT_INFO).checked_sub(kernel_offset)?;
     let map = symbol(&MEMORY_MAP).checked_sub(kernel_offset)?;
