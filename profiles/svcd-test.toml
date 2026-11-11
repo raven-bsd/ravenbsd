@@ -12,7 +12,7 @@ programs = [
 ]
 
 files = [
-    { src = "build/fixtures/svcd-test/testsvc", path = "/sbin/testsvc", mode = 0o755 },
+    { src = "build/fixtures/svcd-test/testsvc", path = "/sbin/testsvc", mode = 0o755, generated = true },
     { src = "etc/svcd-test/a.toml", path = "/etc/services.d/a.toml" },
     { src = "etc/svcd-test/b.toml", path = "/etc/services.d/b.toml" },
     { src = "etc/svcd-test/c.toml", path = "/etc/services.d/c.toml" },
