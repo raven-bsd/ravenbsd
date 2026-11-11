@@ -33,6 +33,26 @@ pub extern "C" fn kmain(boot: *const BootInfo) -> ! {
     };
     // The DTB lives in loader-owned memory that paging reclaims, so read it now.
     let platform = fdt::platform(data.info.dtb.base, data.info.dtb.len);
+    kprintln!(
+        "platform: gicd=0x{:x} gicc=0x{:x} timer={} uart=0x{:x} gic={} uart={}",
+        platform.gicd,
+        platform.gicc,
+        platform.timer_ppi,
+        platform.uart,
+        if platform.gic_from_dtb {
+            "dtb"
+        } else {
+            "fallback"
+        },
+        if platform.uart_from_dtb {
+            "dtb"
+        } else {
+            "fallback"
+        }
+    );
+    if platform.is_raspberry_pi() && platform.fallback {
+        kprintln!("platform: Pi 4 fallback for a missing device-tree node");
+    }
     {
         let initial_cmdline = CmdLine::parse(data.cmdline);
         log::init(initial_cmdline.loglevel());
@@ -54,6 +74,9 @@ pub extern "C" fn kmain(boot: *const BootInfo) -> ! {
         kprintln!("kernel: error: {error}");
         boot::exit_qemu(0x11);
     }
+    // The Pi device windows are mapped only after the kernel's own tables and MMIO window exist.
+    #[cfg(raven_pi4)]
+    crate::arch::aarch64::pi4::map_platform_devices();
     crate::initfs::init();
     if let Err(error) = crate::sched::init() {
         kprintln!("kernel: scheduler init failed: {error:?}");
