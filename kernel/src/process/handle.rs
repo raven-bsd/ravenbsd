@@ -10,6 +10,8 @@ use raven_abi::errno::Errno;
 use raven_abi::types::Rights;
 use raven_handles::HandleTable;
 
+#[cfg(target_arch = "x86_64")]
+use crate::driver::DmaBuffer;
 use crate::event::{EventQueue, Timer, UserEvent};
 #[cfg(target_arch = "x86_64")]
 use crate::ipc::{PendingRequest, SchemeFile, SchemeServer};
@@ -161,6 +163,9 @@ pub enum Object {
     /// A read-only boot-time blob (`BOOT_BLOB`).
     #[cfg(target_arch = "x86_64")]
     BootBlob(Arc<MemObject>),
+    /// A physically contiguous device buffer (`DMA_ALLOC`).
+    #[cfg(target_arch = "x86_64")]
+    DmaBuffer(Arc<DmaBuffer>),
     /// An open scheme file.
     #[cfg(target_arch = "x86_64")]
     SchemeFile(Arc<SchemeFile>),
