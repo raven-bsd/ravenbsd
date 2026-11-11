@@ -9,7 +9,9 @@ use core::time::Duration;
 
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
-use raven_ipc::protocol::{self, MAX_TRANSFER, Opcode, PACKET_SIZE, SchemePacket};
+use raven_ipc::protocol::{
+    self, Attachment, MAX_ATTACHMENTS, MAX_DATA, MAX_TRANSFER, Opcode, PACKET_SIZE, SchemePacket,
+};
 use raven_proto_fs::{OpenFlags, Stat};
 
 use crate::kernel::{Kernel, RtKernel};
@@ -32,6 +34,70 @@ impl From<Errno> for HandlerError {
 
 /// The result type of every [`Handler`] method.
 pub type HandlerResult<T> = Result<T, HandlerError>;
+
+/// A `CALL` reply, optionally carrying up to four S25 attachments.
+///
+/// A server that only uses the captured response buffer returns
+/// [`CallReply::new`] from [`Handler::call_attach`].  To attach handles it
+/// fills `data`/`data_len` (the client-visible inline bytes), calls
+/// [`CallReply::attach`], and leaves `written` at zero: the kernel copies the
+/// inline data and then the 8-byte `[handle, rights_mask]` pairs into the
+/// client response buffer.  For an attachment-free reply the kernel keeps the
+/// legacy capture path and only `written` is used.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CallReply {
+    /// Bytes written into the captured response buffer (no-attachment replies).
+    pub written: usize,
+    /// Inline data copied by the kernel for an attachment reply.
+    pub data: [u8; MAX_DATA],
+    /// Length of [`CallReply::data`].
+    pub data_len: u32,
+    /// Server-table handles to attach.
+    pub attachments: [Attachment; MAX_ATTACHMENTS],
+    /// Number of populated attachments.
+    pub attach_count: u32,
+}
+
+impl CallReply {
+    /// A reply that only uses the conventional captured response buffer.
+    pub const fn new(written: usize) -> Self {
+        Self {
+            written,
+            data: [0u8; MAX_DATA],
+            data_len: 0,
+            attachments: [Attachment {
+                handle: 0,
+                rights_mask: 0,
+            }; MAX_ATTACHMENTS],
+            attach_count: 0,
+        }
+    }
+
+    /// A reply whose inline data is copied to the client ahead of any handles.
+    pub fn with_data(data: &[u8]) -> HandlerResult<Self> {
+        if data.len() > MAX_DATA {
+            return Err(Errno::E2BIG.into());
+        }
+        let mut reply = Self::new(0);
+        reply.data[..data.len()].copy_from_slice(data);
+        reply.data_len = u32::try_from(data.len()).map_err(|_| Errno::E2BIG)?;
+        Ok(reply)
+    }
+
+    /// Append one server-table handle with a rights-reduction mask.
+    pub fn attach(&mut self, handle: Handle, rights_mask: u32) -> HandlerResult<()> {
+        let index = usize::try_from(self.attach_count).map_err(|_| Errno::E2BIG)?;
+        if index >= MAX_ATTACHMENTS {
+            return Err(Errno::E2BIG.into());
+        }
+        self.attachments[index] = Attachment {
+            handle: handle.0,
+            rights_mask,
+        };
+        self.attach_count = u32::try_from(index + 1).map_err(|_| Errno::E2BIG)?;
+        Ok(())
+    }
+}
 
 /// A request received by [`Server::poll`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -133,12 +199,78 @@ pub trait Handler {
         let _ = (file, request, response);
         Err(Errno::ENOSYS.into())
     }
+
+    /// Typed `CALL` with optional S25 reply attachments.
+    ///
+    /// The default forwards to [`Handler::call`] and attaches nothing, so
+    /// existing servers keep their behaviour.  A server that returns handles
+    /// fills a [`CallReply`] instead of writing the whole reply through the
+    /// captured buffer.
+    fn call_attach(
+        &mut self,
+        file: u64,
+        request: &[u8],
+        response: &mut [u8],
+    ) -> HandlerResult<CallReply> {
+        Ok(CallReply::new(self.call(file, request, response)?))
+    }
 }
 
 struct Deferred {
     token: u64,
     request: Handle,
     packet: SchemePacket,
+}
+
+/// One reply's response fields, grouped to keep `send_response` readable.
+struct Reply<'a> {
+    result: Result<(), Errno>,
+    server_cookie: Option<u64>,
+    result_len: usize,
+    data: Option<[u8; 64]>,
+    attachments: &'a [Attachment],
+}
+
+impl<'a> Reply<'a> {
+    const fn ok() -> Self {
+        Self {
+            result: Ok(()),
+            server_cookie: None,
+            result_len: 0,
+            data: None,
+            attachments: &[],
+        }
+    }
+
+    const fn error(error: Errno) -> Self {
+        Self {
+            result: Err(error),
+            server_cookie: None,
+            result_len: 0,
+            data: None,
+            attachments: &[],
+        }
+    }
+
+    const fn cookie(mut self, cookie: u64) -> Self {
+        self.server_cookie = Some(cookie);
+        self
+    }
+
+    const fn len(mut self, length: usize) -> Self {
+        self.result_len = length;
+        self
+    }
+
+    const fn data(mut self, data: [u8; 64]) -> Self {
+        self.data = Some(data);
+        self
+    }
+
+    const fn attach(mut self, attachments: &'a [Attachment]) -> Self {
+        self.attachments = attachments;
+        self
+    }
 }
 
 /// A running scheme server.
@@ -245,13 +377,14 @@ impl<K: Kernel> Server<K> {
                 let mode = flags.create_mode().unwrap_or(0);
                 match handler.open_with(path, flags, mode, ctx)? {
                     Opened::File(id) => self
-                        .send_response(ctx.request, request, Ok(()), Some(id), 0, None)
+                        .send_response(ctx.request, request, Reply::ok().cookie(id))
                         .map_err(HandlerError::from),
                     Opened::Attach(handle) => {
-                        self.kernel
-                            .reply_attach(ctx.request, handle)
-                            .map_err(HandlerError::from)?;
-                        self.send_response(ctx.request, request, Ok(()), Some(0), 0, None)
+                        let attachments = [Attachment {
+                            handle: handle.0,
+                            rights_mask: 0,
+                        }];
+                        self.send_response(ctx.request, request, Reply::ok().attach(&attachments))
                             .map_err(HandlerError::from)
                     }
                 }
@@ -267,7 +400,7 @@ impl<K: Kernel> Server<K> {
                 if written > buffer.len() {
                     return Err(Errno::EPROTO.into());
                 }
-                self.send_response(ctx.request, request, Ok(()), None, written, None)
+                self.send_response(ctx.request, request, Reply::ok().len(written))
                     .map_err(HandlerError::from)
             }
             Opcode::Write => {
@@ -280,17 +413,17 @@ impl<K: Kernel> Server<K> {
                 if written > buffer.len() {
                     return Err(Errno::EPROTO.into());
                 }
-                self.send_response(ctx.request, request, Ok(()), None, written, None)
+                self.send_response(ctx.request, request, Reply::ok().len(written))
                     .map_err(HandlerError::from)
             }
             Opcode::Close => {
                 handler.close(request.file_id)?;
-                self.send_response(ctx.request, request, Ok(()), None, 0, None)
+                self.send_response(ctx.request, request, Reply::ok())
                     .map_err(HandlerError::from)
             }
             Opcode::Dup => {
                 let id = handler.dup(request.file_id)?;
-                self.send_response(ctx.request, request, Ok(()), Some(id), 0, None)
+                self.send_response(ctx.request, request, Reply::ok().cookie(id))
                     .map_err(HandlerError::from)
             }
             Opcode::Fstat => {
@@ -298,7 +431,7 @@ impl<K: Kernel> Server<K> {
                 let mut data = [0u8; 64];
                 stat.encode(&mut data)
                     .map_err(|_| HandlerError::from(Errno::EPROTO))?;
-                self.send_response(ctx.request, request, Ok(()), None, 0, Some(data))
+                self.send_response(ctx.request, request, Reply::ok().data(data))
                     .map_err(HandlerError::from)
             }
             Opcode::Call => {
@@ -313,12 +446,24 @@ impl<K: Kernel> Server<K> {
                 } else {
                     response_buffer_mut(&request)?
                 };
-                let written = handler.call(request.file_id, request_bytes, response_bytes)?;
-                if written > response_bytes.len() {
+                let reply = handler.call_attach(request.file_id, request_bytes, response_bytes)?;
+                let attach_count =
+                    usize::try_from(reply.attach_count).map_err(|_| Errno::EPROTO)?;
+                if attach_count > MAX_ATTACHMENTS
+                    || usize::try_from(reply.data_len).unwrap_or(usize::MAX) > MAX_DATA
+                {
                     return Err(Errno::EPROTO.into());
                 }
-                self.send_response(ctx.request, request, Ok(()), None, written, None)
-                    .map_err(HandlerError::from)
+                if attach_count == 0 {
+                    if reply.written > response_bytes.len() {
+                        return Err(Errno::EPROTO.into());
+                    }
+                    self.send_response(ctx.request, request, Reply::ok().len(reply.written))
+                        .map_err(HandlerError::from)
+                } else {
+                    self.send_attached_call(ctx.request, request, &reply)
+                        .map_err(HandlerError::from)
+                }
             }
         }
     }
@@ -329,32 +474,29 @@ impl<K: Kernel> Server<K> {
         request: SchemePacket,
         error: Errno,
     ) -> Result<(), Errno> {
-        self.send_response(request_handle, request, Err(error), None, 0, None)
+        self.send_response(request_handle, request, Reply::error(error))
     }
 
     fn send_response(
         &self,
         request_handle: Handle,
         request: SchemePacket,
-        result: Result<(), Errno>,
-        server_cookie: Option<u64>,
-        result_len: usize,
-        data: Option<[u8; 64]>,
+        reply: Reply<'_>,
     ) -> Result<(), Errno> {
         let mut response = request;
         response.buffer_len = 0;
         response.data_len = 0;
-        match result {
+        match reply.result {
             Ok(()) => {
                 response.status = 0;
-                if let Some(cookie) = server_cookie {
+                if let Some(cookie) = reply.server_cookie {
                     response.server_cookie = cookie;
                 }
-                if let Some(data) = data {
+                if let Some(data) = reply.data {
                     response.data = data;
                     response.data_len = 64;
                 } else {
-                    response.buffer_len = u64::try_from(result_len).unwrap_or(u64::MAX);
+                    response.buffer_len = u64::try_from(reply.result_len).unwrap_or(u64::MAX);
                 }
             }
             Err(error) => {
@@ -363,7 +505,37 @@ impl<K: Kernel> Server<K> {
         }
         let mut bytes = [0u8; PACKET_SIZE];
         protocol::encode(&response, &mut bytes).map_err(|_| Errno::EPROTO)?;
-        self.kernel.send(request_handle, &bytes)
+        if reply.attachments.is_empty() {
+            self.kernel.send(request_handle, &bytes)
+        } else {
+            self.kernel
+                .send_attach(request_handle, &bytes, reply.attachments)
+        }
+    }
+
+    fn send_attached_call(
+        &self,
+        request_handle: Handle,
+        request: SchemePacket,
+        reply: &CallReply,
+    ) -> Result<(), Errno> {
+        let count = usize::try_from(reply.attach_count).map_err(|_| Errno::E2BIG)?;
+        if count == 0 || count > MAX_ATTACHMENTS {
+            return Err(Errno::E2BIG);
+        }
+        let data_len = usize::try_from(reply.data_len).map_err(|_| Errno::E2BIG)?;
+        if data_len > MAX_DATA {
+            return Err(Errno::E2BIG);
+        }
+        let mut response = request;
+        response.status = 0;
+        response.buffer_len = 0;
+        response.data_len = reply.data_len;
+        response.data = reply.data;
+        let mut bytes = [0u8; PACKET_SIZE];
+        protocol::encode(&response, &mut bytes).map_err(|_| Errno::EPROTO)?;
+        self.kernel
+            .send_attach(request_handle, &bytes, &reply.attachments[..count])
     }
 }
 

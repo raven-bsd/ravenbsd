@@ -9,6 +9,7 @@
 
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
+use raven_ipc::protocol::{self, Attachment, MAX_ATTACHMENTS, Opcode, PACKET_SIZE, REPLY_HANDLE};
 
 use crate::sys;
 
@@ -88,13 +89,25 @@ pub trait Kernel: Clone {
         Err(Errno::ENOSYS)
     }
 
-    /// Attach a handle to an `Open` response (`REPLY_HANDLE`).
+    /// Send a reply with S25 handle attachments.
     ///
-    /// This requires S25's reply-attachment syscall. Master does not provide it yet, so the real
-    /// implementation returns `ENOSYS`; a fake kernel records the request for host tests.
-    fn reply_attach(&self, request: Handle, handle: Handle) -> Result<(), Errno> {
-        let _ = (request, handle);
-        Err(Errno::ENOSYS)
+    /// `attachments` are handles in this server's table; the kernel validates
+    /// `Rights::TRANSFER`, installs reduced duplicates in the client's table and
+    /// writes `[handle, rights_mask]` pairs after the inline data.  A kernel
+    /// that does not implement attachments accepts the empty slice (a normal
+    /// [`Kernel::send`]) and returns `ENOSYS` for a non-empty one.
+    fn send_attach(
+        &self,
+        request: Handle,
+        packet: &[u8],
+        attachments: &[Attachment],
+    ) -> Result<(), Errno> {
+        if attachments.is_empty() {
+            self.send(request, packet)
+        } else {
+            let _ = (request, packet);
+            Err(Errno::ENOSYS)
+        }
     }
 }
 
@@ -142,4 +155,57 @@ impl Kernel for RtKernel {
     fn send(&self, request: Handle, packet: &[u8]) -> Result<(), Errno> {
         sys::send(request, packet)
     }
+
+    fn send_attach(
+        &self,
+        request: Handle,
+        packet: &[u8],
+        attachments: &[Attachment],
+    ) -> Result<(), Errno> {
+        if attachments.is_empty() {
+            return sys::send(request, packet);
+        }
+        let bytes = apply_attachments(packet, attachments)?;
+        sys::send(request, &bytes)
+    }
+}
+
+/// Apply the S25 attachment layout to an encoded reply packet.
+///
+/// The rules are shared by [`RtKernel`] and the host `FakeKernel`, so tests see
+/// the same packet a kernel would validate.
+pub(crate) fn apply_attachments(
+    packet: &[u8],
+    attachments: &[Attachment],
+) -> Result<[u8; PACKET_SIZE], Errno> {
+    if attachments.len() > MAX_ATTACHMENTS || packet.len() != PACKET_SIZE {
+        return Err(Errno::E2BIG);
+    }
+    let mut bytes = [0u8; PACKET_SIZE];
+    bytes.copy_from_slice(packet);
+    let mut decoded = protocol::decode(&bytes).map_err(|_| Errno::EPROTO)?;
+    decoded.validate(true).map_err(|_| Errno::EPROTO)?;
+    let opcode = Opcode::from_u16(decoded.opcode).ok_or(Errno::EPROTO)?;
+    if opcode == Opcode::Open {
+        if attachments.len() != 1 {
+            return Err(Errno::E2BIG);
+        }
+        decoded.flags |= REPLY_HANDLE;
+    } else if opcode == Opcode::Call {
+        let pairs = u64::try_from(attachments.len())
+            .map_err(|_| Errno::E2BIG)?
+            .checked_mul(8)
+            .ok_or(Errno::E2BIG)?;
+        decoded.buffer_len = u64::from(decoded.data_len)
+            .checked_add(pairs)
+            .ok_or(Errno::E2BIG)?;
+    } else {
+        return Err(Errno::E2BIG);
+    }
+    decoded.attach_count = u32::try_from(attachments.len()).map_err(|_| Errno::E2BIG)?;
+    for (index, attachment) in attachments.iter().enumerate() {
+        decoded.attach[index] = *attachment;
+    }
+    protocol::encode(&decoded, &mut bytes).map_err(|_| Errno::EPROTO)?;
+    Ok(bytes)
 }

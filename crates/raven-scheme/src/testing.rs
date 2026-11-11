@@ -13,6 +13,7 @@ use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
+use raven_ipc::protocol::Attachment;
 
 use crate::kernel::Kernel;
 use crate::sync::SpinLock;
@@ -27,7 +28,7 @@ struct State {
     write_data: Vec<u8>,
     call_response: Vec<u8>,
     fstat_data: [u8; 64],
-    attachments: Vec<(Handle, Handle)>,
+    sent_attachments: Vec<(Handle, Vec<u8>, Vec<Attachment>)>,
     closed: Vec<Handle>,
 }
 
@@ -43,7 +44,7 @@ impl Default for State {
             write_data: Vec::new(),
             call_response: Vec::new(),
             fstat_data: [0u8; 64],
-            attachments: Vec::new(),
+            sent_attachments: Vec::new(),
             closed: Vec::new(),
         }
     }
@@ -104,9 +105,9 @@ impl FakeKernel {
         self.state.lock().closed.clone()
     }
 
-    /// Attachments recorded by `REPLY_ATTACH`.
-    pub fn attachments(&self) -> Vec<(Handle, Handle)> {
-        self.state.lock().attachments.clone()
+    /// Attachments recorded by `SEND_ATTACH`: request, encoded packet and pairs.
+    pub fn sent_attachments(&self) -> Vec<(Handle, Vec<u8>, Vec<Attachment>)> {
+        self.state.lock().sent_attachments.clone()
     }
 
     /// Script the data returned by `READ`.
@@ -191,8 +192,17 @@ impl Kernel for FakeKernel {
         Ok(())
     }
 
-    fn reply_attach(&self, request: Handle, handle: Handle) -> Result<(), Errno> {
-        self.state.lock().attachments.push((request, handle));
+    fn send_attach(
+        &self,
+        request: Handle,
+        packet: &[u8],
+        attachments: &[Attachment],
+    ) -> Result<(), Errno> {
+        let encoded = crate::kernel::apply_attachments(packet, attachments)?;
+        self.state
+            .lock()
+            .sent_attachments
+            .push((request, encoded.to_vec(), attachments.to_vec()));
         Ok(())
     }
 }
