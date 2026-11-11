@@ -73,6 +73,10 @@ static CMDLINE: CmdlineCell = CmdlineCell(UnsafeCell::new([0; CMDLINE_MAX]));
 /// Active kernel root frame, or zero before [`init`].
 static KERNEL_ROOT: AtomicU64 = AtomicU64::new(0);
 
+/// aarch64 TTBR0 root used by kernel threads and for an empty user space.
+#[cfg(target_arch = "aarch64")]
+static EMPTY_USER_ROOT: AtomicU64 = AtomicU64::new(0);
+
 /// Why paging initialisation failed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PagingError {
@@ -263,8 +267,8 @@ pub fn init(data: &BootData) -> Result<*const BootInfo, PagingError> {
 /// Builds a kernel-owned TTBR1 root with the HHDM (device attributes for the memory map's MMIO
 /// regions), remaps the kernel image segments with their final permissions, then switches both
 /// TTBRs through the break-before-make sequence and reclaims the loader's frames. TTBR0 receives
-/// a zeroed table: the kernel has no user half until S14c, and the loader's tables (which the
-/// reclaim frees) must stop being reachable.
+/// a zeroed table that stays the kernel's empty user root; user processes install their own
+/// TTBR0 root on the first context switch (S14c).
 #[cfg(target_arch = "aarch64")]
 pub fn init(data: &BootData) -> Result<*const BootInfo, PagingError> {
     if data.info.hhdm_offset != HHDM_BASE {
@@ -332,6 +336,7 @@ pub fn init(data: &BootData) -> Result<*const BootInfo, PagingError> {
     // tables, so instruction fetch cannot miss while the roots change.
     activate(root, user_root);
     KERNEL_ROOT.store(root.0, Ordering::Release);
+    EMPTY_USER_ROOT.store(user_root.0, Ordering::Release);
 
     if wx_violations() != 0 {
         return Err(PagingError::WxViolation);
@@ -350,6 +355,13 @@ pub fn init(data: &BootData) -> Result<*const BootInfo, PagingError> {
 /// The active kernel root frame.
 pub fn kernel_root() -> Option<PhysAddr> {
     let root = KERNEL_ROOT.load(Ordering::Acquire);
+    (root != 0).then_some(PhysAddr(root))
+}
+
+/// The aarch64 TTBR0 root that maps no user pages (kernel threads and a released process).
+#[cfg(target_arch = "aarch64")]
+pub fn empty_user_root() -> Option<PhysAddr> {
+    let root = EMPTY_USER_ROOT.load(Ordering::Acquire);
     (root != 0).then_some(PhysAddr(root))
 }
 
@@ -541,6 +553,46 @@ fn free_table(table_phys: PhysAddr, level: u8, memory: &KernelPhysMemory) {
             };
             if entry.is_present() && !entry.is_huge() {
                 free_table(entry.address(), level.saturating_sub(1), memory);
+            }
+        }
+    }
+    let _ = frame::free_frame(frame_phys(table_phys));
+}
+
+/// Free the user half of an aarch64 address-space root (TTBR0), including the root frame.
+///
+/// Only the lower 256 L0 entries belong to the user space; TTBR1's kernel tables are a separate
+/// root and are never touched. Mapped data frames are owned elsewhere.
+#[cfg(target_arch = "aarch64")]
+#[allow(dead_code)] // Consumed by `AddressSpace::drop`.
+pub fn free_user_tables(root: PhysAddr) {
+    use raven_rmm::Aarch64Encoding as E;
+    use raven_rmm::Encoding;
+    let memory = KernelPhysMemory;
+    let table = PageTable::new(root, 3);
+    for index in 0..256 {
+        let Some(entry) = table.entry(&memory, index) else {
+            continue;
+        };
+        if E::is_present(entry.raw()) && E::is_table(entry.raw(), table.level()) {
+            free_table_aarch64(entry.address(), table.level().saturating_sub(1), &memory);
+        }
+    }
+    let _ = frame::free_frame(frame_phys(root));
+}
+
+#[cfg(target_arch = "aarch64")]
+fn free_table_aarch64(table_phys: PhysAddr, level: u8, memory: &KernelPhysMemory) {
+    use raven_rmm::Aarch64Encoding as E;
+    use raven_rmm::Encoding;
+    let table = PageTable::new(table_phys, level);
+    if level > 0 {
+        for index in 0..512 {
+            let Some(entry) = table.entry(memory, index) else {
+                continue;
+            };
+            if E::is_present(entry.raw()) && E::is_table(entry.raw(), level) {
+                free_table_aarch64(entry.address(), level.saturating_sub(1), memory);
             }
         }
     }

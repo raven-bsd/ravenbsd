@@ -6,12 +6,15 @@
 use alloc::sync::Arc;
 
 use raven_abi::errno::Errno;
+#[cfg(target_arch = "aarch64")]
+use raven_abi::layout::aarch64::{USER_END, USER_MIN};
+#[cfg(target_arch = "x86_64")]
 use raven_abi::layout::x86_64::{USER_END, USER_MIN};
 use raven_abi::types::{Handle, Rights, map, prot};
 use raven_vma::PAGE_SIZE;
 
-use crate::arch::x86_64::trapframe::TrapFrame;
 use crate::process::{self, Process, handle::MemObject, handle::Object};
+use crate::syscall::SyscallFrame;
 
 /// Largest memory object accepted by `MEMOBJ_CREATE` (1 GiB).
 const MAX_MEMOBJ_BYTES: u64 = 1 << 30;
@@ -23,7 +26,7 @@ enum MappedObject {
 }
 
 /// `memobj_create(len, flags) -> Handle`.
-pub fn memobj_create(frame: &TrapFrame) -> Result<usize, Errno> {
+pub fn memobj_create(frame: &SyscallFrame) -> Result<usize, Errno> {
     let len = frame.rdi;
     if frame.rsi != 0 || len == 0 || !len.is_multiple_of(PAGE_SIZE) || len > MAX_MEMOBJ_BYTES {
         return Err(Errno::EINVAL);
@@ -43,7 +46,7 @@ pub fn memobj_create(frame: &TrapFrame) -> Result<usize, Errno> {
 }
 
 /// `map(proc, memobj, offset, addr, len, flags) -> addr`.
-pub fn map(frame: &TrapFrame) -> Result<usize, Errno> {
+pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let target = lookup_process(&caller, Handle(frame.rdi as u32), Rights::MAP)?;
     let raw_memobj = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
@@ -106,7 +109,7 @@ pub fn map(frame: &TrapFrame) -> Result<usize, Errno> {
 }
 
 /// `unmap(proc, addr, len) -> 0`.
-pub fn unmap(frame: &TrapFrame) -> Result<usize, Errno> {
+pub fn unmap(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let target = lookup_process(&caller, Handle(frame.rdi as u32), Rights::MAP)?;
     let addr = frame.rsi;
@@ -119,7 +122,7 @@ pub fn unmap(frame: &TrapFrame) -> Result<usize, Errno> {
 }
 
 /// `protect(proc, addr, len, prot) -> 0`.
-pub fn protect(frame: &TrapFrame) -> Result<usize, Errno> {
+pub fn protect(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let target = lookup_process(&caller, Handle(frame.rdi as u32), Rights::MAP)?;
     let addr = frame.rsi;

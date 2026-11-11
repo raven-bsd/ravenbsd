@@ -18,9 +18,14 @@ path = "src/main.rs"
 linked_list_allocator = { version = "0.10", default-features = false }
 raven-abi = { path = "../crates/raven-abi" }
 raven-bootinfo = { path = "../crates/raven-bootinfo" }
+raven-elf = { path = "../crates/raven-elf" }
 raven-esr = { path = "../crates/raven-esr" }
+raven-handles = { path = "../crates/raven-handles" }
+raven-initfs = { path = "../crates/raven-initfs" }
 raven-rmm = { path = "../crates/raven-rmm" }
 raven-sched-core = { path = "../crates/raven-sched-core" }
+raven-usercopy = { path = "../crates/raven-usercopy" }
+raven-vma = { path = "../crates/raven-vma" }
 spin = { version = "0.9", default-features = false, features = ["spin_mutex"] }
 
 # `raven-mem` exports the C `memcpy` family for x86-64. On aarch64 the same export makes the
@@ -29,16 +34,11 @@ spin = { version = "0.9", default-features = false, features = ["spin_mutex"] }
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 raven-mem = { path = "../crates/raven-mem" }
 
-# Everything below is used by the x86-64 modules only (processes, scheduling, user mode, ACPI).
+# Everything below is used by the x86-64 modules only (ACPI and the TSC scale).
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 acpi = { version = "5.2.0", default-features = false }
-raven-elf = { path = "../crates/raven-elf" }
-raven-handles = { path = "../crates/raven-handles" }
-raven-initfs = { path = "../crates/raven-initfs" }
 raven-mem = { path = "../crates/raven-mem", features = ["export-symbols"] }
 raven-timemath = { path = "../crates/raven-timemath" }
-raven-usercopy = { path = "../crates/raven-usercopy" }
-raven-vma = { path = "../crates/raven-vma" }
 
 [build-dependencies]
 raven-abi = { path = "../crates/raven-abi" }

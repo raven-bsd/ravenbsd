@@ -14,6 +14,9 @@
 use core::mem::{align_of, size_of};
 
 use raven_abi::errno::Errno;
+#[cfg(target_arch = "aarch64")]
+use raven_abi::layout::aarch64::{USER_END, USER_MIN};
+#[cfg(target_arch = "x86_64")]
 use raven_abi::layout::x86_64::{USER_END, USER_MIN};
 
 /// A validated byte range in user space.

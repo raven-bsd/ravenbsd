@@ -16,6 +16,9 @@ core::arch::global_asm!(
     .type _start, %function
 _start:
     msr daifset, #0xf
+    /* The kernel runs on SP_EL1: lower-EL exceptions then land on the interrupted thread's
+     * kernel stack, and SP_EL0 is free for the user stack. */
+    msr spsel, #1
     adrp x9, __boot_stack_top
     add x9, x9, :lo12:__boot_stack_top
     mov sp, x9

@@ -20,10 +20,7 @@ use raven_abi::errno::Errno;
 use raven_rmm::VirtAddr;
 
 use crate::memory::paging;
-#[cfg(target_arch = "x86_64")]
 use crate::process::Process;
-#[cfg(target_arch = "aarch64")]
-use crate::sched::SchedProcess as Process;
 
 /// Lowest priority (idle).
 pub const PRIORITY_MAX: u8 = 31;
@@ -232,7 +229,6 @@ impl Thread {
     }
 
     /// Create a ring-3 thread in `process`.
-    #[cfg(target_arch = "x86_64")]
     pub fn new_user(
         name: String,
         process: Arc<Process>,

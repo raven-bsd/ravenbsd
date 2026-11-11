@@ -12,12 +12,16 @@ pub mod thread;
 use core::fmt;
 use core::sync::atomic::{AtomicI32, AtomicU32, AtomicU64, Ordering};
 
+#[cfg(target_arch = "x86_64")]
 use alloc::collections::VecDeque;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec;
 
 use raven_abi::errno::Errno;
+#[cfg(target_arch = "aarch64")]
+use raven_abi::layout::aarch64::{USER_END, USER_MIN};
+#[cfg(target_arch = "x86_64")]
 use raven_abi::layout::x86_64::{USER_END, USER_MIN};
 use raven_abi::types::prot;
 use raven_elf::{Elf, ElfError, LoadMode, Machine, MapStep, StepKind};
@@ -26,12 +30,24 @@ use raven_rmm::{MapError, PageFlags, PageSize, PhysAddr, VirtAddr};
 use raven_vma::Backing;
 use spin::Mutex;
 
-use crate::arch::x86_64::{syscall, tsc};
+#[cfg(target_arch = "aarch64")]
+use crate::arch::aarch64::syscall as arch_syscall;
+#[cfg(target_arch = "aarch64")]
+use crate::arch::aarch64::timer;
+#[cfg(target_arch = "x86_64")]
+use crate::arch::x86_64::syscall as arch_syscall;
+#[cfg(target_arch = "x86_64")]
+use crate::arch::x86_64::tsc;
 use crate::cmdline::CmdLine;
 use crate::initfs;
+#[cfg(target_arch = "x86_64")]
+use crate::ipc;
+#[cfg(target_arch = "x86_64")]
 use crate::ipc::capture::CaptureSlots;
+#[cfg(target_arch = "x86_64")]
 use crate::ipc::model::Namespace;
-use crate::ipc::{self, PendingRequest, SchemeServer};
+#[cfg(target_arch = "x86_64")]
+use crate::ipc::{PendingRequest, SchemeServer};
 use crate::kprintln;
 use crate::memory::aspace::AddressSpace;
 use crate::memory::uspace::UserAddressSpace;
@@ -81,18 +97,25 @@ pub struct Process {
     /// Threads blocked in `PROC_WAIT` on this process.
     pub waiters: WaitQueue,
     /// Visible scheme names (per-process namespace).
+    #[cfg(target_arch = "x86_64")]
     pub namespace: Mutex<Namespace>,
     /// Scheme names registered by this process.
+    #[cfg(target_arch = "x86_64")]
     pub schemes: Mutex<alloc::vec::Vec<Arc<SchemeServer>>>,
     /// Packets waiting for this process's `RECV`.
+    #[cfg(target_arch = "x86_64")]
     pub scheme_queue: Mutex<VecDeque<Arc<PendingRequest>>>,
     /// Server threads blocked in `RECV`.
+    #[cfg(target_arch = "x86_64")]
     pub scheme_waiters: WaitQueue,
     /// Requests received by this process and not yet replied to.
+    #[cfg(target_arch = "x86_64")]
     pub active_requests: Mutex<alloc::vec::Vec<Arc<PendingRequest>>>,
     /// Requests this process is waiting for as a client.
+    #[cfg(target_arch = "x86_64")]
     pub client_requests: Mutex<alloc::vec::Vec<Arc<PendingRequest>>>,
     /// Capture-window slots owned by this process as a server.
+    #[cfg(target_arch = "x86_64")]
     pub capture_slots: Mutex<CaptureSlots>,
 }
 
@@ -151,12 +174,19 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         threads: AtomicU32::new(0),
         state: Mutex::new(ProcessState::Running),
         waiters: WaitQueue::new(),
+        #[cfg(target_arch = "x86_64")]
         namespace: Mutex::new(Namespace::root()),
+        #[cfg(target_arch = "x86_64")]
         schemes: Mutex::new(alloc::vec::Vec::new()),
+        #[cfg(target_arch = "x86_64")]
         scheme_queue: Mutex::new(VecDeque::new()),
+        #[cfg(target_arch = "x86_64")]
         scheme_waiters: WaitQueue::new(),
+        #[cfg(target_arch = "x86_64")]
         active_requests: Mutex::new(alloc::vec::Vec::new()),
+        #[cfg(target_arch = "x86_64")]
         client_requests: Mutex::new(alloc::vec::Vec::new()),
+        #[cfg(target_arch = "x86_64")]
         capture_slots: Mutex::new(CaptureSlots::new()),
     }))
 }
@@ -164,6 +194,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
 /// Create an empty process for `PROC_CREATE`, with the well-known handles installed.
 pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
+    #[cfg(target_arch = "x86_64")]
     let namespace = if let Some(parent) = current() {
         let snapshot = parent.namespace.lock().clone();
         snapshot.child_snapshot(&ipc::registry::names())
@@ -179,12 +210,19 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         threads: AtomicU32::new(0),
         state: Mutex::new(ProcessState::Created),
         waiters: WaitQueue::new(),
+        #[cfg(target_arch = "x86_64")]
         namespace: Mutex::new(namespace),
+        #[cfg(target_arch = "x86_64")]
         schemes: Mutex::new(alloc::vec::Vec::new()),
+        #[cfg(target_arch = "x86_64")]
         scheme_queue: Mutex::new(VecDeque::new()),
+        #[cfg(target_arch = "x86_64")]
         scheme_waiters: WaitQueue::new(),
+        #[cfg(target_arch = "x86_64")]
         active_requests: Mutex::new(alloc::vec::Vec::new()),
+        #[cfg(target_arch = "x86_64")]
         client_requests: Mutex::new(alloc::vec::Vec::new()),
+        #[cfg(target_arch = "x86_64")]
         capture_slots: Mutex::new(CaptureSlots::new()),
     });
     handle::install_initial(&mut process.handles.lock(), &process, false)?;
@@ -225,7 +263,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
     let path = cmdline.get("init").unwrap_or("/init");
     let entry = initfs::lookup(path).ok_or(ProcessError::NoInit)?;
     let data = entry.data;
-    let elf = Elf::parse(data, Machine::X86_64, USER_MIN..USER_END).map_err(ProcessError::Elf)?;
+    let elf = Elf::parse(data, TARGET_MACHINE, USER_MIN..USER_END).map_err(ProcessError::Elf)?;
     if elf.interp().is_some() {
         return Err(ProcessError::Interpreter);
     }
@@ -244,12 +282,19 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         threads: AtomicU32::new(0),
         state: Mutex::new(ProcessState::Running),
         waiters: WaitQueue::new(),
+        #[cfg(target_arch = "x86_64")]
         namespace: Mutex::new(Namespace::root()),
+        #[cfg(target_arch = "x86_64")]
         schemes: Mutex::new(alloc::vec::Vec::new()),
+        #[cfg(target_arch = "x86_64")]
         scheme_queue: Mutex::new(VecDeque::new()),
+        #[cfg(target_arch = "x86_64")]
         scheme_waiters: WaitQueue::new(),
+        #[cfg(target_arch = "x86_64")]
         active_requests: Mutex::new(alloc::vec::Vec::new()),
+        #[cfg(target_arch = "x86_64")]
         client_requests: Mutex::new(alloc::vec::Vec::new()),
+        #[cfg(target_arch = "x86_64")]
         capture_slots: Mutex::new(CaptureSlots::new()),
     });
     handle::install_initial(&mut process.handles.lock(), &process, true)
@@ -257,7 +302,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
     crate::sched::init().map_err(ProcessError::Sched)?;
     let thread = crate::sched::new_user_thread(&process, elf.entry(), user_stack, user_stack)
         .map_err(ProcessError::Sched)?;
-    syscall::init();
+    arch_syscall::init();
 
     kprintln!("process: starting {path}");
     kprintln!(
@@ -283,16 +328,16 @@ fn load_segments(
         let mut mapper = address_space.mapper().map_err(ProcessError::Map)?;
         map_step(&mut mapper, data, step)?;
     }
+    // The just-written code pages must be visible to instruction fetch before EL0 runs. The
+    // aarch64 loader path keeps the D-cache clean per page (`map_step`) and drops every stale
+    // instruction-cache line here.
+    #[cfg(target_arch = "aarch64")]
+    crate::arch::mmu::icache_invalidate_all();
     Ok(())
 }
 
 fn map_step(
-    mapper: &mut raven_rmm::Mapper<
-        '_,
-        paging::KernelFrameAllocator,
-        paging::KernelPhysMemory,
-        paging::KernelTlb,
-    >,
+    mapper: &mut paging::KernelMapper<'_>,
     data: &[u8],
     step: MapStep,
 ) -> Result<(), ProcessError> {
@@ -328,6 +373,12 @@ fn map_step(
                 }
             }
             StepKind::Zero => {}
+        }
+        // Make the bytes written through the HHDM visible to instruction fetch.
+        #[cfg(target_arch = "aarch64")]
+        // SAFETY: `destination` is a whole 4 KiB frame mapped read/write through the HHDM.
+        unsafe {
+            crate::arch::mmu::dcache_clean_range(destination as u64, PAGE);
         }
         mapper
             .map(virt, PhysAddr(physical.0), flags, PageSize::Size4K)
@@ -506,47 +557,50 @@ fn write_word(buffer: &mut [u8], cursor: &mut usize, value: u64) -> Result<(), P
 
 fn random16() -> [u8; 16] {
     let mut bytes = [0u8; 16];
-    let features = core::arch::x86_64::__cpuid(1);
-    if features.ecx & (1 << 30) != 0 {
-        let mut chunk_index = 0usize;
-        while chunk_index < 2 {
-            let mut attempt: u32 = 0;
-            let mut filled = false;
-            while attempt < 10 {
-                let value: u64;
-                let ok: u8;
-                // SAFETY: `rdrand` is available per CPUID.1:ECX[30] and has no memory side
-                // effects. `setc` records the success flag.
-                unsafe {
-                    core::arch::asm!(
-                        "rdrand {value}",
-                        "setc {ok}",
-                        value = out(reg) value,
-                        ok = out(reg_byte) ok,
-                        options(nomem, nostack),
-                    );
-                }
-                if ok != 0 {
-                    let start = chunk_index.saturating_mul(8);
-                    if let Some(slot) = bytes.get_mut(start..start.saturating_add(8)) {
-                        slot.copy_from_slice(&value.to_le_bytes());
+    #[cfg(target_arch = "x86_64")]
+    {
+        let features = core::arch::x86_64::__cpuid(1);
+        if features.ecx & (1 << 30) != 0 {
+            let mut chunk_index = 0usize;
+            while chunk_index < 2 {
+                let mut attempt: u32 = 0;
+                let mut filled = false;
+                while attempt < 10 {
+                    let value: u64;
+                    let ok: u8;
+                    // SAFETY: `rdrand` is available per CPUID.1:ECX[30] and has no memory side
+                    // effects. `setc` records the success flag.
+                    unsafe {
+                        core::arch::asm!(
+                            "rdrand {value}",
+                            "setc {ok}",
+                            value = out(reg) value,
+                            ok = out(reg_byte) ok,
+                            options(nomem, nostack),
+                        );
                     }
-                    filled = true;
+                    if ok != 0 {
+                        let start = chunk_index.saturating_mul(8);
+                        if let Some(slot) = bytes.get_mut(start..start.saturating_add(8)) {
+                            slot.copy_from_slice(&value.to_le_bytes());
+                        }
+                        filled = true;
+                        break;
+                    }
+                    attempt = attempt.saturating_add(1);
+                }
+                if !filled {
                     break;
                 }
-                attempt = attempt.saturating_add(1);
+                chunk_index = chunk_index.saturating_add(1);
             }
-            if !filled {
-                break;
+            if chunk_index == 2 {
+                return bytes;
             }
-            chunk_index = chunk_index.saturating_add(1);
-        }
-        if chunk_index == 2 {
-            return bytes;
         }
     }
 
-    let mut state = tsc::read() ^ 0x9E37_79B9_7F4A_7C15;
+    let mut state = entropy_seed() ^ 0x9E37_79B9_7F4A_7C15;
     let mut index = 0usize;
     while index < bytes.len() {
         state ^= state << 13;
@@ -565,6 +619,25 @@ fn random16() -> [u8; 16] {
     bytes
 }
 
+/// Non-cryptographic fallback entropy: the architecture's free-running counter.
+#[cfg(target_arch = "x86_64")]
+fn entropy_seed() -> u64 {
+    tsc::read()
+}
+
+/// Non-cryptographic fallback entropy: the generic-timer physical counter.
+#[cfg(target_arch = "aarch64")]
+fn entropy_seed() -> u64 {
+    timer::read_counter()
+}
+
+/// The ELF machine of the running kernel.
+#[cfg(target_arch = "x86_64")]
+const TARGET_MACHINE: Machine = Machine::X86_64;
+/// The ELF machine of the running kernel.
+#[cfg(target_arch = "aarch64")]
+const TARGET_MACHINE: Machine = Machine::Aarch64;
+
 /// Mark the current process exited, release its address space and wake waiters.
 ///
 /// PID 1 follows the C5 test-exit protocol and never returns; a child process returns to the
@@ -580,6 +653,7 @@ pub fn notify_exit(code: i32) {
     process.mark_exited(code);
     // Fail pending scheme requests and remove the registry entries while the server page tables
     // still exist, so capture mappings can be removed before the address space is released.
+    #[cfg(target_arch = "x86_64")]
     ipc::on_process_exit(&process);
     let address_space = process.address_space.lock().take();
     if let Some(address_space) = address_space {
@@ -642,6 +716,7 @@ pub fn user_exception(vector: usize) -> ! {
 }
 
 /// A syscall returned to a non-canonical user instruction pointer.
+#[cfg(target_arch = "x86_64")]
 pub fn bad_sysret(rip: u64) -> ! {
     let path = current().map_or_else(String::new, |process| process.path.clone());
     kprintln!(

@@ -14,10 +14,10 @@ use raven_abi::errno::Errno;
 use raven_abi::types::futex;
 use raven_usercopy::UserSlice;
 
-use crate::arch::x86_64::trapframe::TrapFrame;
 use crate::process;
 use crate::sched;
 use crate::sched::wait::WaitQueue;
+use crate::syscall::SyscallFrame;
 use crate::time;
 use crate::usercopy::copy_from_user;
 
@@ -28,7 +28,7 @@ static QUEUES: [WaitQueue; BUCKETS] = [const { WaitQueue::new() }; BUCKETS];
 static FALLBACK: WaitQueue = WaitQueue::new();
 
 /// `futex(addr, op, val, timeout_ns)`.
-pub fn dispatch(frame: &TrapFrame) -> Result<usize, Errno> {
+pub fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     let addr = frame.rdi;
     let op = frame.rsi as u32;
     let val = frame.rdx as u32;
