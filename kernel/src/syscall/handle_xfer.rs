@@ -39,7 +39,8 @@ fn destination(caller: &Arc<Process>, handle: Handle) -> Result<Arc<Process>, Er
     }
 }
 
-/// Clone a transferable object and reconstruct its current rights without taking two tables locks.
+/// Clone a transferable object and return the rights stored on its handle without taking two
+/// table locks.
 /// The source table is released before the destination table is acquired, so cross-process
 /// transfers cannot form a table-lock cycle. An `Arc` keeps the object alive after source close.
 pub fn clone_transferable(
@@ -47,42 +48,30 @@ pub fn clone_transferable(
     handle: Handle,
 ) -> Result<(Object, Rights), Errno> {
     let table = caller.handles.lock();
-    let object = match table.get(handle, Rights::TRANSFER) {
-        Ok(Object::MemObjectInitfs) => Object::MemObjectInitfs,
-        Ok(Object::Memory(object)) => Object::Memory(Arc::clone(object)),
-        Ok(Object::Timer(object)) => Object::Timer(Arc::clone(object)),
-        Ok(Object::UserEvent(object)) => Object::UserEvent(Arc::clone(object)),
-        Ok(Object::RootDevice) => Object::RootDevice,
-        #[cfg(target_arch = "x86_64")]
-        Ok(Object::MmioRegion(object)) => Object::MmioRegion(Arc::clone(object)),
-        #[cfg(target_arch = "x86_64")]
-        Ok(Object::BootBlob(object)) => Object::BootBlob(Arc::clone(object)),
-        #[cfg(target_arch = "x86_64")]
-        Ok(Object::DmaBuffer(object)) => Object::DmaBuffer(Arc::clone(object)),
-        #[cfg(target_arch = "x86_64")]
-        Ok(Object::Irq(object)) => Object::Irq(Arc::clone(object)),
-        #[cfg(target_arch = "x86_64")]
-        Ok(Object::SchemeFile(object)) => Object::SchemeFile(Arc::clone(object)),
-        #[cfg(target_arch = "x86_64")]
-        Ok(Object::SchemeServer(object)) => Object::SchemeServer(Arc::clone(object)),
-        Ok(_) => return Err(Errno::EBADF),
+    let (entry, rights) = match table.get_with_rights(handle, Rights::TRANSFER) {
+        Ok(item) => item,
         Err(Errno::EACCES) => return Err(Errno::EPERM),
         Err(error) => return Err(error),
     };
-    let mut rights = Rights::NONE;
-    for bit in [
-        Rights::READ,
-        Rights::WRITE,
-        Rights::MAP,
-        Rights::EXEC,
-        Rights::DUP,
-        Rights::TRANSFER,
-        Rights::SIGNAL,
-        Rights::ADMIN,
-    ] {
-        if table.get(handle, bit).is_ok() {
-            rights = rights.union(bit);
-        }
-    }
+    let object = match entry {
+        Object::MemObjectInitfs => Object::MemObjectInitfs,
+        Object::Memory(object) => Object::Memory(Arc::clone(object)),
+        Object::Timer(object) => Object::Timer(Arc::clone(object)),
+        Object::UserEvent(object) => Object::UserEvent(Arc::clone(object)),
+        Object::RootDevice => Object::RootDevice,
+        #[cfg(target_arch = "x86_64")]
+        Object::MmioRegion(object) => Object::MmioRegion(Arc::clone(object)),
+        #[cfg(target_arch = "x86_64")]
+        Object::BootBlob(object) => Object::BootBlob(Arc::clone(object)),
+        #[cfg(target_arch = "x86_64")]
+        Object::DmaBuffer(object) => Object::DmaBuffer(Arc::clone(object)),
+        #[cfg(target_arch = "x86_64")]
+        Object::Irq(object) => Object::Irq(Arc::clone(object)),
+        #[cfg(target_arch = "x86_64")]
+        Object::SchemeFile(object) => Object::SchemeFile(Arc::clone(object)),
+        #[cfg(target_arch = "x86_64")]
+        Object::SchemeServer(object) => Object::SchemeServer(Arc::clone(object)),
+        _ => return Err(Errno::EBADF),
+    };
     Ok((object, rights))
 }
