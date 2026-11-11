@@ -825,6 +825,10 @@ pub fn switch_count() -> u64 {
     if !INITIALIZED.load(Ordering::Acquire) {
         return 0;
     }
+    // Same local discipline as every other scheduler mutation: the timer tick takes
+    // `sync::critical` and then the per-CPU slot lock, so the monitor must too.  Without it an
+    // interrupt on this CPU could re-enter `tick` and deadlock on the slot lock held here.
+    let _guard = sync::critical();
     let mut total = 0u64;
     for cpu in 0..smp::online_cpus() {
         let slot = lock_cpu(cpu);

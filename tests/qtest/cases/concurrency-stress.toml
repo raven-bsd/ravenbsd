@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "concurrency-stress"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/s34-concurrency/build.sh"]
+initfs = "build/fixtures/s34-concurrency/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s21-framecheck=1 s34-tlb-fail=1"
+qemu_extra = []
+expect_exit = "success"
+
+# The one-shot injection may fire during process setup or during the map/unmap stress.
+[[expect]]
+regex = '^smp: tlb shootdown timeout on cpu \d+$'
+unordered = true
+
+[[expect]]
+regex = '^s21: frames free=\d+$'
+
+[[expect]]
+regex = '^s34: frames before$'
+
+[[expect]]
+regex = '^s34: timer probe ok$'
+
+[[expect]]
+regex = '^s34: event stress ok$'
+
+[[expect]]
+regex = '^s34: shootdown stress ok$'
+
+[[expect]]
+regex = '^s21: frames free=\d+$'
+
+[[expect]]
+regex = '^s34: frames after$'
+
+[[expect]]
+regex = '^s34: concurrency ok$'
+
+[[forbid]]
+regex = '(?i)panic|s34: failed'

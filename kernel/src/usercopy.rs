@@ -219,8 +219,21 @@ pub fn copy_cstr_from_user(address: u64, buffer: &mut [u8]) -> Result<&str, Errn
     Err(Errno::ENAMETOOLONG)
 }
 
-/// Return the fixup address when `return_address` is inside a usercopy critical section.
-pub fn fixup_for(return_address: u64) -> Option<u64> {
+/// Direction of the user access guarded by one fixup entry.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Access {
+    /// The kernel reads from the user (`copy_from_user`).
+    Read,
+    /// The kernel writes to the user (`copy_to_user`).
+    Write,
+}
+
+/// Return the fixup address and access direction when `return_address` is inside a usercopy
+/// critical section.
+///
+/// The table is emitted in the order `copy_from_user`, `copy_to_user`; the parity of the entry
+/// index therefore selects the direction.
+fn fixup_for(return_address: u64) -> Option<(u64, Access)> {
     let start = core::ptr::addr_of!(__usercopy_fixup_start) as u64;
     let end = core::ptr::addr_of!(__usercopy_fixup_end) as u64;
     if end <= start {
@@ -240,7 +253,12 @@ pub fn fixup_for(return_address: u64) -> Option<u64> {
             )
         };
         if return_address >= entry_start && return_address < entry_end {
-            return Some(fixup);
+            let access = if index.is_multiple_of(2) {
+                Access::Read
+            } else {
+                Access::Write
+            };
+            return Some((fixup, access));
         }
         index = index.saturating_add(1);
     }
@@ -249,31 +267,43 @@ pub fn fixup_for(return_address: u64) -> Option<u64> {
 
 /// Handle a page fault that happened inside a usercopy critical section.
 ///
-/// Returns true when the frame's instruction pointer was moved to the fixup label.
+/// A write into a private copy-on-write mapping is logically writable: resolve the COW and let
+/// the faulting instruction retry.  A read fault or a genuine permission violation is redirected
+/// to the fixup label, which returns `EFAULT`.  Kernel-origin faults never reach this function
+/// (the caller only calls it for a user address inside a usercopy range).
+///
+/// Returns true when the frame was either retried or moved to the fixup label.
 #[cfg(target_arch = "x86_64")]
 pub fn handle_page_fault(frame: &mut TrapFrame, cr2: u64) -> bool {
     if !is_user_address(cr2) {
         return false;
     }
-    let Some(fixup) = fixup_for(frame.rip) else {
+    let Some((fixup, access)) = fixup_for(frame.rip) else {
         return false;
     };
+    if access == Access::Write && crate::process::handle_page_fault(cr2) {
+        // RIP is unchanged: the store/rep movsb retries against the now-private page.
+        return true;
+    }
     frame.rip = fixup;
     true
 }
 
 /// Handle an aarch64 same-EL data abort inside a usercopy critical section.
 ///
-/// Returns true when `ELR_EL1` was redirected to the fixup label; the vector then returns and the
-/// routine delivers `-EFAULT` to its Rust wrapper.
+/// Same policy as the x86-64 handler: resolve COW for a write, otherwise redirect to the fixup
+/// label so the routine delivers `-EFAULT` to its Rust wrapper.
 #[cfg(target_arch = "aarch64")]
 pub fn handle_fault_aarch64(frame: &mut TrapFrame) -> bool {
     if !is_user_address(frame.far) {
         return false;
     }
-    let Some(fixup) = fixup_for(frame.elr) else {
+    let Some((fixup, access)) = fixup_for(frame.elr) else {
         return false;
     };
+    if access == Access::Write && crate::process::handle_page_fault(frame.far) {
+        return true;
+    }
     frame.elr = fixup;
     true
 }

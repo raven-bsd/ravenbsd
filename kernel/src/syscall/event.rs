@@ -51,7 +51,7 @@ fn create_queue(frame: &SyscallFrame) -> Result<usize, Errno> {
     let process = process::current().ok_or(Errno::ESRCH)?;
     let rights = Rights::READ.union(Rights::WRITE).union(Rights::DUP);
     let queue = Arc::new(EventQueue::new(process.id));
-    event::register_queue(&queue);
+    event::register_queue(&queue)?;
     Ok(process
         .handles
         .lock()
@@ -200,7 +200,7 @@ fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
             )
         };
         copy_to_user(slot, source)?;
-        consume_user_event(&process, Handle(item.key));
+        consume_source(&process, Handle(item.key));
         count = count.saturating_add(1);
     }
     let _ = destination;
@@ -317,7 +317,7 @@ fn source_from_handle(process: &Arc<process::Process>, handle: Handle) -> Result
 fn readiness(process: &Arc<process::Process>, handle: Handle) -> u32 {
     let table = process.handles.lock();
     match table.get(handle, Rights::READ) {
-        Ok(Object::Timer(timer)) if timer.ready(time::now_ns()) => event::SIGNALED,
+        Ok(Object::Timer(timer)) if timer.peek(time::now_ns()) => event::SIGNALED,
         Ok(Object::UserEvent(event)) if event.ready() => event::SIGNALED,
         #[cfg(target_arch = "x86_64")]
         Ok(Object::Irq(irq)) if irq.pending() != 0 => event::SIGNALED,
@@ -342,10 +342,19 @@ fn readiness(process: &Arc<process::Process>, handle: Handle) -> u32 {
     }
 }
 
-/// Consume the doorbell only after its record reached user memory.
-fn consume_user_event(process: &Arc<process::Process>, handle: Handle) {
+/// Consume the source level only after its record reached user memory.
+///
+/// Timer readiness is a predicate (`peek`) during the scan; the period is consumed here, exactly
+/// once per delivered record.  Irq readiness is level-triggered and consumed by `IRQ_WAIT`.
+fn consume_source(process: &Arc<process::Process>, handle: Handle) {
     let table = process.handles.lock();
-    if let Ok(Object::UserEvent(event)) = table.get(handle, Rights::READ) {
-        let _ = event.take();
+    match table.get(handle, Rights::READ) {
+        Ok(Object::Timer(timer)) => {
+            let _ = timer.consume(time::now_ns());
+        }
+        Ok(Object::UserEvent(event)) => {
+            let _ = event.take();
+        }
+        _ => {}
     }
 }

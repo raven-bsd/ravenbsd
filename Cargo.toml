@@ -28,6 +28,8 @@ members = [
     "tests/fixtures/k66-fs",
     "tests/fixtures/s30-irq",
     "tests/fixtures/s31-irq",
+    "tests/fixtures/s34-concurrency",
+    "tests/fixtures/usercopy-cow",
     "tests/fixtures/testkernel",
     "xtask",
     "tests/qtest",

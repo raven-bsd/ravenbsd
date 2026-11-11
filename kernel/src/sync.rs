@@ -179,8 +179,9 @@ pub struct IrqSpinLock<T> {
     data: UnsafeCell<T>,
 }
 
-// SAFETY: the lock serialises every access to `data`; `T: Send` makes moving it across contexts
-// safe. The single CPU's interrupt disable makes the guard non-reentrant.
+// SAFETY: the lock flag serialises CPUs, and masking interrupts makes it non-reentrant on the
+// holding CPU: acquiring the same guard twice on one CPU deadlocks by contract, so every
+// interrupt-reachable user must never take it recursively.
 unsafe impl<T: Send> Sync for IrqSpinLock<T> {}
 
 impl<T> IrqSpinLock<T> {

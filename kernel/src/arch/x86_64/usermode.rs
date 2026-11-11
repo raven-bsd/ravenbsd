@@ -36,8 +36,11 @@ impl PerCpu {
 
 struct PerCpuCell(UnsafeCell<PerCpu>);
 
-// SAFETY: the structure is written during single-CPU boot / context setup and read by the
-// architectural GS-relative entry paths; there is one CPU in S08.
+// SAFETY: this is the boot processor's legacy GS block, written by the S08 syscall setup and by
+// the context code before ring 3.  The scheduler installs the real per-CPU GS block from
+// `ap_start` on every CPU; user threads and ring-3 transitions run only on CPU 0 under the current
+// execution model, so application processors never read or write this block.  A future
+// user-thread-SMP change must give every CPU its own block.
 unsafe impl Sync for PerCpuCell {}
 
 static PERCPU: PerCpuCell = PerCpuCell(UnsafeCell::new(PerCpu::new()));
@@ -52,7 +55,7 @@ const _: () = {
 /// Initialise the per-CPU self pointer.
 pub fn percpu_init() {
     let pointer = PERCPU.0.get();
-    // SAFETY: single-CPU early boot; no other reader exists yet.
+    // SAFETY: the boot processor calls this before AP bring-up; no other reader exists yet.
     unsafe {
         (*pointer).self_ptr = pointer as u64;
     }
