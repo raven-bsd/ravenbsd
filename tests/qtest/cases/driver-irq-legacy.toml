@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "driver-irq-legacy"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 60
+pre = ["sh tests/fixtures/s30-irq/build.sh"]
+initfs = "build/fixtures/s30-irq/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s30-irq-probe=1"
+qemu_extra = []
+expect_exit = "success"
+
+# The kernel probes the real IOAPIC redirection entry: masked right after irq_create...
+[[expect]]
+regex = '^s30: legacy gsi=\d+ vector=0x[0-9a-f]{2} masked=1$'
+
+[[expect]]
+regex = '^s30: legacy create ok$'
+
+[[expect]]
+regex = '^s30: legacy flags ok$'
+
+[[expect]]
+regex = '^s30: legacy busy ok$'
+
+[[expect]]
+regex = '^s30: legacy gsi=\d+ vector=0x[0-9a-f]{2} masked=1$'
+
+[[expect]]
+regex = '^s30: legacy reuse ok$'
+
+# ...and unmasked only after IRQ_ACK.
+[[expect]]
+regex = '^s30: legacy gsi=\d+ masked=0$'
+
+[[expect]]
+regex = '^s30: legacy ack ok$'
+
+[[expect]]
+regex = '^s30: legacy done$'
+
+[[forbid]]
+regex = '(?i)panic'
