@@ -23,6 +23,9 @@ use super::protocol::{self, Opcode, PACKET_SIZE, REPLY_HANDLE, SchemePacket, att
 use super::{PendingRequest, RequestBuffers, SchemeFile};
 use super::{next_file_id, next_request_id, registry};
 
+/// Maximum outstanding client requests one process may hold.
+const MAX_CLIENT_REQUESTS: usize = 1024;
+
 /// Open a path on `server` and return a new scheme-file handle.
 pub fn open(
     caller: &Arc<Process>,
@@ -346,9 +349,37 @@ pub fn send(
     if packet.request_id != request.id || packet.opcode != request.opcode.as_u16() {
         return Err(Errno::EPROTO);
     }
-    let installed = install_attachments(caller, &request, &mut packet)?;
+    let bounds = {
+        let request_packet = request.packet.lock();
+        protocol::reply_result(
+            request.opcode,
+            request_packet.buffer_len,
+            request_packet.response_len,
+            &packet,
+        )
+    };
+    let result = match bounds {
+        Ok(result) => result,
+        Err(_) => {
+            // Strict policy: a successful reply that claims more than the request capacity is a
+            // protocol error. Complete the client, otherwise it would wait forever.
+            request.fail(Errno::EPROTO);
+            retire(caller, &request, request_handle);
+            return Err(Errno::EPROTO);
+        }
+    };
+    let installed = match install_attachments(caller, &request, &mut packet) {
+        Ok(installed) => installed,
+        Err(error) => {
+            request.fail(error);
+            retire(caller, &request, request_handle);
+            return Err(error);
+        }
+    };
     if let Err(error) = write_reply_buffer(&request, &packet) {
         rollback_attachments(&request.client, &installed);
+        request.fail(error);
+        retire(caller, &request, request_handle);
         return Err(error);
     }
     if request.opcode == Opcode::Open
@@ -359,17 +390,18 @@ pub fn send(
             .store(packet.server_cookie, Ordering::Release);
     }
     let status = packet.status;
-    let result = match request.opcode {
-        Opcode::Read | Opcode::Write | Opcode::Call => packet.buffer_len,
-        _ => u64::from(packet.data_len),
-    };
     request.complete(status, result, Some(packet));
-    caller
+    retire(caller, &request, request_handle);
+    Ok(())
+}
+
+/// Remove a completed request from the server's accounting and close its request handle.
+fn retire(server: &Arc<Process>, request: &Arc<PendingRequest>, request_handle: Handle) {
+    server
         .active_requests
         .lock()
-        .retain(|item| !Arc::ptr_eq(item, &request));
-    let _ = caller.handles.lock().close(request_handle);
-    Ok(())
+        .retain(|item| item.id != request.id);
+    let _ = server.handles.lock().close(request_handle);
 }
 
 fn install_attachments(
@@ -534,9 +566,17 @@ fn deliver(
         request.fail(Errno::EPROTO);
         return Err(Errno::EPROTO);
     }
-    let destination = UserSlice::new(packet_address, PACKET_SIZE as u64)?;
+    let destination = match UserSlice::new(packet_address, PACKET_SIZE as u64) {
+        Ok(destination) => destination,
+        Err(error) => {
+            // K2: the request was already removed from the server queue. Complete the client
+            // with EPROTO instead of leaving it blocked forever on an invalid destination.
+            request.fail(Errno::EPROTO);
+            return Err(error);
+        }
+    };
     if let Err(error) = copy_to_user(destination, &bytes) {
-        request.fail(error);
+        request.fail(Errno::EPROTO);
         return Err(error);
     }
     let handle = match caller
@@ -562,11 +602,15 @@ fn submit(request: &Arc<PendingRequest>) -> Result<(), Errno> {
     if *state != process::ProcessState::Running {
         return Err(Errno::EIO);
     }
-    request
-        .client
-        .client_requests
-        .lock()
-        .push(Arc::clone(request));
+    // Bound the client's outstanding list independently of the delivery queue. A client that
+    // loops one-way CLOSE/DUP against a slow server cannot grow kernel memory without limit.
+    {
+        let mut client_requests = request.client.client_requests.lock();
+        if client_requests.len() >= MAX_CLIENT_REQUESTS {
+            return Err(Errno::EAGAIN);
+        }
+        client_requests.push(Arc::clone(request));
+    }
     request
         .server
         .scheme_queue

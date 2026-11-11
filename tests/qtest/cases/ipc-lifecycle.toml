@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S33 request lifecycle: invalid RECV destination, one-way accounting, reply bounds,
+# cancellation and server death. The initfs controller drives all scenarios.
+
+name = "ipc-lifecycle"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/s33-ipc/build.sh"]
+initfs = "build/fixtures/s33-ipc/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s33-ipccheck"
+expect_exit = "success"
+
+[[expect]]
+regex = '^s33: bad recv ok$'
+
+[[expect]]
+regex = '^s33: reply bounds ok$'
+
+[[expect]]
+regex = '^s33: loop ok$'
+
+[[expect]]
+regex = '^s33: child outstanding=0$'
+unordered = true
+
+[[expect]]
+regex = '^s33: cancel ok$'
+
+[[expect]]
+regex = '^s33: server death ok$'
+
+[[expect]]
+regex = '^s33: lifecycle ok$'
+
+[[forbid]]
+regex = '^s33: child outstanding=[0-9]{3,}$'
+
+[[forbid]]
+regex = '(?i)panic'
