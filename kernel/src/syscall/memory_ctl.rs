@@ -14,6 +14,8 @@ use raven_abi::types::{Handle, Rights, map, prot};
 use raven_vma::PAGE_SIZE;
 
 #[cfg(target_arch = "x86_64")]
+use crate::driver::DmaBuffer;
+#[cfg(target_arch = "x86_64")]
 use crate::process::handle::MmioRegion;
 use crate::process::{self, Process, handle::MemObject, handle::Object};
 use crate::syscall::SyscallFrame;
@@ -29,6 +31,8 @@ enum MappedObject {
     Mmio(Arc<MmioRegion>),
     #[cfg(target_arch = "x86_64")]
     BootBlob(Arc<MemObject>),
+    #[cfg(target_arch = "x86_64")]
+    Dma(Arc<DmaBuffer>),
 }
 
 /// `memobj_create(len, flags) -> Handle`.
@@ -120,6 +124,12 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
         MappedObject::BootBlob(object) => {
             address_space.map_memobj(vaddr, len, offset, protection, object, false)?;
         }
+        #[cfg(target_arch = "x86_64")]
+        MappedObject::Dma(buffer) => {
+            let non_cacheable = buffer.flags() & crate::driver::DMA_FLAG_NON_CACHEABLE != 0;
+            let writable = protection & (prot::WRITE as u8) != 0;
+            address_space.map_dma(vaddr, len, offset, writable, non_cacheable, buffer)?;
+        }
     }
     Ok(vaddr as usize)
 }
@@ -208,6 +218,8 @@ fn resolve_object(
             Mmio,
             #[cfg(target_arch = "x86_64")]
             Blob,
+            #[cfg(target_arch = "x86_64")]
+            Dma,
         }
         let kind = {
             let handles = caller.handles.lock();
@@ -217,6 +229,8 @@ fn resolve_object(
                 Ok(Object::MmioRegion(_)) => Kind::Mmio,
                 #[cfg(target_arch = "x86_64")]
                 Ok(Object::BootBlob(_)) => Kind::Blob,
+                #[cfg(target_arch = "x86_64")]
+                Ok(Object::DmaBuffer(_)) => Kind::Dma,
                 Ok(_) => return Err(Errno::EBADF),
                 Err(error) => return Err(error),
             }
@@ -273,6 +287,27 @@ fn resolve_object(
                     Object::BootBlob(object) => Ok(MappedObject::BootBlob(Arc::clone(object))),
                     _ => Err(Errno::EBADF),
                 }
+            }
+            #[cfg(target_arch = "x86_64")]
+            Kind::Dma => {
+                let mut needed = Rights::MAP;
+                if protection & (prot::WRITE as u8) != 0 {
+                    needed = needed.union(Rights::WRITE);
+                }
+                let buffer = {
+                    let handles = caller.handles.lock();
+                    match handles.get(handle, needed) {
+                        Ok(Object::DmaBuffer(buffer)) => Arc::clone(buffer),
+                        Ok(_) => return Err(Errno::EPERM),
+                        Err(Errno::EACCES) => return Err(Errno::EPERM),
+                        Err(error) => return Err(error),
+                    }
+                };
+                let end = offset.checked_add(len).ok_or(Errno::EINVAL)?;
+                if end > buffer.len() {
+                    return Err(Errno::EINVAL);
+                }
+                Ok(MappedObject::Dma(buffer))
             }
         }
     }

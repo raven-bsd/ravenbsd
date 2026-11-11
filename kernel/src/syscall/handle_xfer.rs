@@ -58,6 +58,8 @@ pub fn clone_transferable(
         #[cfg(target_arch = "x86_64")]
         Ok(Object::BootBlob(object)) => Object::BootBlob(Arc::clone(object)),
         #[cfg(target_arch = "x86_64")]
+        Ok(Object::DmaBuffer(object)) => Object::DmaBuffer(Arc::clone(object)),
+        #[cfg(target_arch = "x86_64")]
         Ok(Object::SchemeFile(object)) => Object::SchemeFile(Arc::clone(object)),
         #[cfg(target_arch = "x86_64")]
         Ok(Object::SchemeServer(object)) => Object::SchemeServer(Arc::clone(object)),

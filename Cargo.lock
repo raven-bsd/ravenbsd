@@ -557,6 +557,8 @@ name = "raven-s21-edu"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-elf",
+ "raven-initfs",
  "raven-rt",
 ]
 

@@ -19,6 +19,8 @@ path = "src/main.rs"
 
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
+raven-elf = { path = "../../../crates/raven-elf" }
+raven-initfs = { path = "../../../crates/raven-initfs" }
 raven-rt = { path = "../../../userland/rt", default-features = false }
 
 [lints]

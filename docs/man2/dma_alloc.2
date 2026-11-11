@@ -1,21 +1,75 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt DMA_ALLOC 2
 .Os RavenBSD
 .Sh NAME
 .Nm dma_alloc
-.Nd allocates device-visible memory
+.Nd allocate device-visible memory
 .Sh SYNOPSIS
-See the
-.Pa raven-abi
-crate (syscall number 0x72).
+.Fn dma_alloc root_dev len align mask_bits flags
 .Sh DESCRIPTION
-The
-.Nm
-system call is part of RavenBSD ABI v1. It is implemented by ticket S21b; this page is the contract placeholder and will be
-completed when S21b lands. The authoritative signature is the doc comment of the syscall in the
-.Pa raven-abi
-crate.
+.Nm allocates a physically contiguous, zero-filled buffer a device can reach.
+.Fa root_dev
+must be the
+.Em RootDevice
+capability with
+.Dv ADMIN
+(as for
+.Xr mmio_create 2 ) .
+.Bl -bullet
+.It
+.Fa len
+is a non-zero multiple of 4096.
+.It
+.Fa align
+is a power of two of at least 4096; 0 means 4096.  The first byte of the
+buffer is aligned to it.
+.It
+.Fa mask_bits
+bounds the bus address: every byte of the buffer lies below
+.Li 1 << mask_bits .
+20..64 are accepted; 0 means 32.
+.It
+.Fa flags
+is 0 or
+.Dv NON_CACHEABLE
+(1).
+.El
+The returned handle carries
+.Dv READ ,
+.Dv WRITE ,
+.Dv MAP ,
+.Dv DUP
+and
+.Dv TRANSFER .
+It is mapped with
+.Xr map 2 :
+cached write-back by default (coherent on x86-64) and uncached when the
+buffer was created with
+.Dv NON_CACHEABLE .
+The frames are returned when the last handle closes or the owning process
+exits.
+.Pp
+Each process may hold at most 64 MiB and the whole system at most 25 % of
+RAM; further allocations fail with
+.Er ENOMEM .
+The kernel does not claim DMA isolation:
+.Xr dma_info 2
+reports the buffer as
+.Dv UNPROTECTED
+on hardware without an IOMMU.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EPERM
+No root capability with
+.Dv ADMIN .
+.It Er EINVAL
+Bad length, alignment, mask or unknown flags.
+.It Er ENOMEM
+No contiguous range fits the mask, or a budget is exhausted.
+.It Er EMFILE
+The process handle table is full.
+.El
 .Sh STANDARDS
 RavenBSD ABI v1.

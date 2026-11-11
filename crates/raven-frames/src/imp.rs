@@ -69,13 +69,33 @@ impl<'a> FrameAllocator<'a> {
 
     /// Allocate `n` contiguous frames whose absolute first frame is `align_frames`-aligned.
     pub fn alloc_contiguous(&mut self, n: u64, align_frames: u64) -> Option<u64> {
+        self.alloc_contiguous_bounded(
+            n,
+            align_frames,
+            self.base_frame.saturating_add(self.frame_count),
+        )
+    }
+
+    /// Allocate `n` contiguous frames whose absolute first frame is `align_frames`-aligned and
+    /// whose last frame is below `max_frame`.
+    ///
+    /// The upper bound is inclusive of `max_frame - 1`: the whole run lies in
+    /// `[base_frame, max_frame)`. This is how callers express device DMA masks.
+    pub fn alloc_contiguous_bounded(
+        &mut self,
+        n: u64,
+        align_frames: u64,
+        max_frame: u64,
+    ) -> Option<u64> {
         if n == 0 || align_frames == 0 || n > self.frame_count {
             return None;
         }
+        // The highest absolute start that still leaves every frame below `max_frame`.
+        let max_start = max_frame.checked_sub(n)?;
         let mut start = 0u64;
         while start.checked_add(n)? <= self.frame_count {
             let absolute = self.base_frame.checked_add(start)?;
-            if absolute % align_frames == 0 {
+            if absolute <= max_start && absolute % align_frames == 0 {
                 let mut offset = 0u64;
                 while offset < n && self.is_free(start + offset) {
                     offset += 1;
@@ -334,6 +354,193 @@ mod tests {
         let mut allocator = allocator(&mut bitmap, 64);
         assert_eq!(allocator.alloc_contiguous(0, 1), None);
         assert_eq!(allocator.alloc_contiguous(1, 0), None);
+    }
+
+    #[test]
+    fn bounded_run_stays_below_the_bound() {
+        let mut bitmap = [0u64; 2];
+        let mut allocator = allocator(&mut bitmap, 128);
+        let start = allocator.alloc_contiguous_bounded(4, 1, 8).unwrap();
+        assert!(start < 8);
+        assert!(start + 4 <= 8);
+    }
+
+    #[test]
+    fn bounded_run_may_end_exactly_at_the_bound() {
+        let mut bitmap = [0u64; 2];
+        let mut allocator = allocator(&mut bitmap, 128);
+        assert_eq!(allocator.alloc_contiguous_bounded(4, 1, 4), Some(0));
+    }
+
+    #[test]
+    fn bounded_run_crossing_the_bound_returns_none() {
+        let mut bitmap = [0u64; 2];
+        let mut allocator = allocator(&mut bitmap, 128);
+        assert_eq!(allocator.alloc_contiguous_bounded(4, 1, 3), None);
+    }
+
+    #[test]
+    fn bounded_run_larger_than_the_bound_returns_none() {
+        let mut bitmap = [0u64; 2];
+        let mut allocator = allocator(&mut bitmap, 128);
+        assert_eq!(allocator.alloc_contiguous_bounded(8, 1, 4), None);
+    }
+
+    #[test]
+    fn bounded_zero_max_frame_returns_none() {
+        let mut bitmap = [0u64; 2];
+        let mut allocator = allocator(&mut bitmap, 128);
+        assert_eq!(allocator.alloc_contiguous_bounded(1, 1, 0), None);
+    }
+
+    #[test]
+    fn bounded_zero_arguments_return_none() {
+        let mut bitmap = [0u64; 2];
+        let mut allocator = allocator(&mut bitmap, 128);
+        assert_eq!(allocator.alloc_contiguous_bounded(0, 1, 128), None);
+        assert_eq!(allocator.alloc_contiguous_bounded(1, 0, 128), None);
+    }
+
+    #[test]
+    fn bounded_honours_alignment_inside_the_bound() {
+        let mut bitmap = [0u64; 2];
+        let mut allocator = allocator(&mut bitmap, 128);
+        allocator.mark_reserved(0, 1);
+        assert_eq!(allocator.alloc_contiguous_bounded(2, 4, 16), Some(4));
+    }
+
+    #[test]
+    fn bounded_skips_an_alignment_that_crosses_the_bound() {
+        let mut first_bitmap = [0u64; 2];
+        let mut first = allocator(&mut first_bitmap, 128);
+        first.mark_reserved(0, 8);
+        // Only aligned starts at or below 20-8=12 remain; 8 works.
+        assert_eq!(first.alloc_contiguous_bounded(8, 8, 20), Some(8));
+
+        let mut second_bitmap = [0u64; 2];
+        let mut second = allocator(&mut second_bitmap, 128);
+        second.mark_reserved(0, 8);
+        // Bound 15 allows only the reserved start 0: no run.
+        assert_eq!(second.alloc_contiguous_bounded(8, 8, 15), None);
+    }
+
+    #[test]
+    fn bounded_skips_holes_inside_the_bound() {
+        let mut bitmap = [0u64; 2];
+        let mut allocator = allocator(&mut bitmap, 128);
+        allocator.mark_reserved(2, 2);
+        // Only starts at or below 6-4=2 are allowed; every 4-frame window there hits the hole.
+        assert_eq!(allocator.alloc_contiguous_bounded(4, 1, 6), None);
+        assert_eq!(allocator.alloc_contiguous_bounded(4, 1, 128), Some(4));
+    }
+
+    #[test]
+    fn bounded_marks_the_run_allocated() {
+        let mut bitmap = [0u64; 2];
+        let mut allocator = allocator(&mut bitmap, 128);
+        let start = allocator.alloc_contiguous_bounded(3, 1, 64).unwrap();
+        assert_eq!(allocator.alloc_contiguous_bounded(3, 1, 64), Some(3));
+        for frame in start..start + 3 {
+            assert_eq!(allocator.free(frame), Ok(()));
+        }
+        assert_eq!(allocator.alloc_contiguous_bounded(3, 1, 64), Some(start));
+    }
+
+    #[test]
+    fn bounded_exhaustion_returns_none() {
+        let mut bitmap = [0u64; 1];
+        let mut allocator = allocator(&mut bitmap, 64);
+        allocator.mark_reserved(8, 56);
+        assert_eq!(allocator.alloc_contiguous_bounded(8, 1, 8), Some(0));
+        assert_eq!(allocator.alloc_contiguous_bounded(1, 1, 8), None);
+    }
+
+    #[test]
+    fn bounded_free_coalesces_adjacent_runs() {
+        let mut bitmap = [0u64; 2];
+        let mut allocator = allocator(&mut bitmap, 128);
+        let first = allocator.alloc_contiguous_bounded(2, 1, 128).unwrap();
+        let second = allocator.alloc_contiguous_bounded(2, 1, 128).unwrap();
+        assert_eq!(allocator.free(first), Ok(()));
+        assert_eq!(allocator.free(first + 1), Ok(()));
+        assert_eq!(allocator.free(second), Ok(()));
+        assert_eq!(allocator.free(second + 1), Ok(()));
+        // The whole four-frame span must be reallocatable as one run.
+        assert_eq!(allocator.alloc_contiguous_bounded(4, 1, 128), Some(first));
+    }
+
+    #[test]
+    fn bounded_no_double_allocation_of_the_same_frame() {
+        let mut bitmap = [0u64; 2];
+        let mut allocator = allocator(&mut bitmap, 128);
+        let first = allocator.alloc_contiguous_bounded(1, 1, 128).unwrap();
+        let _ = allocator.alloc_contiguous_bounded(1, 1, 128).unwrap();
+        assert_ne!(allocator.alloc_contiguous_bounded(1, 1, 128), Some(first));
+    }
+
+    #[test]
+    fn bounded_honours_the_base_frame() {
+        let mut bitmap = [0u64; 1];
+        let mut allocator = FrameAllocator::new(&mut bitmap, 100, 32);
+        allocator.mark_usable(100, 32);
+        assert_eq!(allocator.alloc_contiguous_bounded(4, 1, 104), Some(100));
+        assert_eq!(allocator.alloc_contiguous_bounded(4, 1, 103), None);
+    }
+
+    #[test]
+    fn bounded_updates_the_rolling_hint() {
+        let mut bitmap = [0u64; 2];
+        let mut allocator = allocator(&mut bitmap, 128);
+        let start = allocator.alloc_contiguous_bounded(2, 1, 128).unwrap();
+        assert_eq!(allocator.alloc(), Some(start + 2));
+    }
+
+    #[test]
+    fn bounded_matches_unbounded_when_the_bound_is_total() {
+        let mut first_bitmap = [0u64; 4];
+        let mut first = allocator(&mut first_bitmap, 256);
+        let mut second_bitmap = [0u64; 4];
+        let mut second = allocator(&mut second_bitmap, 256);
+        assert_eq!(
+            first.alloc_contiguous(5, 4),
+            second.alloc_contiguous_bounded(5, 4, 256)
+        );
+    }
+
+    #[test]
+    fn bounded_random_model_never_hands_out_frames_twice() {
+        let mut bitmap = [0u64; 8];
+        let mut allocator = allocator(&mut bitmap, 512);
+        let mut free: BTreeSet<u64> = (0..512).collect();
+        let mut allocated: BTreeSet<u64> = BTreeSet::new();
+        let mut state = 0x0BAD_5EED_F00D_CAFEu64;
+        for _ in 0..2000 {
+            let n = xorshift(&mut state) % 8 + 1;
+            let align = 1u64 << (xorshift(&mut state) % 4);
+            let max = 512 - xorshift(&mut state) % 64;
+            let Some(start) = allocator.alloc_contiguous_bounded(n, align, max) else {
+                continue;
+            };
+            assert!(start.saturating_add(n) <= max);
+            assert_eq!(start % align, 0);
+            for frame in start..start + n {
+                assert!(free.remove(&frame), "double allocation of {frame}");
+                assert!(allocated.insert(frame));
+            }
+            if xorshift(&mut state) & 1 == 0 {
+                for frame in start..start + n {
+                    assert_eq!(allocator.free(frame), Ok(()));
+                    allocated.remove(&frame);
+                    free.insert(frame);
+                }
+            }
+        }
+        while let Some(frame) = allocator.alloc() {
+            assert!(free.remove(&frame));
+            assert!(allocated.insert(frame));
+        }
+        assert!(free.is_empty());
+        assert_eq!(allocated.len(), 512);
     }
 
     #[test]
