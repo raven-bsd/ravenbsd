@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Restart allowlist for the one-shot profile gate (`cargo xtask check`, step "profiles").
+#
+# Every profile that extends `shell` and is booted by a qtest which expects the guest to exit
+# must pin every resident service of the shell profile to `restart = "never"` in its rc.conf.
+# Without the pin, `svcd` in `exit_when_settled` mode keeps waiting for a restartable service and
+# the case never reaches `init exited (0)` (this is exactly what K17 ramfsd and K62 initfsd did).
+#
+# A service may keep a restartable policy only through an entry here. Every entry needs a
+# `reason`; the lead reviews this file like any other code. `profiles` narrows the exemption to
+# the named profiles; without it the exemption applies to every one-shot profile.
+#
+# [[allow]]
+# service = "example"
+# reason = "why the restartable policy is safe for a one-shot case"
+# profiles = ["core-test"]
