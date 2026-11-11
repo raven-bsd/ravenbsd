@@ -358,4 +358,4 @@ expected = [
   { kind = "sample", rtt_ms = 100, srtt_q8 = 800, rttvar_q8 = 96, rto_computed_ms = 148, rto_ms = 148 },
 ]
 
-# 22 sequences. 1..6 timeline steps each, 70 samples and 10 timeouts in total.
+# 22 sequences. 1..6 timeline steps each, 54 samples and 12 timeouts in total.
