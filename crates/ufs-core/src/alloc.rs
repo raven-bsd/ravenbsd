@@ -409,7 +409,7 @@ fn write_u32(buf: &mut [u8], off: usize, value: u32) -> Result<(), UfsError> {
     Ok(())
 }
 
-fn csum_total(cs: &[Csum32]) -> Csum {
+pub(crate) fn csum_total(cs: &[Csum32]) -> Csum {
     let mut total = Csum::default();
     for entry in cs {
         total.ndir += i64::from(entry.ndir);
@@ -437,11 +437,33 @@ impl<D: BlockIo> Ufs<D> {
     }
 
     fn load_cg(&mut self, cg: u32) -> Result<CylinderGroup, UfsError> {
-        CylinderGroup::read(&mut self.disk, &self.fs, cg)
+        if self.journal.is_none() {
+            return CylinderGroup::read(&mut self.disk, &self.fs, cg);
+        }
+        let offset = self
+            .fs
+            .cgstart(cg)?
+            .checked_add(self.fs.cblkno as u64)
+            .and_then(|frag| frag.checked_mul(u64::from(self.fs.fsize)))
+            .ok_or(UfsError::Corrupt("cylinder group offset"))?;
+        let mut raw = vec![0u8; self.fs.cgsize as usize];
+        self.read_disk_at(offset, &mut raw)?;
+        CylinderGroup::decode(raw, cg, &self.fs)
     }
 
     fn store_cg(&mut self, cg: u32, group: &mut CylinderGroup) -> Result<(), UfsError> {
-        group.write(&mut self.disk, &self.fs)?;
+        if self.journal.is_none() {
+            group.write(&mut self.disk, &self.fs)?;
+        } else {
+            group.encode()?;
+            let offset = self
+                .fs
+                .cgstart(cg)?
+                .checked_add(self.fs.cblkno as u64)
+                .and_then(|frag| frag.checked_mul(u64::from(self.fs.fsize)))
+                .ok_or(UfsError::Corrupt("cylinder group offset"))?;
+            self.write_metadata(offset, &group.raw)?;
+        }
         if !self.dirty_cgs.contains(&cg) {
             self.dirty_cgs.push(cg);
         }
@@ -622,6 +644,9 @@ impl<D: BlockIo> Ufs<D> {
         }
         self.update_group(cg, &mut group)?;
         self.inodes.retain(|entry| entry.ino != ino);
+        if let Some(journal) = self.journal.as_mut() {
+            journal.forget_inode(ino);
+        }
         Ok(())
     }
 
@@ -709,18 +734,36 @@ impl<D: BlockIo> Ufs<D> {
         if self.read_only {
             return Ok(());
         }
-        let dirty = core::mem::take(&mut self.dirty_cgs);
-        for cg in dirty {
-            let mut group = self.load_cg(cg)?;
-            group.write(&mut self.disk, &self.fs)?;
+        self.sync_staging = true;
+        let result = self.sync_metadata();
+        self.sync_staging = false;
+        result
+    }
+
+    fn sync_metadata(&mut self) -> Result<(), UfsError> {
+        self.dirty_cgs.clear();
+        let mut summary_bytes = vec![0u8; self.fs.cssize as usize];
+        for (index, entry) in self.cs.iter().enumerate() {
+            let offset = index * 16;
+            if let Some(slot) = summary_bytes.get_mut(offset..offset + 16) {
+                slot.copy_from_slice(&entry.to_le_bytes());
+            }
         }
-        ffs_vfsops::write_summaries(&mut self.disk, &self.fs, &self.cs)?;
+        let summary_off = u64::from(self.fs.csaddr)
+            .checked_mul(u64::from(self.fs.fsize))
+            .ok_or(UfsError::BadSuperblock("summary offset"))?;
+        if self.journal.is_some() {
+            self.write_metadata(summary_off, &summary_bytes)?;
+        } else {
+            ffs_vfsops::write_summaries(&mut self.disk, &self.fs, &self.cs)?;
+        }
         self.fs.cstotal = csum_total(&self.cs);
         self.fs.write_cstotal_raw();
         self.fs.set_time_raw(self.fs.time);
         self.fs.set_clean_raw(crate::fs::FS_ISCLEAN);
         self.fs.clear_fmod_raw();
-        ffs_vfsops::write_superblock(&mut self.disk, &self.fs)?;
+        self.stage_superblock()?;
+        self.commit_journal()?;
         self.disk.flush().map_err(|_| UfsError::Io)
     }
 
@@ -1098,9 +1141,8 @@ impl<D: BlockIo> Ufs<D> {
     fn write_new_inode(&mut self, ino: Ino, mode: u16) -> Result<(), UfsError> {
         let (fsba, slot) = self.fs.ino_to_fsba(ino)?;
         let mut block = vec![0u8; self.fs.bsize as usize];
-        self.disk
-            .read_at(self.fs.frag_offset(fsba)?, &mut block)
-            .map_err(|_| UfsError::Io)?;
+        let block_off = self.fs.frag_offset(fsba)?;
+        self.read_disk_at(block_off, &mut block)?;
         let offset = slot
             .checked_mul(self.fs.inode_size())
             .ok_or(UfsError::Corrupt("inode slot"))?;
@@ -1115,6 +1157,9 @@ impl<D: BlockIo> Ufs<D> {
         raw[gen_off..gen_off + 4].copy_from_slice(&generation);
         self.write_block_at(fsba, &block)?;
         self.inodes.retain(|entry| entry.ino != ino);
+        if let Some(journal) = self.journal.as_mut() {
+            journal.note_inode(ino, u32::from(mode));
+        }
         Ok(())
     }
 
@@ -1123,7 +1168,7 @@ impl<D: BlockIo> Ufs<D> {
         if data.len() != self.fs.bsize as usize {
             return Err(UfsError::Invalid);
         }
-        self.disk.write_at(offset, data).map_err(|_| UfsError::Io)?;
+        self.write_metadata(offset, data)?;
         self.blocks.retain(|entry| entry.frag != frag);
         Ok(())
     }

@@ -9,6 +9,8 @@ pub mod irq;
 pub mod kmain;
 pub mod mmu;
 pub mod percpu;
+#[cfg(raven_pi4)]
+pub mod pi4;
 pub mod selftest;
 pub mod serial;
 pub mod start;

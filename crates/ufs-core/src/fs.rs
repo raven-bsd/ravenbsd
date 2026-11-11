@@ -63,6 +63,13 @@ pub(crate) const FS_ISCLEAN: u8 = 0x01;
 pub(crate) const FS_WASCLEAN: u8 = 0x02;
 pub(crate) const FS_FLAGS_UPDATED: u8 = 0x80;
 pub(crate) const FS_SWAPPED: u32 = 0x8000_0000;
+pub(crate) const FS_DOWAPBL: u32 = 0x100;
+
+/// WAPBL on-disk version and journal location types (`sys/ufs/ufs/ufs_wapbl.h`).
+pub(crate) const UFS_WAPBL_VERSION: u8 = 1;
+pub(crate) const UFS_WAPBL_JOURNALLOC_NONE: u8 = 0;
+pub(crate) const UFS_WAPBL_JOURNALLOC_END_PARTITION: u8 = 1;
+pub(crate) const UFS_WAPBL_JOURNALLOC_IN_FILESYSTEM: u8 = 2;
 
 const O_SBLKNO: usize = 8;
 const O_CBLKNO: usize = 12;
@@ -106,6 +113,10 @@ const O_FMOD: usize = 208;
 const O_CLEAN: usize = 209;
 const O_OLD_FLAGS: usize = 211;
 const O_FLAGS: usize = 1312;
+const O_JOURNAL_VERSION: usize = 864;
+const O_JOURNAL_LOCATION: usize = 865;
+const O_JOURNAL_FLAGS: usize = 868;
+const O_JOURNAL_LOCS: usize = 872;
 const O_CONTIGSUMSIZE: usize = 1316;
 const O_MAXSYMLINKLEN: usize = 1320;
 const O_MAGIC: usize = 1372;
@@ -209,6 +220,11 @@ pub(crate) struct Superblock {
     pub(crate) avgfpdir: u32,
     pub(crate) contigsumsize: i32,
     pub(crate) old_flags: u8,
+    pub(crate) flags: u32,
+    pub(crate) journal_version: u8,
+    pub(crate) journal_location: u8,
+    pub(crate) journal_flags: u32,
+    pub(crate) journals: [u64; 4],
     pub(crate) raw: Vec<u8>,
 }
 
@@ -309,6 +325,16 @@ impl Superblock {
             avgfpdir: read_u32(buf, O_AVGFPDIR)?,
             contigsumsize: read_i32(buf, O_CONTIGSUMSIZE)?,
             old_flags,
+            flags,
+            journal_version: read_u8(buf, O_JOURNAL_VERSION)?,
+            journal_location: read_u8(buf, O_JOURNAL_LOCATION)?,
+            journal_flags: read_u32(buf, O_JOURNAL_FLAGS)?,
+            journals: [
+                read_u64(buf, O_JOURNAL_LOCS)?,
+                read_u64(buf, O_JOURNAL_LOCS + 8)?,
+                read_u64(buf, O_JOURNAL_LOCS + 16)?,
+                read_u64(buf, O_JOURNAL_LOCS + 24)?,
+            ],
             raw: buf.to_vec(),
         };
         Ok(sb)
@@ -332,6 +358,20 @@ impl Superblock {
     /// Whether the filesystem is marked clean (`FS_ISCLEAN` or `FS_WASCLEAN`).
     pub(crate) fn is_clean(&self) -> bool {
         self.clean & (FS_ISCLEAN | FS_WASCLEAN) != 0
+    }
+
+    /// Whether the superblock records a WAPBL journal.
+    pub(crate) fn has_journal(&self) -> bool {
+        self.journal_version == UFS_WAPBL_VERSION
+            && self.journal_location != UFS_WAPBL_JOURNALLOC_NONE
+    }
+
+    /// Update the on-disk `fs_flags` word and its in-memory copy.
+    pub(crate) fn set_flags_raw(&mut self, flags: u32) {
+        self.flags = flags;
+        if let Some(bytes) = self.raw.get_mut(O_FLAGS..O_FLAGS + 4) {
+            bytes.copy_from_slice(&flags.to_le_bytes());
+        }
     }
 
     /// Base fragment of cylinder group `cg`.

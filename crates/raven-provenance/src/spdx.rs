@@ -15,6 +15,18 @@ pub(crate) const COPYRIGHT_LINE: &str = "Copyright (c) 2026, Bo Maryniuk and Rav
 const SPDX_TAG: &str = "SPDX-License-Identifier:";
 const MAX_ALTERNATIVES: usize = 256;
 
+/// Extensions checked everywhere in the tree.
+const CORE_EXTENSIONS: &[&str] = &["rs", "S", "s", "ld", "sh", "toml", "md", "yml"];
+
+/// Roots whose non-Rust sources are checked as well.
+const ADDON_ROOTS: &[&str] = &["addons/", "tools/", "tests/"];
+
+/// Extensions checked only under [`ADDON_ROOTS`]: add-on C, Python, Go and YAML sources.
+///
+/// `.json` is deliberately absent: the format has no comment syntax, so a header cannot be
+/// carried there and generated result files could never comply.
+const ADDON_EXTENSIONS: &[&str] = &["c", "h", "py", "go", "yaml"];
+
 /// Comment syntax used when inserting a header.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CommentStyle {
@@ -40,12 +52,22 @@ impl CommentStyle {
 }
 
 /// Whether the file type is subject to the SPDX header rule.
+///
+/// Core source and documentation types are checked everywhere. Add-on sources (C, Python, Go,
+/// YAML) are checked only under the add-on roots, where hand-written non-Rust code lives.
 pub(crate) fn is_checked_file(path: &str) -> bool {
-    is_makefile(path)
-        || matches!(
-            Path::new(path).extension().and_then(|ext| ext.to_str()),
-            Some("rs" | "S" | "s" | "ld" | "sh" | "toml" | "md" | "yml")
-        )
+    if is_makefile(path) {
+        return true;
+    }
+    let Some(extension) = Path::new(path).extension().and_then(|ext| ext.to_str()) else {
+        return false;
+    };
+    CORE_EXTENSIONS.contains(&extension)
+        || (is_addon_source(path) && ADDON_EXTENSIONS.contains(&extension))
+}
+
+fn is_addon_source(path: &str) -> bool {
+    ADDON_ROOTS.iter().any(|root| path.starts_with(root))
 }
 
 /// Comment style for a checked file type.
@@ -54,9 +76,9 @@ pub(crate) fn comment_style(path: &str) -> Option<CommentStyle> {
         return Some(CommentStyle::LineHash);
     }
     match Path::new(path).extension().and_then(|ext| ext.to_str())? {
-        "rs" | "S" | "s" => Some(CommentStyle::LineSlash),
-        "sh" | "toml" | "yml" => Some(CommentStyle::LineHash),
-        "ld" => Some(CommentStyle::BlockC),
+        "rs" | "S" | "s" | "go" => Some(CommentStyle::LineSlash),
+        "sh" | "toml" | "yml" | "yaml" | "py" => Some(CommentStyle::LineHash),
+        "ld" | "c" | "h" => Some(CommentStyle::BlockC),
         "md" => Some(CommentStyle::Html),
         _ => None,
     }
@@ -412,6 +434,46 @@ mod tests {
     }
 
     #[test]
+    fn addon_extensions_are_checked_only_under_the_addon_roots() {
+        for path in [
+            "addons/foo/bar.c",
+            "addons/foo/bar.h",
+            "tools/ufs-oracle/audit.py",
+            "tools/linux-corpus/programs/hello.go",
+            "tests/bench/load.yaml",
+            "tests/fixtures/foo/build.sh",
+        ] {
+            assert!(is_checked_file(path), "{path} should be checked");
+        }
+        // The same extensions outside the add-on roots are not part of the contract.
+        for path in ["bar.c", "src/bar.h", "crates/foo/bar.py", "docs/bar.yaml"] {
+            assert!(!is_checked_file(path), "{path} should not be checked");
+        }
+        // JSON has no comment syntax, so a header cannot be required there.
+        for path in [
+            "tests/net/results/syn.json",
+            "tools/bench-host/results/x.json",
+        ] {
+            assert!(!is_checked_file(path), "{path} should not be checked");
+        }
+    }
+
+    #[test]
+    fn addon_comment_styles_follow_the_language() {
+        assert_eq!(
+            comment_style("addons/foo/bar.c"),
+            Some(CommentStyle::BlockC)
+        );
+        assert_eq!(
+            comment_style("addons/foo/bar.h"),
+            Some(CommentStyle::BlockC)
+        );
+        assert_eq!(comment_style("tools/x.py"), Some(CommentStyle::LineHash));
+        assert_eq!(comment_style("tools/x.go"), Some(CommentStyle::LineSlash));
+        assert_eq!(comment_style("tests/x.yaml"), Some(CommentStyle::LineHash));
+    }
+
+    #[test]
     fn spdx_within_five_lines_is_found() {
         let content = "line\n// SPDX-License-Identifier: MIT\n";
         assert_eq!(find_spdx(content, 5).as_deref(), Some("MIT"));
@@ -527,6 +589,22 @@ mod tests {
         assert!(updated.starts_with(&format!(
             "/* SPDX-License-Identifier: {PROJECT_LICENSE} */\n"
         )));
+    }
+
+    #[test]
+    fn fix_treats_addon_sources_by_language() {
+        for path in ["addons/foo/bar.c", "addons/foo/bar.h"] {
+            let updated = fixed_content(path, "int x;\n").unwrap();
+            assert!(updated.starts_with(&format!(
+                "/* SPDX-License-Identifier: {PROJECT_LICENSE} */\n"
+            )));
+        }
+        let updated = fixed_content("tools/x.py", "#!/usr/bin/env python3\nprint(1)\n").unwrap();
+        assert!(updated.starts_with("#!/usr/bin/env python3\n# SPDX-License-Identifier:"));
+        let updated = fixed_content("tools/x.go", "package main\n").unwrap();
+        assert!(updated.starts_with(&format!("// SPDX-License-Identifier: {PROJECT_LICENSE}\n")));
+        let updated = fixed_content("tests/x.yaml", "key: value\n").unwrap();
+        assert!(updated.starts_with(&format!("# SPDX-License-Identifier: {PROJECT_LICENSE}\n")));
     }
 
     #[test]

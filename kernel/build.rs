@@ -17,11 +17,16 @@ fn main() {
     let arch = env::var("CARGO_CFG_TARGET_ARCH").expect("CARGO_CFG_TARGET_ARCH must be set");
     let manifest_dir =
         PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set"));
+    let pi4 = arch == "aarch64" && env::var_os("RAVEN_PI4").is_some();
 
     let (linker_script, expected) = match arch.as_str() {
         "x86_64" => (
             "linker/x86_64.ld",
             raven_abi::layout::x86_64::KERNEL_IMAGE_BASE + IMAGE_OFFSET,
+        ),
+        "aarch64" if pi4 => (
+            "linker/aarch64-pi4.ld",
+            raven_abi::layout::aarch64::KERNEL_IMAGE_BASE + IMAGE_OFFSET,
         ),
         "aarch64" => (
             "linker/aarch64.ld",
@@ -35,6 +40,11 @@ fn main() {
         manifest_dir.join(linker_script).display()
     );
     println!("cargo:rerun-if-changed={linker_script}");
+    if pi4 {
+        println!("cargo:rustc-cfg=raven_pi4");
+    }
+    println!("cargo:rustc-check-cfg=cfg(raven_pi4)");
+    println!("cargo:rerun-if-env-changed=RAVEN_PI4");
     println!("cargo:rustc-link-arg-bins=-zmax-page-size=4096");
     println!("cargo:rustc-link-arg-bins=--gc-sections");
     // The workspace release profile strips all symbols, but the S01 acceptance checks `nm` and

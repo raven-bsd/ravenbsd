@@ -33,17 +33,24 @@ impl Violation {
 pub struct CheckOptions {
     /// Repository root to inspect.
     pub root: PathBuf,
-    /// Optional donors lock file. When `None`, `RAVEN_DONORS_LOCK` or the sibling
-    /// `ravenbsd-resources/donors.lock` checkout is used.
+    /// Optional donors lock file. When `None`, `RAVEN_DONORS_LOCK` or the nearest
+    /// `ravenbsd-resources/donors.lock` found from the root upwards is used.
     pub donors_lock: Option<PathBuf>,
+    /// Treat a dependency scan that cannot run as a violation instead of a warning.
+    ///
+    /// The gate (`make check`) sets this; the plain CLI does not, so a missing cargo cache still
+    /// produces a warning there.
+    pub strict: bool,
 }
 
 impl CheckOptions {
-    /// Create options for `root` with the default donors lock resolution.
+    /// Create options for `root` with the default donors lock resolution and warnings for a
+    /// broken dependency scan.
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self {
             root: root.into(),
             donors_lock: None,
+            strict: false,
         }
     }
 }

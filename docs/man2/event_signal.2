@@ -1,21 +1,20 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt EVENT_SIGNAL 2
 .Os RavenBSD
 .Sh NAME
 .Nm event_signal
-.Nd signals a user event
+.Nd signal a user-event doorbell
 .Sh SYNOPSIS
-See the
-.Pa raven-abi
-crate (syscall number 0x5D).
+.Fn event_signal event value
 .Sh DESCRIPTION
-The
-.Nm
-system call is part of RavenBSD ABI v1. It is implemented by ticket S26; this page is the contract placeholder and will be
-completed when S26 lands. The authoritative signature is the doc comment of the syscall in the
-.Pa raven-abi
-crate.
+.Nm sets the doorbell level and wakes event-queue waiters.  The value is
+reserved.  The level is consumed when a level-triggered wait reports it.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EPERM
+The handle lacks SIGNAL rights.
+.El
 .Sh STANDARDS
 RavenBSD ABI v1.

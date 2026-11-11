@@ -39,11 +39,25 @@ pub struct ObjectMapping {
     pub shared: bool,
 }
 
+/// One device-window mapping: the physical pages belong to hardware and are never freed.
+#[derive(Clone, Copy)]
+struct MmioMapping {
+    start: u64,
+    len: u64,
+}
+
+impl MmioMapping {
+    fn contains(&self, address: u64) -> bool {
+        address >= self.start && address < self.start.saturating_add(self.len)
+    }
+}
+
 /// A user address space: page tables, VMAs and memory-object ownership.
 pub struct UserAddressSpace {
     aspace: AddressSpace,
     vmas: Vmas,
     objects: Vec<ObjectMapping>,
+    mmio: Vec<MmioMapping>,
 }
 
 impl UserAddressSpace {
@@ -53,6 +67,7 @@ impl UserAddressSpace {
             aspace,
             vmas: Vmas::new(USER_MIN..USER_END),
             objects: Vec::new(),
+            mmio: Vec::new(),
         }
     }
 
@@ -238,6 +253,71 @@ impl UserAddressSpace {
         Ok(())
     }
 
+    /// Map a device window at `physical` for `len` bytes, uncached and never executable.
+    ///
+    /// The physical pages belong to hardware: unmapping releases the page-table entries but never
+    /// returns them to the frame allocator.
+    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S21a device mappings are x86-64.
+    pub fn map_mmio(
+        &mut self,
+        vaddr: u64,
+        len: u64,
+        physical: u64,
+        writable: bool,
+    ) -> Result<(), Errno> {
+        if len == 0 || !vaddr.is_multiple_of(PAGE_SIZE) || !physical.is_multiple_of(PAGE_SIZE) {
+            return Err(Errno::EINVAL);
+        }
+        let protection = if writable {
+            (prot::READ | prot::WRITE) as u8
+        } else {
+            prot::READ as u8
+        };
+        self.vmas
+            .insert(vaddr, len, protection, Backing::Anonymous)
+            .map_err(vma_errno)?;
+        let pages = pages_in(len)?;
+        let flags = if writable {
+            PageFlags::user_rw().union(PageFlags::mmio_attribute())
+        } else {
+            PageFlags::user_ro().union(PageFlags::mmio_attribute())
+        };
+        let mut mapped = 0u64;
+        let mut failure = None;
+        if let Ok(mut mapper) = self.aspace.mapper() {
+            let mut page = 0u64;
+            while page < pages {
+                let Some(virt) =
+                    VirtAddr::new(vaddr.saturating_add(page.saturating_mul(PAGE_SIZE)))
+                else {
+                    failure = Some(Errno::EINVAL);
+                    break;
+                };
+                let Some(address) = physical.checked_add(page.saturating_mul(PAGE_SIZE)) else {
+                    failure = Some(Errno::EINVAL);
+                    break;
+                };
+                match mapper.map(virt, PhysAddr(address), flags, PageSize::Size4K) {
+                    Ok(()) => mapped = mapped.saturating_add(1),
+                    Err(error) => {
+                        failure = Some(map_errno(error));
+                        break;
+                    }
+                }
+                page = page.saturating_add(1);
+            }
+        } else {
+            failure = Some(Errno::ENOMEM);
+        }
+        if let Some(error) = failure {
+            self.rollback_foreign(vaddr, mapped);
+            let _ = self.vmas.remove(vaddr, len);
+            return Err(error);
+        }
+        self.mmio.push(MmioMapping { start: vaddr, len });
+        Ok(())
+    }
+
     /// Remove a fully mapped range, splitting VMAs and releasing object references.
     pub fn unmap(&mut self, start: u64, len: u64) -> Result<(), Errno> {
         if len == 0 || !start.is_multiple_of(PAGE_SIZE) || !len.is_multiple_of(PAGE_SIZE) {
@@ -247,6 +327,7 @@ impl UserAddressSpace {
             return Err(Errno::EINVAL);
         }
         let pages = pages_in(len)?;
+        let mmio = self.mmio.clone();
         let mut to_free: Vec<u64> = Vec::with_capacity(usize::try_from(pages).unwrap_or(0));
         {
             let mut mapper = self.aspace.mapper().map_err(map_errno)?;
@@ -262,7 +343,8 @@ impl UserAddressSpace {
                     return Err(Errno::EINVAL);
                 };
                 let vma = self.vmas.find(virt.data()).ok_or(Errno::EINVAL)?;
-                let owns = page_owned(vma, &self.objects, virt.data(), physical.0);
+                let owns = !mmio.iter().any(|m| m.contains(virt.data()))
+                    && page_owned(vma, &self.objects, virt.data(), physical.0);
                 owned.push((virt, physical.0, owns));
                 page = page.saturating_add(1);
             }
@@ -275,6 +357,7 @@ impl UserAddressSpace {
         }
         self.vmas.remove(start, len).map_err(vma_errno)?;
         self.remove_object_range(start, len);
+        self.remove_mmio_range(start, len);
         // Do not recycle frames until every CPU has dropped its translation: a stale TLB entry
         // could otherwise reach a frame that was already handed to another address space.
         let flushed = crate::sched::smp::shootdown::flush_range(start, len);
@@ -289,6 +372,11 @@ impl UserAddressSpace {
     /// Change protections over a fully mapped range.
     pub fn protect(&mut self, start: u64, len: u64, new_prot: u8) -> Result<(), Errno> {
         if len == 0 || !start.is_multiple_of(PAGE_SIZE) || !len.is_multiple_of(PAGE_SIZE) {
+            return Err(Errno::EINVAL);
+        }
+        if self.overlaps_mmio(start, len) {
+            // Device windows carry cache attributes and rights semantics that `protect` must
+            // not silently change.
             return Err(Errno::EINVAL);
         }
         if new_prot & !(prot::MASK as u8) != 0
@@ -430,6 +518,7 @@ impl UserAddressSpace {
     pub fn free_user_frames(&mut self) {
         let vmas: Vec<Vma> = self.vmas.iter().copied().collect();
         let objects = self.objects.clone();
+        let mmio = self.mmio.clone();
         if let Ok(mut mapper) = self.aspace.mapper() {
             for vma in vmas {
                 let pages = pages_in(vma.len()).unwrap_or(0);
@@ -440,6 +529,7 @@ impl UserAddressSpace {
                         break;
                     };
                     if let Some((physical, _, _)) = mapper.translate(virt)
+                        && !mmio.iter().any(|mapping| mapping.contains(address))
                         && page_owned(vma, &objects, address, physical.0)
                     {
                         let _ = frame::free_frame(frame::PhysAddr(physical.0));
@@ -450,6 +540,7 @@ impl UserAddressSpace {
         }
         self.vmas = Vmas::new(USER_MIN..USER_END);
         self.objects.clear();
+        self.mmio.clear();
     }
 
     /// Release an address space that is currently active: free its data frames, switch back to the
@@ -519,6 +610,38 @@ impl UserAddressSpace {
             }
         }
         self.objects = next;
+    }
+
+    fn overlaps_mmio(&self, start: u64, len: u64) -> bool {
+        let end = start.saturating_add(len);
+        self.mmio
+            .iter()
+            .any(|mapping| start < mapping.start.saturating_add(mapping.len) && mapping.start < end)
+    }
+
+    fn remove_mmio_range(&mut self, start: u64, len: u64) {
+        let end = start.saturating_add(len);
+        let mut next = Vec::with_capacity(self.mmio.len().saturating_add(2));
+        for mapping in &self.mmio {
+            let mapping_end = mapping.start.saturating_add(mapping.len);
+            if mapping_end <= start || mapping.start >= end {
+                next.push(*mapping);
+                continue;
+            }
+            if mapping.start < start {
+                next.push(MmioMapping {
+                    start: mapping.start,
+                    len: start.saturating_sub(mapping.start),
+                });
+            }
+            if mapping_end > end {
+                next.push(MmioMapping {
+                    start: end,
+                    len: mapping_end.saturating_sub(end),
+                });
+            }
+        }
+        self.mmio = next;
     }
 }
 

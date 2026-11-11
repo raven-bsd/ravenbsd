@@ -218,10 +218,10 @@ fn path_problem(path: &str) -> Option<String> {
     if candidate.components().any(|component| {
         matches!(
             component,
-            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            Component::ParentDir | Component::CurDir | Component::RootDir | Component::Prefix(_)
         )
     }) {
-        return Some("`path` must not contain `..` components".to_string());
+        return Some("`path` must not contain `.` or `..` components".to_string());
     }
     None
 }
@@ -630,6 +630,36 @@ mod tests {
             .violations
             .iter()
             .any(|v| v.rule == "provenance-schema" && v.message.contains("repository-relative")));
+    }
+
+    #[test]
+    fn empty_path_is_rejected() {
+        let temp = root_with(&[]);
+        let loaded = load_text(&temp, &entry("", "A", "MIT"));
+        assert!(
+            loaded
+                .violations
+                .iter()
+                .any(|v| v.rule == "provenance-schema" && v.message.contains("must not be empty")),
+            "{:?}",
+            loaded.violations
+        );
+    }
+
+    #[test]
+    fn repository_root_path_is_rejected() {
+        for path in [".", "./", ".//"] {
+            let temp = root_with(&["crates/foo/src/lib.rs"]);
+            let loaded = load_text(&temp, &entry(path, "A", "MIT"));
+            assert!(
+                loaded
+                    .violations
+                    .iter()
+                    .any(|v| v.rule == "provenance-schema" && v.message.contains("`.`")),
+                "{path}: {:?}",
+                loaded.violations
+            );
+        }
     }
 
     #[test]

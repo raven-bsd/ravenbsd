@@ -10,6 +10,9 @@
 //! register.
 
 pub mod basic;
+#[cfg(target_arch = "x86_64")]
+pub mod driver;
+pub mod event;
 pub mod futex;
 pub mod handle_xfer;
 /// Scheme IPC remains x86-64 only: its capture path builds an encoding-specific mapper and is
@@ -59,6 +62,17 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
         Some(Syscall::UNMAP) => memory_ctl::unmap(frame),
         Some(Syscall::PROTECT) => memory_ctl::protect(frame),
         Some(Syscall::HANDLE_TRANSFER) => handle_xfer::transfer(frame),
+        #[cfg(target_arch = "x86_64")]
+        Some(call @ (Syscall::MMIO_CREATE | Syscall::BOOT_BLOB)) => driver::dispatch(call, frame),
+        Some(
+            call @ (Syscall::EVQ_CREATE
+            | Syscall::EVQ_CTL
+            | Syscall::EVQ_WAIT
+            | Syscall::TIMER_CREATE
+            | Syscall::EVENT_CREATE
+            | Syscall::EVENT_SIGNAL
+            | Syscall::TIMER_SET),
+        ) => event::dispatch(call, frame),
         #[cfg(target_arch = "x86_64")]
         Some(
             call @ (Syscall::SCHEME_REGISTER

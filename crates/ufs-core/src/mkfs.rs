@@ -91,6 +91,14 @@ struct Geometry {
     maxfilesize: u64,
     minfree: i32,
     timestamp: i64,
+    journal: Option<JournalLocation>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct JournalLocation {
+    start: u64,
+    count: u64,
+    block_size: u32,
 }
 
 fn log2(value: u32) -> u32 {
@@ -314,6 +322,7 @@ fn validate_options(opts: &MkfsOptions<'_>, device_size: u64) -> Result<Geometry
         maxfilesize,
         minfree: opts.minfree,
         timestamp: opts.timestamp,
+        journal: None,
     })
 }
 
@@ -400,10 +409,9 @@ fn build_cg(geom: &Geometry, cg: u32, root_block: Option<u32>) -> Result<CgBuild
     }
     if let Some(root) = root_block {
         let first = root as usize;
-        let count = (geom.fsize as usize).div_ceil(512).max(1);
-        for index in 0..count {
-            clear_bit(&mut free, first + index)?;
-        }
+        // The root directory is one 512-byte directory block; it occupies one fragment
+        // regardless of the fragment size.
+        clear_bit(&mut free, first)?;
     }
 
     let mut nbfree = 0i32;
@@ -443,7 +451,7 @@ fn build_cg(geom: &Geometry, cg: u32, root_block: Option<u32>) -> Result<CgBuild
         0
     };
     let nextfreeoff = if geom.contigsumsize > 0 {
-        clusteroff + (ndblk / geom.frag).div_ceil(8)
+        clusteroff + (geom.fpg / geom.frag).div_ceil(8)
     } else {
         freeoff + free_len as u32
     };
@@ -651,6 +659,15 @@ fn write_superblock(geom: &Geometry, opts: &MkfsOptions<'_>, cs: &[Csum32]) -> V
             FS_UFS1_MAGIC
         },
     );
+    if let Some(journal) = geom.journal {
+        raw[864] = crate::fs::UFS_WAPBL_VERSION;
+        raw[865] = crate::fs::UFS_WAPBL_JOURNALLOC_END_PARTITION;
+        write_u32(&mut raw, 868, 0);
+        write_u64(&mut raw, 872, journal.start);
+        write_u64(&mut raw, 880, journal.count);
+        write_u64(&mut raw, 888, u64::from(journal.block_size));
+        write_u64(&mut raw, 896, 0);
+    }
     raw
 }
 
@@ -684,9 +701,58 @@ fn dot_block(root: Ino) -> Vec<u8> {
 }
 
 /// Format `disk` and create `/lost+found`, returning a writable mount.
-pub fn format<D: BlockIo>(mut disk: D, opts: &MkfsOptions<'_>) -> Result<Ufs<D>, UfsError> {
+pub fn format<D: BlockIo>(disk: D, opts: &MkfsOptions<'_>) -> Result<Ufs<D>, UfsError> {
+    format_inner(disk, opts, 0)
+}
+
+/// Format a filesystem with a WAPBL log after it.
+///
+/// `journal_size` bytes at the end of the device are reserved for the log;
+/// the filesystem itself is smaller by that amount.  The superblock records an
+/// end-of-partition WAPBL log, so NetBSD can replay the same image.
+pub fn format_journaled<D: BlockIo>(
+    disk: D,
+    opts: &MkfsOptions<'_>,
+    journal_size: u64,
+) -> Result<Ufs<D>, UfsError> {
+    format_inner(disk, opts, journal_size)
+}
+
+fn format_inner<D: BlockIo>(
+    mut disk: D,
+    opts: &MkfsOptions<'_>,
+    journal_size: u64,
+) -> Result<Ufs<D>, UfsError> {
     let device_size = disk.size_bytes();
-    let geom = validate_options(opts, device_size)?;
+    let total = if opts.size == 0 {
+        device_size
+    } else {
+        opts.size
+    };
+    if journal_size != 0
+        && (journal_size < 1024 * 1024
+            || !journal_size.is_multiple_of(512)
+            || journal_size >= total)
+    {
+        return Err(UfsError::Invalid);
+    }
+    let mut fs_opts = *opts;
+    let journal = if journal_size == 0 {
+        None
+    } else {
+        let fs_size = total.checked_sub(journal_size).ok_or(UfsError::Invalid)?;
+        if !fs_size.is_multiple_of(u64::from(opts.block_size)) {
+            return Err(UfsError::Invalid);
+        }
+        fs_opts.size = fs_size;
+        Some(JournalLocation {
+            start: fs_size / 512,
+            count: journal_size / 512,
+            block_size: 512,
+        })
+    };
+    let mut geom = validate_options(&fs_opts, device_size)?;
+    geom.journal = journal;
     write_zeroes(&mut disk, geom.size * u64::from(geom.fsize))?;
 
     let mut cg0 = build_cg(&geom, 0, None)?;
@@ -715,7 +781,7 @@ pub fn format<D: BlockIo>(mut disk: D, opts: &MkfsOptions<'_>) -> Result<Ufs<D>,
         cgs.push(build_cg(&geom, cg, None)?);
     }
     let summaries: Vec<Csum32> = cgs.iter().map(|cg| cg.cs).collect();
-    let mut superblock = write_superblock(&geom, opts, &summaries);
+    let mut superblock = write_superblock(&geom, &fs_opts, &summaries);
 
     for cg in &cgs {
         let cgno = superblock_cg(&cg.raw)?;
@@ -800,6 +866,14 @@ pub fn format<D: BlockIo>(mut disk: D, opts: &MkfsOptions<'_>) -> Result<Ufs<D>,
     disk.write_at(SBLOCK_UFS1, &superblock)
         .map_err(|_| UfsError::Io)?;
     let _ = &mut superblock;
+    if let Some(journal) = geom.journal {
+        crate::wapbl::format_log(
+            &mut disk,
+            journal.start * u64::from(journal.block_size),
+            journal.count * u64::from(journal.block_size),
+            journal.block_size,
+        )?;
+    }
 
     let mut ufs = Ufs::mount(disk, MountOptions { read_only: false })?;
     ufs.mkdir(crate::fs::UFS_ROOTINO, b"lost+found", 0o700, 0, 0)?;

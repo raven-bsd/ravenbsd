@@ -50,9 +50,7 @@ impl<D: BlockIo> Ufs<D> {
         self.validate_extent(addr, size)?;
         let offset = self.fs.frag_offset(addr)?;
         let mut data = vec![0u8; size as usize];
-        self.disk
-            .read_at(offset, &mut data)
-            .map_err(|_| UfsError::Io)?;
+        self.read_disk_at(offset, &mut data)?;
         Ok(data)
     }
 
@@ -118,6 +116,13 @@ impl<D: BlockIo> Ufs<D> {
         crate::dinode::encode(self.fs.ufs2, raw, inode)?;
         self.write_block_at(fsba, &block)?;
         self.inodes.retain(|entry| entry.ino != ino);
+        if let Some(journal) = self.journal.as_mut() {
+            if inode.nlink == 0 {
+                journal.note_inode(ino, u32::from(inode.mode));
+            } else {
+                journal.forget_inode(ino);
+            }
+        }
         Ok(())
     }
 
@@ -147,6 +152,9 @@ impl<D: BlockIo> Ufs<D> {
         dst.copy_from_slice(target);
         self.write_block_at(fsba, &block)?;
         self.inodes.retain(|entry| entry.ino != ino);
+        if let Some(journal) = self.journal.as_mut() {
+            journal.forget_inode(ino);
+        }
         Ok(())
     }
 
@@ -225,7 +233,7 @@ impl<D: BlockIo> Ufs<D> {
                 if current == 0 {
                     current = self.alloc_block(ino, lbn, None, self.fs.bsize)?;
                     let zero = vec![0u8; self.fs.bsize as usize];
-                    self.write_frags(current, &zero)?;
+                    self.write_meta_frags(current, &zero)?;
                     ip.ib[root_index] = current;
                     ip.blocks = ip
                         .blocks
@@ -255,7 +263,7 @@ impl<D: BlockIo> Ufs<D> {
                     } else {
                         let child = self.alloc_block(ino, lbn, None, self.fs.bsize)?;
                         let zero = vec![0u8; self.fs.bsize as usize];
-                        self.write_frags(child, &zero)?;
+                        self.write_meta_frags(child, &zero)?;
                         ip.blocks = ip
                             .blocks
                             .checked_add(u64::from(self.fs.bsize / 512))

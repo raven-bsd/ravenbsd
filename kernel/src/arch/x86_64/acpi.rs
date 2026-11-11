@@ -15,11 +15,21 @@ use core::mem::size_of;
 use core::ptr::NonNull;
 
 use acpi::madt::Madt;
+use acpi::mcfg::Mcfg;
 use acpi::{AcpiHandler, AcpiTables, PhysicalMapping};
 use raven_bootinfo::MemoryKind;
 
 use crate::kprintln;
 use crate::memory::{frame, mmio, paging};
+
+/// Magic of the kernel's ACPI bundle (`"RAC1"`).
+pub const ACPI_BLOB_MAGIC: u32 = 0x3143_4152;
+/// ACPI bundle layout version.
+pub const ACPI_BLOB_VERSION: u16 = 1;
+/// Size of the ACPI bundle header in bytes.
+pub const ACPI_BLOB_HEADER_SIZE: u32 = 24;
+/// Size of one ACPI bundle directory entry in bytes.
+pub const ACPI_BLOB_ENTRY_SIZE: u32 = 20;
 
 /// Maximum local APIC ids retained for S10.
 const MAX_CPUS: usize = 64;
@@ -97,6 +107,14 @@ pub struct AcpiInfo {
     pub override_count: usize,
     /// Firmware says the legacy 8259 PIC is present.
     pub legacy_pics: bool,
+    /// A valid MCFG was parsed.
+    pub mcfg_available: bool,
+    /// ECAM base address from the first MCFG entry.
+    pub mcfg_base: u64,
+    /// First bus of the first MCFG entry.
+    pub mcfg_start_bus: u8,
+    /// Last bus of the first MCFG entry.
+    pub mcfg_end_bus: u8,
 }
 
 impl AcpiInfo {
@@ -112,6 +130,10 @@ impl AcpiInfo {
             overrides: [NO_OVERRIDE; MAX_OVERRIDES],
             override_count: 0,
             legacy_pics: false,
+            mcfg_available: false,
+            mcfg_base: 0,
+            mcfg_start_bus: 0,
+            mcfg_end_bus: 0,
         }
     }
 
@@ -173,6 +195,14 @@ pub fn init() {
 
     match parse(boot.acpi_rsdp as usize) {
         Ok(parsed) => {
+            if parsed.mcfg_available {
+                kprintln!(
+                    "acpi: mcfg base={:#x} buses={}-{}",
+                    parsed.mcfg_base,
+                    parsed.mcfg_start_bus,
+                    parsed.mcfg_end_bus
+                );
+            }
             store(parsed);
             kprintln!(
                 "acpi: {} cpus, {} ioapics, {} overrides",
@@ -277,6 +307,14 @@ fn parse(rsdp: usize) -> Result<AcpiInfo, ()> {
 
     let mut info = AcpiInfo::empty();
     info.available = true;
+    if let Ok(mcfg) = tables.find_table::<Mcfg>()
+        && let Some(entry) = mcfg.entries().first()
+    {
+        info.mcfg_available = true;
+        info.mcfg_base = entry.base_address;
+        info.mcfg_start_bus = entry.bus_number_start;
+        info.mcfg_end_bus = entry.bus_number_end;
+    }
     info.cpus = 0;
     info.io_apic_count = 0;
     info.local_apic_address = if local_apic_address == 0 {
@@ -386,6 +424,314 @@ fn push_apic_id(info: &mut AcpiInfo, apic_id: u32) {
         *slot = apic_id;
         info.cpus = info.cpus.saturating_add(1);
     }
+}
+
+/// Upper bound of the captured ACPI bundle, including header, directory and table copies.
+const MAX_EARLY_BLOB: usize = 256 * 1024;
+/// Largest ACPI table copied into the bundle.
+const MAX_TABLE_BYTES: u32 = 64 * 1024;
+/// Largest number of bundle entries (RSDP, root tables and SDTs).
+const MAX_BLOB_TABLES: usize = 64;
+
+struct EarlyBlob {
+    bytes: [u8; MAX_EARLY_BLOB],
+    len: usize,
+}
+
+struct EarlyCell(core::cell::UnsafeCell<EarlyBlob>);
+
+// SAFETY: the cell is written once during single-CPU paging init, before loader memory is
+// reclaimed, and is read-only afterwards.
+unsafe impl Sync for EarlyCell {}
+
+static EARLY: EarlyCell = EarlyCell(core::cell::UnsafeCell::new(EarlyBlob {
+    bytes: [0; MAX_EARLY_BLOB],
+    len: 0,
+}));
+
+/// One bundle entry collected before the header is written.
+#[derive(Clone, Copy)]
+struct BlobEntry {
+    signature: [u8; 8],
+    physical: u64,
+    length: u32,
+}
+
+/// Capture the ACPI tables into kernel memory while loader memory is still mapped.
+///
+/// Called from `paging::init` on x86-64 before `LoaderReclaimable` frames are freed, so a
+/// firmware that places the RSDP or its tables in loader-owned memory keeps them reachable here.
+pub fn capture_early(rsdp_phys: u64) {
+    // SAFETY: this is the single-CPU init writer; the cell is unpublished until it is complete.
+    let early = unsafe { &mut *EARLY.0.get() };
+    match build_early_blob(rsdp_phys, early) {
+        Ok(()) => {}
+        Err(reason) => {
+            early.len = 0;
+            kprintln!("acpi: blob capture unavailable ({reason})");
+        }
+    }
+}
+
+/// The captured ACPI bundle, or `None` when the capture failed or ACPI is absent.
+pub fn early_blob() -> Option<&'static [u8]> {
+    // SAFETY: the cell was written once during init and is read-only afterwards.
+    let early = unsafe { &*EARLY.0.get() };
+    if early.len == 0 {
+        None
+    } else {
+        Some(early.bytes.get(..early.len).unwrap_or(&[]))
+    }
+}
+
+fn build_early_blob(rsdp_phys: u64, early: &mut EarlyBlob) -> Result<(), &'static str> {
+    if rsdp_phys == 0 {
+        return Err("no RSDP");
+    }
+    let rsdp_pointer = map_physical(rsdp_phys, 36);
+    if rsdp_pointer.is_null() {
+        return Err("cannot map RSDP");
+    }
+    // SAFETY: `map_physical` mapped 36 readable bytes at the pointer.
+    let rsdp = unsafe { core::slice::from_raw_parts(rsdp_pointer, 36) };
+    if rsdp.get(..8).ok_or("short RSDP")? != b"RSD PTR ".as_slice() {
+        return Err("bad RSDP signature");
+    }
+    if !checksum(rsdp.get(..20).ok_or("short RSDP")?) {
+        return Err("bad RSDP checksum");
+    }
+    let revision = *rsdp.get(15).ok_or("short RSDP")?;
+    let rsdt_phys = u64::from(read_u32(rsdp, 16).ok_or("short RSDP")?);
+    let rsdp_len = if revision >= 2 {
+        let length = read_u32(rsdp, 20).ok_or("short RSDP")?;
+        if length < 36 {
+            return Err("bad RSDP length");
+        }
+        if !checksum(rsdp) {
+            return Err("bad extended RSDP checksum");
+        }
+        36usize
+    } else {
+        20usize
+    };
+    let xsdt_phys = if revision >= 2 {
+        read_u64(rsdp, 24).ok_or("short RSDP")?
+    } else {
+        0
+    };
+
+    let mut entries: [BlobEntry; MAX_BLOB_TABLES] = [BlobEntry {
+        signature: [0; 8],
+        physical: 0,
+        length: 0,
+    }; MAX_BLOB_TABLES];
+    let mut count = 0usize;
+
+    push_entry(
+        &mut entries,
+        &mut count,
+        b"RSD PTR ",
+        rsdp_phys,
+        u32::try_from(rsdp_len).map_err(|_| "rsdp too large")?,
+    )?;
+
+    if xsdt_phys != 0 {
+        walk_root_table(&mut entries, &mut count, b"XSDT    ", xsdt_phys, true)?;
+    }
+    if rsdt_phys != 0 {
+        walk_root_table(&mut entries, &mut count, b"RSDT    ", rsdt_phys, false)?;
+    }
+
+    // Header: magic, version, header size, rsdp_phys, table count, directory offset.
+    let writer: &mut [u8] = &mut early.bytes;
+    writer.fill(0);
+    put_u32(writer, 0, ACPI_BLOB_MAGIC).ok_or("short blob")?;
+    put_u16(writer, 4, ACPI_BLOB_VERSION).ok_or("short blob")?;
+    put_u16(writer, 6, ACPI_BLOB_HEADER_SIZE as u16).ok_or("short blob")?;
+    put_u64(writer, 8, rsdp_phys).ok_or("short blob")?;
+    put_u32(writer, 16, count as u32).ok_or("short blob")?;
+    put_u32(writer, 20, ACPI_BLOB_HEADER_SIZE).ok_or("short blob")?;
+
+    let directory_len = count
+        .checked_mul(ACPI_BLOB_ENTRY_SIZE as usize)
+        .ok_or("directory overflow")?;
+    let payload_start = (ACPI_BLOB_HEADER_SIZE as usize)
+        .checked_add(directory_len)
+        .ok_or("directory overflow")?;
+    if payload_start > writer.len() {
+        return Err("blob too large");
+    }
+    let mut offset = payload_start;
+    for (index, entry) in entries.iter().take(count).enumerate() {
+        let at = (ACPI_BLOB_HEADER_SIZE as usize)
+            .checked_add(index.saturating_mul(ACPI_BLOB_ENTRY_SIZE as usize))
+            .ok_or("directory overflow")?;
+        let slot_end = at
+            .checked_add(ACPI_BLOB_ENTRY_SIZE as usize)
+            .ok_or("directory overflow")?;
+        let slot = writer.get_mut(at..slot_end).ok_or("directory overflow")?;
+        slot.get_mut(0..8)
+            .ok_or("directory overflow")?
+            .copy_from_slice(&entry.signature);
+        put_u32(slot, 8, offset as u32).ok_or("directory overflow")?;
+        put_u32(slot, 12, entry.length).ok_or("directory overflow")?;
+        slot.get_mut(16..20).ok_or("directory overflow")?.fill(0);
+        let end = offset
+            .checked_add(entry.length as usize)
+            .ok_or("blob overflow")?;
+        let destination = writer.get_mut(offset..end).ok_or("blob too large")?;
+        let source_pointer = map_physical(entry.physical, entry.length as usize);
+        if source_pointer.is_null() {
+            return Err("cannot map table");
+        }
+        // SAFETY: `map_physical` mapped `length` readable bytes at the pointer.
+        let source = unsafe { core::slice::from_raw_parts(source_pointer, entry.length as usize) };
+        destination.copy_from_slice(source);
+        offset = end;
+    }
+    early.len = offset;
+    Ok(())
+}
+
+fn put_u16(bytes: &mut [u8], at: usize, value: u16) -> Option<()> {
+    let end = at.checked_add(2)?;
+    bytes
+        .get_mut(at..end)?
+        .copy_from_slice(&value.to_le_bytes());
+    Some(())
+}
+
+fn put_u32(bytes: &mut [u8], at: usize, value: u32) -> Option<()> {
+    let end = at.checked_add(4)?;
+    bytes
+        .get_mut(at..end)?
+        .copy_from_slice(&value.to_le_bytes());
+    Some(())
+}
+
+fn put_u64(bytes: &mut [u8], at: usize, value: u64) -> Option<()> {
+    let end = at.checked_add(8)?;
+    bytes
+        .get_mut(at..end)?
+        .copy_from_slice(&value.to_le_bytes());
+    Some(())
+}
+
+fn push_entry(
+    entries: &mut [BlobEntry; MAX_BLOB_TABLES],
+    count: &mut usize,
+    signature: &[u8; 8],
+    physical: u64,
+    length: u32,
+) -> Result<(), &'static str> {
+    if entries
+        .iter()
+        .take(*count)
+        .any(|entry| entry.physical == physical)
+    {
+        return Ok(());
+    }
+    let slot = entries.get_mut(*count).ok_or("too many tables")?;
+    slot.signature = *signature;
+    slot.physical = physical;
+    slot.length = length;
+    *count = count.saturating_add(1);
+    Ok(())
+}
+
+fn walk_root_table(
+    entries: &mut [BlobEntry; MAX_BLOB_TABLES],
+    count: &mut usize,
+    signature: &[u8; 8],
+    physical: u64,
+    extended: bool,
+) -> Result<(), &'static str> {
+    let header_pointer = map_physical(physical, 36);
+    if header_pointer.is_null() {
+        return Err("cannot map root table");
+    }
+    // SAFETY: `map_physical` mapped 36 readable bytes at the pointer.
+    let header = unsafe { core::slice::from_raw_parts(header_pointer, 36) };
+    let expected = signature.get(..4).ok_or("short root table")?;
+    if header.get(..4).ok_or("short root table")? != expected {
+        return Err("bad root table signature");
+    }
+    let length = read_u32(header, 4).ok_or("short root table")?;
+    if !(36..=MAX_TABLE_BYTES).contains(&length) {
+        return Err("bad root table length");
+    }
+    let bytes_pointer = map_physical(physical, length as usize);
+    if bytes_pointer.is_null() {
+        return Err("cannot map root table body");
+    }
+    // SAFETY: `map_physical` mapped `length` readable bytes at the pointer.
+    let bytes = unsafe { core::slice::from_raw_parts(bytes_pointer, length as usize) };
+    if !checksum(bytes) {
+        return Err("bad root table checksum");
+    }
+    push_entry(entries, count, signature, physical, length)?;
+    let body = bytes.get(36..).ok_or("short root table")?;
+    let pointer_size = if extended { 8 } else { 4 };
+    let mut index = 0usize;
+    while index.saturating_add(pointer_size) <= body.len() {
+        let table_phys = if extended {
+            read_u64(body, index).ok_or("short root entry")?
+        } else {
+            u64::from(read_u32(body, index).ok_or("short root entry")?)
+        };
+        index = index.saturating_add(pointer_size);
+        if table_phys == 0 {
+            continue;
+        }
+        walk_sdt(entries, count, table_phys)?;
+    }
+    Ok(())
+}
+
+fn walk_sdt(
+    entries: &mut [BlobEntry; MAX_BLOB_TABLES],
+    count: &mut usize,
+    physical: u64,
+) -> Result<(), &'static str> {
+    let header_pointer = map_physical(physical, 36);
+    if header_pointer.is_null() {
+        return Ok(());
+    }
+    // SAFETY: `map_physical` mapped 36 readable bytes at the pointer.
+    let header = unsafe { core::slice::from_raw_parts(header_pointer, 36) };
+    let signature = header.get(..4).ok_or("short SDT")?;
+    if signature == b"SSDT" || signature == b"DSDT" {
+        return Ok(());
+    }
+    if !signature
+        .iter()
+        .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit())
+    {
+        return Ok(());
+    }
+    let length = read_u32(header, 4).ok_or("short SDT")?;
+    if !(36..=MAX_TABLE_BYTES).contains(&length) {
+        return Ok(());
+    }
+    let bytes_pointer = map_physical(physical, length as usize);
+    if bytes_pointer.is_null() {
+        return Ok(());
+    }
+    // SAFETY: `map_physical` mapped `length` readable bytes at the pointer.
+    let bytes = unsafe { core::slice::from_raw_parts(bytes_pointer, length as usize) };
+    if !checksum(bytes) {
+        return Ok(());
+    }
+    let mut padded = [b' '; 8];
+    padded
+        .get_mut(..4)
+        .ok_or("short SDT")?
+        .copy_from_slice(signature);
+    push_entry(entries, count, &padded, physical, length)
+}
+
+fn checksum(bytes: &[u8]) -> bool {
+    bytes.iter().fold(0u8, |sum, byte| sum.wrapping_add(*byte)) == 0
 }
 
 fn read_u16(bytes: &[u8], offset: usize) -> Option<u16> {

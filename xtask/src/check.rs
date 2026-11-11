@@ -176,6 +176,7 @@ fn build_steps(workspace: &Workspace, fast: bool) -> Result<Vec<Step>> {
                 "check".into(),
                 "--root".into(),
                 ".".into(),
+                "--strict".into(),
             ],
         ));
     } else {
@@ -392,5 +393,36 @@ mod tests {
                 .any(|pair| pair == ["--target", "aarch64-unknown-none-softfloat"])
         );
         assert!(spec.args.iter().any(|arg| arg == "raven-kernel"));
+    }
+
+    #[test]
+    fn provenance_step_runs_strict() {
+        let root = std::env::temp_dir().join(format!(
+            "raven-xtask-check-provenance-{}",
+            std::process::id()
+        ));
+        let crate_dir = root.join("crates/raven-provenance");
+        std::fs::create_dir_all(&crate_dir).unwrap();
+        std::fs::write(crate_dir.join("Cargo.toml"), "# stub\n").unwrap();
+        let workspace = Workspace {
+            root: root.clone(),
+            packages: Vec::new(),
+        };
+        let steps = build_steps(&workspace, false).unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+
+        let provenance = steps
+            .iter()
+            .find(|step| step.name == "provenance")
+            .expect("provenance step exists");
+        let StepKind::Command(spec) = &provenance.kind else {
+            panic!("provenance step is not a command");
+        };
+        assert_eq!(spec.program, "cargo");
+        assert!(
+            spec.args.iter().any(|arg| arg == "--strict"),
+            "make check must run provenance with --strict: {:?}",
+            spec.args
+        );
     }
 }

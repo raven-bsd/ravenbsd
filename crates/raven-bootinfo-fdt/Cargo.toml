@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-bootinfo-fdt"
+version = "0.1.0"
+description = "Build a raven-bootinfo BootInfo, platform description and minimal page tables from a flattened device tree."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raven-bootinfo = { path = "../raven-bootinfo" }
+raven-fdt-lite = { path = "../raven-fdt-lite" }
+
+[lints]
+workspace = true

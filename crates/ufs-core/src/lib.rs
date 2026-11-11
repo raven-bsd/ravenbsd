@@ -30,6 +30,7 @@ extern crate std;
 
 mod balloc;
 mod blockio;
+pub mod check;
 mod dinode;
 mod dir;
 mod dirwrite;
@@ -47,6 +48,7 @@ mod ufs;
 mod ufs_bmap;
 mod ufs_lookup;
 mod ufs_readwrite;
+pub(crate) mod wapbl;
 
 pub use blockio::BlockIo;
 pub use error::{IoError, UfsError};

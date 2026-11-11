@@ -1,21 +1,25 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt EVQ_CTL 2
 .Os RavenBSD
 .Sh NAME
 .Nm evq_ctl
-.Nd adds, modifies or removes an event source
+.Nd manage an event-queue registration
 .Sh SYNOPSIS
-See the
-.Pa raven-abi
-crate (syscall number 0x59).
+.Fn evq_ctl evq op handle events cookie
 .Sh DESCRIPTION
-The
-.Nm
-system call is part of RavenBSD ABI v1. It is implemented by ticket S26; this page is the contract placeholder and will be
-completed when S26 lands. The authoritative signature is the doc comment of the syscall in the
-.Pa raven-abi
-crate.
+.Fa op is ADD (1), MOD (2), or DEL (3).  Event bits are READABLE, WRITABLE,
+HUP and SIGNALED; EDGE requests transition-triggered delivery.  A deletion
+returns only after its cookie cannot be returned by a later wait.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EINVAL
+An operation or event mask is invalid.
+.It Er ENOSPC
+The queue already has 4096 registrations.
+.It Er EEXIST , Er ENOENT
+The registration already exists or does not exist.
+.El
 .Sh STANDARDS
 RavenBSD ABI v1.
