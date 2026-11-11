@@ -8,7 +8,6 @@ timeout_secs = 180
 pre = ["sh tests/fixtures/s26-evq/build.sh"]
 initfs = "build/fixtures/s26-evq/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
-qemu_extra = ["-smp", "1"]
 expect_exit = "success"
 
 [[expect]]
