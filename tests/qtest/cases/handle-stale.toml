@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "handle-stale"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/s35-handles/build.sh"]
+initfs = "build/fixtures/s35-handles/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^s35: stale handles ok$'
+
+[[expect]]
+regex = '^s35: rights ok$'
+
+[[expect]]
+regex = '^s35: close order ok$'
+
+[[forbid]]
+regex = '(?i)panic'
