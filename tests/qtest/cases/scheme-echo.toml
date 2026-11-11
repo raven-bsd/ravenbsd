@@ -5,6 +5,8 @@ name = "scheme-echo"
 arch = "x86_64"
 profile = "base"
 timeout_secs = 120
+pre = ["sh tests/fixtures/s11-echo/build.sh"]
+initfs = "build/fixtures/s11-echo/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 expect_exit = "success"
 

@@ -175,6 +175,8 @@ pub(crate) fn image_command(
     arch: &str,
     profile: &str,
     boot_cmdline: Option<&str>,
+    initfs: Option<&Path>,
+    kernel: Option<&Path>,
     output: &Path,
 ) -> (String, Vec<String>) {
     let mut args = vec![
@@ -188,6 +190,14 @@ pub(crate) fn image_command(
     if let Some(cmdline) = boot_cmdline {
         args.push("--cmdline".to_string());
         args.push(cmdline.to_string());
+    }
+    if let Some(initfs) = initfs {
+        args.push("--initfs".to_string());
+        args.push(initfs.display().to_string());
+    }
+    if let Some(kernel) = kernel {
+        args.push("--kernel".to_string());
+        args.push(kernel.display().to_string());
     }
     args.push("--output".to_string());
     args.push(output.display().to_string());
@@ -391,6 +401,8 @@ mod tests {
             "x86_64",
             "base",
             Some("console=ttyS0 test-exit=1"),
+            None,
+            None,
             Path::new("build/qtest/boot.img"),
         );
         assert_eq!(program, "cargo");
@@ -413,9 +425,27 @@ mod tests {
 
     #[test]
     fn image_command_without_cmdline() {
-        let (_, args) = image_command("aarch64", "base", None, Path::new("out.img"));
+        let (_, args) = image_command("aarch64", "base", None, None, None, Path::new("out.img"));
         assert!(!args.contains(&"--cmdline".to_string()));
         assert_eq!(args[args.len() - 2], "--output");
+    }
+
+    #[test]
+    fn image_command_forwards_initfs_and_kernel_overrides() {
+        let (_, args) = image_command(
+            "x86_64",
+            "base",
+            None,
+            Some(Path::new("build/fixtures/s24-spawn/initfs.img")),
+            Some(Path::new("build/fixtures/testkernel/kernel.elf")),
+            Path::new("build/qtest/case.img"),
+        );
+        let initfs = args.iter().position(|arg| arg == "--initfs").unwrap();
+        assert_eq!(args[initfs + 1], "build/fixtures/s24-spawn/initfs.img");
+        let kernel = args.iter().position(|arg| arg == "--kernel").unwrap();
+        assert_eq!(args[kernel + 1], "build/fixtures/testkernel/kernel.elf");
+        assert_eq!(args[args.len() - 2], "--output");
+        assert!(initfs < kernel, "options follow the case file order");
     }
 
     #[test]

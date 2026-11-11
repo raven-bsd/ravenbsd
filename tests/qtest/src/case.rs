@@ -118,6 +118,12 @@ pub struct CaseSpec {
     pub expect_exit: ExpectExit,
     /// When set, the case is not executed and reports this reason as `skipped`.
     pub skip: Option<String>,
+    /// Shell commands run, in order, from the harness working directory before the image build.
+    pub pre: Vec<String>,
+    /// Prebuilt initfs installed instead of the profile's, relative to the working directory.
+    pub initfs: Option<String>,
+    /// Kernel ELF installed instead of the built kernel (loader test kernels).
+    pub loader_kernel: Option<String>,
 }
 
 /// A validated case with compiled regexes.
@@ -233,6 +239,21 @@ impl Case {
         {
             bail!("skip needs a reason");
         }
+        for (index, command) in raw.pre.iter().enumerate() {
+            if command.trim().is_empty() {
+                bail!("pre[{index}] must not be empty");
+            }
+        }
+        if let Some(initfs) = &raw.initfs
+            && initfs.trim().is_empty()
+        {
+            bail!("initfs must not be empty");
+        }
+        if let Some(kernel) = &raw.loader_kernel
+            && kernel.trim().is_empty()
+        {
+            bail!("loader_kernel must not be empty");
+        }
         Ok(Self {
             spec: CaseSpec {
                 name: raw.name,
@@ -243,6 +264,9 @@ impl Case {
                 qemu_extra: raw.qemu_extra,
                 expect_exit,
                 skip: raw.skip,
+                pre: raw.pre,
+                initfs: raw.initfs,
+                loader_kernel: raw.loader_kernel,
             },
             expects: raw.expect,
             forbids: raw.forbid,
@@ -301,6 +325,12 @@ struct RawCase {
     expect_exit: String,
     #[serde(default)]
     skip: Option<String>,
+    #[serde(default)]
+    pre: Vec<String>,
+    #[serde(default)]
+    initfs: Option<String>,
+    #[serde(default)]
+    loader_kernel: Option<String>,
     #[serde(default, rename = "expect")]
     expect: Vec<Expect>,
     #[serde(default, rename = "forbid")]
@@ -562,5 +592,48 @@ regex = '(?i)panic'
         let case = Case::parse(minimal()).unwrap();
         assert!(case.steps.is_empty());
         assert!(case.step_regexes().is_empty());
+    }
+
+    #[test]
+    fn image_override_keys_default_to_empty() {
+        let case = Case::parse(minimal()).unwrap();
+        assert!(case.spec.pre.is_empty());
+        assert!(case.spec.initfs.is_none());
+        assert!(case.spec.loader_kernel.is_none());
+    }
+
+    #[test]
+    fn image_override_keys_parse() {
+        let text = format!(
+            "{}pre = [\"sh tests/fixtures/s24-spawn/build.sh\", \"true\"]\n\
+             initfs = \"build/fixtures/s24-spawn/initfs.img\"\n\
+             loader_kernel = \"build/fixtures/testkernel/kernel.elf\"\n",
+            minimal()
+        );
+        let case = Case::parse(&text).unwrap();
+        assert_eq!(case.spec.pre.len(), 2);
+        assert_eq!(case.spec.pre[0], "sh tests/fixtures/s24-spawn/build.sh");
+        assert_eq!(case.spec.pre[1], "true");
+        assert_eq!(
+            case.spec.initfs.as_deref(),
+            Some("build/fixtures/s24-spawn/initfs.img")
+        );
+        assert_eq!(
+            case.spec.loader_kernel.as_deref(),
+            Some("build/fixtures/testkernel/kernel.elf")
+        );
+    }
+
+    #[test]
+    fn empty_image_overrides_are_rejected() {
+        for text in [
+            format!("{}pre = [\"\"]\n", minimal()),
+            format!("{}pre = [\"  \"]\n", minimal()),
+            format!("{}initfs = \"\"\n", minimal()),
+            format!("{}loader_kernel = \" \"\n", minimal()),
+        ] {
+            let error = format!("{:#}", Case::parse(&text).unwrap_err());
+            assert!(error.contains("must not be empty"), "{text}: {error}");
+        }
     }
 }

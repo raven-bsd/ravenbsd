@@ -5,6 +5,8 @@ name = "kernel-spawn"
 arch = "x86_64"
 profile = "base"
 timeout_secs = 120
+pre = ["sh tests/fixtures/s24-spawn/build.sh"]
+initfs = "build/fixtures/s24-spawn/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1 s24-framecheck=1"
 expect_exit = "success"
 

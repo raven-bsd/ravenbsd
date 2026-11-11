@@ -23,6 +23,9 @@ format; `raven-qtest list` prints every case it can parse.
 | `boot_cmdline` | string | Passed to `cargo xtask image --cmdline`. |
 | `qemu_extra` | array of strings | Extra QEMU arguments appended after the fixed ones. |
 | `skip` | string | Do not run the case; report `skipped` with this reason. |
+| `pre` | array of strings | Shell commands run in order from the repository root before the image build; a non-zero exit is an `error`. |
+| `initfs` | string | Prebuilt initfs installed instead of the profile's. |
+| `loader_kernel` | string | Kernel ELF installed instead of the built kernel (loader test kernels). |
 | `[[expect]]` | table | `regex` plus optional `unordered` (bool, default `false`). |
 | `[[forbid]]` | table | `regex`; any matching serial line fails the case. |
 | `[[oracle]]` | table | Host-side artifact check; see below. |
@@ -49,6 +52,48 @@ regex = '^RavenBSD \S+ 0\.1 RavenBSD 0\.1 \(\S+\) #\d+: .+ x86_64$'
 
 [[forbid]]
 regex = '(?i)panic'
+```
+
+## Fixture images
+
+Some cases need a guest other than the profile's `/init`. `pre` builds the fixture and `initfs`
+(or `loader_kernel`) installs it into the per-case image before QEMU starts. The S24 spawn case:
+
+```toml
+name = "kernel-spawn"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/s24-spawn/build.sh"]
+initfs = "build/fixtures/s24-spawn/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s24-framecheck=1"
+expect_exit = "success"
+```
+
+`pre` entries are shell commands (`sh -c`) run in order from the harness working directory (the
+repository root for `cargo xtask qtest`) before the image is built; a non-zero exit makes the case
+`error` and QEMU never starts. `initfs` and `loader_kernel` are paths relative to the same
+directory (absolute paths are accepted). The harness passes them to the image builder:
+
+```
+cargo xtask image --arch <a> --profile <p> [--cmdline <s>] [--initfs <p>] [--kernel <p>] --output <img>
+```
+
+`--initfs` replaces `raven/initfs.img` and `--kernel` replaces `raven/kernel.elf` in the ESP; the
+loader is always built. A supplied image (`raven-qtest run --image ...`) or `--no-build` wins: the
+overrides are only applied when the harness builds the image itself.
+
+Each fixture directory carries one `build.sh` that reproduces the recipe from its ticket report:
+the fixture packages are built for `x86_64-unknown-none` in release mode with the recorded
+`RUSTFLAGS` (custom linker script, `-C lto=no`), then `raven-initfs`'s `mkinitfs` packs
+`build/fixtures/<name>/initfs.img`. The scripts are deterministic: same source and toolchain
+produce the same bytes, and the initfs format carries no timestamps. The loader test kernel is the
+exception: it is a kernel, not an initfs, so its script writes
+`build/fixtures/testkernel/kernel.elf` and the case uses `loader_kernel`:
+
+```toml
+pre = ["sh tests/fixtures/testkernel/build.sh"]
+loader_kernel = "build/fixtures/testkernel/kernel.elf"
 ```
 
 ## Serial dialogue

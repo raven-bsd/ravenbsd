@@ -5,6 +5,8 @@ name = "kernel-usermode"
 arch = "x86_64"
 profile = "base"
 timeout_secs = 60
+pre = ["sh tests/fixtures/s08-init/build.sh"]
+initfs = "build/fixtures/s08-init/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 expect_exit = "success"
 
