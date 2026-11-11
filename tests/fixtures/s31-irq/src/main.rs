@@ -313,9 +313,7 @@ extern "C" fn waiter_thread(_argument: usize) -> ! {
             Ok(0) => {
                 if CLOSE_STARTED.load(Ordering::Acquire) {
                     match irq_wait(handle, 250_000_000) {
-                        Err(error) if error.0 == Errno::EBADF.0 => {
-                            break i32::from(Errno::EIO.0)
-                        }
+                        Err(error) if error.0 == Errno::EBADF.0 => break i32::from(Errno::EIO.0),
                         Err(error) => break i32::from(error.0),
                         Ok(0) => continue,
                         Ok(count) => break i32::try_from(count).unwrap_or(i32::MAX),
@@ -324,7 +322,7 @@ extern "C" fn waiter_thread(_argument: usize) -> ! {
                 continue;
             }
             Err(error) if error.0 == Errno::EBADF.0 && CLOSE_STARTED.load(Ordering::Acquire) => {
-                break i32::from(Errno::EIO.0)
+                break i32::from(Errno::EIO.0);
             }
             Err(error) => break i32::from(error.0),
             // The victim source never fires; a positive count means a foreign message reached
