@@ -309,16 +309,18 @@ impl Journal {
         self.generation = header.generation;
         let mut blocks: BTreeMap<u64, (u64, usize)> = BTreeMap::new();
         let mut inodes: BTreeMap<Ino, u32> = BTreeMap::new();
+        if header.head == 0 && header.tail == 0 {
+            return self.finish_replay(disk, fs_size_bytes, blocks, inodes);
+        }
         let mut off = if header.tail == 0 {
             header.circ_off
         } else {
             header.tail
         };
         let end = header.head;
-        if end != 0 && off == end {
-            return self.finish_replay(disk, fs_size_bytes, blocks, inodes);
-        }
-        while off != end {
+        let mut first = true;
+        while first || off != end {
+            first = false;
             let mut raw = vec![0u8; LOG_BLOCK];
             self.circ_read(disk, off, &mut raw)?;
             let record_type = read_u32(&raw, 0)?;
@@ -587,6 +589,9 @@ impl Journal {
             || header.circ_off + header.circ_size > self.circ_off + self.circ_size
         {
             return Err(UfsError::Corrupt("bad WAPBL geometry"));
+        }
+        if header.tail != 0 && header.head == 0 {
+            return Err(UfsError::Corrupt("WAPBL head/tail mismatch"));
         }
         if header.head != 0
             && (header.head < header.circ_off || header.head >= header.circ_off + header.circ_size)
