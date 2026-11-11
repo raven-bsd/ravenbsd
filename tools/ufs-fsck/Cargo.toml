@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "ufs-fsck"
+version = "0.1.0"
+description = "Check and repair UFS1/UFS2 images in Rust (fsck_ffs phases)."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+ufs-core = { path = "../../crates/ufs-core" }
+
+[[bin]]
+name = "ufs-fsck"
+path = "src/main.rs"
+
+[lints]
+workspace = true

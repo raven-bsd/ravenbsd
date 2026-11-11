@@ -26,6 +26,7 @@ members = [
     "tests/ufs-oracle",
     "tests/ufs-powercut",
     "tools/linux-corpus",
+    "tools/ufs-fsck",
     "tools/ufs-mkfs",
     "libc/spike/va",
     "userland/rt",

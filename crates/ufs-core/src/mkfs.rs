@@ -400,10 +400,9 @@ fn build_cg(geom: &Geometry, cg: u32, root_block: Option<u32>) -> Result<CgBuild
     }
     if let Some(root) = root_block {
         let first = root as usize;
-        let count = (geom.fsize as usize).div_ceil(512).max(1);
-        for index in 0..count {
-            clear_bit(&mut free, first + index)?;
-        }
+        // The root directory is one 512-byte directory block; it occupies one fragment
+        // regardless of the fragment size.
+        clear_bit(&mut free, first)?;
     }
 
     let mut nbfree = 0i32;
@@ -443,7 +442,7 @@ fn build_cg(geom: &Geometry, cg: u32, root_block: Option<u32>) -> Result<CgBuild
         0
     };
     let nextfreeoff = if geom.contigsumsize > 0 {
-        clusteroff + (ndblk / geom.frag).div_ceil(8)
+        clusteroff + (geom.fpg / geom.frag).div_ceil(8)
     } else {
         freeoff + free_len as u32
     };
