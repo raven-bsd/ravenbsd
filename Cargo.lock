@@ -361,7 +361,13 @@ dependencies = [
 name = "raven-init"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-proto-svc",
  "raven-rt",
+ "raven-scheme",
+ "raven-svc-manifest",
  "raven-uname",
 ]
 
@@ -467,6 +473,10 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
 ]
+
+[[package]]
+name = "raven-proto-svc"
+version = "0.1.0"
 
 [[package]]
 name = "raven-provenance"
@@ -577,10 +587,28 @@ name = "raven-svc-manifest"
 version = "0.1.0"
 
 [[package]]
+name = "raven-svcctl"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-proto-svc",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-testkernel"
 version = "0.1.0"
 dependencies = [
  "raven-bootinfo",
+]
+
+[[package]]
+name = "raven-testsvc"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
 ]
 
 [[package]]

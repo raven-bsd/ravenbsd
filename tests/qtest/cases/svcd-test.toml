@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "svcd-test"
+arch = "x86_64"
+profile = "svcd-test"
+timeout_secs = 20
+pre = ["sh userland/init/testsvc/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^testsvc: a started$'
+
+[[expect]]
+regex = '^testsvc: b started$'
+
+[[expect]]
+regex = '^testsvc: c started$'
+
+[[expect]]
+regex = '^svcd: x crash loop, giving up$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

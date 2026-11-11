@@ -31,8 +31,10 @@ members = [
     "userland/rt",
     "userland/linux-shim",
     "userland/init",
+    "userland/init/testsvc",
     "userland/bin/uname",
     "userland/bin/echo",
+    "userland/bin/svcctl",
     "tests/net/packetdrill-harness",
     "tools/bench-host",
 ]

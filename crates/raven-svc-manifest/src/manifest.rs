@@ -60,6 +60,14 @@ pub struct Manifest {
     pub max_restarts: u32,
     /// Readiness policy.
     pub readiness: Readiness,
+    /// How long readiness may take, in milliseconds, `0..=60000`.
+    pub ready_timeout_ms: u32,
+    /// Whether the service is required for a successful boot.
+    pub required: bool,
+    /// Window in which restart attempts are counted, in milliseconds, `0..=3600000`.
+    pub window_ms: u32,
+    /// Capabilities transferred to the child before its first thread starts.
+    pub grants: Vec<String>,
     /// Whether the service participates in the start plan.
     pub enable: bool,
     /// Environment entries from the optional `[env]` table.
@@ -80,6 +88,10 @@ impl Default for Manifest {
             restart_delay_ms: 200,
             max_restarts: 5,
             readiness: Readiness::None,
+            ready_timeout_ms: 5_000,
+            required: true,
+            window_ms: 60_000,
+            grants: Vec::new(),
             enable: true,
             env: Vec::new(),
         }
@@ -139,6 +151,10 @@ impl Manifest {
         let mut restart_delay_ms = 200;
         let mut max_restarts = 5;
         let mut readiness = Readiness::None;
+        let mut ready_timeout_ms = 5_000;
+        let mut required = true;
+        let mut window_ms = 60_000;
+        let mut grants = Vec::new();
         let mut enable = true;
         let mut env = Vec::new();
 
@@ -266,6 +282,31 @@ impl Manifest {
                         _ => return Err(error(line, ParseErrorKind::InvalidValue("readiness"))),
                     };
                 }
+                "ready_timeout_ms" => {
+                    let value = integer_value(value, line, "ready_timeout_ms")?;
+                    if value > 60_000 {
+                        return Err(error(
+                            line,
+                            ParseErrorKind::IntegerOutOfRange("ready_timeout_ms"),
+                        ));
+                    }
+                    ready_timeout_ms = value as u32;
+                }
+                "required" => required = bool_value(value, line, "required")?,
+                "window_ms" => {
+                    let value = integer_value(value, line, "window_ms")?;
+                    if value > 3_600_000 {
+                        return Err(error(line, ParseErrorKind::IntegerOutOfRange("window_ms")));
+                    }
+                    window_ms = value as u32;
+                }
+                "grants" => {
+                    let values = array_value(value, line, "grants")?;
+                    if values.iter().any(|item| !is_service_name(item)) {
+                        return Err(error(line, ParseErrorKind::InvalidValue("grants")));
+                    }
+                    grants = values;
+                }
                 "enable" => enable = bool_value(value, line, "enable")?,
                 _ => return Err(error(line, ParseErrorKind::UnknownKey(key.to_string()))),
             }
@@ -291,6 +332,10 @@ impl Manifest {
             restart_delay_ms,
             max_restarts,
             readiness,
+            ready_timeout_ms,
+            required,
+            window_ms,
+            grants,
             enable,
             env,
         })
@@ -332,6 +377,10 @@ restart = "always"
 restart_delay_ms = 1_500
 max_restarts = 7
 readiness = "scheme"
+ready_timeout_ms = 7_500
+required = false
+window_ms = 120_000
+grants = ["initfs"]
 enable = false
 
 [env]
@@ -350,6 +399,10 @@ FOO = "bar"
         assert_eq!(manifest.restart_delay_ms, 1500);
         assert_eq!(manifest.max_restarts, 7);
         assert_eq!(manifest.readiness, Readiness::Scheme);
+        assert_eq!(manifest.ready_timeout_ms, 7500);
+        assert!(!manifest.required);
+        assert_eq!(manifest.window_ms, 120_000);
+        assert_eq!(manifest.grants, ["initfs"]);
         assert!(!manifest.enable);
         assert_eq!(
             manifest.env,
@@ -367,6 +420,10 @@ FOO = "bar"
         assert_eq!(manifest.restart_delay_ms, 200);
         assert_eq!(manifest.max_restarts, 5);
         assert_eq!(manifest.readiness, Readiness::None);
+        assert_eq!(manifest.ready_timeout_ms, 5_000);
+        assert!(manifest.required);
+        assert_eq!(manifest.window_ms, 60_000);
+        assert!(manifest.grants.is_empty());
         assert!(manifest.enable);
         assert!(manifest.args.is_empty());
         assert!(manifest.env.is_empty());
@@ -600,5 +657,104 @@ FOO = "bar"
         assert_eq!(manifest.max_restarts, u32::MAX);
         let manifest = parse("name = \"x\"\nexec = \"/x\"\nmax_restarts = 0");
         assert_eq!(manifest.max_restarts, 0);
+    }
+
+    #[test]
+    fn grants_parse_in_order() {
+        let manifest = parse("name = \"x\"\nexec = \"/x\"\ngrants = [\"initfs\", \"block\"]");
+        assert_eq!(manifest.grants, ["initfs", "block"]);
+    }
+
+    #[test]
+    fn grants_reject_bad_names() {
+        assert!(matches!(
+            kind("name = \"x\"\nexec = \"/x\"\ngrants = [\"Init FS\"]"),
+            ParseErrorKind::InvalidValue("grants")
+        ));
+        assert!(matches!(
+            kind("name = \"x\"\nexec = \"/x\"\ngrants = [\"\"]"),
+            ParseErrorKind::InvalidValue("grants")
+        ));
+    }
+
+    #[test]
+    fn ready_timeout_defaults_and_boundaries() {
+        let manifest = parse("name = \"x\"\nexec = \"/x\"");
+        assert_eq!(manifest.ready_timeout_ms, 5_000);
+        let manifest = parse("name = \"x\"\nexec = \"/x\"\nready_timeout_ms = 0");
+        assert_eq!(manifest.ready_timeout_ms, 0);
+        let manifest = parse("name = \"x\"\nexec = \"/x\"\nready_timeout_ms = 60_000");
+        assert_eq!(manifest.ready_timeout_ms, 60_000);
+        assert!(matches!(
+            kind("name = \"x\"\nexec = \"/x\"\nready_timeout_ms = 60001"),
+            ParseErrorKind::IntegerOutOfRange("ready_timeout_ms")
+        ));
+    }
+
+    #[test]
+    fn required_defaults_to_true() {
+        let manifest = parse("name = \"x\"\nexec = \"/x\"");
+        assert!(manifest.required);
+        let manifest = parse("name = \"x\"\nexec = \"/x\"\nrequired = false");
+        assert!(!manifest.required);
+    }
+
+    #[test]
+    fn window_ms_defaults_and_boundaries() {
+        let manifest = parse("name = \"x\"\nexec = \"/x\"");
+        assert_eq!(manifest.window_ms, 60_000);
+        let manifest = parse("name = \"x\"\nexec = \"/x\"\nwindow_ms = 3_600_000");
+        assert_eq!(manifest.window_ms, 3_600_000);
+        assert!(matches!(
+            kind("name = \"x\"\nexec = \"/x\"\nwindow_ms = 3600001"),
+            ParseErrorKind::IntegerOutOfRange("window_ms")
+        ));
+    }
+
+    #[test]
+    fn new_extension_types_are_strict() {
+        assert!(matches!(
+            kind("name = \"x\"\nexec = \"/x\"\ngrants = \"initfs\""),
+            ParseErrorKind::InvalidValue("grants")
+        ));
+        assert!(matches!(
+            kind("name = \"x\"\nexec = \"/x\"\nrequired = \"true\""),
+            ParseErrorKind::InvalidValue("required")
+        ));
+        assert!(matches!(
+            kind("name = \"x\"\nexec = \"/x\"\nready_timeout_ms = \"5000\""),
+            ParseErrorKind::InvalidValue("ready_timeout_ms")
+        ));
+        assert!(matches!(
+            kind("name = \"x\"\nexec = \"/x\"\nwindow_ms = \"60000\""),
+            ParseErrorKind::InvalidValue("window_ms")
+        ));
+    }
+
+    #[test]
+    fn duplicate_extension_keys_are_rejected() {
+        assert!(matches!(
+            kind("name = \"x\"\nexec = \"/x\"\nrequired = true\nrequired = false"),
+            ParseErrorKind::DuplicateKey(key) if key == "required"
+        ));
+        assert!(matches!(
+            kind("name = \"x\"\nexec = \"/x\"\ngrants = []\ngrants = []"),
+            ParseErrorKind::DuplicateKey(key) if key == "grants"
+        ));
+    }
+
+    #[test]
+    fn old_manifests_keep_their_meaning() {
+        let manifest = parse(
+            "name = \"vfsd\"\nexec = \"/sbin/vfsd\"\nneeds = [\"logd\"]\nreadiness = \"scheme\"",
+        );
+        assert_eq!(manifest.needs, ["logd"]);
+        assert_eq!(manifest.readiness, Readiness::Scheme);
+        assert_eq!(manifest.restart, Restart::OnFailure);
+        assert_eq!(manifest.restart_delay_ms, 200);
+        assert_eq!(manifest.max_restarts, 5);
+        assert_eq!(manifest.ready_timeout_ms, 5_000);
+        assert!(manifest.required);
+        assert!(manifest.grants.is_empty());
     }
 }

@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "x"
+exec = "/sbin/testsvc"
+args = ["x"]
+restart = "on-failure"
+restart_delay_ms = 300
+max_restarts = 3
+required = false
