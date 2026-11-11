@@ -1,0 +1,259 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# SACK scoreboard vectors: loss marks, Pipe and NextSeg.
+# RFCs encoded: 6675 sections 2-5 (scoreboard, IsLost, SetPipe, NextSeg),
+# 2018 section 3 (SACK blocks), 2883 (DSACK). Offsets are bytes relative to
+# snd_una; see sack.md for the exact definitions and worked cases.
+
+[[case]]
+name = "empty-scoreboard"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 10000
+high_rxt = 0
+unsent_available = true
+receiver_window = 20000
+range_cap = 16
+sacked = []
+expect = { sacked_after = [], dsack_detected = false, reneging = false, dropped = 0, pipe = 10000, lost = [], next_seg = { start = 10000, len = 1000, kind = "new", rule = 2 }, high_rxt_after = 0, rescue_rxt_after = -1 }
+
+[[case]]
+name = "one-sacked-range"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 5000
+high_rxt = 0
+unsent_available = true
+receiver_window = 10000
+range_cap = 16
+sacked = [[2000, 3000]]
+expect = { sacked_after = [[2000, 3000]], dsack_detected = false, reneging = false, dropped = 0, pipe = 4000, lost = [], next_seg = { start = 5000, len = 1000, kind = "new", rule = 2 }, high_rxt_after = 0, rescue_rxt_after = -1 }
+
+[[case]]
+name = "three-sacked-ranges"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 6000
+high_rxt = 0
+unsent_available = false
+receiver_window = 0
+range_cap = 16
+sacked = [[1000, 2000], [3000, 4000], [5000, 6000]]
+expect = { sacked_after = [[1000, 2000], [3000, 4000], [5000, 6000]], dsack_detected = false, reneging = false, dropped = 0, pipe = 2000, lost = [[0, 1000]], next_seg = { start = 0, len = 1000, kind = "retransmit", rule = 1 }, high_rxt_after = 1000, rescue_rxt_after = -1 }
+
+[[case]]
+name = "sack-bytes-threshold"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 4000
+high_rxt = 0
+unsent_available = false
+receiver_window = 0
+range_cap = 16
+sacked = [[1500, 4000]]
+expect = { sacked_after = [[1500, 4000]], dsack_detected = false, reneging = false, dropped = 0, pipe = 0, lost = [[0, 1500]], next_seg = { start = 0, len = 1000, kind = "retransmit", rule = 1 }, high_rxt_after = 1000, rescue_rxt_after = -1 }
+
+[[case]]
+name = "below-threshold"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 5000
+high_rxt = 0
+unsent_available = true
+receiver_window = 10000
+range_cap = 16
+sacked = [[2000, 3000]]
+expect = { sacked_after = [[2000, 3000]], dsack_detected = false, reneging = false, dropped = 0, pipe = 4000, lost = [], next_seg = { start = 5000, len = 1000, kind = "new", rule = 2 }, high_rxt_after = 0, rescue_rxt_after = -1 }
+
+[[case]]
+name = "high-rxt-pipe"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 5000
+high_rxt = 5000
+unsent_available = false
+receiver_window = 0
+range_cap = 16
+sacked = [[2000, 3000]]
+expect = { sacked_after = [[2000, 3000]], dsack_detected = false, reneging = false, dropped = 0, pipe = 8000, lost = [], next_seg = { start = 4000, len = 1000, kind = "rescue", rule = 4 }, high_rxt_after = 5000, rescue_rxt_after = 5000 }
+
+[[case]]
+name = "rule2-after-no-rule1"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 6000
+high_rxt = 1500
+unsent_available = true
+receiver_window = 10000
+range_cap = 16
+sacked = [[1000, 2000], [3000, 4000], [5000, 6000]]
+expect = { sacked_after = [[1000, 2000], [3000, 4000], [5000, 6000]], dsack_detected = false, reneging = false, dropped = 0, pipe = 3000, lost = [[0, 1000]], next_seg = { start = 6000, len = 1000, kind = "new", rule = 2 }, high_rxt_after = 1500, rescue_rxt_after = -1 }
+
+[[case]]
+name = "rule3-no-unsent"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 6000
+high_rxt = 1500
+unsent_available = false
+receiver_window = 0
+range_cap = 16
+sacked = [[1000, 2000], [3000, 4000], [5000, 6000]]
+expect = { sacked_after = [[1000, 2000], [3000, 4000], [5000, 6000]], dsack_detected = false, reneging = false, dropped = 0, pipe = 3000, lost = [[0, 1000]], next_seg = { start = 2000, len = 1000, kind = "retransmit", rule = 3 }, high_rxt_after = 3000, rescue_rxt_after = -1 }
+
+[[case]]
+name = "rule4-rescue"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 3000
+high_rxt = 0
+unsent_available = false
+receiver_window = 0
+range_cap = 16
+sacked = [[0, 1000]]
+expect = { sacked_after = [[0, 1000]], dsack_detected = false, reneging = false, dropped = 0, pipe = 2000, lost = [], next_seg = { start = 2000, len = 1000, kind = "rescue", rule = 4 }, high_rxt_after = 0, rescue_rxt_after = 3000 }
+
+[[case]]
+name = "rule5-all-sacked"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 3000
+high_rxt = 0
+unsent_available = false
+receiver_window = 0
+range_cap = 16
+sacked = [[0, 3000]]
+expect = { sacked_after = [[0, 3000]], dsack_detected = false, reneging = false, dropped = 0, pipe = 0, lost = [], next_seg = { start = -1, len = 0, kind = "none", rule = 5 }, high_rxt_after = 0, rescue_rxt_after = -1 }
+
+[[case]]
+name = "dsack-duplicate"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 5000
+high_rxt = 0
+unsent_available = true
+receiver_window = 10000
+range_cap = 16
+sacked = [[2000, 3000]]
+dsack = [[-1000, 0]]
+expect = { sacked_after = [[2000, 3000]], dsack_detected = true, reneging = false, dropped = 0, pipe = 4000, lost = [], next_seg = { start = 5000, len = 1000, kind = "new", rule = 2 }, high_rxt_after = 0, rescue_rxt_after = -1 }
+
+[[case]]
+name = "reneging"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 4000
+high_rxt = 0
+unsent_available = false
+receiver_window = 0
+range_cap = 16
+sacked = []
+previously_sacked = [[1000, 3000]]
+expect = { sacked_after = [], dsack_detected = false, reneging = true, dropped = 0, pipe = 4000, lost = [], next_seg = { start = 3000, len = 1000, kind = "rescue", rule = 4 }, high_rxt_after = 0, rescue_rxt_after = 4000 }
+
+[[case]]
+name = "cap-two"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 6000
+high_rxt = 0
+unsent_available = false
+receiver_window = 0
+range_cap = 2
+sacked = [[1000, 2000], [3000, 4000], [5000, 6000]]
+expect = { sacked_after = [[1000, 2000], [3000, 4000]], dsack_detected = false, reneging = false, dropped = 1, pipe = 4000, lost = [], next_seg = { start = 0, len = 1000, kind = "retransmit", rule = 3 }, high_rxt_after = 1000, rescue_rxt_after = -1 }
+
+[[case]]
+name = "mixed-pipe"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 7000
+high_rxt = 4500
+unsent_available = false
+receiver_window = 0
+range_cap = 16
+sacked = [[1000, 2000], [3000, 5000]]
+expect = { sacked_after = [[1000, 2000], [3000, 5000]], dsack_detected = false, reneging = false, dropped = 0, pipe = 5000, lost = [[0, 1000]], next_seg = { start = 6000, len = 1000, kind = "rescue", rule = 4 }, high_rxt_after = 4500, rescue_rxt_after = 7000 }
+
+[[case]]
+name = "lost-gap"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 7000
+high_rxt = 0
+unsent_available = false
+receiver_window = 0
+range_cap = 16
+sacked = [[1000, 2000], [3000, 4000], [5000, 6000]]
+expect = { sacked_after = [[1000, 2000], [3000, 4000], [5000, 6000]], dsack_detected = false, reneging = false, dropped = 0, pipe = 3000, lost = [[0, 1000]], next_seg = { start = 0, len = 1000, kind = "retransmit", rule = 1 }, high_rxt_after = 1000, rescue_rxt_after = -1 }
+
+[[case]]
+name = "rule4-existing-rescue"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 3000
+high_rxt = 0
+rescue_rxt = 3000
+unsent_available = false
+receiver_window = 0
+range_cap = 16
+sacked = [[0, 1000]]
+expect = { sacked_after = [[0, 1000]], dsack_detected = false, reneging = false, dropped = 0, pipe = 2000, lost = [], next_seg = { start = -1, len = 0, kind = "none", rule = 5 }, high_rxt_after = 0, rescue_rxt_after = 3000 }
+
+[[case]]
+name = "high-rxt-in-gap"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 5000
+high_rxt = 1500
+unsent_available = false
+receiver_window = 0
+range_cap = 16
+sacked = [[1000, 2000], [3000, 4000]]
+expect = { sacked_after = [[1000, 2000], [3000, 4000]], dsack_detected = false, reneging = false, dropped = 0, pipe = 4000, lost = [], next_seg = { start = 2000, len = 1000, kind = "retransmit", rule = 3 }, high_rxt_after = 3000, rescue_rxt_after = -1 }
+
+[[case]]
+name = "no-sacked-unsent"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 5000
+high_rxt = 0
+unsent_available = true
+receiver_window = 6000
+range_cap = 16
+sacked = []
+expect = { sacked_after = [], dsack_detected = false, reneging = false, dropped = 0, pipe = 5000, lost = [], next_seg = { start = 5000, len = 1000, kind = "new", rule = 2 }, high_rxt_after = 0, rescue_rxt_after = -1 }
+
+[[case]]
+name = "sacked-tail"
+mss = 1000
+dup_ack_threshold = 3
+snd_una = 0
+high_data = 6000
+high_rxt = 0
+unsent_available = false
+receiver_window = 0
+range_cap = 16
+sacked = [[0, 4000]]
+expect = { sacked_after = [[0, 4000]], dsack_detected = false, reneging = false, dropped = 0, pipe = 2000, lost = [], next_seg = { start = 5000, len = 1000, kind = "rescue", rule = 4 }, high_rxt_after = 0, rescue_rxt_after = 6000 }
+
+# 19 cases. DSACK, reneging, range cap and all five NextSeg rules are covered.
