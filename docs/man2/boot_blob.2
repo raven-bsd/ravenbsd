@@ -1,21 +1,74 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt BOOT_BLOB 2
 .Os RavenBSD
 .Sh NAME
 .Nm boot_blob
-.Nd returns a boot-time blob
+.Nd return a read-only boot-time blob
 .Sh SYNOPSIS
-See the
-.Pa raven-abi
-crate (syscall number 0x71).
+.Fn boot_blob root_dev kind
 .Sh DESCRIPTION
-The
-.Nm
-system call is part of RavenBSD ABI v1. It is implemented by ticket S21a; this page is the contract placeholder and will be
-completed when S21a lands. The authoritative signature is the doc comment of the syscall in the
-.Pa raven-abi
-crate.
+.Nm returns a read-only memory object with a copy of boot-time data.
+.Fa root_dev
+must be the
+.Em RootDevice
+capability with
+.Dv ADMIN ,
+exactly as for
+.Xr mmio_create 2 .
+.Fa kind
+selects the payload:
+.Bl -tag -width Ds
+.It Dv 1
+The ACPI bundle.  Its first bytes are a header
+.Sy { magic: u32, version: u16, header_size: u16, rsdp_phys: u64,
+table_count: u32, directory_offset: u32 }
+with magic
+.Qq RAC1
+(0x31434152), version 1, and a header size of 24.
+At
+.Em directory_offset
+follow
+.Em table_count
+20-byte directory entries
+.Sy { signature: [u8; 8], offset: u32, length: u32, reserved: u32 }
+naming blob-relative payload offsets.
+The payloads are verbatim copies of the RSDP (signature
+.Qq RSD PTR ) ,
+the XSDT/RSDT, and every top-level table the kernel can reach (FADT, MADT,
+MCFG and friends); SSDT and DSDT are never copied.
+.It Dv 2
+The flattened device tree; absent on x86-64, so
+.Er ENOENT .
+.It Dv 3
+The memory-map summary: the BootInfo regions as
+.Sy raven_bootinfo::MemoryRegion
+records, page padded; the first all-zero record ends the array.
+.El
+The returned handle carries
+.Dv READ ,
+.Dv MAP ,
+.Dv DUP
+and
+.Dv TRANSFER .
+It has no
+.Dv WRITE
+right and a mapping with
+.Dv PROT_WRITE
+is refused with
+.Er EPERM .
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EPERM
+No root capability with
+.Dv ADMIN .
+.It Er ENOENT
+The requested blob does not exist on this platform.
+.It Er EINVAL
+Unknown kind.
+.It Er EMFILE
+The process handle table is full.
+.El
 .Sh STANDARDS
 RavenBSD ABI v1.

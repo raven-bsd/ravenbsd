@@ -52,6 +52,11 @@ pub fn clone_transferable(
         Ok(Object::Memory(object)) => Object::Memory(Arc::clone(object)),
         Ok(Object::Timer(object)) => Object::Timer(Arc::clone(object)),
         Ok(Object::UserEvent(object)) => Object::UserEvent(Arc::clone(object)),
+        Ok(Object::RootDevice) => Object::RootDevice,
+        #[cfg(target_arch = "x86_64")]
+        Ok(Object::MmioRegion(object)) => Object::MmioRegion(Arc::clone(object)),
+        #[cfg(target_arch = "x86_64")]
+        Ok(Object::BootBlob(object)) => Object::BootBlob(Arc::clone(object)),
         #[cfg(target_arch = "x86_64")]
         Ok(Object::SchemeFile(object)) => Object::SchemeFile(Arc::clone(object)),
         #[cfg(target_arch = "x86_64")]

@@ -41,6 +41,37 @@ impl MemObject {
         Ok(Arc::new(MemObject { frames }))
     }
 
+    /// Allocate page-rounded frames and copy `bytes` into them. Padding stays zeroed.
+    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S21a boot blobs are x86-64.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Arc<MemObject>, Errno> {
+        let pages = bytes.len().div_ceil(frame::PAGE_SIZE as usize);
+        let pages = u64::try_from(pages.max(1)).map_err(|_| Errno::EINVAL)?;
+        let object = MemObject::new(pages)?;
+        let mut index = 0u64;
+        let mut copied = 0usize;
+        while copied < bytes.len() {
+            let Some(physical) = object.frame_at(index) else {
+                return Err(Errno::ENOMEM);
+            };
+            let destination = frame::phys_to_virt(frame::PhysAddr(physical));
+            if destination.is_null() {
+                return Err(Errno::ENOMEM);
+            }
+            let chunk = core::cmp::min(
+                frame::PAGE_SIZE as usize,
+                bytes.len().saturating_sub(copied),
+            );
+            // SAFETY: `destination` is a fresh frame mapped writable through the HHDM and `chunk`
+            // stays within both the frame and the remaining source bytes.
+            unsafe {
+                core::ptr::copy_nonoverlapping(bytes.as_ptr().add(copied), destination, chunk);
+            }
+            copied = copied.saturating_add(chunk);
+            index = index.saturating_add(1);
+        }
+        Ok(object)
+    }
+
     /// Length in bytes.
     pub fn len(&self) -> u64 {
         u64::try_from(self.frames.len())
@@ -64,6 +95,44 @@ impl Drop for MemObject {
     }
 }
 
+/// A device-memory window a driver can map (`MMIO_CREATE`). Immutable after creation.
+#[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S21a implements the device syscalls on x86-64.
+pub struct MmioRegion {
+    /// Physical start address (page aligned).
+    phys: u64,
+    /// Length in bytes (page multiple, non-zero).
+    len: u64,
+    /// Creation attributes; only 0 is defined today.
+    attrs: u32,
+}
+
+impl MmioRegion {
+    /// Construct a region. Callers must have validated the range.
+    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S21a is x86-64.
+    pub const fn new(phys: u64, len: u64, attrs: u32) -> Self {
+        Self { phys, len, attrs }
+    }
+
+    /// Physical start address.
+    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S21a is x86-64.
+    pub const fn phys(&self) -> u64 {
+        self.phys
+    }
+
+    /// Length in bytes.
+    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S21a is x86-64.
+    pub const fn len(&self) -> u64 {
+        self.len
+    }
+
+    /// Creation attributes.
+    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S21a is x86-64.
+    #[allow(dead_code)] // Reported to drivers by later tickets.
+    pub const fn attrs(&self) -> u32 {
+        self.attrs
+    }
+}
+
 /// Objects a handle can refer to in S08.
 #[allow(dead_code)] // Object access is used by later MAP/THREAD tickets; PID 1 only closes/dups now.
 #[derive(Clone)]
@@ -84,6 +153,14 @@ pub enum Object {
     Timer(Arc<Timer>),
     /// A user-space doorbell event source.
     UserEvent(Arc<UserEvent>),
+    /// The root device capability held by the first process (`Handle::ROOT_DEVICE`).
+    RootDevice,
+    /// A device-memory window created by `MMIO_CREATE`.
+    #[cfg(target_arch = "x86_64")]
+    MmioRegion(Arc<MmioRegion>),
+    /// A read-only boot-time blob (`BOOT_BLOB`).
+    #[cfg(target_arch = "x86_64")]
+    BootBlob(Arc<MemObject>),
     /// An open scheme file.
     #[cfg(target_arch = "x86_64")]
     SchemeFile(Arc<SchemeFile>),
@@ -98,10 +175,11 @@ pub enum Object {
 /// The kernel's handle table type.
 pub type Table = HandleTable<Object>;
 
-/// Install the well-known handles 0, 1 and 2 in a fresh process.
+/// Install the well-known handles 0, 1 and 2 (and 3 for the first process) in a fresh process.
 ///
-/// The first process (the spawner) gets the `EXEC` right on the initfs; child processes only get
-/// `READ|MAP`, so they can inspect the archive but cannot map executable file pages.
+/// The first process (the spawner) gets the `EXEC` right on the initfs and the `RootDevice`
+/// capability at `Handle::ROOT_DEVICE`; child processes only get `READ|MAP` on the initfs, so they
+/// can inspect the archive but cannot map executable file pages, and no root capability.
 pub fn install_initial(
     table: &mut Table,
     process: &Arc<Process>,
@@ -114,5 +192,9 @@ pub fn install_initial(
     }
     table.insert(Object::MemObjectInitfs, initfs)?;
     table.insert(Object::Namespace, Rights::READ)?;
+    if initfs_exec {
+        let root = Rights::ADMIN.union(Rights::DUP).union(Rights::TRANSFER);
+        table.insert(Object::RootDevice, root)?;
+    }
     Ok(())
 }

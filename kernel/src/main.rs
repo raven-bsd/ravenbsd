@@ -19,6 +19,8 @@ mod cmdline;
 mod fdt {
     pub use crate::arch::aarch64::fdt::*;
 }
+#[cfg(target_arch = "x86_64")]
+mod driver;
 mod event;
 mod initfs;
 #[cfg(target_arch = "x86_64")]
@@ -80,6 +82,7 @@ pub extern "C" fn kmain(boot: *const raven_bootinfo::BootInfo) -> ! {
         boot::exit_qemu(0x11);
     }
     initfs::init();
+    crate::driver::init();
     if let Err(error) = sched::init() {
         kprintln!("kernel: scheduler init failed: {error:?}");
         boot::exit_qemu(0x11);

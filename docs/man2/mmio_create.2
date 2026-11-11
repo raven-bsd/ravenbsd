@@ -1,21 +1,82 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt MMIO_CREATE 2
 .Os RavenBSD
 .Sh NAME
 .Nm mmio_create
-.Nd creates a device memory region
+.Nd create a device-memory region
 .Sh SYNOPSIS
-See the
-.Pa raven-abi
-crate (syscall number 0x70).
+.Fn mmio_create root_dev phys len attrs
 .Sh DESCRIPTION
-The
-.Nm
-system call is part of RavenBSD ABI v1. It is implemented by ticket S21a; this page is the contract placeholder and will be
-completed when S21a lands. The authoritative signature is the doc comment of the syscall in the
-.Pa raven-abi
-crate.
+.Nm creates an
+.Em MmioRegion
+capability for the device window at physical address
+.Fa phys
+of
+.Fa len
+bytes.
+.Fa root_dev
+must be the
+.Em RootDevice
+capability (well-known handle 3 of the first process) or a duplicate that
+keeps the
+.Dv ADMIN
+right; any other handle, or one without
+.Dv ADMIN ,
+fails with
+.Er EPERM .
+.Bl -bullet
+.It
+.Fa phys
+and
+.Fa len
+must be non-zero multiples of 4096.
+.It
+The range must not intersect ordinary RAM, the kernel image, loader memory,
+or the local APIC / IOAPIC windows the kernel owns; such ranges fail with
+.Er EPERM .
+Ranges inside
+.Em Reserved
+or
+.Em Mmio
+memory-map regions, or outside the memory map, are device space and allowed.
+.It
+.Fa attrs
+is reserved; only 0 is accepted
+.Er EINVAL
+otherwise.
+.El
+The returned handle carries
+.Dv READ ,
+.Dv WRITE ,
+.Dv MAP ,
+.Dv DUP
+and
+.Dv TRANSFER .
+.Pp
+The region is mapped with
+.Xr map 2
+using the memory-object conventions: offset and length must be page aligned
+and stay inside the region, otherwise
+.Er EINVAL .
+The mapping is uncached (x86-64 PCD+PWT cache-disable + write-through, the
+same attribute pair the kernel uses for its own device windows), never
+executable, and exists only in the mapped process; it is removed on process
+exit without recycling the device pages.
+A writable mapping requires the
+.Dv WRITE
+right.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EPERM
+No root capability with
+.Dv ADMIN ,
+or the range is not device space.
+.It Er EINVAL
+Misaligned or overflowing addresses, zero length, or unknown attributes.
+.It Er EMFILE
+The process handle table is full.
+.El
 .Sh STANDARDS
 RavenBSD ABI v1.

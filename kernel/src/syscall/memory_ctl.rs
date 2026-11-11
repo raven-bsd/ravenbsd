@@ -13,6 +13,8 @@ use raven_abi::layout::x86_64::{USER_END, USER_MIN};
 use raven_abi::types::{Handle, Rights, map, prot};
 use raven_vma::PAGE_SIZE;
 
+#[cfg(target_arch = "x86_64")]
+use crate::process::handle::MmioRegion;
 use crate::process::{self, Process, handle::MemObject, handle::Object};
 use crate::syscall::SyscallFrame;
 
@@ -23,6 +25,10 @@ enum MappedObject {
     Anonymous,
     Initfs,
     MemObject(Arc<MemObject>),
+    #[cfg(target_arch = "x86_64")]
+    Mmio(Arc<MmioRegion>),
+    #[cfg(target_arch = "x86_64")]
+    BootBlob(Arc<MemObject>),
 }
 
 /// `memobj_create(len, flags) -> Handle`.
@@ -73,7 +79,7 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
         return Err(Errno::EINVAL);
     }
 
-    let object = resolve_object(&caller, raw_memobj, offset, protection, shared)?;
+    let object = resolve_object(&caller, raw_memobj, offset, len, protection, shared)?;
 
     if fixed {
         let end = addr.checked_add(len).ok_or(Errno::EINVAL)?;
@@ -103,6 +109,16 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
         }
         MappedObject::MemObject(object) => {
             address_space.map_memobj(vaddr, len, offset, protection, object, shared)?;
+        }
+        #[cfg(target_arch = "x86_64")]
+        MappedObject::Mmio(region) => {
+            let physical = region.phys().checked_add(offset).ok_or(Errno::EINVAL)?;
+            let writable = protection & (prot::WRITE as u8) != 0;
+            address_space.map_mmio(vaddr, len, physical, writable)?;
+        }
+        #[cfg(target_arch = "x86_64")]
+        MappedObject::BootBlob(object) => {
+            address_space.map_memobj(vaddr, len, offset, protection, object, false)?;
         }
     }
     Ok(vaddr as usize)
@@ -152,10 +168,12 @@ fn lookup_process(
     }
 }
 
+#[cfg_attr(target_arch = "aarch64", allow(unused_variables))] // The x86-64-only driver arms consume these.
 fn resolve_object(
     caller: &Arc<Process>,
     raw: u32,
     offset: u64,
+    len: u64,
     protection: u8,
     shared: bool,
 ) -> Result<MappedObject, Errno> {
@@ -184,17 +202,78 @@ fn resolve_object(
             _ => Err(Errno::EBADF),
         }
     } else {
-        let mut needed = Rights::MAP;
-        if shared && protection & (prot::WRITE as u8) != 0 {
-            needed = needed.union(Rights::WRITE);
+        enum Kind {
+            Memory,
+            #[cfg(target_arch = "x86_64")]
+            Mmio,
+            #[cfg(target_arch = "x86_64")]
+            Blob,
         }
-        if exec {
-            needed = needed.union(Rights::EXEC);
-        }
-        let handles = caller.handles.lock();
-        match handles.get(handle, needed)? {
-            Object::Memory(object) => Ok(MappedObject::MemObject(Arc::clone(object))),
-            _ => Err(Errno::EBADF),
+        let kind = {
+            let handles = caller.handles.lock();
+            match handles.get(handle, Rights::NONE) {
+                Ok(Object::Memory(_)) => Kind::Memory,
+                #[cfg(target_arch = "x86_64")]
+                Ok(Object::MmioRegion(_)) => Kind::Mmio,
+                #[cfg(target_arch = "x86_64")]
+                Ok(Object::BootBlob(_)) => Kind::Blob,
+                Ok(_) => return Err(Errno::EBADF),
+                Err(error) => return Err(error),
+            }
+        };
+        match kind {
+            Kind::Memory => {
+                let mut needed = Rights::MAP;
+                if shared && protection & (prot::WRITE as u8) != 0 {
+                    needed = needed.union(Rights::WRITE);
+                }
+                if exec {
+                    needed = needed.union(Rights::EXEC);
+                }
+                let handles = caller.handles.lock();
+                match handles.get(handle, needed)? {
+                    Object::Memory(object) => Ok(MappedObject::MemObject(Arc::clone(object))),
+                    _ => Err(Errno::EBADF),
+                }
+            }
+            #[cfg(target_arch = "x86_64")]
+            Kind::Mmio => {
+                if exec {
+                    return Err(Errno::EINVAL);
+                }
+                let mut needed = Rights::MAP;
+                if protection & (prot::WRITE as u8) != 0 {
+                    needed = needed.union(Rights::WRITE);
+                }
+                let region = {
+                    let handles = caller.handles.lock();
+                    match handles.get(handle, needed) {
+                        Ok(Object::MmioRegion(region)) => Arc::clone(region),
+                        Ok(_) => return Err(Errno::EPERM),
+                        Err(Errno::EACCES) => return Err(Errno::EPERM),
+                        Err(error) => return Err(error),
+                    }
+                };
+                let end = offset.checked_add(len).ok_or(Errno::EINVAL)?;
+                if end > region.len() {
+                    return Err(Errno::EINVAL);
+                }
+                Ok(MappedObject::Mmio(region))
+            }
+            #[cfg(target_arch = "x86_64")]
+            Kind::Blob => {
+                if protection & (prot::WRITE as u8) != 0 {
+                    return Err(Errno::EPERM);
+                }
+                if shared {
+                    return Err(Errno::EINVAL);
+                }
+                let handles = caller.handles.lock();
+                match handles.get(handle, Rights::MAP)? {
+                    Object::BootBlob(object) => Ok(MappedObject::BootBlob(Arc::clone(object))),
+                    _ => Err(Errno::EBADF),
+                }
+            }
         }
     }
 }
