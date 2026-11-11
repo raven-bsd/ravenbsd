@@ -202,6 +202,13 @@ fn stale_handles() -> Result<(), Errno> {
         return Err(Errno::EIO);
     }
     close(fresh)?;
+    println!(
+        "s35: slot {} retired after {} closes; stale cycle-1 handle EBADF; next slot {} generation {}",
+        slot,
+        RETIRE_AFTER,
+        fresh.index(),
+        fresh.generation()
+    );
     Ok(())
 }
 
@@ -259,6 +266,7 @@ fn rights() -> Result<(), Errno> {
     close(narrowed)?;
     close(transferred)?;
     close(memory)?;
+    println!("s35: transfer READ|WRITE|MAP|DUP|TRANSFER ok");
     Ok(())
 }
 
@@ -299,6 +307,7 @@ fn close_order() -> Result<(), Errno> {
 
     close(observer)?;
     close(queue)?;
+    println!("s35: bad close EBADF kept the event, good close removed it");
     Ok(())
 }
 

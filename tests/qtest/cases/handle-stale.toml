@@ -11,10 +11,19 @@ boot_cmdline = "console=ttyS0 test-exit=1"
 expect_exit = "success"
 
 [[expect]]
+regex = '^s35: slot [0-9]+ retired after 256 closes; stale cycle-1 handle EBADF; next slot [0-9]+ generation 44$'
+
+[[expect]]
 regex = '^s35: stale handles ok$'
 
 [[expect]]
+regex = '^s35: transfer READ\|WRITE\|MAP\|DUP\|TRANSFER ok$'
+
+[[expect]]
 regex = '^s35: rights ok$'
+
+[[expect]]
+regex = '^s35: bad close EBADF kept the event, good close removed it$'
 
 [[expect]]
 regex = '^s35: close order ok$'
