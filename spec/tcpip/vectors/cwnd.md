@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # Congestion-window arithmetic
 
 Status: companion to `cwnd.toml` and normative for C13. All values are bytes;

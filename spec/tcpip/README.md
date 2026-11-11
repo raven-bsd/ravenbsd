@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # raven-tcpip: clean-room behaviour specification
 
 Status: C01 spec wave, rev 1. Licence of this document: BSD-3-Clause.

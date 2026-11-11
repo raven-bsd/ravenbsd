@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # Behaviour oracle: measurement plan and result table
 
 Status: plan for C24, with the measurements that could actually be taken on the

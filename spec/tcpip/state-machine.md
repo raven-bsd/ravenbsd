@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # TCP state machine, RST policy and timers
 
 Status: normative for C08-C20. Every row carries an identifier used by the

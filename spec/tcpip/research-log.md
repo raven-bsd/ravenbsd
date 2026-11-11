@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # Research log (C01 spec-author session)
 
 Status: provenance record, not a specification. It lists the donor material

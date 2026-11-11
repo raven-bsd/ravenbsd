@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # Feature decisions and smoltcp comparison
 
 Status: normative decision table for C02-C27. The smoltcp column is an

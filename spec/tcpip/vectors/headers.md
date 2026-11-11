@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # Header vector arithmetic and parser contract
 
 Status: companion to `headers.toml`. It defines the field names, the order in

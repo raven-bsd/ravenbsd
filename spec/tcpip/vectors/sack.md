@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # SACK scoreboard and recovery arithmetic
 
 Status: companion to `sack.toml` and normative for C12. It is the sender-side

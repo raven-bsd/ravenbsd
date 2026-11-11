@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
 # RTT sample and timeout sequences -> SRTT, RTTVAR, RTO.
 # RFC 6298 sections 2.2, 2.3, 2.4, 2.5 and 5; RFC 1122 section 4.2.3.1.
 # Fixed point: SRTT/RTTVAR in eighths of a millisecond (q8).

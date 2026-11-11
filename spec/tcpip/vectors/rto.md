@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # RTO arithmetic
 
 Status: companion to `rto.toml` and normative for C10. The estimator is the
