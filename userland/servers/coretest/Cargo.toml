@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-coretest"
+version = "0.1.0"
+description = "One-shot client used by the core-servers qtest."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-rt = { path = "../../rt", features = ["alloc"] }
+raven-scheme = { path = "../../../crates/raven-scheme" }
+
+[lints]
+workspace = true

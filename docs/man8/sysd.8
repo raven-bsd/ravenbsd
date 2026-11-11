@@ -1,0 +1,54 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 11, 2026
+.Dt SYSD 8
+.Os RavenBSD
+.Sh NAME
+.Nm sysd
+.Nd RavenBSD system information server
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+registers the
+.Dq sys:
+scheme.
+The directory contains these files:
+.Bl -tag -width "hostname"
+.It Va hostname
+System hostname, read/write, default
+.Dq raven ,
+at most 63 bytes.
+A write replaces the hostname and ignores one trailing newline.
+.It Va uname
+The five
+.Xr uname 1
+fields, one per line: sysname, nodename, release, version and machine.
+.It Va version
+The
+.Xr uname 1
+version field.
+.It Va uptime
+Seconds since boot from
+.Dv CLOCK_MONOTONIC .
+.It Va kernel
+The system name, release and version on one line.
+.El
+.Pp
+All files end with a newline.
+Only
+.Va hostname
+is writable.
+.Sh FILES
+.Bl -tag -width /etc/services.d -compact
+.It Pa /etc/services.d/sysd.toml
+Service manifest.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr uname 1 ,
+.Xr logd 8 ,
+.Xr init 8
+.Sh STANDARDS
+RavenBSD.

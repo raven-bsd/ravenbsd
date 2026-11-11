@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The core-servers integration profile. It inherits the shell profile's programs and fragments
+# (including the five core servers and their manifests) and adds the one-shot client.
+
+name = "core-test"
+
+extends = "shell"
+
+[boot]
+cmdline = "console=ttyS0 loglevel=info"
+log_level = "info"

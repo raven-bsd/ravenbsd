@@ -329,6 +329,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-coretest"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-echo"
 version = "0.1.0"
 dependencies = [
@@ -442,6 +451,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-logd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-mem"
 version = "0.1.0"
 
@@ -464,6 +483,20 @@ dependencies = [
  "serde_json",
  "smoltcp",
 ]
+
+[[package]]
+name = "raven-nulld"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-prng"
+version = "0.1.0"
 
 [[package]]
 name = "raven-proto-audio"
@@ -510,6 +543,17 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+]
+
+[[package]]
+name = "raven-randd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-prng",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -629,6 +673,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-sysd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-testkernel"
 version = "0.1.0"
 dependencies = [
@@ -668,6 +722,16 @@ version = "0.1.0"
 [[package]]
 name = "raven-vma"
 version = "0.1.0"
+
+[[package]]
+name = "raven-zerod"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
 
 [[package]]
 name = "regex"

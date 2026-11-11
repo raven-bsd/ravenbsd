@@ -1,0 +1,37 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 11, 2026
+.Dt RANDD 8
+.Os RavenBSD
+.Sh NAME
+.Nm randd
+.Nd RavenBSD pseudo-random device server
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+registers the
+.Dq rand:
+scheme.
+Reads return pseudo-random bytes from a ChaCha20-based generator and writes mix their input into
+the generator state.
+.Pp
+The generator is seeded from the monotonic clock and a stack address and re-seeded from the clock
+every 64 KiB.
+.Sy It is not cryptographically secure.
+Until a real entropy source exists, applications must not use
+.Dq rand:
+for keys, nonces or other secrets.
+.Sh FILES
+.Bl -tag -width /etc/services.d -compact
+.It Pa /etc/services.d/randd.toml
+Service manifest.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr zerod 8 ,
+.Xr nulld 8 ,
+.Xr init 8
+.Sh STANDARDS
+RavenBSD.

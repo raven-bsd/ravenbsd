@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.files]]
+src = "build/fixtures/core-test/coretest"
+path = "/sbin/coretest"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "profiles/core-test.d/coretest.manifest"
+path = "/etc/services.d/coretest.toml"
