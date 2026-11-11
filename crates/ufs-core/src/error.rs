@@ -28,6 +28,10 @@ pub enum UfsError {
     Corrupt(&'static str),
     /// The requested name or inode does not exist.
     NotFound,
+    /// A directory entry with this name already exists.
+    Exists,
+    /// A directory still contains entries other than `.` and `..`.
+    NotEmpty,
     /// A path component was expected to name a directory.
     NotDir,
     /// A file operation was attempted on a directory.
@@ -50,6 +54,8 @@ impl fmt::Display for UfsError {
             Self::Unsupported(reason) => write!(f, "unsupported: {reason}"),
             Self::Corrupt(reason) => write!(f, "corrupt filesystem: {reason}"),
             Self::NotFound => f.write_str("not found"),
+            Self::Exists => f.write_str("file exists"),
+            Self::NotEmpty => f.write_str("directory not empty"),
             Self::NotDir => f.write_str("not a directory"),
             Self::IsDir => f.write_str("is a directory"),
             Self::NameTooLong => f.write_str("name too long"),
