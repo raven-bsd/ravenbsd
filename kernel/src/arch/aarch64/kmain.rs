@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! aarch64 early-boot `kmain`: validate the handoff, bring up the frame allocator, build the
-//! kernel's own page tables and heap, run the requested self-test and exit with the test status.
+//! aarch64 early-boot `kmain`: validate the handoff, build the kernel's own page tables and heap,
+//! bring up the GICv2 and the generic timer, run the requested self-test and exit with the test
+//! status.
 //!
-//! After `memory::paging::init` the kernel runs on its own TTBR1 tables and the loader's frames
-//! are reclaimed, exactly as the x86-64 `kmain` does. There is no scheduler or user mode here
-//! yet (S14b/S14c).
+//! The device tree is parsed before paging reclaims loader memory; the resulting platform
+//! addresses are plain values, so the later GIC/timer bring-up does not touch loader frames.
+//! There is no scheduler or user mode until a self-test asks for it (S14b/S14c).
 
 use raven_bootinfo::BootInfo;
 
+use crate::arch::aarch64::{fdt, gic, irq, timer};
 use crate::cmdline::CmdLine;
-use crate::{boot, kprintln, log, memory};
+use crate::{boot, kprintln, log, memory, sync, time};
 
 /// Kernel entry point called by `_start` with the loader's `BootInfo` pointer in `x0`.
 ///
@@ -29,6 +31,8 @@ pub extern "C" fn kmain(boot: *const BootInfo) -> ! {
             boot::exit_qemu(0x11);
         }
     };
+    // The DTB lives in loader-owned memory that paging reclaims, so read it now.
+    let platform = fdt::platform(data.info.dtb.base, data.info.dtb.len);
     {
         let initial_cmdline = CmdLine::parse(data.cmdline);
         log::init(initial_cmdline.loglevel());
@@ -49,6 +53,32 @@ pub extern "C" fn kmain(boot: *const BootInfo) -> ! {
     if let Err(error) = memory::heap::init() {
         kprintln!("kernel: error: {error}");
         boot::exit_qemu(0x11);
+    }
+
+    // GICv2 and the generic timer. The frames are mapped through the uncached MMIO window.
+    if let Err(error) = gic::init(platform.gicd, platform.gicc) {
+        kprintln!("kernel: error: {error}");
+        boot::exit_qemu(0x11);
+    }
+    let frequency = match timer::init(platform.timer_ppi) {
+        Ok(frequency) => frequency,
+        Err(error) => {
+            kprintln!("kernel: error: {error}");
+            boot::exit_qemu(0x11);
+        }
+    };
+    irq::set_timer(platform.timer_ppi);
+    time::init(frequency, timer::read_counter());
+    if let Err(error) = gic::enable(platform.timer_ppi) {
+        kprintln!("kernel: error: {error}");
+        boot::exit_qemu(0x11);
+    }
+    kprintln!("time: generic timer {} MHz", frequency / 1_000_000);
+    kprintln!("timer: {} Hz", timer::HZ);
+
+    // SAFETY: the vector table was installed in `_start`, and the GIC and timer are configured.
+    unsafe {
+        sync::enable_interrupts();
     }
 
     // `data` still points at loader memory that paging just reclaimed. Re-parse the command

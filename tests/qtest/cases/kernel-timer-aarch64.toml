@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "kernel-timer-aarch64"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 60
+boot_cmdline = "console=ttyAMA0 test-exit=1 selftest=timer"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^time: generic timer \d+ MHz$'
+
+[[expect]]
+regex = '^timer: 1000 Hz$'
+
+[[expect]]
+regex = '^selftest: timer 100 ticks in (9[0-9]|1[0-1][0-9]) ms$'
+
+[[expect]]
+regex = '^selftest: timer interrupts=\d+$'
+
+[[forbid]]
+regex = '(?i)panic'

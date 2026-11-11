@@ -45,12 +45,17 @@ pub mod sleep;
 pub mod thread;
 pub mod wait;
 
+#[cfg(target_arch = "x86_64")]
 #[path = "../smp/mod.rs"]
+pub mod smp;
+#[cfg(target_arch = "aarch64")]
+#[path = "smp_shim.rs"]
 pub mod smp;
 
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicBool, Ordering};
 
+#[cfg(target_arch = "x86_64")]
 use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -59,7 +64,21 @@ use raven_abi::errno::Errno;
 use spin::{Mutex as SpinMutex, MutexGuard as SpinMutexGuard};
 
 use crate::kprintln;
-use crate::process::Process;
+#[cfg(target_arch = "x86_64")]
+pub use crate::process::Process as SchedProcess;
+#[cfg(target_arch = "aarch64")]
+/// The aarch64 scheduler runs kernel threads of one implicit kernel process; user processes and
+/// address spaces arrive with S14c.
+pub struct SchedProcess;
+#[cfg(target_arch = "aarch64")]
+impl SchedProcess {
+    /// Account a started thread (no-op until user processes exist).
+    pub fn thread_started(&self) {}
+    /// Account an exited thread; the implicit kernel process never exits.
+    pub fn thread_exited(&self) -> bool {
+        true
+    }
+}
 use crate::sync;
 use crate::time;
 
@@ -100,7 +119,7 @@ impl CpuSched {
 
 /// CPU-independent scheduler data.
 struct Global {
-    kernel_process: Arc<Process>,
+    kernel_process: Arc<SchedProcess>,
     kernel_cr3: u64,
 }
 
@@ -121,10 +140,14 @@ pub fn init() -> Result<(), Errno> {
     if INITIALIZED.load(Ordering::Acquire) {
         return Ok(());
     }
+    #[cfg(target_arch = "x86_64")]
     if !context::fpu_state_ok() {
         return Err(Errno::EINVAL);
     }
+    #[cfg(target_arch = "x86_64")]
     let kernel_process = crate::process::new_kernel_process()?;
+    #[cfg(target_arch = "aarch64")]
+    let kernel_process = Arc::new(SchedProcess);
     let kernel_cr3 = context::read_cr3();
     let idle = Thread::new_idle(Arc::clone(&kernel_process), context::read_rsp(), kernel_cr3);
     // SAFETY: the scheduler has not been published yet; this is the only writer.
@@ -146,11 +169,13 @@ fn global() -> Option<&'static Global> {
 }
 
 /// Kernel process used by kernel threads.
-pub fn kernel_process() -> Option<Arc<Process>> {
+#[cfg(target_arch = "x86_64")]
+pub fn kernel_process() -> Option<Arc<SchedProcess>> {
     global().map(|global| Arc::clone(&global.kernel_process))
 }
 
 /// Kernel page-table root used by kernel threads.
+#[cfg(target_arch = "x86_64")]
 pub fn kernel_cr3() -> Option<u64> {
     global().map(|global| global.kernel_cr3)
 }
@@ -165,6 +190,7 @@ fn lock_cpu(cpu: usize) -> SpinMutexGuard<'static, Option<CpuSched>> {
 }
 
 /// Initialise the per-CPU scheduler slot for an application processor.
+#[cfg(target_arch = "x86_64")]
 pub fn init_cpu(cpu: usize, idle: Arc<Thread>) -> Result<(), Errno> {
     if cpu == 0 || cpu >= MAX_CPUS {
         return Err(Errno::EINVAL);
@@ -178,6 +204,7 @@ pub fn init_cpu(cpu: usize, idle: Arc<Thread>) -> Result<(), Errno> {
 }
 
 /// Allocate an idle thread (and its kernel stack) for an application processor.
+#[cfg(target_arch = "x86_64")]
 pub fn new_ap_idle() -> Result<Arc<Thread>, Errno> {
     let process = kernel_process().ok_or(Errno::EINVAL)?;
     let cr3 = kernel_cr3().ok_or(Errno::EINVAL)?;
@@ -185,6 +212,7 @@ pub fn new_ap_idle() -> Result<Arc<Thread>, Errno> {
 }
 
 /// Adopt the AP's already-running stack as its idle thread and enter the idle loop.
+#[cfg(target_arch = "x86_64")]
 pub fn ap_main(cpu: usize) -> ! {
     let idle = {
         let slot = lock_cpu(cpu);
@@ -208,8 +236,15 @@ pub fn current_thread() -> Option<Arc<Thread>> {
 }
 
 /// The process owning the current thread.
-pub fn current_process() -> Option<Arc<Process>> {
+#[cfg(target_arch = "x86_64")]
+pub fn current_process() -> Option<Arc<SchedProcess>> {
     current_thread().map(|thread| Arc::clone(&thread.process))
+}
+
+/// True once [`init`] published the scheduler.
+#[cfg_attr(target_arch = "x86_64", allow(dead_code))] // The aarch64 IRQ path checks it directly.
+pub fn initialized() -> bool {
+    INITIALIZED.load(Ordering::Acquire)
 }
 
 /// Put a ready thread on the best CPU's queue; false when the queue is full.
@@ -259,6 +294,7 @@ pub fn spawn_kernel(name: &str, entry: fn()) -> Result<Arc<Thread>, Errno> {
 
 /// Spawn a kernel thread directly on `cpu` (the SMP self-test uses this to place one worker per
 /// CPU before the scheduler starts).
+#[cfg(target_arch = "x86_64")]
 pub fn spawn_kernel_on(cpu: usize, name: &str, entry: fn()) -> Result<Arc<Thread>, Errno> {
     if cpu >= smp::online_cpus() {
         return Err(Errno::EINVAL);
@@ -280,8 +316,9 @@ fn new_kernel_thread(name: &str, entry: fn()) -> Result<Arc<Thread>, Errno> {
 }
 
 /// Create a ring-3 thread in `process`, without enqueueing it.
+#[cfg(target_arch = "x86_64")]
 pub fn new_user_thread(
-    process: &Arc<Process>,
+    process: &Arc<SchedProcess>,
     entry: u64,
     stack_top: u64,
     arg: u64,
@@ -297,6 +334,7 @@ pub fn new_user_thread(
 }
 
 /// Start the scheduler with `thread` as the first runnable user thread.
+#[cfg(target_arch = "x86_64")]
 pub fn start_user(thread: Arc<Thread>) -> ! {
     // `syscall::init` installs the legacy single-CPU GS block; restore the real one and drop the
     // temporary null-page mapping that made the GS window fault-free.
@@ -315,8 +353,11 @@ pub fn start() -> ! {
         kprintln!("sched: not initialised");
         crate::boot::exit_qemu(0x11);
     }
-    smp::percpu::install_bsp_gs();
-    crate::arch::x86_64::ap_start::remove_null_page();
+    #[cfg(target_arch = "x86_64")]
+    {
+        smp::percpu::install_bsp_gs();
+        crate::arch::x86_64::ap_start::remove_null_page();
+    }
     let cpus = smp::online_cpus();
     kprintln!(
         "sched: running ({} {}, slice 10 ms)",
@@ -431,6 +472,7 @@ pub fn tick() {
 }
 
 /// Return-from-interrupt hook called by the timer and reschedule-IPI stubs.
+#[cfg(target_arch = "x86_64")]
 pub fn timer_return(from_user: bool) {
     if !from_user || !sync::preemption_enabled() {
         return;
@@ -439,6 +481,7 @@ pub fn timer_return(from_user: bool) {
 }
 
 /// Return-to-user hook called after a syscall.
+#[cfg(target_arch = "x86_64")]
 pub fn syscall_return() {
     if !sync::preemption_enabled() {
         return;
@@ -447,6 +490,7 @@ pub fn syscall_return() {
 }
 
 /// Return from a reschedule IPI.
+#[cfg(target_arch = "x86_64")]
 pub fn ipi_return(from_user: bool) {
     timer_return(from_user);
 }
@@ -525,6 +569,7 @@ pub fn sleep_until(deadline: u64) -> isize {
 ///
 /// The caller then optionally registers a timeout with [`add_sleep`], publishes a waiter, and
 /// calls [`block_current`]. [`end_block`] clears the token and any stale timeout entry.
+#[allow(dead_code)] // Blocking primitives are consumed by the syscall/futex path (x86-64 today, S14c on aarch64).
 pub fn begin_block() -> Result<u64, Errno> {
     if !INITIALIZED.load(Ordering::Acquire) {
         return Err(Errno::EINVAL);
@@ -547,6 +592,7 @@ pub fn begin_block() -> Result<u64, Errno> {
 }
 
 /// Register a timeout for the current blocking operation with its wake status.
+#[allow(dead_code)] // Blocking primitives are consumed by the syscall/futex path (x86-64 today, S14c on aarch64).
 pub fn add_sleep(token: u64, deadline: u64, status: isize) {
     if !INITIALIZED.load(Ordering::Acquire) {
         return;
@@ -571,6 +617,7 @@ pub fn add_sleep(token: u64, deadline: u64, status: isize) {
 ///
 /// A wakeup that raced with the caller's setup is consumed here. Returns the wake status (0 or
 /// `-errno`).
+#[allow(dead_code)] // Blocking primitives are consumed by the syscall/futex path (x86-64 today, S14c on aarch64).
 pub fn block_current() -> isize {
     if !INITIALIZED.load(Ordering::Acquire) {
         return 0;
@@ -593,6 +640,7 @@ pub fn block_current() -> isize {
 }
 
 /// Finish a blocking operation: drop the token and any timeout that did not fire.
+#[allow(dead_code)] // Blocking primitives are consumed by the syscall/futex path (x86-64 today, S14c on aarch64).
 pub fn end_block(token: u64) {
     if !INITIALIZED.load(Ordering::Acquire) {
         return;
@@ -740,9 +788,14 @@ pub fn exit_thread(code: i32) -> ! {
         None => crate::arch::halt(),
     };
     thread.exit_code.store(code, Ordering::SeqCst);
+    // The x86-64 path reports a dead process to the supervisor; aarch64 has no user processes
+    // yet (S14c), and its `SchedProcess::thread_exited` is always true.
+    #[cfg(target_arch = "x86_64")]
     if thread.process.thread_exited() {
         crate::process::notify_exit(code);
     }
+    #[cfg(target_arch = "aarch64")]
+    let _ = thread.process.thread_exited();
     let _guard = sync::critical();
     let cpu = this_cpu();
     let (from, to) = {
@@ -771,6 +824,20 @@ pub fn exit_thread(code: i32) -> ! {
     loop {
         core::hint::spin_loop();
     }
+}
+
+/// Return-from-IRQ hook: switch to a ready thread when a reschedule is pending.
+///
+/// The aarch64 IRQ dispatcher calls this after the timer tick and before the vector restores the
+/// interrupted frame. Like x86-64's `timer_return`, only a return to user mode preempts: kernel
+/// threads reach a scheduling point through yield/block/sleep. `from_user` is false for the
+/// current-EL IRQ slots (all of them until S14c).
+#[cfg_attr(target_arch = "x86_64", allow(dead_code))] // x86-64 uses `timer_return` from its ISR stubs.
+pub fn irq_return(from_user: bool) {
+    if !from_user || !INITIALIZED.load(Ordering::Acquire) || !sync::preemption_enabled() {
+        return;
+    }
+    preempt_if_needed();
 }
 
 /// Number of successful context switches across all CPUs.

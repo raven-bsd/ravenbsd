@@ -20,6 +20,7 @@ raven-abi = { path = "../crates/raven-abi" }
 raven-bootinfo = { path = "../crates/raven-bootinfo" }
 raven-esr = { path = "../crates/raven-esr" }
 raven-rmm = { path = "../crates/raven-rmm" }
+raven-sched-core = { path = "../crates/raven-sched-core" }
 spin = { version = "0.9", default-features = false, features = ["spin_mutex"] }
 
 # `raven-mem` exports the C `memcpy` family for x86-64. On aarch64 the same export makes the
@@ -35,7 +36,6 @@ raven-elf = { path = "../crates/raven-elf" }
 raven-handles = { path = "../crates/raven-handles" }
 raven-initfs = { path = "../crates/raven-initfs" }
 raven-mem = { path = "../crates/raven-mem", features = ["export-symbols"] }
-raven-sched-core = { path = "../crates/raven-sched-core" }
 raven-timemath = { path = "../crates/raven-timemath" }
 raven-usercopy = { path = "../crates/raven-usercopy" }
 raven-vma = { path = "../crates/raven-vma" }

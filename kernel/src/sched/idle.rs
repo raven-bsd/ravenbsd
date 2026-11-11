@@ -13,9 +13,15 @@ pub fn run() -> ! {
             let _guard = crate::sync::critical();
             super::schedule_locked();
         }
+        #[cfg(target_arch = "x86_64")]
         // SAFETY: ring-0 `sti; hlt; cli`; the timer gate is installed before the idle loop starts.
         unsafe {
             core::arch::asm!("sti", "hlt", "cli", options(nomem, nostack),);
+        }
+        #[cfg(target_arch = "aarch64")]
+        // SAFETY: `wfi` is valid at EL1 with IRQs enabled; the timer is armed before idle runs.
+        unsafe {
+            core::arch::asm!("wfi", options(nomem, nostack, preserves_flags));
         }
     }
 }

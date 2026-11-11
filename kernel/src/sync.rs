@@ -5,13 +5,15 @@
 //!
 //! Every lock here disables interrupts and increments the CPU's preemption counter, so the
 //! scheduler cannot switch away while kernel state is being mutated. `IrqSpinLock` is a real
-//! spinlock (needed for the S10 AP bring-up) whose guard restores the saved `RFLAGS.IF` on drop.
-//! `critical()` is the same critical section without a spin flag, used by the scheduler itself
-//! because the run queue is per-CPU and is only mutated with interrupts off.
+//! spinlock whose guard restores the saved interrupt state on drop. `critical()` is the same
+//! critical section without a spin flag, used by the scheduler itself because the run queue is
+//! per-CPU and is only mutated with interrupts off.
 //!
-//! The preemption counter follows the running thread: `sched::context::switch` stores the
-//! outgoing thread's counter and installs the incoming thread's value. A guard created before a
-//! blocking context switch is therefore still live, and is dropped, when that thread resumes.
+//! x86-64 saves `RFLAGS.IF` and masks with `cli`; aarch64 saves `DAIF` and masks with
+//! `daifset #0xf`. The preemption counter follows the running thread: `sched::context::switch`
+//! stores the outgoing thread's counter and installs the incoming thread's value. A guard created
+//! before a blocking context switch is therefore still live, and is dropped, when that thread
+//! resumes.
 
 use core::cell::UnsafeCell;
 use core::ops::{Deref, DerefMut};
@@ -19,9 +21,11 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::sched::smp::percpu;
 
+#[cfg(target_arch = "x86_64")]
 const RFLAGS_IF: u64 = 1 << 9;
 
-/// Disable interrupts and return the previous flags.
+/// Disable interrupts and return the previous state.
+#[cfg(target_arch = "x86_64")]
 #[inline]
 fn disable_interrupts() -> u64 {
     let flags: u64;
@@ -38,7 +42,26 @@ fn disable_interrupts() -> u64 {
     flags
 }
 
-/// Restore the `IF` bit from `flags`.
+/// Disable interrupts and return the previous state.
+#[cfg(target_arch = "aarch64")]
+#[inline]
+fn disable_interrupts() -> u64 {
+    let flags: u64;
+    // SAFETY: DAIF is an EL1 system register; masking all asynchronous exceptions is the
+    // architectural equivalent of `cli`.
+    unsafe {
+        core::arch::asm!(
+            "mrs {}, daif",
+            "msr daifset, #0xf",
+            out(reg) flags,
+            options(nomem, nostack, preserves_flags),
+        );
+    }
+    flags
+}
+
+/// Restore the interrupt state captured by [`disable_interrupts`].
+#[cfg(target_arch = "x86_64")]
 #[inline]
 fn restore_interrupts(flags: u64) {
     // SAFETY: sti/cli are ring-0 only; the caller passes flags captured by `disable_interrupts`.
@@ -48,6 +71,16 @@ fn restore_interrupts(flags: u64) {
         } else {
             core::arch::asm!("cli", options(nomem, nostack));
         }
+    }
+}
+
+/// Restore the interrupt state captured by [`disable_interrupts`].
+#[cfg(target_arch = "aarch64")]
+#[inline]
+fn restore_interrupts(flags: u64) {
+    // SAFETY: DAIF is an EL1 system register; the value was captured by `disable_interrupts`.
+    unsafe {
+        core::arch::asm!("msr daif, {}", in(reg) flags, options(nomem, nostack));
     }
 }
 
@@ -78,12 +111,27 @@ pub fn preemption_enabled() -> bool {
 ///
 /// # Safety
 ///
-/// Only call once the interrupt descriptor table and the device gates are installed.
+/// Only call once the interrupt vector table and the device gates are installed.
+#[cfg(target_arch = "x86_64")]
 #[inline]
 pub unsafe fn enable_interrupts() {
     // SAFETY: the caller guarantees the IDT and gates are ready.
     unsafe {
         core::arch::asm!("sti", options(nomem, nostack, preserves_flags));
+    }
+}
+
+/// Enable IRQs (FIQ/SError stay masked until a source exists).
+///
+/// # Safety
+///
+/// Only call once the vector table and the GIC/timer are initialised.
+#[cfg(target_arch = "aarch64")]
+#[inline]
+pub unsafe fn enable_interrupts() {
+    // SAFETY: the caller guarantees the vectors and the GIC/timer are ready.
+    unsafe {
+        core::arch::asm!("msr daifclr, #2", options(nomem, nostack, preserves_flags));
     }
 }
 

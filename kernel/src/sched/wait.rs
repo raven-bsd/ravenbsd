@@ -9,6 +9,11 @@
 //!
 //! Lock order: a wait-queue lock is never held while taking the run-queue lock. `wake` removes
 //! entries under the bucket lock, releases it, and only then calls [`super::wake`].
+//!
+//! The futex/syscall path only exists on x86-64 today; aarch64 compiles the module for S14c and
+//! does not yet call it.
+
+#![allow(dead_code)]
 
 use alloc::sync::Arc;
 use alloc::vec::Vec;

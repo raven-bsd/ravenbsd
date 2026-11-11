@@ -3,11 +3,16 @@
 
 //! aarch64 architecture support.
 
+pub mod fdt;
+pub mod gic;
+pub mod irq;
 pub mod kmain;
 pub mod mmu;
+pub mod percpu;
 pub mod selftest;
 pub mod serial;
 pub mod start;
+pub mod timer;
 pub mod vectors;
 
 /// Halts the current CPU forever.
