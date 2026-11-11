@@ -213,6 +213,7 @@ fn resolve_object(
         }
     } else {
         enum Kind {
+            Initfs,
             Memory,
             #[cfg(target_arch = "x86_64")]
             Mmio,
@@ -224,6 +225,7 @@ fn resolve_object(
         let kind = {
             let handles = caller.handles.lock();
             match handles.get(handle, Rights::NONE) {
+                Ok(Object::MemObjectInitfs) => Kind::Initfs,
                 Ok(Object::Memory(_)) => Kind::Memory,
                 #[cfg(target_arch = "x86_64")]
                 Ok(Object::MmioRegion(_)) => Kind::Mmio,
@@ -236,6 +238,23 @@ fn resolve_object(
             }
         };
         match kind {
+            Kind::Initfs => {
+                // A transferred initfs handle keeps the strict well-known-handle rules: the
+                // backing stays `Backing::Initfs`, so `protect` cannot make the physical pages
+                // writable, and shared mappings are not allowed.
+                if shared {
+                    return Err(Errno::EINVAL);
+                }
+                let mut needed = Rights::READ.union(Rights::MAP);
+                if exec {
+                    needed = needed.union(Rights::EXEC);
+                }
+                let handles = caller.handles.lock();
+                match handles.get(handle, needed)? {
+                    Object::MemObjectInitfs => Ok(MappedObject::Initfs),
+                    _ => Err(Errno::EBADF),
+                }
+            }
             Kind::Memory => {
                 let mut needed = Rights::MAP;
                 if shared && protection & (prot::WRITE as u8) != 0 {
