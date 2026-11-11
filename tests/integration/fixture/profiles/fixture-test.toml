@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The fixture profile installs the server, so the server and its dependency run in the guest.
+
+name = "fixture-test"
+
+[[initfs.programs]]
+package = "fixture-server"
+path = "/sbin/server"
+
+[boot]
+cmdline = "console=ttyS0"
+log_level = "info"

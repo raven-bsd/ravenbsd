@@ -33,6 +33,7 @@ members = [
     "tools/linux-corpus",
     "tools/ufs-fsck",
     "tools/ufs-mkfs",
+    "tools/integration-inventory",
     "libc/spike/va",
     "userland/rt",
     "userland/linux-shim",

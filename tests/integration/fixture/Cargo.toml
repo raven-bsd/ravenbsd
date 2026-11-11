@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Miniature workspace for `cargo test -p raven-integration-inventory`: one package per kind the
+# inventory classifies, plus a mirror whose source the "kernel" includes directly.
+
+[workspace]
+resolver = "3"
+members = [
+    "crates/core-lib",
+    "crates/mirror-lib",
+    "kernel",
+    "libc/spike/spike-lib",
+    "tools/tool",
+    "userland/servers/server",
+]
