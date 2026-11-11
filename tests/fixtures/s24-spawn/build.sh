@@ -16,4 +16,4 @@ RUSTFLAGS="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=
 cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "$out/initfs.img" \
     /init=${CARGO_TARGET_DIR:-target}/x86_64-unknown-none/release/raven-s24-parent \
-    /child=target/x86_64-unknown-none/release/raven-s24-child
+    /child=${CARGO_TARGET_DIR:-target}/x86_64-unknown-none/release/raven-s24-child
