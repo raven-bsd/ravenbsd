@@ -148,7 +148,10 @@ class Image:
         return bytes(out[:size])
 
     def link_target(self, ip):
-        if ip["size"] <= (120 if self.ufs2 else 60):
+        # NetBSD ufs_readlink uses `size < maxsymlinklen`; the historical
+        # off-by-one is part of the on-disk format (ufs_vnops.c).  A target
+        # of exactly 120 (UFS2) or 60 (UFS1) bytes lives in a data block.
+        if ip["size"] < (120 if self.ufs2 else 60):
             return ip["raw"][(112 if self.ufs2 else 40):][:ip["size"]]
         return self.readfile(ip)
 

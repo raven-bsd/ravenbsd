@@ -840,6 +840,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ufs-oracle-tests"
+version = "0.1.0"
+dependencies = [
+ "ufs-core",
+]
+
+[[package]]
+name = "ufs-powercut-tests"
+version = "0.1.0"
+dependencies = [
+ "ufs-core",
+]
+
+[[package]]
 name = "uguid"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
