@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-k66-fs"
+version = "0.1.0"
+description = "K66 filesystem-contract fixture: fake server and client."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[lib]
+name = "raven_k66_fs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raven-k66-fs"
+path = "src/main.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-ipc = { path = "../../../crates/raven-ipc" }
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-scheme = { path = "../../../crates/raven-scheme" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc"] }
+
+[lints]
+workspace = true

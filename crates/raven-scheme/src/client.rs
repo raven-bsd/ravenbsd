@@ -5,7 +5,7 @@
 
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
-use raven_proto_fs::{CallRequest, Stat};
+use raven_proto_fs::{CallRequest, OpenFlags, Stat};
 
 use crate::kernel::{Kernel, RtKernel};
 
@@ -38,9 +38,16 @@ impl<K: Kernel> Client<K> {
         &self.kernel
     }
 
-    /// Open a scheme path with S11 flags.
+    /// Open a scheme path with raw S11 wire flags.
+    ///
+    /// Prefer [`Client::open_flags`] with a validated [`OpenFlags`] value.
     pub fn open(&self, path: &str, flags: u32) -> Result<Handle, Errno> {
         self.kernel.open(path, flags)
+    }
+
+    /// Open a scheme path with validated K66 open flags.
+    pub fn open_flags(&self, path: &str, flags: OpenFlags) -> Result<Handle, Errno> {
+        self.kernel.open(path, u32::from(flags.to_wire()))
     }
 
     /// Read from `file` at `offset`.

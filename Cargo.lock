@@ -425,6 +425,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-k66-fs"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-ipc",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-kernel"
 version = "0.1.0"
 dependencies = [

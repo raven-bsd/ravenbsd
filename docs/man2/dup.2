@@ -1,6 +1,6 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt DUP 2
 .Os RavenBSD
 .Sh NAME
@@ -15,7 +15,32 @@ The .Nm system call is part of the scheme IPC protocol (see
 .Xr scheme 7
 and
 .Pa architecture/03-system-servers.md ).
-It is implemented by ticket S11; this page is the contract placeholder and will be completed
-when S11 lands.
+.Pp
+.Nm
+creates a second kernel handle for the same open-file description.  The
+server-side file id and the sequential cursor are shared; a
+.Xr read 2
+or
+.Xr write 2
+through either handle advances the one cursor.  The server increments the
+description's reference count and releases it only at the last
+.Xr close 2 .
+.Pp
+The rights mask reduces the rights of the new kernel handle.  It does not create
+a new server file id and it does not reset the cursor.
+.Sh RETURN VALUES
+A new SchemeFile handle on success.
+.Sh ERRORS
+.Bl -tag -width Er -offset indent
+.It Er EBADF
+The source handle is not a scheme-file handle.
+.It Er EINVAL
+The rights mask is invalid.
+.El
+.Sh SEE ALSO
+.Xr close 2 ,
+.Xr open 2 ,
+.Xr read 2 ,
+.Xr write 2
 .Sh STANDARDS
 RavenBSD ABI v1.

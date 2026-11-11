@@ -16,11 +16,18 @@ pinned by a golden test in the module tests or in `tests/fuzz.rs`.
 
 * `OPEN`, `READ`, `WRITE`, `CLOSE`, `DUP`, `FSTAT` and `CALL` keep the S11 opcodes.
 * `OPEN` carries a path relative to the server root (no leading `/` required, at most 255 bytes)
-  and Linux open flags (`O_RDONLY 0`, `O_WRONLY 1`, `O_RDWR 2`, `O_CREAT 0o100`, `O_EXCL 0o200`,
-  `O_TRUNC 0o1000`, `O_APPEND 0o2000`, `O_DIRECTORY 0o200000`, `O_NOFOLLOW 0o400000`). The
-  creation mode is separate. Servers reject `.`/`..` path components; `vfsd` normalises absolute
-  paths first with `normalize_absolute`.
-* `READ` on a directory returns packed directory entries. `FSTAT` returns a `Stat` record.
+  and the compact wire open-flag set in [`open`](src/open.rs), **not** Linux `O_*` numbers:
+  READ, WRITE, CREATE, EXCL, TRUNC, APPEND, DIRECTORY and NOFOLLOW. Unknown bits and invalid
+  combinations are rejected with `EINVAL`. `OpenFlags::from_linux`/`to_linux` is the translation
+  layer for client APIs. `O_CREAT` uses mode `0o644` (0o666 masked by the server umask 0o022);
+  protocol version 1 has no per-client umask or mode on the wire.
+* `READ`/`WRITE` on files are sequential: the server keeps the cursor in the open-file description
+  and the wire offset must be zero. `DUP` shares the description; the server releases it at the
+  last close. `READ` on a directory returns packed directory entries and uses the same per-OFD
+  sequential cursor (a change to the directory invalidates it with `EINVAL`). `FSTAT` returns a
+  `Stat` record.
+* Servers reject `.`/`..` path components; `vfsd` normalises absolute paths first with
+  `normalize_request`, which also reports a trailing-slash or final-dot directory requirement.
 * Control path operations use `CALL` with the versioned layout below. Unknown versions and
   operations are `-ENOSYS`.
 * Responses use a negative Linux errno (`-4095..=-1`) or zero. The crate's `ProtoError::errno`
@@ -66,10 +73,13 @@ File-type values in `mode`: `S_IFREG 0o100000`, `S_IFDIR 0o040000`, `S_IFLNK 0o1
 `kind` values: `DT_UNKNOWN 0`, `DT_FIFO 1`, `DT_CHR 2`, `DT_DIR 4`, `DT_BLK 6`, `DT_REG 8`,
 `DT_LNK 10`, `DT_SOCK 12`. `record_len(name_len) = align8(16 + name_len)`.
 
-The `offset` argument of `READ` is an opaque byte cookie: the next cookie is the previous cookie
-plus the number of bytes returned. A zero-byte `READ` means end of directory. `next_dir_cookie`
-and `DirEntry::next_cookie` implement the checked addition. A server that returns several entries
-in one read advances the cookie by the total returned length.
+Directory reads are sequential in protocol version 1. The server keeps the per-open-file-description
+cursor; the wire `offset` must be zero. A zero-byte `READ` means end of directory. A buffer smaller
+than the next complete record is `EINVAL`; a server must not return a partial record. On the first
+read the server records the directory generation, and a create/unlink/rename between reads makes the
+next read `EINVAL` (documented invalidation). `DirCookie` is the standard `(generation, index)`
+server-side encoding for that cursor; it is not a live byte position and is not sent on the wire in
+protocol version 1.
 
 Example record for inode 7, regular file, name `abc` (24 bytes):
 

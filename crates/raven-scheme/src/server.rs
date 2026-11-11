@@ -10,7 +10,7 @@ use core::time::Duration;
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 use raven_ipc::protocol::{self, MAX_TRANSFER, Opcode, PACKET_SIZE, SchemePacket};
-use raven_proto_fs::Stat;
+use raven_proto_fs::{OpenFlags, Stat};
 
 use crate::kernel::{Kernel, RtKernel};
 use crate::sync::SpinLock;
@@ -71,10 +71,31 @@ pub struct Ctx {
 /// keep the request open; the same token is later passed to [`Completer::complete`]. Tokens must
 /// be unique among the requests currently deferred by one server.
 pub trait Handler {
-    /// Open `path` (relative to the server root) with S11 flags.
+    /// Open `path` (relative to the server root) with raw S11 wire flags.
+    ///
+    /// This is the pre-K66 entry point kept for servers that still interpret the
+    /// legacy `READ`/`WRITE`/`CREATE` bits themselves.  New servers override
+    /// [`Handler::open_with`] instead; the default implementation validates the
+    /// wire flags and forwards the raw bits here.
     fn open(&mut self, path: &str, flags: u32, mode: u32, ctx: &Ctx) -> HandlerResult<Opened> {
         let _ = (path, flags, mode, ctx);
         Err(Errno::ENOSYS.into())
+    }
+
+    /// Open `path` with validated K66 open flags and the create mode.
+    ///
+    /// `mode` is the create mode (`0o644` for protocol version 1) when
+    /// `flags.create()` is set; it is zero otherwise.  A server that does not
+    /// need the typed interface may leave the default, which forwards the raw
+    /// wire bits to [`Handler::open`].
+    fn open_with(
+        &mut self,
+        path: &str,
+        flags: OpenFlags,
+        mode: u32,
+        ctx: &Ctx,
+    ) -> HandlerResult<Opened> {
+        self.open(path, u32::from(flags.to_wire()), mode, ctx)
     }
 
     /// Read from `file` at `offset` into `buffer`.
@@ -219,7 +240,10 @@ impl<K: Kernel> Server<K> {
             Opcode::Open => {
                 let path = core::str::from_utf8(request.path_bytes())
                     .map_err(|_| HandlerError::from(Errno::EINVAL))?;
-                match handler.open(path, u32::from(request.flags), 0, ctx)? {
+                let flags = OpenFlags::from_wire(request.flags)
+                    .map_err(|_| HandlerError::from(Errno::EINVAL))?;
+                let mode = flags.create_mode().unwrap_or(0);
+                match handler.open_with(path, flags, mode, ctx)? {
                     Opened::File(id) => self
                         .send_response(ctx.request, request, Ok(()), Some(id), 0, None)
                         .map_err(HandlerError::from),

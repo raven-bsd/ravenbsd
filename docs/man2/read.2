@@ -1,6 +1,6 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt READ 2
 .Os RavenBSD
 .Sh NAME
@@ -15,7 +15,52 @@ The .Nm system call is part of the scheme IPC protocol (see
 .Xr scheme 7
 and
 .Pa architecture/03-system-servers.md ).
-It is implemented by ticket S11; this page is the contract placeholder and will be completed
-when S11 lands.
+.Pp
+Filesystem
+.Nm
+is sequential.  The server keeps the cursor in the open-file description and
+advances it by the number of bytes returned.  The wire offset must be zero; a
+server returns
+.Er EINVAL
+for a nonzero offset.  There is no positional read in protocol version 1.
+.Pp
+A
+.Xr dup 2
+or a transferred reference shares the same description, so a read through either
+handle advances the same cursor.  The
+.Xr close 2
+of one duplicate does not disturb the survivor.
+.Pp
+On a directory handle,
+.Nm
+returns packed directory-entry records (see
+.Pa raven-proto-fs ) .
+A zero-byte result is end of directory.  A buffer smaller than the next complete
+record returns
+.Er EINVAL .
+The server records the directory generation at the first read; if a create,
+unlink, rmdir, rename or symlink changes the directory before the next read, the
+next read returns
+.Er EINVAL
+and the caller must reopen the directory to restart.  Directory entries do not
+include
+.Ql .\&
+or
+.Ql ..\& .
+.Sh RETURN VALUES
+The number of bytes read, or zero at end of file or directory.
+.Sh ERRORS
+.Bl -tag -width Er -offset indent
+.It Er EINVAL
+The wire offset was nonzero, a directory buffer was too small, or the directory
+changed during the read sequence.
+.It Er EBADF
+The handle is not open for reading.
+.El
+.Sh SEE ALSO
+.Xr close 2 ,
+.Xr dup 2 ,
+.Xr open 2 ,
+.Xr write 2
 .Sh STANDARDS
 RavenBSD ABI v1.

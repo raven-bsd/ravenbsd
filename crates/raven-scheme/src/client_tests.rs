@@ -19,6 +19,25 @@ fn open_records_path_and_flags() {
 }
 
 #[test]
+fn open_flags_records_the_wire_encoding() {
+    let kernel = FakeKernel::new();
+    let client = Client::with_kernel(kernel.clone());
+    let flags = raven_proto_fs::OpenFlags::from_linux(
+        raven_proto_fs::O_RDWR
+            | raven_proto_fs::O_CREAT
+            | raven_proto_fs::O_EXCL
+            | raven_proto_fs::O_TRUNC,
+    )
+    .unwrap();
+    let handle = client.open_flags("file:/tmp/a", flags).unwrap();
+    assert_eq!(handle, Handle(1));
+    assert_eq!(
+        kernel.open_calls(),
+        vec![("file:/tmp/a".to_string(), u32::from(flags.to_wire()))]
+    );
+}
+
+#[test]
 fn read_returns_scripted_bytes() {
     let kernel = FakeKernel::new();
     kernel.set_read_data(b"hello");

@@ -1,6 +1,6 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 11, 2026
 .Dt CLOSE 2
 .Os RavenBSD
 .Sh NAME
@@ -15,7 +15,32 @@ The .Nm system call is part of the scheme IPC protocol (see
 .Xr scheme 7
 and
 .Pa architecture/03-system-servers.md ).
-It is implemented by ticket S11; this page is the contract placeholder and will be completed
-when S11 lands.
+.Pp
+For a filesystem handle,
+.Nm
+releases one reference to the open-file description.  The server removes the
+description and its cursor only when the last reference is closed.  A
+.Xr dup 2
+duplicate or a transferred reference keeps the description alive.
+.Pp
+When the last reference to an unlinked file is closed, the server releases the
+inode and its data.  A process that dies closes every handle it owned exactly
+once; a transferred reference in another process still keeps the description
+alive.
+.Pp
+Closing an unknown or already closed server file id returns
+.Er EBADF .
+.Sh RETURN VALUES
+Zero on success.
+.Sh ERRORS
+.Bl -tag -width Er -offset indent
+.It Er EBADF
+The handle is not a scheme-file handle or is already closed.
+.El
+.Sh SEE ALSO
+.Xr dup 2 ,
+.Xr open 2 ,
+.Xr read 2 ,
+.Xr write 2
 .Sh STANDARDS
 RavenBSD ABI v1.

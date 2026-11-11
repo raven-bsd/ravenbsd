@@ -6,6 +6,8 @@
 //! Servers implement [`Handler`], call [`Server::register`] and run [`Server::run`]. The server
 //! loop receives S11 packets, validates them with `raven-ipc`, dispatches the typed operation and
 //! sends the response. [`Completer`] supports deferred replies for servers such as `consd`.
+//! Filesystem servers keep open-file descriptions in [`OpenTable`] and override
+//! [`Handler::open_with`] to receive validated K66 [`raven_proto_fs::OpenFlags`].
 //!
 //! Clients use [`Client`] for `OPEN READ WRITE CLOSE DUP FSTAT CALL`. The real implementation is
 //! [`RtKernel`]; host tests and downstream services can supply a fake [`Kernel`] instead. The
@@ -25,6 +27,7 @@ extern crate alloc;
 
 pub mod client;
 pub mod kernel;
+pub mod ofd;
 pub mod server;
 pub mod sync;
 
@@ -40,5 +43,6 @@ mod sys;
 
 pub use client::Client;
 pub use kernel::{Kernel, RtKernel};
+pub use ofd::{OpenFile, OpenTable};
 pub use server::{Completer, Ctx, Handler, HandlerError, HandlerResult, Opened, Packet, Server};
 pub use sync::{SpinGuard, SpinLock};

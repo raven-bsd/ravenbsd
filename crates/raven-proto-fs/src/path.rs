@@ -166,6 +166,34 @@ pub fn normalize_absolute<'a>(path: &str, out: &'a mut [u8]) -> Result<&'a str, 
     core::str::from_utf8(&out[..length]).map_err(|_| PathError::Invalid)
 }
 
+/// A normalised request path plus the directory requirement the input expressed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NormalizedPath<'a> {
+    /// Lexically normalised absolute path.
+    pub path: &'a str,
+    /// The original path had a trailing slash or ended in `.`/`..`, so it must
+    /// resolve to a directory.
+    pub requires_dir: bool,
+}
+
+/// Normalise an absolute request path and record its directory requirement.
+///
+/// `vfsd` is the only layer that calls this for client paths.  A trailing
+/// slash is removed by [`normalize_absolute`], so [`NormalizedPath::requires_dir`]
+/// preserves the intent for the owning server.  `/` is always a directory.
+pub fn normalize_request<'a>(
+    path: &str,
+    out: &'a mut [u8],
+) -> Result<NormalizedPath<'a>, PathError> {
+    let last = path.rsplit('/').next().unwrap_or("");
+    let requires_dir = path.ends_with('/') || last == "." || last == "..";
+    let normalized = normalize_absolute(path, out)?;
+    Ok(NormalizedPath {
+        path: normalized,
+        requires_dir,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -325,6 +353,31 @@ mod tests {
         );
         let long_path = format!("/{}", "a".repeat(MAX_PATH));
         assert_eq!(split_first_component(&long_path), Err(PathError::TooLong));
+    }
+
+    #[test]
+    fn normalize_request_preserves_directory_intent() {
+        let mut buffer = [0u8; MAX_PATH];
+        type Case<'a> = (&'a str, Result<(&'a str, bool), PathError>);
+        let cases: &[Case<'_>] = &[
+            ("/", Ok(("/", true))),
+            ("//", Ok(("/", true))),
+            ("/a", Ok(("/a", false))),
+            ("/a/", Ok(("/a", true))),
+            ("/a//", Ok(("/a", true))),
+            ("/a/.", Ok(("/a", true))),
+            ("/a/..", Ok(("/", true))),
+            ("/a/./b", Ok(("/a/b", false))),
+            ("/a/b/..", Ok(("/a", true))),
+            ("/a/../b", Ok(("/b", false))),
+            ("", Err(PathError::NotAbsolute)),
+            (".", Err(PathError::NotAbsolute)),
+        ];
+        for (input, expected) in cases {
+            let actual = normalize_request(input, &mut buffer)
+                .map(|result| (result.path, result.requires_dir));
+            assert_eq!(&actual, expected, "input {input:?}");
+        }
     }
 
     #[test]

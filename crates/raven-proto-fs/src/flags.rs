@@ -27,7 +27,10 @@ pub const O_DIRECTORY: u32 = 0o200000;
 /// Do not follow a final symbolic link.
 pub const O_NOFOLLOW: u32 = 0o400000;
 
-/// Mask of every open flag this protocol version defines.
+/// Linux-valued mask of every open flag the client API accepts.
+///
+/// The S11 wire uses the compact [`crate::open::OpenFlags`] bit set, not these
+/// numbers; use that type for protocol work.
 pub const OPEN_FLAGS_MASK: u32 =
     O_ACCMODE | O_CREAT | O_EXCL | O_TRUNC | O_APPEND | O_DIRECTORY | O_NOFOLLOW;
 

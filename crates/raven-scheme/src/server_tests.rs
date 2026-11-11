@@ -94,6 +94,7 @@ impl Handler for TestHandler {
 
 fn open_packet(path: &str) -> SchemePacket {
     let mut packet = SchemePacket::request(Opcode::Open, 1, 7);
+    packet.flags = raven_proto_fs::WIRE_OPEN_READ;
     packet.set_path(path.as_bytes()).unwrap();
     packet
 }
@@ -130,7 +131,7 @@ fn open_file_returns_a_server_cookie() {
     let sent = decode_sent(&kernel);
     assert_eq!(sent[0].status, 0);
     assert_eq!(sent[0].server_cookie, 0x1234);
-    assert_eq!(handler.calls, vec!["open hello 0"]);
+    assert_eq!(handler.calls, vec!["open hello 1"]);
     assert!(kernel.attachments().is_empty());
 }
 
@@ -629,6 +630,79 @@ fn open_flags_are_forwarded() {
         )
         .unwrap();
     assert_eq!(handler.calls, vec!["open x 3"]);
+}
+
+#[test]
+fn open_validates_wire_flags_before_the_handler() {
+    let kernel = FakeKernel::new();
+    let mut server = Server::register_with(kernel.clone(), "echo").unwrap();
+    let mut handler = TestHandler::default();
+    let mut packet = open_packet("x");
+    packet.flags = 0x0100;
+    server
+        .dispatch(
+            Packet {
+                handle: Handle(9),
+                packet,
+            },
+            &mut handler,
+        )
+        .unwrap();
+    assert!(handler.calls.is_empty());
+    assert_eq!(decode_sent(&kernel)[0].status, i32::from(Errno::EINVAL.0));
+
+    let mut packet = open_packet("x");
+    packet.flags = 0;
+    server
+        .dispatch(
+            Packet {
+                handle: Handle(10),
+                packet,
+            },
+            &mut handler,
+        )
+        .unwrap();
+    assert!(handler.calls.is_empty());
+    assert_eq!(decode_sent(&kernel)[1].status, i32::from(Errno::EINVAL.0));
+}
+
+#[test]
+fn open_with_receives_typed_flags_and_create_mode() {
+    struct TypedHandler {
+        seen: Option<(u16, u32)>,
+    }
+
+    impl Handler for TypedHandler {
+        fn open_with(
+            &mut self,
+            _path: &str,
+            flags: raven_proto_fs::OpenFlags,
+            mode: u32,
+            _ctx: &Ctx,
+        ) -> HandlerResult<Opened> {
+            self.seen = Some((flags.to_wire(), mode));
+            Ok(Opened::File(1))
+        }
+    }
+
+    let kernel = FakeKernel::new();
+    let mut server = Server::register_with(kernel, "echo").unwrap();
+    let mut handler = TypedHandler { seen: None };
+    let mut packet = open_packet("created");
+    packet.flags = raven_proto_fs::WIRE_OPEN_READ
+        | raven_proto_fs::WIRE_OPEN_CREATE
+        | raven_proto_fs::WIRE_OPEN_EXCL;
+    let expected = packet.flags;
+    server
+        .dispatch(
+            Packet {
+                handle: Handle(9),
+                packet,
+            },
+            &mut handler,
+        )
+        .unwrap();
+    assert_eq!(handler.seen, Some((expected, 0o644)));
 }
 
 #[test]
