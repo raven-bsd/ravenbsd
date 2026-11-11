@@ -10,7 +10,7 @@ cd "$root"
 
 out=build/fixtures/s21-edu
 mkdir -p "$out"
-RUSTFLAGS="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=-T$root/userland/linker/x86_64.ld" \
+RUSTFLAGS="-C code-model=small -C relocation-model=static -C lto=no -C link-arg=-T$root/tests/fixtures/s21-edu/linker.ld" \
     cargo build -p raven-s21-edu --target x86_64-unknown-none --release
 cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "$out/initfs.img" \
