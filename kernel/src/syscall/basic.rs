@@ -112,8 +112,10 @@ fn uname(pointer: u64) -> Result<usize, Errno> {
 
 fn handle_close(raw: u32) -> Result<usize, Errno> {
     let process = process::current().ok_or(Errno::ESRCH)?;
-    crate::event::on_handle_close(&process, Handle(raw));
     process.handles.lock().close(Handle(raw))?;
+    // Deregistration is observable only after the close commits: a failed close (stale
+    // generation, empty slot) must leave every event-queue registration untouched.
+    crate::event::on_handle_close(&process, Handle(raw));
     Ok(0)
 }
 
