@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "usercopy-cow"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 60
+pre = ["sh tests/fixtures/usercopy-cow/build.sh"]
+initfs = "build/fixtures/usercopy-cow/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^usercopy-cow: uname cow ok$'
+
+[[expect]]
+regex = '^usercopy-cow: clock cow ok$'
+
+[[expect]]
+regex = '^usercopy-cow: event cow ok$'
+
+[[expect]]
+regex = '^usercopy-cow: ipc cow ok$'
+
+[[expect]]
+regex = '^usercopy-cow: read-only efault ok$'
+
+[[expect]]
+regex = '^usercopy-cow: ok$'
+
+[[forbid]]
+regex = '(?i)panic|usercopy-cow: failed'

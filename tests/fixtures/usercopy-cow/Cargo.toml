@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-usercopy-cow"
+version = "0.1.0"
+description = "S34 usercopy fixture: COW resolution for kernel copies and EFAULT on read-only."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "raven-usercopy-cow"
+path = "src/main.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-ipc = { path = "../../../crates/raven-ipc" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc"] }
+
+[lints]
+workspace = true
