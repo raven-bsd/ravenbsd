@@ -1,0 +1,358 @@
+# RTT sample and timeout sequences -> SRTT, RTTVAR, RTO.
+# RFC 6298 sections 2.2, 2.3, 2.4, 2.5 and 5; RFC 1122 section 4.2.3.1.
+# Fixed point: SRTT/RTTVAR in eighths of a millisecond (q8).
+# See rto.md for the exact arithmetic and rounding.
+
+[[sequence]]
+name = "single-100"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 100 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 100, srtt_q8 = 800, rttvar_q8 = 400, rto_computed_ms = 300, rto_ms = 300 },
+]
+
+[[sequence]]
+name = "single-1"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 1 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 1, srtt_q8 = 8, rttvar_q8 = 4, rto_computed_ms = 3, rto_ms = 3 },
+]
+
+[[sequence]]
+name = "two-100-200"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 100 },
+  { kind = "sample", rtt_ms = 200 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 100, srtt_q8 = 800, rttvar_q8 = 400, rto_computed_ms = 300, rto_ms = 300 },
+  { kind = "sample", rtt_ms = 200, srtt_q8 = 900, rttvar_q8 = 500, rto_computed_ms = 363, rto_ms = 363 },
+]
+
+[[sequence]]
+name = "decreasing"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 400 },
+  { kind = "sample", rtt_ms = 200 },
+  { kind = "sample", rtt_ms = 100 },
+  { kind = "sample", rtt_ms = 50 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 400, srtt_q8 = 3200, rttvar_q8 = 1600, rto_computed_ms = 1200, rto_ms = 1200 },
+  { kind = "sample", rtt_ms = 200, srtt_q8 = 3000, rttvar_q8 = 1600, rto_computed_ms = 1175, rto_ms = 1175 },
+  { kind = "sample", rtt_ms = 100, srtt_q8 = 2725, rttvar_q8 = 1750, rto_computed_ms = 1216, rto_ms = 1216 },
+  { kind = "sample", rtt_ms = 50, srtt_q8 = 2435, rttvar_q8 = 1894, rto_computed_ms = 1252, rto_ms = 1252 },
+]
+
+[[sequence]]
+name = "increasing"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 10 },
+  { kind = "sample", rtt_ms = 20 },
+  { kind = "sample", rtt_ms = 40 },
+  { kind = "sample", rtt_ms = 80 },
+  { kind = "sample", rtt_ms = 160 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 10, srtt_q8 = 80, rttvar_q8 = 40, rto_computed_ms = 30, rto_ms = 30 },
+  { kind = "sample", rtt_ms = 20, srtt_q8 = 90, rttvar_q8 = 50, rto_computed_ms = 37, rto_ms = 37 },
+  { kind = "sample", rtt_ms = 40, srtt_q8 = 119, rttvar_q8 = 95, rto_computed_ms = 63, rto_ms = 63 },
+  { kind = "sample", rtt_ms = 80, srtt_q8 = 185, rttvar_q8 = 202, rto_computed_ms = 125, rto_ms = 125 },
+  { kind = "sample", rtt_ms = 160, srtt_q8 = 322, rttvar_q8 = 426, rto_computed_ms = 254, rto_ms = 254 },
+]
+
+[[sequence]]
+name = "spike"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 100 },
+  { kind = "sample", rtt_ms = 100 },
+  { kind = "sample", rtt_ms = 100 },
+  { kind = "sample", rtt_ms = 1000 },
+  { kind = "sample", rtt_ms = 100 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 100, srtt_q8 = 800, rttvar_q8 = 400, rto_computed_ms = 300, rto_ms = 300 },
+  { kind = "sample", rtt_ms = 100, srtt_q8 = 800, rttvar_q8 = 300, rto_computed_ms = 250, rto_ms = 250 },
+  { kind = "sample", rtt_ms = 100, srtt_q8 = 800, rttvar_q8 = 225, rto_computed_ms = 213, rto_ms = 213 },
+  { kind = "sample", rtt_ms = 1000, srtt_q8 = 1700, rttvar_q8 = 1969, rto_computed_ms = 1197, rto_ms = 1197 },
+  { kind = "sample", rtt_ms = 100, srtt_q8 = 1588, rttvar_q8 = 1702, rto_computed_ms = 1050, rto_ms = 1050 },
+]
+
+[[sequence]]
+name = "zero-rtt"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 0 },
+  { kind = "sample", rtt_ms = 0 },
+  { kind = "sample", rtt_ms = 0 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 0, srtt_q8 = 0, rttvar_q8 = 0, rto_computed_ms = 1, rto_ms = 1 },
+  { kind = "sample", rtt_ms = 0, srtt_q8 = 0, rttvar_q8 = 0, rto_computed_ms = 1, rto_ms = 1 },
+  { kind = "sample", rtt_ms = 0, srtt_q8 = 0, rttvar_q8 = 0, rto_computed_ms = 1, rto_ms = 1 },
+]
+
+[[sequence]]
+name = "large-5000"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 5000 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 5000, srtt_q8 = 40000, rttvar_q8 = 20000, rto_computed_ms = 15000, rto_ms = 15000 },
+]
+
+[[sequence]]
+name = "cap-20000"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 20000 },
+  { kind = "sample", rtt_ms = 20000 },
+  { kind = "sample", rtt_ms = 20000 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 20000, srtt_q8 = 160000, rttvar_q8 = 80000, rto_computed_ms = 60000, rto_ms = 60000 },
+  { kind = "sample", rtt_ms = 20000, srtt_q8 = 160000, rttvar_q8 = 60000, rto_computed_ms = 50000, rto_ms = 50000 },
+  { kind = "sample", rtt_ms = 20000, srtt_q8 = 160000, rttvar_q8 = 45000, rto_computed_ms = 42500, rto_ms = 42500 },
+]
+
+[[sequence]]
+name = "min-clamp-100"
+rto_min_ms = 100
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 1 },
+  { kind = "sample", rtt_ms = 1 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 1, srtt_q8 = 8, rttvar_q8 = 4, rto_computed_ms = 3, rto_ms = 100 },
+  { kind = "sample", rtt_ms = 1, srtt_q8 = 8, rttvar_q8 = 3, rto_computed_ms = 3, rto_ms = 100 },
+]
+
+[[sequence]]
+name = "backoff-100"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 100 },
+  { kind = "timeout" },
+  { kind = "timeout" },
+  { kind = "timeout" },
+]
+expected = [
+  { kind = "sample", rtt_ms = 100, srtt_q8 = 800, rttvar_q8 = 400, rto_computed_ms = 300, rto_ms = 300 },
+  { kind = "timeout", srtt_q8 = 800, rttvar_q8 = 400, rto_ms = 600 },
+  { kind = "timeout", srtt_q8 = 800, rttvar_q8 = 400, rto_ms = 1200 },
+  { kind = "timeout", srtt_q8 = 800, rttvar_q8 = 400, rto_ms = 2400 },
+]
+
+[[sequence]]
+name = "backoff-cap"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 10000 },
+  { kind = "timeout" },
+  { kind = "timeout" },
+]
+expected = [
+  { kind = "sample", rtt_ms = 10000, srtt_q8 = 80000, rttvar_q8 = 40000, rto_computed_ms = 30000, rto_ms = 30000 },
+  { kind = "timeout", srtt_q8 = 80000, rttvar_q8 = 40000, rto_ms = 60000 },
+  { kind = "timeout", srtt_q8 = 80000, rttvar_q8 = 40000, rto_ms = 60000 },
+]
+
+[[sequence]]
+name = "backoff-then-sample"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 100 },
+  { kind = "timeout" },
+  { kind = "timeout" },
+  { kind = "sample", rtt_ms = 100 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 100, srtt_q8 = 800, rttvar_q8 = 400, rto_computed_ms = 300, rto_ms = 300 },
+  { kind = "timeout", srtt_q8 = 800, rttvar_q8 = 400, rto_ms = 600 },
+  { kind = "timeout", srtt_q8 = 800, rttvar_q8 = 400, rto_ms = 1200 },
+  { kind = "sample", rtt_ms = 100, srtt_q8 = 800, rttvar_q8 = 300, rto_computed_ms = 250, rto_ms = 250 },
+]
+
+[[sequence]]
+name = "fractional-rounding"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 7 },
+  { kind = "sample", rtt_ms = 11 },
+  { kind = "sample", rtt_ms = 13 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 7, srtt_q8 = 56, rttvar_q8 = 28, rto_computed_ms = 21, rto_ms = 21 },
+  { kind = "sample", rtt_ms = 11, srtt_q8 = 60, rttvar_q8 = 29, rto_computed_ms = 22, rto_ms = 22 },
+  { kind = "sample", rtt_ms = 13, srtt_q8 = 66, rttvar_q8 = 33, rto_computed_ms = 25, rto_ms = 25 },
+]
+
+[[sequence]]
+name = "alternating"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 50 },
+  { kind = "sample", rtt_ms = 500 },
+  { kind = "sample", rtt_ms = 50 },
+  { kind = "sample", rtt_ms = 500 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 50, srtt_q8 = 400, rttvar_q8 = 200, rto_computed_ms = 150, rto_ms = 150 },
+  { kind = "sample", rtt_ms = 500, srtt_q8 = 850, rttvar_q8 = 1050, rto_computed_ms = 632, rto_ms = 632 },
+  { kind = "sample", rtt_ms = 50, srtt_q8 = 794, rttvar_q8 = 900, rto_computed_ms = 550, rto_ms = 550 },
+  { kind = "sample", rtt_ms = 500, srtt_q8 = 1195, rttvar_q8 = 1477, rto_computed_ms = 888, rto_ms = 888 },
+]
+
+[[sequence]]
+name = "steady-40"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 40 },
+  { kind = "sample", rtt_ms = 40 },
+  { kind = "sample", rtt_ms = 40 },
+  { kind = "sample", rtt_ms = 40 },
+  { kind = "sample", rtt_ms = 40 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 40, srtt_q8 = 320, rttvar_q8 = 160, rto_computed_ms = 120, rto_ms = 120 },
+  { kind = "sample", rtt_ms = 40, srtt_q8 = 320, rttvar_q8 = 120, rto_computed_ms = 100, rto_ms = 100 },
+  { kind = "sample", rtt_ms = 40, srtt_q8 = 320, rttvar_q8 = 90, rto_computed_ms = 85, rto_ms = 85 },
+  { kind = "sample", rtt_ms = 40, srtt_q8 = 320, rttvar_q8 = 68, rto_computed_ms = 74, rto_ms = 74 },
+  { kind = "sample", rtt_ms = 40, srtt_q8 = 320, rttvar_q8 = 51, rto_computed_ms = 66, rto_ms = 66 },
+]
+
+[[sequence]]
+name = "rttvar-dominated"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 1000 },
+  { kind = "sample", rtt_ms = 1 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 1000, srtt_q8 = 8000, rttvar_q8 = 4000, rto_computed_ms = 3000, rto_ms = 3000 },
+  { kind = "sample", rtt_ms = 1, srtt_q8 = 7001, rttvar_q8 = 4998, rto_computed_ms = 3375, rto_ms = 3375 },
+]
+
+[[sequence]]
+name = "min-default-200"
+rto_min_ms = 200
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 10 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 10, srtt_q8 = 80, rttvar_q8 = 40, rto_computed_ms = 30, rto_ms = 200 },
+]
+
+[[sequence]]
+name = "backoff-to-cap"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 3000 },
+  { kind = "timeout" },
+  { kind = "timeout" },
+  { kind = "timeout" },
+  { kind = "timeout" },
+]
+expected = [
+  { kind = "sample", rtt_ms = 3000, srtt_q8 = 24000, rttvar_q8 = 12000, rto_computed_ms = 9000, rto_ms = 9000 },
+  { kind = "timeout", srtt_q8 = 24000, rttvar_q8 = 12000, rto_ms = 18000 },
+  { kind = "timeout", srtt_q8 = 24000, rttvar_q8 = 12000, rto_ms = 36000 },
+  { kind = "timeout", srtt_q8 = 24000, rttvar_q8 = 12000, rto_ms = 60000 },
+  { kind = "timeout", srtt_q8 = 24000, rttvar_q8 = 12000, rto_ms = 60000 },
+]
+
+[[sequence]]
+name = "rto-max-clamp"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 30000 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 30000, srtt_q8 = 240000, rttvar_q8 = 120000, rto_computed_ms = 90000, rto_ms = 60000 },
+]
+
+[[sequence]]
+name = "timeout-before-any-sample"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "timeout" },
+]
+expected = [
+  { kind = "timeout", srtt_q8 = 0, rttvar_q8 = 0, rto_ms = 2000 },
+]
+
+[[sequence]]
+name = "many-samples"
+rto_min_ms = 1
+rto_max_ms = 60000
+clock_granularity_ms = 1
+timeline = [
+  { kind = "sample", rtt_ms = 100 },
+  { kind = "sample", rtt_ms = 100 },
+  { kind = "sample", rtt_ms = 100 },
+  { kind = "sample", rtt_ms = 100 },
+  { kind = "sample", rtt_ms = 100 },
+  { kind = "sample", rtt_ms = 100 },
+]
+expected = [
+  { kind = "sample", rtt_ms = 100, srtt_q8 = 800, rttvar_q8 = 400, rto_computed_ms = 300, rto_ms = 300 },
+  { kind = "sample", rtt_ms = 100, srtt_q8 = 800, rttvar_q8 = 300, rto_computed_ms = 250, rto_ms = 250 },
+  { kind = "sample", rtt_ms = 100, srtt_q8 = 800, rttvar_q8 = 225, rto_computed_ms = 213, rto_ms = 213 },
+  { kind = "sample", rtt_ms = 100, srtt_q8 = 800, rttvar_q8 = 169, rto_computed_ms = 185, rto_ms = 185 },
+  { kind = "sample", rtt_ms = 100, srtt_q8 = 800, rttvar_q8 = 127, rto_computed_ms = 164, rto_ms = 164 },
+  { kind = "sample", rtt_ms = 100, srtt_q8 = 800, rttvar_q8 = 96, rto_computed_ms = 148, rto_ms = 148 },
+]
+
+# 22 sequences. 1..6 timeline steps each, 70 samples and 10 timeouts in total.

@@ -1,0 +1,496 @@
+# Header parse/emit vectors for raven-tcpip-wire.
+# RFCs encoded: 791 (IPv4), 792 (ICMPv4), 768 (UDP), 826 (ARP),
+# 8200 (IPv6), 4443 (ICMPv6), 9293 (TCP), 7323 (TCP options), 2018 (SACK),
+# 1071 (internet checksum). Values are computed from the RFC field layouts;
+# see headers.md for the arithmetic. A `reject` value is the exact reason tag
+# the parser must return.
+
+[[case]]
+name = "ipv4-tcp-syn"
+proto = "ipv4"
+bytes = "45 00 00 28 12 34 40 00 40 06 3c 65 c0 00 02 01 c6 33 64 02 9c 40 00 50 00 00 03 e8 00 00 00 00 50 02 ff ff 23 33 00 00"
+expect = { version = 4, ihl = 5, dscp = 0, ecn = 0, total_len = 40, id = 4660, flags = "DF", frag_offset = 0, ttl = 64, protocol = 6, checksum = 15461, src = "192.0.2.1", dst = "198.51.100.2", payload_len = 20 }
+
+[[case]]
+name = "ipv4-udp-dns"
+proto = "ipv4"
+bytes = "45 00 00 20 12 34 40 00 40 11 3c 62 c0 00 02 01 c6 33 64 02 cf 08 00 35 00 0c 31 2d 12 34 01 00"
+expect = { version = 4, ihl = 5, dscp = 0, ecn = 0, total_len = 32, id = 4660, flags = "DF", frag_offset = 0, ttl = 64, protocol = 17, checksum = 15458, src = "192.0.2.1", dst = "198.51.100.2", payload_len = 12 }
+
+[[case]]
+name = "ipv4-icmp-echo"
+proto = "ipv4"
+bytes = "45 00 00 20 12 34 40 00 40 01 3c 72 c0 00 02 01 c6 33 64 02 08 00 33 36 00 01 00 02 61 62 63 64"
+expect = { version = 4, ihl = 5, dscp = 0, ecn = 0, total_len = 32, id = 4660, flags = "DF", frag_offset = 0, ttl = 64, protocol = 1, checksum = 15474, src = "192.0.2.1", dst = "198.51.100.2", payload_len = 12 }
+
+[[case]]
+name = "ipv4-options-nop-eol"
+proto = "ipv4"
+bytes = "46 00 00 2c 12 34 40 00 40 06 39 60 c0 00 02 01 c6 33 64 02 01 01 01 00 9c 40 00 50 00 00 03 e8 00 00 00 00 50 02 ff ff 23 33 00 00"
+expect = { version = 4, ihl = 6, dscp = 0, ecn = 0, total_len = 44, id = 4660, flags = "DF", frag_offset = 0, ttl = 64, protocol = 6, checksum = 14688, src = "192.0.2.1", dst = "198.51.100.2", payload_len = 20 }
+
+[[case]]
+name = "ipv4-options-rr"
+proto = "ipv4"
+bytes = "47 00 00 25 12 34 40 00 40 11 2d 94 c0 00 02 01 c6 33 64 02 07 07 04 c0 00 02 01 00 cf 08 00 35 00 09 cc 66 78"
+expect = { version = 4, ihl = 7, dscp = 0, ecn = 0, total_len = 37, id = 4660, flags = "DF", frag_offset = 0, ttl = 64, protocol = 17, checksum = 11668, src = "192.0.2.1", dst = "198.51.100.2", payload_len = 9 }
+
+[[case]]
+name = "ipv4-frag-mf"
+proto = "ipv4"
+bytes = "45 00 00 24 ab cd 20 00 40 11 c2 c4 c0 00 02 01 c6 33 64 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
+expect = { version = 4, ihl = 5, dscp = 0, ecn = 0, total_len = 36, id = 43981, flags = "MF", frag_offset = 0, ttl = 64, protocol = 17, checksum = 49860, src = "192.0.2.1", dst = "198.51.100.2", payload_len = 16 }
+
+[[case]]
+name = "ipv4-frag-offset"
+proto = "ipv4"
+bytes = "45 00 00 1c ab cd 00 b9 40 11 e2 13 c0 00 02 01 c6 33 64 02 00 00 00 00 00 00 00 00"
+expect = { version = 4, ihl = 5, dscp = 0, ecn = 0, total_len = 28, id = 43981, flags = "", frag_offset = 1480, ttl = 64, protocol = 17, checksum = 57875, src = "192.0.2.1", dst = "198.51.100.2", payload_len = 8 }
+
+[[case]]
+name = "ipv4-ttl-1"
+proto = "ipv4"
+bytes = "45 00 00 1d 12 34 40 00 01 11 7b 65 c0 00 02 01 c6 33 64 02 cf 08 00 35 00 09 cc 66 78"
+expect = { version = 4, ihl = 5, dscp = 0, ecn = 0, total_len = 29, id = 4660, flags = "DF", frag_offset = 0, ttl = 1, protocol = 17, checksum = 31589, src = "192.0.2.1", dst = "198.51.100.2", payload_len = 9 }
+
+[[case]]
+name = "ipv4-dscp-ef"
+proto = "ipv4"
+bytes = "45 b8 00 1d 12 34 40 00 40 11 3b ad c0 00 02 01 c6 33 64 02 cf 08 00 35 00 09 cc 66 78"
+expect = { version = 4, ihl = 5, dscp = 46, ecn = 0, total_len = 29, id = 4660, flags = "DF", frag_offset = 0, ttl = 64, protocol = 17, checksum = 15277, src = "192.0.2.1", dst = "198.51.100.2", payload_len = 9 }
+
+[[case]]
+name = "ipv4-bad-version"
+proto = "ipv4"
+bytes = "55 00 00 1d 12 34 40 00 40 11 2c 65 c0 00 02 01 c6 33 64 02 cf 08 00 35 00 09 cc 66 78"
+reject = "ipv4.version"
+
+[[case]]
+name = "ipv4-bad-ihl"
+proto = "ipv4"
+bytes = "44 00 00 19 12 34 40 00 40 11 3d 69 c0 00 02 01 c6 33 64 02 cf 08 00 35 00 09 cc 66 78"
+reject = "ipv4.ihl"
+
+[[case]]
+name = "ipv4-bad-total-small"
+proto = "ipv4"
+bytes = "45 00 00 13 12 34 40 00 40 11 3c 6f c0 00 02 01 c6 33 64 02 cf 08 00 35 00 09 cc 66 78"
+reject = "ipv4.total_len"
+
+[[case]]
+name = "ipv4-bad-total-large"
+proto = "ipv4"
+bytes = "45 00 00 3c 12 34 40 00 40 11 3c 46 c0 00 02 01 c6 33 64 02 cf 08 00 35 00 09 cc 66 78"
+reject = "ipv4.total_len"
+
+[[case]]
+name = "ipv4-bad-checksum"
+proto = "ipv4"
+bytes = "45 00 00 1d 12 34 40 00 40 11 de ad c0 00 02 01 c6 33 64 02 cf 08 00 35 00 09 cc 66 78"
+reject = "ipv4.checksum"
+
+[[case]]
+name = "ipv4-truncated"
+proto = "ipv4"
+bytes = "45 00 00 1d 12 34 40 00 40 11 3c 65 c0 00 02 01 c6 33 64"
+reject = "ipv4.truncated"
+
+[[case]]
+name = "ipv4-zero-total"
+proto = "ipv4"
+bytes = "45 00 00 00 12 34 40 00 40 11 3c 82 c0 00 02 01 c6 33 64 02 cf 08 00 35 00 09 cc 66 78"
+reject = "ipv4.total_len"
+
+[[case]]
+name = "ipv6-tcp-syn"
+proto = "ipv6"
+bytes = "60 00 00 00 00 14 06 40 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 01 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 02 9c 40 00 50 00 00 03 e8 00 00 00 00 50 02 ff ff b3 f5 00 00"
+expect = { version = 6, traffic_class = 0, flow_label = 0, payload_len = 20, next_header = 6, hop_limit = 64, src = "2001:0db8:0000:0000:0000:0000:0000:0001", dst = "2001:0db8:0000:0000:0000:0000:0000:0002" }
+
+[[case]]
+name = "ipv6-udp-dns"
+proto = "ipv6"
+bytes = "60 00 00 00 00 0a 11 40 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 01 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 02 cf 08 00 35 00 0a c2 f3 12 34"
+expect = { version = 6, traffic_class = 0, flow_label = 0, payload_len = 10, next_header = 17, hop_limit = 64, src = "2001:0db8:0000:0000:0000:0000:0000:0001", dst = "2001:0db8:0000:0000:0000:0000:0000:0002" }
+
+[[case]]
+name = "ipv6-icmpv6-echo"
+proto = "ipv6"
+bytes = "60 00 00 00 00 0c 3a 40 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 01 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 02 80 00 5f 7a 00 01 00 02 61 62 63 64"
+expect = { version = 6, traffic_class = 0, flow_label = 0, payload_len = 12, next_header = 58, hop_limit = 64, src = "2001:0db8:0000:0000:0000:0000:0000:0001", dst = "2001:0db8:0000:0000:0000:0000:0000:0002" }
+
+[[case]]
+name = "ipv6-hopbyhop-tcp"
+proto = "ipv6"
+bytes = "60 00 00 00 00 1c 00 40 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 01 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 02 06 00 01 04 00 00 00 00 9c 40 00 50 00 00 00 01 00 00 00 00 50 02 ff ff b7 dc 00 00"
+expect = { version = 6, traffic_class = 0, flow_label = 0, payload_len = 28, next_header = 0, hop_limit = 64, src = "2001:0db8:0000:0000:0000:0000:0000:0001", dst = "2001:0db8:0000:0000:0000:0000:0000:0002" }
+
+[[case]]
+name = "ipv6-fragment-first"
+proto = "ipv6"
+bytes = "60 00 00 00 00 1c 2c 40 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 01 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 02 06 00 00 01 00 00 00 01 9c 40 00 50 00 00 00 01 00 00 00 00 50 02 ff ff b7 dc 00 00"
+expect = { version = 6, traffic_class = 0, flow_label = 0, payload_len = 28, next_header = 44, hop_limit = 64, src = "2001:0db8:0000:0000:0000:0000:0000:0001", dst = "2001:0db8:0000:0000:0000:0000:0000:0002" }
+
+[[case]]
+name = "ipv6-fragment-later"
+proto = "ipv6"
+bytes = "60 00 00 00 00 10 2c 40 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 01 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 02 3b 00 00 00 00 00 00 08 00 00 00 00 00 00 00 00"
+expect = { version = 6, traffic_class = 0, flow_label = 0, payload_len = 16, next_header = 44, hop_limit = 64, src = "2001:0db8:0000:0000:0000:0000:0000:0001", dst = "2001:0db8:0000:0000:0000:0000:0000:0002" }
+
+[[case]]
+name = "ipv6-bad-version"
+proto = "ipv6"
+bytes = "50 00 00 00 00 00 11 40 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 01 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 02"
+reject = "ipv6.version"
+
+[[case]]
+name = "ipv6-truncated"
+proto = "ipv6"
+bytes = "60 00 00 00 00 00 11 40 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 01 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00"
+reject = "ipv6.truncated"
+
+[[case]]
+name = "ipv6-jumbogram"
+proto = "ipv6"
+bytes = "60 00 00 00 00 00 3b 40 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 01 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 02"
+reject = "ipv6.jumbogram"
+
+[[case]]
+name = "ipv6-unknown-next"
+proto = "ipv6"
+bytes = "60 00 00 00 00 04 3b 40 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 01 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 02 00 00 00 00"
+expect = { version = 6, traffic_class = 0, flow_label = 0, payload_len = 4, next_header = 59, hop_limit = 64, src = "2001:0db8:0000:0000:0000:0000:0000:0001", dst = "2001:0db8:0000:0000:0000:0000:0000:0002" }
+
+[[case]]
+name = "ipv6-bad-payload-len"
+proto = "ipv6"
+bytes = "60 00 00 00 00 64 11 40 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 01 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 02"
+reject = "ipv6.payload_len"
+
+[[case]]
+name = "ipv6-hopbyhop-bad-len"
+proto = "ipv6"
+bytes = "60 00 00 00 00 04 00 40 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 01 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 02 06 00 00 00"
+reject = "ipv6.ext_len"
+
+[[case]]
+name = "ipv6-icmpv6-ptb"
+proto = "ipv6"
+bytes = "60 00 00 00 00 08 3a 40 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 01 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 02 02 00 9d 48 00 00 05 00"
+expect = { version = 6, traffic_class = 0, flow_label = 0, payload_len = 8, next_header = 58, hop_limit = 64, src = "2001:0db8:0000:0000:0000:0000:0000:0001", dst = "2001:0db8:0000:0000:0000:0000:0000:0002" }
+
+[[case]]
+name = "tcp-syn-no-options"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 03 e8 00 00 00 00 50 02 ff ff 23 33 00 00"
+expect = { src_port = 40000, dst_port = 80, seq = 1000, ack = 0, data_offset = 5, flags = "SYN", window = 65535, checksum = 9011, urgent = 0, options = [], payload_len = 0 }
+
+[[case]]
+name = "tcp-syn-mss"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 03 e8 00 00 00 00 60 02 ff ff 0b 77 00 00 02 04 05 b4"
+expect = { src_port = 40000, dst_port = 80, seq = 1000, ack = 0, data_offset = 6, flags = "SYN", window = 65535, checksum = 2935, urgent = 0, options = [{ kind = 2, name = "mss", mss = 1460 }], payload_len = 0 }
+
+[[case]]
+name = "tcp-syn-wscale"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 03 e8 00 00 00 00 70 02 ff ff f7 68 00 00 02 04 05 b4 01 03 03 07"
+expect = { src_port = 40000, dst_port = 80, seq = 1000, ack = 0, data_offset = 7, flags = "SYN", window = 65535, checksum = 63336, urgent = 0, options = [{ kind = 2, name = "mss", mss = 1460 }, { kind = 1, name = "nop" }, { kind = 3, name = "window_scale", shift = 7 }], payload_len = 0 }
+
+[[case]]
+name = "tcp-syn-timestamps"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 03 e8 00 00 00 00 80 02 ff ff d9 c7 00 00 08 0a 11 22 33 44 55 66 77 88 00 00"
+expect = { src_port = 40000, dst_port = 80, seq = 1000, ack = 0, data_offset = 8, flags = "SYN", window = 65535, checksum = 55751, urgent = 0, options = [{ kind = 8, name = "timestamps", tsval = 287454020, tsecr = 1432778632 }, { kind = 0, name = "eol" }, { kind = 0, name = "eol" }], payload_len = 0 }
+
+[[case]]
+name = "tcp-syn-sack"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 03 e8 00 00 00 00 70 02 ff ff f7 70 00 00 02 04 05 b4 04 02 00 00"
+expect = { src_port = 40000, dst_port = 80, seq = 1000, ack = 0, data_offset = 7, flags = "SYN", window = 65535, checksum = 63344, urgent = 0, options = [{ kind = 2, name = "mss", mss = 1460 }, { kind = 4, name = "sack_permitted" }, { kind = 0, name = "eol" }, { kind = 0, name = "eol" }], payload_len = 0 }
+
+[[case]]
+name = "tcp-syn-all-options"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 03 e8 00 00 00 00 c0 02 ff ff 81 f8 00 00 02 04 05 b4 04 02 01 01 08 0a 11 22 33 44 55 66 77 88 01 01 03 03 07 00 00 00 00 00"
+expect = { src_port = 40000, dst_port = 80, seq = 1000, ack = 0, data_offset = 12, flags = "SYN", window = 65535, checksum = 33272, urgent = 0, options = [{ kind = 2, name = "mss", mss = 1460 }, { kind = 4, name = "sack_permitted" }, { kind = 1, name = "nop" }, { kind = 1, name = "nop" }, { kind = 8, name = "timestamps", tsval = 287454020, tsecr = 1432778632 }, { kind = 1, name = "nop" }, { kind = 1, name = "nop" }, { kind = 3, name = "window_scale", shift = 7 }, { kind = 0, name = "eol" }, { kind = 0, name = "eol" }, { kind = 0, name = "eol" }, { kind = 0, name = "eol" }, { kind = 0, name = "eol" }], payload_len = 0 }
+
+[[case]]
+name = "tcp-ack-data"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 03 e9 00 00 13 89 50 10 ff ff cb c3 00 00 68 65 6c 6c 6f"
+expect = { src_port = 40000, dst_port = 80, seq = 1001, ack = 5001, data_offset = 5, flags = "ACK", window = 65535, checksum = 52163, urgent = 0, options = [], payload_len = 5 }
+
+[[case]]
+name = "tcp-fin-ack"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 03 e9 00 00 13 89 50 11 ff ff 0f 9a 00 00"
+expect = { src_port = 40000, dst_port = 80, seq = 1001, ack = 5001, data_offset = 5, flags = "ACK,FIN", window = 65535, checksum = 3994, urgent = 0, options = [], payload_len = 0 }
+
+[[case]]
+name = "tcp-rst-ack"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 03 e9 00 00 13 89 50 14 00 00 0f 97 00 00"
+expect = { src_port = 40000, dst_port = 80, seq = 1001, ack = 5001, data_offset = 5, flags = "ACK,RST", window = 0, checksum = 3991, urgent = 0, options = [], payload_len = 0 }
+
+[[case]]
+name = "tcp-urg"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 03 e9 00 00 13 89 50 30 ff ff 4b 13 00 02 61 62 63"
+expect = { src_port = 40000, dst_port = 80, seq = 1001, ack = 5001, data_offset = 5, flags = "URG,ACK", window = 65535, checksum = 19219, urgent = 2, options = [], payload_len = 3 }
+
+[[case]]
+name = "tcp-bad-data-offset-low"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 00 01 00 00 00 00 00 02 ff ff 77 1a 00 00"
+reject = "tcp.data_offset"
+
+[[case]]
+name = "tcp-bad-option-len-zero"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 00 01 00 00 00 00 60 02 ff ff 15 16 00 00 02 00 00 00"
+reject = "tcp.option_length"
+
+[[case]]
+name = "tcp-bad-option-truncated"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 00 01 00 00 00 00 60 02 ff ff 15 10 00 00 02 06 00 00"
+reject = "tcp.option_truncated"
+
+[[case]]
+name = "tcp-bad-data-offset-high"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 00 01 00 00 00 00 f0 02 ff ff 86 f1 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
+reject = "tcp.data_offset"
+
+[[case]]
+name = "tcp-option-timestamp-len-9"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 00 01 00 00 00 00 80 02 ff ff ef 01 00 00 08 09 00 00 00 01 00 00 00 02 00 00"
+reject = "tcp.option_length"
+
+[[case]]
+name = "tcp-wscale-shift-15"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 00 01 00 00 00 00 70 02 ff ff fb 47 00 00 02 04 05 b4 01 03 03 0f"
+expect = { src_port = 40000, dst_port = 80, seq = 1, ack = 0, data_offset = 7, flags = "SYN", window = 65535, checksum = 64327, urgent = 0, options = [{ kind = 2, name = "mss", mss = 1460 }, { kind = 1, name = "nop" }, { kind = 3, name = "window_scale", shift = 15 }], payload_len = 0 }
+
+[[case]]
+name = "tcp-sack-two-blocks"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 00 01 00 00 00 00 a0 10 ff ff 92 64 00 00 01 01 05 12 00 00 07 d0 00 00 0b b8 00 00 13 88 00 00 17 70"
+expect = { src_port = 40000, dst_port = 80, seq = 1, ack = 0, data_offset = 10, flags = "ACK", window = 65535, checksum = 37476, urgent = 0, options = [{ kind = 1, name = "nop" }, { kind = 1, name = "nop" }, { kind = 5, name = "sack", blocks = [[2000, 3000], [5000, 6000]] }], payload_len = 0 }
+
+[[case]]
+name = "tcp-ecn-flags"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 00 01 00 00 00 00 50 c2 ff ff 26 5a 00 00"
+expect = { src_port = 40000, dst_port = 80, seq = 1, ack = 0, data_offset = 5, flags = "CWR,ECE,SYN", window = 65535, checksum = 9818, urgent = 0, options = [], payload_len = 0 }
+
+[[case]]
+name = "tcp-bad-checksum"
+proto = "tcp"
+bytes = "9c 40 00 50 00 00 00 01 00 00 00 00 50 02 ff ff de ad 00 00"
+reject = "tcp.checksum"
+
+[[case]]
+name = "udp-basic"
+proto = "udp"
+bytes = "cf 08 00 35 00 0d 00 8d 68 65 6c 6c 6f"
+expect = { src_port = 53000, dst_port = 53, length = 13, checksum = 141, payload_len = 5 }
+
+[[case]]
+name = "udp-zero-checksum-v4"
+proto = "udp"
+bytes = "cf 08 00 35 00 0d 00 00 68 65 6c 6c 6f"
+expect = { src_port = 53000, dst_port = 53, length = 13, checksum = 0, payload_len = 5 }
+
+[[case]]
+name = "udp-bad-length-small"
+proto = "udp"
+bytes = "cf 08 00 35 00 07 00 99 68 65 6c 6c 6f"
+reject = "udp.length"
+
+[[case]]
+name = "udp-bad-length-large"
+proto = "udp"
+bytes = "cf 08 00 35 00 14 00 7f 68 65 6c 6c 6f"
+reject = "udp.length"
+
+[[case]]
+name = "udp-zero-length"
+proto = "udp"
+bytes = "cf 08 00 35 00 00 00 a7 68 65 6c 6c 6f"
+reject = "udp.length"
+
+[[case]]
+name = "udp-truncated"
+proto = "udp"
+bytes = "cf 08 00 35"
+reject = "udp.truncated"
+
+[[case]]
+name = "udp-checksum-bad"
+proto = "udp"
+bytes = "cf 08 00 35 00 0d de ad 68 65 6c 6c 6f"
+reject = "udp.checksum"
+
+[[case]]
+name = "udp-v6-zero-checksum"
+proto = "udp"
+context = { family = "ipv6", src = "2001:db8::1", dst = "2001:db8::2" }
+bytes = "cf 08 00 35 00 0d 00 00 68 65 6c 6c 6f"
+reject = "udp.zero_checksum_ipv6"
+
+[[case]]
+name = "icmp-echo-request"
+proto = "icmp"
+bytes = "08 00 33 36 00 01 00 02 61 62 63 64"
+expect = { type = 8, code = 0, checksum = 13110, rest = 65538, id = 1, seq = 2, payload_len = 4 }
+
+[[case]]
+name = "icmp-echo-reply"
+proto = "icmp"
+bytes = "00 00 3b 36 00 01 00 02 61 62 63 64"
+expect = { type = 0, code = 0, checksum = 15158, rest = 65538, id = 1, seq = 2, payload_len = 4 }
+
+[[case]]
+name = "icmp-dest-unreach-frag"
+proto = "icmp"
+bytes = "03 04 b2 83 00 00 05 78 45 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
+expect = { type = 3, code = 4, checksum = 45699, rest = 1400, mtu = 1400, payload_len = 20 }
+
+[[case]]
+name = "icmp-time-exceeded"
+proto = "icmp"
+bytes = "0b 00 af ff 00 00 00 00 45 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
+expect = { type = 11, code = 0, checksum = 45055, rest = 0, payload_len = 20 }
+
+[[case]]
+name = "icmp-port-unreachable"
+proto = "icmp"
+bytes = "03 03 b7 fc 00 00 00 00 45 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
+expect = { type = 3, code = 3, checksum = 47100, rest = 0, payload_len = 20 }
+
+[[case]]
+name = "icmp-bad-checksum"
+proto = "icmp"
+bytes = "08 00 de ad 00 00 00 01 78"
+reject = "icmp.checksum"
+
+[[case]]
+name = "icmp-truncated"
+proto = "icmp"
+bytes = "08 00 00"
+reject = "icmp.truncated"
+
+[[case]]
+name = "icmp-unknown-type"
+proto = "icmp"
+bytes = "2a 00 11 39 00 00 00 00 61 62 63 64"
+expect = { type = 42, code = 0, checksum = 4409, rest = 0, payload_len = 4 }
+
+[[case]]
+name = "icmpv6-echo-request"
+proto = "icmpv6"
+bytes = "80 00 5f 7a 00 01 00 02 61 62 63 64"
+expect = { type = 128, code = 0, checksum = 24442, rest = 65538, id = 1, seq = 2, payload_len = 4 }
+
+[[case]]
+name = "icmpv6-echo-reply"
+proto = "icmpv6"
+bytes = "81 00 5e 7a 00 01 00 02 61 62 63 64"
+expect = { type = 129, code = 0, checksum = 24186, rest = 65538, id = 1, seq = 2, payload_len = 4 }
+
+[[case]]
+name = "icmpv6-packet-too-big"
+proto = "icmpv6"
+bytes = "02 00 9d 48 00 00 05 00"
+expect = { type = 2, code = 0, checksum = 40264, rest = 1280, mtu = 1280, payload_len = 0 }
+
+[[case]]
+name = "icmpv6-dest-unreach"
+proto = "icmpv6"
+bytes = "01 04 a3 44 00 00 00 00"
+expect = { type = 1, code = 4, checksum = 41796, rest = 0, payload_len = 0 }
+
+[[case]]
+name = "icmpv6-param-problem"
+proto = "icmpv6"
+bytes = "04 00 a0 42 00 00 00 06"
+expect = { type = 4, code = 0, checksum = 41026, rest = 6, payload_len = 0 }
+
+[[case]]
+name = "icmpv6-nd-ns"
+proto = "icmpv6"
+bytes = "87 00 ec 72 00 00 00 00 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 02 01 01 02 00 00 00 00 01"
+expect = { type = 135, code = 0, checksum = 60530, rest = 0, target = "2001:0db8:0000:0000:0000:0000:0000:0002", payload_len = 24 }
+
+[[case]]
+name = "icmpv6-nd-na"
+proto = "icmpv6"
+bytes = "88 00 8a 72 60 00 00 00 20 01 0d b8 00 00 00 00 00 00 00 00 00 00 00 02 02 01 02 00 00 00 00 01"
+expect = { type = 136, code = 0, checksum = 35442, rest = 1610612736, target = "2001:0db8:0000:0000:0000:0000:0000:0002", payload_len = 24 }
+
+[[case]]
+name = "icmpv6-bad-checksum"
+proto = "icmpv6"
+bytes = "80 00 de ad 00 00 00 01 78"
+reject = "icmpv6.checksum"
+
+[[case]]
+name = "icmpv6-truncated"
+proto = "icmpv6"
+bytes = "80 00 00 00"
+reject = "icmpv6.truncated"
+
+[[case]]
+name = "arp-request"
+proto = "arp"
+bytes = "00 01 08 00 06 04 00 01 02 00 00 00 00 01 c0 00 02 01 00 00 00 00 00 00 c0 00 02 02"
+expect = { htype = 1, ptype = 2048, hlen = 6, plen = 4, oper = 1, sha = "02:00:00:00:00:01", spa = "192.0.2.1", tha = "00:00:00:00:00:00", tpa = "192.0.2.2" }
+
+[[case]]
+name = "arp-reply"
+proto = "arp"
+bytes = "00 01 08 00 06 04 00 02 02 00 00 00 00 02 c0 00 02 02 02 00 00 00 00 01 c0 00 02 01"
+expect = { htype = 1, ptype = 2048, hlen = 6, plen = 4, oper = 2, sha = "02:00:00:00:00:02", spa = "192.0.2.2", tha = "02:00:00:00:00:01", tpa = "192.0.2.1" }
+
+[[case]]
+name = "arp-gratuitous"
+proto = "arp"
+bytes = "00 01 08 00 06 04 00 01 02 00 00 00 00 01 c0 00 02 01 00 00 00 00 00 00 c0 00 02 01"
+expect = { htype = 1, ptype = 2048, hlen = 6, plen = 4, oper = 1, sha = "02:00:00:00:00:01", spa = "192.0.2.1", tha = "00:00:00:00:00:00", tpa = "192.0.2.1" }
+
+[[case]]
+name = "arp-probe"
+proto = "arp"
+bytes = "00 01 08 00 06 04 00 01 02 00 00 00 00 01 00 00 00 00 00 00 00 00 00 00 c0 00 02 01"
+expect = { htype = 1, ptype = 2048, hlen = 6, plen = 4, oper = 1, sha = "02:00:00:00:00:01", spa = "0.0.0.0", tha = "00:00:00:00:00:00", tpa = "192.0.2.1" }
+
+[[case]]
+name = "arp-truncated"
+proto = "arp"
+bytes = "00 01 08 00 06 04 00 01 02 00 00 00 00 01 c0 00 02 01 00 00"
+reject = "arp.truncated"
+
+[[case]]
+name = "arp-bad-hlen"
+proto = "arp"
+bytes = "00 01 08 00 08 04 00 01 02 00 00 00 00 01 c0 00 02 01 00 00 00 00 00 00 c0 00 02 02"
+reject = "arp.hlen"
+
+[[case]]
+name = "arp-unknown-op"
+proto = "arp"
+bytes = "00 01 08 00 06 04 00 03 02 00 00 00 00 01 c0 00 02 01 00 00 00 00 00 00 c0 00 02 02"
+expect = { htype = 1, ptype = 2048, hlen = 6, plen = 4, oper = 3, sha = "02:00:00:00:00:01", spa = "192.0.2.1", tha = "00:00:00:00:00:00", tpa = "192.0.2.2" }
+
+[[case]]
+name = "arp-bad-ptype"
+proto = "arp"
+bytes = "00 01 86 dd 06 04 00 01 02 00 00 00 00 01 c0 00 02 01 00 00 00 00 00 00 c0 00 02 02"
+reject = "arp.ptype"
+
+# 81 cases. Count per protocol: IPv4 16, IPv6 13, TCP 19, UDP 8, ICMPv4 8,
+# ICMPv6 9, ARP 8. At least 60, with at least one malformed case per parser.
