@@ -2,16 +2,22 @@
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! IOAPIC redirection table programming.
+//!
+//! Every register access, including the interrupt-context masking of a level-triggered line, goes
+//! through [`IOAPICS`].  It is an [`IrqSpinLock`], so a process-context sequence masks interrupts
+//! on its CPU until the two IOREGSEL/IOWIN accesses are complete; the interrupt handler on that
+//! CPU therefore cannot observe the controller half-programmed.  This is the single serialization
+//! policy for IOREGSEL/IOWIN, which is not atomic MMIO.
 
 #![allow(dead_code)] // route/mask are the S07 driver and S21 device-irq API.
 
 use core::fmt;
 
 use raven_rmm::MapError;
-use spin::Mutex;
 
 use crate::arch::x86_64::acpi;
 use crate::memory::mmio;
+use crate::sync::IrqSpinLock;
 
 /// IOAPIC register select offset.
 const IOREGSEL: usize = 0x00;
@@ -29,7 +35,8 @@ struct State {
 
 const NO_STATE: Option<State> = None;
 
-static IOAPICS: Mutex<[Option<State>; MAX_IOAPICS]> = Mutex::new([NO_STATE; MAX_IOAPICS]);
+static IOAPICS: IrqSpinLock<[Option<State>; MAX_IOAPICS]> =
+    IrqSpinLock::new([NO_STATE; MAX_IOAPICS]);
 
 /// Why an IOAPIC operation failed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -86,7 +93,6 @@ pub fn init() -> Result<(), IoApicError> {
     if stored == 0 {
         Err(first_error.unwrap_or(IoApicError::NotMapped))
     } else {
-        publish_isr_view(&guard);
         Ok(())
     }
 }
@@ -97,6 +103,9 @@ pub fn gsi_for_isa(irq: u8) -> u32 {
 }
 
 /// Route a GSI to `vector` on `destination`'s local APIC.
+///
+/// The redirection entry is programmed masked.  Only the `IRQ_WAIT`/`IRQ_ACK` protocol of the
+/// owning `Irq` unmasks it, so a line cannot fire between `irq_create` and the first wait.
 pub fn route(
     gsi: u32,
     vector: u8,
@@ -107,7 +116,7 @@ pub fn route(
     let guard = IOAPICS.lock();
     let (index, state) = find_state(&guard, gsi)?;
 
-    let mut low = u32::from(vector);
+    let mut low = u32::from(vector) | (1 << 16);
     if active_low {
         low |= 1 << 13;
     }
@@ -139,77 +148,31 @@ pub fn unmask(gsi: u32) -> Result<(), IoApicError> {
     Ok(())
 }
 
-/// One IOAPIC as the interrupt handler sees it.
-#[derive(Clone, Copy)]
-struct IsrState {
-    base: usize,
-    gsi_base: u32,
-    max_entry: u8,
-}
-
-struct IsrViewCell(core::cell::UnsafeCell<[Option<IsrState>; MAX_IOAPICS]>);
-
-// SAFETY: the view is written once during init, before interrupts are enabled, and read-only
-// afterwards from the interrupt handler.
-unsafe impl Sync for IsrViewCell {}
-
-static ISR_VIEW: IsrViewCell = IsrViewCell(core::cell::UnsafeCell::new([None; MAX_IOAPICS]));
-
-/// Record the IOAPIC state for the lock-free interrupt-handler view. Called from [`init`].
-fn publish_isr_view(states: &[Option<State>; MAX_IOAPICS]) {
-    // SAFETY: single-CPU init before `sti`; published only here.
-    unsafe {
-        let view = &mut *ISR_VIEW.0.get();
-        for (index, state) in states.iter().enumerate() {
-            if let Some(slot) = view.get_mut(index) {
-                *slot = state.map(|state| IsrState {
-                    base: state.base,
-                    gsi_base: state.gsi_base,
-                    max_entry: state.max_entry,
-                });
-            }
-        }
-    }
-}
-
-/// Mask a level-triggered GSI from the interrupt handler without taking a process-context lock.
+/// Mask a level-triggered GSI from the interrupt handler.
+///
+/// The controller lock is interrupt-safe: a process-context sequence holds it with interrupts
+/// masked on its CPU, so on that CPU the handler cannot observe it held.  The wait is therefore
+/// uncontended under the current execution model (delivery on the boot CPU, where all process
+/// context runs); it is a real spinlock rather than a sleepable mutex, so it remains correct if
+/// delivery moves to another CPU later.
 pub fn mask_gsi_isr(gsi: u32) {
-    // SAFETY: the view was published before interrupts were enabled and is never modified.
-    let view = unsafe { &*ISR_VIEW.0.get() };
-    for state in view.iter().flatten() {
-        let Some(offset) = gsi.checked_sub(state.gsi_base) else {
-            continue;
-        };
-        if offset > u32::from(state.max_entry) {
-            continue;
-        }
-        let mut entry = read_redirection_isr(state.base, offset as u8);
-        entry |= 1 << 16;
-        write_redirection_isr(state.base, offset as u8, entry as u32, (entry >> 32) as u32);
+    let guard = IOAPICS.lock();
+    let Ok((index, state)) = find_state(&guard, gsi) else {
         return;
-    }
+    };
+    let mut entry = read_redirection(state, index);
+    entry |= 1 << 16;
+    write_redirection(state, index, entry as u32, (entry >> 32) as u32);
 }
 
-fn read_redirection_isr(base: usize, index: u8) -> u64 {
-    let low = read_reg(base, 0x10u8.saturating_add(index.saturating_mul(2)));
-    let high = read_reg(
-        base,
-        0x10u8
-            .saturating_add(index.saturating_mul(2))
-            .saturating_add(1),
-    );
-    u64::from(low) | (u64::from(high) << 32)
-}
-
-fn write_redirection_isr(base: usize, index: u8, low: u32, high: u32) {
-    write_reg(base, 0x10u8.saturating_add(index.saturating_mul(2)), low);
-    write_reg(
-        base,
-        0x10u8
-            .saturating_add(index.saturating_mul(2))
-            .saturating_add(1),
-        high,
-    );
+/// Read the mask bit of one redirection entry.
+///
+/// A diagnostic probe for the `s30-irq-probe` boot flag: it reports the state of the real
+/// controller register, not an internal flag.
+pub fn redirection_masked(gsi: u32) -> Option<bool> {
+    let guard = IOAPICS.lock();
+    let (index, state) = find_state(&guard, gsi).ok()?;
+    Some(read_redirection(state, index) & (1 << 16) != 0)
 }
 
 /// Mask every redirection entry of every mapped IOAPIC.

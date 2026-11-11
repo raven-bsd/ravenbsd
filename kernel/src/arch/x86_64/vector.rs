@@ -5,8 +5,24 @@
 //!
 //! Device vectors live above the exception (0..32), timer (0x20/0x21) and IPI (0x30..0x32)
 //! vectors.  Each vector has exactly one owner (the `Irq` object); closing the object returns
-//! the vector to the pool.  The bitmap is lock-free because allocation and release only happen
-//! in process context, while the interrupt handler only reads the owner table.
+//! the vector to the pool.  The bitmap and the owner table are lock-free because allocation,
+//! owner publication and release only happen in process context, while the interrupt handler
+//! only reads the owner table.
+//!
+//! Owner protocol (current execution model):
+//!
+//! * [`allocate`] claims the bitmap bit.
+//! * [`install_owner`] publishes the raw owner with `Release` before the interrupt source is
+//!   armed, so the handler sees either zero or a live object.
+//! * [`release`] clears the owner with `Release` *before* it publishes the slot as free, so a
+//!   new owner is never mistaken for the old one.
+//! * The handler reads the owner with `Acquire` and only dereferences a non-zero pointer.
+//!
+//! This is safe only while the kernel is non-preemptible, user threads and process-context
+//! closes run on CPU 0, and device delivery is routed to that same CPU: release therefore cannot
+//! run concurrently with the handler that may still dereference the object.  Enabling user-thread
+//! SMP, kernel preemption or delivery on another CPU invalidates the argument and needs a typed
+//! owning reference or a documented quarantine.
 
 use core::sync::atomic::{AtomicU64, Ordering};
 
@@ -62,28 +78,33 @@ pub fn install_owner(vector: u8, owner: u64) {
     }
 }
 
-/// Return a vector to the pool and clear its owner.
+/// Return a vector to the pool.
+///
+/// The owner is cleared before the allocation bit is published as free.  The reverse order
+/// would let the next allocator install its owner and then have this release erase it, leaving a
+/// live interrupt source with no owner.  See the module documentation for the execution-model
+/// prerequisites that make the clear-then-free window safe.
 pub fn release(vector: u8) -> bool {
     let Some(index) = slot(vector) else {
         return false;
     };
+    if let Some(owner_slot) = OWNERS.get(index) {
+        owner_slot.store(0, Ordering::Release);
+    }
     let word = index / 64;
     let bit = (index % 64) as u32;
     let mask = 1u64 << bit;
     if let Some(slot) = TAKEN.get(word) {
         slot.fetch_and(!mask, Ordering::AcqRel);
     }
-    if let Some(owner_slot) = OWNERS.get(index) {
-        owner_slot.store(0, Ordering::Release);
-    }
     true
 }
 
 /// The raw owner pointer of a device vector, or null when it is unowned or not in the pool.
 ///
-/// Called from the interrupt handler, which never blocks: on the boot CPU the owner cannot
-/// disappear while this function and its caller run, because release happens in process context
-/// on the same CPU.
+/// Called from the interrupt handler, which never blocks.  See the module documentation for the
+/// protocol that keeps the pointer valid: release clears the slot before the object is freed and
+/// runs on the same CPU that receives the interrupt.
 pub fn owner(vector: u8) -> u64 {
     match slot(vector) {
         Some(index) => OWNERS

@@ -30,14 +30,19 @@ pub const MSI_ADDRESS_BASE: u32 = 0xFEE0_0000;
 
 /// Encode the 64-bit MSI message address for `destination`.
 ///
-/// xAPIC mode places the 8-bit destination id in the low word's bits 19..12.  x2APIC mode
-/// carries the full 32-bit destination in the upper half.  Both keep the redirection hint and
-/// destination-mode bits clear (physical destination).
-pub const fn msi_address(destination: u32, x2apic: bool) -> (u32, u32) {
-    if x2apic {
-        (MSI_ADDRESS_BASE, destination)
+/// The 8-bit destination APIC id goes in the low word's bits 19..12 and the upper word stays
+/// zero.  This is the architectural message address in both xAPIC and x2APIC mode: the MSI
+/// address format does not change with the local APIC mode.  The redirection hint and
+/// destination-mode bits stay clear (physical destination).
+///
+/// Returns `None` for ids above 255.  The extended destination format is not implemented, and
+/// the id must never be moved into the upper half: a caller that gets `None` has to fail with
+/// `EOPNOTSUPP` (the BSD `ENOTSUP` value) instead of programming an unvalidated message.
+pub const fn msi_address(destination: u32) -> Option<(u32, u32)> {
+    if destination <= 0xFF {
+        Some((MSI_ADDRESS_BASE | (destination << 12), 0))
     } else {
-        (MSI_ADDRESS_BASE | ((destination & 0xFF) << 12), 0)
+        None
     }
 }
 
@@ -59,26 +64,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn xapic_address_places_destination_in_bits_19_12() {
-        assert_eq!(msi_address(0, false), (0xFEE0_0000, 0));
-        assert_eq!(msi_address(1, false), (0xFEE0_1000, 0));
-        assert_eq!(msi_address(0x7F, false), (0xFEE7_F000, 0));
+    fn address_places_the_destination_in_bits_19_12() {
+        assert_eq!(msi_address(0), Some((0xFEE0_0000, 0)));
+        assert_eq!(msi_address(1), Some((0xFEE0_1000, 0)));
+        assert_eq!(msi_address(0x7F), Some((0xFEE7_F000, 0)));
+        assert_eq!(msi_address(0xFF), Some((0xFEEF_F000, 0)));
     }
 
     #[test]
-    fn xapic_address_masks_destination_to_eight_bits() {
-        assert_eq!(msi_address(0x1AB, false).0, 0xFEEA_B000);
+    fn address_uses_the_same_encoding_in_x2apic_mode() {
+        // x2APIC keeps the architectural message address: destination 0x10 is not moved into
+        // the upper half.
+        assert_eq!(msi_address(0x10), Some((0xFEE1_0000, 0)));
+        assert_eq!(msi_address(0x10).map(|(_, high)| high), Some(0));
     }
 
     #[test]
-    fn x2apic_address_keeps_the_low_half_and_moves_destination_high() {
-        assert_eq!(msi_address(0x10, true), (0xFEE0_0000, 0x10));
-        assert_eq!(msi_address(0xFFFF_FFEF, true), (0xFEE0_0000, 0xFFFF_FFEF));
+    fn address_rejects_ids_above_255() {
+        assert_eq!(msi_address(0x100), None);
+        assert_eq!(msi_address(0xFFFF_FFEF), None);
+        assert_eq!(msi_address(u32::MAX), None);
     }
 
     #[test]
     fn address_has_the_redirection_and_destination_bits_clear() {
-        let (low, high) = msi_address(0x3C, false);
+        let Some((low, high)) = msi_address(0x3C) else {
+            panic!("destination 0x3C must encode");
+        };
         assert_eq!(low & 0x0000_000F, 0);
         assert_eq!(high, 0);
     }
@@ -139,7 +151,9 @@ mod tests {
     #[test]
     fn golden_msi_message_matches_the_architectural_layout() {
         // Destination 5, vector 0x42, fixed delivery, edge: the documented triple.
-        let (lo, hi) = msi_address(5, false);
+        let Some((lo, hi)) = msi_address(5) else {
+            panic!("destination 5 must encode");
+        };
         let data = msi_data(0x42, DELIVERY_FIXED, false);
         assert_eq!(lo, 0xFEE0_5000);
         assert_eq!(hi, 0);
@@ -148,7 +162,6 @@ mod tests {
 
     #[test]
     fn destination_zero_is_the_boot_apic() {
-        assert_eq!(msi_address(0, false), (MSI_ADDRESS_BASE, 0));
-        assert_eq!(msi_address(0, true), (MSI_ADDRESS_BASE, 0));
+        assert_eq!(msi_address(0), Some((MSI_ADDRESS_BASE, 0)));
     }
 }

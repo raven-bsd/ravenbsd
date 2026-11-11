@@ -47,6 +47,92 @@ enum IrqKind {
     MsiX,
 }
 
+/// Claim registry for legacy GSIs.
+///
+/// A GSI has exactly one redirection entry: two `Irq` objects for the same line would overwrite
+/// each other and the first close would mask the second object's line.  The bitmap is atomic
+/// because creation and release run in process context.
+mod gsi_owners {
+    use core::sync::atomic::{AtomicU64, Ordering};
+
+    use raven_abi::errno::Errno;
+
+    /// Highest GSI tracked; the IOAPIC tables on supported machines stay far below it.
+    const MAX_GSI: usize = 2048;
+    const WORDS: usize = MAX_GSI / 64;
+
+    static CLAIMED: [AtomicU64; WORDS] = [const { AtomicU64::new(0) }; WORDS];
+
+    /// Claim `gsi` for one legacy `Irq`.
+    pub fn claim(gsi: u32) -> Result<(), Errno> {
+        let index = usize::try_from(gsi).map_err(|_| Errno::EINVAL)?;
+        if index >= MAX_GSI {
+            return Err(Errno::EINVAL);
+        }
+        let Some(slot) = CLAIMED.get(index / 64) else {
+            return Err(Errno::EINVAL);
+        };
+        let mask = 1u64 << ((index % 64) as u32);
+        if slot.fetch_or(mask, Ordering::AcqRel) & mask != 0 {
+            Err(Errno::EBUSY)
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Release a claim after a close or a failed creation.
+    pub fn release(gsi: u32) {
+        let Ok(index) = usize::try_from(gsi) else {
+            return;
+        };
+        if index >= MAX_GSI {
+            return;
+        }
+        let Some(slot) = CLAIMED.get(index / 64) else {
+            return;
+        };
+        slot.fetch_and(!(1u64 << ((index % 64) as u32)), Ordering::AcqRel);
+    }
+}
+
+/// True when the boot command line asked for the legacy redirection-state probe.
+fn legacy_probe_enabled() -> bool {
+    crate::cmdline::CmdLine::parse(crate::memory::paging::cmdline()).flag("s30-irq-probe")
+}
+
+/// Print the real redirection-entry mask bit at legacy creation time.
+fn probe_legacy_created(gsi: u32, vector: u8) {
+    if !legacy_probe_enabled() {
+        return;
+    }
+    match ioapic::redirection_masked(gsi) {
+        Some(masked) => crate::kprintln!(
+            "s30: legacy gsi={} vector={:#04x} masked={}",
+            gsi,
+            vector,
+            u8::from(masked)
+        ),
+        None => {
+            crate::kprintln!(
+                "s30: legacy gsi={} vector={:#04x} masked=unknown",
+                gsi,
+                vector
+            )
+        }
+    }
+}
+
+/// Print the real redirection-entry mask bit after the wait/ack unmask.
+fn probe_legacy_unmasked(gsi: u32) {
+    if !legacy_probe_enabled() {
+        return;
+    }
+    match ioapic::redirection_masked(gsi) {
+        Some(masked) => crate::kprintln!("s30: legacy gsi={} masked={}", gsi, u8::from(masked)),
+        None => crate::kprintln!("s30: legacy gsi={} masked=unknown", gsi),
+    }
+}
+
 /// One interrupt source a driver can wait on.
 pub struct Irq {
     kind: IrqKind,
@@ -75,6 +161,9 @@ impl Drop for Irq {
     fn drop(&mut self) {
         if self.kind == IrqKind::Legacy {
             let _ = ioapic::mask(self.gsi);
+            // Mask first, then let the next `irq_create` claim the line: a new owner must never
+            // inherit an unmasked entry.
+            gsi_owners::release(self.gsi);
         }
         vector::release(self.vector);
     }
@@ -89,15 +178,23 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
 
     let (irq, fill) = match kind {
         IRQ_LEGACY => {
-            if frame.r8 != 0 {
+            // The ABI's fourth argument travels in r10; r8 and r9 are ignored.
+            if frame.r10 != 0 {
                 return Err(Errno::EINVAL);
             }
             let irq_number = u8::try_from(number).map_err(|_| Errno::EINVAL)?;
             let gsi = ioapic::gsi_for_isa(irq_number);
+            gsi_owners::claim(gsi)?;
             let (active_low, level) = crate::arch::x86_64::acpi::info()
                 .override_for_isa(irq_number)
                 .unwrap_or((false, false));
-            let vector = vector::allocate().ok_or(Errno::ENOSPC)?;
+            let vector = match vector::allocate() {
+                Some(vector) => vector,
+                None => {
+                    gsi_owners::release(gsi);
+                    return Err(Errno::ENOSPC);
+                }
+            };
             let irq = Arc::new(Irq {
                 kind: IrqKind::Legacy,
                 gsi,
@@ -108,13 +205,14 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
                 waiters: WaitQueue::new(),
             });
             vector::install_owner(vector, Arc::as_ptr(&irq) as u64);
+            // `route` programs the entry masked; only IRQ_WAIT/IRQ_ACK unmask it.
             ioapic::route(gsi, vector, apic::id(), active_low, level).map_err(|_| Errno::EINVAL)?;
-            // The line stays masked until the first IRQ_WAIT / IRQ_ACK.
-            ioapic::mask(gsi).map_err(|_| Errno::EINVAL)?;
+            probe_legacy_created(gsi, vector);
             (irq, None)
         }
         IRQ_MSI | IRQ_MSIX => {
             let info = frame.r10;
+            let (address_lo, address_hi) = msi_address(apic::id()).ok_or(Errno::EOPNOTSUPP)?;
             let vector = vector::allocate().ok_or(Errno::ENOSPC)?;
             let irq = Arc::new(Irq {
                 kind: if kind == IRQ_MSI {
@@ -130,7 +228,6 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
                 waiters: WaitQueue::new(),
             });
             vector::install_owner(vector, Arc::as_ptr(&irq) as u64);
-            let (address_lo, address_hi) = msi_address(apic::id(), apic::is_x2apic());
             let data = msi_data(vector, DELIVERY_FIXED, false);
             let fill = IrqInfo {
                 vector: u32::from(vector),
@@ -172,6 +269,7 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
     // A legacy line stays masked until its first wait (or ack), then is re-armed by each ack.
     if irq.kind == IrqKind::Legacy && !irq.armed.swap(true, Ordering::AcqRel) {
         ioapic::unmask(irq.gsi).map_err(|_| Errno::EINVAL)?;
+        probe_legacy_unmasked(irq.gsi);
     }
 
     loop {
@@ -223,6 +321,7 @@ pub fn ack(frame: &SyscallFrame) -> Result<usize, Errno> {
     };
     if irq.kind == IrqKind::Legacy && (irq.level || !irq.armed.swap(true, Ordering::AcqRel)) {
         ioapic::unmask(irq.gsi).map_err(|_| Errno::EINVAL)?;
+        probe_legacy_unmasked(irq.gsi);
     }
     Ok(0)
 }
