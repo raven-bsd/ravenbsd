@@ -25,7 +25,7 @@ raven-scheme = { path = "../../crates/raven-scheme" }
 raven-initfs = { path = "../../crates/raven-initfs" }
 
 [dev-dependencies]
-raven-initfs = { path = "../../crates/raven-initfs", default-features = false }
+raven-initfs = { path = "../../crates/raven-initfs", features = ["std"] }
 
 [[example]]
 name = "hello"

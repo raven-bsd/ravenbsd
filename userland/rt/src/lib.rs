@@ -20,6 +20,7 @@ pub mod args;
 pub mod entry;
 #[cfg(feature = "alloc")]
 pub mod fs;
+pub mod initfs;
 pub mod print;
 pub mod spawn;
 pub mod sync;
@@ -35,6 +36,7 @@ pub use args::Args;
 /// The runtime's process entry point.
 #[cfg(not(test))]
 pub use entry::__raven_start;
+pub use initfs::initfs_has_manifest;
 pub use sys::{
     clock_get, debug_write, exit, futex_wait, futex_wake, handle_close, handle_dup,
     handle_transfer, map_initfs, nanosleep, uname, yield_now,

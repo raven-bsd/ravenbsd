@@ -58,6 +58,13 @@ pub fn run() -> i32 {
             return 1;
         }
     };
+    // The base/dev/tiny profiles ship no manifests and take the legacy banner path, which never
+    // reads file data. The kernel has already fully validated this same image, so a cheap name
+    // table scan can skip the userspace CRC pass that dominates a debug build's boot time. Any
+    // image the scanner cannot read falls through to the strict parser below.
+    if raven_rt::initfs_has_manifest(image) == Some(false) {
+        return crate::legacy::run();
+    }
     let initfs = match Initfs::parse(image) {
         Ok(initfs) => initfs,
         Err(error) => {
