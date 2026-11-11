@@ -132,56 +132,77 @@ fn qemu_args(
     interactive: bool,
     extra: &[String],
 ) -> Vec<String> {
-    let mut args = match arch {
-        Arch::X86_64 => vec![
-            "-machine".to_string(),
-            "q35".to_string(),
-            "-m".to_string(),
-            "512M".to_string(),
-            "-smp".to_string(),
-            "4".to_string(),
-            "-serial".to_string(),
-            if interactive { "mon:stdio" } else { "stdio" }.to_string(),
-            "-display".to_string(),
-            "none".to_string(),
-            "-no-reboot".to_string(),
-            "-drive".to_string(),
-            format!("if=pflash,format=raw,readonly=on,file={}", code.display()),
-            "-drive".to_string(),
-            format!("if=pflash,format=raw,file={}", vars.display()),
-            "-drive".to_string(),
-            format!("format=raw,file={}", image.display()),
-            "-device".to_string(),
-            "isa-debug-exit,iobase=0xf4,iosize=0x04".to_string(),
-        ],
-        Arch::Aarch64 => vec![
-            "-M".to_string(),
-            "virt".to_string(),
-            "-cpu".to_string(),
-            "cortex-a72".to_string(),
-            "-m".to_string(),
-            "512M".to_string(),
-            "-smp".to_string(),
-            "4".to_string(),
-            "-nographic".to_string(),
-            "-drive".to_string(),
-            format!("if=pflash,format=raw,readonly=on,file={}", code.display()),
-            "-drive".to_string(),
-            format!("if=pflash,format=raw,file={}", vars.display()),
-            "-drive".to_string(),
-            format!("format=raw,file={}", image.display()),
-        ],
-        Arch::Riscv64 => Vec::new(),
-    };
+    let mut args = Vec::new();
+    match arch {
+        Arch::X86_64 => {
+            push_pair(&mut args, "-machine", "q35");
+            push_pair(&mut args, "-m", "512M");
+            push_pair(&mut args, "-smp", "4");
+            push_pair(
+                &mut args,
+                "-serial",
+                if interactive { "mon:stdio" } else { "stdio" },
+            );
+            push_pair(&mut args, "-display", "none");
+            if !interactive {
+                push_pair(&mut args, "-monitor", "none");
+            }
+            args.push("-no-reboot".to_string());
+            push_pair(
+                &mut args,
+                "-drive",
+                format!("if=pflash,format=raw,readonly=on,file={}", code.display()),
+            );
+            push_pair(
+                &mut args,
+                "-drive",
+                format!("if=pflash,format=raw,file={}", vars.display()),
+            );
+            push_pair(
+                &mut args,
+                "-drive",
+                format!("format=raw,file={}", image.display()),
+            );
+            push_pair(
+                &mut args,
+                "-device",
+                "isa-debug-exit,iobase=0xf4,iosize=0x04",
+            );
+        }
+        Arch::Aarch64 => {
+            push_pair(&mut args, "-M", "virt");
+            push_pair(&mut args, "-cpu", "cortex-a72");
+            push_pair(&mut args, "-m", "512M");
+            push_pair(&mut args, "-smp", "4");
+            args.push("-nographic".to_string());
+            push_pair(
+                &mut args,
+                "-drive",
+                format!("if=pflash,format=raw,readonly=on,file={}", code.display()),
+            );
+            push_pair(
+                &mut args,
+                "-drive",
+                format!("if=pflash,format=raw,file={}", vars.display()),
+            );
+            push_pair(
+                &mut args,
+                "-drive",
+                format!("format=raw,file={}", image.display()),
+            );
+        }
+        Arch::Riscv64 => {}
+    }
     if kvm {
         args.push("-enable-kvm".to_string());
     }
-    if arch == Arch::X86_64 && !interactive {
-        args.insert(12, "none".to_string());
-        args.insert(12, "-monitor".to_string());
-    }
     args.extend(extra.iter().cloned());
     args
+}
+
+fn push_pair(args: &mut Vec<String>, option: &str, value: impl Into<String>) {
+    args.push(option.to_string());
+    args.push(value.into());
 }
 
 fn map_exit(code: Option<i32>) -> u8 {
@@ -214,6 +235,54 @@ mod tests {
         assert!(args.iter().any(|arg| arg.contains("isa-debug-exit")));
         assert!(args.iter().any(|arg| arg == "format=raw,file=/img"));
         assert!(!args.iter().any(|arg| arg == "-enable-kvm"));
+    }
+
+    #[test]
+    fn no_build_x86_argv_is_exact() {
+        let args = qemu_args(
+            Arch::X86_64,
+            Path::new("/img"),
+            Path::new("/code"),
+            Path::new("/vars"),
+            false,
+            false,
+            &[],
+        );
+        let expected: Vec<String> = [
+            "-machine",
+            "q35",
+            "-m",
+            "512M",
+            "-smp",
+            "4",
+            "-serial",
+            "stdio",
+            "-display",
+            "none",
+            "-monitor",
+            "none",
+            "-no-reboot",
+            "-drive",
+            "if=pflash,format=raw,readonly=on,file=/code",
+            "-drive",
+            "if=pflash,format=raw,file=/vars",
+            "-drive",
+            "format=raw,file=/img",
+            "-device",
+            "isa-debug-exit,iobase=0xf4,iosize=0x04",
+        ]
+        .iter()
+        .map(|argument| (*argument).to_string())
+        .collect();
+        assert_eq!(args, expected);
+        for pair in args.windows(2) {
+            if pair[0] == "-drive" {
+                assert!(
+                    !pair[1].contains("-monitor"),
+                    "drive value holds another option"
+                );
+            }
+        }
     }
 
     #[test]
