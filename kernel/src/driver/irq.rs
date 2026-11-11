@@ -235,6 +235,10 @@ impl Irq {
     }
 
     /// True when `handle` is being closed by another thread.
+    ///
+    /// The flag is published with `Release` before [`Self::cancel_waiters`] takes the wait-queue
+    /// lock, so a waiter that acquires the same lock afterwards is guaranteed to observe it
+    /// (the lock's release-acquire pair orders the store before the waiter's condition check).
     fn cancelled(&self, handle: Handle) -> bool {
         self.closing_handle.load(Ordering::Acquire) == closing_key(handle.0)
     }
@@ -244,6 +248,11 @@ impl Irq {
     /// The waiter revalidates its own handle and returns `EIO` if it is gone; waiters on other
     /// handles of the same object simply re-block.  Called from process context, so the
     /// allocation in `wake_all` is allowed.
+    ///
+    /// Ordering: `closing_handle` is stored before the wait-queue lock is taken, and the
+    /// waiter's enqueue condition re-checks the flag under that same lock.  A close therefore
+    /// cannot slip between a waiter's cancel check and its enqueue: either the waiter is in
+    /// the queue when the drain runs (it is woken), or it sees the flag and never enqueues.
     pub(crate) fn cancel_waiters(&self, handle: u32) {
         self.closing_handle
             .store(closing_key(handle), Ordering::Release);
@@ -414,9 +423,16 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
         if let Some(deadline) = deadline {
             sched::add_sleep(token, deadline, Errno::ETIMEDOUT.to_ret());
         }
-        let queued = irq
-            .waiters
-            .enqueue_if(0, u64::from(irq.vector), || Ok(irq.pending() == 0));
+        // The enqueue decision re-checks the cancel flag under the wait-queue lock.
+        // `cancel_waiters` stores `closing_handle` and then takes the same lock to drain, so
+        // the lock ordering alone proves the pair cannot miss each other: either this push
+        // happens before the drain (the close wakes the waiter), or the condition observes
+        // the close and refuses to enqueue (the check above returns `EIO` on the next pass).
+        // Without this, the window between the cancel check and the block would be safe only
+        // because syscall entry masks interrupts on the delivery CPU.
+        let queued = irq.waiters.enqueue_if(0, u64::from(irq.vector), || {
+            Ok(irq.pending() == 0 && !irq.cancelled(handle))
+        });
         match queued {
             Ok(true) => {
                 let status = sched::block_current();
