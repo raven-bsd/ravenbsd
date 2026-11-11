@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-s35-handles"
+version = "0.1.0"
+description = "S35 handle generation, rights extraction and close-ordering fixture."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "raven-s35-init"
+path = "src/main.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc"] }
+
+[lints]
+workspace = true
