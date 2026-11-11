@@ -775,6 +775,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-s37-fs"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-elf",
+ "raven-initfs",
+ "raven-ipc",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-sched-core"
 version = "0.1.0"
 

@@ -23,6 +23,8 @@ advances it by the number of bytes returned.  The wire offset must be zero; a
 server returns
 .Er EINVAL
 for a nonzero offset.  There is no positional read in protocol version 1.
+The kernel has no offset argument for this syscall and always sends zero; a
+server-side nonzero offset can only come from a raw protocol peer.
 .Pp
 A
 .Xr dup 2

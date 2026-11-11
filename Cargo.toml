@@ -21,6 +21,7 @@ members = [
     "tests/fixtures/s11-echo",
     "tests/fixtures/s33-ipc",
     "tests/fixtures/s32-capture",
+    "tests/fixtures/s37-fs",
     "tests/fixtures/s25-xfer",
     "tests/fixtures/s26-evq",
     "tests/fixtures/s35-handles",
