@@ -332,6 +332,10 @@ name = "raven-esr"
 version = "0.1.0"
 
 [[package]]
+name = "raven-fdt-lite"
+version = "0.1.0"
+
+[[package]]
 name = "raven-frames"
 version = "0.1.0"
 
