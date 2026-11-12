@@ -1,0 +1,95 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt VIRTIO-BLK 8
+.Os RavenBSD
+.Sh NAME
+.Nm virtio-blk
+.Nd virtio block driver
+.Sh SYNOPSIS
+.Nm /sbin/virtio-blk
+.Op Ar bar Ns = Ns Ar n
+.Op Ar bar_size Ns = Ns Ar bytes
+.Op Ar dma Ns = Ns Ar bytes
+.Op Ar irq Ns = Ns Ar line
+.Op Ar test
+.Sh DESCRIPTION
+.Nm
+is the userspace driver for a modern (virtio 1.0) PCI block function.  It is
+launched by
+.Xr devd 8
+for a function whose vendor and device ids match
+.Pa /etc/drivers.toml ,
+and receives four handles in the documented order: the device BAR (3), the
+function's configuration page (4), a DMA buffer (5) and a legacy interrupt (6).
+The command-line arguments are the values
+.Nm
+gets from
+.Xr devd 8 :
+.Va bar ,
+.Va bar_size ,
+.Va dma
+and
+.Va irq .
+.Pp
+The driver resets the function, negotiates
+.Dv VIRTIO_F_VERSION_1
+plus
+.Dv VIRTIO_BLK_F_FLUSH
+and the read-only feature when the device offers them, and reads the capacity
+from the device configuration in 512-byte sectors.  One split request queue of
+at most eight entries is programmed in the DMA buffer.  A request is the
+bounded chain header, optional data and status; the data window is 65,024
+bytes (127 sectors), so a 128-sector protocol request is split into two
+chunks.  Every sector range,
+descriptor index and used-ring length is checked before it is used.  Completion
+is driven by the ISR byte and the transferred interrupt with a bounded wait; a
+timeout resets the device and returns
+.Er EIO ,
+never a partial reply.
+.Pp
+The driver serves the
+.Dq disk:
+scheme with the
+.Xr blockd 8
+framing.  The only device path is
+.Dq 0 ,
+the whole device.  INFO, READ, WRITE and FLUSH are supported; LIST returns
+.Er EINVAL
+because partitions are
+.Xr blockd 8 Ns 's
+job.  A read-only device refuses a writable open and every write with
+.Er EROFS .
+.Pp
+With
+.Ar test
+the driver also runs the qtest self-test: cycle 1 writes a deterministic
+pattern across the data area, flushes, reads a one-mebibyte sample and records
+a marker; after a client flush it resets and exits.  Cycle 2 re-reads the whole
+data area byte for byte, compares the sample checksum with the marker and
+exits.  The production driver (no
+.Ar test )
+never writes data the client did not ask for.
+.Pp
+The device must be a modern-only function (for example QEMU's
+.Ql virtio-blk-pci,disable-legacy=on ) whose registers live in a memory BAR.
+Legacy virtio, MSI and MSI-X are not supported yet; the driver uses the
+function's legacy INTx line.
+.Sh FILES
+.Bl -tag -width /etc/drivers.toml -compact
+.It Pa /etc/drivers.toml
+the driver table that launches
+.Nm
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr devd 8 ,
+.Xr blockd 8 ,
+.Xr pcid 8
+.Sh HISTORY
+The
+.Nm
+driver first appeared in RavenBSD 0.1.
+.Sh STANDARDS
+Virtio 1.0 (OASIS), PCI Local Bus 3.0.

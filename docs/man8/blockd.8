@@ -15,10 +15,30 @@ registers the
 scheme and serves a sector-addressed block device through the
 .Xr open 2
 protocol.
-The current backend is a deterministic in-memory disk loaded from
-.Pa initfs:/etc/blockd.img ;
-a real storage driver supplies the backend in a later milestone.
-The image is scanned as GPT before the first client is accepted.
+Two backends exist: a deterministic in-memory disk loaded from
+.Pa initfs:/etc/blockd.img
+(the default), and a real device behind a driver's
+.Dq disk:
+scheme when
+.Ev BLOCKD_DISK
+names one, for example
+.Ql disk:0
+for the
+.Xr virtio-blk 8
+driver.  The in-memory image is scanned as GPT before the first client is
+accepted; the remote backend reads at most a one-mebibyte GPT prefix, never the
+whole disk.
+.Pp
+The remote backend keeps one outstanding
+.Dq CALL
+per operation: it opens the driver path, issues one
+.Dq READ ,
+.Dq WRITE
+or
+.Dq FLUSH ,
+closes the handle and decodes the reply.  A driver restart between operations
+therefore cannot leave a stale handle, and a failed open or a short reply is an
+error, never a guessed result.
 .Pp
 Every request is decoded into a fixed little-endian structure, its sector
 range is checked against the device capacity with overflow-safe arithmetic,
@@ -75,6 +95,13 @@ The primary and backup arrays must agree.
 A corrupt table is reported as a startup error instead of being guessed; the
 server exits non-zero and never serves a partial partition list.
 .Pp
+With the remote backend the scanner runs on the one-mebibyte prefix, so the
+primary and backup tables must both lie inside that prefix.  A table whose
+backup header is at the device's last sector is rejected until a prefix-only
+scanner lands; the
+.Ql virtio-blk
+qtest fixture builds a prefix-consistent table and proves the bounded read.
+.Pp
 A GPT name longer than the 40-byte wire field is shortened on a UTF-8
 character boundary.
 .Sh FILES
@@ -82,7 +109,19 @@ character boundary.
 .It Pa /etc/services.d/blockd.toml
 Service manifest.
 .It Pa /etc/blockd.img
-Initial logical disk image.
+Initial logical disk image (RAM backend).
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width BLOCKD_DISK -compact
+.It Ev BLOCKD_IMAGE
+Path of the in-memory image, default
+.Pa initfs:/etc/blockd.img .
+Ignored when
+.Ev BLOCKD_DISK
+is set.
+.It Ev BLOCKD_DISK
+Driver scheme to use as the backend, for example
+.Ql disk:0 .
 .El
 .Sh ERRORS
 A malformed or out-of-range request returns
@@ -98,6 +137,7 @@ An internal encoding failure returns
 .Sh SEE ALSO
 .Xr init 8 ,
 .Xr initfsd 8 ,
-.Xr svcctl 1
+.Xr svcctl 1 ,
+.Xr virtio-blk 8
 .Sh STANDARDS
 RavenBSD.

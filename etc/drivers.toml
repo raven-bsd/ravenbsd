@@ -28,6 +28,16 @@
 # for the driver and closes them all, so a crash/restart cycle frees the DMA
 # buffer and the IRQ line.  The driver never receives the root device or ADMIN.
 #
-# No drivers ship in the production image yet: B13b adds the virtio-net entry.
-# The test profiles carry their own table (`profiles/*/drivers.conf`) so a qtest
-# never depends on this file.
+# No drivers ship in the production image yet.  B13b/B13c added the transport and
+# the resource grants; the entries below are the first real functions (a modern
+# virtio-blk at BAR4 and a modern virtio-net at BAR4), ready for the storage and
+# network milestones.  The test profiles carry their own table
+# (`profiles/*/drivers.conf`) so a qtest never depends on this file.
+
+[[driver]]
+name = "virtio-blk"
+vendor = 0x1af4
+device = 0x1042
+exec = "/sbin/virtio-blk"
+args = ["bar=4", "resources=dma+irq"]
+cycles = 1

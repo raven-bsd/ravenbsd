@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# blockd on the remote backend: it starts after the driver publishes `disk:` and scans the GPT
+# from the driver's disk instead of the initfs image.
+[[initfs.files]]
+src = "profiles/virtio-blk-test.d/blockd.manifest"
+path = "/etc/services.d/blockd.toml"

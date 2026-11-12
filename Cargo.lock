@@ -696,6 +696,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-k15-mkdisk"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-block",
+]
+
+[[package]]
+name = "raven-k15-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-block",
+ "raven-rt",
+ "raven-scheme",
+ "virtio-blk",
+]
+
+[[package]]
 name = "raven-k54-mkimage"
 version = "0.1.0"
 dependencies = [
@@ -1835,6 +1853,18 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "virtio-blk"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-driver",
+ "raven-proto-block",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
 
 [[package]]
 name = "virtio-net"

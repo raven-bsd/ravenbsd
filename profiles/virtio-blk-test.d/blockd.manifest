@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# blockd over the virtio-blk driver's `disk:0` scheme. The production manifest keeps the initfs
+# RAM default; this test instance starts in the devd wave (after `disk:` exists so the process
+# namespace contains it), waits for the driver's pattern pass to finish, scans the GPT and serves
+# `block:`. Readiness `scheme` gates the probe until `block:` is registered.
+name = "blockd"
+exec = "/sbin/blockd"
+needs = ["scheme:disk"]
+provides = ["scheme:block"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0
+
+[env]
+BLOCKD_DISK = "disk:0"
