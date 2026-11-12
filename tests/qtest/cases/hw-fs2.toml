@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# hw-fs boot 2: the pre-step extracts the UFS partition from the disk boot 1 wrote and requires
+# `ufs-fsck -n` to report clean; the guest then proves the payload survived, the renamed name is
+# present and the unlinked/removed names are gone. The disk is not rebuilt.
+
+name = "hw-fs2"
+arch = "x86_64"
+profile = "hw-fs"
+timeout_secs = 300
+pre = ["sh tests/fixtures/k72-hwfs/verify.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-drive", "if=none,id=d0,format=raw,file=build/fixtures/k72-hwfs/disk.img",
+    "-device", "virtio-blk-pci,drive=d0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: pcid up$'
+
+[[expect]]
+regex = '^devd: matched [0-9a-f]{2}:[0-9a-f]{2}\.[0-9] vendor=0x1af4 device=0x1042 irq_line=[0-9]+ irq_pin=[0-9]+$'
+
+[[expect]]
+regex = '^virtio-blk: id=1af4:1042$'
+
+[[expect]]
+regex = '^blockd: remote disk=disk:0 sectors=[0-9]+ ro=0$'
+
+[[expect]]
+regex = '^blockd: part 1 ufs-root 34\.\.[0-9]+$'
+
+[[expect]]
+regex = '^fsd-ufs: mounted block:0 partition 1 as ufs: \([0-9]+ bytes\)$'
+
+[[expect]]
+regex = '^svcd: root mounted at /root$'
+
+[[expect]]
+regex = '^hw-fs: boot 2 start$'
+
+[[expect]]
+regex = '^hw-fs: boot 2 payload survived bytes=12288 checksum=0x[0-9a-f]{16}$'
+
+[[expect]]
+regex = '^hw-fs: boot 2 unlinked gone$'
+
+[[expect]]
+regex = '^hw-fs: boot 2 ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|hw-fs: error:'

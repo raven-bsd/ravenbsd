@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The hw-fs devd: launch the matched driver once (production mode, it serves `disk:` for the whole
+# boot) and wait. `scheme:disk` is the readiness gate that orders blockd after the driver.
+name = "devd"
+exec = "/sbin/devd"
+args = ["devd"]
+needs = ["scheme:pci"]
+provides = ["scheme:disk"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0

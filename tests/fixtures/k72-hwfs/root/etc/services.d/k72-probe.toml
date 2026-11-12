@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# One-shot root service: runs from the UFS root at /root after the mount, writes or verifies the
+# deterministic payload, and exits so svcd can settle.
+name = "k72-probe"
+exec = "/sbin/k72-probe"
+args = ["k72-probe"]
+needs = ["scheme:file"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

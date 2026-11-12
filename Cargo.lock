@@ -761,6 +761,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-k72-mkdisk"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-block",
+]
+
+[[package]]
+name = "raven-k72-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-kernel"
 version = "0.1.0"
 dependencies = [

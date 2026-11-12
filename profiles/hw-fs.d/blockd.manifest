@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# blockd over the virtio-blk driver. The remote backend reads the 1 MiB GPT prefix and serves the
+# partition list; fsd-ufs mounts partition 1 read-write.
+name = "blockd"
+exec = "/sbin/blockd"
+needs = ["scheme:disk"]
+provides = ["scheme:block"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0
+
+[env]
+BLOCKD_DISK = "disk:0"
