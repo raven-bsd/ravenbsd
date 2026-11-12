@@ -429,7 +429,6 @@ fn run_case(name: &str) {
 #[test]
 fn high_data_offset_vector_uses_the_documented_20_byte_form() {
     let case = find_case("tcp-bad-data-offset-high");
-    assert_eq!(case.bytes.len(), 20, "the TOML row is the documented 20-byte variant");
     let bytes = vector_bytes(case);
     assert_eq!(bytes.len(), 20);
     let error = parse_outcome(case, bytes, context_for(case))
