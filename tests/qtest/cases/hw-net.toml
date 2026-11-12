@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B70 M5 end-to-end, boot 1: QEMU user networking plus a host TCP forward to the guest echo
+# port. The guest side needs B12b (persistent virtio-net), B12c (netd over virtio-net),
+# B14 (ifconfig/ping/nc/netstat) and B15 (DHCP/resolver). Until those land the case is parked;
+# the profile, QEMU command line and host-echo harness are ready for the final assertions.
+#
+# The host client starts before QEMU and retries 127.0.0.1:23070; QEMU forwards that port to
+# the guest listener on 23070. The second case verifies the exact payload it received.
+
+name = "hw-net"
+arch = "x86_64"
+profile = "hw-net"
+timeout_secs = 300
+skip = "harness parked: needs B12b/B12c/B14/B15 for DHCP/ping/DNS/TCP assertions"
+pre = [
+    "sh tests/fixtures/b70-net/build.sh",
+    "sh tests/fixtures/b70-net/start-host-echo.sh",
+]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0,hostfwd=tcp:127.0.0.1:23070-:23070",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
