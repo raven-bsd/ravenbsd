@@ -235,7 +235,10 @@ are checked in the named source:
 
 ## 13. Accepted deviations from the smoltcp comparison
 
-None yet. C24 owns this section: it appends a row here for every
-`DEVIATION-ACCEPTED` in `oracle-results.md`, next to the feature it affects.
-The only deviations in this revision are the local choices in
-`state-machine.md` §15, not deviations from smoltcp.
+C24 owns this section. Each row is a `DEVIATION-ACCEPTED` in
+`oracle-results.md` and has a regression test in `tests/tcpip/oracle`.
+
+| Feature | RFC | Deviation | Reason and regression |
+|---|---|---|---|
+| ECN offered on every active SYN | 3168 | `tcp.ecn_enable=1` defaults to offering ECE+CWR; Linux `tcp_ecn=2` is passive-only | The stack is a library and the behaviour is an explicit property; the peer may ignore it. `accepted_deviation_ecn_is_offered_by_default` |
+| Per-connection challenge-ACK bucket | 5961 | 10 tokens / 5 s per connection on top of the Linux-compatible 1000/s global bucket | Stricter than Linux, not weaker; protects a single connection from a local flood. `accepted_deviation_challenge_ack_limits_are_pinned` |
