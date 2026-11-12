@@ -4,10 +4,11 @@
 # RavenBSD top-level Makefile. All logic lives in the Rust `xtask` crate; this file only forwards
 # targets and variables. `make help` lists every target.
 #
-# Variables: ARCH=x86_64|aarch64|riscv64 (default x86_64), PROFILE=base, RELEASE=1 -> --release,
-# VERBOSE=1 prints the commands xtask runs.
+# Variables: ARCH=x86_64|aarch64|riscv64 (default x86_64), PLATFORM=generic|pi4, PROFILE=base,
+# RELEASE=1 -> --release, VERBOSE=1 prints the commands xtask runs.
 
 ARCH ?= x86_64
+PLATFORM ?= generic
 PROFILE ?= base
 RELEASE ?= 0
 VERBOSE ?= 0
@@ -53,7 +54,7 @@ release:
 	@sh scripts/build.sh release $(ARCH)
 
 image:
-	@$(XTASK) image --arch $(ARCH) --profile $(PROFILE)
+	@$(XTASK) image --arch $(ARCH) --platform $(PLATFORM) --profile $(PROFILE)
 
 run:
 	@$(XTASK) run --arch $(ARCH) --profile $(PROFILE)

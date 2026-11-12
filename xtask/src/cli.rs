@@ -16,7 +16,7 @@ use crate::{check, docs, guard, image, initfs, qtest, repo, run as run_image};
 pub(crate) const HELP: &str = "\
 RavenBSD build system
 
-usage: make <target> [ARCH=x86_64|aarch64|riscv64] [PROFILE=base] [RELEASE=1] [VERBOSE=1]
+usage: make <target> [ARCH=x86_64|aarch64|riscv64] [PLATFORM=generic|pi4] [PROFILE=base] [RELEASE=1] [VERBOSE=1]
 
 targets:
   help          show this list
@@ -41,7 +41,7 @@ cargo xtask commands:
   check [--fast]
   guard
   build <kernel|loader|user> --arch <a> [--release] [-p <package>]...
-  image   --arch <a> [--profile <p>] [--cmdline <s>] [--initfs <p>] [--kernel <p>] [--output <path>]
+  image   --arch <a> [--platform <generic|pi4>] [--profile <p>] [--cmdline <s>] [--initfs <p>] [--kernel <p>] [--output <path>]
   initfs  --arch <a> [--profile <p>]
   run     --arch <a> [--profile <p>] [--no-build] [-- <qemu args>]
   qtest   [--case <name> | --all] [--arch <a>] [--no-build]
@@ -68,6 +68,7 @@ enum Command {
     },
     Image {
         arch: Arch,
+        platform: image::Platform,
         profile: String,
         cmdline: Option<String>,
         initfs: Option<String>,
@@ -191,6 +192,7 @@ fn parse_initfs(args: &[String]) -> Result<Command> {
 fn parse_image(args: &[String]) -> Result<Command> {
     let mut parser = Parser::new(args);
     let mut arch = None;
+    let mut platform = image::Platform::Generic;
     let mut profile = "base".to_string();
     let mut cmdline = None;
     let mut initfs = None;
@@ -199,6 +201,7 @@ fn parse_image(args: &[String]) -> Result<Command> {
     while let Some(arg) = parser.next() {
         match arg.as_str() {
             "--arch" => arch = Some(parse_arch(&parser.value("--arch")?)?),
+            "--platform" => platform = image::Platform::parse(&parser.value("--platform")?)?,
             "--profile" => profile = parser.value("--profile")?,
             "--cmdline" => cmdline = Some(parser.value("--cmdline")?),
             "--initfs" => initfs = Some(parser.value("--initfs")?),
@@ -209,6 +212,7 @@ fn parse_image(args: &[String]) -> Result<Command> {
     }
     Ok(Command::Image {
         arch: arch.ok_or_else(|| anyhow!("--arch is required"))?,
+        platform,
         profile,
         cmdline,
         initfs,
@@ -287,6 +291,7 @@ fn execute(command: Command) -> Result<u8> {
         }
         Command::Image {
             arch,
+            platform,
             profile,
             cmdline,
             initfs,
@@ -299,9 +304,12 @@ fn execute(command: Command) -> Result<u8> {
                 arch,
                 &profile,
                 cmdline.as_deref(),
-                initfs.as_deref().map(Path::new),
-                kernel.as_deref().map(Path::new),
-                output.as_deref().map(Path::new),
+                image::Overrides {
+                    initfs: initfs.as_deref().map(Path::new),
+                    kernel: kernel.as_deref().map(Path::new),
+                    output: output.as_deref().map(Path::new),
+                },
+                platform,
             )
         }
         Command::Run {
@@ -383,204 +391,5 @@ impl<'a> Parser<'a> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn args(items: &[&str]) -> Vec<String> {
-        items.iter().map(|item| item.to_string()).collect()
-    }
-
-    #[test]
-    fn no_arguments_prints_help() {
-        assert_eq!(parse_args(&[]).unwrap(), Command::Help);
-    }
-
-    #[test]
-    fn help_flags_print_help() {
-        assert_eq!(parse_args(&args(&["--help"])).unwrap(), Command::Help);
-        assert_eq!(parse_args(&args(&["-h"])).unwrap(), Command::Help);
-        assert_eq!(parse_args(&args(&["help"])).unwrap(), Command::Help);
-    }
-
-    #[test]
-    fn help_lists_every_make_target() {
-        for target in [
-            "help",
-            "setup",
-            "doctor",
-            "check",
-            "guard",
-            "kernel",
-            "loader",
-            "dev",
-            "release",
-            "image",
-            "run",
-            "test",
-            "world",
-            "provenance",
-            "toolchain",
-            "clean",
-            "distclean",
-        ] {
-            assert!(HELP.contains(target), "help text is missing `{target}`");
-        }
-    }
-
-    #[test]
-    fn unknown_command_is_an_error() {
-        assert!(parse_args(&args(&["nonsense"])).is_err());
-    }
-
-    #[test]
-    fn build_user_accepts_multiple_packages() {
-        let command = parse_args(&args(&[
-            "build",
-            "user",
-            "--arch",
-            "x86_64",
-            "--release",
-            "-p",
-            "raven-init",
-            "-p",
-            "raven-echo",
-        ]))
-        .unwrap();
-        assert_eq!(
-            command,
-            Command::Build {
-                component: Component::User,
-                arch: Arch::X86_64,
-                release: true,
-                packages: vec!["raven-init".into(), "raven-echo".into()],
-            }
-        );
-    }
-
-    #[test]
-    fn build_requires_arch_and_component() {
-        assert!(parse_args(&args(&["build", "kernel"])).is_err());
-        assert!(parse_args(&args(&["build", "--arch", "x86_64"])).is_err());
-    }
-
-    #[test]
-    fn build_rejects_unknown_architecture() {
-        assert!(parse_args(&args(&["build", "kernel", "--arch", "sparc64"])).is_err());
-    }
-
-    #[test]
-    fn check_fast_flag_is_parsed() {
-        assert_eq!(
-            parse_args(&args(&["check"])).unwrap(),
-            Command::Check { fast: false }
-        );
-        assert_eq!(
-            parse_args(&args(&["check", "--fast"])).unwrap(),
-            Command::Check { fast: true }
-        );
-        assert!(parse_args(&args(&["check", "--slow"])).is_err());
-    }
-
-    #[test]
-    fn image_options_are_parsed() {
-        let command = parse_args(&args(&[
-            "image",
-            "--arch",
-            "aarch64",
-            "--profile",
-            "tiny",
-            "--cmdline",
-            "console=ttyS0",
-            "--output",
-            "build/out.img",
-        ]))
-        .unwrap();
-        assert_eq!(
-            command,
-            Command::Image {
-                arch: Arch::Aarch64,
-                profile: "tiny".into(),
-                cmdline: Some("console=ttyS0".into()),
-                initfs: None,
-                kernel: None,
-                output: Some("build/out.img".into()),
-            }
-        );
-    }
-
-    #[test]
-    fn image_initfs_and_kernel_overrides_are_parsed() {
-        let command = parse_args(&args(&[
-            "image",
-            "--arch",
-            "x86_64",
-            "--initfs",
-            "build/fixtures/s24-spawn/initfs.img",
-            "--kernel",
-            "build/fixtures/testkernel/kernel.elf",
-        ]))
-        .unwrap();
-        assert_eq!(
-            command,
-            Command::Image {
-                arch: Arch::X86_64,
-                profile: "base".into(),
-                cmdline: None,
-                initfs: Some("build/fixtures/s24-spawn/initfs.img".into()),
-                kernel: Some("build/fixtures/testkernel/kernel.elf".into()),
-                output: None,
-            }
-        );
-    }
-
-    #[test]
-    fn run_keeps_extra_arguments_after_separator() {
-        let command = parse_args(&args(&[
-            "run",
-            "--arch",
-            "x86_64",
-            "--no-build",
-            "--",
-            "-serial",
-            "stdio",
-        ]))
-        .unwrap();
-        assert_eq!(
-            command,
-            Command::Run {
-                arch: Arch::X86_64,
-                profile: "base".into(),
-                no_build: true,
-                extra: vec!["-serial".into(), "stdio".into()],
-            }
-        );
-    }
-
-    #[test]
-    fn qtest_arguments_are_forwarded_verbatim() {
-        let command = parse_args(&args(&["qtest", "--all", "--arch", "aarch64"])).unwrap();
-        assert_eq!(
-            command,
-            Command::Qtest {
-                args: vec!["--all".into(), "--arch".into(), "aarch64".into()],
-            }
-        );
-    }
-
-    #[test]
-    fn guard_rejects_extra_arguments() {
-        assert!(parse_args(&args(&["guard", "now"])).is_err());
-    }
-
-    #[test]
-    fn initfs_defaults_to_base_profile() {
-        let command = parse_args(&args(&["initfs", "--arch", "riscv64"])).unwrap();
-        assert_eq!(
-            command,
-            Command::Initfs {
-                arch: Arch::Riscv64,
-                profile: "base".into(),
-            }
-        );
-    }
-}
+#[path = "cli_ut.rs"]
+mod tests;

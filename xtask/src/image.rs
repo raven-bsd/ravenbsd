@@ -15,15 +15,46 @@ use crate::gpt::{GptLayout, Partition, SECTOR_SIZE, TYPE_ESP, TYPE_LINUX_DATA};
 use crate::profiles::Profile;
 use crate::repo::Workspace;
 
-const IMAGE_BYTES: u64 = 256 * 1024 * 1024;
-const TOTAL_SECTORS: u64 = IMAGE_BYTES / SECTOR_SIZE;
-const ESP_START_LBA: u64 = 2048;
-const ESP_SECTORS: u64 = 64 * 1024 * 1024 / SECTOR_SIZE;
-const ROOT_START_LBA: u64 = ESP_START_LBA + ESP_SECTORS;
-const ROOT_SECTORS: u64 = 64 * 1024 * 1024 / SECTOR_SIZE;
-const GPT_ENTRY_SECTORS: u64 = 32;
+/// Image platform layout.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Platform {
+    /// UEFI image: loader, kernel ELF, initfs and boot.toml in the ESP.
+    Generic,
+    /// Raspberry Pi 4: firmware, config.txt, flat kernel8.img and DTB in the FAT boot partition.
+    Pi4,
+}
+
+impl Platform {
+    /// Parse the `--platform` value.
+    pub(crate) fn parse(value: &str) -> Result<Self> {
+        match value {
+            "generic" => Ok(Self::Generic),
+            "pi4" => Ok(Self::Pi4),
+            other => bail!("unknown platform `{other}` (expected generic or pi4)"),
+        }
+    }
+}
+
+pub(crate) const IMAGE_BYTES: u64 = 256 * 1024 * 1024;
+pub(crate) const TOTAL_SECTORS: u64 = IMAGE_BYTES / SECTOR_SIZE;
+pub(crate) const ESP_START_LBA: u64 = 2048;
+pub(crate) const ESP_SECTORS: u64 = 64 * 1024 * 1024 / SECTOR_SIZE;
+pub(crate) const ROOT_START_LBA: u64 = ESP_START_LBA + ESP_SECTORS;
+pub(crate) const ROOT_SECTORS: u64 = 64 * 1024 * 1024 / SECTOR_SIZE;
+pub(crate) const GPT_ENTRY_SECTORS: u64 = 32;
 
 /// Build a bootable image from the profile and return 0 on success.
+/// Optional image inputs supplied by the CLI or a fixture case.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Overrides<'a> {
+    /// Prepared initfs instead of the profile build.
+    pub(crate) initfs: Option<&'a Path>,
+    /// Prepared kernel instead of the fresh kernel build.
+    pub(crate) kernel: Option<&'a Path>,
+    /// Output path instead of the platform default.
+    pub(crate) output: Option<&'a Path>,
+}
+
 pub(crate) fn run(
     root: &Path,
     arch: Arch,
@@ -31,23 +62,43 @@ pub(crate) fn run(
     cmdline: Option<&str>,
     output: Option<&Path>,
 ) -> Result<u8> {
-    run_with_overrides(root, arch, profile_name, cmdline, None, None, output)
+    run_with_overrides(
+        root,
+        arch,
+        profile_name,
+        cmdline,
+        Overrides {
+            output,
+            ..Overrides::default()
+        },
+        Platform::Generic,
+    )
 }
 
 /// Build a bootable image and return 0 on success.
 ///
-/// `initfs_override` and `kernel_override` install a prepared file instead of the profile's
-/// initfs and the freshly built kernel (fixture cases and the loader test kernel). Relative
-/// paths are resolved against the repository root.
+/// The `overrides` fields install a prepared file instead of the profile's initfs and the freshly
+/// built kernel (fixture cases and the loader test kernel). Relative paths are resolved against
+/// the repository root.
 pub(crate) fn run_with_overrides(
     root: &Path,
     arch: Arch,
     profile_name: &str,
     cmdline: Option<&str>,
-    initfs_override: Option<&Path>,
-    kernel_override: Option<&Path>,
-    output: Option<&Path>,
+    overrides: Overrides<'_>,
+    platform: Platform,
 ) -> Result<u8> {
+    if platform == Platform::Pi4 {
+        return crate::pi::build(
+            root,
+            arch,
+            profile_name,
+            cmdline,
+            overrides.initfs,
+            overrides.kernel,
+            overrides.output,
+        );
+    }
     let profile = Profile::load(root, profile_name)?;
     let workspace = Workspace::load(root)?;
 
@@ -57,18 +108,18 @@ pub(crate) fn run_with_overrides(
     if code != 0 {
         bail!("loader build failed with exit code {code}");
     }
-    if kernel_override.is_none() {
+    if overrides.kernel.is_none() {
         let code = build::run(&workspace, Component::Kernel, arch, false, &[])?;
         if code != 0 {
             bail!("kernel build failed with exit code {code}");
         }
     }
 
-    let initfs_path = match initfs_override {
+    let initfs_path = match overrides.initfs {
         Some(path) => resolve_override(root, path),
         None => crate::initfs::build(root, arch, profile_name)?,
     };
-    let kernel_path = match kernel_override {
+    let kernel_path = match overrides.kernel {
         Some(path) => resolve_override(root, path),
         None => build::artifact_path(root, arch, Component::Kernel, ""),
     };
@@ -123,7 +174,8 @@ pub(crate) fn run_with_overrides(
         ],
     )?;
 
-    let output = output
+    let output = overrides
+        .output
         .map(Path::to_path_buf)
         .unwrap_or_else(|| default_output(root, arch));
     if let Some(parent) = output.parent() {
@@ -150,7 +202,7 @@ fn resolve_override(root: &Path, path: &Path) -> PathBuf {
     }
 }
 
-fn write_image(path: &Path, gpt: &GptLayout, esp: &[u8]) -> Result<()> {
+pub(crate) fn write_image(path: &Path, gpt: &GptLayout, esp: &[u8]) -> Result<()> {
     let mut file = OpenOptions::new()
         .create(true)
         .write(true)
@@ -211,51 +263,12 @@ fn toml_escape(value: &str) -> String {
     escaped
 }
 
-fn source_date_epoch() -> Option<i64> {
+pub(crate) fn source_date_epoch() -> Option<i64> {
     std::env::var("SOURCE_DATE_EPOCH")
         .ok()
         .and_then(|value| value.parse().ok())
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn boot_toml_uses_profile_and_override() {
-        let profile = Profile::load(
-            Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap(),
-            "base",
-        )
-        .unwrap();
-        assert_eq!(
-            boot_toml(&profile, None),
-            "cmdline = \"console=ttyS0 test-exit=1\"\nlog_level = \"info\"\n"
-        );
-        assert_eq!(
-            boot_toml(&profile, Some("console=ttyS0 \"quoted\"")),
-            "cmdline = \"console=ttyS0 \\\"quoted\\\"\"\nlog_level = \"info\"\n"
-        );
-    }
-
-    #[test]
-    fn default_output_is_under_build_arch() {
-        assert_eq!(
-            default_output(Path::new("/repo"), Arch::X86_64),
-            Path::new("/repo/build/x86_64/ravenbsd-x86_64.img")
-        );
-    }
-
-    #[test]
-    fn relative_overrides_are_anchored_at_the_root() {
-        let root = Path::new("/repo");
-        assert_eq!(
-            resolve_override(root, Path::new("build/fixtures/s24-spawn/initfs.img")),
-            Path::new("/repo/build/fixtures/s24-spawn/initfs.img")
-        );
-        assert_eq!(
-            resolve_override(root, Path::new("/tmp/kernel.elf")),
-            Path::new("/tmp/kernel.elf")
-        );
-    }
-}
+#[path = "image_ut.rs"]
+mod tests;
