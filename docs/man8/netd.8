@@ -1,0 +1,123 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt NETD 8
+.Os RavenBSD
+.Sh NAME
+.Nm netd
+.Nd RavenBSD net: socket server over loopback
+.Sh SYNOPSIS
+.Nm /sbin/netd
+.Sh DESCRIPTION
+.Nm
+runs the native socket core with IPv4 loopback configured
+.Pq Li 127.0.0.1/8 ,
+registers the
+.Dq net:
+scheme and serves one file per socket plus the
+.Pa net:
+control file.
+.Pp
+The first milestone has one interface,
+.Dq lo ;
+the virtio-net frame ring is the B12b seam and is not wired in this binary.
+IPv6 is not configured.
+.Pp
+Scheme paths are:
+.Bl -tag -width "net:tcp/<ipv4>:<port>" -compact
+.It Pa net:
+interface control channel
+.It Pa net:tcp/ Ns Ar ipv4 : Ns Ar port
+TCP socket; the path endpoint is the listener endpoint for
+.Dv LISTEN
+and the remote endpoint for
+.Dv CONNECT
+.It Pa net:udp/ Ns Ar ipv4 : Ns Ar port
+UDP socket
+.El
+.Pp
+After
+.Dv OPEN ,
+the client uses the S11
+.Dv CALL
+operation with a
+.Xr raven-proto-net 3
+.Dv SocketRequest
+message.  The supported calls are
+.Dv BIND ,
+.Dv LISTEN ,
+.Dv ACCEPT ,
+.Dv CONNECT ,
+.Dv SHUTDOWN ,
+.Dv GETSOCKNAME ,
+.Dv GETPEERNAME ,
+.Dv SETSOCKOPT
+and
+.Dv GETSOCKOPT .
+A successful
+.Dv ACCEPT
+returns a numeric socket id; the client opens
+.Pa net:accept/<id>
+to materialise the SchemeFile handle for that connection.  This is the
+ABI-v1 substitute for an S25 attachment: there is no server-side file-create
+primitive, so the accepted descriptor is opened explicitly.  B12b may replace
+it with the standard attachment path when the protocol grows one.
+.Pp
+.Dv READ
+and
+.Dv WRITE
+move stream bytes for TCP.  A typed
+.Dv SocketRequest::Read
+returns a
+.Dv Response::Read
+header followed by the datagram payload and the source endpoint for UDP;
+.Dv SocketRequest::Write
+carries an optional destination endpoint.  A raw UDP write is accepted only
+after
+.Dv CONNECT
+sets a peer.
+.Pp
+The control file accepts
+.Dv IfaceRequest
+messages.  In this milestone
+.Dv LIST
+returns one
+.Dq lo
+record and
+.Dv ARP_LIST
+returns an empty table;
+.Dv SET_ADDRESS
+and
+.Dv SET_STATE
+update the loopback record, while route operations return
+.Er EOPNOTSUPP .
+.Pp
+The server polls the native stack whenever it handles a request and clients
+retry a socket operation that returns
+.Er EAGAIN .
+The qtest uses a client/server pair inside one probe process, checks TCP and
+UDP bytes and orderly close, lists
+.Dq lo ,
+restarts
+.Nm
+once through
+.Xr svcctl 1 ,
+and runs the same probe again to show that the socket table was released.
+There is no host networking and no virtio-net device in this test.
+.Sh FILES
+.Bl -tag -width /etc/services.d/netd.toml -compact
+.It Pa /etc/services.d/netd.toml
+service manifest
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr svcctl 1 ,
+.Xr init 8 ,
+.Xr vfsd 8
+.Sh HISTORY
+The
+.Nm
+server first appeared in RavenBSD 0.1.
+.Sh STANDARDS
+RavenBSD ABI v1; `raven-proto-net` protocol version 1.

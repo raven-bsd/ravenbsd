@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Socket server. The loopback milestone owns a socket table over the native core and serves the
+# `net:` scheme; B12b wires the virtio-net frame ring behind the same interface.
+name = "netd"
+exec = "/sbin/netd"
+needs = ["logd"]
+provides = ["scheme:net"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "on-failure"

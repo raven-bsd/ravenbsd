@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "netd"
+arch = "x86_64"
+profile = "netd-test"
+timeout_secs = 240
+pre = ["sh tests/fixtures/b12-netd/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^netd: interface lo 127\.0\.0\.1/8$'
+
+[[expect]]
+regex = '^svcd: netd up$'
+
+[[expect]]
+regex = '^netd: iface lo 127\.0\.0\.1/8$'
+
+[[expect]]
+regex = '^netd: tcp echo ok$'
+
+[[expect]]
+regex = '^netd: udp echo ok$'
+
+[[expect]]
+regex = '^netd: probe ok$'
+
+[[expect]]
+regex = '^netd running [0-9]+$'
+
+[[expect]]
+regex = '^netd: iface lo 127\.0\.0\.1/8$'
+
+[[expect]]
+regex = '^netd: tcp echo ok$'
+
+[[expect]]
+regex = '^netd: udp echo ok$'
+
+[[expect]]
+regex = '^netd: restart ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
