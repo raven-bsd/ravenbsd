@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The default file namespace.  One absolute mount point followed by the scheme
+# that owns it.  A missing optional mount is skipped; a missing "/" is fatal.
+
+/ initfs:
+/tmp ramfs:
+/dev/null null:
+/dev/zero zero:
+/dev/random rand:
