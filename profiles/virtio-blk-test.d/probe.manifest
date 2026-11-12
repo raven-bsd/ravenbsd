@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# One-shot probe: verify the pattern partition through `block:0`, then flush (which ends the
+# driver's test-serving cycle).
+name = "k15-probe"
+exec = "/sbin/k15-probe"
+needs = ["scheme:block"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

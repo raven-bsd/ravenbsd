@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# Block-device server.  K14 serves a RAM disk loaded from the initial
-# filesystem; K15 replaces the backend with a real storage driver.
+# Block-device server.  The default backend is the RAM disk loaded from the
+# initial filesystem; a service override can set BLOCKD_DISK=disk:0 to use the
+# virtio-blk driver instead (the test profile does exactly that).
 name = "blockd"
 exec = "/sbin/blockd"
 needs = ["scheme:initfs"]

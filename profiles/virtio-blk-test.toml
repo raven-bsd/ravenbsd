@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The K15 virtio-blk qtest profile: init, the console service manager, pcid, devd in test mode,
+# the virtio-blk driver, blockd on the driver's `disk:` scheme and the one-shot probe.
+
+name = "virtio-blk-test"
+
+[initfs]
+programs = [
+    { package = "raven-init", path = "/init" },
+    { package = "raven-svcctl", path = "/bin/svcctl" },
+    { package = "raven-pcid", path = "/sbin/pcid" },
+    { package = "raven-devd", path = "/sbin/devd" },
+    { package = "virtio-blk", path = "/sbin/virtio-blk" },
+    { package = "raven-blockd", path = "/sbin/blockd" },
+]
+
+[boot]
+cmdline = "console=ttyS0 loglevel=info"
+log_level = "info"

@@ -1,0 +1,126 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K15: devd hands the modern virtio-blk function (BAR4, 64 KiB DMA, legacy IRQ) to the driver.
+# Cycle 1 writes/flushes/verifies a deterministic pattern across the 1 GiB disk, then serves
+# `disk:`; blockd scans the GPT prefix and the probe reads the pattern partition through
+# `block:0`, ending the cycle with a flush. Cycle 2 re-reads the persisted data and compares the
+# checksum stored in the marker sector.
+
+name = "virtio-blk"
+arch = "x86_64"
+profile = "virtio-blk-test"
+timeout_secs = 600
+pre = ["sh tests/fixtures/k15-blk/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-smp", "1",
+    "-drive", "if=none,id=d0,format=raw,file=build/fixtures/k15-blk/disk.img",
+    "-device", "virtio-blk-pci,drive=d0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^pcid: devices=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^svcd: pcid up$'
+
+[[expect]]
+regex = '^devd: matched [0-9a-f]{2}:[0-9a-f]{2}\.[0-9] vendor=0x1af4 device=0x1042 irq_line=[0-9]+ irq_pin=[0-9]+$'
+
+[[expect]]
+regex = '^devd: driver virtio-blk bar=4 size=16384$'
+
+[[expect]]
+regex = '^devd: driver virtio-blk dma bus=0x[0-9a-f]+ len=65536$'
+
+[[expect]]
+regex = '^devd: driver virtio-blk irq line=[0-9]+$'
+
+[[expect]]
+regex = '^virtio-blk: id=1af4:1042$'
+
+[[expect]]
+regex = '^virtio-blk: capacity=2097152 sector_size=512 ro=0$'
+
+[[expect]]
+regex = '^virtio-blk: features=0x[0-9a-f]{8} version1=1$'
+
+[[expect]]
+regex = '^virtio-blk: queue0 size=8 notify=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^virtio-blk: dma bus=0x[0-9a-f]+ len=65536 irq=[0-9]+$'
+
+[[expect]]
+regex = '^virtio-blk: pattern sectors=2095104 checksum=0x[0-9a-f]{16}$'
+
+[[expect]]
+regex = '^virtio-blk: marker ok$'
+
+[[expect]]
+regex = '^virtio-blk: serving$'
+
+[[expect]]
+regex = '^blockd: remote disk=disk:0 sectors=2097152 ro=0$'
+
+[[expect]]
+regex = '^blockd: gpt ok partitions=1$'
+
+[[expect]]
+regex = '^blockd: part 1 pattern 34\.\.1800$'
+
+[[expect]]
+regex = '^svcd: blockd up$'
+
+[[expect]]
+regex = '^k15: probe info sectors=2097152 ro=0$'
+
+[[expect]]
+regex = '^k15: probe list partitions=1$'
+
+[[expect]]
+regex = '^k15: probe part 1 pattern 34\.\.1800$'
+
+[[expect]]
+regex = '^k15: probe pattern sectors=1767 checksum=0x[0-9a-f]{16}$'
+
+[[expect]]
+regex = '^k15: probe flush ok$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-blk: serve done$'
+unordered = true
+
+[[expect]]
+regex = '^devd: driver virtio-blk cycle 1 exit=0$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-blk: partition pattern ok sectors=1767$'
+
+[[expect]]
+regex = '^virtio-blk: cycle 2 data ok checksum=0x[0-9a-f]{16}$'
+
+[[expect]]
+regex = '^virtio-blk: done$'
+
+[[expect]]
+regex = '^devd: driver virtio-blk cycle 2 exit=0$'
+
+[[expect]]
+regex = '^devd: driver virtio-blk cycles=2$'
+
+[[expect]]
+regex = '^k15: probe ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|virtio-blk: .*timed out|I/O error'

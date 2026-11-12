@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-k15-mkdisk"
+version = "0.1.0"
+description = "Build the 1 GiB GPT disk used by the virtio-blk qtest."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raven-proto-block = { path = "../../../../crates/raven-proto-block" }
+
+[lints]
+workspace = true
