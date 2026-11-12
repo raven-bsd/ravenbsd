@@ -576,6 +576,20 @@ pub fn handle_close(handle: Handle) -> Result<(), Errno> {
     Ok(())
 }
 
+/// Terminate `process` and all its threads; requires `Rights::SIGNAL` on the handle.
+pub fn proc_terminate(process: Handle, code: i32) -> Result<(), Errno> {
+    // SAFETY: PROC_TERMINATE takes scalar arguments only; the kernel validates the handle, the
+    // destination process, the SIGNAL right and the target state (C16).
+    checked(unsafe {
+        syscall2(
+            Syscall::PROC_TERMINATE as usize,
+            process.0 as usize,
+            code as usize,
+        )
+    })
+    .map(|_| ())
+}
+
 /// Duplicate a handle with an intersected rights mask.
 pub fn handle_dup(handle: Handle, rights: Rights) -> Result<Handle, Errno> {
     // SAFETY: HANDLE_DUP takes a scalar handle and rights mask.

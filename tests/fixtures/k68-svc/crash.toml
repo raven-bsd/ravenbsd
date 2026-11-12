@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "crash"
+exec = "/sbin/k68svc"
+args = ["crash"]
+readiness = "exit"
+restart = "on-failure"
+max_restarts = 0
+required = false

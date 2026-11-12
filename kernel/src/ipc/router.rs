@@ -87,7 +87,7 @@ pub fn open(
     if packet.set_path(path.as_bytes()).is_err() {
         // The server never saw an OPEN, so no CLOSE is owed.
         file.server_refs.store(0, Ordering::Release);
-        let _ = caller.handles.lock().close(handle);
+        let _ = crate::event::close_handle(caller, handle);
         return Err(Errno::ENAMETOOLONG);
     }
     let request = PendingRequest::new(
@@ -107,7 +107,7 @@ pub fn open(
                 let attached = Handle(attached);
                 // The attachment replaces this provisional SchemeFile; it owns no server state.
                 file.server_refs.store(0, Ordering::Release);
-                let _ = caller.handles.lock().close(handle);
+                let _ = crate::event::close_handle(caller, handle);
                 return Ok(attached);
             }
             file.server_cookie
@@ -117,13 +117,13 @@ pub fn open(
         Ok((status, _)) => {
             // The server rejected the OPEN; it created no description to close.
             file.server_refs.store(0, Ordering::Release);
-            let _ = caller.handles.lock().close(handle);
+            let _ = crate::event::close_handle(caller, handle);
             Err(status_errno(status))
         }
         Err(error) => {
             // The OPEN may have reached the server before the wait failed; send one CLOSE so a
             // description the client cannot see is not leaked. An unknown id is harmless.
-            let _ = caller.handles.lock().close(handle);
+            let _ = crate::event::close_handle(caller, handle);
             Err(error)
         }
     }
@@ -207,8 +207,7 @@ pub fn close(caller: &Arc<Process>, handle: Handle) -> Result<(), Errno> {
             _ => return Err(Errno::EBADF),
         }
     };
-    crate::event::on_handle_close(caller, handle);
-    caller.handles.lock().close(handle)?;
+    crate::event::close_handle(caller, handle)?;
     if Arc::strong_count(&file) == 1 {
         // No other handle, transfer or in-flight request references this open-file description.
         // Build the CLOSE requests here, in the shallow close-syscall context, so they are
@@ -251,7 +250,7 @@ pub fn dup(caller: &Arc<Process>, handle: Handle, mask: u32) -> Result<Handle, E
     file.server_refs.fetch_add(1, Ordering::AcqRel);
     if let Err(error) = submit(&request) {
         file.server_refs.fetch_sub(1, Ordering::AcqRel);
-        let _ = caller.handles.lock().close(duplicate);
+        let _ = crate::event::close_handle(caller, duplicate);
         return Err(error);
     }
     Ok(duplicate)
@@ -481,7 +480,7 @@ fn retire(server: &Arc<Process>, request: &Arc<PendingRequest>, request_handle: 
         .active_requests
         .lock()
         .retain(|item| item.id != request.id);
-    let _ = server.handles.lock().close(request_handle);
+    let _ = crate::event::close_handle(server, request_handle);
 }
 
 fn install_attachments(
@@ -502,28 +501,41 @@ fn install_attachments(
         index = index.saturating_add(1);
     }
     let mut installed = [None; 4];
-    let mut client = request.client.handles.lock();
-    index = 0;
-    while index < count {
-        let (object, rights) = source
-            .get_mut(index)
-            .and_then(Option::take)
-            .ok_or(Errno::EPROTO)?;
-        let attachment = packet.attach.get_mut(index).ok_or(Errno::EPROTO)?;
-        match client.insert(object, attachment_rights(rights, attachment.rights_mask)) {
-            Ok(handle) => {
-                attachment.handle = handle.0;
-                let slot = installed.get_mut(index).ok_or(Errno::EPROTO)?;
-                *slot = Some(handle);
-            }
-            Err(error) => {
-                for handle in installed.iter().flatten() {
-                    let _ = client.close(*handle);
+    let mut failure = None;
+    {
+        let mut client = request.client.handles.lock();
+        index = 0;
+        while index < count {
+            let Some((object, rights)) = source.get_mut(index).and_then(Option::take) else {
+                failure = Some(Errno::EPROTO);
+                break;
+            };
+            let Some(attachment) = packet.attach.get_mut(index) else {
+                failure = Some(Errno::EPROTO);
+                break;
+            };
+            match client.insert(object, attachment_rights(rights, attachment.rights_mask)) {
+                Ok(handle) => {
+                    attachment.handle = handle.0;
+                    let Some(slot) = installed.get_mut(index) else {
+                        failure = Some(Errno::EPROTO);
+                        break;
+                    };
+                    *slot = Some(handle);
                 }
-                return Err(error);
+                Err(error) => {
+                    failure = Some(error);
+                    break;
+                }
             }
+            index = index.saturating_add(1);
         }
-        index = index.saturating_add(1);
+    }
+    if let Some(error) = failure {
+        // The table lock is released: closing a handle runs the event close hook, which takes
+        // the process handle table again.
+        rollback_attachments(&request.client, &installed);
+        return Err(error);
     }
     Ok(installed)
 }
@@ -629,9 +641,8 @@ fn write_reply_buffer(request: &Arc<PendingRequest>, packet: &SchemePacket) -> R
 }
 
 fn rollback_attachments(client: &Arc<Process>, installed: &[Option<Handle>; 4]) {
-    let mut handles = client.handles.lock();
     for handle in installed.iter().flatten() {
-        let _ = handles.close(*handle);
+        let _ = crate::event::close_handle(client, *handle);
     }
 }
 

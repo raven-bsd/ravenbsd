@@ -533,6 +533,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-k68-svc"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-svc",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-k71-scheme"
 version = "0.1.0"
 dependencies = [
@@ -989,6 +1000,15 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "raven-s38-events"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
 ]
 
 [[package]]

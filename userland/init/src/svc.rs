@@ -19,8 +19,6 @@ use raven_proto_svc::{MAX_LINE, Op};
 use raven_rt::sync::Mutex;
 use raven_scheme::{Ctx, Handler, HandlerResult, Opened, Server};
 
-use core::sync::atomic::{AtomicBool, Ordering};
-
 use crate::boot::{self, Core};
 
 /// S11 `Opcode::Open` wire value.
@@ -29,8 +27,6 @@ const OPEN_OPCODE: u16 = 1;
 const OPEN_READ: u32 = 1;
 /// S11 `OPEN_CREATE` flag.
 const OPEN_CREATE: u32 = 4;
-/// Set when the supervisor is about to exit and the server thread must return.
-static STOP_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 struct OpenFile {
     data: Vec<u8>,
@@ -41,7 +37,6 @@ struct OpenFile {
 /// The `svc:` server thread.
 pub fn thread(_: usize) {
     serve();
-    crate::boot::thread_finished();
 }
 
 fn serve() {
@@ -66,26 +61,7 @@ fn serve() {
             handler.pending = Some((packet.packet.file_id, path.to_string()));
         }
         let _ = server.dispatch(packet, &mut handler);
-        if stop_requested() {
-            return;
-        }
     }
-}
-
-/// Ask the server thread to return after its current request.
-///
-/// The actual wake-up is a normal `svc:` open: `RECV` has no timeout, so the supervisor sends one
-/// request and waits for its response before joining the thread.
-pub(crate) fn request_stop() {
-    STOP_REQUESTED.store(true, Ordering::Release);
-    let client = raven_scheme::Client::new();
-    if let Ok(handle) = client.open("svc:", 1) {
-        let _ = client.close(handle);
-    }
-}
-
-fn stop_requested() -> bool {
-    STOP_REQUESTED.load(Ordering::Acquire)
 }
 
 struct SvcHandler {
@@ -216,18 +192,33 @@ impl Handler for SvcHandler {
                 guard.pending_starts.push(start);
             }
             Op::Stop => {
-                if let Some(handle) = guard.supervisor.stop(index) {
-                    guard.pending_closes.push(handle);
+                if let Some(handle) = guard.supervisor.stop(index, false) {
+                    guard.pending_terminations.push(handle);
                 }
             }
             Op::Restart => {
-                if let Some(handle) = guard.supervisor.stop(index) {
-                    guard.pending_closes.push(handle);
+                if let Some(handle) = guard.supervisor.stop(index, true) {
+                    guard.pending_terminations.push(handle);
+                } else {
+                    let state = guard
+                        .supervisor
+                        .runtime()
+                        .get(index)
+                        .map(|runtime| runtime.state);
+                    if matches!(
+                        state,
+                        Some(
+                            raven_proto_svc::State::Stopped
+                                | raven_proto_svc::State::Failed
+                                | raven_proto_svc::State::GaveUp
+                        )
+                    ) {
+                        let Some(start) = guard.supervisor.request_start(index, now) else {
+                            return Err(Errno::EBUSY.into());
+                        };
+                        guard.pending_starts.push(start);
+                    }
                 }
-                let Some(start) = guard.supervisor.request_start(index, now) else {
-                    return Err(Errno::EBUSY.into());
-                };
-                guard.pending_starts.push(start);
             }
         }
         Ok(0)

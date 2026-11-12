@@ -26,6 +26,7 @@ members = [
     "tests/fixtures/s26-evq",
     "tests/fixtures/s27-echo",
     "tests/fixtures/s35-handles",
+    "tests/fixtures/k68-svc",
     "tests/fixtures/s21-edu",
     "tests/fixtures/k66-fs",
     "tests/fixtures/k71-scheme",
@@ -34,6 +35,7 @@ members = [
     "tests/fixtures/s31-irq",
     "tests/fixtures/s34-concurrency",
     "tests/fixtures/s36-lifecycle",
+    "tests/fixtures/s38-events",
     "tests/fixtures/usercopy-cow",
     "tests/fixtures/testkernel",
     "xtask",
@@ -136,6 +138,66 @@ debug = false
 debug = false
 
 [profile.dev.package."raven-svc-manifest"]
+debug = false
+
+[profile.dev.package."raven-hostname"]
+debug = false
+
+[profile.dev.package."raven-sleep"]
+debug = false
+
+[profile.dev.package."raven-date"]
+debug = false
+
+[profile.dev.package."raven-dmesg"]
+debug = false
+
+[profile.dev.package."raven-mount"]
+debug = false
+
+[profile.dev.package."raven-umount"]
+debug = false
+
+[profile.dev.package."raven-ps"]
+debug = false
+
+[profile.dev.package."raven-consd"]
+debug = false
+
+[profile.dev.package."raven-init"]
+debug = false
+
+[profile.dev.package."raven-initfsd"]
+debug = false
+
+[profile.dev.package."raven-vfsd"]
+debug = false
+
+[profile.dev.package."raven-ramfsd"]
+debug = false
+
+[profile.dev.package."raven-logd"]
+debug = false
+
+[profile.dev.package."raven-sysd"]
+debug = false
+
+[profile.dev.package."raven-nulld"]
+debug = false
+
+[profile.dev.package."raven-zerod"]
+debug = false
+
+[profile.dev.package."raven-randd"]
+debug = false
+
+[profile.dev.package."raven-svcctl"]
+debug = false
+
+[profile.dev.package."raven-uname"]
+debug = false
+
+[profile.dev.package."raven-echo"]
 debug = false
 
 # release: smallest binaries: size optimisation, fat LTO, one codegen unit, no unwinding, symbols stripped.

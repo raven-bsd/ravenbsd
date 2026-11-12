@@ -80,7 +80,7 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
         }
     };
     if !sched::enqueue(Arc::clone(&thread)) {
-        let _ = caller.handles.lock().close(raw);
+        let _ = crate::event::close_handle(&caller, raw);
         sched::reap_thread(thread);
         return Err(Errno::EAGAIN);
     }

@@ -51,10 +51,11 @@ Print the current state of
 .It Cm start Ar name
 Start a stopped service.
 .It Cm stop Ar name
-Stop supervising a running service.
-There are no signals yet: the child keeps running until it exits by itself.
+Terminate the service process with the authorized termination primitive and wait until it has
+reached terminal state, its scheme name is released and its worker has observed the exit.
 .It Cm restart Ar name
-Stop supervising the service and start a fresh instance.
+Stop the service and start a fresh instance after the old process is gone; the replacement cannot
+race the old scheme name.
 .El
 .Sh EXIT STATUS
 .Ex -std
