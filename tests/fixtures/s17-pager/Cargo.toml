@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-s17-pager"
+version = "0.1.0"
+description = "S17 pager fixture: server-backed memory object, page-in, write-back and pager death."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[lib]
+name = "raven_s17_pager"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raven-s17-init"
+path = "src/bin/init.rs"
+
+[[bin]]
+name = "raven-s17-server"
+path = "src/bin/server.rs"
+
+[[bin]]
+name = "raven-s17-fault-client"
+path = "src/bin/fault-client.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-elf = { path = "../../../crates/raven-elf" }
+raven-initfs = { path = "../../../crates/raven-initfs" }
+raven-ipc = { path = "../../../crates/raven-ipc" }
+raven-pager = { path = "../../../crates/raven-pager" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc"] }
+
+[lints]
+workspace = true

@@ -726,6 +726,7 @@ dependencies = [
  "raven-handles",
  "raven-initfs",
  "raven-mem",
+ "raven-pager",
  "raven-rmm",
  "raven-sched-core",
  "raven-timemath",
@@ -842,6 +843,10 @@ dependencies = [
  "raven-rt",
  "raven-scheme",
 ]
+
+[[package]]
+name = "raven-pager"
+version = "0.1.0"
 
 [[package]]
 name = "raven-pcid"
@@ -1051,6 +1056,18 @@ dependencies = [
  "raven-elf",
  "raven-initfs",
  "raven-ipc",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-s17-pager"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-elf",
+ "raven-initfs",
+ "raven-ipc",
+ "raven-pager",
  "raven-rt",
 ]
 

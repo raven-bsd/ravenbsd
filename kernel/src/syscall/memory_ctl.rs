@@ -10,13 +10,17 @@ use raven_abi::errno::Errno;
 use raven_abi::layout::aarch64::{USER_END, USER_MIN};
 #[cfg(target_arch = "x86_64")]
 use raven_abi::layout::x86_64::{USER_END, USER_MIN};
-use raven_abi::types::{Handle, Rights, map, prot};
+use raven_abi::types::{Handle, Rights, map, memobj, prot};
+#[cfg(target_arch = "x86_64")]
+use raven_usercopy::UserSlice;
 use raven_vma::PAGE_SIZE;
 
 use crate::driver::DmaBuffer;
 use crate::process::handle::MmioRegion;
 use crate::process::{self, Process, handle::MemObject, handle::Object};
 use crate::syscall::SyscallFrame;
+#[cfg(target_arch = "x86_64")]
+use crate::usercopy::copy_from_user;
 
 /// Largest memory object accepted by `MEMOBJ_CREATE` (1 GiB).
 const MAX_MEMOBJ_BYTES: u64 = 1 << 30;
@@ -33,11 +37,28 @@ enum MappedObject {
 /// `memobj_create(len, flags) -> Handle`.
 pub fn memobj_create(frame: &SyscallFrame) -> Result<usize, Errno> {
     let len = frame.rdi;
-    if frame.rsi != 0 || len == 0 || !len.is_multiple_of(PAGE_SIZE) || len > MAX_MEMOBJ_BYTES {
+    let flags = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    if flags & !memobj::PAGER != 0
+        || len == 0
+        || !len.is_multiple_of(PAGE_SIZE)
+        || len > MAX_MEMOBJ_BYTES
+    {
         return Err(Errno::EINVAL);
     }
     let caller = process::current().ok_or(Errno::ESRCH)?;
-    let object = MemObject::new(len / PAGE_SIZE)?;
+    let paged = flags & memobj::PAGER != 0;
+    let object = if paged {
+        #[cfg(target_arch = "x86_64")]
+        {
+            MemObject::new_paged(len / PAGE_SIZE, &caller)?
+        }
+        #[cfg(not(target_arch = "x86_64"))]
+        {
+            return Err(Errno::ENOSYS);
+        }
+    } else {
+        MemObject::new(len / PAGE_SIZE)?
+    };
     let rights = Rights::READ
         .union(Rights::WRITE)
         .union(Rights::MAP)
@@ -46,8 +67,50 @@ pub fn memobj_create(frame: &SyscallFrame) -> Result<usize, Errno> {
     let raw = caller
         .handles
         .lock()
-        .insert(Object::Memory(object), rights)?;
+        .insert(Object::Memory(object.clone()), rights)?;
+    if paged {
+        object.set_pager_handle(raw.0);
+    }
     Ok(raw.0 as usize)
+}
+
+/// `pager_supply(object, offset, data, data_len) -> 0` (contract C18).
+#[cfg(target_arch = "x86_64")]
+pub fn pager_supply(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let process = process::current().ok_or(Errno::ESRCH)?;
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let offset = frame.rsi;
+    let data_len = usize::try_from(frame.r10).map_err(|_| Errno::EINVAL)?;
+    if data_len == 0 || data_len > PAGE_SIZE as usize || !offset.is_multiple_of(PAGE_SIZE) {
+        return Err(Errno::EINVAL);
+    }
+    let object = {
+        let handles = process.handles.lock();
+        match handles.get(handle, Rights::WRITE) {
+            Ok(Object::Memory(object)) => Arc::clone(object),
+            Ok(_) => return Err(Errno::EBADF),
+            Err(Errno::EACCES) => return Err(Errno::EPERM),
+            Err(error) => return Err(error),
+        }
+    };
+    if !object.is_pager(&process) {
+        return Err(Errno::EPERM);
+    }
+    let end = offset.checked_add(PAGE_SIZE).ok_or(Errno::EINVAL)?;
+    if end > object.len() {
+        return Err(Errno::EINVAL);
+    }
+    let mut buffer = alloc::vec![0u8; data_len];
+    let source = UserSlice::new(frame.rdx, data_len as u64)?;
+    copy_from_user(&mut buffer, source)?;
+    object.supply_page(offset / PAGE_SIZE, &buffer)?;
+    Ok(0)
+}
+
+/// Pager-backed objects need the x86-64 scheme IPC transport.
+#[cfg(not(target_arch = "x86_64"))]
+pub fn pager_supply(_frame: &SyscallFrame) -> Result<usize, Errno> {
+    Err(Errno::ENOSYS)
 }
 
 /// `map(proc, memobj, offset, addr, len, flags) -> addr`.
@@ -133,9 +196,22 @@ pub fn unmap(frame: &SyscallFrame) -> Result<usize, Errno> {
     let addr = frame.rsi;
     let len = frame.rdx;
     validate_range(addr, len)?;
-    let mut guard = target.address_space.lock();
-    let address_space = guard.as_mut().ok_or(Errno::ESRCH)?;
-    address_space.unmap(addr, len)?;
+    let dirty = {
+        let mut guard = target.address_space.lock();
+        let address_space = guard.as_mut().ok_or(Errno::ESRCH)?;
+        // Collect before the mapping disappears; the object Arcs keep the pages alive for the
+        // PageOut requests below.
+        let dirty = address_space.collect_pager_dirty(addr, len);
+        address_space.unmap(addr, len)?;
+        dirty
+    };
+    // C18: the address-space lock is released before the pager IPC wait.
+    #[cfg(target_arch = "x86_64")]
+    for (object, page) in dirty {
+        crate::memory::pager::page_out(&caller, &object, page)?;
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    let _ = dirty;
     Ok(0)
 }
 
