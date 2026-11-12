@@ -95,12 +95,17 @@ The primary and backup arrays must agree.
 A corrupt table is reported as a startup error instead of being guessed; the
 server exits non-zero and never serves a partial partition list.
 .Pp
-With the remote backend the scanner runs on the one-mebibyte prefix, so the
-primary and backup tables must both lie inside that prefix.  A table whose
-backup header is at the device's last sector is rejected until a prefix-only
-scanner lands; the
+With the remote backend the scanner runs on the one-mebibyte prefix.  The
+primary header and entry array must lie inside that prefix; the primary entries
+may name partitions beyond it.  The backup header and array are validated when
+they also lie inside the prefix, and are optional when the standard backup
+sits at the device's last sector.  The scanner still checks the protective MBR,
+both CRCs, the header's own and alternate LBA, the usable range, the entry
+bounds and entry overlap, and rejects a `total_sectors` that disagrees with the
+header.  The in-memory RAM backend keeps the strict both-tables validation.
+The
 .Ql virtio-blk
-qtest fixture builds a prefix-consistent table and proves the bounded read.
+qtest fixture uses a standard last-LBA GPT and proves the bounded read.
 .Pp
 A GPT name longer than the 40-byte wire field is shortened on a UTF-8
 character boundary.

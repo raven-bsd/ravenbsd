@@ -88,19 +88,14 @@ pub fn scan(disk: &[u8]) -> Result<Gpt, GptError> {
     if disk.len() < 34 * GPT_SECTOR || sectors < 34 {
         return Err(GptError::TooShort);
     }
-    let mbr = disk.get(..GPT_SECTOR).ok_or(GptError::TooShort)?;
-    if mbr[510] != 0x55 || mbr[511] != 0xaa || mbr[450] != 0xee {
-        return Err(GptError::NoProtectiveMbr);
-    }
-    if u32::from_le_bytes(mbr[454..458].try_into().map_err(|_| GptError::TooShort)?) != 1 {
-        return Err(GptError::NoProtectiveMbr);
-    }
+    validate_protective_mbr(disk)?;
 
-    let primary = parse_header(disk, 1, sectors)?;
-    if primary.current_lba != 1 || primary.backup_lba == 1 || primary.backup_lba >= sectors as u64 {
+    let total_sectors = sectors as u64;
+    let primary = parse_header(disk, 1, total_sectors)?;
+    if primary.current_lba != 1 || primary.backup_lba == 1 || primary.backup_lba >= total_sectors {
         return Err(GptError::BadHeader);
     }
-    let backup = parse_header(disk, primary.backup_lba, sectors)?;
+    let backup = parse_header(disk, primary.backup_lba, total_sectors)?;
     if backup.current_lba != primary.backup_lba
         || backup.backup_lba != 1
         || backup.disk_guid != primary.disk_guid
@@ -127,10 +122,108 @@ pub fn scan(disk: &[u8]) -> Result<Gpt, GptError> {
         return Err(GptError::BackupMismatch);
     }
 
+    let partitions = collect_partitions(&primary, entries)?;
+    Ok(Gpt {
+        disk_guid: primary.disk_guid,
+        partitions,
+    })
+}
+
+/// Scan a bounded GPT prefix from a device whose full size is `total_sectors`.
+///
+/// The primary header and entry array must be inside `prefix`.  The backup
+/// header/array is validated when it also lies inside the prefix; a standard
+/// backup at the device's last LBA is outside the prefix and is then optional.
+/// The primary entries may name partitions beyond the prefix, but every range
+/// must stay inside the usable area of the whole device.
+pub fn scan_prefix(prefix: &[u8], total_sectors: u64) -> Result<Gpt, GptError> {
+    if total_sectors < 34 {
+        return Err(GptError::TooShort);
+    }
+    let prefix_sectors = (prefix.len() / GPT_SECTOR) as u64;
+    if prefix.len() < 34 * GPT_SECTOR || prefix_sectors < 2 || prefix_sectors > total_sectors {
+        return Err(GptError::TooShort);
+    }
+    validate_protective_mbr(prefix)?;
+
+    let primary = parse_header(prefix, 1, total_sectors)?;
+    if primary.current_lba != 1 || primary.backup_lba != total_sectors - 1 {
+        return Err(GptError::BadHeader);
+    }
+    validate_prefix_geometry(&primary, total_sectors)?;
+    let entries = entry_array(prefix, &primary)?;
+
+    if primary.backup_lba < prefix_sectors {
+        let backup = parse_header(prefix, primary.backup_lba, total_sectors)?;
+        if backup.current_lba != primary.backup_lba
+            || backup.backup_lba != 1
+            || backup.disk_guid != primary.disk_guid
+            || backup.first_usable != primary.first_usable
+            || backup.last_usable != primary.last_usable
+            || backup.entry_count != primary.entry_count
+            || backup.entry_size != primary.entry_size
+            || backup.entries_crc != primary.entries_crc
+        {
+            return Err(GptError::BackupMismatch);
+        }
+        let backup_entries = entry_array(prefix, &backup)?;
+        if entries != backup_entries {
+            return Err(GptError::BackupMismatch);
+        }
+    }
+
+    let partitions = collect_partitions(&primary, entries)?;
+    Ok(Gpt {
+        disk_guid: primary.disk_guid,
+        partitions,
+    })
+}
+
+fn validate_protective_mbr(disk: &[u8]) -> Result<(), GptError> {
+    let mbr = disk.get(..GPT_SECTOR).ok_or(GptError::TooShort)?;
+    if mbr[510] != 0x55 || mbr[511] != 0xaa || mbr[450] != 0xee {
+        return Err(GptError::NoProtectiveMbr);
+    }
+    if u32::from_le_bytes(mbr[454..458].try_into().map_err(|_| GptError::TooShort)?) != 1 {
+        return Err(GptError::NoProtectiveMbr);
+    }
+    Ok(())
+}
+
+fn validate_prefix_geometry(header: &Header, total_sectors: u64) -> Result<(), GptError> {
+    if header.first_usable < 2
+        || header.first_usable > header.last_usable
+        || header.last_usable >= total_sectors
+        || header.backup_lba <= header.last_usable
+    {
+        return Err(GptError::BadHeader);
+    }
+    let array_len = u64::from(header.entry_count)
+        .checked_mul(u64::from(header.entry_size))
+        .ok_or(GptError::BadHeader)?;
+    let array_sectors = array_len.div_ceil(GPT_SECTOR as u64);
+    let primary_end = header
+        .entries_lba
+        .checked_add(array_sectors)
+        .ok_or(GptError::BadHeader)?;
+    if primary_end > total_sectors || header.first_usable < primary_end {
+        return Err(GptError::BadHeader);
+    }
+    let backup_start = header
+        .backup_lba
+        .checked_sub(array_sectors)
+        .ok_or(GptError::BadHeader)?;
+    if header.last_usable >= backup_start {
+        return Err(GptError::BadHeader);
+    }
+    Ok(())
+}
+
+fn collect_partitions(header: &Header, entries: &[u8]) -> Result<Vec<Partition>, GptError> {
     let mut partitions: Vec<Partition> = Vec::new();
-    for index in 0..primary.entry_count as usize {
+    for index in 0..header.entry_count as usize {
         let offset = index
-            .checked_mul(primary.entry_size as usize)
+            .checked_mul(header.entry_size as usize)
             .ok_or(GptError::BadEntry)?;
         let entry = entries
             .get(offset..offset + ENTRY_MIN_SIZE)
@@ -141,7 +234,7 @@ pub fn scan(disk: &[u8]) -> Result<Gpt, GptError> {
         }
         let first = u64::from_le_bytes(entry[32..40].try_into().map_err(|_| GptError::BadEntry)?);
         let last = u64::from_le_bytes(entry[40..48].try_into().map_err(|_| GptError::BadEntry)?);
-        if first < primary.first_usable || last > primary.last_usable || first > last {
+        if first < header.first_usable || last > header.last_usable || first > last {
             return Err(GptError::BadEntry);
         }
         for previous in &partitions {
@@ -157,13 +250,10 @@ pub fn scan(disk: &[u8]) -> Result<Gpt, GptError> {
             name,
         });
     }
-    Ok(Gpt {
-        disk_guid: primary.disk_guid,
-        partitions,
-    })
+    Ok(partitions)
 }
 
-fn parse_header(disk: &[u8], lba: u64, sectors: usize) -> Result<Header, GptError> {
+fn parse_header(disk: &[u8], lba: u64, total_sectors: u64) -> Result<Header, GptError> {
     let offset = usize::try_from(lba)
         .map_err(|_| GptError::BadHeader)?
         .checked_mul(GPT_SECTOR)
@@ -208,9 +298,9 @@ fn parse_header(disk: &[u8], lba: u64, sectors: usize) -> Result<Header, GptErro
     let entries_crc =
         u32::from_le_bytes(sector[88..92].try_into().map_err(|_| GptError::BadHeader)?);
     if current_lba != lba
-        || backup_lba >= sectors as u64
+        || backup_lba >= total_sectors
         || entries_lba < 2
-        || entries_lba >= sectors as u64
+        || entries_lba >= total_sectors
         || entry_count == 0
         || entry_count as usize > MAX_ENTRIES
         || entry_size as usize != ENTRY_MIN_SIZE

@@ -98,7 +98,8 @@ mod program {
                 .map_err(|error| format!("gpt prefix: {}", error.description()))?;
             done += count;
         }
-        let gpt = gpt::scan(&prefix).map_err(|error| format!("gpt: {}", error_name(error)))?;
+        let gpt = gpt::scan_prefix(&prefix, info.sectors)
+            .map_err(|error| format!("gpt: {}", error_name(error)))?;
         let records = partition_records(&gpt)?;
         report(&gpt, &records);
         let handler = BlockHandler::new(disk, records)
