@@ -77,6 +77,7 @@ pub(crate) struct TcpConnection {
     pub fin_wait2_deadline: Option<Instant>,
     pub keepalive_deadline: Option<Instant>,
     pub keepalive_interval_ms: u64,
+    pub keepalive_probe_interval_ms: u64,
     pub keepalive_probes: u8,
     pub keepalive_left: u8,
     pub challenge_tokens: u32,
@@ -169,6 +170,7 @@ impl TcpConnection {
             fin_wait2_deadline: None,
             keepalive_deadline: None,
             keepalive_interval_ms: 7_200_000,
+            keepalive_probe_interval_ms: 75_000,
             keepalive_probes: 9,
             keepalive_left: 9,
             challenge_tokens: 10,
@@ -261,6 +263,7 @@ impl TcpConnection {
             fin_wait2_deadline: None,
             keepalive_deadline: None,
             keepalive_interval_ms: 7_200_000,
+            keepalive_probe_interval_ms: 75_000,
             keepalive_probes: 9,
             keepalive_left: 9,
             challenge_tokens: 10,
@@ -761,6 +764,7 @@ impl<D: Device> Stack<D> {
             return Err(Errno::ENOTSOCK);
         };
         connection.keepalive_interval_ms = interval.as_millis();
+        connection.keepalive_probe_interval_ms = interval.as_millis().min(75_000);
         connection.keepalive_probes = probes;
         connection.keepalive_left = probes;
         connection.keepalive_deadline =
@@ -1571,6 +1575,7 @@ impl<D: Device> Stack<D> {
                             connection.fin_acked = true;
                             if segment.fin() {
                                 time_wait = true;
+                                send_ack = true;
                             } else {
                                 fin_wait2 = true;
                             }
@@ -2800,10 +2805,12 @@ impl<D: Device> Stack<D> {
                         keepalive_timeout = true;
                     } else {
                         connection.keepalive_left = connection.keepalive_left.saturating_sub(1);
-                        connection.keepalive_deadline =
-                            Some(Instant::from_millis(now.as_millis().saturating_add(
-                                i64::try_from(connection.keepalive_interval_ms).unwrap_or(i64::MAX),
-                            )));
+                        connection.keepalive_deadline = Some(Instant::from_millis(
+                            now.as_millis().saturating_add(
+                                i64::try_from(connection.keepalive_probe_interval_ms)
+                                    .unwrap_or(i64::MAX),
+                            ),
+                        ));
                         keepalive_probe = true;
                     }
                 }
