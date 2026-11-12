@@ -626,6 +626,31 @@ pub fn map_mmio(handle: Handle, len: usize) -> Result<&'static [u8], Errno> {
     Ok(unsafe { core::slice::from_raw_parts(address as *const u8, len) })
 }
 
+/// Map a writable device window for the process lifetime.
+///
+/// This is the `MAP` counterpart for registers a driver has to program (`B13a`): every access must
+/// go through `raven_driver::MmioRegion`, which performs one volatile access of the right width
+/// per read or write and bounds-checks the offset. The mapping itself is never unmapped.
+pub fn map_mmio_mut(handle: Handle, len: usize) -> Result<&'static mut [u8], Errno> {
+    // SAFETY: MAP takes scalar arguments; the kernel validates the handle, its MAP right, the
+    // fixed user range and the mapping length.
+    let address = checked(unsafe {
+        syscall6(
+            Syscall::MAP as usize,
+            Handle::SELF_PROC.0 as usize,
+            handle.0 as usize,
+            0,
+            0,
+            len,
+            map::pack(prot::READ | prot::WRITE, 0),
+        )
+    })?;
+    // SAFETY: MAP created a writable mapping of `len` bytes for the process lifetime and this
+    // process holds the only reference to it; the caller wraps it in `MmioRegion`, which never
+    // aliases the window.
+    Ok(unsafe { core::slice::from_raw_parts_mut(address as *mut u8, len) })
+}
+
 /// Read a boot-time blob through the root device capability.
 pub fn boot_blob(root: Handle, kind: u32) -> Result<Handle, Errno> {
     // SAFETY: BOOT_BLOB takes scalar arguments; the kernel validates the root capability.

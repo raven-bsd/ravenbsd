@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The B13a driver path: pcid sizes the BARs and serves the configuration page, devd launches the
+# fixture driver with the requested BAR and that page, and the driver writes and reads a register.
+
+name = "driver-mmio-rw"
+arch = "x86_64"
+profile = "b13a-driver-test"
+timeout_secs = 240
+pre = ["sh tests/fixtures/b13a-driver/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-device", "edu"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^pcid: devices=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^svcd: pcid up$'
+
+[[expect]]
+regex = '^devd: matched [0-9a-f]{2}:[0-9a-f]{2}\.[0-9] vendor=0x1234 device=0x11e8 irq_line=[0-9]+ irq_pin=[0-9]+$'
+
+[[expect]]
+regex = '^devd: driver b13a bar=0 size=1048576$'
+
+[[expect]]
+regex = '^b13a: bar=0 size=1048576$'
+
+[[expect]]
+regex = '^b13a: id=0x010000ed$'
+
+[[expect]]
+regex = '^b13a: mmio 0xfeedface$'
+
+[[expect]]
+regex = '^b13a: config vendor=0x1234 device=0x11e8$'
+
+[[expect]]
+regex = '^b13a: caps? .*$'
+
+[[expect]]
+regex = '^b13a: done$'
+
+[[expect]]
+regex = '^devd: driver b13a cycles=1$'
+
+[[expect]]
+regex = '^svcd: devd up$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|b13a: .*failed'

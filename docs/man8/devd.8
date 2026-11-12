@@ -17,11 +17,28 @@ reads the driver table from
 inside the initfs archive, reads the device directory from the
 .Dq pci:
 scheme, and matches each device by vendor and device id.  For a match it opens
-.Pa /bar0
-of the device and spawns the configured driver in a new process.  The BAR
+the BAR selected by the driver's
+.Va bar
+argument (default
+.Ql 0 )
+and one page of the function's PCI configuration space, then spawns the
+configured driver in a new process.  Both
 .Dv MmioRegion
-handle is transferred into the child before its first thread starts; the child
-does not receive the RootDevice capability.
+handles are transferred into the child before its first thread starts, in
+order: the BAR is the child's handle 3 and the configuration page its handle 4
+(a fresh child has 0 for itself, 1 for the initfs and 2 for the namespace).  The
+child does not receive the RootDevice capability.
+.Pp
+Before the spawn,
+.Nm
+reads
+.Pa /bars
+for the chosen index, refuses an I/O or absent BAR, and appends two arguments
+to the driver's own:
+.Ql bar= Ns Ar n
+and
+.Ql bar_size= Ns Ar bytes ,
+so a driver never guesses the region it was given.
 .Pp
 The driver table is a small
 .Ql [[driver]]
@@ -43,8 +60,12 @@ are required;
 .Va args
 defaults to an empty list and
 .Va cycles
-defaults to 1 with a maximum of 100.  A malformed table or an executable path
-that does not start with
+defaults to 1 with a maximum of 100.  An argument of the form
+.Ql bar= Ns Ar n
+is consumed by
+.Nm
+as the BAR selector (never passed to the child).  A malformed table or an
+executable path that does not start with
 .Pa /
 is rejected before any spawn.
 .Pp

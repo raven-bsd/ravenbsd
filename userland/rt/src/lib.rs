@@ -40,8 +40,8 @@ pub use initfs::initfs_has_manifest;
 pub use sys::{
     DMA_FLAG_NON_CACHEABLE, DmaInfo, IRQ_LEGACY, IRQ_MSI, IRQ_MSIX, IrqInfo, boot_blob, clock_get,
     debug_read, debug_write, dma_alloc, dma_info, exit, futex_wait, futex_wake, handle_close,
-    handle_dup, handle_transfer, irq_ack, irq_create, irq_wait, map_initfs, map_mmio, mmio_create,
-    nanosleep, proc_terminate, uname, yield_now,
+    handle_dup, handle_transfer, irq_ack, irq_create, irq_wait, map_initfs, map_mmio, map_mmio_mut,
+    mmio_create, nanosleep, proc_terminate, uname, yield_now,
 };
 
 /// `entry!(main)` registers the program's `main(args: Args) -> i32` function.

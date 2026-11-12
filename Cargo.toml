@@ -106,6 +106,7 @@ members = [
     "tests/tcpip/interop",
     "tests/tcpip/bench",
     "tests/tcpip/oracle",
+    "tests/fixtures/b13a-driver",
     "tools/bench-host",
     "tools/fuzz",
     "tests/fuzz/replay",
