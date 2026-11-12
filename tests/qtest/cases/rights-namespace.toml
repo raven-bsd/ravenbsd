@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "rights-namespace"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/s16-rights/build.sh"]
+initfs = "build/fixtures/s16-rights/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s16-teardowncheck"
+qemu_extra = []
+expect_exit = "success"
+
+# Same-process revocation: parent and a derived child lose MAP (EPERM); a leaf derived after the
+# revoke never had it (EACCES); the second revoke is a no-op and a stale one is EBADF.
+[[expect]]
+regex = '^s16: revoke same ok$'
+
+# Cross-process: the parent transfers a MemObject, revokes MAP before the child's first thread,
+# and the child sees EPERM for MAP but can still DUP its remaining rights.
+[[expect]]
+regex = '^s16: revoke cross ok$'
+
+# Namespace: the child is created before the server, granted the s16a prefix, then the prefix is
+# removed mid-run. Exact names are unaffected.
+[[expect]]
+regex = '^s16: server ready$'
+
+[[expect]]
+regex = '^s16: prefix open ok$'
+
+[[expect]]
+regex = '^s16: prefix denied$'
+
+[[expect]]
+regex = '^s16: prefix removed$'
+
+[[expect]]
+regex = '^s16: existing handle ok$'
+
+[[expect]]
+regex = '^s16: prefix case ok$'
+
+# CLEAR removes every prefix: both schemes become unreachable for new opens, and the two file
+# handles opened before the clear keep working.
+[[expect]]
+regex = '^s16: clear first ok$'
+
+[[expect]]
+regex = '^s16: clear other ok$'
+
+[[expect]]
+regex = '^s16: clear all ok$'
+
+[[expect]]
+regex = '^s16: clear existing ok$'
+
+[[expect]]
+regex = '^s16: clear case ok$'
+
+[[expect]]
+regex = '^s16: exact name ok$'
+
+[[expect]]
+regex = '^s16: exact case ok$'
+
+# 10,000 dup/revoke/close cycles; the final process-exit line must have no handles or nodes left.
+[[expect]]
+regex = '^s16: churn done=10000$'
+
+[[expect]]
+regex = '^s16: rights ok$'
+
+[[expect]]
+regex = '^s16: namespace ok$'
+
+[[expect]]
+regex = '^s16: lifecycle ok$'
+
+[[expect]]
+regex = '^s16: exit /init handles=0 lineage=0$'
+
+[[forbid]]
+regex = '(?i)panic|s16: failed|EXCEPTION'
