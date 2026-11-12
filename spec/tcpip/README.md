@@ -6,6 +6,11 @@
 Status: C01 spec wave, rev 1. Licence of this document: BSD-3-Clause.
 This tree is prose, tables and test vectors only. It contains no executable code.
 
+C32 update: smoltcp is retired. `raven-tcpip` is the only TCP/IP backend and the default of
+`raven-netcore`; references to smoltcp in this tree (`features.md`, `research-log.md`,
+`provenance.md`) are the historical C01 comparison and stay as written. The DHCPv4 client is
+implemented (`crates/raven-tcpip/src/dhcp.rs`, adapted from smoltcp's 0BSD client).
+
 ## 1. What this specification is
 
 `raven-tcpip` is a standalone, OS-independent TCP/IP stack: `no_std` + `alloc`,

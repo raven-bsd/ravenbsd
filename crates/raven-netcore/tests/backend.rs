@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! A trivial non-smoltcp backend proves the seam is genuinely abstract.
+//! A trivial stub backend proves the seam is genuinely abstract.
 
 use raven_abi::errno::Errno;
 use raven_netcore::{Core, Event, Ipv4Addr, SocketId, StackBackend};

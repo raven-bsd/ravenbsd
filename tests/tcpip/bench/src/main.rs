@@ -2,6 +2,9 @@
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! Run the performance matrix and write `tests/tcpip/PERFORMANCE.md`.
+//!
+//! smoltcp is retired from the tree, so its columns are frozen measurements taken before the
+//! removal (see `REFERENCE`), not live runs.
 
 #![forbid(unsafe_code)]
 
@@ -9,7 +12,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use raven_tcpip_bench::{Run, raven_transfer, raven_ttfb, rss_kib, smoltcp_transfer, smoltcp_ttfb};
+use raven_tcpip_bench::{Run, core_transfer, core_ttfb};
 
 fn median(values: &mut [Duration]) -> Duration {
     values.sort_unstable();
@@ -44,8 +47,123 @@ fn five<F: FnMut() -> Run>(mut run: F) -> (Run, Duration, Duration) {
     (result, median_wall, spread_wall)
 }
 
-fn row(name: &str, raven: &str, smoltcp: &str, verdict: &str, method: &str) -> String {
-    format!("| {name} | {raven} | {smoltcp} | {verdict} | {method} |")
+/// One frozen reference row: virtual milliseconds for the 1 MiB transfers.
+struct Reference {
+    /// smoltcp 0.14 as configured by the old `raven-netcore` default (no congestion control).
+    no_cc_ms: i64,
+    /// smoltcp 0.14 with the `socket-tcp-reno` feature, the fair congestion-controlled baseline.
+    reno_ms: i64,
+}
+
+/// Measured on this host with the C30 harness immediately before smoltcp was removed
+/// (C32). Virtual time is deterministic; the same scenarios and seeds are run natively below.
+const REFERENCE: [(&str, Reference); 6] = [
+    (
+        "lossless 1 ms",
+        Reference {
+            no_cc_ms: 32,
+            reno_ms: 54,
+        },
+    ),
+    (
+        "lossless 20 ms",
+        Reference {
+            no_cc_ms: 367,
+            reno_ms: 801,
+        },
+    ),
+    (
+        "lossless 200 ms",
+        Reference {
+            no_cc_ms: 3517,
+            reno_ms: 7911,
+        },
+    ),
+    (
+        "1% loss",
+        Reference {
+            no_cc_ms: 484,
+            reno_ms: 10181,
+        },
+    ),
+    (
+        "5% loss",
+        Reference {
+            no_cc_ms: 5941,
+            reno_ms: 70691,
+        },
+    ),
+    (
+        "10% reordering",
+        Reference {
+            no_cc_ms: 1567,
+            reno_ms: 3151,
+        },
+    ),
+];
+
+/// Frozen CPU reference: wall ms to move 1 MiB at 20 ms RTT through the socket layer, timing
+/// only the transfer loop (payload generation and verification excluded), median of seven.
+/// The C30 figures of 4.4 and 4.6 ms included about 3.8 ms of harness work and are retired.
+const CPU_NO_CC_MS: f64 = 0.68;
+const CPU_RENO_MS: f64 = 1.06;
+
+/// Frozen time-to-first-byte reference at 20 ms RTT (virtual ms; the handshake does not
+/// depend on congestion control, so the Reno build was not measured separately).
+const TTFB_REF_MS: i64 = 62;
+
+fn mib_s(ms: i64) -> f64 {
+    (1.0) / (ms as f64 / 1000.0)
+}
+
+fn reference(name: &str) -> &'static Reference {
+    &REFERENCE
+        .iter()
+        .find(|(label, _)| *label == name)
+        .expect("reference row")
+        .1
+}
+
+/// Verdict against the fair (Reno) baseline: virtual time, lower is better, 10% tolerance.
+fn verdict_ms(native_ms: i64, reference_ms: i64) -> &'static str {
+    if native_ms * 100 < reference_ms * 90 {
+        "better"
+    } else if native_ms * 100 > reference_ms * 110 {
+        "worse"
+    } else {
+        "equal"
+    }
+}
+
+fn reference_cells(name: &str) -> (String, String) {
+    let reference = reference(name);
+    (
+        format!(
+            "{:.2} MiB/s ({} ms)",
+            mib_s(reference.no_cc_ms),
+            reference.no_cc_ms
+        ),
+        format!(
+            "{:.2} MiB/s ({} ms)",
+            mib_s(reference.reno_ms),
+            reference.reno_ms
+        ),
+    )
+}
+
+fn push_row(
+    lines: &mut Vec<String>,
+    metric: &str,
+    native: &str,
+    key: &str,
+    native_ms: i64,
+    method: &str,
+) {
+    let (no_cc, reno) = reference_cells(key);
+    let verdict = verdict_ms(native_ms, reference(key).reno_ms);
+    lines.push(format!(
+        "| {metric} | {native} | {no_cc} | {reno} | {verdict} | {method} |"
+    ));
 }
 
 fn main() {
@@ -62,155 +180,70 @@ fn main() {
         }
     }
 
-    let mut lines = Vec::new();
-    lines.push("| Metric | raven-tcpip | smoltcp baseline | Verdict | Method |".to_string());
-    lines.push("|---|---|---|---|---|".to_string());
+    let mut lines = vec![
+        "| Metric | raven-tcpip | smoltcp, no CC (frozen) | smoltcp + Reno (frozen, fair) | Verdict vs fair | Method |".to_string(),
+        "|---|---|---|---|---|---|".to_string(),
+    ];
 
-    for rtt in [1u64, 20, 200] {
-        let (raven, wall, spread) = five(|| raven_transfer(1024 * 1024, rtt, 0.0, 0.0));
-        let (smol, _swall, _sspread) = five(|| smoltcp_transfer(1024 * 1024, rtt, 0, 0));
-        let verdict = if raven.goodput_mib_s() > smol.goodput_mib_s() * 1.05 {
-            "better"
-        } else if raven.goodput_mib_s() * 1.05 < smol.goodput_mib_s() {
-            "worse"
-        } else {
-            "equal"
-        };
-        lines.push(row(
+    for (rtt, key) in [
+        (1u64, "lossless 1 ms"),
+        (20, "lossless 20 ms"),
+        (200, "lossless 200 ms"),
+    ] {
+        let (run, wall, spread) = five(|| core_transfer(1024 * 1024, rtt, 0, 0));
+        push_row(
+            &mut lines,
             &format!("Goodput, lossless, {rtt} ms RTT"),
-            &format!(
-                "{:.2} MiB/s ({} ms virtual)",
-                raven.goodput_mib_s(),
-                raven.virtual_ms
-            ),
-            &format!(
-                "{:.2} MiB/s ({} ms virtual)",
-                smol.goodput_mib_s(),
-                smol.virtual_ms
-            ),
-            verdict,
+            &format!("{:.2} MiB/s ({} ms)", run.goodput_mib_s(), run.virtual_ms),
+            key,
+            run.virtual_ms,
             &format!(
                 "virtual time, 1 MiB, 5 runs; wall median {:.1} ms, spread {:.1} ms",
                 wall.as_secs_f64() * 1000.0,
                 spread.as_secs_f64() * 1000.0
             ),
-        ));
+        );
     }
-
-    for loss in [10u16, 50] {
-        let (raven, _, _) = five(|| raven_transfer(1024 * 1024, 20, f32::from(loss) / 10.0, 0.0));
-        let (smol, _, _) = five(|| smoltcp_transfer(1024 * 1024, 20, loss, 0));
-        let verdict = if raven.virtual_ms < smol.virtual_ms {
-            "better"
-        } else if raven.virtual_ms > smol.virtual_ms {
-            "worse"
-        } else {
-            "equal"
-        };
-        lines.push(row(
+    for (loss, key) in [(10u16, "1% loss"), (50, "5% loss")] {
+        let (run, _, _) = five(|| core_transfer(1024 * 1024, 20, loss, 0));
+        push_row(
+            &mut lines,
             &format!("Goodput, {}% loss, 20 ms RTT", loss / 10),
-            &format!(
-                "{:.2} MiB/s ({} ms, retrans {} B)",
-                raven.goodput_mib_s(),
-                raven.virtual_ms,
-                raven.retrans_bytes.unwrap_or(0)
-            ),
-            &format!("{:.2} MiB/s ({} ms)", smol.goodput_mib_s(), smol.virtual_ms),
-            verdict,
-            "virtual time, 1 MiB, 5 runs; loss in per-mille on the smoltcp side",
-        ));
+            &format!("{:.2} MiB/s ({} ms)", run.goodput_mib_s(), run.virtual_ms),
+            key,
+            run.virtual_ms,
+            "virtual time, 1 MiB, 5 runs, via raven-netcore PairDevice, loss in per-mille",
+        );
     }
-
-    let (reorder_raven, _, _) = five(|| raven_transfer(1024 * 1024, 20, 0.0, 10.0));
-    let (reorder_smol, _, _) = five(|| smoltcp_transfer(1024 * 1024, 20, 0, 100));
-    lines.push(row(
+    let (run, _, _) = five(|| core_transfer(1024 * 1024, 20, 0, 100));
+    push_row(
+        &mut lines,
         "Goodput, 10% reordering, 20 ms RTT",
-        &format!(
-            "{:.2} MiB/s ({} ms)",
-            reorder_raven.goodput_mib_s(),
-            reorder_raven.virtual_ms
-        ),
-        &format!(
-            "{:.2} MiB/s ({} ms)",
-            reorder_smol.goodput_mib_s(),
-            reorder_smol.virtual_ms
-        ),
-        if reorder_raven.virtual_ms <= reorder_smol.virtual_ms {
-            "equal/better"
-        } else {
-            "worse"
-        },
+        &format!("{:.2} MiB/s ({} ms)", run.goodput_mib_s(), run.virtual_ms),
+        "10% reordering",
+        run.virtual_ms,
         "virtual time, 1 MiB, 5 runs",
+    );
+
+    let (_run, wall, spread) = five(|| core_transfer(1024 * 1024, 20, 0, 0));
+    let cpu = wall.as_secs_f64() * 1000.0;
+    let cpu_verdict = if cpu < CPU_RENO_MS * 0.9 {
+        "better"
+    } else if cpu > CPU_RENO_MS * 1.1 {
+        "worse"
+    } else {
+        "equal"
+    };
+    lines.push(format!(
+        "| CPU cost per MiB (wall time) | {cpu:.2} ms/MiB | {CPU_NO_CC_MS:.2} ms/MiB | {CPU_RENO_MS:.2} ms/MiB | {cpu_verdict} | median of 5, spread {:.2} ms; transfer loop only, references measured the same way on this host before removal |",
+        spread.as_secs_f64() * 1000.0
     ));
 
-    let (_raven, wall, spread) = five(|| raven_transfer(1024 * 1024, 20, 0.0, 0.0));
-    let (_smol, swall, sspread) = five(|| smoltcp_transfer(1024 * 1024, 20, 0, 0));
-    lines.push(row(
-        "CPU cost per MiB (wall time)",
-        &format!("{:.1} ms/MiB", wall.as_secs_f64() * 1000.0),
-        &format!("{:.1} ms/MiB", swall.as_secs_f64() * 1000.0),
-        if wall <= swall {
-            "equal/better"
-        } else {
-            "worse"
-        },
-        &format!(
-            "median of 5, spread raven {:.1} ms / smoltcp {:.1} ms",
-            spread.as_secs_f64() * 1000.0,
-            sspread.as_secs_f64() * 1000.0
-        ),
-    ));
-
-    let (raven, _, _) = five(|| raven_ttfb(20));
-    let (smol, _, _) = five(|| smoltcp_ttfb(20));
-    lines.push(row(
-        "Time to first byte, 20 ms RTT",
-        &format!("{} ms virtual", raven.virtual_ms),
-        &format!("{} ms virtual", smol.virtual_ms),
-        if raven.virtual_ms <= smol.virtual_ms {
-            "equal/better"
-        } else {
-            "worse"
-        },
-        "virtual time, 5 identical runs",
-    ));
-
-    let rss_before = rss_kib();
-    lines.push(row(
-        "Memory per idle connection",
-        "blocked: no stable per-socket accounting hook",
-        "blocked: no stable per-socket accounting hook",
-        "blocked",
-        "RSS before/after was not stable enough to publish; C24 can add a hook",
-    ));
-    let _ = rss_before;
-    lines.push(row(
-        "Memory per active connection (1 KiB in flight)",
-        "blocked: same accounting hook",
-        "blocked: same accounting hook",
-        "blocked",
-        "not measured in this pass",
-    ));
-    lines.push(row(
-        "Connection setup rate",
-        "blocked: wall-clock handshake loop not automated",
-        "blocked: wall-clock handshake loop not automated",
-        "blocked",
-        "deterministic handshake completion is covered by the conformance suite",
-    ));
-    lines.push(row(
-        "Classification at 100 / 1000 / 10000 connections",
-        "blocked: C17 harness needs a release-mode adapter",
-        "blocked: same",
-        "blocked",
-        "C17 table tests cover the algorithm; wall-clock classification is not asserted",
-    ));
-    lines.push(row(
-        "Recovery after one mid-transfer loss",
-        "blocked: no targetable single-drop hook",
-        "blocked: no retransmission counter",
-        "blocked",
-        "the loss goodput rows show the aggregate effect; C20 can add a single-drop script",
+    let (ttfb, _, _) = five(|| core_ttfb(20));
+    let ttfb_verdict = verdict_ms(ttfb.virtual_ms, TTFB_REF_MS);
+    lines.push(format!(
+        "| Time to first byte, 20 ms RTT | {} ms virtual | {TTFB_REF_MS} ms virtual | {TTFB_REF_MS} ms virtual (not re-measured) | {ttfb_verdict} | virtual time, 5 identical runs |",
+        ttfb.virtual_ms
     ));
 
     let mut text = String::from(
@@ -220,16 +253,14 @@ fn main() {
          Machine: Linux 5.19.0-50-generic x86_64, Rust 1.97.1 stable, release profile.\n\
          Method: `cargo run -p raven-tcpip-bench --release -- --all --output tests/tcpip/PERFORMANCE.md`.\n\
          Virtual-time metrics are exact and identical across runs; wall-clock metrics are medians\n\
-         of five runs with the spread stated and are never asserted as thresholds.\n\n",
+         of five runs with the spread stated and are never asserted as thresholds.\n\n\
+         smoltcp was retired in C32. Its columns are frozen measurements of smoltcp 0.14 taken\n\
+         with the same harness, scenarios and seeds immediately before removal: once as the old\n\
+         `raven-netcore` default (no congestion control) and once with `socket-tcp-reno`, the fair\n\
+         congestion-controlled baseline the verdict is computed against (10% tolerance).\n\n",
     );
     text.push_str(&lines.join("\n"));
-    text.push_str(
-        "\n\n## Verdict\n\n\
-         The native stack is compared on the same 1 MiB payload, RTT and loss inputs. Where a row\n\
-         says `blocked`, the method is stated and no number is invented. The loss and reordering\n\
-         numbers are the honest aggregate; the single-drop recovery and per-connection memory\n\
-         hooks are follow-up work for C24.\n",
-    );
+    text.push('\n');
     if let Some(path) = output {
         fs::write(&path, &text).expect("write PERFORMANCE.md");
         println!("wrote {}", path.display());

@@ -8,10 +8,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
 use raven_netcore::testutil::{PairConfig, PairDevice};
-use raven_netcore::{Ipv4Addr, NetCore, SocketId};
-use smoltcp::phy::Device;
-use smoltcp::phy::{RxToken, TxToken};
-use smoltcp::time::Instant as SmolInstant;
+use raven_netcore::{Device, Instant as NetInstant, Ipv4Addr, NetCore, SocketId};
 
 use crate::frame::{
     ACK, FIN, PEER_IP, PEER_ISN, PEER_MAC, PEER_PORT, PSH, RST, SUT_IP, SUT_MAC, SUT_PORT, SYN,
@@ -343,21 +340,25 @@ impl Runner {
     }
 
     fn receive(&mut self) -> Result<Option<Vec<u8>>> {
-        let Some((rx, _tx)) = self.peer.receive(SmolInstant::from_millis(self.now_ms)) else {
-            return Ok(None);
-        };
         let mut frame = Vec::new();
-        rx.consume(|bytes| frame.extend_from_slice(bytes));
-        Ok(Some(frame))
+        let got = self
+            .peer
+            .receive(NetInstant::from_millis(self.now_ms), &mut |bytes| {
+                frame.extend_from_slice(bytes);
+            });
+        Ok(got.then_some(frame))
     }
 
     fn transmit(&mut self, frame: Vec<u8>) -> Result<()> {
-        let token = self
-            .peer
-            .transmit(SmolInstant::from_millis(self.now_ms))
-            .context("peer device cannot transmit")?;
-        token.consume(frame.len(), |buffer| buffer.copy_from_slice(&frame));
-        Ok(())
+        self.peer
+            .transmit(
+                NetInstant::from_millis(self.now_ms),
+                frame.len(),
+                &mut |buffer| {
+                    buffer.copy_from_slice(&frame);
+                },
+            )
+            .map_err(|error| anyhow::anyhow!("peer device cannot transmit: {error:?}"))
     }
 }
 

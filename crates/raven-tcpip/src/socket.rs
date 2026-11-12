@@ -17,7 +17,7 @@ use crate::ipv4_stack::to_wire;
 use crate::ipv6_stack::IpAddr;
 use crate::listen::{AcceptQueue, HalfOpenQueue};
 use crate::stack::Stack;
-use crate::table::{ConnectionKey, ConnectionTable};
+use crate::table::{ConnectionKey, ConnectionTable, TimeWaitInfo};
 
 /// Hard ceiling of a listener's accept queue; the runtime limit is the
 /// `tcp.accept_queue_limit` property.
@@ -96,6 +96,7 @@ pub(crate) struct SocketTable {
     conn_index: ConnectionTable<u32>,
     reported_chains: usize,
     released_ports: Vec<u16>,
+    detached: Vec<(ConnectionKey, TimeWaitInfo, i64)>,
     next_id: u32,
     max: usize,
 }
@@ -119,6 +120,7 @@ impl SocketTable {
             conn_index: ConnectionTable::new(max.max(1), secret, max_chain),
             reported_chains: 0,
             released_ports: Vec::new(),
+            detached: Vec::new(),
             next_id: 1,
             max,
         }
@@ -174,7 +176,8 @@ impl SocketTable {
         }
     }
 
-    /// Reclaim closed records whose application handle is gone.
+    /// Reclaim closed records whose application handle is gone, and move released TIME-WAIT
+    /// connections out of the table so they stop counting against its size.
     pub(crate) fn reclaim(&mut self) -> usize {
         let dead: Vec<u32> = self
             .records
@@ -182,6 +185,43 @@ impl SocketTable {
             .filter(|(_, record)| record.closed && record.app_closed)
             .map(|(id, _)| *id)
             .collect();
+        let waiting: Vec<u32> = self
+            .records
+            .iter()
+            .filter(|(_, record)| {
+                record.app_closed
+                    && !record.closed
+                    && matches!(&record.kind, Kind::Tcp(connection)
+                        if connection.state == crate::tcp_state::TcpState::TimeWait
+                            && connection.remote.is_some()
+                            && connection.time_wait_deadline.is_some())
+            })
+            .map(|(id, _)| *id)
+            .collect();
+        for id in &waiting {
+            self.unindex(SocketId(*id));
+            let Some(record) = self.records.remove(id) else {
+                continue;
+            };
+            let window = crate::tcp_data::advertised_window(&record);
+            if let Kind::Tcp(connection) = &record.kind
+                && let Some(key) = connection_key(connection)
+                && let Some(deadline) = connection.time_wait_deadline
+            {
+                self.detached.push((
+                    key,
+                    TimeWaitInfo {
+                        snd_nxt: connection.snd_nxt,
+                        rcv_nxt: connection.rcv_nxt,
+                        irs: connection.irs,
+                        window,
+                        ts_recent: connection.ts_recent,
+                        timestamps: connection.timestamps,
+                    },
+                    deadline.as_millis(),
+                ));
+            }
+        }
         for id in &dead {
             self.unindex(SocketId(*id));
             if let Some(record) = self.records.remove(id) {
@@ -193,7 +233,12 @@ impl SocketTable {
                 }
             }
         }
-        dead.len()
+        dead.len() + waiting.len()
+    }
+
+    /// TIME-WAIT connections whose records were reclaimed since the last call.
+    pub(crate) fn take_detached(&mut self) -> Vec<(ConnectionKey, TimeWaitInfo, i64)> {
+        core::mem::take(&mut self.detached)
     }
 
     /// Local ports of the records reclaimed since the last call.
@@ -354,7 +399,16 @@ impl<D: Device> Stack<D> {
         if let Ok(record) = self.sockets.record(socket)
             && matches!(record.kind, Kind::Tcp(_))
         {
-            self.tcp_shutdown(socket)?;
+            if record.app_closed {
+                return Err(Errno::EBADF);
+            }
+            match self.tcp_shutdown(socket) {
+                Ok(()) => {}
+                // The connection already ended (reset, timeout): releasing the handle is fine
+                // once; only a second close is a bad handle.
+                Err(Errno::EBADF) => {}
+                Err(error) => return Err(error),
+            }
             let record = self.sockets.record_mut(socket)?;
             record.tx_shutdown = true;
             record.app_closed = true;

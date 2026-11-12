@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! OS-independent, backend-agnostic nonblocking socket layer.
+//! OS-independent nonblocking socket layer over the native `raven-tcpip` stack.
 //!
-//! [`Core`] owns a [`StackBackend`] and a socket-id table. [`NetCore`] keeps the B07 name as the
-//! smoltcp-backed alias. Every operation is nonblocking: `send`/`recv` return [`Errno::EAGAIN`]
-//! when a buffer is empty or full, and [`Core::poll`] drives the backend and returns readiness
-//! *transitions* since the previous call. No smoltcp type is re-exported from this crate.
+//! [`Core`] owns a [`StackBackend`]. [`NetCore`] is the native-backed core and the only one
+//! shipped; the trait stays as the seam for stubs and future transports. Every operation is
+//! nonblocking: `send`/`recv` return [`Errno::EAGAIN`] when a buffer is empty or full, and
+//! [`Core::poll`] drives the backend and returns readiness *transitions* since the previous
+//! call. A link is any [`Device`] (re-exported from `raven-tcpip`).
 //!
 //! The crate is `no_std` and needs only `alloc`. Tests and host harnesses use the in-memory
 //! `testutil::PairDevice` link.
@@ -23,20 +24,27 @@ mod core;
 
 pub use address::Ipv4Addr;
 pub use backend::StackBackend;
-#[cfg(feature = "backend-raven-tcpip")]
 pub use backend::raven::RavenTcpipBackend;
-pub use backend::smoltcp::SmoltcpBackend;
 pub use core::Core;
 
 pub use raven_abi::errno::Errno;
+pub use raven_tcpip::{ChecksumOffload, Device, DeviceCaps, Instant, Medium, TxError};
 
-/// The smoltcp-backed core, preserving the B07 name.
-#[cfg(not(feature = "backend-raven-tcpip"))]
-pub type NetCore<D> = Core<SmoltcpBackend<D>>;
+/// The native raven-tcpip-backed core.
+pub type NetCore<D> = Core<RavenTcpipBackend<D>>;
 
-/// The native raven-tcpip-backed core, selected by `backend-raven-tcpip`.
-#[cfg(feature = "backend-raven-tcpip")]
-pub type NetCore<D> = Core<backend::raven::RavenTcpipBackend<D>>;
+/// An address lease obtained over DHCP.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DhcpLease {
+    /// The leased address.
+    pub address: Ipv4Addr,
+    /// Prefix length of the connected network.
+    pub prefix_len: u8,
+    /// Default gateway, if the server gave one.
+    pub router: Option<Ipv4Addr>,
+    /// DNS servers.
+    pub dns: alloc::vec::Vec<Ipv4Addr>,
+}
 
 /// Socket identifier.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

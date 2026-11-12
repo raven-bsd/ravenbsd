@@ -306,6 +306,14 @@ impl<T: Clone> TimeWaitTable<T> {
 
     /// Expire entries due at `now` and return their values.
     pub fn expire_values(&mut self, now_ms: i64) -> Vec<T> {
+        self.expire_entries(now_ms)
+            .into_iter()
+            .map(|(_, value)| value)
+            .collect()
+    }
+
+    /// Expire entries due at `now` and return their keys and values.
+    pub fn expire_entries(&mut self, now_ms: i64) -> Vec<(ConnectionKey, T)> {
         let mut expired = Vec::new();
         while let Some((deadline, key)) = self.expiry.front().copied() {
             if deadline > now_ms {
@@ -318,11 +326,23 @@ impl<T: Clone> TimeWaitTable<T> {
                 .is_some_and(|(_, current)| *current == deadline)
                 && let Some((value, _)) = self.entries.remove(&key)
             {
-                expired.push(value);
+                expired.push((key, value));
             }
         }
         self.stats.timewait_expired = self.stats.timewait_expired.saturating_add(expired.len());
         expired
+    }
+
+    /// The value of a live entry.
+    #[must_use]
+    pub fn get(&self, key: &ConnectionKey) -> Option<&T> {
+        self.entries.get(key).map(|(value, _)| value)
+    }
+
+    /// The deadline of a live entry, in milliseconds.
+    #[must_use]
+    pub fn deadline(&self, key: &ConnectionKey) -> Option<i64> {
+        self.entries.get(key).map(|(_, deadline)| *deadline)
     }
 
     /// Forget an entry whose connection left TIME-WAIT.
@@ -396,4 +416,44 @@ pub fn rebind_decision(
         return Rebind::AddrInUse;
     }
     Rebind::Allowed
+}
+
+#[cfg(any(test, feature = "testutil"))]
+impl TimeWaitTable<TimeWaitSlot> {
+    /// Entries held, and how many are detached from their socket record.
+    pub(crate) fn entries_detached(&self) -> (usize, usize) {
+        let detached = self
+            .entries
+            .values()
+            .filter(|(slot, _)| slot.info.is_some())
+            .count();
+        (self.entries.len(), detached)
+    }
+}
+
+/// What a TIME-WAIT entry needs to answer a late segment after its socket record is gone.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct TimeWaitInfo {
+    /// Next sequence number this side would send.
+    pub snd_nxt: u32,
+    /// Next sequence number expected from the peer.
+    pub rcv_nxt: u32,
+    /// Peer initial sequence number, for the new-incarnation test.
+    pub irs: u32,
+    /// Window to advertise in the ACK.
+    pub window: u16,
+    /// Last peer timestamp, echoed in the ACK.
+    pub ts_recent: u32,
+    /// Whether timestamps were negotiated.
+    pub timestamps: bool,
+}
+
+/// A TIME-WAIT table slot: the socket record that still carries the connection, or the
+/// detached state once the record was reclaimed.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TimeWaitSlot {
+    /// Raw socket id, meaningful while `info` is `None`.
+    pub socket: u32,
+    /// Detached state.
+    pub info: Option<TimeWaitInfo>,
 }

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! Benchmark scenarios shared by the `raven-tcpip` and smoltcp backends.
+//! Benchmark scenarios for the native `raven-tcpip` stack.
 
 #![forbid(unsafe_code)]
 
 use std::time::{Duration, Instant};
 
 use raven_netcore::testutil::{PairConfig, PairDevice};
-use raven_netcore::{Event, Ipv4Addr as SmolIpv4, NetCore, SocketId as SmolSocket};
+use raven_netcore::{Ipv4Addr as CoreIpv4, NetCore, SocketId as CoreSocket};
 use raven_tcpip::{
     Instant as SimInstant, IpAddr, Ipv4Addr, Ipv4Config, SocketId, Stack, StackConfig,
 };
@@ -158,97 +158,6 @@ pub fn raven_transfer(bytes: usize, rtt_ms: u64, loss_percent: f32, reorder_perc
     }
 }
 
-fn smol_pair(
-    rtt_ms: u64,
-    loss_per_mille: u16,
-    reorder_per_mille: u16,
-) -> (NetCore<PairDevice>, NetCore<PairDevice>) {
-    let config = PairConfig {
-        loss_per_mille,
-        reorder_per_mille,
-        delay_ms: rtt_ms / 2,
-        jitter_ms: 0,
-        seed: 0x5eed_1234_5678_9abc,
-    };
-    let (client_device, server_device) = PairDevice::pair(config);
-    let mut client = NetCore::new(client_device, AMAC, 0);
-    let mut server = NetCore::new(server_device, BMAC, 0);
-    client.set_ipv4(SmolIpv4::new(A[0], A[1], A[2], A[3]), 24, None);
-    server.set_ipv4(SmolIpv4::new(B[0], B[1], B[2], B[3]), 24, None);
-    (client, server)
-}
-
-fn smol_step(
-    client: &mut NetCore<PairDevice>,
-    server: &mut NetCore<PairDevice>,
-    now: &mut i64,
-) -> (Vec<Event>, Vec<Event>) {
-    *now += 1;
-    (client.poll(*now), server.poll(*now))
-}
-
-/// Transfer `bytes` over the smoltcp baseline over the same virtual delay/loss model.
-pub fn smoltcp_transfer(
-    bytes: usize,
-    rtt_ms: u64,
-    loss_per_mille: u16,
-    reorder_per_mille: u16,
-) -> Run {
-    let (mut client, mut server) = smol_pair(rtt_ms, loss_per_mille, reorder_per_mille);
-    let start = Instant::now();
-    let mut now = 0i64;
-    let listener = server.tcp_listen(80, 8).expect("listen");
-    let client_socket: SmolSocket = client
-        .tcp_connect((SmolIpv4::new(B[0], B[1], B[2], B[3]), 80), None)
-        .expect("connect");
-    let mut server_socket = None;
-    for _ in 0..20_000 {
-        if let Ok(Some(socket)) = server.tcp_accept(listener) {
-            server_socket = Some(socket);
-            break;
-        }
-        let _ = smol_step(&mut client, &mut server, &mut now);
-    }
-    let server_socket = server_socket.expect("accept");
-    let connect_ms = now;
-    let payload = pattern(bytes);
-    let mut sent = 0usize;
-    let mut received = Vec::new();
-    let mut buffer = vec![0u8; 65_536];
-    for _ in 0..2_000_000 {
-        if sent < payload.len()
-            && let Ok(count) = client.send(client_socket, &payload[sent..])
-        {
-            sent += count;
-        }
-        loop {
-            match server.recv(server_socket, &mut buffer) {
-                Ok(0) => break,
-                Ok(count) => received.extend_from_slice(&buffer[..count]),
-                Err(_) => break,
-            }
-        }
-        if received.len() >= payload.len() {
-            break;
-        }
-        let _ = smol_step(&mut client, &mut server, &mut now);
-    }
-    assert_eq!(received.len(), payload.len(), "short smoltcp transfer");
-    assert_eq!(
-        hash(&received),
-        hash(&payload),
-        "smoltcp payload corruption"
-    );
-    let wall = start.elapsed();
-    Run {
-        bytes,
-        virtual_ms: now.saturating_sub(connect_ms),
-        segments: None,
-        retrans_bytes: None,
-        wall,
-    }
-}
-
 /// Virtual time to first byte after connect.
 pub fn raven_ttfb(rtt_ms: u64) -> Run {
     let (_link, mut a, mut b) = raven_pair(rtt_ms, 0.0, 0.0);
@@ -292,14 +201,42 @@ pub fn raven_ttfb(rtt_ms: u64) -> Run {
     }
 }
 
-/// Virtual time to first byte with the smoltcp baseline.
-pub fn smoltcp_ttfb(rtt_ms: u64) -> Run {
-    let (mut client, mut server) = smol_pair(rtt_ms, 0, 0);
-    let start = Instant::now();
+fn core_pair(
+    rtt_ms: u64,
+    loss_per_mille: u16,
+    reorder_per_mille: u16,
+) -> (NetCore<PairDevice>, NetCore<PairDevice>) {
+    let config = PairConfig {
+        loss_per_mille,
+        reorder_per_mille,
+        delay_ms: rtt_ms / 2,
+        jitter_ms: 0,
+        seed: 0x5eed_1234_5678_9abc,
+    };
+    let (client_device, server_device) = PairDevice::pair(config);
+    let mut client = NetCore::new(client_device, AMAC, 0);
+    let mut server = NetCore::new(server_device, BMAC, 0);
+    client.set_ipv4(CoreIpv4::new(A[0], A[1], A[2], A[3]), 24, None);
+    server.set_ipv4(CoreIpv4::new(B[0], B[1], B[2], B[3]), 24, None);
+    (client, server)
+}
+
+/// Transfer `bytes` through the `raven-netcore` socket layer over its `PairDevice` link.
+///
+/// This is the exact scenario the frozen smoltcp reference was measured with (same link model,
+/// seed, socket API and loop), so the two are directly comparable. Loss and reordering are in
+/// parts per thousand.
+pub fn core_transfer(
+    bytes: usize,
+    rtt_ms: u64,
+    loss_per_mille: u16,
+    reorder_per_mille: u16,
+) -> Run {
+    let (mut client, mut server) = core_pair(rtt_ms, loss_per_mille, reorder_per_mille);
     let mut now = 0i64;
     let listener = server.tcp_listen(80, 8).expect("listen");
-    let client_socket = client
-        .tcp_connect((SmolIpv4::new(B[0], B[1], B[2], B[3]), 80), None)
+    let client_socket: CoreSocket = client
+        .tcp_connect((CoreIpv4::new(B[0], B[1], B[2], B[3]), 80), None)
         .expect("connect");
     let mut server_socket = None;
     for _ in 0..20_000 {
@@ -307,13 +244,75 @@ pub fn smoltcp_ttfb(rtt_ms: u64) -> Run {
             server_socket = Some(socket);
             break;
         }
-        let _ = smol_step(&mut client, &mut server, &mut now);
+        now += 1;
+        client.poll(now);
+        server.poll(now);
+    }
+    let server_socket = server_socket.expect("accept");
+    let connect_ms = now;
+    let payload = pattern(bytes);
+    // Only the stack work is timed: payload generation and verification are harness cost.
+    let start = Instant::now();
+    let mut sent = 0usize;
+    let mut received = Vec::new();
+    let mut buffer = vec![0u8; 65_536];
+    for _ in 0..2_000_000 {
+        if sent < payload.len()
+            && let Ok(count) = client.send(client_socket, &payload[sent..])
+        {
+            sent += count;
+        }
+        loop {
+            match server.recv(server_socket, &mut buffer) {
+                Ok(0) | Err(_) => break,
+                Ok(count) => received.extend_from_slice(&buffer[..count]),
+            }
+        }
+        if received.len() >= payload.len() {
+            break;
+        }
+        now += 1;
+        client.poll(now);
+        server.poll(now);
+    }
+    let wall = start.elapsed();
+    assert_eq!(received.len(), payload.len(), "short transfer");
+    assert_eq!(hash(&received), hash(&payload), "payload corruption");
+    Run {
+        bytes,
+        virtual_ms: now.saturating_sub(connect_ms),
+        segments: None,
+        retrans_bytes: None,
+        wall,
+    }
+}
+
+/// Virtual time to first byte through the socket layer, as the reference measured it.
+pub fn core_ttfb(rtt_ms: u64) -> Run {
+    let (mut client, mut server) = core_pair(rtt_ms, 0, 0);
+    let start = Instant::now();
+    let mut now = 0i64;
+    let listener = server.tcp_listen(80, 8).expect("listen");
+    let client_socket = client
+        .tcp_connect((CoreIpv4::new(B[0], B[1], B[2], B[3]), 80), None)
+        .expect("connect");
+    let mut server_socket = None;
+    for _ in 0..20_000 {
+        if let Ok(Some(socket)) = server.tcp_accept(listener) {
+            server_socket = Some(socket);
+            break;
+        }
+        now += 1;
+        client.poll(now);
+        server.poll(now);
     }
     let server_socket = server_socket.expect("accept");
     client.send(client_socket, b"x").expect("send");
     let mut buffer = [0u8; 8];
     for _ in 0..20_000 {
-        let _ = smol_step(&mut client, &mut server, &mut now);
+        now += 1;
+        client.poll(now);
+        server.poll(now);
         if let Ok(count) = server.recv(server_socket, &mut buffer)
             && count > 0
         {

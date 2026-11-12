@@ -44,9 +44,16 @@ impl<B: StackBackend> Core<B> {
         self.backend.enable_dhcp();
     }
 
-    /// Enable DHCP, or return [`Errno::EOPNOTSUPP`] when the backend has no DHCP client.
+    /// Enable DHCP, or return an error (`ENETUNREACH` without a hardware address,
+    /// `EOPNOTSUPP` from a backend with no client).
     pub fn try_enable_dhcp(&mut self) -> Result<(), Errno> {
         self.backend.try_enable_dhcp()
+    }
+
+    /// The DHCP lease in force, once one was acquired.
+    #[must_use]
+    pub fn dhcp_lease(&self) -> Option<crate::DhcpLease> {
+        self.backend.dhcp_lease()
     }
 
     /// Listen for TCP connections.
@@ -123,23 +130,12 @@ impl<B: StackBackend> Core<B> {
     }
 }
 
-#[cfg(feature = "backend-raven-tcpip")]
-impl<D: smoltcp::phy::Device> Core<crate::backend::raven::RavenTcpipBackend<D>> {
-    /// Create the native raven-tcpip-backed core.
+impl<D: raven_tcpip::Device> Core<crate::backend::raven::RavenTcpipBackend<D>> {
+    /// Create the native raven-tcpip-backed core with Ethernet address `mac`.
     #[must_use]
     pub fn new(device: D, mac: [u8; 6], now_ms: i64) -> Self {
         Self {
             backend: crate::backend::raven::RavenTcpipBackend::new(device, mac, now_ms),
-        }
-    }
-}
-
-impl<D: smoltcp::phy::Device> Core<crate::backend::smoltcp::SmoltcpBackend<D>> {
-    /// Create the smoltcp-backed core with Ethernet address `mac`.
-    #[must_use]
-    pub fn new(device: D, mac: [u8; 6], now_ms: i64) -> Self {
-        Self {
-            backend: crate::backend::smoltcp::SmoltcpBackend::new(device, mac, now_ms),
         }
     }
 }

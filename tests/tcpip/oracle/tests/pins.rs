@@ -173,10 +173,10 @@ fn lossy_transfer_ms(loss_percent: f32, reorder_percent: f32) -> i64 {
 
 /// C23-D01, re-classified. The recovery defect is fixed (selective retransmission, reordering
 /// tolerance with spurious-retransmit undo, RTT sampling). What remains of the gap to the
-/// smoltcp baseline at 1% loss is congestion control: the native stack reduces its window on
-/// every loss event, and the smoltcp configuration in `raven-netcore` has no congestion
-/// control, so it keeps a full 64 KiB window through the same losses. A loss-based sender
-/// at 20 ms RTT and 1% loss is bounded near 0.8 MiB/s (Mathis estimate); the pin keeps the
+/// frozen no-congestion-control reference at 1% loss is congestion control: the native stack
+/// reduces its window on every loss event, and that reference never did. Against smoltcp with
+/// its Reno controller (the fair baseline, 10181 ms) the native stack is about ten times
+/// faster. A loss-based sender at 20 ms RTT and 1% loss is bounded near 0.8 MiB/s (Mathis estimate); the pin keeps the
 /// native result in that range and far from the pre-C28 803 s.
 #[test]
 fn c23_d01_loss_goodput_is_in_the_congestion_controlled_range() {

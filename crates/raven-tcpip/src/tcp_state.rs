@@ -409,7 +409,7 @@ impl TcpConnection {
     }
 }
 
-struct Segment {
+struct Segment<'a> {
     seq: u32,
     ack: u32,
     flags: TcpFlags,
@@ -421,10 +421,10 @@ struct Segment {
     tsecr: Option<u32>,
     sack_permitted: bool,
     sack_blocks: Vec<(u32, u32)>,
-    payload: Vec<u8>,
+    payload: &'a [u8],
 }
 
-impl Segment {
+impl Segment<'_> {
     fn syn(&self) -> bool {
         self.flags.syn()
     }
@@ -453,6 +453,13 @@ impl<D: Device> Stack<D> {
             Kind::Listener { .. } => Ok(TcpState::Listen),
             _ => Err(Errno::ENOTSOCK),
         }
+    }
+
+    /// TIME-WAIT entries held and how many of them no longer have a socket record (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_time_wait_entries(&self) -> (usize, usize) {
+        self.timewait.entries_detached()
     }
 
     /// Half-open connections of a listener (host tests).
@@ -1077,7 +1084,7 @@ impl<D: Device> Stack<D> {
             tsecr,
             sack_permitted,
             sack_blocks,
-            payload: packet.payload().to_vec(),
+            payload: packet.payload(),
         };
         let source_port = packet.src_port();
         let destination_port = packet.dst_port();
@@ -1146,6 +1153,7 @@ impl<D: Device> Stack<D> {
             }
         }
 
+        self.absorb_detached();
         let exact =
             self.sockets
                 .find_connection(destination, destination_port, source, source_port);
@@ -1153,6 +1161,18 @@ impl<D: Device> Stack<D> {
             self.counters.in_segments = self.counters.in_segments.wrapping_add(1);
             self.tcp_input_established(socket, &segment, now);
             return;
+        }
+        let time_wait_key = crate::table::ConnectionKey {
+            local: destination,
+            local_port: destination_port,
+            remote: source,
+            remote_port: source_port,
+        };
+        if let Some(info) = self.timewait.get(&time_wait_key).and_then(|slot| slot.info) {
+            self.counters.in_segments = self.counters.in_segments.wrapping_add(1);
+            if self.detached_time_wait_input(&time_wait_key, info, &segment, now) {
+                return;
+            }
         }
         let listener = self.sockets.records.iter().find_map(|(raw_id, record)| {
             if record.closed {
@@ -1239,7 +1259,7 @@ impl<D: Device> Stack<D> {
         destination: IpAddr,
         source_port: u16,
         destination_port: u16,
-        segment: &Segment,
+        segment: &Segment<'_>,
         now: Instant,
     ) {
         if segment.rst() {
@@ -1368,7 +1388,7 @@ impl<D: Device> Stack<D> {
     }
 
     #[allow(unused_assignments)]
-    fn tcp_input_established(&mut self, socket: SocketId, segment: &Segment, now: Instant) {
+    fn tcp_input_established(&mut self, socket: SocketId, segment: &Segment<'_>, now: Instant) {
         let mut transition = None;
         let mut send_ack = false;
         let mut send_challenge = false;
@@ -1383,7 +1403,7 @@ impl<D: Device> Stack<D> {
         let mut pending_listener = None;
         let mut ack_advanced = None;
         let mut eifel_distance: Option<u32> = None;
-        let mut incoming: Option<(u32, Vec<u8>)> = None;
+        let mut incoming: Option<(u32, &[u8])> = None;
         let mut fin_after_data = false;
         let mut fast_retransmit = false;
         {
@@ -1591,7 +1611,7 @@ impl<D: Device> Stack<D> {
                                 .rcv_nxt
                                 .wrapping_add(u32::from(connection.rcv_wnd));
                             if !seq_ge(segment.seq, right) {
-                                incoming = Some((segment.seq, segment.payload.clone()));
+                                incoming = Some((segment.seq, segment.payload));
                             } else {
                                 self.counters.past_window_drops =
                                     self.counters.past_window_drops.wrapping_add(1);
@@ -1699,7 +1719,7 @@ impl<D: Device> Stack<D> {
                             break 'transition;
                         }
                         if !segment.payload.is_empty() {
-                            incoming = Some((segment.seq, segment.payload.clone()));
+                            incoming = Some((segment.seq, segment.payload));
                         }
                         if segment.ack == connection.snd_nxt {
                             connection.fin_acked = true;
@@ -1741,7 +1761,7 @@ impl<D: Device> Stack<D> {
                             break 'transition;
                         }
                         if !segment.payload.is_empty() {
-                            incoming = Some((segment.seq, segment.payload.clone()));
+                            incoming = Some((segment.seq, segment.payload));
                         }
                         if segment.fin() && segment.seq == connection.rcv_nxt {
                             connection.rcv_nxt = connection.rcv_nxt.wrapping_add(1);
@@ -1770,7 +1790,7 @@ impl<D: Device> Stack<D> {
                             break 'transition;
                         }
                         if !segment.payload.is_empty() {
-                            incoming = Some((segment.seq, segment.payload.clone()));
+                            incoming = Some((segment.seq, segment.payload));
                         }
                         if segment.fin() {
                             send_ack = true;
@@ -1960,7 +1980,7 @@ impl<D: Device> Stack<D> {
             }
         }
         if let Some((seq, data)) = incoming {
-            self.tcp_deliver_data(socket, seq, &data, now);
+            self.tcp_deliver_data(socket, seq, data, now);
         }
         if fin_after_data {
             if let Ok(record) = self.sockets.record_mut(socket)
@@ -2067,7 +2087,7 @@ impl<D: Device> Stack<D> {
         destination: IpAddr,
         source_port: u16,
         destination_port: u16,
-        segment: &Segment,
+        segment: &Segment<'_>,
     ) {
         let iss = segment.ack.wrapping_sub(1);
         let mut connection = TcpConnection::new_passive(
@@ -2231,19 +2251,101 @@ impl<D: Device> Stack<D> {
         }) else {
             return;
         };
-        for raw in self.timewait.insert(key, socket.0, deadline) {
-            if raw == socket.0 {
+        let slot = crate::table::TimeWaitSlot {
+            socket: socket.0,
+            info: None,
+        };
+        let recycled = self.timewait.insert(key, slot, deadline);
+        self.close_recycled(socket.0, &recycled);
+    }
+
+    /// Close the records of TIME-WAIT entries that were recycled to make room.
+    fn close_recycled(&mut self, keep: u32, recycled: &[crate::table::TimeWaitSlot]) {
+        for slot in recycled {
+            self.counters.timewait_recycled = self.counters.timewait_recycled.wrapping_add(1);
+            if slot.info.is_some() || slot.socket == keep {
                 continue;
             }
-            if let Some(record) = self.sockets.records.get_mut(&raw)
+            if let Some(record) = self.sockets.records.get_mut(&slot.socket)
                 && let Kind::Tcp(connection) = &mut record.kind
                 && connection.state == TcpState::TimeWait
             {
                 connection.state = TcpState::Closed;
                 record.closed = true;
-                self.counters.timewait_recycled = self.counters.timewait_recycled.wrapping_add(1);
             }
         }
+    }
+
+    /// Take in TIME-WAIT connections whose socket records were reclaimed.
+    pub(crate) fn absorb_detached(&mut self) {
+        for (key, info, deadline) in self.sockets.take_detached() {
+            let slot = crate::table::TimeWaitSlot {
+                socket: 0,
+                info: Some(info),
+            };
+            let recycled = self.timewait.insert(key, slot, deadline);
+            self.close_recycled(0, &recycled);
+        }
+    }
+
+    /// Answer a segment for a TIME-WAIT connection whose record is gone.
+    ///
+    /// Returns true when the segment was consumed; false when it is a new incarnation (a SYN
+    /// beyond the old receive sequence) that must be treated as a fresh connection attempt.
+    fn detached_time_wait_input(
+        &mut self,
+        key: &crate::table::ConnectionKey,
+        info: crate::table::TimeWaitInfo,
+        segment: &Segment<'_>,
+        now: Instant,
+    ) -> bool {
+        if segment.rst() {
+            self.counters.timewait_rst_ignored = self.counters.timewait_rst_ignored.wrapping_add(1);
+            return true;
+        }
+        if segment.syn() {
+            if seq_gt(segment.seq, info.irs) {
+                self.timewait.remove(key);
+                return false;
+            }
+            self.counters.timewait_syn_drops = self.counters.timewait_syn_drops.wrapping_add(1);
+            return true;
+        }
+        if !segment.payload.is_empty() {
+            self.counters.data_after_fin = self.counters.data_after_fin.wrapping_add(1);
+            self.counters.timewait_data_drops = self.counters.timewait_data_drops.wrapping_add(1);
+        }
+        if segment.fin() {
+            let deadline = now.as_millis().saturating_add(
+                i64::try_from(self.tunables.time_wait_interval).unwrap_or(i64::MAX),
+            );
+            let slot = crate::table::TimeWaitSlot {
+                socket: 0,
+                info: Some(info),
+            };
+            let recycled = self.timewait.insert(*key, slot, deadline);
+            self.close_recycled(0, &recycled);
+        }
+        if info.timestamps {
+            let mut options = Vec::with_capacity(10);
+            options.extend_from_slice(&[8, 10]);
+            options.extend_from_slice(&u32::try_from(now.as_millis()).unwrap_or(0).to_be_bytes());
+            options.extend_from_slice(&info.ts_recent.to_be_bytes());
+            self.option_override = Some(options);
+        }
+        let _ = self.send_tcp_packet(
+            key.local,
+            key.remote,
+            key.local_port,
+            key.remote_port,
+            TcpFlags::ACK,
+            info.snd_nxt,
+            info.rcv_nxt,
+            info.window,
+            &[],
+            false,
+        );
+        true
     }
 
     fn send_syn(&mut self, socket: SocketId) -> Result<(), Errno> {
@@ -2531,6 +2633,33 @@ impl<D: Device> Stack<D> {
             option_bytes.extend_from_slice(&vec![0u8; mac_len]);
         }
         let padded_options = (option_bytes.len() + 3) & !3;
+        #[allow(unused_mut)]
+        let mut signed = false;
+        #[cfg(feature = "tcp-md5")]
+        {
+            signed |= md5_key.is_some();
+        }
+        #[cfg(feature = "tcp-ao")]
+        {
+            signed |= ao_key.is_some();
+        }
+        if !signed
+            && padded_options <= 40
+            && let (IpAddr::V4(local_v4), IpAddr::V4(remote_v4)) = (local, remote)
+        {
+            let context = ChecksumContext::ipv4(to_wire4(local_v4), to_wire4(remote_v4));
+            let length = 20 + padded_options + payload.len();
+            let result = self.send_ipv4_built(length, remote_v4, 6, &mut |region| {
+                region[..20 + padded_options].fill(0);
+                if let Ok(mut builder) =
+                    TcpBuilder::new(region, context, &header, &option_bytes, payload.len())
+                {
+                    builder.payload_mut().copy_from_slice(payload);
+                    builder.finish();
+                }
+            });
+            return self.account_tcp_send(result, flags);
+        }
         let mut segment = vec![0u8; 20 + padded_options + payload.len()];
         let context = match (local, remote) {
             (IpAddr::V4(local), IpAddr::V4(remote)) => {
@@ -2604,6 +2733,15 @@ impl<D: Device> Stack<D> {
             IpAddr::V4(destination) => self.send_ipv4(&segment, destination, 6),
             IpAddr::V6(destination) => self.send_ipv6(&segment, destination, 6),
         };
+        self.account_tcp_send(result, flags)
+    }
+
+    /// Count a transmitted (or failed) TCP segment and pass the result through.
+    fn account_tcp_send(
+        &mut self,
+        result: Result<(), Errno>,
+        flags: TcpFlags,
+    ) -> Result<(), Errno> {
         if result.is_ok() {
             self.counters.out_segments = self.counters.out_segments.wrapping_add(1);
             if flags.rst() {
@@ -2759,7 +2897,12 @@ impl<D: Device> Stack<D> {
     }
 
     pub(crate) fn process_tcp_timers(&mut self, now: Instant) {
-        self.timewait.expire_values(now.as_millis());
+        self.absorb_detached();
+        for (key, slot) in self.timewait.expire_entries(now.as_millis()) {
+            if slot.info.is_some() {
+                self.ports.release(key.local_port);
+            }
+        }
         let sockets: Vec<SocketId> = self
             .sockets
             .records
@@ -3190,7 +3333,7 @@ fn our_mss(remote: IpAddr, caps: crate::DeviceCaps, default: u16) -> u16 {
         .max(536)
 }
 
-fn apply_syn_options(connection: &mut TcpConnection, segment: &Segment, now: Instant) {
+fn apply_syn_options(connection: &mut TcpConnection, segment: &Segment<'_>, now: Instant) {
     if let Some(mss) = segment.mss {
         let clamped = mss.clamp(connection.mss_floor, connection.our_mss);
         if clamped != mss {

@@ -10,15 +10,6 @@
 use crate::ipv4::Ipv4Addr;
 use crate::ipv6::Ipv6Addr;
 
-/// Add one 16-bit word to a folded one's-complement sum.
-fn add_word(mut sum: u32, word: u16) -> u32 {
-    sum += u32::from(word);
-    while sum > 0xffff {
-        sum = (sum & 0xffff) + (sum >> 16);
-    }
-    sum
-}
-
 /// Fold a 32-bit accumulator down to 16 bits.
 fn fold(mut sum: u32) -> u16 {
     while sum > 0xffff {
@@ -28,39 +19,73 @@ fn fold(mut sum: u32) -> u16 {
     u16::try_from(sum).unwrap_or(0xffff)
 }
 
+/// Add `value` to a 64-bit one's-complement accumulator (end-around carry).
+fn add_carry(sum: u64, value: u64) -> u64 {
+    let (total, carry) = sum.overflowing_add(value);
+    total + u64::from(carry)
+}
+
+/// Accumulate an even-length slice as native-endian 16-bit words, eight bytes at a time.
+///
+/// One's-complement addition does not depend on byte order (RFC 1071 section 2(B)), so the
+/// words are loaded as the CPU stores them and the folded result is swapped once at the end.
+fn accumulate(bytes: &[u8], mut sum: u64) -> u64 {
+    let mut chunks = bytes.chunks_exact(8);
+    for chunk in &mut chunks {
+        if let Ok(word) = <[u8; 8]>::try_from(chunk) {
+            sum = add_carry(sum, u64::from_ne_bytes(word));
+        }
+    }
+    let tail = chunks.remainder();
+    if !tail.is_empty() {
+        let mut padded = [0u8; 8];
+        padded[..tail.len()].copy_from_slice(tail);
+        sum = add_carry(sum, u64::from_ne_bytes(padded));
+    }
+    sum
+}
+
+/// Fold a 64-bit one's-complement accumulator down to 16 bits.
+fn fold_wide(mut sum: u64) -> u16 {
+    while sum > 0xffff {
+        sum = (sum & 0xffff) + (sum >> 16);
+    }
+    u16::try_from(sum).unwrap_or(0xffff)
+}
+
 /// Compute the internet checksum of the concatenation of `parts`.
 ///
 /// The result is the value a sender writes into the checksum field. To verify a received
 /// packet, pass every slice including the checksum field; a valid packet yields zero.
 #[must_use]
 pub fn internet_checksum(parts: &[&[u8]]) -> u16 {
-    let mut sum: u32 = 0;
+    let mut sum: u64 = 0;
     let mut pending: Option<u8> = None;
 
     for part in parts {
-        let mut octets = part.iter().copied();
+        let mut rest: &[u8] = part;
         if let Some(high) = pending.take() {
-            match octets.next() {
-                Some(low) => sum = add_word(sum, u16::from_be_bytes([high, low])),
+            match rest.split_first() {
+                Some((&low, tail)) => {
+                    sum = add_carry(sum, u64::from(u16::from_ne_bytes([high, low])));
+                    rest = tail;
+                }
                 None => {
                     pending = Some(high);
                     continue;
                 }
             }
         }
-        while let Some(high) = octets.next() {
-            let Some(low) = octets.next() else {
-                pending = Some(high);
-                break;
-            };
-            sum = add_word(sum, u16::from_be_bytes([high, low]));
-        }
+        let (body, tail) = rest.split_at(rest.len() & !1);
+        sum = accumulate(body, sum);
+        pending = tail.first().copied();
     }
 
     if let Some(high) = pending {
-        sum = add_word(sum, u16::from_be_bytes([high, 0]));
+        sum = add_carry(sum, u64::from(u16::from_ne_bytes([high, 0])));
     }
-    !fold(sum)
+    let network_order = u16::from_be_bytes(fold_wide(sum).to_ne_bytes());
+    !network_order
 }
 
 /// Incrementally update a checksum after one 16-bit word changed (RFC 1624).
