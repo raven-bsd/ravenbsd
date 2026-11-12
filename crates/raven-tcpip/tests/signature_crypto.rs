@@ -364,3 +364,25 @@ fn hmac_sha1_key_id_sized_keys_are_supported() {
     let key = [0x55u8; 64];
     assert_eq!(hmac_sha1(&key, b"payload").len(), 20);
 }
+
+#[test]
+fn ao_signed_data_reaches_the_peer() {
+    let (_link, mut a, mut b) = pair();
+    let (sa, sb) = handshake(&mut a, &mut b);
+    let keys = [AoKey {
+        key_id: 3,
+        algorithm: AoAlgorithm::HmacSha1,
+        key: b"ao-key".to_vec(),
+    }];
+    a.set_ao_keys(sa, &keys).expect("a keys");
+    b.set_ao_keys(sb, &keys).expect("b keys");
+    a.send(sa, b"ao").expect("send");
+    for time in 210..700 {
+        let now = Instant::from_millis(time);
+        a.poll(now);
+        b.poll(now);
+    }
+    let mut buffer = [0u8; 8];
+    assert_eq!(b.recv(sb, &mut buffer).expect("recv"), 2);
+    assert_eq!(&buffer[..2], b"ao");
+}

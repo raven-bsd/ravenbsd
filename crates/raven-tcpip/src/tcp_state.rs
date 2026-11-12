@@ -2055,6 +2055,29 @@ fn ack_window_ok(connection: &TcpConnection, ack: u32) -> bool {
 }
 
 #[cfg(any(feature = "tcp-md5", feature = "tcp-ao"))]
+#[allow(dead_code)]
+fn find_option(segment: &[u8], kind: u8) -> Option<usize> {
+    let header_len = usize::from(*segment.get(12)? >> 4) * 4;
+    let mut offset = 20;
+    while offset + 2 <= header_len && offset + 2 <= segment.len() {
+        let option = *segment.get(offset)?;
+        if option == 0 || option == 1 {
+            offset += 1;
+            continue;
+        }
+        let length = usize::from(*segment.get(offset + 1)?);
+        if length < 2 {
+            return None;
+        }
+        if option == kind {
+            return Some(offset);
+        }
+        offset += length;
+    }
+    None
+}
+
+#[cfg(any(feature = "tcp-md5", feature = "tcp-ao"))]
 fn signature_pseudo(local: IpAddr, remote: IpAddr, length: usize) -> Vec<u8> {
     match (local, remote) {
         (IpAddr::V4(local), IpAddr::V4(remote)) => raven_tcpip_wire::checksum::pseudo_header_v4(
