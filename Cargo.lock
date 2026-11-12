@@ -345,6 +345,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-b47-plat"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-plat",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-b47a-ipc"
 version = "0.1.0"
 dependencies = [
@@ -650,14 +661,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "raven-k33-rootfs-probe"
-version = "0.1.0"
-dependencies = [
- "raven-abi",
- "raven-rt",
-]
-
-[[package]]
 name = "raven-k15-mkdisk"
 version = "0.1.0"
 dependencies = [
@@ -673,6 +676,14 @@ dependencies = [
  "raven-rt",
  "raven-scheme",
  "virtio-blk",
+]
+
+[[package]]
+name = "raven-k33-rootfs-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
 ]
 
 [[package]]
@@ -890,6 +901,25 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-proto-dev",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-plat"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
+
+[[package]]
+name = "raven-platd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-driver",
+ "raven-plat",
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",

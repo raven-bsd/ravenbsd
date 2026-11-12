@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "platd"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/b47-plat/build.sh"]
+initfs = "build/fixtures/b47-plat/initfs.img"
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^platd: ready backend=fake$'
+
+[[expect]]
+regex = '^b47-plat: model=0x00002711$'
+
+[[expect]]
+regex = '^b47-plat: revision=0x00c03114$'
+
+[[expect]]
+regex = '^b47-plat: serial=0x0000000012345678$'
+
+[[expect]]
+regex = '^b47-plat: mac=02:00:00:00:00:01$'
+
+[[expect]]
+regex = '^b47-plat: clock12=50000000$'
+
+[[expect]]
+regex = '^b47-plat: power0=1$'
+
+[[expect]]
+regex = '^platd: claim pin=17$'
+
+[[expect]]
+regex = '^b47-plat: gpio claim ok$'
+
+[[expect]]
+regex = '^platd: conflict pin=17$'
+
+[[expect]]
+regex = '^b47-plat: gpio conflict ok$'
+
+[[expect]]
+regex = '^b47-plat: gpio config ok$'
+
+[[expect]]
+regex = '^platd: release pin=17$'
+
+[[expect]]
+regex = '^b47-plat: gpio release ok$'
+
+[[expect]]
+regex = '^b47-plat: rng=[0-9a-f]{16}$'
+
+[[expect]]
+regex = '^b47-plat: client claimed$'
+
+[[expect]]
+regex = '^platd: release pin=27$'
+
+[[expect]]
+regex = '^b47-plat: reclaim ok$'
+
+[[expect]]
+regex = '^b47-plat: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

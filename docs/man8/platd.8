@@ -1,0 +1,62 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt PLATD 8
+.Os RavenBSD
+.Sh NAME
+.Nm platd
+.Nd RavenBSD Raspberry Pi 4 platform server
+.Sh SYNOPSIS
+.Nm
+.Op Ar fake
+.Op Ar mailbox=handle:length gpio=handle:length rng=handle:length dma=handle:length
+.Sh DESCRIPTION
+.Nm
+owns the Raspberry Pi 4 VideoCore mailbox, the GPIO/pinmux arbiter and the RNG200, and registers
+the
+.Dq plat:
+scheme. It is the single owner of those platform resources so the EMMC2, GENET and audio
+servers do not program the same registers.
+.Pp
+The mailbox property channel is bounded (16-byte aligned property buffers, tag and response-code
+validation, and a finite full/empty poll). The tag set includes board model, revision, serial,
+MAC, clock rate and power state.
+.Pp
+Opening
+.Dq plat:gpio/<pin>
+claims the pin with the open-file description as the lease. A second claim returns
+.Dv EBUSY .
+The descriptor is released by
+.Xr close 2 ,
+and the kernel delivers a CLOSE notification when the owning client dies, so the server reclaims
+the pin. A CALL on the lease selects the pin function, pull and level.
+.Pp
+The
+.Dq plat:rng
+descriptor returns at most 256 bytes per read. The RNG200 status bits are checked before each
+FIFO read; an empty FIFO returns
+.Dv EAGAIN
+instead of blocking the server loop.
+.Pp
+With the
+.Ar fake
+argument the deterministic fake backend is used; this is the QEMU test path. Otherwise the
+supervisor must transfer the platform MMIO and DMA capabilities and pass their numeric handles.
+.Nm
+never maps a physical address itself and never requests
+.Dv ADMIN .
+.Sh FILES
+.Bl -tag -width /etc/services.d/platd.toml -compact
+.It Pa /etc/services.d/platd.toml
+Service manifest.
+.It Pa profiles/platd.toml
+Build profile.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr devd 8 ,
+.Xr init 8 ,
+.Xr randd 8
+.Sh STANDARDS
+RavenBSD.

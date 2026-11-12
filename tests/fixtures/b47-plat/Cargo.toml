@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-b47-plat"
+version = "0.1.0"
+description = "B47b platd fixture: board/clock/power/MAC, GPIO arbitration, RNG and client death."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "raven-b47-plat-init"
+path = "src/bin/init.rs"
+
+[[bin]]
+name = "raven-b47-plat-client"
+path = "src/bin/client.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-initfs = { path = "../../../crates/raven-initfs" }
+raven-plat = { path = "../../../crates/raven-plat" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc"] }
+raven-scheme = { path = "../../../crates/raven-scheme" }
+
+[lints]
+workspace = true
