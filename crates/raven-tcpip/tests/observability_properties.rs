@@ -153,15 +153,33 @@ fn connection_max_refuses_the_extra_connection() {
 fn timewait_max_recycles_the_oldest_entry() {
     let (_link, mut a, mut b) = pair();
     set(&mut a, "tcp.timewait_max", 1);
-    let (socket, peer) = handshake(&mut a, &mut b);
-    a.shutdown_write(socket).expect("fin a");
-    pump_ms(&mut a, &mut b, 210, 400);
-    b.shutdown_write(peer).expect("fin b");
-    pump_ms(&mut a, &mut b, 410, 700);
-    assert_eq!(a.tcp_state(socket), Ok(TcpState::TimeWait));
-    set(&mut a, "tcp.timewait_max", 1);
-    let sockets_before = a.sockets().count();
-    assert!(sockets_before >= 1);
+    b.tcp_listen(80, 8).expect("listen");
+    let first = a
+        .tcp_connect((IpAddr::V4(address(B)), 80), Some(40_000))
+        .expect("first");
+    pump_ms(&mut a, &mut b, 0, 200);
+    let second = a
+        .tcp_connect((IpAddr::V4(address(B)), 80), Some(40_001))
+        .expect("second");
+    pump_ms(&mut a, &mut b, 210, 450);
+    let peer_first = b
+        .tcp_accept(raven_tcpip::SocketId(1))
+        .expect("accept")
+        .expect("first peer");
+    let peer_second = b
+        .tcp_accept(raven_tcpip::SocketId(1))
+        .expect("accept")
+        .expect("second peer");
+    a.shutdown_write(first).expect("fin first");
+    pump_ms(&mut a, &mut b, 460, 650);
+    b.shutdown_write(peer_first).expect("fin peer first");
+    pump_ms(&mut a, &mut b, 660, 900);
+    assert_eq!(a.tcp_state(first), Ok(TcpState::TimeWait));
+    a.shutdown_write(second).expect("fin second");
+    pump_ms(&mut a, &mut b, 910, 1100);
+    b.shutdown_write(peer_second).expect("fin peer second");
+    pump_ms(&mut a, &mut b, 1110, 1400);
+    assert!(a.counters().timewait_recycled >= 1);
 }
 
 #[test]
@@ -792,4 +810,58 @@ impl raven_tcpip::Device for ZeroMtuDevice {
     ) -> Result<(), raven_tcpip::TxError> {
         Ok(())
     }
+}
+
+#[test]
+fn sack_ranges_max_caps_receiver_blocks() {
+    let (link, mut a, mut b) = pair();
+    set(&mut b, "tcp.sack_ranges_max", 1);
+    let (_socket, peer) = handshake(&mut a, &mut b);
+    let rcv_nxt = b.test_tcp_rcv_nxt(peer).expect("rcv_nxt");
+    let ack = b.test_tcp_window(peer).expect("window").2;
+    let start = link.trace().entries().len();
+    for index in 0..4u32 {
+        inject_segment(
+            &mut b,
+            A,
+            B,
+            40_000,
+            80,
+            rcv_nxt.wrapping_add(100 + index * 10),
+            ack,
+            TcpFlags::ACK,
+            b"h",
+        );
+    }
+    b.poll(Instant::from_millis(300));
+    let counts = common::trace_sack_blocks(&link, start);
+    assert!(!counts.is_empty(), "no SACK blocks emitted");
+    assert!(counts.iter().all(|count| *count <= 1), "counts {counts:?}");
+}
+
+#[test]
+fn challenge_ack_global_interval_refills_the_bucket() {
+    let (_link, mut a, mut b) = pair();
+    set(&mut a, "tcp.challenge_ack_burst", 100);
+    set(&mut a, "tcp.challenge_ack_global_burst", 1);
+    set(&mut a, "tcp.challenge_ack_global_interval", 100);
+    let (socket, _peer) = handshake(&mut a, &mut b);
+    let seq = a.test_tcp_rcv_nxt(socket).expect("seq");
+    inject_segment(&mut a, B, A, 80, 40_000, seq, 0, TcpFlags::SYN, &[]);
+    inject_segment(&mut a, B, A, 80, 40_000, seq, 0, TcpFlags::SYN, &[]);
+    assert_eq!(a.counters().challenge_ack_suppressed, 1);
+    inject_segment_at(
+        &mut a,
+        B,
+        A,
+        80,
+        40_000,
+        seq,
+        0,
+        TcpFlags::SYN,
+        &[],
+        &[],
+        Instant::from_millis(500),
+    );
+    assert_eq!(a.counters().challenge_acks_sent, 2);
 }

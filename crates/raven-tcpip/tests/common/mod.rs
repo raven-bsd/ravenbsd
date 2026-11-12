@@ -526,3 +526,31 @@ pub fn inject_segment_window(
     builder.finish();
     stack.test_inject_frame(&frame, Instant::ZERO);
 }
+
+pub fn trace_sack_blocks(link: &Link, start: usize) -> Vec<usize> {
+    let mut counts = Vec::new();
+    for entry in link.trace().entries().iter().skip(start) {
+        let Ok(ethernet) = EthernetFrame::parse(&entry.bytes) else {
+            continue;
+        };
+        if ethernet.ether_type() != EtherType::Ipv4 {
+            continue;
+        }
+        let Ok(ipv4) = Ipv4Packet::parse(ethernet.payload()) else {
+            continue;
+        };
+        if ipv4.protocol() != 6 {
+            continue;
+        }
+        let context = ChecksumContext::ipv4(ipv4.src(), ipv4.dst());
+        let Ok(tcp) = TcpPacket::parse(ipv4.payload(), context) else {
+            continue;
+        };
+        for option in tcp.options().flatten() {
+            if let TcpOption::Sack(blocks) = option {
+                counts.push(blocks.count());
+            }
+        }
+    }
+    counts
+}
