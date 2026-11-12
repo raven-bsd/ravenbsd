@@ -187,6 +187,8 @@ pub struct Stack<D: Device> {
     pub(crate) delivered: Vec<(u8, Vec<u8>)>,
     #[cfg(any(test, feature = "testutil"))]
     pub(crate) tcp_debug: Vec<(u16, u16, u8, u32, u32)>,
+    #[allow(dead_code)] // Read by the testutil urgent-segment hook.
+    pub(crate) tcp_urgent_seen: usize,
     #[cfg(any(test, feature = "testutil"))]
     pub(crate) trace: Vec<Vec<u8>>,
     #[cfg(any(test, feature = "testutil"))]
@@ -252,6 +254,7 @@ impl<D: Device> Stack<D> {
             delivered: Vec::new(),
             #[cfg(any(test, feature = "testutil"))]
             tcp_debug: Vec::new(),
+            tcp_urgent_seen: 0,
             #[cfg(any(test, feature = "testutil"))]
             trace: Vec::new(),
             #[cfg(any(test, feature = "testutil"))]
