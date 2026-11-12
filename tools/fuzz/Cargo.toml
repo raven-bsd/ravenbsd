@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-fuzz"
+version = "0.1.0"
+description = "Deterministic host-side fuzz driver for the S20 targets."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raven-fuzz-model = { path = "../../crates/raven-fuzz-model" }
+
+[lints]
+workspace = true

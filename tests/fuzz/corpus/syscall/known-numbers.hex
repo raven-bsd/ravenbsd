@@ -1,0 +1,12 @@
+# S20 corpus: syscall numbering and errno returns.
+# Eight bytes per word, little endian.
+0100000000000000   # EXIT
+0700000000000000   # DEBUG_READ
+3200000000000000   # PROC_TERMINATE
+ff00000000000000   # not a syscall
+0001000000000000   # 0x100, not a syscall
+0000000000000000   # zero is not a syscall
+fbffffffffffffff   # -5 (a return value, not a number)
+00000000           # i32 zero: Ok(0)
+fbffffffffffffff   # i32 -5: EIO
+f1ffffffffffffff   # i32 -15: ENOTBLK

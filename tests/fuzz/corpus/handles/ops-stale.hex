@@ -1,0 +1,13 @@
+# S20 corpus: insert/close cycles so stale handles and retired generations are exercised.
+00 01
+03 00000000
+00 01
+03 00000001
+00 01
+03 00000002
+01 00000000 00      # stale handle 0 after three reuses
+01 00000001 00      # stale handle 1
+00 02
+02 00000003 02      # dup the fourth handle with exactly its rights
+03 00000003
+02 00000003 02      # dup after close

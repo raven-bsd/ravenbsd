@@ -1,0 +1,13 @@
+# S20 corpus: an ELF header claiming 65535 program headers at offset 64.
+# The parser must reject it instead of reading past the image.
+7f454c46020101000000000000000000
+02003e0001000000
+0000400000000000
+4000000000000000
+0000000000000000
+00000000
+40003800
+ffff
+0000
+0000
+0000

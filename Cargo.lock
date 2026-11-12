@@ -508,6 +508,31 @@ name = "raven-frames"
 version = "0.1.0"
 
 [[package]]
+name = "raven-fuzz"
+version = "0.1.0"
+dependencies = [
+ "raven-fuzz-model",
+]
+
+[[package]]
+name = "raven-fuzz-model"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-elf",
+ "raven-handles",
+ "raven-ipc",
+ "raven-usercopy",
+]
+
+[[package]]
+name = "raven-fuzz-replay"
+version = "0.1.0"
+dependencies = [
+ "raven-fuzz-model",
+]
+
+[[package]]
 name = "raven-handles"
 version = "0.1.0"
 dependencies = [
