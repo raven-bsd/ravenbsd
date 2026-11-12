@@ -650,14 +650,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "raven-k33-rootfs-probe"
-version = "0.1.0"
-dependencies = [
- "raven-abi",
- "raven-rt",
-]
-
-[[package]]
 name = "raven-k15-mkdisk"
 version = "0.1.0"
 dependencies = [
@@ -673,6 +665,14 @@ dependencies = [
  "raven-rt",
  "raven-scheme",
  "virtio-blk",
+]
+
+[[package]]
+name = "raven-k33-rootfs-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
 ]
 
 [[package]]
@@ -1259,6 +1259,16 @@ dependencies = [
  "raven-abi",
  "raven-initfs",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-s39-parity"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]

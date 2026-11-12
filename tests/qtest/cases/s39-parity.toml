@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "s39-parity"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/s39-parity/build.sh"]
+initfs = "build/fixtures/s39-parity/initfs.img"
+boot_cmdline = "console=ttyAMA0 test-exit=1 s39-eventcheck"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^s39: svcd svc: ok$'
+
+[[expect]]
+regex = '^s39: namespace syscall ok$'
+
+[[expect]]
+regex = '^s39: prefix granted$'
+
+[[expect]]
+regex = '^s39: server registered$'
+
+[[expect]]
+regex = '^s39: server ready$'
+
+# The client lines are unordered: the client can reach the server as soon as it registers,
+# before the controller finishes its own control open.
+[[expect]]
+regex = '^s39: namespace denied ok$'
+unordered = true
+
+[[expect]]
+regex = '^s39: prefix open ok$'
+unordered = true
+
+[[expect]]
+regex = '^s39: client event registered$'
+unordered = true
+
+[[expect]]
+regex = '^s39: client ready$'
+unordered = true
+
+[[expect]]
+regex = '^s39: client armed$'
+
+# The dying client had one event registration in one queue; the exit hook cleared it and left
+# no registration behind. The waiter count depends on whether the client reached EVQ_WAIT
+# before the controller's terminate, so only its form is asserted.
+[[expect]]
+regex = '^s39: exit pid=\d+ events=1 cleared=1 total=0 waiters=\d+$'
+
+[[expect]]
+regex = '^s39: client killed$'
+
+[[expect]]
+regex = '^s39: server survives$'
+
+[[expect]]
+regex = '^s39: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|s39: failed'

@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-s39-parity"
+version = "0.1.0"
+description = "S39 aarch64 parity fixture: svcd, namespace prefix and event cleanup."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[lib]
+name = "raven_s39_parity"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raven-s39-init"
+path = "src/bin/init.rs"
+
+[[bin]]
+name = "raven-s39-server"
+path = "src/bin/server.rs"
+
+[[bin]]
+name = "raven-s39-client"
+path = "src/bin/client.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-initfs = { path = "../../../crates/raven-initfs" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc"] }
+raven-scheme = { path = "../../../crates/raven-scheme" }
+
+[lints]
+workspace = true
