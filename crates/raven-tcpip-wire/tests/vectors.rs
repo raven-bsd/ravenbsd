@@ -379,11 +379,25 @@ fn find_case(name: &str) -> &'static Case {
 // Case runner
 // ---------------------------------------------------------------------------------------------
 
+/// The TOML row for `tcp-bad-data-offset-high` carries 60 octets with a
+/// well-formed 60-byte header and a valid checksum, while `headers.md` line 186
+/// pins the intended case as “a data offset of 15 with only 20 bytes”. Use the
+/// documented 20-byte form so the case exercises `tcp.data_offset`; the parser
+/// itself must keep accepting legal 60-byte headers.
+fn vector_bytes(case: &Case) -> &[u8] {
+    if case.name == "tcp-bad-data-offset-high" && case.bytes.len() == 60 {
+        &case.bytes[..20]
+    } else {
+        &case.bytes
+    }
+}
+
 fn run_case(name: &str) {
     let case = find_case(name);
     let context = context_for(case);
+    let bytes = vector_bytes(case);
     if let Some(expected_tag) = &case.reject {
-        let outcome = parse_outcome(case, &case.bytes, context);
+        let outcome = parse_outcome(case, bytes, context);
         let error = match outcome {
             Ok(()) => panic!("case `{name}` parsed successfully, expected `{expected_tag}`"),
             Err(error) => error,
@@ -401,18 +415,36 @@ fn run_case(name: &str) {
         .as_ref()
         .expect("valid case has an expect table");
     match case.proto.as_str() {
-        "ipv4" => check_ipv4(&Ipv4Packet::parse(&case.bytes).expect(name), expect),
-        "ipv6" => check_ipv6(&Ipv6Packet::parse(&case.bytes).expect(name), expect),
-        "tcp" => check_tcp(&TcpPacket::parse(&case.bytes, context).expect(name), expect),
-        "udp" => check_udp(&UdpPacket::parse(&case.bytes, context).expect(name), expect),
-        "icmp" => check_icmpv4(&Icmpv4Packet::parse(&case.bytes).expect(name), expect),
-        "icmpv6" => check_icmpv6(
-            &Icmpv6Packet::parse(&case.bytes, context).expect(name),
-            expect,
-        ),
-        "arp" => check_arp(&ArpPacket::parse(&case.bytes).expect(name), expect),
+        "ipv4" => check_ipv4(&Ipv4Packet::parse(bytes).expect(name), expect),
+        "ipv6" => check_ipv6(&Ipv6Packet::parse(bytes).expect(name), expect),
+        "tcp" => check_tcp(&TcpPacket::parse(bytes, context).expect(name), expect),
+        "udp" => check_udp(&UdpPacket::parse(bytes, context).expect(name), expect),
+        "icmp" => check_icmpv4(&Icmpv4Packet::parse(bytes).expect(name), expect),
+        "icmpv6" => check_icmpv6(&Icmpv6Packet::parse(bytes, context).expect(name), expect),
+        "arp" => check_arp(&ArpPacket::parse(bytes).expect(name), expect),
         other => panic!("unknown proto `{other}` in case `{name}`"),
     }
+}
+
+#[test]
+fn high_data_offset_vector_uses_the_documented_20_byte_form() {
+    let case = find_case("tcp-bad-data-offset-high");
+    assert_eq!(case.bytes.len(), 60, "the TOML row is the 60-byte variant");
+    let bytes = vector_bytes(case);
+    assert_eq!(bytes.len(), 20);
+    let error = parse_outcome(case, bytes, context_for(case))
+        .expect_err("20 bytes with data offset 15 must reject");
+    assert_eq!(error.tag(), "tcp.data_offset");
+}
+
+#[test]
+fn a_legal_60_byte_tcp_header_is_accepted() {
+    let case = find_case("tcp-bad-data-offset-high");
+    let parsed = TcpPacket::parse(&case.bytes, context_for(case))
+        .expect("a 60-byte header that fits and checksums is legal");
+    assert_eq!(parsed.data_offset(), 15);
+    assert_eq!(parsed.header_len(), 60);
+    assert_eq!(parsed.payload_len(), 0);
 }
 
 fn parse_outcome(case: &Case, bytes: &[u8], context: ChecksumContext) -> Result<(), ParseError> {
