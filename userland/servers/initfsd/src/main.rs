@@ -12,42 +12,40 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
-    use alloc::collections::BTreeMap;
     use alloc::string::{String, ToString};
     use alloc::vec::Vec;
 
     use raven_abi::errno::Errno;
     use raven_initfs::Initfs;
     use raven_initfsd::model::{FileEntry, Model, NodeRef};
-    use raven_proto_fs::{Call, CallRequest, CallResponse, Stat, StatFs};
+    use raven_proto_fs::{
+        Call, CallRequest, CallResponse, OpenFlags, S_IFDIR, S_IFMT, Stat, StatFs,
+    };
     use raven_rt::entry;
-    use raven_scheme::{Ctx, Handler, HandlerResult, Opened, Server};
+    use raven_scheme::{Ctx, Handler, HandlerResult, OpenTable, Opened, Server};
 
     entry!(main);
 
     /// S11 `Opcode::Open` wire value.
     const OPEN_OPCODE: u16 = 1;
-    const OPEN_READ: u32 = 1;
-    const OPEN_WRITE: u32 = 2;
-    const OPEN_CREATE: u32 = 4;
+    /// Aggregate open-file-description budget.
+    const MAX_OPEN_FILES: usize = 256;
 
-    struct OpenFile {
+    struct OpenState {
         node: NodeRef,
-        readable: bool,
-        cursor: u64,
     }
 
     struct InitfsHandler {
         model: Model<'static>,
-        files: BTreeMap<u64, OpenFile>,
+        opens: OpenTable<OpenState>,
         pending: Option<(u64, String)>,
     }
 
     impl Handler for InitfsHandler {
-        fn open(
+        fn open_with(
             &mut self,
             path: &str,
-            flags: u32,
+            flags: OpenFlags,
             _mode: u32,
             _ctx: &Ctx,
         ) -> HandlerResult<Opened> {
@@ -57,36 +55,37 @@ mod program {
             if expected != path {
                 return Err(Errno::EINVAL.into());
             }
-            if flags & (OPEN_WRITE | OPEN_CREATE) != 0 {
+            if flags.writable() || flags.create() {
                 return Err(Errno::EROFS.into());
             }
-            if flags & OPEN_READ == 0 {
-                return Err(Errno::EACCES.into());
+            if !flags.readable() {
+                return Err(Errno::EBADF.into());
+            }
+            if self.opens.len() >= MAX_OPEN_FILES {
+                return Err(Errno::EMFILE.into());
             }
             let node = self.model.lookup(path)?;
-            self.files.insert(
-                file_id,
-                OpenFile {
-                    node,
-                    readable: true,
-                    cursor: 0,
-                },
-            );
+            if flags.directory() && self.model.stat(node)?.mode & S_IFMT != S_IFDIR {
+                return Err(Errno::ENOTDIR.into());
+            }
+            self.opens
+                .insert_with_id(file_id, OpenState { node }, flags)?;
             Ok(Opened::File(file_id))
         }
 
-        fn read(&mut self, file: u64, _offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
-            let Some(open) = self.files.get_mut(&file) else {
-                return Err(Errno::EBADF.into());
-            };
-            if !open.readable {
-                return Err(Errno::EBADF.into());
+        fn read(&mut self, file: u64, offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
+            if offset != 0 {
+                return Err(Errno::EINVAL.into());
             }
-            let read = match open.node {
-                NodeRef::File(index) => self.model.read_file(index, open.cursor, buffer)?,
-                NodeRef::Dir(index) => self.model.readdir(index, open.cursor, buffer)?,
+            let Some(open) = self.opens.get_mut(file) else {
+                return Err(Errno::EBADF.into());
             };
-            open.cursor = open.cursor.saturating_add(read as u64);
+            let cursor = open.cursor();
+            let read = match open.file.node {
+                NodeRef::File(index) => self.model.read_file(index, cursor, buffer)?,
+                NodeRef::Dir(index) => self.model.readdir(index, cursor, buffer)?,
+            };
+            open.advance(read)?;
             Ok(read)
         }
 
@@ -95,24 +94,21 @@ mod program {
         }
 
         fn close(&mut self, file: u64) -> HandlerResult<()> {
-            self.files.remove(&file).map(|_| ()).ok_or(Errno::EBADF)?;
+            self.opens.close(file)?;
             Ok(())
         }
 
         fn dup(&mut self, file: u64) -> HandlerResult<u64> {
-            if !self.files.contains_key(&file) {
-                return Err(Errno::EBADF.into());
-            }
-            Ok(file)
+            Ok(self.opens.dup(file)?)
         }
 
         fn fstat(&mut self, file: u64) -> HandlerResult<Stat> {
-            let open = self.files.get(&file).ok_or(Errno::EBADF)?;
-            Ok(self.model.stat(open.node)?)
+            let node = self.opens.get(file).ok_or(Errno::EBADF)?.file.node;
+            Ok(self.model.stat(node)?)
         }
 
         fn call(&mut self, file: u64, request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {
-            if !self.files.contains_key(&file) {
+            if self.opens.get(file).is_none() {
                 return Err(Errno::EBADF.into());
             }
             let decoded = CallRequest::decode(request).map_err(|_| Errno::EPROTO)?;
@@ -180,7 +176,7 @@ mod program {
         log_started("initfsd");
         let mut handler = InitfsHandler {
             model,
-            files: BTreeMap::new(),
+            opens: OpenTable::new(),
             pending: None,
         };
         loop {

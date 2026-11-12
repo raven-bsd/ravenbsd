@@ -444,6 +444,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-k67-fs"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-ipc",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-k71-scheme"
 version = "0.1.0"
 dependencies = [
@@ -611,6 +623,7 @@ name = "raven-ramfsd"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-ipc",
  "raven-proto-fs",
  "raven-ramfs-core",
  "raven-rt",

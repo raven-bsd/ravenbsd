@@ -35,8 +35,24 @@ Only
 is accepted through
 .Dv CALL .
 .Pp
+A server-wide budget of 256 open-file descriptions applies; the next open returns
+.Er EMFILE .
+.Dv DUP
+shares the description and cursor, and only the last
+.Dv CLOSE
+removes it.
+.Dv OPEN
+with
+.Dv O_DIRECTORY
+on a regular file returns
+.Er ENOTDIR .
+The wire offset of
 .Dv READ
-of a file copies bytes at the requested offset and returns a short read at end of file.
+must be zero; a nonzero offset returns
+.Er EINVAL .
+.Pp
+.Dv READ
+of a file copies bytes from the sequential cursor and returns a short read at end of file.
 .Dv READ
 of a directory returns packed K60 directory entries in sorted order without
 .Pa .

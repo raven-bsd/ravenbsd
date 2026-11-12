@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "fs-servers"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 300
+pre = ["sh tests/fixtures/k67-fs/build.sh"]
+initfs = "build/fixtures/k67-fs/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^k67: cycles ok$'
+
+[[expect]]
+regex = '^k67: client accepted 256$'
+
+[[expect]]
+regex = '^k67: abandoned ok$'
+
+[[expect]]
+regex = '^k67: budget ok$'
+
+[[expect]]
+regex = '^k67: unlink ok$'
+
+[[expect]]
+regex = '^k67: dup ok$'
+
+[[expect]]
+regex = '^k67: readdir ok$'
+
+[[expect]]
+regex = '^k67: vfsd ok$'
+
+[[expect]]
+regex = '^k67: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
