@@ -8,3 +8,4 @@ AI_POLICY.md
 README.md
 docs/man
 tests/ufs-vectors/golden/
+tests/tcpip/fuzz/corpus/
