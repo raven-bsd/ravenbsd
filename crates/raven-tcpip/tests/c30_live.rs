@@ -169,7 +169,8 @@ fn sack_recovery_completes_under_heavy_loss() {
 #[test]
 fn closed_half_open_connections_free_their_backlog_slot() {
     let (_link, _a, mut b) = pair_with_link(LinkConfig::default(), StackConfig::default());
-    b.set_property("tcp.syn_cookies_enable", 0).expect("cookies");
+    b.set_property("tcp.syn_cookies_enable", 0)
+        .expect("cookies");
     let listener = b.tcp_listen(80, 2).expect("listen");
     let syn = |b: &mut Stack<Endpoint>, port: u16| {
         inject_segment(b, A, B, port, 80, 1_000, 0, TcpFlags::SYN, &[]);
@@ -267,8 +268,7 @@ impl Device for PathLimit {
 fn limited_pair(limit: usize) -> (Stack<PathLimit>, Stack<PathLimit>) {
     let (a, b) = Link::new(LinkConfig::default(), 5);
     let mut stacks = Vec::new();
-    for (endpoint, address_octets, seed, peer, peer_mac) in
-        [(a, A, 1, B, BMAC), (b, B, 2, A, AMAC)]
+    for (endpoint, address_octets, seed, peer, peer_mac) in [(a, A, 1, B, BMAC), (b, B, 2, A, AMAC)]
     {
         let device = PathLimit {
             inner: endpoint,
@@ -300,14 +300,61 @@ fn plpmtud_recovers_from_a_black_hole_and_finds_a_larger_payload() {
     let counters = a.counters();
     assert!(elapsed > 0);
     assert!(counters.plpmtud_probes >= 1, "no probe was sent");
-    assert!(counters.plpmtud_losses >= 1, "no probe or black hole was seen");
+    assert!(
+        counters.plpmtud_losses >= 1,
+        "no probe or black hole was seen"
+    );
     let after = a.socket_info(client).expect("info").mss;
-    assert!(after < before, "mss {after} was not below the blocked {before}");
+    assert!(
+        after < before,
+        "mss {after} was not below the blocked {before}"
+    );
     assert!(after >= 536, "mss {after} fell below the floor");
     assert!(
         usize::from(after) + 66 <= 1_000,
         "mss {after} does not fit the 1000-byte path"
     );
+}
+
+#[test]
+fn a_resend_after_a_false_black_hole_does_not_make_the_peer_ack_unsent_data() {
+    let (la, lb) = Link::new(
+        LinkConfig {
+            rtt_ms: 20,
+            loss_percent: 5.0,
+            ..LinkConfig::default()
+        },
+        131,
+    );
+    let mut a = common::endpoint_stack(la, A, 1, StackConfig::default());
+    let mut b = common::endpoint_stack(lb, B, 2, StackConfig::default());
+    a.test_insert_neighbor(address(B), BMAC, Instant::ZERO, 60_000);
+    b.test_insert_neighbor(address(A), AMAC, Instant::ZERO, 60_000);
+    let (client, server) = connect(&mut a, &mut b);
+    let elapsed = transfer(&mut a, &mut b, client, server, 1 << 20, 100);
+    assert!(elapsed < 20_000, "5% loss took {elapsed} ms");
+    assert_eq!(a.counters().acks_for_unsent, 0);
+}
+
+#[test]
+fn reordering_without_loss_completes_and_learns_the_reordering_distance() {
+    let (_link, mut a, mut b) = pair_with_link(
+        LinkConfig {
+            rtt_ms: 20,
+            reorder_percent: 10.0,
+            ..LinkConfig::default()
+        },
+        StackConfig::default(),
+    );
+    let (client, server) = connect(&mut a, &mut b);
+    let elapsed = transfer(&mut a, &mut b, client, server, 1 << 20, 100);
+    assert!(elapsed < 10_000, "10% reordering took {elapsed} ms");
+    let counters = a.counters();
+    assert!(
+        counters.spurious_retransmits >= 1,
+        "no spurious retransmit was detected"
+    );
+    assert!(counters.reordering_window_growth >= 1);
 }
 
 #[test]
@@ -335,7 +382,10 @@ fn ten_percent_loss_does_not_kill_the_connection_or_collapse_the_path_mtu() {
         a.poll(Instant::from_millis(time));
         b.poll(Instant::from_millis(time));
     }
-    let server = b.tcp_accept(SocketId(1)).expect("accept").expect("connection");
+    let server = b
+        .tcp_accept(SocketId(1))
+        .expect("accept")
+        .expect("connection");
     let payload = vec![1u8; 1 << 20];
     let (mut sent, mut got) = (0usize, 0usize);
     let mut buffer = vec![0u8; 4096];

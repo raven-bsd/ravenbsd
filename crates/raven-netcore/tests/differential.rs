@@ -358,8 +358,16 @@ fn event_sequences_match_for_an_orderly_close() {
     let native = close_events(&mut client, &mut server);
 
     assert_eq!(native.2, baseline.2, "errors differ");
-    assert_eq!(project(&native.0), project(&baseline.0), "client events differ");
-    assert_eq!(project(&native.1), project(&baseline.1), "server events differ");
+    assert_eq!(
+        project(&native.0),
+        project(&baseline.0),
+        "client events differ"
+    );
+    assert_eq!(
+        project(&native.1),
+        project(&baseline.1),
+        "server events differ"
+    );
 }
 
 fn refused_events<B: raven_netcore::StackBackend>(

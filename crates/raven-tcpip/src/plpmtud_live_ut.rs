@@ -62,7 +62,10 @@ fn a_black_hole_drops_to_the_floor_and_starts_a_search() {
     c.mss_floor = 536;
     assert!(plpmtud_blackhole(&mut c, 7));
     assert_eq!(c.mss, 536);
-    assert_eq!(c.plp.as_ref().map(|s| s.state), Some(PlpmtudState::Searching));
+    assert_eq!(
+        c.plp.as_ref().map(|s| s.state),
+        Some(PlpmtudState::Searching)
+    );
     assert!(!plpmtud_blackhole(&mut c, 8));
 }
 

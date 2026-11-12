@@ -100,7 +100,9 @@ pub(crate) struct SocketTable {
     max: usize,
 }
 
-pub(crate) fn connection_key(connection: &crate::tcp_state::TcpConnection) -> Option<ConnectionKey> {
+pub(crate) fn connection_key(
+    connection: &crate::tcp_state::TcpConnection,
+) -> Option<ConnectionKey> {
     let (remote, remote_port) = connection.remote?;
     Some(ConnectionKey {
         local: connection.local,

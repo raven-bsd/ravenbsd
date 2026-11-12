@@ -375,6 +375,12 @@ impl<D: Device> Stack<D> {
                 return Err(Errno::ENOTSOCK);
             };
             if seq_gt(ack, connection.snd_una) {
+                if seq_gt(ack, connection.snd_nxt) {
+                    connection.snd_nxt = ack;
+                }
+                if connection.snd_max.is_some_and(|max| seq_ge(ack, max)) {
+                    connection.snd_max = None;
+                }
                 let mut sampled = false;
                 if let Some((sample_seq, sent_at, retransmitted)) = connection.rtt_sample
                     && seq_ge(ack, sample_seq)
@@ -544,9 +550,7 @@ impl<D: Device> Stack<D> {
                     return;
                 }
                 let take = (payload.len() - data_start).min(room);
-                record
-                    .rx
-                    .extend(&payload[data_start..data_start + take]);
+                record.rx.extend(&payload[data_start..data_start + take]);
                 self.tcp_data_delivered = self.tcp_data_delivered.saturating_add(take);
                 self.counters.in_bytes = self
                     .counters

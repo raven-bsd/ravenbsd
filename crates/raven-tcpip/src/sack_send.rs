@@ -35,7 +35,7 @@ pub(crate) fn merge_sack_blocks(connection: &mut TcpConnection, blocks: &[(u32, 
         return false;
     }
     let una = connection.snd_una;
-    let nxt = connection.snd_nxt;
+    let nxt = connection.highest_sent();
     let before = sacked_bytes(&connection.sacked);
     for &(left, right) in blocks {
         let left = if seq_lt(left, una) { una } else { left };
@@ -91,7 +91,11 @@ pub(crate) fn scoreboard(connection: &TcpConnection) -> SackScoreboard {
     } else {
         0
     };
-    let threshold = if connection.rto_recovery { 1 } else { 3 };
+    let threshold = if connection.rto_recovery {
+        1
+    } else {
+        connection.reorder_dist.max(1)
+    };
     let mut board = SackScoreboard::new(
         high_data,
         high_rxt,
@@ -113,14 +117,53 @@ pub(crate) fn sack_pipe(connection: &TcpConnection) -> u32 {
     scoreboard(connection).pipe()
 }
 
+/// Largest reordering distance, in segments, the loss detector will learn.
+const MAX_REORDER_DIST: u32 = 300;
+
+/// How many segments overtook the oldest unacknowledged one, from the SACKed ranges.
+pub(crate) fn reorder_distance(connection: &TcpConnection) -> u32 {
+    let mss = u32::from(connection.mss).max(1);
+    let top = connection
+        .sacked
+        .last()
+        .map_or(0, |(_, end)| end.wrapping_sub(connection.snd_una));
+    (top / mss).saturating_add(1)
+}
+
 /// Whether the oldest unacknowledged byte is considered lost by the SACK information.
 pub(crate) fn head_is_lost(connection: &TcpConnection) -> bool {
-    connection.sack_permitted
-        && !connection.sacked.is_empty()
-        && scoreboard(connection).is_lost(0)
+    connection.sack_permitted && !connection.sacked.is_empty() && scoreboard(connection).is_lost(0)
 }
 
 impl<D: Device> Stack<D> {
+    /// The ACK that ended a fast retransmit echoes a timestamp from before the retransmission:
+    /// the original segment arrived, so the loss was reordering. Undo the window reduction and
+    /// raise the tolerated reordering distance.
+    pub(crate) fn undo_spurious_recovery(&mut self, socket: SocketId, distance: u32) {
+        let Ok(record) = self.sockets.record_mut(socket) else {
+            return;
+        };
+        let Kind::Tcp(connection) = &mut record.kind else {
+            return;
+        };
+        let Some(mut saved) = connection.undo.take() else {
+            return;
+        };
+        self.counters.spurious_retransmits = self.counters.spurious_retransmits.wrapping_add(1);
+        if distance > connection.reorder_dist {
+            connection.reorder_dist = distance.min(MAX_REORDER_DIST);
+            self.counters.reordering_window_growth =
+                self.counters.reordering_window_growth.wrapping_add(1);
+        }
+        if let Some((cwnd, ssthresh)) = saved.restore() {
+            connection.cc.undo(cwnd, ssthresh);
+            self.counters.spurious_undo = self.counters.spurious_undo.wrapping_add(1);
+        }
+        connection.sack_recovery = false;
+        connection.rto_recovery = false;
+        connection.sacked.clear();
+    }
+
     /// Retransmit what the scoreboard calls lost while the window has room.
     pub(crate) fn tcp_sack_recover(&mut self, socket: SocketId) {
         for _ in 0..MAX_BURST {

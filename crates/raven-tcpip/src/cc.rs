@@ -53,6 +53,8 @@ pub trait CongestionControl {
     fn on_partial_ack(&mut self, _acked_bytes: u32) {}
     /// The recovery episode is complete; return to congestion avoidance.
     fn on_recovery_exit(&mut self) {}
+    /// The loss response was spurious: restore the window state from before it.
+    fn undo(&mut self, _cwnd: u32, _ssthresh: u32) {}
 }
 
 /// NewReno with RFC 3465 appropriate byte counting and RFC 6582 recovery.
@@ -175,6 +177,11 @@ impl CongestionControl for NewReno {
     }
     fn on_recovery_exit(&mut self) {
         self.full_ack();
+    }
+    fn undo(&mut self, cwnd: u32, ssthresh: u32) {
+        self.cwnd = cwnd.max(2 * self.mss);
+        self.ssthresh = ssthresh;
+        self.in_recovery = false;
     }
 }
 
@@ -332,6 +339,11 @@ impl CongestionControl for Cubic {
             self.cwnd = self.ssthresh;
             self.in_recovery = false;
         }
+    }
+    fn undo(&mut self, cwnd: u32, ssthresh: u32) {
+        self.cwnd = cwnd;
+        self.ssthresh = ssthresh;
+        self.in_recovery = false;
     }
 }
 

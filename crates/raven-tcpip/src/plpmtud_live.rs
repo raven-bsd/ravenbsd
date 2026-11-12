@@ -179,7 +179,7 @@ pub(crate) fn plpmtud_on_timeout(connection: &mut TcpConnection, now_ms: i64) ->
     }
     connection.plp_next_ms = now_ms;
     probe_failed(connection, size);
-    connection.snd_nxt = connection.snd_una;
+    connection.rewind_for_resend();
     connection.rto_deadline = None;
     connection.sacked.clear();
     connection.sack_recovery = false;
