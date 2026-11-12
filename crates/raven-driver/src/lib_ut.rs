@@ -36,6 +36,13 @@ impl Window {
             unsafe { core::slice::from_raw_parts(self.bytes.as_ptr(), self.bytes.len()) };
         ConfigRegion::new(slice)
     }
+
+    fn dma(&mut self, bus: u64) -> DmaRegion {
+        // SAFETY: writable access to a buffer that outlives the region in each test.
+        let slice: &'static mut [u8] =
+            unsafe { core::slice::from_raw_parts_mut(self.bytes.as_mut_ptr(), self.bytes.len()) };
+        DmaRegion::new(slice, bus)
+    }
 }
 
 #[test]
@@ -217,4 +224,57 @@ fn the_capability_limit_is_enforced() {
     let list = capabilities(&config).unwrap();
     assert!(list.len() <= MAX_CAPABILITIES);
     assert_eq!(list.len(), MAX_CAPABILITIES);
+}
+
+#[test]
+fn a_dma_region_reports_its_length_and_bus_address() {
+    let mut window = Window::new(4096);
+    let region = window.dma(0x1_2345_6000);
+    assert_eq!(region.len(), 4096);
+    assert!(!region.is_empty());
+    assert_eq!(region.bus_address(), 0x1_2345_6000);
+}
+
+#[test]
+fn dma_accesses_round_trip_every_width() {
+    let mut window = Window::new(64);
+    let mut region = window.dma(0x1000);
+    region.write_u8(0, 0x5A).unwrap();
+    region.write_u16(2, 0x1234).unwrap();
+    region.write_u32(4, 0xDEAD_BEEF).unwrap();
+    region.write_u64(8, 0x0102_0304_0506_0708).unwrap();
+    assert_eq!(region.read_u8(0), Ok(0x5A));
+    assert_eq!(region.read_u16(2), Ok(0x1234));
+    assert_eq!(region.read_u32(4), Ok(0xDEAD_BEEF));
+    assert_eq!(region.read_u64(8), Ok(0x0102_0304_0506_0708));
+}
+
+#[test]
+fn dma_byte_copies_round_trip() {
+    let mut window = Window::new(32);
+    let mut region = window.dma(0x2000);
+    region.write_bytes(8, b"descriptor").unwrap();
+    let mut out = [0u8; 10];
+    region.read_bytes(8, &mut out).unwrap();
+    assert_eq!(&out, b"descriptor");
+}
+
+#[test]
+fn dma_accesses_outside_the_buffer_are_refused() {
+    let mut window = Window::new(16);
+    let mut region = window.dma(0x3000);
+    assert_eq!(region.read_u8(16), Err(AccessError::Bounds));
+    assert_eq!(region.write_u32(14, 0), Err(AccessError::Bounds));
+    assert_eq!(region.read_u16(1), Err(AccessError::Alignment));
+    assert_eq!(region.write_bytes(10, b"abcdefg"), Err(AccessError::Bounds));
+}
+
+#[test]
+fn a_dma_region_can_be_fenced_and_an_irq_keeps_its_handle() {
+    let mut window = Window::new(16);
+    let region = window.dma(0x4000);
+    region.publish();
+    region.acquire();
+    let irq = Irq::new(Handle::new(6, 0));
+    assert_eq!(irq.handle().index(), 6);
 }

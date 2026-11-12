@@ -380,6 +380,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-b13c-resources"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-driver",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-blockd"
 version = "0.1.0"
 dependencies = [
@@ -508,6 +517,10 @@ dependencies = [
 [[package]]
 name = "raven-driver"
 version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
 
 [[package]]
 name = "raven-echo"

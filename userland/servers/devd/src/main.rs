@@ -76,62 +76,32 @@ mod program {
         let cycles = if test { driver.cycles } else { 1 };
         let mut cycle = 0u32;
         while cycle < cycles {
-            let (bar_index, driver_args) = split_bar_argument(&driver.args)?;
+            let options = split_driver_arguments(&driver.args)?;
             let bars = read_bars(&client, &device.name())?;
-            let Some(&(kind, size)) = bars.get(bar_index) else {
-                return Err(alloc::format!("bar{bar_index} does not exist"));
+            let Some(&(kind, size)) = bars.get(options.bar) else {
+                return Err(alloc::format!("bar{} does not exist", options.bar));
             };
             if kind != "memory" || size == 0 {
                 return Err(alloc::format!(
-                    "bar{bar_index} is {kind} (size {size}), not a memory BAR"
+                    "bar{} is {kind} (size {size}), not a memory BAR",
+                    options.bar
                 ));
             }
-            let bar = client
-                .open(
-                    &alloc::format!("pci:/{}/bar{}", device.name(), bar_index),
-                    READ,
-                )
-                .map_err(|error| format!("bar{bar_index}: {}", error.description()))?;
-            let config = match client.open(&alloc::format!("pci:/{}/config", device.name()), READ) {
-                Ok(handle) => handle,
-                Err(error) => {
-                    let _ = raven_rt::handle_close(bar);
-                    return Err(alloc::format!("config: {}", error.description()));
-                }
-            };
-            raven_rt::println!(
-                "devd: driver {} bar={} size={}",
-                driver.name,
-                bar_index,
-                size
-            );
-            let mut sys = GrantSys {
-                handles: alloc::vec![bar, config],
-            };
-            let mut argv: Vec<&str> = Vec::with_capacity(driver_args.len() + 4);
-            argv.push(driver.name.as_str());
-            argv.extend(driver_args.iter().map(String::as_str));
-            let bar_token = alloc::format!("bar={bar_index}");
-            let size_token = alloc::format!("bar_size={size}");
-            argv.push(&bar_token);
-            argv.push(&size_token);
-            let child = spawn_with(
+            // Every handle opened for this launch is closed here, whether the driver ran, the
+            // spawn failed or a resource was missing: a restart cycle cannot leak DMA or IRQ
+            // handles (B13c).
+            let mut opened: Vec<Handle> = Vec::with_capacity(4);
+            let launched = launch_driver(
+                &client,
                 &initfs,
-                &driver.exec,
-                &SpawnOptions {
-                    args: &argv,
-                    env: &[],
-                },
-                &mut sys,
-            )
-            .map_err(|error| alloc::format!("spawn: {error:?}"))?;
-            let mut code = -1i32;
-            RtSys
-                .proc_wait(child, &mut code)
-                .map_err(|error| format!("wait: {error:?}"))?;
-            let _ = raven_rt::handle_close(bar);
-            let _ = raven_rt::handle_close(config);
-            let _ = raven_rt::handle_close(child);
+                &device,
+                driver,
+                &options,
+                size,
+                &mut opened,
+            );
+            close_all(&opened);
+            let code = launched?;
             cycle = cycle.saturating_add(1);
             raven_rt::println!("devd: driver {} cycle {} exit={}", driver.name, cycle, code);
         }
@@ -139,27 +109,178 @@ mod program {
         if test { Ok(()) } else { serve() }
     }
 
-    /// Split the driver's `args` into the BAR selector and the arguments passed to the child.
+    /// The launch-time arguments `devd` consumes from the driver's own list.
+    struct DriverOptions {
+        bar: usize,
+        dma: bool,
+        irq: bool,
+        rest: Vec<String>,
+    }
+
+    /// Split the driver's `args` into the selectors `devd` acts on and the tokens passed to the
+    /// child.
     ///
-    /// `bar=N` selects the PCI BAR `devd` opens and transfers (default 0, the first BAR); the token
-    /// itself is not passed on. `devd` appends `bar=<N>` and `bar_size=<bytes>` to the child's
-    /// arguments so a driver never has to guess either value.
-    fn split_bar_argument(args: &[String]) -> Result<(usize, Vec<String>), String> {
-        let mut bar = 0usize;
-        let mut rest = Vec::with_capacity(args.len());
+    /// `bar=N` selects the PCI BAR (default 0, the first one). `resources=dma+irq` asks for the
+    /// per-function DMA buffer and legacy IRQ line (default `none`). Neither token is passed on;
+    /// `devd` appends `bar=<N>`, `bar_size=<bytes>`, and the requested `dma=<len>` and
+    /// `irq=<line>` so a driver never has to guess them.
+    fn split_driver_arguments(args: &[String]) -> Result<DriverOptions, String> {
+        let mut options = DriverOptions {
+            bar: 0,
+            dma: false,
+            irq: false,
+            rest: Vec::with_capacity(args.len()),
+        };
         for argument in args {
             if let Some(value) = argument.strip_prefix("bar=") {
-                bar = value
+                let bar: usize = value
                     .parse()
                     .map_err(|_| alloc::format!("invalid bar selector `{argument}`"))?;
                 if bar >= 6 {
                     return Err(alloc::format!("bar{bar} is not a PCI BAR index"));
                 }
+                options.bar = bar;
                 continue;
             }
-            rest.push(argument.clone());
+            if let Some(value) = argument.strip_prefix("resources=") {
+                // `+` rather than `,`: the `/etc/drivers.toml` parser splits an `args` array on
+                // commas before it unquotes the elements.
+                if value == "none" {
+                    options.dma = false;
+                    options.irq = false;
+                } else {
+                    for part in value.split('+') {
+                        match part {
+                            "dma" => options.dma = true,
+                            "irq" => options.irq = true,
+                            other => {
+                                return Err(alloc::format!(
+                                    "invalid resource `{other}` in `{argument}`"
+                                ));
+                            }
+                        }
+                    }
+                }
+                continue;
+            }
+            options.rest.push(argument.clone());
         }
-        Ok((bar, rest))
+        Ok(options)
+    }
+
+    /// Open one resource endpoint and remember the handle for the close pass.
+    fn open_resource(
+        client: &Client,
+        device: &str,
+        endpoint: &str,
+        opened: &mut Vec<Handle>,
+    ) -> Result<Handle, String> {
+        let handle = client
+            .open(&alloc::format!("pci:/{device}/{endpoint}"), READ)
+            .map_err(|error| format!("{endpoint}: {}", error.description()))?;
+        opened.push(handle);
+        Ok(handle)
+    }
+
+    fn close_all(handles: &[Handle]) {
+        for handle in handles {
+            let _ = raven_rt::handle_close(*handle);
+        }
+    }
+
+    /// One launch/exit cycle: open the requested resources, transfer them to the child, wait.
+    ///
+    /// The caller closes everything in `opened` once this returns, so a failed spawn or a failed
+    /// wait releases the BAR, configuration page, DMA buffer and IRQ exactly once. The returned
+    /// value is the driver's exit status.
+    fn launch_driver(
+        client: &Client,
+        initfs: &Initfs<'_>,
+        device: &DeviceInfo,
+        driver: &DriverSpec,
+        options: &DriverOptions,
+        bar_size: u64,
+        opened: &mut Vec<Handle>,
+    ) -> Result<i32, String> {
+        let name = device.name();
+        let bar = open_resource(client, &name, &alloc::format!("bar{}", options.bar), opened)?;
+        let config = open_resource(client, &name, "config", opened)?;
+        raven_rt::println!(
+            "devd: driver {} bar={} size={}",
+            driver.name,
+            options.bar,
+            bar_size
+        );
+
+        let mut dma_token = None;
+        let mut irq_token = None;
+        let mut dma = None;
+        let mut irq = None;
+        if options.dma {
+            let handle = open_resource(client, &name, "dma", opened)?;
+            let info = raven_rt::dma_info(handle)
+                .map_err(|error| format!("dma info: {}", error.description()))?;
+            raven_rt::println!(
+                "devd: driver {} dma bus={:#x} len={}",
+                driver.name,
+                info.bus_addr,
+                info.len
+            );
+            dma_token = Some(alloc::format!("dma={}", info.len));
+            dma = Some(handle);
+        }
+        if options.irq {
+            let handle = open_resource(client, &name, "irq", opened)?;
+            raven_rt::println!(
+                "devd: driver {} irq line={}",
+                driver.name,
+                device.interrupt_line
+            );
+            irq_token = Some(alloc::format!("irq={}", device.interrupt_line));
+            irq = Some(handle);
+        }
+
+        let mut handles: Vec<Handle> = Vec::with_capacity(4);
+        handles.push(bar);
+        handles.push(config);
+        if let Some(handle) = dma {
+            handles.push(handle);
+        }
+        if let Some(handle) = irq {
+            handles.push(handle);
+        }
+
+        let mut argv: Vec<&str> = Vec::with_capacity(options.rest.len() + 6);
+        argv.push(driver.name.as_str());
+        argv.extend(options.rest.iter().map(String::as_str));
+        let bar_token = alloc::format!("bar={}", options.bar);
+        let size_token = alloc::format!("bar_size={bar_size}");
+        argv.push(&bar_token);
+        argv.push(&size_token);
+        if let Some(token) = &dma_token {
+            argv.push(token.as_str());
+        }
+        if let Some(token) = &irq_token {
+            argv.push(token.as_str());
+        }
+        let mut sys = GrantSys { handles };
+        let child = spawn_with(
+            initfs,
+            &driver.exec,
+            &SpawnOptions {
+                args: &argv,
+                env: &[],
+            },
+            &mut sys,
+        )
+        .map_err(|error| alloc::format!("spawn: {error:?}"))?;
+        let mut code = -1i32;
+        if let Err(error) = RtSys.proc_wait(child, &mut code) {
+            let _ = raven_rt::handle_close(child);
+            return Err(format!("wait: {error:?}"));
+        }
+        let _ = raven_rt::handle_close(child);
+        Ok(code)
     }
 
     /// Read `pci:/<dev>/bars`: one `index kind size` line per BAR.

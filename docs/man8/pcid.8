@@ -55,11 +55,36 @@ opens a fresh
 over that function's 4 KiB configuration page and returns it as an S25
 attachment, for capability discovery through
 .Xr raven-driver 3 .
+.It Pa /bb:ss.f/dma
+allocates a fresh, zeroed 64 KiB
+.Dv DmaBuffer
+for that function through the root capability and returns it as an S25
+attachment.  The client reads the device-visible address with
+.Dv DMA_INFO ;
+with no IOMMU it is the physical address, and the per-process budget and the
+64 MiB limit still apply.
+.It Pa /bb:ss.f/irq
+creates a fresh
+.Dv Irq
+for the function's legacy INTx line (the
+.Va interrupt-line
+byte of its configuration header) through the root capability and returns it as
+an S25 attachment.  The line is masked until the owner's first
+.Dv IRQ_WAIT
+and is released when the client closes the handle; a function whose
+configuration header reports line 255 returns
+.Er ENOENT .
+MSI and MSI-X are not exposed yet.
 .El
 .Pp
+The server closes its own copy of every attached handle as soon as the reply is
+sent, so the client's handle is the only owner: a driver restart frees the DMA
+buffer and the IRQ line instead of keeping them alive inside
+.Nm .
+.Pp
 Only read access is accepted for the informational files; every open of a
-BAR or configuration page is a new attachment and the client owns the returned
-handle.
+BAR, configuration page, DMA buffer or IRQ is a new attachment and the client
+owns the returned handle.
 .Sh FILES
 .Bl -tag -width /etc/services.d/pcid.toml -compact
 .It Pa /etc/services.d/pcid.toml

@@ -4,8 +4,9 @@
 //! `pcid`: PCI configuration-space enumerator and the `pci:` scheme.
 //!
 //! The server holds the root-device grant. It maps the ACPI blob, finds the MCFG/ECAM window,
-//! enumerates the first PCI bus, and exposes one file per function plus `info` and `barN`
-//! endpoints. Opening a BAR endpoint attaches a fresh `MmioRegion` handle to the client.
+//! enumerates the first PCI bus, and exposes one file per function plus `info`, `bars`, `config`,
+//! `barN`, `dma` and `irq` endpoints. Opening a BAR, configuration page, DMA buffer or IRQ
+//! endpoint attaches a fresh handle to the client.
 
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
@@ -25,7 +26,7 @@ mod program {
     use raven_proto_dev::{DEVICE_INFO_LEN, DeviceInfo};
     use raven_proto_fs::{DT_REG, DirEntry, DirEntryHeader, S_IFREG, Stat};
     use raven_rt::entry;
-    use raven_scheme::{Ctx, Handler, HandlerResult, Opened, Server};
+    use raven_scheme::{Ctx, Handler, HandlerResult, Kernel, Opened, RtKernel, Server};
 
     entry!(main);
 
@@ -38,6 +39,58 @@ mod program {
     const ECAM_DEVICE_STRIDE: usize = 0x8000;
     const OPEN_OPCODE: u16 = 1;
     const OPEN_READ: u32 = 1;
+    /// DMA buffer `pcid` hands a driver: two virtqueues plus a frame pool (B13c).
+    const DRIVER_DMA_LEN: usize = 64 * 1024;
+    /// PCI functions address 32-bit bus addresses on every machine the driver path supports.
+    const DRIVER_DMA_MASK_BITS: u32 = 32;
+    /// PCI spec value for "interrupt line unknown / not connected".
+    const IRQ_LINE_NONE: u8 = 0xFF;
+
+    /// The real kernel, plus `pcid`'s ownership rule for Open attachments.
+    ///
+    /// `Opened::Attach` hands a staging handle to the client: the reply installs a client-side
+    /// derivative of the same object, so the server's copy must be closed or the object (and its
+    /// GSI claim, for an IRQ) lives for the lifetime of `pcid`. Closing after the send also covers
+    /// the failed-send case, where the client received nothing.
+    #[derive(Clone, Copy, Debug, Default)]
+    struct AttachKernel {
+        inner: RtKernel,
+    }
+
+    impl Kernel for AttachKernel {
+        fn scheme_register(&self, name: &str) -> Result<(), Errno> {
+            self.inner.scheme_register(name)
+        }
+
+        fn recv(&self, packet: &mut [u8]) -> Result<Handle, Errno> {
+            self.inner.recv(packet)
+        }
+
+        fn recv_timeout(
+            &self,
+            packet: &mut [u8],
+            timeout_ms: u64,
+        ) -> Result<Option<Handle>, Errno> {
+            self.inner.recv_timeout(packet, timeout_ms)
+        }
+
+        fn send(&self, request: Handle, packet: &[u8]) -> Result<(), Errno> {
+            self.inner.send(request, packet)
+        }
+
+        fn send_attach(
+            &self,
+            request: Handle,
+            packet: &[u8],
+            attachments: &[raven_scheme::Attachment],
+        ) -> Result<(), Errno> {
+            let result = self.inner.send_attach(request, packet, attachments);
+            for attachment in attachments {
+                let _ = raven_rt::handle_close(Handle(attachment.handle));
+            }
+            result
+        }
+    }
 
     struct OpenFile {
         data: Vec<u8>,
@@ -109,7 +162,7 @@ mod program {
             );
         }
         raven_rt::println!("pcid: devices={}", devices.len());
-        let mut server = match Server::register("pci") {
+        let mut server = match Server::register_with(AttachKernel::default(), "pci") {
             Ok(server) => server,
             Err(error) => {
                 raven_rt::eprintln!("pcid: pci: {}", error.description());
@@ -382,6 +435,28 @@ mod program {
                     device.function,
                 ) as u64);
                 let handle = raven_rt::mmio_create(self.root, phys, PAGE, 0)?;
+                return Ok(Opened::Attach(handle));
+            }
+            if endpoint == "dma" {
+                // A fresh bounded DMA buffer for this function, created with the RootDevice
+                // capability `pcid` holds and attached to the client. The buffer is identity
+                // mapped, so the bus address `DMA_INFO` reports is the physical address.
+                let handle =
+                    raven_rt::dma_alloc(self.root, DRIVER_DMA_LEN, PAGE, DRIVER_DMA_MASK_BITS, 0)?;
+                return Ok(Opened::Attach(handle));
+            }
+            if endpoint == "irq" {
+                // The function's legacy INTx line, as reported by the configuration header. MSI
+                // and MSI-X need per-vector programming and are a later ticket.
+                if device.interrupt_line == IRQ_LINE_NONE {
+                    return Err(Errno::ENOENT.into());
+                }
+                let handle = raven_rt::irq_create(
+                    self.root,
+                    raven_rt::IRQ_LEGACY,
+                    u32::from(device.interrupt_line),
+                    None,
+                )?;
                 return Ok(Opened::Attach(handle));
             }
             if let Some(index) = endpoint.strip_prefix("bar") {

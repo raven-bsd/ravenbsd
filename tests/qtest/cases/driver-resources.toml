@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B13c: devd grants a driver its BAR, configuration page, a 64 KiB DMA buffer and the function's
+# legacy IRQ. The fixture proves the DMA bus address with an `edu` bus-master copy and waits for
+# the device interrupt; two launch/exit cycles prove the resources are released on restart.
+
+name = "driver-resources"
+arch = "x86_64"
+profile = "b13c-resources-test"
+timeout_secs = 240
+pre = ["sh tests/fixtures/b13c-resources/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-device", "edu"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^pcid: devices=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^svcd: pcid up$'
+
+[[expect]]
+regex = '^devd: matched [0-9a-f]{2}:[0-9a-f]{2}\.[0-9] vendor=0x1234 device=0x11e8 irq_line=[0-9]+ irq_pin=[0-9]+$'
+
+[[expect]]
+regex = '^devd: driver b13c bar=0 size=1048576$'
+
+[[expect]]
+regex = '^devd: driver b13c dma bus=0x[0-9a-f]+ len=65536$'
+
+[[expect]]
+regex = '^devd: driver b13c irq line=[0-9]+$'
+
+[[expect]]
+regex = '^b13c: bar=0 size=1048576$'
+
+[[expect]]
+regex = '^b13c: config vendor=0x1234 device=0x11e8$'
+
+[[expect]]
+regex = '^b13c: dma len=65536 bus=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^b13c: dma bus ok$'
+
+[[expect]]
+regex = '^b13c: irq line=[0-9]+ fired$'
+
+[[expect]]
+regex = '^b13c: done$'
+
+[[expect]]
+regex = '^devd: driver b13c cycle 1 exit=0$'
+
+[[expect]]
+regex = '^devd: driver b13c cycle 2 exit=0$'
+
+[[expect]]
+regex = '^devd: driver b13c cycles=2$'
+
+[[expect]]
+regex = '^svcd: devd up$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|b13c: .*failed'

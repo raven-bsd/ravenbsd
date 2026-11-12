@@ -10,8 +10,24 @@
 #   vendor = 0x1234            # required PCI vendor id
 #   device = 0x11e8            # required PCI device id
 #   exec = "/sbin/name"        # program in the initfs
-#   args = ["bar=0"]           # optional; `bar=N` selects the BAR devd grants (default 0)
+#   args = ["bar=0"]           # optional selectors (see below)
 #   cycles = 1                 # 1 in service use; more only for lifecycle tests
 #
-# No drivers ship in the production image yet: B13b adds the virtio-net entry. The test profiles
-# carry their own table (`profiles/*/drivers.conf`) so a qtest never depends on this file.
+# `devd` consumes two selector tokens and appends the resolved values to the
+# child's arguments:
+#
+#   bar=N                      PCI BAR index (0..5) devd opens and transfers as
+#                              handle 3; the configuration page is handle 4
+#   resources=dma+irq          also grant a 64 KiB DMA buffer (handle 5) and the
+#                              function's legacy IRQ (handle 6); `none` (the
+#                              default) grants neither.  `+` rather than `,`
+#                              because the table parser splits arrays on commas.
+#
+# The child receives `bar=<N>`, `bar_size=<bytes>`, and, when requested,
+# `dma=<len>` and `irq=<line>`.  devd keeps its own copy of every handle, waits
+# for the driver and closes them all, so a crash/restart cycle frees the DMA
+# buffer and the IRQ line.  The driver never receives the root device or ADMIN.
+#
+# No drivers ship in the production image yet: B13b adds the virtio-net entry.
+# The test profiles carry their own table (`profiles/*/drivers.conf`) so a qtest
+# never depends on this file.
