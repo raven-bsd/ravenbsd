@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 use raven_tcpip_wire::checksum::ChecksumContext;
-use raven_tcpip_wire::tcp::{TcpBuilder, TcpFlags, TcpHeader, TcpPacket};
+use raven_tcpip_wire::tcp::{TcpBuilder, TcpFlags, TcpHeader, TcpOption, TcpPacket};
 
 use crate::device::Device;
 use crate::ipv4_stack::to_wire as to_wire4;
@@ -16,6 +16,7 @@ use crate::ipv6_stack::{IpAddr, Ipv6Addr, to_wire as to_wire6};
 use crate::rto::RtoEstimator;
 use crate::seq::{seq_ge, seq_gt, seq_le, seq_lt};
 use crate::socket::{Kind, SocketRecord};
+use crate::tcp_data::advertised_window;
 use crate::{Instant, Ipv4Addr, SocketId, Stack};
 
 type Retransmit = (Vec<u8>, IpAddr, (IpAddr, u16), u16, u32, u32, u16);
@@ -56,7 +57,7 @@ pub(crate) struct TcpConnection {
     pub irs: u32,
     pub snd_una: u32,
     pub snd_nxt: u32,
-    pub snd_wnd: u16,
+    pub snd_wnd: u32,
     pub max_snd_wnd: u16,
     pub rcv_nxt: u32,
     pub rcv_wnd: u16,
@@ -97,6 +98,20 @@ pub(crate) struct TcpConnection {
     pub rto_timeouts: usize,
     pub last_retransmit_seq: Option<u32>,
     pub rto_max_retransmits: u8,
+    pub snd_wscale: u8,
+    pub rcv_wscale: u8,
+    pub offer_wscale: bool,
+    pub offer_timestamps: bool,
+    pub timestamps: bool,
+    pub ts_recent: u32,
+    pub ts_recent_age: Instant,
+    #[allow(dead_code)] // Read by the testutil option-inspection hook.
+    pub last_tsval: u32,
+    pub last_ts_sent: Option<(u32, Instant)>,
+    pub peer_mss: u16,
+    pub our_mss: u16,
+    pub mss_clamps: usize,
+    pub paws_drops: usize,
 }
 
 impl TcpConnection {
@@ -155,6 +170,19 @@ impl TcpConnection {
             rto_timeouts: 0,
             last_retransmit_seq: None,
             rto_max_retransmits: 6,
+            snd_wscale: 0,
+            rcv_wscale: 0,
+            offer_wscale: false,
+            offer_timestamps: false,
+            timestamps: false,
+            ts_recent: 0,
+            ts_recent_age: now,
+            last_tsval: 0,
+            last_ts_sent: None,
+            peer_mss: 536,
+            our_mss: 1460,
+            mss_clamps: 0,
+            paws_drops: 0,
         }
     }
 
@@ -214,6 +242,19 @@ impl TcpConnection {
             rto_timeouts: 0,
             last_retransmit_seq: None,
             rto_max_retransmits: 6,
+            snd_wscale: 0,
+            rcv_wscale: 0,
+            offer_wscale: false,
+            offer_timestamps: false,
+            timestamps: false,
+            ts_recent: 0,
+            ts_recent_age: now,
+            last_tsval: 0,
+            last_ts_sent: None,
+            peer_mss: 536,
+            our_mss: 1460,
+            mss_clamps: 0,
+            paws_drops: 0,
         }
     }
 
@@ -238,6 +279,10 @@ struct Segment {
     flags: TcpFlags,
     window: u16,
     urgent: u16,
+    mss: Option<u16>,
+    wscale: Option<u8>,
+    tsval: Option<u32>,
+    tsecr: Option<u32>,
     payload: Vec<u8>,
 }
 
@@ -319,6 +364,13 @@ impl<D: Device> Stack<D> {
         self.tcp_urgent_seen
     }
 
+    /// SYN,ACK attempts (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_tcp_synacks(&self) -> usize {
+        self.tcp_synacks
+    }
+
     /// TCP segments received (host tests).
     #[cfg(any(test, feature = "testutil"))]
     #[must_use]
@@ -329,7 +381,7 @@ impl<D: Device> Stack<D> {
     /// The current send window and in-flight bytes (host tests).
     #[cfg(any(test, feature = "testutil"))]
     #[must_use]
-    pub fn test_tcp_window(&self, socket: SocketId) -> Option<(u16, u32, u32)> {
+    pub fn test_tcp_window(&self, socket: SocketId) -> Option<(u32, u32, u32)> {
         match &self.sockets.record(socket).ok()?.kind {
             Kind::Tcp(connection) => {
                 Some((connection.snd_wnd, connection.snd_una, connection.snd_nxt))
@@ -364,6 +416,40 @@ impl<D: Device> Stack<D> {
     pub fn test_tcp_rcv_nxt(&self, socket: SocketId) -> Option<u32> {
         match &self.sockets.record(socket).ok()?.kind {
             Kind::Tcp(connection) => Some(connection.rcv_nxt),
+            _ => None,
+        }
+    }
+
+    /// Negotiated TCP options (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    #[allow(clippy::type_complexity)]
+    pub fn test_tcp_options_info(
+        &self,
+        socket: SocketId,
+    ) -> Option<(u8, u8, bool, u32, u16, u16, usize, usize, u32)> {
+        match &self.sockets.record(socket).ok()?.kind {
+            Kind::Tcp(connection) => Some((
+                connection.snd_wscale,
+                connection.rcv_wscale,
+                connection.timestamps,
+                connection.ts_recent,
+                connection.peer_mss,
+                connection.mss,
+                connection.mss_clamps,
+                connection.paws_drops,
+                connection.last_tsval,
+            )),
+            _ => None,
+        }
+    }
+
+    /// Age anchor of the last accepted timestamp (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_tcp_ts_age(&self, socket: SocketId) -> Option<Instant> {
+        match &self.sockets.record(socket).ok()?.kind {
+            Kind::Tcp(connection) => Some(connection.ts_recent_age),
             _ => None,
         }
     }
@@ -556,6 +642,12 @@ impl<D: Device> Stack<D> {
             self.config.clock_granularity_ms,
         );
         connection.rto_max_retransmits = self.config.rto_max_retransmits;
+        connection.offer_wscale = self.config.window_scaling;
+        connection.offer_timestamps = self.config.timestamps;
+        connection.rcv_wscale = choose_wscale(self.config.rx_queue_bytes);
+        connection.our_mss = our_mss(remote.0, self.device.capabilities())
+            .clamp(self.config.mss_floor, self.config.mss_ceiling);
+        connection.mss = connection.our_mss;
         let socket = self.sockets.alloc(
             Kind::Tcp(connection),
             self.config.rx_queue_bytes,
@@ -599,12 +691,31 @@ impl<D: Device> Stack<D> {
             packet.sequence(),
             packet.acknowledgement(),
         ));
+        let mut mss = None;
+        let mut wscale = None;
+        let mut tsval = None;
+        let mut tsecr = None;
+        for option in packet.options() {
+            match option {
+                Ok(TcpOption::MaxSegmentSize(value)) => mss = Some(value),
+                Ok(TcpOption::WindowScale(value)) => wscale = Some(value),
+                Ok(TcpOption::Timestamps { tsval: v, tsecr: e }) => {
+                    tsval = Some(v);
+                    tsecr = Some(e);
+                }
+                _ => {}
+            }
+        }
         let segment = Segment {
             seq: packet.sequence(),
             ack: packet.acknowledgement(),
             flags: packet.flags(),
             window: packet.window(),
             urgent: packet.urgent_pointer(),
+            mss,
+            wscale,
+            tsval,
+            tsecr,
             payload: packet.payload().to_vec(),
         };
         let source_port = packet.src_port();
@@ -761,6 +872,13 @@ impl<D: Device> Stack<D> {
             self.config.clock_granularity_ms,
         );
         connection.rto_max_retransmits = self.config.rto_max_retransmits;
+        connection.offer_wscale = self.config.window_scaling;
+        connection.offer_timestamps = self.config.timestamps;
+        connection.rcv_wscale = choose_wscale(self.config.rx_queue_bytes);
+        connection.our_mss = our_mss(source, self.device.capabilities())
+            .clamp(self.config.mss_floor, self.config.mss_ceiling);
+        connection.mss = connection.our_mss;
+        apply_syn_options(&mut connection, segment, now);
         let Ok(socket) = self.sockets.alloc(
             Kind::Tcp(connection),
             self.config.rx_queue_bytes,
@@ -812,6 +930,7 @@ impl<D: Device> Stack<D> {
                             break 'transition;
                         }
                         if segment.syn() && !segment.ack_flag() {
+                            apply_syn_options(connection, segment, now);
                             connection.irs = segment.seq;
                             connection.rcv_nxt = segment.seq.wrapping_add(1);
                             connection.connect_deadline = None;
@@ -827,10 +946,11 @@ impl<D: Device> Stack<D> {
                             break 'transition;
                         }
                         if segment.syn() {
+                            apply_syn_options(connection, segment, now);
                             connection.irs = segment.seq;
                             connection.rcv_nxt = segment.seq.wrapping_add(1);
                             connection.snd_una = segment.ack;
-                            connection.snd_wnd = segment.window;
+                            connection.snd_wnd = u32::from(segment.window);
                             connection.max_snd_wnd = connection.max_snd_wnd.max(segment.window);
                             connection.connect_deadline = None;
                             transition = Some(TcpState::Established);
@@ -852,6 +972,7 @@ impl<D: Device> Stack<D> {
                             break 'transition;
                         }
                         if segment.syn() && !segment.ack_flag() {
+                            apply_syn_options(connection, segment, now);
                             if segment.seq == connection.irs {
                                 send_ack = true;
                             } else {
@@ -864,7 +985,7 @@ impl<D: Device> Stack<D> {
                             && seq_le(segment.ack, connection.snd_nxt)
                         {
                             connection.snd_una = segment.ack;
-                            connection.snd_wnd = segment.window;
+                            connection.snd_wnd = u32::from(segment.window) << connection.snd_wscale;
                             connection.max_snd_wnd = connection.max_snd_wnd.max(segment.window);
                             transition = Some(TcpState::Established);
                             if connection.passive {
@@ -894,6 +1015,23 @@ impl<D: Device> Stack<D> {
                         if segment.syn() {
                             send_challenge = true;
                             break 'transition;
+                        }
+                        if connection.timestamps
+                            && let Some(tsval) = segment.tsval
+                            && seq_lt(tsval, connection.ts_recent)
+                            && now.saturating_since(connection.ts_recent_age).as_millis()
+                                < 24 * 60 * 60 * 1000
+                        {
+                            connection.paws_drops = connection.paws_drops.saturating_add(1);
+                            send_ack = true;
+                            break 'transition;
+                        }
+                        if connection.timestamps
+                            && let Some(tsval) = segment.tsval
+                            && seq_gt(tsval, connection.ts_recent)
+                        {
+                            connection.ts_recent = tsval;
+                            connection.ts_recent_age = now;
                         }
                         if !ack_window_ok(connection, segment.ack) {
                             send_challenge = true;
@@ -937,6 +1075,23 @@ impl<D: Device> Stack<D> {
                         if segment.syn() {
                             send_challenge = true;
                             break 'transition;
+                        }
+                        if connection.timestamps
+                            && let Some(tsval) = segment.tsval
+                            && seq_lt(tsval, connection.ts_recent)
+                            && now.saturating_since(connection.ts_recent_age).as_millis()
+                                < 24 * 60 * 60 * 1000
+                        {
+                            connection.paws_drops = connection.paws_drops.saturating_add(1);
+                            send_ack = true;
+                            break 'transition;
+                        }
+                        if connection.timestamps
+                            && let Some(tsval) = segment.tsval
+                            && seq_gt(tsval, connection.ts_recent)
+                        {
+                            connection.ts_recent = tsval;
+                            connection.ts_recent_age = now;
                         }
                         if !ack_window_ok(connection, segment.ack) {
                             send_challenge = true;
@@ -1009,7 +1164,7 @@ impl<D: Device> Stack<D> {
                             send_ack = true;
                         }
                         if segment.ack_flag() {
-                            connection.snd_wnd = segment.window;
+                            connection.snd_wnd = u32::from(segment.window) << connection.snd_wscale;
                         }
                     }
                     TcpState::Closing => {
@@ -1145,6 +1300,18 @@ impl<D: Device> Stack<D> {
         }
         if let Some(ack) = ack_advanced {
             let _ = self.tcp_ack_data(socket, ack);
+            if let Some(tsecr) = segment.tsecr
+                && let Ok(record) = self.sockets.record_mut(socket)
+                && let Kind::Tcp(connection) = &mut record.kind
+                && let Some((tsval, sent_at)) = connection.last_ts_sent
+                && tsval == tsecr
+            {
+                let rtt = self.now.as_millis().saturating_sub(sent_at.as_millis());
+                if rtt >= 0 {
+                    connection.rto.sample(u64::try_from(rtt).unwrap_or(0));
+                }
+                connection.last_ts_sent = None;
+            }
         }
         if send_syn_ack {
             let _ = self.send_syn_ack(socket);
@@ -1158,19 +1325,23 @@ impl<D: Device> Stack<D> {
     }
 
     fn send_syn(&mut self, socket: SocketId) -> Result<(), Errno> {
-        let (local, remote, iss, port) = {
+        let (local, remote, iss, port, options) = {
             let record = self.sockets.record(socket)?;
             let Kind::Tcp(connection) = &record.kind else {
                 return Err(Errno::ENOTSOCK);
             };
             let remote = connection.remote.ok_or(Errno::ENOTCONN)?;
+            let tsval = u32::try_from(self.now.as_millis()).unwrap_or(0);
+            let options = syn_options(connection, tsval, connection.ts_recent);
             (
                 connection.local,
                 remote,
                 connection.iss,
                 connection.local_port,
+                options,
             )
         };
+        self.option_override = Some(options);
         self.send_tcp_packet(
             local,
             remote.0,
@@ -1186,7 +1357,7 @@ impl<D: Device> Stack<D> {
     }
 
     pub(crate) fn send_syn_ack(&mut self, socket: SocketId) -> Result<(), Errno> {
-        let (local, remote, iss, rcv_nxt, port, window) = {
+        let (local, remote, iss, rcv_nxt, port, window, options) = {
             let record = self.sockets.record(socket)?;
             let Kind::Tcp(connection) = &record.kind else {
                 return Err(Errno::ENOTSOCK);
@@ -1199,8 +1370,17 @@ impl<D: Device> Stack<D> {
                 connection.rcv_nxt,
                 connection.local_port,
                 connection.rcv_wnd,
+                {
+                    let tsval = u32::try_from(self.now.as_millis()).unwrap_or(0);
+                    syn_options(connection, tsval, connection.ts_recent)
+                },
             )
         };
+        self.option_override = Some(options);
+        #[cfg(any(test, feature = "testutil"))]
+        {
+            self.tcp_synacks = self.tcp_synacks.saturating_add(1);
+        }
         self.send_tcp_packet(
             local,
             remote.0,
@@ -1216,6 +1396,18 @@ impl<D: Device> Stack<D> {
     }
 
     pub(crate) fn send_ack_for(&mut self, socket: SocketId) -> Result<(), Errno> {
+        let ts_options = {
+            let record = self.sockets.record(socket)?;
+            match &record.kind {
+                Kind::Tcp(connection) => {
+                    timestamp_options(connection, u32::try_from(self.now.as_millis()).unwrap_or(0))
+                }
+                _ => Vec::new(),
+            }
+        };
+        if !ts_options.is_empty() {
+            self.option_override = Some(ts_options);
+        }
         let (local, remote, snd_nxt, rcv_nxt, port, window) = {
             let record = self.sockets.record(socket)?;
             let Kind::Tcp(connection) = &record.kind else {
@@ -1228,7 +1420,7 @@ impl<D: Device> Stack<D> {
                 connection.snd_nxt,
                 connection.rcv_nxt,
                 connection.local_port,
-                connection.rcv_wnd,
+                advertised_window(record),
             )
         };
         self.send_tcp_packet(
@@ -1258,7 +1450,7 @@ impl<D: Device> Stack<D> {
                 connection.snd_nxt,
                 connection.rcv_nxt,
                 connection.local_port,
-                connection.rcv_wnd,
+                advertised_window(record),
             )
         };
         self.send_tcp_packet(
@@ -1321,8 +1513,14 @@ impl<D: Device> Stack<D> {
             window,
             urgent_pointer: 0,
         };
-        let mss = [2u8, 4, 5, 0xb4];
-        let option_bytes: &[u8] = if options { &mss } else { &[] };
+        let default_mss = [2u8, 4, 5, 0xb4];
+        let option_bytes: Vec<u8> = if let Some(options) = self.option_override.take() {
+            options
+        } else if options {
+            default_mss.to_vec()
+        } else {
+            Vec::new()
+        };
         let padded_options = (option_bytes.len() + 3) & !3;
         let mut segment = vec![0u8; 20 + padded_options + payload.len()];
         let context = match (local, remote) {
@@ -1336,7 +1534,7 @@ impl<D: Device> Stack<D> {
         };
         {
             let mut builder =
-                TcpBuilder::new(&mut segment, context, &header, option_bytes, payload.len())
+                TcpBuilder::new(&mut segment, context, &header, &option_bytes, payload.len())
                     .map_err(|_| Errno::EINVAL)?;
             builder.payload_mut().copy_from_slice(payload);
             builder.finish();
@@ -1657,6 +1855,86 @@ fn ack_window_ok(connection: &TcpConnection, ack: u32) -> bool {
         .snd_una
         .wrapping_sub(u32::from(connection.max_snd_wnd));
     seq_ge(ack, lower)
+}
+
+fn choose_wscale(receive_cap: usize) -> u8 {
+    let mut shift = 0u8;
+    while shift < 14 && (65_535usize << shift) < receive_cap {
+        shift += 1;
+    }
+    shift
+}
+
+fn our_mss(remote: IpAddr, caps: crate::DeviceCaps) -> u16 {
+    let link = caps.mtu.saturating_sub(14);
+    let header = match remote {
+        IpAddr::V4(_) => 40,
+        IpAddr::V6(_) => 60,
+    };
+    u16::try_from(link.saturating_sub(header))
+        .unwrap_or(1460)
+        .max(536)
+}
+
+fn apply_syn_options(connection: &mut TcpConnection, segment: &Segment, now: Instant) {
+    if let Some(mss) = segment.mss {
+        let clamped = mss.clamp(536, connection.our_mss);
+        if clamped != mss {
+            connection.mss_clamps = connection.mss_clamps.saturating_add(1);
+        }
+        connection.peer_mss = clamped;
+        connection.mss = connection.peer_mss.min(connection.our_mss);
+    }
+    if connection.offer_wscale {
+        connection.snd_wscale = segment.wscale.unwrap_or(0).min(14);
+    }
+    if connection.offer_timestamps
+        && let Some(tsval) = segment.tsval
+    {
+        connection.timestamps = true;
+        connection.ts_recent = tsval;
+        connection.ts_recent_age = now;
+    }
+    let option_reduction = if connection.timestamps { 12 } else { 0 };
+    connection.mss = connection
+        .peer_mss
+        .min(connection.our_mss)
+        .saturating_sub(option_reduction)
+        .max(1);
+}
+
+fn syn_options(connection: &TcpConnection, tsval: u32, tsecr: u32) -> Vec<u8> {
+    let mut options = Vec::new();
+    options.extend_from_slice(&[2, 4]);
+    options.extend_from_slice(&connection.our_mss.to_be_bytes());
+    options.extend_from_slice(&[4, 2]);
+    options.extend_from_slice(&[1, 1]);
+    if connection.offer_timestamps {
+        options.extend_from_slice(&[8, 10]);
+        options.extend_from_slice(&tsval.to_be_bytes());
+        options.extend_from_slice(&tsecr.to_be_bytes());
+        options.extend_from_slice(&[1, 1]);
+    }
+    if connection.offer_wscale {
+        options.extend_from_slice(&[3, 3, connection.rcv_wscale]);
+    }
+    options.push(0);
+    options
+}
+
+pub(crate) fn timestamp_options_public(connection: &TcpConnection, tsval: u32) -> Vec<u8> {
+    timestamp_options(connection, tsval)
+}
+
+fn timestamp_options(connection: &TcpConnection, tsval: u32) -> Vec<u8> {
+    if !connection.timestamps {
+        return Vec::new();
+    }
+    let mut options = Vec::new();
+    options.extend_from_slice(&[8, 10]);
+    options.extend_from_slice(&tsval.to_be_bytes());
+    options.extend_from_slice(&connection.ts_recent.to_be_bytes());
+    options
 }
 
 fn flags_or(first: TcpFlags, second: TcpFlags) -> TcpFlags {

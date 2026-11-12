@@ -119,6 +119,7 @@ impl<D: Device> Stack<D> {
     }
 
     /// Transmit as much queued data as the peer window, SWS and Nagle allow.
+    #[allow(clippy::type_complexity)]
     pub(crate) fn tcp_try_send(&mut self, socket: SocketId) -> Result<(), Errno> {
         loop {
             let snapshot = {
@@ -145,7 +146,7 @@ impl<D: Device> Stack<D> {
                     }
                 } else {
                     let unsent = queued - inflight;
-                    let window = u32::from(connection.snd_wnd);
+                    let window = connection.snd_wnd;
                     if window <= inflight {
                         if connection.zero_window_deadline.is_none() {
                             connection.zero_window_deadline = Some(Instant::from_millis(
@@ -185,21 +186,35 @@ impl<D: Device> Stack<D> {
                                 connection.local_port,
                                 connection.snd_nxt,
                                 connection.rcv_nxt,
-                                advertised_window(record),
+                                {
+                                    let free = record.rx_cap.saturating_sub(record.rx.len());
+                                    u16::try_from(
+                                        (free >> connection.rcv_wscale).min(usize::from(u16::MAX)),
+                                    )
+                                    .unwrap_or(u16::MAX)
+                                },
                                 push,
+                                crate::tcp_state::timestamp_options_public(
+                                    connection,
+                                    u32::try_from(self.now.as_millis()).unwrap_or(0),
+                                ),
                             )))
                         }
                     }
                 }
             };
             let Some(snapshot) = snapshot else { break };
-            let Some((payload, local, remote, local_port, seq, ack, window, push)) = snapshot
+            let Some((payload, local, remote, local_port, seq, ack, window, push, ts_options)) =
+                snapshot
             else {
                 // All queued data is sent; emit the deferred FIN.
                 let _ = self.tcp_send_deferred_fin(socket);
                 break;
             };
             let remote = remote.ok_or(Errno::ENOTCONN)?;
+            if !ts_options.is_empty() {
+                self.option_override = Some(ts_options);
+            }
             let mut flags = TcpFlags::ACK;
             if push {
                 flags = TcpFlags::from_bits(flags.bits() | TcpFlags::PSH.bits());
@@ -497,7 +512,7 @@ pub(crate) fn advertised_window(record: &crate::socket::SocketRecord) -> u16 {
     let value = if free < floor && free < record.rx_cap {
         0
     } else {
-        free
+        free >> connection.rcv_wscale
     };
     u16::try_from(value.min(usize::from(u16::MAX))).unwrap_or(u16::MAX)
 }
