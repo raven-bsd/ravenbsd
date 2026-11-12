@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.files]]
+src = "build/fixtures/b12-netd/netd-probe"
+path = "/sbin/netd-probe"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "etc/services.d/netd.toml"
+path = "/etc/services.d/netd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/logd.toml"
+path = "/etc/services.d/logd.toml"
+
+[[initfs.files]]
+src = "profiles/netd-test.d/netd-probe.manifest"
+path = "/etc/services.d/netd-probe.toml"
+
+[[initfs.files]]
+src = "profiles/netd-test.d/netd-restart.manifest"
+path = "/etc/services.d/netd-restart.toml"
+
+[[initfs.files]]
+src = "profiles/netd-test.d/netd-probe2.manifest"
+path = "/etc/services.d/netd-probe2.toml"

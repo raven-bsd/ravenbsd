@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "netd-restart"
+exec = "/bin/svcctl"
+args = ["svcctl", "restart", "netd"]
+needs = ["netd-probe"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

@@ -281,6 +281,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "netd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-netcore",
+ "raven-proto-fs",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "netd-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -650,14 +672,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "raven-k33-rootfs-probe"
-version = "0.1.0"
-dependencies = [
- "raven-abi",
- "raven-rt",
-]
-
-[[package]]
 name = "raven-k15-mkdisk"
 version = "0.1.0"
 dependencies = [
@@ -673,6 +687,14 @@ dependencies = [
  "raven-rt",
  "raven-scheme",
  "virtio-blk",
+]
+
+[[package]]
+name = "raven-k33-rootfs-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
 ]
 
 [[package]]
