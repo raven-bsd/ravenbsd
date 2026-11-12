@@ -1,0 +1,48 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt HOSTNAME 1
+.Os RavenBSD
+.Sh NAME
+.Nm hostname
+.Nd print or set the system hostname
+.Sh SYNOPSIS
+.Nm
+.Op Ar name
+.Nm
+.Fl -selftest
+.Sh DESCRIPTION
+With no operand,
+.Nm
+reads
+.Pa sys:/hostname
+and prints the current hostname.
+With one
+.Ar name ,
+it writes the name to
+.Pa sys:/hostname
+through the
+.Xr sysd 8
+server.  The name must be non-empty, at most 64 bytes, and contain no NUL,
+.Ql / ,
+or control characters.
+.Pp
+The protocol version 1 hostname is stored by
+.Xr sysd 8
+and is not persisted across a reboot.
+.Pp
+.Fl -selftest
+reads the current value, sets
+.Ql selftest-host ,
+verifies it, restores the original value, and prints
+.Dq hostname: selftest ok .
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr uname 1 ,
+.Xr sysd 8
+.Sh STANDARDS
+The
+.Nm
+interface follows the traditional BSD utility.

@@ -1,0 +1,35 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt UMOUNT 1
+.Os RavenBSD
+.Sh NAME
+.Nm umount
+.Nd remove a file: mount
+.Sh SYNOPSIS
+.Nm
+.Ar path
+.Nm
+.Fl -selftest
+.Sh DESCRIPTION
+The administrative interface and the full operand description are in
+.Xr umount 8 .
+The program is installed as
+.Pa /sbin/umount ;
+this section-1 entry exists because the tool's source package lives under
+.Pa userland/bin
+and the documentation gate requires a section-1 page for that package
+directory as well as the section-8 page for the installed path.
+.Pp
+.Fl -selftest
+mounts
+.Ql ramfs:
+at
+.Pa /mnt2
+and unmounts it.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr mount 8 ,
+.Xr umount 8

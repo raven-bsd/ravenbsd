@@ -1,0 +1,38 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt UMOUNT 8
+.Os RavenBSD
+.Sh NAME
+.Nm umount
+.Nd remove a file: mount
+.Sh SYNOPSIS
+.Nm
+.Ar path
+.Nm
+.Fl -selftest
+.Sh DESCRIPTION
+.Nm
+asks
+.Xr vfsd 8
+to remove the mount at the absolute
+.Ar path .
+The path is normalized; an unknown mount point returns
+.Er ENOENT .
+.Pp
+.Fl -selftest
+mounts
+.Ql ramfs:
+at
+.Pa /mnt2 ,
+unmounts it, and prints
+.Dq umount: selftest ok .
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+A rejected unmount exits with status 1.
+.Sh SEE ALSO
+.Xr mount 8 ,
+.Xr vfsd 8
+.Sh STANDARDS
+The mount table is a RavenBSD protocol-version-1 interface.

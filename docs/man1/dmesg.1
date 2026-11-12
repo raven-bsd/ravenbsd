@@ -1,0 +1,32 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt DMESG 1
+.Os RavenBSD
+.Sh NAME
+.Nm dmesg
+.Nd print the system log ring
+.Sh SYNOPSIS
+.Nm
+.Nm
+.Fl -selftest
+.Sh DESCRIPTION
+The administrative interface and the full description are in
+.Xr dmesg 8 .
+The program is installed as
+.Pa /sbin/dmesg ;
+this section-1 entry exists because the tool's source package lives under
+.Pa userland/bin
+and the documentation gate requires a section-1 page for that package
+directory as well as the section-8 page for the installed path.
+.Pp
+.Nm
+reads
+.Pa log:
+from its oldest retained record and writes the records to the debug console.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr dmesg 8 ,
+.Xr logd 8

@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.programs]]
+package = "raven-hostname"
+path = "/bin/hostname"
+
+[[initfs.programs]]
+package = "raven-sleep"
+path = "/bin/sleep"
+
+[[initfs.programs]]
+package = "raven-date"
+path = "/bin/date"
+
+[[initfs.programs]]
+package = "raven-dmesg"
+path = "/sbin/dmesg"
+
+[[initfs.programs]]
+package = "raven-mount"
+path = "/sbin/mount"
+
+[[initfs.programs]]
+package = "raven-umount"
+path = "/sbin/umount"
+
+[[initfs.programs]]
+package = "raven-ps"
+path = "/bin/ps"

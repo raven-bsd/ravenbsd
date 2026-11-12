@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The system-tools integration profile. It inherits the shell profile (core servers, initfsd,
+# ramfsd, vfsd) and runs every K39 tool once with --selftest as a one-shot service.
+#
+# The tools are spawned by svcd, not by a helper service: a spawned process carries INITFS with
+# READ|MAP but no EXEC right, so a non-PID1 service cannot load another tool. Seven one-shot
+# services exercise the same tool binaries and argument parsers.
+
+name = "system-tools-test"
+
+extends = "shell"
+
+[boot]
+cmdline = "console=ttyS0 loglevel=info"
+log_level = "info"

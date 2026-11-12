@@ -1,0 +1,34 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt DATE 1
+.Os RavenBSD
+.Sh NAME
+.Nm date
+.Nd print seconds since boot
+.Sh SYNOPSIS
+.Nm
+.Nm
+.Fl -selftest
+.Sh DESCRIPTION
+Protocol version 1 has no wall clock.  With no operands,
+.Nm
+reads
+.Dv CLOCK_MONOTONIC
+with
+.Xr clock_get 2
+and prints
+.Dq up <seconds>s .
+.Pp
+.Fl -selftest
+checks the clock and prints
+.Dq date: selftest ok .
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr clock_get 2
+.Sh STANDARDS
+The output is a RavenBSD interim format, not the POSIX
+.Nm
+date format; a wall clock is deferred to a later protocol version.

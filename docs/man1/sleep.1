@@ -1,0 +1,33 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt SLEEP 1
+.Os RavenBSD
+.Sh NAME
+.Nm sleep
+.Nd suspend execution for an interval
+.Sh SYNOPSIS
+.Nm
+.Ar seconds
+.Nm
+.Fl -selftest
+.Sh DESCRIPTION
+.Nm
+suspends the calling process for
+.Ar seconds
+whole seconds with
+.Xr nanosleep 2 .
+The value must be a decimal integer that converts to nanoseconds without
+overflow.
+.Pp
+.Fl -selftest
+sleeps for one millisecond and prints
+.Dq sleep: selftest ok .
+.Sh EXIT STATUS
+.Ex -std
+A usage error or an overflowing value exits with status 2.
+.Sh SEE ALSO
+.Xr nanosleep 2
+.Sh STANDARDS
+The operand is a whole number of seconds in this version; fractional seconds
+are not accepted.

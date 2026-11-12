@@ -380,12 +380,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-date"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-df"
 version = "0.1.0"
 dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-tool-core",
+]
+
+[[package]]
+name = "raven-dmesg"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
 ]
 
 [[package]]
@@ -427,6 +444,15 @@ name = "raven-handles"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+]
+
+[[package]]
+name = "raven-hostname"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
 ]
 
 [[package]]
@@ -596,6 +622,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-mount"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-msi"
 version = "0.1.0"
 
@@ -683,6 +718,15 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+]
+
+[[package]]
+name = "raven-ps"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
 ]
 
 [[package]]
@@ -949,6 +993,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-sleep"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-stat"
 version = "0.1.0"
 dependencies = [
@@ -1022,6 +1074,14 @@ dependencies = [
 [[package]]
 name = "raven-tty-core"
 version = "0.1.0"
+
+[[package]]
+name = "raven-umount"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
 
 [[package]]
 name = "raven-uname"

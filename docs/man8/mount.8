@@ -1,0 +1,57 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt MOUNT 8
+.Os RavenBSD
+.Sh NAME
+.Nm mount
+.Nd list or add a file: mount
+.Sh SYNOPSIS
+.Nm
+.Nm
+.Ar scheme: path
+.Nm
+.Fl -selftest
+.Sh DESCRIPTION
+With no operands,
+.Nm
+reads the static mount table from
+.Pa /etc/mounts
+and prints one line per entry:
+.Bd -literal -offset indent
+<scheme> on <path>
+.Ed
+.Pp
+Protocol version 1 has no
+.Dv LISTMOUNTS
+control operation, so the static file is the source of the listing.
+.Pp
+With two operands,
+.Nm
+asks
+.Xr vfsd 8
+to mount
+.Ar scheme:
+.Pq a name ending in a colon
+at the absolute
+.Ar path .
+The mount point does not have to exist in the underlying server; VFS merges
+the mount into the namespace.
+.Pp
+.Fl -selftest
+lists the static table, mounts
+.Ql ramfs:
+at
+.Pa /mnt ,
+unmounts it, and prints
+.Dq mount: selftest ok .
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+A rejected mount exits with status 1.
+.Sh SEE ALSO
+.Xr umount 8 ,
+.Xr vfsd 8 ,
+.Xr scheme 7
+.Sh STANDARDS
+The mount table is a RavenBSD protocol-version-1 interface.
