@@ -3,12 +3,13 @@
 
 //! Kernel objects stored in a process handle table.
 
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 use raven_abi::types::Rights;
-use raven_handles::HandleTable;
+use raven_handles::{HandleTable, LineageNode};
+use spin::Mutex;
 
 use crate::driver::DmaBuffer;
 use crate::driver::irq::Irq;
@@ -172,6 +173,42 @@ pub enum Object {
 
 /// The kernel's handle table type.
 pub type Table = HandleTable<Object>;
+
+/// Weak registry of every derived lineage node, used to propagate a revoke across processes.
+///
+/// Root nodes do not need an entry: a revoke resolves its target from the caller's table and only
+/// derived nodes (dup/transfer/attachment) can be descendants. The list is pruned on every use;
+/// it holds no strong reference, so process exit and handle close drop their nodes normally.
+static LINEAGE: Mutex<Vec<Weak<LineageNode>>> = Mutex::new(Vec::new());
+
+/// Register a derived node for the next cross-process revocation walk.
+pub fn register_lineage(node: Arc<LineageNode>) {
+    let mut registry = LINEAGE.lock();
+    registry.retain(|entry| entry.strong_count() > 0);
+    registry.push(Arc::downgrade(&node));
+}
+
+/// Propagate `mask` from `target` to every live registered descendant.
+///
+/// The snapshot is taken under the registry lock and released before any node is touched, so a
+/// node's own state (atomics/parent chain) is never modified while the registry lock is held.
+pub fn revoke_descendants(target: &Arc<LineageNode>, mask: Rights) {
+    let nodes: Vec<Arc<LineageNode>> = {
+        let mut registry = LINEAGE.lock();
+        registry.retain(|entry| entry.strong_count() > 0);
+        registry.iter().filter_map(Weak::upgrade).collect()
+    };
+    for node in nodes {
+        if !Arc::ptr_eq(&node, target) && node.is_descendant_of(target) {
+            node.revoke(mask);
+        }
+    }
+}
+
+/// Live lineage nodes (S16 churn evidence).
+pub fn lineage_nodes() -> u64 {
+    raven_handles::live_lineage_nodes()
+}
 
 /// Install the well-known handles 0, 1 and 2 (and 3 for the first process) in a fresh process.
 ///

@@ -36,6 +36,7 @@ pub fn dispatch(call: Syscall, frame: &SyscallFrame) -> Result<usize, Errno> {
         Syscall::UNAME => uname(frame.rdi),
         Syscall::HANDLE_CLOSE => handle_close(frame.rdi as u32),
         Syscall::HANDLE_DUP => handle_dup(frame.rdi as u32, frame.rsi as u32),
+        Syscall::HANDLE_REVOKE => handle_revoke(frame.rdi as u32, frame.rsi as u32),
         _ => Err(Errno::ENOSYS),
     }
 }
@@ -121,9 +122,30 @@ fn handle_close(raw: u32) -> Result<usize, Errno> {
 
 fn handle_dup(raw: u32, mask: u32) -> Result<usize, Errno> {
     let process = process::current().ok_or(Errno::ESRCH)?;
-    let duplicate = process
-        .handles
-        .lock()
-        .dup(Handle(raw), raven_abi::types::Rights(mask))?;
+    let (duplicate, node) = {
+        let mut handles = process.handles.lock();
+        let duplicate = handles.dup(Handle(raw), raven_abi::types::Rights(mask))?;
+        let node = handles.lineage_node(duplicate).ok();
+        (duplicate, node)
+    };
+    if let Some(node) = node {
+        crate::process::handle::register_lineage(node);
+    }
     Ok(duplicate.0 as usize)
+}
+
+/// `HANDLE_REVOKE`: remove rights from a handle and every handle derived from it.
+///
+/// Contract C17: no right is required to reduce a handle the caller owns; `mask == 0` means every
+/// right currently usable; bits not held are ignored. The target node is revoked under the handle
+/// table lock, then the derived-node registry propagates the same mask across processes. The
+/// handle stays open, and a later lookup that needs a revoked bit returns `EPERM`.
+fn handle_revoke(raw: u32, mask: u32) -> Result<usize, Errno> {
+    let process = process::current().ok_or(Errno::ESRCH)?;
+    let (node, applied) = {
+        let mut handles = process.handles.lock();
+        handles.revoke_target(Handle(raw), raven_abi::types::Rights(mask))?
+    };
+    crate::process::handle::revoke_descendants(&node, applied);
+    Ok(0)
 }

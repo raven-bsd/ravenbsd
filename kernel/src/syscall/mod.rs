@@ -60,6 +60,7 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
         Some(Syscall::EXIT) => process::exit_process(frame.rdi as i32),
         // C16: authorized termination (contract crate owns the number and wording).
         Some(Syscall::PROC_TERMINATE) => process_ctl::terminate(frame),
+        Some(Syscall::PROC_NAMESPACE) => process_ctl::namespace(frame),
         Some(Syscall::FUTEX) => futex::dispatch(frame),
         #[cfg(target_arch = "x86_64")]
         Some(Syscall::DEBUG_READ) => debug_read::handle(frame),
