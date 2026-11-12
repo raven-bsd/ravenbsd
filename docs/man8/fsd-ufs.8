@@ -5,7 +5,7 @@
 .Os RavenBSD
 .Sh NAME
 .Nm fsd-ufs
-.Nd RavenBSD read-only UFS filesystem server
+.Nd RavenBSD UFS filesystem server
 .Sh SYNOPSIS
 .Nm
 .Sh DESCRIPTION
@@ -14,14 +14,16 @@ registers the
 .Dq ufs:
 scheme, opens one GPT partition from a
 .Dq block:
-device, mounts it read-only through the
+device, mounts it through the
 .Dq ufs-core
 library, and serves the tree with the
 .Dq file:
 protocol that
 .Xr vfsd 8
 mounts.
-The initial mount is read-only; K55 adds the write path.
+The mount is read-write by default; setting
+.Ev FSD_UFS_READ_ONLY
+keeps it read-only.
 .Pp
 The server selects partition 1 by default.  The partition is read with the
 24-byte
@@ -40,7 +42,7 @@ reads
 .Sy INFO
 and
 .Sy LIST
-from it, and mounts the selected partition read-only.
+from it, and mounts the selected partition.
 It then registers the
 .Dq ufs:
 scheme.
@@ -76,9 +78,29 @@ open-file description; a client that sends a nonzero wire offset gets
 A buffer smaller than the next packed entry also returns
 .Er EINVAL .
 The open-file budget is 256 descriptions.
-No write, create, truncate, rename, chmod or metadata operation is accepted;
-those return
-.Er EROFS .
+.Pp
+Open with create, truncate or append, and the
+.Sy MKDIR ,
+.Sy UNLINK ,
+.Sy RMDIR ,
+.Sy RENAME ,
+.Sy SYMLINK ,
+.Sy CHMOD and
+.Sy TRUNCATE
+control operations are forwarded to
+.Dq ufs-core .
+Writes use the open-file cursor; a successful
+.Sy SYNC
+returns only after the inode table, cylinder groups, summaries, superblock and
+block device have been flushed.
+If the superblock records WAPBL, metadata changes are staged through the
+journal before commit; an image without a journal uses the synchronous
+inode/cylinder-group/superblock ordering.
+.Pp
+After an I/O error the server enters a read-only state and rejects later
+mutations with
+.Er EROFS ;
+it never reports a failed write as durable.
 .Sh ENVIRONMENT
 .Bl -tag -width FSD_UFS_PARTITION -compact
 .It Ev FSD_UFS_DEVICE
@@ -89,6 +111,9 @@ One-based GPT partition index, default 1.  Zero mounts the whole device.
 .It Ev FSD_UFS_SCHEME
 Registered scheme name, default
 .Dq ufs .
+.It Ev FSD_UFS_READ_ONLY
+One, true or yes for a read-only mount; zero, false or no for read-write.
+The default is read-write.
 .El
 .Sh FILES
 .Bl -tag -width /etc/services.d -compact
@@ -106,8 +131,10 @@ or
 .Er ELOOP .
 A corrupt filesystem or block I/O failure returns
 .Er EIO .
-A write operation returns
+A mutation on a read-only mount, or after an I/O error, returns
 .Er EROFS .
+A full filesystem returns
+.Er ENOSPC .
 A protocol framing error returns
 .Er EPROTO .
 .Sh EXIT STATUS

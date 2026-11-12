@@ -634,6 +634,11 @@ impl<D: BlockIo> Ufs<D> {
         if !group.inode_used(&self.fs, index)? {
             return Err(UfsError::Corrupt("double free of inode"));
         }
+        // Zero the dinode before clearing the bitmap.  A crash between the two
+        // direct writes then leaves an allocated-but-empty inode, never a free
+        // bitmap with a stale non-empty dinode.  With WAPBL both updates are
+        // staged in the same transaction and commit together.
+        self.clear_inode_raw(ino)?;
         group.clear_inode_used(&self.fs, index)?;
         group.cs.nifree = group.cs.nifree.saturating_add(1);
         if mode & 0o170000 == 0o040000 {
@@ -1135,6 +1140,27 @@ impl<D: BlockIo> Ufs<D> {
         }
         self.write_block_at(fsba, &block)?;
         group.initediblk = group.initediblk.saturating_add(self.fs.inopb);
+        Ok(())
+    }
+
+    fn clear_inode_raw(&mut self, ino: Ino) -> Result<(), UfsError> {
+        let (fsba, slot) = self.fs.ino_to_fsba(ino)?;
+        let block_off = self.fs.frag_offset(fsba)?;
+        let mut block = vec![0u8; self.fs.bsize as usize];
+        self.read_disk_at(block_off, &mut block)?;
+        let inode_size = self.fs.inode_size();
+        let start = slot
+            .checked_mul(inode_size)
+            .ok_or(UfsError::Corrupt("inode slot"))?;
+        let end = start
+            .checked_add(inode_size)
+            .ok_or(UfsError::Corrupt("inode slot"))?;
+        block
+            .get_mut(start..end)
+            .ok_or(UfsError::Corrupt("inode slot"))?
+            .fill(0);
+        self.write_block_at(fsba, &block)?;
+        self.inodes.retain(|entry| entry.ino != ino);
         Ok(())
     }
 

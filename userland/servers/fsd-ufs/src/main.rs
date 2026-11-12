@@ -31,7 +31,7 @@ mod program {
     const DEFAULT_DEVICE: &str = "block:0";
     const DEFAULT_SCHEME: &str = "ufs";
     const DEFAULT_PARTITION: u32 = 1;
-    const DEFAULT_READ_ONLY: bool = true;
+    const DEFAULT_READ_ONLY: bool = false;
 
     fn main(args: raven_rt::Args) -> i32 {
         let device = args.env_get("FSD_UFS_DEVICE").unwrap_or(DEFAULT_DEVICE);

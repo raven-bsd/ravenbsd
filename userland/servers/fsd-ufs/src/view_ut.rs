@@ -185,7 +185,6 @@ fn statfs_reports_the_formatted_geometry() {
 }
 
 #[test]
-#[ignore = "blocked on ufs-core free_inode leaving freed inodes non-empty"]
 fn a_write_cycle_remounts_clean() {
     let disk = VecDisk::new(vec![0u8; options().size as usize]);
     let mut ufs = format(disk, &options()).expect("format");

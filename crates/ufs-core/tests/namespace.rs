@@ -150,7 +150,7 @@ fn unlink_file_frees_inode() {
     let free_before = ufs.statfs().files_free;
     ufs.unlink(root, b"k59-gone").expect("unlink");
     assert_eq!(ufs.lookup(root, b"k59-gone"), Err(UfsError::NotFound));
-    assert_eq!(ufs.getattr(ino).expect("freed inode").nlink, 0);
+    assert!(ufs.getattr(ino).is_err());
     assert_eq!(ufs.statfs().files_free, free_before + 1);
     ufs.verify_allocation().expect("verify");
 }
@@ -208,7 +208,7 @@ fn link_and_unlink_keep_link_count() {
     assert_eq!(ufs.getattr(file).expect("attr").nlink, 1);
     ufs.unlink(root, b"k59-b").expect("unlink b");
     assert_eq!(ufs.lookup(root, b"k59-b"), Err(UfsError::NotFound));
-    assert_eq!(ufs.getattr(file).expect("freed inode").nlink, 0);
+    assert!(ufs.getattr(file).is_err());
     ufs.verify_allocation().expect("verify");
 }
 
@@ -351,7 +351,7 @@ fn rename_file_over_file_replaces() {
     assert_eq!(ufs.lookup(root, b"k59-target").expect("lookup"), source);
     assert_eq!(read_all(&mut ufs, source, 6).expect("read"), b"source");
     assert_eq!(ufs.getattr(source).expect("attr").nlink, 1);
-    assert_eq!(ufs.getattr(target).expect("old target").nlink, 0);
+    assert!(ufs.getattr(target).is_err());
     ufs.verify_allocation().expect("verify");
 }
 
@@ -417,7 +417,7 @@ fn rename_directory_over_empty_same_parent() {
     assert_eq!(ufs.lookup(root, b"k59-src-dir"), Err(UfsError::NotFound));
     assert_eq!(ufs.lookup(root, b"k59-target-dir").expect("lookup"), source);
     assert_eq!(ufs.getattr(source).expect("attr").nlink, 2);
-    assert_eq!(ufs.getattr(target).expect("old target").nlink, 0);
+    assert!(ufs.getattr(target).is_err());
     assert_eq!(ufs.getattr(root).expect("attr").nlink, parent_links + 1);
     ufs.rmdir(root, b"k59-target-dir").expect("rmdir");
     assert_eq!(ufs.getattr(root).expect("attr").nlink, parent_links);
@@ -438,7 +438,7 @@ fn rename_directory_over_empty_across_parents() {
     assert_eq!(ufs.lookup(b, b"target").expect("lookup"), source);
     assert_eq!(ufs.lookup(source, b"..").expect("dotdot"), b);
     assert_eq!(ufs.getattr(root).expect("attr").nlink, root_links);
-    assert_eq!(ufs.getattr(target).expect("old target").nlink, 0);
+    assert!(ufs.getattr(target).is_err());
     ufs.rmdir(b, b"target").expect("rmdir");
     ufs.rmdir(root, b"k59-ra").expect("rmdir a");
     ufs.rmdir(root, b"k59-rb").expect("rmdir b");
@@ -599,7 +599,7 @@ fn rename_file_over_symlink_replaces_it() {
         .expect("rename over symlink");
     assert_eq!(ufs.lookup(root, b"k59-r-link").expect("lookup"), file);
     assert_eq!(read_all(&mut ufs, file, 7).expect("read"), b"payload");
-    assert_eq!(ufs.getattr(link).expect("old link").nlink, 0);
+    assert!(ufs.getattr(link).is_err());
     ufs.verify_allocation().expect("verify");
 }
 
@@ -930,8 +930,8 @@ fn unlink_special_files_from_golden_image() {
     ufs.unlink(root, b"fifo").expect("unlink fifo");
     assert_eq!(ufs.lookup(root, b"cdev"), Err(UfsError::NotFound));
     assert_eq!(ufs.lookup(root, b"fifo"), Err(UfsError::NotFound));
-    assert_eq!(ufs.getattr(cdev).expect("cdev inode").nlink, 0);
-    assert_eq!(ufs.getattr(fifo).expect("fifo inode").nlink, 0);
+    assert!(ufs.getattr(cdev).is_err());
+    assert!(ufs.getattr(fifo).is_err());
     ufs.verify_allocation().expect("verify");
 }
 
@@ -956,7 +956,7 @@ fn rename_file_over_special_file() {
     ufs.rename(root, b"k59-over-fifo", root, b"fifo")
         .expect("rename over fifo");
     assert_eq!(ufs.lookup(root, b"fifo").expect("lookup"), file);
-    assert_eq!(ufs.getattr(fifo).expect("old fifo").nlink, 0);
+    assert!(ufs.getattr(fifo).is_err());
 }
 
 #[test]
