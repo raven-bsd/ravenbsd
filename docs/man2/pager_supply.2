@@ -1,0 +1,51 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt PAGER_SUPPLY 2
+.Os RavenBSD
+.Sh NAME
+.Nm pager_supply
+.Nd supply a page to a pager-backed memory object
+.Sh SYNOPSIS
+.Fn pager_supply object offset data data_len
+.Sh DESCRIPTION
+.Nm
+supplies one page of
+.Fa data
+to the pager-backed memory object
+.Fa object
+created with
+.Fn memobj_create len flags
+and the
+.Dv memobj::PAGER
+flag.
+The caller must be the object's registered pager.
+.Fa offset
+is page-aligned and inside the object;
+.Fa data_len
+is between 1 and the page size.
+The kernel copies the bytes into a fresh frame, marks the page present and wakes
+threads waiting on that page.
+.Sh RETURN VALUES
+Zero on success; a negative
+.Va errno
+on failure.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EBADF
+.Fa object
+is not a live memory object.
+.It Er EPERM
+The caller is not the object's pager.
+.It Er EINVAL
+The offset, length or range is invalid.
+.It Er EFAULT
+The data pointer is not readable.
+.It Er ENOMEM
+No frame is available.
+.El
+.Sh SEE ALSO
+.Xr memobj_create 2 ,
+.Xr map 2
+.Sh STANDARDS
+RavenBSD ABI v1, contract C18.

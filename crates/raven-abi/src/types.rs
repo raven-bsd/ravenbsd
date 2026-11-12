@@ -97,6 +97,12 @@ pub mod prot {
     pub const MASK: usize = 7;
 }
 
+/// Memory-object creation flags (the `flags` argument of `MEMOBJ_CREATE`).
+pub mod memobj {
+    /// The caller becomes the pager; the returned handle is the pager key and pages are lazy.
+    pub const PAGER: usize = 1;
+}
+
 /// Mapping flags (`map_flags << 8` in the `MAP` flags argument).
 pub mod map {
     /// Place the mapping exactly at `addr`; fail if it overlaps.

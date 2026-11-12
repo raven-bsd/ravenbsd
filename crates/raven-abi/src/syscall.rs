@@ -94,11 +94,19 @@ syscalls! {
     /// `protect(proc: Handle, addr: usize, len: usize, prot: usize) -> 0`.
     PROTECT = 0x42;
 
-    /// `memobj_create(len: usize, flags: usize) -> Handle` creates an anonymous, zero-filled memory object of `len` bytes
-    /// (page multiple, `flags` must be 0) with rights `READ | WRITE | MAP | DUP | TRANSFER`. Map it into any process
-    /// with [`Syscall::MAP`] (`map::SHARED` shares the frames, otherwise copy-on-write). This is how a parent
-    /// writes a child's stack and segments: map the object into itself, fill it, map the same object into the child.
+    /// `memobj_create(len: usize, flags: usize) -> Handle` creates a memory object of `len` bytes
+    /// (page multiple) with rights `READ | WRITE | MAP | DUP | TRANSFER`. `flags` bit
+    /// `types::memobj::PAGER` makes the caller the pager: no frames are allocated, the returned
+    /// handle is the pager key, and page faults are served through `PAGER_SUPPLY`. `flags` 0 keeps
+    /// the anonymous zero-filled eager object. Map it with [`Syscall::MAP`] (`map::SHARED` shares
+    /// the frames, otherwise copy-on-write).
     MEMOBJ_CREATE = 0x43;
+    /// `pager_supply(object: Handle, offset: usize, data: &[u8]) -> 0` supplies one page to a
+    /// pager-backed memory object created with `memobj_create(..., memobj::PAGER)`. The caller must
+    /// be the object's pager; `offset` is page-aligned and inside the object, `data` is 1..=PAGE
+    /// bytes. The kernel copies it into a fresh frame, marks the page present and wakes waiters.
+    /// Contract C18.
+    PAGER_SUPPLY = 0x100;
 
     /// `handle_close(h: Handle) -> 0`.
     HANDLE_CLOSE = 0x50;

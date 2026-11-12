@@ -10,7 +10,13 @@
 .Ft Handle
 .Fn memobj_create "usize len" "usize flags"
 .Sh DESCRIPTION
-The .Nm system call creates an anonymous zero-filled memory object.
+The .Nm system call creates a memory object. With a zero
+.Fa flags
+argument it is anonymous and zero-filled. With the
+.Dv memobj::PAGER
+flag the caller becomes the object's pager: no frames are allocated, the
+returned handle is the pager key, and page faults are served with
+.Xr pager_supply 2 .
 .Pp
 This page documents the native RavenBSD ABI; see the
 .Pa raven-abi
