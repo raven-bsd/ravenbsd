@@ -1055,6 +1055,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-tcpip-wire"
+version = "0.1.0"
+
+[[package]]
 name = "raven-testkernel"
 version = "0.1.0"
 dependencies = [
