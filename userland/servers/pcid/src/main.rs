@@ -89,6 +89,18 @@ mod program {
             }
         };
         let devices = enumerate(ecam, bus);
+        for device in &devices {
+            raven_rt::println!(
+                "pcid: device {} vendor={:#06x} device={:#06x} class={:#04x} subclass={:#04x} irq_line={} irq_pin={}",
+                device.name(),
+                device.vendor,
+                device.device,
+                device.class,
+                device.subclass,
+                device.interrupt_line,
+                device.interrupt_pin
+            );
+        }
         raven_rt::println!("pcid: devices={}", devices.len());
         let mut server = match Server::register("pci") {
             Ok(server) => server,
