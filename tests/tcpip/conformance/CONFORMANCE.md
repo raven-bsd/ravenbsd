@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # TCP conformance results
 
 Fresh BSD-3-Clause scripts run through the C04 simulator. packetdrill
