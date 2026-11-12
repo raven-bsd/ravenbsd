@@ -945,6 +945,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-s21d-aarch64"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-s24-child"
 version = "0.1.0"
 dependencies = [
