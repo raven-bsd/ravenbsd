@@ -564,3 +564,11 @@ fn default_mss_bounds_are_sane() {
     assert!(config.mss_floor >= 536);
     assert!(config.mss_ceiling <= 1460);
 }
+
+#[test]
+fn sack_permitted_is_negotiated_on_the_default_handshake() {
+    let (_link, mut a, mut b) = pair();
+    let (sa, sb) = handshake(&mut a, &mut b);
+    assert_eq!(a.test_tcp_sack_permitted(sa), Some(true));
+    assert_eq!(b.test_tcp_sack_permitted(sb), Some(true));
+}
