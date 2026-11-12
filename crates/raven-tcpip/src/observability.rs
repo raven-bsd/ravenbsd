@@ -1360,6 +1360,16 @@ impl<D: crate::Device> Stack<D> {
 
     fn apply_property(&mut self, name: &str, value: u64) {
         match name {
+            "tcp.hash_chain_max" => self
+                .sockets
+                .set_index_max_chain(usize::try_from(value).unwrap_or(8)),
+            "tcp.timewait_max" => self
+                .timewait
+                .set_capacity(usize::try_from(value).unwrap_or(65_536)),
+            "tcp.port_range_first" | "tcp.port_range_last" => self.ports.set_range(
+                u16::try_from(self.tunables.port_range_first).unwrap_or(32_768),
+                u16::try_from(self.tunables.port_range_last).unwrap_or(60_999),
+            ),
             "tcp.reassembly_timeout" => self.reassembly.set_timeout_ms(value),
             "tcp.reassembly_holes_max" => {
                 self.reassembly

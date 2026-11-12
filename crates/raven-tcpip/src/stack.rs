@@ -194,6 +194,10 @@ pub struct Stack<D: Device> {
     pub(crate) ip_errors: Vec<(Ipv4Addr, Errno)>,
     pub(crate) arp_requests: usize,
     pub(crate) next_ephemeral: u16,
+    /// Live randomised ephemeral-port allocator (C17).
+    pub(crate) ports: crate::table::PortAllocator,
+    /// Live TIME-WAIT membership and recycling (C17).
+    pub(crate) timewait: crate::table::TimeWaitTable<u32>,
     pub(crate) next_isn: u32,
     pub(crate) option_override: Option<Vec<u8>>,
     #[allow(dead_code)] // Used when the tcp-md5 feature is enabled.
@@ -273,7 +277,11 @@ impl<D: Device> Stack<D> {
         Self {
             device,
             config,
-            sockets: SocketTable::new(config.max_sockets),
+            sockets: SocketTable::new(
+                config.max_sockets,
+                cookie_secret,
+                usize::try_from(tunables.hash_chain_max).unwrap_or(8),
+            ),
             events: VecDeque::new(),
             timers: Vec::new(),
             next_timer_id: 1,
@@ -294,6 +302,14 @@ impl<D: Device> Stack<D> {
             ip_errors: Vec::new(),
             arp_requests: 0,
             next_ephemeral,
+            ports: crate::table::PortAllocator::new(
+                u16::try_from(tunables.port_range_first).unwrap_or(32_768),
+                u16::try_from(tunables.port_range_last).unwrap_or(60_999),
+                cookie_secret ^ 0x706f_7274,
+            ),
+            timewait: crate::table::TimeWaitTable::new(
+                usize::try_from(tunables.timewait_max).unwrap_or(65_536),
+            ),
             next_isn,
             option_override: None,
             md5_keys: BTreeMap::new(),
@@ -479,36 +495,11 @@ impl<D: Device> Stack<D> {
     }
 
     fn observe_hash_chains(&mut self) {
-        let max_chain = usize::try_from(self.tunables.hash_chain_max).unwrap_or(8);
-        let mut table = crate::table::ConnectionTable::new(
-            self.config.max_sockets.max(1),
-            self.cookie_secret,
-            max_chain,
-        );
-        for record in self.sockets.records.values() {
-            if record.closed {
-                continue;
-            }
-            let crate::socket::Kind::Tcp(connection) = &record.kind else {
-                continue;
-            };
-            let Some((remote, remote_port)) = connection.remote else {
-                continue;
-            };
-            table.insert(
-                crate::table::ConnectionKey {
-                    local: connection.local,
-                    local_port: connection.local_port,
-                    remote,
-                    remote_port,
-                },
-                (),
-            );
-        }
+        let fresh = self.sockets.take_long_chains();
         self.counters.hash_chain_overflows = self
             .counters
             .hash_chain_overflows
-            .wrapping_add(u64::try_from(table.stats.long_chain_warnings).unwrap_or(0));
+            .wrapping_add(u64::try_from(fresh).unwrap_or(0));
     }
 
     fn refresh_events(&mut self) {
@@ -549,10 +540,10 @@ impl<D: Device> Stack<D> {
                 pending, reported, ..
             } = &mut record.kind
             {
-                for connection in pending.iter().skip(*reported) {
+                for connection in pending.sockets().skip(*reported) {
                     events.push(Event::Accepted {
                         listener: id,
-                        conn: *connection,
+                        conn: SocketId(connection),
                     });
                 }
                 *reported = pending.len();

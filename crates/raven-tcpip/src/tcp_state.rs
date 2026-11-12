@@ -404,7 +404,7 @@ impl<D: Device> Stack<D> {
     #[must_use]
     pub fn test_listener_half_open(&self, listener: SocketId) -> Vec<SocketId> {
         match self.sockets.record(listener).map(|record| &record.kind) {
-            Ok(Kind::Listener { half_open, .. }) => half_open.iter().copied().collect(),
+            Ok(Kind::Listener { half_open, .. }) => half_open.sockets().map(SocketId).collect(),
             _ => Vec::new(),
         }
     }
@@ -1085,21 +1085,9 @@ impl<D: Device> Stack<D> {
             }
         }
 
-        let exact = self.sockets.records.iter().find_map(|(raw_id, record)| {
-            if record.closed {
-                return None;
-            }
-            match &record.kind {
-                Kind::Tcp(connection)
-                    if connection.local == destination
-                        && connection.local_port == destination_port
-                        && connection.remote == Some((source, source_port)) =>
-                {
-                    Some(SocketId(*raw_id))
-                }
-                _ => None,
-            }
-        });
+        let exact =
+            self.sockets
+                .find_connection(destination, destination_port, source, source_port);
         if let Some(socket) = exact {
             self.counters.in_segments = self.counters.in_segments.wrapping_add(1);
             self.tcp_input_established(socket, &segment, now);
@@ -1154,6 +1142,34 @@ impl<D: Device> Stack<D> {
         );
     }
 
+    /// Forget half-open entries whose connection closed or left SYN-RECEIVED.
+    fn prune_half_open(&mut self, listener: SocketId) {
+        let queued: Vec<u32> = match self.sockets.record(listener).map(|record| &record.kind) {
+            Ok(Kind::Listener { half_open, .. }) => half_open.sockets().collect(),
+            _ => return,
+        };
+        let stale: Vec<u32> = queued
+            .into_iter()
+            .filter(|raw| {
+                !self.sockets.records.get(raw).is_some_and(|record| {
+                    !record.closed
+                        && matches!(&record.kind,
+                            Kind::Tcp(connection) if connection.state == TcpState::SynReceived)
+                })
+            })
+            .collect();
+        if stale.is_empty() {
+            return;
+        }
+        if let Ok(record) = self.sockets.record_mut(listener)
+            && let Kind::Listener { half_open, .. } = &mut record.kind
+        {
+            for raw in stale {
+                half_open.remove_socket(raw);
+            }
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn tcp_listen_input(
         &mut self,
@@ -1205,6 +1221,7 @@ impl<D: Device> Stack<D> {
         if !segment.syn() {
             return;
         }
+        self.prune_half_open(listener);
         let limit = usize::try_from(self.tunables.half_open_limit).unwrap_or(1024);
         let backlog_full = match self.sockets.record(listener) {
             Ok(SocketRecord {
@@ -1276,8 +1293,15 @@ impl<D: Device> Stack<D> {
         self.counters.passive_opens = self.counters.passive_opens.wrapping_add(1);
         if let Ok(record) = self.sockets.record_mut(listener)
             && let Kind::Listener { half_open, .. } = &mut record.kind
+            && !half_open.push(crate::HalfOpen {
+                remote: source,
+                remote_port: source_port,
+                irs: segment.seq,
+                iss,
+                socket: socket.0,
+            })
         {
-            half_open.push_back(socket);
+            self.counters.half_open_drops = self.counters.half_open_drops.wrapping_add(1);
         }
         let _ = self.send_syn_ack(socket);
     }
@@ -1292,6 +1316,7 @@ impl<D: Device> Stack<D> {
         let mut rst_seq = 0;
         let mut close_error = None;
         let mut time_wait = false;
+        let mut time_wait_refreshed = false;
         let mut fin_wait2 = false;
         let mut closed = false;
         let mut pending_listener = None;
@@ -1767,6 +1792,7 @@ impl<D: Device> Stack<D> {
                         }
                         if segment.fin() {
                             connection.rcv_nxt = connection.rcv_nxt.wrapping_add(1);
+                            time_wait_refreshed = true;
                             connection.time_wait_deadline = Some(Instant::from_millis(
                                 now.as_millis().saturating_add(
                                     i64::try_from(self.tunables.time_wait_interval)
@@ -1817,19 +1843,34 @@ impl<D: Device> Stack<D> {
                     _ => None,
                 }
             });
+            let entry = self.sockets.record(socket).ok().and_then(|record| {
+                let Kind::Tcp(connection) = &record.kind else {
+                    return None;
+                };
+                let (remote, remote_port) = connection.remote?;
+                Some(crate::HalfOpen {
+                    remote,
+                    remote_port,
+                    irs: connection.irs,
+                    iss: connection.iss,
+                    socket: socket.0,
+                })
+            });
             if let Some(listener) = listener
+                && let Some(entry) = entry
                 && let Ok(record) = self.sockets.record_mut(listener)
                 && let Kind::Listener {
                     pending, half_open, ..
                 } = &mut record.kind
             {
-                half_open.retain(|connection| *connection != socket);
+                half_open.remove_socket(socket.0);
                 let limit = usize::try_from(self.tunables.accept_queue_limit).unwrap_or(128);
                 if pending.len() >= limit {
+                    pending.count_drop();
                     self.counters.accept_queue_drops =
                         self.counters.accept_queue_drops.wrapping_add(1);
-                } else if !pending.contains(&socket) {
-                    pending.push_back(socket);
+                } else if !pending.contains_socket(socket.0) {
+                    pending.push(entry);
                 }
             }
         }
@@ -1873,7 +1914,9 @@ impl<D: Device> Stack<D> {
             self.fast_retransmit(socket);
         }
         self.tcp_sack_recover(socket);
-        self.enforce_timewait_limit(socket);
+        if time_wait || time_wait_refreshed {
+            self.note_time_wait(socket);
+        }
         if send_syn_ack {
             let _ = self.send_syn_ack(socket);
         }
@@ -1974,9 +2017,16 @@ impl<D: Device> Stack<D> {
         {
             let limit = usize::try_from(self.tunables.accept_queue_limit).unwrap_or(128);
             if pending.len() >= limit {
+                pending.count_drop();
                 self.counters.accept_queue_drops = self.counters.accept_queue_drops.wrapping_add(1);
             } else {
-                pending.push_back(socket);
+                pending.push(crate::HalfOpen {
+                    remote: source,
+                    remote_port: source_port,
+                    irs: segment.seq.wrapping_sub(1),
+                    iss: segment.ack.wrapping_sub(1),
+                    socket: socket.0,
+                });
             }
         }
         let _ = self.send_ack_for(socket);
@@ -2059,48 +2109,34 @@ impl<D: Device> Stack<D> {
         }
     }
 
-    fn enforce_timewait_limit(&mut self, current: SocketId) {
-        let current_is_timewait = self
-            .sockets
-            .record(current)
-            .ok()
-            .is_some_and(|record| {
-                matches!(&record.kind, Kind::Tcp(connection) if connection.state == TcpState::TimeWait)
-            });
-        if !current_is_timewait {
-            return;
-        }
-        let limit = usize::try_from(self.tunables.timewait_max).unwrap_or(65_536);
-        loop {
-            let timewait: Vec<(SocketId, Instant)> = self
-                .sockets
-                .records
-                .iter()
-                .filter_map(|(raw_id, record)| match &record.kind {
-                    Kind::Tcp(connection) if connection.state == TcpState::TimeWait => Some((
-                        SocketId(*raw_id),
-                        connection.time_wait_deadline.unwrap_or(Instant::ZERO),
-                    )),
-                    _ => None,
-                })
-                .collect();
-            if timewait.len() <= limit {
-                break;
-            }
-            let Some((oldest, _)) = timewait.into_iter().min_by_key(|(_, deadline)| *deadline)
-            else {
-                break;
+    /// Record a connection in the TIME-WAIT table and recycle the oldest when it is full.
+    fn note_time_wait(&mut self, socket: SocketId) {
+        let Some((key, deadline)) = self.sockets.record(socket).ok().and_then(|record| {
+            let Kind::Tcp(connection) = &record.kind else {
+                return None;
             };
-            if oldest == current {
-                break;
+            if connection.state != TcpState::TimeWait {
+                return None;
             }
-            if let Ok(record) = self.sockets.record_mut(oldest) {
-                if let Kind::Tcp(connection) = &mut record.kind {
-                    connection.state = TcpState::Closed;
-                }
+            Some((
+                crate::socket::connection_key(connection)?,
+                connection.time_wait_deadline?.as_millis(),
+            ))
+        }) else {
+            return;
+        };
+        for raw in self.timewait.insert(key, socket.0, deadline) {
+            if raw == socket.0 {
+                continue;
+            }
+            if let Some(record) = self.sockets.records.get_mut(&raw)
+                && let Kind::Tcp(connection) = &mut record.kind
+                && connection.state == TcpState::TimeWait
+            {
+                connection.state = TcpState::Closed;
                 record.closed = true;
+                self.counters.timewait_recycled = self.counters.timewait_recycled.wrapping_add(1);
             }
-            self.counters.timewait_recycled = self.counters.timewait_recycled.wrapping_add(1);
         }
     }
 
@@ -2608,6 +2644,7 @@ impl<D: Device> Stack<D> {
     }
 
     pub(crate) fn process_tcp_timers(&mut self, now: Instant) {
+        self.timewait.expire_values(now.as_millis());
         let sockets: Vec<SocketId> = self
             .sockets
             .records

@@ -18,6 +18,8 @@ pub struct HalfOpen {
     pub irs: u32,
     /// Our initial sequence.
     pub iss: u32,
+    /// The socket record that carries this connection.
+    pub socket: u32,
 }
 
 /// Counters for the listen path.
@@ -75,6 +77,19 @@ impl HalfOpenQueue {
         self.entries.remove(index)
     }
 
+    /// Remove the entry carried by `socket`; returns whether one was queued.
+    pub fn remove_socket(&mut self, socket: u32) -> bool {
+        match self.entries.iter().position(|entry| entry.socket == socket) {
+            Some(index) => self.entries.remove(index).is_some(),
+            None => false,
+        }
+    }
+
+    /// The sockets of the queued entries, oldest first.
+    pub fn sockets(&self) -> impl Iterator<Item = u32> + '_ {
+        self.entries.iter().map(|entry| entry.socket)
+    }
+
     /// Number of half-open entries.
     #[must_use]
     pub fn len(&self) -> usize {
@@ -120,6 +135,27 @@ impl AcceptQueue {
     /// Pop one completed connection.
     pub fn pop(&mut self) -> Option<HalfOpen> {
         self.entries.pop_front()
+    }
+
+    /// Whether `socket` is queued.
+    #[must_use]
+    pub fn contains_socket(&self, socket: u32) -> bool {
+        self.entries.iter().any(|entry| entry.socket == socket)
+    }
+
+    /// The sockets of the queued entries, oldest first.
+    pub fn sockets(&self) -> impl Iterator<Item = u32> + '_ {
+        self.entries.iter().map(|entry| entry.socket)
+    }
+
+    /// Drop every queued entry.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Count a connection dropped because the configured limit was reached.
+    pub fn count_drop(&mut self) {
+        self.stats.accept_queue_drops = self.stats.accept_queue_drops.saturating_add(1);
     }
 
     /// Number of completed connections.

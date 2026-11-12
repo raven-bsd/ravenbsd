@@ -269,7 +269,13 @@ impl<D: Device> Stack<D> {
         let Kind::Listener { pending, .. } = &mut record.kind else {
             return Err(Errno::ENOTSOCK);
         };
-        pending.push_back(connection);
+        pending.push(crate::HalfOpen {
+            remote: crate::IpAddr::V4(crate::Ipv4Addr::UNSPECIFIED),
+            remote_port: 0,
+            irs: 0,
+            iss: 0,
+            socket: connection.0,
+        });
         Ok(connection)
     }
 }
