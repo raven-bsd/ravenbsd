@@ -112,6 +112,7 @@ pub(crate) struct TcpConnection {
     pub our_mss: u16,
     pub mss_clamps: usize,
     pub paws_drops: usize,
+    pub sack_permitted: bool,
 }
 
 impl TcpConnection {
@@ -183,6 +184,7 @@ impl TcpConnection {
             our_mss: 1460,
             mss_clamps: 0,
             paws_drops: 0,
+            sack_permitted: false,
         }
     }
 
@@ -255,6 +257,7 @@ impl TcpConnection {
             our_mss: 1460,
             mss_clamps: 0,
             paws_drops: 0,
+            sack_permitted: false,
         }
     }
 
@@ -283,6 +286,7 @@ struct Segment {
     wscale: Option<u8>,
     tsval: Option<u32>,
     tsecr: Option<u32>,
+    sack_permitted: bool,
     payload: Vec<u8>,
 }
 
@@ -440,6 +444,16 @@ impl<D: Device> Stack<D> {
                 connection.paws_drops,
                 connection.last_tsval,
             )),
+            _ => None,
+        }
+    }
+
+    /// Whether SACK-permitted was negotiated (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_tcp_sack_permitted(&self, socket: SocketId) -> Option<bool> {
+        match &self.sockets.record(socket).ok()?.kind {
+            Kind::Tcp(connection) => Some(connection.sack_permitted),
             _ => None,
         }
     }
@@ -695,10 +709,12 @@ impl<D: Device> Stack<D> {
         let mut wscale = None;
         let mut tsval = None;
         let mut tsecr = None;
+        let mut sack_permitted = false;
         for option in packet.options() {
             match option {
                 Ok(TcpOption::MaxSegmentSize(value)) => mss = Some(value),
                 Ok(TcpOption::WindowScale(value)) => wscale = Some(value),
+                Ok(TcpOption::SackPermitted) => sack_permitted = true,
                 Ok(TcpOption::Timestamps { tsval: v, tsecr: e }) => {
                     tsval = Some(v);
                     tsecr = Some(e);
@@ -716,6 +732,7 @@ impl<D: Device> Stack<D> {
             wscale,
             tsval,
             tsecr,
+            sack_permitted,
             payload: packet.payload().to_vec(),
         };
         let source_port = packet.src_port();
@@ -1887,6 +1904,9 @@ fn apply_syn_options(connection: &mut TcpConnection, segment: &Segment, now: Ins
     }
     if connection.offer_wscale {
         connection.snd_wscale = segment.wscale.unwrap_or(0).min(14);
+    }
+    if segment.sack_permitted {
+        connection.sack_permitted = true;
     }
     if connection.offer_timestamps
         && let Some(tsval) = segment.tsval
