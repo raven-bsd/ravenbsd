@@ -28,6 +28,18 @@ pub trait StackBackend {
     /// Enable DHCP.
     fn enable_dhcp(&mut self);
 
+    /// Enable DHCP, or report that this backend has no DHCP client.
+    ///
+    /// The default forwards to [`Self::enable_dhcp`] and succeeds. A backend without a client
+    /// overrides it to return [`Errno::EOPNOTSUPP`] so a caller can tell "no lease will ever
+    /// arrive" from "no lease yet". A native client needs the backend to send and receive UDP
+    /// from the unconfigured address (broadcast from 0.0.0.0:68) and to let the lease replace
+    /// the interface address, which is a change to the device-facing half of this trait.
+    fn try_enable_dhcp(&mut self) -> Result<(), Errno> {
+        self.enable_dhcp();
+        Ok(())
+    }
+
     /// Listen on `port`.
     fn tcp_listen(&mut self, port: u16, backlog: usize) -> Result<SocketId, Errno>;
 

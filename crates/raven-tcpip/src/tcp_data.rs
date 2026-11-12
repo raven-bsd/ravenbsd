@@ -3,6 +3,7 @@
 
 //! TCP data queues, window accounting, SWS, Nagle and delayed ACK.
 
+use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
@@ -33,7 +34,7 @@ impl<D: Device> Stack<D> {
             }
             let room = record.tx_cap.saturating_sub(record.tx.len());
             let accepted = data.len().min(room);
-            record.tx.extend(data[..accepted].iter().copied());
+            record.tx.extend(&data[..accepted]);
             accepted
         };
         if accepted == 0 {
@@ -73,9 +74,11 @@ impl<D: Device> Stack<D> {
                 return Ok(0);
             }
             let count = buffer.len().min(record.rx.len());
-            for (destination, source) in buffer.iter_mut().zip(record.rx.drain(..count)) {
-                *destination = source;
-            }
+            let (front, back) = record.rx.as_slices();
+            let first = count.min(front.len());
+            buffer[..first].copy_from_slice(&front[..first]);
+            buffer[first..count].copy_from_slice(&back[..count - first]);
+            record.rx.drain(..count);
             count
         };
         if count == 0 {
@@ -210,13 +213,7 @@ impl<D: Device> Stack<D> {
                                 }
                             }
                             let start = usize::try_from(inflight).unwrap_or(usize::MAX);
-                            let payload: Vec<u8> = record
-                                .tx
-                                .iter()
-                                .skip(start)
-                                .take(take as usize)
-                                .copied()
-                                .collect();
+                            let payload = queue_range(&record.tx, start, take as usize);
                             let push = start + payload.len() == record.tx.len();
                             Some(Some((
                                 payload,
@@ -549,7 +546,7 @@ impl<D: Device> Stack<D> {
                 let take = (payload.len() - data_start).min(room);
                 record
                     .rx
-                    .extend(payload[data_start..data_start + take].iter().copied());
+                    .extend(&payload[data_start..data_start + take]);
                 self.tcp_data_delivered = self.tcp_data_delivered.saturating_add(take);
                 self.counters.in_bytes = self
                     .counters
@@ -589,7 +586,7 @@ impl<D: Device> Stack<D> {
                     }
                     let room = record.rx_cap.saturating_sub(record.rx.len());
                     let take = (data.len() - skip).min(room);
-                    record.rx.extend(data[skip..skip + take].iter().copied());
+                    record.rx.extend(&data[skip..skip + take]);
                     self.counters.in_bytes = self
                         .counters
                         .in_bytes
@@ -732,6 +729,23 @@ fn ooo_creates_hole(ooo: &[(u32, Vec<u8>)], seq: u32, len: usize) -> bool {
         let other_end = start.wrapping_add(u32::try_from(data.len()).unwrap_or(u32::MAX));
         seq_ge(end, *start) && seq_ge(other_end, seq)
     })
+}
+
+/// Copy `len` bytes of `queue` starting at `start`, clamped to what the queue holds.
+pub(crate) fn queue_range(queue: &VecDeque<u8>, start: usize, len: usize) -> Vec<u8> {
+    let (front, back) = queue.as_slices();
+    let mut bytes = Vec::with_capacity(len.min(queue.len().saturating_sub(start)));
+    if start < front.len() {
+        let end = front.len().min(start.saturating_add(len));
+        bytes.extend_from_slice(&front[start..end]);
+    }
+    let wanted = len.saturating_sub(bytes.len());
+    let back_start = start.saturating_sub(front.len());
+    if wanted > 0 && back_start < back.len() {
+        let end = back.len().min(back_start + wanted);
+        bytes.extend_from_slice(&back[back_start..end]);
+    }
+    bytes
 }
 
 /// Number of separate contiguous ranges held out of order.

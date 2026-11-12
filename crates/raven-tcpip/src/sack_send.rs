@@ -227,13 +227,7 @@ impl<D: Device> Stack<D> {
         let ack = connection.rcv_nxt;
         let seq = una.wrapping_add(offset);
         let options = crate::tcp_state::timestamp_options_public(connection, now_ms);
-        let payload: Vec<u8> = record
-            .tx
-            .iter()
-            .skip(start)
-            .take(take)
-            .copied()
-            .collect();
+        let payload = crate::tcp_data::queue_range(&record.tx, start, take);
         Some((payload, local, remote, port, seq, ack, window, options))
     }
 }

@@ -44,6 +44,11 @@ impl<B: StackBackend> Core<B> {
         self.backend.enable_dhcp();
     }
 
+    /// Enable DHCP, or return [`Errno::EOPNOTSUPP`] when the backend has no DHCP client.
+    pub fn try_enable_dhcp(&mut self) -> Result<(), Errno> {
+        self.backend.try_enable_dhcp()
+    }
+
     /// Listen for TCP connections.
     pub fn tcp_listen(&mut self, port: u16, backlog: usize) -> Result<SocketId, Errno> {
         self.backend.tcp_listen(port, backlog)
