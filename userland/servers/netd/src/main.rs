@@ -14,11 +14,11 @@ extern crate alloc;
 mod program {
     use alloc::collections::BTreeMap;
     use alloc::rc::Rc;
+    use alloc::string::String;
     use core::cell::Cell;
 
     use raven_abi::errno::Errno;
     use raven_abi::types::{Handle, clock};
-    use raven_netcore::Event;
     use raven_proto_fs::Stat;
     use raven_proto_net::socket::{Call, Response, SocketRequest};
     use raven_rt::entry;
@@ -27,7 +27,7 @@ mod program {
         CallReply, Ctx, Handler, HandlerError, HandlerResult, Kernel, Opened, RtKernel, Server,
     };
 
-    use netd::{Loopback, Netd};
+    use netd::{Loopback, NetEvent, Netd};
 
     entry!(main);
 
@@ -36,14 +36,26 @@ mod program {
     struct NetHandler {
         netd: Netd<Loopback>,
         events: BTreeMap<u64, Handle>,
+        nic_retry_ms: i64,
     }
 
-    fn main(_args: raven_rt::Args) -> i32 {
+    fn main(args: raven_rt::Args) -> i32 {
         let now = now_ms();
+        let require_nic = args.get(1) == Some("nic");
+        let netd = Netd::new(Loopback::new(MAC), MAC, now);
         let mut handler = NetHandler {
-            netd: Netd::new(Loopback::new(MAC), MAC, now),
+            netd,
             events: BTreeMap::new(),
+            nic_retry_ms: now,
         };
+        if require_nic {
+            if let Err(error) = handler.try_nic(now) {
+                raven_rt::eprintln!("netd: nic: {error}");
+                return 1;
+            }
+        } else {
+            let _ = handler.try_nic(now);
+        }
         let registered = Rc::new(Cell::new(None));
         let kernel = RecordingKernel {
             inner: RtKernel,
@@ -76,6 +88,10 @@ mod program {
         let mut events = [EvqEvent::default(); 4];
         loop {
             let now = now_ms();
+            if !handler.netd.has_nic() && now >= handler.nic_retry_ms {
+                let _ = handler.try_nic(now);
+                handler.nic_retry_ms = now.saturating_add(1_000);
+            }
             let ready = handler.netd.poll(now);
             handler.signal_events(&ready);
             // No stack timer pending: block on the scheme-server source and its client events.
@@ -102,16 +118,32 @@ mod program {
     }
 
     impl NetHandler {
-        fn signal_events(&mut self, ready: &[Event]) {
-            for event in ready {
-                let socket = match event {
-                    Event::Readable(socket)
-                    | Event::Writable(socket)
-                    | Event::Closed(socket)
-                    | Event::Error(socket, _) => *socket,
-                    Event::Accepted { listener, .. } => *listener,
+        fn try_nic(&mut self, now: i64) -> Result<(), String> {
+            if self.netd.has_nic() {
+                return Ok(());
+            }
+            let config = netd::nic::attach(&mut self.netd, now)?;
+            raven_rt::println!(
+                "netd: interface eth0 {}.{}.{}.{}/{}",
+                config.addr[0],
+                config.addr[1],
+                config.addr[2],
+                config.addr[3],
+                config.prefix
+            );
+            Ok(())
+        }
+
+        fn signal_events(&mut self, ready: &[NetEvent]) {
+            for ready in ready {
+                let socket = match ready.event {
+                    raven_netcore::Event::Readable(socket)
+                    | raven_netcore::Event::Writable(socket)
+                    | raven_netcore::Event::Closed(socket)
+                    | raven_netcore::Event::Error(socket, _) => socket,
+                    raven_netcore::Event::Accepted { listener, .. } => listener,
                 };
-                for file in self.netd.files_for_socket(socket) {
+                for file in self.netd.files_for_socket(ready.interface, socket) {
                     if let Some(event) = self.events.get(&file) {
                         let _ = event_signal(*event, 1);
                     }

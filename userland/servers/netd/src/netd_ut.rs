@@ -21,8 +21,26 @@ const UDP_CLIENT: Endpoint = Endpoint {
     port: 7002,
 };
 
+const NIC_MAC: [u8; 6] = [0x02, 0, 0, 0, 0, 2];
+
 fn new_netd() -> Netd<Loopback> {
     Netd::new(Loopback::new(MAC), MAC, 0)
+}
+
+fn new_netd_with_nic() -> Netd<Loopback> {
+    let mut netd = new_netd();
+    netd.attach_nic(
+        Loopback::new(NIC_MAC),
+        NicConfig {
+            mac: NIC_MAC,
+            mtu: 1500,
+            addr: [10, 0, 2, 15],
+            prefix: 24,
+            gateway: Some([10, 0, 2, 2]),
+        },
+        0,
+    );
+    netd
 }
 
 fn call_request(netd: &mut Netd<Loopback>, file: u64, request: &SocketRequest<'_>) -> Vec<u8> {
@@ -146,6 +164,67 @@ fn tcp_loopback_echo_and_orderly_close() {
     netd.close(client).unwrap();
     netd.close(listener).unwrap();
     assert_eq!(netd.socket_files(), 0);
+}
+
+#[test]
+fn nic_core_serves_non_loopback_paths_and_lists_eth0() {
+    let mut netd = new_netd_with_nic();
+    let endpoint = Endpoint {
+        ip: [10, 0, 2, 15],
+        port: 7000,
+    };
+    let listener = netd.open("net:tcp/10.0.2.15:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, listener, Call::Listen { backlog: 2 }),
+        Response::Ok
+    );
+    let client = netd.open("net:tcp/10.0.2.15:7000").unwrap();
+    assert_eq!(
+        call_socket(&mut netd, client, Call::Connect(endpoint)),
+        Response::Ok
+    );
+    let mut now = 0;
+    let id = accept(&mut netd, listener, &mut now);
+    let accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+
+    assert_eq!(netd.write(client, 0, b"nic").unwrap(), 3);
+    let mut buffer = [0u8; 8];
+    let read = read_retry(&mut netd, accepted, &mut buffer, &mut now);
+    assert_eq!(&buffer[..read], b"nic");
+    assert_eq!(netd.write(accepted, 0, &buffer[..read]).unwrap(), 3);
+    let read = read_retry(&mut netd, client, &mut buffer, &mut now);
+    assert_eq!(&buffer[..read], b"nic");
+    match call_socket(&mut netd, client, Call::GetSockName) {
+        Response::Endpoint(endpoint) => assert_eq!(endpoint.ip, [10, 0, 2, 15]),
+        other => panic!("unexpected getsockname: {other:?}"),
+    }
+
+    let control = netd.open("net:").unwrap();
+    let response = call_iface(&mut netd, control, IfaceRequest::List);
+    let count = IfaceResponse::decode(response.get(..8).unwrap()).unwrap();
+    assert_eq!(count, IfaceResponse::Count { count: 2 });
+    let name_len = response[14] as usize;
+    let iface_len = 21 + name_len;
+    let lo = IfaceResponse::decode(response.get(8..8 + iface_len).unwrap()).unwrap();
+    let IfaceResponse::Iface(lo) = lo else {
+        panic!("missing lo");
+    };
+    assert_eq!(lo.name.as_str(), "lo");
+    let offset = 8 + iface_len;
+    let name_len = response[offset + 6] as usize;
+    let eth = IfaceResponse::decode(response.get(offset..offset + 21 + name_len).unwrap()).unwrap();
+    let IfaceResponse::Iface(eth) = eth else {
+        panic!("missing eth0");
+    };
+    assert_eq!(eth.name.as_str(), "eth0");
+    assert_eq!(eth.addr, [10, 0, 2, 15]);
+    assert_eq!(eth.prefix, 24);
+    assert_eq!(eth.mac, NIC_MAC);
+    assert_eq!(eth.mtu, 1500);
+
+    netd.close(accepted).unwrap();
+    netd.close(client).unwrap();
+    netd.close(listener).unwrap();
 }
 
 #[test]
