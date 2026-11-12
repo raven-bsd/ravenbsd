@@ -184,7 +184,7 @@ fn socket_table_refuses_max_plus_one() {
 }
 
 #[test]
-fn send_exhaustion_returns_eagain_and_counts_a_drop() {
+fn send_exhaustion_returns_eagain() {
     let config = StackConfig {
         tx_queue_bytes: 4,
         ..StackConfig::default()
@@ -194,8 +194,6 @@ fn send_exhaustion_returns_eagain_and_counts_a_drop() {
     assert_eq!(stack.send(socket, b"1234").expect("first send"), 4);
     assert_eq!(stack.send(socket, b"5"), Err(Errno::EAGAIN));
     let result = stack.poll(Instant::ZERO);
-    assert_eq!(result.dropped, 1);
-    let result = stack.poll(Instant::from_millis(1));
     assert_eq!(result.dropped, 0);
 }
 

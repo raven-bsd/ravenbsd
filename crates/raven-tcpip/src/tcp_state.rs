@@ -76,6 +76,17 @@ pub(crate) struct TcpConnection {
     pub keepalive_left: u8,
     pub challenge_tokens: u32,
     pub challenge_last: Instant,
+    pub mss: u16,
+    pub nodelay: bool,
+    pub ack_deadline: Option<Instant>,
+    pub ack_segments: u8,
+    pub ooo: Vec<(u32, Vec<u8>)>,
+    pub ooo_limit: usize,
+    pub zero_window_deadline: Option<Instant>,
+    pub zero_window_backoff_ms: u64,
+    pub zero_window_probes: usize,
+    pub urgent_position: Option<u16>,
+    pub urgent_count: usize,
 }
 
 impl TcpConnection {
@@ -116,6 +127,17 @@ impl TcpConnection {
             keepalive_left: 9,
             challenge_tokens: 10,
             challenge_last: now,
+            mss: 1460,
+            nodelay: false,
+            ack_deadline: None,
+            ack_segments: 0,
+            ooo: Vec::new(),
+            ooo_limit: 8,
+            zero_window_deadline: None,
+            zero_window_backoff_ms: 1000,
+            zero_window_probes: 0,
+            urgent_position: None,
+            urgent_count: 0,
         }
     }
 
@@ -157,6 +179,17 @@ impl TcpConnection {
             keepalive_left: 9,
             challenge_tokens: 10,
             challenge_last: now,
+            mss: 1460,
+            nodelay: false,
+            ack_deadline: None,
+            ack_segments: 0,
+            ooo: Vec::new(),
+            ooo_limit: 8,
+            zero_window_deadline: None,
+            zero_window_backoff_ms: 1000,
+            zero_window_probes: 0,
+            urgent_position: None,
+            urgent_count: 0,
         }
     }
 
@@ -180,6 +213,7 @@ struct Segment {
     ack: u32,
     flags: TcpFlags,
     window: u16,
+    urgent: u16,
     payload: Vec<u8>,
 }
 
@@ -224,11 +258,60 @@ impl<D: Device> Stack<D> {
         }
     }
 
+    /// Last urgent pointer and urgent-segment count (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_tcp_urgent(&self, socket: SocketId) -> Option<(Option<u16>, usize)> {
+        match &self.sockets.record(socket).ok()?.kind {
+            Kind::Tcp(connection) => Some((connection.urgent_position, connection.urgent_count)),
+            _ => None,
+        }
+    }
+
+    /// Out-of-order hole count (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_tcp_ooo_len(&self, socket: SocketId) -> Option<usize> {
+        match &self.sockets.record(socket).ok()?.kind {
+            Kind::Tcp(connection) => Some(connection.ooo.len()),
+            _ => None,
+        }
+    }
+
+    /// Zero-window probes sent (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_tcp_zero_window_probes(&self, socket: SocketId) -> Option<usize> {
+        match &self.sockets.record(socket).ok()?.kind {
+            Kind::Tcp(connection) => Some(connection.zero_window_probes),
+            _ => None,
+        }
+    }
+
+    /// TCP urgent segments seen (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_tcp_urgent_seen(&self) -> usize {
+        self.tcp_urgent_seen
+    }
+
     /// TCP segments received (host tests).
     #[cfg(any(test, feature = "testutil"))]
     #[must_use]
     pub fn test_tcp_debug(&self) -> &[(u16, u16, u8, u32, u32)] {
         &self.tcp_debug
+    }
+
+    /// The current send window and in-flight bytes (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_tcp_window(&self, socket: SocketId) -> Option<(u16, u32, u32)> {
+        match &self.sockets.record(socket).ok()?.kind {
+            Kind::Tcp(connection) => {
+                Some((connection.snd_wnd, connection.snd_una, connection.snd_nxt))
+            }
+            _ => None,
+        }
     }
 
     /// The local port and remote endpoint for a TCP socket (host tests).
@@ -258,6 +341,14 @@ impl<D: Device> Stack<D> {
         match &self.sockets.record(socket).ok()?.kind {
             Kind::Tcp(connection) => Some(connection.rcv_nxt),
             _ => None,
+        }
+    }
+
+    /// The most recent urgent pointer delivered out-of-band on this socket.
+    pub fn tcp_urgent(&self, socket: SocketId) -> Result<Option<u16>, Errno> {
+        match &self.sockets.record(socket)?.kind {
+            Kind::Tcp(connection) => Ok(connection.urgent_position),
+            _ => Err(Errno::ENOTSOCK),
         }
     }
 
@@ -413,10 +504,35 @@ impl<D: Device> Stack<D> {
             ack: packet.acknowledgement(),
             flags: packet.flags(),
             window: packet.window(),
+            urgent: packet.urgent_pointer(),
             payload: packet.payload().to_vec(),
         };
         let source_port = packet.src_port();
         let destination_port = packet.dst_port();
+        if segment.flags.urg() {
+            #[cfg(any(test, feature = "testutil"))]
+            {
+                self.tcp_urgent_seen = self.tcp_urgent_seen.saturating_add(1);
+            }
+            let exact =
+                self.sockets
+                    .records
+                    .iter_mut()
+                    .find_map(|(_, record)| match &mut record.kind {
+                        Kind::Tcp(connection)
+                            if connection.local == destination
+                                && connection.local_port == destination_port
+                                && connection.remote == Some((source, source_port)) =>
+                        {
+                            Some(connection)
+                        }
+                        _ => None,
+                    });
+            if let Some(connection) = exact {
+                connection.urgent_position = Some(segment.urgent);
+                connection.urgent_count = connection.urgent_count.saturating_add(1);
+            }
+        }
 
         let exact = self.sockets.records.iter().find_map(|(raw_id, record)| {
             if record.closed {
@@ -562,11 +678,13 @@ impl<D: Device> Stack<D> {
         let mut send_syn_ack = false;
         let mut rst_seq = 0;
         let mut close_error = None;
-        let mut queue_data = false;
         let mut time_wait = false;
         let mut fin_wait2 = false;
         let mut closed = false;
         let mut pending_listener = None;
+        let mut ack_advanced = None;
+        let mut incoming: Option<(u32, Vec<u8>)> = None;
+        let mut fin_after_data = false;
         {
             let Ok(record) = self.sockets.record_mut(socket) else {
                 return;
@@ -604,6 +722,8 @@ impl<D: Device> Stack<D> {
                             connection.irs = segment.seq;
                             connection.rcv_nxt = segment.seq.wrapping_add(1);
                             connection.snd_una = segment.ack;
+                            connection.snd_wnd = segment.window;
+                            connection.max_snd_wnd = connection.max_snd_wnd.max(segment.window);
                             transition = Some(TcpState::Established);
                             send_ack = true;
                         }
@@ -671,32 +791,28 @@ impl<D: Device> Stack<D> {
                             break 'transition;
                         }
                         if seq_gt(segment.ack, connection.snd_una) {
-                            connection.snd_una = segment.ack;
+                            ack_advanced = Some(segment.ack);
                         }
-                        if !seq_gt(segment.seq, connection.rcv_nxt) && !segment.payload.is_empty() {
-                            let start =
-                                usize::try_from(connection.rcv_nxt.wrapping_sub(segment.seq))
-                                    .unwrap_or(usize::MAX);
-                            if start < segment.payload.len()
-                                && segment.payload.len() - start <= record.rx_cap
-                            {
-                                record.rx.extend(segment.payload[start..].iter().copied());
-                                connection.rcv_nxt = connection.rcv_nxt.wrapping_add(
-                                    u32::try_from(segment.payload.len() - start).unwrap_or(0),
-                                );
-                                queue_data = true;
+                        if !segment.payload.is_empty() {
+                            let right = connection
+                                .rcv_nxt
+                                .wrapping_add(u32::from(connection.rcv_wnd));
+                            if !seq_ge(segment.seq, right) {
+                                incoming = Some((segment.seq, segment.payload.clone()));
+                            } else {
+                                self.drops = self.drops.saturating_add(1);
+                                send_ack = true;
                             }
                         }
-                        if segment.fin()
-                            && segment
-                                .seq
-                                .wrapping_add(u32::try_from(segment.payload.len()).unwrap_or(0))
-                                == connection.rcv_nxt
-                        {
-                            connection.rcv_nxt = connection.rcv_nxt.wrapping_add(1);
-                            connection.peer_fin = true;
-                            transition = Some(TcpState::CloseWait);
-                            send_ack = true;
+                        if segment.fin() && segment.seq == connection.rcv_nxt {
+                            if segment.payload.is_empty() {
+                                connection.rcv_nxt = connection.rcv_nxt.wrapping_add(1);
+                                connection.peer_fin = true;
+                                transition = Some(TcpState::CloseWait);
+                                send_ack = true;
+                            } else {
+                                fin_after_data = true;
+                            }
                         }
                     }
                     TcpState::FinWait1 => {
@@ -716,6 +832,9 @@ impl<D: Device> Stack<D> {
                         if !ack_window_ok(connection, segment.ack) {
                             send_challenge = true;
                             break 'transition;
+                        }
+                        if !segment.payload.is_empty() {
+                            incoming = Some((segment.seq, segment.payload.clone()));
                         }
                         if segment.ack == connection.snd_nxt {
                             connection.fin_acked = true;
@@ -750,6 +869,9 @@ impl<D: Device> Stack<D> {
                             send_challenge = true;
                             break 'transition;
                         }
+                        if !segment.payload.is_empty() {
+                            incoming = Some((segment.seq, segment.payload.clone()));
+                        }
                         if segment.fin() && segment.seq == connection.rcv_nxt {
                             connection.rcv_nxt = connection.rcv_nxt.wrapping_add(1);
                             connection.peer_fin = true;
@@ -770,6 +892,9 @@ impl<D: Device> Stack<D> {
                         if segment.syn() {
                             send_challenge = true;
                             break 'transition;
+                        }
+                        if !segment.payload.is_empty() {
+                            incoming = Some((segment.seq, segment.payload.clone()));
                         }
                         if segment.fin() {
                             send_ack = true;
@@ -896,6 +1021,22 @@ impl<D: Device> Stack<D> {
         if send_challenge && self.allow_challenge(socket, now) {
             let _ = self.send_challenge_ack(socket);
         }
+        if let Some((seq, data)) = incoming {
+            self.tcp_deliver_data(socket, seq, &data, now);
+        }
+        if fin_after_data {
+            if let Ok(record) = self.sockets.record_mut(socket)
+                && let Kind::Tcp(connection) = &mut record.kind
+            {
+                connection.rcv_nxt = connection.rcv_nxt.wrapping_add(1);
+                connection.peer_fin = true;
+                connection.state = TcpState::CloseWait;
+            }
+            let _ = self.send_ack_for(socket);
+        }
+        if let Some(ack) = ack_advanced {
+            let _ = self.tcp_ack_data(socket, ack);
+        }
         if send_syn_ack {
             let _ = self.send_syn_ack(socket);
         }
@@ -904,9 +1045,6 @@ impl<D: Device> Stack<D> {
         }
         if send_rst {
             let _ = self.send_rst_for(socket, rst_seq);
-        }
-        if queue_data {
-            // Data is queued by the code above; C09 adds delivery policy.
         }
     }
 
@@ -938,7 +1076,7 @@ impl<D: Device> Stack<D> {
         )
     }
 
-    fn send_syn_ack(&mut self, socket: SocketId) -> Result<(), Errno> {
+    pub(crate) fn send_syn_ack(&mut self, socket: SocketId) -> Result<(), Errno> {
         let (local, remote, iss, rcv_nxt, port, window) = {
             let record = self.sockets.record(socket)?;
             let Kind::Tcp(connection) = &record.kind else {
@@ -968,7 +1106,7 @@ impl<D: Device> Stack<D> {
         )
     }
 
-    fn send_ack_for(&mut self, socket: SocketId) -> Result<(), Errno> {
+    pub(crate) fn send_ack_for(&mut self, socket: SocketId) -> Result<(), Errno> {
         let (local, remote, snd_nxt, rcv_nxt, port, window) = {
             let record = self.sockets.record(socket)?;
             let Kind::Tcp(connection) = &record.kind else {
@@ -1052,7 +1190,7 @@ impl<D: Device> Stack<D> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn send_tcp_packet(
+    pub(crate) fn send_tcp_packet(
         &mut self,
         local: IpAddr,
         remote: IpAddr,
@@ -1329,6 +1467,8 @@ impl<D: Device> Stack<D> {
             if keepalive_probe {
                 let _ = self.send_ack_for(socket);
             }
+            self.tcp_delayed_ack(socket, now);
+            let _ = self.tcp_zero_window_timer(socket, now);
         }
     }
 }

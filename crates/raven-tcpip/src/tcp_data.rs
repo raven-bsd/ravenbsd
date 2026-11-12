@@ -1,0 +1,434 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+//! TCP data queues, window accounting, SWS, Nagle and delayed ACK.
+
+use alloc::vec::Vec;
+
+use raven_abi::errno::Errno;
+use raven_tcpip_wire::tcp::TcpFlags;
+
+use crate::device::Device;
+use crate::seq::{seq_gt, seq_lt};
+use crate::socket::Kind;
+use crate::tcp_state::TcpState;
+use crate::{Instant, SocketId, Stack};
+
+impl<D: Device> Stack<D> {
+    /// Queue application bytes on a TCP socket and transmit what the window allows.
+    pub(crate) fn tcp_send_data(&mut self, socket: SocketId, data: &[u8]) -> Result<usize, Errno> {
+        if data.is_empty() {
+            return Ok(0);
+        }
+        let accepted = {
+            let record = self.sockets.record_mut(socket)?;
+            if record.closed {
+                return Err(Errno::EBADF);
+            }
+            if !matches!(record.kind, Kind::Tcp(_)) {
+                return Err(Errno::ENOTCONN);
+            }
+            if record.tx_shutdown {
+                return Err(Errno::EPIPE);
+            }
+            let room = record.tx_cap.saturating_sub(record.tx.len());
+            let accepted = data.len().min(room);
+            record.tx.extend(data[..accepted].iter().copied());
+            accepted
+        };
+        if accepted == 0 {
+            return Err(Errno::EAGAIN);
+        }
+        self.tcp_try_send(socket)?;
+        Ok(accepted)
+    }
+
+    /// Read TCP bytes; short buffers get a prefix of the stream.
+    pub(crate) fn tcp_recv_data(
+        &mut self,
+        socket: SocketId,
+        buffer: &mut [u8],
+    ) -> Result<usize, Errno> {
+        if buffer.is_empty() {
+            return Ok(0);
+        }
+        let count = {
+            let record = self.sockets.record_mut(socket)?;
+            if let Some(error) = record.error.take() {
+                return Err(error);
+            }
+            if !matches!(record.kind, Kind::Tcp(_) | Kind::Icmp { .. }) {
+                return Err(Errno::ENOTSOCK);
+            }
+            let peer_fin = match &record.kind {
+                Kind::Tcp(connection) => connection.peer_fin || record.peer_closed,
+                _ => record.peer_closed,
+            };
+            if (record.closed || peer_fin) && record.rx.is_empty() {
+                return Ok(0);
+            }
+            let count = buffer.len().min(record.rx.len());
+            for (destination, source) in buffer.iter_mut().zip(record.rx.drain(..count)) {
+                *destination = source;
+            }
+            count
+        };
+        if count == 0 {
+            let record = self.sockets.record(socket)?;
+            let peer_fin = match &record.kind {
+                Kind::Tcp(connection) => connection.peer_fin || record.peer_closed,
+                _ => record.peer_closed,
+            };
+            if peer_fin || (record.closed && record.rx.is_empty()) {
+                return Ok(0);
+            }
+            return Err(Errno::EAGAIN);
+        }
+        // A read opens the receive window; advertise it promptly.
+        let _ = self.send_ack_for(socket);
+        Ok(count)
+    }
+
+    /// Set Nagle behaviour.
+    pub(crate) fn tcp_set_nodelay(&mut self, socket: SocketId, on: bool) -> Result<(), Errno> {
+        let record = self.sockets.record_mut(socket)?;
+        let Kind::Tcp(connection) = &mut record.kind else {
+            return Err(Errno::ENOTSOCK);
+        };
+        connection.nodelay = on;
+        if on {
+            // Flush what can be sent now.
+        }
+        Ok(())
+    }
+
+    /// Bytes waiting in the transmit queue.
+    pub(crate) fn tcp_send_queue_len(&self, socket: SocketId) -> Result<usize, Errno> {
+        match &self.sockets.record(socket)?.kind {
+            Kind::Tcp(_) => Ok(self.sockets.record(socket)?.tx.len()),
+            _ => Err(Errno::ENOTSOCK),
+        }
+    }
+
+    /// Bytes waiting in the receive queue.
+    pub(crate) fn tcp_recv_queue_len(&self, socket: SocketId) -> Result<usize, Errno> {
+        match &self.sockets.record(socket)?.kind {
+            Kind::Tcp(_) | Kind::Icmp { .. } => Ok(self.sockets.record(socket)?.rx.len()),
+            _ => Err(Errno::ENOTSOCK),
+        }
+    }
+
+    /// Transmit as much queued data as the peer window, SWS and Nagle allow.
+    pub(crate) fn tcp_try_send(&mut self, socket: SocketId) -> Result<(), Errno> {
+        loop {
+            let snapshot = {
+                let record = self.sockets.record(socket)?;
+                let Kind::Tcp(connection) = &record.kind else {
+                    return Err(Errno::ENOTSOCK);
+                };
+                if !matches!(
+                    connection.state,
+                    TcpState::Established
+                        | TcpState::CloseWait
+                        | TcpState::FinWait1
+                        | TcpState::FinWait2
+                ) {
+                    return Ok(());
+                }
+                let inflight = connection.snd_nxt.wrapping_sub(connection.snd_una);
+                let queued = u32::try_from(record.tx.len()).unwrap_or(u32::MAX);
+                if queued <= inflight {
+                    if connection.close_requested && !connection.fin_sent {
+                        Some(None)
+                    } else {
+                        None
+                    }
+                } else {
+                    let unsent = queued - inflight;
+                    let window = u32::from(connection.snd_wnd);
+                    if window <= inflight {
+                        None
+                    } else {
+                        let usable = (window - inflight).min(unsent);
+                        let mss = u32::from(connection.mss);
+                        let floor = mss.max(u32::try_from(record.tx_cap / 2).unwrap_or(0).max(1));
+                        let all_fits = usable == unsent;
+                        let window_ok = usable >= floor || all_fits;
+                        let nagle_ok = connection.nodelay
+                            || inflight == 0
+                            || usable >= u32::from(connection.mss);
+                        if !window_ok || !nagle_ok {
+                            None
+                        } else {
+                            let take = usable.min(u32::from(connection.mss));
+                            let start = usize::try_from(inflight).unwrap_or(usize::MAX);
+                            let payload: Vec<u8> = record
+                                .tx
+                                .iter()
+                                .skip(start)
+                                .take(take as usize)
+                                .copied()
+                                .collect();
+                            let push = start + payload.len() == record.tx.len();
+                            Some(Some((
+                                payload,
+                                connection.local,
+                                connection.remote,
+                                connection.local_port,
+                                connection.snd_nxt,
+                                connection.rcv_nxt,
+                                advertised_window(record),
+                                push,
+                            )))
+                        }
+                    }
+                }
+            };
+            let Some(snapshot) = snapshot else { break };
+            let Some((payload, local, remote, local_port, seq, ack, window, push)) = snapshot
+            else {
+                // All queued data is sent; emit the deferred FIN.
+                let _ = self.tcp_send_deferred_fin(socket);
+                break;
+            };
+            let remote = remote.ok_or(Errno::ENOTCONN)?;
+            let mut flags = TcpFlags::ACK;
+            if push {
+                flags = TcpFlags::from_bits(flags.bits() | TcpFlags::PSH.bits());
+            }
+            self.send_tcp_packet(
+                local, remote.0, local_port, remote.1, flags, seq, ack, window, &payload, false,
+            )?;
+            let record = self.sockets.record_mut(socket)?;
+            if let Kind::Tcp(connection) = &mut record.kind {
+                connection.snd_nxt = connection
+                    .snd_nxt
+                    .wrapping_add(u32::try_from(payload.len()).unwrap_or(0));
+            }
+        }
+        Ok(())
+    }
+
+    fn tcp_send_deferred_fin(&mut self, socket: SocketId) -> Result<(), Errno> {
+        let snapshot = {
+            let record = self.sockets.record(socket)?;
+            let Kind::Tcp(connection) = &record.kind else {
+                return Err(Errno::ENOTSOCK);
+            };
+            if connection.fin_sent || !connection.close_requested {
+                return Ok(());
+            }
+            let remote = connection.remote.ok_or(Errno::ENOTCONN)?;
+            (
+                connection.local,
+                remote,
+                connection.local_port,
+                connection.snd_nxt,
+                connection.rcv_nxt,
+                advertised_window(record),
+                connection.state,
+            )
+        };
+        let (local, remote, local_port, seq, ack, window, state) = snapshot;
+        self.send_tcp_packet(
+            local,
+            remote.0,
+            local_port,
+            remote.1,
+            TcpFlags::from_bits(TcpFlags::FIN.bits() | TcpFlags::ACK.bits()),
+            seq,
+            ack,
+            window,
+            &[],
+            false,
+        )?;
+        let record = self.sockets.record_mut(socket)?;
+        if let Kind::Tcp(connection) = &mut record.kind {
+            connection.snd_nxt = connection.snd_nxt.wrapping_add(1);
+            connection.fin_sent = true;
+            connection.state = if state == TcpState::CloseWait {
+                TcpState::LastAck
+            } else {
+                TcpState::FinWait1
+            };
+        }
+        Ok(())
+    }
+
+    /// Remove acknowledged bytes and transmit more.
+    pub(crate) fn tcp_ack_data(&mut self, socket: SocketId, ack: u32) -> Result<(), Errno> {
+        {
+            let record = self.sockets.record_mut(socket)?;
+            let Kind::Tcp(connection) = &mut record.kind else {
+                return Err(Errno::ENOTSOCK);
+            };
+            if seq_gt(ack, connection.snd_una) {
+                let delta = ack.wrapping_sub(connection.snd_una);
+                let remove = usize::try_from(delta)
+                    .unwrap_or(usize::MAX)
+                    .min(record.tx.len());
+                record.tx.drain(..remove);
+                connection.snd_una = ack;
+                connection.zero_window_backoff_ms = 1000;
+                connection.zero_window_deadline = None;
+            }
+        }
+        self.tcp_try_send(socket)
+    }
+
+    /// Deliver incoming in-order and out-of-order payload.
+    pub(crate) fn tcp_deliver_data(
+        &mut self,
+        socket: SocketId,
+        seq: u32,
+        payload: &[u8],
+        now: Instant,
+    ) {
+        if payload.is_empty() {
+            return;
+        }
+        let mut immediate_ack = false;
+        {
+            let Ok(record) = self.sockets.record_mut(socket) else {
+                return;
+            };
+            let Kind::Tcp(connection) = &mut record.kind else {
+                return;
+            };
+            let mut data_start = 0usize;
+            let mut sequence = seq;
+            if seq_lt(sequence, connection.rcv_nxt) {
+                let skip = usize::try_from(connection.rcv_nxt.wrapping_sub(sequence))
+                    .unwrap_or(usize::MAX);
+                if skip >= payload.len() {
+                    let _ = self.send_ack_for(socket);
+                    return;
+                }
+                data_start = skip;
+                sequence = connection.rcv_nxt;
+            }
+            if seq_gt(sequence, connection.rcv_nxt) {
+                if connection.ooo.len() >= connection.ooo_limit {
+                    self.drops = self.drops.saturating_add(1);
+                } else {
+                    connection.ooo.push((sequence, payload.to_vec()));
+                }
+                immediate_ack = true;
+            } else {
+                let room = record.rx_cap.saturating_sub(record.rx.len());
+                let take = (payload.len() - data_start).min(room);
+                record
+                    .rx
+                    .extend(payload[data_start..data_start + take].iter().copied());
+                connection.rcv_nxt = connection
+                    .rcv_nxt
+                    .wrapping_add(u32::try_from(take).unwrap_or(0));
+                if take < payload.len() - data_start {
+                    self.drops = self.drops.saturating_add(1);
+                }
+                connection.ack_segments = connection.ack_segments.saturating_add(1);
+                if take >= usize::from(connection.mss) || connection.ack_segments >= 2 {
+                    immediate_ack = true;
+                } else {
+                    connection.ack_deadline =
+                        Some(Instant::from_millis(now.as_millis().saturating_add(40)));
+                }
+                // Drain any now-contiguous out-of-order pieces.
+                loop {
+                    let next = connection
+                        .ooo
+                        .iter()
+                        .position(|(segment_seq, _)| *segment_seq == connection.rcv_nxt);
+                    let Some(index) = next else { break };
+                    let (_, data) = connection.ooo.remove(index);
+                    let room = record.rx_cap.saturating_sub(record.rx.len());
+                    let take = data.len().min(room);
+                    record.rx.extend(data[..take].iter().copied());
+                    connection.rcv_nxt = connection
+                        .rcv_nxt
+                        .wrapping_add(u32::try_from(take).unwrap_or(0));
+                    if take < data.len() {
+                        break;
+                    }
+                }
+            }
+        }
+        if immediate_ack {
+            let _ = self.send_ack_for(socket);
+        }
+    }
+
+    /// Send a delayed ACK if the timer fired.
+    pub(crate) fn tcp_delayed_ack(&mut self, socket: SocketId, now: Instant) {
+        let due = {
+            let Ok(record) = self.sockets.record(socket) else {
+                return;
+            };
+            let Kind::Tcp(connection) = &record.kind else {
+                return;
+            };
+            connection
+                .ack_deadline
+                .is_some_and(|deadline| deadline <= now)
+        };
+        if due {
+            if let Ok(record) = self.sockets.record_mut(socket)
+                && let Kind::Tcp(connection) = &mut record.kind
+            {
+                connection.ack_deadline = None;
+                connection.ack_segments = 0;
+            }
+            let _ = self.send_ack_for(socket);
+        }
+    }
+
+    /// Zero-window probe timer.
+    pub(crate) fn tcp_zero_window_timer(&mut self, socket: SocketId, now: Instant) -> bool {
+        let probe = {
+            let Ok(record) = self.sockets.record(socket) else {
+                return false;
+            };
+            let Kind::Tcp(connection) = &record.kind else {
+                return false;
+            };
+            connection
+                .zero_window_deadline
+                .is_some_and(|deadline| deadline <= now)
+                && record.tx.len()
+                    > usize::try_from(connection.snd_nxt.wrapping_sub(connection.snd_una))
+                        .unwrap_or(0)
+        };
+        if !probe {
+            return false;
+        }
+        let _ = self.send_ack_for(socket);
+        if let Ok(record) = self.sockets.record_mut(socket)
+            && let Kind::Tcp(connection) = &mut record.kind
+        {
+            connection.zero_window_probes = connection.zero_window_probes.saturating_add(1);
+            connection.zero_window_backoff_ms = connection
+                .zero_window_backoff_ms
+                .saturating_mul(2)
+                .min(60_000);
+            connection.zero_window_deadline =
+                Some(Instant::from_millis(now.as_millis().saturating_add(
+                    i64::try_from(connection.zero_window_backoff_ms).unwrap_or(i64::MAX),
+                )));
+        }
+        true
+    }
+}
+
+fn advertised_window(record: &crate::socket::SocketRecord) -> u16 {
+    let Kind::Tcp(connection) = &record.kind else {
+        return 0;
+    };
+    let free = record.rx_cap.saturating_sub(record.rx.len());
+    let floor = usize::from(connection.mss).max(record.rx_cap / 2).max(1);
+    let value = if free < floor && free < record.rx_cap {
+        0
+    } else {
+        free
+    };
+    u16::try_from(value.min(usize::from(u16::MAX))).unwrap_or(u16::MAX)
+}

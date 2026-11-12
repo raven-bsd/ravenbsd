@@ -189,66 +189,32 @@ impl<D: Device> Stack<D> {
         self.tcp_connect_internal(remote, local_port)
     }
 
-    /// Queue bytes on a TCP connection. Returns [`Errno::EAGAIN`] when the transmit buffer is
-    /// full; the dropped bytes are counted in the next [`crate::PollResult`].
+    /// Queue bytes on a TCP connection. Returns the accepted count, or `EAGAIN` when full.
     pub fn send(&mut self, socket: SocketId, data: &[u8]) -> Result<usize, Errno> {
-        if data.is_empty() {
-            return Ok(0);
-        }
-        let mut dropped = 0usize;
-        let outcome = {
-            let record = self.sockets.record_mut(socket)?;
-            if record.closed {
-                Err(Errno::EBADF)
-            } else if !matches!(record.kind, Kind::Tcp(_)) {
-                Err(Errno::ENOTCONN)
-            } else if record.tx_shutdown {
-                Err(Errno::EPIPE)
-            } else {
-                let room = record.tx_cap.saturating_sub(record.tx.len());
-                if data.len() > room {
-                    dropped = data.len();
-                    Err(Errno::EAGAIN)
-                } else {
-                    record.tx.extend(data.iter().copied());
-                    Ok(data.len())
-                }
-            }
-        };
-        self.drops = self.drops.saturating_add(dropped);
-        outcome
+        self.tcp_send_data(socket, data)
     }
 
-    /// Read bytes from a TCP connection.
-    ///
-    /// An empty non-closed socket returns [`Errno::EAGAIN`]; an orderly EOF returns `Ok(0)`.
+    /// Read bytes from a TCP connection, or a datagram from a UDP socket.
     pub fn recv(&mut self, socket: SocketId, buffer: &mut [u8]) -> Result<usize, Errno> {
-        if buffer.is_empty() {
-            return Ok(0);
+        if matches!(self.sockets.record(socket)?.kind, Kind::Udp { .. }) {
+            return self.udp_recv_from(socket, buffer).map(|(length, _)| length);
         }
-        let record = self.sockets.record_mut(socket)?;
-        if let Some(error) = record.error.take() {
-            return Err(error);
-        }
-        if record.closed && record.rx.is_empty() {
-            return Ok(0);
-        }
-        if !matches!(record.kind, Kind::Tcp(_) | Kind::Icmp { .. }) {
-            return Err(Errno::ENOTSOCK);
-        }
-        let count = buffer.len().min(record.rx.len());
-        for (destination, source) in buffer.iter_mut().zip(record.rx.drain(..count)) {
-            *destination = source;
-        }
-        if count == 0 {
-            if record.peer_closed {
-                Ok(0)
-            } else {
-                Err(Errno::EAGAIN)
-            }
-        } else {
-            Ok(count)
-        }
+        self.tcp_recv_data(socket, buffer)
+    }
+
+    /// Disable Nagle for a TCP socket.
+    pub fn set_nodelay(&mut self, socket: SocketId, on: bool) -> Result<(), Errno> {
+        self.tcp_set_nodelay(socket, on)
+    }
+
+    /// Bytes waiting to be sent.
+    pub fn send_queue_len(&self, socket: SocketId) -> Result<usize, Errno> {
+        self.tcp_send_queue_len(socket)
+    }
+
+    /// Bytes waiting to be received.
+    pub fn recv_queue_len(&self, socket: SocketId) -> Result<usize, Errno> {
+        self.tcp_recv_queue_len(socket)
     }
 
     /// Close the transmit half of a TCP connection.
