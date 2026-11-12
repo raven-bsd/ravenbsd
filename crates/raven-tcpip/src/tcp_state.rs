@@ -124,7 +124,15 @@ pub(crate) struct TcpConnection {
     pub dupack_count: u8,
     pub last_activity: Instant,
     pub last_adv_window: u16,
+    pub last_ack_window: u16,
     pub cc: Box<dyn crate::cc::CongestionControl>,
+    pub rack: crate::recovery::Rack,
+    pub rack_sent: Vec<(u32, u32)>,
+    pub tlp: crate::recovery::Tlp,
+    pub tlp_enabled: bool,
+    pub tlp_probe_at: Option<Instant>,
+    pub ecn: crate::recovery::Ecn,
+    pub recover_seq: u32,
 }
 
 impl TcpConnection {
@@ -207,7 +215,15 @@ impl TcpConnection {
             dupack_count: 0,
             last_activity: now,
             last_adv_window: 0,
+            last_ack_window: 65_535,
             cc: Box::new(crate::cc::NewReno::new(1460, 14_600, u32::MAX, 16_777_216)),
+            rack: crate::recovery::Rack::new(10),
+            rack_sent: Vec::new(),
+            tlp: crate::recovery::Tlp::default(),
+            tlp_enabled: true,
+            tlp_probe_at: None,
+            ecn: crate::recovery::Ecn::default(),
+            recover_seq: 0,
         }
     }
 
@@ -291,7 +307,15 @@ impl TcpConnection {
             dupack_count: 0,
             last_activity: now,
             last_adv_window: 0,
+            last_ack_window: 65_535,
             cc: Box::new(crate::cc::NewReno::new(1460, 14_600, u32::MAX, 16_777_216)),
+            rack: crate::recovery::Rack::new(10),
+            rack_sent: Vec::new(),
+            tlp: crate::recovery::Tlp::default(),
+            tlp_enabled: true,
+            tlp_probe_at: None,
+            ecn: crate::recovery::Ecn::default(),
+            recover_seq: 0,
         }
     }
 
@@ -407,6 +431,19 @@ impl<D: Device> Stack<D> {
     #[must_use]
     pub fn test_tcp_synacks(&self) -> usize {
         self.tcp_synacks
+    }
+
+    /// TLP deadline (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_tcp_tlp_deadline(&self, socket: SocketId) -> Option<Instant> {
+        match &self.sockets.record(socket).ok()?.kind {
+            Kind::Tcp(connection) => connection
+                .tlp
+                .deadline
+                .map(|ms| Instant::from_millis(i64::from(ms))),
+            _ => None,
+        }
     }
 
     /// TCP segments received (host tests).
@@ -797,6 +834,11 @@ impl<D: Device> Stack<D> {
         connection.offer_timestamps = self.tunables.timestamps_enable != 0;
         connection.offer_sack = self.tunables.sack_enable != 0;
         connection.ecn_enabled = self.tunables.ecn_enable != 0;
+        connection.ecn.negotiated = false;
+        connection.rack = crate::recovery::Rack::new(
+            u32::try_from(self.tunables.reordering_window_base).unwrap_or(10),
+        );
+        connection.tlp_enabled = self.tunables.tlp_enable != 0;
         connection.nodelay = self.tunables.nagle == 0;
         connection.ooo_limit = usize::try_from(self.tunables.reassembly_holes_max).unwrap_or(32);
         connection.keepalive_interval_ms = self.tunables.keepalive_interval;
@@ -1403,6 +1445,19 @@ impl<D: Device> Stack<D> {
                             self.counters.ecn_ce_marks = self.counters.ecn_ce_marks.wrapping_add(1);
                             if !connection.ecn_cwr_pending {
                                 connection.ecn_cwr_pending = true;
+                                let flight = connection.snd_nxt.wrapping_sub(connection.snd_una);
+                                let mut context = crate::CcContext {
+                                    mss: u32::from(connection.mss),
+                                    flight,
+                                    pipe: flight,
+                                    rtt: None,
+                                    snd_nxt: connection.snd_nxt,
+                                    snd_una: connection.snd_una,
+                                };
+                                connection
+                                    .cc
+                                    .on_loss(&mut context, crate::cc::LossKind::Ecn);
+                                connection.recover_seq = connection.snd_nxt;
                                 self.counters.ecn_ce_react =
                                     self.counters.ecn_ce_react.wrapping_add(1);
                             }
@@ -1427,11 +1482,18 @@ impl<D: Device> Stack<D> {
                                 send_ack = true;
                             }
                         }
-                        if segment.ack == connection.snd_una
+                        let duplicate_window = segment.window <= connection.last_ack_window;
+                        connection.last_ack_window = segment.window;
+                        let after_tlp = connection
+                            .tlp_probe_at
+                            .is_some_and(|probe| now.saturating_since(probe).as_millis() < 1000);
+                        if !after_tlp
+                            && segment.ack == connection.snd_una
                             && segment.payload.is_empty()
                             && connection.snd_una != connection.snd_nxt
                             && !segment.syn()
                             && !segment.fin()
+                            && duplicate_window
                         {
                             connection.dupack_count = connection.dupack_count.saturating_add(1);
                             let threshold =
@@ -2611,11 +2673,113 @@ impl<D: Device> Stack<D> {
                                     connection.rcv_wnd,
                                 ));
                             }
+                            let flight = connection.snd_nxt.wrapping_sub(connection.snd_una);
+                            let mut context = crate::CcContext {
+                                mss: u32::from(connection.mss),
+                                flight,
+                                pipe: flight,
+                                rtt: None,
+                                snd_nxt: connection.snd_nxt,
+                                snd_una: connection.snd_una,
+                            };
+                            connection.cc.on_rto(&mut context);
+                            connection.recover_seq = connection.snd_nxt;
+                            connection.tlp.disarm();
                             connection.rto.timeout();
                             connection.rto_deadline =
                                 Some(Instant::from_millis(now.as_millis().saturating_add(
                                     i64::try_from(connection.rto.rto_ms()).unwrap_or(i64::MAX),
                                 )));
+                        }
+                    }
+                }
+                if retransmit.is_none()
+                    && connection.snd_una != connection.snd_nxt
+                    && matches!(
+                        connection.state,
+                        TcpState::Established | TcpState::CloseWait | TcpState::FinWait1
+                    )
+                {
+                    let now_ms = u32::try_from(now.as_millis()).unwrap_or(u32::MAX);
+                    let length = record.tx.len().min(usize::from(connection.mss));
+                    if length > 0 {
+                        let srtt = u32::try_from(connection.rto.srtt_ms()).unwrap_or(u32::MAX);
+                        let rto_deadline = connection.rto_deadline.map(|deadline| {
+                            u32::try_from(deadline.as_millis()).unwrap_or(u32::MAX)
+                        });
+                        let tlp_due = connection.tlp_enabled
+                            && connection.tlp.fires(now_ms)
+                            && connection.tlp.is_sooner_than(rto_deadline);
+                        if tlp_due {
+                            let payload: Vec<u8> = record.tx.iter().take(length).copied().collect();
+                            connection.tlp.disarm();
+                            connection.tlp_probe_at = Some(now);
+                            self.counters.tlp_fires = self.counters.tlp_fires.wrapping_add(1);
+                            self.counters.retrans_segments =
+                                self.counters.retrans_segments.wrapping_add(1);
+                            self.counters.retrans_bytes = self
+                                .counters
+                                .retrans_bytes
+                                .wrapping_add(u64::try_from(length).unwrap_or(0));
+                            connection.retransmits_total =
+                                connection.retransmits_total.saturating_add(1);
+                            if let Some(remote) = connection.remote {
+                                retransmit = Some((
+                                    payload,
+                                    connection.local,
+                                    remote,
+                                    connection.local_port,
+                                    connection.snd_una,
+                                    connection.rcv_nxt,
+                                    connection.rcv_wnd,
+                                ));
+                            }
+                        } else if connection.dupack_count >= 3
+                            && let Some((_end_seq, sent_at)) = connection.rack_sent.first().copied()
+                        {
+                            let bound = srtt
+                                .saturating_mul(2)
+                                .max(connection.rack.reorder_window.saturating_mul(2))
+                                .max(20);
+                            if now_ms.saturating_sub(sent_at) > bound {
+                                connection.rack_sent.remove(0);
+                                let payload: Vec<u8> =
+                                    record.tx.iter().take(length).copied().collect();
+                                let flight = connection.snd_nxt.wrapping_sub(connection.snd_una);
+                                let mut context = crate::CcContext {
+                                    mss: u32::from(connection.mss),
+                                    flight,
+                                    pipe: flight,
+                                    rtt: None,
+                                    snd_nxt: connection.snd_nxt,
+                                    snd_una: connection.snd_una,
+                                };
+                                connection
+                                    .cc
+                                    .on_loss(&mut context, crate::cc::LossKind::Sack);
+                                connection.recover_seq = connection.snd_nxt;
+                                self.counters.rack_losses =
+                                    self.counters.rack_losses.wrapping_add(1);
+                                self.counters.retrans_segments =
+                                    self.counters.retrans_segments.wrapping_add(1);
+                                self.counters.retrans_bytes = self
+                                    .counters
+                                    .retrans_bytes
+                                    .wrapping_add(u64::try_from(length).unwrap_or(0));
+                                connection.retransmits_total =
+                                    connection.retransmits_total.saturating_add(1);
+                                if let Some(remote) = connection.remote {
+                                    retransmit = Some((
+                                        payload,
+                                        connection.local,
+                                        remote,
+                                        connection.local_port,
+                                        connection.snd_una,
+                                        connection.rcv_nxt,
+                                        connection.rcv_wnd,
+                                    ));
+                                }
+                            }
                         }
                     }
                 }
@@ -2805,6 +2969,7 @@ fn apply_syn_options(connection: &mut TcpConnection, segment: &Segment, now: Ins
     }
     if connection.ecn_enabled && segment.flags.ece() {
         connection.ecn_negotiated = true;
+        connection.ecn.negotiate(true, true);
     }
     if connection.offer_timestamps
         && let Some(tsval) = segment.tsval
