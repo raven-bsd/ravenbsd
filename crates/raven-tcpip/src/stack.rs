@@ -124,6 +124,14 @@ pub struct StackConfig {
     pub rto_max_retransmits: u8,
     /// RTO clock granularity in milliseconds.
     pub clock_granularity_ms: u64,
+    /// Minimum MSS we accept from a peer.
+    pub mss_floor: u16,
+    /// Maximum MSS we announce.
+    pub mss_ceiling: u16,
+    /// Offer window scaling.
+    pub window_scaling: bool,
+    /// Offer timestamps and enable PAWS.
+    pub timestamps: bool,
 }
 
 impl Default for StackConfig {
@@ -145,6 +153,10 @@ impl Default for StackConfig {
             rto_max_ms: 60_000,
             rto_max_retransmits: 6,
             clock_granularity_ms: 1,
+            mss_floor: 536,
+            mss_ceiling: 1460,
+            window_scaling: true,
+            timestamps: true,
         }
     }
 }
@@ -181,6 +193,7 @@ pub struct Stack<D: Device> {
     pub(crate) arp_requests: usize,
     pub(crate) next_ephemeral: u16,
     pub(crate) next_isn: u32,
+    pub(crate) option_override: Option<Vec<u8>>,
     pub(crate) icmp_tokens: u32,
     pub(crate) icmp_last_refill: Instant,
     pub(crate) icmp_errors_sent: usize,
@@ -205,6 +218,8 @@ pub struct Stack<D: Device> {
     pub(crate) tcp_data_delivered: usize,
     #[allow(dead_code)] // Read by the testutil urgent-segment hook.
     pub(crate) tcp_urgent_seen: usize,
+    #[allow(dead_code)] // Read by the testutil SYN,ACK count hook.
+    pub(crate) tcp_synacks: usize,
     #[cfg(any(test, feature = "testutil"))]
     pub(crate) trace: Vec<Vec<u8>>,
     #[cfg(any(test, feature = "testutil"))]
@@ -249,6 +264,7 @@ impl<D: Device> Stack<D> {
             arp_requests: 0,
             next_ephemeral,
             next_isn,
+            option_override: None,
             icmp_tokens: config.icmp_error_burst,
             icmp_last_refill: now,
             icmp_errors_sent: 0,
@@ -272,6 +288,7 @@ impl<D: Device> Stack<D> {
             tcp_debug: Vec::new(),
             tcp_data_delivered: 0,
             tcp_urgent_seen: 0,
+            tcp_synacks: 0,
             #[cfg(any(test, feature = "testutil"))]
             trace: Vec::new(),
             #[cfg(any(test, feature = "testutil"))]
