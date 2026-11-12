@@ -3,7 +3,7 @@
 
 # RavenBSD Rust toolchain patch set
 
-Status: spike result (ticket K02), 2026-11-09.
+Status: K02 spike plus the K19 install path, 2026-11-12.
 
 This directory holds the patch series that adds `x86_64-unknown-ravenbsd` (and draft
 `aarch64-unknown-ravenbsd` / `riscv64gc-unknown-ravenbsd`) to a released Rust source tree, plus the
@@ -31,9 +31,16 @@ bootstrap configuration and the build wrapper for `make toolchain` (ticket K19).
   `crates/raven-abi/src/errno.rs` and the musl donor oracle; the reviewer's
   `k02-errno-audit.py` also reports no numeric mismatches.
 * `bootstrap.toml` with `llvm.download-ci-llvm = true`, `rust.channel = "stable"`, the host and
-  `x86_64-unknown-ravenbsd` targets, and `build.extended = true` is accepted by bootstrap. A full
-  toolchain build (and therefore the actual LLVM download) was not run; the ticket forbids a full
-  multi-hour build.
+  `x86_64-unknown-ravenbsd` targets, and `build.extended = true` is accepted by bootstrap.
+* K19 ran `make toolchain` end to end on 2026-11-12. The source tarball SHA-256 matched, both
+  patches applied, the CI LLVM was downloaded and the stage-1 `x.py install` finished in 6:11 on
+  20 logical CPUs. The installed toolchain reports `rustc 1.97.1 (8bab26f4f 2026-07-14) (built
+  from a source tarball)` and contains `cargo`, rustc, host std and the
+  `x86_64-unknown-ravenbsd` std rlibs. A reinstall from the cached build tree takes 0:10; a second
+  `make toolchain` with a matching stamp skips the build entirely.
+* Rust's own `src/stage0` pins `1.96.0` as the bootstrap compiler for the 1.97.1 source. That
+  download is part of the pinned release, not a substituted version; no nightly is used. The
+  `build.sh` check requires the repository's pinned `rustc 1.97.1` to invoke the script.
 
 ## Layout
 
@@ -119,9 +126,15 @@ Additions outside the 48 Redox sites:
   `rust-libc` donor checkout at `7631ff2...` (`1.0.0-alpha.5`). Exact identities, license texts
   and modified file groups are recorded in `libc-0.2.185-provenance.md`.
 
-## Estimate for K19
+## K19 result
 
-Observed spike work is one minion session; the remaining K19 work is the full toolchain
-build/install path and CI: roughly **12-20 hours of minion time** (UNVERIFIED), dominated by
-the first full stage1/stage2 build and debugging the download-ci-llvm path, not by the patch
-itself. ralibc implementation work for std is separate (K20-K22).
+`make toolchain` is implemented in `build.sh` and builds stage 1 by default. It checks the host
+prerequisites, rejects a stage0 compiler other than the pinned 1.97.1, verifies the tarball hash,
+stamps the patched source and installed prefix, and registers the result with
+`rustup toolchain link ravenbsd build/toolchain`. A stage-2 build is available with
+`make toolchain TOOLCHAIN_STAGE=2` but is not required by the K19 gate.
+
+`rustc +ravenbsd --target x86_64-unknown-ravenbsd --emit=metadata` compiles a minimal `no_main`
+crate. The target std rlibs are installed, but the runtime (ralibc and the userland ABI) is still
+K20-K22 work; the K19 gate only proves the compiler and metadata emission. ralibc implementation
+work for std is separate (K20-K22).

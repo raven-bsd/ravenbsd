@@ -5,6 +5,9 @@
 # loader and userland programs are built for their own targets by `cargo xtask` (architecture/10).
 [workspace]
 resolver = "3"
+# `make toolchain` extracts the pinned Rust source under build/; its bootstrap
+# package must not be pulled into this workspace.
+exclude = ["build"]
 # A ticket that creates a new top-level crate appends ONE line to `members` (and nothing else here).
 # Planned members: "kernel", "boot/loader", "userland/rt", "userland/init", "userland/bin/<tool>",
 # "userland/servers/<server>", "userland/drivers/<driver>", "userland/linux-shim", "libc/ralibc",
