@@ -1,0 +1,68 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt VIRTIO-NET 8
+.Os RavenBSD
+.Sh NAME
+.Nm virtio-net
+.Nd virtio network driver
+.Sh SYNOPSIS
+.Nm /sbin/virtio-net
+.Op Ar bar Ns = Ns Ar n
+.Op Ar bar_size Ns = Ns Ar bytes
+.Op Ar dma Ns = Ns Ar bytes
+.Op Ar irq Ns = Ns Ar line
+.Sh DESCRIPTION
+.Nm
+is the userspace driver for a modern (virtio 1.0) PCI network function.  It is
+launched by
+.Xr devd 8
+for a function whose vendor and device ids match the driver table, and it
+receives four handles in the documented order: the device BAR (3), the
+function's configuration page (4), a DMA buffer (5) and a legacy interrupt (6).
+The command-line arguments are the values
+.Nm
+appends to the driver's arguments:
+.Va bar ,
+.Va bar_size ,
+.Va dma
+and
+.Va irq .
+.Pp
+The driver resets the function, acknowledges it, negotiates
+.Dv VIRTIO_F_VERSION_1
+plus the MAC, MTU and link-status features, and programs split RX and TX
+virtqueues in the DMA buffer.  Descriptors point directly into that buffer, so
+frames are not copied between queues, and every used-ring index and length is
+checked against the queue and buffer bounds before it is dereferenced.  The
+device is interrupted through the transferred IRQ handle; the ISR byte and the
+used rings are drained on each interrupt.  Received ARP requests directed at the
+driver's MAC address are answered from the frame ring.
+.Pp
+When the driver exits it resets the function so the next launch starts from a
+clean device.  The DMA buffer and the interrupt line belong to
+.Xr devd 8 ,
+which closes its own copies after the child exits; a crash or restart
+therefore cannot leak either resource.
+.Pp
+The device must be a modern-only function (for example QEMU's
+.Ql virtio-net-pci,disable-legacy=on ) whose registers live in a memory BAR.
+Legacy virtio, MSI and MSI-X are not supported yet; the driver uses the
+function's legacy INTx line.
+.Sh FILES
+.Bl -tag -width /etc/drivers.toml -compact
+.It Pa /etc/drivers.toml
+the driver table that launches
+.Nm
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr devd 8 ,
+.Xr pcid 8
+.Sh HISTORY
+The
+.Nm
+driver first appeared in RavenBSD 0.1.
+.Sh STANDARDS
+Virtio 1.0 (OASIS), PCI Local Bus 3.0.

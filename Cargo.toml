@@ -108,6 +108,7 @@ members = [
     "tests/tcpip/oracle",
     "tests/fixtures/b13a-driver",
     "tests/fixtures/b13c-resources",
+    "userland/drivers/virtio-net",
     "tools/bench-host",
     "tools/fuzz",
     "tests/fuzz/replay",
