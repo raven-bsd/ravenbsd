@@ -83,7 +83,11 @@ pub use recovery::{Ecn, Rack, SpuriousUndo, Tlp, pto};
 pub use route::{Route, RouteTable};
 pub use rto::RtoEstimator;
 pub use sack::{NextKind, NextSeg, SackResult, SackScoreboard, receiver_blocks, sack_option_bytes};
+#[cfg(feature = "tcp-md5")]
+pub use signature::md5;
 pub use signature::{AoAlgorithm, AoKey, DigestProvider, NoDigest};
+#[cfg(feature = "tcp-ao")]
+pub use signature::{hmac_sha1, hmac_sha256};
 pub use stack::{Ipv4Addr, Ipv4Config, MAX_TIMERS, Stack, StackConfig, TimerId};
 pub use table::{
     ConnectionKey, ConnectionTable, ListenerKey, ListenerTable, PortAllocator, Rebind,

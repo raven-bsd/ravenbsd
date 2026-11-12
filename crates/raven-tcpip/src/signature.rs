@@ -53,3 +53,35 @@ impl DigestProvider for NoDigest {
         [0; 32]
     }
 }
+
+/// Compute an MD5 digest when the `tcp-md5` feature is enabled.
+#[cfg(feature = "tcp-md5")]
+#[must_use]
+pub fn md5(data: &[u8]) -> [u8; 16] {
+    use md5::{Digest, Md5};
+    let mut hasher = Md5::new();
+    hasher.update(data);
+    hasher.finalize().into()
+}
+
+/// Compute HMAC-SHA-1 when the `tcp-ao` feature is enabled.
+#[cfg(feature = "tcp-ao")]
+#[must_use]
+pub fn hmac_sha1(key: &[u8], data: &[u8]) -> [u8; 20] {
+    use hmac::{Hmac, Mac};
+    use sha1::Sha1;
+    let mut mac = <Hmac<Sha1> as Mac>::new_from_slice(key).expect("HMAC accepts any key length");
+    mac.update(data);
+    mac.finalize().into_bytes().into()
+}
+
+/// Compute HMAC-SHA-256 when the `tcp-ao` feature is enabled.
+#[cfg(feature = "tcp-ao")]
+#[must_use]
+pub fn hmac_sha256(key: &[u8], data: &[u8]) -> [u8; 32] {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(key).expect("HMAC accepts any key length");
+    mac.update(data);
+    mac.finalize().into_bytes().into()
+}

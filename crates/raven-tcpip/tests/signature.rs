@@ -4,10 +4,12 @@
 //! C18 signature plumbing tests. Cryptography is intentionally absent.
 
 #![cfg(feature = "testutil")]
+#![allow(unused_imports)] // Imports are used by the feature-gated tests.
 
 use raven_abi::errno::Errno;
 use raven_tcpip::{AoAlgorithm, AoKey, DigestProvider, NoDigest};
 
+#[cfg(not(feature = "tcp-md5"))]
 #[test]
 fn md5_setter_reports_not_supported_until_approved() {
     let mut stack = raven_tcpip::Stack::new(
@@ -22,6 +24,7 @@ fn md5_setter_reports_not_supported_until_approved() {
     );
 }
 
+#[cfg(not(feature = "tcp-ao"))]
 #[test]
 fn ao_setter_reports_not_supported_until_approved() {
     let mut stack = raven_tcpip::Stack::new(
