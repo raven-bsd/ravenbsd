@@ -1147,6 +1147,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-tcpip-fuzz-replay"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-tcpip",
+ "raven-tcpip-sim",
+ "raven-tcpip-wire",
+]
+
+[[package]]
 name = "raven-tcpip-sim"
 version = "0.1.0"
 dependencies = [

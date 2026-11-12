@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-tcpip-fuzz"
+version = "0.1.0"
+description = "cargo-fuzz targets for raven-tcpip; nightly tool only, outside the workspace."
+edition = "2024"
+license = "BSD-3-Clause"
+publish = false
+
+# Its own workspace: a stable `cargo build` or `make check` never needs nightly.
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+raven-tcpip-fuzz-replay = { path = "../fuzz-replay" }
+
+[[bin]]
+name = "wire_parse"
+path = "fuzz_targets/wire_parse.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "tcp_options"
+path = "fuzz_targets/tcp_options.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "segment_sequence"
+path = "fuzz_targets/segment_sequence.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "handshake_state"
+path = "fuzz_targets/handshake_state.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "reassembly"
+path = "fuzz_targets/reassembly.rs"
+test = false
+doc = false
+
+[profile.release]
+debug = 1
