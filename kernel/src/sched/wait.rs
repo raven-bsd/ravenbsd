@@ -70,25 +70,26 @@ impl WaitQueue {
     }
 
     /// Wake up to `max` waiters for `(space, addr)`, returning how many actually woke.
+    ///
+    /// Allocation-free: the teardown and fault paths wake waiters on a bounded kernel stack, so
+    /// this removes at most `max` matching entries one at a time and never builds a temporary
+    /// `Vec`.  The wait-queue lock is released before the scheduler lock, preserving the usual
+    /// wait-queue-to-scheduler order.
     pub fn wake(&self, space: u64, addr: u64, max: usize) -> usize {
-        let mut woken: Vec<Arc<Thread>> = Vec::new();
-        {
-            let mut waiters = self.waiters.lock();
-            let mut index = 0usize;
-            while index < waiters.len() && woken.len() < max {
-                let matches = waiters
-                    .get(index)
-                    .is_some_and(|waiter| waiter.space == space && waiter.addr == addr);
-                if matches {
-                    let waiter = waiters.remove(index);
-                    woken.push(waiter.thread);
-                } else {
-                    index = index.saturating_add(1);
-                }
-            }
-        }
+        let mut matched = 0usize;
         let mut count = 0usize;
-        for thread in woken {
+        while matched < max {
+            let waiter = {
+                let mut waiters = self.waiters.lock();
+                waiters
+                    .iter()
+                    .position(|waiter| waiter.space == space && waiter.addr == addr)
+                    .map(|index| waiters.remove(index).thread)
+            };
+            let Some(thread) = waiter else {
+                break;
+            };
+            matched = matched.saturating_add(1);
             if super::wake(thread, None, 0) {
                 count = count.saturating_add(1);
             }
@@ -117,14 +118,21 @@ impl WaitQueue {
     }
 
     /// Wake every waiter, returning how many actually woke.
+    ///
+    /// Allocation-free for the same reason as [`Self::wake`]: `PendingRequest::complete` runs
+    /// from process teardown, including the page-fault path, and the old temporary
+    /// `Vec<Arc<Thread>>` was the deepest allocation that overflowed the kernel stack.
     #[allow(dead_code)] // used by PROC_WAIT in S24
     pub fn wake_all(&self) -> usize {
-        let woken: Vec<Arc<Thread>> = {
-            let mut waiters = self.waiters.lock();
-            waiters.drain(..).map(|waiter| waiter.thread).collect()
-        };
         let mut count = 0usize;
-        for thread in woken {
+        loop {
+            let waiter = {
+                let mut waiters = self.waiters.lock();
+                waiters.pop().map(|waiter| waiter.thread)
+            };
+            let Some(thread) = waiter else {
+                break;
+            };
             if super::wake(thread, None, 0) {
                 count = count.saturating_add(1);
             }

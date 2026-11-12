@@ -36,6 +36,7 @@ members = [
     "tests/fixtures/s34-concurrency",
     "tests/fixtures/s36-lifecycle",
     "tests/fixtures/s38-events",
+    "tests/fixtures/s40-teardown",
     "tests/fixtures/usercopy-cow",
     "tests/fixtures/testkernel",
     "xtask",

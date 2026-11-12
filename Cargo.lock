@@ -1000,6 +1000,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-s40-teardown"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-ipc",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-sched-core"
 version = "0.1.0"
 

@@ -244,6 +244,13 @@ impl Capture {
     }
 }
 
+/// True when the S40 capture diagnostics are enabled.
+fn trace_s40() -> bool {
+    crate::memory::paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "s40-teardowncheck")
+}
+
 impl Drop for Capture {
     fn drop(&mut self) {
         let mut released = true;
@@ -274,6 +281,15 @@ impl Drop for Capture {
             let size = self.pages.saturating_mul(PAGE);
             let flushed = released && crate::sched::smp::shootdown::flush_range(self.base, size);
             if !flushed {
+                if trace_s40() {
+                    crate::kprintln!(
+                        "s40: capture drop leak slot={:?} base={:#x} pages={} released={}",
+                        self.slot,
+                        self.base,
+                        self.pages,
+                        released
+                    );
+                }
                 // A stale translation may still reach these frames; retain them and let the
                 // capture counter expose the leak instead of recycling them.
                 self.frames.leak();
@@ -407,11 +423,15 @@ pub fn create(
         page = page.saturating_add(1);
     }
 
-    let slot = server
-        .capture_slots
-        .lock()
-        .acquire(pages)
-        .ok_or(Errno::ENOMEM)?;
+    let slot = match server.capture_slots.lock().acquire(pages) {
+        Some(slot) => slot,
+        None => {
+            if trace_s40() {
+                crate::kprintln!("s40: capture no slot pages={pages}");
+            }
+            return Err(Errno::ENOMEM);
+        }
+    };
     let base = capture_window::BASE
         .saturating_add((slot as u64).saturating_mul(capture_window::SLOT_SIZE));
     let flags = if writable {
@@ -453,6 +473,14 @@ pub fn create(
                 .map(virt, PhysAddr(physical), flags, PageSize::Size4K)
                 .is_err()
             {
+                if trace_s40() {
+                    crate::kprintln!(
+                        "s40: capture map failed slot={} page={} base={:#x}",
+                        slot,
+                        mapped,
+                        base
+                    );
+                }
                 if !unmap_partial(&mut mapper, base, mapped) {
                     frames.leak();
                 }
