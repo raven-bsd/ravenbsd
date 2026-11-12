@@ -194,6 +194,9 @@ pub struct Stack<D: Device> {
     pub(crate) ip_errors: Vec<(Ipv4Addr, Errno)>,
     pub(crate) arp_requests: usize,
     pub(crate) next_ephemeral: u16,
+    /// The DHCPv4 client, while one is running.
+    pub(crate) dhcp: Option<crate::dhcp::Dhcp>,
+    pub(crate) dhcp_retry: crate::dhcp::RetryConfig,
     /// Reused receive staging: frames of one poll batch are copied here, not into fresh vectors.
     pub(crate) rx_arena: Vec<u8>,
     pub(crate) rx_spans: Vec<(usize, usize)>,
@@ -305,6 +308,8 @@ impl<D: Device> Stack<D> {
             ip_errors: Vec::new(),
             arp_requests: 0,
             next_ephemeral,
+            dhcp: None,
+            dhcp_retry: crate::dhcp::RetryConfig::default(),
             rx_arena: Vec::new(),
             rx_spans: Vec::new(),
             ports: crate::table::PortAllocator::new(
@@ -429,6 +434,7 @@ impl<D: Device> Stack<D> {
         self.rx_arena = arena;
         self.rx_spans = spans;
         self.retry_tcp_sends();
+        self.dhcp_step(now);
         self.process_ip_timers(now);
         self.observe_hash_chains();
 
@@ -449,6 +455,12 @@ impl<D: Device> Stack<D> {
             earliest = Some(match earliest {
                 Some(deadline) if deadline <= timer.deadline => deadline,
                 _ => timer.deadline,
+            });
+        }
+        if let Some(dhcp_deadline) = self.dhcp_deadline() {
+            earliest = Some(match earliest {
+                Some(current) if current <= dhcp_deadline => current,
+                _ => dhcp_deadline,
             });
         }
         if let Some(tcp_deadline) = self.next_tcp_deadline() {

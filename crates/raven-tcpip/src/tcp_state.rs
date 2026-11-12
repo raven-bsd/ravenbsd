@@ -455,6 +455,13 @@ impl<D: Device> Stack<D> {
         }
     }
 
+    /// TIME-WAIT entries held and how many of them no longer have a socket record (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_time_wait_entries(&self) -> (usize, usize) {
+        self.timewait.entries_detached()
+    }
+
     /// Half-open connections of a listener (host tests).
     #[cfg(any(test, feature = "testutil"))]
     #[must_use]
@@ -1973,7 +1980,7 @@ impl<D: Device> Stack<D> {
             }
         }
         if let Some((seq, data)) = incoming {
-            self.tcp_deliver_data(socket, seq, &data, now);
+            self.tcp_deliver_data(socket, seq, data, now);
         }
         if fin_after_data {
             if let Ok(record) = self.sockets.record_mut(socket)

@@ -618,8 +618,15 @@ impl<D: Device> Stack<D> {
             .sockets
             .records
             .iter()
-            .filter_map(|(raw_id, record)| match record.kind {
-                Kind::Tcp(_) if !record.closed => Some(SocketId(*raw_id)),
+            .filter_map(|(raw_id, record)| match &record.kind {
+                Kind::Tcp(connection) if !record.closed => {
+                    let in_flight =
+                        usize::try_from(connection.snd_nxt.wrapping_sub(connection.snd_una))
+                            .unwrap_or(usize::MAX);
+                    let unsent = record.tx.len() > in_flight;
+                    let fin_due = connection.close_requested && !connection.fin_sent;
+                    (unsent || fin_due).then_some(SocketId(*raw_id))
+                }
                 _ => None,
             })
             .collect();

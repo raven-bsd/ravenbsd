@@ -9,7 +9,7 @@
 //! **Time.** [`Instant`] and [`Duration`] are plain wrappers over `i64`/`u64` milliseconds. The
 //! caller supplies `now` to every entry point; the stack never asks for the time.
 //!
-//! **Link layer.** The stack owns no driver. It talks to one trait, ours (not smoltcp's):
+//! **Link layer.** The stack owns no driver. It talks to one trait:
 //! [`Device`]. [`Device::receive`] hands the next frame to a callback and returns `true`, or returns
 //! `false` when the queue is empty. [`Device::transmit`] reserves `len` bytes, lets a callback write
 //! them, then queues the frame.
@@ -42,6 +42,8 @@ extern crate alloc;
 
 mod cc;
 mod device;
+mod dhcp;
+mod dhcp_stack;
 mod event;
 mod icmp_stack;
 mod ipv4_stack;
@@ -71,6 +73,7 @@ pub use raven_abi::errno::Errno;
 
 pub use cc::{CcContext, CongestionControl, Cubic, LossKind, NewReno, Prr, icbrt};
 pub use device::{ChecksumOffload, Device, DeviceCaps, Medium, TxError};
+pub use dhcp::{Event as DhcpEvent, Lease as DhcpLease, RetryConfig as DhcpRetryConfig};
 pub use event::{Event, PollResult, SocketId};
 pub use ipv6_stack::{
     IpAddr, Ipv6Addr, Ipv6AddressState, Ipv6Cidr, Ipv6Config, Neighbor6Cache, Neighbor6Entry,

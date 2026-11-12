@@ -35,7 +35,20 @@ pub(crate) fn from_wire(address: WireIpv4Addr) -> Ipv4Addr {
 
 impl<D: Device> Stack<D> {
     /// Configure an IPv4 address and install the connected route plus an optional default route.
+    ///
+    /// A static configuration replaces any DHCP lease and stops the DHCP client.
     pub fn set_ipv4(&mut self, config: Ipv4Config) -> Result<(), Errno> {
+        self.dhcp = None;
+        self.apply_ipv4(config)
+    }
+
+    /// The IPv4 configuration in force: static, leased, or `None` before one is set.
+    #[must_use]
+    pub fn ipv4_config(&self) -> Option<Ipv4Config> {
+        self.ipv4
+    }
+
+    pub(crate) fn apply_ipv4(&mut self, config: Ipv4Config) -> Result<(), Errno> {
         if config.prefix_len > 32 {
             return Err(Errno::EINVAL);
         }
@@ -177,6 +190,18 @@ impl<D: Device> Stack<D> {
             self.drops = self.drops.saturating_add(1);
             return;
         };
+        if self.dhcp.is_some()
+            && packet.protocol() == 17
+            && !packet.is_fragment()
+            && self.dhcp_input(
+                from_wire(packet.src()),
+                from_wire(packet.dst()),
+                packet.payload(),
+                now,
+            )
+        {
+            return;
+        }
         let Some(config) = self.ipv4 else {
             return;
         };

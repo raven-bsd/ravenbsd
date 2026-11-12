@@ -44,9 +44,16 @@ impl<B: StackBackend> Core<B> {
         self.backend.enable_dhcp();
     }
 
-    /// Enable DHCP, or return [`Errno::EOPNOTSUPP`] when the backend has no DHCP client.
+    /// Enable DHCP, or return an error (`ENETUNREACH` without a hardware address,
+    /// `EOPNOTSUPP` from a backend with no client).
     pub fn try_enable_dhcp(&mut self) -> Result<(), Errno> {
         self.backend.try_enable_dhcp()
+    }
+
+    /// The DHCP lease in force, once one was acquired.
+    #[must_use]
+    pub fn dhcp_lease(&self) -> Option<crate::DhcpLease> {
+        self.backend.dhcp_lease()
     }
 
     /// Listen for TCP connections.

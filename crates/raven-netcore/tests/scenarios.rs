@@ -9,9 +9,11 @@ mod common;
 
 use std::collections::BTreeMap;
 
-use common::{CLIENT_IP, PORT, SERVER_IP, connected_pair, hash, pattern, setup, step, wait_accept};
+use common::{
+    CLIENT_IP, CLIENT_MAC, PORT, SERVER_IP, connected_pair, hash, pattern, setup, step, wait_accept,
+};
 use raven_netcore::testutil::{PairConfig, PairDevice};
-use raven_netcore::{Errno, Event, NetCore, SocketId};
+use raven_netcore::{Device, Errno, Event, Instant, NetCore, SocketId};
 
 /// Events grouped by socket, in order, consecutive repeats collapsed. An accepted connection
 /// is attributed to its listener.
@@ -402,12 +404,66 @@ fn udp_datagram_boundaries_and_sources_are_preserved() {
     );
 }
 
+/// Frames the peer end of the link has queued, newest last.
+fn peer_frames(peer: &mut PairDevice, now: i64) -> Vec<Vec<u8>> {
+    let mut frames = Vec::new();
+    loop {
+        let mut frame = Vec::new();
+        if !peer.receive(Instant::from_millis(now), &mut |bytes| {
+            frame = bytes.to_vec();
+        }) {
+            return frames;
+        }
+        frames.push(frame);
+    }
+}
+
 #[test]
-fn dhcp_is_reported_unsupported_and_arms_no_timer() {
+fn enabling_dhcp_broadcasts_a_discover_and_a_static_address_stops_it() {
+    let (device, mut peer) = PairDevice::pair(PairConfig::reliable());
+    let mut client = NetCore::new(device, CLIENT_MAC, 0);
+    assert_eq!(client.try_enable_dhcp(), Ok(()));
+    assert_eq!(client.dhcp_lease(), None);
+    client.poll(1);
+    let frames = peer_frames(&mut peer, 1);
+    let discover = frames
+        .iter()
+        .find(|frame| {
+            frame.len() > 42
+                && frame[..6] == [0xff; 6]
+                && frame[12..14] == [0x08, 0x00]
+                && frame[23] == 17
+                && frame[34..36] == 68u16.to_be_bytes()
+                && frame[36..38] == 67u16.to_be_bytes()
+        })
+        .expect("a broadcast DHCP DISCOVER from port 68 to 67");
+    assert_eq!(
+        discover[26..30],
+        [0, 0, 0, 0],
+        "sent from the unspecified address"
+    );
+    assert!(
+        client.next_poll_delay_ms(1).is_some(),
+        "the retry timer is armed"
+    );
+
+    client.set_ipv4(CLIENT_IP, 24, None);
+    for now in 2..30_000 {
+        client.poll(now);
+    }
+    assert!(
+        peer_frames(&mut peer, 30_000)
+            .iter()
+            .all(|frame| frame.len() < 42 || frame[34..36] != 68u16.to_be_bytes()),
+        "no DHCP traffic after the static override"
+    );
+}
+
+#[test]
+fn an_unconfigured_interface_without_dhcp_asks_for_no_wakeups() {
     let mut now = 0i64;
     let (mut client, _server) = setup(PairConfig::reliable(), &mut now);
-    assert_eq!(client.try_enable_dhcp(), Err(Errno::EOPNOTSUPP));
-    client.enable_dhcp();
+    client.set_ipv4(CLIENT_IP, 24, None);
     assert_eq!(client.next_poll_delay_ms(now), None);
 }
 

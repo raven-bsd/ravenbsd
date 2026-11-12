@@ -8,25 +8,18 @@ Method: `cargo run -p raven-tcpip-bench --release -- --all --output tests/tcpip/
 Virtual-time metrics are exact and identical across runs; wall-clock metrics are medians
 of five runs with the spread stated and are never asserted as thresholds.
 
-| Metric | raven-tcpip | smoltcp baseline | Verdict | Method |
-|---|---|---|---|---|
-| Goodput, lossless, 1 ms RTT | 28.57 MiB/s (35 ms virtual) | 31.25 MiB/s (32 ms virtual) | worse | virtual time, 1 MiB, 5 runs; wall median 7.5 ms, spread 1.1 ms |
-| Goodput, lossless, 20 ms RTT | 2.70 MiB/s (370 ms virtual) | 2.72 MiB/s (367 ms virtual) | equal | virtual time, 1 MiB, 5 runs; wall median 7.4 ms, spread 0.3 ms |
-| Goodput, lossless, 200 ms RTT | 0.27 MiB/s (3700 ms virtual) | 0.28 MiB/s (3517 ms virtual) | worse | virtual time, 1 MiB, 5 runs; wall median 8.5 ms, spread 0.1 ms |
-| Goodput, 1% loss, 20 ms RTT | 0.92 MiB/s (1090 ms, retrans 18642 B) | 2.07 MiB/s (484 ms) | worse | virtual time, 1 MiB, 5 runs; loss in per-mille on the smoltcp side |
-| Goodput, 5% loss, 20 ms RTT | 0.17 MiB/s (6001 ms, retrans 106116 B) | 0.17 MiB/s (5941 ms) | worse | virtual time, 1 MiB, 5 runs; loss in per-mille on the smoltcp side |
-| Goodput, 10% reordering, 20 ms RTT | 0.66 MiB/s (1505 ms) | 0.64 MiB/s (1567 ms) | equal/better | virtual time, 1 MiB, 5 runs |
-| CPU cost per MiB (wall time) | 7.5 ms/MiB | 4.4 ms/MiB | worse | median of 5, spread raven 0.4 ms / smoltcp 0.2 ms |
-| Time to first byte, 20 ms RTT | 40 ms virtual | 62 ms virtual | equal/better | virtual time, 5 identical runs |
-| Memory per idle connection | blocked: no stable per-socket accounting hook | blocked: no stable per-socket accounting hook | blocked | RSS before/after was not stable enough to publish; C24 can add a hook |
-| Memory per active connection (1 KiB in flight) | blocked: same accounting hook | blocked: same accounting hook | blocked | not measured in this pass |
-| Connection setup rate | blocked: wall-clock handshake loop not automated | blocked: wall-clock handshake loop not automated | blocked | deterministic handshake completion is covered by the conformance suite |
-| Classification at 100 / 1000 / 10000 connections | blocked: C17 harness needs a release-mode adapter | blocked: same | blocked | C17 table tests cover the algorithm; wall-clock classification is not asserted |
-| Recovery after one mid-transfer loss | blocked: no targetable single-drop hook | blocked: no retransmission counter | blocked | the loss goodput rows show the aggregate effect; C20 can add a single-drop script |
+smoltcp was retired in C32. Its columns are frozen measurements of smoltcp 0.14 taken
+with the same harness, scenarios and seeds immediately before removal: once as the old
+`raven-netcore` default (no congestion control) and once with `socket-tcp-reno`, the fair
+congestion-controlled baseline the verdict is computed against (10% tolerance).
 
-## Verdict
-
-The native stack is compared on the same 1 MiB payload, RTT and loss inputs. Where a row
-says `blocked`, the method is stated and no number is invented. The loss and reordering
-numbers are the honest aggregate; the single-drop recovery and per-connection memory
-hooks are follow-up work for C24.
+| Metric | raven-tcpip | smoltcp, no CC (frozen) | smoltcp + Reno (frozen, fair) | Verdict vs fair | Method |
+|---|---|---|---|---|---|
+| Goodput, lossless, 1 ms RTT | 29.41 MiB/s (34 ms) | 31.25 MiB/s (32 ms) | 18.52 MiB/s (54 ms) | better | virtual time, 1 MiB, 5 runs; wall median 1.0 ms, spread 1.6 ms |
+| Goodput, lossless, 20 ms RTT | 2.70 MiB/s (370 ms) | 2.72 MiB/s (367 ms) | 1.25 MiB/s (801 ms) | better | virtual time, 1 MiB, 5 runs; wall median 1.2 ms, spread 0.3 ms |
+| Goodput, lossless, 200 ms RTT | 0.27 MiB/s (3700 ms) | 0.28 MiB/s (3517 ms) | 0.13 MiB/s (7911 ms) | better | virtual time, 1 MiB, 5 runs; wall median 2.7 ms, spread 0.2 ms |
+| Goodput, 1% loss, 20 ms RTT | 1.10 MiB/s (910 ms) | 2.07 MiB/s (484 ms) | 0.10 MiB/s (10181 ms) | better | virtual time, 1 MiB, 5 runs, via raven-netcore PairDevice, loss in per-mille |
+| Goodput, 5% loss, 20 ms RTT | 0.29 MiB/s (3446 ms) | 0.17 MiB/s (5941 ms) | 0.01 MiB/s (70691 ms) | better | virtual time, 1 MiB, 5 runs, via raven-netcore PairDevice, loss in per-mille |
+| Goodput, 10% reordering, 20 ms RTT | 2.04 MiB/s (490 ms) | 0.64 MiB/s (1567 ms) | 0.32 MiB/s (3151 ms) | better | virtual time, 1 MiB, 5 runs |
+| CPU cost per MiB (wall time) | 1.14 ms/MiB | 0.68 ms/MiB | 1.06 ms/MiB | equal | median of 5, spread 0.04 ms; transfer loop only, references measured the same way on this host before removal |
+| Time to first byte, 20 ms RTT | 60 ms virtual | 62 ms virtual | 62 ms virtual (not re-measured) | equal | virtual time, 5 identical runs |

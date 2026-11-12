@@ -3,11 +3,14 @@
 
 # raven-netcore
 
-OS-independent socket layer over [smoltcp](https://github.com/smoltcp-rs/smoltcp). `netd` will use
-it to own the interface, socket table and readiness state, while the host tests exercise the same
+OS-independent socket layer over the native [`raven-tcpip`](../raven-tcpip) stack. `netd` uses it
+to own the interface, socket table and readiness state, while the host tests exercise the same
 code through an in-memory Ethernet link.
 
-The crate is `no_std` and needs only `alloc`. It forbids `unsafe`.
+The crate is `no_std` and needs only `alloc`. It forbids `unsafe`. smoltcp, the stack this layer
+was first written against, was retired in C32: there is one backend, `RavenTcpipBackend`, and
+`NetCore<D>` is `Core<RavenTcpipBackend<D>>`. `StackBackend` stays as the seam for stubs and
+future transports.
 
 ## Public API
 
@@ -24,41 +27,40 @@ pub enum Event {
 }
 ```
 
+`Device` is `raven_tcpip::Device` (re-exported with `DeviceCaps`, `Instant`, `Medium`,
+`ChecksumOffload` and `TxError`): `receive(now, consume)` hands the next frame to a callback and
+`transmit(now, len, fill)` lets the stack write a frame in place.
+
 All operations are nonblocking:
 
 * `send` returns `Ok(n)` or `Errno::EAGAIN` when the transmit buffer is full; TCP may accept a
-  short write.
+  short write. On a connection the peer has already torn down it returns `Errno::ENOTCONN`.
 * `recv` returns `Ok(0)` only after the peer's orderly close; an empty live socket returns
-  `Errno::EAGAIN`.
-* `poll(now_ms)` drives smoltcp and returns readiness *transitions* since the previous call,
+  `Errno::EAGAIN`; a reset connection reports its error once.
+* `poll(now_ms)` drives the stack and returns readiness *transitions* since the previous call,
   not levels.
-* `next_poll_delay_ms(now_ms)` reports the stack's next timer deadline. A link with its own
-  propagation delay must still be polled at least as often as that delay.
+* `next_poll_delay_ms(now_ms)` reports the stack's next timer deadline, or `None` when nothing is
+  scheduled. A link with its own propagation delay must still be polled at least as often as
+  that delay.
 * Unknown socket ids return `Errno::EBADF`. Wrong socket types return `Errno::ENOTSOCK` or
   `Errno::ENOTCONN` as appropriate.
 
 Socket ids are allocated monotonically and are not reused until the `u32` counter wraps. A TCP
-`close` invalidates the id immediately but keeps the smoltcp socket alive until the FIN handshake
-finishes. A listener close stops new accepts; already completed, unaccepted connections keep their
-own ids.
+`close` invalidates the id immediately; the connection finishes its FIN handshake and TIME-WAIT
+inside the stack, and its table slot is reclaimed as soon as the application has let go, so a
+server can accept far more than `max_sockets` connections over its lifetime. A listener close
+stops new accepts; already completed, unaccepted connections keep their own ids.
 
 ## Interface configuration
 
-`set_ipv4(addr, prefix, gateway)` installs a static address (prefix lengths above 32 are clamped
-to 32) and replaces any DHCP client. `enable_dhcp()` clears the static address and installs the
-smoltcp DHCP client; lease changes are applied during `poll`.
+`set_ipv4(addr, prefix, gateway)` installs a static address and stops any DHCP client.
+`enable_dhcp()` / `try_enable_dhcp()` start the native DHCPv4 client (`ENETUNREACH` if the link
+has no hardware address): it discovers, requests, renews at T1, rebinds at T2 and drops the
+address when the lease ends; `dhcp_lease()` reports the lease in force. Lease changes are
+applied during `poll`.
 
-Only IPv4 is exposed in this ticket. IPv6 can be added when the API is needed; the current
-smoltcp feature set does not enable it.
-
-## smoltcp features used
-
-```text
-alloc, medium-ethernet, proto-ipv4, socket-tcp, socket-udp, socket-dhcpv4
-```
-
-`socket-dhcpv4` pulls in `proto-dhcpv4`. IP fragmentation is not enabled, so UDP datagrams must
-fit the link MTU (1500-byte IP MTU).
+Only IPv4 is exposed in this layer; the native stack also speaks IPv6 and the API can grow when
+`netd` needs it.
 
 ## Tests
 
@@ -69,11 +71,9 @@ cargo build -p raven-netcore --target x86_64-unknown-none
 ```
 
 `testutil` provides `PairDevice`: two endpoints connected by in-memory queues with configurable
-loss, reordering, delay and jitter driven by a deterministic PRNG. The test harness advances time
-manually and verifies TCP echo (including 1 MiB with 2% loss), orderly close, refused and
-backlogged connections, `EAGAIN` transitions, UDP boundaries and source addresses, event
-sequences, determinism and a large time jump.
-
-The DHCP client is tested for state transitions only: this ticket has no in-test DHCP server. A
-server would need a third endpoint or raw frame injection into the pair, which is outside the
-OS-independent socket layer under test.
+loss, reordering, delay and jitter driven by a deterministic PRNG. `tests/scenarios.rs` covers
+byte-exact transfers (1 MiB reliable, lossy and reordering links, both directions at once),
+pinned readiness-event sequences, orderly close, refused connections, 150 sequential
+connections through a 64-slot table, simultaneous connections, a full backlog, UDP boundaries,
+DHCP on the wire and determinism from the seed. The wire-level DHCP exchange against a scripted
+server lives in `raven-tcpip`'s `tests/dhcp.rs`.

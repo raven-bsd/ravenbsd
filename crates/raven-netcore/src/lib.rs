@@ -33,6 +33,19 @@ pub use raven_tcpip::{ChecksumOffload, Device, DeviceCaps, Instant, Medium, TxEr
 /// The native raven-tcpip-backed core.
 pub type NetCore<D> = Core<RavenTcpipBackend<D>>;
 
+/// An address lease obtained over DHCP.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DhcpLease {
+    /// The leased address.
+    pub address: Ipv4Addr,
+    /// Prefix length of the connected network.
+    pub prefix_len: u8,
+    /// Default gateway, if the server gave one.
+    pub router: Option<Ipv4Addr>,
+    /// DNS servers.
+    pub dns: alloc::vec::Vec<Ipv4Addr>,
+}
+
 /// Socket identifier.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SocketId(pub u32);

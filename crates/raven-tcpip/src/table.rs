@@ -418,6 +418,19 @@ pub fn rebind_decision(
     Rebind::Allowed
 }
 
+#[cfg(any(test, feature = "testutil"))]
+impl TimeWaitTable<TimeWaitSlot> {
+    /// Entries held, and how many are detached from their socket record.
+    pub(crate) fn entries_detached(&self) -> (usize, usize) {
+        let detached = self
+            .entries
+            .values()
+            .filter(|(slot, _)| slot.info.is_some())
+            .count();
+        (self.entries.len(), detached)
+    }
+}
+
 /// What a TIME-WAIT entry needs to answer a late segment after its socket record is gone.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct TimeWaitInfo {

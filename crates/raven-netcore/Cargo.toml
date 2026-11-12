@@ -26,6 +26,10 @@ name = "tcp"
 required-features = ["testutil"]
 
 [[test]]
+name = "scenarios"
+required-features = ["testutil"]
+
+[[test]]
 name = "udp"
 required-features = ["testutil"]
 

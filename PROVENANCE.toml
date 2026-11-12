@@ -297,3 +297,19 @@ tier = "A"
 copied = "2026-11-11"
 modified = true
 notes = "WAPBL port group. vfs_wapbl.c supplied the record write order, circular queue advance/read/write, commit-header selection, replay block/revocation/inode processing and tail handling; sys/sys/wapbl.h the public transaction/replay API; sys/sys/wapbl_replay.h the on-disk wc_header/wc_blocklist/wc_inodelist layouts; sys/ufs/ffs/ffs_wapbl.c the location discovery, start/stop ordering and inode cleanup; sys/ufs/ufs/ufs_wapbl.h the fs_journal_* fields and SF_LOG semantics. All five carry the NetBSD Foundation BSD-2-Clause notice. wapbl_replay.h was not in B63's 107-file audit list but has the same notice as wapbl.h. Kernel buffers, vnodes, credentials, cache sync and locking are replaced by Journal over BlockIo; each committed transaction is checkpointed synchronously, and an end-of-partition log is reserved at format time instead of allocating an in-filesystem log inode."
+
+# smoltcp (0BSD, tier A) was the TCP/IP backend of crates/raven-netcore until C32 retired it.
+# The dependency, the backend source and every feature that selected it are gone from the tree
+# (`cargo tree --workspace | grep -c smoltcp` is 0). It never had an [[import]] entry because no
+# smoltcp file was copied; the one derived file is the DHCP client below.
+
+[[import]]
+path = "crates/raven-tcpip/src/dhcp.rs"
+upstream = "smoltcp"
+upstream_path = "src/socket/dhcpv4.rs"
+upstream_rev = "8b0e5c8598647fe92e2a1b87932d1932354fee0b"
+license = "0BSD"
+tier = "A"
+copied = "2026-11-12"
+modified = true
+notes = "DHCPv4 client state machine adapted from smoltcp (0BSD): discover/request/renew/rebind/expiry transitions, the request back-off (doubling every two tries), the renew/rebind retransmit rule and the T1/T2 derivation. Rewritten sans-IO around a millisecond clock and this crate's address type, with its own RFC 2131 message codec, no heapless, and no smoltcp wire types. smoltcp's own DHCP packet representation was not copied."

@@ -102,9 +102,11 @@ const REFERENCE: [(&str, Reference); 6] = [
     ),
 ];
 
-/// Frozen CPU reference, wall ms per MiB (1 MiB, 20 ms RTT, median of five).
-const CPU_NO_CC_MS: f64 = 4.4;
-const CPU_RENO_MS: f64 = 4.6;
+/// Frozen CPU reference: wall ms to move 1 MiB at 20 ms RTT through the socket layer, timing
+/// only the transfer loop (payload generation and verification excluded), median of seven.
+/// The C30 figures of 4.4 and 4.6 ms included about 3.8 ms of harness work and are retired.
+const CPU_NO_CC_MS: f64 = 0.68;
+const CPU_RENO_MS: f64 = 1.06;
 
 /// Frozen time-to-first-byte reference at 20 ms RTT (virtual ms; the handshake does not
 /// depend on congestion control, so the Reno build was not measured separately).
@@ -207,12 +209,7 @@ fn main() {
         push_row(
             &mut lines,
             &format!("Goodput, {}% loss, 20 ms RTT", loss / 10),
-            &format!(
-                "{:.2} MiB/s ({} ms, retrans {} B)",
-                run.goodput_mib_s(),
-                run.virtual_ms,
-                run.retrans_bytes.unwrap_or(0)
-            ),
+            &format!("{:.2} MiB/s ({} ms)", run.goodput_mib_s(), run.virtual_ms),
             key,
             run.virtual_ms,
             "virtual time, 1 MiB, 5 runs, via raven-netcore PairDevice, loss in per-mille",
@@ -238,7 +235,7 @@ fn main() {
         "equal"
     };
     lines.push(format!(
-        "| CPU cost per MiB (wall time) | {cpu:.1} ms/MiB | {CPU_NO_CC_MS:.1} ms/MiB | {CPU_RENO_MS:.1} ms/MiB | {cpu_verdict} | median of 5, spread {:.1} ms; references measured on this host before removal |",
+        "| CPU cost per MiB (wall time) | {cpu:.2} ms/MiB | {CPU_NO_CC_MS:.2} ms/MiB | {CPU_RENO_MS:.2} ms/MiB | {cpu_verdict} | median of 5, spread {:.2} ms; transfer loop only, references measured the same way on this host before removal |",
         spread.as_secs_f64() * 1000.0
     ));
 
@@ -263,7 +260,7 @@ fn main() {
          congestion-controlled baseline the verdict is computed against (10% tolerance).\n\n",
     );
     text.push_str(&lines.join("\n"));
-    text.push_str("\n");
+    text.push('\n');
     if let Some(path) = output {
         fs::write(&path, &text).expect("write PERFORMANCE.md");
         println!("wrote {}", path.display());

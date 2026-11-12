@@ -154,12 +154,27 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
     }
 
     fn enable_dhcp(&mut self) {
-        // raven-tcpip has no DHCP client: the call changes nothing and arms no timer. Callers
-        // that need to know use `try_enable_dhcp`, which reports EOPNOTSUPP.
+        let _ = self.stack.dhcp_enable();
     }
 
     fn try_enable_dhcp(&mut self) -> Result<(), Errno> {
-        Err(Errno::EOPNOTSUPP)
+        self.stack.dhcp_enable()
+    }
+
+    fn dhcp_lease(&self) -> Option<crate::DhcpLease> {
+        let lease = self.stack.dhcp_lease()?;
+        Some(crate::DhcpLease {
+            address: Ipv4Addr::from_octets(lease.address.octets()),
+            prefix_len: lease.prefix_len,
+            router: lease
+                .router
+                .map(|router| Ipv4Addr::from_octets(router.octets())),
+            dns: lease
+                .dns
+                .iter()
+                .map(|server| Ipv4Addr::from_octets(server.octets()))
+                .collect(),
+        })
     }
 
     fn tcp_listen(&mut self, port: u16, backlog: usize) -> Result<SocketId, Errno> {
