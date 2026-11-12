@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# One-shot client that lists /root/etc and reads /root/etc/hostname through vfsd.
+name = "k33-probe"
+exec = "/sbin/k33-probe"
+args = ["k33-probe"]
+needs = ["scheme:file"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

@@ -696,6 +696,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-k33-rootfs-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-k54-mkimage"
 version = "0.1.0"
 dependencies = [

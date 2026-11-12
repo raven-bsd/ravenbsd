@@ -1,0 +1,73 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The hw root filesystem. `make image PROFILE=hw` stages these entries, formats a 24 MiB UFS2
+# image and wraps it in the GPT disk blockd serves as the RAM block image.
+
+size = 8388608
+
+[[programs]]
+package = "raven-uname"
+path = "/sbin/uname"
+
+[[programs]]
+package = "raven-cat"
+path = "/bin/cat"
+
+[[programs]]
+package = "raven-ls"
+path = "/bin/ls"
+
+[[programs]]
+package = "raven-echo"
+path = "/bin/echo"
+
+[[programs]]
+package = "raven-rsh"
+path = "/bin/rsh"
+
+[[programs]]
+package = "raven-consd"
+path = "/sbin/consd"
+
+[[files]]
+src = "rootfs/hw/etc/services.d/consd.toml"
+path = "/etc/services.d/consd.toml"
+
+[[files]]
+src = "rootfs/hw/etc/services.d/rsh.toml"
+path = "/etc/services.d/rsh.toml"
+
+[[files]]
+src = "rootfs/hw/etc/services.d/uname-root.toml"
+path = "/etc/services.d/uname-root.toml"
+
+[[files]]
+src = "rootfs/hw/etc/services.d/root-marker.toml"
+path = "/etc/services.d/root-marker.toml"
+
+[[files]]
+src = "rootfs/hw/etc/services.d/k33-probe.toml"
+path = "/etc/services.d/k33-probe.toml"
+
+[[files]]
+src = "rootfs/hw/etc/services.d/ls-root.toml"
+path = "/etc/services.d/ls-root.toml"
+
+[[files]]
+src = "rootfs/hw/etc/rc.conf"
+path = "/etc/rc.conf"
+
+[[files]]
+src = "rootfs/hw/etc/hostname"
+path = "/etc/hostname"
+
+[[files]]
+src = "rootfs/hw/etc/root-marker.txt"
+path = "/etc/root-marker.txt"
+
+[[files]]
+src = "build/fixtures/k33-rootfs/k33-probe"
+path = "/sbin/k33-probe"
+mode = 0o755
+generated = true

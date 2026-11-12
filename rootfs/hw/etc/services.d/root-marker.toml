@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# This manifest exists only in the root image, never in the initfs.
+name = "root-marker"
+exec = "/bin/cat"
+args = ["cat", "file:/root/etc/root-marker.txt"]
+needs = ["scheme:file"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

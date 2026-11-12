@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Runs /root/sbin/uname from the UFS root; the qtest checks the printed uname line.
+name = "uname-root"
+exec = "/sbin/uname"
+args = ["uname", "-a"]
+needs = ["scheme:file"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
