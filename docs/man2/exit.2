@@ -1,22 +1,35 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 12, 2026
 .Dt EXIT 2
 .Os RavenBSD
 .Sh NAME
 .Nm exit
-.Nd terminate the calling process
+.Nd terminate the calling process and all of its threads
 .Sh SYNOPSIS
 .Ft void
 .Fn exit "int code"
 .Sh DESCRIPTION
-The .Nm system call terminates the calling process and all of its threads.
+The
+.Nm
+system call terminates the calling process and every thread it owns:
+.Fa code
+is stored for
+.Xr proc_wait 2 ,
+threads blocked in syscalls exit at their next scheduling point instead of returning to user
+mode, scheme names and pending requests of the process are released, and its address space and
+handle table are torn down once.
 .Pp
-This page documents the native RavenBSD ABI; see the
-.Pa raven-abi
-crate for the exact numeric value and types.
+A thread that must terminate only itself uses
+.Xr thread_exit 2 .
+An authorized caller can terminate another process with
+.Xr proc_terminate 2 .
 .Sh RETURN VALUES
 .Fn exit
- does not return.
+does not return.
+.Sh SEE ALSO
+.Xr proc_wait 2 ,
+.Xr proc_terminate 2 ,
+.Xr thread_exit 2
 .Sh STANDARDS
 RavenBSD ABI v1.

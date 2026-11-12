@@ -1,6 +1,6 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 10, 2026
+.Dd November 12, 2026
 .Dt THREAD_CREATE 2
 .Os RavenBSD
 .Sh NAME
@@ -10,12 +10,68 @@
 .Ft Handle
 .Fn thread_create "Handle proc" "usize entry" "usize stack_top" "usize arg" "usize flags"
 .Sh DESCRIPTION
-The .Nm system call creates a thread in .Fa proc at .Fa entry with the stack pointer .Fa stack_top.
+The
+.Nm
+system call creates a thread in
+.Fa proc
+at
+.Fa entry
+with the stack pointer
+.Fa stack_top
+and the first-argument register set to
+.Fa arg .
+All
+.Fa flags
+bits are reserved and must be zero.
 .Pp
-This page documents the native RavenBSD ABI; see the
-.Pa raven-abi
-crate for the exact numeric value and types.
+Admission is atomic with respect to process exit: the call either joins a live process or
+fails; a process that has exited (through
+.Xr exit 2 ,
+its last
+.Xr thread_exit 2 ,
+or
+.Xr proc_terminate 2 )
+rejects the thread with
+.Er ESRCH
+and is never resurrected.  A failure after admission (a full handle table or run queue) rolls
+the thread back.
+.Pp
+The returned handle carries
+.Dv SIGNAL
+and
+.Dv DUP .
 .Sh RETURN VALUES
-On success .Nm returns a non-negative value; on failure it returns a negative error number.
+On success
+.Nm
+returns the new thread handle; on failure it returns a negative error number.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EBADF
+.Fa proc
+is not a process handle.
+.It Er EACCES
+.Fa proc
+lacks the
+.Dv MAP
+right, or the entry is not executable or the stack not writable in the target.
+.It Er EFAULT
+.Fa entry
+or
+.Fa stack_top
+is outside the user range or unmapped.
+.It Er EINVAL
+Reserved flag bits are set, or the stack pointer is not 16-byte aligned.
+.It Er ESRCH
+.Fa proc
+has no address space or is already terminal.
+.It Er EAGAIN
+The run queue is full.
+.It Er EMFILE
+The caller's handle table is full.
+.El
+.Sh SEE ALSO
+.Xr exit 2 ,
+.Xr proc_terminate 2 ,
+.Xr thread_exit 2
 .Sh STANDARDS
 RavenBSD ABI v1.
