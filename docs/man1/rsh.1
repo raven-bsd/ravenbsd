@@ -1,0 +1,133 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt RSH 1
+.Os RavenBSD
+.Sh NAME
+.Nm rsh
+.Nd the RavenBSD shell
+.Sh SYNOPSIS
+.Nm
+.Nm
+.Ar script
+.Nm
+.Fl c Ar command
+.Sh DESCRIPTION
+.Nm
+is the first shell of RavenBSD.
+It opens
+.Pa tty:console
+(it needs the console server,
+.Xr consd 8 ) ,
+prints the prompt
+.Dq Li "raven# "
+and evaluates one line at a time.
+Commands run against the
+.Pa file:
+namespace
+.Xr vfsd 8
+mounts, so
+.Pa /
+is the read-only initfs and
+.Pa /tmp
+is the in-memory filesystem of
+.Xr ramfsd 8 .
+.Pp
+The command line supports words with single quotes, double quotes and backslash escapes,
+.Ic #
+comments, the connectors
+.Ic \&;
+.Ic &&
+and
+.Ic ||
+and the redirections
+.Ic > ,
+.Ic >>
+and
+.Ic <
+(redirections are implemented for builtins only).
+Variable expansion understands
+.Va $NAME ,
+.Va ${NAME}
+and
+.Va $? .
+There is no globbing, no history, no completion, no pipes and no job control; a pipe is reported
+as
+.Dq Li "rsh: pipes are not supported yet" .
+.Sh BUILTINS
+.Bl -tag -width "export" -compact
+.It Ic cd Ar dir
+Change the shell's working directory.
+.It Ic pwd
+Print the working directory.
+.It Ic echo Ar words...
+Print the words, or write them to the redirection target.
+.It Ic exit Op Ar n
+Exit the shell with status
+.Ar n
+(the default is the last status).
+.It Ic set
+Print every variable as
+.Va NAME=value .
+.It Ic export Op Ar NAME[=value] ...
+Mark variables for children, optionally setting them.
+.It Ic unset Ar NAME ...
+Remove variables.
+.It Ic env
+Print the exported variables.
+.It Ic help
+List the builtins.
+.It Ic type Ar name
+Explain whether a name is a builtin or where it resolves.
+.El
+.Sh EXTERNAL COMMANDS
+A word without a slash is looked up in
+.Pa /bin
+and then
+.Pa /sbin ;
+a word with a slash is used as given.
+The program is loaded from the initfs with
+.Xr spawn 2 ,
+receives the words as arguments and the exported variables plus
+.Va PWD
+as its environment, and
+.Nm
+waits for it (see
+.Xr proc_wait 2 ) ,
+setting
+.Va $?
+to its exit status.
+An unknown command reports
+.Dq Li "rsh: name: command not found"
+and sets
+.Va $?
+to 127.
+.Pp
+At startup
+.Nm
+prints
+.Dq Li "rsh: ready"
+and runs
+.Pa /etc/rc.local
+when that file exists.
+.Sh FILES
+.Bl -tag -width /etc/services.d -compact
+.It Pa /etc/services.d/rsh.toml
+Service manifest: needs
+.Nm consd ,
+.Nm vfsd ,
+.Nm ramfsd
+and
+.Nm initfsd ,
+grants the initfs, and never restarts.
+.It Pa /etc/rc.local
+Optional startup script.
+.El
+.Sh EXIT STATUS
+.Nm
+exits with the status of its last command, or with the argument of
+.Ic exit .
+.Sh SEE ALSO
+.Xr consd 8 ,
+.Xr init 8 ,
+.Xr vfsd 8

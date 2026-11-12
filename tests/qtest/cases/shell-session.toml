@@ -1,0 +1,185 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The milestone test: boot to a shell prompt and play the scripted session of
+# `architecture/16-first-shell.md` section 1 over the serial console.
+
+name = "shell-session"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 420
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^rsh: ready$'
+
+[[expect]]
+regex = '^RavenBSD raven 0\.1 .* x86_64$'
+
+[[expect]]
+regex = '^hello$'
+
+[[expect]]
+regex = '^a$'
+
+[[expect]]
+regex = '^d/$'
+
+[[expect]]
+regex = '^cat$'
+
+[[expect]]
+regex = '^ls$'
+
+[[expect]]
+regex = '^uname$'
+
+[[expect]]
+regex = '^logd running \d+$'
+
+[[expect]]
+regex = '^consd running \d+$'
+
+[[expect]]
+regex = '^vfsd running \d+$'
+
+[[expect]]
+regex = '^ramfsd running \d+$'
+
+[[expect]]
+regex = '^cat: /nonexistent: no such file or directory$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|rsh: .*command not found'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "uname -a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^RavenBSD raven 0\.1 .* x86_64$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo hello > /tmp/a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /tmp/a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^hello$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mkdir /tmp/d\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ls /tmp\n"
+delay_ms = 100
+
+[[step]]
+wait = '^a$'
+timeout_secs = 30
+
+[[step]]
+wait = '^d/$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ls /bin\n"
+delay_ms = 100
+
+[[step]]
+wait = '^cat$'
+timeout_secs = 30
+
+[[step]]
+wait = '^ls$'
+timeout_secs = 30
+
+[[step]]
+wait = '^uname$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "svcctl list\n"
+delay_ms = 100
+
+[[step]]
+wait = '^logd running \d+$'
+timeout_secs = 30
+
+[[step]]
+wait = '^consd running \d+$'
+timeout_secs = 30
+
+[[step]]
+wait = '^vfsd running \d+$'
+timeout_secs = 30
+
+[[step]]
+wait = '^ramfsd running \d+$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /nonexistent\n"
+delay_ms = 100
+
+[[step]]
+wait = '^cat: /nonexistent: no such file or directory$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

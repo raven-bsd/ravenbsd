@@ -807,6 +807,18 @@ name = "raven-rmm"
 version = "0.1.0"
 
 [[package]]
+name = "raven-rsh"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+ "raven-shell-core",
+]
+
+[[package]]
 name = "raven-rt"
 version = "0.1.0"
 dependencies = [
@@ -991,6 +1003,10 @@ dependencies = [
  "raven-ipc",
  "raven-proto-fs",
 ]
+
+[[package]]
+name = "raven-shell-core"
+version = "0.1.0"
 
 [[package]]
 name = "raven-sleep"

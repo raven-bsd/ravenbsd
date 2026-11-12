@@ -50,6 +50,7 @@ members = [
     "userland/init",
     "userland/init/testsvc",
     "userland/bin/uname",
+    "userland/bin/rsh",
     "userland/bin/echo",
     "userland/bin/hostname",
     "userland/bin/sleep",

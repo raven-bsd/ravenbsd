@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The shell-session profile: the shell profile plus the `/etc/svcd.conf` that ends svcd when the
+# shell exits. The qtest case drives the dialogue over the serial console.
+
+name = "shell-test"
+
+extends = "shell"
+
+[boot]
+cmdline = "console=ttyS0 loglevel=info"
+log_level = "info"
