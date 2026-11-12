@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-fs-fuzz-replay"
+version = "0.1.0"
+description = "Stable replay harness for the UFS filesystem fuzz targets."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+ufs-core = { path = "../../../crates/ufs-core" }
+
+[lints]
+workspace = true

@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-fs-fuzz-targets"
+version = "0.1.0"
+description = "cargo-fuzz targets for the UFS parser; nightly tool only, outside the workspace."
+edition = "2024"
+license = "BSD-3-Clause"
+publish = false
+
+# Its own workspace: stable builds and make check never need nightly.
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+raven-fs-fuzz-replay = { path = "../replay" }
+
+[[bin]]
+name = "ufs_superblock"
+path = "fuzz_targets/ufs_superblock.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "ufs_cg"
+path = "fuzz_targets/ufs_cg.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "ufs_inode"
+path = "fuzz_targets/ufs_inode.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "ufs_directory"
+path = "fuzz_targets/ufs_directory.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "ufs_indirect"
+path = "fuzz_targets/ufs_indirect.rs"
+test = false
+doc = false
+
+[profile.release]
+debug = 1
