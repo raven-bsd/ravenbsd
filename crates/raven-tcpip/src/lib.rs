@@ -57,6 +57,7 @@ mod sack;
 mod seq;
 mod socket;
 mod stack;
+mod table;
 mod tcp_data;
 mod tcp_state;
 mod time;
@@ -82,6 +83,10 @@ pub use route::{Route, RouteTable};
 pub use rto::RtoEstimator;
 pub use sack::{NextKind, NextSeg, SackResult, SackScoreboard, receiver_blocks, sack_option_bytes};
 pub use stack::{Ipv4Addr, Ipv4Config, MAX_TIMERS, Stack, StackConfig, TimerId};
+pub use table::{
+    ConnectionKey, ConnectionTable, ListenerKey, ListenerTable, PortAllocator, Rebind,
+    TimeWaitTable, rebind_decision,
+};
 pub use tcp_state::TcpState;
 pub use time::{Duration, Instant};
 
