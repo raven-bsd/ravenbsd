@@ -1178,6 +1178,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-tcpip-oracle"
+version = "0.1.0"
+dependencies = [
+ "raven-tcpip",
+ "raven-tcpip-sim",
+ "raven-tcpip-wire",
+]
+
+[[package]]
 name = "raven-tcpip-sim"
 version = "0.1.0"
 dependencies = [
