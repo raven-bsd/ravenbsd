@@ -1,0 +1,8 @@
+# S20 corpus: user-copy address/length pairs.
+# Sixteen bytes per pair: address (u64 LE) then length (u64 LE).
+0010000000000000 0010000000000000   # 0x1000, one page
+0000000000000000 0010000000000000   # address zero, one page
+00e0ffffff7f0000 0100000000000000   # just below the stack top, one byte
+ffffffffffffffff 0100000000000000   # all ones, one byte (must be rejected)
+0010000000000000 ffffffffffffffff   # one page, huge length (must be rejected)
+0100000000000000 0000000000000000   # one byte at the range start, empty length

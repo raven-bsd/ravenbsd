@@ -97,6 +97,8 @@ members = [
     "tests/tcpip/bench",
     "tests/tcpip/oracle",
     "tools/bench-host",
+    "tools/fuzz",
+    "tests/fuzz/replay",
 ]
 default-members = ["crates/*"]
 

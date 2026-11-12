@@ -1,0 +1,15 @@
+# S20 corpus: handle table op scripts.
+# op 0 insert: next byte is the rights mask.
+# op 1 get:    four handle bytes (LE) then the needed rights mask.
+# op 2 dup:    four handle bytes then the requested rights mask.
+# op 3 close:  four handle bytes.
+00 03
+00 01
+01 00000000 03      # get handle 0 with READ|WRITE
+01 00000000 7f      # get handle 0 asking for more rights than it has
+02 00000000 01      # dup handle 0 with READ only
+03 00000000         # close handle 0
+01 00000000 00      # get a closed handle
+03 00000000         # close it twice
+00 7f               # reopen with every right
+02 00000000 ff      # dup asking for more than the source has

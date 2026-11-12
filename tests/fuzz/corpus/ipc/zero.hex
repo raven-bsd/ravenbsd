@@ -1,0 +1,6 @@
+# S20 corpus: an all-zero packet and a short garbage packet.
+# The decoder must reject or normalise both without panicking.
+0000000000000000
+0000000000000000
+0000000000000000
+0000000000000000

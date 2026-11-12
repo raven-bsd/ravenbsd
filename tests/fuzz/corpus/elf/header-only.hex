@@ -1,0 +1,13 @@
+# S20 corpus: an ELF64 header with no program headers (parses, empty plan).
+# 64 bytes: magic, class/data/version, ET_EXEC, EM_X86_64, entry 0x400000, no phdrs.
+7f454c46020101000000000000000000
+02003e0001000000
+0000400000000000
+0000000000000000
+0000000000000000
+00000000
+40003800
+0000
+0000
+0000
+0000
