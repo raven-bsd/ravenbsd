@@ -823,6 +823,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-tcpip"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-prng",
+ "raven-tcpip-wire",
+]
+
+[[package]]
 name = "raven-tcpip-wire"
 version = "0.1.0"
 

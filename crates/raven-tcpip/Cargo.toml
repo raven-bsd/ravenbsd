@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-tcpip"
+version = "0.1.0"
+description = "OS-independent RavenBSD TCP/IP stack skeleton: device boundary, time, buffers and poll loop."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+# Builds the in-memory loopback/null devices used by host tests and simulators.
+testutil = []
+
+[dependencies]
+raven-tcpip-wire = { path = "../raven-tcpip-wire" }
+raven-abi = { path = "../raven-abi" }
+raven-prng = { path = "../raven-prng" }
