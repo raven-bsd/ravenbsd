@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The blockd integration profile. It inherits the shell profile (including
+# initfsd) and adds blockd, the one-shot probe and the deterministic GPT image.
+
+name = "blockd-test"
+
+extends = "shell"
+
+[boot]
+cmdline = "console=ttyS0 loglevel=info"
+log_level = "info"

@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "blockd"
+arch = "x86_64"
+profile = "blockd-test"
+timeout_secs = 240
+pre = ["sh tests/fixtures/k14-block/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: blockd up$'
+
+[[expect]]
+regex = '^blockd: gpt ok partitions=2$'
+unordered = true
+
+[[expect]]
+regex = '^blockd: part 1 first 34\.\.100$'
+unordered = true
+
+[[expect]]
+regex = '^blockd: part 2 second 101\.\.200$'
+unordered = true
+
+[[expect]]
+regex = '^blockd: probe info sectors=2048 ro=0$'
+
+[[expect]]
+regex = '^blockd: probe mbr ok$'
+
+[[expect]]
+regex = '^blockd: probe write-read-flush ok$'
+
+[[expect]]
+regex = '^blockd: probe part 1 first 34\.\.100$'
+
+[[expect]]
+regex = '^blockd: probe part 2 second 101\.\.200$'
+
+[[expect]]
+regex = '^blockd: probe malformed ok$'
+
+[[expect]]
+regex = '^blockd: probe no-partial-write ok$'
+
+[[expect]]
+regex = '^blockd: probe ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
