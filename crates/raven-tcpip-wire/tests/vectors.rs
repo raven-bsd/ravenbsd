@@ -429,7 +429,7 @@ fn run_case(name: &str) {
 #[test]
 fn high_data_offset_vector_uses_the_documented_20_byte_form() {
     let case = find_case("tcp-bad-data-offset-high");
-    assert_eq!(case.bytes.len(), 60, "the TOML row is the 60-byte variant");
+    assert_eq!(case.bytes.len(), 20, "the TOML row is the documented 20-byte variant");
     let bytes = vector_bytes(case);
     assert_eq!(bytes.len(), 20);
     let error = parse_outcome(case, bytes, context_for(case))
@@ -439,8 +439,13 @@ fn high_data_offset_vector_uses_the_documented_20_byte_form() {
 
 #[test]
 fn a_legal_60_byte_tcp_header_is_accepted() {
-    let case = find_case("tcp-bad-data-offset-high");
-    let parsed = TcpPacket::parse(&case.bytes, context_for(case))
+    let bytes = parse_hex(
+        "9c 40 00 50 00 00 00 01 00 00 00 00 f0 02 ff ff 86 f1 00 00 \
+         00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 \
+         00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00",
+    );
+    assert_eq!(bytes.len(), 60);
+    let parsed = TcpPacket::parse(&bytes, default_context())
         .expect("a 60-byte header that fits and checksums is legal");
     assert_eq!(parsed.data_offset(), 15);
     assert_eq!(parsed.header_len(), 60);
