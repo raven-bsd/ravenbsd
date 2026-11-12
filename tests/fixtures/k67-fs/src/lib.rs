@@ -4,6 +4,7 @@
 //! Shared client helpers for the K67 conformance fixture.
 
 #![no_std]
+#![forbid(unsafe_code)]
 
 extern crate alloc;
 
