@@ -56,6 +56,12 @@ impl Ipv4Addr {
     pub const fn is_broadcast(self) -> bool {
         matches!(self.0, [0xff, 0xff, 0xff, 0xff])
     }
+
+    /// Whether this is an IPv4 multicast address.
+    #[must_use]
+    pub const fn is_multicast(self) -> bool {
+        self.0[0] & 0xf0 == 0xe0
+    }
 }
 
 impl From<[u8; 4]> for Ipv4Addr {
@@ -103,6 +109,10 @@ pub struct StackConfig {
     pub reassembly_bytes: usize,
     /// Maximum neighbour-cache entries.
     pub neighbor_cache_entries: usize,
+    /// Outbound ICMP error token-bucket refill rate, packets per second.
+    pub icmp_error_rate_pps: u32,
+    /// Outbound ICMP error token-bucket burst size.
+    pub icmp_error_burst: u32,
 }
 
 impl Default for StackConfig {
@@ -117,6 +127,8 @@ impl Default for StackConfig {
             tx_queue_bytes: 64 * 1024,
             reassembly_bytes: 256 * 1024,
             neighbor_cache_entries: 64,
+            icmp_error_rate_pps: 10,
+            icmp_error_burst: 10,
         }
     }
 }
@@ -151,6 +163,11 @@ pub struct Stack<D: Device> {
     pub(crate) pending_tx_frames: usize,
     pub(crate) ip_errors: Vec<(Ipv4Addr, Errno)>,
     pub(crate) arp_requests: usize,
+    pub(crate) next_ephemeral: u16,
+    pub(crate) icmp_tokens: u32,
+    pub(crate) icmp_last_refill: Instant,
+    pub(crate) icmp_errors_sent: usize,
+    pub(crate) icmp_redirects: usize,
     #[cfg(any(test, feature = "testutil"))]
     pub(crate) delivered: Vec<(u8, Vec<u8>)>,
     #[cfg(any(test, feature = "testutil"))]
@@ -166,7 +183,10 @@ impl<D: Device> Stack<D> {
     /// same bytes and event trace. `now` is the initial monotonic time.
     #[must_use]
     pub fn new(device: D, config: StackConfig, seed: u64, now: Instant) -> Self {
-        let rng = Generator::from_seed(&seed_from_entropy(seed, 0));
+        let mut rng = Generator::from_seed(&seed_from_entropy(seed, 0));
+        let mut ephemeral_seed = [0u8; 2];
+        rng.fill(&mut ephemeral_seed);
+        let next_ephemeral = 49_152u16.saturating_add(u16::from_le_bytes(ephemeral_seed) % 16_384);
         Self {
             device,
             config,
@@ -189,6 +209,11 @@ impl<D: Device> Stack<D> {
             pending_tx_frames: 0,
             ip_errors: Vec::new(),
             arp_requests: 0,
+            next_ephemeral,
+            icmp_tokens: config.icmp_error_burst,
+            icmp_last_refill: now,
+            icmp_errors_sent: 0,
+            icmp_redirects: 0,
             #[cfg(any(test, feature = "testutil"))]
             delivered: Vec::new(),
             #[cfg(any(test, feature = "testutil"))]

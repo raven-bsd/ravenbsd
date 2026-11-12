@@ -4,12 +4,16 @@
 //! Bounded socket table and the non-blocking socket API (contract C15).
 
 use alloc::collections::{BTreeMap, VecDeque};
+use alloc::vec;
 use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
+use raven_tcpip_wire::checksum::ChecksumContext;
+use raven_tcpip_wire::udp::UdpBuilder;
 
 use crate::device::Device;
 use crate::event::SocketId;
+use crate::ipv4_stack::to_wire;
 use crate::stack::{Ipv4Addr, Stack};
 
 pub(crate) struct Datagram {
@@ -31,6 +35,10 @@ pub(crate) enum Kind {
     Udp {
         local_port: u16,
         datagrams: VecDeque<Datagram>,
+        remote: Option<(Ipv4Addr, u16)>,
+    },
+    Icmp {
+        id: u16,
     },
 }
 
@@ -243,7 +251,7 @@ impl<D: Device> Stack<D> {
         if record.closed && record.rx.is_empty() {
             return Ok(0);
         }
-        if !matches!(record.kind, Kind::Tcp { .. }) {
+        if !matches!(record.kind, Kind::Tcp { .. } | Kind::Icmp { .. }) {
             return Err(Errno::ENOTSOCK);
         }
         let count = buffer.len().min(record.rx.len());
@@ -292,28 +300,30 @@ impl<D: Device> Stack<D> {
         Ok(())
     }
 
-    /// Bind a UDP socket on `port`.
+    /// Bind a UDP socket on `port`; zero allocates a deterministic ephemeral port.
     pub fn udp_bind(&mut self, port: u16) -> Result<SocketId, Errno> {
-        if port == 0 {
-            return Err(Errno::EADDRNOTAVAIL);
-        }
-        if self.port_in_use(port) {
-            return Err(Errno::EADDRINUSE);
-        }
+        let port = if port == 0 {
+            self.alloc_ephemeral_port()?
+        } else {
+            if self.port_in_use(port) {
+                return Err(Errno::EADDRINUSE);
+            }
+            port
+        };
         let rx_cap = self.config.rx_queue_bytes;
         let tx_cap = self.config.tx_queue_bytes;
         self.sockets.alloc(
             Kind::Udp {
                 local_port: port,
                 datagrams: VecDeque::new(),
+                remote: None,
             },
             rx_cap,
             tx_cap,
         )
     }
 
-    /// Send a UDP datagram to `to`. The skeleton validates and bounds the write; C06 adds the
-    /// wire path.
+    /// Send a UDP datagram to `to`, computing the checksum and handing it to IPv4.
     pub fn udp_send_to(
         &mut self,
         socket: SocketId,
@@ -324,46 +334,81 @@ impl<D: Device> Stack<D> {
             return Err(Errno::EADDRNOTAVAIL);
         }
         let mut dropped = 0usize;
-        let outcome = {
+        let (local_port, pending_error) = {
             let record = self.sockets.record_mut(socket)?;
             if record.closed {
-                Err(Errno::EBADF)
-            } else if !matches!(record.kind, Kind::Udp { .. }) {
-                Err(Errno::ENOTSOCK)
-            } else if data.len() > record.tx_cap {
+                return Err(Errno::EBADF);
+            }
+            let local_port = match &record.kind {
+                Kind::Udp { local_port, .. } => *local_port,
+                _ => return Err(Errno::ENOTSOCK),
+            };
+            if data.len() > record.tx_cap {
                 dropped = data.len();
-                Err(Errno::EAGAIN)
+                (local_port, Some(Errno::EAGAIN))
             } else {
-                Ok(data.len())
+                (local_port, record.error.take())
             }
         };
-        self.drops = self.drops.saturating_add(dropped);
-        outcome
+        if let Some(error) = pending_error {
+            self.drops = self.drops.saturating_add(dropped);
+            return Err(error);
+        }
+        let local = self.ipv4.ok_or(Errno::ENETUNREACH)?.addr;
+        let mut datagram = vec![0u8; 8 + data.len()];
+        {
+            let context = ChecksumContext::ipv4(to_wire(local), to_wire(to.0));
+            let mut builder = UdpBuilder::new(&mut datagram, context, local_port, to.1, data.len())
+                .map_err(|_| Errno::EINVAL)?;
+            builder.payload_mut().copy_from_slice(data);
+            builder.finish();
+        }
+        self.send_ipv4(&datagram, to.0, 17)?;
+        if let Kind::Udp { remote, .. } = &mut self.sockets.record_mut(socket)?.kind {
+            *remote = Some(to);
+        }
+        Ok(data.len())
     }
 
     /// Receive a UDP datagram and its source address.
+    ///
+    /// A short buffer receives the prefix and the return value is the true datagram length, so
+    /// the caller can detect truncation.
     pub fn udp_recv_from(
         &mut self,
         socket: SocketId,
         buffer: &mut [u8],
     ) -> Result<(usize, (Ipv4Addr, u16)), Errno> {
         let record = self.sockets.record_mut(socket)?;
+        if record.closed {
+            return Err(Errno::EBADF);
+        }
+        if let Some(error) = record.error.take() {
+            return Err(error);
+        }
         let Kind::Udp { datagrams, .. } = &mut record.kind else {
             return Err(Errno::ENOTSOCK);
         };
         let Some(datagram) = datagrams.pop_front() else {
             return Err(Errno::EAGAIN);
         };
-        if datagram.data.len() > buffer.len() {
-            return Err(Errno::EINVAL);
-        }
-        buffer[..datagram.data.len()].copy_from_slice(&datagram.data);
+        let count = buffer.len().min(datagram.data.len());
+        buffer[..count].copy_from_slice(&datagram.data[..count]);
         Ok((datagram.data.len(), datagram.src))
     }
 
     /// Read and discard a UDP datagram, returning its payload length.
     pub fn udp_recv(&mut self, socket: SocketId, buffer: &mut [u8]) -> Result<usize, Errno> {
         self.udp_recv_from(socket, buffer).map(|(length, _)| length)
+    }
+
+    /// The bound local port of a UDP socket (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    pub fn test_udp_port(&self, socket: SocketId) -> Result<u16, Errno> {
+        match &self.sockets.record(socket)?.kind {
+            Kind::Udp { local_port, .. } => Ok(*local_port),
+            _ => Err(Errno::ENOTSOCK),
+        }
     }
 
     fn port_in_use(&self, port: u16) -> bool {
@@ -379,17 +424,20 @@ impl<D: Device> Stack<D> {
                 | Kind::Udp {
                     local_port: local, ..
                 } => *local == port,
+                Kind::Icmp { .. } => false,
             }
         })
     }
 
     fn alloc_ephemeral_port(&mut self) -> Result<u16, Errno> {
         const START: u32 = 49_152;
-        const COUNT: u32 = u32::MAX - START + 1;
+        const COUNT: u32 = 65_536 - START;
+        let first = u32::from(self.next_ephemeral);
         for offset in 0..COUNT {
-            let port =
-                u16::try_from((START + offset) % 65_536).map_err(|_| Errno::EADDRNOTAVAIL)?;
-            if port >= 49_152 && !self.port_in_use(port) {
+            let port = u16::try_from(START + (first - START + offset) % COUNT)
+                .map_err(|_| Errno::EADDRNOTAVAIL)?;
+            if !self.port_in_use(port) {
+                self.next_ephemeral = if port == 65_535 { 49_152 } else { port + 1 };
                 return Ok(port);
             }
         }

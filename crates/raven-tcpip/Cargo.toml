@@ -19,6 +19,7 @@ testutil = []
 
 [dev-dependencies]
 raven-tcpip-wire = { path = "../raven-tcpip-wire" }
+raven-tcpip-sim = { path = "../../tests/tcpip" }
 
 [dependencies]
 raven-tcpip-wire = { path = "../raven-tcpip-wire" }

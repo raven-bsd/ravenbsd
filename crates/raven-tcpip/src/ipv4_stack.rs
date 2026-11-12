@@ -25,7 +25,7 @@ const ARP_LIFETIME_MS: u64 = 60_000;
 const ARP_MAX_RETRIES: u8 = 3;
 pub(crate) const REASSEMBLY_TIMEOUT_MS: u64 = 30_000;
 
-fn to_wire(address: Ipv4Addr) -> WireIpv4Addr {
+pub(crate) fn to_wire(address: Ipv4Addr) -> WireIpv4Addr {
     WireIpv4Addr::new(address.octets())
 }
 
@@ -199,21 +199,30 @@ impl<D: Device> Stack<D> {
                 packet.payload(),
                 now,
             ) {
-                Ok(Some(datagram)) => self.deliver_ipv4(packet.protocol(), &datagram),
+                Ok(Some(datagram)) => {
+                    self.deliver_ipv4(source, destination, packet.protocol(), &datagram)
+                }
                 Ok(None) => {}
                 Err(_) => self.drops = self.drops.saturating_add(1),
             }
             return;
         }
-        self.deliver_ipv4(packet.protocol(), packet.payload());
+        self.deliver_ipv4(source, destination, packet.protocol(), packet.payload());
     }
 
-    fn deliver_ipv4(&mut self, protocol: u8, payload: &[u8]) {
+    fn deliver_ipv4(
+        &mut self,
+        source: Ipv4Addr,
+        destination: Ipv4Addr,
+        protocol: u8,
+        payload: &[u8],
+    ) {
         #[cfg(any(test, feature = "testutil"))]
         self.delivered.push((protocol, payload.to_vec()));
-        #[cfg(not(any(test, feature = "testutil")))]
-        {
-            let _ = (protocol, payload);
+        match protocol {
+            17 => self.handle_udp(source, destination, payload),
+            1 => self.handle_icmpv4(source, destination, payload),
+            _ => {}
         }
     }
 
@@ -228,7 +237,7 @@ impl<D: Device> Stack<D> {
         let route = *self.routes.lookup(destination).ok_or(Errno::ENETUNREACH)?;
         let next_hop = route.gateway.unwrap_or(destination);
         if next_hop == config.addr {
-            self.deliver_ipv4(protocol, payload);
+            self.deliver_ipv4(config.addr, destination, protocol, payload);
             return Ok(());
         }
         let resolved = self

@@ -42,6 +42,7 @@ extern crate alloc;
 
 mod device;
 mod event;
+mod icmp_stack;
 mod ipv4_stack;
 mod neighbor;
 mod reassembly;
@@ -49,6 +50,7 @@ mod route;
 mod socket;
 mod stack;
 mod time;
+mod udp_stack;
 
 pub use raven_abi::errno::Errno;
 
