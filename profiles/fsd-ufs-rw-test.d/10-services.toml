@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.files]]
+src = "etc/services.d/logd.toml"
+path = "/etc/services.d/logd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/initfsd.toml"
+path = "/etc/services.d/initfsd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/ramfsd.toml"
+path = "/etc/services.d/ramfsd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/nulld.toml"
+path = "/etc/services.d/nulld.toml"
+
+[[initfs.files]]
+src = "etc/services.d/zerod.toml"
+path = "/etc/services.d/zerod.toml"
+
+[[initfs.files]]
+src = "etc/services.d/randd.toml"
+path = "/etc/services.d/randd.toml"
+
+[[initfs.files]]
+src = "profiles/fsd-ufs-rw-test.d/vfsd.manifest"
+path = "/etc/services.d/vfsd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/blockd.toml"
+path = "/etc/services.d/blockd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/fsd-ufs.toml"
+path = "/etc/services.d/fsd-ufs.toml"

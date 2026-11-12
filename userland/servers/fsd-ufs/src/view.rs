@@ -16,7 +16,7 @@ use raven_proto_fs::{
     DirEntry as ProtoDirEntry, DirEntryHeader as ProtoDirEntryHeader, MAX_PATH, PathError, Stat,
     StatFs, normalize_absolute,
 };
-use ufs_core::{Attr, BlockIo, FileType, Ino, MountOptions, Ufs, UfsError};
+use ufs_core::{Attr, BlockIo, FileType, Ino, MountOptions, SetAttr, Ufs, UfsError};
 
 use crate::handler::FileSystem;
 
@@ -28,6 +28,7 @@ pub const MAX_SYMLINK_BYTES: usize = 1024;
 /// A read-only UFS mount exposed through [`FileSystem`].
 pub struct UfsView<D: BlockIo> {
     ufs: Ufs<D>,
+    read_only: bool,
 }
 
 impl<D: BlockIo> UfsView<D> {
@@ -35,7 +36,13 @@ impl<D: BlockIo> UfsView<D> {
     pub fn mount(disk: D, read_only: bool) -> Result<Self, UfsError> {
         Ok(Self {
             ufs: Ufs::mount(disk, MountOptions { read_only })?,
+            read_only,
         })
+    }
+
+    /// Whether the mounted filesystem is using a WAPBL journal.
+    pub fn is_journaled(&self) -> bool {
+        self.ufs.is_journaled()
     }
 
     /// Read the target of `ino` as UTF-8.
@@ -47,6 +54,43 @@ impl<D: BlockIo> UfsView<D> {
         }
         let target = core::str::from_utf8(&buffer[..length]).map_err(|_| UfsError::Invalid)?;
         Ok(target.to_string())
+    }
+
+    fn ensure_writable(&self) -> Result<(), Errno> {
+        if self.read_only {
+            Err(Errno::EROFS)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn note_error(&mut self, error: UfsError) -> Errno {
+        if matches!(error, UfsError::Io) {
+            self.read_only = true;
+        }
+        errno(error)
+    }
+
+    /// Split a path into its resolved parent directory and final name.
+    fn parent_and_name(&mut self, path: &str) -> Result<(Ino, String), Errno> {
+        let normalized = normalize_path(path)?;
+        if normalized == "/" {
+            return Err(Errno::EINVAL);
+        }
+        let (parent, name) = normalized.rsplit_once('/').ok_or(Errno::EINVAL)?;
+        if name.is_empty() || name == "." || name == ".." {
+            return Err(Errno::EINVAL);
+        }
+        if name.len() > 255 {
+            return Err(Errno::ENAMETOOLONG);
+        }
+        let parent = if parent.is_empty() { "/" } else { parent };
+        let dir = self.resolve_inner(parent, true)?;
+        let attr = self.ufs.getattr(dir).map_err(errno)?;
+        if attr.kind != FileType::Directory {
+            return Err(Errno::ENOTDIR);
+        }
+        Ok((dir, name.to_string()))
     }
 
     fn resolve_inner(&mut self, path: &str, follow_last: bool) -> Result<Ino, Errno> {
@@ -291,6 +335,107 @@ impl<D: BlockIo> FileSystem for UfsView<D> {
             files: stat.files,
             free_files: stat.files_free,
         }
+    }
+
+    fn is_read_only(&self) -> bool {
+        self.read_only
+    }
+
+    fn create_file(&mut self, path: &str, mode: u16, exclusive: bool) -> Result<u32, Errno> {
+        self.ensure_writable()?;
+        let (parent, name) = self.parent_and_name(path)?;
+        match self.ufs.create(parent, name.as_bytes(), mode, 0, 0) {
+            Ok(ino) => Ok(ino),
+            Err(UfsError::Exists) if !exclusive => self.resolve(path),
+            Err(error) => Err(self.note_error(error)),
+        }
+    }
+
+    fn mkdir(&mut self, path: &str, mode: u16) -> Result<(), Errno> {
+        self.ensure_writable()?;
+        let (parent, name) = self.parent_and_name(path)?;
+        self.ufs
+            .mkdir(parent, name.as_bytes(), mode, 0, 0)
+            .map(|_| ())
+            .map_err(|error| self.note_error(error))
+    }
+
+    fn unlink(&mut self, path: &str) -> Result<(), Errno> {
+        self.ensure_writable()?;
+        let (parent, name) = self.parent_and_name(path)?;
+        self.ufs
+            .unlink(parent, name.as_bytes())
+            .map_err(|error| self.note_error(error))
+    }
+
+    fn rmdir(&mut self, path: &str) -> Result<(), Errno> {
+        self.ensure_writable()?;
+        let (parent, name) = self.parent_and_name(path)?;
+        self.ufs
+            .rmdir(parent, name.as_bytes())
+            .map_err(|error| self.note_error(error))
+    }
+
+    fn rename(&mut self, from: &str, to: &str) -> Result<(), Errno> {
+        self.ensure_writable()?;
+        let (old_dir, old_name) = self.parent_and_name(from)?;
+        let (new_dir, new_name) = self.parent_and_name(to)?;
+        self.ufs
+            .rename(old_dir, old_name.as_bytes(), new_dir, new_name.as_bytes())
+            .map_err(|error| self.note_error(error))
+    }
+
+    fn symlink(&mut self, path: &str, target: &[u8]) -> Result<(), Errno> {
+        self.ensure_writable()?;
+        let (parent, name) = self.parent_and_name(path)?;
+        self.ufs
+            .symlink(parent, name.as_bytes(), target, 0, 0)
+            .map(|_| ())
+            .map_err(|error| self.note_error(error))
+    }
+
+    fn link(&mut self, path: &str, target: &str) -> Result<(), Errno> {
+        self.ensure_writable()?;
+        let (parent, name) = self.parent_and_name(path)?;
+        let target = self.resolve_inner(target, false)?;
+        self.ufs
+            .link(parent, name.as_bytes(), target)
+            .map_err(|error| self.note_error(error))
+    }
+
+    fn chmod(&mut self, path: &str, mode: u16) -> Result<(), Errno> {
+        self.ensure_writable()?;
+        let ino = self.resolve(path)?;
+        self.ufs
+            .setattr(
+                ino,
+                SetAttr {
+                    mode: Some(mode),
+                    ..SetAttr::default()
+                },
+            )
+            .map_err(|error| self.note_error(error))
+    }
+
+    fn truncate(&mut self, ino: u32, size: u64) -> Result<(), Errno> {
+        self.ensure_writable()?;
+        self.ufs
+            .truncate(ino, size)
+            .map_err(|error| self.note_error(error))
+    }
+
+    fn write(&mut self, ino: u32, offset: u64, data: &[u8]) -> Result<usize, Errno> {
+        self.ensure_writable()?;
+        self.ufs
+            .write(ino, offset, data)
+            .map_err(|error| self.note_error(error))
+    }
+
+    fn sync(&mut self) -> Result<(), Errno> {
+        if self.read_only {
+            return Ok(());
+        }
+        self.ufs.sync().map_err(|error| self.note_error(error))
     }
 }
 

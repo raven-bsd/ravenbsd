@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "fsd-ufs-rw"
+arch = "x86_64"
+profile = "fsd-ufs-rw-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/k55-ufs/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: blockd up$'
+unordered = true
+
+[[expect]]
+regex = '^blockd: gpt ok partitions=1$'
+unordered = true
+
+[[expect]]
+regex = '^blockd: part 1 ufs-root 34\.\.32801$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: fsd-ufs up$'
+unordered = true
+
+[[expect]]
+regex = '^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$'
+unordered = true
+
+[[expect]]
+regex = '^fsd-ufs: mode=rw journal=none$'
+unordered = true
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe mount ok$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe create/write ok$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe truncate/append ok$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe unlink/rmdir ok$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe fsync ok$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe umount ok$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe server stopped$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: ufs-fsck -n clean$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe server restarted$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe remount ok$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Test-only vfsd manifest: vfsd snapshots the visible scheme names when its
+# process is created, so fsd-ufs must register `ufs` before vfsd starts.
+name = "vfsd"
+exec = "/sbin/vfsd"
+needs = ["logd", "initfsd", "ramfsd", "nulld", "zerod", "randd", "fsd-ufs"]
+provides = ["scheme:file"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "on-failure"

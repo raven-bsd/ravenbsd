@@ -300,7 +300,6 @@ fn write_calls_return_erofs_and_sync_is_a_noop() {
             from: b"/file",
             to: b"/other",
         },
-        Call::Truncate { size: 0 },
         Call::Symlink {
             path: b"/new",
             target: b"file",
@@ -322,6 +321,16 @@ fn write_calls_return_erofs_and_sync_is_a_noop() {
             other => panic!("unexpected response: {other:?}"),
         }
     }
+
+    let request = CallRequest::new(Call::Truncate { size: 0 });
+    let length = request.encode(&mut encoded).expect("encode");
+    let length = handler
+        .call(7, &encoded[..length], &mut response)
+        .expect("call");
+    assert_eq!(
+        CallResponse::decode(request.op(), &response[..length]).expect("response"),
+        CallResponse::Status(-i32::from(Errno::EBADF.0))
+    );
 
     let request = CallRequest::new(Call::Sync);
     let length = request.encode(&mut encoded).expect("encode");
