@@ -1,0 +1,103 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt BLOCKD 8
+.Os RavenBSD
+.Sh NAME
+.Nm blockd
+.Nd RavenBSD block-device server
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+registers the
+.Dq block:
+scheme and serves a sector-addressed block device through the
+.Xr open 2
+protocol.
+The current backend is a deterministic in-memory disk loaded from
+.Pa initfs:/etc/blockd.img ;
+a real storage driver supplies the backend in a later milestone.
+The image is scanned as GPT before the first client is accepted.
+.Pp
+Every request is decoded into a fixed little-endian structure, its sector
+range is checked against the device capacity with overflow-safe arithmetic,
+and the whole request is rejected before the backend is touched when it is
+malformed or out of range.
+A rejected multi-sector write never modifies any of its sectors.
+There is no request queue: the server handles one dispatch at a time, and a
+dead client holds no outstanding request state.
+.Pp
+The server is built with
+.Cd #![forbid(unsafe_code)]
+and has no unbounded queue.
+.Sh PROTOCOL
+The device path is
+.Dq 0 ;
+it must be opened read-only, write-only or read-write.
+A call carries one 24-byte request header:
+.Bl -tag -width "data_len (u32)" -compact
+.It Sy version No (u16)
+Protocol version 1.
+.It Sy op No (u16)
+1 read, 2 write, 3 flush, 4 info, 5 list.
+.It Sy sector No (u64)
+First sector relative to the device.
+.It Sy count No (u32)
+Sector count, at most 128.
+.It Sy flags No (u32)
+Reserved; must be zero.
+.It Sy data_len No (u32)
+Payload length; exactly
+.Sy count
+times 512 for a write and zero for every other operation.
+.El
+.Pp
+A reply starts with an 8-byte header: a signed little-endian status (zero or
+a negative
+.Xr errno 2
+value) and a payload length.
+Read replies carry
+.Sy count
+whole 512-byte sectors.
+Write, flush and error replies carry no payload.
+An info reply carries 24 bytes: sector size, read-only flag, capacity in
+sectors and a reserved word.
+A list reply carries a 4-byte count followed by 64-byte records: one-based
+index, first sector, sector count, a 40-byte UTF-8 name, the name length and
+three reserved bytes.
+The list holds at most 128 records, the standard GPT entry limit.
+.Sh PARTITIONS
+The scanner validates the protective MBR, the primary and backup headers,
+both header CRCs, both entry-array CRCs, the usable range, every entry's
+bounds and the absence of overlaps.
+The primary and backup arrays must agree.
+A corrupt table is reported as a startup error instead of being guessed; the
+server exits non-zero and never serves a partial partition list.
+.Pp
+A GPT name longer than the 40-byte wire field is shortened on a UTF-8
+character boundary.
+.Sh FILES
+.Bl -tag -width /etc/services.d -compact
+.It Pa /etc/services.d/blockd.toml
+Service manifest.
+.It Pa /etc/blockd.img
+Initial logical disk image.
+.El
+.Sh ERRORS
+A malformed or out-of-range request returns
+.Er EINVAL .
+A write on a read-only open, or a call on an unknown file, returns
+.Er EBADF .
+A writable open or write on a read-only device returns
+.Er EROFS .
+An internal encoding failure returns
+.Er EPROTO .
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr init 8 ,
+.Xr initfsd 8 ,
+.Xr svcctl 1
+.Sh STANDARDS
+RavenBSD.

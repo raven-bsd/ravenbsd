@@ -371,6 +371,17 @@ name = "raven-audio-core"
 version = "0.1.0"
 
 [[package]]
+name = "raven-blockd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-block",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-bootinfo"
 version = "0.1.0"
 
@@ -630,6 +641,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-k14-controller"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-block",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-k14-mkdisk"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-block",
+]
+
+[[package]]
 name = "raven-k66-fs"
 version = "0.1.0"
 dependencies = [
@@ -826,6 +854,10 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
 ]
+
+[[package]]
+name = "raven-proto-block"
+version = "0.1.0"
 
 [[package]]
 name = "raven-proto-dev"
