@@ -34,7 +34,7 @@ mod program {
     /// S11 `Opcode::Open` wire value.
     const OPEN_OPCODE: u16 = 1;
     /// Largest image the RAM backend will load.
-    const MAX_IMAGE_BYTES: usize = 16 * 1024 * 1024;
+    const MAX_IMAGE_BYTES: usize = 64 * 1024 * 1024;
     /// Default image when the service manifest does not override it.
     const DEFAULT_IMAGE: &str = "initfs:/etc/blockd.img";
 
