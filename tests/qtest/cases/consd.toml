@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The consd dialogue: the probe prints a prompt, round-trips the mode operations, reads one line
+# (edited with a backspace) and then gets `-EINTR` from a `^C` on the next read.
+
+name = "consd"
+arch = "x86_64"
+profile = "consd-test"
+timeout_secs = 240
+pre = ["sh userland/servers/consd-probe/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: consd up$'
+
+[[expect]]
+regex = '^consd: modes ok$'
+
+[[expect]]
+regex = '^consd: got abd$'
+
+[[expect]]
+regex = '^consd: interrupted$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
+
+[[step]]
+wait = '^consd: modes ok$'
+timeout_secs = 120
+
+[[step]]
+wait = '^consd: type something> $'
+timeout_secs = 120
+
+[[step]]
+send = "abc\u007Fd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^consd: got abd$'
+timeout_secs = 120
+
+[[step]]
+send = "x\u0003"
+delay_ms = 100
+
+[[step]]
+wait = '^consd: interrupted$'
+timeout_secs = 120
