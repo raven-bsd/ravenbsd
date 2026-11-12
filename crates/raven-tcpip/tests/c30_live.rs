@@ -348,7 +348,7 @@ fn reordering_without_loss_completes_and_learns_the_reordering_distance() {
     );
     let (client, server) = connect(&mut a, &mut b);
     let elapsed = transfer(&mut a, &mut b, client, server, 1 << 20, 100);
-    assert!(elapsed < 10_000, "10% reordering took {elapsed} ms");
+    assert!(elapsed < 8_000, "10% reordering took {elapsed} ms");
     let counters = a.counters();
     assert!(
         counters.spurious_retransmits >= 1,

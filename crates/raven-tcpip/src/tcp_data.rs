@@ -285,18 +285,7 @@ impl<D: Device> Stack<D> {
                     && connection.snd_una != connection.snd_nxt
                     && connection.rto.has_sample()
                 {
-                    let srtt = u32::try_from(connection.rto.srtt_ms()).unwrap_or(u32::MAX);
-                    let rttvar = u32::try_from(connection.rto.rttvar_ms()).unwrap_or(u32::MAX);
-                    connection.tlp.arm(now_ms, srtt, rttvar);
-                    let cap =
-                        now_ms.saturating_add(srtt.saturating_add(srtt / 2).saturating_add(10));
-                    if connection
-                        .tlp
-                        .deadline
-                        .is_some_and(|deadline| deadline > cap)
-                    {
-                        connection.tlp.deadline = Some(cap);
-                    }
+                    arm_tlp(connection, now_ms, self.tunables.delack_delay);
                 }
                 connection.last_activity = self.now;
                 self.counters.out_bytes = self
@@ -308,7 +297,8 @@ impl<D: Device> Stack<D> {
                     self.counters.ecn_cwr_sent = self.counters.ecn_cwr_sent.wrapping_add(1);
                 }
                 if connection.rtt_sample.is_none() {
-                    connection.rtt_sample = Some((seq, self.now, false));
+                    let end = seq.wrapping_add(u32::try_from(payload.len()).unwrap_or(0));
+                    connection.rtt_sample = Some((end, self.now, false));
                 }
                 if connection.rto_deadline.is_none() {
                     connection.rto_deadline =
@@ -424,18 +414,7 @@ impl<D: Device> Stack<D> {
                 let now_ms = u32::try_from(self.now.as_millis()).unwrap_or(u32::MAX);
                 connection.rack.on_ack(ack, now_ms);
                 if connection.tlp_enabled && connection.snd_nxt != ack {
-                    let srtt = u32::try_from(connection.rto.srtt_ms()).unwrap_or(u32::MAX);
-                    let rttvar = u32::try_from(connection.rto.rttvar_ms()).unwrap_or(u32::MAX);
-                    connection.tlp.arm(now_ms, srtt, rttvar);
-                    let cap =
-                        now_ms.saturating_add(srtt.saturating_add(srtt / 2).saturating_add(10));
-                    if connection
-                        .tlp
-                        .deadline
-                        .is_some_and(|deadline| deadline > cap)
-                    {
-                        connection.tlp.deadline = Some(cap);
-                    }
+                    arm_tlp(connection, now_ms, self.tunables.delack_delay);
                 } else {
                     connection.tlp.disarm();
                 }
@@ -464,9 +443,6 @@ impl<D: Device> Stack<D> {
                 if connection.snd_nxt == ack {
                     connection.rto_deadline = None;
                 } else {
-                    if connection.rtt_sample.is_none() {
-                        connection.rtt_sample = Some((ack, self.now, false));
-                    }
                     connection.rto_deadline =
                         Some(Instant::from_millis(self.now.as_millis().saturating_add(
                             i64::try_from(connection.rto.rto_ms()).unwrap_or(i64::MAX),
@@ -733,6 +709,35 @@ fn ooo_creates_hole(ooo: &[(u32, Vec<u8>)], seq: u32, len: usize) -> bool {
         let other_end = start.wrapping_add(u32::try_from(data.len()).unwrap_or(u32::MAX));
         seq_ge(end, *start) && seq_ge(other_end, seq)
     })
+}
+
+/// Arm the tail-loss probe timer (RFC 8985).
+///
+/// With at most one segment outstanding the receiver may hold its ACK for the delayed-ACK
+/// time, so the probe waits for that as well; otherwise a healthy link is probed needlessly.
+fn arm_tlp(connection: &mut crate::tcp_state::TcpConnection, now_ms: u32, delack_ms: u64) {
+    let srtt = u32::try_from(connection.rto.srtt_ms()).unwrap_or(u32::MAX);
+    let rttvar = u32::try_from(connection.rto.rttvar_ms()).unwrap_or(u32::MAX);
+    let single = connection.snd_nxt.wrapping_sub(connection.snd_una) <= u32::from(connection.mss);
+    let allowance = if single {
+        u32::try_from(delack_ms).unwrap_or(u32::MAX)
+    } else {
+        0
+    };
+    connection.tlp.arm(now_ms, srtt, rttvar);
+    if let Some(deadline) = connection.tlp.deadline {
+        connection.tlp.deadline = Some(deadline.saturating_add(allowance));
+    }
+    let cap = now_ms
+        .saturating_add(srtt.saturating_add(srtt / 2).saturating_add(10))
+        .saturating_add(allowance);
+    if connection
+        .tlp
+        .deadline
+        .is_some_and(|deadline| deadline > cap)
+    {
+        connection.tlp.deadline = Some(cap);
+    }
 }
 
 /// Copy `len` bytes of `queue` starting at `start`, clamped to what the queue holds.

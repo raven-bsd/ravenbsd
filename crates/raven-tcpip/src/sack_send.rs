@@ -94,7 +94,7 @@ pub(crate) fn scoreboard(connection: &TcpConnection) -> SackScoreboard {
     let threshold = if connection.rto_recovery {
         1
     } else {
-        connection.reorder_dist.max(1)
+        dup_threshold(connection)
     };
     let mut board = SackScoreboard::new(
         high_data,
@@ -115,6 +115,17 @@ pub(crate) fn scoreboard(connection: &TcpConnection) -> SackScoreboard {
 /// Bytes the scoreboard counts as still in the network.
 pub(crate) fn sack_pipe(connection: &TcpConnection) -> u32 {
     scoreboard(connection).pipe()
+}
+
+/// The loss threshold in segments: the learned reordering distance, but never more than the
+/// flight can supply, or recovery would wait for the retransmission timer.
+pub(crate) fn dup_threshold(connection: &TcpConnection) -> u32 {
+    let mss = u32::from(connection.mss).max(1);
+    let flight = connection.snd_nxt.wrapping_sub(connection.snd_una) / mss;
+    connection
+        .reorder_dist
+        .min(3u32.saturating_add(flight / 4))
+        .max(3)
 }
 
 /// Largest reordering distance, in segments, the loss detector will learn.

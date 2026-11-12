@@ -1522,6 +1522,7 @@ impl<D: Device> Stack<D> {
                         if connection.timestamps
                             && let Some(tsval) = segment.tsval
                             && seq_gt(tsval, connection.ts_recent)
+                            && seq_le(segment.seq, connection.rcv_nxt)
                         {
                             connection.ts_recent = tsval;
                             connection.ts_recent_age = now;
@@ -1624,7 +1625,10 @@ impl<D: Device> Stack<D> {
                             connection.dupack_count = connection.dupack_count.saturating_add(1);
                             let threshold = u8::try_from(self.tunables.dup_ack_threshold)
                                 .unwrap_or(3)
-                                .max(u8::try_from(connection.reorder_dist).unwrap_or(u8::MAX));
+                                .max(
+                                    u8::try_from(crate::sack_send::dup_threshold(connection))
+                                        .unwrap_or(u8::MAX),
+                                );
                             if connection.dupack_count >= threshold
                                 || crate::sack_send::head_is_lost(connection)
                             {
@@ -1678,6 +1682,7 @@ impl<D: Device> Stack<D> {
                         if connection.timestamps
                             && let Some(tsval) = segment.tsval
                             && seq_gt(tsval, connection.ts_recent)
+                            && seq_le(segment.seq, connection.rcv_nxt)
                         {
                             connection.ts_recent = tsval;
                             connection.ts_recent_age = now;
@@ -2988,7 +2993,8 @@ impl<D: Device> Stack<D> {
                                 ));
                             }
                         } else if usize::from(connection.dupack_count)
-                            >= usize::try_from(connection.reorder_dist).unwrap_or(usize::MAX)
+                            >= usize::try_from(crate::sack_send::dup_threshold(connection))
+                                .unwrap_or(usize::MAX)
                             && !connection.sack_recovery
                             && let Some((_end_seq, sent_at)) = connection.rack_sent.first().copied()
                         {

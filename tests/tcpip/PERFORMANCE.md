@@ -10,13 +10,13 @@ of five runs with the spread stated and are never asserted as thresholds.
 
 | Metric | raven-tcpip | smoltcp baseline | Verdict | Method |
 |---|---|---|---|---|
-| Goodput, lossless, 1 ms RTT | 28.57 MiB/s (35 ms virtual) | 31.25 MiB/s (32 ms virtual) | worse | virtual time, 1 MiB, 5 runs; wall median 10.0 ms, spread 3.3 ms |
-| Goodput, lossless, 20 ms RTT | 2.70 MiB/s (370 ms virtual) | 2.72 MiB/s (367 ms virtual) | equal | virtual time, 1 MiB, 5 runs; wall median 9.6 ms, spread 0.3 ms |
-| Goodput, lossless, 200 ms RTT | 0.27 MiB/s (3700 ms virtual) | 0.28 MiB/s (3517 ms virtual) | worse | virtual time, 1 MiB, 5 runs; wall median 10.5 ms, spread 0.4 ms |
-| Goodput, 1% loss, 20 ms RTT | 1.24 MiB/s (806 ms, retrans 53058 B) | 2.07 MiB/s (484 ms) | worse | virtual time, 1 MiB, 5 runs; loss in per-mille on the smoltcp side |
-| Goodput, 5% loss, 20 ms RTT | 0.16 MiB/s (6401 ms, retrans 152004 B) | 0.17 MiB/s (5941 ms) | worse | virtual time, 1 MiB, 5 runs; loss in per-mille on the smoltcp side |
-| Goodput, 10% reordering, 20 ms RTT | 0.22 MiB/s (4602 ms) | 0.64 MiB/s (1567 ms) | worse | virtual time, 1 MiB, 5 runs |
-| CPU cost per MiB (wall time) | 9.5 ms/MiB | 4.4 ms/MiB | worse | median of 5, spread raven 0.3 ms / smoltcp 0.1 ms |
+| Goodput, lossless, 1 ms RTT | 28.57 MiB/s (35 ms virtual) | 31.25 MiB/s (32 ms virtual) | worse | virtual time, 1 MiB, 5 runs; wall median 7.5 ms, spread 1.1 ms |
+| Goodput, lossless, 20 ms RTT | 2.70 MiB/s (370 ms virtual) | 2.72 MiB/s (367 ms virtual) | equal | virtual time, 1 MiB, 5 runs; wall median 7.4 ms, spread 0.3 ms |
+| Goodput, lossless, 200 ms RTT | 0.27 MiB/s (3700 ms virtual) | 0.28 MiB/s (3517 ms virtual) | worse | virtual time, 1 MiB, 5 runs; wall median 8.5 ms, spread 0.1 ms |
+| Goodput, 1% loss, 20 ms RTT | 0.92 MiB/s (1090 ms, retrans 18642 B) | 2.07 MiB/s (484 ms) | worse | virtual time, 1 MiB, 5 runs; loss in per-mille on the smoltcp side |
+| Goodput, 5% loss, 20 ms RTT | 0.17 MiB/s (6001 ms, retrans 106116 B) | 0.17 MiB/s (5941 ms) | worse | virtual time, 1 MiB, 5 runs; loss in per-mille on the smoltcp side |
+| Goodput, 10% reordering, 20 ms RTT | 0.66 MiB/s (1505 ms) | 0.64 MiB/s (1567 ms) | equal/better | virtual time, 1 MiB, 5 runs |
+| CPU cost per MiB (wall time) | 7.5 ms/MiB | 4.4 ms/MiB | worse | median of 5, spread raven 0.4 ms / smoltcp 0.2 ms |
 | Time to first byte, 20 ms RTT | 40 ms virtual | 62 ms virtual | equal/better | virtual time, 5 identical runs |
 | Memory per idle connection | blocked: no stable per-socket accounting hook | blocked: no stable per-socket accounting hook | blocked | RSS before/after was not stable enough to publish; C24 can add a hook |
 | Memory per active connection (1 KiB in flight) | blocked: same accounting hook | blocked: same accounting hook | blocked | not measured in this pass |

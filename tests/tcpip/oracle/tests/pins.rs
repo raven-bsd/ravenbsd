@@ -101,3 +101,96 @@ fn measured_timewait_and_finwait2_defaults_are_pinned() {
     assert_eq!(stack.get_property("tcp.keepalive_interval"), Ok(7_200_000));
     assert_eq!(stack.get_property("tcp.keepalive_probes"), Ok(9));
 }
+
+fn lossy_transfer_ms(loss_percent: f32, reorder_percent: f32) -> i64 {
+    let (a, b) = Link::new(
+        LinkConfig {
+            rtt_ms: 20,
+            loss_percent,
+            reorder_percent,
+            ..LinkConfig::default()
+        },
+        131,
+    );
+    let mut client = stack(a);
+    let mut server = Stack::new(b, StackConfig::default(), 2, Instant::ZERO);
+    server
+        .set_ipv4(Ipv4Config {
+            addr: Ipv4Addr::new(B),
+            prefix_len: 24,
+            gateway: None,
+        })
+        .expect("ipv4");
+    client.test_insert_neighbor(
+        Ipv4Addr::new(B),
+        [0x02, 0, 0, 0, 0, 2],
+        Instant::ZERO,
+        600_000,
+    );
+    server.test_insert_neighbor(
+        Ipv4Addr::new(A),
+        [0x02, 0, 0, 0, 0, 1],
+        Instant::ZERO,
+        600_000,
+    );
+    server.tcp_listen(80, 8).expect("listen");
+    let socket = client
+        .tcp_connect((IpAddr::V4(Ipv4Addr::new(B)), 80), Some(40_000))
+        .expect("connect");
+    let mut now = 0i64;
+    let peer = loop {
+        if let Ok(Some(peer)) = server.tcp_accept(raven_tcpip::SocketId(1)) {
+            break peer;
+        }
+        now += 1;
+        assert!(now < 60_000, "handshake did not finish");
+        client.poll(Instant::from_millis(now));
+        server.poll(Instant::from_millis(now));
+    };
+    let start = now;
+    let payload = vec![0x42u8; 1 << 20];
+    let (mut sent, mut received) = (0usize, 0usize);
+    let mut buffer = vec![0u8; 65_536];
+    while received < payload.len() {
+        if sent < payload.len()
+            && let Ok(count) = client.send(socket, &payload[sent..])
+        {
+            sent += count;
+        }
+        while let Ok(count) = server.recv(peer, &mut buffer) {
+            if count == 0 {
+                break;
+            }
+            received += count;
+        }
+        now += 1;
+        assert!(now - start < 120_000, "transfer stalled at {received}");
+        client.poll(Instant::from_millis(now));
+        server.poll(Instant::from_millis(now));
+    }
+    now - start
+}
+
+/// C23-D01, re-classified. The recovery defect is fixed (selective retransmission, reordering
+/// tolerance with spurious-retransmit undo, RTT sampling). What remains of the gap to the
+/// smoltcp baseline at 1% loss is congestion control: the native stack reduces its window on
+/// every loss event, and the smoltcp configuration in `raven-netcore` has no congestion
+/// control, so it keeps a full 64 KiB window through the same losses. A loss-based sender
+/// at 20 ms RTT and 1% loss is bounded near 0.8 MiB/s (Mathis estimate); the pin keeps the
+/// native result in that range and far from the pre-C28 803 s.
+#[test]
+fn c23_d01_loss_goodput_is_in_the_congestion_controlled_range() {
+    let elapsed = lossy_transfer_ms(1.0, 0.0);
+    assert!(
+        (600..2_500).contains(&elapsed),
+        "1 MiB at 1% loss and 20 ms RTT took {elapsed} ms"
+    );
+}
+
+/// The same defect class for reordering: without loss the transfer must not be slowed by
+/// spurious fast retransmits, so it stays within a small multiple of the lossless time.
+#[test]
+fn c23_d01_reordering_does_not_collapse_the_window() {
+    let elapsed = lossy_transfer_ms(0.0, 10.0);
+    assert!(elapsed < 3_000, "1 MiB at 10% reordering took {elapsed} ms");
+}
