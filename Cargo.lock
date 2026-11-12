@@ -828,6 +828,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-s36-lifecycle"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-elf",
+ "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-s37-fs"
 version = "0.1.0"
 dependencies = [

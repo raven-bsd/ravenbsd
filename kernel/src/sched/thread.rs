@@ -15,6 +15,8 @@ use core::sync::atomic::{
 use alloc::alloc::alloc_zeroed;
 use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
+use spin::Mutex;
 
 use raven_abi::errno::Errno;
 use raven_rmm::VirtAddr;
@@ -350,10 +352,24 @@ impl Thread {
     }
 }
 
+/// Freed stacks awaiting reuse (S36).  A cached stack keeps its guard page unmapped; reuse
+/// skips the unmap.  The cache is deliberately bounded and never hands memory back to the heap:
+/// the heap block's guard page mapping was removed and cannot be restored without its lost
+/// physical frame, so deallocating would break the next allocation over the block.
+static STACK_CACHE: Mutex<Vec<(u64, u64)>> = Mutex::new(Vec::new());
+/// Maximum cached stacks; beyond this a freed stack stays allocated but unused.
+const STACK_CACHE_MAX: usize = 64;
+/// Stacks freshly carved from the heap since boot (diagnostic counter).
+static STACK_FRESH: AtomicU64 = AtomicU64::new(0);
+
 /// Allocate a page-aligned kernel stack and unmap its lowest page as a guard.
 ///
-/// Returns `(base, top)`, or `None` when the heap or the kernel mapper fails.
+/// Returns `(base, top)`, or `None` when the heap or the kernel mapper fails.  A cached stack is
+/// reused first; its guard is already unmapped.
 pub fn allocate_kernel_stack() -> Option<(u64, u64)> {
+    if let Some(stack) = STACK_CACHE.lock().pop() {
+        return Some(stack);
+    }
     let pages = STACK_RESERVED_PAGES;
     let size = usize::try_from(pages.checked_mul(PAGE)?).ok()?;
     let layout = Layout::from_size_align(size, PAGE as usize).ok()?;
@@ -367,5 +383,27 @@ pub fn allocate_kernel_stack() -> Option<(u64, u64)> {
     let unmapped = paging::with_kernel_mapper(|mapper| mapper.unmap(guard)).ok()?;
     unmapped.ok()?;
     let top = base.checked_add(STACK_RESERVED_PAGES.checked_mul(PAGE)?)?;
+    STACK_FRESH.fetch_add(1, Ordering::Relaxed);
     Some((base, top))
+}
+
+/// Return a stack for reuse.  The caller must no longer be running on it.
+pub fn free_kernel_stack(base: u64, top: u64) {
+    if base == 0 || top <= base {
+        return;
+    }
+    let mut cache = STACK_CACHE.lock();
+    if cache.len() < STACK_CACHE_MAX {
+        cache.push((base, top));
+    }
+}
+
+/// Stacks freshly carved from the heap (diagnostic).
+pub fn stack_fresh() -> u64 {
+    STACK_FRESH.load(Ordering::Relaxed)
+}
+
+/// Stacks currently cached for reuse (diagnostic).
+pub fn stack_cached() -> u64 {
+    u64::try_from(STACK_CACHE.lock().len()).unwrap_or(0)
 }

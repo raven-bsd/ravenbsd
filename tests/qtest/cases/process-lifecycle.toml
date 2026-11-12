@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "process-lifecycle"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/s36-lifecycle/build.sh"]
+initfs = "build/fixtures/s36-lifecycle/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s21-framecheck=1 s36-stackcheck=1"
+qemu_extra = []
+expect_exit = "success"
+
+# Scenario 4: a created-but-never-started process is reaped by PROC_WAIT.
+[[expect]]
+regex = '^s36: unstarted reaped$'
+
+# Scenario 2, baseline marker exit: kernel stack/heap counters before the churn.
+[[expect]]
+regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+$'
+
+[[expect]]
+regex = '^s36: cycles done=10000$'
+
+# Scenario 2, closing marker exit: the counters again (the report compares the two lines).
+[[expect]]
+regex = '^s36: stacks fresh=\d+ cached=\d+ heap=\d+$'
+
+# Scenario 1: one thread exits (process alive), then EXIT kills every thread.
+[[expect]]
+regex = '^s36: tw thread exited$'
+
+[[expect]]
+regex = '^s36: twowait ok$'
+
+# Scenario 3: admission into a terminal process is refused.
+[[expect]]
+regex = '^s36: admission ok$'
+
+# Scenario 5: authorized stop and its errors.
+[[expect]]
+regex = '^s36: terminate ok$'
+
+[[expect]]
+regex = '^s36: eperm ebadf esrch ok$'
+
+# Scenario 6: a terminated server's scheme name is immediately registrable.
+[[expect]]
+regex = '^s36: server ready$'
+
+[[expect]]
+regex = '^s36: scheme reregistered$'
+
+[[expect]]
+regex = '^s36: lifecycle ok$'
+
+[[forbid]]
+regex = '(?i)panic|s36: failed'

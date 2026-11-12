@@ -41,6 +41,14 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
         return Err(Errno::EFAULT);
     }
 
+    // Admission is atomic with respect to process exit: the state lock is held from the
+    // terminal check until the thread is enqueued.  Exit takes the same state lock first, so a
+    // thread is either admitted into a live process (and then terminated by the process-exit
+    // filter) or rejected with ESRCH; a terminal process can never be resurrected.
+    let mut state = target.state.lock();
+    if *state == ProcessState::Exited {
+        return Err(Errno::ESRCH);
+    }
     {
         let address_space = target.address_space.lock();
         let address_space = address_space.as_ref().ok_or(Errno::ESRCH)?;
@@ -55,23 +63,30 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
         if stack_vma.prot() & (prot::WRITE as u8) == 0 {
             return Err(Errno::EACCES);
         }
-        let state = target.state.lock();
-        if *state == ProcessState::Exited {
-            return Err(Errno::ESRCH);
-        }
     }
 
     let thread = sched::new_user_thread(&target, entry, stack_top, frame.r10)?;
     let rights = Rights::SIGNAL.union(Rights::DUP);
-    let raw = caller
+    let raw = match caller
         .handles
         .lock()
-        .insert(Object::Thread(Arc::clone(&thread)), rights)?;
+        .insert(Object::Thread(Arc::clone(&thread)), rights)
+    {
+        Ok(raw) => raw,
+        Err(error) => {
+            // Roll the thread back: its stack is freed by the deferred reaper.
+            sched::reap_thread(thread);
+            return Err(error);
+        }
+    };
     if !sched::enqueue(Arc::clone(&thread)) {
         let _ = caller.handles.lock().close(raw);
+        sched::reap_thread(thread);
         return Err(Errno::EAGAIN);
     }
-    *target.state.lock() = ProcessState::Running;
+    if *state == ProcessState::Created {
+        *state = ProcessState::Running;
+    }
     Ok(raw.0 as usize)
 }
 

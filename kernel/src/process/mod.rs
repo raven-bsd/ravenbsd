@@ -10,7 +10,7 @@ pub mod handle;
 pub mod thread;
 
 use core::fmt;
-use core::sync::atomic::{AtomicI32, AtomicU32, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
 
 #[cfg(target_arch = "x86_64")]
 use alloc::collections::VecDeque;
@@ -92,6 +92,10 @@ pub struct Process {
     pub exit_code: AtomicI32,
     /// Live thread count.
     pub threads: AtomicU32,
+    /// True once the process is terminal: none of its threads may run user code again.
+    pub exiting: AtomicBool,
+    /// True once the one-shot teardown has released the address space and handle table.
+    pub torn_down: AtomicBool,
     /// Number of timer objects created by this process and still alive.
     pub timer_count: Arc<AtomicU32>,
     /// Bytes of DMA buffers created by this process and still alive.
@@ -177,6 +181,8 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        exiting: AtomicBool::new(false),
+        torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
         dma_bytes: Arc::new(AtomicU64::new(0)),
         state: Mutex::new(ProcessState::Running),
@@ -215,6 +221,8 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        exiting: AtomicBool::new(false),
+        torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
         dma_bytes: Arc::new(AtomicU64::new(0)),
         state: Mutex::new(ProcessState::Created),
@@ -248,18 +256,6 @@ impl Process {
     pub fn thread_exited(&self) -> bool {
         self.threads.fetch_sub(1, Ordering::AcqRel) <= 1
     }
-
-    /// Mark the process exited, publish the code and wake every waiter exactly once.
-    pub fn mark_exited(&self, code: i32) {
-        self.exit_code.store(code, Ordering::Release);
-        let mut state = self.state.lock();
-        if *state == ProcessState::Exited {
-            return;
-        }
-        *state = ProcessState::Exited;
-        let _ = self.waiters.wake_all();
-        crate::event::notify_all();
-    }
 }
 
 /// True when the initfs contains the requested init path.
@@ -290,6 +286,8 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
         threads: AtomicU32::new(0),
+        exiting: AtomicBool::new(false),
+        torn_down: AtomicBool::new(false),
         timer_count: Arc::new(AtomicU32::new(0)),
         dma_bytes: Arc::new(AtomicU64::new(0)),
         state: Mutex::new(ProcessState::Running),
@@ -650,26 +648,43 @@ const TARGET_MACHINE: Machine = Machine::X86_64;
 #[cfg(target_arch = "aarch64")]
 const TARGET_MACHINE: Machine = Machine::Aarch64;
 
-/// Mark the current process exited, release its address space and wake waiters.
+/// One-shot process teardown: scheme teardown, address space, handle table, exit reporting.
 ///
-/// PID 1 follows the C5 test-exit protocol and never returns; a child process returns to the
-/// scheduler after its address space has been switched away from.
-pub fn notify_exit(code: i32) {
-    let Some(process) = current() else {
-        kprintln!("init exited ({code})");
-        if crate::log::test_exit() {
-            crate::boot::exit_qemu(if code == 0 { 0x10 } else { 0x11 });
-        }
-        crate::arch::halt()
-    };
-    process.mark_exited(code);
+/// The first caller wins; later callers (the last-thread path racing an `EXIT`, a terminate
+/// racing the target's own exit) observe `torn_down` and do nothing.
+///
+/// `own_context` is true when the teardown runs on a thread of the dying process itself (the
+/// `EXIT` path).  Only then may the address space be released with
+/// [`UserAddressSpace::release`], which switches CR3 to the kernel root: a foreign caller
+/// (terminating another process, reaping an unstarted child) must keep its own CR3, because it
+/// returns to user mode through `sysret`.  The cold path frees the target's frames and page
+/// tables without switching, which is safe because user threads run only on CPU 0 in a
+/// non-preemptible kernel: the caller is the only running user thread, so the target's root is
+/// not active anywhere, and none of its blocked or runnable threads can be switched to (the
+/// scheduler filter drops them).
+///
+/// The per-exit evidence prints (`s24`/`s25`/`s21`/`s36` counters) belong to the dying
+/// thread's own exit path and run in that context only; a foreign caller skips them (an
+/// unstarted process has no thread to print from, and a terminated process prints on its last
+/// thread's exit).
+fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
+    if process.torn_down.swap(true, Ordering::AcqRel) {
+        return;
+    }
     // Fail pending scheme requests and remove the registry entries while the server page tables
     // still exist, so capture mappings can be removed before the address space is released.
     #[cfg(target_arch = "x86_64")]
-    ipc::on_process_exit(&process);
+    ipc::on_process_exit(process);
     let address_space = process.address_space.lock().take();
-    if let Some(address_space) = address_space {
-        address_space.release();
+    if let Some(mut address_space) = address_space {
+        if own_context {
+            address_space.release();
+        } else {
+            // SAFETY: not unsafe, but context-dependent - see the function comment.  The target
+            // root is inactive; free its frames and tables without switching the caller's CR3.
+            address_space.free_user_frames();
+            drop(address_space);
+        }
     }
     // A dead process can no longer call syscalls: drop its handle table so DMA buffers and
     // every other object release their resources even while a last reference to the process
@@ -683,6 +698,13 @@ pub fn notify_exit(code: i32) {
         crate::arch::halt()
     }
     kprintln!("process: {} exited ({code})", process.path);
+    // The per-exit evidence prints belong to the dying thread's own context; a foreign teardown
+    // (reaping an unstarted process, terminating another) must return to its caller without
+    // them.
+    if !own_context {
+        return;
+    }
+    // S24 leak evidence: the free-frame count after every child exit.
     if CmdLine::parse(paging::cmdline())
         .get("s24-framecheck")
         .is_some()
@@ -706,11 +728,99 @@ pub fn notify_exit(code: i32) {
     {
         kprintln!("s21: frames free={}", frame::stats().free_bytes);
     }
+    // S36 stack-reuse evidence: the fresh-allocation and cached-stack counters must return to
+    // baseline across repeated spawn/exit cycles.
+    if CmdLine::parse(paging::cmdline())
+        .get("s36-stackcheck")
+        .is_some()
+    {
+        let (heap_used, _) = crate::memory::heap::stats();
+        kprintln!(
+            "s36: stacks fresh={} cached={} heap={}",
+            crate::sched::thread::stack_fresh(),
+            crate::sched::thread::stack_cached(),
+            heap_used
+        );
+    }
+}
+
+/// Set the terminal state exactly once: exit code, wake every waiter, run the teardown.
+///
+/// Returns false when the process was already terminal (no resurrection, no second teardown).
+fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool {
+    let mut state = process.state.lock();
+    if *state == ProcessState::Exited {
+        return false;
+    }
+    *state = ProcessState::Exited;
+    process.exit_code.store(code, Ordering::Release);
+    process.exiting.store(true, Ordering::Release);
+    let _ = process.waiters.wake_all();
+    drop(state);
+    crate::event::notify_all();
+    teardown(process, code, own_context);
+    true
+}
+
+/// Process-wide `EXIT`: terminate every thread, tear down once, then exit the caller.
+///
+/// Other threads of the process never run user code again: the scheduler drops any runnable
+/// thread of a terminal process, and a woken thread re-checks the flag before returning to user
+/// mode.  Since user threads run only on the boot CPU inside a non-preemptible kernel, no other
+/// thread is executing while this syscall runs, so the address space can be released here.
+pub fn exit_process(code: i32) -> ! {
+    if let Some(process) = current() {
+        let _ = terminate_once(&process, code, true);
+    }
+    crate::sched::exit_thread(code)
+}
+
+/// Authorized termination of `target` by a caller holding a `SIGNAL` process handle.
+///
+/// A terminal process returns `ESRCH` (already exiting); the caller's rights check happens in
+/// the syscall layer.
+pub fn terminate(target: &Arc<Process>, code: i32) -> Result<(), Errno> {
+    if terminate_once(target, code, false) {
+        Ok(())
+    } else {
+        Err(Errno::ESRCH)
+    }
+}
+
+/// Reap a process that was created but never started.
+///
+/// Such a process has no threads and can never run, so `PROC_WAIT` on it completes at once; the
+/// terminal state and teardown are the same as any other exit (`Created` -> `Exited`).
+pub fn reap_unstarted(target: &Arc<Process>) -> Result<i32, Errno> {
+    let code = {
+        let state = target.state.lock();
+        if *state != ProcessState::Created {
+            return Err(Errno::EBUSY);
+        }
+        target.exit_code.load(Ordering::Acquire)
+    };
+    let _ = terminate_once(target, code, false);
+    Ok(code)
+}
+
+/// Mark the current process exited and release its resources (last-thread path).
+///
+/// PID 1 follows the C5 test-exit protocol and never returns; a child process returns to the
+/// scheduler after its address space has been switched away from.
+pub fn notify_exit(code: i32) {
+    let Some(process) = current() else {
+        kprintln!("init exited ({code})");
+        if crate::log::test_exit() {
+            crate::boot::exit_qemu(if code == 0 { 0x10 } else { 0x11 });
+        }
+        crate::arch::halt()
+    };
+    let _ = terminate_once(&process, code, true);
 }
 
 /// Terminate the calling process (`EXIT`).
 pub fn exit_current(code: i32) -> ! {
-    crate::sched::exit_thread(code)
+    exit_process(code)
 }
 
 /// Try to resolve a user page fault. Returns true when the faulting instruction can be retried.

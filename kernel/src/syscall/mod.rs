@@ -29,6 +29,8 @@ pub mod thread;
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
 
+use crate::process;
+
 /// Register view shared by every syscall handler.
 ///
 /// The field names are the x86-64 ABI names because the handler bodies predate aarch64; the
@@ -55,6 +57,10 @@ pub struct SyscallFrame {
 fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     let number = usize::try_from(frame.rax).unwrap_or(usize::MAX);
     match Syscall::from_usize(number) {
+        // EXIT is process-wide: every thread of the process terminates.
+        Some(Syscall::EXIT) => process::exit_process(frame.rdi as i32),
+        // C16: authorized termination (contract crate owns the number and wording).
+        Some(Syscall::PROC_TERMINATE) => process_ctl::terminate(frame),
         Some(Syscall::FUTEX) => futex::dispatch(frame),
         #[cfg(target_arch = "x86_64")]
         Some(Syscall::DEBUG_READ) => debug_read::handle(frame),

@@ -58,6 +58,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 use spin::{Mutex as SpinMutex, MutexGuard as SpinMutexGuard};
@@ -376,10 +377,23 @@ fn schedule_locked() {
                 .push_back(current.priority, Arc::clone(&current));
         }
         state.need_resched = false;
-        let next = match state.runqueue.pop_front() {
+        // A terminal process must never run user code again: drop every runnable thread that
+        // belongs to one before picking the next thread.
+        let mut next = match state.runqueue.pop_front() {
             Some(next) => next,
             None => Arc::clone(&state.idle),
         };
+        loop {
+            if next.idle || !next.process.exiting.load(Ordering::Acquire) {
+                break;
+            }
+            next.set_state(ThreadState::Dead);
+            push_reap(Arc::into_raw(next) as usize);
+            next = match state.runqueue.pop_front() {
+                Some(next) => next,
+                None => Arc::clone(&state.idle),
+            };
+        }
         if Arc::ptr_eq(&next, &current) {
             current.set_state(ThreadState::Running);
             return;
@@ -397,6 +411,9 @@ fn schedule_locked() {
     unsafe {
         context::switch(&from, &to);
     }
+    // Resumed on the incoming thread's stack: the outgoing stack is not this one, so deferred
+    // dead stacks can be freed here.
+    reap_dead();
 }
 
 /// Timer tick: wake this CPU's expired sleepers, account the slice and steal work when idle.
@@ -547,6 +564,11 @@ pub fn sleep_until(deadline: u64) -> isize {
     current.wake_status.store(0, Ordering::SeqCst);
     current.set_state(ThreadState::Blocked);
     schedule_locked();
+    // A woken thread of a terminal process must not return to user mode: exit at the next
+    // scheduling point instead (its stack is reaped by the next schedule on another thread).
+    if current.process.exiting.load(Ordering::Acquire) {
+        exit_thread(0);
+    }
     current.wake_status.load(Ordering::SeqCst) as isize
 }
 
@@ -621,6 +643,11 @@ pub fn block_current() -> isize {
     }
     current.set_state(ThreadState::Blocked);
     schedule_locked();
+    // A woken thread of a terminal process must not return to user mode: exit at the next
+    // scheduling point instead (its stack is reaped by the next schedule on another thread).
+    if current.process.exiting.load(Ordering::Acquire) {
+        exit_thread(0);
+    }
     current.wake_status.load(Ordering::SeqCst) as isize
 }
 
@@ -776,14 +803,22 @@ pub fn exit_thread(code: i32) -> ! {
     if thread.process.thread_exited() {
         crate::process::notify_exit(code);
     }
+    // The frame that switches away is abandoned on the dead stack, so its `Arc` local can never
+    // be dropped.  Move the owning reference into the deferred-reap queue; the reference is
+    // turned back into an `Arc` and dropped by the next schedule on another thread.
+    let raw = Arc::into_raw(thread);
+    push_reap(raw as usize);
     let _guard = sync::critical();
     let cpu = this_cpu();
-    let (from, to) = {
+    let to = {
         let mut slot = lock_cpu(cpu);
         let Some(state) = slot.as_mut() else {
             crate::arch::halt();
         };
-        thread.set_state(ThreadState::Dead);
+        // SAFETY: the raw reference is owned by the reap queue until a later scheduling point;
+        // this switch is the only reader and happens before the queue is drained.
+        let dead = unsafe { &*raw };
+        dead.set_state(ThreadState::Dead);
         let next = match state.runqueue.pop_front() {
             Some(next) => next,
             None => Arc::clone(&state.idle),
@@ -794,12 +829,12 @@ pub fn exit_thread(code: i32) -> ! {
             .store(u32::try_from(cpu).unwrap_or(u32::MAX), Ordering::Release);
         state.switches = state.switches.saturating_add(1);
         state.current = Some(Arc::clone(&next));
-        (thread, next)
+        next
     };
-    // SAFETY: the critical section stays live on the dead thread's stack forever; that stack is
-    // never freed, so the frame and the guard remain valid but unused.
+    // SAFETY: the critical section stays live on the dead thread's stack forever; the stack is
+    // freed later by `reap_dead` from another thread's context.
     unsafe {
-        context::switch(&from, &to);
+        context::switch(&*raw, &to);
     }
     loop {
         core::hint::spin_loop();
@@ -818,6 +853,53 @@ pub fn irq_return(from_user: bool) {
         return;
     }
     preempt_if_needed();
+}
+
+/// Deferred kernel-stack reaping.
+///
+/// A thread cannot free the stack it is running on, and the `Arc<Thread>` local in the frame
+/// that switches away is abandoned with that stack.  `exit_thread` (and the terminal-process
+/// filter) therefore hand the owning reference to this queue; the next scheduling point on
+/// another thread turns it back into an `Arc`, frees the stack and drops the reference.
+///
+/// Freeing from `sched/mod.rs` keeps the stack allocator in `thread.rs` untouched: the block is
+/// deallocated with the exact layout `allocate_kernel_stack` used.  The only obstacle is its
+/// guard page, which `allocate_kernel_stack` unmaps and whose physical frame the unmap discards;
+/// a reused block would fail that unmap.  The reaper therefore remaps the guard page to one
+/// shared zeroed frame before freeing, so the next allocation over the block can unmap it
+/// again.  The shared frame is never read and costs one frame in total.
+static REAP: SpinMutex<Vec<usize>> = SpinMutex::new(Vec::new());
+
+fn push_reap(raw: usize) {
+    REAP.lock().push(raw);
+}
+
+/// Queue a thread whose stack must be freed by the next scheduling point.
+///
+/// Used for creation rollback (a thread that was never enqueued) as well as for dead threads.
+pub fn reap_thread(thread: Arc<Thread>) {
+    push_reap(Arc::into_raw(thread) as usize);
+}
+
+/// Drop the owning references of every queued dead thread.  Runs from process context on a live
+/// stack after a context switch.
+///
+/// The 16 KiB kernel stack itself is not freed yet: the allocation and its unmapped guard page
+/// live in `kernel/src/sched/thread.rs` (not in this ticket's Owns), and freeing the heap block
+/// here would break the next `allocate_kernel_stack` that reuses it (its guard unmap must find
+/// the page present - see S36's report).  The Thread and Process Arcs are released here.
+fn reap_dead() {
+    let pending = {
+        let mut queue = REAP.lock();
+        core::mem::take(&mut *queue)
+    };
+    for raw in pending {
+        // SAFETY: each pointer was produced by `Arc::into_raw` exactly once and is owned by the
+        // queue; the thread is neither current nor runnable.
+        let thread = unsafe { Arc::from_raw(raw as *const Thread) };
+        self::thread::free_kernel_stack(thread.kernel_stack_base, thread.kernel_stack_top);
+        drop(thread);
+    }
 }
 
 /// Number of successful context switches across all CPUs.
