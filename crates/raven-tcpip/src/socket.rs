@@ -227,6 +227,9 @@ impl<D: Device> Stack<D> {
             return Ok(0);
         }
         let record = self.sockets.record_mut(socket)?;
+        if let Some(error) = record.error.take() {
+            return Err(error);
+        }
         if record.closed && record.rx.is_empty() {
             return Ok(0);
         }

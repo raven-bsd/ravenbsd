@@ -358,6 +358,16 @@ fn rst_inside_the_window_closes_the_connection() {
 }
 
 #[test]
+fn recv_after_reset_returns_econnreset() {
+    let (_link, mut a, mut b) = pair();
+    let socket = handshake(&mut a, &mut b);
+    let rcv_nxt = a.test_tcp_rcv_nxt(socket).expect("rcv_nxt");
+    let frame = tcp_frame(B, A, 80, 40_000, rcv_nxt, 1, TcpFlags::RST);
+    a.test_inject_frame(&frame, Instant::from_millis(160));
+    assert_eq!(a.recv(socket, &mut [0u8; 1]), Err(Errno::ECONNRESET));
+}
+
+#[test]
 fn in_window_syn_on_established_gets_a_challenge_ack() {
     let (link, mut a, mut b) = pair();
     let socket = handshake(&mut a, &mut b);
