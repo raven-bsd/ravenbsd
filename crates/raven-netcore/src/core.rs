@@ -118,6 +118,17 @@ impl<B: StackBackend> Core<B> {
     }
 }
 
+#[cfg(feature = "backend-raven-tcpip")]
+impl<D: smoltcp::phy::Device> Core<crate::backend::raven::RavenTcpipBackend<D>> {
+    /// Create the native raven-tcpip-backed core.
+    #[must_use]
+    pub fn new(device: D, mac: [u8; 6], now_ms: i64) -> Self {
+        Self {
+            backend: crate::backend::raven::RavenTcpipBackend::new(device, mac, now_ms),
+        }
+    }
+}
+
 impl<D: smoltcp::phy::Device> Core<crate::backend::smoltcp::SmoltcpBackend<D>> {
     /// Create the smoltcp-backed core with Ethernet address `mac`.
     #[must_use]

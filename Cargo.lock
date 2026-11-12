@@ -727,6 +727,7 @@ name = "raven-netcore"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-tcpip",
  "smoltcp",
 ]
 
