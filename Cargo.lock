@@ -925,6 +925,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-tcpip-interop"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "raven-abi",
+ "raven-tcpip",
+ "raven-tcpip-wire",
+]
+
+[[package]]
 name = "raven-tcpip-sim"
 version = "0.1.0"
 dependencies = [
