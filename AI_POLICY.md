@@ -4,9 +4,11 @@ RavenBSD welcomes AI-assisted contributions. This is a design goal of the projec
 tolerance. The rules below keep that honest. A copy of this file ships in the source repo.
 
 1. **AI contributions are welcome.** Code, docs, tests, and reviews may be produced by LLMs.
-2. **Disclosure.** Every commit that contains AI-produced work carries a trailer:
-   `Assisted-by: <tool or model>` (for example `Assisted-by: DeepSeek`). The ticket ID goes in the
-   subject: `S04: parse BootInfo memory map`.
+2. **Attribution.** Commits use the owner's configured Git identity (`user.name` and `user.email`).
+   Do not add `Assisted-by`, `Co-authored-by`, bot-identity or other AI trailers. AI involvement is
+   recorded in the ticket reports and process, not in commit metadata. Never change Git config,
+   `--author`, `GIT_AUTHOR_*` or `GIT_COMMITTER_*`; only the human owner sets the identity. The ticket
+   ID goes in the subject: `S04: parse BootInfo memory map`.
 3. **A human or the lead is accountable.** Nothing merges without review by the lead (or the
    project owner). The author of a patch is never its only reviewer.
 4. **Same bar for everyone.** Tests, `make check`, provenance headers, review. AI-written code is not
