@@ -68,7 +68,6 @@ impl<D: Device> NativeDevice for NativeDeviceAdapter<D> {
 /// The native stack behind [`StackBackend`].
 pub struct RavenTcpipBackend<D: Device> {
     stack: Stack<NativeDeviceAdapter<D>>,
-    dhcp_pending: bool,
     closed: BTreeSet<u32>,
     notified_closed: BTreeSet<u32>,
     accepted: BTreeSet<u32>,
@@ -94,7 +93,6 @@ impl<D: Device> RavenTcpipBackend<D> {
                 seed,
                 Instant::from_millis(now_ms),
             ),
-            dhcp_pending: false,
             closed: BTreeSet::new(),
             notified_closed: BTreeSet::new(),
             accepted: BTreeSet::new(),
@@ -192,7 +190,6 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
     type Device = D;
 
     fn set_ipv4(&mut self, addr: Ipv4Addr, prefix: u8, gateway: Option<Ipv4Addr>) {
-        self.dhcp_pending = false;
         let _ = self.stack.set_ipv4(Ipv4Config {
             addr: native::Ipv4Addr::new(addr.octets()),
             prefix_len: prefix,
@@ -201,9 +198,12 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
     }
 
     fn enable_dhcp(&mut self) {
-        // raven-tcpip has no DHCP client. Keep a discovery timer so the
-        // socket layer does not spin; C26-D01 records the gap honestly.
-        self.dhcp_pending = true;
+        // raven-tcpip has no DHCP client: the call changes nothing and arms no timer. Callers
+        // that need to know use `try_enable_dhcp`, which reports EOPNOTSUPP.
+    }
+
+    fn try_enable_dhcp(&mut self) -> Result<(), Errno> {
+        Err(Errno::EOPNOTSUPP)
     }
 
     fn tcp_listen(&mut self, port: u16, backlog: usize) -> Result<SocketId, Errno> {
@@ -357,7 +357,6 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
         self.stack
             .next_poll_delay(Instant::from_millis(now_ms))
             .map(|duration| duration.as_millis())
-            .or_else(|| self.dhcp_pending.then_some(1_000))
     }
 }
 

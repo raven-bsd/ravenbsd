@@ -15,7 +15,13 @@ use crate::device::Device;
 use crate::event::SocketId;
 use crate::ipv4_stack::to_wire;
 use crate::ipv6_stack::IpAddr;
+use crate::listen::{AcceptQueue, HalfOpenQueue};
 use crate::stack::Stack;
+use crate::table::{ConnectionKey, ConnectionTable};
+
+/// Hard ceiling of a listener's accept queue; the runtime limit is the
+/// `tcp.accept_queue_limit` property.
+const ACCEPT_QUEUE_CEILING: usize = 65_535;
 
 pub(crate) struct Datagram {
     pub(crate) data: Vec<u8>,
@@ -27,8 +33,8 @@ pub(crate) enum Kind {
     Listener {
         port: u16,
         _backlog: usize,
-        pending: VecDeque<SocketId>,
-        half_open: VecDeque<SocketId>,
+        pending: AcceptQueue,
+        half_open: HalfOpenQueue,
         reported: usize,
     },
     Tcp(crate::tcp_state::TcpConnection),
@@ -58,6 +64,8 @@ pub(crate) struct SocketRecord {
     pub(crate) prev_closed: bool,
     pub(crate) prev_error: Option<Errno>,
     pub(crate) forced_readable: bool,
+    /// The application released its handle; the record may be reclaimed once it is closed.
+    pub(crate) app_closed: bool,
 }
 
 impl SocketRecord {
@@ -77,23 +85,120 @@ impl SocketRecord {
             prev_closed: false,
             prev_error: None,
             forced_readable: false,
+            app_closed: false,
         }
     }
 }
 
 pub(crate) struct SocketTable {
     pub(crate) records: BTreeMap<u32, SocketRecord>,
+    /// Live four-tuple classification of TCP connections (C17).
+    conn_index: ConnectionTable<u32>,
+    reported_chains: usize,
+    released_ports: Vec<u16>,
     next_id: u32,
     max: usize,
 }
 
+pub(crate) fn connection_key(
+    connection: &crate::tcp_state::TcpConnection,
+) -> Option<ConnectionKey> {
+    let (remote, remote_port) = connection.remote?;
+    Some(ConnectionKey {
+        local: connection.local,
+        local_port: connection.local_port,
+        remote,
+        remote_port,
+    })
+}
+
 impl SocketTable {
-    pub(crate) fn new(max: usize) -> Self {
+    pub(crate) fn new(max: usize, secret: u64, max_chain: usize) -> Self {
         Self {
             records: BTreeMap::new(),
+            conn_index: ConnectionTable::new(max.max(1), secret, max_chain),
+            reported_chains: 0,
+            released_ports: Vec::new(),
             next_id: 1,
             max,
         }
+    }
+
+    /// Classify a segment's four-tuple to the open connection that owns it.
+    pub(crate) fn find_connection(
+        &self,
+        local: IpAddr,
+        local_port: u16,
+        remote: IpAddr,
+        remote_port: u16,
+    ) -> Option<SocketId> {
+        let key = ConnectionKey {
+            local,
+            local_port,
+            remote,
+            remote_port,
+        };
+        let id = *self.conn_index.get(&key)?;
+        let record = self.records.get(&id)?;
+        match &record.kind {
+            Kind::Tcp(connection) if !record.closed && connection_key(connection) == Some(key) => {
+                Some(SocketId(id))
+            }
+            _ => None,
+        }
+    }
+
+    /// Chains longer than the configured bound seen by the live index, since the last call.
+    pub(crate) fn take_long_chains(&mut self) -> usize {
+        let total = self.conn_index.stats.long_chain_warnings;
+        let fresh = total.saturating_sub(self.reported_chains);
+        self.reported_chains = total;
+        fresh
+    }
+
+    /// Change the collision-chain bound the live index reports against.
+    pub(crate) fn set_index_max_chain(&mut self, max_chain: usize) {
+        self.conn_index.set_max_chain(max_chain);
+    }
+
+    /// Drop the index entry of a connection that closed.
+    pub(crate) fn unindex(&mut self, id: SocketId) {
+        let key = match self.records.get(&id.0).map(|record| &record.kind) {
+            Some(Kind::Tcp(connection)) => connection_key(connection),
+            _ => None,
+        };
+        if let Some(key) = key
+            && self.conn_index.get(&key) == Some(&id.0)
+        {
+            self.conn_index.remove(&key);
+        }
+    }
+
+    /// Reclaim closed records whose application handle is gone.
+    pub(crate) fn reclaim(&mut self) -> usize {
+        let dead: Vec<u32> = self
+            .records
+            .iter()
+            .filter(|(_, record)| record.closed && record.app_closed)
+            .map(|(id, _)| *id)
+            .collect();
+        for id in &dead {
+            self.unindex(SocketId(*id));
+            if let Some(record) = self.records.remove(id) {
+                match record.kind {
+                    Kind::Tcp(connection) => self.released_ports.push(connection.local_port),
+                    Kind::Udp { local_port, .. } => self.released_ports.push(local_port),
+                    Kind::Listener { port, .. } => self.released_ports.push(port),
+                    Kind::Icmp { .. } => {}
+                }
+            }
+        }
+        dead.len()
+    }
+
+    /// Local ports of the records reclaimed since the last call.
+    pub(crate) fn take_released_ports(&mut self) -> Vec<u16> {
+        core::mem::take(&mut self.released_ports)
     }
 
     pub(crate) fn alloc(
@@ -103,10 +208,18 @@ impl SocketTable {
         tx_cap: usize,
     ) -> Result<SocketId, Errno> {
         if self.records.len() >= self.max {
+            self.reclaim();
+        }
+        if self.records.len() >= self.max {
             return Err(Errno::EMFILE);
         }
         let id = self.next_id;
         self.next_id = self.next_id.wrapping_add(1);
+        if let Kind::Tcp(connection) = &kind
+            && let Some(key) = connection_key(connection)
+        {
+            self.conn_index.insert(key, id);
+        }
         self.records
             .insert(id, SocketRecord::new(kind, rx_cap, tx_cap));
         Ok(SocketId(id))
@@ -136,12 +249,13 @@ impl<D: Device> Stack<D> {
         }
         let rx_cap = self.recv_buffer_cap();
         let tx_cap = self.send_buffer_cap();
+        let backlog = backlog.max(1);
         self.sockets.alloc(
             Kind::Listener {
                 port,
-                _backlog: backlog.max(1),
-                pending: VecDeque::new(),
-                half_open: VecDeque::new(),
+                _backlog: backlog,
+                pending: AcceptQueue::new(ACCEPT_QUEUE_CEILING),
+                half_open: HalfOpenQueue::new(backlog),
                 reported: 0,
             },
             rx_cap,
@@ -166,7 +280,7 @@ impl<D: Device> Stack<D> {
                 let Kind::Listener { pending, .. } = &mut record.kind else {
                     return Err(Errno::ENOTSOCK);
                 };
-                pending.pop_front()
+                pending.pop().map(|entry| SocketId(entry.socket))
             };
             let Some(connection) = next else {
                 return Ok(None);
@@ -243,6 +357,7 @@ impl<D: Device> Stack<D> {
             self.tcp_shutdown(socket)?;
             let record = self.sockets.record_mut(socket)?;
             record.tx_shutdown = true;
+            record.app_closed = true;
             record.tx.clear();
             return Ok(());
         }
@@ -251,13 +366,25 @@ impl<D: Device> Stack<D> {
             return Err(Errno::EBADF);
         }
         record.closed = true;
+        record.app_closed = true;
         record.rx.clear();
         record.tx.clear();
-        if let Kind::Listener { pending, .. } = &mut record.kind {
+        let mut orphans: Vec<u32> = Vec::new();
+        if let Kind::Listener {
+            pending, half_open, ..
+        } = &mut record.kind
+        {
+            orphans.extend(pending.sockets());
+            orphans.extend(half_open.sockets());
             pending.clear();
         }
         if let Kind::Udp { datagrams, .. } = &mut record.kind {
             datagrams.clear();
+        }
+        for raw in orphans {
+            if let Some(child) = self.sockets.records.get_mut(&raw) {
+                child.app_closed = true;
+            }
         }
         Ok(())
     }
@@ -419,31 +546,32 @@ impl<D: Device> Stack<D> {
     }
 
     pub(crate) fn alloc_ephemeral_port(&mut self) -> Result<u16, Errno> {
-        let first = u16::try_from(self.tunables.port_range_first).unwrap_or(32_768);
-        let last = u16::try_from(self.tunables.port_range_last)
-            .unwrap_or(60_999)
-            .max(first);
-        let count = u32::from(last) - u32::from(first) + 1;
+        for port in self.sockets.take_released_ports() {
+            self.ports.release(port);
+        }
         let attempts = usize::try_from(self.tunables.port_alloc_attempts)
             .unwrap_or(64)
-            .min(count as usize);
-        let mut seed = [0u8; 4];
-        self.rng.fill(&mut seed);
-        let start = u32::from_le_bytes(seed) % count;
-        for probe in 0..attempts as u32 {
-            let offset = (start + probe) % count;
-            let port = u16::try_from(u32::from(first) + offset).unwrap_or(first);
-            self.counters.port_alloc_probes = self.counters.port_alloc_probes.wrapping_add(1);
+            .max(1);
+        let mut reclaimed = false;
+        for _ in 0..attempts {
+            let Some(port) = self.ports.allocate() else {
+                if !reclaimed && self.sockets.reclaim() > 0 {
+                    reclaimed = true;
+                    for port in self.sockets.take_released_ports() {
+                        self.ports.release(port);
+                    }
+                    continue;
+                }
+                break;
+            };
+            self.counters.port_alloc_probes = self
+                .counters
+                .port_alloc_probes
+                .wrapping_add(u64::try_from(self.ports.last_attempts).unwrap_or(1));
             if !self.port_in_use(port) {
-                self.next_ephemeral = if port == last { first } else { port + 1 };
-                return Ok(port);
-            }
-        }
-        for offset in 0..count {
-            let port = u16::try_from(u32::from(first) + offset).unwrap_or(first);
-            self.counters.port_alloc_probes = self.counters.port_alloc_probes.wrapping_add(1);
-            if !self.port_in_use(port) {
-                self.next_ephemeral = if port == last { first } else { port + 1 };
+                let last = u16::try_from(self.tunables.port_range_last).unwrap_or(60_999);
+                let first = u16::try_from(self.tunables.port_range_first).unwrap_or(32_768);
+                self.next_ephemeral = if port >= last { first } else { port + 1 };
                 return Ok(port);
             }
         }

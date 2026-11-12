@@ -91,7 +91,12 @@ fn dhcp_can_be_enabled_and_replaced_by_static_configuration() {
         client.poll(now);
         server.poll(now);
     }
-    assert!(client.next_poll_delay_ms(now).is_some());
+    // A backend with a DHCP client arms a discovery wake-up; one without must say so
+    // explicitly instead of arming a silent timer.
+    match client.try_enable_dhcp() {
+        Ok(()) => assert!(client.next_poll_delay_ms(now).is_some()),
+        Err(error) => assert_eq!(error, Errno::EOPNOTSUPP),
+    }
 
     client.set_ipv4(CLIENT_IP, 24, None);
     let listener = server.tcp_listen(PORT, 2).unwrap();

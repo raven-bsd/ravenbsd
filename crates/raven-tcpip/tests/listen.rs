@@ -19,6 +19,7 @@ fn entry(value: u8) -> HalfOpen {
         remote_port: 1000 + u16::from(value),
         irs: u32::from(value),
         iss: u32::from(value) + 10,
+        socket: u32::from(value),
     }
 }
 
@@ -105,6 +106,7 @@ fn ten_thousand_syns_do_not_exhaust_memory() {
             remote_port: 1000,
             irs: index,
             iss: index.wrapping_add(1),
+            socket: index,
         });
     }
     assert_eq!(queue.len(), 64);

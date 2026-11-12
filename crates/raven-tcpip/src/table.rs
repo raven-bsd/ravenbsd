@@ -55,6 +55,11 @@ impl<T> ConnectionTable<T> {
         }
     }
 
+    /// Change the collision-chain bound used for later warnings.
+    pub fn set_max_chain(&mut self, max_chain: usize) {
+        self.max_chain = max_chain.max(1);
+    }
+
     /// The bucket index for a key (diagnostics/tests).
     #[must_use]
     pub fn bucket(&self, key: &ConnectionKey) -> usize {
@@ -212,6 +217,12 @@ impl PortAllocator {
         self.used.insert(port);
     }
 
+    /// Change the inclusive allocation range; reservations are kept.
+    pub fn set_range(&mut self, start: u16, end: u16) {
+        self.start = start;
+        self.end = end.max(start);
+    }
+
     /// Release a port.
     pub fn release(&mut self, port: u16) {
         self.used.remove(&port);
@@ -265,34 +276,63 @@ impl<T: Clone> TimeWaitTable<T> {
         }
     }
 
-    /// Insert a TIME-WAIT entry; when full, recycle the oldest.
-    pub fn insert(&mut self, key: ConnectionKey, value: T, deadline_ms: i64) {
-        while self.entries.len() >= self.capacity {
-            if let Some((_, oldest)) = self.expiry.pop_front() {
-                self.entries.remove(&oldest);
-                self.stats.timewait_recycled = self.stats.timewait_recycled.saturating_add(1);
-            } else {
+    /// Insert a TIME-WAIT entry; when full, recycle the oldest and return the recycled values.
+    pub fn insert(&mut self, key: ConnectionKey, value: T, deadline_ms: i64) -> Vec<T> {
+        let mut recycled = Vec::new();
+        let replacing = self.entries.contains_key(&key);
+        while !replacing && self.entries.len() >= self.capacity {
+            let Some((deadline, oldest)) = self.expiry.pop_front() else {
                 break;
+            };
+            if self
+                .entries
+                .get(&oldest)
+                .is_some_and(|(_, current)| *current == deadline)
+                && let Some((evicted, _)) = self.entries.remove(&oldest)
+            {
+                recycled.push(evicted);
+                self.stats.timewait_recycled = self.stats.timewait_recycled.saturating_add(1);
             }
         }
         self.entries.insert(key, (value, deadline_ms));
         self.expiry.push_back((deadline_ms, key));
+        recycled
     }
 
     /// Expire entries due at `now`, O(1) per entry.
     pub fn expire(&mut self, now_ms: i64) -> usize {
-        let mut removed = 0;
+        self.expire_values(now_ms).len()
+    }
+
+    /// Expire entries due at `now` and return their values.
+    pub fn expire_values(&mut self, now_ms: i64) -> Vec<T> {
+        let mut expired = Vec::new();
         while let Some((deadline, key)) = self.expiry.front().copied() {
             if deadline > now_ms {
                 break;
             }
             self.expiry.pop_front();
-            if self.entries.remove(&key).is_some() {
-                removed += 1;
+            if self
+                .entries
+                .get(&key)
+                .is_some_and(|(_, current)| *current == deadline)
+                && let Some((value, _)) = self.entries.remove(&key)
+            {
+                expired.push(value);
             }
         }
-        self.stats.timewait_expired = self.stats.timewait_expired.saturating_add(removed);
-        removed
+        self.stats.timewait_expired = self.stats.timewait_expired.saturating_add(expired.len());
+        expired
+    }
+
+    /// Forget an entry whose connection left TIME-WAIT.
+    pub fn remove(&mut self, key: &ConnectionKey) -> Option<T> {
+        self.entries.remove(key).map(|(value, _)| value)
+    }
+
+    /// Change the capacity; the next insert recycles down to it.
+    pub fn set_capacity(&mut self, capacity: usize) {
+        self.capacity = capacity.max(1);
     }
 
     /// Number of entries.
