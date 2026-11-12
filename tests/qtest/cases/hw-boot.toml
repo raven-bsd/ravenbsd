@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "hw-boot"
+arch = "x86_64"
+profile = "hw"
+timeout_secs = 240
+pre = ["sh tests/fixtures/k33-rootfs/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: bootstrap plan: .*vfsd.*$'
+
+[[expect]]
+regex = '^svcd: root mounted at /root$'
+
+[[expect]]
+regex = '^svcd: root services=[1-9][0-9]* added=[0-9]+$'
+
+[[expect]]
+regex = '^svcd: service plan: .*root-marker.*$'
+
+[[expect]]
+regex = '^k33 root marker$'
+unordered = true
+
+[[expect]]
+regex = '^k33: etc=.*services\.d.*$'
+unordered = true
+
+[[expect]]
+regex = '^k33: hostname=k33-root$'
+unordered = true
+
+[[expect]]
+regex = 'RavenBSD \S+ 0\.1 RavenBSD 0\.1 \(\S+\) #\d+: .+ x86_64$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: uname-root up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: root-marker up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: k33-probe up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: ls-root up$'
+unordered = true
+
+[[expect]]
+regex = '^rc\.conf$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

@@ -492,6 +492,73 @@ fn names_are_in_manifest_order() {
 }
 
 #[test]
+fn merge_adds_root_services_and_recomputes_the_plan() {
+    let mut supervisor = supervisor(vec![service("a")]);
+    let added = supervisor
+        .merge(vec![with_needs("b", &["a"]), service("c")], None)
+        .unwrap();
+    assert_eq!(added, 2);
+    assert_eq!(supervisor.names().collect::<Vec<_>>(), ["a", "b", "c"]);
+    assert_eq!(supervisor.plan().waves.len(), 2);
+}
+
+#[test]
+fn merge_replaces_a_manifest_without_resetting_its_runtime() {
+    let mut supervisor = supervisor(vec![service("a")]);
+    let generation = supervisor.start(0, 0).unwrap();
+    let mut replacement = service("a");
+    replacement.exec = "/root/sbin/a".to_string();
+    let added = supervisor.merge(vec![replacement], None).unwrap();
+    assert_eq!(added, 0);
+    assert_eq!(supervisor.services()[0].exec, "/root/sbin/a");
+    assert_eq!(supervisor.runtime()[0].generation, generation);
+    assert!(supervisor.runtime()[0].started);
+}
+
+#[test]
+fn merge_applies_root_restart_overrides() {
+    let overrides = Overrides {
+        entries: vec![(
+            "a".to_string(),
+            raven_svc_manifest::Override::Restart(Restart::Never),
+        )],
+    };
+    let mut supervisor = supervisor(vec![service("a")]);
+    supervisor.merge(Vec::new(), Some(&overrides)).unwrap();
+    assert_eq!(supervisor.services()[0].restart, Restart::Never);
+}
+
+#[test]
+fn merge_rejects_an_unknown_override_without_changing_the_set() {
+    let overrides = Overrides {
+        entries: vec![(
+            "missing".to_string(),
+            raven_svc_manifest::Override::Restart(Restart::Never),
+        )],
+    };
+    let mut supervisor = supervisor(vec![service("a")]);
+    assert_eq!(
+        supervisor.merge(vec![service("b")], Some(&overrides)),
+        Err(MergeError::UnknownService("missing".to_string()))
+    );
+    assert_eq!(supervisor.names().collect::<Vec<_>>(), ["a"]);
+}
+
+#[test]
+fn merge_rolls_back_when_the_merged_graph_is_invalid() {
+    let mut supervisor = supervisor(vec![service("a")]);
+    let error = supervisor
+        .merge(vec![with_needs("b", &["missing"])], None)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        MergeError::Graph(GraphError::Missing { .. })
+    ));
+    assert_eq!(supervisor.names().collect::<Vec<_>>(), ["a"]);
+    assert_eq!(supervisor.runtime().len(), 1);
+}
+
+#[test]
 fn invalid_indices_are_ignored() {
     let mut supervisor = supervisor(vec![service("a")]);
     assert!(supervisor.start(9, 0).is_none());

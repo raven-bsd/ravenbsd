@@ -47,6 +47,7 @@ members = [
     "tests/fixtures/usercopy-cow",
     "tests/fixtures/testkernel",
     "tests/fixtures/k14-block/mkdisk",
+    "tests/fixtures/k33-rootfs",
     "tests/fixtures/k14-block/controller",
     "tests/fixtures/k54-ufs/mkimage",
     "tests/fixtures/k54-ufs/probe",

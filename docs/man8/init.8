@@ -18,6 +18,40 @@ Each manifest is a small TOML file with the service name, executable, arguments,
 environment, dependencies, restart policy and readiness mode.
 .Pp
 Services start in dependency order computed at boot.
+When the initfs contains the storage chain
+.Pq Pa blockd , fsd-ufs , vfsd ,
+.Nm
+uses two phases.  Phase 1 starts only the bootstrap closure of
+.Pa logd , initfsd , ramfsd , nulld , zerod , randd , blockd , fsd-ufs , vfsd
+and their dependencies (including the device servers).
+Once
+.Dq ufs:
+and
+.Dq file:
+are up, it mounts the UFS root through
+.Xr vfsd 8
+at
+.Pa /root
+and reads the root manifests from
+.Pa /root/etc/services.d
+and
+.Pa /root/etc/rc.conf .
+Root manifests replace a bootstrap manifest with the same name in place and add the rest; the
+dependency plan is recomputed and phase 2 starts every service that has not started yet.
+A root executable is read from
+.Pa /root Ns Ar exec ;
+when that file is absent the service falls back to its initfs executable and logs the reason.
+This is a
+.Pa /root
+prefix, not a second root mount: vfsd keeps its one
+.Pa /
+mount.
+.Pp
+Profiles without the storage chain keep the one-phase initfs plan.  The
+.Pa hw
+profile uses release user programs and an 8 MiB UFS root image; until the virtio-blk driver lands,
+blockd serves that image from the initfs RAM disk.
+.Pp
 A missing dependency or a dependency cycle is fatal:
 .Nm
 prints
@@ -111,6 +145,10 @@ Optional
 and
 .Dq NAME_restart
 overrides.
+.It Pa /root/etc/services.d/*.toml
+Root-filesystem service manifests (two-phase boot).
+.It Pa /root/etc/rc.conf
+Root-filesystem overrides applied to the merged service set.
 .It Pa /etc/svcd.conf
 Optional test-mode settings.
 .El

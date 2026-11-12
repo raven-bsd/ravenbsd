@@ -14,7 +14,9 @@ use alloc::vec::Vec;
 
 use raven_abi::types::Handle;
 use raven_proto_svc::{State, Status};
-use raven_svc_manifest::{GraphError, Manifest, Plan, Readiness, Restart, start_order};
+use raven_svc_manifest::{
+    GraphError, Manifest, Overrides, Plan, Readiness, Restart, apply_overrides, start_order,
+};
 
 /// Per-service runtime state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -104,6 +106,15 @@ pub struct ExitOutcome {
     pub notices: Vec<Notice>,
 }
 
+/// Why a root-manifest merge failed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum MergeError {
+    /// A root `rc.conf` override names a service that does not exist.
+    UnknownService(String),
+    /// The merged dependency graph is invalid.
+    Graph(GraphError),
+}
+
 /// The service supervisor.
 #[derive(Debug)]
 pub struct Supervisor {
@@ -127,6 +138,41 @@ impl Supervisor {
             plan,
             boot_complete: false,
         })
+    }
+
+    /// Merge root-filesystem manifests into the bootstrap set.
+    ///
+    /// A manifest with the same name replaces the initfs configuration in place, preserving that
+    /// service's runtime and index (so a restart picks up the new file); a new name is appended.
+    /// Optional root `rc.conf` overrides apply to the merged set. The plan is recomputed before
+    /// any change is committed, so a bad merged graph leaves the supervisor untouched.
+    pub fn merge(
+        &mut self,
+        root_services: Vec<Manifest>,
+        overrides: Option<&Overrides>,
+    ) -> Result<usize, MergeError> {
+        let mut services = self.services.clone();
+        let mut added = 0usize;
+        for manifest in root_services {
+            if let Some(index) = services
+                .iter()
+                .position(|service| service.name == manifest.name)
+            {
+                services[index] = manifest;
+            } else {
+                services.push(manifest);
+                added = added.saturating_add(1);
+            }
+        }
+        if let Some(overrides) = overrides {
+            apply_overrides(&mut services, overrides)
+                .map_err(|error| MergeError::UnknownService(error.service))?;
+        }
+        let plan = start_order(&services).map_err(MergeError::Graph)?;
+        self.runtime.resize(services.len(), Runtime::default());
+        self.services = services;
+        self.plan = plan;
+        Ok(added)
     }
 
     /// Parsed manifests in input order.

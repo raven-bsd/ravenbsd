@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "consd"
+exec = "/sbin/consd"
+needs = ["logd"]
+provides = ["scheme:tty"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"

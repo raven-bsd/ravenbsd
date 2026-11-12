@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Executes the root image's /bin/ls against /root/etc.
+name = "ls-root"
+exec = "/bin/ls"
+args = ["ls", "file:/root/etc"]
+needs = ["scheme:file"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

@@ -27,6 +27,6 @@ mod repo;
 mod rootfs;
 mod run;
 
-pub use rootfs::build_ufs_root;
+pub use rootfs::{build_root_disk, build_ufs_root, inject_initfs_file, stage_rootfs_spec};
 
 pub use cli::run_cli;

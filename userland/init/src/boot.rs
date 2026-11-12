@@ -17,12 +17,12 @@ use raven_rt::spawn::{RtSys, SpawnError, SpawnOptions, Sys};
 use raven_rt::sync::Mutex;
 use raven_scheme::Server;
 use raven_svc_manifest::{
-    GraphError, Manifest, ParseError, ParseErrorKind, UnknownService, apply_overrides,
+    GraphError, Manifest, Overrides, ParseError, ParseErrorKind, UnknownService, apply_overrides,
     parse_overrides,
 };
 
 use crate::config::{self, Config};
-use crate::state::{Notice, StartRequest, Supervisor};
+use crate::state::{MergeError, Notice, StartRequest, Supervisor};
 
 /// The mapped initfs, set once at boot.
 static INITFS: Mutex<Option<Initfs<'static>>> = Mutex::new(None);
@@ -41,6 +41,8 @@ pub(crate) struct Core {
     pub(crate) pending_starts: Vec<StartRequest>,
     pub(crate) pending_terminations: Vec<Handle>,
     pub(crate) all_up_printed: bool,
+    /// True when the service was declared by the root filesystem and should run from `/root`.
+    pub(crate) root_exec: Vec<bool>,
 }
 
 /// Map the initfs, parse manifests and run the service manager.
@@ -124,6 +126,15 @@ pub fn run() -> i32 {
             return 1;
         }
     };
+    // A root-capable image has the blockd -> fsd-ufs -> vfsd chain in its initfs. Other profiles
+    // keep the one-phase initfs plan unchanged.
+    let root_capable = ["blockd", "fsd-ufs", "vfsd"].iter().all(|name| {
+        supervisor
+            .services()
+            .iter()
+            .any(|service| service.name == *name)
+    });
+    let root_exec = alloc::vec![false; supervisor.len()];
     let core = Arc::new(Mutex::new(Core {
         supervisor,
         config,
@@ -131,6 +142,7 @@ pub fn run() -> i32 {
         pending_starts: Vec::new(),
         pending_terminations: Vec::new(),
         all_up_printed: false,
+        root_exec,
     }));
     if CORE.lock().is_some() {
         raven_rt::println!("svcd: core already initialised");
@@ -155,36 +167,31 @@ pub fn run() -> i32 {
         }
     }
 
-    let waves = { core.lock().supervisor.plan().waves.clone() };
-    for wave in waves {
-        for &index in &wave {
-            let generation = { core.lock().supervisor.start(index, now_ms()) };
-            if let Some(generation) = generation {
-                spawn_worker(&core, index, generation);
+    if root_capable {
+        let selected = bootstrap_selection(core.lock().supervisor.services());
+        {
+            let guard = core.lock();
+            raven_rt::println!(
+                "svcd: bootstrap plan: {}",
+                plan_text(&guard.supervisor, Some(&selected))
+            );
+        }
+        if let Some(code) = run_waves(&core, Some(&selected), false, false) {
+            return code;
+        }
+        match activate_root(&core) {
+            Ok(()) => {}
+            Err(reason) => {
+                raven_rt::println!("svcd: root: {reason}; starting the initfs plan");
             }
         }
-        loop {
-            pump(&core);
-            if let Some(code) = core.lock().exit_code {
-                return code;
-            }
-            let done = {
-                let guard = core.lock();
-                wave.iter().all(|&index| {
-                    guard.supervisor.runtime().get(index).is_none_or(|runtime| {
-                        runtime.ever_ready
-                            || matches!(
-                                runtime.state,
-                                State::Failed | State::GaveUp | State::Stopped
-                            )
-                    })
-                })
-            };
-            if done {
-                break;
-            }
-            let _ = raven_rt::nanosleep(5_000_000);
+        // Root one-shot services read through vfsd; start them one at a time so the shared
+        // file-serving path is not exercised by several new clients at once.
+        if let Some(code) = run_waves(&core, None, true, true) {
+            return code;
         }
+    } else if let Some(code) = run_waves(&core, None, false, false) {
+        return code;
     }
 
     core.lock().supervisor.set_boot_complete();
@@ -217,6 +224,231 @@ pub fn run() -> i32 {
         }
         let _ = raven_rt::nanosleep(10_000_000);
     }
+}
+
+/// Start the current plan, optionally restricted to a bootstrap selection and to services that
+/// have not been started yet. Returns an exit code when a service asked svcd to exit.
+fn run_waves(
+    core: &Arc<Mutex<Core>>,
+    selected: Option<&[bool]>,
+    only_unstarted: bool,
+    serial: bool,
+) -> Option<i32> {
+    let waves = { core.lock().supervisor.plan().waves.clone() };
+    for wave in waves {
+        let members: Vec<usize> = {
+            let guard = core.lock();
+            wave.iter()
+                .copied()
+                .filter(|index| {
+                    selected.is_none_or(|selected| selected.get(*index).copied().unwrap_or(false))
+                        && (!only_unstarted
+                            || !guard
+                                .supervisor
+                                .runtime()
+                                .get(*index)
+                                .is_some_and(|runtime| runtime.started))
+                })
+                .collect()
+        };
+        if members.is_empty() {
+            continue;
+        }
+        if serial {
+            for index in members {
+                if let Some(code) = start_and_wait(core, &[index]) {
+                    return Some(code);
+                }
+            }
+        } else if let Some(code) = start_and_wait(core, &members) {
+            return Some(code);
+        }
+    }
+    None
+}
+
+/// Start `members` and wait until each has been ready or reached a terminal state.
+fn start_and_wait(core: &Arc<Mutex<Core>>, members: &[usize]) -> Option<i32> {
+    for &index in members {
+        let generation = { core.lock().supervisor.start(index, now_ms()) };
+        if let Some(generation) = generation {
+            spawn_worker(core, index, generation);
+        }
+    }
+    loop {
+        pump(core);
+        if let Some(code) = core.lock().exit_code {
+            return Some(code);
+        }
+        let done = {
+            let guard = core.lock();
+            members.iter().all(|&index| {
+                guard.supervisor.runtime().get(index).is_none_or(|runtime| {
+                    runtime.ever_ready
+                        || matches!(
+                            runtime.state,
+                            State::Failed | State::GaveUp | State::Stopped
+                        )
+                })
+            })
+        };
+        if done {
+            return None;
+        }
+        let _ = raven_rt::nanosleep(5_000_000);
+    }
+}
+
+/// Select the bootstrap services and every dependency they need by service name or scheme.
+fn bootstrap_selection(services: &[Manifest]) -> Vec<bool> {
+    const SEEDS: &[&str] = &[
+        "logd", "initfsd", "ramfsd", "nulld", "zerod", "randd", "blockd", "fsd-ufs", "vfsd", "devd",
+    ];
+    let mut selected = alloc::vec![false; services.len()];
+    for seed in SEEDS {
+        if let Some(index) = services.iter().position(|service| service.name == *seed) {
+            selected[index] = true;
+        }
+    }
+    loop {
+        let mut changed = false;
+        for index in 0..services.len() {
+            if !selected[index] {
+                continue;
+            }
+            for need in &services[index].needs {
+                let dependency = if need.starts_with("scheme:") {
+                    services.iter().position(|service| {
+                        service
+                            .provides
+                            .iter()
+                            .any(|provide| provide.as_str() == need.as_str())
+                    })
+                } else {
+                    services
+                        .iter()
+                        .position(|service| service.name.as_str() == need.as_str())
+                };
+                if let Some(dependency) = dependency
+                    && !selected[dependency]
+                {
+                    selected[dependency] = true;
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            return selected;
+        }
+    }
+}
+
+/// Render the plan as one space-separated line, optionally filtered to `selected`.
+fn plan_text(supervisor: &Supervisor, selected: Option<&[bool]>) -> String {
+    let mut text = String::new();
+    for wave in &supervisor.plan().waves {
+        for &index in wave {
+            if let Some(selected) = selected
+                && !selected.get(index).copied().unwrap_or(false)
+            {
+                continue;
+            }
+            let Some(service) = supervisor.services().get(index) else {
+                continue;
+            };
+            if !text.is_empty() {
+                text.push(' ');
+            }
+            text.push_str(&service.name);
+        }
+    }
+    if text.is_empty() {
+        text.push_str("(none)");
+    }
+    text
+}
+
+/// Mount the root filesystem at `/root`, read and merge its service set.
+fn activate_root(core: &Arc<Mutex<Core>>) -> Result<(), String> {
+    raven_rt::fs::mount("/root", "ufs:")
+        .map_err(|error| alloc::format!("/root mount failed: {}", error.description()))?;
+    raven_rt::println!("svcd: root mounted at /root");
+    let services = read_root_services()?;
+    let overrides = read_root_overrides()?;
+    let root_count = services.len();
+    let root_names: Vec<String> = services
+        .iter()
+        .map(|service| service.name.clone())
+        .collect();
+    let mut guard = core.lock();
+    let added = guard
+        .supervisor
+        .merge(services, overrides.as_ref())
+        .map_err(describe_merge_error)?;
+    let total = guard.supervisor.len();
+    guard.root_exec.resize(total, false);
+    for name in &root_names {
+        if let Some(index) = guard.supervisor.find(name) {
+            guard.root_exec[index] = true;
+        }
+    }
+    raven_rt::println!("svcd: root services={} added={}", root_count, added);
+    raven_rt::println!("svcd: service plan: {}", plan_text(&guard.supervisor, None));
+    Ok(())
+}
+
+fn read_root_services() -> Result<Vec<Manifest>, String> {
+    let entries = raven_rt::fs::read_dir("file:/root/etc/services.d")
+        .map_err(|error| alloc::format!("/root/etc/services.d: {}", error.description()))?;
+    let mut names: Vec<String> = entries
+        .into_iter()
+        .map(|entry| entry.name)
+        .filter(|name| name.ends_with(".toml"))
+        .collect();
+    names.sort();
+    let mut services = Vec::new();
+    for name in names {
+        let path = alloc::format!("file:/root/etc/services.d/{name}");
+        let data = raven_rt::fs::read_to_vec(&path)
+            .map_err(|error| alloc::format!("{path}: {}", error.description()))?;
+        let text = core::str::from_utf8(&data).map_err(|_| alloc::format!("{path}: not UTF-8"))?;
+        match Manifest::parse(text) {
+            Ok(manifest) => services.push(manifest),
+            Err(error) => raven_rt::println!(
+                "svcd: /root/etc/services.d/{name}: {}",
+                describe_parse_error(&error)
+            ),
+        }
+    }
+    Ok(services)
+}
+
+fn read_root_overrides() -> Result<Option<Overrides>, String> {
+    match raven_rt::fs::read_to_vec("file:/root/etc/rc.conf") {
+        Ok(data) => {
+            let text = core::str::from_utf8(&data)
+                .map_err(|_| "/root/etc/rc.conf: not UTF-8".to_string())?;
+            parse_overrides(text).map(Some).map_err(|error| {
+                alloc::format!("/root/etc/rc.conf: {}", describe_parse_error(&error))
+            })
+        }
+        Err(raven_abi::errno::Errno::ENOENT) => Ok(None),
+        Err(error) => Err(alloc::format!("/root/etc/rc.conf: {}", error.description())),
+    }
+}
+
+fn describe_merge_error(error: MergeError) -> String {
+    match error {
+        MergeError::UnknownService(service) => {
+            alloc::format!("root rc.conf names unknown service `{service}`")
+        }
+        MergeError::Graph(error) => describe_graph_error(&error),
+    }
+}
+
+/// True when `index` should start from the root filesystem.
+pub(crate) fn service_root_exec(core: &Arc<Mutex<Core>>, index: usize) -> bool {
+    core.lock().root_exec.get(index).copied().unwrap_or(false)
 }
 
 /// Execute queued control requests from the `svc:` server.
@@ -287,7 +519,7 @@ pub(crate) fn emit(core: &Arc<Mutex<Core>>, notices: &[Notice]) {
 }
 
 /// Spawn `manifest.exec` with its args, environment and grants.
-pub(crate) fn spawn_service(manifest: &Manifest) -> Result<Handle, String> {
+pub(crate) fn spawn_service(manifest: &Manifest, from_root: bool) -> Result<Handle, String> {
     let initfs = {
         let guard = INITFS.lock();
         guard.as_ref().copied()
@@ -314,6 +546,34 @@ pub(crate) fn spawn_service(manifest: &Manifest) -> Result<Handle, String> {
         args: &args,
         env: &environment,
     };
+
+    if from_root {
+        let path = alloc::format!("file:/root{}", manifest.exec);
+        match raven_rt::spawn::read_file_image(&path) {
+            Ok(image) => {
+                let mut sys = GrantSys {
+                    grants: grants.clone(),
+                };
+                return raven_rt::spawn::spawn_image_with(
+                    &image,
+                    &manifest.exec,
+                    &options,
+                    &mut sys,
+                )
+                .map_err(describe_spawn);
+            }
+            Err(SpawnError::FileNotFound) => {
+                raven_rt::println!(
+                    "svcd: {}: {} not found, using initfs {}",
+                    manifest.name,
+                    path,
+                    manifest.exec
+                );
+            }
+            Err(error) => return Err(describe_spawn(error)),
+        }
+    }
+
     let mut sys = GrantSys { grants };
     raven_rt::spawn::spawn_with(&initfs, &manifest.exec, &options, &mut sys).map_err(describe_spawn)
 }
@@ -342,6 +602,7 @@ pub(crate) fn take_server() -> Option<Server> {
     SERVER.lock().take()
 }
 
+#[derive(Clone, Copy)]
 struct Grant {
     handle: Handle,
     rights: Rights,
@@ -374,6 +635,16 @@ impl Sys for GrantSys {
 
     fn unmap(&mut self, proc: Handle, addr: usize, len: usize) -> Result<(), Errno> {
         RtSys.unmap(proc, addr, len)
+    }
+
+    fn protect(
+        &mut self,
+        proc: Handle,
+        addr: usize,
+        len: usize,
+        protection: u8,
+    ) -> Result<(), Errno> {
+        RtSys.protect(proc, addr, len, protection)
     }
 
     fn thread_create(
@@ -420,6 +691,7 @@ fn is_manifest_path(path: &str) -> bool {
 fn describe_spawn(error: SpawnError) -> String {
     match error {
         SpawnError::NotFound => "executable not found in the initfs".to_string(),
+        SpawnError::FileNotFound => "executable not found on the file server".to_string(),
         SpawnError::BadElf(error) => alloc::format!("bad ELF: {error:?}"),
         SpawnError::HasInterpreter => "ELF interpreter is not supported".to_string(),
         SpawnError::TooLarge => "image is too large".to_string(),

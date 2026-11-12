@@ -115,9 +115,19 @@ pub(crate) fn run_with_overrides(
         }
     }
 
-    let initfs_path = match overrides.initfs {
-        Some(path) => resolve_override(root, path),
-        None => crate::initfs::build(root, arch, profile_name)?,
+    // A rootfs profile is a production image: its initfs and root programs are built with the
+    // release profile so the initfs stays small enough for the RAM block image.
+    let rootfs = crate::rootfs::profile_exists(root, profile_name);
+    let initfs_bytes = match overrides.initfs {
+        Some(path) => {
+            let path = resolve_override(root, path);
+            fs::read(&path).with_context(|| format!("cannot read {}", path.display()))?
+        }
+        None if rootfs => build_release_initfs(root, arch, &profile, &workspace)?,
+        None => {
+            let path = crate::initfs::build(root, arch, profile_name)?;
+            fs::read(&path).with_context(|| format!("cannot read {}", path.display()))?
+        }
     };
     let kernel_path = match overrides.kernel {
         Some(path) => resolve_override(root, path),
@@ -129,8 +139,16 @@ pub(crate) fn run_with_overrides(
         fs::read(&loader).with_context(|| format!("cannot read {}", loader.display()))?;
     let kernel_bytes =
         fs::read(&kernel_path).with_context(|| format!("cannot read {}", kernel_path.display()))?;
-    let initfs_bytes =
-        fs::read(&initfs_path).with_context(|| format!("cannot read {}", initfs_path.display()))?;
+    // The `hw` profile carries a UFS root. Until virtio-blk lands, blockd serves it from the
+    // initfs as a RAM disk, so the one-partition GPT disk is inserted at /etc/blockd.img.
+    let initfs_bytes = match crate::rootfs::build_for_profile(root, arch, profile_name, true)? {
+        Some(disk) => {
+            let data =
+                fs::read(&disk).with_context(|| format!("cannot read {}", disk.display()))?;
+            crate::rootfs::inject_initfs_file(&initfs_bytes, "/etc/blockd.img", &data, 0o444)?
+        }
+        None => initfs_bytes,
+    };
 
     let boot_toml = boot_toml(&profile, cmdline);
     let loader_name = match arch {
@@ -185,6 +203,51 @@ pub(crate) fn run_with_overrides(
     write_image(&output, &gpt, &esp)?;
     println!("{}", output.display());
     Ok(0)
+}
+
+/// Build the initfs for a rootfs profile from release user programs.
+fn build_release_initfs(
+    root: &Path,
+    arch: Arch,
+    profile: &Profile,
+    workspace: &Workspace,
+) -> Result<Vec<u8>> {
+    let mut packages: Vec<String> = profile
+        .initfs
+        .programs
+        .iter()
+        .map(|program| program.package.clone())
+        .collect();
+    packages.sort();
+    packages.dedup();
+    if !packages.is_empty() {
+        let code = build::run(workspace, Component::User, arch, true, &packages)?;
+        if code != 0 {
+            bail!("release user program build failed with exit code {code}");
+        }
+    }
+    let mut builder = raven_initfs::InitfsBuilder::new();
+    for program in &profile.initfs.programs {
+        let path = build::artifact_path(root, arch, Component::User, &program.package);
+        let data = fs::read(&path).with_context(|| {
+            format!(
+                "cannot read release user program {} (package `{}`)",
+                path.display(),
+                program.package
+            )
+        })?;
+        builder.add_file(&program.path, &data, 0o755)?;
+    }
+    for file in &profile.initfs.files {
+        let data = fs::read(root.join(&file.src)).with_context(|| {
+            format!(
+                "cannot read profile file {} for initfs path {}",
+                file.src, file.path
+            )
+        })?;
+        builder.add_file(&file.path, &data, file.mode)?;
+    }
+    Ok(builder.build())
 }
 
 fn default_output(root: &Path, arch: Arch) -> PathBuf {
