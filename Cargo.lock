@@ -1308,6 +1308,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-s39-parity"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-s40-teardown"
 version = "0.1.0"
 dependencies = [

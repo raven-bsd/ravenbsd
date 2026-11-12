@@ -7,14 +7,11 @@ use alloc::sync::Arc;
 use core::sync::atomic::Ordering;
 
 use raven_abi::errno::Errno;
-#[cfg(target_arch = "x86_64")]
 use raven_abi::types::namespace;
 use raven_abi::types::{Handle, Rights};
 use raven_usercopy::UserSlice;
 
-#[cfg(target_arch = "x86_64")]
 use crate::ipc::model::{self, NAME_MAX};
-#[cfg(target_arch = "x86_64")]
 use crate::ipc::router;
 use crate::process::{self, ProcessState, handle::Object};
 use crate::sched;
@@ -65,7 +62,6 @@ pub fn terminate(frame: &SyscallFrame) -> Result<usize, Errno> {
 /// Contract C17: `proc` is `SELF_PROC` or a process handle with `ADMIN`; a prefix may only be
 /// added inside the caller's own namespace. Registration enforcement is staged for the follow-up
 /// ticket (svcd must first grant service prefixes), so only `OPEN` consumes the namespace.
-#[cfg(target_arch = "x86_64")]
 pub fn namespace(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
@@ -104,12 +100,6 @@ pub fn namespace(frame: &SyscallFrame) -> Result<usize, Errno> {
         _ => return Err(Errno::EINVAL),
     }
     Ok(0)
-}
-
-/// Scheme IPC is x86-64-only; the namespace syscall reports `ENOSYS` until the port.
-#[cfg(not(target_arch = "x86_64"))]
-pub fn namespace(_frame: &SyscallFrame) -> Result<usize, Errno> {
-    Err(Errno::ENOSYS)
 }
 
 /// `proc_wait(proc, out_code) -> 0`.

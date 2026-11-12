@@ -294,11 +294,9 @@ fn pop_request(
 /// part of the S40 stack overflow.  The lock is released before `fail`/`cancel` because completion
 /// touches the same client list and the request waits.
 pub fn on_process_exit(process: &Arc<Process>) {
-    // S38: the process-exit close hook.  Clear the dying process's event registrations before
-    // its handle table is replaced, so no registration survives the keys it was registered
-    // against.  `event::on_process_exit` is compiled for x86-64 only (S38); aarch64 event
-    // teardown is a follow-up outside this ticket's paths.
-    #[cfg(target_arch = "x86_64")]
+    // S38/S39: the process-exit close hook runs on every architecture.  Clear the dying
+    // process's event registrations before its handle table is replaced, so no registration
+    // survives the keys it was registered against.
     crate::event::on_process_exit(process);
     // S33 leak evidence: the exiting process's outstanding client requests. A completed request
     // is removed from the list, so a long OPEN/CLOSE/DUP loop leaves this at zero; the fixture

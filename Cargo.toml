@@ -46,6 +46,7 @@ members = [
     "tests/fixtures/s40-teardown",
     "tests/fixtures/s16-rights",
     "tests/fixtures/s17-pager",
+    "tests/fixtures/s39-parity",
     "tests/fixtures/usercopy-cow",
     "tests/fixtures/testkernel",
     "tests/fixtures/k14-block/mkdisk",
