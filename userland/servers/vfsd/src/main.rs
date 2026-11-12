@@ -43,6 +43,8 @@ mod program {
     const RETRIES: usize = 500;
     const RETRY_NS: u64 = 10_000_000;
     const BUFFER: usize = 4096;
+    /// Budget for root-proxy open-file descriptions.
+    const MAX_OPEN_FILES: usize = 256;
 
     /// The real kernel, plus vfsd's ownership rule for Open attachments.
     ///
@@ -96,11 +98,13 @@ mod program {
         path: String,
         root_listing: bool,
         merged: Option<Vec<u8>>,
+        mount_generation: u32,
     }
 
     struct VfsHandler {
         table: MountTable,
         opens: OpenTable<Proxy>,
+        mount_generation: u32,
     }
 
     impl VfsHandler {
@@ -108,7 +112,12 @@ mod program {
             Self {
                 table,
                 opens: OpenTable::new(),
+                mount_generation: 1,
             }
+        }
+
+        fn bump_mounts(&mut self) {
+            self.mount_generation = self.mount_generation.wrapping_add(1).max(1);
         }
 
         fn absolute(&self, base: &str, path: &str) -> Result<String, Errno> {
@@ -179,13 +188,21 @@ mod program {
         }
 
         fn read_root(&mut self, file: u64, buffer: &mut [u8]) -> Result<usize, Errno> {
+            let current_generation = self.mount_generation;
             let (target, needs_build) = {
                 let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
-                (entry.file.target, entry.file.merged.is_none())
+                (
+                    entry.file.target,
+                    entry.file.merged.is_none()
+                        || entry.file.mount_generation != current_generation,
+                )
             };
             if needs_build {
                 let packed = self.build_root_listing(target)?;
-                self.opens.get_mut(file).ok_or(Errno::EBADF)?.file.merged = Some(packed);
+                let entry = self.opens.get_mut(file).ok_or(Errno::EBADF)?;
+                entry.file.merged = Some(packed);
+                entry.file.mount_generation = current_generation;
+                entry.set_cursor(0);
             }
             let (written, next) = {
                 let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
@@ -364,12 +381,17 @@ mod program {
                 }
             }
             if path == "/" {
+                if self.opens.len() >= MAX_OPEN_FILES {
+                    let _ = client.close(target);
+                    return Err(Errno::EMFILE.into());
+                }
                 let id = self.opens.insert(
                     Proxy {
                         target,
                         path,
                         root_listing: true,
                         merged: None,
+                        mount_generation: self.mount_generation,
                     },
                     flags,
                 )?;
@@ -430,12 +452,14 @@ mod program {
                     let path = normalized(&path)?;
                     let scheme = bytes_to_string(scheme)?;
                     self.table.mount(&path, &scheme)?;
+                    self.bump_mounts();
                     status(response, Ok(()))
                 }
                 Call::Umount { path } => {
                     let path = bytes_to_string(path)?;
                     let path = normalized(&path)?;
                     self.table.umount(&path, 0)?;
+                    self.bump_mounts();
                     status(response, Ok(()))
                 }
                 Call::Sync => {

@@ -32,6 +32,24 @@ Directories must be empty before
 Rename replaces an existing file, or an empty directory of the same kind, and rejects moving a
 directory into itself.
 .Pp
+A server-wide budget of 256 open-file descriptions applies; the next open returns
+.Er EMFILE .
+A duplicate shares the open-file description, its flags and its sequential cursor; the first close
+does not remove the description, only the last close does.
+The wire offset of
+.Dv READ
+and
+.Dv WRITE
+must be zero; a nonzero offset returns
+.Er EINVAL .
+.Pp
+Directory reads are sequential.  A buffer smaller than the next packed entry returns
+.Er EINVAL .
+The server records the directory generation at the first read; a create, remove, rename or
+symlink change in that directory invalidates the cursor and the next read returns
+.Er EINVAL .
+Reopen the directory to restart the listing.
+.Pp
 All content is lost when
 .Nm
 restarts; this is intentional for the first in-memory filesystem.

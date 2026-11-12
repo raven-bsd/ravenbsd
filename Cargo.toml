@@ -29,6 +29,7 @@ members = [
     "tests/fixtures/s21-edu",
     "tests/fixtures/k66-fs",
     "tests/fixtures/k71-scheme",
+    "tests/fixtures/k67-fs",
     "tests/fixtures/s30-irq",
     "tests/fixtures/s31-irq",
     "tests/fixtures/s34-concurrency",
