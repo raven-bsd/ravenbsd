@@ -86,6 +86,7 @@ members = [
     "userland/servers/consd",
     "userland/servers/consd-probe",
     "tests/net/packetdrill-harness",
+    "tests/tcpip",
     "tools/bench-host",
 ]
 default-members = ["crates/*"]
