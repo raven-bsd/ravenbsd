@@ -22,7 +22,6 @@ use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
 
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
-use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 use raven_abi::types::Rights;
@@ -237,6 +236,16 @@ impl PendingRequest {
         self.waiters.wake_all();
     }
 
+    /// Release the captured buffers after the server is done with them.
+    ///
+    /// Idempotent.  A cancelled request deliberately keeps its captures mapped until the server
+    /// retires or skips it, because the server may still touch the buffer.  Once that happens the
+    /// server-side release must free them even if a dead client thread's abandoned syscall frame
+    /// still holds this request's `Arc` (the S40 teardown case).
+    pub fn release_captures(&self) {
+        self.buffers.lock().release();
+    }
+
     /// Fail the request with `errno`.
     pub fn fail(&self, error: Errno) {
         self.complete(i32::from(error.0), 0, None);
@@ -263,10 +272,27 @@ pub fn next_file_id() -> u64 {
     NEXT_FILE_ID.fetch_add(1, Ordering::Relaxed)
 }
 
+/// Pop one queued server request without holding the lock across completion.
+fn pop_queued(
+    queue: &Mutex<alloc::collections::VecDeque<Arc<PendingRequest>>>,
+) -> Option<Arc<PendingRequest>> {
+    queue.lock().pop_front()
+}
+
+/// Pop one tracked request without holding the lock across completion.
+fn pop_request(
+    requests: &Mutex<alloc::vec::Vec<Arc<PendingRequest>>>,
+) -> Option<Arc<PendingRequest>> {
+    requests.lock().pop()
+}
+
 /// Fail pending requests and remove the registry entries of an exiting process.
 ///
 /// Called from `process::notify_exit` before the address space is released, so capture mappings
-/// can still be removed.
+/// can still be removed.  Every drain is one request at a time: the teardown runs from the page
+/// fault/exception/EXIT path on a bounded kernel stack, and a temporary request `Vec` here was
+/// part of the S40 stack overflow.  The lock is released before `fail`/`cancel` because completion
+/// touches the same client list and the request waits.
 pub fn on_process_exit(process: &Arc<Process>) {
     // S38: the process-exit close hook.  Clear the dying process's event registrations before
     // its handle table is replaced, so no registration survives the keys it was registered
@@ -285,27 +311,17 @@ pub fn on_process_exit(process: &Arc<Process>) {
 
     registry::on_process_exit(process);
 
-    let queued: Vec<Arc<PendingRequest>> = {
-        let mut queue = process.scheme_queue.lock();
-        queue.drain(..).collect()
-    };
-    for request in queued {
+    while let Some(request) = pop_queued(&process.scheme_queue) {
         request.fail(Errno::EIO);
+        request.release_captures();
     }
 
-    let active: Vec<Arc<PendingRequest>> = {
-        let mut active = process.active_requests.lock();
-        active.drain(..).collect()
-    };
-    for request in active {
+    while let Some(request) = pop_request(&process.active_requests) {
         request.fail(Errno::EIO);
+        request.release_captures();
     }
 
-    let client: Vec<Arc<PendingRequest>> = {
-        let mut client = process.client_requests.lock();
-        client.drain(..).collect()
-    };
-    for request in client {
+    while let Some(request) = pop_request(&process.client_requests) {
         if matches!(request.opcode, Opcode::Close | Opcode::Dup) {
             // One-way notifications must still reach the server after the client is gone: the
             // server releases the open-file description on the last CLOSE, and DUP updates its
@@ -316,6 +332,25 @@ pub fn on_process_exit(process: &Arc<Process>) {
     }
 
     process.scheme_waiters.wake_all();
+
+    // S40 evidence: every teardown invariant in one line. The faulting client may still have a
+    // capture held by a server that has not retired the cancelled request yet; by the controller's
+    // final exit (after the FIFO barrier) all counters are zero.
+    if crate::memory::paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "s40-teardowncheck")
+    {
+        crate::kprintln!(
+            "s40: exit {} client={} active={} queued={} wait={} scheme={} captures={}",
+            process.path,
+            process.client_requests.lock().len(),
+            process.active_requests.lock().len(),
+            process.scheme_queue.lock().len(),
+            process.waiters.len(),
+            process.scheme_waiters.len(),
+            capture::frames_in_use()
+        );
+    }
 
     // S32 leak probe: capture frames still owned after the process's requests were drained.
     // Zero means every copy-backed capture was released exactly once.

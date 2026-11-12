@@ -68,13 +68,20 @@ pub fn names() -> Vec<String> {
 }
 
 /// Remove every registry entry owned by `process`.
+///
+/// Allocation-free for the teardown path: pop one server at a time so the process's scheme list
+/// is not cloned into a temporary `Vec`, and release that list before taking the registry lock
+/// (register takes the registry first, so the reverse order would invert).
 pub fn on_process_exit(process: &Arc<Process>) {
-    let servers: Vec<Arc<SchemeServer>> = process.schemes.lock().clone();
-    let mut registry = REGISTRY.lock();
-    for server in servers {
+    loop {
+        let server = process.schemes.lock().pop();
+        let Some(server) = server else {
+            break;
+        };
         server
             .dead
             .store(true, core::sync::atomic::Ordering::Release);
+        let mut registry = REGISTRY.lock();
         if registry
             .get(&server.name)
             .is_some_and(|current| Arc::ptr_eq(current, &server))

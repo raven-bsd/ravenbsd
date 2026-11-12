@@ -361,6 +361,9 @@ pub fn recv(caller: &Arc<Process>, packet_address: u64, capacity: u64) -> Result
         };
         if let Some(request) = request {
             if request.cancelled.load(Ordering::Acquire) || request.done.load(Ordering::Acquire) {
+                // The server never received this request, so it cannot still touch the capture;
+                // release it now instead of waiting for a reply that can never be sent.
+                request.release_captures();
                 continue;
             }
             return deliver(caller, request, packet_address);
@@ -374,6 +377,7 @@ pub fn recv(caller: &Arc<Process>, packet_address: u64, capacity: u64) -> Result
                 sched::end_block(token);
                 if request.cancelled.load(Ordering::Acquire) || request.done.load(Ordering::Acquire)
                 {
+                    request.release_captures();
                     continue;
                 }
                 return deliver(caller, request, packet_address);
@@ -423,6 +427,33 @@ pub fn send(
         return Err(Errno::EACCES);
     }
     if request.done.load(Ordering::Acquire) {
+        if crate::memory::paging::cmdline()
+            .split_ascii_whitespace()
+            .any(|token| token == "s40-teardowncheck")
+        {
+            crate::kprintln!(
+                "s40: late send id={} refs={} cancelled={}",
+                request.id,
+                Arc::strong_count(&request),
+                request.cancelled.load(Ordering::Acquire)
+            );
+        }
+        // The client died (the teardown completed the request with EIO) or the request was
+        // cancelled before this reply. The server has now acknowledged it, so retire the
+        // server-side handle and release the capture that cancellation deliberately kept mapped
+        // for this late touch. Without this, every client death with a held request would leak
+        // one capture slot until the server exits.
+        retire(caller, &request, request_handle);
+        request.release_captures();
+        if crate::memory::paging::cmdline()
+            .split_ascii_whitespace()
+            .any(|token| token == "s40-teardowncheck")
+        {
+            crate::kprintln!(
+                "s40: late send retired refs={}",
+                Arc::strong_count(&request)
+            );
+        }
         return Err(Errno::EIO);
     }
     if packet.request_id != request.id || packet.opcode != request.opcode.as_u16() {

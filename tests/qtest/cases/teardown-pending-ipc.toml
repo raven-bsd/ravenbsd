@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "teardown-pending-ipc"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/s40-teardown/build.sh"]
+initfs = "build/fixtures/s40-teardown/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s40-teardowncheck s32-capturecheck s33-ipccheck"
+qemu_extra = []
+expect_exit = "success"
+
+# The server registers and the controller's probe completes.
+[[expect]]
+regex = '^s40: server ready$'
+
+# A faulting client exits with its own wait queue empty and no outstanding request (the blocked
+# writer was released by the request cancellation).
+[[expect]]
+regex = '^s40: exit child client=0 active=0 queued=0 wait=0 scheme=0 captures=\d+$'
+
+# 100 children fault with a held scheme WRITE plus an internal PROC_WAIT waiter; the server's
+# SEND then sees the already-cancelled request.
+[[expect]]
+regex = '^s40: hold send errno=5$'
+
+[[expect]]
+regex = '^s40: cycles done=100$'
+
+[[expect]]
+regex = '^s40: teardown ok$'
+
+# The controller (PID 1) exits with no outstanding client request and no capture frame.
+[[expect]]
+regex = '^s33: /init outstanding=0$'
+
+[[expect]]
+regex = '^s40: exit /init client=0 active=0 queued=0 wait=0 scheme=0 captures=0$'
+
+[[expect]]
+regex = '^s32: capture frames=0 free_bytes=\d+$'
+
+[[forbid]]
+regex = '(?i)double fault|panic|EXCEPTION|s40: failed|s40: fault exit|s40: namecheck|s40: hold send ok'

@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-s40-teardown"
+version = "0.1.0"
+description = "S40 process teardown with pending IPC requests fixture."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[lib]
+name = "raven_s40_teardown"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raven-s40-init"
+path = "src/bin/init.rs"
+
+[[bin]]
+name = "raven-s40-server"
+path = "src/bin/server.rs"
+
+[[bin]]
+name = "raven-s40-fault"
+path = "src/bin/fault.rs"
+
+[[bin]]
+name = "raven-s40-namecheck"
+path = "src/bin/namecheck.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-initfs = { path = "../../../crates/raven-initfs" }
+raven-ipc = { path = "../../../crates/raven-ipc" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
+
+[lints]
+workspace = true

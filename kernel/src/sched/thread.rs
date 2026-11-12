@@ -3,7 +3,7 @@
 
 //! Thread objects and kernel-stack allocation.
 //!
-//! A thread owns a 16 KiB kernel stack with an unmapped guard page below it. The stack is never
+//! A thread owns a 20 KiB kernel stack with an unmapped guard page below it. The stack is never
 //! freed in S09: exiting threads leave their stacks mapped for the kernel's lifetime, which is
 //! safe (no use-after-free) and bounded by the test workload. A later ticket adds a stack cache.
 
@@ -31,8 +31,13 @@ pub const PRIORITY_DEFAULT: u8 = 16;
 /// Priority of the per-CPU idle thread.
 pub const PRIORITY_IDLE: u8 = PRIORITY_MAX;
 
-/// Number of pages in one kernel stack (16 KiB).
-const KERNEL_STACK_PAGES: u64 = 4;
+/// Number of pages in one kernel stack (20 KiB).
+///
+/// The page-fault/EXIT teardown chain (process teardown -> IPC request completion -> wait-queue
+/// wake, plus the per-exit evidence parses) reached just over the former 16 KiB stack in the S40
+/// regression.  The wake and drain paths are now allocation-free, and five mapped pages leave
+/// 4 KiB of headroom for the deepest chain (see the S40 report for the measured depth).
+const KERNEL_STACK_PAGES: u64 = 5;
 /// Page size.
 const PAGE: u64 = 4096;
 /// Total reserved pages, including the guard.
