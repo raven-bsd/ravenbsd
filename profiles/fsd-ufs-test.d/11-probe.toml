@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.files]]
+src = "build/fixtures/k54-ufs/probe"
+path = "/sbin/fsd-ufs-probe"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "profiles/fsd-ufs-test.d/probe.manifest"
+path = "/etc/services.d/fsd-ufs-probe.toml"

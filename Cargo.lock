@@ -181,6 +181,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "fsd-ufs"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-block",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+ "ufs-core",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -655,6 +667,23 @@ name = "raven-k14-mkdisk"
 version = "0.1.0"
 dependencies = [
  "raven-proto-block",
+]
+
+[[package]]
+name = "raven-k54-mkimage"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-block",
+]
+
+[[package]]
+name = "raven-k54-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
