@@ -15,7 +15,7 @@ use crate::device::Device;
 use crate::event::SocketId;
 use crate::ipv4_stack::to_wire;
 use crate::ipv6_stack::IpAddr;
-use crate::stack::{Ipv4Addr, Stack};
+use crate::stack::Stack;
 
 pub(crate) struct Datagram {
     pub(crate) data: Vec<u8>,
@@ -27,12 +27,10 @@ pub(crate) enum Kind {
         port: u16,
         _backlog: usize,
         pending: VecDeque<SocketId>,
+        half_open: VecDeque<SocketId>,
         reported: usize,
     },
-    Tcp {
-        _remote: Option<(Ipv4Addr, u16)>,
-        local_port: u16,
-    },
+    Tcp(crate::tcp_state::TcpConnection),
     Udp {
         local_port: u16,
         datagrams: VecDeque<Datagram>,
@@ -142,6 +140,7 @@ impl<D: Device> Stack<D> {
                 port,
                 _backlog: backlog.max(1),
                 pending: VecDeque::new(),
+                half_open: VecDeque::new(),
                 reported: 0,
             },
             rx_cap,
@@ -182,33 +181,12 @@ impl<D: Device> Stack<D> {
     }
 
     /// Start a TCP connection to `remote`.
-    ///
-    /// `local_port` defaults to an ephemeral port. This skeleton allocates the socket record;
-    /// the handshake is implemented by C08.
-    pub fn tcp_connect(
+    pub fn tcp_connect<A: Into<IpAddr>>(
         &mut self,
-        remote: (Ipv4Addr, u16),
+        remote: (A, u16),
         local_port: Option<u16>,
     ) -> Result<SocketId, Errno> {
-        if remote.1 == 0 {
-            return Err(Errno::EADDRNOTAVAIL);
-        }
-        let local_port = match local_port {
-            Some(0) => return Err(Errno::EADDRNOTAVAIL),
-            Some(port) if self.port_in_use(port) => return Err(Errno::EADDRINUSE),
-            Some(port) => port,
-            None => self.alloc_ephemeral_port()?,
-        };
-        let rx_cap = self.config.rx_queue_bytes;
-        let tx_cap = self.config.tx_queue_bytes;
-        self.sockets.alloc(
-            Kind::Tcp {
-                _remote: Some(remote),
-                local_port,
-            },
-            rx_cap,
-            tx_cap,
-        )
+        self.tcp_connect_internal(remote, local_port)
     }
 
     /// Queue bytes on a TCP connection. Returns [`Errno::EAGAIN`] when the transmit buffer is
@@ -222,7 +200,7 @@ impl<D: Device> Stack<D> {
             let record = self.sockets.record_mut(socket)?;
             if record.closed {
                 Err(Errno::EBADF)
-            } else if !matches!(record.kind, Kind::Tcp { .. }) {
+            } else if !matches!(record.kind, Kind::Tcp(_)) {
                 Err(Errno::ENOTCONN)
             } else if record.tx_shutdown {
                 Err(Errno::EPIPE)
@@ -252,7 +230,7 @@ impl<D: Device> Stack<D> {
         if record.closed && record.rx.is_empty() {
             return Ok(0);
         }
-        if !matches!(record.kind, Kind::Tcp { .. } | Kind::Icmp { .. }) {
+        if !matches!(record.kind, Kind::Tcp(_) | Kind::Icmp { .. }) {
             return Err(Errno::ENOTSOCK);
         }
         let count = buffer.len().min(record.rx.len());
@@ -272,19 +250,32 @@ impl<D: Device> Stack<D> {
 
     /// Close the transmit half of a TCP connection.
     pub fn shutdown_write(&mut self, socket: SocketId) -> Result<(), Errno> {
-        let record = self.sockets.record_mut(socket)?;
-        if record.closed {
-            return Err(Errno::EBADF);
+        {
+            let record = self.sockets.record(socket)?;
+            if record.closed {
+                return Err(Errno::EBADF);
+            }
+            if !matches!(record.kind, Kind::Tcp(_)) {
+                return Err(Errno::ENOTCONN);
+            }
         }
-        if !matches!(record.kind, Kind::Tcp { .. }) {
-            return Err(Errno::ENOTCONN);
+        if let Ok(record) = self.sockets.record_mut(socket) {
+            record.tx_shutdown = true;
         }
-        record.tx_shutdown = true;
-        Ok(())
+        self.tcp_shutdown(socket)
     }
 
     /// Close a socket and release its buffers.
     pub fn close(&mut self, socket: SocketId) -> Result<(), Errno> {
+        if let Ok(record) = self.sockets.record(socket)
+            && matches!(record.kind, Kind::Tcp(_))
+        {
+            self.tcp_shutdown(socket)?;
+            let record = self.sockets.record_mut(socket)?;
+            record.tx_shutdown = true;
+            record.tx.clear();
+            return Ok(());
+        }
         let record = self.sockets.record_mut(socket)?;
         if record.closed {
             return Err(Errno::EBADF);
@@ -434,25 +425,23 @@ impl<D: Device> Stack<D> {
         }
     }
 
-    fn port_in_use(&self, port: u16) -> bool {
+    pub(crate) fn port_in_use(&self, port: u16) -> bool {
         self.sockets.records.values().any(|record| {
             if record.closed {
                 return false;
             }
             match &record.kind {
                 Kind::Listener { port: local, .. }
-                | Kind::Tcp {
-                    local_port: local, ..
-                }
                 | Kind::Udp {
                     local_port: local, ..
                 } => *local == port,
+                Kind::Tcp(connection) => connection.local_port == port,
                 Kind::Icmp { .. } => false,
             }
         })
     }
 
-    fn alloc_ephemeral_port(&mut self) -> Result<u16, Errno> {
+    pub(crate) fn alloc_ephemeral_port(&mut self) -> Result<u16, Errno> {
         const START: u32 = 49_152;
         const COUNT: u32 = 65_536 - START;
         let first = u32::from(self.next_ephemeral);
