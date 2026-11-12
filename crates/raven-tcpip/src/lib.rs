@@ -48,6 +48,7 @@ mod ipv4_stack;
 mod ipv6_stack;
 mod neighbor;
 mod reassembly;
+mod recovery;
 mod route;
 mod rto;
 mod sack;
@@ -69,6 +70,7 @@ pub use ipv6_stack::{
     Neighbor6State,
 };
 pub use neighbor::{NeighborCache, NeighborEntry};
+pub use recovery::{Ecn, Rack, SpuriousUndo, Tlp, pto};
 pub use route::{Route, RouteTable};
 pub use rto::RtoEstimator;
 pub use sack::{NextKind, NextSeg, SackResult, SackScoreboard, receiver_blocks, sack_option_bytes};
