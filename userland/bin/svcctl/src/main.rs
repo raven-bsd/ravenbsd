@@ -56,7 +56,7 @@ mod program {
     use alloc::vec::Vec;
 
     use raven_proto_fs::DirEntryIter;
-    use raven_proto_svc::{Op, Status};
+    use raven_proto_svc::{Op, State, Status};
     use raven_rt::entry;
     use raven_scheme::Client;
 
@@ -91,7 +91,10 @@ mod program {
             }
             Command::Start(name) => control(&client, &name, Op::Start),
             Command::Stop(name) => control(&client, &name, Op::Stop),
-            Command::Restart(name) => control(&client, &name, Op::Restart),
+            Command::Restart(name) => {
+                control(&client, &name, Op::Stop)?;
+                control(&client, &name, Op::Start)
+            }
         }
     }
 
@@ -144,6 +147,23 @@ mod program {
         ))
     }
 
+    fn service_state(client: &Client, name: &str) -> Result<State, String> {
+        let path = format!("svc:/{name}");
+        let handle = client
+            .open(&path, 1)
+            .map_err(|error| format!("{name}: {}", error.description()))?;
+        let mut buffer = [0u8; 128];
+        let read = client
+            .read(handle, 0, &mut buffer)
+            .map_err(|error| format!("{name}: {}", error.description()))?;
+        let _ = client.close(handle);
+        let line = buffer
+            .get(..read)
+            .ok_or_else(|| format!("{name}: short read"))?;
+        let status = Status::decode(line).map_err(|_| format!("{name}: bad status line"))?;
+        Ok(status.state)
+    }
+
     fn control(client: &Client, name: &str, operation: Op) -> Result<(), String> {
         let path = format!("svc:/{name}");
         let handle = client
@@ -153,8 +173,38 @@ mod program {
         let result = client.call(handle, &[operation.as_u8()], &mut response);
         let _ = client.close(handle);
         result.map_err(|error| format!("{name}: {}", error.description()))?;
-        // Give the main loop one tick to act on the queued request before reading the state.
-        let _ = raven_rt::nanosleep(50_000_000);
+
+        // STOP is not complete until the worker has observed the child's terminal state.
+        let mut seen_active = false;
+        for _ in 0..200 {
+            let _ = raven_rt::nanosleep(10_000_000);
+            let state = service_state(client, name)?;
+            match operation {
+                Op::Stop => {
+                    if state == State::Stopped {
+                        return print_status(client, name);
+                    }
+                }
+                Op::Start => {
+                    if matches!(state, State::Starting | State::Running | State::Restarting) {
+                        seen_active = true;
+                    }
+                    if state == State::Running || (state == State::Stopped && seen_active) {
+                        return print_status(client, name);
+                    }
+                    if matches!(state, State::Failed | State::GaveUp) {
+                        return Err(format!("{name}: {}", state.as_str()));
+                    }
+                }
+                Op::Restart => {
+                    return Err(format!("{name}: restart is stop + start"));
+                }
+            }
+        }
+        Err(format!("{name}: timed out waiting for the operation"))
+    }
+
+    fn print_status(client: &Client, name: &str) -> Result<(), String> {
         raven_rt::println!("{}", status_line(client, name)?);
         Ok(())
     }
@@ -164,47 +214,5 @@ mod program {
 fn main() {}
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn lists_services() {
-        assert_eq!(parse(&["svcctl", "list"]), Ok(Command::List));
-    }
-
-    #[test]
-    fn parses_service_commands() {
-        assert_eq!(
-            parse(&["svcctl", "status", "logd"]),
-            Ok(Command::Status("logd".to_string()))
-        );
-        assert_eq!(
-            parse(&["svcctl", "start", "logd"]),
-            Ok(Command::Start("logd".to_string()))
-        );
-        assert_eq!(
-            parse(&["svcctl", "stop", "logd"]),
-            Ok(Command::Stop("logd".to_string()))
-        );
-        assert_eq!(
-            parse(&["svcctl", "restart", "logd"]),
-            Ok(Command::Restart("logd".to_string()))
-        );
-    }
-
-    #[test]
-    fn rejects_bad_argument_counts() {
-        assert!(parse(&[]).is_err());
-        assert!(parse(&["svcctl"]).is_err());
-        assert!(parse(&["svcctl", "status"]).is_err());
-        assert!(parse(&["svcctl", "status", "a", "b"]).is_err());
-        assert!(parse(&["svcctl", "frobnicate"]).is_err());
-    }
-
-    #[test]
-    fn usage_is_documented_in_the_error() {
-        let error = parse(&["svcctl", "nope"]).unwrap_err();
-        assert!(error.contains("svcctl list"));
-        assert!(error.contains("restart <name>"));
-    }
-}
+#[path = "main_ut.rs"]
+mod tests;

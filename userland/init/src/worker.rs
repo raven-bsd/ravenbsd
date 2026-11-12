@@ -14,14 +14,13 @@ use alloc::sync::Arc;
 use raven_proto_svc::State;
 use raven_rt::spawn::RtSys;
 use raven_rt::sync::Mutex;
-use raven_svc_manifest::{Manifest, Readiness, Restart};
+use raven_svc_manifest::{Manifest, Readiness};
 
 use crate::boot::{self, Core};
 
 /// Worker thread entry point. The argument packs the index and generation.
 pub fn thread(argument: usize) {
     run(argument);
-    crate::boot::thread_finished();
 }
 
 fn run(argument: usize) {
@@ -52,18 +51,13 @@ fn run(argument: usize) {
                 .spawned(index, generation, handle, boot::now_ms())
         };
         boot::emit(&core, &notices);
+        if core.lock().supervisor.stop_pending(index, generation) {
+            let _ = raven_rt::proc_terminate(handle, 0);
+        }
         if manifest.readiness == Readiness::Scheme
             && !wait_for_scheme(&core, index, generation, &manifest)
         {
             let _ = raven_rt::handle_close(handle);
-            return;
-        }
-
-        let wait_for_exit = {
-            let guard = core.lock();
-            should_wait_for_exit(&guard.config, &manifest)
-        };
-        if !wait_for_exit {
             return;
         }
 
@@ -90,6 +84,10 @@ fn run(argument: usize) {
         boot::emit(&core, &outcome.notices);
         if exit_when_exits {
             core.lock().exit_code = Some(code);
+        }
+        if let Some(request) = outcome.start {
+            boot::spawn_worker(&core, request.index, request.generation);
+            return;
         }
         match outcome.restart {
             Some(restart) => {
@@ -122,26 +120,8 @@ fn ready_manifest(core: &Arc<Mutex<Core>>, index: usize, generation: u64) -> Opt
     guard.supervisor.services().get(index).cloned()
 }
 
-/// Test modes make `svcd` exit while services are still running. A worker blocked in `PROC_WAIT`
-/// keeps the process's thread count above zero, and `EXIT` only terminates the calling thread, so
-/// the test modes only wait where the wait is needed:
-///
-/// * `exit_when_exits`: only the named service is waited for; it is the one whose exit ends the
-///   test. Other services stay up but are not supervised.
-/// * `exit_when_settled`: services with `restart = "never"` are not waited for; a service that
-///   can be restarted is waited for so the crash-loop policy still runs.
-///
-/// The normal profile has neither setting and every service is supervised.
-fn should_wait_for_exit(config: &crate::config::Config, manifest: &Manifest) -> bool {
-    if let Some(target) = config.exit_when_exits.as_deref() {
-        return target == manifest.name;
-    }
-    if config.exit_when_settled {
-        return manifest.restart != Restart::Never;
-    }
-    true
-}
-
+/// Every worker waits for its child. `svcd` exits process-wide, which terminates any helper still
+/// blocked in `PROC_WAIT`; test profiles no longer need `restart = "never"` to avoid the wait.
 fn wait_for_scheme(
     core: &Arc<Mutex<Core>>,
     index: usize,

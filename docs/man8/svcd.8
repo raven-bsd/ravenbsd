@@ -1,0 +1,38 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt SVCD 8
+.Os RavenBSD
+.Sh NAME
+.Nm svcd
+.Nd RavenBSD PID 1 service manager
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+is the name of the PID 1 process implemented by
+.Xr init 8 .
+It reads the service manifests, starts services in dependency order, serves the
+.Dq svc:
+control scheme and supervises restarts.
+.Pp
+A
+.Dq STOP
+request terminates the service process with the authorized termination primitive, waits for the
+terminal state and releases the service's scheme name before reporting success.
+.Dq RESTART
+stops the old process before starting the replacement.
+.Pp
+When
+.Nm
+exits, the process-wide exit terminates its server and worker threads; helper threads blocked in
+.Dv PROC_WAIT
+do not keep the process or console alive.
+See
+.Xr init 8
+for the manifest format, readiness modes and test settings.
+.Sh SEE ALSO
+.Xr init 8 ,
+.Xr svcctl 1
+.Sh STANDARDS
+RavenBSD.

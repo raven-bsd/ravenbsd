@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "client"
+exec = "/sbin/k68svc"
+args = ["client"]
+needs = ["scheme:k68"]
+grants = ["initfs"]
+readiness = "exit"
+restart = "on-failure"
+max_restarts = 0

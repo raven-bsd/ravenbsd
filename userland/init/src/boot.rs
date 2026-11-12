@@ -6,7 +6,7 @@
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicU64, Ordering};
 
 use raven_abi::errno::Errno;
 use raven_abi::types::clock;
@@ -30,14 +30,8 @@ static INITFS: Mutex<Option<Initfs<'static>>> = Mutex::new(None);
 static CORE: Mutex<Option<Arc<Mutex<Core>>>> = Mutex::new(None);
 /// The registered `svc:` server, moved into its thread.
 static SERVER: Mutex<Option<Server>> = Mutex::new(None);
-/// The `svc:` server thread, joined before `svcd` exits.
-static SERVER_THREAD: Mutex<Option<raven_rt::thread::Thread>> = Mutex::new(None);
-/// Worker threads, joined before `svcd` exits in test mode.
-static WORKERS: Mutex<Vec<raven_rt::thread::Thread>> = Mutex::new(Vec::new());
 /// Fallback clock counter when `CLOCK_MONOTONIC` is unavailable.
 static FALLBACK_MS: AtomicU64 = AtomicU64::new(0);
-/// Number of helper threads that have not yet returned from their entry function.
-static LIVE_THREADS: AtomicU32 = AtomicU32::new(0);
 
 /// State shared by the boot thread, workers and the `svc:` server.
 pub(crate) struct Core {
@@ -45,7 +39,7 @@ pub(crate) struct Core {
     pub(crate) config: Config,
     pub(crate) exit_code: Option<i32>,
     pub(crate) pending_starts: Vec<StartRequest>,
-    pub(crate) pending_closes: Vec<Handle>,
+    pub(crate) pending_terminations: Vec<Handle>,
     pub(crate) all_up_printed: bool,
 }
 
@@ -135,7 +129,7 @@ pub fn run() -> i32 {
         config,
         exit_code: None,
         pending_starts: Vec::new(),
-        pending_closes: Vec::new(),
+        pending_terminations: Vec::new(),
         all_up_printed: false,
     }));
     if CORE.lock().is_some() {
@@ -153,11 +147,9 @@ pub fn run() -> i32 {
             return 1;
         }
     }
-    LIVE_THREADS.fetch_add(1, Ordering::AcqRel);
     match raven_rt::thread::spawn(crate::svc::thread, 0, 96 * 1024) {
-        Ok(thread) => *SERVER_THREAD.lock() = Some(thread),
+        Ok(_thread) => {}
         Err(_) => {
-            LIVE_THREADS.fetch_sub(1, Ordering::AcqRel);
             raven_rt::println!("svcd: svc: cannot create the server thread");
             return 1;
         }
@@ -174,7 +166,6 @@ pub fn run() -> i32 {
         loop {
             pump(&core);
             if let Some(code) = core.lock().exit_code {
-                shutdown();
                 return code;
             }
             let done = {
@@ -200,7 +191,6 @@ pub fn run() -> i32 {
     loop {
         pump(&core);
         if let Some(code) = core.lock().exit_code {
-            shutdown();
             return code;
         }
         let (all_up_first, settled, settled_code, exit_when_settled) = {
@@ -223,7 +213,6 @@ pub fn run() -> i32 {
         }
         if exit_when_settled && settled {
             raven_rt::println!("svcd: settled");
-            shutdown();
             return settled_code;
         }
         let _ = raven_rt::nanosleep(10_000_000);
@@ -232,15 +221,16 @@ pub fn run() -> i32 {
 
 /// Execute queued control requests from the `svc:` server.
 pub(crate) fn pump(core: &Arc<Mutex<Core>>) {
-    let (starts, closes) = {
+    let (starts, terminations) = {
         let mut guard = core.lock();
         (
             core::mem::take(&mut guard.pending_starts),
-            core::mem::take(&mut guard.pending_closes),
+            core::mem::take(&mut guard.pending_terminations),
         )
     };
-    for handle in closes {
-        let _ = raven_rt::handle_close(handle);
+    for handle in terminations {
+        // The worker owns the handle and observes the terminal state through PROC_WAIT.
+        let _ = raven_rt::proc_terminate(handle, 0);
     }
     for request in starts {
         let should_start = { core.lock().supervisor.should_start(request) };
@@ -253,11 +243,9 @@ pub(crate) fn pump(core: &Arc<Mutex<Core>>) {
 /// Start one worker thread for `index`.
 pub(crate) fn spawn_worker(core: &Arc<Mutex<Core>>, index: usize, generation: u64) {
     let argument = ((generation as usize) << 32) | (index & 0xFFFF_FFFF);
-    LIVE_THREADS.fetch_add(1, Ordering::AcqRel);
     match raven_rt::thread::spawn(crate::worker::thread, argument, 96 * 1024) {
-        Ok(thread) => WORKERS.lock().push(thread),
+        Ok(_thread) => {}
         Err(_) => {
-            LIVE_THREADS.fetch_sub(1, Ordering::AcqRel);
             let notices = {
                 let mut guard = core.lock();
                 guard.supervisor.spawn_failed(
@@ -269,34 +257,6 @@ pub(crate) fn spawn_worker(core: &Arc<Mutex<Core>>, index: usize, generation: u6
             emit(core, &notices);
         }
     }
-}
-
-/// Record that one helper thread is about to return from its entry function.
-pub(crate) fn thread_finished() {
-    LIVE_THREADS.fetch_sub(1, Ordering::AcqRel);
-}
-
-/// Stop the `svc:` server and wait for every helper thread to return before `main` exits.
-///
-/// `EXIT` marks only the calling thread dead; the process ends when its last thread exits. Test
-/// modes therefore stop the server and wait for the workers they created. The `Thread` handles are
-/// dropped instead of joined: `Thread::join` unmaps the stack as soon as the done word is set,
-/// which races with the joining thread's `futex_wake`/`thread_exit` and faults. The whole address
-/// space is released by the process exit, so leaking those stacks is harmless here.
-fn shutdown() {
-    crate::svc::request_stop();
-    let deadline = now_ms().saturating_add(2_000);
-    while LIVE_THREADS.load(Ordering::Acquire) != 0 && now_ms() < deadline {
-        let _ = raven_rt::nanosleep(1_000_000);
-    }
-    // Give the last thread time to execute THREAD_EXIT after its entry function returned.
-    let _ = raven_rt::nanosleep(20_000_000);
-    let _ = SERVER_THREAD.lock().take();
-    let workers = {
-        let mut guard = WORKERS.lock();
-        core::mem::take(&mut *guard)
-    };
-    drop(workers);
 }
 
 /// Print the supervisor's notices.
