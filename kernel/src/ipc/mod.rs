@@ -268,6 +268,10 @@ pub fn next_file_id() -> u64 {
 /// Called from `process::notify_exit` before the address space is released, so capture mappings
 /// can still be removed.
 pub fn on_process_exit(process: &Arc<Process>) {
+    // S38: the process-exit close hook.  Clear the dying process's event registrations before
+    // its handle table is replaced, so no registration survives the keys it was registered
+    // against.
+    crate::event::on_process_exit(process);
     // S33 leak evidence: the exiting process's outstanding client requests. A completed request
     // is removed from the list, so a long OPEN/CLOSE/DUP loop leaves this at zero; the fixture
     // prints it for the loop client. Gated by a boot command-line flag like s24/s25.

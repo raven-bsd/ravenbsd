@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "event-close"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/s38-events/build.sh"]
+initfs = "build/fixtures/s38-events/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s38-eventcheck=1"
+qemu_extra = []
+expect_exit = "success"
+
+# Case 1: a closed registration delivers nothing, a reused slot inherits nothing, and the queue
+# still delivers for a fresh registration.
+[[expect]]
+regex = '^s38: closed registration not inherited$'
+
+# Case 2: another thread closes the registered handle and exits; the registration is gone.
+[[expect]]
+regex = '^s38: thread exit close ok$'
+
+# Case 3: the child registers an event and exits without closing it.
+[[expect]]
+regex = '^s38: leak ready$'
+
+# The process-exit hook clears exactly the child's one registration.
+[[expect]]
+regex = '^s38: exit pid=\d+ events=1 cleared=1 total=0 removed=\d+$'
+
+[[expect]]
+regex = '^s38: process exit hook ok$'
+
+# Case 4, baseline marker exit: no live registrations before the churn.
+[[expect]]
+regex = '^s38: exit pid=\d+ events=0 cleared=0 total=0 removed=\d+$'
+
+[[expect]]
+regex = '^s38: cycles done=1000$'
+
+# Case 4, closing marker: 1,000 churn registrations plus the post-churn delivery control were
+# created and removed on the long-lived queue; the global live count is back to zero.
+[[expect]]
+regex = '^s38: exit pid=\d+ events=0 cleared=0 total=0 removed=1001$'
+
+[[expect]]
+regex = '^s38: events ok$'
+
+# The fixture (PID 1) still owns the churn queue: it has zero live registrations, and the exit
+# hook clears the queue itself.
+[[expect]]
+regex = '^s38: exit pid=1 events=0 cleared=1 total=0 removed=0$'
+
+[[forbid]]
+regex = '(?i)panic|s38: failed'

@@ -176,39 +176,147 @@ pub fn notify_all() {
     }
 }
 
-/// Remove a closing handle from every queue in its process before the close returns.
-/// Remove `handle` from every registered event queue and cancel a blocked IRQ waiter.
+/// Event registrations removed by the close hook.
 ///
-/// Called before the handle table drops the object.  For an `Irq`, every waiter is woken and
-/// revalidates its own handle: the closing thread runs the close syscall to completion on the
-/// non-preemptible CPU, so a waiter that resumes afterwards sees `EBADF` (or its own cancelled
-/// handle) and returns `EIO`.  The waiter's `Arc` keeps the object alive until it returns.
-pub fn on_handle_close(process: &Arc<crate::process::Process>, handle: raven_abi::types::Handle) {
-    #[cfg(target_arch = "x86_64")]
-    {
-        let irq = {
-            let table = process.handles.lock();
-            match table.get(handle, raven_abi::types::Rights::NONE) {
-                Ok(crate::process::handle::Object::Irq(irq)) => Some(Arc::clone(irq)),
-                _ => None,
-            }
-        };
-        if let Some(irq) = irq {
-            irq.cancel_waiters(handle.0);
-        }
-    }
+/// The S38 evidence print reports the delta between process exits: a close path that forgets the
+/// hook shows a short count.  Counting removed registrations (not hook calls) keeps the evidence
+/// independent of unrelated handle closes such as a spawn's stack object.
+static REMOVED_REGISTRATIONS: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+/// [`REMOVED_REGISTRATIONS`] observed at the previous process exit (the evidence delta base).
+#[cfg(target_arch = "x86_64")]
+static REMOVED_AT_EXIT: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+
+/// True when the S38 close-hook evidence print is enabled (`s38-eventcheck` on the command line).
+#[cfg(target_arch = "x86_64")]
+fn close_evidence() -> bool {
+    crate::memory::paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "s38-eventcheck" || token.starts_with("s38-eventcheck="))
+}
+
+/// Upgraded queue snapshot.  Allocation-free: `notify_all` runs from the timer interrupt, and the
+/// same bound/pattern is reused by the close and exit hooks so they stay safe in any context.
+///
+/// Kept out of line: the 1 KiB array must live in this frame, never in a syscall-dispatch or
+/// teardown frame (the kernel stacks have a narrow margin at the teardown evidence parses).
+#[inline(never)]
+fn queue_snapshot() -> [Option<Arc<EventQueue>>; MAX_QUEUES] {
     let mut queues: [Option<Arc<EventQueue>>; MAX_QUEUES] = [const { None }; MAX_QUEUES];
-    {
-        let table = QUEUES.lock();
-        for (slot, weak) in queues.iter_mut().zip(table.iter()) {
-            *slot = weak.upgrade();
-        }
+    let table = QUEUES.lock();
+    for (slot, weak) in queues.iter_mut().zip(table.iter()) {
+        *slot = weak.upgrade();
     }
+    queues
+}
+
+/// Remove `handle` from every event queue owned by `process` and count its registration.
+///
+/// This is the event part of the close hook.  It is idempotent by construction (`Queue::close` is
+/// a retain over the key), so a handle with no registration is a no-op and one successful close
+/// can never deregister another close's key.
+#[inline(never)]
+fn deregister(process: &Arc<crate::process::Process>, handle: raven_abi::types::Handle) {
+    let queues = queue_snapshot();
+    let mut removed = 0usize;
     for queue in queues.iter().flatten() {
         if queue.owner == process.id {
-            queue.state.lock().close(handle.0);
+            let mut state = queue.state.lock();
+            let before = state.len();
+            state.close(handle.0);
+            removed = removed.saturating_add(before.saturating_sub(state.len()));
         }
     }
+    REMOVED_REGISTRATIONS.fetch_add(removed as u64, core::sync::atomic::Ordering::Relaxed);
+}
+
+/// The post-commit event close hook.
+///
+/// [`close_handle`] below is the preferred entry point because it can also cancel an IRQ waiter
+/// while the slot is still live.  This entry point survives for the user `HANDLE_CLOSE` path,
+/// which closes the table first; it removes the handle's registrations and does not touch the
+/// (already invalidated) slot.
+pub fn on_handle_close(process: &Arc<crate::process::Process>, handle: raven_abi::types::Handle) {
+    deregister(process, handle);
+}
+
+/// Close `handle` in `process` and run the close hook exactly once.
+///
+/// This is the single kernel-side close primitive: scheme-file and request-handle close,
+/// thread-creation rollback and the process-exit sweep all use it, and the user `HANDLE_CLOSE`
+/// path calls [`on_handle_close`] so every close shares the same event hook.  The IRQ object is
+/// captured before the close so a blocked `IRQ_WAIT` can be cancelled when the caller has the
+/// process context; the event registrations are removed only after the close commits, so a stale
+/// handle fails with `EBADF` and leaves every registration intact.
+#[inline(never)]
+pub fn close_handle(
+    process: &Arc<crate::process::Process>,
+    handle: raven_abi::types::Handle,
+) -> Result<(), Errno> {
+    #[cfg(target_arch = "x86_64")]
+    let irq = {
+        let table = process.handles.lock();
+        match table.get(handle, raven_abi::types::Rights::NONE) {
+            Ok(crate::process::handle::Object::Irq(irq)) => Some(Arc::clone(irq)),
+            _ => None,
+        }
+    };
+    process.handles.lock().close(handle)?;
+    #[cfg(target_arch = "x86_64")]
+    if let Some(irq) = irq {
+        irq.cancel_waiters(handle.0);
+    }
+    deregister(process, handle);
+    Ok(())
+}
+
+/// Process-exit close hook: drop every event registration owned by the dying process.
+///
+/// The teardown calls this before it replaces the handle table.  Every queue with this owner is
+/// cleared in one place, so no registration outlives the handle table that keyed it and no
+/// waiter is left on a source whose process is gone.  The state lock is released before the
+/// waiters are woken to keep the queue lock order (`state` before `waiters`) one-way.
+///
+/// x86-64 only for now: the scheme IPC layer that calls it (and whose close paths share the
+/// hook) is not ported yet.
+#[cfg(target_arch = "x86_64")]
+#[inline(never)]
+pub fn on_process_exit(process: &Arc<crate::process::Process>) {
+    let queues = queue_snapshot();
+    let mut events = 0usize;
+    let mut cleared = 0usize;
+    for queue in queues.iter().flatten() {
+        if queue.owner != process.id {
+            continue;
+        }
+        let registrations = {
+            let mut state = queue.state.lock();
+            let count = state.len();
+            *state = evq_core::Queue::new();
+            count
+        };
+        events = events.saturating_add(registrations);
+        cleared = cleared.saturating_add(1);
+        queue.waiting.store(false, Ordering::Release);
+        let _ = queue.waiters.wake_all();
+    }
+    if !close_evidence() {
+        return;
+    }
+    let total = queues
+        .iter()
+        .flatten()
+        .map(|queue| queue.state.lock().len())
+        .sum::<usize>();
+    let closes = REMOVED_REGISTRATIONS.load(Ordering::Relaxed);
+    let delta = closes.saturating_sub(REMOVED_AT_EXIT.swap(closes, Ordering::AcqRel));
+    crate::kprintln!(
+        "s38: exit pid={} events={} cleared={} total={} removed={}",
+        process.id,
+        events,
+        cleared,
+        total,
+        delta
+    );
 }
 
 impl UserEvent {
