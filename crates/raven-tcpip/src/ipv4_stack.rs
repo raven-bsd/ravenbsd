@@ -29,7 +29,7 @@ pub(crate) fn to_wire(address: Ipv4Addr) -> WireIpv4Addr {
     WireIpv4Addr::new(address.octets())
 }
 
-fn from_wire(address: WireIpv4Addr) -> Ipv4Addr {
+pub(crate) fn from_wire(address: WireIpv4Addr) -> Ipv4Addr {
     Ipv4Addr::new(address.octets())
 }
 
@@ -204,7 +204,11 @@ impl<D: Device> Stack<D> {
                     self.deliver_ipv4(source, destination, packet.protocol(), &datagram)
                 }
                 Ok(None) => {}
-                Err(_) => self.drops = self.drops.saturating_add(1),
+                Err(_) => {
+                    self.counters.reassembly_overflows =
+                        self.counters.reassembly_overflows.wrapping_add(1);
+                    self.drops = self.drops.saturating_add(1);
+                }
             }
             return;
         }
@@ -428,7 +432,11 @@ impl<D: Device> Stack<D> {
     }
 
     pub(crate) fn process_ip_timers(&mut self, now: Instant) {
-        let _ = self.reassembly.expire(now);
+        let expired = self.reassembly.expire(now);
+        self.counters.reassembly_timeouts = self
+            .counters
+            .reassembly_timeouts
+            .wrapping_add(u64::try_from(expired).unwrap_or(0));
         self.process_ipv6_timers(now);
         self.process_tcp_timers(now);
         let due = self.neighbors.due_probes(now);
@@ -515,6 +523,20 @@ impl<D: Device> Stack<D> {
     #[must_use]
     pub fn test_reassembly_completed(&self) -> usize {
         self.reassembly.completed()
+    }
+
+    /// Cached IPv4 path MTU for a destination (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_pmtu4(&self, destination: Ipv4Addr) -> Option<u32> {
+        self.pmtu4.get(&destination).map(|(mtu, _)| *mtu)
+    }
+
+    /// Number of cached IPv4 path MTU entries (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_pmtu4_len(&self) -> usize {
+        self.pmtu4.len()
     }
 
     /// ARP requests transmitted.

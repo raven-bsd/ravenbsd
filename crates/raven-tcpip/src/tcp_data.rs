@@ -39,6 +39,11 @@ impl<D: Device> Stack<D> {
         if accepted == 0 {
             return Err(Errno::EAGAIN);
         }
+        if let Ok(record) = self.sockets.record_mut(socket)
+            && let Kind::Tcp(connection) = &mut record.kind
+        {
+            connection.last_activity = self.now;
+        }
         self.tcp_try_send(socket)?;
         Ok(accepted)
     }
@@ -85,6 +90,11 @@ impl<D: Device> Stack<D> {
             return Err(Errno::EAGAIN);
         }
         // A read opens the receive window; advertise it promptly.
+        if let Ok(record) = self.sockets.record_mut(socket)
+            && let Kind::Tcp(connection) = &mut record.kind
+        {
+            connection.last_activity = self.now;
+        }
         let _ = self.send_ack_for(socket);
         Ok(count)
     }
@@ -139,7 +149,7 @@ impl<D: Device> Stack<D> {
                 let inflight = connection.snd_nxt.wrapping_sub(connection.snd_una);
                 let queued = u32::try_from(record.tx.len()).unwrap_or(u32::MAX);
                 if queued <= inflight {
-                    if connection.close_requested && !connection.fin_sent {
+                    if connection.close_requested && !connection.fin_sent && record.tx.is_empty() {
                         Some(None)
                     } else {
                         None
@@ -219,6 +229,18 @@ impl<D: Device> Stack<D> {
             if push {
                 flags = TcpFlags::from_bits(flags.bits() | TcpFlags::PSH.bits());
             }
+            let cwr = self
+                .sockets
+                .record(socket)
+                .ok()
+                .and_then(|record| match &record.kind {
+                    Kind::Tcp(connection) => Some(connection.ecn_cwr_pending),
+                    _ => None,
+                })
+                .unwrap_or(false);
+            if cwr {
+                flags = TcpFlags::from_bits(flags.bits() | TcpFlags::CWR.bits());
+            }
             self.send_tcp_packet(
                 local, remote.0, local_port, remote.1, flags, seq, ack, window, &payload, false,
             )?;
@@ -227,6 +249,15 @@ impl<D: Device> Stack<D> {
                 connection.snd_nxt = connection
                     .snd_nxt
                     .wrapping_add(u32::try_from(payload.len()).unwrap_or(0));
+                connection.last_activity = self.now;
+                self.counters.out_bytes = self
+                    .counters
+                    .out_bytes
+                    .wrapping_add(u64::try_from(payload.len()).unwrap_or(0));
+                if cwr {
+                    connection.ecn_cwr_pending = false;
+                    self.counters.ecn_cwr_sent = self.counters.ecn_cwr_sent.wrapping_add(1);
+                }
                 if connection.rtt_sample.is_none() {
                     connection.rtt_sample = Some((seq, self.now, false));
                 }
@@ -295,6 +326,7 @@ impl<D: Device> Stack<D> {
                 return Err(Errno::ENOTSOCK);
             };
             if seq_gt(ack, connection.snd_una) {
+                let mut sampled = false;
                 if let Some((sample_seq, sent_at, retransmitted)) = connection.rtt_sample
                     && seq_ge(ack, sample_seq)
                 {
@@ -302,16 +334,38 @@ impl<D: Device> Stack<D> {
                         let rtt = self.now.as_millis().saturating_sub(sent_at.as_millis());
                         if rtt >= 0 {
                             connection.rto.sample(u64::try_from(rtt).unwrap_or(0));
+                            sampled = true;
                         }
                     }
                     connection.rtt_sample = None;
                 }
+                if sampled {
+                    self.counters.rtt_updates = self.counters.rtt_updates.wrapping_add(1);
+                } else {
+                    self.counters.rtt_no_updates = self.counters.rtt_no_updates.wrapping_add(1);
+                }
                 let delta = ack.wrapping_sub(connection.snd_una);
+                let flight = connection.snd_nxt.wrapping_sub(connection.snd_una);
+                let snd_nxt = connection.snd_nxt;
+                let mut cc_context = crate::CcContext {
+                    mss: u32::from(connection.mss),
+                    flight,
+                    pipe: flight,
+                    rtt: None,
+                    snd_nxt,
+                    snd_una: connection.snd_una,
+                };
+                connection.cc.on_ack(
+                    &mut cc_context,
+                    delta,
+                    Some(crate::Duration::from_millis(connection.rto.srtt_ms())),
+                );
                 let remove = usize::try_from(delta)
                     .unwrap_or(usize::MAX)
                     .min(record.tx.len());
                 record.tx.drain(..remove);
                 connection.snd_una = ack;
+                connection.last_activity = self.now;
                 connection.zero_window_backoff_ms = 1000;
                 connection.zero_window_deadline = None;
                 connection.retransmit_count = 0;
@@ -356,6 +410,14 @@ impl<D: Device> Stack<D> {
                 let skip = usize::try_from(connection.rcv_nxt.wrapping_sub(sequence))
                     .unwrap_or(usize::MAX);
                 if skip >= payload.len() {
+                    if payload.len() == 1 && record.rx.len() >= record.rx_cap {
+                        self.counters.in_zwnd_probes = self.counters.in_zwnd_probes.wrapping_add(1);
+                    }
+                    self.counters.in_dup_segments = self.counters.in_dup_segments.wrapping_add(1);
+                    self.counters.in_dup_bytes = self
+                        .counters
+                        .in_dup_bytes
+                        .wrapping_add(u64::try_from(payload.len()).unwrap_or(0));
                     let _ = self.send_ack_for(socket);
                     return;
                 }
@@ -363,7 +425,14 @@ impl<D: Device> Stack<D> {
                 sequence = connection.rcv_nxt;
             }
             if seq_gt(sequence, connection.rcv_nxt) {
+                self.counters.in_ooo_segments = self.counters.in_ooo_segments.wrapping_add(1);
+                self.counters.in_ooo_bytes = self
+                    .counters
+                    .in_ooo_bytes
+                    .wrapping_add(u64::try_from(payload.len()).unwrap_or(0));
                 if connection.ooo.len() >= connection.ooo_limit {
+                    self.counters.reassembly_overflows =
+                        self.counters.reassembly_overflows.wrapping_add(1);
                     self.drops = self.drops.saturating_add(1);
                 } else {
                     connection.ooo.push((sequence, payload.to_vec()));
@@ -371,11 +440,22 @@ impl<D: Device> Stack<D> {
                 immediate_ack = true;
             } else {
                 let room = record.rx_cap.saturating_sub(record.rx.len());
+                if room == 0 {
+                    self.counters.zero_window_drops =
+                        self.counters.zero_window_drops.wrapping_add(1);
+                    let _ = self.send_ack_for(socket);
+                    return;
+                }
                 let take = (payload.len() - data_start).min(room);
                 record
                     .rx
                     .extend(payload[data_start..data_start + take].iter().copied());
                 self.tcp_data_delivered = self.tcp_data_delivered.saturating_add(take);
+                self.counters.in_bytes = self
+                    .counters
+                    .in_bytes
+                    .wrapping_add(u64::try_from(take).unwrap_or(0));
+                connection.last_activity = now;
                 connection.rcv_nxt = connection
                     .rcv_nxt
                     .wrapping_add(u32::try_from(take).unwrap_or(0));
@@ -383,11 +463,15 @@ impl<D: Device> Stack<D> {
                     self.drops = self.drops.saturating_add(1);
                 }
                 connection.ack_segments = connection.ack_segments.saturating_add(1);
-                if take >= usize::from(connection.mss) || connection.ack_segments >= 2 {
+                let delack_segments = u8::try_from(self.tunables.delack_segments).unwrap_or(2);
+                if take >= usize::from(connection.mss) || connection.ack_segments >= delack_segments
+                {
                     immediate_ack = true;
                 } else {
                     connection.ack_deadline =
-                        Some(Instant::from_millis(now.as_millis().saturating_add(40)));
+                        Some(Instant::from_millis(now.as_millis().saturating_add(
+                            i64::try_from(self.tunables.delack_delay).unwrap_or(i64::MAX),
+                        )));
                 }
                 // Drain any now-contiguous out-of-order pieces.
                 loop {
@@ -396,14 +480,24 @@ impl<D: Device> Stack<D> {
                         .iter()
                         .position(|(segment_seq, _)| *segment_seq == connection.rcv_nxt);
                     let Some(index) = next else { break };
-                    let (_, data) = connection.ooo.remove(index);
+                    let (segment_seq, data) = connection.ooo.remove(index);
+                    let skip = usize::try_from(connection.rcv_nxt.wrapping_sub(segment_seq))
+                        .unwrap_or(usize::MAX)
+                        .min(data.len());
+                    if skip >= data.len() {
+                        continue;
+                    }
                     let room = record.rx_cap.saturating_sub(record.rx.len());
-                    let take = data.len().min(room);
-                    record.rx.extend(data[..take].iter().copied());
+                    let take = (data.len() - skip).min(room);
+                    record.rx.extend(data[skip..skip + take].iter().copied());
+                    self.counters.in_bytes = self
+                        .counters
+                        .in_bytes
+                        .wrapping_add(u64::try_from(take).unwrap_or(0));
                     connection.rcv_nxt = connection
                         .rcv_nxt
                         .wrapping_add(u32::try_from(take).unwrap_or(0));
-                    if take < data.len() {
+                    if take < data.len() - skip {
                         break;
                     }
                 }
@@ -434,7 +528,26 @@ impl<D: Device> Stack<D> {
                 connection.ack_deadline = None;
                 connection.ack_segments = 0;
             }
+            self.counters.delack_fires = self.counters.delack_fires.wrapping_add(1);
+            self.counters.delayed_acks_sent = self.counters.delayed_acks_sent.wrapping_add(1);
             let _ = self.send_ack_for(socket);
+        }
+    }
+
+    /// Retry queued sends after the input batch; window updates and partial ACKs can
+    /// leave data ready while no timer is armed.
+    pub(crate) fn retry_tcp_sends(&mut self) {
+        let sockets: Vec<SocketId> = self
+            .sockets
+            .records
+            .iter()
+            .filter_map(|(raw_id, record)| match record.kind {
+                Kind::Tcp(_) if !record.closed => Some(SocketId(*raw_id)),
+                _ => None,
+            })
+            .collect();
+        for socket in sockets {
+            let _ = self.tcp_try_send(socket);
         }
     }
 
@@ -485,6 +598,8 @@ impl<D: Device> Stack<D> {
         if !probe {
             return false;
         }
+        self.counters.zwprobe_sent = self.counters.zwprobe_sent.wrapping_add(1);
+        self.counters.zwprobe_fires = self.counters.zwprobe_fires.wrapping_add(1);
         let _ = self.send_ack_for(socket);
         if let Ok(record) = self.sockets.record_mut(socket)
             && let Kind::Tcp(connection) = &mut record.kind
@@ -493,7 +608,7 @@ impl<D: Device> Stack<D> {
             connection.zero_window_backoff_ms = connection
                 .zero_window_backoff_ms
                 .saturating_mul(2)
-                .min(60_000);
+                .min(self.tunables.zwprobe_max_interval);
             connection.zero_window_deadline =
                 Some(Instant::from_millis(now.as_millis().saturating_add(
                     i64::try_from(connection.zero_window_backoff_ms).unwrap_or(i64::MAX),

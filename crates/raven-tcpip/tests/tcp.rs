@@ -464,7 +464,9 @@ fn backlog_limit_refuses_the_extra_half_open() {
         .iter()
         .filter(|(flags, _, _)| flags.syn() && flags.ack())
         .count();
-    assert_eq!(syn_acks, 1);
+    assert_eq!(syn_acks, 2);
+    assert_eq!(stack.counters().syn_cookie_sent, 1);
+    assert_eq!(stack.counters().listen_drops, 0);
 }
 
 #[test]

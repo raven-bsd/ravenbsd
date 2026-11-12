@@ -48,6 +48,7 @@ mod ipv4_stack;
 mod ipv6_stack;
 mod listen;
 mod neighbor;
+mod observability;
 mod pmtu;
 mod reassembly;
 mod recovery;
@@ -75,6 +76,9 @@ pub use ipv6_stack::{
 };
 pub use listen::{AcceptQueue, HalfOpen, HalfOpenQueue, IsnGenerator, ListenStats, SynCookie};
 pub use neighbor::{NeighborCache, NeighborEntry};
+pub use observability::{
+    Counters, OptionFlags, PropKind, PropertyInfo, SocketInfo, Stability, Unit,
+};
 pub use pmtu::{
     IPV4_FLOOR, IPV6_FLOOR, MtuCache, Plpmtud, PlpmtudState, classic_update, floor_for,
     probe_sequence,

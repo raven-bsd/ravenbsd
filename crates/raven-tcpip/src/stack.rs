@@ -14,6 +14,7 @@ use crate::device::Device;
 use crate::event::{Event, PollResult, SocketId};
 use crate::ipv6_stack::{Ipv6Config, Neighbor6Cache, V6Address};
 use crate::neighbor::NeighborCache;
+use crate::observability::{Counters, Tunables};
 use crate::reassembly::Reassembly;
 use crate::route::RouteTable;
 use crate::socket::{Kind, SocketTable};
@@ -187,6 +188,7 @@ pub struct Stack<D: Device> {
     pub(crate) routes: RouteTable,
     pub(crate) neighbors: NeighborCache,
     pub(crate) reassembly: Reassembly,
+    pub(crate) pmtu4: BTreeMap<Ipv4Addr, (u32, Instant)>,
     pub(crate) next_ip_id: u16,
     pub(crate) pending_tx_frames: usize,
     pub(crate) ip_errors: Vec<(Ipv4Addr, Errno)>,
@@ -198,6 +200,7 @@ pub struct Stack<D: Device> {
     pub(crate) md5_keys: BTreeMap<u16, Vec<u8>>,
     #[allow(dead_code)] // Used when the tcp-ao feature is enabled.
     pub(crate) ao_keys: BTreeMap<u16, Vec<crate::signature::AoKey>>,
+    #[allow(dead_code)] // Read by the signature test hook.
     pub(crate) signature_failures: usize,
     pub(crate) icmp_tokens: u32,
     pub(crate) icmp_last_refill: Instant,
@@ -221,6 +224,11 @@ pub struct Stack<D: Device> {
     #[cfg(any(test, feature = "testutil"))]
     pub(crate) tcp_debug: Vec<(u16, u16, u8, u32, u32)>,
     pub(crate) tcp_data_delivered: usize,
+    pub(crate) counters: Counters,
+    pub(crate) cookie_secret: u64,
+    pub(crate) tunables: Tunables,
+    pub(crate) challenge_global_tokens: u32,
+    pub(crate) challenge_global_last: Instant,
     #[allow(dead_code)] // Read by the testutil urgent-segment hook.
     pub(crate) tcp_urgent_seen: usize,
     #[allow(dead_code)] // Read by the testutil SYN,ACK count hook.
@@ -245,6 +253,23 @@ impl<D: Device> Stack<D> {
         rng.fill(&mut isn_seed);
         let next_isn = u32::from_le_bytes(isn_seed);
         let next_ephemeral = 49_152u16.saturating_add(u16::from_le_bytes(ephemeral_seed) % 16_384);
+        let cookie_seed = seed_from_entropy(seed, 0xc0_0c);
+        let mut secret_bytes = [0u8; 8];
+        secret_bytes.copy_from_slice(&cookie_seed[..8]);
+        let cookie_secret = u64::from_le_bytes(secret_bytes);
+        let tunables = Tunables {
+            rto_initial: config.rto_initial_ms,
+            rto_min: config.rto_min_ms,
+            rto_max: config.rto_max_ms,
+            rto_max_retries: u64::from(config.rto_max_retransmits),
+            mss_floor: u64::from(config.mss_floor),
+            mss_ceiling: u64::from(config.mss_ceiling),
+            window_scale_enable: u64::from(config.window_scaling),
+            timestamps_enable: u64::from(config.timestamps),
+            send_buffer_default: config.tx_queue_bytes as u64,
+            recv_buffer_default: config.rx_queue_bytes as u64,
+            ..Tunables::default()
+        };
         Self {
             device,
             config,
@@ -263,6 +288,7 @@ impl<D: Device> Stack<D> {
                 config.reassembly_bytes,
                 crate::ipv4_stack::REASSEMBLY_TIMEOUT_MS,
             ),
+            pmtu4: BTreeMap::new(),
             next_ip_id: 1,
             pending_tx_frames: 0,
             ip_errors: Vec::new(),
@@ -295,6 +321,11 @@ impl<D: Device> Stack<D> {
             #[cfg(any(test, feature = "testutil"))]
             tcp_debug: Vec::new(),
             tcp_data_delivered: 0,
+            counters: Counters::default(),
+            cookie_secret,
+            tunables,
+            challenge_global_tokens: 1000,
+            challenge_global_last: now,
             tcp_urgent_seen: 0,
             tcp_synacks: 0,
             #[cfg(any(test, feature = "testutil"))]
@@ -327,6 +358,13 @@ impl<D: Device> Stack<D> {
         while index < self.timers.len() {
             if self.timers[index].deadline <= now {
                 let timer = self.timers.remove(index);
+                let lateness = now.saturating_since(timer.deadline).as_millis();
+                if lateness > 1 {
+                    self.counters.timer_early = self.counters.timer_early.wrapping_add(1);
+                }
+                if lateness > self.tunables.timer_late_threshold {
+                    self.counters.timer_missed = self.counters.timer_missed.wrapping_add(1);
+                }
                 self.expired.push(timer.id);
             } else {
                 index += 1;
@@ -363,7 +401,9 @@ impl<D: Device> Stack<D> {
         for frame in &frames {
             self.handle_frame(frame, now);
         }
+        self.retry_tcp_sends();
         self.process_ip_timers(now);
+        self.observe_hash_chains();
 
         self.refresh_events();
         result.tx_frames = self.pending_tx_frames;
@@ -436,6 +476,39 @@ impl<D: Device> Stack<D> {
     #[must_use]
     pub fn timer_count(&self) -> usize {
         self.timers.len()
+    }
+
+    fn observe_hash_chains(&mut self) {
+        let max_chain = usize::try_from(self.tunables.hash_chain_max).unwrap_or(8);
+        let mut table = crate::table::ConnectionTable::new(
+            self.config.max_sockets.max(1),
+            self.cookie_secret,
+            max_chain,
+        );
+        for record in self.sockets.records.values() {
+            if record.closed {
+                continue;
+            }
+            let crate::socket::Kind::Tcp(connection) = &record.kind else {
+                continue;
+            };
+            let Some((remote, remote_port)) = connection.remote else {
+                continue;
+            };
+            table.insert(
+                crate::table::ConnectionKey {
+                    local: connection.local,
+                    local_port: connection.local_port,
+                    remote,
+                    remote_port,
+                },
+                (),
+            );
+        }
+        self.counters.hash_chain_overflows = self
+            .counters
+            .hash_chain_overflows
+            .wrapping_add(u64::try_from(table.stats.long_chain_warnings).unwrap_or(0));
     }
 
     fn refresh_events(&mut self) {

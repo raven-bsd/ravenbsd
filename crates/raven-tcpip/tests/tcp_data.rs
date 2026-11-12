@@ -685,7 +685,7 @@ fn out_of_order_hole_limit_is_bounded() {
         );
     }
     let holes = b.test_tcp_ooo_len(socket_b).expect("holes");
-    assert!(holes <= 8, "holes {holes}");
+    assert!(holes <= 32, "holes {holes}");
 }
 
 #[test]

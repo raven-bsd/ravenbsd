@@ -52,17 +52,27 @@ pub(crate) struct Reassembly {
     used_bytes: usize,
     cap_bytes: usize,
     timeout_ms: u64,
+    max_fragments: usize,
     dropped: usize,
     completed: usize,
 }
 
 impl Reassembly {
+    pub(crate) fn set_timeout_ms(&mut self, timeout_ms: u64) {
+        self.timeout_ms = timeout_ms;
+    }
+
+    pub(crate) fn set_max_fragments(&mut self, max: usize) {
+        self.max_fragments = max.max(1);
+    }
+
     pub(crate) fn new(cap_bytes: usize, timeout_ms: u64) -> Self {
         Self {
             entries: BTreeMap::new(),
             used_bytes: 0,
             cap_bytes,
             timeout_ms,
+            max_fragments: MAX_FRAGMENTS_PER_DATAGRAM,
             dropped: 0,
             completed: 0,
         }
@@ -108,7 +118,7 @@ impl Reassembly {
                     break;
                 }
             }
-            if conflict.is_none() && entry.fragments.len() >= MAX_FRAGMENTS_PER_DATAGRAM {
+            if conflict.is_none() && entry.fragments.len() >= self.max_fragments {
                 conflict = Some(ReassemblyError::TooManyFragments);
             }
             if conflict.is_none() && !more {
