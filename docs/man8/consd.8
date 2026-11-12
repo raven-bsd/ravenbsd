@@ -1,0 +1,71 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt CONSD 8
+.Os RavenBSD
+.Sh NAME
+.Nm consd
+.Nd RavenBSD console server with a line discipline
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+registers the
+.Dq tty:
+scheme and serves one path,
+.Dq console .
+It owns the serial input line: a reader thread takes raw bytes from
+.Sy DEBUG_READ ,
+runs them through the line discipline and writes the echo back with
+.Sy DEBUG_WRITE .
+.Pp
+In canonical mode
+.Sy READ
+returns whole lines terminated with a newline.
+.Cm CR
+and
+.Cm LF
+end a line, backspace (0x7f or 0x08) erases one byte, ^U kills the line, ^C discards it and
+interrupts the pending read with
+.Er EINTR ,
+^D on an empty line returns zero bytes and ^L is inserted verbatim.
+The line limit is 1024 bytes; further bytes ring the bell and are dropped.
+In raw mode bytes pass through without echo or editing.
+.Pp
+A
+.Sy READ
+that finds no complete line waits until the reader thread has one or an event arrives; there is
+no busy loop and no polling.
+.Sy WRITE
+writes the bytes to the console unchanged.
+Several opens are allowed and reads are served first come first served.
+.Pp
+The mode operations travel over the S11
+.Sy CALL
+opcode as the 12-byte messages of
+.Xr raven-proto-tty 3 :
+.Cm SET_MODE
+(mode, echo),
+.Cm GET_MODE
+and
+.Cm FLUSH .
+A mode switch drops a partially edited line, and
+.Cm FLUSH
+returns the number of discarded input bytes.
+.Sh FILES
+.Bl -tag -width /etc/services.d -compact
+.It Pa /etc/services.d/consd.toml
+Service manifest: needs
+.Dq logd ,
+provides
+.Dq scheme:tty ,
+readiness by scheme.
+.El
+.Sh EXIT STATUS
+.Nm
+runs until the process is terminated; it exits non-zero when the scheme cannot be registered or
+the reader thread cannot be created.
+.Sh SEE ALSO
+.Xr init 8 ,
+.Xr logd 8 ,
+.Xr ramfsd 8

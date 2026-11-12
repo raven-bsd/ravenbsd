@@ -329,6 +329,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-consd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-proto-tty",
+ "raven-rt",
+ "raven-scheme",
+ "raven-tty-core",
+]
+
+[[package]]
+name = "raven-consd-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-proto-tty",
+ "raven-rt",
+ "raven-scheme",
+ "raven-tty-core",
+]
+
+[[package]]
 name = "raven-coretest"
 version = "0.1.0"
 dependencies = [
@@ -576,6 +600,13 @@ dependencies = [
 [[package]]
 name = "raven-proto-svc"
 version = "0.1.0"
+
+[[package]]
+name = "raven-proto-tty"
+version = "0.1.0"
+dependencies = [
+ "raven-tty-core",
+]
 
 [[package]]
 name = "raven-provenance"
@@ -863,6 +894,10 @@ dependencies = [
 
 [[package]]
 name = "raven-timemath"
+version = "0.1.0"
+
+[[package]]
+name = "raven-tty-core"
 version = "0.1.0"
 
 [[package]]

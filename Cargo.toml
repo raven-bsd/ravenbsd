@@ -62,6 +62,8 @@ members = [
     "userland/servers/vfsd",
     "userland/servers/vfsd-probe",
     "userland/servers/coretest",
+    "userland/servers/consd",
+    "userland/servers/consd-probe",
     "tests/net/packetdrill-harness",
     "tools/bench-host",
 ]
