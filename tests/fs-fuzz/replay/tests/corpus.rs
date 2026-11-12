@@ -5,8 +5,13 @@
 
 use std::fs;
 use std::path::PathBuf;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
 use raven_fs_fuzz_replay::{TARGETS, replay};
+
+const REPLAY_TIMEOUT: Duration = Duration::from_secs(5);
 
 fn corpus_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../corpus")
@@ -25,8 +30,15 @@ fn every_target_has_a_corpus_and_replays_clean() {
                 continue;
             }
             let data = fs::read(&path).expect("read seed");
-            if let Err(error) = replay(target, &data) {
-                panic!("{}: {error}", path.display());
+            let target = target.to_string();
+            let (sender, receiver) = mpsc::channel();
+            thread::spawn(move || {
+                let _ = sender.send(replay(&target, &data));
+            });
+            match receiver.recv_timeout(REPLAY_TIMEOUT) {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => panic!("{}: {error}", path.display()),
+                Err(_) => panic!("{}: replay exceeded {REPLAY_TIMEOUT:?}", path.display()),
             }
             count += 1;
         }
