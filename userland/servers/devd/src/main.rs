@@ -76,13 +76,45 @@ mod program {
         let cycles = if test { driver.cycles } else { 1 };
         let mut cycle = 0u32;
         while cycle < cycles {
+            let (bar_index, driver_args) = split_bar_argument(&driver.args)?;
+            let bars = read_bars(&client, &device.name())?;
+            let Some(&(kind, size)) = bars.get(bar_index) else {
+                return Err(alloc::format!("bar{bar_index} does not exist"));
+            };
+            if kind != "memory" || size == 0 {
+                return Err(alloc::format!(
+                    "bar{bar_index} is {kind} (size {size}), not a memory BAR"
+                ));
+            }
             let bar = client
-                .open(&alloc::format!("pci:/{}/bar0", device.name()), READ)
-                .map_err(|error| format!("bar0: {}", error.description()))?;
-            let mut sys = GrantSys { handle: bar };
-            let mut argv: Vec<&str> = Vec::with_capacity(driver.args.len() + 1);
+                .open(
+                    &alloc::format!("pci:/{}/bar{}", device.name(), bar_index),
+                    READ,
+                )
+                .map_err(|error| format!("bar{bar_index}: {}", error.description()))?;
+            let config = match client.open(&alloc::format!("pci:/{}/config", device.name()), READ) {
+                Ok(handle) => handle,
+                Err(error) => {
+                    let _ = raven_rt::handle_close(bar);
+                    return Err(alloc::format!("config: {}", error.description()));
+                }
+            };
+            raven_rt::println!(
+                "devd: driver {} bar={} size={}",
+                driver.name,
+                bar_index,
+                size
+            );
+            let mut sys = GrantSys {
+                handles: alloc::vec![bar, config],
+            };
+            let mut argv: Vec<&str> = Vec::with_capacity(driver_args.len() + 4);
             argv.push(driver.name.as_str());
-            argv.extend(driver.args.iter().map(String::as_str));
+            argv.extend(driver_args.iter().map(String::as_str));
+            let bar_token = alloc::format!("bar={bar_index}");
+            let size_token = alloc::format!("bar_size={size}");
+            argv.push(&bar_token);
+            argv.push(&size_token);
             let child = spawn_with(
                 &initfs,
                 &driver.exec,
@@ -98,12 +130,80 @@ mod program {
                 .proc_wait(child, &mut code)
                 .map_err(|error| format!("wait: {error:?}"))?;
             let _ = raven_rt::handle_close(bar);
+            let _ = raven_rt::handle_close(config);
             let _ = raven_rt::handle_close(child);
             cycle = cycle.saturating_add(1);
             raven_rt::println!("devd: driver {} cycle {} exit={}", driver.name, cycle, code);
         }
         raven_rt::println!("devd: driver {} cycles={}", driver.name, cycles);
         if test { Ok(()) } else { serve() }
+    }
+
+    /// Split the driver's `args` into the BAR selector and the arguments passed to the child.
+    ///
+    /// `bar=N` selects the PCI BAR `devd` opens and transfers (default 0, the first BAR); the token
+    /// itself is not passed on. `devd` appends `bar=<N>` and `bar_size=<bytes>` to the child's
+    /// arguments so a driver never has to guess either value.
+    fn split_bar_argument(args: &[String]) -> Result<(usize, Vec<String>), String> {
+        let mut bar = 0usize;
+        let mut rest = Vec::with_capacity(args.len());
+        for argument in args {
+            if let Some(value) = argument.strip_prefix("bar=") {
+                bar = value
+                    .parse()
+                    .map_err(|_| alloc::format!("invalid bar selector `{argument}`"))?;
+                if bar >= 6 {
+                    return Err(alloc::format!("bar{bar} is not a PCI BAR index"));
+                }
+                continue;
+            }
+            rest.push(argument.clone());
+        }
+        Ok((bar, rest))
+    }
+
+    /// Read `pci:/<dev>/bars`: one `index kind size` line per BAR.
+    fn read_bars(client: &Client, device: &str) -> Result<Vec<(&'static str, u64)>, String> {
+        let path = alloc::format!("pci:/{device}/bars");
+        let handle = client
+            .open(&path, READ)
+            .map_err(|error| format!("bars: {}", error.description()))?;
+        let mut text = Vec::new();
+        let mut buffer = [0u8; 512];
+        loop {
+            let read = client
+                .read(handle, 0, &mut buffer)
+                .map_err(|error| format!("bars read: {}", error.description()))?;
+            if read == 0 {
+                break;
+            }
+            text.extend_from_slice(buffer.get(..read).unwrap_or(&[]));
+        }
+        let _ = client.close(handle);
+        let text = core::str::from_utf8(&text).map_err(|_| "bars: not UTF-8".to_string())?;
+        let mut bars = Vec::new();
+        for line in text.lines() {
+            let mut fields = line.split_whitespace();
+            let (Some(index), Some(kind), Some(size)) =
+                (fields.next(), fields.next(), fields.next())
+            else {
+                continue;
+            };
+            let index: usize = index.parse().map_err(|_| "bars: bad index".to_string())?;
+            let size: u64 = size.parse().map_err(|_| "bars: bad size".to_string())?;
+            let kind = match kind {
+                "memory" => "memory",
+                "io" => "io",
+                _ => "absent",
+            };
+            if bars.len() <= index {
+                bars.resize(index + 1, ("absent", 0u64));
+            }
+            if let Some(slot) = bars.get_mut(index) {
+                *slot = (kind, size);
+            }
+        }
+        Ok(bars)
     }
 
     fn load_drivers(initfs: &Initfs<'_>) -> Result<Vec<DriverSpec>, String> {
@@ -267,7 +367,7 @@ mod program {
     }
 
     struct GrantSys {
-        handle: Handle,
+        handles: Vec<Handle>,
     }
 
     impl Sys for GrantSys {
@@ -302,7 +402,12 @@ mod program {
             stack_top: usize,
             arg: usize,
         ) -> Result<Handle, Errno> {
-            raven_rt::handle_transfer(proc, self.handle, Rights::ALL)?;
+            // The grants land in the child's first free slots, in order: a fresh child has
+            // handles 0 (self), 1 (initfs) and 2 (namespace), so the first grant is handle 3 and
+            // the second is handle 4. Drivers rely on that convention (see `devd(8)`).
+            for handle in &self.handles {
+                raven_rt::handle_transfer(proc, *handle, Rights::ALL)?;
+            }
             RtSys.thread_create(proc, entry, stack_top, arg)
         }
 

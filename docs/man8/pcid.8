@@ -38,13 +38,28 @@ line and the interrupt pin.
 .It Pa /bb:ss.f/bar Ns Ar n
 opens a fresh
 .Dv MmioRegion
-for that 32-bit or 64-bit memory BAR and returns it as an S25 attachment.  I/O
-BARs and absent BARs return
+for that 32-bit or 64-bit memory BAR and returns it as an S25 attachment.  The
+region covers the whole BAR, sized by writing all ones into the BAR register
+and reading the mask back during enumeration (the original value is restored
+immediately).  I/O BARs and absent BARs return
 .Er ENOENT .
+.It Pa /bb:ss.f/bars
+one
+.Ql index kind size
+line per BAR
+.Pq kind is Ql memory , Ql io or Ql absent ,
+so a launcher can choose a BAR and tell its driver the length.
+.It Pa /bb:ss.f/config
+opens a fresh
+.Dv MmioRegion
+over that function's 4 KiB configuration page and returns it as an S25
+attachment, for capability discovery through
+.Xr raven-driver 3 .
 .El
 .Pp
-Only read access is accepted; every open is a new attachment and the client owns
-the returned handle.
+Only read access is accepted for the informational files; every open of a
+BAR or configuration page is a new attachment and the client owns the returned
+handle.
 .Sh FILES
 .Bl -tag -width /etc/services.d/pcid.toml -compact
 .It Pa /etc/services.d/pcid.toml

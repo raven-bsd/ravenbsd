@@ -371,6 +371,15 @@ name = "raven-audio-core"
 version = "0.1.0"
 
 [[package]]
+name = "raven-b13a-driver"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-driver",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-bootinfo"
 version = "0.1.0"
 
@@ -484,6 +493,10 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
 ]
+
+[[package]]
+name = "raven-driver"
+version = "0.1.0"
 
 [[package]]
 name = "raven-echo"

@@ -47,6 +47,10 @@ mod program {
     struct PcidHandler {
         root: Handle,
         devices: Vec<DeviceInfo>,
+        /// Probed BAR sizes, parallel to `devices` (0 = absent or I/O BAR).
+        sizes: Vec<[u64; 6]>,
+        /// Physical ECAM base, used to attach one function's configuration page.
+        ecam_base: u64,
         files: BTreeMap<u64, OpenFile>,
         pending: Option<(u64, String)>,
     }
@@ -81,14 +85,17 @@ mod program {
                 return 1;
             }
         };
-        let ecam = match raven_rt::map_mmio(ecam_handle, ECAM_BUS_BYTES) {
+        // One writable mapping serves both directions: BAR sizing writes the BAR registers (all
+        // ones, then the original value) and the enumeration only reads. The values are restored
+        // before the server starts.
+        let ecam_write = match raven_rt::map_mmio_mut(ecam_handle, ECAM_BUS_BYTES) {
             Ok(ecam) => ecam,
             Err(error) => {
-                raven_rt::eprintln!("pcid: ecam map: {}", error.description());
+                raven_rt::eprintln!("pcid: ecam rw map: {}", error.description());
                 return 1;
             }
         };
-        let devices = enumerate(ecam, bus);
+        let (devices, sizes) = enumerate_and_size(ecam_write, bus);
         for device in &devices {
             raven_rt::println!(
                 "pcid: device {} vendor={:#06x} device={:#06x} class={:#04x} subclass={:#04x} irq_line={} irq_pin={}",
@@ -112,6 +119,8 @@ mod program {
         let mut handler = PcidHandler {
             root,
             devices,
+            sizes,
+            ecam_base,
             files: BTreeMap::new(),
             pending: None,
         };
@@ -219,6 +228,101 @@ mod program {
         devices
     }
 
+    /// Size the BARs of every enumerated function, then hand both lists back.
+    fn enumerate_and_size(ecam: &mut [u8], bus: u8) -> (Vec<DeviceInfo>, Vec<[u64; 6]>) {
+        let devices = enumerate(ecam, bus);
+        let sizes = probe_sizes(ecam, &devices);
+        (devices, sizes)
+    }
+
+    /// Offset of one function's 4 KiB configuration page inside the ECAM bus window.
+    fn ecam_offset(bus: u8, slot: u8, function: u8) -> usize {
+        usize::from(bus)
+            .saturating_mul(ECAM_BUS_BYTES)
+            .saturating_add(usize::from(slot).saturating_mul(ECAM_DEVICE_STRIDE))
+            .saturating_add(usize::from(function).saturating_mul(PAGE))
+    }
+
+    /// Probe each memory BAR's size by writing all ones and reading the mask back.
+    ///
+    /// The original value is restored immediately. I/O and absent BARs report zero; a 64-bit BAR
+    /// consumes two slots and the second one stays zero.
+    fn probe_sizes(ecam: &mut [u8], devices: &[DeviceInfo]) -> Vec<[u64; 6]> {
+        const MAX_BAR_BYTES: u64 = 256 * 1024 * 1024;
+        let mut sizes = Vec::with_capacity(devices.len());
+        for device in devices {
+            let offset = ecam_offset(device.bus, device.slot, device.function);
+            let mut entry = [0u64; 6];
+            let mut index = 0usize;
+            while index < 6 {
+                let Some(config) = ecam.get_mut(offset..) else {
+                    break;
+                };
+                let register = 0x10 + index * 4;
+                let value = read_u32(config, register).unwrap_or(0xFFFF_FFFF);
+                if value == 0 || value & 1 != 0 {
+                    index += 1;
+                    continue;
+                }
+                let wide = (value >> 1) & 0x3 == 2 && index < 5;
+                let saved_high = if wide {
+                    read_u32(config, register + 4).unwrap_or(0)
+                } else {
+                    0
+                };
+                let _ = write_u32(config, register, 0xFFFF_FFFF);
+                if wide {
+                    let _ = write_u32(config, register + 4, 0xFFFF_FFFF);
+                }
+                let mask_low = read_u32(config, register).unwrap_or(0) & !0xF;
+                let mask_high = if wide {
+                    read_u32(config, register + 4).unwrap_or(0)
+                } else {
+                    0
+                };
+                let _ = write_u32(config, register, value);
+                if wide {
+                    let _ = write_u32(config, register + 4, saved_high);
+                }
+                let mask = if wide {
+                    u64::from(mask_low) | (u64::from(mask_high) << 32)
+                } else {
+                    u64::from(mask_low)
+                };
+                if mask != 0 {
+                    // The size is the lowest set bit of the mask: devices only decode the address
+                    // bits they implement, so the high bits of the all-ones write read back as
+                    // zero and `!mask + 1` would be nonsense.
+                    let size = mask & mask.wrapping_neg();
+                    if size <= MAX_BAR_BYTES {
+                        entry[index] = size;
+                    }
+                }
+                index += if wide { 2 } else { 1 };
+            }
+            sizes.push(entry);
+        }
+        sizes
+    }
+
+    /// One line per BAR for the `bars` endpoint: `index kind size`.
+    fn bars_text(device: &DeviceInfo, sizes: &[u64; 6]) -> String {
+        let mut text = String::new();
+        for index in 0..6 {
+            let value = device.bars.get(index).copied().unwrap_or(0);
+            let kind = if value == 0 {
+                "absent"
+            } else if value & 1 != 0 {
+                "io"
+            } else {
+                "memory"
+            };
+            let size = sizes.get(index).copied().unwrap_or(0);
+            text.push_str(&alloc::format!("{index} {kind} {size}\n"));
+        }
+        text
+    }
+
     impl Handler for PcidHandler {
         fn open(
             &mut self,
@@ -258,10 +362,51 @@ mod program {
                 );
                 return Ok(Opened::File(file_id));
             }
+            if endpoint == "bars" {
+                let position = self
+                    .devices
+                    .iter()
+                    .position(|candidate| candidate.name() == name)
+                    .ok_or(Errno::ENOENT)?;
+                let sizes = self.sizes.get(position).copied().unwrap_or([0u64; 6]);
+                let data = bars_text(&device, &sizes).into_bytes();
+                self.files.insert(file_id, OpenFile { data, cursor: 0 });
+                return Ok(Opened::File(file_id));
+            }
+            if endpoint == "config" {
+                // One function's 4 KiB configuration page, attached read-only; the client maps it
+                // with `map_mmio` and walks the capability list through `raven-driver`.
+                let phys = self.ecam_base.saturating_add(ecam_offset(
+                    device.bus,
+                    device.slot,
+                    device.function,
+                ) as u64);
+                let handle = raven_rt::mmio_create(self.root, phys, PAGE, 0)?;
+                return Ok(Opened::Attach(handle));
+            }
             if let Some(index) = endpoint.strip_prefix("bar") {
                 let index: usize = index.parse().map_err(|_| Errno::EINVAL)?;
+                let position = self
+                    .devices
+                    .iter()
+                    .position(|candidate| candidate.name() == name)
+                    .ok_or(Errno::ENOENT)?;
+                let size = self
+                    .sizes
+                    .get(position)
+                    .and_then(|sizes| sizes.get(index))
+                    .copied()
+                    .unwrap_or(0);
+                if size == 0 {
+                    return Err(Errno::ENOENT.into());
+                }
                 let phys = bar_phys(device.bars, index).ok_or(Errno::ENOENT)?;
-                let handle = raven_rt::mmio_create(self.root, phys, PAGE, 0)?;
+                let handle = raven_rt::mmio_create(
+                    self.root,
+                    phys,
+                    usize::try_from(size).unwrap_or(PAGE),
+                    0,
+                )?;
                 return Ok(Opened::Attach(handle));
             }
             Err(Errno::ENOENT.into())
@@ -358,6 +503,14 @@ mod program {
         Some(u32::from_le_bytes(
             bytes.get(offset..offset.checked_add(4)?)?.try_into().ok()?,
         ))
+    }
+
+    fn write_u32(bytes: &mut [u8], offset: usize, value: u32) -> Option<()> {
+        let end = offset.checked_add(4)?;
+        bytes
+            .get_mut(offset..end)?
+            .copy_from_slice(&value.to_le_bytes());
+        Some(())
     }
 
     fn read_u64(bytes: &[u8], offset: usize) -> Option<u64> {

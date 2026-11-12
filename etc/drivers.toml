@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The production driver table read by `devd` from `/etc/drivers.toml`.
+#
+# One `[[driver]]` per PCI function a driver serves:
+#
+#   [[driver]]
+#   name = "short-name"        # log lines and the dev: scheme
+#   vendor = 0x1234            # required PCI vendor id
+#   device = 0x11e8            # required PCI device id
+#   exec = "/sbin/name"        # program in the initfs
+#   args = ["bar=0"]           # optional; `bar=N` selects the BAR devd grants (default 0)
+#   cycles = 1                 # 1 in service use; more only for lifecycle tests
+#
+# No drivers ship in the production image yet: B13b adds the virtio-net entry. The test profiles
+# carry their own table (`profiles/*/drivers.conf`) so a qtest never depends on this file.
