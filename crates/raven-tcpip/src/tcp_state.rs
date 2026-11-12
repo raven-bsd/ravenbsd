@@ -409,7 +409,7 @@ impl TcpConnection {
     }
 }
 
-struct Segment {
+struct Segment<'a> {
     seq: u32,
     ack: u32,
     flags: TcpFlags,
@@ -421,10 +421,10 @@ struct Segment {
     tsecr: Option<u32>,
     sack_permitted: bool,
     sack_blocks: Vec<(u32, u32)>,
-    payload: Vec<u8>,
+    payload: &'a [u8],
 }
 
-impl Segment {
+impl Segment<'_> {
     fn syn(&self) -> bool {
         self.flags.syn()
     }
@@ -1077,7 +1077,7 @@ impl<D: Device> Stack<D> {
             tsecr,
             sack_permitted,
             sack_blocks,
-            payload: packet.payload().to_vec(),
+            payload: packet.payload(),
         };
         let source_port = packet.src_port();
         let destination_port = packet.dst_port();
@@ -1252,7 +1252,7 @@ impl<D: Device> Stack<D> {
         destination: IpAddr,
         source_port: u16,
         destination_port: u16,
-        segment: &Segment,
+        segment: &Segment<'_>,
         now: Instant,
     ) {
         if segment.rst() {
@@ -1381,7 +1381,7 @@ impl<D: Device> Stack<D> {
     }
 
     #[allow(unused_assignments)]
-    fn tcp_input_established(&mut self, socket: SocketId, segment: &Segment, now: Instant) {
+    fn tcp_input_established(&mut self, socket: SocketId, segment: &Segment<'_>, now: Instant) {
         let mut transition = None;
         let mut send_ack = false;
         let mut send_challenge = false;
@@ -1396,7 +1396,7 @@ impl<D: Device> Stack<D> {
         let mut pending_listener = None;
         let mut ack_advanced = None;
         let mut eifel_distance: Option<u32> = None;
-        let mut incoming: Option<(u32, Vec<u8>)> = None;
+        let mut incoming: Option<(u32, &[u8])> = None;
         let mut fin_after_data = false;
         let mut fast_retransmit = false;
         {
@@ -1604,7 +1604,7 @@ impl<D: Device> Stack<D> {
                                 .rcv_nxt
                                 .wrapping_add(u32::from(connection.rcv_wnd));
                             if !seq_ge(segment.seq, right) {
-                                incoming = Some((segment.seq, segment.payload.clone()));
+                                incoming = Some((segment.seq, segment.payload));
                             } else {
                                 self.counters.past_window_drops =
                                     self.counters.past_window_drops.wrapping_add(1);
@@ -1712,7 +1712,7 @@ impl<D: Device> Stack<D> {
                             break 'transition;
                         }
                         if !segment.payload.is_empty() {
-                            incoming = Some((segment.seq, segment.payload.clone()));
+                            incoming = Some((segment.seq, segment.payload));
                         }
                         if segment.ack == connection.snd_nxt {
                             connection.fin_acked = true;
@@ -1754,7 +1754,7 @@ impl<D: Device> Stack<D> {
                             break 'transition;
                         }
                         if !segment.payload.is_empty() {
-                            incoming = Some((segment.seq, segment.payload.clone()));
+                            incoming = Some((segment.seq, segment.payload));
                         }
                         if segment.fin() && segment.seq == connection.rcv_nxt {
                             connection.rcv_nxt = connection.rcv_nxt.wrapping_add(1);
@@ -1783,7 +1783,7 @@ impl<D: Device> Stack<D> {
                             break 'transition;
                         }
                         if !segment.payload.is_empty() {
-                            incoming = Some((segment.seq, segment.payload.clone()));
+                            incoming = Some((segment.seq, segment.payload));
                         }
                         if segment.fin() {
                             send_ack = true;
@@ -2080,7 +2080,7 @@ impl<D: Device> Stack<D> {
         destination: IpAddr,
         source_port: u16,
         destination_port: u16,
-        segment: &Segment,
+        segment: &Segment<'_>,
     ) {
         let iss = segment.ack.wrapping_sub(1);
         let mut connection = TcpConnection::new_passive(
@@ -2289,7 +2289,7 @@ impl<D: Device> Stack<D> {
         &mut self,
         key: &crate::table::ConnectionKey,
         info: crate::table::TimeWaitInfo,
-        segment: &Segment,
+        segment: &Segment<'_>,
         now: Instant,
     ) -> bool {
         if segment.rst() {
@@ -3326,7 +3326,7 @@ fn our_mss(remote: IpAddr, caps: crate::DeviceCaps, default: u16) -> u16 {
         .max(536)
 }
 
-fn apply_syn_options(connection: &mut TcpConnection, segment: &Segment, now: Instant) {
+fn apply_syn_options(connection: &mut TcpConnection, segment: &Segment<'_>, now: Instant) {
     if let Some(mss) = segment.mss {
         let clamped = mss.clamp(connection.mss_floor, connection.our_mss);
         if clamped != mss {
