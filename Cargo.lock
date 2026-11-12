@@ -832,6 +832,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-tcpip-sim"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-prng",
+ "raven-tcpip",
+ "raven-tcpip-wire",
+]
+
+[[package]]
 name = "raven-tcpip-wire"
 version = "0.1.0"
 

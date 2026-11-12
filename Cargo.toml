@@ -59,6 +59,7 @@ members = [
     "userland/servers/initfsd-probe",
     "userland/servers/coretest",
     "tests/net/packetdrill-harness",
+    "tests/tcpip",
     "tools/bench-host",
 ]
 default-members = ["crates/*"]
