@@ -188,3 +188,13 @@ fn mount_rejects_a_non_ufs_image() {
     let disk = VecDisk::new(vec![0u8; 8192]);
     assert!(UfsView::mount(disk, true).is_err());
 }
+
+#[test]
+fn mount_rejects_a_corrupt_superblock() {
+    let disk = VecDisk::new(vec![0u8; options().size as usize]);
+    let ufs = format(disk, &options()).expect("format");
+    let mut disk = ufs.unmount().expect("unmount");
+    // The primary UFS2 superblock is at 8192; break its magic.
+    disk.data[8192 + 1372] ^= 0xff;
+    assert!(UfsView::mount(disk, true).is_err());
+}
