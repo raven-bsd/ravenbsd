@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The platform server profile: svcd starts platd after the base services are up. The supervisor
+# must grant platd the platform MMIO/DMA capabilities before it can use the hardware backend; the
+# `fake` qtest path is independent of this profile.
+name = "platd"
+
+[initfs]
+programs = [
+    { package = "raven-init", path = "/init" },
+    { package = "raven-platd", path = "/sbin/platd" },
+]
+
+files = [
+    { src = "etc/services.d/platd.toml", path = "/etc/services.d/platd.toml" },
+]
+
+[boot]
+cmdline = "console=ttyAMA0 loglevel=info"
+log_level = "info"
