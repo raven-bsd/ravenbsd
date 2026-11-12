@@ -234,7 +234,15 @@ pub fn dup(caller: &Arc<Process>, handle: Handle, mask: u32) -> Result<Handle, E
             _ => return Err(Errno::EBADF),
         }
     };
-    let duplicate = caller.handles.lock().dup(handle, Rights(mask))?;
+    let (duplicate, node) = {
+        let mut handles = caller.handles.lock();
+        let duplicate = handles.dup(handle, Rights(mask))?;
+        let node = handles.lineage_node(duplicate).ok();
+        (duplicate, node)
+    };
+    if let Some(node) = node {
+        crate::process::handle::register_lineage(node);
+    }
     let mut packet = SchemePacket::request(Opcode::Dup, next_request_id(), file.server_id());
     packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
     let request = PendingRequest::new(
@@ -532,12 +540,14 @@ fn install_attachments(
         index = index.saturating_add(1);
     }
     let mut installed = [None; 4];
+    let mut installed_nodes = [None, None, None, None];
     let mut failure = None;
     {
         let mut client = request.client.handles.lock();
         index = 0;
         while index < count {
-            let Some((object, rights)) = source.get_mut(index).and_then(Option::take) else {
+            let Some((object, rights, parent)) = source.get_mut(index).and_then(Option::take)
+            else {
                 failure = Some(Errno::EPROTO);
                 break;
             };
@@ -545,7 +555,11 @@ fn install_attachments(
                 failure = Some(Errno::EPROTO);
                 break;
             };
-            match client.insert(object, attachment_rights(rights, attachment.rights_mask)) {
+            match client.insert_derived(
+                object,
+                attachment_rights(rights, attachment.rights_mask),
+                &parent,
+            ) {
                 Ok(handle) => {
                     attachment.handle = handle.0;
                     let Some(slot) = installed.get_mut(index) else {
@@ -553,6 +567,9 @@ fn install_attachments(
                         break;
                     };
                     *slot = Some(handle);
+                    if let Some(node_slot) = installed_nodes.get_mut(index) {
+                        *node_slot = client.lineage_node(handle).ok();
+                    }
                 }
                 Err(error) => {
                     failure = Some(error);
@@ -567,6 +584,11 @@ fn install_attachments(
         // the process handle table again.
         rollback_attachments(&request.client, &installed);
         return Err(error);
+    }
+    // Register the derived nodes only after the client table lock is released; a revoke may
+    // snapshot the registry at any point after the handle becomes visible.
+    for node in installed_nodes.iter().flatten() {
+        crate::process::handle::register_lineage(Arc::clone(node));
     }
     Ok(installed)
 }

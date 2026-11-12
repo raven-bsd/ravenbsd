@@ -15,7 +15,17 @@ The .Nm system call is part of the scheme IPC protocol (see
 .Xr scheme 7
 and
 .Pa architecture/03-system-servers.md ).
-It is implemented by ticket S11; this page is the contract placeholder and will be completed
-when S11 lands.
+It registers a scheme name for the calling process after the
+.Dv ADMIN
+self-handle check; the name must match the scheme-name grammar.
+.Pp
+Ticket S16 implements namespace prefix mutations and enforces them in
+.Xr open 2 ;
+registration enforcement is staged so that the current services, whose names are snapshotted
+before spawn, keep working.  Until the follow-up flips the check, any valid name may be
+registered; the namespace rules will then apply to registration as well.
+.Sh SEE ALSO
+.Xr open 2 ,
+.Xr proc_namespace 2
 .Sh STANDARDS
 RavenBSD ABI v1.

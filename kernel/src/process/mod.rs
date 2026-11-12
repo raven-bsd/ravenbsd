@@ -690,6 +690,23 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     // every other object release their resources even while a last reference to the process
     // survives elsewhere (for example on the abandoned stack of its dead thread).
     *process.handles.lock() = HandleTable::new();
+    // S16 churn evidence: after the handle table is replaced, the process must own no handles
+    // and no lineage nodes that are not kept alive by a descendant in another process. The
+    // controller terminates the fixture server first, so its own final line is the baseline.
+    // Keep this own-context only: a foreign teardown (terminate/reap) must return through the
+    // caller's path, the S40 rule for every teardown evidence print.
+    if own_context
+        && CmdLine::parse(paging::cmdline())
+            .get("s16-teardowncheck")
+            .is_some()
+    {
+        kprintln!(
+            "s16: exit {} handles={} lineage={}",
+            process.path,
+            process.handles.lock().len(),
+            crate::process::handle::lineage_nodes()
+        );
+    }
     if process.id == 1 {
         kprintln!("init exited ({code})");
         if crate::log::test_exit() {

@@ -115,12 +115,38 @@ impl Namespace {
                 .any(|prefix| !prefix.is_empty() && scheme.starts_with(prefix))
     }
 
-    /// Allow every scheme name beginning with `prefix`.
-    #[allow(dead_code)] // exercised by the host model; no namespace syscall sets prefixes yet
+    /// Allow every scheme name beginning with `prefix`. Adding an existing prefix is a no-op.
     pub fn allow_prefix(&mut self, prefix: &str) {
         if !prefix.is_empty() && !self.prefixes.iter().any(|item| item == prefix) {
             self.prefixes.push(prefix.to_string());
         }
+    }
+
+    /// True when this namespace may grant `prefix` to itself or to a child.
+    ///
+    /// A wildcard (root) namespace may grant any non-empty prefix. An explicit namespace may only
+    /// grant a prefix that narrows one of its own prefixes: granting `net-tcp` under `net` is a
+    /// subset, while granting `net` when only the exact name `net` is visible would widen the
+    /// child's authority and is refused.
+    pub fn can_grant_prefix(&self, prefix: &str) -> bool {
+        if prefix.is_empty() {
+            return false;
+        }
+        self.wildcard
+            || self
+                .prefixes
+                .iter()
+                .any(|existing| prefix.starts_with(existing))
+    }
+
+    /// Remove `prefix`; removing an absent prefix is a no-op. Exact names stay.
+    pub fn remove_prefix(&mut self, prefix: &str) {
+        self.prefixes.retain(|item| item != prefix);
+    }
+
+    /// Remove all prefixes; exact names stay.
+    pub fn clear_prefixes(&mut self) {
+        self.prefixes.clear();
     }
 
     /// Add a scheme name if it is not already visible.
@@ -155,107 +181,5 @@ pub fn valid_status(status: i32) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use alloc::format;
-
-    #[test]
-    fn scheme_names_follow_the_contract() {
-        for name in ["echo", "file", "net", "a", "a-b_c:0"] {
-            assert!(valid_scheme_name(name), "{name}");
-        }
-        for name in ["", "Echo", "a b", "a/b", "ä", &"a".repeat(65)] {
-            assert!(!valid_scheme_name(name), "{name:?}");
-        }
-    }
-
-    #[test]
-    fn paths_split_at_the_first_colon() {
-        assert_eq!(split_path("echo:hello"), Ok(("echo", "hello")));
-        assert_eq!(split_path("echo:"), Ok(("echo", "")));
-        assert_eq!(split_path("file:/etc/passwd"), Ok(("file", "/etc/passwd")));
-        assert_eq!(split_path("echo"), Err(PathError::MissingScheme));
-        assert_eq!(split_path(""), Err(PathError::BadLength));
-        assert_eq!(split_path("Echo:x"), Err(PathError::BadScheme));
-        assert_eq!(
-            split_path(&format!("echo:{}", "x".repeat(PATH_MAX))),
-            Err(PathError::BadLength)
-        );
-    }
-
-    #[test]
-    fn root_and_child_namespaces() {
-        let root = Namespace::root();
-        assert!(root.allows("anything"));
-        let registered = alloc::vec!["echo".to_string()];
-        let child = root.child_snapshot(&registered);
-        assert!(!child.wildcard);
-        assert!(child.allows("echo"));
-        assert!(!child.allows("file"));
-
-        let mut child = child;
-        child.add("file");
-        assert!(child.allows("file"));
-        child.add("file");
-        assert_eq!(child.names.len(), 2);
-        let grandchild = child.child_snapshot(&[]);
-        assert!(grandchild.allows("echo"));
-        assert!(grandchild.allows("file"));
-
-        let mut prefixed = Namespace::default();
-        prefixed.allow_prefix("net");
-        assert!(prefixed.allows("net"));
-        assert!(prefixed.allows("net-tcp"));
-        assert!(!prefixed.allows("file"));
-        let inherited = prefixed.child_snapshot(&[]);
-        assert!(inherited.allows("net-tcp"));
-    }
-
-    #[test]
-    fn open_rights_are_derived_from_flags() {
-        let read = open_rights(OPEN_READ).unwrap();
-        assert!(read.contains(Rights::READ));
-        assert!(!read.contains(Rights::WRITE));
-        assert!(read.contains(Rights::DUP));
-
-        let write = open_rights(OPEN_WRITE).unwrap();
-        assert!(write.contains(Rights::WRITE));
-        assert!(!write.contains(Rights::READ));
-
-        let both = open_rights(OPEN_READ | OPEN_WRITE | OPEN_CREATE).unwrap();
-        assert!(both.contains(Rights::READ.union(Rights::WRITE).union(Rights::DUP)));
-
-        assert_eq!(open_rights(0), None);
-        assert_eq!(open_rights(8), None);
-    }
-
-    #[test]
-    fn status_range_is_positive_errno_only() {
-        assert!(valid_status(0));
-        assert!(valid_status(5));
-        assert!(valid_status(4095));
-        assert!(!valid_status(-1));
-        assert!(!valid_status(4096));
-    }
-
-    #[test]
-    fn random_paths_never_panic() {
-        let mut state = 0x9e37_79b9_7f4a_7c15u64;
-        let mut text = String::new();
-        for _ in 0..10_000 {
-            text.clear();
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            let length = (state % 32) as usize;
-            for _ in 0..length {
-                state ^= state << 13;
-                state ^= state >> 7;
-                state ^= state << 17;
-                text.push(char::from(b'a' + (state % 26) as u8));
-            }
-            let _ = valid_scheme_name(&text);
-            let _ = split_path(&text);
-        }
-    }
-}
+#[path = "model_ut.rs"]
+mod tests;

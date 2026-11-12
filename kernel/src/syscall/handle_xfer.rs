@@ -7,6 +7,7 @@ use alloc::sync::Arc;
 
 use raven_abi::errno::Errno;
 use raven_abi::types::{Handle, Rights};
+use raven_handles::LineageNode;
 
 use crate::process::{self, Process, handle::Object};
 use crate::syscall::SyscallFrame;
@@ -21,11 +22,16 @@ pub fn transfer(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let destination = destination(&caller, destination_handle)?;
-    let (object, rights) = clone_transferable(&caller, source_handle)?;
-    let installed = destination
-        .handles
-        .lock()
-        .insert(object, rights.intersect(Rights(mask)))?;
+    let (object, rights, parent) = clone_transferable(&caller, source_handle)?;
+    let (installed, node) = {
+        let mut handles = destination.handles.lock();
+        let installed = handles.insert_derived(object, rights.intersect(Rights(mask)), &parent)?;
+        let node = handles.lineage_node(installed).ok();
+        (installed, node)
+    };
+    if let Some(node) = node {
+        crate::process::handle::register_lineage(node);
+    }
     Ok(installed.0 as usize)
 }
 
@@ -46,13 +52,14 @@ fn destination(caller: &Arc<Process>, handle: Handle) -> Result<Arc<Process>, Er
 pub fn clone_transferable(
     caller: &Arc<Process>,
     handle: Handle,
-) -> Result<(Object, Rights), Errno> {
+) -> Result<(Object, Rights, Arc<LineageNode>), Errno> {
     let table = caller.handles.lock();
     let (entry, rights) = match table.get_with_rights(handle, Rights::TRANSFER) {
         Ok(item) => item,
         Err(Errno::EACCES) => return Err(Errno::EPERM),
         Err(error) => return Err(error),
     };
+    let node = table.lineage_node(handle)?;
     let object = match entry {
         Object::MemObjectInitfs => Object::MemObjectInitfs,
         Object::Memory(object) => Object::Memory(Arc::clone(object)),
@@ -73,5 +80,5 @@ pub fn clone_transferable(
         Object::SchemeServer(object) => Object::SchemeServer(Arc::clone(object)),
         _ => return Err(Errno::EBADF),
     };
-    Ok((object, rights))
+    Ok((object, rights, node))
 }

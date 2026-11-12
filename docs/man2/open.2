@@ -18,6 +18,15 @@ to the server registered for
 .Va scheme .
 Normally a successful reply creates and returns a new SchemeFile handle.
 .Pp
+The scheme name must be visible in the caller's namespace, either as an exact name or through
+a prefix granted with
+.Xr proc_namespace 2 .
+A name outside the namespace fails with
+.Er EACCES .
+Removing a prefix prevents new opens under it; existing
+.Vt SchemeFile
+handles stay usable.
+.Pp
 A server may instead set the reply flag
 .Dv REPLY_HANDLE
 and provide exactly one attachment (see
@@ -152,6 +161,7 @@ Write or truncate was requested on a directory.
 .Xr close 2 ,
 .Xr dup 2 ,
 .Xr fstat 2 ,
+.Xr proc_namespace 2 ,
 .Xr read 2 ,
 .Xr write 2
 .Sh STANDARDS
