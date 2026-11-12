@@ -82,6 +82,8 @@ members = [
     "userland/servers/ramfsd-probe",
     "userland/servers/initfsd",
     "userland/servers/initfsd-probe",
+    "userland/servers/pcid",
+    "userland/servers/devd",
     "userland/servers/vfsd",
     "userland/servers/vfsd-probe",
     "userland/servers/coretest",
@@ -130,6 +132,15 @@ debug = false
 debug = false
 
 [profile.dev.package."raven-proto-fs"]
+debug = false
+
+[profile.dev.package."raven-proto-dev"]
+debug = false
+
+[profile.dev.package."raven-pcid"]
+debug = false
+
+[profile.dev.package."raven-devd"]
 debug = false
 
 [profile.dev.package."raven-scheme"]

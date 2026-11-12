@@ -296,10 +296,7 @@ pub(crate) fn spawn_service(manifest: &Manifest) -> Result<Handle, String> {
         return Err("initfs is not mapped".to_string());
     };
     let mut grants = Vec::new();
-    let specs = match crate::grants::parse_grants(&manifest.name, &manifest.grants) {
-        Ok(specs) => specs,
-        Err(error) => return Err(error),
-    };
+    let specs = crate::grants::parse_grants(&manifest.name, &manifest.grants)?;
     for spec in specs {
         grants.push(Grant {
             handle: spec.handle(),

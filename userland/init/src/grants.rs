@@ -8,7 +8,7 @@
 //! most the `initfs` archive. The policy is pure so it can be tested on the host.
 
 use alloc::format;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 
 use raven_abi::types::{Handle, Rights};
@@ -54,10 +54,7 @@ pub fn parse_grants(service: &str, grants: &[String]) -> Result<Vec<GrantSpec>, 
             "initfs" => result.push(GrantSpec::Initfs),
             "root" if service == "pcid" => result.push(GrantSpec::Root),
             "root" => {
-                return Err(format!(
-                    "root grant reserved for pcid, not `{}`",
-                    service.to_string()
-                ));
+                return Err(format!("root grant reserved for pcid, not `{service}`"));
             }
             other => return Err(format!("unknown grant `{other}`")),
         }

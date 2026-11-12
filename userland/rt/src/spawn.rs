@@ -157,6 +157,12 @@ pub fn spawn_with<S: Sys>(
         }
     };
 
+    // The image builder needs a whole temporary stack. Keeping it on the caller's stack would
+    // overflow the fixed-size stack of a service that spawns a child (all RavenBSD processes have
+    // 64 KiB); the heap allocation is the same size and lives only for this spawn.
+    #[cfg(feature = "alloc")]
+    let mut stack_buffer = alloc_crate::vec![0u8; STACK_SIZE];
+    #[cfg(not(feature = "alloc"))]
     let mut stack_buffer = [0u8; STACK_SIZE];
     let (image_offset, sp0) = match build_stack(
         &mut stack_buffer,

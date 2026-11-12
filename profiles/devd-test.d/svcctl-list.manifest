@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The one-shot listing runs in the wave after devd, so `devd stopped 0` is deterministic.
+name = "svcctl-list"
+exec = "/bin/svcctl"
+args = ["svcctl", "list"]
+needs = ["devd"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

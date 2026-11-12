@@ -603,6 +603,172 @@ pub fn handle_dup(handle: Handle, rights: Rights) -> Result<Handle, Errno> {
     u32::try_from(value).map(Handle).map_err(|_| Errno::EINVAL)
 }
 
+/// Map a read-only MMIO or boot-blob handle for the process lifetime.
+///
+/// This is the safe counterpart of `MAP` for the read-only device windows used by `pcid`; the
+/// returned slice must not outlive the mapping, which is never unmapped.
+pub fn map_mmio(handle: Handle, len: usize) -> Result<&'static [u8], Errno> {
+    // SAFETY: MAP takes scalar arguments; the kernel validates the handle, its MAP right, the
+    // fixed user range and the mapping length.
+    let address = checked(unsafe {
+        syscall6(
+            Syscall::MAP as usize,
+            Handle::SELF_PROC.0 as usize,
+            handle.0 as usize,
+            0,
+            0,
+            len,
+            map::pack(prot::READ, 0),
+        )
+    })?;
+    // SAFETY: MAP created a read-only mapping of `len` bytes for the process lifetime; this
+    // wrapper never unmaps it and the caller only reads device/ACPI bytes through the slice.
+    Ok(unsafe { core::slice::from_raw_parts(address as *const u8, len) })
+}
+
+/// Read a boot-time blob through the root device capability.
+pub fn boot_blob(root: Handle, kind: u32) -> Result<Handle, Errno> {
+    // SAFETY: BOOT_BLOB takes scalar arguments; the kernel validates the root capability.
+    handle_from_ret(unsafe {
+        syscall2(Syscall::BOOT_BLOB as usize, root.0 as usize, kind as usize)
+    })
+}
+
+/// Create an MMIO region through the root device capability.
+pub fn mmio_create(root: Handle, phys: u64, len: usize, attrs: u32) -> Result<Handle, Errno> {
+    // SAFETY: MMIO_CREATE takes scalar arguments; the kernel validates the range and root right.
+    handle_from_ret(unsafe {
+        syscall6(
+            Syscall::MMIO_CREATE as usize,
+            root.0 as usize,
+            phys as usize,
+            len,
+            attrs as usize,
+            0,
+            0,
+        )
+    })
+}
+
+/// Allocate a device-visible DMA buffer through the root device capability.
+pub fn dma_alloc(
+    root: Handle,
+    len: usize,
+    align: usize,
+    mask_bits: u32,
+    flags: u32,
+) -> Result<Handle, Errno> {
+    // SAFETY: DMA_ALLOC takes scalar arguments; the kernel validates the budget and root right.
+    handle_from_ret(unsafe {
+        syscall6(
+            Syscall::DMA_ALLOC as usize,
+            root.0 as usize,
+            len,
+            align,
+            mask_bits as usize,
+            flags as usize,
+            0,
+        )
+    })
+}
+
+/// DMA buffer information.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DmaInfo {
+    /// Device-visible bus address.
+    pub bus_addr: u64,
+    /// Buffer length in bytes.
+    pub len: u64,
+    /// DMA flags (bit 0: unprotected).
+    pub flags: u32,
+    /// Reserved padding.
+    pub pad: u32,
+}
+
+/// Read the DMA information record for `buffer`.
+pub fn dma_info(buffer: Handle) -> Result<DmaInfo, Errno> {
+    let mut info = DmaInfo::default();
+    // SAFETY: DMA_INFO writes one `DmaInfo` into the valid stack record.
+    checked(unsafe {
+        syscall2(
+            Syscall::DMA_INFO as usize,
+            buffer.0 as usize,
+            (&mut info as *mut DmaInfo) as usize,
+        )
+    })?;
+    Ok(info)
+}
+
+/// The DMA buffer is not cache-coherent.
+pub const DMA_FLAG_NON_CACHEABLE: u32 = 1;
+/// Legacy IOAPIC interrupt source.
+pub const IRQ_LEGACY: u32 = 1;
+/// MSI interrupt source.
+pub const IRQ_MSI: u32 = 2;
+/// MSI-X interrupt source.
+pub const IRQ_MSIX: u32 = 3;
+
+/// MSI/MSI-X message filled by [`irq_create`].
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct IrqInfo {
+    /// Allocated vector.
+    pub vector: u32,
+    /// Message address low dword.
+    pub address_lo: u32,
+    /// Message address high dword.
+    pub address_hi: u32,
+    /// Message data.
+    pub data: u32,
+}
+
+/// Create an interrupt source through the root device capability.
+///
+/// `info` is required for MSI/MSI-X and ignored for legacy sources.
+pub fn irq_create(
+    root: Handle,
+    kind: u32,
+    number: u32,
+    info: Option<&mut IrqInfo>,
+) -> Result<Handle, Errno> {
+    let pointer = match info {
+        Some(info) => (info as *mut IrqInfo) as usize,
+        None => 0,
+    };
+    // SAFETY: IRQ_CREATE takes scalar arguments and an optional writable IrqInfo record.
+    handle_from_ret(unsafe {
+        syscall6(
+            Syscall::IRQ_CREATE as usize,
+            root.0 as usize,
+            kind as usize,
+            number as usize,
+            pointer,
+            0,
+            0,
+        )
+    })
+}
+
+/// Wait for an interrupt; returns the accumulated firing count (0 on timeout).
+pub fn irq_wait(irq: Handle, timeout_ns: u64) -> Result<usize, Errno> {
+    // SAFETY: IRQ_WAIT takes a scalar handle and timeout.
+    checked(unsafe {
+        syscall2(
+            Syscall::IRQ_WAIT as usize,
+            irq.0 as usize,
+            timeout_ns as usize,
+        )
+    })
+}
+
+/// Re-arm a level-triggered interrupt after handling it.
+pub fn irq_ack(irq: Handle) -> Result<(), Errno> {
+    // SAFETY: IRQ_ACK takes a scalar handle value.
+    checked(unsafe { syscall1(Syscall::IRQ_ACK as usize, irq.0 as usize) })?;
+    Ok(())
+}
+
 fn handle_from_ret(value: isize) -> Result<Handle, Errno> {
     let value = Errno::from_ret(value)?;
     u32::try_from(value).map(Handle).map_err(|_| Errno::EINVAL)
