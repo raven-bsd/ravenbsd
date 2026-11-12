@@ -929,6 +929,35 @@ name = "raven-va-spike"
 version = "0.1.0"
 
 [[package]]
+name = "raven-vfs-core"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+]
+
+[[package]]
+name = "raven-vfsd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+ "raven-vfs-core",
+]
+
+[[package]]
+name = "raven-vfsd-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-vma"
 version = "0.1.0"
 

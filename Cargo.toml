@@ -59,6 +59,8 @@ members = [
     "userland/servers/ramfsd-probe",
     "userland/servers/initfsd",
     "userland/servers/initfsd-probe",
+    "userland/servers/vfsd",
+    "userland/servers/vfsd-probe",
     "userland/servers/coretest",
     "userland/servers/consd",
     "userland/servers/consd-probe",

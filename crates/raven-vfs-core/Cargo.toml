@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-vfs-core"
+version = "0.1.0"
+description = "Mount table and path routing core for the RavenBSD vfsd server."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raven-abi = { path = "../raven-abi" }
+raven-proto-fs = { path = "../raven-proto-fs" }
+
+[lints]
+workspace = true
