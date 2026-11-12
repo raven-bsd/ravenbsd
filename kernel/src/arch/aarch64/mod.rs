@@ -5,12 +5,12 @@
 
 pub mod fdt;
 pub mod gic;
-/// Kernel scheme IPC on aarch64.
+/// The single kernel scheme-IPC module lives at the crate root on both architectures.
 ///
-/// The crate-root `ipc` declaration is x86-64-only; compiling the same sources here gives the
-/// aarch64 kernel one IPC module with the registry, namespaces, routing and capture code.
-#[path = "../../ipc/mod.rs"]
-pub mod ipc;
+/// This re-export keeps the existing aarch64 import paths (`crate::arch::aarch64::ipc::...`)
+/// resolving to that one instance; it is not a second module. The consumers outside S39's Owns
+/// can switch to `crate::ipc` in a follow-up.
+pub(crate) use crate::ipc;
 pub mod irq;
 pub mod kmain;
 pub mod mmu;

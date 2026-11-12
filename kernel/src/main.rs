@@ -25,7 +25,6 @@ mod fdt {
 mod driver;
 mod event;
 mod initfs;
-#[cfg(target_arch = "x86_64")]
 mod ipc;
 mod log;
 mod memory;

@@ -183,15 +183,20 @@ pub fn notify_all() {
 /// independent of unrelated handle closes such as a spawn's stack object.
 static REMOVED_REGISTRATIONS: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
 /// [`REMOVED_REGISTRATIONS`] observed at the previous process exit (the evidence delta base).
-#[cfg(target_arch = "x86_64")]
 static REMOVED_AT_EXIT: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
 
 /// True when the S38 close-hook evidence print is enabled (`s38-eventcheck` on the command line).
-#[cfg(target_arch = "x86_64")]
 fn close_evidence() -> bool {
     crate::memory::paging::cmdline()
         .split_ascii_whitespace()
         .any(|token| token == "s38-eventcheck" || token.starts_with("s38-eventcheck="))
+}
+
+/// True when the S39 aarch64-parity exit evidence is enabled (`s39-eventcheck`).
+fn s39_evidence() -> bool {
+    crate::memory::paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "s39-eventcheck" || token.starts_with("s39-eventcheck="))
 }
 
 /// Upgraded queue snapshot.  Allocation-free: `notify_all` runs from the timer interrupt, and the
@@ -271,19 +276,17 @@ pub fn close_handle(
 
 /// Process-exit close hook: drop every event registration owned by the dying process.
 ///
-/// The teardown calls this before it replaces the handle table.  Every queue with this owner is
-/// cleared in one place, so no registration outlives the handle table that keyed it and no
-/// waiter is left on a source whose process is gone.  The state lock is released before the
-/// waiters are woken to keep the queue lock order (`state` before `waiters`) one-way.
-///
-/// x86-64 only for now: the scheme IPC layer that calls it (and whose close paths share the
-/// hook) is not ported yet.
-#[cfg(target_arch = "x86_64")]
+/// The teardown calls this before it replaces the handle table on every architecture.  Every
+/// queue with this owner is cleared in one place, so no registration outlives the handle table
+/// that keyed it and no waiter is left on a source whose process is gone.  The state lock is
+/// released before the waiters are woken to keep the queue lock order (`state` before `waiters`)
+/// one-way.
 #[inline(never)]
 pub fn on_process_exit(process: &Arc<crate::process::Process>) {
     let queues = queue_snapshot();
     let mut events = 0usize;
     let mut cleared = 0usize;
+    let mut waiters = 0usize;
     for queue in queues.iter().flatten() {
         if queue.owner != process.id {
             continue;
@@ -296,10 +299,12 @@ pub fn on_process_exit(process: &Arc<crate::process::Process>) {
         };
         events = events.saturating_add(registrations);
         cleared = cleared.saturating_add(1);
-        queue.waiting.store(false, Ordering::Release);
+        waiters = waiters.saturating_add(usize::from(queue.waiting.swap(false, Ordering::AcqRel)));
         let _ = queue.waiters.wake_all();
     }
-    if !close_evidence() {
+    let s38 = close_evidence();
+    let s39 = s39_evidence();
+    if !s38 && !s39 {
         return;
     }
     let total = queues
@@ -309,14 +314,26 @@ pub fn on_process_exit(process: &Arc<crate::process::Process>) {
         .sum::<usize>();
     let closes = REMOVED_REGISTRATIONS.load(Ordering::Relaxed);
     let delta = closes.saturating_sub(REMOVED_AT_EXIT.swap(closes, Ordering::AcqRel));
-    crate::kprintln!(
-        "s38: exit pid={} events={} cleared={} total={} removed={}",
-        process.id,
-        events,
-        cleared,
-        total,
-        delta
-    );
+    if s38 {
+        crate::kprintln!(
+            "s38: exit pid={} events={} cleared={} total={} removed={}",
+            process.id,
+            events,
+            cleared,
+            total,
+            delta
+        );
+    }
+    if s39 {
+        crate::kprintln!(
+            "s39: exit pid={} events={} cleared={} total={} waiters={}",
+            process.id,
+            events,
+            cleared,
+            total,
+            waiters
+        );
+    }
 }
 
 impl UserEvent {
