@@ -63,6 +63,7 @@ members = [
     "tests/tcpip/conformance",
     "tests/tcpip/fuzz-replay",
     "tests/tcpip/interop",
+    "tests/tcpip/bench",
     "tools/bench-host",
 ]
 default-members = ["crates/*"]

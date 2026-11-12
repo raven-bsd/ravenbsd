@@ -905,6 +905,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-tcpip-bench"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-netcore",
+ "raven-tcpip",
+ "raven-tcpip-sim",
+ "raven-tcpip-wire",
+]
+
+[[package]]
 name = "raven-tcpip-conformance"
 version = "0.1.0"
 dependencies = [
