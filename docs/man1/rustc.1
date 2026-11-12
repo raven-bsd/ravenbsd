@@ -1,0 +1,82 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt RUSTC 1
+.Os RavenBSD
+.Sh NAME
+.Nm rustc
+.Nd Rust compiler with the RavenBSD target
+.Sh SYNOPSIS
+.Nm rustc
+.Op + Ns Ar toolchain
+.Op Fl -target Ar triple
+.Op Ar options
+.Ar input
+.Sh DESCRIPTION
+This page documents the patched stable Rust compiler installed by
+.Pa make toolchain .
+It is the upstream Rust compiler built from the pinned stable source release
+with the reviewed RavenBSD target patch series; the language and existing
+targets are unchanged.
+.Pp
+The patched compiler is registered with
+.Xr rustup 1
+as the custom toolchain
+.Dq ravenbsd
+and lives in
+.Pa build/toolchain .
+Select it explicitly:
+.Bd -literal -offset indent
+rustc +ravenbsd --version
+rustc +ravenbsd --target x86_64-unknown-ravenbsd --emit=metadata crate.rs
+.Ed
+.Pp
+The target triples added by the patch series are
+.Dq x86_64-unknown-ravenbsd ,
+.Dq aarch64-unknown-ravenbsd
+and
+.Dq riscv64gc-unknown-ravenbsd .
+Only
+.Dq x86_64-unknown-ravenbsd
+is verified by the K19 gate; the other two are draft target specs.
+The target is static-only
+.Pq Va dynamic_linking No = false ,
+uses the
+.Dq relibc
+environment and
+.Dq rust-lld
+as its linker.
+Standard library support for the target is a later gate
+.Pq K20 Ns / Ns K22 ;
+the K19 acceptance compiles metadata only.
+.Pp
+The source release and the SHA-256 of the source tarball are recorded in
+.Pa toolchain/rust-version .
+The script downloads the tarball once, verifies the hash, applies
+.Pa toolchain/patches/*.patch
+and reuses the verified source and install on later runs.
+It fails rather than falling back to a different release, a nightly compiler
+or an unverified archive.
+.Pp
+The default stage is 1. A stage-2 compiler can be built with
+.Bd -literal -offset indent
+make toolchain TOOLCHAIN_STAGE=2
+.Ed
+.Sh FILES
+.Bl -tag -width build/toolchain-src -compact
+.It Pa build/toolchain
+installed custom toolchain
+.It Pa build/toolchain-src
+patched Rust source and incremental bootstrap build tree
+.It Pa toolchain/rust-version
+pinned release and source hash
+.It Pa toolchain/bootstrap.toml
+host and RavenBSD target bootstrap configuration
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr cargo 1 ,
+.Xr rustup 1
+.Sh STANDARDS
+Rust 1.97.1 stable, MIT OR Apache-2.0.

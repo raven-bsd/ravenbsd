@@ -9,7 +9,9 @@ change-id = "ignore"
 [build]
 target = ["x86_64-unknown-linux-gnu", "x86_64-unknown-ravenbsd"]
 extended = true
-tools = ["cargo", "rustfmt", "clippy"]
+# `make toolchain` installs stage 1. Cargo is part of that stage; rustfmt and
+# clippy are stage-2 tools and are deliberately not required for the K19 gate.
+tools = ["cargo"]
 docs = false
 # The patches only touch compiler/rustc_target and library/; the LLVM submodule is
 # not modified, so the CI LLVM can be downloaded instead of checking it out.

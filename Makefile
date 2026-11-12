@@ -68,8 +68,10 @@ world:
 provenance:
 	@cargo run -q -p raven-provenance -- check --root .
 
+TOOLCHAIN_STAGE ?= 1
+
 toolchain:
-	@printf '%s\n' 'not implemented yet (ticket K19)' >&2; exit 1
+	@TOOLCHAIN_STAGE=$(TOOLCHAIN_STAGE) sh toolchain/build.sh
 
 clean:
 	@echo "removing build output"
