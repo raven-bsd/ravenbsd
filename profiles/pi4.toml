@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The Raspberry Pi 4 boot/root profile. It inherits the base initfs and selects the Pi UART for
+# the kernel command line; the image platform (`--platform pi4`) selects the FAT boot layout.
+name = "pi4"
+extends = "base"
+
+[boot]
+cmdline = "console=ttyAMA0 loglevel=info"
+log_level = "info"

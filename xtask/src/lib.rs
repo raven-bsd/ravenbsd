@@ -19,6 +19,7 @@ mod gpt;
 mod guard;
 mod image;
 mod initfs;
+mod pi;
 mod process;
 mod profiles;
 mod qtest;
