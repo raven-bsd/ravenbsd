@@ -69,14 +69,27 @@ fn fake_firmware(dir: &Path) {
     for name in FIRMWARE_FILES {
         fs::write(dir.join(name), format!("firmware:{name}")).expect("firmware file");
     }
+    let overlays = dir.join("overlays");
+    fs::create_dir_all(&overlays).expect("overlay dir");
+    fs::write(overlays.join("disable-bt.dtbo"), b"overlay").expect("overlay file");
 }
 
 #[test]
-fn config_txt_is_the_contract_exact_text() {
-    assert_eq!(
-        CONFIG_TXT,
-        "arm_64bit=1\nkernel=kernel8.img\nenable_uart=1\nuart_2ndstage=1\n"
-    );
+fn config_txt_contains_the_contract_and_pi_uart_lines() {
+    for line in [
+        "arm_64bit=1",
+        "kernel=kernel8.img",
+        "enable_uart=1",
+        "uart_2ndstage=1",
+        "dtoverlay=disable-bt",
+        "init_uart_clock=48000000",
+        "core_freq=250",
+    ] {
+        assert!(
+            CONFIG_TXT.lines().any(|item| item == line),
+            "missing {line}"
+        );
+    }
 }
 
 #[test]
@@ -169,6 +182,15 @@ fn boot_partition_contains_the_required_files() {
             "missing {name} in {names:?}"
         );
     }
+    let overlays = root.open_dir("overlays").expect("overlays");
+    let overlay_names: Vec<String> = overlays
+        .iter()
+        .map(|entry| entry.expect("overlay entry").file_name())
+        .collect();
+    assert!(
+        overlay_names.contains(&"disable-bt.dtbo".to_string()),
+        "missing Bluetooth overlay in {overlay_names:?}"
+    );
     let again = build_esp(&kernel8, &firmware).expect("esp again");
     assert_eq!(esp, again, "the FAT boot partition is not deterministic");
     let _ = fs::remove_dir_all(&dir);

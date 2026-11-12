@@ -37,8 +37,11 @@ const FIRMWARE_FILES: [&str; 5] = [
     "LICENCE.broadcom",
     DTB_NAME,
 ];
-/// The exact config.txt required by the K35 contract.
-const CONFIG_TXT: &str = "arm_64bit=1\nkernel=kernel8.img\nenable_uart=1\nuart_2ndstage=1\n";
+/// The boot configuration: the K35 contract lines plus the real-Pi UART setup from
+/// `docs/pi4.md` (free the PL011 from Bluetooth and pin its 48 MHz clock).
+const CONFIG_TXT: &str = "arm_64bit=1\nkernel=kernel8.img\nenable_uart=1\nuart_2ndstage=1\ndtoverlay=disable-bt\ninit_uart_clock=48000000\ncore_freq=250\n";
+/// The Bluetooth-disable overlay referenced by `config.txt`.
+const BLUETOOTH_OVERLAY: &str = "overlays/disable-bt.dtbo";
 
 /// Build a Pi 4 image.
 pub(crate) fn build(
@@ -312,6 +315,15 @@ fn build_esp(kernel8: &[u8], firmware: &Path) -> Result<Vec<u8>> {
         })?;
         fat.add_file(name, &bytes)?;
     }
+    fat.add_dir("overlays")?;
+    let overlay = firmware.join(BLUETOOTH_OVERLAY);
+    let bytes = fs::read(&overlay).with_context(|| {
+        format!(
+            "missing Raspberry Pi firmware file {} (set RAVEN_RPI_FIRMWARE to the firmware boot directory)",
+            overlay.display()
+        )
+    })?;
+    fat.add_file(BLUETOOTH_OVERLAY, &bytes)?;
     let esp = fat.finish()?;
     ensure!(
         esp.len() == size,
