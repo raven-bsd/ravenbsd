@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The test instance runs the matched driver for two launch/exit cycles and exits when done.
+# `scheme:nic` is devd's readiness gate: it names the driver's control scheme, so svcd marks devd
+# ready (and starts the probe's wave) only after the driver has registered `nic:`.
+name = "devd"
+exec = "/sbin/devd"
+args = ["devd", "test"]
+needs = ["scheme:pci"]
+provides = ["scheme:nic"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0

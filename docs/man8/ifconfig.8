@@ -1,0 +1,44 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt IFCONFIG 8
+.Os RavenBSD
+.Sh NAME
+.Nm ifconfig
+.Nd configure and inspect network interfaces
+.Sh SYNOPSIS
+.Nm
+.Nm
+.Ar interface
+.Nm
+.Ar interface
+.Ar address Ns Op / Ns Ar prefix
+.Nm
+.Ar interface
+.Cm up | down
+.Sh DESCRIPTION
+.Nm
+lists the interfaces registered by the
+.Dq net:
+server. With one interface name it prints that interface's address, netmask, flags and MTU.
+The address form sets the IPv4 address and prefix length through
+.Dv SET_ADDRESS ; the default prefix is 24. The
+.Cm up
+and
+.Cm down
+forms change the administrative state through
+.Dv SET_STATE .
+.Pp
+Only the native
+.Dq net:
+control API is used; there is no ioctl or privileged path. Unknown interfaces, malformed
+addresses and prefixes outside
+.Dv 0..=32
+are errors and the tool exits non-zero.
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr nc 8 ,
+.Xr netd 8
+.Sh STANDARDS
+RavenBSD.

@@ -15,6 +15,8 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+use raven_proto_net::ring as netring;
+
 /// Length of the virtio-net header prepended to every frame.
 pub const NET_HEADER_LEN: usize = 12;
 
@@ -379,6 +381,230 @@ pub fn parse_arp_reply(frame: &[u8]) -> Option<ArpReply> {
         sender_ip: ip,
         target_ip,
     })
+}
+
+/// Parse a colon-separated MAC address (`52:54:00:12:34:56`).
+pub fn parse_mac(text: &str) -> Option<MacAddress> {
+    let bytes = text.as_bytes();
+    if bytes.len() != 17 {
+        return None;
+    }
+    let mut mac = [0u8; 6];
+    for (index, slot) in mac.iter_mut().enumerate() {
+        let offset = index * 3;
+        if index != 0 && bytes.get(offset - 1) != Some(&b':') {
+            return None;
+        }
+        let high = hex_digit(*bytes.get(offset)?)?;
+        let low = hex_digit(*bytes.get(offset + 1)?)?;
+        *slot = (high << 4) | low;
+    }
+    Some(MacAddress(mac))
+}
+
+fn hex_digit(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+/// Control scheme and paths served by the persistent driver.
+pub const NIC_SCHEME: &str = "nic";
+/// Machine-readable control summary.
+pub const NIC_INFO: &str = "info";
+/// MAC address line.
+pub const NIC_MAC: &str = "mac";
+/// MTU line.
+pub const NIC_MTU: &str = "mtu";
+/// Link state line.
+pub const NIC_LINK: &str = "link";
+/// The shared ring attachment.
+pub const NIC_RING: &str = "ring";
+/// Arm the ring pump.
+pub const NIC_START: &str = "start";
+/// Stop the ring pump.
+pub const NIC_STOP: &str = "stop";
+/// Test-only clean shutdown.
+pub const NIC_QUIT: &str = "quit";
+
+/// Offset of the B39 ring region inside the 64 KiB DMA buffer.
+pub const RING_REGION_OFFSET: usize = 0x1000;
+/// Length of the B39 ring region.
+pub const RING_REGION_LEN: usize = 0x6000;
+/// RX descriptors in the B39 ring.
+pub const RING_RX_COUNT: u16 = 8;
+/// TX descriptors in the B39 ring.
+pub const RING_TX_COUNT: u16 = 8;
+/// Pool buffers reserved for the device RX queue (one per RX descriptor).
+pub const RING_RX_BUFFERS: usize = 8;
+/// Bytes the device writes before an RX frame (the virtio-net header).
+pub const VIRTIO_NET_HEADER: usize = NET_HEADER_LEN;
+
+/// The B39 layout used by the driver and its consumer.
+pub fn ring_layout() -> Result<netring::RingLayout, netring::LayoutError> {
+    netring::RingLayout::new(RING_REGION_LEN, RING_RX_COUNT, RING_TX_COUNT)
+}
+
+/// The control summary returned by `nic:info`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ControlInfo {
+    /// Device MAC.
+    pub mac: MacAddress,
+    /// Device MTU.
+    pub mtu: u16,
+    /// Link state.
+    pub link: bool,
+    /// DMA buffer length in bytes.
+    pub dma_len: usize,
+    /// Ring region offset inside the DMA buffer.
+    pub ring_offset: usize,
+    /// Ring region length.
+    pub ring_len: usize,
+    /// RX descriptor count.
+    pub rx_count: u16,
+    /// TX descriptor count.
+    pub tx_count: u16,
+    /// Buffer pool length inside the region.
+    pub pool_len: usize,
+}
+
+impl ControlInfo {
+    /// Encode the `key=value` summary into `out`; returns the byte count.
+    pub fn encode(&self, out: &mut [u8]) -> Option<usize> {
+        let mut writer = TextWriter { out, pos: 0 };
+        let link = if self.link { "up" } else { "down" };
+        core::fmt::write(
+            &mut writer,
+            format_args!(
+                "mac={}\nmtu={}\nlink={}\nring_offset={}\nring_len={}\nrx={}\ntx={}\npool={}\ndma={}\n",
+                self.mac,
+                self.mtu,
+                link,
+                self.ring_offset,
+                self.ring_len,
+                self.rx_count,
+                self.tx_count,
+                self.pool_len,
+                self.dma_len
+            ),
+        )
+        .ok()?;
+        Some(writer.pos)
+    }
+
+    /// Decode the summary; every key is required and unknown keys are rejected.
+    pub fn decode(text: &str) -> Option<Self> {
+        let mut mac = None;
+        let mut mtu = None;
+        let mut link = None;
+        let mut ring_offset = None;
+        let mut ring_len = None;
+        let mut rx_count = None;
+        let mut tx_count = None;
+        let mut pool_len = None;
+        let mut dma_len = None;
+        for line in text.lines() {
+            let (key, value) = line.split_once('=')?;
+            match key {
+                "mac" => mac = Some(parse_mac(value)?),
+                "mtu" => mtu = Some(value.parse().ok()?),
+                "link" => {
+                    link = Some(match value {
+                        "up" => true,
+                        "down" => false,
+                        _ => return None,
+                    })
+                }
+                "ring_offset" => ring_offset = Some(value.parse().ok()?),
+                "ring_len" => ring_len = Some(value.parse().ok()?),
+                "rx" => rx_count = Some(value.parse().ok()?),
+                "tx" => tx_count = Some(value.parse().ok()?),
+                "pool" => pool_len = Some(value.parse().ok()?),
+                "dma" => dma_len = Some(value.parse().ok()?),
+                _ => return None,
+            }
+        }
+        Some(Self {
+            mac: mac?,
+            mtu: mtu?,
+            link: link?,
+            dma_len: dma_len?,
+            ring_offset: ring_offset?,
+            ring_len: ring_len?,
+            rx_count: rx_count?,
+            tx_count: tx_count?,
+            pool_len: pool_len?,
+        })
+    }
+}
+
+struct TextWriter<'a> {
+    out: &'a mut [u8],
+    pos: usize,
+}
+
+impl core::fmt::Write for TextWriter<'_> {
+    fn write_str(&mut self, text: &str) -> core::fmt::Result {
+        let end = self.pos.checked_add(text.len()).ok_or(core::fmt::Error)?;
+        let target = self.out.get_mut(self.pos..end).ok_or(core::fmt::Error)?;
+        target.copy_from_slice(text.as_bytes());
+        self.pos = end;
+        Ok(())
+    }
+}
+
+/// Validate one B39 TX descriptor and return the frame bytes inside `region`.
+///
+/// The descriptor must be a complete frame (`FIRST|LAST`, no `ERROR`), inside the buffer pool and
+/// no larger than one pool buffer.
+pub fn frame_desc<'a>(
+    region: &'a [u8],
+    layout: &netring::RingLayout,
+    desc: netring::Desc,
+) -> Option<&'a [u8]> {
+    let both = netring::DESC_FIRST | netring::DESC_LAST;
+    if desc.flags & both != both || desc.flags & netring::DESC_ERROR != 0 {
+        return None;
+    }
+    let addr = usize::try_from(desc.addr).ok()?;
+    let len = usize::try_from(desc.len).ok()?;
+    if len == 0 || len > netring::BUFFER_SIZE || addr < layout.pool_offset() {
+        return None;
+    }
+    let end = addr.checked_add(len)?;
+    if end > layout.region_len() {
+        return None;
+    }
+    region.get(addr..end)
+}
+
+/// Build the RX descriptor for one delivered pool buffer.
+///
+/// The device writes the virtio-net header first, so the descriptor points after it and carries
+/// only the Ethernet frame.
+pub fn rx_desc(
+    layout: &netring::RingLayout,
+    buffer: usize,
+    frame_len: usize,
+) -> Option<netring::Desc> {
+    if frame_len == 0 || frame_len > MAX_FRAME_LEN || buffer >= RING_RX_BUFFERS {
+        return None;
+    }
+    let start = layout
+        .buffer_offset(buffer)?
+        .checked_add(VIRTIO_NET_HEADER)?;
+    let end = start.checked_add(frame_len)?;
+    if end > layout.region_len() {
+        return None;
+    }
+    Some(netring::Desc::new(
+        start as u64,
+        frame_len as u32,
+        netring::DESC_FIRST | netring::DESC_LAST,
+    ))
 }
 
 fn align_up(value: usize, alignment: usize) -> usize {

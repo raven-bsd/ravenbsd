@@ -179,3 +179,104 @@ fn feature_words_are_queried_by_absolute_bit() {
     assert!(!features.has(16));
     assert!(!features.has(64));
 }
+
+#[test]
+fn the_control_summary_round_trips() {
+    let info = ControlInfo {
+        mac: MacAddress([0x52, 0x54, 0x00, 0x12, 0x34, 0x56]),
+        mtu: 1500,
+        link: true,
+        dma_len: 65536,
+        ring_offset: RING_REGION_OFFSET,
+        ring_len: RING_REGION_LEN,
+        rx_count: RING_RX_COUNT,
+        tx_count: RING_TX_COUNT,
+        pool_len: RING_REGION_LEN - 2048,
+    };
+    let mut text = [0u8; 256];
+    let length = info.encode(&mut text).unwrap();
+    let decoded = ControlInfo::decode(core::str::from_utf8(&text[..length]).unwrap()).unwrap();
+    assert_eq!(decoded, info);
+
+    let mut down = info;
+    down.link = false;
+    let length = down.encode(&mut text).unwrap();
+    assert_eq!(
+        ControlInfo::decode(core::str::from_utf8(&text[..length]).unwrap()),
+        Some(down)
+    );
+}
+
+#[test]
+fn the_control_summary_rejects_bad_input() {
+    let good = "mac=52:54:00:12:34:56\nmtu=1500\nlink=up\nring_offset=4096\nring_len=24576\nrx=8\ntx=8\npool=22528\ndma=65536\n";
+    assert!(ControlInfo::decode(good).is_some());
+    assert!(ControlInfo::decode(&good.replace("link=up", "link=sideways")).is_none());
+    assert!(ControlInfo::decode(&good.replace("mtu=1500\n", "")).is_none());
+    assert!(ControlInfo::decode(&good.replace("rx=8", "extra=1")).is_none());
+    assert!(ControlInfo::decode(&good.replace("mac=52:54:00:12:34:56", "mac=zz")).is_none());
+}
+
+#[test]
+fn mac_addresses_parse_strictly() {
+    assert_eq!(
+        parse_mac("52:54:00:ab:cd:ef"),
+        Some(MacAddress([0x52, 0x54, 0x00, 0xab, 0xcd, 0xef]))
+    );
+    assert_eq!(parse_mac("52:54:00:ab:cd"), None);
+    assert_eq!(parse_mac("52-54-00-ab-cd-ef"), None);
+    assert_eq!(parse_mac("52:54:00:ab:cd:g0"), None);
+}
+
+#[test]
+fn the_b39_region_layout_matches_the_contract() {
+    let layout = ring_layout().unwrap();
+    assert_eq!(layout.region_len(), RING_REGION_LEN);
+    assert_eq!(layout.pool_offset(), 2048);
+    assert_eq!(layout.buffer_count(), 11);
+    assert_eq!(layout.count(raven_proto_net::ring::Ring::Rx), 8);
+    assert_eq!(layout.count(raven_proto_net::ring::Ring::Tx), 8);
+}
+
+#[test]
+fn a_tx_descriptor_must_name_a_complete_pool_frame() {
+    let layout = ring_layout().unwrap();
+    let mut region = [0u8; RING_REGION_LEN];
+    let buffer = layout.buffer_offset(8).unwrap();
+    region[buffer] = 0x42;
+    let good = netring::Desc::new(buffer as u64, 1, netring::DESC_FIRST | netring::DESC_LAST);
+    assert_eq!(
+        frame_desc(&region, &layout, good),
+        Some(&region[buffer..buffer + 1])
+    );
+
+    let error = netring::Desc::new(
+        buffer as u64,
+        1,
+        netring::DESC_FIRST | netring::DESC_LAST | netring::DESC_ERROR,
+    );
+    assert_eq!(frame_desc(&region, &layout, error), None);
+    let header_only = netring::Desc::new(buffer as u64, 1, netring::DESC_FIRST);
+    assert_eq!(frame_desc(&region, &layout, header_only), None);
+    let outside = netring::Desc::new((layout.pool_offset() - 1) as u64, 1, 3);
+    assert_eq!(frame_desc(&region, &layout, outside), None);
+    let too_long = netring::Desc::new(buffer as u64, 4096, 3);
+    assert_eq!(frame_desc(&region, &layout, too_long), None);
+}
+
+#[test]
+fn an_rx_descriptor_points_after_the_virtio_header() {
+    let layout = ring_layout().unwrap();
+    let desc = rx_desc(&layout, 0, 64).unwrap();
+    assert_eq!(
+        desc,
+        netring::Desc::new(
+            (layout.buffer_offset(0).unwrap() + VIRTIO_NET_HEADER) as u64,
+            64,
+            3
+        )
+    );
+    assert!(rx_desc(&layout, RING_RX_BUFFERS, 64).is_none());
+    assert!(rx_desc(&layout, 0, 0).is_none());
+    assert!(rx_desc(&layout, 0, MAX_FRAME_LEN + 1).is_none());
+}

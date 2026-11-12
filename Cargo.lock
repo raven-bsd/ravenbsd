@@ -349,6 +349,17 @@ name = "raven-audio-core"
 version = "0.1.0"
 
 [[package]]
+name = "raven-b12b-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+ "virtio-net",
+]
+
+[[package]]
 name = "raven-b13a-driver"
 version = "0.1.0"
 dependencies = [
@@ -364,6 +375,16 @@ dependencies = [
  "raven-abi",
  "raven-driver",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-b14-tools"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -609,6 +630,16 @@ dependencies = [
  "raven-abi",
  "raven-proto-fs",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-ifconfig"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -898,6 +929,16 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-tool-core",
+]
+
+[[package]]
+name = "raven-nc"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -1900,7 +1941,10 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-driver",
+ "raven-proto-fs",
+ "raven-proto-net",
  "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
