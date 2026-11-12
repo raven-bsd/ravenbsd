@@ -187,18 +187,19 @@ pub type Table = HandleTable<Object>;
 
 /// Install the well-known handles 0, 1 and 2 (and 3 for the first process) in a fresh process.
 ///
-/// The first process (the spawner) gets the `EXEC` right on the initfs and the `RootDevice`
-/// capability at `Handle::ROOT_DEVICE`; child processes only get `READ|MAP` on the initfs, so they
-/// can inspect the archive but cannot map executable file pages, and no root capability.
+/// Every process gets `READ|MAP|EXEC` on the initfs; only the first process (the spawner) also
+/// gets `TRANSFER` and the `RootDevice` capability at `Handle::ROOT_DEVICE`. The initfs is an
+/// immutable archive of the system binaries, so read-exec is not a write or data-exfiltration
+/// capability; the old PID-1-only `EXEC` restriction made any non-PID-1 shell unable to spawn.
 pub fn install_initial(
     table: &mut Table,
     process: &Arc<Process>,
     initfs_exec: bool,
 ) -> Result<(), Errno> {
     table.insert(Object::Process(Arc::clone(process)), Rights::ALL)?;
-    let mut initfs = Rights::READ.union(Rights::MAP);
+    let mut initfs = Rights::READ.union(Rights::MAP).union(Rights::EXEC);
     if initfs_exec {
-        initfs = initfs.union(Rights::EXEC).union(Rights::TRANSFER);
+        initfs = initfs.union(Rights::TRANSFER);
     }
     table.insert(Object::MemObjectInitfs, initfs)?;
     table.insert(Object::Namespace, Rights::READ)?;
