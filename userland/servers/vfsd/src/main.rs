@@ -32,7 +32,9 @@ mod program {
     };
     use raven_rt::entry;
     use raven_rt::println;
-    use raven_scheme::{Client, Ctx, Handler, HandlerResult, OpenTable, Opened, Server};
+    use raven_scheme::{
+        Client, Ctx, Handler, HandlerResult, Kernel, OpenTable, Opened, RtKernel, Server,
+    };
     use raven_vfs_core::{DEFAULT_MOUNTS, MountTable, normalized, parse_mounts};
 
     entry!(main);
@@ -41,6 +43,53 @@ mod program {
     const RETRIES: usize = 500;
     const RETRY_NS: u64 = 10_000_000;
     const BUFFER: usize = 4096;
+
+    /// The real kernel, plus vfsd's ownership rule for Open attachments.
+    ///
+    /// `Opened::Attach` hands the target handle to the client.  The reply send
+    /// installs a client-side duplicate of the same SchemeFile; vfsd's source
+    /// handle must then be closed.  The kernel SchemeFile keeps the server
+    /// reference alive through the client duplicate, so the target server does
+    /// not see a close until the client's last handle goes away.
+    #[derive(Clone, Copy, Debug, Default)]
+    struct VfsKernel {
+        inner: RtKernel,
+    }
+
+    impl Kernel for VfsKernel {
+        fn scheme_register(&self, name: &str) -> Result<(), Errno> {
+            self.inner.scheme_register(name)
+        }
+
+        fn recv(&self, packet: &mut [u8]) -> Result<Handle, Errno> {
+            self.inner.recv(packet)
+        }
+
+        fn recv_timeout(
+            &self,
+            packet: &mut [u8],
+            timeout_ms: u64,
+        ) -> Result<Option<Handle>, Errno> {
+            self.inner.recv_timeout(packet, timeout_ms)
+        }
+
+        fn send(&self, request: Handle, packet: &[u8]) -> Result<(), Errno> {
+            self.inner.send(request, packet)
+        }
+
+        fn send_attach(
+            &self,
+            request: Handle,
+            packet: &[u8],
+            attachments: &[raven_scheme::Attachment],
+        ) -> Result<(), Errno> {
+            let result = self.inner.send_attach(request, packet, attachments);
+            for attachment in attachments {
+                let _ = self.inner.close(Handle(attachment.handle));
+            }
+            result
+        }
+    }
 
     struct Proxy {
         target: Handle,
@@ -499,7 +548,7 @@ mod program {
             println!("vfsd: no root mount");
             return 3;
         }
-        let mut server = match Server::register("file") {
+        let mut server = match Server::register_with(VfsKernel::default(), "file") {
             Ok(server) => server,
             Err(error) => {
                 println!("vfsd: register: {}", error.description());
