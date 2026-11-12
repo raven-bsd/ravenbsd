@@ -79,6 +79,10 @@ syscalls! {
     /// invalid/stale handle, `EPERM` without `SIGNAL`, `ESRCH` when the process is already terminal.
     /// Terminating self is allowed and behaves like `exit(code)`. See contract C16.
     PROC_TERMINATE = 0x32;
+    /// `proc_namespace(proc: Handle, op: u32, prefix: &str) -> 0` adds, removes or clears namespace prefixes; `proc` is
+    /// `SELF_PROC` or a process handle with `ADMIN`. Child prefixes must be inside the caller's namespace (`ADMIN` root may
+    /// grant any valid prefix). `op` is `types::namespace::{ADD,REMOVE,CLEAR}`; see contract C17.
+    PROC_NAMESPACE = 0x33;
 
     /// `map(proc: Handle, memobj: Handle, offset: usize, addr: usize, len: usize, flags: usize) -> addr`
     /// maps `len` bytes (page multiple) of `memobj` (or fresh zeroed memory when `memobj ==
@@ -105,6 +109,11 @@ syscalls! {
     /// `TRANSFER`; new rights = old rights AND mask (rights never grow). Used for spawn-time grants (before the child's first thread
     /// runs) and by servers. Ticket S25.
     HANDLE_TRANSFER = 0x52;
+    /// `handle_revoke(h: Handle, rights_mask: u32) -> 0` removes `rights_mask` (0 = all held) from `h` and every handle derived
+    /// from it, including handles in other processes. The handle stays open with the remaining rights; a later operation that needs
+    /// a revoked right fails `EPERM` (a right never granted stays `EACCES`). Repeating a revoke is a no-op; a stale handle is
+    /// `EBADF`. See contract C17.
+    HANDLE_REVOKE = 0x53;
 
     /// `evq_create(flags: u32) -> Handle` creates an event queue (wait-for-many). Ticket S26.
     EVQ_CREATE = 0x58;

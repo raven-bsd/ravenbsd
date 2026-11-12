@@ -1,0 +1,51 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt HANDLE_REVOKE 2
+.Os RavenBSD
+.Sh NAME
+.Nm handle_revoke
+.Nd revoke rights from a handle and its descendants
+.Sh SYNOPSIS
+.Fn handle_revoke h rights_mask
+.Sh DESCRIPTION
+.Nm
+removes the rights in
+.Fa rights_mask
+from the handle
+.Fa h
+and, transitively, from every handle derived from it by
+.Xr handle_dup 2 ,
+.Xr handle_transfer 2
+or a scheme reply attachment, including handles held by another process.
+A mask of zero means every right
+.Fa h
+currently holds.
+The handle remains open with its remaining rights.
+.Pp
+A right that was revoked returns
+.Er EPERM
+when a later operation needs it; a right that was never granted returns
+.Er EACCES .
+Bits not held by
+.Fa h
+are ignored.
+The operation is idempotent; a stale or unknown handle returns
+.Er EBADF .
+A handle derived after a revoke only receives the remaining rights.
+.Sh RETURN VALUES
+Zero on success; a negative
+.Va errno
+on failure.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EBADF
+.Fa h
+is not a live handle.
+.El
+.Sh SEE ALSO
+.Xr handle_dup 2 ,
+.Xr handle_transfer 2 ,
+.Xr proc_namespace 2
+.Sh STANDARDS
+RavenBSD ABI v1, contract C17.
