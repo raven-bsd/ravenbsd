@@ -6,7 +6,7 @@
 #![cfg(feature = "testutil")]
 
 use raven_abi::errno::Errno;
-use raven_tcpip::{Instant, Ipv4Addr, Ipv4Config, LoopbackDevice, Stack, StackConfig};
+use raven_tcpip::{Instant, IpAddr, Ipv4Addr, Ipv4Config, LoopbackDevice, Stack, StackConfig};
 use raven_tcpip_sim::{Link, LinkConfig};
 use raven_tcpip_wire::checksum::ChecksumContext;
 use raven_tcpip_wire::ethernet::{EtherType, EthernetBuilder, EthernetFrame, MacAddr};
@@ -193,7 +193,7 @@ fn udp_roundtrip_between_two_stacks_over_the_simulator() {
     let (length, source) = b.udp_recv_from(socket_b, &mut buffer).expect("recv");
     assert_eq!(length, 3);
     assert_eq!(&buffer[..3], b"dns");
-    assert_eq!(source, (address(A), 40_000));
+    assert_eq!(source, (IpAddr::V4(address(A)), 40_000));
 }
 
 #[test]
@@ -235,7 +235,7 @@ fn datagram_over_the_receive_cap_is_dropped_and_socket_stays_usable() {
     let mut buffer = [0u8; 4];
     assert_eq!(
         stack.udp_recv_from(socket, &mut buffer),
-        Ok((2, (address(B), 2)))
+        Ok((2, (IpAddr::V4(address(B)), 2)))
     );
 }
 
@@ -249,7 +249,7 @@ fn short_recv_reports_the_true_datagram_length() {
     let mut buffer = [0u8; 4];
     assert_eq!(
         stack.udp_recv_from(socket, &mut buffer),
-        Ok((10, (address(B), 7)))
+        Ok((10, (IpAddr::V4(address(B)), 7)))
     );
     assert_eq!(&buffer, b"0123");
 }
@@ -295,7 +295,7 @@ fn zero_udp_checksum_is_accepted_on_ipv4() {
     let mut buffer = [0u8; 8];
     assert_eq!(
         stack.udp_recv_from(socket, &mut buffer),
-        Ok((4, (address(B), 1234)))
+        Ok((4, (IpAddr::V4(address(B)), 1234)))
     );
 }
 

@@ -242,7 +242,7 @@ impl<D: Device> Stack<D> {
             } else {
                 datagrams.push_back(Datagram {
                     data: data.to_vec(),
-                    src: source,
+                    src: (crate::ipv6_stack::IpAddr::V4(source.0), source.1),
                 });
                 Ok(data.len())
             }

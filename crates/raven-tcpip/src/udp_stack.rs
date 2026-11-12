@@ -51,7 +51,7 @@ impl<D: Device> Stack<D> {
         };
         datagrams.push_back(Datagram {
             data: datagram.payload().to_vec(),
-            src: (source, datagram.src_port()),
+            src: (crate::ipv6_stack::IpAddr::V4(source), datagram.src_port()),
         });
     }
 }

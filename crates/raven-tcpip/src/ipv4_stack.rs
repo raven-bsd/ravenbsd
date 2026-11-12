@@ -98,7 +98,8 @@ impl<D: Device> Stack<D> {
         match ethernet.ether_type() {
             EtherType::Arp => self.handle_arp(ethernet.payload(), now),
             EtherType::Ipv4 => self.handle_ipv4(ethernet.payload(), now),
-            EtherType::Ipv6 | EtherType::Unknown(_) => {}
+            EtherType::Ipv6 => self.handle_ipv6(ethernet.payload(), now),
+            EtherType::Unknown(_) => {}
         }
     }
 
@@ -330,7 +331,7 @@ impl<D: Device> Stack<D> {
         Ok(())
     }
 
-    fn transmit_ethernet(
+    pub(crate) fn transmit_ethernet(
         &mut self,
         destination: MacAddr,
         ether_type: EtherType,
@@ -422,6 +423,7 @@ impl<D: Device> Stack<D> {
 
     pub(crate) fn process_ip_timers(&mut self, now: Instant) {
         let _ = self.reassembly.expire(now);
+        self.process_ipv6_timers(now);
         let due = self.neighbors.due_probes(now);
         for address in due {
             let retries = match self.neighbors.get(address) {
