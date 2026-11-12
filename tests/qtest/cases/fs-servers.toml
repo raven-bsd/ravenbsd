@@ -11,13 +11,25 @@ boot_cmdline = "console=ttyS0 test-exit=1"
 expect_exit = "success"
 
 [[expect]]
+regex = '^k67: baseline 4094$'
+
+[[expect]]
+regex = '^k67: cycles free 4094$'
+
+[[expect]]
 regex = '^k67: cycles ok$'
 
 [[expect]]
 regex = '^k67: client accepted 256$'
 
 [[expect]]
+regex = '^k67: abandoned free 4094$'
+
+[[expect]]
 regex = '^k67: abandoned ok$'
+
+[[expect]]
+regex = '^k67: budget free 4094$'
 
 [[expect]]
 regex = '^k67: budget ok$'

@@ -56,6 +56,7 @@ fn run() -> Result<(), String> {
     let baseline = statfs(&client, "ramfs:")
         .map_err(|error| format!("baseline statfs: {error}"))?
         .free_files;
+    println!("k67: baseline {baseline}");
 
     for _ in 0..CYCLES {
         let handle = client
@@ -67,11 +68,11 @@ fn run() -> Result<(), String> {
         let _ = client.close(duplicate);
         let _ = client.close(handle);
     }
-    if statfs(&client, "ramfs:")
+    let after_cycles = statfs(&client, "ramfs:")
         .map_err(|error| format!("cycle statfs: {error}"))?
-        .free_files
-        != baseline
-    {
+        .free_files;
+    println!("k67: cycles free {after_cycles}");
+    if after_cycles != baseline {
         return Err("cycle inode count drifted".to_string());
     }
     println!("k67: cycles ok");
@@ -106,6 +107,7 @@ fn run() -> Result<(), String> {
             "abandoned opens did not return to baseline: {after} != {baseline}"
         ));
     }
+    println!("k67: abandoned free {after}");
     println!("k67: abandoned ok");
 
     let mut handles = [Handle::NONE; BUDGET];
@@ -121,11 +123,11 @@ fn run() -> Result<(), String> {
     for handle in handles {
         let _ = client.close(handle);
     }
-    if statfs(&client, "ramfs:")
+    let after_budget = statfs(&client, "ramfs:")
         .map_err(|error| format!("budget statfs: {error}"))?
-        .free_files
-        != baseline
-    {
+        .free_files;
+    println!("k67: budget free {after_budget}");
+    if after_budget != baseline {
         return Err("budget handles leaked".to_string());
     }
     println!("k67: budget ok");
