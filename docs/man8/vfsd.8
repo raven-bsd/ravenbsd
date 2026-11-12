@@ -1,0 +1,94 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt VFSD 8
+.Os RavenBSD
+.Sh NAME
+.Nm vfsd
+.Nd file namespace server and mount table
+.Sh SYNOPSIS
+.Nm /sbin/vfsd
+.Sh DESCRIPTION
+.Nm
+owns the scheme
+.Dq file:
+and presents the mounted filesystem servers as one absolute tree
+.Pq Pa / .
+It reads
+.Pa /etc/mounts
+through the
+.Dq initfs:
+scheme, waits for each listed scheme to appear, mounts it and then registers
+.Dq file: .
+.Pp
+Each line of
+.Pa /etc/mounts
+is one
+.Dq Aq path Aq scheme
+pair.  Paths must be absolute and normalized; blank lines and
+.Ql #
+comments are ignored.  The compiled-in defaults are:
+.Bd -literal -offset indent
+/          initfs:
+/tmp       ramfs:
+/dev/null  null:
+/dev/zero  zero:
+/dev/random rand:
+.Ed
+.Pp
+A missing optional mount is logged and skipped; a missing
+.Pa /
+is fatal.
+.Pp
+For
+.Dv OPEN ,
+.Nm
+normalizes the path, chooses the longest whole-component mount prefix and opens
+the path on the owning server.  The owning server's handle is returned as an S25
+reply attachment, so subsequent reads and writes go directly to that server.
+Path operations
+.Pq Dv MKDIR , UNLINK , RMDIR , RENAME , TRUNCATE , SYMLINK , READLINK , CHMOD
+are forwarded as
+.Dv CALL
+requests; a rename across mounts returns
+.Er EXDEV .
+.Dv MOUNT
+and
+.Dv UMOUNT
+are handled locally.
+.Dv SYNC
+is forwarded to every mount and
+.Dv STATFS
+to the root mount.
+.Pp
+The root
+.Dq file:
+handle is kept by
+.Nm
+so that
+.Dv READ
+on
+.Pa /
+merges the root server's entries with the names of mounts directly below
+.Pa /
+\(em for example
+.Pa /tmp
+\(em without duplicating a name.  Other opens are attachments.
+.Pp
+Limits: 32 mounts, paths no longer than 255 bytes, and one forwarded
+.Dv CALL
+at a time per server thread.
+.Sh FILES
+.Bl -tag -width /etc/services.d/vfsd.toml -compact
+.It Pa /etc/mounts
+mount table
+.It Pa /etc/services.d/vfsd.toml
+service manifest
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr open 2 ,
+.Xr ramfsd 8
+.Sh STANDARDS
+RavenBSD ABI v1.
