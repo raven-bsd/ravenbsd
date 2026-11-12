@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-b47a-ipc"
+version = "0.1.0"
+description = "B47a aarch64 scheme IPC fixture: svcd, client/server round trip and client death."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[lib]
+name = "raven_b47a_ipc"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raven-b47a-init"
+path = "src/bin/init.rs"
+
+[[bin]]
+name = "raven-b47a-server"
+path = "src/bin/server.rs"
+
+[[bin]]
+name = "raven-b47a-client"
+path = "src/bin/client.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-initfs = { path = "../../../crates/raven-initfs" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc"] }
+raven-scheme = { path = "../../../crates/raven-scheme" }
+
+[lints]
+workspace = true

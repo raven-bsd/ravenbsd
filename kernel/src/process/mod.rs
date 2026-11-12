@@ -12,7 +12,6 @@ pub mod thread;
 use core::fmt;
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
 
-#[cfg(target_arch = "x86_64")]
 use alloc::collections::VecDeque;
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -31,6 +30,10 @@ use raven_vma::Backing;
 use spin::Mutex;
 
 #[cfg(target_arch = "aarch64")]
+use crate::arch::aarch64::ipc::{
+    self, PendingRequest, SchemeServer, capture::CaptureSlots, model::Namespace,
+};
+#[cfg(target_arch = "aarch64")]
 use crate::arch::aarch64::syscall as arch_syscall;
 #[cfg(target_arch = "aarch64")]
 use crate::arch::aarch64::timer;
@@ -41,13 +44,7 @@ use crate::arch::x86_64::tsc;
 use crate::cmdline::CmdLine;
 use crate::initfs;
 #[cfg(target_arch = "x86_64")]
-use crate::ipc;
-#[cfg(target_arch = "x86_64")]
-use crate::ipc::capture::CaptureSlots;
-#[cfg(target_arch = "x86_64")]
-use crate::ipc::model::Namespace;
-#[cfg(target_arch = "x86_64")]
-use crate::ipc::{PendingRequest, SchemeServer};
+use crate::ipc::{self, PendingRequest, SchemeServer, capture::CaptureSlots, model::Namespace};
 use crate::kprintln;
 use crate::memory::aspace::AddressSpace;
 use crate::memory::uspace::UserAddressSpace;
@@ -106,25 +103,18 @@ pub struct Process {
     /// Threads blocked in `PROC_WAIT` on this process.
     pub waiters: WaitQueue,
     /// Visible scheme names (per-process namespace).
-    #[cfg(target_arch = "x86_64")]
     pub namespace: Mutex<Namespace>,
     /// Scheme names registered by this process.
-    #[cfg(target_arch = "x86_64")]
     pub schemes: Mutex<alloc::vec::Vec<Arc<SchemeServer>>>,
     /// Packets waiting for this process's `RECV`.
-    #[cfg(target_arch = "x86_64")]
     pub scheme_queue: Mutex<VecDeque<Arc<PendingRequest>>>,
     /// Server threads blocked in `RECV`.
-    #[cfg(target_arch = "x86_64")]
     pub scheme_waiters: WaitQueue,
     /// Requests received by this process and not yet replied to.
-    #[cfg(target_arch = "x86_64")]
     pub active_requests: Mutex<alloc::vec::Vec<Arc<PendingRequest>>>,
     /// Requests this process is waiting for as a client.
-    #[cfg(target_arch = "x86_64")]
     pub client_requests: Mutex<alloc::vec::Vec<Arc<PendingRequest>>>,
     /// Capture-window slots owned by this process as a server.
-    #[cfg(target_arch = "x86_64")]
     pub capture_slots: Mutex<CaptureSlots>,
 }
 
@@ -187,19 +177,12 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         dma_bytes: Arc::new(AtomicU64::new(0)),
         state: Mutex::new(ProcessState::Running),
         waiters: WaitQueue::new(),
-        #[cfg(target_arch = "x86_64")]
         namespace: Mutex::new(Namespace::root()),
-        #[cfg(target_arch = "x86_64")]
         schemes: Mutex::new(alloc::vec::Vec::new()),
-        #[cfg(target_arch = "x86_64")]
         scheme_queue: Mutex::new(VecDeque::new()),
-        #[cfg(target_arch = "x86_64")]
         scheme_waiters: WaitQueue::new(),
-        #[cfg(target_arch = "x86_64")]
         active_requests: Mutex::new(alloc::vec::Vec::new()),
-        #[cfg(target_arch = "x86_64")]
         client_requests: Mutex::new(alloc::vec::Vec::new()),
-        #[cfg(target_arch = "x86_64")]
         capture_slots: Mutex::new(CaptureSlots::new()),
     }))
 }
@@ -207,7 +190,6 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
 /// Create an empty process for `PROC_CREATE`, with the well-known handles installed.
 pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
-    #[cfg(target_arch = "x86_64")]
     let namespace = if let Some(parent) = current() {
         let snapshot = parent.namespace.lock().clone();
         snapshot.child_snapshot(&ipc::registry::names())
@@ -227,19 +209,12 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         dma_bytes: Arc::new(AtomicU64::new(0)),
         state: Mutex::new(ProcessState::Created),
         waiters: WaitQueue::new(),
-        #[cfg(target_arch = "x86_64")]
         namespace: Mutex::new(namespace),
-        #[cfg(target_arch = "x86_64")]
         schemes: Mutex::new(alloc::vec::Vec::new()),
-        #[cfg(target_arch = "x86_64")]
         scheme_queue: Mutex::new(VecDeque::new()),
-        #[cfg(target_arch = "x86_64")]
         scheme_waiters: WaitQueue::new(),
-        #[cfg(target_arch = "x86_64")]
         active_requests: Mutex::new(alloc::vec::Vec::new()),
-        #[cfg(target_arch = "x86_64")]
         client_requests: Mutex::new(alloc::vec::Vec::new()),
-        #[cfg(target_arch = "x86_64")]
         capture_slots: Mutex::new(CaptureSlots::new()),
     });
     handle::install_initial(&mut process.handles.lock(), &process, false)?;
@@ -292,19 +267,12 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         dma_bytes: Arc::new(AtomicU64::new(0)),
         state: Mutex::new(ProcessState::Running),
         waiters: WaitQueue::new(),
-        #[cfg(target_arch = "x86_64")]
         namespace: Mutex::new(Namespace::root()),
-        #[cfg(target_arch = "x86_64")]
         schemes: Mutex::new(alloc::vec::Vec::new()),
-        #[cfg(target_arch = "x86_64")]
         scheme_queue: Mutex::new(VecDeque::new()),
-        #[cfg(target_arch = "x86_64")]
         scheme_waiters: WaitQueue::new(),
-        #[cfg(target_arch = "x86_64")]
         active_requests: Mutex::new(alloc::vec::Vec::new()),
-        #[cfg(target_arch = "x86_64")]
         client_requests: Mutex::new(alloc::vec::Vec::new()),
-        #[cfg(target_arch = "x86_64")]
         capture_slots: Mutex::new(CaptureSlots::new()),
     });
     handle::install_initial(&mut process.handles.lock(), &process, true)
@@ -673,7 +641,6 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     }
     // Fail pending scheme requests and remove the registry entries while the server page tables
     // still exist, so capture mappings can be removed before the address space is released.
-    #[cfg(target_arch = "x86_64")]
     ipc::on_process_exit(process);
     let address_space = process.address_space.lock().take();
     if let Some(mut address_space) = address_space {

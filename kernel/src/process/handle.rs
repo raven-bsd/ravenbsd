@@ -11,6 +11,8 @@ use raven_abi::types::Rights;
 use raven_handles::{HandleTable, LineageNode};
 use spin::Mutex;
 
+#[cfg(target_arch = "aarch64")]
+use crate::arch::aarch64::ipc::{PendingRequest, SchemeFile, SchemeServer};
 use crate::driver::DmaBuffer;
 use crate::driver::irq::Irq;
 use crate::event::{EventQueue, Timer, UserEvent};
@@ -398,13 +400,10 @@ pub enum Object {
     /// A device interrupt source (`IRQ_CREATE`).
     Irq(Arc<Irq>),
     /// An open scheme file.
-    #[cfg(target_arch = "x86_64")]
     SchemeFile(Arc<SchemeFile>),
     /// A registered scheme server capability.
-    #[cfg(target_arch = "x86_64")]
     SchemeServer(Arc<SchemeServer>),
     /// A server-side request handle returned by `RECV`.
-    #[cfg(target_arch = "x86_64")]
     SchemeRequest(Arc<PendingRequest>),
 }
 

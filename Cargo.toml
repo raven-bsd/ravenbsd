@@ -32,6 +32,7 @@ members = [
     "tests/fixtures/k68-svc",
     "tests/fixtures/s21-edu",
     "tests/fixtures/s21d-aarch64",
+    "tests/fixtures/b47a-ipc",
     "tests/fixtures/k66-fs",
     "tests/fixtures/k71-scheme",
     "tests/fixtures/k67-fs",

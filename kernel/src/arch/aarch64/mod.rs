@@ -5,6 +5,12 @@
 
 pub mod fdt;
 pub mod gic;
+/// Kernel scheme IPC on aarch64.
+///
+/// The crate-root `ipc` declaration is x86-64-only; compiling the same sources here gives the
+/// aarch64 kernel one IPC module with the registry, namespaces, routing and capture code.
+#[path = "../../ipc/mod.rs"]
+pub mod ipc;
 pub mod irq;
 pub mod kmain;
 pub mod mmu;

@@ -97,6 +97,7 @@ __exception_vectors:
     mov x0, #\slot
     mov x1, sp
     bl exception_dispatch
+    mov x2, #\lower
     b __exception_restore
     .endm
 
@@ -117,9 +118,14 @@ __exception_vectors:
     ventry 14, 1
     ventry 15, 1
 
-    /* Shared return path. The current handler never returns, but a future one that does must be
-     * able to leave the same frame. */
+    /* Shared return path. A lower-EL frame carries the interrupted SP_EL0; it must be restored
+     * before `eret`, because a context switch to another user thread changes the single SP_EL0
+     * register. Current-EL frames carry SP_ELx there and must leave SP_EL0 alone. */
 __exception_restore:
+    cbz x2, 1f
+    ldr x9, [sp, #248]
+    msr sp_el0, x9
+1:
     ldr x9, [sp, #256]
     msr elr_el1, x9
     ldr x9, [sp, #264]

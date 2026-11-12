@@ -357,6 +357,10 @@ pub fn call(
 /// The pager identifies the object by the handle value it received from `MEMOBJ_CREATE`. The
 /// request carries a bounded `PagerPacket` in the existing scheme `CALL` inline data; the pager
 /// supplies through `PAGER_SUPPLY` and replies with `SEND`.
+#[cfg_attr(
+    target_arch = "aarch64",
+    allow(dead_code) // the pager service is compiled for x86-64 only
+)]
 pub fn pager_call(
     client: &Arc<Process>,
     object: &Arc<MemObject>,

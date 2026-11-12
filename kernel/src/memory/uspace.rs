@@ -87,7 +87,6 @@ struct DmaMapping {
 /// The range is inserted as a zero-protection VMA in every user address space, so the normal
 /// `MAP` allocator never hands it out and `UNMAP`/`PROTECT` reject it. The kernel maps its own
 /// frames into individual slots on demand; those frames are not owned by the address space.
-#[cfg(target_arch = "x86_64")]
 pub mod capture_window {
     /// First address of the window.
     pub const BASE: u64 = 0x0000_6000_0000_0000;
@@ -126,22 +125,16 @@ impl From<Errno> for FaultError {
 impl UserAddressSpace {
     /// Wrap a fresh page-table root with an empty VMA tree.
     pub fn new(aspace: AddressSpace) -> Self {
-        #[cfg(target_arch = "x86_64")]
-        let vmas = {
-            let mut vmas = Vmas::new(USER_MIN..USER_END);
-            // The window is a compile-time constant inside `USER_MIN..USER_END` and the tree is
-            // empty, so the insert cannot fail; keeping the VMA makes `MAP` skip and `UNMAP`/
-            // `PROTECT` reject the range.
-            let _ = vmas.insert(
-                capture_window::BASE,
-                capture_window::SIZE,
-                0,
-                Backing::Anonymous,
-            );
-            vmas
-        };
-        #[cfg(not(target_arch = "x86_64"))]
-        let vmas = Vmas::new(USER_MIN..USER_END);
+        let mut vmas = Vmas::new(USER_MIN..USER_END);
+        // The window is a compile-time constant inside `USER_MIN..USER_END` and the tree is
+        // empty, so the insert cannot fail; keeping the VMA makes `MAP` skip and `UNMAP`/
+        // `PROTECT` reject the range.
+        let _ = vmas.insert(
+            capture_window::BASE,
+            capture_window::SIZE,
+            0,
+            Backing::Anonymous,
+        );
         Self {
             aspace,
             vmas,
@@ -153,7 +146,6 @@ impl UserAddressSpace {
     }
 
     /// Monotonic mapping generation, bumped by every map/unmap/protect.
-    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S32 captures are x86-64 only.
     pub fn generation(&self) -> u64 {
         self.mapping_generation
     }
@@ -517,7 +509,6 @@ impl UserAddressSpace {
         if len == 0 || !start.is_multiple_of(PAGE_SIZE) || !len.is_multiple_of(PAGE_SIZE) {
             return Err(Errno::EINVAL);
         }
-        #[cfg(target_arch = "x86_64")]
         if overlaps_capture_window(start, len) {
             // The window is kernel-owned; a user unmap would free capture frames the IPC layer
             // still owns and could recycle them under a live server.
@@ -596,7 +587,6 @@ impl UserAddressSpace {
         if len == 0 || !start.is_multiple_of(PAGE_SIZE) || !len.is_multiple_of(PAGE_SIZE) {
             return Err(Errno::EINVAL);
         }
-        #[cfg(target_arch = "x86_64")]
         if overlaps_capture_window(start, len) {
             return Err(Errno::EINVAL);
         }
@@ -1119,18 +1109,11 @@ fn initfs_contains(physical: u64) -> bool {
         .is_some_and(|(base, len)| physical >= base && physical < base.saturating_add(len))
 }
 
-#[cfg(target_arch = "x86_64")]
 fn is_capture_address(address: u64) -> bool {
     address >= capture_window::BASE
         && address < capture_window::BASE.saturating_add(capture_window::SIZE)
 }
 
-#[cfg(not(target_arch = "x86_64"))]
-fn is_capture_address(_address: u64) -> bool {
-    false
-}
-
-#[cfg(target_arch = "x86_64")]
 fn overlaps_capture_window(start: u64, len: u64) -> bool {
     let end = start.saturating_add(len);
     start < capture_window::BASE.saturating_add(capture_window::SIZE) && capture_window::BASE < end

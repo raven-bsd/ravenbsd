@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "scheme-aarch64"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/b47a-ipc/build.sh"]
+initfs = "build/fixtures/b47a-ipc/initfs.img"
+boot_cmdline = "console=ttyAMA0 test-exit=1 s32-capturecheck"
+expect_exit = "success"
+
+[[expect]]
+regex = '^b47a: svcd svc: ok$'
+
+[[expect]]
+regex = '^b47a: server ready$'
+
+[[expect]]
+regex = '^b47a: roundtrip ok$'
+
+[[expect]]
+regex = '^b47a: client held$'
+
+[[expect]]
+regex = '^s32: capture frames=[1-9][0-9]* free_bytes=[0-9]+$'
+
+[[expect]]
+regex = '^b47a: client death EIO$'
+
+[[expect]]
+regex = '^b47a: release ok$'
+
+[[expect]]
+regex = '^s32: capture frames=0 free_bytes=[0-9]+$'
+
+[[expect]]
+regex = '^b47a: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
