@@ -173,7 +173,7 @@ impl SocketTable {
     }
 
     /// Reclaim closed records whose application handle is gone.
-    fn reclaim(&mut self) -> usize {
+    pub(crate) fn reclaim(&mut self) -> usize {
         let dead: Vec<u32> = self
             .records
             .iter()
@@ -550,8 +550,16 @@ impl<D: Device> Stack<D> {
         let attempts = usize::try_from(self.tunables.port_alloc_attempts)
             .unwrap_or(64)
             .max(1);
+        let mut reclaimed = false;
         for _ in 0..attempts {
             let Some(port) = self.ports.allocate() else {
+                if !reclaimed && self.sockets.reclaim() > 0 {
+                    reclaimed = true;
+                    for port in self.sockets.take_released_ports() {
+                        self.ports.release(port);
+                    }
+                    continue;
+                }
                 break;
             };
             self.counters.port_alloc_probes = self

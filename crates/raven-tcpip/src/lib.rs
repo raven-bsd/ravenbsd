@@ -49,6 +49,7 @@ mod ipv6_stack;
 mod listen;
 mod neighbor;
 mod observability;
+mod plpmtud_live;
 mod pmtu;
 mod reassembly;
 mod recovery;

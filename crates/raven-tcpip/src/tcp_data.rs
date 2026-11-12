@@ -191,7 +191,24 @@ impl<D: Device> Stack<D> {
                         if !window_ok || !nagle_ok {
                             None
                         } else {
-                            let take = usable.min(u32::from(connection.mss));
+                            let mut take = usable.min(u32::from(connection.mss));
+                            if self.tunables.plpmtud_enable != 0
+                                && let Some((size, reprobe)) = crate::plpmtud_live::probe_due(
+                                    connection,
+                                    self.now.as_millis(),
+                                    i64::try_from(self.tunables.plpmtud_interval)
+                                        .unwrap_or(i64::MAX),
+                                    usable,
+                                )
+                            {
+                                take = size;
+                                self.counters.plpmtud_probes =
+                                    self.counters.plpmtud_probes.wrapping_add(1);
+                                if reprobe {
+                                    self.counters.plpmtud_reprobes =
+                                        self.counters.plpmtud_reprobes.wrapping_add(1);
+                                }
+                            }
                             let start = usize::try_from(inflight).unwrap_or(usize::MAX);
                             let payload: Vec<u8> = record
                                 .tx
@@ -400,6 +417,7 @@ impl<D: Device> Stack<D> {
                     .min(record.tx.len());
                 record.tx.drain(..remove);
                 connection.snd_una = ack;
+                crate::plpmtud_live::plpmtud_on_ack(connection, ack, self.now.as_millis());
                 let now_ms = u32::try_from(self.now.as_millis()).unwrap_or(u32::MAX);
                 connection.rack.on_ack(ack, now_ms);
                 if connection.tlp_enabled && connection.snd_nxt != ack {
@@ -652,6 +670,11 @@ impl<D: Device> Stack<D> {
                     .tlp
                     .deadline
                     .map(|deadline| Instant::from_millis(i64::from(deadline))),
+                crate::plpmtud_live::next_deadline(
+                    connection,
+                    i64::try_from(self.tunables.plpmtud_interval).unwrap_or(i64::MAX),
+                    self.tunables.plpmtud_enable != 0,
+                ),
             ];
             for deadline in deadlines.into_iter().flatten() {
                 earliest = Some(match earliest {

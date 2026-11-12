@@ -142,6 +142,18 @@ pub(crate) struct TcpConnection {
     pub sack_recovery: bool,
     /// The recovery started with an RTO, so every hole below a SACK is lost.
     pub rto_recovery: bool,
+    /// The largest segment payload the interface and peer allow; the PLPMTUD ceiling.
+    pub plp_ceiling: u16,
+    /// The PLPMTUD search, once started.
+    pub plp: Option<crate::pmtu::Plpmtud>,
+    /// Whether the search decision was taken for this connection.
+    pub plp_decided: bool,
+    /// An in-flight probe: end sequence and payload size.
+    pub plp_probe: Option<(u32, u32)>,
+    /// Earliest time of the next probe, in milliseconds.
+    pub plp_next_ms: i64,
+    /// Consecutive losses of the probe size under test.
+    pub plp_attempts: u8,
 }
 
 impl TcpConnection {
@@ -238,6 +250,12 @@ impl TcpConnection {
             high_rxt: 0,
             sack_recovery: false,
             rto_recovery: false,
+            plp_ceiling: 0,
+            plp: None,
+            plp_decided: false,
+            plp_probe: None,
+            plp_next_ms: 0,
+            plp_attempts: 0,
         }
     }
 
@@ -335,6 +353,12 @@ impl TcpConnection {
             high_rxt: 0,
             sack_recovery: false,
             rto_recovery: false,
+            plp_ceiling: 0,
+            plp: None,
+            plp_decided: false,
+            plp_probe: None,
+            plp_next_ms: 0,
+            plp_attempts: 0,
         }
     }
 
@@ -871,6 +895,7 @@ impl<D: Device> Stack<D> {
         connection.rcv_wscale = choose_wscale(self.recv_buffer_cap());
         let mss_default = u16::try_from(self.tunables.mss_default).unwrap_or(1460);
         let mut mss = our_mss(remote, self.device.capabilities(), mss_default);
+        let interface_mss = mss;
         if self.tunables.ignore_path_mtu == 0
             && let IpAddr::V4(address) = remote
             && let Some((mtu, inserted)) = self.pmtu4.get(&address)
@@ -886,6 +911,10 @@ impl<D: Device> Stack<D> {
             .min(ceiling)
             .max(connection.mss_floor);
         connection.mss = connection.our_mss;
+        connection.plp_ceiling = interface_mss
+            .max(connection.mss_floor)
+            .min(ceiling)
+            .max(connection.mss_floor);
         connection.cc = self.new_cc(connection.our_mss);
     }
 
@@ -1397,7 +1426,7 @@ impl<D: Device> Stack<D> {
                         if segment.syn() && !segment.ack_flag() {
                             apply_syn_options(connection, segment, now);
                             if segment.seq == connection.irs {
-                                send_ack = true;
+                                send_syn_ack = true;
                             } else {
                                 closed = true;
                             }
@@ -2101,6 +2130,13 @@ impl<D: Device> Stack<D> {
             connection.rto_recovery = false;
             connection.recover_seq = snd_nxt;
             connection.high_rxt = seq.wrapping_add(u32::try_from(payload.len()).unwrap_or(0));
+            if crate::plpmtud_live::plpmtud_on_retransmit(
+                connection,
+                seq,
+                u32::try_from(payload.len()).unwrap_or(0),
+            ) {
+                self.counters.plpmtud_losses = self.counters.plpmtud_losses.wrapping_add(1);
+            }
             connection.retransmits_total = connection.retransmits_total.saturating_add(1);
             connection.rto_deadline =
                 Some(Instant::from_millis(self.now.as_millis().saturating_add(
@@ -2201,6 +2237,16 @@ impl<D: Device> Stack<D> {
         #[cfg(any(test, feature = "testutil"))]
         {
             self.tcp_synacks = self.tcp_synacks.saturating_add(1);
+        }
+        if let Ok(record) = self.sockets.record_mut(socket)
+            && let Kind::Tcp(connection) = &mut record.kind
+            && connection.state == TcpState::SynReceived
+        {
+            connection.rto_deadline = Some(Instant::from_millis(
+                self.now
+                    .as_millis()
+                    .saturating_add(i64::try_from(connection.rto.rto_ms()).unwrap_or(i64::MAX)),
+            ));
         }
         let mut flags = flags_or(TcpFlags::SYN, TcpFlags::ACK);
         if self.tunables.ecn_enable != 0
@@ -2662,6 +2708,8 @@ impl<D: Device> Stack<D> {
             let mut keepalive_probe = false;
             let mut keepalive_timeout = false;
             let mut retransmit: Option<Retransmit> = None;
+            let mut plp_resend = false;
+            let mut resend_synack = false;
             {
                 let Ok(record) = self.sockets.record_mut(socket) else {
                     continue;
@@ -2708,6 +2756,60 @@ impl<D: Device> Stack<D> {
                     self.counters.timewait_fires = self.counters.timewait_fires.wrapping_add(1);
                     self.counters.timewait_expiries =
                         self.counters.timewait_expiries.wrapping_add(1);
+                }
+                if connection.state == TcpState::SynReceived
+                    && connection
+                        .rto_deadline
+                        .is_some_and(|deadline| deadline <= now)
+                {
+                    if connection.retransmit_count >= connection.rto_max_retransmits {
+                        connection.state = TcpState::Closed;
+                        connection.rto_deadline = None;
+                        record.closed = true;
+                        self.counters.attempt_fails = self.counters.attempt_fails.wrapping_add(1);
+                    } else {
+                        connection.retransmit_count = connection.retransmit_count.saturating_add(1);
+                        connection.rto.timeout();
+                        resend_synack = true;
+                    }
+                }
+                if connection
+                    .rto_deadline
+                    .is_some_and(|deadline| deadline <= now)
+                    && connection.plp_probe.is_some()
+                    && crate::plpmtud_live::plpmtud_on_timeout(connection, now.as_millis())
+                {
+                    plp_resend = true;
+                    self.counters.plpmtud_losses = self.counters.plpmtud_losses.wrapping_add(1);
+                }
+                if self.tunables.plpmtud_enable != 0
+                    && connection
+                        .rto_deadline
+                        .is_some_and(|deadline| deadline <= now)
+                    && connection.state == TcpState::Established
+                    && connection.snd_nxt != connection.snd_una
+                    && connection.retransmit_count.saturating_add(1)
+                        >= crate::plpmtud_live::BLACKHOLE_TIMEOUTS
+                    && crate::plpmtud_live::plpmtud_blackhole(connection, now.as_millis())
+                {
+                    let flight = connection.snd_nxt.wrapping_sub(connection.snd_una);
+                    let mut context = crate::CcContext {
+                        mss: u32::from(connection.mss),
+                        flight,
+                        pipe: flight,
+                        rtt: None,
+                        snd_nxt: connection.snd_nxt,
+                        snd_una: connection.snd_una,
+                    };
+                    connection.cc.on_rto(&mut context);
+                    connection.rto.timeout();
+                    connection.retransmit_count = connection.retransmit_count.saturating_add(1);
+                    connection.snd_nxt = connection.snd_una;
+                    connection.rto_deadline = None;
+                    connection.sacked.clear();
+                    connection.sack_recovery = false;
+                    plp_resend = true;
+                    self.counters.plpmtud_losses = self.counters.plpmtud_losses.wrapping_add(1);
                 }
                 if connection
                     .rto_deadline
@@ -2939,6 +3041,12 @@ impl<D: Device> Stack<D> {
                     &payload,
                     false,
                 );
+            }
+            if plp_resend {
+                let _ = self.tcp_try_send(socket);
+            }
+            if resend_synack {
+                let _ = self.send_syn_ack(socket);
             }
             self.tcp_delayed_ack(socket, now);
             let _ = self.tcp_zero_window_timer(socket, now);

@@ -210,6 +210,14 @@ impl<D: Device> Stack<D> {
             .wrapping_add(offset)
             .wrapping_add(u32::try_from(take).ok()?);
         connection.retransmits_total = connection.retransmits_total.saturating_add(1);
+        let probe_lost = crate::plpmtud_live::plpmtud_on_retransmit(
+            connection,
+            una.wrapping_add(offset),
+            u32::try_from(take).ok()?,
+        );
+        if probe_lost {
+            self.counters.plpmtud_losses = self.counters.plpmtud_losses.wrapping_add(1);
+        }
         if let Some(sample) = &mut connection.rtt_sample {
             sample.2 = true;
         }
