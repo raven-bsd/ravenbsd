@@ -33,7 +33,8 @@ fn run(argument: usize) {
         let Some(manifest) = ready_manifest(&core, index, generation) else {
             return;
         };
-        let handle = match boot::spawn_service(&manifest) {
+        let from_root = boot::service_root_exec(&core, index);
+        let handle = match boot::spawn_service(&manifest, from_root) {
             Ok(handle) => handle,
             Err(reason) => {
                 let notices = {
