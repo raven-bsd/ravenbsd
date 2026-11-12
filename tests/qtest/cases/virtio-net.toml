@@ -1,0 +1,87 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B13b: devd hands the modern virtio-net function (BAR4, 64 KiB DMA, legacy IRQ) to the driver.
+# The driver negotiates VIRTIO_F_VERSION_1, reports the MAC/MTU/queues, sends one ARP request and
+# receives the user-mode network's reply, then resets the device and exits.
+
+name = "virtio-net"
+arch = "x86_64"
+profile = "virtio-net-test"
+timeout_secs = 240
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^pcid: devices=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^svcd: pcid up$'
+
+[[expect]]
+regex = '^devd: matched [0-9a-f]{2}:[0-9a-f]{2}\.[0-9] vendor=0x1af4 device=0x1041 irq_line=[0-9]+ irq_pin=[0-9]+$'
+
+[[expect]]
+regex = '^devd: driver virtio-net bar=4 size=16384$'
+
+[[expect]]
+regex = '^devd: driver virtio-net dma bus=0x[0-9a-f]+ len=65536$'
+
+[[expect]]
+regex = '^devd: driver virtio-net irq line=[0-9]+$'
+
+[[expect]]
+regex = '^virtio-net: id=1af4:1041$'
+
+[[expect]]
+regex = '^virtio-net: common=0x[0-9a-f]+ notify=0x[0-9a-f]+ isr=0x[0-9a-f]+ device=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^virtio-net: dma len=65536 bus=0x[0-9a-f]+ irq=[0-9]+$'
+
+[[expect]]
+regex = '^virtio-net: mac=[0-9a-f]{2}(:[0-9a-f]{2}){5} mtu=[0-9]+ link=(up|down)$'
+
+[[expect]]
+regex = '^virtio-net: queue0 rx size=[0-9]+$'
+
+[[expect]]
+regex = '^virtio-net: queue1 tx size=[0-9]+$'
+
+[[expect]]
+regex = '^virtio-net: tx frame 42 bytes$'
+
+[[expect]]
+regex = '^virtio-net: rx frame [0-9]+ bytes$'
+
+[[expect]]
+regex = '^virtio-net: arp reply from [0-9a-f]{2}(:[0-9a-f]{2}){5} \(10\.0\.2\.2\)$'
+
+[[expect]]
+regex = '^virtio-net: done$'
+
+[[expect]]
+regex = '^devd: driver virtio-net cycle 1 exit=0$'
+
+[[expect]]
+regex = '^devd: driver virtio-net cycle 2 exit=0$'
+
+[[expect]]
+regex = '^devd: driver virtio-net cycles=2$'
+
+[[expect]]
+regex = '^svcd: devd up$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|virtio-net: .*timed out'
