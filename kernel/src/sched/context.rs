@@ -250,15 +250,29 @@ extern "C" fn sched_thread_entry() -> ! {
 
 #[cfg(target_arch = "x86_64")]
 fn thread_entry() -> ! {
-    let thread = match crate::sched::current_thread() {
-        Some(thread) => thread,
-        None => idle_forever(),
+    // Copy the entry fields out and drop the `Arc<Thread>` clone before diverging: the
+    // trampoline frame never returns (user threads enter ring 3 through it), so a live local
+    // would leave the thread owning a reference to itself on its abandoned stack.  S36's
+    // deferred reaping caches that stack for reuse, and the orphaned reference would keep every
+    // exited thread's allocation alive (a measured ~200-byte leak per exit).
+    let (user, user_entry, user_stack, arg, kernel_entry) = {
+        let thread = match crate::sched::current_thread() {
+            Some(thread) => thread,
+            None => idle_forever(),
+        };
+        (
+            thread.user,
+            thread.user_entry,
+            thread.user_stack,
+            thread.arg,
+            thread.kernel_entry,
+        )
     };
-    if thread.user {
+    if user {
         // SAFETY: the address space, kernel stack and per-CPU state are installed by `switch`;
         // the user range was validated before the thread was created.
         unsafe {
-            enter_user(thread.user_entry, thread.user_stack, thread.arg);
+            enter_user(user_entry, user_stack, arg);
         }
     }
     // Kernel threads run with interrupts enabled.
@@ -266,7 +280,7 @@ fn thread_entry() -> ! {
     unsafe {
         sync::enable_interrupts();
     }
-    if let Some(entry) = thread.kernel_entry {
+    if let Some(entry) = kernel_entry {
         entry();
     }
     crate::sched::exit_thread(0)
@@ -276,22 +290,33 @@ fn thread_entry() -> ! {
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]
 extern "C" fn sched_thread_entry() -> ! {
-    let thread = match crate::sched::current_thread() {
-        Some(thread) => thread,
-        None => idle_forever(),
+    // Drop the self-reference before diverging, as the x86-64 trampoline does: the abandoned
+    // frame must not keep the thread's own `Arc` alive on a cached stack.
+    let (user, user_entry, user_stack, arg, kernel_entry) = {
+        let thread = match crate::sched::current_thread() {
+            Some(thread) => thread,
+            None => idle_forever(),
+        };
+        (
+            thread.user,
+            thread.user_entry,
+            thread.user_stack,
+            thread.arg,
+            thread.kernel_entry,
+        )
     };
-    if thread.user {
+    if user {
         // SAFETY: the address space, kernel stack and per-CPU state were installed by `switch`;
         // the user range was validated before the thread was created.
         unsafe {
-            enter_user(thread.user_entry, thread.user_stack, thread.arg);
+            enter_user(user_entry, user_stack, arg);
         }
     }
     // SAFETY: the vector table and the GIC/timer are initialised before the scheduler starts.
     unsafe {
         sync::enable_interrupts();
     }
-    if let Some(entry) = thread.kernel_entry {
+    if let Some(entry) = kernel_entry {
         entry();
     }
     crate::sched::exit_thread(0)

@@ -651,9 +651,23 @@ const TARGET_MACHINE: Machine = Machine::Aarch64;
 /// One-shot process teardown: scheme teardown, address space, handle table, exit reporting.
 ///
 /// The first caller wins; later callers (the last-thread path racing an `EXIT`, a terminate
-/// racing the target's own exit) observe `torn_down` and do nothing.  Called with the process
-/// state lock released and the calling thread on its own kernel stack.
-fn teardown(process: &Arc<Process>, code: i32) {
+/// racing the target's own exit) observe `torn_down` and do nothing.
+///
+/// `own_context` is true when the teardown runs on a thread of the dying process itself (the
+/// `EXIT` path).  Only then may the address space be released with
+/// [`UserAddressSpace::release`], which switches CR3 to the kernel root: a foreign caller
+/// (terminating another process, reaping an unstarted child) must keep its own CR3, because it
+/// returns to user mode through `sysret`.  The cold path frees the target's frames and page
+/// tables without switching, which is safe because user threads run only on CPU 0 in a
+/// non-preemptible kernel: the caller is the only running user thread, so the target's root is
+/// not active anywhere, and none of its blocked or runnable threads can be switched to (the
+/// scheduler filter drops them).
+///
+/// The per-exit evidence prints (`s24`/`s25`/`s21`/`s36` counters) belong to the dying
+/// thread's own exit path and run in that context only; a foreign caller skips them (an
+/// unstarted process has no thread to print from, and a terminated process prints on its last
+/// thread's exit).
+fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     if process.torn_down.swap(true, Ordering::AcqRel) {
         return;
     }
@@ -662,8 +676,15 @@ fn teardown(process: &Arc<Process>, code: i32) {
     #[cfg(target_arch = "x86_64")]
     ipc::on_process_exit(process);
     let address_space = process.address_space.lock().take();
-    if let Some(address_space) = address_space {
-        address_space.release();
+    if let Some(mut address_space) = address_space {
+        if own_context {
+            address_space.release();
+        } else {
+            // SAFETY: not unsafe, but context-dependent - see the function comment.  The target
+            // root is inactive; free its frames and tables without switching the caller's CR3.
+            address_space.free_user_frames();
+            drop(address_space);
+        }
     }
     // A dead process can no longer call syscalls: drop its handle table so DMA buffers and
     // every other object release their resources even while a last reference to the process
@@ -677,6 +698,13 @@ fn teardown(process: &Arc<Process>, code: i32) {
         crate::arch::halt()
     }
     kprintln!("process: {} exited ({code})", process.path);
+    // The per-exit evidence prints belong to the dying thread's own context; a foreign teardown
+    // (reaping an unstarted process, terminating another) must return to its caller without
+    // them.
+    if !own_context {
+        return;
+    }
+    // S24 leak evidence: the free-frame count after every child exit.
     if CmdLine::parse(paging::cmdline())
         .get("s24-framecheck")
         .is_some()
@@ -706,10 +734,12 @@ fn teardown(process: &Arc<Process>, code: i32) {
         .get("s36-stackcheck")
         .is_some()
     {
+        let (heap_used, _) = crate::memory::heap::stats();
         kprintln!(
-            "s36: stacks fresh={} cached={}",
+            "s36: stacks fresh={} cached={} heap={}",
             crate::sched::thread::stack_fresh(),
-            crate::sched::thread::stack_cached()
+            crate::sched::thread::stack_cached(),
+            heap_used
         );
     }
 }
@@ -717,7 +747,7 @@ fn teardown(process: &Arc<Process>, code: i32) {
 /// Set the terminal state exactly once: exit code, wake every waiter, run the teardown.
 ///
 /// Returns false when the process was already terminal (no resurrection, no second teardown).
-fn terminate_once(process: &Arc<Process>, code: i32) -> bool {
+fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool {
     let mut state = process.state.lock();
     if *state == ProcessState::Exited {
         return false;
@@ -728,7 +758,7 @@ fn terminate_once(process: &Arc<Process>, code: i32) -> bool {
     let _ = process.waiters.wake_all();
     drop(state);
     crate::event::notify_all();
-    teardown(process, code);
+    teardown(process, code, own_context);
     true
 }
 
@@ -740,7 +770,7 @@ fn terminate_once(process: &Arc<Process>, code: i32) -> bool {
 /// thread is executing while this syscall runs, so the address space can be released here.
 pub fn exit_process(code: i32) -> ! {
     if let Some(process) = current() {
-        let _ = terminate_once(&process, code);
+        let _ = terminate_once(&process, code, true);
     }
     crate::sched::exit_thread(code)
 }
@@ -750,7 +780,7 @@ pub fn exit_process(code: i32) -> ! {
 /// A terminal process returns `ESRCH` (already exiting); the caller's rights check happens in
 /// the syscall layer.
 pub fn terminate(target: &Arc<Process>, code: i32) -> Result<(), Errno> {
-    if terminate_once(target, code) {
+    if terminate_once(target, code, false) {
         Ok(())
     } else {
         Err(Errno::ESRCH)
@@ -769,7 +799,7 @@ pub fn reap_unstarted(target: &Arc<Process>) -> Result<i32, Errno> {
         }
         target.exit_code.load(Ordering::Acquire)
     };
-    let _ = terminate_once(target, code);
+    let _ = terminate_once(target, code, false);
     Ok(code)
 }
 
@@ -785,7 +815,7 @@ pub fn notify_exit(code: i32) {
         }
         crate::arch::halt()
     };
-    let _ = terminate_once(&process, code);
+    let _ = terminate_once(&process, code, true);
 }
 
 /// Terminate the calling process (`EXIT`).
