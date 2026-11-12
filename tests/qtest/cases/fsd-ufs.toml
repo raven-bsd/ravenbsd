@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "fsd-ufs"
+arch = "x86_64"
+profile = "fsd-ufs-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/k54-ufs/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: blockd up$'
+unordered = true
+
+[[expect]]
+regex = '^blockd: gpt ok partitions=1$'
+unordered = true
+
+[[expect]]
+regex = '^blockd: part 1 ufs-root 34\.\.32801$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: fsd-ufs up$'
+unordered = true
+
+[[expect]]
+regex = '^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$'
+unordered = true
+
+[[expect]]
+regex = '^fsd-ufs: probe errors ok$'
+
+[[expect]]
+regex = '^fsd-ufs: probe mount ok$'
+
+[[expect]]
+regex = '^fsd-ufs: probe ten\.txt=0123456789$'
+
+[[expect]]
+regex = '^fsd-ufs: probe one\.txt=one$'
+
+[[expect]]
+regex = '^fsd-ufs: probe listing=dir1,fastlink,slowlink,ten\.txt$'
+
+[[expect]]
+regex = '^fsd-ufs: probe readlink=fast-target$'
+
+[[expect]]
+regex = '^fsd-ufs: probe stat=empty,size=0$'
+
+[[expect]]
+regex = '^fsd-ufs: probe vfs-errors ok$'
+
+[[expect]]
+regex = '^fsd-ufs: probe umount ok$'
+
+[[expect]]
+regex = '^fsd-ufs: probe ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

@@ -1,0 +1,122 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt FSD-UFS 8
+.Os RavenBSD
+.Sh NAME
+.Nm fsd-ufs
+.Nd RavenBSD read-only UFS filesystem server
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+registers the
+.Dq ufs:
+scheme, opens one GPT partition from a
+.Dq block:
+device, mounts it read-only through the
+.Dq ufs-core
+library, and serves the tree with the
+.Dq file:
+protocol that
+.Xr vfsd 8
+mounts.
+The initial mount is read-only; K55 adds the write path.
+.Pp
+The server selects partition 1 by default.  The partition is read with the
+24-byte
+.Dq block:
+protocol; the
+.Sy LIST
+reply supplies its first sector and length, so the UFS mount sees only the
+partition and never the GPT headers.
+A missing or corrupt UFS image is a startup error and the server exits
+non-zero; it never serves a partially mounted tree.
+.Sh MOUNT PROTOCOL
+.Nm
+opens
+.Pa block:0 ,
+reads
+.Sy INFO
+and
+.Sy LIST
+from it, and mounts the selected partition read-only.
+It then registers the
+.Dq ufs:
+scheme.
+A client such as
+.Xr vfsd 8
+mounts it with the
+.Dq file:
+control operation
+.Sy MOUNT :
+.Dl mount /ufs ufs:
+After that, opening
+.Pa /ufs/path
+routes
+.Pa path
+to
+.Nm .
+.Pp
+The server root is the filesystem root; an empty path and
+.Pa /
+both name it.
+Paths received from
+.Xr vfsd 8
+have no leading slash and are treated as mount-relative.
+.Pp
+Symbolic links are followed with a bound of 8 links per path.
+A final symbolic link is not followed for
+.Sy READLINK ,
+so the target is returned instead of being resolved.
+.Pp
+Directory reads are sequential.  The server keeps the directory cursor in the
+open-file description; a client that sends a nonzero wire offset gets
+.Er EINVAL .
+A buffer smaller than the next packed entry also returns
+.Er EINVAL .
+The open-file budget is 256 descriptions.
+No write, create, truncate, rename, chmod or metadata operation is accepted;
+those return
+.Er EROFS .
+.Sh ENVIRONMENT
+.Bl -tag -width FSD_UFS_PARTITION -compact
+.It Ev FSD_UFS_DEVICE
+Device path opened as a client, default
+.Pa block:0 .
+.It Ev FSD_UFS_PARTITION
+One-based GPT partition index, default 1.  Zero mounts the whole device.
+.It Ev FSD_UFS_SCHEME
+Registered scheme name, default
+.Dq ufs .
+.El
+.Sh FILES
+.Bl -tag -width /etc/services.d -compact
+.It Pa /etc/services.d/fsd-ufs.toml
+Service manifest.
+.El
+.Sh ERRORS
+A missing path returns
+.Er ENOENT ;
+a component that is not a directory returns
+.Er ENOTDIR ;
+a path longer than 255 bytes or a symlink loop returns
+.Er ENAMETOOLONG
+or
+.Er ELOOP .
+A corrupt filesystem or block I/O failure returns
+.Er EIO .
+A write operation returns
+.Er EROFS .
+A protocol framing error returns
+.Er EPROTO .
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr blockd 8 ,
+.Xr init 8 ,
+.Xr initfsd 8 ,
+.Xr mount 8 ,
+.Xr vfsd 8
+.Sh STANDARDS
+RavenBSD.

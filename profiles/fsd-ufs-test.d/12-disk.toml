@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.files]]
+src = "build/fixtures/k54-ufs/disk.img"
+path = "/etc/blockd.img"
+mode = 0o444
+generated = true
