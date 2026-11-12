@@ -259,10 +259,9 @@ impl<D: Device> Stack<D> {
         let rx_cap = self.config.rx_queue_bytes;
         let tx_cap = self.config.tx_queue_bytes;
         let connection = self.sockets.alloc(
-            Kind::Tcp {
-                _remote: None,
-                local_port: 0,
-            },
+            Kind::Tcp(crate::tcp_state::TcpConnection::new_established_for_test(
+                self.now,
+            )),
             rx_cap,
             tx_cap,
         )?;

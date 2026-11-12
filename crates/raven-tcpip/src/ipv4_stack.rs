@@ -221,6 +221,12 @@ impl<D: Device> Stack<D> {
         #[cfg(any(test, feature = "testutil"))]
         self.delivered.push((protocol, payload.to_vec()));
         match protocol {
+            6 => self.tcp_input(
+                crate::ipv6_stack::IpAddr::V4(source),
+                crate::ipv6_stack::IpAddr::V4(destination),
+                payload,
+                self.now,
+            ),
             17 => self.handle_udp(source, destination, payload),
             1 => self.handle_icmpv4(source, destination, payload),
             _ => {}
@@ -424,6 +430,7 @@ impl<D: Device> Stack<D> {
     pub(crate) fn process_ip_timers(&mut self, now: Instant) {
         let _ = self.reassembly.expire(now);
         self.process_ipv6_timers(now);
+        self.process_tcp_timers(now);
         let due = self.neighbors.due_probes(now);
         for address in due {
             let retries = match self.neighbors.get(address) {

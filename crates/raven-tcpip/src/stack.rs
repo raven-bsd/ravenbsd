@@ -165,6 +165,7 @@ pub struct Stack<D: Device> {
     pub(crate) ip_errors: Vec<(Ipv4Addr, Errno)>,
     pub(crate) arp_requests: usize,
     pub(crate) next_ephemeral: u16,
+    pub(crate) next_isn: u32,
     pub(crate) icmp_tokens: u32,
     pub(crate) icmp_last_refill: Instant,
     pub(crate) icmp_errors_sent: usize,
@@ -185,6 +186,8 @@ pub struct Stack<D: Device> {
     #[cfg(any(test, feature = "testutil"))]
     pub(crate) delivered: Vec<(u8, Vec<u8>)>,
     #[cfg(any(test, feature = "testutil"))]
+    pub(crate) tcp_debug: Vec<(u16, u16, u8, u32, u32)>,
+    #[cfg(any(test, feature = "testutil"))]
     pub(crate) trace: Vec<Vec<u8>>,
     #[cfg(any(test, feature = "testutil"))]
     pub(crate) trace_enabled: bool,
@@ -200,6 +203,9 @@ impl<D: Device> Stack<D> {
         let mut rng = Generator::from_seed(&seed_from_entropy(seed, 0));
         let mut ephemeral_seed = [0u8; 2];
         rng.fill(&mut ephemeral_seed);
+        let mut isn_seed = [0u8; 4];
+        rng.fill(&mut isn_seed);
+        let next_isn = u32::from_le_bytes(isn_seed);
         let next_ephemeral = 49_152u16.saturating_add(u16::from_le_bytes(ephemeral_seed) % 16_384);
         Self {
             device,
@@ -224,6 +230,7 @@ impl<D: Device> Stack<D> {
             ip_errors: Vec::new(),
             arp_requests: 0,
             next_ephemeral,
+            next_isn,
             icmp_tokens: config.icmp_error_burst,
             icmp_last_refill: now,
             icmp_errors_sent: 0,
@@ -243,6 +250,8 @@ impl<D: Device> Stack<D> {
             router_solicitations: 0,
             #[cfg(any(test, feature = "testutil"))]
             delivered: Vec::new(),
+            #[cfg(any(test, feature = "testutil"))]
+            tcp_debug: Vec::new(),
             #[cfg(any(test, feature = "testutil"))]
             trace: Vec::new(),
             #[cfg(any(test, feature = "testutil"))]

@@ -48,8 +48,10 @@ mod ipv6_stack;
 mod neighbor;
 mod reassembly;
 mod route;
+mod seq;
 mod socket;
 mod stack;
+mod tcp_state;
 mod time;
 mod udp_stack;
 
@@ -64,6 +66,7 @@ pub use ipv6_stack::{
 pub use neighbor::{NeighborCache, NeighborEntry};
 pub use route::{Route, RouteTable};
 pub use stack::{Ipv4Addr, Ipv4Config, MAX_TIMERS, Stack, StackConfig, TimerId};
+pub use tcp_state::TcpState;
 pub use time::{Duration, Instant};
 
 #[cfg(any(test, feature = "testutil"))]
