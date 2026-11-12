@@ -134,6 +134,14 @@ pub(crate) struct TcpConnection {
     pub tlp_probe_at: Option<Instant>,
     pub ecn: crate::recovery::Ecn,
     pub recover_seq: u32,
+    /// Absolute SACKed sequence ranges above `snd_una`, sorted and merged.
+    pub sacked: Vec<(u32, u32)>,
+    /// One past the highest sequence retransmitted in the current recovery.
+    pub high_rxt: u32,
+    /// Loss recovery (fast retransmit or RTO) is in progress.
+    pub sack_recovery: bool,
+    /// The recovery started with an RTO, so every hole below a SACK is lost.
+    pub rto_recovery: bool,
 }
 
 impl TcpConnection {
@@ -226,6 +234,10 @@ impl TcpConnection {
             tlp_probe_at: None,
             ecn: crate::recovery::Ecn::default(),
             recover_seq: 0,
+            sacked: Vec::new(),
+            high_rxt: 0,
+            sack_recovery: false,
+            rto_recovery: false,
         }
     }
 
@@ -319,6 +331,10 @@ impl TcpConnection {
             tlp_probe_at: None,
             ecn: crate::recovery::Ecn::default(),
             recover_seq: 0,
+            sacked: Vec::new(),
+            high_rxt: 0,
+            sack_recovery: false,
+            rto_recovery: false,
         }
     }
 
@@ -348,6 +364,7 @@ struct Segment {
     tsval: Option<u32>,
     tsecr: Option<u32>,
     sack_permitted: bool,
+    sack_blocks: Vec<(u32, u32)>,
     payload: Vec<u8>,
 }
 
@@ -966,11 +983,13 @@ impl<D: Device> Stack<D> {
         let mut tsval = None;
         let mut tsecr = None;
         let mut sack_permitted = false;
+        let mut sack_blocks: Vec<(u32, u32)> = Vec::new();
         for option in packet.options() {
             match option {
                 Ok(TcpOption::MaxSegmentSize(value)) => mss = Some(value),
                 Ok(TcpOption::WindowScale(value)) => wscale = Some(value),
                 Ok(TcpOption::SackPermitted) => sack_permitted = true,
+                Ok(TcpOption::Sack(blocks)) => sack_blocks.extend(blocks.take(4)),
                 Ok(TcpOption::Timestamps { tsval: v, tsecr: e }) => {
                     tsval = Some(v);
                     tsecr = Some(e);
@@ -996,6 +1015,7 @@ impl<D: Device> Stack<D> {
             tsval,
             tsecr,
             sack_permitted,
+            sack_blocks,
             payload: packet.payload().to_vec(),
         };
         let source_port = packet.src_port();
@@ -1488,6 +1508,12 @@ impl<D: Device> Stack<D> {
                         }
                         let duplicate_window = segment.window <= connection.last_ack_window;
                         connection.last_ack_window = segment.window;
+                        let sack_new = connection.sack_permitted
+                            && segment.ack_flag()
+                            && crate::sack_send::merge_sack_blocks(
+                                connection,
+                                &segment.sack_blocks,
+                            );
                         let after_tlp = connection
                             .tlp_probe_at
                             .is_some_and(|probe| now.saturating_since(probe).as_millis() < 1000);
@@ -1497,12 +1523,14 @@ impl<D: Device> Stack<D> {
                             && connection.snd_una != connection.snd_nxt
                             && !segment.syn()
                             && !segment.fin()
-                            && duplicate_window
+                            && (duplicate_window || sack_new)
                         {
                             connection.dupack_count = connection.dupack_count.saturating_add(1);
                             let threshold =
                                 u8::try_from(self.tunables.dup_ack_threshold).unwrap_or(3);
-                            if connection.dupack_count >= threshold {
+                            if connection.dupack_count >= threshold
+                                || crate::sack_send::head_is_lost(connection)
+                            {
                                 connection.dupack_count = 0;
                                 fast_retransmit = true;
                             }
@@ -1844,6 +1872,7 @@ impl<D: Device> Stack<D> {
         if fast_retransmit {
             self.fast_retransmit(socket);
         }
+        self.tcp_sack_recover(socket);
         self.enforce_timewait_limit(socket);
         if send_syn_ack {
             let _ = self.send_syn_ack(socket);
@@ -1964,6 +1993,9 @@ impl<D: Device> Stack<D> {
             let Some(remote) = connection.remote else {
                 return;
             };
+            if connection.sack_recovery || connection.cc.in_recovery() {
+                return;
+            }
             let length = record.tx.len().min(usize::from(connection.mss));
             if length == 0 {
                 return;
@@ -2015,6 +2047,10 @@ impl<D: Device> Stack<D> {
             connection
                 .cc
                 .on_loss(&mut context, crate::cc::LossKind::DupAck);
+            connection.sack_recovery = true;
+            connection.rto_recovery = false;
+            connection.recover_seq = snd_nxt;
+            connection.high_rxt = seq.wrapping_add(u32::try_from(payload.len()).unwrap_or(0));
             connection.retransmits_total = connection.retransmits_total.saturating_add(1);
             connection.rto_deadline =
                 Some(Instant::from_millis(self.now.as_millis().saturating_add(
@@ -2593,6 +2629,7 @@ impl<D: Device> Stack<D> {
                 let Ok(record) = self.sockets.record_mut(socket) else {
                     continue;
                 };
+                let advertised = advertised_window(record);
                 let Kind::Tcp(connection) = &mut record.kind else {
                     continue;
                 };
@@ -2675,7 +2712,7 @@ impl<D: Device> Stack<D> {
                                     connection.local_port,
                                     connection.snd_una,
                                     connection.rcv_nxt,
-                                    connection.rcv_wnd,
+                                    advertised,
                                 ));
                             }
                             let flight = connection.snd_nxt.wrapping_sub(connection.snd_una);
@@ -2689,6 +2726,12 @@ impl<D: Device> Stack<D> {
                             };
                             connection.cc.on_rto(&mut context);
                             connection.recover_seq = connection.snd_nxt;
+                            connection.sack_recovery = true;
+                            connection.rto_recovery = true;
+                            connection.dupack_count = 0;
+                            connection.high_rxt = connection
+                                .snd_una
+                                .wrapping_add(u32::try_from(length).unwrap_or(0));
                             connection.tlp.disarm();
                             connection.rto.timeout();
                             connection.rto_deadline =
@@ -2713,6 +2756,7 @@ impl<D: Device> Stack<D> {
                             u32::try_from(deadline.as_millis()).unwrap_or(u32::MAX)
                         });
                         let tlp_due = connection.tlp_enabled
+                            && !connection.sack_recovery
                             && connection.tlp.fires(now_ms)
                             && connection.tlp.is_sooner_than(rto_deadline);
                         if tlp_due {
@@ -2736,10 +2780,11 @@ impl<D: Device> Stack<D> {
                                     connection.local_port,
                                     connection.snd_una,
                                     connection.rcv_nxt,
-                                    connection.rcv_wnd,
+                                    advertised,
                                 ));
                             }
                         } else if connection.dupack_count >= 3
+                            && !connection.sack_recovery
                             && let Some((_end_seq, sent_at)) = connection.rack_sent.first().copied()
                         {
                             let bound = srtt
@@ -2781,7 +2826,7 @@ impl<D: Device> Stack<D> {
                                         connection.local_port,
                                         connection.snd_una,
                                         connection.rcv_nxt,
-                                        connection.rcv_wnd,
+                                        advertised,
                                     ));
                                 }
                             }

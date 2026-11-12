@@ -158,7 +158,12 @@ impl<D: Device> Stack<D> {
                     let unsent = queued - inflight;
                     let window = connection.snd_wnd;
                     let cwnd = connection.cc.cwnd();
-                    if window <= inflight || cwnd <= inflight {
+                    let in_network = if connection.sack_recovery {
+                        crate::sack_send::sack_pipe(connection)
+                    } else {
+                        inflight
+                    };
+                    if window <= inflight || cwnd <= in_network {
                         if window <= inflight && connection.zero_window_deadline.is_none() {
                             connection.zero_window_deadline = Some(Instant::from_millis(
                                 self.now.as_millis().saturating_add(
@@ -169,11 +174,15 @@ impl<D: Device> Stack<D> {
                         }
                         None
                     } else {
-                        let usable = (window - inflight).min(unsent).min(cwnd - inflight);
+                        let cwnd_room = cwnd - in_network;
+                        let usable = (window - inflight).min(unsent).min(cwnd_room);
                         let mss = u32::from(connection.mss);
-                        let floor = mss
-                            .max(u32::try_from(record.tx_cap / 2).unwrap_or(0).max(1))
-                            .min(cwnd.max(mss));
+                        let cwnd_limited = cwnd_room < window - inflight;
+                        let floor = if cwnd_limited {
+                            mss
+                        } else {
+                            mss.max(u32::try_from(record.tx_cap / 2).unwrap_or(0).max(1))
+                        };
                         let all_fits = usable == unsent;
                         let window_ok = usable >= floor || all_fits;
                         let nagle_ok = connection.nodelay
@@ -411,6 +420,12 @@ impl<D: Device> Stack<D> {
                 }
                 connection.tlp_probe_at = None;
                 connection.rack_sent.retain(|(end, _)| seq_gt(*end, ack));
+                crate::sack_send::prune_sacked(connection, ack);
+                if connection.sack_recovery && seq_ge(ack, connection.recover_seq) {
+                    connection.sack_recovery = false;
+                    connection.rto_recovery = false;
+                    connection.sacked.clear();
+                }
                 if connection.cc.in_recovery() {
                     if crate::seq::seq_ge(ack, connection.recover_seq) {
                         connection.cc.on_recovery_exit();
@@ -438,6 +453,7 @@ impl<D: Device> Stack<D> {
                 }
             }
         }
+        self.tcp_sack_recover(socket);
         self.tcp_try_send(socket)
     }
 
@@ -486,7 +502,17 @@ impl<D: Device> Stack<D> {
                     .counters
                     .in_ooo_bytes
                     .wrapping_add(u64::try_from(payload.len()).unwrap_or(0));
-                if connection.ooo.len() >= connection.ooo_limit {
+                let new_hole = ooo_creates_hole(&connection.ooo, sequence, payload.len());
+                let ooo_bytes: usize = connection.ooo.iter().map(|(_, data)| data.len()).sum();
+                let duplicate = connection
+                    .ooo
+                    .iter()
+                    .any(|(start, data)| *start == sequence && data.len() >= payload.len());
+                if duplicate {
+                    self.counters.in_dup_segments = self.counters.in_dup_segments.wrapping_add(1);
+                } else if (new_hole && ooo_hole_count(&connection.ooo) >= connection.ooo_limit)
+                    || ooo_bytes.saturating_add(payload.len()) > record.rx_cap
+                {
                     self.counters.reassembly_overflows =
                         self.counters.reassembly_overflows.wrapping_add(1);
                     self.drops = self.drops.saturating_add(1);
@@ -534,7 +560,7 @@ impl<D: Device> Stack<D> {
                     let next = connection
                         .ooo
                         .iter()
-                        .position(|(segment_seq, _)| *segment_seq == connection.rcv_nxt);
+                        .position(|(segment_seq, _)| seq_ge(connection.rcv_nxt, *segment_seq));
                     let Some(index) = next else { break };
                     let (segment_seq, data) = connection.ooo.remove(index);
                     let skip = usize::try_from(connection.rcv_nxt.wrapping_sub(segment_seq))
@@ -674,6 +700,27 @@ impl<D: Device> Stack<D> {
         }
         true
     }
+}
+
+/// Whether a segment at `seq` of `len` bytes touches no queued out-of-order range.
+fn ooo_creates_hole(ooo: &[(u32, Vec<u8>)], seq: u32, len: usize) -> bool {
+    let end = seq.wrapping_add(u32::try_from(len).unwrap_or(u32::MAX));
+    !ooo.iter().any(|(start, data)| {
+        let other_end = start.wrapping_add(u32::try_from(data.len()).unwrap_or(u32::MAX));
+        seq_ge(end, *start) && seq_ge(other_end, seq)
+    })
+}
+
+/// Number of separate contiguous ranges held out of order.
+fn ooo_hole_count(ooo: &[(u32, Vec<u8>)]) -> usize {
+    ooo.iter()
+        .filter(|(start, _)| {
+            !ooo.iter().any(|(other, data)| {
+                let other_end = other.wrapping_add(u32::try_from(data.len()).unwrap_or(u32::MAX));
+                seq_lt(*other, *start) && seq_ge(other_end, *start)
+            })
+        })
+        .count()
 }
 
 pub(crate) fn advertised_window(record: &crate::socket::SocketRecord) -> u16 {

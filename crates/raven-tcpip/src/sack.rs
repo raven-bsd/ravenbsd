@@ -285,7 +285,7 @@ impl SackScoreboard {
             && let Some((start, end)) = self.gaps().last().copied()
         {
             let start = start.max(self.high_data.saturating_sub(self.mss));
-            let length = (end - start).min(self.mss);
+            let length = end.saturating_sub(start).min(self.mss);
             next = NextSeg {
                 start: i64::from(start),
                 len: length,
