@@ -49,6 +49,10 @@ pub trait CongestionControl {
     fn ssthresh(&self) -> u32;
     /// Whether fast recovery is active.
     fn in_recovery(&self) -> bool;
+    /// A partial ACK inside recovery (RFC 6582).
+    fn on_partial_ack(&mut self, _acked_bytes: u32) {}
+    /// The recovery episode is complete; return to congestion avoidance.
+    fn on_recovery_exit(&mut self) {}
 }
 
 /// NewReno with RFC 3465 appropriate byte counting and RFC 6582 recovery.
@@ -165,6 +169,12 @@ impl CongestionControl for NewReno {
     }
     fn in_recovery(&self) -> bool {
         self.in_recovery
+    }
+    fn on_partial_ack(&mut self, acked_bytes: u32) {
+        self.partial_ack(acked_bytes);
+    }
+    fn on_recovery_exit(&mut self) {
+        self.full_ack();
     }
 }
 
@@ -316,6 +326,12 @@ impl CongestionControl for Cubic {
     }
     fn in_recovery(&self) -> bool {
         self.in_recovery
+    }
+    fn on_recovery_exit(&mut self) {
+        if self.in_recovery {
+            self.cwnd = self.ssthresh;
+            self.in_recovery = false;
+        }
     }
 }
 

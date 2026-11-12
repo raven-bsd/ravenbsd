@@ -157,8 +157,9 @@ impl<D: Device> Stack<D> {
                 } else {
                     let unsent = queued - inflight;
                     let window = connection.snd_wnd;
-                    if window <= inflight {
-                        if connection.zero_window_deadline.is_none() {
+                    let cwnd = connection.cc.cwnd();
+                    if window <= inflight || cwnd <= inflight {
+                        if window <= inflight && connection.zero_window_deadline.is_none() {
                             connection.zero_window_deadline = Some(Instant::from_millis(
                                 self.now.as_millis().saturating_add(
                                     i64::try_from(connection.zero_window_backoff_ms)
@@ -168,9 +169,11 @@ impl<D: Device> Stack<D> {
                         }
                         None
                     } else {
-                        let usable = (window - inflight).min(unsent);
+                        let usable = (window - inflight).min(unsent).min(cwnd - inflight);
                         let mss = u32::from(connection.mss);
-                        let floor = mss.max(u32::try_from(record.tx_cap / 2).unwrap_or(0).max(1));
+                        let floor = mss
+                            .max(u32::try_from(record.tx_cap / 2).unwrap_or(0).max(1))
+                            .min(cwnd.max(mss));
                         let all_fits = usable == unsent;
                         let window_ok = usable >= floor || all_fits;
                         let nagle_ok = connection.nodelay
@@ -249,6 +252,29 @@ impl<D: Device> Stack<D> {
                 connection.snd_nxt = connection
                     .snd_nxt
                     .wrapping_add(u32::try_from(payload.len()).unwrap_or(0));
+                let now_ms = u32::try_from(self.now.as_millis()).unwrap_or(u32::MAX);
+                connection.rack.on_sent(connection.snd_nxt, now_ms);
+                connection.rack_sent.push((connection.snd_nxt, now_ms));
+                if connection.rack_sent.len() > 64 {
+                    connection.rack_sent.remove(0);
+                }
+                if connection.tlp_enabled
+                    && connection.snd_una != connection.snd_nxt
+                    && connection.rto.has_sample()
+                {
+                    let srtt = u32::try_from(connection.rto.srtt_ms()).unwrap_or(u32::MAX);
+                    let rttvar = u32::try_from(connection.rto.rttvar_ms()).unwrap_or(u32::MAX);
+                    connection.tlp.arm(now_ms, srtt, rttvar);
+                    let cap =
+                        now_ms.saturating_add(srtt.saturating_add(srtt / 2).saturating_add(10));
+                    if connection
+                        .tlp
+                        .deadline
+                        .is_some_and(|deadline| deadline > cap)
+                    {
+                        connection.tlp.deadline = Some(cap);
+                    }
+                }
                 connection.last_activity = self.now;
                 self.counters.out_bytes = self
                     .counters
@@ -365,6 +391,36 @@ impl<D: Device> Stack<D> {
                     .min(record.tx.len());
                 record.tx.drain(..remove);
                 connection.snd_una = ack;
+                let now_ms = u32::try_from(self.now.as_millis()).unwrap_or(u32::MAX);
+                connection.rack.on_ack(ack, now_ms);
+                if connection.tlp_enabled && connection.snd_nxt != ack {
+                    let srtt = u32::try_from(connection.rto.srtt_ms()).unwrap_or(u32::MAX);
+                    let rttvar = u32::try_from(connection.rto.rttvar_ms()).unwrap_or(u32::MAX);
+                    connection.tlp.arm(now_ms, srtt, rttvar);
+                    let cap =
+                        now_ms.saturating_add(srtt.saturating_add(srtt / 2).saturating_add(10));
+                    if connection
+                        .tlp
+                        .deadline
+                        .is_some_and(|deadline| deadline > cap)
+                    {
+                        connection.tlp.deadline = Some(cap);
+                    }
+                } else {
+                    connection.tlp.disarm();
+                }
+                connection.tlp_probe_at = None;
+                connection.rack_sent.retain(|(end, _)| seq_gt(*end, ack));
+                if connection.cc.in_recovery() {
+                    if crate::seq::seq_ge(ack, connection.recover_seq) {
+                        connection.cc.on_recovery_exit();
+                    } else {
+                        connection.cc.on_partial_ack(delta);
+                    }
+                }
+                if sampled {
+                    connection.ecn.on_rtt();
+                }
                 connection.last_activity = self.now;
                 connection.zero_window_backoff_ms = 1000;
                 connection.zero_window_deadline = None;
@@ -558,7 +614,7 @@ impl<D: Device> Stack<D> {
             let Kind::Tcp(connection) = &record.kind else {
                 continue;
             };
-            for deadline in [
+            let deadlines = [
                 connection.rto_deadline,
                 connection.ack_deadline,
                 connection.zero_window_deadline,
@@ -566,10 +622,12 @@ impl<D: Device> Stack<D> {
                 connection.fin_wait2_deadline,
                 connection.keepalive_deadline,
                 connection.connect_deadline,
-            ]
-            .into_iter()
-            .flatten()
-            {
+                connection
+                    .tlp
+                    .deadline
+                    .map(|deadline| Instant::from_millis(i64::from(deadline))),
+            ];
+            for deadline in deadlines.into_iter().flatten() {
                 earliest = Some(match earliest {
                     Some(current) if current <= deadline => current,
                     _ => deadline,
