@@ -398,6 +398,7 @@ impl<D: Device> Stack<D> {
                     valid_until: Instant::from_millis(i64::MAX),
                 },
             );
+            let _ = self.send_neighbor_solicitation(link_local, true);
         }
         Ok(())
     }
@@ -800,7 +801,9 @@ impl<D: Device> Stack<D> {
             129 => self.deliver_echo_reply6(&message),
             135 => self.handle_neighbor_solicitation(source, &message, now),
             136 => self.handle_neighbor_advertisement(&message, now),
-            133 => {}
+            133 => {
+                self.router_solicitations = self.router_solicitations.saturating_add(1);
+            }
             134 => self.handle_router_advertisement(source, &message, now),
             1..=4 => self.handle_icmpv6_error(&message),
             _ => {}
@@ -1303,6 +1306,13 @@ impl<D: Device> Stack<D> {
     #[must_use]
     pub fn test_icmpv6_errors_sent(&self) -> usize {
         self.icmpv6_errors_sent
+    }
+
+    /// Router solicitations observed.
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_router_solicitations(&self) -> usize {
+        self.router_solicitations
     }
 }
 

@@ -181,6 +181,7 @@ pub struct Stack<D: Device> {
     pub(crate) nd_bad_hop_limit: usize,
     pub(crate) nd_fragments: usize,
     pub(crate) icmpv6_errors_sent: usize,
+    pub(crate) router_solicitations: usize,
     #[cfg(any(test, feature = "testutil"))]
     pub(crate) delivered: Vec<(u8, Vec<u8>)>,
     #[cfg(any(test, feature = "testutil"))]
@@ -239,6 +240,7 @@ impl<D: Device> Stack<D> {
             nd_bad_hop_limit: 0,
             nd_fragments: 0,
             icmpv6_errors_sent: 0,
+            router_solicitations: 0,
             #[cfg(any(test, feature = "testutil"))]
             delivered: Vec::new(),
             #[cfg(any(test, feature = "testutil"))]

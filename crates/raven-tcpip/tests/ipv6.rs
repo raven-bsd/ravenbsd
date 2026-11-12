@@ -550,6 +550,16 @@ fn v4_mapped_traffic_is_accepted_when_enabled() {
 }
 
 #[test]
+fn router_solicitation_is_parsed() {
+    let mut stack = stack6();
+    stack.test_inject_frame(
+        &nd_frame(b6(), Ipv6Addr::ALL_NODES, 133, &[0u8; 4]),
+        Instant::ZERO,
+    );
+    assert_eq!(stack.test_router_solicitations(), 1);
+}
+
+#[test]
 fn icmpv6_echo_request_is_answered() {
     let mut stack = stack6();
     stack.test_insert_neighbor6(b6(), BMAC, Instant::ZERO);
