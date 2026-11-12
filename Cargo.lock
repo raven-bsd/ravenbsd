@@ -657,6 +657,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-k55-probe"
+version = "0.1.0"
+dependencies = [
+ "fsd-ufs",
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-proto-svc",
+ "raven-rt",
+ "raven-scheme",
+ "ufs-core",
+]
+
+[[package]]
 name = "raven-k66-fs"
 version = "0.1.0"
 dependencies = [

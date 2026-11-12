@@ -254,7 +254,12 @@ impl<D: BlockIo> Ufs<D> {
         if target < 2 || target >= self.fs.ncg.saturating_mul(self.fs.ipg) {
             return Err(UfsError::NotFound);
         }
-        let mut inode = self.load_inode(target)?;
+        let mut inode = match self.load_inode(target) {
+            Ok(inode) => inode,
+            // A freed inode is zeroed and no longer decodes as an object.
+            Err(UfsError::Corrupt(_)) => return Err(UfsError::NotFound),
+            Err(error) => return Err(error),
+        };
         let kind = inode.file_type()?;
         if kind == FileType::Directory {
             return Err(UfsError::Invalid);

@@ -34,5 +34,5 @@ src = "etc/services.d/blockd.toml"
 path = "/etc/services.d/blockd.toml"
 
 [[initfs.files]]
-src = "etc/services.d/fsd-ufs.toml"
+src = "profiles/fsd-ufs-test.d/fsd-ufs-ro.manifest"
 path = "/etc/services.d/fsd-ufs.toml"

@@ -49,6 +49,7 @@ members = [
     "tests/fixtures/k14-block/controller",
     "tests/fixtures/k54-ufs/mkimage",
     "tests/fixtures/k54-ufs/probe",
+    "tests/fixtures/k55-ufs/probe",
     "xtask",
     "tests/qtest",
     "tests/ufs-oracle",

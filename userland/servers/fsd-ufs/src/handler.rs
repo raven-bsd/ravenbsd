@@ -43,6 +43,77 @@ pub trait FileSystem {
 
     /// Filesystem statistics.
     fn statfs(&self) -> StatFs;
+
+    /// Whether the mount is currently read-only.
+    fn is_read_only(&self) -> bool {
+        true
+    }
+
+    /// Create a regular file at `path`; when `exclusive` is set an existing
+    /// file is an error.
+    fn create_file(&mut self, path: &str, mode: u16, exclusive: bool) -> Result<u32, Errno> {
+        let _ = (path, mode, exclusive);
+        Err(Errno::EROFS)
+    }
+
+    /// Create a directory.
+    fn mkdir(&mut self, path: &str, mode: u16) -> Result<(), Errno> {
+        let _ = (path, mode);
+        Err(Errno::EROFS)
+    }
+
+    /// Remove one non-directory entry.
+    fn unlink(&mut self, path: &str) -> Result<(), Errno> {
+        let _ = path;
+        Err(Errno::EROFS)
+    }
+
+    /// Remove one empty directory.
+    fn rmdir(&mut self, path: &str) -> Result<(), Errno> {
+        let _ = path;
+        Err(Errno::EROFS)
+    }
+
+    /// Rename one entry.
+    fn rename(&mut self, from: &str, to: &str) -> Result<(), Errno> {
+        let _ = (from, to);
+        Err(Errno::EROFS)
+    }
+
+    /// Create a symbolic link.
+    fn symlink(&mut self, path: &str, target: &[u8]) -> Result<(), Errno> {
+        let _ = (path, target);
+        Err(Errno::EROFS)
+    }
+
+    /// Create a hard link.
+    fn link(&mut self, path: &str, target: &str) -> Result<(), Errno> {
+        let _ = (path, target);
+        Err(Errno::EROFS)
+    }
+
+    /// Change permission bits.
+    fn chmod(&mut self, path: &str, mode: u16) -> Result<(), Errno> {
+        let _ = (path, mode);
+        Err(Errno::EROFS)
+    }
+
+    /// Change the open file's length.
+    fn truncate(&mut self, ino: u32, size: u64) -> Result<(), Errno> {
+        let _ = (ino, size);
+        Err(Errno::EROFS)
+    }
+
+    /// Write file data.
+    fn write(&mut self, ino: u32, offset: u64, data: &[u8]) -> Result<usize, Errno> {
+        let _ = (ino, offset, data);
+        Err(Errno::EROFS)
+    }
+
+    /// Flush the whole filesystem and the block device.
+    fn sync(&mut self) -> Result<(), Errno> {
+        Ok(())
+    }
 }
 
 struct OpenState {
@@ -80,6 +151,13 @@ impl<F: FileSystem> FsHandler<F> {
             .encode(response)
             .map_err(|_| Errno::EPROTO.into())
     }
+
+    fn result(&self, response: &mut [u8], result: Result<(), Errno>) -> HandlerResult<usize> {
+        match result {
+            Ok(()) => self.status(response, 0),
+            Err(error) => self.status(response, -i32::from(error.0)),
+        }
+    }
 }
 
 fn bytes_to_string(bytes: &[u8]) -> Result<&str, Errno> {
@@ -100,19 +178,33 @@ impl<F: FileSystem> Handler for FsHandler<F> {
         if expected != path {
             return Err(Errno::EINVAL.into());
         }
-        if flags.writable() || flags.create() || flags.truncate() || flags.append() {
+        let mutating = flags.writable() || flags.create() || flags.truncate() || flags.append();
+        if mutating && self.fs.is_read_only() {
             return Err(Errno::EROFS.into());
         }
         if self.opens.len() >= MAX_OPEN_FILES {
             return Err(Errno::EMFILE.into());
         }
-        let ino = self.fs.resolve(path)?;
+        let ino = if flags.create() {
+            let mode = u16::try_from(flags.create_mode().unwrap_or(0o644) & 0o7777)
+                .map_err(|_| Errno::EINVAL)?;
+            self.fs.create_file(path, mode, flags.exclusive())?
+        } else {
+            self.fs.resolve(path)?
+        };
+        if flags.truncate() {
+            self.fs.truncate(ino, 0)?;
+        }
         let stat = self.fs.stat(ino)?;
         if flags.directory() && stat.mode & S_IFMT != S_IFDIR {
             return Err(Errno::ENOTDIR.into());
         }
+        let cursor = if flags.append() { stat.size } else { 0 };
         self.opens
             .insert_with_id(file_id, OpenState { ino, dir_cookie: 0 }, flags)?;
+        if let Some(open) = self.opens.get_mut(file_id) {
+            open.set_cursor(cursor);
+        }
         Ok(Opened::File(file_id))
     }
 
@@ -147,11 +239,28 @@ impl<F: FileSystem> Handler for FsHandler<F> {
         }
     }
 
-    fn write(&mut self, file: u64, _offset: u64, _buffer: &[u8]) -> HandlerResult<usize> {
-        if self.opens.get(file).is_none() {
+    fn write(&mut self, file: u64, offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
+        if offset != 0 {
+            return Err(Errno::EINVAL.into());
+        }
+        let (ino, cursor, flags) = {
+            let open = self.opens.get(file).ok_or(Errno::EBADF)?;
+            (open.file.ino, open.cursor(), open.flags)
+        };
+        if !flags.writable() {
             return Err(Errno::EBADF.into());
         }
-        Err(Errno::EROFS.into())
+        if self.fs.is_read_only() {
+            return Err(Errno::EROFS.into());
+        }
+        let written = self.fs.write(ino, cursor, buffer)?;
+        let open = self.opens.get_mut(file).ok_or(Errno::EBADF)?;
+        let cursor = open
+            .cursor()
+            .checked_add(written as u64)
+            .ok_or(Errno::EFBIG)?;
+        open.set_cursor(cursor);
+        Ok(written)
     }
 
     fn close(&mut self, file: u64) -> HandlerResult<()> {
@@ -201,14 +310,60 @@ impl<F: FileSystem> Handler for FsHandler<F> {
             }
             .encode(response)
             .map_err(|_| Errno::EPROTO.into()),
-            Call::Sync => self.status(response, 0),
-            Call::Mkdir { .. }
-            | Call::Unlink { .. }
-            | Call::Rmdir { .. }
-            | Call::Rename { .. }
-            | Call::Truncate { .. }
-            | Call::Symlink { .. }
-            | Call::Chmod { .. } => self.status(response, -i32::from(Errno::EROFS.0)),
+            Call::Sync => {
+                let result = self.fs.sync();
+                self.result(response, result)
+            }
+            Call::Mkdir { mode, path } => {
+                let path = bytes_to_string(path)?;
+                let mode = u16::try_from(mode & 0o7777).map_err(|_| Errno::EINVAL)?;
+                let result = self.fs.mkdir(path, mode);
+                self.result(response, result)
+            }
+            Call::Unlink { path } => {
+                let path = bytes_to_string(path)?;
+                let result = self.fs.unlink(path);
+                self.result(response, result)
+            }
+            Call::Rmdir { path } => {
+                let path = bytes_to_string(path)?;
+                let result = self.fs.rmdir(path);
+                self.result(response, result)
+            }
+            Call::Rename { from, to } => {
+                let from = bytes_to_string(from)?;
+                let to = bytes_to_string(to)?;
+                let result = self.fs.rename(from, to);
+                self.result(response, result)
+            }
+            Call::Truncate { size } => {
+                let (ino, flags) = {
+                    let open = self.opens.get(file).ok_or(Errno::EBADF)?;
+                    (open.file.ino, open.flags)
+                };
+                if !flags.writable() {
+                    return self.status(response, -i32::from(Errno::EBADF.0));
+                }
+                let result = self.fs.truncate(ino, size);
+                if result.is_ok()
+                    && let Some(open) = self.opens.get_mut(file)
+                    && open.cursor() > size
+                {
+                    open.set_cursor(size);
+                }
+                self.result(response, result)
+            }
+            Call::Symlink { path, target } => {
+                let path = bytes_to_string(path)?;
+                let result = self.fs.symlink(path, target);
+                self.result(response, result)
+            }
+            Call::Chmod { mode, path } => {
+                let path = bytes_to_string(path)?;
+                let mode = u16::try_from(mode & 0o7777).map_err(|_| Errno::EINVAL)?;
+                let result = self.fs.chmod(path, mode);
+                self.result(response, result)
+            }
             Call::Mount { .. } | Call::Umount { .. } => {
                 self.status(response, -i32::from(Errno::EINVAL.0))
             }

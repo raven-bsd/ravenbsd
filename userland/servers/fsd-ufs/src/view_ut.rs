@@ -8,6 +8,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use raven_proto_fs::{DirEntryIter, S_IFLNK, S_IFMT, S_IFREG};
+use ufs_core::check::{Mode, check};
 use ufs_core::mkfs::{MkfsOptions, format};
 use ufs_core::{BlockIo, IoError};
 
@@ -181,6 +182,25 @@ fn statfs_reports_the_formatted_geometry() {
     assert!(stat.files > 0);
     assert!(stat.free_blocks <= stat.blocks);
     assert!(stat.free_files <= stat.files);
+}
+
+#[test]
+fn a_write_cycle_remounts_clean() {
+    let disk = VecDisk::new(vec![0u8; options().size as usize]);
+    let mut ufs = format(disk, &options()).expect("format");
+    let root = ufs.root();
+    let file = ufs.create(root, b"a.txt", 0o644, 0, 0).expect("create");
+    ufs.write(file, 0, b"payload\n").expect("write");
+    let dir = ufs.mkdir(root, b"dir", 0o755, 0, 0).expect("mkdir");
+    ufs.rename(root, b"a.txt", dir, b"b.txt").expect("rename");
+    ufs.symlink(dir, b"link", b"b.txt", 0, 0).expect("symlink");
+    ufs.unlink(dir, b"b.txt").expect("unlink");
+    ufs.unlink(dir, b"link").expect("unlink link");
+    ufs.rmdir(root, b"dir").expect("rmdir");
+    let disk = ufs.unmount().expect("unmount");
+    let mut disk = disk;
+    let report = check(&mut disk, Mode::ReadOnly).expect("check");
+    assert!(report.clean_after, "{:?}", report.findings);
 }
 
 #[test]
