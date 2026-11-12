@@ -1,0 +1,40 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt LS 1
+.Os RavenBSD
+.Sh NAME
+.Nm ls
+.Nd list directory contents
+.Sh SYNOPSIS
+.Nm
+.Op Fl alh
+.Op Ar path ...
+.Sh DESCRIPTION
+The
+.Nm
+utility lists directory entries sorted by name.
+Without a
+.Ar path ,
+the current directory is listed.
+Directories get a trailing
+.Sq /
+in short listings.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl a
+Include names beginning with a dot.
+.It Fl h
+Accepted for compatibility; sizes are printed in bytes.
+.It Fl l
+Print the mode string, size and name.
+.El
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr cat 1 ,
+.Xr stat 1
+.Sh STANDARDS
+RavenBSD.

@@ -1,0 +1,25 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt RMDIR 1
+.Os RavenBSD
+.Sh NAME
+.Nm rmdir
+.Nd remove empty directories
+.Sh SYNOPSIS
+.Nm
+.Ar directory ...
+.Sh DESCRIPTION
+The
+.Nm
+utility removes each empty
+.Ar directory .
+A non-empty directory is an error.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr mkdir 1 ,
+.Xr rm 1
+.Sh STANDARDS
+RavenBSD.

@@ -1,0 +1,28 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt CAT 1
+.Os RavenBSD
+.Sh NAME
+.Nm cat
+.Nd concatenate files to the console
+.Sh SYNOPSIS
+.Nm
+.Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility writes each
+.Ar file
+to the console in order.
+There is no standard input in this milestone; a lone
+.Sq -
+is treated as a file name and fails to open.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr cp 1 ,
+.Xr ls 1
+.Sh STANDARDS
+RavenBSD.

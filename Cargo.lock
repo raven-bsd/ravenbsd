@@ -315,6 +315,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-cat"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-cmdline"
 version = "0.1.0"
 
@@ -335,6 +344,24 @@ dependencies = [
  "raven-abi",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "raven-cp"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
+name = "raven-df"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
 ]
 
 [[package]]
@@ -511,12 +538,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-ls"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-mem"
 version = "0.1.0"
 
 [[package]]
+name = "raven-mkdir"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-msi"
 version = "0.1.0"
+
+[[package]]
+name = "raven-mv"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
 
 [[package]]
 name = "raven-netcore"
@@ -641,6 +695,24 @@ dependencies = [
 [[package]]
 name = "raven-ringbuf"
 version = "0.1.0"
+
+[[package]]
+name = "raven-rm"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
+name = "raven-rmdir"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
 
 [[package]]
 name = "raven-rmm"
@@ -823,6 +895,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-stat"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-svc-manifest"
 version = "0.1.0"
 
@@ -864,6 +945,25 @@ dependencies = [
 [[package]]
 name = "raven-timemath"
 version = "0.1.0"
+
+[[package]]
+name = "raven-tool-core"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-touch"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
 
 [[package]]
 name = "raven-uname"

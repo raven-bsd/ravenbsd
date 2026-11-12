@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "tooltest"
+exec = "/bin/raven-tooltest"
+needs = ["scheme:file"]
+grants = ["initfs"]
+readiness = "exit"
+restart = "on-failure"
+max_restarts = 0
+ready_timeout_ms = 60_000

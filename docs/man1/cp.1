@@ -1,0 +1,34 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt CP 1
+.Os RavenBSD
+.Sh NAME
+.Nm cp
+.Nd copy files and directories
+.Sh SYNOPSIS
+.Nm
+.Op Fl r
+.Ar source target
+.Sh DESCRIPTION
+The
+.Nm
+utility copies
+.Ar source
+to
+.Ar target
+in 4 KiB chunks.
+If
+.Ar target
+is an existing directory, the copy is created below it using the source's final path component.
+.Pp
+With
+.Fl r ,
+directories are copied recursively; without it a directory source is an error.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr mv 1
+.Sh STANDARDS
+RavenBSD.

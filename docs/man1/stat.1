@@ -1,0 +1,28 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt STAT 1
+.Os RavenBSD
+.Sh NAME
+.Nm stat
+.Nd display file status
+.Sh SYNOPSIS
+.Nm
+.Ar path ...
+.Sh DESCRIPTION
+The
+.Nm
+utility prints the K60
+.Vt Stat
+record for each
+.Ar path :
+inode, size, blocks, mode, link count, owner and group, and the access, modification and change
+times.
+Times are whole seconds since the Unix epoch.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr ls 1
+.Sh STANDARDS
+RavenBSD.

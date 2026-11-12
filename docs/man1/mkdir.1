@@ -1,0 +1,29 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt MKDIR 1
+.Os RavenBSD
+.Sh NAME
+.Nm mkdir
+.Nd create directories
+.Sh SYNOPSIS
+.Nm
+.Op Fl p
+.Ar directory ...
+.Sh DESCRIPTION
+The
+.Nm
+utility creates each
+.Ar directory
+with mode 0755.
+.Pp
+With
+.Fl p ,
+every missing parent is created; an existing directory is not an error.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr rmdir 1
+.Sh STANDARDS
+RavenBSD.
