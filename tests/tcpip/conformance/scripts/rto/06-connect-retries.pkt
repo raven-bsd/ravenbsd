@@ -1,0 +1,8 @@
+# area: rto
+# ref: RFC 6298; spec/tcpip/state-machine.md 6
+0.000 socket() = 3
+0.000 connect(3, ..., 8080) = 0
++0.050 > SEC 0:0(0) win 65535
++1.100 > SEC 0:0(0) win 65535
++2.100 > SEC 0:0(0) win 65535
++4.100 > SEC 0:0(0) win 65535

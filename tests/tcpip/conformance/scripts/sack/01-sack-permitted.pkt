@@ -1,0 +1,9 @@
+# area: sack
+# ref: RFC 2018; spec/tcpip/features.md 4
+0.000 socket() = 3
+0.000 bind(3, ..., 8080) = 0
+0.000 listen(3, 1) = 0
++0.100 < S 0:0(0) win 65535 <mss 1460,sackOK>
++0.050 > S. 0:0(0) ack 1 <sackOK>
++0.050 < . 1:1(0) ack 1 win 65535
++0.000 accept(3, ..., 0) = 4

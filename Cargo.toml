@@ -60,6 +60,7 @@ members = [
     "userland/servers/coretest",
     "tests/net/packetdrill-harness",
     "tests/tcpip",
+    "tests/tcpip/conformance",
     "tools/bench-host",
 ]
 default-members = ["crates/*"]

@@ -1,0 +1,8 @@
+# area: options
+# ref: RFC 9293; spec/tcpip/features.md 3
+# skip: C20-D15 the clamped peer MSS is only visible through SocketInfo
+0.000 socket() = 3
+0.000 bind(3, ..., 8080) = 0
+0.000 listen(3, 1) = 0
++0.100 < S 0:0(0) win 65535 <mss 100,sackOK>
++0.050 > S. 0:0(0) ack 1
