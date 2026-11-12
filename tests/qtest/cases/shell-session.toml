@@ -40,18 +40,6 @@ regex = '^ls$'
 regex = '^uname$'
 
 [[expect]]
-regex = '^logd running \d+$'
-
-[[expect]]
-regex = '^consd running \d+$'
-
-[[expect]]
-regex = '^vfsd running \d+$'
-
-[[expect]]
-regex = '^ramfsd running \d+$'
-
-[[expect]]
 regex = '^cat: /nonexistent: no such file or directory$'
 
 [[expect]]
@@ -145,19 +133,19 @@ send = "svcctl list\n"
 delay_ms = 100
 
 [[step]]
-wait = '^logd running \d+$'
-timeout_secs = 30
-
-[[step]]
 wait = '^consd running \d+$'
 timeout_secs = 30
 
 [[step]]
-wait = '^vfsd running \d+$'
+wait = '^logd running \d+$'
 timeout_secs = 30
 
 [[step]]
 wait = '^ramfsd running \d+$'
+timeout_secs = 30
+
+[[step]]
+wait = '^vfsd running \d+$'
 timeout_secs = 30
 
 [[step]]
@@ -177,7 +165,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "exit\n"
+send = "exit 0\n"
 delay_ms = 100
 
 [[step]]

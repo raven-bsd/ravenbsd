@@ -20,6 +20,7 @@ mod program {
     use alloc::format;
     use alloc::string::{String, ToString};
     use alloc::vec::Vec;
+    use core::sync::atomic::{AtomicU32, Ordering};
 
     use raven_abi::errno::Errno;
     use raven_abi::types::Handle;
@@ -82,16 +83,17 @@ mod program {
         Failed(String),
     }
 
-    /// The spawn thread's input and output.
+    /// The session thread's state: the shell, its exit status and a done word.
     ///
-    /// `spawn` builds a 64 KiB stack image on the caller's stack, and this process is itself
-    /// spawned with a 64 KiB stack, so the call runs on a thread with room for it.
-    static JOB: Mutex<Option<Job>> = Mutex::new(None);
-    static RESULT: Mutex<Option<Child>> = Mutex::new(None);
-    /// The parsed initfs table, shared with the spawn thread.
+    /// `spawn` builds a 64 KiB stack image on the caller's stack, and this process is spawned
+    /// with a 64 KiB stack, so the session runs on a thread with room for it.
+    static SHELL: Mutex<Option<Shell>> = Mutex::new(None);
+    static EXIT_CODE: Mutex<Option<i32>> = Mutex::new(None);
+    static SHELL_DONE: AtomicU32 = AtomicU32::new(0);
+    /// The parsed initfs table, shared with the session thread.
     static INITFS: Mutex<Option<Initfs<'static>>> = Mutex::new(None);
-    /// Stack for the spawn thread.
-    const SPAWN_STACK: usize = 256 * 1024;
+    /// Stack for the session thread.
+    const SHELL_STACK: usize = 256 * 1024;
 
     impl Vars for Shell {
         fn get(&self, name: &str) -> Option<String> {
@@ -135,32 +137,29 @@ mod program {
         for name in ["PATH", "HOME", "USER", "SHELL", "PWD"] {
             shell.exported.push(name.to_string());
         }
-
         raven_rt::println!("rsh: ready");
-        shell.run_startup_script();
+        *SHELL.lock() = Some(shell);
 
-        while shell.running {
-            shell.prompt();
-            match shell.read_line() {
-                Line::Ok(text) => {
-                    if text.trim().is_empty() {
-                        continue;
-                    }
-                    shell.run_line(&text);
-                }
-                Line::Interrupted => {
-                    // consd already echoed `^C`; start a fresh line.
-                    shell.status = 130;
-                }
-                Line::Eof => break,
-                Line::Failed(error) => {
-                    raven_rt::eprintln!("rsh: console: {}", error.description());
-                    return Ok(1);
-                }
-            }
+        // The whole session runs on a thread with room for `spawn`'s stack image.
+        let thread = raven_rt::thread::spawn(shell_thread, 0, SHELL_STACK)
+            .map_err(|error| format!("shell thread: {}", error.description()))?;
+        // The thread owns the session; detaching it leaks its stack until exit, which is fine.
+        drop(thread);
+        while SHELL_DONE.load(Ordering::Acquire) == 0 {
+            let _ = raven_rt::futex_wait(&SHELL_DONE, 0, None);
         }
-        let _ = client.close(tty);
-        Ok(shell.status)
+        Ok(EXIT_CODE.lock().take().unwrap_or(1))
+    }
+
+    /// Entry of the session thread: run the shell loop and publish its status.
+    fn shell_thread(_argument: usize) {
+        let code = match SHELL.lock().take() {
+            Some(mut shell) => shell.run_loop(),
+            None => 1,
+        };
+        *EXIT_CODE.lock() = Some(code);
+        SHELL_DONE.store(1, Ordering::Release);
+        let _ = raven_rt::futex_wake(&SHELL_DONE, u32::MAX);
     }
 
     fn flags(value: u32) -> Result<u32, String> {
@@ -168,6 +167,33 @@ mod program {
     }
 
     impl Shell {
+        /// Run the prompt/read/evaluate loop until `exit`, EOF or a console error.
+        fn run_loop(&mut self) -> i32 {
+            self.run_startup_script();
+            while self.running {
+                self.prompt();
+                match self.read_line() {
+                    Line::Ok(text) => {
+                        if text.trim().is_empty() {
+                            continue;
+                        }
+                        self.run_line(&text);
+                    }
+                    Line::Interrupted => {
+                        // consd already echoed `^C`; start a fresh line.
+                        self.status = 130;
+                    }
+                    Line::Eof => break,
+                    Line::Failed(error) => {
+                        raven_rt::eprintln!("rsh: console: {}", error.description());
+                        return 1;
+                    }
+                }
+            }
+            let _ = Client::new().close(self.tty);
+            self.status
+        }
+
         fn prompt(&self) {
             let _ = Client::new().write(self.tty, 0, PROMPT);
         }
@@ -480,30 +506,14 @@ mod program {
                 args: words.to_vec(),
                 env: self.environment(),
             };
-            *JOB.lock() = Some(job);
-            let thread = match raven_rt::thread::spawn(spawn_thread, 0, SPAWN_STACK) {
-                Ok(thread) => thread,
-                Err(error) => {
-                    raven_rt::eprintln!("rsh: {}: {}", name, error.description());
-                    return 1;
-                }
-            };
-            if let Err(error) = thread.join() {
-                raven_rt::eprintln!("rsh: {}: {}", name, error.description());
-                return 1;
-            }
-            match RESULT.lock().take() {
-                Some(Child::Exit(code)) => code,
-                Some(Child::NotFound) => {
+            match run_child(&job) {
+                Child::Exit(code) => code,
+                Child::NotFound => {
                     raven_rt::eprintln!("rsh: {}: command not found", name);
                     127
                 }
-                Some(Child::Failed(message)) => {
+                Child::Failed(message) => {
                     raven_rt::eprintln!("rsh: {}: {}", name, message);
-                    126
-                }
-                None => {
-                    raven_rt::eprintln!("rsh: {}: spawned nothing", name);
                     126
                 }
             }
@@ -576,16 +586,6 @@ mod program {
                 normalize(&format!("{}/{}", self.cwd, path))
             }
         }
-    }
-
-    /// Thread entry: run the queued child with a stack large enough for `spawn`.
-    fn spawn_thread(_argument: usize) {
-        let job = JOB.lock().take();
-        let outcome = match job {
-            Some(job) => run_child(&job),
-            None => Child::Failed("spawn thread started without a job".to_string()),
-        };
-        *RESULT.lock() = Some(outcome);
     }
 
     /// Build the child's stack image, spawn it and wait for it.
