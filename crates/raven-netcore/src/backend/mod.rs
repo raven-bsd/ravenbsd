@@ -9,6 +9,8 @@ use raven_abi::errno::Errno;
 
 use crate::{Event, Ipv4Addr, SocketId};
 
+#[cfg(feature = "backend-raven-tcpip")]
+pub mod raven;
 pub mod smoltcp;
 
 /// A replaceable TCP/IP stack behind the nonblocking socket core.

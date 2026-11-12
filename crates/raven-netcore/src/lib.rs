@@ -23,13 +23,20 @@ mod core;
 
 pub use address::Ipv4Addr;
 pub use backend::StackBackend;
+#[cfg(feature = "backend-raven-tcpip")]
+pub use backend::raven::RavenTcpipBackend;
 pub use backend::smoltcp::SmoltcpBackend;
 pub use core::Core;
 
 pub use raven_abi::errno::Errno;
 
 /// The smoltcp-backed core, preserving the B07 name.
+#[cfg(not(feature = "backend-raven-tcpip"))]
 pub type NetCore<D> = Core<SmoltcpBackend<D>>;
+
+/// The native raven-tcpip-backed core, selected by `backend-raven-tcpip`.
+#[cfg(feature = "backend-raven-tcpip")]
+pub type NetCore<D> = Core<backend::raven::RavenTcpipBackend<D>>;
 
 /// Socket identifier.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
