@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! The nonblocking socket core: a smoltcp interface, socket table and readiness tracking.
+//! The smoltcp implementation of [`StackBackend`].
 
 use alloc::collections::BTreeMap;
 use alloc::vec;
@@ -15,6 +15,7 @@ use smoltcp::time::Instant;
 use smoltcp::wire::{EthernetAddress, HardwareAddress, IpAddress, IpCidr, IpEndpoint, Ipv4Cidr};
 
 use crate::Ipv4Addr;
+use crate::backend::StackBackend;
 
 const TCP_BUFFER_SIZE: usize = 65_536;
 const UDP_METADATA_SLOTS: usize = 32;
@@ -23,35 +24,10 @@ const EPHEMERAL_START: u16 = 49_152;
 const EPHEMERAL_COUNT: u32 = (u16::MAX - EPHEMERAL_START + 1) as u32;
 const CONNECT_TIMEOUT_MS: i64 = 30_000;
 
-/// A socket identifier.
-///
-/// Ids are allocated monotonically. A freed id is not reused until the `u32` counter wraps;
-/// callers may therefore keep an id in an event queue without confusing it with a later socket.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SocketId(pub u32);
-
-/// A readiness transition observed by [`NetCore::poll`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Event {
-    /// The socket has data that can be read.
-    Readable(SocketId),
-    /// The socket has room for more data.
-    Writable(SocketId),
-    /// The peer closed the connection or the local close completed.
-    Closed(SocketId),
-    /// The connection failed; the socket is closed.
-    Error(SocketId, Errno),
-    /// A listener completed a handshake and has a connection ready for `tcp_accept`.
-    Accepted {
-        /// The listening socket.
-        listener: SocketId,
-        /// The new connection socket.
-        conn: SocketId,
-    },
-}
+use crate::{Event, SocketId};
 
 /// A nonblocking socket core over a smoltcp [`Device`].
-pub struct NetCore<D: Device> {
+pub struct SmoltcpBackend<D: Device> {
     device: D,
     iface: Interface,
     sockets: SocketSet<'static>,
@@ -92,7 +68,7 @@ struct TcpRecord {
     locally_closed: bool,
 }
 
-impl<D: Device> NetCore<D> {
+impl<D: Device> SmoltcpBackend<D> {
     /// Create a core over `device` with Ethernet address `mac`.
     ///
     /// `now_ms` is the initial monotonic time in milliseconds. The device must use the Ethernet
@@ -120,14 +96,17 @@ impl<D: Device> NetCore<D> {
         if let Some(handle) = self.dhcp.take() {
             drop(self.sockets.remove(handle));
         }
-        let cidr = Ipv4Cidr::new(addr, prefix.min(32));
+        let cidr = Ipv4Cidr::new(smol(addr), prefix.min(32));
         self.iface.update_ip_addrs(|addrs| {
             addrs.clear();
             let _ = addrs.push(IpCidr::Ipv4(cidr));
         });
         self.iface.routes_mut().remove_default_ipv4_route();
         if let Some(gateway) = gateway {
-            let _ = self.iface.routes_mut().add_default_ipv4_route(gateway);
+            let _ = self
+                .iface
+                .routes_mut()
+                .add_default_ipv4_route(smol(gateway));
         }
     }
 
@@ -248,7 +227,7 @@ impl<D: Device> NetCore<D> {
         socket
             .connect(
                 self.iface.context(),
-                (IpAddress::Ipv4(remote_addr), remote_port),
+                (IpAddress::Ipv4(smol(remote_addr)), remote_port),
                 local_port,
             )
             .map_err(|_| Errno::EADDRNOTAVAIL)?;
@@ -460,7 +439,7 @@ impl<D: Device> NetCore<D> {
             Kind::Tcp(_) | Kind::Listener(_) => return Err(Errno::ENOTSOCK),
         };
         let socket = self.sockets.get_mut::<udp::Socket>(handle);
-        let endpoint = IpEndpoint::new(IpAddress::Ipv4(to.0), to.1);
+        let endpoint = IpEndpoint::new(IpAddress::Ipv4(smol(to.0)), to.1);
         match socket.send_slice(data, endpoint) {
             Ok(()) => Ok(data.len()),
             Err(udp::SendError::BufferFull) => Err(Errno::EAGAIN),
@@ -489,7 +468,7 @@ impl<D: Device> NetCore<D> {
             #[allow(unreachable_patterns)]
             _ => return Err(Errno::EAFNOSUPPORT),
         };
-        Ok((length, (addr, metadata.endpoint.port)))
+        Ok((length, (ours(addr), metadata.endpoint.port)))
     }
 
     /// Drive the interface, apply DHCP updates and return readiness transitions since the last call.
@@ -874,4 +853,86 @@ fn random_seed(mac: [u8; 6], now_ms: i64) -> u64 {
         seed = seed.rotate_left(9) ^ u64::from(byte).wrapping_mul(0x100_0000_01b3);
     }
     seed
+}
+
+impl<D: Device> StackBackend for SmoltcpBackend<D> {
+    type Device = D;
+
+    fn set_ipv4(&mut self, addr: Ipv4Addr, prefix: u8, gateway: Option<Ipv4Addr>) {
+        SmoltcpBackend::set_ipv4(self, addr, prefix, gateway);
+    }
+
+    fn enable_dhcp(&mut self) {
+        SmoltcpBackend::enable_dhcp(self);
+    }
+
+    fn tcp_listen(&mut self, port: u16, backlog: usize) -> Result<SocketId, Errno> {
+        SmoltcpBackend::tcp_listen(self, port, backlog)
+    }
+
+    fn tcp_accept(&mut self, listener: SocketId) -> Result<Option<SocketId>, Errno> {
+        SmoltcpBackend::tcp_accept(self, listener)
+    }
+
+    fn tcp_connect(
+        &mut self,
+        remote: (Ipv4Addr, u16),
+        local_port: Option<u16>,
+    ) -> Result<SocketId, Errno> {
+        SmoltcpBackend::tcp_connect(self, remote, local_port)
+    }
+
+    fn send(&mut self, s: SocketId, data: &[u8]) -> Result<usize, Errno> {
+        SmoltcpBackend::send(self, s, data)
+    }
+
+    fn recv(&mut self, s: SocketId, buf: &mut [u8]) -> Result<usize, Errno> {
+        SmoltcpBackend::recv(self, s, buf)
+    }
+
+    fn shutdown_write(&mut self, s: SocketId) -> Result<(), Errno> {
+        SmoltcpBackend::shutdown_write(self, s)
+    }
+
+    fn close(&mut self, s: SocketId) -> Result<(), Errno> {
+        SmoltcpBackend::close(self, s)
+    }
+
+    fn udp_bind(&mut self, port: u16) -> Result<SocketId, Errno> {
+        SmoltcpBackend::udp_bind(self, port)
+    }
+
+    fn udp_send_to(
+        &mut self,
+        s: SocketId,
+        data: &[u8],
+        to: (Ipv4Addr, u16),
+    ) -> Result<usize, Errno> {
+        SmoltcpBackend::udp_send_to(self, s, data, to)
+    }
+
+    fn udp_recv_from(
+        &mut self,
+        s: SocketId,
+        buf: &mut [u8],
+    ) -> Result<(usize, (Ipv4Addr, u16)), Errno> {
+        SmoltcpBackend::udp_recv_from(self, s, buf)
+    }
+
+    fn poll(&mut self, now_ms: i64) -> Vec<Event> {
+        SmoltcpBackend::poll(self, now_ms)
+    }
+
+    fn next_poll_delay_ms(&mut self, now_ms: i64) -> Option<u64> {
+        SmoltcpBackend::next_poll_delay_ms(self, now_ms)
+    }
+}
+
+fn smol(addr: Ipv4Addr) -> smoltcp::wire::Ipv4Address {
+    let [a, b, c, d] = addr.octets();
+    smoltcp::wire::Ipv4Address::new(a, b, c, d)
+}
+
+fn ours(addr: smoltcp::wire::Ipv4Address) -> Ipv4Addr {
+    Ipv4Addr::from_octets(addr.octets())
 }

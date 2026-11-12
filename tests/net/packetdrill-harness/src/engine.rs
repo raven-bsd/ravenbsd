@@ -8,7 +8,8 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
 use raven_netcore::testutil::{PairConfig, PairDevice};
-use raven_netcore::{Device, Ipv4Addr, NetCore, SocketId};
+use raven_netcore::{Ipv4Addr, NetCore, SocketId};
+use smoltcp::phy::Device;
 use smoltcp::phy::{RxToken, TxToken};
 use smoltcp::time::Instant as SmolInstant;
 

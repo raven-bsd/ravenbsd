@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! OS-independent socket layer over smoltcp.
+//! OS-independent, backend-agnostic nonblocking socket layer.
 //!
-//! [`NetCore`] owns a smoltcp interface, a socket set and a table of socket ids. Every operation
-//! is nonblocking: `send`/`recv` return [`Errno::EAGAIN`] when a buffer is empty or full, and
-//! [`NetCore::poll`] drives the stack and returns readiness *transitions* since the previous
-//! call.
+//! [`Core`] owns a [`StackBackend`] and a socket-id table. [`NetCore`] keeps the B07 name as the
+//! smoltcp-backed alias. Every operation is nonblocking: `send`/`recv` return [`Errno::EAGAIN`]
+//! when a buffer is empty or full, and [`Core::poll`] drives the backend and returns readiness
+//! *transitions* since the previous call. No smoltcp type is re-exported from this crate.
 //!
 //! The crate is `no_std` and needs only `alloc`. Tests and host harnesses use the in-memory
-//! [`testutil::PairDevice`] link.
+//! `testutil::PairDevice` link.
 
 #![no_std]
 #![forbid(unsafe_code)]
@@ -17,13 +17,38 @@
 
 extern crate alloc;
 
-mod netcore;
+mod address;
+mod backend;
+mod core;
 
-pub use netcore::{Event, NetCore, SocketId};
+pub use address::Ipv4Addr;
+pub use backend::StackBackend;
+pub use backend::smoltcp::SmoltcpBackend;
+pub use core::Core;
 
 pub use raven_abi::errno::Errno;
-pub use smoltcp::phy::Device;
-pub use smoltcp::wire::Ipv4Address as Ipv4Addr;
+
+/// The smoltcp-backed core, preserving the B07 name.
+pub type NetCore<D> = Core<SmoltcpBackend<D>>;
+
+/// Socket identifier.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SocketId(pub u32);
+
+/// Readiness transition.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Event {
+    /// Readable.
+    Readable(SocketId),
+    /// Writable.
+    Writable(SocketId),
+    /// Closed.
+    Closed(SocketId),
+    /// Error.
+    Error(SocketId, Errno),
+    /// Accepted connection.
+    Accepted { listener: SocketId, conn: SocketId },
+}
 
 #[cfg(any(test, feature = "testutil"))]
 pub mod testutil;
