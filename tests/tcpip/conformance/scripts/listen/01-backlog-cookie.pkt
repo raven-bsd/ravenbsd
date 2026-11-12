@@ -1,0 +1,12 @@
+# area: listen
+# ref: RFC 9293 / RFC 4987; spec/tcpip/state-machine.md 5
+0.000 sysctl("tcp.syn_cookies_enable", 1) = 0
+0.000 sysctl("tcp.half_open_limit", 1) = 0
+0.000 socket() = 3
+0.000 bind(3, ..., 8080) = 0
+0.000 listen(3, 1) = 0
++0.100 < S 0:0(0) win 65535
++0.050 > S. 0:0(0) ack 1
++0.000 peerport(40001) = 0
++0.000 < S 0:0(0) win 65535
++0.050 > S. * ack 1

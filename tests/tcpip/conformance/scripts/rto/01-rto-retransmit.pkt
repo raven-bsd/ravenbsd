@@ -1,0 +1,12 @@
+# area: rto
+# ref: RFC 6298; spec/tcpip/state-machine.md 6
+0.000 socket() = 3
+0.000 bind(3, ..., 8080) = 0
+0.000 listen(3, 1) = 0
++0.100 < S 0:0(0) win 65535 <mss 1460,sackOK,nop,wscale 7>
++0.050 > S. 0:0(0) ack 1
++0.050 < . 1:1(0) ack 1 win 65535
++0.000 accept(3, ..., 0) = 4
++0.000 write(4, ..., 10) = 10
++0.050 > P. 1:11(10) ack 1
++1.100 > P. 1:11(10) ack 1

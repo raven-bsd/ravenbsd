@@ -1,0 +1,7 @@
+# area: listen
+# ref: RFC 9293 / RFC 4987; spec/tcpip/state-machine.md 5
+# skip: C20-D14 two full handshakes need a second peer ISN
+0.000 sysctl("tcp.accept_queue_limit", 1) = 0
+0.000 socket() = 3
+0.000 bind(3, ..., 8080) = 0
+0.000 listen(3, 8) = 0

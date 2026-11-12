@@ -1,0 +1,15 @@
+# area: establishment
+# ref: RFC 9293; spec/tcpip/state-machine.md 2
+0.000 socket() = 3
+0.000 bind(3, ..., 8080) = 0
+0.000 listen(3, 1) = 0
++0.100 < S 0:0(0) win 65535 <mss 1460,sackOK,nop,wscale 7>
++0.050 > S. 0:0(0) ack 1
++0.050 < . 1:1(0) ack 1 win 65535
++0.000 accept(3, ..., 0) = 4
++0.000 < F. 1:1(0) ack 1 win 65535
++0.050 > . 1:1(0) ack 2
++0.050 < P. 2:4(2) ack 1 win 65535
++0.050 > . 1:1(0) ack 4
++0.000 read(4, ..., 2) = 2
++0.000 > . 1:1(0) ack 4

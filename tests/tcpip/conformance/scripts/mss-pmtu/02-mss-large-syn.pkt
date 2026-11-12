@@ -1,0 +1,9 @@
+# area: mss-pmtu
+# ref: RFC 9293 / RFC 1191 / RFC 8899; spec/tcpip/features.md 3,8
+0.000 socket() = 3
+0.000 bind(3, ..., 8080) = 0
+0.000 listen(3, 1) = 0
++0.100 < S 0:0(0) win 65535 <mss 8960,sackOK>
++0.050 > S. 0:0(0) ack 1 <mss 1446>
++0.050 < . 1:1(0) ack 1 win 65535
++0.000 accept(3, ..., 0) = 4
