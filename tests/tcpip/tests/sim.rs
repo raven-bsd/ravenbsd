@@ -347,6 +347,40 @@ fn sim_advances_to_an_armed_stack_timer() {
     assert_eq!(sim.now(), Instant::from_millis(50));
 }
 
+fn fnv1a(text: &str) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for byte in text.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash
+}
+
+#[test]
+fn determinism_hash_is_stable_across_runs() {
+    let config = LinkConfig {
+        loss_percent: 2.0,
+        duplicate_percent: 5.0,
+        reorder_percent: 5.0,
+        corrupt_percent: 5.0,
+        ..LinkConfig::default()
+    };
+    let run = |seed| {
+        let (mut a, mut b) = Link::new(config, seed);
+        for index in 0..32u8 {
+            send(&mut a, Instant::from_millis(i64::from(index)), &[index; 8]).expect("send");
+        }
+        for time in 0..2_000 {
+            let _ = drain(&mut b, Instant::from_millis(time));
+        }
+        a.link().trace_text()
+    };
+    let first = run(2026);
+    let second = run(2026);
+    assert_eq!(first, second);
+    eprintln!("trace fnv1a = {:016x}", fnv1a(&first));
+}
+
 #[test]
 fn trace_clear_removes_entries() {
     let mut trace = Trace::new();
