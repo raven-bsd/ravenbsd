@@ -17,6 +17,9 @@ workspace = true
 # Builds the in-memory loopback/null devices used by host tests and simulators.
 testutil = []
 
+[dev-dependencies]
+raven-tcpip-wire = { path = "../raven-tcpip-wire" }
+
 [dependencies]
 raven-tcpip-wire = { path = "../raven-tcpip-wire" }
 raven-abi = { path = "../raven-abi" }

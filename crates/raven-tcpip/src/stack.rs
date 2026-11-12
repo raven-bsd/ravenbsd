@@ -12,12 +12,18 @@ use raven_prng::{Generator, seed_from_entropy};
 
 use crate::device::Device;
 use crate::event::{Event, PollResult, SocketId};
+use crate::neighbor::NeighborCache;
+use crate::reassembly::Reassembly;
+use crate::route::RouteTable;
 use crate::socket::{Kind, SocketTable};
 use crate::time::{Duration, Instant};
 
 /// Maximum number of armed timers. Exceeding it returns [`Errno::ENOMEM`] rather than allocating
 /// without bound.
 pub const MAX_TIMERS: usize = 256;
+
+/// Maximum frames copied out of the device in one poll.
+const MAX_RX_BATCH: usize = 256;
 
 /// An IPv4 address at the stack boundary.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -38,6 +44,18 @@ impl Ipv4Addr {
     pub const fn octets(self) -> [u8; 4] {
         self.0
     }
+
+    /// Whether this is the unspecified address.
+    #[must_use]
+    pub const fn is_unspecified(self) -> bool {
+        matches!(self.0, [0, 0, 0, 0])
+    }
+
+    /// Whether this is the limited broadcast address.
+    #[must_use]
+    pub const fn is_broadcast(self) -> bool {
+        matches!(self.0, [0xff, 0xff, 0xff, 0xff])
+    }
 }
 
 impl From<[u8; 4]> for Ipv4Addr {
@@ -57,6 +75,17 @@ impl fmt::Display for Ipv4Addr {
         let [a, b, c, d] = self.0;
         write!(f, "{a}.{b}.{c}.{d}")
     }
+}
+
+/// IPv4 configuration set by the caller.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Ipv4Config {
+    /// Interface address.
+    pub addr: Ipv4Addr,
+    /// Prefix length, 0..=32.
+    pub prefix_len: u8,
+    /// Optional default gateway.
+    pub gateway: Option<Ipv4Addr>,
 }
 
 /// The stack's resource limits and identity.
@@ -114,6 +143,16 @@ pub struct Stack<D: Device> {
     pub(crate) now: Instant,
     #[allow(dead_code)]
     pub(crate) rng: Generator,
+    pub(crate) ipv4: Option<Ipv4Config>,
+    pub(crate) routes: RouteTable,
+    pub(crate) neighbors: NeighborCache,
+    pub(crate) reassembly: Reassembly,
+    pub(crate) next_ip_id: u16,
+    pub(crate) pending_tx_frames: usize,
+    pub(crate) ip_errors: Vec<(Ipv4Addr, Errno)>,
+    pub(crate) arp_requests: usize,
+    #[cfg(any(test, feature = "testutil"))]
+    pub(crate) delivered: Vec<(u8, Vec<u8>)>,
     #[cfg(any(test, feature = "testutil"))]
     pub(crate) trace: Vec<Vec<u8>>,
     #[cfg(any(test, feature = "testutil"))]
@@ -139,6 +178,19 @@ impl<D: Device> Stack<D> {
             drops: 0,
             now,
             rng,
+            ipv4: None,
+            routes: RouteTable::new(32),
+            neighbors: NeighborCache::new(config.neighbor_cache_entries),
+            reassembly: Reassembly::new(
+                config.reassembly_bytes,
+                crate::ipv4_stack::REASSEMBLY_TIMEOUT_MS,
+            ),
+            next_ip_id: 1,
+            pending_tx_frames: 0,
+            ip_errors: Vec::new(),
+            arp_requests: 0,
+            #[cfg(any(test, feature = "testutil"))]
+            delivered: Vec::new(),
             #[cfg(any(test, feature = "testutil"))]
             trace: Vec::new(),
             #[cfg(any(test, feature = "testutil"))]
@@ -180,6 +232,8 @@ impl<D: Device> Stack<D> {
         let device = &mut self.device;
         #[cfg(any(test, feature = "testutil"))]
         let trace = &mut self.trace;
+        let mut frames: Vec<Vec<u8>> = Vec::new();
+        let mut overflow = 0usize;
         loop {
             let mut count = 0usize;
             let received = device.receive(now, &mut |_frame| {
@@ -188,14 +242,26 @@ impl<D: Device> Stack<D> {
                 if trace_enabled {
                     trace.push(_frame.to_vec());
                 }
+                if frames.len() < MAX_RX_BATCH {
+                    frames.push(_frame.to_vec());
+                } else {
+                    overflow = overflow.saturating_add(1);
+                }
             });
             result.rx_frames = result.rx_frames.saturating_add(count);
             if !received || count == 0 {
                 break;
             }
         }
+        self.drops = self.drops.saturating_add(overflow);
+        for frame in &frames {
+            self.handle_frame(frame, now);
+        }
+        self.process_ip_timers(now);
 
         self.refresh_events();
+        result.tx_frames = self.pending_tx_frames;
+        self.pending_tx_frames = 0;
         result.dropped = self.drops;
         self.drops = 0;
         result
