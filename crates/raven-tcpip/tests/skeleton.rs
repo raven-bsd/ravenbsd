@@ -7,8 +7,8 @@
 
 use raven_abi::errno::Errno;
 use raven_tcpip::{
-    Device, Duration, Event, Instant, LoopbackDevice, MAX_TIMERS, NullDevice, Stack, StackConfig,
-    TxError,
+    Device, Duration, Event, Instant, IpAddr, LoopbackDevice, MAX_TIMERS, NullDevice, Stack,
+    StackConfig, TxError,
 };
 
 fn stack_with(config: StackConfig, seed: u64) -> Stack<LoopbackDevice> {
@@ -405,7 +405,7 @@ fn udp_recv_from_returns_the_source() {
     let mut buffer = [0u8; 8];
     assert_eq!(
         stack.udp_recv_from(socket, &mut buffer),
-        Ok((4, (source, 53)))
+        Ok((4, (IpAddr::V4(source), 53)))
     );
     assert_eq!(&buffer[..4], b"dns!");
 }

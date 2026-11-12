@@ -3,7 +3,7 @@
 
 //! The stack object, poll loop, timers and event transitions.
 
-use alloc::collections::VecDeque;
+use alloc::collections::{BTreeMap, VecDeque};
 use alloc::vec::Vec;
 use core::fmt;
 
@@ -12,6 +12,7 @@ use raven_prng::{Generator, seed_from_entropy};
 
 use crate::device::Device;
 use crate::event::{Event, PollResult, SocketId};
+use crate::ipv6_stack::{Ipv6Config, Neighbor6Cache, V6Address};
 use crate::neighbor::NeighborCache;
 use crate::reassembly::Reassembly;
 use crate::route::RouteTable;
@@ -168,6 +169,19 @@ pub struct Stack<D: Device> {
     pub(crate) icmp_last_refill: Instant,
     pub(crate) icmp_errors_sent: usize,
     pub(crate) icmp_redirects: usize,
+    pub(crate) ipv6: Ipv6Config,
+    pub(crate) ipv6_states: BTreeMap<crate::ipv6_stack::Ipv6Addr, V6Address>,
+    pub(crate) ipv6_dad: Vec<(crate::ipv6_stack::Ipv6Addr, Instant)>,
+    pub(crate) ipv6_neighbors: Neighbor6Cache,
+    pub(crate) ipv6_gateway: Option<crate::ipv6_stack::Ipv6Addr>,
+    pub(crate) slaac_enabled: bool,
+    pub(crate) v4_mapped_enabled: bool,
+    pub(crate) pmtu6: BTreeMap<crate::ipv6_stack::Ipv6Addr, usize>,
+    pub(crate) dad_conflicts: usize,
+    pub(crate) nd_bad_hop_limit: usize,
+    pub(crate) nd_fragments: usize,
+    pub(crate) icmpv6_errors_sent: usize,
+    pub(crate) router_solicitations: usize,
     #[cfg(any(test, feature = "testutil"))]
     pub(crate) delivered: Vec<(u8, Vec<u8>)>,
     #[cfg(any(test, feature = "testutil"))]
@@ -214,6 +228,19 @@ impl<D: Device> Stack<D> {
             icmp_last_refill: now,
             icmp_errors_sent: 0,
             icmp_redirects: 0,
+            ipv6: Ipv6Config::default(),
+            ipv6_states: BTreeMap::new(),
+            ipv6_dad: Vec::new(),
+            ipv6_neighbors: Neighbor6Cache::new(config.neighbor_cache_entries),
+            ipv6_gateway: None,
+            slaac_enabled: false,
+            v4_mapped_enabled: false,
+            pmtu6: BTreeMap::new(),
+            dad_conflicts: 0,
+            nd_bad_hop_limit: 0,
+            nd_fragments: 0,
+            icmpv6_errors_sent: 0,
+            router_solicitations: 0,
             #[cfg(any(test, feature = "testutil"))]
             delivered: Vec::new(),
             #[cfg(any(test, feature = "testutil"))]

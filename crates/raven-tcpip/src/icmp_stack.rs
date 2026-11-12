@@ -203,7 +203,7 @@ impl<D: Device> Stack<D> {
         self.send_ipv4(&message, destination, 1)
     }
 
-    fn allow_icmp_error(&mut self, now: Instant) -> bool {
+    pub(crate) fn allow_icmp_error(&mut self, now: Instant) -> bool {
         let elapsed = now.saturating_since(self.icmp_last_refill).as_millis();
         self.icmp_last_refill = now;
         let rate = u64::from(self.config.icmp_error_rate_pps);

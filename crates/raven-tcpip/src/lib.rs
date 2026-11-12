@@ -44,6 +44,7 @@ mod device;
 mod event;
 mod icmp_stack;
 mod ipv4_stack;
+mod ipv6_stack;
 mod neighbor;
 mod reassembly;
 mod route;
@@ -56,6 +57,10 @@ pub use raven_abi::errno::Errno;
 
 pub use device::{ChecksumOffload, Device, DeviceCaps, Medium, TxError};
 pub use event::{Event, PollResult, SocketId};
+pub use ipv6_stack::{
+    IpAddr, Ipv6Addr, Ipv6AddressState, Ipv6Cidr, Ipv6Config, Neighbor6Cache, Neighbor6Entry,
+    Neighbor6State,
+};
 pub use neighbor::{NeighborCache, NeighborEntry};
 pub use route::{Route, RouteTable};
 pub use stack::{Ipv4Addr, Ipv4Config, MAX_TIMERS, Stack, StackConfig, TimerId};

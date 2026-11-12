@@ -14,11 +14,12 @@ use raven_tcpip_wire::udp::UdpBuilder;
 use crate::device::Device;
 use crate::event::SocketId;
 use crate::ipv4_stack::to_wire;
+use crate::ipv6_stack::IpAddr;
 use crate::stack::{Ipv4Addr, Stack};
 
 pub(crate) struct Datagram {
     pub(crate) data: Vec<u8>,
-    pub(crate) src: (Ipv4Addr, u16),
+    pub(crate) src: (IpAddr, u16),
 }
 
 pub(crate) enum Kind {
@@ -35,7 +36,7 @@ pub(crate) enum Kind {
     Udp {
         local_port: u16,
         datagrams: VecDeque<Datagram>,
-        remote: Option<(Ipv4Addr, u16)>,
+        remote: Option<(IpAddr, u16)>,
     },
     Icmp {
         id: u16,
@@ -324,12 +325,13 @@ impl<D: Device> Stack<D> {
     }
 
     /// Send a UDP datagram to `to`, computing the checksum and handing it to IPv4.
-    pub fn udp_send_to(
+    pub fn udp_send_to<A: Into<IpAddr>>(
         &mut self,
         socket: SocketId,
         data: &[u8],
-        to: (Ipv4Addr, u16),
+        to: (A, u16),
     ) -> Result<usize, Errno> {
+        let to = (to.0.into(), to.1);
         if to.1 == 0 {
             return Err(Errno::EADDRNOTAVAIL);
         }
@@ -354,16 +356,37 @@ impl<D: Device> Stack<D> {
             self.drops = self.drops.saturating_add(dropped);
             return Err(error);
         }
-        let local = self.ipv4.ok_or(Errno::ENETUNREACH)?.addr;
-        let mut datagram = vec![0u8; 8 + data.len()];
-        {
-            let context = ChecksumContext::ipv4(to_wire(local), to_wire(to.0));
-            let mut builder = UdpBuilder::new(&mut datagram, context, local_port, to.1, data.len())
-                .map_err(|_| Errno::EINVAL)?;
-            builder.payload_mut().copy_from_slice(data);
-            builder.finish();
+        match to.0 {
+            IpAddr::V4(destination) => {
+                let local = self.ipv4.ok_or(Errno::ENETUNREACH)?.addr;
+                let mut datagram = vec![0u8; 8 + data.len()];
+                {
+                    let context = ChecksumContext::ipv4(to_wire(local), to_wire(destination));
+                    let mut builder =
+                        UdpBuilder::new(&mut datagram, context, local_port, to.1, data.len())
+                            .map_err(|_| Errno::EINVAL)?;
+                    builder.payload_mut().copy_from_slice(data);
+                    builder.finish();
+                }
+                self.send_ipv4(&datagram, destination, 17)?;
+            }
+            IpAddr::V6(destination) => {
+                let local = self.usable_ipv6().ok_or(Errno::ENETUNREACH)?;
+                let mut datagram = vec![0u8; 8 + data.len()];
+                {
+                    let context = ChecksumContext::ipv6(
+                        crate::ipv6_stack::to_wire(local),
+                        crate::ipv6_stack::to_wire(destination),
+                    );
+                    let mut builder =
+                        UdpBuilder::new(&mut datagram, context, local_port, to.1, data.len())
+                            .map_err(|_| Errno::EINVAL)?;
+                    builder.payload_mut().copy_from_slice(data);
+                    builder.finish();
+                }
+                self.send_ipv6(&datagram, destination, 17)?;
+            }
         }
-        self.send_ipv4(&datagram, to.0, 17)?;
         if let Kind::Udp { remote, .. } = &mut self.sockets.record_mut(socket)?.kind {
             *remote = Some(to);
         }
@@ -378,7 +401,7 @@ impl<D: Device> Stack<D> {
         &mut self,
         socket: SocketId,
         buffer: &mut [u8],
-    ) -> Result<(usize, (Ipv4Addr, u16)), Errno> {
+    ) -> Result<(usize, (IpAddr, u16)), Errno> {
         let record = self.sockets.record_mut(socket)?;
         if record.closed {
             return Err(Errno::EBADF);
