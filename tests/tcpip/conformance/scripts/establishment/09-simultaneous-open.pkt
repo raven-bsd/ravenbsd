@@ -1,6 +1,5 @@
 # area: establishment
 # ref: RFC 9293; spec/tcpip/state-machine.md 2
-# skip: C20-D02 simultaneous-open transition is not implemented
 0.000 socket() = 3
 0.000 connect(3, ..., 8080) = 0
 +0.050 > SEC 0:0(0)

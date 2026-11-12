@@ -150,3 +150,49 @@ fn event_transitions_are_recorded_for_both_backends() {
     // The full sequence is compared when the backend adaptations are settled;
     // C26 keeps the per-backend trace in the report.
 }
+
+fn udp_outcome<B: raven_netcore::StackBackend>(
+    client: &mut Core<B>,
+    server: &mut Core<B>,
+) -> Vec<Vec<u8>> {
+    client.set_ipv4(CLIENT, 24, None);
+    server.set_ipv4(SERVER, 24, None);
+    let server_socket = server.udp_bind(7001).expect("server bind");
+    let client_socket = client.udp_bind(7002).expect("client bind");
+    client
+        .udp_send_to(client_socket, b"first", (SERVER, 7001))
+        .expect("first");
+    client
+        .udp_send_to(client_socket, b"second!", (SERVER, 7001))
+        .expect("second");
+    let mut now = 0i64;
+    let mut received = Vec::new();
+    let mut buffer = [0u8; 64];
+    for _ in 0..5_000 {
+        now += 1;
+        client.poll(now);
+        server.poll(now);
+        while let Ok((length, _)) = server.udp_recv_from(server_socket, &mut buffer) {
+            received.push(buffer[..length].to_vec());
+        }
+        if received.len() >= 2 {
+            break;
+        }
+    }
+    received
+}
+
+#[test]
+fn udp_datagram_boundaries_match() {
+    let (device, peer) = PairDevice::pair(PairConfig::reliable());
+    let mut client = Core::from_backend(SmoltcpBackend::new(device, [0x02, 0, 0, 0, 0, 1], 0));
+    let mut server = Core::from_backend(SmoltcpBackend::new(peer, [0x02, 0, 0, 0, 0, 2], 0));
+    let baseline = udp_outcome(&mut client, &mut server);
+
+    let (device, peer) = PairDevice::pair(PairConfig::reliable());
+    let mut client = Core::from_backend(RavenTcpipBackend::new(device, [0x02, 0, 0, 0, 0, 1], 0));
+    let mut server = Core::from_backend(RavenTcpipBackend::new(peer, [0x02, 0, 0, 0, 0, 2], 0));
+    let native = udp_outcome(&mut client, &mut server);
+    assert_eq!(native, baseline);
+    assert_eq!(native, vec![b"first".to_vec(), b"second!".to_vec()]);
+}

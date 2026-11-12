@@ -40,23 +40,24 @@ cargo run -p raven-tcpip-conformance -- --all
 | OR-06 | RST vs silent drop for a closed port | Linux 5.19 | RST, immediate `ECONNREFUSED` | RST from the no-TCB path, counted by `tcp.rsts_for_unsent` | MATCH | `oracle.md` §3.4 Python `connect`; `observability_counters::rst_for_unsent_counter_moves`, `rst/06-ack-to-listener-rst.pkt`. |
 | OR-07 | RST vs silent drop: wrong sequence in window, out-of-window, TIME-WAIT | Linux 5.19 | NOT-MEASURED: needs raw injection and capture | challenge ACK for in-window wrong sequence; silent drop out of window; RST ignored in TIME-WAIT | NOT-MEASURED | Reference capture unavailable; ours: `rst/03`, `rst/04`, `rst/05` scripts and C19 counters. |
 | OR-08 | Challenge-ACK behaviour and rate limit | Linux 5.19 | 1000 global tokens/s (`tcp_challenge_ack_limit=1000`); per-connection limit not exposed | 1000 global tokens per 1000 ms, plus 10 per-connection tokens per 5000 ms | MATCH (global); DEVIATION-ACCEPTED (per-connection) | `/proc/sys/net/ipv4/tcp_challenge_ack_limit`; `accepted_deviation_challenge_ack_limits_are_pinned`. |
-| OR-09 | Keepalive onset, interval, probe count | Linux 5.19 | onset 7200 s, interval 75 s, probes 9 (`tcp_keepalive_*`) | onset 7200 s, probe interval 7200 s, probes 9 | DEFECT (C24-D01) | `/proc/sys/net/ipv4/tcp_keepalive_*`; ours `tcp.keepalive_interval` is reused as the probe interval. |
+| OR-09 | Keepalive onset, interval, probe count | Linux 5.19 | onset 7200 s, interval 75 s, probes 9 (`tcp_keepalive_*`) | onset 7200 s, probe interval min(configured, 75 s), probes 9 | MATCH (C24-D01 resolved by C29) | `/proc/sys/net/ipv4/tcp_keepalive_*`; live timer uses the 75 s probe interval. |
 | OR-10 | FIN-WAIT-2 and TIME-WAIT durations | Linux 5.19 | FIN-WAIT-2 configured 60 s; TIME-WAIT observed ~62 s | 60 s and 60 s defaults | MATCH | `oracle.md` §3.1/§3.5; `measured_timewait_and_finwait2_defaults_are_pinned`. |
 | OR-11 | Zero-window probe cadence and backoff | Linux 5.19 | NOT-MEASURED: needs a non-reading receiver and a capture | start 1 s, double, cap 60 s (`tcp.zwprobe_max_interval`) | NOT-MEASURED | Reference capture unavailable; ours: `zero-window/01-zero-window-probe.pkt` and C19 property test. |
 | OR-12 | MSS announced for v4 and v6 on the same interface | Linux 5.19 | v4 65483, v6 65464 on loopback (different MTU from our test link) | v4 1446, v6 1426 on a 1500-byte frame device | NOT-MEASURED | `oracle.md` §3.2/§3.3 used a loopback MTU; the interface is not the same. |
 | OR-13 | ECN negotiation and CE response timing | Linux 5.19 | `tcp_ecn=2`: passive ECN only; no capture of the CE response | `tcp.ecn_enable=1`: ECE+CWR offered on every active SYN | DEVIATION-ACCEPTED (C24-A01) | `/proc/sys/net/ipv4/tcp_ecn`; `accepted_deviation_ecn_is_offered_by_default`. |
-| OR-14 | Simultaneous open | Linux 5.19 | NOT-MEASURED: needs two controlled endpoints and capture | not implemented (SYN in SYN-SENT is ignored) | DEFECT (C20-D02) | `establishment/09-simultaneous-open.pkt` is committed as skip. |
-| OR-15 | Simultaneous close | Linux 5.19 | NOT-MEASURED: needs two controlled endpoints and capture | FIN in FIN-WAIT-1 moves to TIME-WAIT and sends the final ACK in the C20 close scripts; the simultaneous FIN+ACK case is C20-D01 | NOT-MEASURED | Reference capture unavailable; `establishment/03`, `establishment/07`. |
+| OR-14 | Simultaneous open | Linux 5.19 | NOT-MEASURED: needs two controlled endpoints and capture | SYN in SYN-SENT moves to SYN-RCVD and the scripted sequence completes | NOT-MEASURED (C20-D02 resolved by C29) | `establishment/09-simultaneous-open.pkt` now passes in `cargo run -p raven-tcpip-conformance -- --all`. |
+| OR-15 | Simultaneous close | Linux 5.19 | NOT-MEASURED: needs two controlled endpoints and capture | FIN+ACK in FIN-WAIT-1 moves to TIME-WAIT and sends the final ACK | NOT-MEASURED (C20-D01 resolved by C29) | Reference capture unavailable; `establishment/07` now passes in the C20 table. |
 
 ## Filed defects
 
-* **C24-D01** Keepalive probe interval: `tcp.keepalive_interval` is used for both
-  the initial delay and every probe. Linux separates onset (7200 s) from the
-  probe interval (75 s). Owning area: C19 observability / TCP timers.
-* **C20-D02** Simultaneous open is not implemented (already filed by C20).
-* **C23-D01** Loss and reordering recovery is far behind the smoltcp baseline;
-  the C23 table is the evidence.
-* **C20-D01** FIN+ACK in FIN-WAIT-1 omits the final ACK (already filed).
+* **C23-D01** Loss and reordering recovery was far behind the smoltcp baseline;
+  C28 improved 1% loss from 803 s to 12.2 s, 5% from 501 s to 16.7 s and
+  reordering from 355 s to 13.5 s, but lossless throughput and CPU remain worse.
+  The C23 table is the current evidence; the C27 gate still sees a worse row.
+* ~~C24-D01~~ Keepalive probe interval: resolved by C29; the live timer now uses
+  min(configured interval, 75 s) for probes after the 7200 s onset.
+* ~~C20-D02~~ Simultaneous open: the scripted path passes; see OR-14.
+* ~~C20-D01~~ FIN+ACK in FIN-WAIT-1 now emits the final ACK; see OR-15.
 
 ## Accepted deviations
 

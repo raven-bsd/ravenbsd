@@ -7,7 +7,7 @@ Fresh BSD-3-Clause scripts run through the C04 simulator. packetdrill
 (GPL, tier C) is a tool whose script language we accept; no packetdrill
 code or scripts are present. See `SCRIPTS.md` for the subset.
 
-Totals: **65 scripts, 47 pass, 1 fail, 17 skip.**
+Totals: **65 scripts, 49 pass, 0 fail, 16 skip.**
 
 | Script | Area | RFC / spec | Verdict | Reason |
 |---|---|---|---|---|
@@ -23,9 +23,9 @@ Totals: **65 scripts, 47 pass, 1 fail, 17 skip.**
 | `establishment/04-graceful-close-passive.pkt` | establishment | RFC 9293; spec/tcpip/state-machine.md 2 | pass |  |
 | `establishment/05-accept-after-handshake.pkt` | establishment | RFC 9293; spec/tcpip/state-machine.md 2 | pass |  |
 | `establishment/06-close-wait-data-after-fin.pkt` | establishment | RFC 9293; spec/tcpip/state-machine.md 2 | pass |  |
-| `establishment/07-fin-wait1-and-fin.pkt` | establishment | RFC 9293; spec/tcpip/state-machine.md 2 | fail | C20-D01 stack defect: FIN+ACK in FIN-WAIT-1 enters TIME-WAIT without the final ACK |
+| `establishment/07-fin-wait1-and-fin.pkt` | establishment | RFC 9293; spec/tcpip/state-machine.md 2 | pass |  |
 | `establishment/08-established-delayed-ack.pkt` | establishment | RFC 9293; spec/tcpip/state-machine.md 2 | pass |  |
-| `establishment/09-simultaneous-open.pkt` | establishment | RFC 9293; spec/tcpip/state-machine.md 2 | skip | C20-D02 simultaneous-open transition is not implemented |
+| `establishment/09-simultaneous-open.pkt` | establishment | RFC 9293; spec/tcpip/state-machine.md 2 | pass |  |
 | `establishment/10-time-wait-reuse.pkt` | establishment | RFC 9293; spec/tcpip/state-machine.md 2 | skip | C20-D03 RFC 6191 TIME-WAIT reuse policy is not implemented |
 | `keepalive/01-keepalive-probe.pkt` | keepalive | RFC 1122 / RFC 9293; spec/tcpip/features.md 7 | pass |  |
 | `keepalive/02-keepalive-timeout.pkt` | keepalive | RFC 1122 / RFC 9293; spec/tcpip/features.md 7 | pass |  |
