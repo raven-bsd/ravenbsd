@@ -1,0 +1,66 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt PCID 8
+.Os RavenBSD
+.Sh NAME
+.Nm pcid
+.Nd PCI configuration-space enumerator and the pci: scheme
+.Sh SYNOPSIS
+.Nm /sbin/pcid
+.Sh DESCRIPTION
+.Nm
+reads the ACPI boot blob, locates the MCFG table and maps the first 1 MiB of the
+ECAM window.  It scans bus 0, records the vendor, device, class, revision and six
+32-bit BAR values of every function, prints
+.Dq pcid: devices= Ns Ar count
+and registers the
+.Dq pci:
+scheme.
+.Pp
+Enumeration is limited to bus 0 in this milestone.  The server receives the
+RootDevice capability through the
+.Ql root
+service grant; it is the only process allowed to create
+.Dv MmioRegion
+objects.
+.Pp
+The scheme layout is:
+.Bl -tag -width Pa -compact
+.It Pa /
+one packed K60 directory entry per function, named
+.Sy bb:ss.f
+.Pq bus, slot, function in lowercase hex .
+.It Pa /bb:ss.f/info
+the 40-byte little-endian device record: bus, slot, function, class, subclass,
+programming interface, revision, vendor, device, six BAR words, the interrupt
+line and the interrupt pin.
+.It Pa /bb:ss.f/bar Ns Ar n
+opens a fresh
+.Dv MmioRegion
+for that 32-bit or 64-bit memory BAR and returns it as an S25 attachment.  I/O
+BARs and absent BARs return
+.Er ENOENT .
+.El
+.Pp
+Only read access is accepted; every open is a new attachment and the client owns
+the returned handle.
+.Sh FILES
+.Bl -tag -width /etc/services.d/pcid.toml -compact
+.It Pa /etc/services.d/pcid.toml
+service manifest with the
+.Ql root
+grant
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr devd 8 ,
+.Xr init 8 ,
+.Xr svcd 8
+.Sh HISTORY
+The
+.Nm
+server first appeared in RavenBSD 0.1.
+.Sh STANDARDS
+RavenBSD ABI v1.

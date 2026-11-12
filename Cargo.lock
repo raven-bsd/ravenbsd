@@ -456,6 +456,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-devd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-dev",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-df"
 version = "0.1.0"
 dependencies = [
@@ -794,6 +806,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-pcid"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-dev",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-prng"
 version = "0.1.0"
 
@@ -803,6 +826,10 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
 ]
+
+[[package]]
+name = "raven-proto-dev"
+version = "0.1.0"
 
 [[package]]
 name = "raven-proto-fs"

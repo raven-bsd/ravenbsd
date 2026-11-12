@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# PCI enumerator. Enumerates bus 0 through the ACPI MCFG/ECAM window and serves the `pci:`
+# scheme. The `root` grant is the only RootDevice capability in the system.
+name = "pcid"
+exec = "/sbin/pcid"
+provides = ["scheme:pci"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "on-failure"
+grants = ["root"]

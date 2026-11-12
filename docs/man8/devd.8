@@ -1,0 +1,92 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt DEVD 8
+.Os RavenBSD
+.Sh NAME
+.Nm devd
+.Nd device manager: match pci: devices and launch drivers
+.Sh SYNOPSIS
+.Nm /sbin/devd
+.Nm /sbin/devd
+.Ar test
+.Sh DESCRIPTION
+.Nm
+reads the driver table from
+.Pa /etc/drivers.toml
+inside the initfs archive, reads the device directory from the
+.Dq pci:
+scheme, and matches each device by vendor and device id.  For a match it opens
+.Pa /bar0
+of the device and spawns the configured driver in a new process.  The BAR
+.Dv MmioRegion
+handle is transferred into the child before its first thread starts; the child
+does not receive the RootDevice capability.
+.Pp
+The driver table is a small
+.Ql [[driver]]
+TOML subset:
+.Bd -literal -offset indent
+[[driver]]
+name = "dummy"
+vendor = 0x1234
+device = 0x11e8
+exec = "/sbin/devd"
+args = []
+cycles = 10
+.Ed
+.Pp
+.Va name
+and
+.Va exec
+are required;
+.Va args
+defaults to an empty list and
+.Va cycles
+defaults to 1 with a maximum of 100.  A malformed table or an executable path
+that does not start with
+.Pa /
+is rejected before any spawn.
+.Pp
+Without arguments
+.Nm
+launches the matched driver once and then registers the
+.Dq dev:
+scheme.  With
+.Ar test
+it launches the driver for the manifest's
+.Va cycles
+count, prints one
+.Dq devd: driver Ar name Dq cycle N exit=C
+line per cycle, reaps every child, closes every BAR handle and exits with
+status 0.  This is the lifecycle path exercised by the
+.Ql devd
+qtest.
+.Pp
+The
+.Ql dummy
+argument is the built-in test driver.  It maps the transferred BAR, verifies
+that
+.Dv MMIO_CREATE
+on that non-root handle fails with
+.Er EPERM ,
+and exits 0.
+.Sh FILES
+.Bl -tag -width /etc/services.d/devd.toml -compact
+.It Pa /etc/drivers.toml
+driver match table
+.It Pa /etc/services.d/devd.toml
+service manifest
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr pcid 8 ,
+.Xr init 8 ,
+.Xr svcd 8
+.Sh HISTORY
+The
+.Nm
+server first appeared in RavenBSD 0.1.
+.Sh STANDARDS
+RavenBSD ABI v1.

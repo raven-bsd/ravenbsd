@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-devd"
+version = "0.1.0"
+description = "RavenBSD device manager: matches pci: devices and launches drivers."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-proto-dev = { path = "../../../crates/raven-proto-dev" }
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-initfs = { path = "../../../crates/raven-initfs" }
+raven-rt = { path = "../../rt", features = ["alloc"] }
+raven-scheme = { path = "../../../crates/raven-scheme" }
+
+[lints]
+workspace = true

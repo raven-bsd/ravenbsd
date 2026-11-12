@@ -296,11 +296,12 @@ pub(crate) fn spawn_service(manifest: &Manifest) -> Result<Handle, String> {
         return Err("initfs is not mapped".to_string());
     };
     let mut grants = Vec::new();
-    for grant in &manifest.grants {
-        match grant.as_str() {
-            "initfs" => grants.push(Handle::INITFS),
-            other => return Err(alloc::format!("unknown grant `{other}`")),
-        }
+    let specs = crate::grants::parse_grants(&manifest.name, &manifest.grants)?;
+    for spec in specs {
+        grants.push(Grant {
+            handle: spec.handle(),
+            rights: spec.rights(),
+        });
     }
     let args: Vec<&str> = manifest.args.iter().map(String::as_str).collect();
     let environment: Vec<String> = manifest
@@ -341,8 +342,13 @@ pub(crate) fn take_server() -> Option<Server> {
     SERVER.lock().take()
 }
 
+struct Grant {
+    handle: Handle,
+    rights: Rights,
+}
+
 struct GrantSys {
-    grants: Vec<Handle>,
+    grants: Vec<Grant>,
 }
 
 impl Sys for GrantSys {
@@ -377,8 +383,8 @@ impl Sys for GrantSys {
         stack_top: usize,
         arg: usize,
     ) -> Result<Handle, Errno> {
-        for source in &self.grants {
-            raven_rt::handle_transfer(proc, *source, Rights::ALL)?;
+        for grant in &self.grants {
+            raven_rt::handle_transfer(proc, grant.handle, grant.rights)?;
         }
         RtSys.thread_create(proc, entry, stack_top, arg)
     }
