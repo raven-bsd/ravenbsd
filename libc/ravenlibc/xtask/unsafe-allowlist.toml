@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# DR-39 allow-list. Each row names one crate and one raw module.
+# [[allow]]
+# crate = "raven-libc-str"
+# path = "src/raw.rs"
+# reason = "raw pointer entry points"

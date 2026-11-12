@@ -19,6 +19,18 @@ mod gpt;
 mod guard;
 mod image;
 mod initfs;
+mod libc_census;
+mod libc_cmd;
+mod libc_headers;
+mod libc_lint;
+mod libc_lint_data;
+mod libc_lint_scan;
+#[cfg(test)]
+mod libc_lint_testutil;
+mod libc_oracle;
+mod libc_pack;
+mod libc_size;
+mod libc_world;
 mod pi;
 mod process;
 mod profiles;
