@@ -134,8 +134,8 @@ impl<D: Device> Stack<D> {
         if self.port_in_use(port) {
             return Err(Errno::EADDRINUSE);
         }
-        let rx_cap = self.config.rx_queue_bytes;
-        let tx_cap = self.config.tx_queue_bytes;
+        let rx_cap = self.recv_buffer_cap();
+        let tx_cap = self.send_buffer_cap();
         self.sockets.alloc(
             Kind::Listener {
                 port,
@@ -272,8 +272,8 @@ impl<D: Device> Stack<D> {
             }
             port
         };
-        let rx_cap = self.config.rx_queue_bytes;
-        let tx_cap = self.config.tx_queue_bytes;
+        let rx_cap = self.recv_buffer_cap();
+        let tx_cap = self.send_buffer_cap();
         self.sockets.alloc(
             Kind::Udp {
                 local_port: port,
@@ -386,6 +386,13 @@ impl<D: Device> Stack<D> {
         self.udp_recv_from(socket, buffer).map(|(length, _)| length)
     }
 
+    /// The send and receive byte caps of a socket (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    pub fn test_socket_caps(&self, socket: SocketId) -> Result<(usize, usize), Errno> {
+        let record = self.sockets.record(socket)?;
+        Ok((record.rx_cap, record.tx_cap))
+    }
+
     /// The bound local port of a UDP socket (host tests).
     #[cfg(any(test, feature = "testutil"))]
     pub fn test_udp_port(&self, socket: SocketId) -> Result<u16, Errno> {
@@ -412,17 +419,35 @@ impl<D: Device> Stack<D> {
     }
 
     pub(crate) fn alloc_ephemeral_port(&mut self) -> Result<u16, Errno> {
-        const START: u32 = 49_152;
-        const COUNT: u32 = 65_536 - START;
-        let first = u32::from(self.next_ephemeral);
-        for offset in 0..COUNT {
-            let port = u16::try_from(START + (first - START + offset) % COUNT)
-                .map_err(|_| Errno::EADDRNOTAVAIL)?;
+        let first = u16::try_from(self.tunables.port_range_first).unwrap_or(32_768);
+        let last = u16::try_from(self.tunables.port_range_last)
+            .unwrap_or(60_999)
+            .max(first);
+        let count = u32::from(last) - u32::from(first) + 1;
+        let attempts = usize::try_from(self.tunables.port_alloc_attempts)
+            .unwrap_or(64)
+            .min(count as usize);
+        let mut seed = [0u8; 4];
+        self.rng.fill(&mut seed);
+        let start = u32::from_le_bytes(seed) % count;
+        for probe in 0..attempts as u32 {
+            let offset = (start + probe) % count;
+            let port = u16::try_from(u32::from(first) + offset).unwrap_or(first);
+            self.counters.port_alloc_probes = self.counters.port_alloc_probes.wrapping_add(1);
             if !self.port_in_use(port) {
-                self.next_ephemeral = if port == 65_535 { 49_152 } else { port + 1 };
+                self.next_ephemeral = if port == last { first } else { port + 1 };
                 return Ok(port);
             }
         }
+        for offset in 0..count {
+            let port = u16::try_from(u32::from(first) + offset).unwrap_or(first);
+            self.counters.port_alloc_probes = self.counters.port_alloc_probes.wrapping_add(1);
+            if !self.port_in_use(port) {
+                self.next_ephemeral = if port == last { first } else { port + 1 };
+                return Ok(port);
+            }
+        }
+        self.counters.port_alloc_fails = self.counters.port_alloc_fails.wrapping_add(1);
         Err(Errno::EADDRNOTAVAIL)
     }
 }

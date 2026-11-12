@@ -96,9 +96,44 @@ impl<D: Device> Stack<D> {
 
     fn handle_icmp_error(&mut self, message: &Icmpv4Packet<'_>) {
         let quoted = message.payload();
+        let is_pmtu = message.message_type() == 3 && message.code() == 4;
         let Ok(inner) = Ipv4Packet::parse(quoted) else {
+            if is_pmtu {
+                self.counters.pmtu_invalid = self.counters.pmtu_invalid.wrapping_add(1);
+            }
             return;
         };
+        if inner.protocol() == 6 && is_pmtu {
+            if inner.payload().len() < 4 || self.tunables.ignore_path_mtu != 0 {
+                if inner.payload().len() < 4 {
+                    self.counters.pmtu_invalid = self.counters.pmtu_invalid.wrapping_add(1);
+                }
+                return;
+            }
+            let mtu = message.rest().max(crate::pmtu::IPV4_FLOOR);
+            let destination = crate::ipv4_stack::from_wire(inner.dst());
+            self.pmtu4.insert(destination, (mtu, self.now));
+            let max = usize::try_from(self.tunables.pmtu_cache_max).unwrap_or(1024);
+            while self.pmtu4.len() > max {
+                let Some(key) = self.pmtu4.keys().next().copied() else {
+                    break;
+                };
+                self.pmtu4.remove(&key);
+            }
+            for record in self.sockets.records.values_mut() {
+                if let Kind::Tcp(connection) = &mut record.kind
+                    && connection.state != crate::TcpState::Closed
+                    && connection
+                        .remote
+                        .is_some_and(|(address, _)| address == crate::IpAddr::V4(destination))
+                {
+                    let path = u16::try_from(mtu.saturating_sub(40)).unwrap_or(u16::MAX);
+                    connection.mss = connection.our_mss.min(path).max(connection.mss_floor);
+                }
+            }
+            self.counters.pmtu_updates = self.counters.pmtu_updates.wrapping_add(1);
+            return;
+        }
         if inner.protocol() != 17 {
             return;
         }

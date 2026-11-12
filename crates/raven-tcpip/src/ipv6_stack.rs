@@ -1027,6 +1027,9 @@ impl<D: Device> Stack<D> {
     fn handle_icmpv6_error(&mut self, message: &Icmpv6Packet<'_>) {
         let quoted = message.payload();
         let Ok(inner) = Ipv6Packet::parse(quoted) else {
+            if message.message_type() == 2 {
+                self.counters.pmtu_invalid = self.counters.pmtu_invalid.wrapping_add(1);
+            }
             return;
         };
         let (next, upper) = inner.upper_layer();
@@ -1043,8 +1046,12 @@ impl<D: Device> Stack<D> {
             (1, 3) => Errno::EADDRNOTAVAIL,
             (1, 4) => Errno::ECONNREFUSED,
             (2, _) => {
+                if self.tunables.ignore_path_mtu != 0 {
+                    return;
+                }
                 let mtu = usize::try_from(message.rest()).unwrap_or(MIN_IPV6_MTU);
                 self.pmtu6.insert(quoted_destination, mtu.max(MIN_IPV6_MTU));
+                self.counters.pmtu_updates = self.counters.pmtu_updates.wrapping_add(1);
                 Errno::EINVAL
             }
             (3, _) => Errno::ETIMEDOUT,

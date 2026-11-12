@@ -3,6 +3,7 @@
 
 //! TCP connection state machine, RFC 5961 hardening and lifecycle timers.
 
+use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 
@@ -102,6 +103,7 @@ pub(crate) struct TcpConnection {
     pub rcv_wscale: u8,
     pub offer_wscale: bool,
     pub offer_timestamps: bool,
+    pub offer_sack: bool,
     pub timestamps: bool,
     pub ts_recent: u32,
     pub ts_recent_age: Instant,
@@ -111,8 +113,18 @@ pub(crate) struct TcpConnection {
     pub peer_mss: u16,
     pub our_mss: u16,
     pub mss_clamps: usize,
+    pub mss_floor: u16,
     pub paws_drops: usize,
     pub sack_permitted: bool,
+    pub negotiated_wscale: Option<u8>,
+    pub ecn_enabled: bool,
+    pub ecn_negotiated: bool,
+    pub ecn_cwr_pending: bool,
+    pub retransmits_total: u32,
+    pub dupack_count: u8,
+    pub last_activity: Instant,
+    pub last_adv_window: u16,
+    pub cc: Box<dyn crate::cc::CongestionControl>,
 }
 
 impl TcpConnection {
@@ -175,6 +187,7 @@ impl TcpConnection {
             rcv_wscale: 0,
             offer_wscale: false,
             offer_timestamps: false,
+            offer_sack: true,
             timestamps: false,
             ts_recent: 0,
             ts_recent_age: now,
@@ -183,8 +196,18 @@ impl TcpConnection {
             peer_mss: 536,
             our_mss: 1460,
             mss_clamps: 0,
+            mss_floor: 536,
             paws_drops: 0,
             sack_permitted: false,
+            negotiated_wscale: None,
+            ecn_enabled: false,
+            ecn_negotiated: false,
+            ecn_cwr_pending: false,
+            retransmits_total: 0,
+            dupack_count: 0,
+            last_activity: now,
+            last_adv_window: 0,
+            cc: Box::new(crate::cc::NewReno::new(1460, 14_600, u32::MAX, 16_777_216)),
         }
     }
 
@@ -248,6 +271,7 @@ impl TcpConnection {
             rcv_wscale: 0,
             offer_wscale: false,
             offer_timestamps: false,
+            offer_sack: true,
             timestamps: false,
             ts_recent: 0,
             ts_recent_age: now,
@@ -256,8 +280,18 @@ impl TcpConnection {
             peer_mss: 536,
             our_mss: 1460,
             mss_clamps: 0,
+            mss_floor: 536,
             paws_drops: 0,
             sack_permitted: false,
+            negotiated_wscale: None,
+            ecn_enabled: false,
+            ecn_negotiated: false,
+            ecn_cwr_pending: false,
+            retransmits_total: 0,
+            dupack_count: 0,
+            last_activity: now,
+            last_adv_window: 0,
+            cc: Box::new(crate::cc::NewReno::new(1460, 14_600, u32::MAX, 16_777_216)),
         }
     }
 
@@ -671,6 +705,20 @@ impl<D: Device> Stack<D> {
         interval: crate::Duration,
         probes: u8,
     ) -> Result<(), Errno> {
+        if self.tunables.keepalive_enable == 0 {
+            return Err(Errno::EOPNOTSUPP);
+        }
+        let interval_ms = if interval.as_millis() == 0 {
+            self.tunables.keepalive_interval
+        } else {
+            interval.as_millis()
+        };
+        let probes = if probes == 0 {
+            u8::try_from(self.tunables.keepalive_probes).unwrap_or(9)
+        } else {
+            probes
+        };
+        let interval = crate::Duration::from_millis(interval_ms);
         let record = self.sockets.record_mut(socket)?;
         let Kind::Tcp(connection) = &mut record.kind else {
             return Err(Errno::ENOTSOCK);
@@ -694,6 +742,12 @@ impl<D: Device> Stack<D> {
         if remote.1 == 0 {
             return Err(Errno::EADDRNOTAVAIL);
         }
+        if self.live_tcp_connections()
+            >= usize::try_from(self.tunables.connection_max).unwrap_or(usize::MAX)
+        {
+            self.counters.attempt_fails = self.counters.attempt_fails.wrapping_add(1);
+            return Err(Errno::EMFILE);
+        }
         let local_port = match local_port {
             Some(0) => return Err(Errno::EADDRNOTAVAIL),
             Some(port) if self.port_in_use(port) => return Err(Errno::EADDRINUSE),
@@ -711,32 +765,110 @@ impl<D: Device> Stack<D> {
         };
         let iss = self.next_isn();
         let mut connection = TcpConnection::new_active(local, local_port, remote, iss, self.now);
-        connection.rto = RtoEstimator::new(
-            self.config.rto_initial_ms,
-            self.config.rto_min_ms,
-            self.config.rto_max_ms,
-            self.config.clock_granularity_ms,
-        );
-        connection.rto_max_retransmits = self.config.rto_max_retransmits;
-        connection.offer_wscale = self.config.window_scaling;
-        connection.offer_timestamps = self.config.timestamps;
-        connection.rcv_wscale = choose_wscale(self.config.rx_queue_bytes);
-        connection.our_mss = our_mss(remote.0, self.device.capabilities())
-            .clamp(self.config.mss_floor, self.config.mss_ceiling);
-        connection.mss = connection.our_mss;
+        self.configure_tcp_connection(&mut connection, remote.0);
         let socket = self.sockets.alloc(
             Kind::Tcp(connection),
-            self.config.rx_queue_bytes,
-            self.config.tx_queue_bytes,
+            self.recv_buffer_cap(),
+            self.send_buffer_cap(),
         )?;
+        self.counters.active_opens = self.counters.active_opens.wrapping_add(1);
         let _ = self.send_syn(socket);
         Ok(socket)
     }
 
+    pub(crate) fn live_tcp_connections(&self) -> usize {
+        self.sockets
+            .records
+            .values()
+            .filter(|record| !record.closed && matches!(record.kind, Kind::Tcp(_)))
+            .count()
+    }
+
+    fn configure_tcp_connection(&self, connection: &mut TcpConnection, remote: IpAddr) {
+        connection.rto = RtoEstimator::new(
+            self.tunables.rto_initial,
+            self.tunables.rto_min,
+            self.tunables.rto_max,
+            self.config.clock_granularity_ms,
+        );
+        connection.rto_max_retransmits =
+            u8::try_from(self.tunables.rto_max_retries).unwrap_or(u8::MAX);
+        connection.offer_wscale = self.tunables.window_scale_enable != 0;
+        connection.offer_timestamps = self.tunables.timestamps_enable != 0;
+        connection.offer_sack = self.tunables.sack_enable != 0;
+        connection.ecn_enabled = self.tunables.ecn_enable != 0;
+        connection.nodelay = self.tunables.nagle == 0;
+        connection.ooo_limit = usize::try_from(self.tunables.reassembly_holes_max).unwrap_or(32);
+        connection.keepalive_interval_ms = self.tunables.keepalive_interval;
+        connection.keepalive_probes =
+            u8::try_from(self.tunables.keepalive_probes).unwrap_or(u8::MAX);
+        connection.keepalive_left = connection.keepalive_probes;
+        connection.challenge_tokens =
+            u32::try_from(self.tunables.challenge_ack_burst).unwrap_or(u32::MAX);
+        connection.rcv_wscale = choose_wscale(self.recv_buffer_cap());
+        let mss_default = u16::try_from(self.tunables.mss_default).unwrap_or(1460);
+        let mut mss = our_mss(remote, self.device.capabilities(), mss_default);
+        if self.tunables.ignore_path_mtu == 0
+            && let IpAddr::V4(address) = remote
+            && let Some((mtu, inserted)) = self.pmtu4.get(&address)
+            && self.now.saturating_since(*inserted).as_millis() < self.tunables.pmtu_cache_ttl
+        {
+            let path = u16::try_from(mtu.saturating_sub(40)).unwrap_or(u16::MAX);
+            mss = mss.min(path);
+        }
+        connection.mss_floor = u16::try_from(self.tunables.mss_floor).unwrap_or(536);
+        let ceiling = u16::try_from(self.tunables.mss_ceiling).unwrap_or(8960);
+        connection.our_mss = mss
+            .max(connection.mss_floor)
+            .min(ceiling)
+            .max(connection.mss_floor);
+        connection.mss = connection.our_mss;
+        connection.cc = self.new_cc(connection.our_mss);
+    }
+
+    fn new_cc(&self, mss: u16) -> Box<dyn crate::cc::CongestionControl> {
+        let mss = u32::from(mss.max(1));
+        let max = u32::try_from(self.tunables.cwnd_max)
+            .unwrap_or(16_777_216)
+            .max(2 * mss);
+        let floor = u32::try_from(self.tunables.cwnd_min)
+            .unwrap_or(2)
+            .saturating_mul(mss);
+        let initial = u32::try_from(self.tunables.initial_window)
+            .unwrap_or(10)
+            .saturating_mul(mss)
+            .max(floor)
+            .max(2 * mss);
+        if self.tunables.cc_algorithm == 0 {
+            let mut cc = crate::cc::NewReno::new(mss, initial, max, max);
+            cc.set_dup_threshold(u32::try_from(self.tunables.dup_ack_threshold).unwrap_or(3));
+            Box::new(cc)
+        } else {
+            Box::new(crate::cc::Cubic::new(mss, initial, max, max))
+        }
+    }
+
+    pub(crate) fn send_buffer_cap(&self) -> usize {
+        let default = usize::try_from(self.tunables.send_buffer_default).unwrap_or(65_536);
+        let max = usize::try_from(self.tunables.send_buffer_max).unwrap_or(4_194_304);
+        default.min(max).min(self.config.tx_queue_bytes)
+    }
+
+    pub(crate) fn recv_buffer_cap(&self) -> usize {
+        let default = usize::try_from(self.tunables.recv_buffer_default).unwrap_or(65_536);
+        let max = usize::try_from(self.tunables.recv_buffer_max).unwrap_or(4_194_304);
+        default.min(max).min(self.config.rx_queue_bytes)
+    }
+
     fn next_isn(&mut self) -> u32 {
-        let iss = self.next_isn;
+        let counter = self.next_isn;
         self.next_isn = self.next_isn.wrapping_add(0x0100_0000);
-        iss
+        let clock = u32::try_from(self.now.as_millis() / 1000).unwrap_or(0);
+        match self.tunables.isn_strength {
+            0 => counter,
+            1 => isn_mix(counter ^ 0x9e37_79b9),
+            _ => isn_mix(counter ^ clock.rotate_left(13) ^ 0x85eb_ca6b),
+        }
     }
 
     pub(crate) fn tcp_input(
@@ -755,10 +887,26 @@ impl<D: Device> Stack<D> {
             }
             _ => return,
         };
-        let Ok(packet) = TcpPacket::parse(payload, context) else {
-            self.drops = self.drops.saturating_add(1);
-            return;
+        let packet = match TcpPacket::parse(payload, context) {
+            Ok(packet) => packet,
+            Err(error) => {
+                if error.tag() == "tcp.checksum" {
+                    self.counters.in_checksum_errors =
+                        self.counters.in_checksum_errors.wrapping_add(1);
+                } else {
+                    self.counters.in_header_errors = self.counters.in_header_errors.wrapping_add(1);
+                    if error.tag().starts_with("tcp.option") {
+                        self.counters.option_malformed =
+                            self.counters.option_malformed.wrapping_add(1);
+                    }
+                }
+                self.drops = self.drops.saturating_add(1);
+                return;
+            }
         };
+        if packet.flags().rst() {
+            self.counters.rst_rcvd = self.counters.rst_rcvd.wrapping_add(1);
+        }
         #[cfg(any(test, feature = "testutil"))]
         self.tcp_debug.push((
             packet.src_port(),
@@ -781,7 +929,14 @@ impl<D: Device> Stack<D> {
                     tsval = Some(v);
                     tsecr = Some(e);
                 }
-                _ => {}
+                Ok(TcpOption::Unknown { .. }) => {
+                    self.counters.option_unknown = self.counters.option_unknown.wrapping_add(1);
+                }
+                Ok(TcpOption::EndOfList | TcpOption::NoOperation) => {}
+                Ok(_) => {}
+                Err(_) => {
+                    self.counters.option_malformed = self.counters.option_malformed.wrapping_add(1);
+                }
             }
         }
         let segment = Segment {
@@ -839,7 +994,7 @@ impl<D: Device> Stack<D> {
                 return;
             }
         }
-        if segment.flags.urg() {
+        if segment.flags.urg() && self.tunables.urgent_mode != 0 {
             #[cfg(any(test, feature = "testutil"))]
             {
                 self.tcp_urgent_seen = self.tcp_urgent_seen.saturating_add(1);
@@ -880,6 +1035,7 @@ impl<D: Device> Stack<D> {
             }
         });
         if let Some(socket) = exact {
+            self.counters.in_segments = self.counters.in_segments.wrapping_add(1);
             self.tcp_input_established(socket, &segment, now);
             return;
         }
@@ -893,6 +1049,7 @@ impl<D: Device> Stack<D> {
             }
         });
         if let Some(listener) = listener {
+            self.counters.in_segments = self.counters.in_segments.wrapping_add(1);
             self.tcp_listen_input(
                 listener,
                 source,
@@ -945,6 +1102,28 @@ impl<D: Device> Stack<D> {
             return;
         }
         if segment.ack_flag() {
+            if self.tunables.syn_cookies_enable != 0
+                && self.syn_cookie_valid(
+                    destination,
+                    source,
+                    destination_port,
+                    source_port,
+                    segment.ack,
+                )
+            {
+                self.finish_syn_cookie(
+                    listener,
+                    source,
+                    destination,
+                    source_port,
+                    destination_port,
+                    segment,
+                );
+                return;
+            }
+            if self.tunables.syn_cookies_enable != 0 {
+                self.counters.syn_cookie_invalid = self.counters.syn_cookie_invalid.wrapping_add(1);
+            }
             let _ = self.send_tcp_raw(
                 destination,
                 source,
@@ -959,6 +1138,7 @@ impl<D: Device> Stack<D> {
         if !segment.syn() {
             return;
         }
+        let limit = usize::try_from(self.tunables.half_open_limit).unwrap_or(1024);
         let backlog_full = match self.sockets.record(listener) {
             Ok(SocketRecord {
                 kind:
@@ -968,10 +1148,42 @@ impl<D: Device> Stack<D> {
                         ..
                     },
                 ..
-            }) => half_open.len() >= *_backlog,
+            }) => half_open.len() >= (*_backlog).min(limit),
             _ => return,
         };
         if backlog_full {
+            if self.tunables.syn_cookies_enable != 0 {
+                let iss = self.syn_cookie(
+                    destination,
+                    source,
+                    destination_port,
+                    source_port,
+                    self.cookie_slot(self.now.as_millis()),
+                );
+                self.option_override = Some(vec![2, 4, 0x05, 0xb4, 1, 1, 3, 3, 0, 0]);
+                let _ = self.send_tcp_packet(
+                    destination,
+                    source,
+                    destination_port,
+                    source_port,
+                    flags_or(TcpFlags::SYN, TcpFlags::ACK),
+                    iss,
+                    segment.seq.wrapping_add(1),
+                    65_535,
+                    &[],
+                    true,
+                );
+                self.counters.syn_cookie_sent = self.counters.syn_cookie_sent.wrapping_add(1);
+                return;
+            }
+            self.counters.listen_drops = self.counters.listen_drops.wrapping_add(1);
+            self.drops = self.drops.saturating_add(1);
+            return;
+        }
+        if self.live_tcp_connections()
+            >= usize::try_from(self.tunables.connection_max).unwrap_or(usize::MAX)
+        {
+            self.counters.listen_drops = self.counters.listen_drops.wrapping_add(1);
             self.drops = self.drops.saturating_add(1);
             return;
         }
@@ -984,27 +1196,16 @@ impl<D: Device> Stack<D> {
             segment.seq,
             now,
         );
-        connection.rto = RtoEstimator::new(
-            self.config.rto_initial_ms,
-            self.config.rto_min_ms,
-            self.config.rto_max_ms,
-            self.config.clock_granularity_ms,
-        );
-        connection.rto_max_retransmits = self.config.rto_max_retransmits;
-        connection.offer_wscale = self.config.window_scaling;
-        connection.offer_timestamps = self.config.timestamps;
-        connection.rcv_wscale = choose_wscale(self.config.rx_queue_bytes);
-        connection.our_mss = our_mss(source, self.device.capabilities())
-            .clamp(self.config.mss_floor, self.config.mss_ceiling);
-        connection.mss = connection.our_mss;
+        self.configure_tcp_connection(&mut connection, source);
         apply_syn_options(&mut connection, segment, now);
         let Ok(socket) = self.sockets.alloc(
             Kind::Tcp(connection),
-            self.config.rx_queue_bytes,
-            self.config.tx_queue_bytes,
+            self.recv_buffer_cap(),
+            self.send_buffer_cap(),
         ) else {
             return;
         };
+        self.counters.passive_opens = self.counters.passive_opens.wrapping_add(1);
         if let Ok(record) = self.sockets.record_mut(listener)
             && let Kind::Listener { half_open, .. } = &mut record.kind
         {
@@ -1029,6 +1230,7 @@ impl<D: Device> Stack<D> {
         let mut ack_advanced = None;
         let mut incoming: Option<(u32, Vec<u8>)> = None;
         let mut fin_after_data = false;
+        let mut fast_retransmit = false;
         {
             let Ok(record) = self.sockets.record_mut(socket) else {
                 return;
@@ -1045,6 +1247,8 @@ impl<D: Device> Stack<D> {
                             {
                                 close_error = Some(Errno::ECONNREFUSED);
                                 closed = true;
+                                self.counters.attempt_fails =
+                                    self.counters.attempt_fails.wrapping_add(1);
                             }
                             break 'transition;
                         }
@@ -1085,8 +1289,15 @@ impl<D: Device> Stack<D> {
                                     close_error = Some(Errno::ECONNREFUSED);
                                     closed = true;
                                 }
+                                self.counters.attempt_fails =
+                                    self.counters.attempt_fails.wrapping_add(1);
                             } else if in_window(connection, segment.seq) {
                                 send_challenge = true;
+                                self.counters.rst_challenge =
+                                    self.counters.rst_challenge.wrapping_add(1);
+                            } else {
+                                self.counters.rst_out_of_window =
+                                    self.counters.rst_out_of_window.wrapping_add(1);
                             }
                             break 'transition;
                         }
@@ -1126,8 +1337,15 @@ impl<D: Device> Stack<D> {
                             if segment.seq == connection.rcv_nxt {
                                 close_error = Some(Errno::ECONNRESET);
                                 closed = true;
+                                self.counters.estab_resets =
+                                    self.counters.estab_resets.wrapping_add(1);
                             } else if in_window(connection, segment.seq) {
                                 send_challenge = true;
+                                self.counters.rst_challenge =
+                                    self.counters.rst_challenge.wrapping_add(1);
+                            } else {
+                                self.counters.rst_out_of_window =
+                                    self.counters.rst_out_of_window.wrapping_add(1);
                             }
                             break 'transition;
                         }
@@ -1142,6 +1360,7 @@ impl<D: Device> Stack<D> {
                                 < 24 * 60 * 60 * 1000
                         {
                             connection.paws_drops = connection.paws_drops.saturating_add(1);
+                            self.counters.paws_drops = self.counters.paws_drops.wrapping_add(1);
                             send_ack = true;
                             break 'transition;
                         }
@@ -1153,8 +1372,38 @@ impl<D: Device> Stack<D> {
                             connection.ts_recent_age = now;
                         }
                         if !ack_window_ok(connection, segment.ack) {
+                            if seq_gt(segment.ack, connection.snd_nxt) {
+                                self.counters.acks_for_unsent =
+                                    self.counters.acks_for_unsent.wrapping_add(1);
+                            } else {
+                                self.counters.ack_challenge =
+                                    self.counters.ack_challenge.wrapping_add(1);
+                            }
                             send_challenge = true;
                             break 'transition;
+                        }
+                        if segment.ack_flag() {
+                            connection.snd_wnd = u32::from(segment.window) << connection.snd_wscale;
+                            connection.max_snd_wnd = connection.max_snd_wnd.max(segment.window);
+                        }
+                        if segment.payload.is_empty()
+                            && segment.ack_flag()
+                            && segment.seq == connection.rcv_nxt.wrapping_sub(1)
+                            && connection.keepalive_deadline.is_some()
+                        {
+                            self.counters.keepalive_probes_rcvd =
+                                self.counters.keepalive_probes_rcvd.wrapping_add(1);
+                        }
+                        if connection.ecn_enabled
+                            && connection.ecn_negotiated
+                            && segment.flags.ece()
+                        {
+                            self.counters.ecn_ce_marks = self.counters.ecn_ce_marks.wrapping_add(1);
+                            if !connection.ecn_cwr_pending {
+                                connection.ecn_cwr_pending = true;
+                                self.counters.ecn_ce_react =
+                                    self.counters.ecn_ce_react.wrapping_add(1);
+                            }
                         }
                         if seq_gt(segment.ack, connection.snd_una) {
                             ack_advanced = Some(segment.ack);
@@ -1166,9 +1415,31 @@ impl<D: Device> Stack<D> {
                             if !seq_ge(segment.seq, right) {
                                 incoming = Some((segment.seq, segment.payload.clone()));
                             } else {
+                                self.counters.past_window_drops =
+                                    self.counters.past_window_drops.wrapping_add(1);
+                                self.counters.past_window_bytes = self
+                                    .counters
+                                    .past_window_bytes
+                                    .wrapping_add(segment.payload.len() as u64);
                                 self.drops = self.drops.saturating_add(1);
                                 send_ack = true;
                             }
+                        }
+                        if segment.ack == connection.snd_una
+                            && segment.payload.is_empty()
+                            && connection.snd_una != connection.snd_nxt
+                            && !segment.syn()
+                            && !segment.fin()
+                        {
+                            connection.dupack_count = connection.dupack_count.saturating_add(1);
+                            let threshold =
+                                u8::try_from(self.tunables.dup_ack_threshold).unwrap_or(3);
+                            if connection.dupack_count >= threshold {
+                                connection.dupack_count = 0;
+                                fast_retransmit = true;
+                            }
+                        } else if seq_gt(segment.ack, connection.snd_una) {
+                            connection.dupack_count = 0;
                         }
                         if segment.fin() && segment.seq == connection.rcv_nxt {
                             if segment.payload.is_empty() {
@@ -1188,6 +1459,11 @@ impl<D: Device> Stack<D> {
                                 closed = true;
                             } else if in_window(connection, segment.seq) {
                                 send_challenge = true;
+                                self.counters.rst_challenge =
+                                    self.counters.rst_challenge.wrapping_add(1);
+                            } else {
+                                self.counters.rst_out_of_window =
+                                    self.counters.rst_out_of_window.wrapping_add(1);
                             }
                             break 'transition;
                         }
@@ -1202,6 +1478,7 @@ impl<D: Device> Stack<D> {
                                 < 24 * 60 * 60 * 1000
                         {
                             connection.paws_drops = connection.paws_drops.saturating_add(1);
+                            self.counters.paws_drops = self.counters.paws_drops.wrapping_add(1);
                             send_ack = true;
                             break 'transition;
                         }
@@ -1213,6 +1490,13 @@ impl<D: Device> Stack<D> {
                             connection.ts_recent_age = now;
                         }
                         if !ack_window_ok(connection, segment.ack) {
+                            if seq_gt(segment.ack, connection.snd_nxt) {
+                                self.counters.acks_for_unsent =
+                                    self.counters.acks_for_unsent.wrapping_add(1);
+                            } else {
+                                self.counters.ack_challenge =
+                                    self.counters.ack_challenge.wrapping_add(1);
+                            }
                             send_challenge = true;
                             break 'transition;
                         }
@@ -1245,6 +1529,11 @@ impl<D: Device> Stack<D> {
                                 closed = true;
                             } else if in_window(connection, segment.seq) {
                                 send_challenge = true;
+                                self.counters.rst_challenge =
+                                    self.counters.rst_challenge.wrapping_add(1);
+                            } else {
+                                self.counters.rst_out_of_window =
+                                    self.counters.rst_out_of_window.wrapping_add(1);
                             }
                             break 'transition;
                         }
@@ -1269,6 +1558,11 @@ impl<D: Device> Stack<D> {
                                 closed = true;
                             } else if in_window(connection, segment.seq) {
                                 send_challenge = true;
+                                self.counters.rst_challenge =
+                                    self.counters.rst_challenge.wrapping_add(1);
+                            } else {
+                                self.counters.rst_out_of_window =
+                                    self.counters.rst_out_of_window.wrapping_add(1);
                             }
                             break 'transition;
                         }
@@ -1293,12 +1587,21 @@ impl<D: Device> Stack<D> {
                                 closed = true;
                             } else if in_window(connection, segment.seq) {
                                 send_challenge = true;
+                                self.counters.rst_challenge =
+                                    self.counters.rst_challenge.wrapping_add(1);
+                            } else {
+                                self.counters.rst_out_of_window =
+                                    self.counters.rst_out_of_window.wrapping_add(1);
                             }
                             break 'transition;
                         }
                         if segment.syn() {
                             send_challenge = true;
                             break 'transition;
+                        }
+                        if !segment.payload.is_empty() {
+                            self.counters.data_after_fin =
+                                self.counters.data_after_fin.wrapping_add(1);
                         }
                         if segment.ack == connection.snd_nxt {
                             time_wait = true;
@@ -1314,12 +1617,21 @@ impl<D: Device> Stack<D> {
                                 closed = true;
                             } else if in_window(connection, segment.seq) {
                                 send_challenge = true;
+                                self.counters.rst_challenge =
+                                    self.counters.rst_challenge.wrapping_add(1);
+                            } else {
+                                self.counters.rst_out_of_window =
+                                    self.counters.rst_out_of_window.wrapping_add(1);
                             }
                             break 'transition;
                         }
                         if segment.syn() {
                             send_challenge = true;
                             break 'transition;
+                        }
+                        if !segment.payload.is_empty() {
+                            self.counters.data_after_fin =
+                                self.counters.data_after_fin.wrapping_add(1);
                         }
                         if segment.ack == connection.snd_nxt {
                             closed = true;
@@ -1329,6 +1641,8 @@ impl<D: Device> Stack<D> {
                     }
                     TcpState::TimeWait => {
                         if segment.rst() {
+                            self.counters.timewait_rst_ignored =
+                                self.counters.timewait_rst_ignored.wrapping_add(1);
                             break 'transition;
                         }
                         if segment.syn() {
@@ -1342,13 +1656,26 @@ impl<D: Device> Stack<D> {
                                 connection.state = TcpState::SynReceived;
                                 connection.time_wait_deadline = None;
                                 send_ack = true;
+                            } else {
+                                self.counters.timewait_syn_drops =
+                                    self.counters.timewait_syn_drops.wrapping_add(1);
                             }
                             break 'transition;
                         }
+                        if !segment.payload.is_empty() {
+                            self.counters.data_after_fin =
+                                self.counters.data_after_fin.wrapping_add(1);
+                            self.counters.timewait_data_drops =
+                                self.counters.timewait_data_drops.wrapping_add(1);
+                        }
                         if segment.fin() {
                             connection.rcv_nxt = connection.rcv_nxt.wrapping_add(1);
-                            connection.time_wait_deadline =
-                                Some(Instant::from_millis(now.as_millis().saturating_add(60_000)));
+                            connection.time_wait_deadline = Some(Instant::from_millis(
+                                now.as_millis().saturating_add(
+                                    i64::try_from(self.tunables.time_wait_interval)
+                                        .unwrap_or(i64::MAX),
+                                ),
+                            ));
                             send_ack = true;
                         } else {
                             send_ack = true;
@@ -1363,12 +1690,16 @@ impl<D: Device> Stack<D> {
             if time_wait {
                 connection.state = TcpState::TimeWait;
                 connection.time_wait_deadline =
-                    Some(Instant::from_millis(now.as_millis().saturating_add(60_000)));
+                    Some(Instant::from_millis(now.as_millis().saturating_add(
+                        i64::try_from(self.tunables.time_wait_interval).unwrap_or(i64::MAX),
+                    )));
             }
             if fin_wait2 {
                 connection.state = TcpState::FinWait2;
                 connection.fin_wait2_deadline =
-                    Some(Instant::from_millis(now.as_millis().saturating_add(60_000)));
+                    Some(Instant::from_millis(now.as_millis().saturating_add(
+                        i64::try_from(self.tunables.finwait2_timeout).unwrap_or(i64::MAX),
+                    )));
             }
             if closed {
                 connection.state = TcpState::Closed;
@@ -1396,13 +1727,22 @@ impl<D: Device> Stack<D> {
                 } = &mut record.kind
             {
                 half_open.retain(|connection| *connection != socket);
-                if !pending.contains(&socket) {
+                let limit = usize::try_from(self.tunables.accept_queue_limit).unwrap_or(128);
+                if pending.len() >= limit {
+                    self.counters.accept_queue_drops =
+                        self.counters.accept_queue_drops.wrapping_add(1);
+                } else if !pending.contains(&socket) {
                     pending.push_back(socket);
                 }
             }
         }
-        if send_challenge && self.allow_challenge(socket, now) {
-            let _ = self.send_challenge_ack(socket);
+        if send_challenge {
+            if self.allow_challenge(socket, now) {
+                let _ = self.send_challenge_ack(socket);
+            } else {
+                self.counters.challenge_ack_suppressed =
+                    self.counters.challenge_ack_suppressed.wrapping_add(1);
+            }
         }
         if let Some((seq, data)) = incoming {
             self.tcp_deliver_data(socket, seq, &data, now);
@@ -1432,6 +1772,10 @@ impl<D: Device> Stack<D> {
                 connection.last_ts_sent = None;
             }
         }
+        if fast_retransmit {
+            self.fast_retransmit(socket);
+        }
+        self.enforce_timewait_limit(socket);
         if send_syn_ack {
             let _ = self.send_syn_ack(socket);
         }
@@ -1440,6 +1784,218 @@ impl<D: Device> Stack<D> {
         }
         if send_rst {
             let _ = self.send_rst_for(socket, rst_seq);
+        }
+    }
+
+    fn cookie_slot(&self, now_ms: i64) -> i64 {
+        let lifetime = i64::try_from(self.tunables.syn_cookie_lifetime)
+            .unwrap_or(60_000)
+            .max(1);
+        now_ms / lifetime
+    }
+
+    fn syn_cookie(
+        &self,
+        local: IpAddr,
+        remote: IpAddr,
+        local_port: u16,
+        remote_port: u16,
+        slot: i64,
+    ) -> u32 {
+        let mut hash = self.cookie_secret ^ (slot as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+        for output in [local, remote] {
+            let bytes = match output {
+                IpAddr::V4(address) => address.octets().to_vec(),
+                IpAddr::V6(address) => address.octets().to_vec(),
+            };
+            for byte in bytes {
+                hash ^= u64::from(byte);
+                hash = hash.wrapping_mul(0x100_0000_01b3);
+            }
+        }
+        hash ^= u64::from(local_port) << 16 | u64::from(remote_port);
+        hash ^= hash >> 33;
+        hash = hash.wrapping_mul(0xff51_afd7_ed55_8ccd);
+        hash ^= hash >> 33;
+        u32::try_from(hash & 0xffff_ffff).unwrap_or(0)
+    }
+
+    fn syn_cookie_valid(
+        &self,
+        local: IpAddr,
+        remote: IpAddr,
+        local_port: u16,
+        remote_port: u16,
+        acknowledgement: u32,
+    ) -> bool {
+        let slot = self.cookie_slot(self.now.as_millis());
+        for candidate in [slot, slot.saturating_sub(1)] {
+            let iss = self.syn_cookie(local, remote, local_port, remote_port, candidate);
+            if acknowledgement == iss.wrapping_add(1) {
+                return true;
+            }
+        }
+        false
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn finish_syn_cookie(
+        &mut self,
+        listener: SocketId,
+        source: IpAddr,
+        destination: IpAddr,
+        source_port: u16,
+        destination_port: u16,
+        segment: &Segment,
+    ) {
+        let iss = segment.ack.wrapping_sub(1);
+        let mut connection = TcpConnection::new_passive(
+            destination,
+            destination_port,
+            (source, source_port),
+            iss,
+            segment.seq.wrapping_sub(1),
+            self.now,
+        );
+        connection.state = TcpState::Established;
+        connection.snd_una = segment.ack;
+        connection.snd_nxt = segment.ack;
+        connection.snd_wnd = u32::from(segment.window);
+        self.configure_tcp_connection(&mut connection, source);
+        let Ok(socket) = self.sockets.alloc(
+            Kind::Tcp(connection),
+            self.recv_buffer_cap(),
+            self.send_buffer_cap(),
+        ) else {
+            return;
+        };
+        self.counters.syn_cookie_valid = self.counters.syn_cookie_valid.wrapping_add(1);
+        self.counters.passive_opens = self.counters.passive_opens.wrapping_add(1);
+        if let Ok(record) = self.sockets.record_mut(listener)
+            && let Kind::Listener { pending, .. } = &mut record.kind
+        {
+            let limit = usize::try_from(self.tunables.accept_queue_limit).unwrap_or(128);
+            if pending.len() >= limit {
+                self.counters.accept_queue_drops = self.counters.accept_queue_drops.wrapping_add(1);
+            } else {
+                pending.push_back(socket);
+            }
+        }
+        let _ = self.send_ack_for(socket);
+    }
+
+    fn fast_retransmit(&mut self, socket: SocketId) {
+        let snapshot = {
+            let Ok(record) = self.sockets.record(socket) else {
+                return;
+            };
+            let Kind::Tcp(connection) = &record.kind else {
+                return;
+            };
+            let Some(remote) = connection.remote else {
+                return;
+            };
+            let length = record.tx.len().min(usize::from(connection.mss));
+            if length == 0 {
+                return;
+            }
+            let payload: Vec<u8> = record.tx.iter().take(length).copied().collect();
+            (
+                connection.local,
+                remote,
+                connection.local_port,
+                connection.snd_una,
+                connection.rcv_nxt,
+                advertised_window(record),
+                payload,
+                connection.snd_nxt,
+                connection.mss,
+            )
+        };
+        let (local, remote, port, seq, ack, window, payload, snd_nxt, mss) = snapshot;
+        let _ = self.send_tcp_packet(
+            local,
+            remote.0,
+            port,
+            remote.1,
+            TcpFlags::from_bits(TcpFlags::ACK.bits() | TcpFlags::PSH.bits()),
+            seq,
+            ack,
+            window,
+            &payload,
+            false,
+        );
+        self.counters.fast_retransmits = self.counters.fast_retransmits.wrapping_add(1);
+        self.counters.retrans_segments = self.counters.retrans_segments.wrapping_add(1);
+        self.counters.retrans_bytes = self
+            .counters
+            .retrans_bytes
+            .wrapping_add(u64::try_from(payload.len()).unwrap_or(0));
+        if let Ok(record) = self.sockets.record_mut(socket)
+            && let Kind::Tcp(connection) = &mut record.kind
+        {
+            let flight = snd_nxt.wrapping_sub(seq);
+            let mut context = crate::CcContext {
+                mss: u32::from(mss),
+                flight,
+                pipe: flight,
+                rtt: None,
+                snd_nxt,
+                snd_una: seq,
+            };
+            connection
+                .cc
+                .on_loss(&mut context, crate::cc::LossKind::DupAck);
+            connection.retransmits_total = connection.retransmits_total.saturating_add(1);
+            connection.rto_deadline =
+                Some(Instant::from_millis(self.now.as_millis().saturating_add(
+                    i64::try_from(connection.rto.rto_ms()).unwrap_or(i64::MAX),
+                )));
+        }
+    }
+
+    fn enforce_timewait_limit(&mut self, current: SocketId) {
+        let current_is_timewait = self
+            .sockets
+            .record(current)
+            .ok()
+            .is_some_and(|record| {
+                matches!(&record.kind, Kind::Tcp(connection) if connection.state == TcpState::TimeWait)
+            });
+        if !current_is_timewait {
+            return;
+        }
+        let limit = usize::try_from(self.tunables.timewait_max).unwrap_or(65_536);
+        loop {
+            let timewait: Vec<(SocketId, Instant)> = self
+                .sockets
+                .records
+                .iter()
+                .filter_map(|(raw_id, record)| match &record.kind {
+                    Kind::Tcp(connection) if connection.state == TcpState::TimeWait => Some((
+                        SocketId(*raw_id),
+                        connection.time_wait_deadline.unwrap_or(Instant::ZERO),
+                    )),
+                    _ => None,
+                })
+                .collect();
+            if timewait.len() <= limit {
+                break;
+            }
+            let Some((oldest, _)) = timewait.into_iter().min_by_key(|(_, deadline)| *deadline)
+            else {
+                break;
+            };
+            if oldest == current {
+                break;
+            }
+            if let Ok(record) = self.sockets.record_mut(oldest) {
+                if let Kind::Tcp(connection) = &mut record.kind {
+                    connection.state = TcpState::Closed;
+                }
+                record.closed = true;
+            }
+            self.counters.timewait_recycled = self.counters.timewait_recycled.wrapping_add(1);
         }
     }
 
@@ -1461,12 +2017,17 @@ impl<D: Device> Stack<D> {
             )
         };
         self.option_override = Some(options);
+        let flags = if self.tunables.ecn_enable != 0 {
+            flags_or(TcpFlags::SYN, flags_or(TcpFlags::ECE, TcpFlags::CWR))
+        } else {
+            TcpFlags::SYN
+        };
         self.send_tcp_packet(
             local,
             remote.0,
             port,
             remote.1,
-            TcpFlags::SYN,
+            flags,
             iss,
             0,
             65_535,
@@ -1500,12 +2061,20 @@ impl<D: Device> Stack<D> {
         {
             self.tcp_synacks = self.tcp_synacks.saturating_add(1);
         }
+        let mut flags = flags_or(TcpFlags::SYN, TcpFlags::ACK);
+        if self.tunables.ecn_enable != 0
+            && let Ok(record) = self.sockets.record(socket)
+            && let Kind::Tcp(connection) = &record.kind
+            && connection.ecn_negotiated
+        {
+            flags = flags_or(flags, TcpFlags::ECE);
+        }
         self.send_tcp_packet(
             local,
             remote.0,
             port,
             remote.1,
-            flags_or(TcpFlags::SYN, TcpFlags::ACK),
+            flags,
             iss,
             rcv_nxt,
             window,
@@ -1515,19 +2084,53 @@ impl<D: Device> Stack<D> {
     }
 
     pub(crate) fn send_ack_for(&mut self, socket: SocketId) -> Result<(), Errno> {
-        let ts_options = {
+        let (options, window, previous_window, mss) = {
             let record = self.sockets.record(socket)?;
-            match &record.kind {
-                Kind::Tcp(connection) => {
-                    timestamp_options(connection, u32::try_from(self.now.as_millis()).unwrap_or(0))
+            let Kind::Tcp(connection) = &record.kind else {
+                return Err(Errno::ENOTSOCK);
+            };
+            let mut options =
+                timestamp_options(connection, u32::try_from(self.now.as_millis()).unwrap_or(0));
+            if connection.sack_permitted && !connection.ooo.is_empty() {
+                let max_ranges = usize::try_from(self.tunables.sack_ranges_max).unwrap_or(16);
+                let holes: Vec<(u32, u32)> = connection
+                    .ooo
+                    .iter()
+                    .take(max_ranges)
+                    .map(|(seq, data)| {
+                        (
+                            *seq,
+                            seq.wrapping_add(u32::try_from(data.len()).unwrap_or(0)),
+                        )
+                    })
+                    .collect();
+                let blocks = crate::sack::receiver_blocks(&holes, connection.timestamps, None);
+                if !blocks.is_empty() {
+                    self.counters.sack_blocks_sent = self
+                        .counters
+                        .sack_blocks_sent
+                        .wrapping_add(blocks.len() as u64);
+                    options.extend_from_slice(&crate::sack::sack_option_bytes(&blocks));
                 }
-                _ => Vec::new(),
             }
+            (
+                options,
+                advertised_window(record),
+                connection.last_adv_window,
+                connection.mss,
+            )
         };
-        if !ts_options.is_empty() {
-            self.option_override = Some(ts_options);
+        if !options.is_empty() {
+            self.option_override = Some(options);
         }
-        let (local, remote, snd_nxt, rcv_nxt, port, window) = {
+        let threshold = mss.max(1);
+        let grew = (window > previous_window
+            && window.saturating_sub(previous_window) >= threshold)
+            || (previous_window == 0 && window > 0);
+        if grew {
+            self.counters.window_updates = self.counters.window_updates.wrapping_add(1);
+        }
+        let (local, remote, snd_nxt, rcv_nxt, port) = {
             let record = self.sockets.record(socket)?;
             let Kind::Tcp(connection) = &record.kind else {
                 return Err(Errno::ENOTSOCK);
@@ -1539,9 +2142,13 @@ impl<D: Device> Stack<D> {
                 connection.snd_nxt,
                 connection.rcv_nxt,
                 connection.local_port,
-                advertised_window(record),
             )
         };
+        if let Ok(record) = self.sockets.record_mut(socket)
+            && let Kind::Tcp(connection) = &mut record.kind
+        {
+            connection.last_adv_window = window;
+        }
         self.send_tcp_packet(
             local,
             remote.0,
@@ -1557,6 +2164,7 @@ impl<D: Device> Stack<D> {
     }
 
     fn send_challenge_ack(&mut self, socket: SocketId) -> Result<(), Errno> {
+        self.counters.challenge_acks_sent = self.counters.challenge_acks_sent.wrapping_add(1);
         let (local, remote, snd_nxt, rcv_nxt, port, window) = {
             let record = self.sockets.record(socket)?;
             let Kind::Tcp(connection) = &record.kind else {
@@ -1736,10 +2344,19 @@ impl<D: Device> Stack<D> {
                 field.copy_from_slice(&checksum.to_be_bytes());
             }
         }
-        match remote {
+        let result = match remote {
             IpAddr::V4(destination) => self.send_ipv4(&segment, destination, 6),
             IpAddr::V6(destination) => self.send_ipv6(&segment, destination, 6),
+        };
+        if result.is_ok() {
+            self.counters.out_segments = self.counters.out_segments.wrapping_add(1);
+            if flags.rst() {
+                self.counters.rst_sent = self.counters.rst_sent.wrapping_add(1);
+            }
+        } else {
+            self.counters.out_errors = self.counters.out_errors.wrapping_add(1);
         }
+        result
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1768,6 +2385,17 @@ impl<D: Device> Stack<D> {
     }
 
     fn allow_challenge(&mut self, socket: SocketId, now: Instant) -> bool {
+        let global_elapsed = now.saturating_since(self.challenge_global_last).as_millis();
+        if global_elapsed >= self.tunables.challenge_ack_global_interval {
+            self.challenge_global_tokens =
+                u32::try_from(self.tunables.challenge_ack_global_burst).unwrap_or(u32::MAX);
+            self.challenge_global_last = now;
+        }
+        if self.challenge_global_tokens == 0 {
+            return false;
+        }
+        let burst = u32::try_from(self.tunables.challenge_ack_burst).unwrap_or(u32::MAX);
+        let interval = self.tunables.challenge_ack_interval;
         let Ok(record) = self.sockets.record_mut(socket) else {
             return false;
         };
@@ -1775,14 +2403,15 @@ impl<D: Device> Stack<D> {
             return false;
         };
         let elapsed = now.saturating_since(connection.challenge_last).as_millis();
-        if elapsed >= 5_000 {
-            connection.challenge_tokens = 10;
+        if elapsed >= interval {
+            connection.challenge_tokens = burst;
             connection.challenge_last = now;
         }
         if connection.challenge_tokens == 0 {
             return false;
         }
         connection.challenge_tokens -= 1;
+        self.challenge_global_tokens -= 1;
         true
     }
 
@@ -1903,8 +2532,11 @@ impl<D: Device> Stack<D> {
                         .connect_deadline
                         .is_some_and(|deadline| deadline <= now)
                 {
-                    if connection.connect_retries >= 6 {
+                    if u32::from(connection.connect_retries)
+                        >= u32::try_from(self.tunables.connect_retries).unwrap_or(6)
+                    {
                         timeout = Some(Errno::ETIMEDOUT);
+                        self.counters.attempt_fails = self.counters.attempt_fails.wrapping_add(1);
                     } else {
                         connection.connect_retries = connection.connect_retries.saturating_add(1);
                         let backoff = 1000u64
@@ -1922,6 +2554,7 @@ impl<D: Device> Stack<D> {
                         .is_some_and(|deadline| deadline <= now)
                 {
                     fin_wait2_timeout = true;
+                    self.counters.finwait2_fires = self.counters.finwait2_fires.wrapping_add(1);
                 }
                 if connection.state == TcpState::TimeWait
                     && connection
@@ -1929,6 +2562,9 @@ impl<D: Device> Stack<D> {
                         .is_some_and(|deadline| deadline <= now)
                 {
                     close_time_wait = true;
+                    self.counters.timewait_fires = self.counters.timewait_fires.wrapping_add(1);
+                    self.counters.timewait_expiries =
+                        self.counters.timewait_expiries.wrapping_add(1);
                 }
                 if connection
                     .rto_deadline
@@ -1944,7 +2580,16 @@ impl<D: Device> Stack<D> {
                             connection.rtt_sample = Some((connection.snd_una, now, true));
                         }
                         connection.retransmit_count = connection.retransmit_count.saturating_add(1);
+                        connection.retransmits_total =
+                            connection.retransmits_total.saturating_add(1);
                         connection.rto_timeouts = connection.rto_timeouts.saturating_add(1);
+                        self.counters.rto_fires = self.counters.rto_fires.wrapping_add(1);
+                        self.counters.retrans_segments =
+                            self.counters.retrans_segments.wrapping_add(1);
+                        self.counters.retrans_bytes = self
+                            .counters
+                            .retrans_bytes
+                            .wrapping_add(u64::try_from(length).unwrap_or(0));
                         if connection.retransmit_count > connection.rto_max_retransmits {
                             connection.state = TcpState::Closed;
                             record.error = Some(Errno::ETIMEDOUT);
@@ -1973,6 +2618,14 @@ impl<D: Device> Stack<D> {
                     }
                 }
                 if connection.state == TcpState::Established
+                    && self.tunables.user_timeout > 0
+                    && now.saturating_since(connection.last_activity).as_millis()
+                        >= self.tunables.user_timeout
+                {
+                    timeout = Some(Errno::ETIMEDOUT);
+                    self.counters.user_timeouts = self.counters.user_timeouts.wrapping_add(1);
+                }
+                if connection.state == TcpState::Established
                     && connection
                         .keepalive_deadline
                         .is_some_and(|deadline| deadline <= now)
@@ -1997,6 +2650,8 @@ impl<D: Device> Stack<D> {
                     connection.state = TcpState::Closed;
                     record.error = Some(Errno::ETIMEDOUT);
                     record.closed = true;
+                    self.counters.finwait2_timeouts =
+                        self.counters.finwait2_timeouts.wrapping_add(1);
                 }
                 if keepalive_timeout {
                     connection.state = TcpState::Closed;
@@ -2009,9 +2664,11 @@ impl<D: Device> Stack<D> {
                 }
             }
             if retransmit_syn {
+                self.counters.connect_fires = self.counters.connect_fires.wrapping_add(1);
                 let _ = self.send_syn(socket);
             }
             if keepalive_probe {
+                self.counters.keepalive_fires = self.counters.keepalive_fires.wrapping_add(1);
                 let _ = self.send_ack_for(socket);
             }
             if let Some((payload, local, remote, local_port, seq, ack, window)) = retransmit {
@@ -2098,6 +2755,14 @@ fn signature_pseudo(local: IpAddr, remote: IpAddr, length: usize) -> Vec<u8> {
     }
 }
 
+fn isn_mix(mut value: u32) -> u32 {
+    value ^= value >> 16;
+    value = value.wrapping_mul(0x7feb_352d);
+    value ^= value >> 15;
+    value = value.wrapping_mul(0x846c_a68b);
+    value ^ (value >> 16)
+}
+
 fn choose_wscale(receive_cap: usize) -> u8 {
     let mut shift = 0u8;
     while shift < 14 && (65_535usize << shift) < receive_cap {
@@ -2106,20 +2771,23 @@ fn choose_wscale(receive_cap: usize) -> u8 {
     shift
 }
 
-fn our_mss(remote: IpAddr, caps: crate::DeviceCaps) -> u16 {
+fn our_mss(remote: IpAddr, caps: crate::DeviceCaps, default: u16) -> u16 {
+    if caps.mtu == 0 {
+        return default.max(64);
+    }
     let link = caps.mtu.saturating_sub(14);
     let header = match remote {
         IpAddr::V4(_) => 40,
         IpAddr::V6(_) => 60,
     };
     u16::try_from(link.saturating_sub(header))
-        .unwrap_or(1460)
+        .unwrap_or(default)
         .max(536)
 }
 
 fn apply_syn_options(connection: &mut TcpConnection, segment: &Segment, now: Instant) {
     if let Some(mss) = segment.mss {
-        let clamped = mss.clamp(536, connection.our_mss);
+        let clamped = mss.clamp(connection.mss_floor, connection.our_mss);
         if clamped != mss {
             connection.mss_clamps = connection.mss_clamps.saturating_add(1);
         }
@@ -2128,9 +2796,13 @@ fn apply_syn_options(connection: &mut TcpConnection, segment: &Segment, now: Ins
     }
     if connection.offer_wscale {
         connection.snd_wscale = segment.wscale.unwrap_or(0).min(14);
+        connection.negotiated_wscale = Some(connection.snd_wscale);
     }
-    if segment.sack_permitted {
+    if segment.sack_permitted && connection.offer_sack {
         connection.sack_permitted = true;
+    }
+    if connection.ecn_enabled && segment.flags.ece() {
+        connection.ecn_negotiated = true;
     }
     if connection.offer_timestamps
         && let Some(tsval) = segment.tsval
@@ -2151,7 +2823,9 @@ fn syn_options(connection: &TcpConnection, tsval: u32, tsecr: u32) -> Vec<u8> {
     let mut options = Vec::new();
     options.extend_from_slice(&[2, 4]);
     options.extend_from_slice(&connection.our_mss.to_be_bytes());
-    options.extend_from_slice(&[4, 2]);
+    if connection.offer_sack {
+        options.extend_from_slice(&[4, 2]);
+    }
     options.extend_from_slice(&[1, 1]);
     if connection.offer_timestamps {
         options.extend_from_slice(&[8, 10]);
