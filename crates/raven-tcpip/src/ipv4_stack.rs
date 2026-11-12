@@ -287,6 +287,101 @@ impl<D: Device> Stack<D> {
         Ok(())
     }
 
+    /// Send a transport segment of `len` bytes that `build` writes in place.
+    ///
+    /// On the common path (resolved neighbour, fits one frame) the Ethernet, IPv4 and transport
+    /// headers and the payload are written straight into the device's transmit buffer, with no
+    /// intermediate copy. Local delivery, fragmentation and unresolved neighbours go through
+    /// [`Self::send_ipv4`] with a temporary buffer.
+    pub(crate) fn send_ipv4_built(
+        &mut self,
+        len: usize,
+        destination: Ipv4Addr,
+        protocol: u8,
+        build: &mut dyn FnMut(&mut [u8]),
+    ) -> Result<(), Errno> {
+        let config = self.ipv4.ok_or(Errno::ENETUNREACH)?;
+        let route = *self.routes.lookup(destination).ok_or(Errno::ENETUNREACH)?;
+        let next_hop = route.gateway.unwrap_or(destination);
+        let resolved = if next_hop == config.addr {
+            None
+        } else {
+            self.neighbors
+                .get(next_hop)
+                .filter(|entry| entry.is_resolved(self.now))
+                .and_then(|entry| entry.mac)
+        };
+        if let Some(mac) = resolved
+            && 20usize.saturating_add(len) <= route.mtu.max(68)
+        {
+            return self.transmit_ipv4_frame(mac, config.addr, destination, protocol, len, build);
+        }
+        let mut segment = vec![0u8; len];
+        build(&mut segment);
+        self.send_ipv4(&segment, destination, protocol)
+    }
+
+    fn transmit_ipv4_frame(
+        &mut self,
+        mac: [u8; 6],
+        source_addr: Ipv4Addr,
+        destination: Ipv4Addr,
+        protocol: u8,
+        len: usize,
+        build: &mut dyn FnMut(&mut [u8]),
+    ) -> Result<(), Errno> {
+        let caps = self.device.capabilities();
+        let source = self
+            .config
+            .hardware_addr
+            .or(caps.hardware_addr)
+            .ok_or(Errno::ENETUNREACH)?;
+        let total = 14usize.saturating_add(20).saturating_add(len);
+        if total > caps.mtu {
+            return Err(Errno::EINVAL);
+        }
+        let id = self.next_ip_id;
+        self.next_ip_id = self.next_ip_id.wrapping_add(1);
+        let header = Ipv4Header {
+            id,
+            ttl: 64,
+            protocol,
+            src: to_wire(source_addr),
+            dst: to_wire(destination),
+            ..Ipv4Header::default()
+        };
+        let now = self.now;
+        let mut failed = false;
+        self.device
+            .transmit(now, total, &mut |buffer| {
+                let Ok(mut frame) = EthernetBuilder::new(
+                    buffer,
+                    MacAddr::new(mac),
+                    MacAddr::new(source),
+                    EtherType::Ipv4,
+                    20 + len,
+                ) else {
+                    failed = true;
+                    return;
+                };
+                let Ok(mut packet) = Ipv4Builder::new(frame.payload_mut(), &header, len) else {
+                    failed = true;
+                    return;
+                };
+                build(packet.payload_mut());
+            })
+            .map_err(|error| match error {
+                crate::TxError::Busy => Errno::EAGAIN,
+                crate::TxError::TooLong => Errno::EINVAL,
+                crate::TxError::Down => Errno::ENETUNREACH,
+            })?;
+        if failed {
+            return Err(Errno::EINVAL);
+        }
+        self.pending_tx_frames = self.pending_tx_frames.saturating_add(1);
+        Ok(())
+    }
+
     fn transmit_fragments(
         &mut self,
         mac: [u8; 6],

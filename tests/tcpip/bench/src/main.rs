@@ -12,7 +12,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use raven_tcpip_bench::{Run, raven_transfer, raven_ttfb};
+use raven_tcpip_bench::{Run, core_transfer, core_ttfb};
 
 fn median(values: &mut [Duration]) -> Duration {
     values.sort_unstable();
@@ -188,7 +188,7 @@ fn main() {
         (20, "lossless 20 ms"),
         (200, "lossless 200 ms"),
     ] {
-        let (run, wall, spread) = five(|| raven_transfer(1024 * 1024, rtt, 0.0, 0.0));
+        let (run, wall, spread) = five(|| core_transfer(1024 * 1024, rtt, 0, 0));
         push_row(
             &mut lines,
             &format!("Goodput, lossless, {rtt} ms RTT"),
@@ -202,11 +202,11 @@ fn main() {
             ),
         );
     }
-    for (loss, key) in [(1.0f32, "1% loss"), (5.0, "5% loss")] {
-        let (run, _, _) = five(|| raven_transfer(1024 * 1024, 20, loss, 0.0));
+    for (loss, key) in [(10u16, "1% loss"), (50, "5% loss")] {
+        let (run, _, _) = five(|| core_transfer(1024 * 1024, 20, loss, 0));
         push_row(
             &mut lines,
-            &format!("Goodput, {loss}% loss, 20 ms RTT"),
+            &format!("Goodput, {}% loss, 20 ms RTT", loss / 10),
             &format!(
                 "{:.2} MiB/s ({} ms, retrans {} B)",
                 run.goodput_mib_s(),
@@ -215,10 +215,10 @@ fn main() {
             ),
             key,
             run.virtual_ms,
-            "virtual time, 1 MiB, 5 runs, seed 131",
+            "virtual time, 1 MiB, 5 runs, via raven-netcore PairDevice, loss in per-mille",
         );
     }
-    let (run, _, _) = five(|| raven_transfer(1024 * 1024, 20, 0.0, 10.0));
+    let (run, _, _) = five(|| core_transfer(1024 * 1024, 20, 0, 100));
     push_row(
         &mut lines,
         "Goodput, 10% reordering, 20 ms RTT",
@@ -228,7 +228,7 @@ fn main() {
         "virtual time, 1 MiB, 5 runs",
     );
 
-    let (_run, wall, spread) = five(|| raven_transfer(1024 * 1024, 20, 0.0, 0.0));
+    let (_run, wall, spread) = five(|| core_transfer(1024 * 1024, 20, 0, 0));
     let cpu = wall.as_secs_f64() * 1000.0;
     let cpu_verdict = if cpu < CPU_RENO_MS * 0.9 {
         "better"
@@ -242,7 +242,7 @@ fn main() {
         spread.as_secs_f64() * 1000.0
     ));
 
-    let (ttfb, _, _) = five(|| raven_ttfb(20));
+    let (ttfb, _, _) = five(|| core_ttfb(20));
     let ttfb_verdict = verdict_ms(ttfb.virtual_ms, TTFB_REF_MS);
     lines.push(format!(
         "| Time to first byte, 20 ms RTT | {} ms virtual | {TTFB_REF_MS} ms virtual | {TTFB_REF_MS} ms virtual (not re-measured) | {ttfb_verdict} | virtual time, 5 identical runs |",

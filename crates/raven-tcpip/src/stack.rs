@@ -194,6 +194,9 @@ pub struct Stack<D: Device> {
     pub(crate) ip_errors: Vec<(Ipv4Addr, Errno)>,
     pub(crate) arp_requests: usize,
     pub(crate) next_ephemeral: u16,
+    /// Reused receive staging: frames of one poll batch are copied here, not into fresh vectors.
+    pub(crate) rx_arena: Vec<u8>,
+    pub(crate) rx_spans: Vec<(usize, usize)>,
     /// Live randomised ephemeral-port allocator (C17).
     pub(crate) ports: crate::table::PortAllocator,
     /// Live TIME-WAIT membership and recycling (C17).
@@ -302,6 +305,8 @@ impl<D: Device> Stack<D> {
             ip_errors: Vec::new(),
             arp_requests: 0,
             next_ephemeral,
+            rx_arena: Vec::new(),
+            rx_spans: Vec::new(),
             ports: crate::table::PortAllocator::new(
                 u16::try_from(tunables.port_range_first).unwrap_or(32_768),
                 u16::try_from(tunables.port_range_last).unwrap_or(60_999),
@@ -392,7 +397,10 @@ impl<D: Device> Stack<D> {
         let device = &mut self.device;
         #[cfg(any(test, feature = "testutil"))]
         let trace = &mut self.trace;
-        let mut frames: Vec<Vec<u8>> = Vec::new();
+        let mut arena = core::mem::take(&mut self.rx_arena);
+        let mut spans = core::mem::take(&mut self.rx_spans);
+        arena.clear();
+        spans.clear();
         let mut overflow = 0usize;
         loop {
             let mut count = 0usize;
@@ -402,8 +410,9 @@ impl<D: Device> Stack<D> {
                 if trace_enabled {
                     trace.push(_frame.to_vec());
                 }
-                if frames.len() < MAX_RX_BATCH {
-                    frames.push(_frame.to_vec());
+                if spans.len() < MAX_RX_BATCH {
+                    spans.push((arena.len(), _frame.len()));
+                    arena.extend_from_slice(_frame);
                 } else {
                     overflow = overflow.saturating_add(1);
                 }
@@ -414,9 +423,11 @@ impl<D: Device> Stack<D> {
             }
         }
         self.drops = self.drops.saturating_add(overflow);
-        for frame in &frames {
-            self.handle_frame(frame, now);
+        for &(start, length) in &spans {
+            self.handle_frame(&arena[start..start + length], now);
         }
+        self.rx_arena = arena;
+        self.rx_spans = spans;
         self.retry_tcp_sends();
         self.process_ip_timers(now);
         self.observe_hash_chains();

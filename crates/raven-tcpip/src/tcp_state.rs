@@ -2626,6 +2626,33 @@ impl<D: Device> Stack<D> {
             option_bytes.extend_from_slice(&vec![0u8; mac_len]);
         }
         let padded_options = (option_bytes.len() + 3) & !3;
+        #[allow(unused_mut)]
+        let mut signed = false;
+        #[cfg(feature = "tcp-md5")]
+        {
+            signed |= md5_key.is_some();
+        }
+        #[cfg(feature = "tcp-ao")]
+        {
+            signed |= ao_key.is_some();
+        }
+        if !signed
+            && padded_options <= 40
+            && let (IpAddr::V4(local_v4), IpAddr::V4(remote_v4)) = (local, remote)
+        {
+            let context = ChecksumContext::ipv4(to_wire4(local_v4), to_wire4(remote_v4));
+            let length = 20 + padded_options + payload.len();
+            let result = self.send_ipv4_built(length, remote_v4, 6, &mut |region| {
+                region[..20 + padded_options].fill(0);
+                if let Ok(mut builder) =
+                    TcpBuilder::new(region, context, &header, &option_bytes, payload.len())
+                {
+                    builder.payload_mut().copy_from_slice(payload);
+                    builder.finish();
+                }
+            });
+            return self.account_tcp_send(result, flags);
+        }
         let mut segment = vec![0u8; 20 + padded_options + payload.len()];
         let context = match (local, remote) {
             (IpAddr::V4(local), IpAddr::V4(remote)) => {
@@ -2699,6 +2726,15 @@ impl<D: Device> Stack<D> {
             IpAddr::V4(destination) => self.send_ipv4(&segment, destination, 6),
             IpAddr::V6(destination) => self.send_ipv6(&segment, destination, 6),
         };
+        self.account_tcp_send(result, flags)
+    }
+
+    /// Count a transmitted (or failed) TCP segment and pass the result through.
+    fn account_tcp_send(
+        &mut self,
+        result: Result<(), Errno>,
+        flags: TcpFlags,
+    ) -> Result<(), Errno> {
         if result.is_ok() {
             self.counters.out_segments = self.counters.out_segments.wrapping_add(1);
             if flags.rst() {

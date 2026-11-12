@@ -18,3 +18,4 @@ raven-tcpip = { path = "../../../crates/raven-tcpip", features = ["testutil"] }
 raven-tcpip-wire = { path = "../../../crates/raven-tcpip-wire" }
 raven-tcpip-sim = { path = ".." }
 raven-abi = { path = "../../../crates/raven-abi" }
+raven-netcore = { path = "../../../crates/raven-netcore", features = ["testutil"] }
