@@ -77,6 +77,10 @@ pub struct Namespace {
     pub prefixes: Vec<String>,
 }
 
+#[cfg_attr(
+    target_arch = "aarch64",
+    allow(dead_code) // prefix updates are used by the x86-64 PROC_NAMESPACE syscall
+)]
 impl Namespace {
     /// The root namespace (the first process and kernel process).
     pub fn root() -> Self {

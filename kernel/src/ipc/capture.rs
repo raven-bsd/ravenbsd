@@ -509,12 +509,7 @@ pub fn create(
 }
 
 fn unmap_partial(
-    mapper: &mut raven_rmm::Mapper<
-        '_,
-        crate::memory::paging::KernelFrameAllocator,
-        crate::memory::paging::KernelPhysMemory,
-        crate::memory::paging::KernelTlb,
-    >,
+    mapper: &mut crate::memory::paging::KernelMapper<'_>,
     base: u64,
     pages: u64,
 ) -> bool {
@@ -544,5 +539,17 @@ fn map_errno(error: MapError) -> Errno {
 const _: () = {
     assert!(capture_window::SLOT_SIZE == 4 * 1024 * 1024);
     assert!(capture_window::SLOTS > 0);
-    assert!(capture_window::BASE < raven_abi::layout::x86_64::USER_END);
+    assert!(capture_window::BASE < capture_user_end());
 };
+
+/// One past the highest user address on the running target.
+const fn capture_user_end() -> u64 {
+    #[cfg(target_arch = "x86_64")]
+    {
+        raven_abi::layout::x86_64::USER_END
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        raven_abi::layout::aarch64::USER_END
+    }
+}

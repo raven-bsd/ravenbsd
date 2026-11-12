@@ -17,9 +17,7 @@ pub mod driver;
 pub mod event;
 pub mod futex;
 pub mod handle_xfer;
-/// Scheme IPC remains x86-64 only: its capture path builds an encoding-specific mapper and is
-/// outside this ticket's write set. aarch64 reports `ENOSYS` for those calls.
-#[cfg(target_arch = "x86_64")]
+/// Scheme IPC (`0x60..0x69`) is shared by x86-64 and aarch64.
 pub mod ipc;
 pub mod memory_ctl;
 pub mod process_ctl;
@@ -88,7 +86,6 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
             | Syscall::EVENT_SIGNAL
             | Syscall::TIMER_SET),
         ) => event::dispatch(call, frame),
-        #[cfg(target_arch = "x86_64")]
         Some(
             call @ (Syscall::SCHEME_REGISTER
             | Syscall::OPEN

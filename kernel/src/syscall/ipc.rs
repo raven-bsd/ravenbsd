@@ -8,7 +8,13 @@ use alloc::sync::Arc;
 use raven_abi::errno::Errno;
 use raven_abi::types::{Handle, Rights};
 
+#[cfg(target_arch = "aarch64")]
+use crate::arch::aarch64::ipc::model::{self, NAME_MAX, PATH_MAX};
+#[cfg(target_arch = "aarch64")]
+use crate::arch::aarch64::ipc::{self, registry, router};
+#[cfg(target_arch = "x86_64")]
 use crate::ipc::model::{self, NAME_MAX, PATH_MAX};
+#[cfg(target_arch = "x86_64")]
 use crate::ipc::{self, registry, router};
 use crate::process::{self, Process, handle::Object};
 use crate::syscall::SyscallFrame;
