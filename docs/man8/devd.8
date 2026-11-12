@@ -29,16 +29,37 @@ order: the BAR is the child's handle 3 and the configuration page its handle 4
 (a fresh child has 0 for itself, 1 for the initfs and 2 for the namespace).  The
 child does not receive the RootDevice capability.
 .Pp
+When the driver's arguments contain
+.Ql resources=dma+irq ,
+.Nm
+also opens
+.Pa /dma
+and
+.Pa /irq
+for the same function.  The 64 KiB DMA buffer is handle 5 and the legacy IRQ
+handle 6.  If the list names only one resource, only that handle is added, in
+the same order; the endpoint exists on every 3.0 function, but a function that
+reports interrupt line 255 has no IRQ.  This is how a driver gets the memory and
+interrupt a queue needs while still receiving no RootDevice and no
+.Dv ADMIN .
+.Pp
 Before the spawn,
 .Nm
 reads
 .Pa /bars
-for the chosen index, refuses an I/O or absent BAR, and appends two arguments
+for the chosen index, refuses an I/O or absent BAR, and appends four arguments
 to the driver's own:
-.Ql bar= Ns Ar n
-and
+.Ql bar= Ns Ar n ,
 .Ql bar_size= Ns Ar bytes ,
-so a driver never guesses the region it was given.
+and, when requested,
+.Ql dma= Ns Ar len
+and
+.Ql irq= Ns Ar line ,
+so a driver never guesses the regions or the line it was given.
+.Nm
+keeps its own copy of every handle it opened and closes all of them after the
+driver exits, so a crash and restart cannot leak a DMA buffer or a claimed IRQ
+line.
 .Pp
 The driver table is a small
 .Ql [[driver]]
@@ -49,7 +70,7 @@ name = "dummy"
 vendor = 0x1234
 device = 0x11e8
 exec = "/sbin/devd"
-args = []
+args = ["bar=0", "resources=dma+irq"]
 cycles = 10
 .Ed
 .Pp
@@ -64,8 +85,16 @@ defaults to 1 with a maximum of 100.  An argument of the form
 .Ql bar= Ns Ar n
 is consumed by
 .Nm
-as the BAR selector (never passed to the child).  A malformed table or an
-executable path that does not start with
+as the BAR selector (never passed to the child); the form
+.Ql resources= Ns Ar list
+requests resources, with
+.Ql dma+irq
+and
+.Ql none
+as the accepted values (a
+.Ql +
+rather than a comma, because the table parser splits an array on commas).  A
+malformed table or an executable path that does not start with
 .Pa /
 is rejected before any spawn.
 .Pp
@@ -79,7 +108,7 @@ it launches the driver for the manifest's
 .Va cycles
 count, prints one
 .Dq devd: driver Ar name Dq cycle N exit=C
-line per cycle, reaps every child, closes every BAR handle and exits with
+line per cycle, reaps every child, closes every resource handle and exits with
 status 0.  This is the lifecycle path exercised by the
 .Ql devd
 qtest.

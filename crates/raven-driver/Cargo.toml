@@ -4,13 +4,20 @@
 [package]
 name = "raven-driver"
 version = "0.1.0"
-description = "Safe MMIO and PCI configuration-region access for RavenBSD userspace drivers."
+description = "Safe MMIO, PCI configuration-region, DMA and IRQ access for RavenBSD userspace drivers."
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+raven-abi = { path = "../raven-abi" }
+
+# Only on the target: `raven-rt` exports the process `_start`, which must not be linked into the
+# host test binary. The IRQ wrapper is a thin forwarder, so its methods exist only on the target
+# and the host tests cover construction and every DMA path.
+[target.'cfg(target_os = "none")'.dependencies]
+raven-rt = { path = "../../userland/rt", default-features = false }
 
 [lints]
 workspace = true

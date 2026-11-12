@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! Safe device-region access for RavenBSD userspace drivers (B13a).
+//! Safe device-region access for RavenBSD userspace drivers (B13a, B13c).
 //!
 //! Drivers are ordinary `no_std` servers and must keep `#![forbid(unsafe_code)]`, but a device
 //! driver has to touch memory the CPU does not treat as ordinary RAM: every register access must
@@ -9,14 +9,18 @@
 //! window. This crate is the one place that owns that `unsafe`; the review checklist already
 //! names `crates/raven-driver` as the allowed home for MMIO and DMA code.
 //!
-//! Two region types:
+//! The types:
 //!
 //! * [`MmioRegion`] wraps a **writable** mapping (`&'static mut [u8]`, obtained from the runtime's
 //!   `map_mmio_mut`) and offers bounded volatile reads and writes.
 //! * [`ConfigRegion`] wraps a **read-only** mapping (`&'static [u8]`, the PCI configuration space
 //!   of one function) and offers the bounded reads a capability walk needs.
+//! * [`DmaRegion`] wraps a **writable** DMA buffer mapping and remembers the device-visible bus
+//!   address; [`DmaRegion::publish`] and [`DmaRegion::acquire`] are the release/acquire fences a
+//!   descriptor ring needs around a doorbell.
+//! * [`Irq`] wraps the transferred `Irq` handle and exposes `wait` and `ack`.
 //!
-//! Both types validate every offset and alignment before touching memory; an out-of-range or
+//! Every region validates offset and alignment before touching memory; an out-of-range or
 //! misaligned access is an [`AccessError`], never a fault. The widths follow the device model:
 //! 8, 16, 32 and 64 bits, little endian, exactly one machine access each.
 
@@ -24,6 +28,13 @@
 #![allow(unsafe_code)] // volatile device access; every block has a SAFETY comment.
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(missing_docs)]
+
+use core::sync::atomic::{Ordering, fence};
+
+use raven_abi::types::Handle;
+
+#[cfg(target_os = "none")]
+use raven_abi::errno::Errno;
 
 /// Page size used by the kernel's device mappings.
 pub const PAGE: usize = 4096;
@@ -358,6 +369,179 @@ pub fn capabilities(region: &ConfigRegion) -> Result<CapabilityList, AccessError
         }
     }
     Ok(found)
+}
+
+/// A writable DMA buffer mapping.
+///
+/// The window comes from `raven_rt::map_mmio_mut` (or any MAP of the transferred `DmaBuffer`
+/// handle) and `bus_address` from `raven_rt::dma_info`. Accesses are volatile, bounded and
+/// alignment-checked exactly like [`MmioRegion`]; the difference is the recorded bus address and
+/// the two fences a device/driver handshake needs.
+pub struct DmaRegion {
+    window: &'static mut [u8],
+    bus_address: u64,
+}
+
+impl DmaRegion {
+    /// Wrap a writable DMA buffer mapping and its device-visible bus address.
+    pub fn new(window: &'static mut [u8], bus_address: u64) -> Self {
+        Self {
+            window,
+            bus_address,
+        }
+    }
+
+    /// Length of the buffer in bytes.
+    pub fn len(&self) -> usize {
+        self.window.len()
+    }
+
+    /// True when the buffer is empty.
+    pub fn is_empty(&self) -> bool {
+        self.window.is_empty()
+    }
+
+    /// The device-visible address of the first byte.
+    pub fn bus_address(&self) -> u64 {
+        self.bus_address
+    }
+
+    /// Release fence: call after writing descriptors and before ringing the doorbell.
+    pub fn publish(&self) {
+        fence(Ordering::Release);
+    }
+
+    /// Acquire fence: call after the device signals completion and before reading the rings.
+    pub fn acquire(&self) {
+        fence(Ordering::Acquire);
+    }
+
+    /// Read one byte.
+    pub fn read_u8(&self, offset: usize) -> Result<u8, AccessError> {
+        let pointer = self.pointer(offset, 1, 1)?;
+        // SAFETY: `pointer` is inside the mapped DMA buffer.
+        Ok(unsafe { core::ptr::read_volatile(pointer) })
+    }
+
+    /// Read one 16-bit little-endian word.
+    pub fn read_u16(&self, offset: usize) -> Result<u16, AccessError> {
+        let pointer = self.pointer(offset, 2, 2)?;
+        // SAFETY: `pointer` is inside the mapped DMA buffer and 2-byte aligned.
+        Ok(u16::from_le(unsafe {
+            core::ptr::read_volatile(pointer.cast::<u16>())
+        }))
+    }
+
+    /// Read one 32-bit little-endian word.
+    pub fn read_u32(&self, offset: usize) -> Result<u32, AccessError> {
+        let pointer = self.pointer(offset, 4, 4)?;
+        // SAFETY: `pointer` is inside the mapped DMA buffer and 4-byte aligned.
+        Ok(u32::from_le(unsafe {
+            core::ptr::read_volatile(pointer.cast::<u32>())
+        }))
+    }
+
+    /// Read one 64-bit little-endian word.
+    pub fn read_u64(&self, offset: usize) -> Result<u64, AccessError> {
+        let pointer = self.pointer(offset, 8, 8)?;
+        // SAFETY: `pointer` is inside the mapped DMA buffer and 8-byte aligned.
+        Ok(u64::from_le(unsafe {
+            core::ptr::read_volatile(pointer.cast::<u64>())
+        }))
+    }
+
+    /// Write one byte.
+    pub fn write_u8(&mut self, offset: usize, value: u8) -> Result<(), AccessError> {
+        let pointer = self.pointer(offset, 1, 1)?;
+        // SAFETY: `pointer` is inside the mapped DMA buffer.
+        unsafe { core::ptr::write_volatile(pointer, value) };
+        Ok(())
+    }
+
+    /// Write one 16-bit little-endian word.
+    pub fn write_u16(&mut self, offset: usize, value: u16) -> Result<(), AccessError> {
+        let pointer = self.pointer(offset, 2, 2)?;
+        // SAFETY: `pointer` is inside the mapped DMA buffer and 2-byte aligned.
+        unsafe { core::ptr::write_volatile(pointer.cast::<u16>(), value.to_le()) };
+        Ok(())
+    }
+
+    /// Write one 32-bit little-endian word.
+    pub fn write_u32(&mut self, offset: usize, value: u32) -> Result<(), AccessError> {
+        let pointer = self.pointer(offset, 4, 4)?;
+        // SAFETY: `pointer` is inside the mapped DMA buffer and 4-byte aligned.
+        unsafe { core::ptr::write_volatile(pointer.cast::<u32>(), value.to_le()) };
+        Ok(())
+    }
+
+    /// Write one 64-bit little-endian word.
+    pub fn write_u64(&mut self, offset: usize, value: u64) -> Result<(), AccessError> {
+        let pointer = self.pointer(offset, 8, 8)?;
+        // SAFETY: `pointer` is inside the mapped DMA buffer and 8-byte aligned.
+        unsafe { core::ptr::write_volatile(pointer.cast::<u64>(), value.to_le()) };
+        Ok(())
+    }
+
+    /// Copy `bytes` into the buffer at `offset`.
+    pub fn write_bytes(&mut self, offset: usize, bytes: &[u8]) -> Result<(), AccessError> {
+        self.pointer(offset, bytes.len(), 1)?;
+        for (index, byte) in bytes.iter().enumerate() {
+            let position = offset.checked_add(index).ok_or(AccessError::Bounds)?;
+            let pointer = self.pointer(position, 1, 1)?;
+            // SAFETY: `pointer` is inside the mapped DMA buffer.
+            unsafe { core::ptr::write_volatile(pointer, *byte) };
+        }
+        Ok(())
+    }
+
+    /// Copy the buffer at `offset` into `out`.
+    pub fn read_bytes(&self, offset: usize, out: &mut [u8]) -> Result<(), AccessError> {
+        self.pointer(offset, out.len(), 1)?;
+        for (index, slot) in out.iter_mut().enumerate() {
+            let position = offset.checked_add(index).ok_or(AccessError::Bounds)?;
+            let pointer = self.pointer(position, 1, 1)?;
+            // SAFETY: `pointer` is inside the mapped DMA buffer.
+            *slot = unsafe { core::ptr::read_volatile(pointer) };
+        }
+        Ok(())
+    }
+
+    fn pointer(&self, offset: usize, len: usize, align: usize) -> Result<*mut u8, AccessError> {
+        let base = self.window.as_ptr() as usize;
+        checked_pointer(base, self.window.len(), offset, len, align)
+    }
+}
+
+/// The interrupt handle `devd` transfers to a driver.
+///
+/// The wrapper keeps the raw handle and forwards to the runtime; it carries no state, so a
+/// driver can hold one and still keep `#![forbid(unsafe_code)]`.
+pub struct Irq {
+    handle: Handle,
+}
+
+impl Irq {
+    /// Wrap a transferred `Irq` handle.
+    pub const fn new(handle: Handle) -> Self {
+        Self { handle }
+    }
+
+    /// The underlying handle, for logging or a hand-off.
+    pub const fn handle(&self) -> Handle {
+        self.handle
+    }
+
+    /// Wait up to `timeout_ns` for an interrupt; `Ok(0)` means the timeout expired.
+    #[cfg(target_os = "none")]
+    pub fn wait(&self, timeout_ns: u64) -> Result<usize, Errno> {
+        raven_rt::irq_wait(self.handle, timeout_ns)
+    }
+
+    /// Acknowledge the handled interrupt and re-arm (or mask) the source.
+    #[cfg(target_os = "none")]
+    pub fn ack(&self) -> Result<(), Errno> {
+        raven_rt::irq_ack(self.handle)
+    }
 }
 
 fn checked_pointer(
