@@ -508,6 +508,21 @@ name = "raven-frames"
 version = "0.1.0"
 
 [[package]]
+name = "raven-fs-fuzz"
+version = "0.1.0"
+dependencies = [
+ "raven-fs-fuzz-replay",
+]
+
+[[package]]
+name = "raven-fs-fuzz-replay"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "ufs-core",
+]
+
+[[package]]
 name = "raven-handles"
 version = "0.1.0"
 dependencies = [
