@@ -29,6 +29,30 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(raw.0 as usize)
 }
 
+/// Authorized termination (`PROC_TERMINATE`, proposed ABI number 0x32).
+///
+/// `proc_terminate(proc: Handle, code: i32) -> 0`.  The caller must hold a process handle with
+/// the `SIGNAL` right; an unprivileged caller gets `EPERM`, a terminal target `ESRCH`.
+pub fn terminate(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let handle = Handle(frame.rdi as u32);
+    let code = frame.rsi as i32;
+    let target = {
+        let handles = caller.handles.lock();
+        match handles.get(handle, Rights::SIGNAL) {
+            Ok(Object::Process(target)) => Arc::clone(target),
+            Ok(_) => return Err(Errno::EBADF),
+            Err(Errno::EACCES) => return Err(Errno::EPERM),
+            Err(error) => return Err(error),
+        }
+    };
+    if Arc::ptr_eq(&target, &caller) {
+        return Err(Errno::EINVAL);
+    }
+    process::terminate(&target, code)?;
+    Ok(0)
+}
+
 /// `proc_wait(proc, out_code) -> 0`.
 pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
@@ -52,6 +76,13 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
             drop(state);
             copy_to_user(destination, &code.to_le_bytes())?;
             return Ok(0);
+        }
+        if *state == ProcessState::Created {
+            // A created-but-never-started process has no thread and can never run: wait reaps
+            // it immediately (the terminal state and the one-shot teardown are the same).
+            drop(state);
+            let _ = process::reap_unstarted(&target);
+            continue;
         }
         let token = sched::begin_block()?;
         // The state lock is held, so the process cannot pass Exited between the check above and
