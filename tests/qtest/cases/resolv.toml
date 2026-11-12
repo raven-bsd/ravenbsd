@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "resolv"
+arch = "x86_64"
+profile = "resolv-test"
+timeout_secs = 180
+pre = ["sh tests/fixtures/b15-resolv/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: logd up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: initfsd up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: netd up$'
+unordered = true
+
+[[expect]]
+regex = '^resolvd: nameservers=1$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: resolvd up$'
+unordered = true
+
+[[expect]]
+regex = '^b15-dnsd: ready$'
+unordered = true
+
+[[expect]]
+regex = '^b15-resolv: a\.test=192\.0\.2\.10$'
+
+[[expect]]
+regex = '^b15-resolv: aaaa\.test=2001:db8:0:0:0:0:0:1$'
+
+[[expect]]
+regex = '^b15-resolv: alias\.test=192\.0\.2\.10$'
+
+[[expect]]
+regex = '^b15-resolv: missing\.test=NXDOMAIN$'
+
+[[expect]]
+regex = '^b15-resolv: probe ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

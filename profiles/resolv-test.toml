@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Resolver test profile: init, logd, initfsd, netd, resolvd, the loopback DNS
+# fixture and the one-shot resolv probe.  This is the B12a loopback path; the
+# DHCP/QEMU-user-net case waits for B12b/B12c.
+
+name = "resolv-test"
+
+[initfs]
+programs = [
+    { package = "raven-init", path = "/init" },
+    { package = "raven-logd", path = "/sbin/logd" },
+    { package = "raven-initfsd", path = "/sbin/initfsd" },
+    { package = "netd", path = "/sbin/netd" },
+    { package = "resolvd", path = "/sbin/resolvd" },
+]
+
+[boot]
+cmdline = "console=ttyS0 loglevel=info"
+log_level = "info"

@@ -1,0 +1,61 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt RESOLVD 8
+.Os RavenBSD
+.Sh NAME
+.Nm resolvd
+.Nd RavenBSD DNS resolver service
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+reads IPv4 nameservers from
+.Pa /etc/resolv.conf
+and registers the
+.Dq resolv:
+scheme.  A client opens the control file and sends one
+.Sy CALL
+with a query; the reply carries A/AAAA records, NXDOMAIN, or an error.
+Each query uses a bounded UDP exchange through
+.Xr netd 8 :
+one retry per configured server, a 500 ms per-attempt timeout, and CNAME
+following bounded to eight links.  The service never invents an address and
+does not cache across queries.
+.Pp
+Only the
+.Sy nameserver
+directive is interpreted; IPv4 addresses are used.  A static
+.Pa /etc/resolv.conf
+wins.  DHCP lease application is not wired in this milestone: it needs the
+netd/B12b/B12c interface for a real link and lease state.
+.Sh PROTOCOL
+The control file is
+.Pa resolv: .
+A query is little-endian: version 1 (u16), query type (u8; 1 = A, 28 = AAAA),
+name length (u16), and the ASCII name.  A reply is version 1, status (0 =
+answers, 1 = NXDOMAIN, 2 = error), query type, record count, then records of
+type (u8), TTL (u32), and 4 or 16 address bytes.  At most eight records fit.
+.Sh FILES
+.Bl -tag -width /etc/services.d -compact
+.It Pa /etc/resolv.conf
+Static nameserver list.
+.It Pa /etc/services.d/resolvd.toml
+Service manifest.
+.El
+.Sh ERRORS
+A malformed query or reply returns
+.Er EINVAL
+or
+.Er EPROTO .
+A nonexistent name returns the NXDOMAIN reply.
+A timeout or transport failure is reported as an error reply, not an empty
+answer.
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr netd 8 ,
+.Xr init 8
+.Sh STANDARDS
+RavenBSD.
+RFC 1035 and RFC 2131 are the DNS and DHCP references.

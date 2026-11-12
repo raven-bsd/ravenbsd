@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.files]]
+src = "etc/services.d/logd.toml"
+path = "/etc/services.d/logd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/initfsd.toml"
+path = "/etc/services.d/initfsd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/netd.toml"
+path = "/etc/services.d/netd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/resolvd.toml"
+path = "/etc/services.d/resolvd.toml"
+
+[[initfs.files]]
+src = "tests/fixtures/b15-resolv/resolv.conf"
+path = "/etc/resolv.conf"
