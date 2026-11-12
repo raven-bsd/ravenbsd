@@ -114,6 +114,16 @@ pub struct StackConfig {
     pub icmp_error_rate_pps: u32,
     /// Outbound ICMP error token-bucket burst size.
     pub icmp_error_burst: u32,
+    /// Initial retransmission timeout before any RTT sample.
+    pub rto_initial_ms: u64,
+    /// Minimum retransmission timeout.
+    pub rto_min_ms: u64,
+    /// Maximum retransmission timeout.
+    pub rto_max_ms: u64,
+    /// Retransmissions before a connection gives up.
+    pub rto_max_retransmits: u8,
+    /// RTO clock granularity in milliseconds.
+    pub clock_granularity_ms: u64,
 }
 
 impl Default for StackConfig {
@@ -130,6 +140,11 @@ impl Default for StackConfig {
             neighbor_cache_entries: 64,
             icmp_error_rate_pps: 10,
             icmp_error_burst: 10,
+            rto_initial_ms: 1000,
+            rto_min_ms: 200,
+            rto_max_ms: 60_000,
+            rto_max_retransmits: 6,
+            clock_granularity_ms: 1,
         }
     }
 }
@@ -187,6 +202,7 @@ pub struct Stack<D: Device> {
     pub(crate) delivered: Vec<(u8, Vec<u8>)>,
     #[cfg(any(test, feature = "testutil"))]
     pub(crate) tcp_debug: Vec<(u16, u16, u8, u32, u32)>,
+    pub(crate) tcp_data_delivered: usize,
     #[allow(dead_code)] // Read by the testutil urgent-segment hook.
     pub(crate) tcp_urgent_seen: usize,
     #[cfg(any(test, feature = "testutil"))]
@@ -254,6 +270,7 @@ impl<D: Device> Stack<D> {
             delivered: Vec::new(),
             #[cfg(any(test, feature = "testutil"))]
             tcp_debug: Vec::new(),
+            tcp_data_delivered: 0,
             tcp_urgent_seen: 0,
             #[cfg(any(test, feature = "testutil"))]
             trace: Vec::new(),
@@ -340,6 +357,12 @@ impl<D: Device> Stack<D> {
             earliest = Some(match earliest {
                 Some(deadline) if deadline <= timer.deadline => deadline,
                 _ => timer.deadline,
+            });
+        }
+        if let Some(tcp_deadline) = self.next_tcp_deadline() {
+            earliest = Some(match earliest {
+                Some(current) if current <= tcp_deadline => current,
+                _ => tcp_deadline,
             });
         }
         let deadline = earliest?;

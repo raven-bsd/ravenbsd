@@ -48,6 +48,7 @@ mod ipv6_stack;
 mod neighbor;
 mod reassembly;
 mod route;
+mod rto;
 mod seq;
 mod socket;
 mod stack;
@@ -66,6 +67,7 @@ pub use ipv6_stack::{
 };
 pub use neighbor::{NeighborCache, NeighborEntry};
 pub use route::{Route, RouteTable};
+pub use rto::RtoEstimator;
 pub use stack::{Ipv4Addr, Ipv4Config, MAX_TIMERS, Stack, StackConfig, TimerId};
 pub use tcp_state::TcpState;
 pub use time::{Duration, Instant};

@@ -22,6 +22,7 @@ pub(crate) struct Datagram {
     pub(crate) src: (IpAddr, u16),
 }
 
+#[allow(clippy::large_enum_variant)] // One connection record is intentionally inline for stable ids.
 pub(crate) enum Kind {
     Listener {
         port: u16,

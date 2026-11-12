@@ -13,9 +13,12 @@ use raven_tcpip_wire::tcp::{TcpBuilder, TcpFlags, TcpHeader, TcpPacket};
 use crate::device::Device;
 use crate::ipv4_stack::to_wire as to_wire4;
 use crate::ipv6_stack::{IpAddr, Ipv6Addr, to_wire as to_wire6};
+use crate::rto::RtoEstimator;
 use crate::seq::{seq_ge, seq_gt, seq_le, seq_lt};
 use crate::socket::{Kind, SocketRecord};
 use crate::{Instant, Ipv4Addr, SocketId, Stack};
+
+type Retransmit = (Vec<u8>, IpAddr, (IpAddr, u16), u16, u32, u32, u16);
 
 /// The eleven TCP states from RFC 9293.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -87,6 +90,13 @@ pub(crate) struct TcpConnection {
     pub zero_window_probes: usize,
     pub urgent_position: Option<u16>,
     pub urgent_count: usize,
+    pub rto: RtoEstimator,
+    pub rto_deadline: Option<Instant>,
+    pub rtt_sample: Option<(u32, Instant, bool)>,
+    pub retransmit_count: u8,
+    pub rto_timeouts: usize,
+    pub last_retransmit_seq: Option<u32>,
+    pub rto_max_retransmits: u8,
 }
 
 impl TcpConnection {
@@ -138,6 +148,13 @@ impl TcpConnection {
             zero_window_probes: 0,
             urgent_position: None,
             urgent_count: 0,
+            rto: RtoEstimator::new(1000, 200, 60_000, 1),
+            rto_deadline: None,
+            rtt_sample: None,
+            retransmit_count: 0,
+            rto_timeouts: 0,
+            last_retransmit_seq: None,
+            rto_max_retransmits: 6,
         }
     }
 
@@ -190,6 +207,13 @@ impl TcpConnection {
             zero_window_probes: 0,
             urgent_position: None,
             urgent_count: 0,
+            rto: RtoEstimator::new(1000, 200, 60_000, 1),
+            rto_deadline: None,
+            rtt_sample: None,
+            retransmit_count: 0,
+            rto_timeouts: 0,
+            last_retransmit_seq: None,
+            rto_max_retransmits: 6,
         }
     }
 
@@ -344,6 +368,75 @@ impl<D: Device> Stack<D> {
         }
     }
 
+    /// RTO estimator state (host tests): srtt, rttvar, rto, retransmits, has_sample.
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_tcp_rto(&self, socket: SocketId) -> Option<(u64, u64, u64, u8, bool)> {
+        match &self.sockets.record(socket).ok()?.kind {
+            Kind::Tcp(connection) => Some((
+                connection.rto.srtt_ms(),
+                connection.rto.rttvar_ms(),
+                connection.rto.rto_ms(),
+                connection.retransmit_count,
+                connection.rto.has_sample(),
+            )),
+            _ => None,
+        }
+    }
+
+    /// RTO deadline (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_tcp_rto_deadline(&self, socket: SocketId) -> Option<Instant> {
+        match &self.sockets.record(socket).ok()?.kind {
+            Kind::Tcp(connection) => connection.rto_deadline,
+            _ => None,
+        }
+    }
+
+    /// Last retransmitted sequence (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_tcp_last_retransmit(&self, socket: SocketId) -> Option<u32> {
+        match &self.sockets.record(socket).ok()?.kind {
+            Kind::Tcp(connection) => connection.last_retransmit_seq,
+            _ => None,
+        }
+    }
+
+    /// Send-queue front and sequence (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_tcp_tx_head(&self, socket: SocketId) -> Option<(u32, Vec<u8>)> {
+        match &self.sockets.record(socket).ok()?.kind {
+            Kind::Tcp(connection) => {
+                let record = self.sockets.record(socket).ok()?;
+                Some((
+                    connection.snd_una,
+                    record.tx.iter().take(8).copied().collect(),
+                ))
+            }
+            _ => None,
+        }
+    }
+
+    /// Total delivered TCP data bytes (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_tcp_data_delivered(&self) -> usize {
+        self.tcp_data_delivered
+    }
+
+    /// Total RTO timeouts observed on a socket.
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_tcp_rto_timeouts(&self, socket: SocketId) -> Option<usize> {
+        match &self.sockets.record(socket).ok()?.kind {
+            Kind::Tcp(connection) => Some(connection.rto_timeouts),
+            _ => None,
+        }
+    }
+
     /// The most recent urgent pointer delivered out-of-band on this socket.
     pub fn tcp_urgent(&self, socket: SocketId) -> Result<Option<u16>, Errno> {
         match &self.sockets.record(socket)?.kind {
@@ -455,7 +548,14 @@ impl<D: Device> Stack<D> {
                 .map_or(IpAddr::V6(Ipv6Addr::UNSPECIFIED), IpAddr::V6),
         };
         let iss = self.next_isn();
-        let connection = TcpConnection::new_active(local, local_port, remote, iss, self.now);
+        let mut connection = TcpConnection::new_active(local, local_port, remote, iss, self.now);
+        connection.rto = RtoEstimator::new(
+            self.config.rto_initial_ms,
+            self.config.rto_min_ms,
+            self.config.rto_max_ms,
+            self.config.clock_granularity_ms,
+        );
+        connection.rto_max_retransmits = self.config.rto_max_retransmits;
         let socket = self.sockets.alloc(
             Kind::Tcp(connection),
             self.config.rx_queue_bytes,
@@ -646,7 +746,7 @@ impl<D: Device> Stack<D> {
             return;
         }
         let iss = self.next_isn();
-        let connection = TcpConnection::new_passive(
+        let mut connection = TcpConnection::new_passive(
             destination,
             destination_port,
             (source, source_port),
@@ -654,6 +754,13 @@ impl<D: Device> Stack<D> {
             segment.seq,
             now,
         );
+        connection.rto = RtoEstimator::new(
+            self.config.rto_initial_ms,
+            self.config.rto_min_ms,
+            self.config.rto_max_ms,
+            self.config.clock_granularity_ms,
+        );
+        connection.rto_max_retransmits = self.config.rto_max_retransmits;
         let Ok(socket) = self.sockets.alloc(
             Kind::Tcp(connection),
             self.config.rx_queue_bytes,
@@ -707,6 +814,7 @@ impl<D: Device> Stack<D> {
                         if segment.syn() && !segment.ack_flag() {
                             connection.irs = segment.seq;
                             connection.rcv_nxt = segment.seq.wrapping_add(1);
+                            connection.connect_deadline = None;
                             transition = Some(TcpState::SynReceived);
                             send_syn_ack = true;
                             break 'transition;
@@ -724,6 +832,7 @@ impl<D: Device> Stack<D> {
                             connection.snd_una = segment.ack;
                             connection.snd_wnd = segment.window;
                             connection.max_snd_wnd = connection.max_snd_wnd.max(segment.window);
+                            connection.connect_deadline = None;
                             transition = Some(TcpState::Established);
                             send_ack = true;
                         }
@@ -1386,6 +1495,7 @@ impl<D: Device> Stack<D> {
             let mut fin_wait2_timeout = false;
             let mut keepalive_probe = false;
             let mut keepalive_timeout = false;
+            let mut retransmit: Option<Retransmit> = None;
             {
                 let Ok(record) = self.sockets.record_mut(socket) else {
                     continue;
@@ -1424,6 +1534,48 @@ impl<D: Device> Stack<D> {
                         .is_some_and(|deadline| deadline <= now)
                 {
                     close_time_wait = true;
+                }
+                if connection
+                    .rto_deadline
+                    .is_some_and(|deadline| deadline <= now)
+                    && connection.snd_nxt != connection.snd_una
+                    && !matches!(connection.state, TcpState::Closed | TcpState::TimeWait)
+                {
+                    let length = record.tx.len().min(usize::from(connection.mss));
+                    if length > 0 {
+                        if let Some(sample) = &mut connection.rtt_sample {
+                            sample.2 = true;
+                        } else {
+                            connection.rtt_sample = Some((connection.snd_una, now, true));
+                        }
+                        connection.retransmit_count = connection.retransmit_count.saturating_add(1);
+                        connection.rto_timeouts = connection.rto_timeouts.saturating_add(1);
+                        if connection.retransmit_count > connection.rto_max_retransmits {
+                            connection.state = TcpState::Closed;
+                            record.error = Some(Errno::ETIMEDOUT);
+                            record.closed = true;
+                            connection.rto_deadline = None;
+                        } else {
+                            let payload: Vec<u8> = record.tx.iter().take(length).copied().collect();
+                            connection.last_retransmit_seq = Some(connection.snd_una);
+                            if let Some(remote) = connection.remote {
+                                retransmit = Some((
+                                    payload,
+                                    connection.local,
+                                    remote,
+                                    connection.local_port,
+                                    connection.snd_una,
+                                    connection.rcv_nxt,
+                                    connection.rcv_wnd,
+                                ));
+                            }
+                            connection.rto.timeout();
+                            connection.rto_deadline =
+                                Some(Instant::from_millis(now.as_millis().saturating_add(
+                                    i64::try_from(connection.rto.rto_ms()).unwrap_or(i64::MAX),
+                                )));
+                        }
+                    }
                 }
                 if connection.state == TcpState::Established
                     && connection
@@ -1466,6 +1618,20 @@ impl<D: Device> Stack<D> {
             }
             if keepalive_probe {
                 let _ = self.send_ack_for(socket);
+            }
+            if let Some((payload, local, remote, local_port, seq, ack, window)) = retransmit {
+                let _ = self.send_tcp_packet(
+                    local,
+                    remote.0,
+                    local_port,
+                    remote.1,
+                    TcpFlags::from_bits(TcpFlags::ACK.bits() | TcpFlags::PSH.bits()),
+                    seq,
+                    ack,
+                    window,
+                    &payload,
+                    false,
+                );
             }
             self.tcp_delayed_ack(socket, now);
             let _ = self.tcp_zero_window_timer(socket, now);

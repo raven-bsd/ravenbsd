@@ -9,7 +9,7 @@ use raven_abi::errno::Errno;
 use raven_tcpip_wire::tcp::TcpFlags;
 
 use crate::device::Device;
-use crate::seq::{seq_gt, seq_lt};
+use crate::seq::{seq_ge, seq_gt, seq_lt};
 use crate::socket::Kind;
 use crate::tcp_state::TcpState;
 use crate::{Instant, SocketId, Stack};
@@ -122,8 +122,8 @@ impl<D: Device> Stack<D> {
     pub(crate) fn tcp_try_send(&mut self, socket: SocketId) -> Result<(), Errno> {
         loop {
             let snapshot = {
-                let record = self.sockets.record(socket)?;
-                let Kind::Tcp(connection) = &record.kind else {
+                let record = self.sockets.record_mut(socket)?;
+                let Kind::Tcp(connection) = &mut record.kind else {
                     return Err(Errno::ENOTSOCK);
                 };
                 if !matches!(
@@ -147,6 +147,14 @@ impl<D: Device> Stack<D> {
                     let unsent = queued - inflight;
                     let window = u32::from(connection.snd_wnd);
                     if window <= inflight {
+                        if connection.zero_window_deadline.is_none() {
+                            connection.zero_window_deadline = Some(Instant::from_millis(
+                                self.now.as_millis().saturating_add(
+                                    i64::try_from(connection.zero_window_backoff_ms)
+                                        .unwrap_or(i64::MAX),
+                                ),
+                            ));
+                        }
                         None
                     } else {
                         let usable = (window - inflight).min(unsent);
@@ -204,6 +212,15 @@ impl<D: Device> Stack<D> {
                 connection.snd_nxt = connection
                     .snd_nxt
                     .wrapping_add(u32::try_from(payload.len()).unwrap_or(0));
+                if connection.rtt_sample.is_none() {
+                    connection.rtt_sample = Some((seq, self.now, false));
+                }
+                if connection.rto_deadline.is_none() {
+                    connection.rto_deadline =
+                        Some(Instant::from_millis(self.now.as_millis().saturating_add(
+                            i64::try_from(connection.rto.rto_ms()).unwrap_or(i64::MAX),
+                        )));
+                }
             }
         }
         Ok(())
@@ -263,6 +280,17 @@ impl<D: Device> Stack<D> {
                 return Err(Errno::ENOTSOCK);
             };
             if seq_gt(ack, connection.snd_una) {
+                if let Some((sample_seq, sent_at, retransmitted)) = connection.rtt_sample
+                    && seq_ge(ack, sample_seq)
+                {
+                    if !retransmitted {
+                        let rtt = self.now.as_millis().saturating_sub(sent_at.as_millis());
+                        if rtt >= 0 {
+                            connection.rto.sample(u64::try_from(rtt).unwrap_or(0));
+                        }
+                    }
+                    connection.rtt_sample = None;
+                }
                 let delta = ack.wrapping_sub(connection.snd_una);
                 let remove = usize::try_from(delta)
                     .unwrap_or(usize::MAX)
@@ -271,6 +299,18 @@ impl<D: Device> Stack<D> {
                 connection.snd_una = ack;
                 connection.zero_window_backoff_ms = 1000;
                 connection.zero_window_deadline = None;
+                connection.retransmit_count = 0;
+                if connection.snd_nxt == ack {
+                    connection.rto_deadline = None;
+                } else {
+                    if connection.rtt_sample.is_none() {
+                        connection.rtt_sample = Some((ack, self.now, false));
+                    }
+                    connection.rto_deadline =
+                        Some(Instant::from_millis(self.now.as_millis().saturating_add(
+                            i64::try_from(connection.rto.rto_ms()).unwrap_or(i64::MAX),
+                        )));
+                }
             }
         }
         self.tcp_try_send(socket)
@@ -320,6 +360,7 @@ impl<D: Device> Stack<D> {
                 record
                     .rx
                     .extend(payload[data_start..data_start + take].iter().copied());
+                self.tcp_data_delivered = self.tcp_data_delivered.saturating_add(take);
                 connection.rcv_nxt = connection
                     .rcv_nxt
                     .wrapping_add(u32::try_from(take).unwrap_or(0));
@@ -382,6 +423,34 @@ impl<D: Device> Stack<D> {
         }
     }
 
+    /// The earliest TCP timer deadline across all connections.
+    pub(crate) fn next_tcp_deadline(&self) -> Option<Instant> {
+        let mut earliest: Option<Instant> = None;
+        for record in self.sockets.records.values() {
+            let Kind::Tcp(connection) = &record.kind else {
+                continue;
+            };
+            for deadline in [
+                connection.rto_deadline,
+                connection.ack_deadline,
+                connection.zero_window_deadline,
+                connection.time_wait_deadline,
+                connection.fin_wait2_deadline,
+                connection.keepalive_deadline,
+                connection.connect_deadline,
+            ]
+            .into_iter()
+            .flatten()
+            {
+                earliest = Some(match earliest {
+                    Some(current) if current <= deadline => current,
+                    _ => deadline,
+                });
+            }
+        }
+        earliest
+    }
+
     /// Zero-window probe timer.
     pub(crate) fn tcp_zero_window_timer(&mut self, socket: SocketId, now: Instant) -> bool {
         let probe = {
@@ -419,7 +488,7 @@ impl<D: Device> Stack<D> {
     }
 }
 
-fn advertised_window(record: &crate::socket::SocketRecord) -> u16 {
+pub(crate) fn advertised_window(record: &crate::socket::SocketRecord) -> u16 {
     let Kind::Tcp(connection) = &record.kind else {
         return 0;
     };
