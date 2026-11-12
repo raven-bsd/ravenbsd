@@ -117,6 +117,7 @@ fn half_open_limit_bounds_the_listener_queue() {
     b.poll(Instant::ZERO);
     assert_eq!(b.counters().passive_opens, 1);
     assert_eq!(b.counters().listen_drops, 1);
+    assert_eq!(b.counters().half_open_drops, 1);
 }
 
 #[test]

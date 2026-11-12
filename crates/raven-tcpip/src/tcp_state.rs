@@ -1076,6 +1076,7 @@ impl<D: Device> Stack<D> {
                 segment.seq.wrapping_add(segment.len()),
             )
         };
+        self.counters.rsts_for_unsent = self.counters.rsts_for_unsent.wrapping_add(1);
         let _ = self.send_tcp_raw(
             destination,
             source,
@@ -1177,6 +1178,7 @@ impl<D: Device> Stack<D> {
                 return;
             }
             self.counters.listen_drops = self.counters.listen_drops.wrapping_add(1);
+            self.counters.half_open_drops = self.counters.half_open_drops.wrapping_add(1);
             self.drops = self.drops.saturating_add(1);
             return;
         }

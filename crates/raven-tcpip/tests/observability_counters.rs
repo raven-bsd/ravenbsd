@@ -256,3 +256,11 @@ fn active_connection_count_is_visible_through_sockets() {
     assert_eq!(stack.sockets().count(), 1);
     assert_eq!(stack.counters().active_opens, 1);
 }
+
+#[test]
+fn rst_for_unsent_counter_moves() {
+    let (_link, mut _a, mut b) = pair();
+    inject_segment(&mut b, A, B, 40_000, 9, 1, 0, TcpFlags::SYN, &[]);
+    assert_eq!(b.counters().rsts_for_unsent, 1);
+    assert_eq!(b.counters().rst_sent, 1);
+}
