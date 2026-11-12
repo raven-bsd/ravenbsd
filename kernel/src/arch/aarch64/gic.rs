@@ -6,8 +6,8 @@
 //! Both frames are mapped through the kernel's uncached MMIO window (`memory::mmio`), so the
 //! driver never touches the HHDM aliases of device memory. The programming sequence follows the
 //! GICv2 architecture and the Raspberry Pi OS tutorial's GIC-400 path: disable the distributor,
-//! clear the banked SGI/PPI state, accept all priorities, then enable group 1 and the CPU
-//! interface. Interrupts are masked by the CPU's DAIF until the handler path is ready.
+//! clear the banked SGI/PPI state, accept all priorities, then enable both interrupt groups and
+//! the CPU interface. Interrupts are masked by the CPU's DAIF until the handler path is ready.
 
 use core::fmt;
 use core::sync::atomic::{AtomicU64, Ordering};
@@ -16,12 +16,14 @@ use crate::memory::mmio::map_mmio;
 
 // Distributor registers.
 const GICD_CTLR: u64 = 0x000;
+const GICD_IGROUPR: u64 = 0x080;
 const GICD_ISENABLER: u64 = 0x100;
 const GICD_ICENABLER: u64 = 0x180;
 const GICD_ICPENDR: u64 = 0x280;
 const GICD_ICACTIVER: u64 = 0x380;
 const GICD_IPRIORITYR: u64 = 0x400;
 const GICD_ITARGETSR: u64 = 0x800;
+const GICD_ICFGR: u64 = 0xc00;
 // CPU interface registers.
 const GICC_CTLR: u64 = 0x000;
 const GICC_PMR: u64 = 0x004;
@@ -92,8 +94,10 @@ pub fn init(distributor_phys: u64, cpu_interface_phys: u64) -> Result<(), GicErr
     unsafe {
         core::arch::asm!("dsb sy", options(nostack, preserves_flags));
     }
-    write32(distributor, GICD_CTLR, 1);
-    write32(cpu_interface, GICC_CTLR, 1);
+    // Enable both groups: firmware may leave boot devices in Group 0 (QEMU `virt`) or hand a
+    // non-secure kernel Group 1 lines (Pi 4). A GIC without security extensions implements bit 0.
+    write32(distributor, GICD_CTLR, 0b11);
+    write32(cpu_interface, GICC_CTLR, 0b11);
 
     GICD.store(distributor, Ordering::Release);
     GICC.store(cpu_interface, Ordering::Release);
@@ -111,6 +115,7 @@ pub fn enable(irq: u32) -> Result<(), GicError> {
         GICD_ISENABLER.saturating_add(u64::from(irq >> 5).saturating_mul(4)),
         1u32 << (irq & 31),
     );
+    barrier();
     Ok(())
 }
 
@@ -125,23 +130,30 @@ pub fn disable(irq: u32) -> Result<(), GicError> {
         GICD_ICENABLER.saturating_add(u64::from(irq >> 5).saturating_mul(4)),
         1u32 << (irq & 31),
     );
+    barrier();
     Ok(())
 }
 
+/// Make the distributor writes visible before the caller signals EOI or returns.
+fn barrier() {
+    // SAFETY: DSB is a valid EL1 barrier and touches no memory.
+    unsafe {
+        core::arch::asm!("dsb sy", options(nostack, preserves_flags));
+    }
+}
+
 /// Set the priority of one interrupt line (banked registers for PPIs/SGIs).
-#[allow(dead_code)] // Consumed by S21d when drivers register their own lines.
 pub fn set_priority(irq: u32, priority: u8) -> Result<(), GicError> {
     let distributor = base(&GICD)?;
     if irq >= 1020 {
         return Err(GicError::NotInitialised);
     }
+    let offset = GICD_IPRIORITYR.saturating_add(u64::from(irq & !3));
     let shift = (irq & 3) << 3;
-    let value = u32::from(priority) << shift;
-    write32(
-        distributor,
-        GICD_IPRIORITYR.saturating_add(u64::from(irq & !3)),
-        value,
-    );
+    let mut value = read32(distributor, offset);
+    value &= !(0xff << shift);
+    value |= u32::from(priority) << shift;
+    write32(distributor, offset, value);
     Ok(())
 }
 
@@ -149,20 +161,80 @@ pub fn set_priority(irq: u32, priority: u8) -> Result<(), GicError> {
 ///
 /// ITARGETSR is banked and read-only for SGIs/PPIs (0..31); setting a target there is ignored by
 /// the architecture, so this is only meaningful for SPIs.
-#[allow(dead_code)] // Consumed by S21d when drivers register their own lines.
 pub fn set_target(irq: u32, cpu: u8) -> Result<(), GicError> {
     let distributor = base(&GICD)?;
-    if !(FIRST_SPI..1020).contains(&irq) {
+    if !is_spi(irq) {
         return Err(GicError::NotInitialised);
     }
+    let offset = GICD_ITARGETSR.saturating_add(u64::from(irq & !3));
     let shift = (irq & 3) << 3;
-    let value = u32::from(cpu) << shift;
+    let mut value = read32(distributor, offset);
+    value &= !(0xff << shift);
+    value |= u32::from(cpu) << shift;
+    write32(distributor, offset, value);
+    Ok(())
+}
+
+/// Put one interrupt in Group 1, the non-secure group the kernel enables in `init`.
+///
+/// On a GIC without security extensions the register is RAZ/WI, so the write is harmless; on the
+/// Pi 4 GIC-400 it is required for a non-secure EL1 kernel to receive the SPI. Kept for the Pi
+/// platform wiring; the QEMU `virt` gate uses the default Group 0.
+#[allow(dead_code)] // Consumed by the Pi 4 platform follow-up.
+pub fn set_group1(irq: u32) -> Result<(), GicError> {
+    let distributor = base(&GICD)?;
+    if irq >= 1020 {
+        return Err(GicError::NotInitialised);
+    }
     write32(
         distributor,
-        GICD_ITARGETSR.saturating_add(u64::from(irq & !3)),
-        value,
+        GICD_IGROUPR.saturating_add(u64::from(irq >> 5).saturating_mul(4)),
+        1u32 << (irq & 31),
     );
     Ok(())
+}
+
+/// Configure one SPI as level-sensitive or edge-triggered.
+///
+/// GICv2 has two configuration bits per interrupt; for SPIs bit 0 is reserved and bit 1 selects
+/// edge (`1`) or level (`0`). GIC-400 SPI polarity is fixed active-high.
+pub fn configure_spi(irq: u32, level: bool) -> Result<(), GicError> {
+    let distributor = base(&GICD)?;
+    if !is_spi(irq) {
+        return Err(GicError::NotInitialised);
+    }
+    let offset = GICD_ICFGR.saturating_add(u64::from(irq >> 4).saturating_mul(4));
+    let shift = (irq & 15) << 1;
+    let mut value = read32(distributor, offset);
+    value &= !(0b11 << shift);
+    if !level {
+        value |= 0b10 << shift;
+    }
+    write32(distributor, offset, value);
+    // SAFETY: the DSB orders the configuration write before the line is enabled.
+    unsafe {
+        core::arch::asm!("dsb sy", options(nostack, preserves_flags));
+    }
+    Ok(())
+}
+
+/// Clear the pending state of one interrupt line.
+pub fn clear_pending(irq: u32) -> Result<(), GicError> {
+    let distributor = base(&GICD)?;
+    if irq >= 1020 {
+        return Err(GicError::NotInitialised);
+    }
+    write32(
+        distributor,
+        GICD_ICPENDR.saturating_add(u64::from(irq >> 5).saturating_mul(4)),
+        1u32 << (irq & 31),
+    );
+    Ok(())
+}
+
+/// True for a shared peripheral interrupt id (32..1019).
+pub const fn is_spi(irq: u32) -> bool {
+    irq >= FIRST_SPI && irq < 1020
 }
 
 /// Read the highest-priority pending interrupt (raw IAR value).

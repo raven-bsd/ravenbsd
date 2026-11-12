@@ -13,9 +13,7 @@ use raven_abi::layout::x86_64::{USER_END, USER_MIN};
 use raven_abi::types::{Handle, Rights, map, prot};
 use raven_vma::PAGE_SIZE;
 
-#[cfg(target_arch = "x86_64")]
 use crate::driver::DmaBuffer;
-#[cfg(target_arch = "x86_64")]
 use crate::process::handle::MmioRegion;
 use crate::process::{self, Process, handle::MemObject, handle::Object};
 use crate::syscall::SyscallFrame;
@@ -27,11 +25,8 @@ enum MappedObject {
     Anonymous,
     Initfs,
     MemObject(Arc<MemObject>),
-    #[cfg(target_arch = "x86_64")]
     Mmio(Arc<MmioRegion>),
-    #[cfg(target_arch = "x86_64")]
     BootBlob(Arc<MemObject>),
-    #[cfg(target_arch = "x86_64")]
     Dma(Arc<DmaBuffer>),
 }
 
@@ -114,17 +109,14 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
         MappedObject::MemObject(object) => {
             address_space.map_memobj(vaddr, len, offset, protection, object, shared)?;
         }
-        #[cfg(target_arch = "x86_64")]
         MappedObject::Mmio(region) => {
             let physical = region.phys().checked_add(offset).ok_or(Errno::EINVAL)?;
             let writable = protection & (prot::WRITE as u8) != 0;
             address_space.map_mmio(vaddr, len, physical, writable)?;
         }
-        #[cfg(target_arch = "x86_64")]
         MappedObject::BootBlob(object) => {
             address_space.map_memobj(vaddr, len, offset, protection, object, false)?;
         }
-        #[cfg(target_arch = "x86_64")]
         MappedObject::Dma(buffer) => {
             let non_cacheable = buffer.flags() & crate::driver::DMA_FLAG_NON_CACHEABLE != 0;
             let writable = protection & (prot::WRITE as u8) != 0;
@@ -178,7 +170,6 @@ fn lookup_process(
     }
 }
 
-#[cfg_attr(target_arch = "aarch64", allow(unused_variables))] // The x86-64-only driver arms consume these.
 fn resolve_object(
     caller: &Arc<Process>,
     raw: u32,
@@ -215,11 +206,8 @@ fn resolve_object(
         enum Kind {
             Initfs,
             Memory,
-            #[cfg(target_arch = "x86_64")]
             Mmio,
-            #[cfg(target_arch = "x86_64")]
             Blob,
-            #[cfg(target_arch = "x86_64")]
             Dma,
         }
         let kind = {
@@ -227,11 +215,8 @@ fn resolve_object(
             match handles.get(handle, Rights::NONE) {
                 Ok(Object::MemObjectInitfs) => Kind::Initfs,
                 Ok(Object::Memory(_)) => Kind::Memory,
-                #[cfg(target_arch = "x86_64")]
                 Ok(Object::MmioRegion(_)) => Kind::Mmio,
-                #[cfg(target_arch = "x86_64")]
                 Ok(Object::BootBlob(_)) => Kind::Blob,
-                #[cfg(target_arch = "x86_64")]
                 Ok(Object::DmaBuffer(_)) => Kind::Dma,
                 Ok(_) => return Err(Errno::EBADF),
                 Err(error) => return Err(error),
@@ -269,7 +254,6 @@ fn resolve_object(
                     _ => Err(Errno::EBADF),
                 }
             }
-            #[cfg(target_arch = "x86_64")]
             Kind::Mmio => {
                 if exec {
                     return Err(Errno::EINVAL);
@@ -293,7 +277,6 @@ fn resolve_object(
                 }
                 Ok(MappedObject::Mmio(region))
             }
-            #[cfg(target_arch = "x86_64")]
             Kind::Blob => {
                 if protection & (prot::WRITE as u8) != 0 {
                     return Err(Errno::EPERM);
@@ -307,7 +290,6 @@ fn resolve_object(
                     _ => Err(Errno::EBADF),
                 }
             }
-            #[cfg(target_arch = "x86_64")]
             Kind::Dma => {
                 let mut needed = Rights::MAP;
                 if protection & (prot::WRITE as u8) != 0 {

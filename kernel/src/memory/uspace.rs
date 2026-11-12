@@ -54,7 +54,6 @@ impl MmioMapping {
 
 /// One DMA-buffer mapping: the frames are owned by the buffer object, which the mapping keeps
 /// alive until it is unmapped.
-#[cfg(target_arch = "x86_64")]
 struct DmaMapping {
     start: u64,
     len: u64,
@@ -90,7 +89,6 @@ pub struct UserAddressSpace {
     vmas: Vmas,
     objects: Vec<ObjectMapping>,
     mmio: Vec<MmioMapping>,
-    #[cfg(target_arch = "x86_64")]
     dma: Vec<DmaMapping>,
     /// Bumped on every mapping change. A capture records it at create and only copies back when
     /// the client's mapping has not been replaced meanwhile.
@@ -121,7 +119,6 @@ impl UserAddressSpace {
             vmas,
             objects: Vec::new(),
             mmio: Vec::new(),
-            #[cfg(target_arch = "x86_64")]
             dma: Vec::new(),
             mapping_generation: 0,
         }
@@ -391,10 +388,8 @@ impl UserAddressSpace {
     /// Map a DMA buffer at `offset` for `len` bytes.
     ///
     /// The frames are owned by the buffer object; the mapping keeps the buffer alive and unmapping
-    /// never returns the frames to the frame allocator. Cached write-back is used unless the
-    /// buffer was created with the non-cacheable flag.
-    #[cfg(target_arch = "x86_64")]
-    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S21b DMA mappings are x86-64.
+    /// never returns the frames to the frame allocator. x86-64 uses cached write-back unless the
+    /// buffer was created with the non-cacheable flag; aarch64 always maps Normal-NC (MAIR attr2)
     pub fn map_dma(
         &mut self,
         vaddr: u64,
@@ -425,8 +420,16 @@ impl UserAddressSpace {
         } else {
             PageFlags::user_ro()
         };
+        #[cfg(target_arch = "x86_64")]
         if non_cacheable {
             flags = flags.union(PageFlags::mmio_attribute());
+        }
+        #[cfg(target_arch = "aarch64")]
+        {
+            // aarch64 devices are not guaranteed to snoop the CPU cache and the ABI has no
+            // cache-maintenance syscall, so every DMA buffer is Normal-NC (MAIR attr2).
+            let _ = non_cacheable;
+            flags = flags.union(PageFlags::from_bits(raven_rmm::page::NON_CACHEABLE));
         }
         let mut mapped = 0u64;
         let mut failure = None;
@@ -487,14 +490,11 @@ impl UserAddressSpace {
         }
         let pages = pages_in(len)?;
         let mmio = self.mmio.clone();
-        #[cfg(target_arch = "x86_64")]
         let dma = self
             .dma
             .iter()
             .map(|mapping| (mapping.start, mapping.len))
             .collect::<Vec<_>>();
-        #[cfg(not(target_arch = "x86_64"))]
-        let dma = Vec::<(u64, u64)>::new();
         let mut to_free: Vec<u64> = Vec::with_capacity(usize::try_from(pages).unwrap_or(0));
         {
             let mut mapper = self.aspace.mapper().map_err(map_errno)?;
@@ -530,7 +530,6 @@ impl UserAddressSpace {
         self.vmas.remove(start, len).map_err(vma_errno)?;
         self.remove_object_range(start, len);
         self.remove_mmio_range(start, len);
-        #[cfg(target_arch = "x86_64")]
         self.remove_dma_range(start, len);
         // Do not recycle frames until every CPU has dropped its translation: a stale TLB entry
         // could otherwise reach a frame that was already handed to another address space.
@@ -701,14 +700,11 @@ impl UserAddressSpace {
         let vmas: Vec<Vma> = self.vmas.iter().copied().collect();
         let objects = self.objects.clone();
         let mmio = self.mmio.clone();
-        #[cfg(target_arch = "x86_64")]
         let dma = self
             .dma
             .iter()
             .map(|mapping| (mapping.start, mapping.len))
             .collect::<Vec<_>>();
-        #[cfg(not(target_arch = "x86_64"))]
-        let dma = Vec::<(u64, u64)>::new();
         if let Ok(mut mapper) = self.aspace.mapper() {
             for vma in vmas {
                 let pages = pages_in(vma.len()).unwrap_or(0);
@@ -736,7 +732,6 @@ impl UserAddressSpace {
         self.vmas = Vmas::new(USER_MIN..USER_END);
         self.objects.clear();
         self.mmio.clear();
-        #[cfg(target_arch = "x86_64")]
         self.dma.clear();
     }
 
@@ -841,7 +836,6 @@ impl UserAddressSpace {
         self.mmio = next;
     }
 
-    #[cfg(target_arch = "x86_64")]
     fn remove_dma_range(&mut self, start: u64, len: u64) {
         let end = start.saturating_add(len);
         let mut next = Vec::with_capacity(self.dma.len().saturating_add(2));

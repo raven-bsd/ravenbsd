@@ -22,7 +22,6 @@ mod console;
 mod fdt {
     pub use crate::arch::aarch64::fdt::*;
 }
-#[cfg(target_arch = "x86_64")]
 mod driver;
 mod event;
 mod initfs;

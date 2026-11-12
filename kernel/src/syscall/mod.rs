@@ -13,7 +13,6 @@ pub mod basic;
 /// Console input is a COM1 device path; aarch64 reports `ENOSYS`.
 #[cfg(target_arch = "x86_64")]
 pub mod debug_read;
-#[cfg(target_arch = "x86_64")]
 pub mod driver;
 pub mod event;
 pub mod futex;
@@ -73,11 +72,8 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
         Some(Syscall::UNMAP) => memory_ctl::unmap(frame),
         Some(Syscall::PROTECT) => memory_ctl::protect(frame),
         Some(Syscall::HANDLE_TRANSFER) => handle_xfer::transfer(frame),
-        #[cfg(target_arch = "x86_64")]
         Some(call @ (Syscall::MMIO_CREATE | Syscall::BOOT_BLOB)) => driver::dispatch(call, frame),
-        #[cfg(target_arch = "x86_64")]
         Some(call @ (Syscall::DMA_ALLOC | Syscall::DMA_INFO)) => driver::dispatch(call, frame),
-        #[cfg(target_arch = "x86_64")]
         Some(call @ (Syscall::IRQ_CREATE | Syscall::IRQ_WAIT | Syscall::IRQ_ACK)) => {
             driver::dispatch(call, frame)
         }

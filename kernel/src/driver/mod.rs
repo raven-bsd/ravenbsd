@@ -28,12 +28,13 @@ pub const BLOB_DTB: u32 = 2;
 /// `BOOT_BLOB` kind: the memory map summary.
 pub const BLOB_MEMORY_MAP: u32 = 3;
 
-/// The only defined `MMIO_CREATE` attribute set: uncached (PCD+PWT) device memory.
+/// The only defined `MMIO_CREATE` attribute set: uncached device memory (x86-64 PCD+PWT,
+/// aarch64 Device-nGnRE).
 pub const MMIO_ATTRS_DEFAULT: u32 = 0;
 
-/// `DMA_ALLOC` flag: map the buffer uncached. On x86-64 the default is cached write-back,
-/// which is coherent; this flag exists for aarch64 and is honoured on x86-64 by mapping the
-/// buffer with the device cache attributes.
+/// `DMA_ALLOC` flag: map the buffer uncached. On x86-64 the default is coherent cached
+/// write-back and this flag selects the device attributes; aarch64 always maps DMA buffers
+/// Normal-NC (MAIR attr2), so the flag is implied there.
 pub const DMA_FLAG_NON_CACHEABLE: u32 = 1;
 /// All valid `DMA_ALLOC` flags.
 pub const DMA_FLAGS_MASK: u32 = DMA_FLAG_NON_CACHEABLE;
@@ -42,9 +43,11 @@ pub const DMA_INFO_UNPROTECTED: u32 = 1;
 /// Default per-process DMA budget.
 pub const DMA_PER_PROCESS_LIMIT: u64 = 64 * 1024 * 1024;
 
-/// The DMA domain of a device capability. Today every device uses the identity domain; the
-/// IOMMU (S18) and aarch64 `dma-ranges` (S21d) tickets will introduce real domains through the
-/// same record.
+/// The DMA domain of a device capability.
+///
+/// x86-64 uses the identity domain; the IOMMU (S18) ticket will introduce protected domains
+/// through the same record. On aarch64 the Pi 4 domain is derived from the live device tree's
+/// `/soc` `dma-ranges`; QEMU `virt` has no `dma-ranges` and stays identity.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DmaDomain {
     /// Added to physical addresses to produce bus addresses.
@@ -64,6 +67,10 @@ pub const DMA_DOMAIN_IDENTITY: DmaDomain = DmaDomain {
     coherent: true,
     protected: false,
 };
+
+/// The domain every allocation on this machine uses. Initialised to identity and replaced once
+/// by the platform boot path when the device tree declares `dma-ranges`.
+static DMA_DOMAIN: Mutex<DmaDomain> = Mutex::new(DMA_DOMAIN_IDENTITY);
 
 /// A physically contiguous, zero-filled device buffer.
 pub struct DmaBuffer {
@@ -125,10 +132,15 @@ static GLOBAL_USED: AtomicU64 = AtomicU64::new(0);
 /// Size of one local APIC / IOAPIC window the kernel owns.
 const APIC_WINDOW: u64 = 0x1000;
 
+#[cfg(target_arch = "x86_64")]
+pub(crate) mod irq;
+#[cfg(target_arch = "aarch64")]
+#[path = "irq_aarch64.rs"]
 pub(crate) mod irq;
 /// Boot blobs built once during init.
 struct BlobSet {
     acpi: Option<Arc<MemObject>>,
+    dtb: Option<Arc<MemObject>>,
     memory_map: Option<Arc<MemObject>>,
 }
 
@@ -138,6 +150,7 @@ static BLOBS: Mutex<Option<BlobSet>> = Mutex::new(None);
 ///
 /// Called once from the x86-64 boot path after the heap exists. The ACPI bytes were captured
 /// before loader memory was reclaimed; this step only wraps them in kernel-owned frames.
+#[cfg(target_arch = "x86_64")]
 pub fn init() {
     let acpi = match crate::arch::acpi::early_blob() {
         Some(bytes) => match MemObject::from_bytes(bytes) {
@@ -149,25 +162,74 @@ pub fn init() {
         },
         None => None,
     };
-    let memory_map = {
-        let mut bytes = Vec::new();
-        let mut usable = 0u64;
-        for region in paging::memory_map() {
-            if region.kind() == Some(MemoryKind::Usable) {
-                usable = usable.saturating_add(region.len);
+    *BLOBS.lock() = Some(BlobSet {
+        acpi,
+        dtb: None,
+        memory_map: build_memory_map_blob(),
+    });
+}
+
+/// Build the boot blobs and derive the DMA domain on aarch64.
+///
+/// Called once from the aarch64 boot path after the kernel page tables and heap exist. The DTB
+/// is copied into kernel-owned frames so a later `BOOT_BLOB` kind 2 does not depend on loader
+/// memory; the `/soc` `dma-ranges` window becomes this machine's single DMA domain.
+#[cfg(target_arch = "aarch64")]
+pub fn init_aarch64(gicd: u64, gicc: u64, uart: u64) {
+    *PLATFORM_OWNED.lock() = [gicd, gicc, uart];
+    let dtb =
+        crate::arch::aarch64::fdt::dtb_slice().and_then(|bytes| {
+            match MemObject::from_bytes(bytes) {
+                Ok(object) => Some(object),
+                Err(error) => {
+                    kprintln!("driver: dtb blob frames failed: {error:?}");
+                    None
+                }
             }
-            write_region(&mut bytes, *region);
+        });
+    if let Some(window) = crate::arch::aarch64::fdt::platform_dma_window() {
+        let domain = DmaDomain {
+            bus_offset: window.bus_base.wrapping_sub(window.cpu_base),
+            max_bus_addr: window.bus_base.saturating_add(window.size),
+            coherent: false,
+            protected: false,
+        };
+        *DMA_DOMAIN.lock() = domain;
+        kprintln!(
+            "driver: dma offset=0x{:x} max=0x{:x}",
+            domain.bus_offset,
+            domain.max_bus_addr
+        );
+    }
+    *BLOBS.lock() = Some(BlobSet {
+        acpi: None,
+        dtb,
+        memory_map: build_memory_map_blob(),
+    });
+}
+
+/// The platform windows the kernel owns and `MMIO_CREATE` must refuse on aarch64.
+#[cfg(target_arch = "aarch64")]
+static PLATFORM_OWNED: Mutex<[u64; 3]> = Mutex::new([0; 3]);
+
+/// Wrap the copied memory map in a read-only boot blob and record the global DMA budget.
+fn build_memory_map_blob() -> Option<Arc<MemObject>> {
+    let mut bytes = Vec::new();
+    let mut usable = 0u64;
+    for region in paging::memory_map() {
+        if region.kind() == Some(MemoryKind::Usable) {
+            usable = usable.saturating_add(region.len);
         }
-        GLOBAL_LIMIT.store(usable / 4, Ordering::Release);
-        match MemObject::from_bytes(&bytes) {
-            Ok(object) => Some(object),
-            Err(error) => {
-                kprintln!("driver: memory map blob frames failed: {error:?}");
-                None
-            }
+        write_region(&mut bytes, *region);
+    }
+    GLOBAL_LIMIT.store(usable / 4, Ordering::Release);
+    match MemObject::from_bytes(&bytes) {
+        Ok(object) => Some(object),
+        Err(error) => {
+            kprintln!("driver: memory map blob frames failed: {error:?}");
+            None
         }
-    };
-    *BLOBS.lock() = Some(BlobSet { acpi, memory_map });
+    }
 }
 
 fn write_region(bytes: &mut Vec<u8>, region: raven_bootinfo::MemoryRegion) {
@@ -231,7 +293,11 @@ pub fn boot_blob(frame: &SyscallFrame) -> Result<usize, Errno> {
             .as_ref()
             .and_then(|set| set.acpi.clone())
             .ok_or(Errno::ENOENT)?,
-        BLOB_DTB => return Err(Errno::ENOENT),
+        BLOB_DTB => BLOBS
+            .lock()
+            .as_ref()
+            .and_then(|set| set.dtb.clone())
+            .ok_or(Errno::ENOENT)?,
         BLOB_MEMORY_MAP => BLOBS
             .lock()
             .as_ref()
@@ -285,18 +351,30 @@ fn refuse_kernel_owned(phys: u64, end: u64) -> Result<(), Errno> {
     if phys < kernel_end && info.kernel_phys_base < end {
         return Err(Errno::EPERM);
     }
-    let acpi = crate::arch::acpi::info();
-    if acpi.local_apic_address != 0 && overlaps(phys, end, acpi.local_apic_address, APIC_WINDOW) {
-        return Err(Errno::EPERM);
-    }
-    let mut index = 0usize;
-    while index < acpi.io_apic_count {
-        if let Some(io_apic) = acpi.io_apics.get(index)
-            && overlaps(phys, end, io_apic.address, APIC_WINDOW)
+    #[cfg(target_arch = "x86_64")]
+    {
+        let acpi = crate::arch::acpi::info();
+        if acpi.local_apic_address != 0 && overlaps(phys, end, acpi.local_apic_address, APIC_WINDOW)
         {
             return Err(Errno::EPERM);
         }
-        index = index.saturating_add(1);
+        let mut index = 0usize;
+        while index < acpi.io_apic_count {
+            if let Some(io_apic) = acpi.io_apics.get(index)
+                && overlaps(phys, end, io_apic.address, APIC_WINDOW)
+            {
+                return Err(Errno::EPERM);
+            }
+            index = index.saturating_add(1);
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        for base in PLATFORM_OWNED.lock().iter().copied() {
+            if base != 0 && overlaps(phys, end, base, APIC_WINDOW) {
+                return Err(Errno::EPERM);
+            }
+        }
     }
     Ok(())
 }
@@ -331,12 +409,24 @@ pub fn dma_alloc(frame: &SyscallFrame) -> Result<usize, Errno> {
     if flags & !DMA_FLAGS_MASK != 0 {
         return Err(Errno::EINVAL);
     }
-    let max_frame = if mask_bits >= 64 {
+    // aarch64 has no cache-maintenance syscall for drivers, so the kernel selects Normal-NC
+    // (MAIR attr2) for every DMA buffer regardless of the request flags.
+    #[cfg(target_arch = "aarch64")]
+    let flags = flags | DMA_FLAG_NON_CACHEABLE;
+
+    let domain = *DMA_DOMAIN.lock();
+    let bus_limit = if mask_bits >= 64 {
         u64::MAX
     } else {
-        (1u64 << mask_bits) / frame::PAGE_SIZE
+        1u64 << mask_bits
     };
-    if len.checked_div(frame::PAGE_SIZE).ok_or(Errno::EINVAL)? > max_frame {
+    let device_limit = domain.max_bus_addr.min(bus_limit);
+    let Some(max_phys_end) = device_limit.checked_sub(domain.bus_offset) else {
+        return Err(Errno::ENOMEM);
+    };
+    let max_frame = max_phys_end / frame::PAGE_SIZE;
+    let pages = len.checked_div(frame::PAGE_SIZE).ok_or(Errno::EINVAL)?;
+    if pages > max_frame || max_frame == 0 {
         return Err(Errno::ENOMEM);
     }
 
@@ -358,7 +448,6 @@ pub fn dma_alloc(frame: &SyscallFrame) -> Result<usize, Errno> {
             Errno::ENOMEM
         })?;
 
-    let pages = len / frame::PAGE_SIZE;
     let align_pages = align / frame::PAGE_SIZE;
     let physical = frame::alloc_contiguous(pages, align_pages, max_frame);
     let Some(physical) = physical else {
@@ -400,7 +489,7 @@ pub fn dma_alloc(frame: &SyscallFrame) -> Result<usize, Errno> {
         frames,
         len,
         flags,
-        domain: DMA_DOMAIN_IDENTITY,
+        domain,
         quota,
     });
     let rights = Rights::READ

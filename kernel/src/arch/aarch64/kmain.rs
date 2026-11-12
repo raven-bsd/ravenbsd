@@ -77,6 +77,7 @@ pub extern "C" fn kmain(boot: *const BootInfo) -> ! {
     // The Pi device windows are mapped only after the kernel's own tables and MMIO window exist.
     #[cfg(raven_pi4)]
     crate::arch::aarch64::pi4::map_platform_devices();
+    crate::driver::init_aarch64(platform.gicd, platform.gicc, platform.uart);
     crate::initfs::init();
     if let Err(error) = crate::sched::init() {
         kprintln!("kernel: scheduler init failed: {error:?}");

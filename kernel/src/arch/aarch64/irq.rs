@@ -4,9 +4,9 @@
 //! IRQ dispatch from the exception vectors.
 //!
 //! The vector entry saves a full trap frame and calls [`dispatch`] with interrupts masked for the
-//! duration (the CPU masks IRQ on exception entry). The handler acknowledges the GIC, runs the
-//! device handler, signals end-of-interrupt and then gives the scheduler a chance to switch
-//! before the frame is restored. Nothing here allocates or blocks.
+//! duration (the CPU masks IRQ on exception entry). The handler acknowledges the GIC, routes the
+//! interrupt to the timer or a driver `Irq` object, signals end-of-interrupt and then gives the
+//! scheduler a chance to switch before the frame is restored. Nothing here allocates or blocks.
 
 use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
@@ -16,6 +16,10 @@ use crate::sched;
 static IRQ_COUNT: AtomicU64 = AtomicU64::new(0);
 /// PPI number of the timer, zero until [`set_timer`].
 static TIMER_IRQ: AtomicU32 = AtomicU32::new(0);
+/// Spurious GIC acknowledgements (no interrupt to service).
+static SPURIOUS: AtomicU64 = AtomicU64::new(0);
+/// Interrupts with no owner; counted instead of logged in interrupt context.
+static UNEXPECTED: AtomicU64 = AtomicU64::new(0);
 
 /// Record the timer interrupt line (called after GIC/timer init).
 pub fn set_timer(irq: u32) {
@@ -27,6 +31,22 @@ pub fn count() -> u64 {
     IRQ_COUNT.load(Ordering::Acquire)
 }
 
+/// Report and clear the interrupt-context counters. Process context only.
+pub fn flush_spurious() {
+    let spurious = SPURIOUS.swap(0, Ordering::AcqRel);
+    if spurious != 0 {
+        crate::kprintln!("irq: spurious interrupts={spurious}");
+    }
+    let unexpected = UNEXPECTED.swap(0, Ordering::AcqRel);
+    if unexpected != 0 {
+        crate::kprintln!("irq: unexpected interrupts={unexpected}");
+    }
+}
+
+fn note_unexpected() {
+    UNEXPECTED.fetch_add(1, Ordering::Relaxed);
+}
+
 /// Handle one IRQ exception. Called from `exception_dispatch` for the IRQ vector slots.
 ///
 /// `from_user` is true for the lower-EL slots: only those may be preempted on return (the x86-64
@@ -36,17 +56,23 @@ pub fn dispatch(from_user: bool) {
     let raw = gic::acknowledge();
     let id = gic::interrupt_id(raw);
     if gic::is_spurious(id) {
+        SPURIOUS.fetch_add(1, Ordering::Relaxed);
         return;
     }
     IRQ_COUNT.fetch_add(1, Ordering::Relaxed);
 
     if id == TIMER_IRQ.load(Ordering::Acquire) {
         timer::handle();
+    } else if gic::is_spi(id) {
+        if !crate::driver::irq::handle_spi(id) {
+            // An unclaimed line must not storm; masking it also makes the next `IRQ_CREATE`
+            // start from a quiet source.
+            note_unexpected();
+            let _ = gic::disable(id);
+        }
     } else {
-        // No other driver registers a handler yet (S14b). Disable the line so an unexpected
-        // interrupt cannot storm, and report it once.
+        note_unexpected();
         let _ = gic::disable(id);
-        crate::kprintln!("irq: unexpected interrupt {}", id);
     }
 
     gic::eoi(raw);
