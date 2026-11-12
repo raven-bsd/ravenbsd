@@ -55,6 +55,7 @@ mod route;
 mod rto;
 mod sack;
 mod seq;
+mod signature;
 mod socket;
 mod stack;
 mod table;
@@ -82,6 +83,7 @@ pub use recovery::{Ecn, Rack, SpuriousUndo, Tlp, pto};
 pub use route::{Route, RouteTable};
 pub use rto::RtoEstimator;
 pub use sack::{NextKind, NextSeg, SackResult, SackScoreboard, receiver_blocks, sack_option_bytes};
+pub use signature::{AoAlgorithm, AoKey, DigestProvider, NoDigest};
 pub use stack::{Ipv4Addr, Ipv4Config, MAX_TIMERS, Stack, StackConfig, TimerId};
 pub use table::{
     ConnectionKey, ConnectionTable, ListenerKey, ListenerTable, PortAllocator, Rebind,

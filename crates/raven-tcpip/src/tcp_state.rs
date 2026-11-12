@@ -537,6 +537,22 @@ impl<D: Device> Stack<D> {
         }
     }
 
+    /// Configure an MD5 key. No digest backend is approved, so this returns
+    /// `ENOTSUP` until C18's QUESTION is answered.
+    pub fn set_md5_key(&mut self, _socket: SocketId, _key: Option<&[u8]>) -> Result<(), Errno> {
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Configure TCP-AO keys. No digest backend is approved, so this returns
+    /// `ENOTSUP` until C18's QUESTION is answered.
+    pub fn set_ao_keys(
+        &mut self,
+        _socket: SocketId,
+        _keys: &[crate::signature::AoKey],
+    ) -> Result<(), Errno> {
+        Err(Errno::EOPNOTSUPP)
+    }
+
     /// The most recent urgent pointer delivered out-of-band on this socket.
     pub fn tcp_urgent(&self, socket: SocketId) -> Result<Option<u16>, Errno> {
         match &self.sockets.record(socket)?.kind {

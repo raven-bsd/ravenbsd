@@ -16,6 +16,9 @@ workspace = true
 [features]
 # Builds the in-memory loopback/null devices used by host tests and simulators.
 testutil = []
+# TCP MD5/AO plumbing; digest backend requires reviewer approval.
+tcp-md5 = []
+tcp-ao = []
 
 [dev-dependencies]
 raven-tcpip-wire = { path = "../raven-tcpip-wire" }
