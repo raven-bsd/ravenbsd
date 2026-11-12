@@ -197,7 +197,7 @@ pub struct Stack<D: Device> {
     /// Live randomised ephemeral-port allocator (C17).
     pub(crate) ports: crate::table::PortAllocator,
     /// Live TIME-WAIT membership and recycling (C17).
-    pub(crate) timewait: crate::table::TimeWaitTable<u32>,
+    pub(crate) timewait: crate::table::TimeWaitTable<crate::table::TimeWaitSlot>,
     pub(crate) next_isn: u32,
     pub(crate) option_override: Option<Vec<u8>>,
     #[allow(dead_code)] // Used when the tcp-md5 feature is enabled.

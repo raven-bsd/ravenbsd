@@ -12,8 +12,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 
-use smoltcp::phy::{Device, DeviceCapabilities, Medium, RxToken, TxToken};
-use smoltcp::time::Instant;
+use raven_tcpip::{ChecksumOffload, Device, DeviceCaps, Instant, Medium, TxError};
 
 /// Link behaviour for a [`PairDevice`] pair.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -89,76 +88,35 @@ impl PairDevice {
 }
 
 impl Device for PairDevice {
-    type RxToken<'a>
-        = PairRxToken
-    where
-        Self: 'a;
-    type TxToken<'a>
-        = PairTxToken
-    where
-        Self: 'a;
-
-    fn capabilities(&self) -> DeviceCapabilities {
-        let mut capabilities = DeviceCapabilities::default();
-        capabilities.medium = Medium::Ethernet;
-        capabilities.max_transmission_unit = 1514;
-        capabilities
+    fn capabilities(&self) -> DeviceCaps {
+        DeviceCaps {
+            medium: Medium::Ethernet,
+            mtu: 1514,
+            hardware_addr: None,
+            checksum_offload: ChecksumOffload::None,
+        }
     }
 
-    fn receive(&mut self, timestamp: Instant) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
-        let bytes = self
-            .link
-            .borrow_mut()
-            .dequeue(self.side, timestamp.total_millis())?;
-        Some((
-            PairRxToken { bytes },
-            PairTxToken {
-                link: Rc::clone(&self.link),
-                side: self.side,
-                timestamp: timestamp.total_millis(),
-            },
-        ))
+    fn receive(&mut self, now: Instant, consume: &mut dyn FnMut(&[u8])) -> bool {
+        let Some(bytes) = self.link.borrow_mut().dequeue(self.side, now.as_millis()) else {
+            return false;
+        };
+        consume(&bytes);
+        true
     }
 
-    fn transmit(&mut self, timestamp: Instant) -> Option<Self::TxToken<'_>> {
-        Some(PairTxToken {
-            link: Rc::clone(&self.link),
-            side: self.side,
-            timestamp: timestamp.total_millis(),
-        })
-    }
-}
-
-pub struct PairRxToken {
-    bytes: Vec<u8>,
-}
-
-impl RxToken for PairRxToken {
-    fn consume<R, F>(self, f: F) -> R
-    where
-        F: FnOnce(&[u8]) -> R,
-    {
-        f(&self.bytes)
-    }
-}
-
-pub struct PairTxToken {
-    link: Rc<RefCell<Link>>,
-    side: Side,
-    timestamp: i64,
-}
-
-impl TxToken for PairTxToken {
-    fn consume<R, F>(self, len: usize, f: F) -> R
-    where
-        F: FnOnce(&mut [u8]) -> R,
-    {
+    fn transmit(
+        &mut self,
+        now: Instant,
+        len: usize,
+        fill: &mut dyn FnMut(&mut [u8]),
+    ) -> Result<(), TxError> {
         let mut bytes = vec![0; len];
-        let result = f(&mut bytes);
+        fill(&mut bytes);
         self.link
             .borrow_mut()
-            .enqueue(self.side, self.timestamp, bytes);
-        result
+            .enqueue(self.side, now.as_millis(), bytes);
+        Ok(())
     }
 }
 

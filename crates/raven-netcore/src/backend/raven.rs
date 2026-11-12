@@ -6,68 +6,14 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 
-use raven_abi::errno::Errno;
-use raven_tcpip::{
-    self as native, ChecksumOffload, Device as NativeDevice, DeviceCaps as NativeCaps, Instant,
-    IpAddr, Ipv4Config, Medium, Stack, StackConfig, TxError,
-};
-use smoltcp::phy::{Device, RxToken, TxToken};
-use smoltcp::time::Instant as SmolInstant;
-
 use crate::backend::StackBackend;
 use crate::{Event, Ipv4Addr, SocketId};
-
-/// A smoltcp `Device` adapted to C15's `Device` trait.
-pub struct NativeDeviceAdapter<D: Device> {
-    device: D,
-    mac: [u8; 6],
-}
-
-impl<D: Device> NativeDeviceAdapter<D> {
-    fn new(device: D, mac: [u8; 6]) -> Self {
-        Self { device, mac }
-    }
-}
-
-impl<D: Device> NativeDevice for NativeDeviceAdapter<D> {
-    fn capabilities(&self) -> NativeCaps {
-        let caps = self.device.capabilities();
-        NativeCaps {
-            medium: Medium::Ethernet,
-            mtu: caps.max_transmission_unit,
-            hardware_addr: Some(self.mac),
-            checksum_offload: ChecksumOffload::None,
-        }
-    }
-
-    fn receive(&mut self, now: Instant, consume: &mut dyn FnMut(&[u8])) -> bool {
-        let now = SmolInstant::from_millis(now.as_millis());
-        if let Some((rx, _tx)) = self.device.receive(now) {
-            rx.consume(|bytes| consume(bytes));
-            true
-        } else {
-            false
-        }
-    }
-
-    fn transmit(
-        &mut self,
-        now: Instant,
-        len: usize,
-        fill: &mut dyn FnMut(&mut [u8]),
-    ) -> Result<(), TxError> {
-        let now = SmolInstant::from_millis(now.as_millis());
-        let Some(tx) = self.device.transmit(now) else {
-            return Err(TxError::Busy);
-        };
-        tx.consume(len, |buffer| fill(buffer));
-        Ok(())
-    }
-}
+use raven_abi::errno::Errno;
+use raven_tcpip::{self as native, Device, Instant, IpAddr, Ipv4Config, Stack, StackConfig};
 
 /// The native stack behind [`StackBackend`].
 pub struct RavenTcpipBackend<D: Device> {
-    stack: Stack<NativeDeviceAdapter<D>>,
+    stack: Stack<D>,
     closed: BTreeSet<u32>,
     notified_closed: BTreeSet<u32>,
     accepted: BTreeSet<u32>,
@@ -79,13 +25,13 @@ pub struct RavenTcpipBackend<D: Device> {
 impl<D: Device> RavenTcpipBackend<D> {
     /// Create a native backend over `device` with Ethernet address `mac`.
     ///
-    /// Time is the same millisecond epoch as smoltcp's: `now_ms` is converted
-    /// directly to C15's `Instant` and never decreases.
+    /// Time is a millisecond epoch: `now_ms` is converted directly to C15's
+    /// `Instant` and must never decrease.
     pub fn new(device: D, mac: [u8; 6], now_ms: i64) -> Self {
         let seed = u64::from_le_bytes([mac[0], mac[1], mac[2], mac[3], mac[4], 0x5a, 0, 0]);
         Self {
             stack: Stack::new(
-                NativeDeviceAdapter::new(device, mac),
+                device,
                 StackConfig {
                     hardware_addr: Some(mac),
                     ..StackConfig::default()
@@ -99,6 +45,16 @@ impl<D: Device> RavenTcpipBackend<D> {
             listeners: BTreeMap::new(),
             pending_udp: Vec::new(),
             pending_udp_bytes: 0,
+        }
+    }
+
+    /// A send on a connection the peer already tore down reports `ENOTCONN` (the socket layer's
+    /// long-standing contract), while an id the stack never issued stays `EBADF`.
+    fn dead_connection_error(&self, s: SocketId, error: Errno) -> Errno {
+        if error == Errno::EBADF && self.stack.socket_info(Self::native(s)).is_ok() {
+            Errno::ENOTCONN
+        } else {
+            error
         }
     }
 
@@ -247,7 +203,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
         }
         self.stack
             .send(Self::native(s), data)
-            .map_err(map_wrong_type)
+            .map_err(|error| self.dead_connection_error(s, map_wrong_type(error)))
     }
 
     fn recv(&mut self, s: SocketId, buf: &mut [u8]) -> Result<usize, Errno> {

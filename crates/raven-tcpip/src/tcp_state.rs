@@ -1146,6 +1146,7 @@ impl<D: Device> Stack<D> {
             }
         }
 
+        self.absorb_detached();
         let exact =
             self.sockets
                 .find_connection(destination, destination_port, source, source_port);
@@ -1153,6 +1154,18 @@ impl<D: Device> Stack<D> {
             self.counters.in_segments = self.counters.in_segments.wrapping_add(1);
             self.tcp_input_established(socket, &segment, now);
             return;
+        }
+        let time_wait_key = crate::table::ConnectionKey {
+            local: destination,
+            local_port: destination_port,
+            remote: source,
+            remote_port: source_port,
+        };
+        if let Some(info) = self.timewait.get(&time_wait_key).and_then(|slot| slot.info) {
+            self.counters.in_segments = self.counters.in_segments.wrapping_add(1);
+            if self.detached_time_wait_input(&time_wait_key, info, &segment, now) {
+                return;
+            }
         }
         let listener = self.sockets.records.iter().find_map(|(raw_id, record)| {
             if record.closed {
@@ -2231,19 +2244,101 @@ impl<D: Device> Stack<D> {
         }) else {
             return;
         };
-        for raw in self.timewait.insert(key, socket.0, deadline) {
-            if raw == socket.0 {
+        let slot = crate::table::TimeWaitSlot {
+            socket: socket.0,
+            info: None,
+        };
+        let recycled = self.timewait.insert(key, slot, deadline);
+        self.close_recycled(socket.0, &recycled);
+    }
+
+    /// Close the records of TIME-WAIT entries that were recycled to make room.
+    fn close_recycled(&mut self, keep: u32, recycled: &[crate::table::TimeWaitSlot]) {
+        for slot in recycled {
+            self.counters.timewait_recycled = self.counters.timewait_recycled.wrapping_add(1);
+            if slot.info.is_some() || slot.socket == keep {
                 continue;
             }
-            if let Some(record) = self.sockets.records.get_mut(&raw)
+            if let Some(record) = self.sockets.records.get_mut(&slot.socket)
                 && let Kind::Tcp(connection) = &mut record.kind
                 && connection.state == TcpState::TimeWait
             {
                 connection.state = TcpState::Closed;
                 record.closed = true;
-                self.counters.timewait_recycled = self.counters.timewait_recycled.wrapping_add(1);
             }
         }
+    }
+
+    /// Take in TIME-WAIT connections whose socket records were reclaimed.
+    pub(crate) fn absorb_detached(&mut self) {
+        for (key, info, deadline) in self.sockets.take_detached() {
+            let slot = crate::table::TimeWaitSlot {
+                socket: 0,
+                info: Some(info),
+            };
+            let recycled = self.timewait.insert(key, slot, deadline);
+            self.close_recycled(0, &recycled);
+        }
+    }
+
+    /// Answer a segment for a TIME-WAIT connection whose record is gone.
+    ///
+    /// Returns true when the segment was consumed; false when it is a new incarnation (a SYN
+    /// beyond the old receive sequence) that must be treated as a fresh connection attempt.
+    fn detached_time_wait_input(
+        &mut self,
+        key: &crate::table::ConnectionKey,
+        info: crate::table::TimeWaitInfo,
+        segment: &Segment,
+        now: Instant,
+    ) -> bool {
+        if segment.rst() {
+            self.counters.timewait_rst_ignored = self.counters.timewait_rst_ignored.wrapping_add(1);
+            return true;
+        }
+        if segment.syn() {
+            if seq_gt(segment.seq, info.irs) {
+                self.timewait.remove(key);
+                return false;
+            }
+            self.counters.timewait_syn_drops = self.counters.timewait_syn_drops.wrapping_add(1);
+            return true;
+        }
+        if !segment.payload.is_empty() {
+            self.counters.data_after_fin = self.counters.data_after_fin.wrapping_add(1);
+            self.counters.timewait_data_drops = self.counters.timewait_data_drops.wrapping_add(1);
+        }
+        if segment.fin() {
+            let deadline = now.as_millis().saturating_add(
+                i64::try_from(self.tunables.time_wait_interval).unwrap_or(i64::MAX),
+            );
+            let slot = crate::table::TimeWaitSlot {
+                socket: 0,
+                info: Some(info),
+            };
+            let recycled = self.timewait.insert(*key, slot, deadline);
+            self.close_recycled(0, &recycled);
+        }
+        if info.timestamps {
+            let mut options = Vec::with_capacity(10);
+            options.extend_from_slice(&[8, 10]);
+            options.extend_from_slice(&u32::try_from(now.as_millis()).unwrap_or(0).to_be_bytes());
+            options.extend_from_slice(&info.ts_recent.to_be_bytes());
+            self.option_override = Some(options);
+        }
+        let _ = self.send_tcp_packet(
+            key.local,
+            key.remote,
+            key.local_port,
+            key.remote_port,
+            TcpFlags::ACK,
+            info.snd_nxt,
+            info.rcv_nxt,
+            info.window,
+            &[],
+            false,
+        );
+        true
     }
 
     fn send_syn(&mut self, socket: SocketId) -> Result<(), Errno> {
@@ -2759,7 +2854,12 @@ impl<D: Device> Stack<D> {
     }
 
     pub(crate) fn process_tcp_timers(&mut self, now: Instant) {
-        self.timewait.expire_values(now.as_millis());
+        self.absorb_detached();
+        for (key, slot) in self.timewait.expire_entries(now.as_millis()) {
+            if slot.info.is_some() {
+                self.ports.release(key.local_port);
+            }
+        }
         let sockets: Vec<SocketId> = self
             .sockets
             .records

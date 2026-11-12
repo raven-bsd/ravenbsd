@@ -4,7 +4,7 @@
 [package]
 name = "raven-tcpip-bench"
 version = "0.1.0"
-description = "Deterministic and wall-clock benchmark harness for raven-tcpip and the smoltcp baseline."
+description = "Deterministic and wall-clock benchmark harness for raven-tcpip against frozen reference measurements."
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -17,5 +17,4 @@ workspace = true
 raven-tcpip = { path = "../../../crates/raven-tcpip", features = ["testutil"] }
 raven-tcpip-wire = { path = "../../../crates/raven-tcpip-wire" }
 raven-tcpip-sim = { path = ".." }
-raven-netcore = { path = "../../../crates/raven-netcore", features = ["testutil"] }
 raven-abi = { path = "../../../crates/raven-abi" }

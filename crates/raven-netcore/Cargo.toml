@@ -4,7 +4,7 @@
 [package]
 name = "raven-netcore"
 version = "0.1.0"
-description = "OS-independent smoltcp socket layer: nonblocking TCP/UDP sockets, readiness events and interface configuration."
+description = "OS-independent nonblocking socket layer over the native raven-tcpip stack: nonblocking TCP/UDP sockets, readiness events and interface configuration."
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -16,13 +16,6 @@ workspace = true
 [features]
 # Builds the in-memory PairDevice used by integration tests and host harnesses.
 testutil = []
-# The default backend: smoltcp (0BSD) confined to backend/smoltcp.rs.
-default = ["backend-smoltcp"]
-backend-smoltcp = []
-# The native raven-tcpip backend; C27 decides whether it becomes the default.
-backend-raven-tcpip = ["dep:raven-tcpip"]
-# Builds the same-scenario differential harness.
-differential = ["backend-raven-tcpip"]
 
 [[test]]
 name = "core"
@@ -37,13 +30,5 @@ name = "udp"
 required-features = ["testutil"]
 
 [dependencies]
-smoltcp = { version = "0.14", default-features = false, features = [
-    "alloc",
-    "medium-ethernet",
-    "proto-ipv4",
-    "socket-tcp",
-    "socket-udp",
-    "socket-dhcpv4",
-] }
 raven-abi = { path = "../raven-abi" }
-raven-tcpip = { path = "../raven-tcpip", optional = true }
+raven-tcpip = { path = "../raven-tcpip" }
