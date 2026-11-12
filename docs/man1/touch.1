@@ -14,8 +14,8 @@ The
 .Nm
 utility creates each missing
 .Ar file .
-For an existing file it opens the file for writing and truncates it to its current size, which
-asks the filesystem to update its timestamps.
+For an existing file it opens the file for writing and closes it; the server's timestamp update
+depends on the filesystem implementation.
 .Sh EXIT STATUS
 .Ex -std
 A usage error exits with status 2.
