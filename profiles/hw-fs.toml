@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The hw-fs profile: the K33 root boot, but the `block:` backend is the K15 virtio-blk driver's
+# `disk:0` instead of the RAM image, and the root UFS lives on the attached GPT disk.
+
+name = "hw-fs"
+
+[initfs]
+programs = [
+    { package = "raven-init", path = "/init" },
+    { package = "raven-logd", path = "/sbin/logd" },
+    { package = "raven-initfsd", path = "/sbin/initfsd" },
+    { package = "raven-ramfsd", path = "/sbin/ramfsd" },
+    { package = "raven-nulld", path = "/sbin/nulld" },
+    { package = "raven-zerod", path = "/sbin/zerod" },
+    { package = "raven-randd", path = "/sbin/randd" },
+    { package = "raven-blockd", path = "/sbin/blockd" },
+    { package = "fsd-ufs", path = "/sbin/fsd-ufs" },
+    { package = "raven-vfsd", path = "/sbin/vfsd" },
+    { package = "raven-pcid", path = "/sbin/pcid" },
+    { package = "raven-devd", path = "/sbin/devd" },
+    { package = "virtio-blk", path = "/sbin/virtio-blk" },
+]
+
+[boot]
+cmdline = "console=ttyS0 loglevel=info"
+log_level = "info"

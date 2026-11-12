@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# blockd on the virtio-blk driver's `disk:0`. The GPT scan reads the 1 MiB prefix; the disk is a
+# standard GPT that fits inside it, so no custom table is needed.
+[[initfs.files]]
+src = "profiles/hw-fs.d/blockd.manifest"
+path = "/etc/services.d/blockd.toml"

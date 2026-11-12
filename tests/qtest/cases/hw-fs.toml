@@ -1,0 +1,110 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# hw-fs boot 1: the guest mounts the fixture's UFS root from the virtio-blk disk, creates the
+# deterministic file set, fsyncs, and exits; `hw-fs2` boots the same disk again.
+
+name = "hw-fs"
+arch = "x86_64"
+profile = "hw-fs"
+timeout_secs = 300
+pre = ["sh tests/fixtures/k72-hwfs/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-drive", "if=none,id=d0,format=raw,file=build/fixtures/k72-hwfs/disk.img",
+    "-device", "virtio-blk-pci,drive=d0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^pcid: devices=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^svcd: pcid up$'
+
+[[expect]]
+regex = '^devd: matched [0-9a-f]{2}:[0-9a-f]{2}\.[0-9] vendor=0x1af4 device=0x1042 irq_line=[0-9]+ irq_pin=[0-9]+$'
+
+[[expect]]
+regex = '^devd: driver virtio-blk bar=4 size=16384$'
+
+[[expect]]
+regex = '^devd: driver virtio-blk dma bus=0x[0-9a-f]+ len=65536$'
+
+[[expect]]
+regex = '^devd: driver virtio-blk irq line=[0-9]+$'
+
+[[expect]]
+regex = '^virtio-blk: id=1af4:1042$'
+
+[[expect]]
+regex = '^virtio-blk: capacity=[0-9]+ sector_size=512 ro=0$'
+
+[[expect]]
+regex = '^virtio-blk: queue0 size=8 notify=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^blockd: remote disk=disk:0 sectors=[0-9]+ ro=0$'
+
+[[expect]]
+regex = '^blockd: gpt ok partitions=1$'
+
+[[expect]]
+regex = '^blockd: part 1 ufs-root 34\.\.[0-9]+$'
+
+[[expect]]
+regex = '^fsd-ufs: mounted block:0 partition 1 as ufs: \([0-9]+ bytes\)$'
+
+[[expect]]
+regex = '^fsd-ufs: mode=rw journal=none$'
+
+[[expect]]
+regex = '^svcd: root mounted at /root$'
+
+[[expect]]
+regex = '^svcd: root services=1 added=1$'
+
+[[expect]]
+regex = '^hw-fs: boot 1 start$'
+
+[[expect]]
+regex = '^hw-fs: mount path=/root$'
+
+[[expect]]
+regex = '^hw-fs: mkdir ok$'
+
+[[expect]]
+regex = '^hw-fs: write payload bytes=12288 checksum=0x[0-9a-f]{16}$'
+
+[[expect]]
+regex = '^hw-fs: read back ok checksum=0x[0-9a-f]{16}$'
+
+[[expect]]
+regex = '^hw-fs: fsync ok$'
+
+[[expect]]
+regex = '^hw-fs: rename payload -> payload\.renamed ok$'
+
+[[expect]]
+regex = '^hw-fs: unlink victim ok$'
+
+[[expect]]
+regex = '^hw-fs: rmdir non-empty rejected errno=[0-9]+$'
+
+[[expect]]
+regex = '^hw-fs: rmdir empty ok$'
+
+[[expect]]
+regex = '^hw-fs: boot 1 state written$'
+
+[[expect]]
+regex = '^hw-fs: boot 1 ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|hw-fs: error:'

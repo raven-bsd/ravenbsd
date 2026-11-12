@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# devd launches the virtio-blk driver once and then keeps waiting for it (the driver serves
+# `disk:` for the whole boot). The `scheme:disk` declaration is devd's readiness gate: blockd is
+# spawned only after the scheme exists, so its process namespace contains `disk:`.
+[[initfs.files]]
+src = "profiles/hw-fs.d/devd.manifest"
+path = "/etc/services.d/devd.toml"
+
+[[initfs.files]]
+src = "profiles/hw-fs.d/drivers.conf"
+path = "/etc/drivers.toml"
