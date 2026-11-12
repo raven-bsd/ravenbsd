@@ -13,7 +13,7 @@
 #[allow(clippy::arithmetic_side_effects, clippy::indexing_slicing)]
 // The shared source is audited and linted in raven-fdt-lite's own host build.
 mod imp;
-pub use imp::{Fdt, Node};
+pub use imp::{DmaWindow, Fdt, Node};
 
 #[path = "../../../../crates/raven-bootinfo-fdt/src/imp.rs"]
 #[allow(dead_code)] // Shared crate source includes helpers used by its own host tests.
@@ -101,4 +101,112 @@ pub fn platform(base: u64, len: u64) -> Platform {
         Some(fdt) => platform_from_fdt(&fdt),
         None => Platform::qemu_virt(),
     }
+}
+
+/// The firmware DTB bytes through the HHDM, if the boot handoff carried one.
+///
+/// The Pi path re-reads the DTB after paging init (the RAM copy is reserved), so this is the
+/// same range [`dtb`] accepts. A missing or oversized DTB returns `None`.
+pub fn dtb_slice() -> Option<&'static [u8]> {
+    // SAFETY: paging published the copied BootInfo during init and it is immutable afterwards.
+    let info = unsafe { &*crate::memory::paging::boot_info_ptr() };
+    if info.dtb.base == 0 || info.dtb.len == 0 || info.dtb.len > MAX_DTB_BYTES {
+        return None;
+    }
+    let virtual_base = HHDM_BASE.checked_add(info.dtb.base)?;
+    let length = usize::try_from(info.dtb.len).ok()?;
+    // SAFETY: the firmware DTB range is mapped through the HHDM and only read through the slice.
+    Some(unsafe { core::slice::from_raw_parts(virtual_base as *const u8, length) })
+}
+
+/// The nearest DMA window of the Pi 4 `/soc` bus.
+///
+/// QEMU `virt` has no `dma-ranges`, and AAVMF exposes no DTB, so both return `None` and the
+/// identity domain stays in force.
+pub fn platform_dma_window() -> Option<DmaWindow> {
+    // SAFETY: paging published the copied BootInfo during init and it is immutable afterwards.
+    let boot_info = unsafe { &*crate::memory::paging::boot_info_ptr() };
+    let fdt = dtb(boot_info.dtb.base, boot_info.dtb.len)?;
+    for path in [
+        "/soc/mailbox@7e00b880",
+        "/soc/rng@7e104000",
+        "/emmc2bus/mmc@7e340000",
+        "/scb/ethernet@7d580000",
+    ] {
+        if let Some(window) = fdt.dma_window_for(path)
+            && window.size != 0
+        {
+            return Some(window);
+        }
+    }
+    None
+}
+
+/// The trigger/polarity of one GIC SPI.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SpiRoute {
+    /// True for a level-sensitive line, false for an edge-triggered one.
+    pub level: bool,
+    /// True when the device drives the line active-low.
+    pub active_low: bool,
+}
+
+/// Find the route of the GIC interrupt `spi` in the live device tree, or the `virt` fallback.
+///
+/// `spi` is the GIC interrupt id (32..1019). The device tree numbers SPIs from zero, so the
+/// lookup matches `spi - 32` against the binding's second cell. The fallback covers the UEFI boot
+/// path, where AAVMF exposes no DTB: UART0/RTC/GPIO use level lines and the virtio-mmio slots are
+/// edge-triggered. An unknown line defaults to level, which is the GIC reset configuration.
+pub fn spi_route(spi: u32) -> SpiRoute {
+    // SAFETY: paging published the copied BootInfo during init and it is immutable afterwards.
+    let boot_info = unsafe { &*crate::memory::paging::boot_info_ptr() };
+    if let Some(fdt) = dtb(boot_info.dtb.base, boot_info.dtb.len)
+        && let Some(root) = fdt.root()
+        && let Some(route) = scan_spi(&root, spi)
+    {
+        return route;
+    }
+    fallback_spi_route(spi)
+}
+
+fn fallback_spi_route(spi: u32) -> SpiRoute {
+    let spi_number = spi.saturating_sub(32);
+    let level = !(16..48).contains(&spi_number);
+    SpiRoute {
+        level,
+        active_low: false,
+    }
+}
+
+fn scan_spi(node: &Node<'_>, spi: u32) -> Option<SpiRoute> {
+    if let Some(value) = node.property("interrupts") {
+        // The GIC binding uses three cells per interrupt: type (0 = SPI, 1 = PPI), the zero-based
+        // SPI number, and flags. The caller passes the GIC id, which is SPI + 32.
+        let wanted = spi.saturating_sub(32);
+        for chunk in value.chunks_exact(12) {
+            let kind = be_u32(chunk, 0)?;
+            let number = be_u32(chunk, 4)?;
+            let flags = be_u32(chunk, 8)?;
+            if kind == 0 && number == wanted {
+                return Some(SpiRoute {
+                    level: flags & 1 == 0,
+                    active_low: flags & 2 != 0,
+                });
+            }
+        }
+    }
+    for child in node.children() {
+        if let Some(route) = scan_spi(&child, spi) {
+            return Some(route);
+        }
+    }
+    None
+}
+
+fn be_u32(bytes: &[u8], offset: usize) -> Option<u32> {
+    let end = offset.checked_add(4)?;
+    let slice = bytes.get(offset..end)?;
+    let mut word = [0u8; 4];
+    word.copy_from_slice(slice);
+    Some(u32::from_be_bytes(word))
 }

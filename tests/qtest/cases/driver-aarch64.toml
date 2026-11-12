@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "driver-aarch64"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/s21d-aarch64/build.sh"]
+initfs = "build/fixtures/s21d-aarch64/initfs.img"
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = ["-device", "edu"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^s21d: mmio id=0x010000ed$'
+
+[[expect]]
+regex = '^s21d: dma bus=0x[0-9a-f]+ len=1048576$'
+
+[[expect]]
+regex = '^s21d: irq spi=34 count=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^s21d: teardown ok$'
+
+[[expect]]
+regex = '^s21d: negatives ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

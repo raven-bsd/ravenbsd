@@ -59,13 +59,9 @@ pub fn clone_transferable(
         Object::Timer(object) => Object::Timer(Arc::clone(object)),
         Object::UserEvent(object) => Object::UserEvent(Arc::clone(object)),
         Object::RootDevice => Object::RootDevice,
-        #[cfg(target_arch = "x86_64")]
         Object::MmioRegion(object) => Object::MmioRegion(Arc::clone(object)),
-        #[cfg(target_arch = "x86_64")]
         Object::BootBlob(object) => Object::BootBlob(Arc::clone(object)),
-        #[cfg(target_arch = "x86_64")]
         Object::DmaBuffer(object) => Object::DmaBuffer(Arc::clone(object)),
-        #[cfg(target_arch = "x86_64")]
         Object::Irq(object) => Object::Irq(Arc::clone(object)),
         #[cfg(target_arch = "x86_64")]
         Object::SchemeFile(object) => Object::SchemeFile(Arc::clone(object)),

@@ -10,9 +10,7 @@ use raven_abi::errno::Errno;
 use raven_abi::types::Rights;
 use raven_handles::HandleTable;
 
-#[cfg(target_arch = "x86_64")]
 use crate::driver::DmaBuffer;
-#[cfg(target_arch = "x86_64")]
 use crate::driver::irq::Irq;
 use crate::event::{EventQueue, Timer, UserEvent};
 #[cfg(target_arch = "x86_64")]
@@ -46,7 +44,6 @@ impl MemObject {
     }
 
     /// Allocate page-rounded frames and copy `bytes` into them. Padding stays zeroed.
-    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S21a boot blobs are x86-64.
     pub fn from_bytes(bytes: &[u8]) -> Result<Arc<MemObject>, Errno> {
         let pages = bytes.len().div_ceil(frame::PAGE_SIZE as usize);
         let pages = u64::try_from(pages.max(1)).map_err(|_| Errno::EINVAL)?;
@@ -100,7 +97,6 @@ impl Drop for MemObject {
 }
 
 /// A device-memory window a driver can map (`MMIO_CREATE`). Immutable after creation.
-#[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S21a implements the device syscalls on x86-64.
 pub struct MmioRegion {
     /// Physical start address (page aligned).
     phys: u64,
@@ -112,25 +108,21 @@ pub struct MmioRegion {
 
 impl MmioRegion {
     /// Construct a region. Callers must have validated the range.
-    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S21a is x86-64.
     pub const fn new(phys: u64, len: u64, attrs: u32) -> Self {
         Self { phys, len, attrs }
     }
 
     /// Physical start address.
-    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S21a is x86-64.
     pub const fn phys(&self) -> u64 {
         self.phys
     }
 
     /// Length in bytes.
-    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S21a is x86-64.
     pub const fn len(&self) -> u64 {
         self.len
     }
 
     /// Creation attributes.
-    #[cfg_attr(target_arch = "aarch64", allow(dead_code))] // S21a is x86-64.
     #[allow(dead_code)] // Reported to drivers by later tickets.
     pub const fn attrs(&self) -> u32 {
         self.attrs
@@ -160,16 +152,12 @@ pub enum Object {
     /// The root device capability held by the first process (`Handle::ROOT_DEVICE`).
     RootDevice,
     /// A device-memory window created by `MMIO_CREATE`.
-    #[cfg(target_arch = "x86_64")]
     MmioRegion(Arc<MmioRegion>),
     /// A read-only boot-time blob (`BOOT_BLOB`).
-    #[cfg(target_arch = "x86_64")]
     BootBlob(Arc<MemObject>),
     /// A physically contiguous device buffer (`DMA_ALLOC`).
-    #[cfg(target_arch = "x86_64")]
     DmaBuffer(Arc<DmaBuffer>),
     /// A device interrupt source (`IRQ_CREATE`).
-    #[cfg(target_arch = "x86_64")]
     Irq(Arc<Irq>),
     /// An open scheme file.
     #[cfg(target_arch = "x86_64")]

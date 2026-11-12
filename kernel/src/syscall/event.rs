@@ -306,7 +306,6 @@ fn queue_from_handle(
 fn source_from_handle(process: &Arc<process::Process>, handle: Handle) -> Result<(), Errno> {
     match process.handles.lock().get(handle, Rights::READ)? {
         Object::Timer(_) | Object::UserEvent(_) | Object::Process(_) => Ok(()),
-        #[cfg(target_arch = "x86_64")]
         Object::Irq(_) => Ok(()),
         #[cfg(target_arch = "x86_64")]
         Object::SchemeFile(_) | Object::SchemeServer(_) => Ok(()),
@@ -319,7 +318,6 @@ fn readiness(process: &Arc<process::Process>, handle: Handle) -> u32 {
     match table.get(handle, Rights::READ) {
         Ok(Object::Timer(timer)) if timer.peek(time::now_ns()) => event::SIGNALED,
         Ok(Object::UserEvent(event)) if event.ready() => event::SIGNALED,
-        #[cfg(target_arch = "x86_64")]
         Ok(Object::Irq(irq)) if irq.pending() != 0 => event::SIGNALED,
         Ok(Object::Process(target)) if *target.state.lock() == ProcessState::Exited => {
             event::SIGNALED
