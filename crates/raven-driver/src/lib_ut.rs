@@ -114,7 +114,11 @@ fn an_empty_region_refuses_everything() {
 }
 
 fn config_with_header(vendor: u16, device: u16, capability: Option<u8>) -> Window {
-    let mut window = Window::new(CONFIG_LEN);
+    config_with_header_size(CONFIG_LEN, vendor, device, capability)
+}
+
+fn config_with_header_size(len: usize, vendor: u16, device: u16, capability: Option<u8>) -> Window {
+    let mut window = Window::new(len);
     window.bytes[0..2].copy_from_slice(&vendor.to_le_bytes());
     window.bytes[2..4].copy_from_slice(&device.to_le_bytes());
     window.bytes[0x0A] = 0x00;
@@ -164,6 +168,47 @@ fn a_capability_chain_is_walked_in_order() {
 }
 
 #[test]
+fn a_prepended_descending_capability_chain_is_walked_in_order() {
+    let mut window = config_with_header(0x1AF4, 0x1000, Some(0x80));
+    window.bytes[0x80] = 0x11; // MSI-X at the highest offset
+    window.bytes[0x81] = 0x60;
+    window.bytes[0x60] = 0x09; // vendor-specific in the middle
+    window.bytes[0x61] = 0x40;
+    window.bytes[0x40] = 0x05; // MSI at the lowest offset
+    window.bytes[0x41] = 0x00;
+    let config = window.config();
+    let list = capabilities(&config).unwrap();
+    assert_eq!(list.len(), 3);
+    let seen: Vec<(u8, u8)> = list.iter().map(|cap| (cap.id, cap.offset)).collect();
+    assert_eq!(seen, vec![(0x11, 0x80), (0x09, 0x60), (0x05, 0x40)]);
+}
+
+#[test]
+fn a_single_capability_is_walked() {
+    let mut window = config_with_header(0x1AF4, 0x1000, Some(0x40));
+    window.bytes[0x40] = 0x11;
+    window.bytes[0x41] = 0x00;
+    let config = window.config();
+    let list = capabilities(&config).unwrap();
+    assert_eq!(list.len(), 1);
+    assert_eq!(list.get(0).map(|cap| cap.offset), Some(0x40));
+}
+
+#[test]
+fn a_two_entry_capability_cycle_ends_after_both_entries() {
+    let mut window = config_with_header(0x1AF4, 0x1000, Some(0x40));
+    window.bytes[0x40] = 0x11;
+    window.bytes[0x41] = 0x60;
+    window.bytes[0x60] = 0x09;
+    window.bytes[0x61] = 0x40;
+    let config = window.config();
+    let list = capabilities(&config).unwrap();
+    assert_eq!(list.len(), 2);
+    assert_eq!(list.get(0).map(|cap| cap.offset), Some(0x40));
+    assert_eq!(list.get(1).map(|cap| cap.offset), Some(0x60));
+}
+
+#[test]
 fn a_cyclic_capability_chain_ends() {
     let mut window = config_with_header(0x1AF4, 0x1000, Some(0x40));
     window.bytes[0x40] = 0x11;
@@ -171,6 +216,15 @@ fn a_cyclic_capability_chain_ends() {
     let config = window.config();
     let list = capabilities(&config).unwrap();
     assert_eq!(list.len(), 1);
+}
+
+#[test]
+fn a_next_pointer_outside_the_mapped_config_region_keeps_the_error() {
+    let mut window = config_with_header_size(0x80, 0x1AF4, 0x1000, Some(0x40));
+    window.bytes[0x40] = 0x11;
+    window.bytes[0x41] = 0x80; // past the 0x80-byte mapping
+    let config = window.config();
+    assert!(matches!(capabilities(&config), Err(AccessError::Bounds)));
 }
 
 #[test]

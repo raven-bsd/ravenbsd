@@ -347,28 +347,43 @@ impl Default for CapabilityList {
 
 /// Walk at most [`MAX_CAPABILITIES`] entries, starting at the first one.
 ///
-/// The list is capped and cycle-protected: a next pointer that does not move forward ends the
-/// walk instead of looping forever.
+/// PCI capability lists are singly linked and need not be numerically ordered: firmware and
+/// emulators can prepend entries, so a valid chain may run from a high offset to a low one. The
+/// walk therefore follows every `next` pointer in list order. It is bounded by
+/// [`MAX_CAPABILITIES`] and cycle-safe without allocation: one bit per possible 8-bit
+/// configuration-space offset is marked before the entry is visited. A zero next pointer, a
+/// visited offset, a malformed entry or a next pointer that leaves the mapped configuration
+/// region ends the walk (an out-of-range read keeps the existing [`AccessError`]).
 pub fn capabilities(region: &ConfigRegion) -> Result<CapabilityList, AccessError> {
     let mut found = CapabilityList::new();
     let Some(mut current) = region.first_capability()? else {
         return Ok(found);
     };
-    let mut offset = current.offset;
+    let mut visited = [0u64; 4];
     loop {
-        if !found.push(current) {
+        if !mark_visited(&mut visited, current.offset) || !found.push(current) {
             break;
         }
-        if current.next == 0 || usize::from(current.next) <= usize::from(offset) {
+        if current.next == 0 {
             break;
         }
-        offset = current.next;
-        match region.capability(offset)? {
+        match region.capability(current.next)? {
             Some(next) => current = next,
             None => break,
         }
     }
     Ok(found)
+}
+
+/// Mark one 8-bit configuration offset; false when it was already visited.
+fn mark_visited(visited: &mut [u64; 4], offset: u8) -> bool {
+    let index = (offset as usize) / 64;
+    let mask = 1u64 << (offset % 64);
+    if visited[index] & mask != 0 {
+        return false;
+    }
+    visited[index] |= mask;
+    true
 }
 
 /// A writable DMA buffer mapping.
