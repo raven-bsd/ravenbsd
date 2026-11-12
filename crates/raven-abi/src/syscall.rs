@@ -74,6 +74,11 @@ syscalls! {
     PROC_CREATE = 0x30;
     /// `proc_wait(proc: Handle, out_code: *mut i32) -> 0` blocks until the process has exited and stores its exit code.
     PROC_WAIT = 0x31;
+    /// `proc_terminate(proc: Handle, code: i32) -> 0` terminates `proc` and all its threads; requires
+    /// `Rights::SIGNAL` on the process handle. The exit code is stored for `PROC_WAIT`. `EBADF` for an
+    /// invalid/stale handle, `EPERM` without `SIGNAL`, `ESRCH` when the process is already terminal.
+    /// Terminating self is allowed and behaves like `exit(code)`. See contract C16.
+    PROC_TERMINATE = 0x32;
 
     /// `map(proc: Handle, memobj: Handle, offset: usize, addr: usize, len: usize, flags: usize) -> addr`
     /// maps `len` bytes (page multiple) of `memobj` (or fresh zeroed memory when `memobj ==
