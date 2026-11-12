@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.programs]]
+package = "raven-cat"
+path = "/bin/cat"
+
+[[initfs.programs]]
+package = "raven-ls"
+path = "/bin/ls"
+
+[[initfs.programs]]
+package = "raven-mkdir"
+path = "/bin/mkdir"
+
+[[initfs.programs]]
+package = "raven-rmdir"
+path = "/bin/rmdir"
+
+[[initfs.programs]]
+package = "raven-rm"
+path = "/bin/rm"
+
+[[initfs.programs]]
+package = "raven-mv"
+path = "/bin/mv"
+
+[[initfs.programs]]
+package = "raven-cp"
+path = "/bin/cp"
+
+[[initfs.programs]]
+package = "raven-touch"
+path = "/bin/touch"
+
+[[initfs.programs]]
+package = "raven-stat"
+path = "/bin/stat"
+
+[[initfs.programs]]
+package = "raven-df"
+path = "/bin/df"

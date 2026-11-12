@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.files]]
+src = "build/fixtures/file-tools/tooltest"
+path = "/bin/raven-tooltest"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "profiles/file-tools-test.d/tooltest.manifest"
+path = "/etc/services.d/tooltest.toml"

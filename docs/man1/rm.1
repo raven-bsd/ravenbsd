@@ -1,0 +1,36 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt RM 1
+.Os RavenBSD
+.Sh NAME
+.Nm rm
+.Nd remove files and directories
+.Sh SYNOPSIS
+.Nm
+.Op Fl rf
+.Ar path ...
+.Sh DESCRIPTION
+The
+.Nm
+utility removes each
+.Ar path .
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl f
+Ignore a missing operand.
+.It Fl r
+Recurse into directories and remove their contents before the directory itself.
+.El
+.Pp
+A directory without
+.Fl r
+is an error.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr rmdir 1
+.Sh STANDARDS
+RavenBSD.

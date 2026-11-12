@@ -1,0 +1,28 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt DF 1
+.Os RavenBSD
+.Sh NAME
+.Nm df
+.Nd display filesystem statistics
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+The
+.Nm
+utility requests the root filesystem's
+.Dv STATFS
+record and prints the total, used and available space in 1 KiB blocks, the used percentage and
+the mount point.
+.Pp
+The current K60
+.Dv STATFS
+call has no path argument, so only the root mount is reported.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr stat 1
+.Sh STANDARDS
+RavenBSD.

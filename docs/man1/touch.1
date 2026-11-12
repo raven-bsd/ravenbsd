@@ -1,0 +1,25 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt TOUCH 1
+.Os RavenBSD
+.Sh NAME
+.Nm touch
+.Nd create files or update timestamps
+.Sh SYNOPSIS
+.Nm
+.Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility creates each missing
+.Ar file .
+For an existing file it opens the file for writing and closes it; the server's timestamp update
+depends on the filesystem implementation.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr stat 1
+.Sh STANDARDS
+RavenBSD.

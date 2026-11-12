@@ -52,6 +52,16 @@ members = [
     "userland/bin/uname",
     "userland/bin/echo",
     "userland/bin/svcctl",
+    "userland/bin/cat",
+    "userland/bin/ls",
+    "userland/bin/mkdir",
+    "userland/bin/rmdir",
+    "userland/bin/rm",
+    "userland/bin/mv",
+    "userland/bin/cp",
+    "userland/bin/touch",
+    "userland/bin/stat",
+    "userland/bin/df",
     "userland/servers/logd",
     "userland/servers/sysd",
     "userland/servers/randd",
@@ -92,6 +102,33 @@ opt-level = 0
 debug = 2
 overflow-checks = true
 panic = "abort"
+
+# The 64 MiB ESP cannot hold the debug-sized shell initfs together with the ten file tools.
+# Drop debug info only for the userland runtime and its pure libraries; kernel debug info is
+# unchanged.
+[profile.dev.package."raven-rt"]
+debug = false
+
+[profile.dev.package."raven-tool-core"]
+debug = false
+
+[profile.dev.package."raven-proto-fs"]
+debug = false
+
+[profile.dev.package."raven-scheme"]
+debug = false
+
+[profile.dev.package."raven-ipc"]
+debug = false
+
+[profile.dev.package."raven-vfs-core"]
+debug = false
+
+[profile.dev.package."raven-ramfs-core"]
+debug = false
+
+[profile.dev.package."raven-svc-manifest"]
+debug = false
 
 # release: smallest binaries: size optimisation, fat LTO, one codegen unit, no unwinding, symbols stripped.
 [profile.release]
