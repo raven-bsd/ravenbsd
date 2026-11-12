@@ -115,6 +115,11 @@ fn tcp_loopback_echo_and_orderly_close() {
     );
     let id = accept(&mut netd, listener, &mut now);
     let accepted = netd.open(&alloc::format!("net:accept/{id}")).unwrap();
+    let client_local = call_socket(&mut netd, client, Call::GetSockName);
+    assert_eq!(
+        call_socket(&mut netd, accepted, Call::GetPeerName),
+        client_local
+    );
 
     assert_eq!(netd.write(client, 0, b"hello").unwrap(), 5);
     let mut buffer = [0u8; 16];
@@ -233,6 +238,8 @@ fn malformed_requests_and_unknown_files_do_not_panic() {
     assert_eq!(netd.read(999, 0, &mut response), Err(Errno::EBADF));
     assert_eq!(netd.write(999, 0, &[0]), Err(Errno::EBADF));
     assert_eq!(netd.close(999), Err(Errno::EBADF));
+    assert_eq!(netd.open("net:accept/01"), Err(Errno::EINVAL));
+    assert_eq!(netd.open("net:accept/999"), Err(Errno::ENOENT));
 }
 
 #[test]

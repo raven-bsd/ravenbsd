@@ -88,4 +88,28 @@ pub trait StackBackend {
 
     /// Time until the next poll, in milliseconds.
     fn next_poll_delay_ms(&mut self, now_ms: i64) -> Option<u64>;
+
+    /// Local endpoint of `s`, when the backend exposes one.
+    fn local_endpoint(&self, s: SocketId) -> Option<(Ipv4Addr, u16)> {
+        let _ = s;
+        None
+    }
+
+    /// Peer endpoint of `s`, when connected.
+    fn peer_endpoint(&self, s: SocketId) -> Option<(Ipv4Addr, u16)> {
+        let _ = s;
+        None
+    }
+
+    /// Apply a protocol socket option; the backend owns any unsupported-option policy.
+    fn set_socket_option(&mut self, s: SocketId, option: u32, value: i32) -> Result<(), Errno> {
+        let _ = (s, option, value);
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Read a protocol socket option.
+    fn get_socket_option(&self, s: SocketId, option: u32) -> Result<i32, Errno> {
+        let _ = (s, option);
+        Err(Errno::EOPNOTSUPP)
+    }
 }

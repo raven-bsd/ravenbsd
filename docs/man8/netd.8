@@ -51,9 +51,10 @@ message.  The supported calls are
 .Dv SHUTDOWN ,
 .Dv GETSOCKNAME ,
 .Dv GETPEERNAME ,
-.Dv SETSOCKOPT
+.Dv SETSOCKOPT ,
+.Dv GETSOCKOPT
 and
-.Dv GETSOCKOPT .
+.Dv EVENT .
 A successful
 .Dv ACCEPT
 returns a numeric socket id; the client opens
@@ -77,6 +78,29 @@ after
 .Dv CONNECT
 sets a peer.
 .Pp
+.Dv EVENT
+returns an S25
+.Dv UserEvent
+attachment in the
+.Dv CALL
+reply.  The client registers that handle in an S26 event queue and waits for
+readable, writable, accepted or closed transitions rather than retrying with
+sleeps.  The server itself blocks in
+.Dv EVQ_WAIT
+on the scheme-server handle and uses the stack's next-timer delay as the
+timeout, so stack timers still run without a heartbeat thread.
+.Pp
+.Dv TCP_NODELAY
+is applied to the native TCP socket.
+.Dv SO_REUSEADDR ,
+.Dv SO_RCVBUF
+and
+.Dv SO_SNDBUF
+are retained per socket and reported back by
+.Dv GETSOCKOPT ;
+the native stack in this revision has no per-socket bind or buffer knob, so
+those values do not alter stack behaviour yet.
+.Pp
 The control file accepts
 .Dv IfaceRequest
 messages.  In this milestone
@@ -92,11 +116,12 @@ and
 update the loopback record, while route operations return
 .Er EOPNOTSUPP .
 .Pp
-The server polls the native stack whenever it handles a request and clients
-retry a socket operation that returns
-.Er EAGAIN .
-The qtest uses a client/server pair inside one probe process, checks TCP and
-UDP bytes and orderly close, lists
+The server polls the native stack after each request and after each event
+wakeup; clients sleep only when they do not ask for a readiness event.
+The qtest uses a client/server pair inside one probe process, waits on the
+.Dv EVENT
+doorbells, checks TCP and UDP bytes, the accept path, local/peer endpoints,
+socket options and orderly close, lists
 .Dq lo ,
 restarts
 .Nm

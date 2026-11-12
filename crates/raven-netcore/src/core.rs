@@ -128,6 +128,31 @@ impl<B: StackBackend> Core<B> {
     pub fn next_poll_delay_ms(&mut self, now_ms: i64) -> Option<u64> {
         self.backend.next_poll_delay_ms(now_ms)
     }
+
+    /// Local endpoint of `socket`, when the backend exposes it.
+    pub fn local_endpoint(&self, socket: SocketId) -> Option<(Ipv4Addr, u16)> {
+        self.backend.local_endpoint(socket)
+    }
+
+    /// Peer endpoint of `socket`, when connected.
+    pub fn peer_endpoint(&self, socket: SocketId) -> Option<(Ipv4Addr, u16)> {
+        self.backend.peer_endpoint(socket)
+    }
+
+    /// Apply one protocol socket option (`1..=4`).
+    pub fn set_socket_option(
+        &mut self,
+        socket: SocketId,
+        option: u32,
+        value: i32,
+    ) -> Result<(), Errno> {
+        self.backend.set_socket_option(socket, option, value)
+    }
+
+    /// Read one protocol socket option (`1..=5`).
+    pub fn get_socket_option(&self, socket: SocketId, option: u32) -> Result<i32, Errno> {
+        self.backend.get_socket_option(socket, option)
+    }
 }
 
 impl<D: raven_tcpip::Device> Core<crate::backend::raven::RavenTcpipBackend<D>> {

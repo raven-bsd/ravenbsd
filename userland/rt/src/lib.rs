@@ -18,6 +18,7 @@ extern crate alloc as alloc_crate;
 pub mod alloc;
 pub mod args;
 pub mod entry;
+pub mod event;
 #[cfg(feature = "alloc")]
 pub mod fs;
 pub mod initfs;

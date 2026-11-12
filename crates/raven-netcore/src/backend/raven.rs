@@ -20,6 +20,7 @@ pub struct RavenTcpipBackend<D: Device> {
     listeners: BTreeMap<u16, usize>,
     pending_udp: Vec<(SocketId, Vec<u8>, (Ipv4Addr, u16))>,
     pending_udp_bytes: usize,
+    options: BTreeMap<(u32, u32), i32>,
 }
 
 impl<D: Device> RavenTcpipBackend<D> {
@@ -45,6 +46,7 @@ impl<D: Device> RavenTcpipBackend<D> {
             listeners: BTreeMap::new(),
             pending_udp: Vec::new(),
             pending_udp_bytes: 0,
+            options: BTreeMap::new(),
         }
     }
 
@@ -245,6 +247,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
         }
         self.stack.close(Self::native(s))?;
         self.closed.insert(s.0);
+        self.options.retain(|(socket, _), _| *socket != s.0);
         Ok(())
     }
 
@@ -328,6 +331,54 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
         self.stack
             .next_poll_delay(Instant::from_millis(now_ms))
             .map(|duration| duration.as_millis())
+    }
+    fn local_endpoint(&self, s: SocketId) -> Option<(Ipv4Addr, u16)> {
+        let info = self.stack.socket_info(Self::native(s)).ok()?;
+        let (address, port) = info.local;
+        match address {
+            IpAddr::V4(address) => Some((Ipv4Addr::from_octets(address.octets()), port)),
+            _ => None,
+        }
+    }
+
+    fn peer_endpoint(&self, s: SocketId) -> Option<(Ipv4Addr, u16)> {
+        let info = self.stack.socket_info(Self::native(s)).ok()?;
+        let (address, port) = info.remote?;
+        match address {
+            IpAddr::V4(address) => Some((Ipv4Addr::from_octets(address.octets()), port)),
+            _ => None,
+        }
+    }
+
+    fn set_socket_option(&mut self, s: SocketId, option: u32, value: i32) -> Result<(), Errno> {
+        if self.closed.contains(&s.0) {
+            return Err(Errno::EBADF);
+        }
+        match option {
+            // The native stack has no per-socket bind/buffer knob in this revision; retain the
+            // requested values and apply TCP_NODELAY through the stack setter.
+            1..=3 => {
+                self.options.insert((s.0, option), value);
+                Ok(())
+            }
+            4 => {
+                self.stack.set_nodelay(Self::native(s), value != 0)?;
+                self.options.insert((s.0, option), value);
+                Ok(())
+            }
+            _ => Err(Errno::EINVAL),
+        }
+    }
+
+    fn get_socket_option(&self, s: SocketId, option: u32) -> Result<i32, Errno> {
+        if self.closed.contains(&s.0) {
+            return Err(Errno::EBADF);
+        }
+        match option {
+            1..=4 => Ok(*self.options.get(&(s.0, option)).unwrap_or(&0)),
+            5 => Ok(0),
+            _ => Err(Errno::EINVAL),
+        }
     }
 }
 

@@ -163,6 +163,27 @@ impl<D: Device> Netd<D> {
         self.accepted.len()
     }
 
+    /// Socket id behind one open file, if it is a socket file with a live socket.
+    #[must_use]
+    pub fn socket_id(&self, file: u64) -> Option<SocketId> {
+        match self.files.get(&file)? {
+            File::Control => None,
+            File::Socket(socket) => socket.socket,
+        }
+    }
+
+    /// Open files currently attached to `socket`.
+    #[must_use]
+    pub fn files_for_socket(&self, socket: SocketId) -> Vec<u64> {
+        self.files
+            .iter()
+            .filter_map(|(file, state)| match state {
+                File::Socket(state) if state.socket == Some(socket) => Some(*file),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// Open `path` and return its server file id.
     pub fn open(&mut self, path: &str) -> Result<u64, Errno> {
         if self.files.len() >= MAX_OPEN_FILES {
@@ -170,10 +191,11 @@ impl<D: Device> Netd<D> {
         }
         let file = if path == "net:" {
             File::Control
-        } else if let Some(id) = path.strip_prefix("net:accept/") {
-            let id: u32 = id.parse().map_err(|_| Errno::EINVAL)?;
+        } else if let Some(id) = path::parse_accepted(path) {
             let accepted = self.accepted.remove(&id).ok_or(Errno::ENOENT)?;
             File::Socket(SocketFile::accepted(accepted))
+        } else if path.starts_with(path::ACCEPT_PREFIX) {
+            return Err(Errno::EINVAL);
         } else {
             let parsed = path::parse(path).map_err(|_| Errno::EINVAL)?;
             let endpoint = parsed.endpoint.ok_or(Errno::EINVAL)?;
@@ -382,6 +404,9 @@ impl<D: Device> Netd<D> {
             Call::GetPeerName => self.endpoint_response(file, true),
             Call::SetSockOpt { opt, value } => self.set_option(file, opt, value),
             Call::GetSockOpt { opt } => self.get_option(file, opt),
+            // The target glue creates the S26 event handle and attaches it; the pure core has no
+            // kernel handle table.
+            Call::Event => Err(Errno::EOPNOTSUPP),
         };
         match result {
             Ok(response_value) => self.write_response(response, &response_value),
@@ -408,6 +433,7 @@ impl<D: Device> Netd<D> {
                 socket.socket = Some(id);
                 socket.local = endpoint;
                 socket.bound = true;
+                self.apply_options(file);
                 Ok(Response::Ok)
             }
             Transport::Control => Err(Errno::EINVAL),
@@ -438,6 +464,7 @@ impl<D: Device> Netd<D> {
         socket.listener = true;
         socket.local.port = port;
         socket.bound = true;
+        self.apply_options(file);
         Ok(Response::Ok)
     }
 
@@ -458,12 +485,23 @@ impl<D: Device> Netd<D> {
             let _ = self.core.close(socket);
             return Err(Errno::ENFILE);
         }
+        let accepted_local = self
+            .core
+            .local_endpoint(socket)
+            .map(|(ip, port)| Endpoint {
+                ip: ip.octets(),
+                port,
+            })
+            .unwrap_or(local);
         self.accepted.insert(
             socket.0,
             Accepted {
                 socket,
-                local,
-                remote: None,
+                local: accepted_local,
+                remote: self.core.peer_endpoint(socket).map(|(ip, port)| Endpoint {
+                    ip: ip.octets(),
+                    port,
+                }),
                 transport: Transport::Tcp,
             },
         );
@@ -497,6 +535,7 @@ impl<D: Device> Netd<D> {
                 };
                 socket.socket = Some(id);
                 socket.remote = Some(endpoint);
+                self.apply_options(file);
                 Ok(Response::Ok)
             }
             Transport::Udp => {
@@ -537,26 +576,48 @@ impl<D: Device> Netd<D> {
     }
 
     fn endpoint_response(&mut self, file: u64, peer: bool) -> Result<Response, Errno> {
-        let socket = match self.files.get(&file).ok_or(Errno::EBADF)? {
-            File::Control => return Err(Errno::EINVAL),
-            File::Socket(socket) => socket,
-        };
+        let (socket_id, local, remote, peer_endpoint) =
+            match self.files.get(&file).ok_or(Errno::EBADF)? {
+                File::Control => return Err(Errno::EINVAL),
+                File::Socket(socket) => (socket.socket, socket.local, socket.remote, socket.peer),
+            };
+        if let Some(id) = socket_id {
+            let endpoint = if peer {
+                self.core.peer_endpoint(id)
+            } else {
+                self.core.local_endpoint(id)
+            };
+            if let Some((ip, port)) = endpoint {
+                return Ok(Response::Endpoint(Endpoint {
+                    ip: ip.octets(),
+                    port,
+                }));
+            }
+        }
         let endpoint = if peer {
-            socket.remote.or(socket.peer).ok_or(Errno::ENOTCONN)?
+            remote.or(peer_endpoint).ok_or(Errno::ENOTCONN)?
         } else {
-            socket.local
+            local
         };
         Ok(Response::Endpoint(endpoint))
     }
 
     fn set_option(&mut self, file: u64, opt: SockOpt, value: i32) -> Result<Response, Errno> {
-        let socket = match self.files.get_mut(&file).ok_or(Errno::EBADF)? {
+        let socket_id = match self.files.get(&file).ok_or(Errno::EBADF)? {
             File::Control => return Err(Errno::EINVAL),
-            File::Socket(socket) => socket,
+            File::Socket(socket) => socket.socket,
         };
         if !opt.is_writable() || value < 0 {
             return Err(Errno::EINVAL);
         }
+        if let Some(id) = socket_id {
+            self.core
+                .set_socket_option(id, u32::from(opt.code()), value)?;
+        }
+        let socket = match self.files.get_mut(&file).ok_or(Errno::EBADF)? {
+            File::Socket(socket) => socket,
+            File::Control => return Err(Errno::EINVAL),
+        };
         match opt {
             SockOpt::ReuseAddr => socket.reuse_addr = value != 0,
             SockOpt::RcvBuf => socket.rcvbuf = value,
@@ -572,6 +633,14 @@ impl<D: Device> Netd<D> {
             File::Control => return Err(Errno::EINVAL),
             File::Socket(socket) => socket,
         };
+        if let Some(id) = socket.socket
+            && opt != SockOpt::Error
+        {
+            return self
+                .core
+                .get_socket_option(id, u32::from(opt.code()))
+                .map(Response::Value);
+        }
         let value = match opt {
             SockOpt::ReuseAddr => i32::from(socket.reuse_addr),
             SockOpt::RcvBuf => socket.rcvbuf,
@@ -580,6 +649,26 @@ impl<D: Device> Netd<D> {
             SockOpt::Error => 0,
         };
         Ok(Response::Value(value))
+    }
+
+    fn apply_options(&mut self, file: u64) {
+        let Some(File::Socket(socket)) = self.files.get(&file) else {
+            return;
+        };
+        let Some(id) = socket.socket else {
+            return;
+        };
+        let values = [
+            (SockOpt::ReuseAddr, i32::from(socket.reuse_addr)),
+            (SockOpt::RcvBuf, socket.rcvbuf),
+            (SockOpt::SndBuf, socket.sndbuf),
+            (SockOpt::TcpNoDelay, i32::from(socket.nodelay)),
+        ];
+        for (option, value) in values {
+            let _ = self
+                .core
+                .set_socket_option(id, u32::from(option.code()), value);
+        }
     }
 
     fn control_call(&mut self, request: &[u8], response: &mut [u8]) -> Result<usize, Errno> {

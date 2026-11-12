@@ -20,8 +20,14 @@ golden test in `tests/golden.rs` or in the module tests.
 * Every length is bounded before it is used: scheme path 64 bytes, interface name 16 bytes,
   `READ`/`WRITE` payload and UDP datagram 65 535 bytes, `LISTEN` backlog 4096, ring entries 4096,
   shared region 16 MiB.
-* Handles never travel inside a message. `OPEN` and `ACCEPT` transfer the new handle through the
-  kernel's handle mechanism (S11/S25); the message only carries the numeric socket id.
+* Handles never travel inside the wire body. `OPEN` returns a kernel SchemeFile; `ACCEPT` returns
+  a numeric socket id, and the client then opens `net:accept/<id>` to materialise that socket's
+  SchemeFile. This is the ABI-v1 accept path because the kernel has no server-side SchemeFile
+  create primitive (follow-up for the ABI/S25 contract). A `CALL` reply may carry an S25
+  attachment, used by the readiness-event operation below.
+* Accepted-socket path: `net:accept/<decimal-u32>`; the parser is
+  `raven_proto_net::path::parse_accepted` and the prefix is
+  `raven_proto_net::path::ACCEPT_PREFIX`.
 * Errno values in responses are `raven-abi` errno numbers (Linux values, DR-13).
 * Decoders consume exactly the whole input; trailing bytes are an error, so a short read is never
   silently accepted.
@@ -66,13 +72,14 @@ version  kind  ep len        ip        port  d  n  s
 |---|---|---|
 | 1 | BIND | endpoint (6) |
 | 2 | LISTEN | `backlog: u16` (`1..=4096`) |
-| 3 | ACCEPT | none; the kernel attaches the new handle |
+| 3 | ACCEPT | none; returns `SOCKET(id)` and the client opens `net:accept/<id>` |
 | 4 | CONNECT | endpoint (6) |
 | 5 | SHUTDOWN | `how: u8` (0 read, 1 write, 2 both) |
 | 6 | GETSOCKNAME | none |
 | 7 | GETPEERNAME | none |
 | 8 | SETSOCKOPT | `opt: u16`, `value: i32` (non-negative) |
 | 9 | GETSOCKOPT | `opt: u16` |
+| 10 | EVENT | none; reply is `OK` inline data plus one S25 `UserEvent` attachment |
 
 Socket option ids (native protocol ids, not Linux `SOL_SOCKET` numbers):
 
@@ -106,6 +113,9 @@ Socket option ids (native protocol ids, not Linux `SOL_SOCKET` numbers):
 
 `EAGAIN` (11) is therefore `01 00 0b 00 06 00`. A tag other than ERR with a non-zero status, or
 ERR with status 0, is malformed.
+`EVENT` replies with `OK` followed by one S25 attachment pair `[u32 user_event][u32 rights]`; the
+client registers the transferred UserEvent in an S26 event queue with `SIGNALED|EDGE` and waits
+for readable/writable/accepted/closed transitions instead of polling.
 
 ## Interface control
 
