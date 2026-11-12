@@ -124,6 +124,7 @@ members = [
     "tests/fixtures/k15-blk/probe",
     "tests/fixtures/k72-hwfs/mkdisk",
     "tests/fixtures/k72-hwfs/probe",
+    "tests/fixtures/b12b-net/probe",
     "userland/drivers/virtio-net",
     "userland/drivers/virtio-blk",
     "tools/bench-host",

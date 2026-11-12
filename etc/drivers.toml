@@ -41,3 +41,13 @@ device = 0x1042
 exec = "/sbin/virtio-blk"
 args = ["bar=4", "resources=dma+irq"]
 cycles = 1
+
+# The persistent network frame service. `serve` selects the long-running `nic:` service; without
+# it (the B13b test profile) the driver keeps the old one-shot ARP self-test for that qtest.
+[[driver]]
+name = "virtio-net"
+vendor = 0x1af4
+device = 0x1041
+exec = "/sbin/virtio-net"
+args = ["bar=4", "resources=dma+irq", "serve"]
+cycles = 1

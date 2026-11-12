@@ -349,6 +349,17 @@ name = "raven-audio-core"
 version = "0.1.0"
 
 [[package]]
+name = "raven-b12b-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+ "virtio-net",
+]
+
+[[package]]
 name = "raven-b13a-driver"
 version = "0.1.0"
 dependencies = [
@@ -1900,7 +1911,10 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-driver",
+ "raven-proto-fs",
+ "raven-proto-net",
  "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
