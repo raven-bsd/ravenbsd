@@ -263,7 +263,7 @@ reject = "tcp.option_truncated"
 [[case]]
 name = "tcp-bad-data-offset-high"
 proto = "tcp"
-bytes = "9c 40 00 50 00 00 00 01 00 00 00 00 f0 02 ff ff 86 f1 00 00"
+bytes = "9c 40 00 50 00 00 00 01 00 00 00 00 f0 02 ff ff 86 f1 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
 reject = "tcp.data_offset"
 
 [[case]]
