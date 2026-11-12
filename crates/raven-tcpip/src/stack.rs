@@ -194,6 +194,11 @@ pub struct Stack<D: Device> {
     pub(crate) next_ephemeral: u16,
     pub(crate) next_isn: u32,
     pub(crate) option_override: Option<Vec<u8>>,
+    #[allow(dead_code)] // Used when the tcp-md5 feature is enabled.
+    pub(crate) md5_keys: BTreeMap<u16, Vec<u8>>,
+    #[allow(dead_code)] // Used when the tcp-ao feature is enabled.
+    pub(crate) ao_keys: BTreeMap<u16, Vec<crate::signature::AoKey>>,
+    pub(crate) signature_failures: usize,
     pub(crate) icmp_tokens: u32,
     pub(crate) icmp_last_refill: Instant,
     pub(crate) icmp_errors_sent: usize,
@@ -265,6 +270,9 @@ impl<D: Device> Stack<D> {
             next_ephemeral,
             next_isn,
             option_override: None,
+            md5_keys: BTreeMap::new(),
+            ao_keys: BTreeMap::new(),
+            signature_failures: 0,
             icmp_tokens: config.icmp_error_burst,
             icmp_last_refill: now,
             icmp_errors_sent: 0,

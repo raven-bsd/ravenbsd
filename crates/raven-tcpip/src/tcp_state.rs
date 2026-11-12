@@ -537,6 +537,68 @@ impl<D: Device> Stack<D> {
         }
     }
 
+    /// Configure an MD5 key for a TCP connection.
+    #[cfg(feature = "tcp-md5")]
+    pub fn set_md5_key(&mut self, socket: SocketId, key: Option<&[u8]>) -> Result<(), Errno> {
+        let record = self.sockets.record(socket)?;
+        let Kind::Tcp(connection) = &record.kind else {
+            return Err(Errno::ENOTSOCK);
+        };
+        let port = connection.local_port;
+        match key {
+            Some(key) => {
+                self.md5_keys.insert(port, key.to_vec());
+            }
+            None => {
+                self.md5_keys.remove(&port);
+            }
+        }
+        Ok(())
+    }
+
+    /// Configure an MD5 key for a TCP connection.
+    #[cfg(not(feature = "tcp-md5"))]
+    pub fn set_md5_key(&mut self, _socket: SocketId, _key: Option<&[u8]>) -> Result<(), Errno> {
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Configure TCP-AO keys for a TCP connection.
+    #[cfg(feature = "tcp-ao")]
+    pub fn set_ao_keys(
+        &mut self,
+        socket: SocketId,
+        keys: &[crate::signature::AoKey],
+    ) -> Result<(), Errno> {
+        let record = self.sockets.record(socket)?;
+        let Kind::Tcp(connection) = &record.kind else {
+            return Err(Errno::ENOTSOCK);
+        };
+        let port = connection.local_port;
+        if keys.is_empty() {
+            self.ao_keys.remove(&port);
+        } else {
+            self.ao_keys.insert(port, keys.to_vec());
+        }
+        Ok(())
+    }
+
+    /// Configure TCP-AO keys for a TCP connection.
+    #[cfg(not(feature = "tcp-ao"))]
+    pub fn set_ao_keys(
+        &mut self,
+        _socket: SocketId,
+        _keys: &[crate::signature::AoKey],
+    ) -> Result<(), Errno> {
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Signature verification failures (host tests).
+    #[cfg(any(test, feature = "testutil"))]
+    #[must_use]
+    pub fn test_signature_failures(&self) -> usize {
+        self.signature_failures
+    }
+
     /// The most recent urgent pointer delivered out-of-band on this socket.
     pub fn tcp_urgent(&self, socket: SocketId) -> Result<Option<u16>, Errno> {
         match &self.sockets.record(socket)?.kind {
@@ -737,6 +799,46 @@ impl<D: Device> Stack<D> {
         };
         let source_port = packet.src_port();
         let destination_port = packet.dst_port();
+        #[cfg(feature = "tcp-md5")]
+        if let Some(key) = self.md5_keys.get(&destination_port).cloned() {
+            let mut digest = None;
+            for option in packet.options().flatten() {
+                if let TcpOption::Md5 { digest: value } = option {
+                    digest = Some(value);
+                }
+            }
+            let Some(received) = digest else {
+                self.signature_failures = self.signature_failures.saturating_add(1);
+                self.drops = self.drops.saturating_add(1);
+                return;
+            };
+            let mut header = [0u8; 20];
+            header.copy_from_slice(&payload[..20]);
+            header[16] = 0;
+            header[17] = 0;
+            let mut input = signature_pseudo(
+                IpAddr::V4(match (source, destination) {
+                    (IpAddr::V4(_), IpAddr::V4(value)) => value,
+                    _ => Ipv4Addr::UNSPECIFIED,
+                }),
+                IpAddr::V4(match (source, destination) {
+                    (IpAddr::V4(value), IpAddr::V4(_)) => value,
+                    _ => Ipv4Addr::UNSPECIFIED,
+                }),
+                payload.len(),
+            );
+            input.clear();
+            input = signature_pseudo(source, destination, payload.len());
+            input.extend_from_slice(&header);
+            input.extend_from_slice(packet.payload());
+            input.extend_from_slice(&key);
+            let expected = crate::signature::md5(&input);
+            if received != expected {
+                self.signature_failures = self.signature_failures.saturating_add(1);
+                self.drops = self.drops.saturating_add(1);
+                return;
+            }
+        }
         if segment.flags.urg() {
             #[cfg(any(test, feature = "testutil"))]
             {
@@ -1531,13 +1633,39 @@ impl<D: Device> Stack<D> {
             urgent_pointer: 0,
         };
         let default_mss = [2u8, 4, 5, 0xb4];
-        let option_bytes: Vec<u8> = if let Some(options) = self.option_override.take() {
+        #[allow(unused_mut)]
+        let mut option_bytes: Vec<u8> = if let Some(options) = self.option_override.take() {
             options
         } else if options {
             default_mss.to_vec()
         } else {
             Vec::new()
         };
+        #[cfg(feature = "tcp-md5")]
+        let md5_key = self.md5_keys.get(&local_port).cloned();
+        #[cfg(feature = "tcp-md5")]
+        if md5_key.is_some() {
+            option_bytes.extend_from_slice(&[19, 18]);
+            option_bytes.extend_from_slice(&[0u8; 16]);
+        }
+        #[cfg(feature = "tcp-ao")]
+        let ao_key = self
+            .ao_keys
+            .get(&local_port)
+            .and_then(|keys| keys.first())
+            .cloned();
+        #[cfg(feature = "tcp-ao")]
+        if let Some(key) = &ao_key {
+            let mac_len = match key.algorithm {
+                crate::signature::AoAlgorithm::HmacSha1 => 20,
+                crate::signature::AoAlgorithm::HmacSha256 => 32,
+            };
+            option_bytes.push(29);
+            option_bytes.push(u8::try_from(4 + mac_len).unwrap_or(40));
+            option_bytes.push(key.key_id);
+            option_bytes.push(0);
+            option_bytes.extend_from_slice(&vec![0u8; mac_len]);
+        }
         let padded_options = (option_bytes.len() + 3) & !3;
         let mut segment = vec![0u8; 20 + padded_options + payload.len()];
         let context = match (local, remote) {
@@ -1555,6 +1683,58 @@ impl<D: Device> Stack<D> {
                     .map_err(|_| Errno::EINVAL)?;
             builder.payload_mut().copy_from_slice(payload);
             builder.finish();
+        }
+        #[cfg(feature = "tcp-md5")]
+        if let Some(key) = md5_key {
+            let md5_offset = 20 + option_bytes.len().saturating_sub(18);
+            segment[16] = 0;
+            segment[17] = 0;
+            if let Some(slot) = segment.get_mut(md5_offset + 2..md5_offset + 18) {
+                slot.fill(0);
+            }
+            let mut input = signature_pseudo(local, remote, segment.len());
+            input.extend_from_slice(&segment[..20]);
+            input.extend_from_slice(payload);
+            input.extend_from_slice(&key);
+            let digest = crate::signature::md5(&input);
+            if let Some(slot) = segment.get_mut(md5_offset + 2..md5_offset + 18) {
+                slot.copy_from_slice(&digest);
+            }
+            let checksum = context.compute(6, &segment);
+            if let Some(field) = segment.get_mut(16..18) {
+                field.copy_from_slice(&checksum.to_be_bytes());
+            }
+        }
+        #[cfg(feature = "tcp-ao")]
+        if let Some(key) = &ao_key {
+            let mac_len = match key.algorithm {
+                crate::signature::AoAlgorithm::HmacSha1 => 20,
+                crate::signature::AoAlgorithm::HmacSha256 => 32,
+            };
+            let offset = 20 + option_bytes.len().saturating_sub(4 + mac_len);
+            segment[16] = 0;
+            segment[17] = 0;
+            if let Some(slot) = segment.get_mut(offset + 4..offset + 4 + mac_len) {
+                slot.fill(0);
+            }
+            let mut input = signature_pseudo(local, remote, segment.len());
+            input.extend_from_slice(&segment);
+            input.extend_from_slice(&key.key);
+            let digest: Vec<u8> = match key.algorithm {
+                crate::signature::AoAlgorithm::HmacSha1 => {
+                    crate::signature::hmac_sha1(&key.key, &input).to_vec()
+                }
+                crate::signature::AoAlgorithm::HmacSha256 => {
+                    crate::signature::hmac_sha256(&key.key, &input).to_vec()
+                }
+            };
+            if let Some(slot) = segment.get_mut(offset + 4..offset + 4 + digest.len()) {
+                slot.copy_from_slice(&digest);
+            }
+            let checksum = context.compute(6, &segment);
+            if let Some(field) = segment.get_mut(16..18) {
+                field.copy_from_slice(&checksum.to_be_bytes());
+            }
         }
         match remote {
             IpAddr::V4(destination) => self.send_ipv4(&segment, destination, 6),
@@ -1872,6 +2052,50 @@ fn ack_window_ok(connection: &TcpConnection, ack: u32) -> bool {
         .snd_una
         .wrapping_sub(u32::from(connection.max_snd_wnd));
     seq_ge(ack, lower)
+}
+
+#[cfg(any(feature = "tcp-md5", feature = "tcp-ao"))]
+#[allow(dead_code)]
+fn find_option(segment: &[u8], kind: u8) -> Option<usize> {
+    let header_len = usize::from(*segment.get(12)? >> 4) * 4;
+    let mut offset = 20;
+    while offset + 2 <= header_len && offset + 2 <= segment.len() {
+        let option = *segment.get(offset)?;
+        if option == 0 || option == 1 {
+            offset += 1;
+            continue;
+        }
+        let length = usize::from(*segment.get(offset + 1)?);
+        if length < 2 {
+            return None;
+        }
+        if option == kind {
+            return Some(offset);
+        }
+        offset += length;
+    }
+    None
+}
+
+#[cfg(any(feature = "tcp-md5", feature = "tcp-ao"))]
+fn signature_pseudo(local: IpAddr, remote: IpAddr, length: usize) -> Vec<u8> {
+    match (local, remote) {
+        (IpAddr::V4(local), IpAddr::V4(remote)) => raven_tcpip_wire::checksum::pseudo_header_v4(
+            to_wire4(local),
+            to_wire4(remote),
+            6,
+            u16::try_from(length).unwrap_or(u16::MAX),
+        )
+        .to_vec(),
+        (IpAddr::V6(local), IpAddr::V6(remote)) => raven_tcpip_wire::checksum::pseudo_header_v6(
+            to_wire6(local),
+            to_wire6(remote),
+            6,
+            u32::try_from(length).unwrap_or(u32::MAX),
+        )
+        .to_vec(),
+        _ => Vec::new(),
+    }
 }
 
 fn choose_wscale(receive_cap: usize) -> u8 {
