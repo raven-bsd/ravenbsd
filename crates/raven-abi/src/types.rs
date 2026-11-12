@@ -128,6 +128,16 @@ pub mod clock {
     pub const MONOTONIC: u32 = 1;
 }
 
+/// Namespace prefix operations for `PROC_NAMESPACE`.
+pub mod namespace {
+    /// Grant every scheme name starting with the prefix.
+    pub const ADD: u32 = 1;
+    /// Remove the prefix; existing handles keep working.
+    pub const REMOVE: u32 = 2;
+    /// Remove all prefixes; exact names stay.
+    pub const CLEAR: u32 = 3;
+}
+
 /// Seconds and nanoseconds, 64-bit each on every architecture.
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]

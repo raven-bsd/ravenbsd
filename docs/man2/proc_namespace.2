@@ -1,0 +1,62 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt PROC_NAMESPACE 2
+.Os RavenBSD
+.Sh NAME
+.Nm proc_namespace
+.Nd add, remove or clear scheme namespace prefixes
+.Sh SYNOPSIS
+.Fn proc_namespace proc op prefix prefix_len
+.Sh DESCRIPTION
+.Nm
+changes the scheme namespace of
+.Fa proc ,
+which is
+.Dv SELF_PROC
+or a process handle with the
+.Dv ADMIN
+right.
+.Fa op
+is one of
+.Dv namespace::ADD ,
+.Dv namespace::REMOVE
+or
+.Dv namespace::CLEAR
+(1, 2 and 3).
+.Pp
+.Dv ADD
+grants every scheme name starting with the
+.Fa prefix
+bytes.
+The caller may only grant a prefix inside its own namespace; the root
+administrative namespace may grant any valid prefix.
+.Dv REMOVE
+removes the prefix from new lookups and registrations; existing scheme-file
+handles keep working.
+.Dv CLEAR
+removes all prefixes, not exact names.
+Adding an existing prefix or removing an absent one succeeds.
+.Pp
+Child namespaces are subsets of their parent's namespace.
+.Sh RETURN VALUES
+Zero on success; a negative
+.Va errno
+on failure.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EBADF
+.Fa proc
+is not a live process handle.
+.It Er EPERM
+The caller lacks
+.Dv ADMIN
+or tries to grant outside its own namespace.
+.It Er EINVAL
+The operation or prefix is invalid.
+.El
+.Sh SEE ALSO
+.Xr handle_revoke 2 ,
+.Xr open 2
+.Sh STANDARDS
+RavenBSD ABI v1, contract C17.
