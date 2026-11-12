@@ -61,6 +61,7 @@ members = [
     "tests/net/packetdrill-harness",
     "tests/tcpip",
     "tests/tcpip/conformance",
+    "tests/tcpip/fuzz-replay",
     "tools/bench-host",
 ]
 default-members = ["crates/*"]

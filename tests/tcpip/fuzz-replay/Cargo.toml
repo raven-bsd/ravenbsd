@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-tcpip-fuzz-replay"
+version = "0.1.0"
+description = "Stable replay and regression harness for the raven-tcpip fuzz targets."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+raven-tcpip = { path = "../../../crates/raven-tcpip", features = ["testutil"] }
+raven-tcpip-wire = { path = "../../../crates/raven-tcpip-wire" }
+raven-tcpip-sim = { path = ".." }
+raven-abi = { path = "../../../crates/raven-abi" }

@@ -160,7 +160,9 @@ fn write(filter: Option<&str>) -> Result<(), String> {
     let table = Table { rows };
     let (pass, fail, skip) = counts(&table.rows);
     let mut text = String::from(
-        "# TCP conformance results\n\n\
+        "<!-- SPDX-License-Identifier: BSD-3-Clause -->\n\
+         <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->\n\n\
+         # TCP conformance results\n\n\
          Fresh BSD-3-Clause scripts run through the C04 simulator. packetdrill\n\
          (GPL, tier C) is a tool whose script language we accept; no packetdrill\n\
          code or scripts are present. See `SCRIPTS.md` for the subset.\n\n",
