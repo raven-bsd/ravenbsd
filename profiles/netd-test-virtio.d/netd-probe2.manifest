@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "netd-virtio-probe2"
+exec = "/sbin/netd-probe"
+args = ["netd-probe", "virtio-second"]
+needs = ["netd-virtio-restart"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

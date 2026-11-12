@@ -34,7 +34,7 @@ pub use iface::{
     ARP_COMPLETE, ARP_STATIC, ArpEntry, IF_LINK_UP, IF_LOOPBACK, IF_UP, IfName, IfaceInfo,
     IfaceRequest, IfaceResponse, MAX_IFNAME, Route,
 };
-pub use path::{PathError, SchemePath, Transport};
+pub use path::{ACCEPT_PREFIX, PathError, SchemePath, Transport, parse_accepted};
 pub use raven_abi::errno::Errno;
 pub use ring::{
     BUFFER_SIZE, DESC_CHECKSUM_OK, DESC_ERROR, DESC_FIRST, DESC_FLAG_MASK, DESC_LAST, Desc,

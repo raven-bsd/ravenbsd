@@ -1,13 +1,14 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 12, 2026
+.Dd November 13, 2026
 .Dt NETD 8
 .Os RavenBSD
 .Sh NAME
 .Nm netd
-.Nd RavenBSD net: socket server over loopback
+.Nd RavenBSD net: socket server over loopback and virtio-net
 .Sh SYNOPSIS
 .Nm /sbin/netd
+.Op nic
 .Sh DESCRIPTION
 .Nm
 runs the native socket core with IPv4 loopback configured
@@ -18,10 +19,18 @@ scheme and serves one file per socket plus the
 .Pa net:
 control file.
 .Pp
-The first milestone has one interface,
-.Dq lo ;
-the virtio-net frame ring is the B12b seam and is not wired in this binary.
-IPv6 is not configured.
+When the persistent
+.Dq nic:
+frame service is available,
+.Nm
+maps its B39 shared ring and adds a second core for the virtio-net interface
+.Dq eth0
+.Pq Li 10.0.2.15/24 , gateway 10.0.2.2 .
+The optional
+.Ar nic
+argument makes the NIC mandatory: the server exits if the service cannot be
+attached.  Without it the server retries once a second while running so a
+driver that starts later is still picked up.  IPv6 is not configured.
 .Pp
 Scheme paths are:
 .Bl -tag -width "net:tcp/<ipv4>:<port>" -compact
@@ -51,9 +60,10 @@ message.  The supported calls are
 .Dv SHUTDOWN ,
 .Dv GETSOCKNAME ,
 .Dv GETPEERNAME ,
-.Dv SETSOCKOPT
+.Dv SETSOCKOPT ,
+.Dv GETSOCKOPT
 and
-.Dv GETSOCKOPT .
+.Dv EVENT .
 A successful
 .Dv ACCEPT
 returns a numeric socket id; the client opens
@@ -77,33 +87,80 @@ after
 .Dv CONNECT
 sets a peer.
 .Pp
+.Dv EVENT
+returns an S25
+.Dv UserEvent
+attachment in the
+.Dv CALL
+reply.  The client registers that handle in an S26 event queue and waits for
+readable, writable, accepted or closed transitions rather than retrying with
+sleeps.  The server itself blocks in
+.Dv EVQ_WAIT
+on the scheme-server handle and uses the stack's next-timer delay as the
+timeout, so stack timers still run without a heartbeat thread.  When
+.Dq eth0
+is attached the loop also drains the NIC rings at least every 10 ms; both
+cores are driven by the same loop and there is no per-device thread.
+.Pp
+.Dv TCP_NODELAY
+is applied to the native TCP socket.
+.Dv SO_REUSEADDR ,
+.Dv SO_RCVBUF
+and
+.Dv SO_SNDBUF
+are retained per socket and reported back by
+.Dv GETSOCKOPT ;
+the native stack in this revision has no per-socket bind or buffer knob, so
+those values do not alter stack behaviour yet.
+.Pp
 The control file accepts
 .Dv IfaceRequest
-messages.  In this milestone
+messages.
 .Dv LIST
-returns one
+returns
 .Dq lo
-record and
+and, when attached,
+.Dq eth0 ;
 .Dv ARP_LIST
 returns an empty table;
 .Dv SET_ADDRESS
 and
 .Dv SET_STATE
-update the loopback record, while route operations return
+update the selected interface, while route operations return
 .Er EOPNOTSUPP .
+Socket paths under
+.Li 127.0.0.0/8
+use the loopback core; every other path uses the NIC core when it is attached.
 .Pp
-The server polls the native stack whenever it handles a request and clients
-retry a socket operation that returns
-.Er EAGAIN .
-The qtest uses a client/server pair inside one probe process, checks TCP and
-UDP bytes and orderly close, lists
+The server polls the native stacks after each request and after each event
+wakeup; clients sleep only when they do not ask for a readiness event.
+The loopback qtest uses a client/server pair inside one probe process, waits on
+the
+.Dv EVENT
+doorbells, checks TCP and UDP bytes, the accept path, local/peer endpoints,
+socket options and orderly close, lists
 .Dq lo ,
 restarts
 .Nm
 once through
 .Xr svcctl 1 ,
 and runs the same probe again to show that the socket table was released.
-There is no host networking and no virtio-net device in this test.
+.Pp
+The
+.Dq netd-virtio
+qtest boots
+.Xr virtio-net 8
+and
+.Nm ,
+then sends TCP and UDP payloads through the QEMU user-mode gateway; the TCP
+side uses a QEMU
+.Dv guestfwd
+.Dq /bin/cat
+echo and the UDP side uses a one-shot host echo bound to the gateway alias.
+It restarts
+.Nm
+between the two probe runs and checks that the ring is remapped and both
+payloads still echo.  There is no host bridge or external network.
 .Sh FILES
 .Bl -tag -width /etc/services.d/netd.toml -compact
 .It Pa /etc/services.d/netd.toml
@@ -114,7 +171,8 @@ service manifest
 .Sh SEE ALSO
 .Xr svcctl 1 ,
 .Xr init 8 ,
-.Xr vfsd 8
+.Xr vfsd 8 ,
+.Xr virtio-net 8
 .Sh HISTORY
 The
 .Nm

@@ -290,6 +290,7 @@ dependencies = [
  "raven-proto-net",
  "raven-rt",
  "raven-scheme",
+ "virtio-net",
 ]
 
 [[package]]
