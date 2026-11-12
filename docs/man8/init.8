@@ -77,9 +77,11 @@ Test mode is configured by
 .It Cm exit_when_exits No = Ar service
 Exit with that service's status as soon as it terminates.
 .It Cm exit_when_settled No = true
-Once every service is up or has given up, print
+Once every service has started and no one-shot work is still starting or restarting, print
 .Dq svcd: settled
 and exit 0 if no required service failed, otherwise 1.
+Long-running services are not required to stop first; the process-wide exit terminates their
+workers.
 .El
 Unknown keys are reported as
 .Dq svcd: /etc/svcd.conf: unknown key <key>
@@ -88,12 +90,17 @@ The normal profile has no such file, so
 .Nm
 runs forever.
 .Pp
-There are no signals yet.
 .Dq STOP
-drops
-.Nm Ns 's
-process handle for the service and stops supervising it, but the child process
-keeps running until it exits by itself.
+terminates the service process with the authorized termination primitive, waits for its terminal
+state and only then reports success; the service scheme name is released by that teardown.
+.Dq RESTART
+performs the stop first and starts the replacement only after the old process is gone.
+The process-wide exit also terminates the
+.Dq svc:
+server and every worker still blocked in
+.Dv PROC_WAIT , so no helper thread keeps
+.Nm
+alive or the console open.
 .Sh FILES
 .Bl -tag -width /etc/services.d -compact
 .It Pa /etc/services.d/*.toml

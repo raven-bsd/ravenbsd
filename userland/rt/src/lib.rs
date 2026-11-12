@@ -39,7 +39,7 @@ pub use entry::__raven_start;
 pub use initfs::initfs_has_manifest;
 pub use sys::{
     clock_get, debug_read, debug_write, exit, futex_wait, futex_wake, handle_close, handle_dup,
-    handle_transfer, map_initfs, nanosleep, uname, yield_now,
+    handle_transfer, map_initfs, nanosleep, proc_terminate, uname, yield_now,
 };
 
 /// `entry!(main)` registers the program's `main(args: Args) -> i32` function.
