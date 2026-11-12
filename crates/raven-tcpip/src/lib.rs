@@ -47,6 +47,7 @@ mod icmp_stack;
 mod ipv4_stack;
 mod ipv6_stack;
 mod neighbor;
+mod pmtu;
 mod reassembly;
 mod recovery;
 mod route;
@@ -70,6 +71,10 @@ pub use ipv6_stack::{
     Neighbor6State,
 };
 pub use neighbor::{NeighborCache, NeighborEntry};
+pub use pmtu::{
+    IPV4_FLOOR, IPV6_FLOOR, MtuCache, Plpmtud, PlpmtudState, classic_update, floor_for,
+    probe_sequence,
+};
 pub use recovery::{Ecn, Rack, SpuriousUndo, Tlp, pto};
 pub use route::{Route, RouteTable};
 pub use rto::RtoEstimator;
