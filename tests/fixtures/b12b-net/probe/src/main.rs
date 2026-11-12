@@ -40,6 +40,8 @@ mod program {
     const POLL_NS: u64 = 10_000_000;
     const RECONNECT_ROUNDS: usize = 600;
     const RECONNECT_NS: u64 = 100_000_000;
+    const DEVD_ROUNDS: usize = 600;
+    const DEVD_NS: u64 = 50_000_000;
 
     fn main(_args: raven_rt::Args) -> i32 {
         match run() {
@@ -88,6 +90,7 @@ mod program {
                 wait_for_nic(&client)?;
             }
         }
+        wait_for_devd(&client)?;
         raven_rt::println!("net-b: probe ok");
         Ok(())
     }
@@ -211,6 +214,37 @@ mod program {
             let _ = raven_rt::nanosleep(RECONNECT_NS);
         }
         Err("nic: did not reappear for the second cycle".to_string())
+    }
+
+    /// Keep this readiness-`exit` service alive until devd has finished its second cycle, so svcd
+    /// cannot settle (and the qtest cannot end) before the driver's cycle-2 teardown lines.
+    fn wait_for_devd(client: &Client) -> Result<(), String> {
+        for _ in 0..DEVD_ROUNDS {
+            if let Ok(line) = devd_state(client)
+                && (line.contains(" stopped")
+                    || line.contains(" failed")
+                    || line.contains(" gave-up"))
+            {
+                raven_rt::println!("net-b: devd done");
+                return Ok(());
+            }
+            let _ = raven_rt::nanosleep(DEVD_NS);
+        }
+        Err("devd did not finish the second cycle".to_string())
+    }
+
+    fn devd_state(client: &Client) -> Result<String, String> {
+        let handle = client
+            .open("svc:/devd", OPEN_READ)
+            .map_err(|error| format!("open svc:/devd: {}", error.description()))?;
+        let mut data = [0u8; 128];
+        let length = client
+            .read(handle, 0, &mut data)
+            .map_err(|error| format!("read svc:/devd: {}", error.description()))?;
+        let _ = client.close(handle);
+        core::str::from_utf8(data.get(..length).ok_or("svc length")?)
+            .map(|line| line.to_string())
+            .map_err(|_| "svc line is not UTF-8".to_string())
     }
 }
 

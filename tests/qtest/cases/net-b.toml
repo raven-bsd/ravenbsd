@@ -59,15 +59,19 @@ regex = '^net-b: cycle 1 arp reply from [0-9a-f]{2}(:[0-9a-f]{2}){5} \(10\.0\.2\
 
 [[expect]]
 regex = '^net-b: cycle 1 quit$'
+unordered = true
 
 [[expect]]
 regex = '^virtio-net: stats rx=[1-9][0-9]* tx=[1-9][0-9]* drops=0$'
+unordered = true
 
 [[expect]]
 regex = '^virtio-net: serve done$'
+unordered = true
 
 [[expect]]
 regex = '^devd: driver virtio-net cycle 1 exit=0$'
+unordered = true
 
 [[expect]]
 regex = '^virtio-net: id=1af4:1041$'
@@ -92,21 +96,31 @@ regex = '^net-b: cycle 2 arp reply from [0-9a-f]{2}(:[0-9a-f]{2}){5} \(10\.0\.2\
 
 [[expect]]
 regex = '^net-b: cycle 2 quit$'
-
-[[expect]]
-regex = '^net-b: probe ok$'
+unordered = true
 
 [[expect]]
 regex = '^virtio-net: stats rx=[1-9][0-9]* tx=[1-9][0-9]* drops=0$'
+unordered = true
 
 [[expect]]
 regex = '^virtio-net: serve done$'
+unordered = true
 
 [[expect]]
 regex = '^devd: driver virtio-net cycle 2 exit=0$'
+unordered = true
 
 [[expect]]
 regex = '^devd: driver virtio-net cycles=2$'
+unordered = true
+
+[[expect]]
+regex = '^net-b: devd done$'
+unordered = true
+
+[[expect]]
+regex = '^net-b: probe ok$'
+unordered = true
 
 [[expect]]
 regex = '^svcd: settled$'
