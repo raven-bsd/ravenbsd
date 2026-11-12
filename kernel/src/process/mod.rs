@@ -707,6 +707,21 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
             crate::process::handle::lineage_nodes()
         );
     }
+    // S17 pager evidence: once both the address space and the handle table are gone, no
+    // pager-backed object may survive in this process. Own-context only, like every other
+    // teardown print (S40). `split_ascii_whitespace` keeps this path off the deep `CmdLine`
+    // parser: a pager fault already leaves the teardown close to the 20 KiB kernel stack.
+    if own_context
+        && paging::cmdline()
+            .split_ascii_whitespace()
+            .any(|token| token == "s17-pagecheck")
+    {
+        kprintln!(
+            "s17: exit {} pager_objects={}",
+            process.path,
+            crate::process::handle::pager_objects()
+        );
+    }
     if process.id == 1 {
         kprintln!("init exited ({code})");
         if crate::log::test_exit() {
@@ -841,15 +856,45 @@ pub fn exit_current(code: i32) -> ! {
 }
 
 /// Try to resolve a user page fault. Returns true when the faulting instruction can be retried.
+///
+/// This is the legacy entry point for the usercopy fixup path and the aarch64 vectors; both
+/// reach it for a write or for the only arch-specific COW resolution they support. The x86-64
+/// exception entry uses [`handle_page_fault_access`] so a read-only VMA write is rejected
+/// instead of paged in.
 pub fn handle_page_fault(cr2: u64) -> bool {
+    resolve_page_fault(cr2, true)
+}
+
+/// Resolve a user page fault with the faulting access kind.
+///
+/// The address-space lock is released before a pager PageIn wait (C18); the pager service
+/// re-acquires it after the supply to map the page.
+#[cfg(target_arch = "x86_64")]
+pub fn handle_page_fault_access(cr2: u64, write: bool) -> bool {
+    resolve_page_fault(cr2, write)
+}
+
+fn resolve_page_fault(cr2: u64, write: bool) -> bool {
     let Some(process) = current() else {
         return false;
     };
-    let mut address_space = process.address_space.lock();
-    let Some(address_space) = address_space.as_mut() else {
-        return false;
+    let outcome = {
+        let mut address_space = process.address_space.lock();
+        let Some(address_space) = address_space.as_mut() else {
+            return false;
+        };
+        address_space.handle_fault(cr2, write)
     };
-    address_space.handle_fault(cr2).is_ok()
+    match outcome {
+        Ok(()) => true,
+        #[cfg(target_arch = "x86_64")]
+        Err(crate::memory::uspace::FaultError::Pager(fault)) => {
+            crate::memory::pager::service(&process, fault)
+        }
+        #[cfg(not(target_arch = "x86_64"))]
+        Err(crate::memory::uspace::FaultError::Pager(_)) => false,
+        Err(crate::memory::uspace::FaultError::Errno(_)) => false,
+    }
 }
 
 /// Terminate the current process because of a user page fault.

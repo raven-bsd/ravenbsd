@@ -69,6 +69,7 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
         Some(Syscall::PROC_CREATE) => process_ctl::create(frame),
         Some(Syscall::PROC_WAIT) => process_ctl::wait(frame),
         Some(Syscall::MEMOBJ_CREATE) => memory_ctl::memobj_create(frame),
+        Some(Syscall::PAGER_SUPPLY) => memory_ctl::pager_supply(frame),
         Some(Syscall::MAP) => memory_ctl::map(frame),
         Some(Syscall::UNMAP) => memory_ctl::unmap(frame),
         Some(Syscall::PROTECT) => memory_ctl::protect(frame),

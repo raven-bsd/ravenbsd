@@ -16,6 +16,7 @@ use raven_abi::layout::aarch64::{USER_END, USER_MIN};
 #[cfg(target_arch = "x86_64")]
 use raven_abi::layout::x86_64::{USER_END, USER_MIN};
 use raven_abi::types::prot;
+use raven_pager::PageState;
 use raven_rmm::{MapError, PageFlags, PageSize, PhysAddr, VirtAddr};
 use raven_vma::{Backing, PAGE_SIZE, Vma, VmaError, Vmas};
 
@@ -37,6 +38,26 @@ pub struct ObjectMapping {
     pub object: Arc<MemObject>,
     /// True for a shared mapping; false for a private copy-on-write mapping.
     pub shared: bool,
+}
+
+/// A fault that must be resolved outside the address-space lock.
+#[allow(dead_code)] // the `Errno` payload is diagnostic; only the pager variant is actionable
+pub enum FaultError {
+    /// A normal fault failure.
+    Errno(Errno),
+    /// A pager-backed page needs a PageIn wait.
+    Pager(PagerFault),
+}
+
+/// The token `process::handle_page_fault` consumes after releasing the address-space lock.
+#[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
+pub struct PagerFault {
+    /// The pager-backed object.
+    pub object: Arc<MemObject>,
+    /// Page index inside the object.
+    pub page: u64,
+    /// Faulting user address.
+    pub cr2: u64,
 }
 
 /// One device-window mapping: the physical pages belong to hardware and are never freed.
@@ -93,6 +114,13 @@ pub struct UserAddressSpace {
     /// Bumped on every mapping change. A capture records it at create and only copies back when
     /// the client's mapping has not been replaced meanwhile.
     mapping_generation: u64,
+}
+
+/// A normal fault error can be returned from code that still speaks `Errno`.
+impl From<Errno> for FaultError {
+    fn from(error: Errno) -> Self {
+        FaultError::Errno(error)
+    }
 }
 
 impl UserAddressSpace {
@@ -275,7 +303,6 @@ impl UserAddressSpace {
         let pages = pages_in(len)?;
         let writable = shared && prot & (prot::WRITE as u8) != 0;
         let flags = leaf_flags(prot, writable);
-        let mut mapped = 0u64;
         let mut failure = None;
         if let Ok(mut mapper) = self.aspace.mapper() {
             let mut page = 0u64;
@@ -286,13 +313,22 @@ impl UserAddressSpace {
                     failure = Some(Errno::EINVAL);
                     break;
                 };
-                let Some(physical) = object.frame_at((offset / PAGE_SIZE).saturating_add(page))
-                else {
+                let object_page = (offset / PAGE_SIZE).saturating_add(page);
+                let Some(physical) = object.frame_at(object_page) else {
+                    if object.is_paged() {
+                        page = page.saturating_add(1);
+                        continue;
+                    }
                     failure = Some(Errno::EINVAL);
                     break;
                 };
                 match mapper.map(virt, PhysAddr(physical), flags, PageSize::Size4K) {
-                    Ok(()) => mapped = mapped.saturating_add(1),
+                    Ok(()) => {
+                        if writable {
+                            // C18: a shared writable mapping is conservatively dirty.
+                            object.mark_dirty(object_page);
+                        }
+                    }
                     Err(error) => {
                         failure = Some(map_errno(error));
                         break;
@@ -304,7 +340,9 @@ impl UserAddressSpace {
             failure = Some(Errno::ENOMEM);
         }
         if let Some(error) = failure {
-            self.rollback_foreign(vaddr, mapped);
+            // A pager object may have present pages after absent ones, so unmap every page in
+            // the attempted range instead of assuming a contiguous prefix was mapped.
+            self.rollback_foreign(vaddr, pages);
             let _ = self.vmas.remove(vaddr, len);
             return Err(error);
         }
@@ -507,6 +545,16 @@ impl UserAddressSpace {
                     return Err(Errno::EINVAL);
                 };
                 let Some((physical, _, _)) = mapper.translate(virt) else {
+                    // A pager-backed page that was never faulted has no PTE yet; it is still
+                    // part of the VMA and must be dropped with the range (C18).
+                    let pager_page = self
+                        .objects
+                        .iter()
+                        .any(|mapping| mapping.contains(virt.data()) && mapping.object.is_paged());
+                    if pager_page {
+                        page = page.saturating_add(1);
+                        continue;
+                    }
                     return Err(Errno::EINVAL);
                 };
                 let vma = self.vmas.find(virt.data()).ok_or(Errno::EINVAL)?;
@@ -578,6 +626,14 @@ impl UserAddressSpace {
                 };
                 let vma = self.vmas.find(virt.data()).ok_or(Errno::ENOMEM)?;
                 let Some((physical, _, _)) = mapper.translate(virt) else {
+                    let pager_page = self
+                        .objects
+                        .iter()
+                        .any(|mapping| mapping.contains(virt.data()) && mapping.object.is_paged());
+                    if pager_page {
+                        page = page.saturating_add(1);
+                        continue;
+                    }
                     return Err(Errno::ENOMEM);
                 };
                 let writable_now = if new_prot & (prot::WRITE as u8) == 0 {
@@ -616,24 +672,80 @@ impl UserAddressSpace {
         Ok(())
     }
 
-    /// Handle a user page fault at `cr2`. A successful copy-on-write returns `Ok(())` and the
-    /// faulting instruction is retried.
-    pub fn handle_fault(&mut self, cr2: u64) -> Result<(), Errno> {
+    /// Handle a user page fault at `cr2`.
+    ///
+    /// A resolved COW fault returns `Ok(())`; a pager-backed absent page returns a `PagerFault`
+    /// token so the caller can drop the address-space lock before the PageIn wait (C18).
+    pub fn handle_fault(&mut self, cr2: u64, write: bool) -> Result<(), FaultError> {
         if !(USER_MIN..USER_END).contains(&cr2) {
-            return Err(Errno::EFAULT);
+            return Err(FaultError::Errno(Errno::EFAULT));
         }
-        let vma = self.vmas.find(cr2).ok_or(Errno::EFAULT)?;
-        if vma.prot() & (prot::WRITE as u8) == 0 {
-            return Err(Errno::EFAULT);
+        let vma = self
+            .vmas
+            .find(cr2)
+            .ok_or(FaultError::Errno(Errno::EFAULT))?;
+        let writable_vma = vma.prot() & (prot::WRITE as u8) != 0;
+        if let Some(mapping) = self
+            .objects
+            .iter()
+            .find(|mapping| mapping.contains(cr2))
+            .cloned()
+            && mapping.object.is_paged()
+        {
+            // A write to a read-only VMA is a protection fault, not a page-in: never map the
+            // page read-only here or the retried store would fault forever.
+            if write && !writable_vma {
+                return Err(FaultError::Errno(Errno::EFAULT));
+            }
+            let object_page = mapping
+                .offset
+                .saturating_add(cr2.saturating_sub(mapping.start))
+                / PAGE_SIZE;
+            match mapping.object.page_state(object_page) {
+                Some(PageState::Present | PageState::Dirty | PageState::Writing) => {
+                    // A read fault, or any fault on a shared mapping, only needs the object
+                    // frame in the PTE. Shared writeback marks the page dirty when it maps it
+                    // writable.
+                    if !write || mapping.shared {
+                        return self.map_pager_page(cr2).map_err(FaultError::Errno);
+                    }
+                    let pte_writable = {
+                        let virt = VirtAddr::new(cr2 & !(PAGE_SIZE - 1))
+                            .ok_or(FaultError::Errno(Errno::EFAULT))?;
+                        self.aspace
+                            .mapper()
+                            .ok()
+                            .and_then(|mut mapper| mapper.translate(virt))
+                            .is_some_and(|(_, flags, _)| flags.is_writable())
+                    };
+                    if pte_writable {
+                        // A protect() callback may make an already-private COW page writable
+                        // again. Remapping the object frame here would discard the private copy.
+                        return Ok(());
+                    }
+                    // A write to a private pager page must COW the present frame below.
+                }
+                Some(PageState::Failed) => return Err(FaultError::Errno(Errno::EIO)),
+                Some(PageState::Absent | PageState::InFlight) | None => {
+                    return Err(FaultError::Pager(PagerFault {
+                        object: Arc::clone(&mapping.object),
+                        page: object_page,
+                        cr2,
+                    }));
+                }
+            }
+        }
+        if !writable_vma {
+            return Err(FaultError::Errno(Errno::EFAULT));
         }
         let page = cr2 & !(PAGE_SIZE - 1);
-        let virt = VirtAddr::new(page).ok_or(Errno::EFAULT)?;
+        let virt = VirtAddr::new(page).ok_or(FaultError::Errno(Errno::EFAULT))?;
         let mut mapper = self.aspace.mapper().map_err(map_errno)?;
         let Some((physical, flags, _)) = mapper.translate(virt) else {
-            return Err(Errno::EFAULT);
+            return Err(FaultError::Errno(Errno::EFAULT));
         };
         if flags.is_writable() {
-            return Err(Errno::EFAULT);
+            return Err(FaultError::Errno(Errno::EFAULT));
         }
         let already_private = match vma.backing() {
             Backing::Initfs { .. } => !initfs_contains(physical.0),
@@ -657,21 +769,20 @@ impl UserAddressSpace {
         if already_private {
             let flags = leaf_flags(vma.prot(), true);
             let result = mapper.protect(virt, flags).map_err(map_errno);
-            if result.is_ok() {
-                let _ = crate::sched::smp::shootdown::flush_range(page, PAGE_SIZE);
-                self.bump_generation();
-            }
-            return result;
+            result.map_err(FaultError::Errno)?;
+            let _ = crate::sched::smp::shootdown::flush_range(page, PAGE_SIZE);
+            self.bump_generation();
+            return Ok(());
         }
         // Copy-on-write: the faulting page still points into the initfs or the memory object.
         let Some(new_frame) = frame::alloc_zeroed_frame() else {
-            return Err(Errno::ENOMEM);
+            return Err(FaultError::Errno(Errno::ENOMEM));
         };
         let source = frame::phys_to_virt(frame::PhysAddr(physical.0));
         let destination = frame::phys_to_virt(new_frame);
         if source.is_null() || destination.is_null() {
             let _ = frame::free_frame(new_frame);
-            return Err(Errno::EFAULT);
+            return Err(FaultError::Errno(Errno::EFAULT));
         }
         // SAFETY: both pointers refer to whole 4 KiB frames; the source belongs to the initfs or
         // memory object and the destination is a fresh frame.
@@ -680,7 +791,7 @@ impl UserAddressSpace {
         }
         if mapper.unmap(virt).is_err() {
             let _ = frame::free_frame(new_frame);
-            return Err(Errno::EFAULT);
+            return Err(FaultError::Errno(Errno::EFAULT));
         }
         let flags = leaf_flags(vma.prot(), true);
         if mapper
@@ -688,11 +799,84 @@ impl UserAddressSpace {
             .is_err()
         {
             let _ = frame::free_frame(new_frame);
-            return Err(Errno::EFAULT);
+            return Err(FaultError::Errno(Errno::EFAULT));
         }
         let _ = crate::sched::smp::shootdown::flush_range(page, PAGE_SIZE);
         self.bump_generation();
         Ok(())
+    }
+
+    /// Map a supplied pager page into the faulting address space.
+    pub fn map_pager_page(&mut self, cr2: u64) -> Result<(), Errno> {
+        let mapping = self
+            .objects
+            .iter()
+            .find(|mapping| mapping.contains(cr2))
+            .cloned()
+            .ok_or(Errno::EFAULT)?;
+        let object_page = mapping
+            .offset
+            .saturating_add(cr2.saturating_sub(mapping.start))
+            / PAGE_SIZE;
+        let physical = mapping.object.frame_at(object_page).ok_or(Errno::ENOENT)?;
+        let vma = self.vmas.find(cr2).ok_or(Errno::EFAULT)?;
+        let writable = mapping.shared && vma.prot() & (prot::WRITE as u8) != 0;
+        let flags = leaf_flags(vma.prot(), writable);
+        let virt = VirtAddr::new(cr2 & !(PAGE_SIZE - 1)).ok_or(Errno::EFAULT)?;
+        let mut mapper = self.aspace.mapper().map_err(map_errno)?;
+        match mapper.translate(virt) {
+            Some((current, _, _)) if current.0 == physical => {
+                mapper.protect(virt, flags).map_err(map_errno)?;
+            }
+            Some(_) => {
+                let _ = mapper.unmap(virt);
+                mapper
+                    .map(virt, PhysAddr(physical), flags, PageSize::Size4K)
+                    .map_err(map_errno)?;
+            }
+            None => mapper
+                .map(virt, PhysAddr(physical), flags, PageSize::Size4K)
+                .map_err(map_errno)?,
+        }
+        if writable {
+            mapping.object.mark_dirty(object_page);
+        }
+        let _ = crate::sched::smp::shootdown::flush_range(virt.data(), PAGE_SIZE);
+        self.bump_generation();
+        Ok(())
+    }
+
+    /// Dirty pager pages touched by an unmap range, for PageOut after the address-space lock is
+    /// released.
+    pub fn collect_pager_dirty(&self, start: u64, len: u64) -> Vec<(Arc<MemObject>, u64)> {
+        let end = start.saturating_add(len);
+        let mut dirty = Vec::new();
+        for mapping in &self.objects {
+            if !mapping.object.is_paged() || !mapping.shared {
+                continue;
+            }
+            let from = start.max(mapping.start);
+            let to = end.min(mapping.start.saturating_add(mapping.len));
+            if from >= to {
+                continue;
+            }
+            let first = mapping
+                .offset
+                .saturating_add(from.saturating_sub(mapping.start))
+                / PAGE_SIZE;
+            let last = mapping
+                .offset
+                .saturating_add(to.saturating_sub(1).saturating_sub(mapping.start))
+                / PAGE_SIZE;
+            let mut page = first;
+            while page <= last {
+                if mapping.object.page_state(page) == Some(PageState::Dirty) {
+                    dirty.push((Arc::clone(&mapping.object), page));
+                }
+                page = page.saturating_add(1);
+            }
+        }
+        dirty
     }
 
     /// Free every data frame owned by this address space and clear the VMA tree.

@@ -11,10 +11,11 @@ use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 use raven_abi::types::{Handle, Rights};
+use raven_pager::PagerPacket;
 use raven_usercopy::UserSlice;
 use spin::Mutex;
 
-use crate::process::handle::Object;
+use crate::process::handle::{MemObject, Object};
 use crate::process::{self, Process};
 use crate::sched;
 use crate::usercopy::{copy_from_user, copy_to_user};
@@ -349,6 +350,47 @@ pub fn call(
         return Err(status_errno(status));
     }
     Ok(usize::try_from(result).unwrap_or(usize::MAX))
+}
+
+/// Send one kernel pager PageIn/PageOut request to the object's pager and wait for the reply.
+///
+/// The pager identifies the object by the handle value it received from `MEMOBJ_CREATE`. The
+/// request carries a bounded `PagerPacket` in the existing scheme `CALL` inline data; the pager
+/// supplies through `PAGER_SUPPLY` and replies with `SEND`.
+pub fn pager_call(
+    client: &Arc<Process>,
+    object: &Arc<MemObject>,
+    page: u64,
+    kind: u16,
+) -> Result<i32, Errno> {
+    let server = object.pager_process().ok_or(Errno::EIO)?;
+    let offset = page.saturating_mul(raven_pager::PAGE_SIZE as u64);
+    let key = object.pager_handle();
+    let packet = if kind == raven_pager::PAGE_IN {
+        PagerPacket::page_in(key, offset)
+    } else {
+        PagerPacket::page_out(key, offset)
+    };
+    let mut bytes = [0u8; raven_pager::PACKET_SIZE];
+    packet.encode(&mut bytes).map_err(|_| Errno::EINVAL)?;
+    let mut scheme = SchemePacket::request(Opcode::Call, next_request_id(), 0);
+    scheme.data_len = raven_pager::PACKET_SIZE as u32;
+    scheme
+        .data
+        .get_mut(..raven_pager::PACKET_SIZE)
+        .ok_or(Errno::EINVAL)?
+        .copy_from_slice(&bytes);
+    let request = PendingRequest::new(
+        Arc::clone(client),
+        server,
+        None,
+        Opcode::Call,
+        scheme,
+        RequestBuffers::default(),
+    );
+    submit(&request)?;
+    let (status, _) = wait(client, &request)?;
+    Ok(status)
 }
 
 /// Receive the next request packet; returns a server-side request handle.

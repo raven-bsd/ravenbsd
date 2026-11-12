@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "pager"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/s17-pager/build.sh"]
+initfs = "build/fixtures/s17-pager/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s17-pagecheck"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^s17: server ready$'
+
+[[expect]]
+regex = '^s17: random pages=\d+ pageins=\d+ ok$'
+
+[[expect]]
+regex = '^s17: shared write-back pageout=\d+ ok$'
+
+[[expect]]
+regex = '^s17: private cow ok$'
+
+# The short-supply fault is delivered as a page fault: PAGER_SUPPLY with a zero length is
+# rejected, the error reply fails the in-flight page, and the faulting process exits -11.
+[[expect]]
+regex = '^s17: fault-client fault pager:error$'
+
+[[expect]]
+regex = '^process: child killed by page fault at 0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^s17: short supply pagein=\d+ short=\d+ ok$'
+
+# The second fault sees the terminal Failed page state: no second PageIn is sent.
+[[expect]]
+regex = '^s17: fault-client fault pager:error$'
+
+[[expect]]
+regex = '^process: child killed by page fault at 0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^s17: page eio ok$'
+
+# Pager death fails the outstanding PageIn with EIO and the controller keeps running.
+[[expect]]
+regex = '^s17: fault-client fault pager:death$'
+
+[[expect]]
+regex = '^s17: server pager death object=\d+$'
+
+[[expect]]
+regex = '^process: child killed by page fault at 0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^s17: pager death client=-11 server=0 ok$'
+
+[[expect]]
+regex = '^s17: present page survives pager death ok$'
+
+[[expect]]
+regex = '^s17: ok$'
+
+[[expect]]
+regex = '^s17: exit /init pager_objects=0$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|double fault|s17: failed|unexpected value'

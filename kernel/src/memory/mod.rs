@@ -11,5 +11,7 @@ pub mod aspace;
 pub mod frame;
 pub mod heap;
 pub mod mmio;
+#[cfg(target_arch = "x86_64")]
+pub mod pager;
 pub mod paging;
 pub mod uspace;
