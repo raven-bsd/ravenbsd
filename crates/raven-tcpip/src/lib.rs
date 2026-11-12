@@ -42,6 +42,10 @@ extern crate alloc;
 
 mod device;
 mod event;
+mod ipv4_stack;
+mod neighbor;
+mod reassembly;
+mod route;
 mod socket;
 mod stack;
 mod time;
@@ -50,7 +54,9 @@ pub use raven_abi::errno::Errno;
 
 pub use device::{ChecksumOffload, Device, DeviceCaps, Medium, TxError};
 pub use event::{Event, PollResult, SocketId};
-pub use stack::{Ipv4Addr, MAX_TIMERS, Stack, StackConfig, TimerId};
+pub use neighbor::{NeighborCache, NeighborEntry};
+pub use route::{Route, RouteTable};
+pub use stack::{Ipv4Addr, Ipv4Config, MAX_TIMERS, Stack, StackConfig, TimerId};
 pub use time::{Duration, Instant};
 
 #[cfg(any(test, feature = "testutil"))]
