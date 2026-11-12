@@ -40,6 +40,7 @@
 
 extern crate alloc;
 
+mod cc;
 mod device;
 mod event;
 mod icmp_stack;
@@ -60,6 +61,7 @@ mod udp_stack;
 
 pub use raven_abi::errno::Errno;
 
+pub use cc::{CcContext, CongestionControl, Cubic, LossKind, NewReno, Prr, icbrt};
 pub use device::{ChecksumOffload, Device, DeviceCaps, Medium, TxError};
 pub use event::{Event, PollResult, SocketId};
 pub use ipv6_stack::{
