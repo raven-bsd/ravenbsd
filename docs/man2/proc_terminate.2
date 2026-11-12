@@ -1,0 +1,58 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt PROC_TERMINATE 2
+.Os RavenBSD
+.Sh NAME
+.Nm proc_terminate
+.Nd terminate a process and all its threads
+.Sh SYNOPSIS
+.Fn proc_terminate proc code
+.Sh DESCRIPTION
+.Nm
+terminates the target process and every thread it owns, stores
+.Fa code
+for
+.Xr proc_wait 2 ,
+and runs the same one-shot teardown as
+.Xr exit 2 :
+scheme names owned by the process are released, pending requests fail, the address space and
+handle table are torn down and waiters are woken.
+A runnable thread of the target stops before it can run user code again; a thread blocked in a
+syscall exits at its next scheduling point.
+.Pp
+This is the authorized termination primitive for service supervision (contract C16).
+The caller must hold the
+.Dv SIGNAL
+right on the process handle; a handle duplicated without it fails with
+.Er EPERM .
+Terminating the calling process behaves like
+.Xr exit 2 .
+.Pp
+A second call on a terminal process fails with
+.Er ESRCH ;
+the exit code and the reap are observed once, through
+.Xr proc_wait 2 .
+.Sh RETURN VALUES
+Zero on success; a negative
+.Va errno
+on failure.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EBADF
+.Fa proc
+is not a valid process handle.
+.It Er EPERM
+The handle lacks the
+.Dv SIGNAL
+right.
+.It Er ESRCH
+The target process is already terminal.
+.El
+.Sh SEE ALSO
+.Xr exit 2 ,
+.Xr proc_create 2 ,
+.Xr proc_wait 2 ,
+.Xr thread_exit 2
+.Sh STANDARDS
+RavenBSD ABI v1.

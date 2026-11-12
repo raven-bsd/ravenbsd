@@ -897,6 +897,7 @@ fn reap_dead() {
         // SAFETY: each pointer was produced by `Arc::into_raw` exactly once and is owned by the
         // queue; the thread is neither current nor runnable.
         let thread = unsafe { Arc::from_raw(raw as *const Thread) };
+        self::thread::free_kernel_stack(thread.kernel_stack_base, thread.kernel_stack_top);
         drop(thread);
     }
 }

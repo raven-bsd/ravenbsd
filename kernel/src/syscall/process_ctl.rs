@@ -47,7 +47,8 @@ pub fn terminate(frame: &SyscallFrame) -> Result<usize, Errno> {
         }
     };
     if Arc::ptr_eq(&target, &caller) {
-        return Err(Errno::EINVAL);
+        // C16: terminating self behaves like exit(code).
+        process::exit_process(code);
     }
     process::terminate(&target, code)?;
     Ok(0)

@@ -700,6 +700,18 @@ fn teardown(process: &Arc<Process>, code: i32) {
     {
         kprintln!("s21: frames free={}", frame::stats().free_bytes);
     }
+    // S36 stack-reuse evidence: the fresh-allocation and cached-stack counters must return to
+    // baseline across repeated spawn/exit cycles.
+    if CmdLine::parse(paging::cmdline())
+        .get("s36-stackcheck")
+        .is_some()
+    {
+        kprintln!(
+            "s36: stacks fresh={} cached={}",
+            crate::sched::thread::stack_fresh(),
+            crate::sched::thread::stack_cached()
+        );
+    }
 }
 
 /// Set the terminal state exactly once: exit code, wake every waiter, run the teardown.
