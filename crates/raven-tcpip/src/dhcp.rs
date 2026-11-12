@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: 0BSD
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 //! DHCPv4 client (RFC 2131): a sans-IO state machine and a small message codec.
