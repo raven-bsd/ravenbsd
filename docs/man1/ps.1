@@ -1,0 +1,49 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt PS 1
+.Os RavenBSD
+.Sh NAME
+.Nm ps
+.Nd list services from the svc: scheme
+.Sh SYNOPSIS
+.Nm
+.Nm
+.Fl -selftest
+.Sh DESCRIPTION
+.Nm
+reads the directory
+.Pa svc:
+and each
+.Pa svc:/<name>
+status record, and prints one line per service:
+.Bd -literal -offset indent
+NAME STATE RESTARTS
+.Ed
+.Pp
+The state is one of
+.Ql stopped ,
+.Ql starting ,
+.Ql running ,
+.Ql restarting ,
+.Ql failed
+or
+.Ql gave-up .
+.Pp
+.Fl -selftest
+reads every status record, checks that the directory is non-empty and every
+line parses, and prints
+.Dq ps: selftest ok .
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+A missing or malformed
+.Pa svc:
+record exits with status 1.
+.Sh SEE ALSO
+.Xr svcctl 1 ,
+.Xr init 8
+.Sh STANDARDS
+The output is a RavenBSD service view, not the process table of a POSIX
+.Nm
+utility.

@@ -1,0 +1,36 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt DMESG 8
+.Os RavenBSD
+.Sh NAME
+.Nm dmesg
+.Nd print the system log ring
+.Sh SYNOPSIS
+.Nm
+.Nm
+.Fl -selftest
+.Sh DESCRIPTION
+.Nm
+opens
+.Pa log:
+and reads the in-kernel log ring from its oldest retained record, writing the
+records to the debug console.  The ring is owned by
+.Xr logd 8 ; records older than the ring capacity are unavailable.
+.Pp
+.Fl -selftest
+opens and reads the real ring and prints
+.Dq dmesg: selftest ok .
+An empty ring is a valid early-boot state, not an error.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+A missing log server exits with status 1.
+.Sh SEE ALSO
+.Xr logd 8
+.Sh STANDARDS
+The log format is the RavenBSD
+.Pa raven-logd
+record format, not the POSIX
+.Nm
+interface.

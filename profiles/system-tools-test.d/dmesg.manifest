@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "dmesg"
+exec = "/sbin/dmesg"
+args = ["dmesg", "--selftest"]
+needs = ["scheme:log"]
+readiness = "exit"
+restart = "on-failure"
+max_restarts = 0

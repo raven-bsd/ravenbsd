@@ -1,0 +1,39 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt MOUNT 1
+.Os RavenBSD
+.Sh NAME
+.Nm mount
+.Nd list or add a file: mount
+.Sh SYNOPSIS
+.Nm
+.Nm
+.Ar scheme: path
+.Nm
+.Fl -selftest
+.Sh DESCRIPTION
+The administrative interface and the full operand description are in
+.Xr mount 8 .
+The program is installed as
+.Pa /sbin/mount ;
+this section-1 entry exists because the tool's source package lives under
+.Pa userland/bin
+and the documentation gate requires a section-1 page for that package
+directory as well as the section-8 page for the installed path.
+.Pp
+With no operands it lists
+.Pa /etc/mounts
+as
+.Dq Aq scheme on Aq path .
+.Fl -selftest
+mounts and unmounts
+.Ql ramfs:
+at
+.Pa /mnt .
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr mount 8 ,
+.Xr umount 8

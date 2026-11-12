@@ -338,6 +338,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-date"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-dmesg"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-echo"
 version = "0.1.0"
 dependencies = [
@@ -376,6 +393,15 @@ name = "raven-handles"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+]
+
+[[package]]
+name = "raven-hostname"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
 ]
 
 [[package]]
@@ -515,6 +541,15 @@ name = "raven-mem"
 version = "0.1.0"
 
 [[package]]
+name = "raven-mount"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-msi"
 version = "0.1.0"
 
@@ -586,6 +621,15 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+]
+
+[[package]]
+name = "raven-ps"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
 ]
 
 [[package]]
@@ -823,6 +867,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-sleep"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-svc-manifest"
 version = "0.1.0"
 
@@ -864,6 +916,14 @@ dependencies = [
 [[package]]
 name = "raven-timemath"
 version = "0.1.0"
+
+[[package]]
+name = "raven-umount"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
 
 [[package]]
 name = "raven-uname"

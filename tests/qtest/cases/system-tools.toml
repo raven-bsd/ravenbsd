@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K39 system tools: each tool runs once with --selftest against the live shell servers. The
+# services are started in dependency order, so the output lines are matched unordered.
+
+name = "system-tools"
+arch = "x86_64"
+profile = "system-tools-test"
+timeout_secs = 180
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^hostname: selftest ok$'
+unordered = true
+
+[[expect]]
+regex = '^sleep: selftest ok$'
+unordered = true
+
+[[expect]]
+regex = '^date: selftest ok$'
+unordered = true
+
+[[expect]]
+regex = '^dmesg: selftest ok$'
+unordered = true
+
+[[expect]]
+regex = '^mount: selftest ok$'
+unordered = true
+
+[[expect]]
+regex = '^umount: selftest ok$'
+unordered = true
+
+[[expect]]
+regex = '^ps: selftest ok$'
+unordered = true
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

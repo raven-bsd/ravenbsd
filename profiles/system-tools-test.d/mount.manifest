@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "mount"
+exec = "/sbin/mount"
+args = ["mount", "--selftest"]
+needs = ["scheme:file"]
+readiness = "exit"
+restart = "on-failure"
+max_restarts = 0

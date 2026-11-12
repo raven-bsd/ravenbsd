@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.files]]
+src = "profiles/system-tools-test.d/hostname.manifest"
+path = "/etc/services.d/hostname.toml"
+
+[[initfs.files]]
+src = "profiles/system-tools-test.d/sleep.manifest"
+path = "/etc/services.d/sleep.toml"
+
+[[initfs.files]]
+src = "profiles/system-tools-test.d/date.manifest"
+path = "/etc/services.d/date.toml"
+
+[[initfs.files]]
+src = "profiles/system-tools-test.d/dmesg.manifest"
+path = "/etc/services.d/dmesg.toml"
+
+[[initfs.files]]
+src = "profiles/system-tools-test.d/mount.manifest"
+path = "/etc/services.d/mount.toml"
+
+[[initfs.files]]
+src = "profiles/system-tools-test.d/umount.manifest"
+path = "/etc/services.d/umount.toml"
+
+[[initfs.files]]
+src = "profiles/system-tools-test.d/ps.manifest"
+path = "/etc/services.d/ps.toml"

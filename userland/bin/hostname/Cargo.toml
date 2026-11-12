@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-hostname"
+version = "0.1.0"
+description = "RavenBSD hostname utility: argument parsing and sys:/hostname access."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-rt = { path = "../../../userland/rt" }
+
+[lints]
+workspace = true
