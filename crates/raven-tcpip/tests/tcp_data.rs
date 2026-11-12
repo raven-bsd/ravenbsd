@@ -409,8 +409,8 @@ fn urgent_pointer_is_parsed_and_counted() {
     builder.payload_mut().copy_from_slice(&packet);
     builder.finish();
     b.test_inject_frame(&frame, Instant::ZERO);
-    let (position, count) = b.test_tcp_urgent(socket_b).expect("urgent");
-    assert_eq!(position, Some(1));
+    assert_eq!(b.tcp_urgent(socket_b), Ok(Some(1)));
+    let (_, count) = b.test_tcp_urgent(socket_b).expect("urgent");
     assert_eq!(count, 1);
 }
 

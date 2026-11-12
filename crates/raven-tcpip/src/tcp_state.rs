@@ -344,6 +344,14 @@ impl<D: Device> Stack<D> {
         }
     }
 
+    /// The most recent urgent pointer delivered out-of-band on this socket.
+    pub fn tcp_urgent(&self, socket: SocketId) -> Result<Option<u16>, Errno> {
+        match &self.sockets.record(socket)?.kind {
+            Kind::Tcp(connection) => Ok(connection.urgent_position),
+            _ => Err(Errno::ENOTSOCK),
+        }
+    }
+
     /// The last asynchronous TCP error recorded on a socket.
     pub fn tcp_error(&self, socket: SocketId) -> Result<Option<Errno>, Errno> {
         Ok(self.sockets.record(socket)?.error)
