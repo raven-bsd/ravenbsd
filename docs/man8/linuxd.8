@@ -1,0 +1,79 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 13, 2026
+.Dt LINUXD 8
+.Os RavenBSD
+.Sh NAME
+.Nm linuxd
+.Nd RavenBSD Linux personality server
+.Sh SYNOPSIS
+.Nm
+.Op Ar image
+.Sh DESCRIPTION
+.Nm
+registers the
+.Dq linux:
+scheme, loads one static Linux executable from the
+.Xr initfs 5
+archive and starts it as a native RavenBSD process with the Linux personality.
+The kernel delivers every Linux syscall of that process to the handler as a
+.Dv CALL
+packet carrying a
+.Vt LinuxSyscallV1
+request; the server answers with a
+.Vt LinuxReplyV1
+value that the kernel writes to the process's return register.
+.Pp
+An existing client that opens
+.Dq linux:
+blocks until the server acknowledges the open; the personality handler itself is
+the scheme-server handle the server registered, so the server needs no self-open.
+.Pp
+The skeleton serves
+.Cm write ,
+.Cm exit_group ,
+.Cm brk ,
+.Cm mmap
+(anonymous only),
+.Cm getpid ,
+.Cm uname ,
+.Cm rt_sigprocmask
+and
+.Cm arch_prctl .
+Anonymous
+.Cm mmap
+and
+.Cm brk
+come from two pre-mapped arenas
+.Pq 1 MiB each ;
+every other number returns
+.Er ENOSYS
+and is counted in the statistics the server prints before it exits.
+.Pp
+The default image path is
+.Pa /hello ;
+the optional
+.Ar image
+argument selects another path in the initfs.
+.Sh EXIT STATUS
+The server exits 0 after the Linux process exits, and prints the dispatcher
+statistics
+.Pq per-syscall calls and errors, and the unimplemented hits .
+A load failure exits 3, a failed personality switch 5, and a Linux process that
+does not reach its first syscall within 20 seconds 1.
+.Sh LIMITATIONS
+The trap packet carries no process identity, so one server instance serves one
+Linux process at a time.
+.Cm arch_prctl
+with
+.Dv ARCH_SET_FS
+returns
+.Er ENOSYS
+because the kernel has no per-thread FS base; a static musl program stops in
+.Fn __init_tls
+until that primitive exists.
+There is no dynamic loader, no file descriptor table beyond stdio, and no
+.Pa /proc .
+.Sh SEE ALSO
+.Xr init 8 ,
+.Xr nulld 8
