@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 // Copyright (c) 2002 Hiroaki Etoh, Federico G. Schwindt, and Miodrag Vallat.
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+// RavenBSD: transpiled from freebsd:lib/libc/secure/libc_stack_protector.c @ 133344405f532bd54ff3629a77d4c4e062f01fdb
 //
 //! The stack-smashing failure paths.
 

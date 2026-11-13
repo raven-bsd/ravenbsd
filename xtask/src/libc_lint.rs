@@ -469,6 +469,20 @@ fn crate_path<'a>(crates: &'a Crates, name: &str) -> &'a str {
         .unwrap_or("crates/unknown")
 }
 
+/// True when `code` names the `alloc` crate (`alloc::...`), not merely a path ending in
+/// `alloc::` such as `raven_libc_malloc::`.
+fn uses_alloc_path(code: &str) -> bool {
+    let mut rest = code;
+    while let Some(pos) = rest.find("alloc::") {
+        let before = rest[..pos].chars().next_back();
+        if !matches!(before, Some(c) if c.is_alphanumeric() || c == '_') {
+            return true;
+        }
+        rest = &rest[pos + "alloc".len()..];
+    }
+    false
+}
+
 fn check_no_std(
     rel: &str,
     text: &str,
@@ -484,7 +498,7 @@ fn check_no_std(
     };
     let lines = libc_lint_scan::scan(text);
     for (index, line) in lines.iter().enumerate() {
-        if rel.ends_with("_ut.rs") || rel.contains("/tests/") {
+        if rel.ends_with("_ut.rs") || rel.contains("/tests/") || rel.contains("/examples/") {
             continue;
         }
         if line.code.contains("std::") || line.code.contains("use std") {
@@ -498,7 +512,7 @@ fn check_no_std(
         }
         if row.std == "core"
             && !row.alloc_feature
-            && (line.code.contains("alloc::") || line.code.contains("extern crate alloc"))
+            && (uses_alloc_path(&line.code) || line.code.contains("extern crate alloc"))
         {
             violations.push(error(
                 "no-std",

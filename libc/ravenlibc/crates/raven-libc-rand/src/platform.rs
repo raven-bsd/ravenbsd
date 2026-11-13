@@ -4,6 +4,7 @@
 // Copyright (c) 2013, Markus Friedl <markus@openbsd.org>
 // Copyright (c) 2014, Theo de Raadt <deraadt@openbsd.org>
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+// RavenBSD: transpiled from openbsd:lib/libc/crypt/arc4random.h @ 4ce71f2817f675745b0596aaf04de4a122b1cc52
 //
 // RavenBSD: adapted from openbsd:lib/libc/crypt/arc4random.h @ 4ce71f2817f675745b0596aaf04de4a122b1cc52
 // (file revision tag: $OpenBSD: arc4random.h,v 1.4 2015/01/15 06:57:18 deraadt Exp $)

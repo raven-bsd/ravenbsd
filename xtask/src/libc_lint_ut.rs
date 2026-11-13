@@ -432,6 +432,34 @@ fn no_cc_build_script_is_reported() {
 }
 
 #[test]
+fn no_std_core_crate_accepts_a_malloc_path() {
+    let tree = fixture();
+    manifest(&tree, "raven-libc-str");
+    crate_file(
+        &tree,
+        "raven-libc-str",
+        "src/lib.rs",
+        &format!("{HDR}use raven_libc_malloc::Entropy;\n"),
+    );
+    let violations = check(&tree, "no-std");
+    assert!(!violations.iter().any(|v| v.key == "alloc-in-core"));
+}
+
+#[test]
+fn no_std_skips_examples() {
+    let tree = fixture();
+    manifest(&tree, "raven-libc-str");
+    crate_file(
+        &tree,
+        "raven-libc-str",
+        "examples/gate.rs",
+        &format!("{HDR}fn main() {{ std::process::exit(1); }}\n"),
+    );
+    let violations = check(&tree, "no-std");
+    assert!(!violations.iter().any(|v| v.key == "std-path"));
+}
+
+#[test]
 fn no_std_core_crate_rejects_alloc() {
     let tree = fixture();
     manifest(&tree, "raven-libc-str");

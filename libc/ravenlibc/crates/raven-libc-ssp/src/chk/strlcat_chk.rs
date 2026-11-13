@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: ISC
 // Copyright (c) 1998, 2015 Todd C. Miller <Todd.Miller@courtesan.com>
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+// RavenBSD: transpiled from freebsd:lib/libc/secure/strlcat_chk.c @ 133344405f532bd54ff3629a77d4c4e062f01fdb
 //
 //! `__strlcat_chk` check core.
 

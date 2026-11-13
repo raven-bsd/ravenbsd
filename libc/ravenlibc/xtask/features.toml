@@ -9,6 +9,9 @@ crates = ["*"]
 name = "std"
 crates = ["*"]
 [[feature]]
+name = "weak-entropy-interim"
+crates = ["raven-libc-rand"]
+[[feature]]
 name = "alloc"
 crates = ["raven-libc-dtoa"]
 [[feature]]
