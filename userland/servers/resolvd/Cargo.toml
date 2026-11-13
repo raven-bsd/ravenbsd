@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "resolvd"
+version = "0.1.0"
+description = "RavenBSD DNS resolver service (resolv: scheme)."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-proto-net = { path = "../../../crates/raven-proto-net" }
+raven-scheme = { path = "../../../crates/raven-scheme" }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-rt = { path = "../../rt", features = ["alloc"] }
+
+[lints]
+workspace = true

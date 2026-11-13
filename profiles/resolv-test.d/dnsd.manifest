@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "b15-dnsd"
+exec = "/sbin/b15-dnsd"
+needs = ["scheme:net"]
+readiness = "none"
+restart = "never"

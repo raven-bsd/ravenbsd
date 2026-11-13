@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Phase 1: static override plus the loopback DNS fixture.
+name = "b15-resolv-probe"
+exec = "/sbin/b15-resolv-probe"
+args = ["b15-resolv-probe", "phase1"]
+needs = ["scheme:resolv", "b15-dnsd"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

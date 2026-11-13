@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The persistent virtio-net `nic:` service is the netd backend in this profile.
+name = "devd"
+exec = "/sbin/devd"
+args = ["devd"]
+needs = ["scheme:pci"]
+provides = ["scheme:nic", "scheme:dev"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0
