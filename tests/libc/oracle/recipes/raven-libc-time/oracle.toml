@@ -1,0 +1,87 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# raven-libc-time: NetBSD localtime.c, asctime.c, difftime.c, strftime.c and
+# strptime.c. The shim keeps the host <time.h> and supplies tzfile.h,
+# namespace.h, a C-locale <locale.h>, _GNU_SOURCE and a non-setuid
+# issetugid().
+
+schema = 1
+family = "raven-libc-time"
+description = "NetBSD localtime/gmtime/mktime/timegm/strftime/strptime/asctime/difftime originals"
+exports = [
+  "__lcl_get_monotonic_time",
+  "__lcl_isthreaded",
+  "__lcl_lock",
+  "__lcl_ptr",
+  "__lcl_rd2wrlock",
+  "__lcl_unlock",
+  "asctime",
+  "asctime_r",
+  "ctime",
+  "ctime_r",
+  "ctime_rz",
+  "difftime",
+  "gmtime",
+  "gmtime_r",
+  "localtime",
+  "localtime_r",
+  "localtime_rz",
+  "mktime",
+  "mktime_z",
+  "offtime",
+  "offtime_r",
+  "posix2time",
+  "posix2time_z",
+  "strftime",
+  "strftime_l",
+  "strftime_lz",
+  "strftime_z",
+  "strptime",
+  "strptime_l",
+  "time2posix",
+  "time2posix_z",
+  "timegm",
+  "timelocal",
+  "timelocal_z",
+  "timeoff",
+  "tzalloc",
+  "tzfree",
+  "tzgetgmtoff",
+  "tzgetname",
+  "tzset",
+  "tzset_unlocked",
+  "tzsetwall",
+]
+opt = ["O2", "O0"]
+defines = [
+  "_REENTRANT",
+  "_GNU_SOURCE",
+  "issetugid()=0",
+  "HAVE_STRFTIME_L=0",
+  "__UNCONST(x)=(x)",
+  "__type_max(t)=((t)~((1ULL<<(sizeof(t)*__CHAR_BIT__-1))))",
+  "snprintf_l(buf,size,loc,...)=snprintf(buf,size,__VA_ARGS__)",
+]
+include = ["shim:time"]
+flags = []
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/time/localtime.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/time/asctime.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/time/difftime.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/time/strftime.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/time/strptime.c"

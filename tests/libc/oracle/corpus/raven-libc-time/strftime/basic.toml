@@ -1,0 +1,261 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The C44 strftime matrix. `%P`, `^` and `#` are RD-28 extensions that the
+# pinned donor does not implement; they are covered by the crate unit tests.
+# `%w` and `%u` are included here and expose the C44 padding divergence.
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 4
+yday = 0
+isdst = 0
+gmtoff = 0
+format = "%Y"
+size = 128
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 4
+yday = 0
+isdst = 0
+gmtoff = 0
+format = "%y %C"
+size = 128
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 4
+yday = 0
+isdst = 0
+gmtoff = 0
+format = "%m %d %e %H %I %M %S %j"
+size = 128
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 4
+yday = 0
+isdst = 0
+gmtoff = 0
+format = "%w %u %U %W %V %G %g"
+size = 128
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 4
+yday = 0
+isdst = 0
+gmtoff = 0
+format = "%a %A %b %B %h %p"
+size = 128
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 4
+yday = 0
+isdst = 0
+gmtoff = 0
+format = "%c %x %X %r"
+size = 128
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 4
+yday = 0
+isdst = 0
+gmtoff = 0
+format = "%D %F %R %T %v %+"
+size = 128
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 4
+yday = 0
+isdst = 0
+gmtoff = 0
+format = "%Z %z %s"
+size = 128
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 4
+yday = 0
+isdst = 0
+gmtoff = 0
+format = "%n%t%% %Q"
+size = 128
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 4
+yday = 0
+isdst = 0
+gmtoff = 0
+format = "%-d %_d %0d %-j %_j %0j"
+size = 128
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 4
+yday = 0
+isdst = 0
+gmtoff = 0
+format = "%k:%l"
+size = 128
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 4
+yday = 0
+isdst = 0
+gmtoff = 0
+format = "%c"
+size = 25
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 4
+yday = 0
+isdst = 0
+gmtoff = 0
+format = "%c"
+size = 24
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 4
+yday = 0
+isdst = 0
+gmtoff = 0
+format = "%Y"
+size = 5
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 4
+yday = 0
+isdst = 0
+gmtoff = 0
+format = "%Y"
+size = 4
+
+[[case]]
+zone = "EST5EDT,M3.2.0,M11.1.0"
+year = 2023
+mon = 6
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 6
+yday = 181
+isdst = 1
+gmtoff = -14400
+format = "%Y-%m-%d %H:%M:%S %Z %z %s"
+size = 128
+
+[[case]]
+zone = "EST5EDT,M3.2.0,M11.1.0"
+year = 2023
+mon = 6
+mday = 1
+hour = 0
+min = 0
+sec = 0
+wday = 6
+yday = 181
+isdst = 1
+gmtoff = -14400
+format = "%a %A %w %u"
+size = 128

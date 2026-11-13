@@ -1,0 +1,126 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The C44 matrix: epoch, negative year, normalisation, EST5EDT winter/summer,
+# the spring gap and the autumn overlap. The gap is a failure on both sides
+# (the donor's default without NO_ERROR_IN_DST_GAP).
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+isdst = 0
+
+[[case]]
+zone = "UTC0"
+year = 1899
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+isdst = 0
+
+[[case]]
+zone = "UTC0"
+year = 2023
+mon = 6
+mday = 1
+hour = 12
+min = 34
+sec = 56
+isdst = 0
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 12
+mday = 1
+hour = 0
+min = 0
+sec = 0
+isdst = 0
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = -1
+mday = 1
+hour = 0
+min = 0
+sec = 0
+isdst = 0
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 0
+hour = 0
+min = 0
+sec = 0
+isdst = 0
+
+[[case]]
+zone = "UTC0"
+year = 1970
+mon = 0
+mday = 32
+hour = 0
+min = 0
+sec = 0
+isdst = 0
+
+[[case]]
+zone = "EST5EDT,M3.2.0,M11.1.0"
+year = 2023
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+isdst = -1
+
+[[case]]
+zone = "EST5EDT,M3.2.0,M11.1.0"
+year = 2023
+mon = 6
+mday = 1
+hour = 0
+min = 0
+sec = 0
+isdst = -1
+
+[[case]]
+zone = "EST5EDT,M3.2.0,M11.1.0"
+year = 2023
+mon = 2
+mday = 12
+hour = 2
+min = 30
+sec = 0
+isdst = -1
+
+[[case]]
+zone = "EST5EDT,M3.2.0,M11.1.0"
+year = 2023
+mon = 10
+mday = 5
+hour = 1
+min = 30
+sec = 0
+isdst = 0
+
+[[case]]
+zone = "EST5EDT,M3.2.0,M11.1.0"
+year = 2023
+mon = 10
+mday = 5
+hour = 1
+min = 30
+sec = 0
+isdst = 1
