@@ -418,20 +418,23 @@ pub(crate) fn strtodg(
                         nf = nf.wrapping_add(nz);
                         let mut i = 1i32;
                         while i < nz {
-                            if nd < 9 {
+                            // The donor's `if (nd++ < 9) ... else if (nd <= DBL_DIG+1) ...`
+                            // increments before the second test; a pre-increment here would let
+                            // a 17th fractional digit into `z` and break the k/scaling pairing.
+                            nd = nd.wrapping_add(1);
+                            if nd <= 9 {
                                 y = y.wrapping_mul(10);
                             } else if nd <= DBL_DIG + 1 {
                                 z = z.wrapping_mul(10);
                             }
-                            nd = nd.wrapping_add(1);
                             i = i.wrapping_add(1);
                         }
-                        if nd < 9 {
+                        nd = nd.wrapping_add(1);
+                        if nd <= 9 {
                             y = y.wrapping_mul(10).wrapping_add(digit);
                         } else if nd <= DBL_DIG + 1 {
                             z = z.wrapping_mul(10).wrapping_add(digit);
                         }
-                        nd = nd.wrapping_add(1);
                         nz = 0;
                     }
                     s = s.wrapping_add(1);

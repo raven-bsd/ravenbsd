@@ -67,3 +67,38 @@ fn long_leading_zero_run_skips_no_digit() {
     assert_eq!(expt, -133);
     assert_eq!(bits, [0x9d62_7bb1, 0xe14f_1459]);
 }
+
+#[test]
+fn seventeenth_fractional_digit_is_not_stored() {
+    // Regression: a pre-increment `nd` let the 17th significant digit into `z` while `k` stayed
+    // at DBL_DIG+1, so the starting approximation became 1024.0 instead of the f32 1023.99994.
+    let mut ctx = DtoaCtx::new();
+    let fpi = Fpi::float();
+    let mut bits = [0u32; 2];
+    let mut expt = 0i32;
+    let (n, k) = strtodg(
+        &mut ctx,
+        b"1.0239999389648438e3",
+        &fpi,
+        &mut expt,
+        &mut bits,
+        &C_NUMERIC,
+    )
+    .unwrap();
+    assert_eq!(n, 20);
+    assert_eq!(k & STRTOG_RETMASK, STRTOG_NORMAL);
+    assert_eq!(expt, -14);
+    assert_eq!(bits[0] & 0x00ff_ffff, 0x00ff_ffff);
+    assert_eq!(
+        crate::strtof::strtof(
+            &mut ctx,
+            b"1.0239999389648438e3",
+            &C_NUMERIC,
+            Rounding::Nearest
+        )
+        .unwrap()
+        .0
+        .to_bits(),
+        0x447f_ffff
+    );
+}

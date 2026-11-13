@@ -48,3 +48,10 @@ strtof_nearest = "0d15adb4"
 strtof_upward = "0d15adb4"
 strtof_downward = "0d15adb3"
 strtof_towardzero = "0d15adb3"
+
+[[case]]
+text = "1.0239999389648438e3"
+strtof_nearest = "447fffff"
+strtof_upward = "44800000"
+strtof_downward = "447fffff"
+strtof_towardzero = "447fffff"
