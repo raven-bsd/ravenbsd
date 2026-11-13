@@ -973,6 +973,7 @@ dependencies = [
  "raven-libc-dtoa",
  "raven-libc-stdlib",
  "raven-libc-str",
+ "raven-libc-time",
  "serde",
  "toml",
 ]

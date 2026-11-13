@@ -18,6 +18,7 @@ raven-libc-ctype = { path = "../../../libc/ravenlibc/crates/raven-libc-ctype" }
 raven-libc-str = { path = "../../../libc/ravenlibc/crates/raven-libc-str" }
 raven-libc-stdlib = { path = "../../../libc/ravenlibc/crates/raven-libc-stdlib" }
 raven-libc-dtoa = { path = "../../../libc/ravenlibc/crates/raven-libc-dtoa", features = ["alloc"] }
+raven-libc-time = { path = "../../../libc/ravenlibc/crates/raven-libc-time" }
 
 [features]
 default = []
@@ -35,6 +36,7 @@ oracle-stdlib-freebsd = []
 oracle-stdlib-musl = []
 oracle-dtoa = []
 oracle-dtoa-ld128 = []
+oracle-raven-libc-time = []
 all-oracles = [
     "oracle-string-basic",
     "oracle-ctype-multibyte",
@@ -50,6 +52,7 @@ all-oracles = [
     "oracle-stdlib-musl",
     "oracle-dtoa",
     "oracle-dtoa-ld128",
+    "oracle-raven-libc-time",
 ]
 
 [lints]

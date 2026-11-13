@@ -1,0 +1,172 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The C44 strptime matrix: the donor ATF vectors, names, ranges, ISO forms,
+# numeric zones, week finalisation and malformed inputs.
+
+[[case]]
+text = "Tue Jan 20 23:27:46 1998"
+format = "%a %b %d %T %Y"
+
+[[case]]
+text = "Fri Mar  4 20:05:34 2005"
+format = "%c"
+
+[[case]]
+text = "5\t3  4 8pm:05:34 2005"
+format = "%w%n%m%t%d%n%k%p:%M:%S %Y"
+
+[[case]]
+text = "Sunday"
+format = "%A"
+
+[[case]]
+text = "tueSDay"
+format = "%A"
+
+[[case]]
+text = "SaturDay"
+format = "%a"
+
+[[case]]
+text = "Moon"
+format = "%A"
+
+[[case]]
+text = "september"
+format = "%b"
+
+[[case]]
+text = "Mayor"
+format = "%b"
+
+[[case]]
+text = "Mars"
+format = "%b"
+
+[[case]]
+text = "23"
+format = "%H"
+
+[[case]]
+text = "61"
+format = "%S"
+
+[[case]]
+text = "24"
+format = "%H"
+
+[[case]]
+text = "62"
+format = "%S"
+
+[[case]]
+text = "00"
+format = "%I"
+
+[[case]]
+text = "x20y"
+format = "x%Cy"
+
+[[case]]
+text = "x84y"
+format = "x%yy"
+
+[[case]]
+text = "x2084y"
+format = "x%C%yy"
+
+[[case]]
+text = "x8420y"
+format = "x%y%Cy"
+
+[[case]]
+text = "1998-01-20"
+format = "%F"
+
+[[case]]
+text = "01/20/98"
+format = "%D"
+
+[[case]]
+text = "23:27:46"
+format = "%T"
+
+[[case]]
+text = "23:27"
+format = "%R"
+
+[[case]]
+text = "0"
+format = "%s"
+
+[[case]]
+text = "-1"
+format = "%s"
+
+[[case]]
+text = "Z"
+format = "%z"
+
+[[case]]
+text = "GMT"
+format = "%z"
+
+[[case]]
+text = "+03"
+format = "%z"
+
+[[case]]
+text = "-04:03"
+format = "%z"
+
+[[case]]
+text = "EST"
+format = "%z"
+
+[[case]]
+text = "EDT"
+format = "%z"
+
+[[case]]
+text = "UTC"
+format = "%Z"
+
+[[case]]
+text = "2023 01"
+format = "%Y %U"
+
+[[case]]
+text = "2023 060"
+format = "%Y %j"
+
+[[case]]
+text = "2023-07-01tail"
+format = "%F"
+
+[[case]]
+text = "23:27"
+format = "%H-%M"
+
+[[case]]
+text = "2023-13-01"
+format = "%Y-%m-%d"
+
+[[case]]
+text = "Bogus"
+format = "%z"
+
+[[case]]
+text = "8pm"
+format = "%k%p"
+
+[[case]]
+text = "12:00:00 AM"
+format = "%r"
+
+# C44 defect: the Rust `finish` loop runs past the last month start when
+# `%U`/`%W` week finalisation produces a yday above 365, and never returns.
+# The C oracle returns a normalised 2028 date. This is the minimal reproducer.
+[[case]]
+text = "53 5 2028"
+format = "%U %w %Y"

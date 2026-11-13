@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[case]]
+t1 = 10
+t0 = 3
+
+[[case]]
+t1 = 3
+t0 = 10
+
+[[case]]
+t1 = 5
+t0 = 5
+
+[[case]]
+t1 = 1
+t0 = -1
+
+[[case]]
+t1 = -1
+t0 = 1
+
+[[case]]
+t1 = 9007199254740991
+t0 = 0
+
+[[case]]
+t1 = 9223372036854775807
+t0 = -9223372036854775808
