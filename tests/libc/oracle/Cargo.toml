@@ -20,6 +20,7 @@ raven-libc-stdlib = { path = "../../../libc/ravenlibc/crates/raven-libc-stdlib" 
 raven-libc-dtoa = { path = "../../../libc/ravenlibc/crates/raven-libc-dtoa", features = ["alloc"] }
 raven-libc-fmt = { path = "../../../libc/ravenlibc/crates/raven-libc-fmt" }
 raven-libc-time = { path = "../../../libc/ravenlibc/crates/raven-libc-time" }
+raven-libc-m = { path = "../../../libc/ravenlibc/crates/raven-libc-m" }
 
 [features]
 default = []
@@ -36,6 +37,7 @@ oracle-stdlib-openbsd = []
 oracle-stdlib-freebsd = []
 oracle-stdlib-musl = []
 oracle-dtoa = []
+oracle-m-core = []
 oracle-dtoa-ld128 = []
 oracle-fmt-freebsd = []
 oracle-fmt-musl = []
@@ -55,6 +57,7 @@ all-oracles = [
     "oracle-stdlib-freebsd",
     "oracle-stdlib-musl",
     "oracle-dtoa",
+    "oracle-m-core",
     "oracle-dtoa-ld128",
     "oracle-fmt-freebsd",
     "oracle-fmt-musl",

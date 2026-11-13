@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Measured ULP budget of raven-libc-m against the musl C ancestor (see tests/diff_m_core.rs).
+# A zero means bit-exact. The values are the measured maxima of the default calibration run
+# (20 seeds x 10,000 cases per function) quoted in the C47a report; they are a measurement, not a
+# tolerance chosen to make the test pass.
+
+[ulp]
+atan2 = 0
+atan2f = 0
+acos = 0
+acosf = 0
+acosh = 1
+acoshf = 2
+asin = 0
+asinf = 0
+asinh = 1
+asinhf = 2
+atan = 0
+atanf = 0
+atanh = 0
+atanhf = 0
+cos = 0
+cosf = 0
+cosh = 2
+coshf = 2
+erf = 1
+erff = 1
+erfc = 4
+erfcf = 4
+exp = 1
+expf = 1
+exp2 = 1
+exp2f = 1
+exp10 = 2
+exp10f = 2
+expm1 = 0
+expm1f = 0
+j0 = 0
+j0f = 0
+j1 = 0
+j1f = 0
+jn = 0
+jnf = 0
+log = 1
+logf = 1
+log2 = 1
+log2f = 1
+log10 = 0
+log10f = 0
+log1p = 0
+log1pf = 0
+pow = 1
+powf = 1
+sin = 0
+sinf = 0
+sinh = 0
+sinhf = 1
+tan = 0
+tanf = 0
+tanh = 0
+tanhf = 0
+y0 = 32
+y0f = 64
+y1 = 3
+y1f = 4
+yn = 7
+ynf = 7

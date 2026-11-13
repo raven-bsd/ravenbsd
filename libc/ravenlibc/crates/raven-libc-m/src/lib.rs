@@ -74,9 +74,12 @@ pub(crate) const SOFT_FLOAT: bool = true;
 
 #[macro_use]
 mod macros;
+mod rsqrt;
+mod sinpi;
 #[macro_use]
 mod support;
 mod coremath;
+mod fdlibm;
 mod generic;
 mod portable;
 
@@ -379,6 +382,450 @@ pub fn modf(x: f64) -> (f64, f64) {
 #[inline]
 pub fn modff(x: f32) -> (f32, f32) {
     portable::modff(x)
+}
+
+/// The exponential of `x`.
+#[inline]
+pub fn exp(x: f64) -> f64 {
+    fdlibm::exp_fn(x)
+}
+
+/// The exponential of an f32.
+#[inline]
+pub fn expf(x: f32) -> f32 {
+    fdlibm::expf_fn(x)
+}
+
+/// `2` raised to `x`.
+#[inline]
+pub fn exp2(x: f64) -> f64 {
+    fdlibm::exp2_fn(x)
+}
+
+/// `2` raised to an f32 `x`.
+#[inline]
+pub fn exp2f(x: f32) -> f32 {
+    fdlibm::exp2f_fn(x)
+}
+
+/// `exp(x) - 1`, accurate near zero.
+#[inline]
+pub fn expm1(x: f64) -> f64 {
+    fdlibm::expm1_fn(x)
+}
+
+/// `expm1` for f32.
+#[inline]
+pub fn expm1f(x: f32) -> f32 {
+    fdlibm::expm1f_fn(x)
+}
+
+/// The natural logarithm of `x`.
+#[inline]
+pub fn log(x: f64) -> f64 {
+    fdlibm::log_fn(x)
+}
+
+/// The natural logarithm of an f32.
+#[inline]
+pub fn logf(x: f32) -> f32 {
+    fdlibm::logf_fn(x)
+}
+
+/// The base-2 logarithm of `x`.
+#[inline]
+pub fn log2(x: f64) -> f64 {
+    fdlibm::log2_fn(x)
+}
+
+/// The base-2 logarithm of an f32.
+#[inline]
+pub fn log2f(x: f32) -> f32 {
+    fdlibm::log2f_fn(x)
+}
+
+/// The base-10 logarithm of `x`.
+#[inline]
+pub fn log10(x: f64) -> f64 {
+    fdlibm::log10_fn(x)
+}
+
+/// The base-10 logarithm of an f32.
+#[inline]
+pub fn log10f(x: f32) -> f32 {
+    fdlibm::log10f_fn(x)
+}
+
+/// `log(1 + x)`, accurate near zero.
+#[inline]
+pub fn log1p(x: f64) -> f64 {
+    fdlibm::log1p_fn(x)
+}
+
+/// `log1p` for f32.
+#[inline]
+pub fn log1pf(x: f32) -> f32 {
+    fdlibm::log1pf_fn(x)
+}
+
+/// The hyperbolic sine of `x`.
+#[inline]
+pub fn sinh(x: f64) -> f64 {
+    fdlibm::sinh_fn(x)
+}
+
+/// The hyperbolic sine of an f32.
+#[inline]
+pub fn sinhf(x: f32) -> f32 {
+    fdlibm::sinhf_fn(x)
+}
+
+/// The hyperbolic cosine of `x`.
+#[inline]
+pub fn cosh(x: f64) -> f64 {
+    fdlibm::cosh_fn(x)
+}
+
+/// The hyperbolic cosine of an f32.
+#[inline]
+pub fn coshf(x: f32) -> f32 {
+    fdlibm::coshf_fn(x)
+}
+
+/// The hyperbolic tangent of `x`.
+#[inline]
+pub fn tanh(x: f64) -> f64 {
+    fdlibm::tanh_fn(x)
+}
+
+/// The hyperbolic tangent of an f32.
+#[inline]
+pub fn tanhf(x: f32) -> f32 {
+    fdlibm::tanhf_fn(x)
+}
+
+/// The inverse hyperbolic sine of `x`.
+#[inline]
+pub fn asinh(x: f64) -> f64 {
+    fdlibm::asinh_fn(x)
+}
+
+/// The inverse hyperbolic sine of an f32.
+#[inline]
+pub fn asinhf(x: f32) -> f32 {
+    fdlibm::asinhf_fn(x)
+}
+
+/// The inverse hyperbolic cosine of `x`.
+#[inline]
+pub fn acosh(x: f64) -> f64 {
+    fdlibm::acosh_fn(x)
+}
+
+/// The inverse hyperbolic cosine of an f32.
+#[inline]
+pub fn acoshf(x: f32) -> f32 {
+    fdlibm::acoshf_fn(x)
+}
+
+/// The inverse hyperbolic tangent of `x`.
+#[inline]
+pub fn atanh(x: f64) -> f64 {
+    fdlibm::atanh_fn(x)
+}
+
+/// The inverse hyperbolic tangent of an f32.
+#[inline]
+pub fn atanhf(x: f32) -> f32 {
+    fdlibm::atanhf_fn(x)
+}
+
+/// The error function of `x`.
+#[inline]
+pub fn erf(x: f64) -> f64 {
+    fdlibm::erf_fn(x)
+}
+
+/// The error function of an f32.
+#[inline]
+pub fn erff(x: f32) -> f32 {
+    fdlibm::erff_fn(x)
+}
+
+/// The complementary error function of `x`.
+#[inline]
+pub fn erfc(x: f64) -> f64 {
+    fdlibm::erfc_fn(x)
+}
+
+/// The complementary error function of an f32.
+#[inline]
+pub fn erfcf(x: f32) -> f32 {
+    fdlibm::erfcf_fn(x)
+}
+
+/// `log|Gamma(x)|` and the sign of `Gamma(x)`.
+#[inline]
+pub fn lgamma_r(x: f64) -> (f64, i32) {
+    fdlibm::lgamma_r_fn(x)
+}
+
+/// `lgamma_r` for f32.
+#[inline]
+pub fn lgammaf_r(x: f32) -> (f32, i32) {
+    fdlibm::lgammaf_r_fn(x)
+}
+
+/// `log|Gamma(x)|`.
+#[inline]
+pub fn lgamma(x: f64) -> f64 {
+    fdlibm::lgamma_fn(x)
+}
+
+/// `lgamma` for f32.
+#[inline]
+pub fn lgammaf(x: f32) -> f32 {
+    fdlibm::lgammaf_fn(x)
+}
+
+/// The sine of `x`, in radians.
+#[inline]
+pub fn sin(x: f64) -> f64 {
+    fdlibm::sin_fn(x)
+}
+
+/// The sine of an f32.
+#[inline]
+pub fn sinf(x: f32) -> f32 {
+    fdlibm::sinf_fn(x)
+}
+
+/// The cosine of `x`, in radians.
+#[inline]
+pub fn cos(x: f64) -> f64 {
+    fdlibm::cos_fn(x)
+}
+
+/// The cosine of an f32.
+#[inline]
+pub fn cosf(x: f32) -> f32 {
+    fdlibm::cosf_fn(x)
+}
+
+/// The tangent of `x`, in radians.
+#[inline]
+pub fn tan(x: f64) -> f64 {
+    fdlibm::tan_fn(x)
+}
+
+/// The tangent of an f32.
+#[inline]
+pub fn tanf(x: f32) -> f32 {
+    fdlibm::tanf_fn(x)
+}
+
+/// The arcsine of `x`.
+#[inline]
+pub fn asin(x: f64) -> f64 {
+    fdlibm::asin_fn(x)
+}
+
+/// The arcsine of an f32.
+#[inline]
+pub fn asinf(x: f32) -> f32 {
+    fdlibm::asinf_fn(x)
+}
+
+/// The arccosine of `x`.
+#[inline]
+pub fn acos(x: f64) -> f64 {
+    fdlibm::acos_fn(x)
+}
+
+/// The arccosine of an f32.
+#[inline]
+pub fn acosf(x: f32) -> f32 {
+    fdlibm::acosf_fn(x)
+}
+
+/// The arctangent of `x`.
+#[inline]
+pub fn atan(x: f64) -> f64 {
+    fdlibm::atan_fn(x)
+}
+
+/// The arctangent of an f32.
+#[inline]
+pub fn atanf(x: f32) -> f32 {
+    fdlibm::atanf_fn(x)
+}
+
+/// The arctangent of `y / x`, using the signs to pick the quadrant.
+#[inline]
+pub fn atan2(y: f64, x: f64) -> f64 {
+    fdlibm::atan2_fn(y, x)
+}
+
+/// `atan2` for f32.
+#[inline]
+pub fn atan2f(y: f32, x: f32) -> f32 {
+    fdlibm::atan2f_fn(y, x)
+}
+
+/// `x` raised to `y`.
+#[inline]
+pub fn pow(x: f64, y: f64) -> f64 {
+    fdlibm::pow_fn(x, y)
+}
+
+/// `x` raised to `y`, f32.
+#[inline]
+pub fn powf(x: f32, y: f32) -> f32 {
+    fdlibm::powf_fn(x, y)
+}
+
+/// `10` raised to `x`.
+#[inline]
+pub fn exp10(x: f64) -> f64 {
+    fdlibm::exp10_fn(x)
+}
+
+/// `10` raised to an f32 `x`.
+#[inline]
+pub fn exp10f(x: f32) -> f32 {
+    fdlibm::exp10f_fn(x)
+}
+
+/// The gamma function of `x`.
+#[inline]
+pub fn tgamma(x: f64) -> f64 {
+    fdlibm::tgamma_fn(x)
+}
+
+/// The gamma function of an f32.
+#[inline]
+pub fn tgammaf(x: f32) -> f32 {
+    fdlibm::tgammaf_fn(x)
+}
+
+/// The Bessel function of the first kind, order zero.
+#[inline]
+pub fn j0(x: f64) -> f64 {
+    fdlibm::j0_fn(x)
+}
+
+/// `j0` for f32.
+#[inline]
+pub fn j0f(x: f32) -> f32 {
+    fdlibm::j0f_fn(x)
+}
+
+/// The Bessel function of the first kind, order one.
+#[inline]
+pub fn j1(x: f64) -> f64 {
+    fdlibm::j1_fn(x)
+}
+
+/// `j1` for f32.
+#[inline]
+pub fn j1f(x: f32) -> f32 {
+    fdlibm::j1f_fn(x)
+}
+
+/// The Bessel function of the first kind, order `n`.
+#[inline]
+pub fn jn(n: i32, x: f64) -> f64 {
+    fdlibm::jn_fn(n, x)
+}
+
+/// `jn` for f32.
+#[inline]
+pub fn jnf(n: i32, x: f32) -> f32 {
+    fdlibm::jnf_fn(n, x)
+}
+
+/// The Bessel function of the second kind, order zero.
+#[inline]
+pub fn y0(x: f64) -> f64 {
+    fdlibm::y0_fn(x)
+}
+
+/// `y0` for f32.
+#[inline]
+pub fn y0f(x: f32) -> f32 {
+    fdlibm::y0f_fn(x)
+}
+
+/// The Bessel function of the second kind, order one.
+#[inline]
+pub fn y1(x: f64) -> f64 {
+    fdlibm::y1_fn(x)
+}
+
+/// `y1` for f32.
+#[inline]
+pub fn y1f(x: f32) -> f32 {
+    fdlibm::y1f_fn(x)
+}
+
+/// The Bessel function of the second kind, order `n`.
+#[inline]
+pub fn yn(n: i32, x: f64) -> f64 {
+    fdlibm::yn_fn(n, x)
+}
+
+/// `yn` for f32.
+#[inline]
+pub fn ynf(n: i32, x: f32) -> f32 {
+    fdlibm::ynf_fn(n, x)
+}
+
+/// The reciprocal square root of `x`.
+#[inline]
+pub fn rsqrt(x: f64) -> f64 {
+    rsqrt::rsqrt(x)
+}
+
+/// The reciprocal square root of an f32.
+#[inline]
+pub fn rsqrtf(x: f32) -> f32 {
+    rsqrt::rsqrtf(x)
+}
+
+/// `sin(pi * x)`.
+#[inline]
+pub fn sinpi(x: f64) -> f64 {
+    sinpi::sinpi(x)
+}
+
+/// `sin(pi * x)` for f32.
+#[inline]
+pub fn sinpif(x: f32) -> f32 {
+    sinpi::sinpif(x)
+}
+
+/// C23 `fmaximum_mag`.
+#[inline]
+pub fn fmaximum_mag(x: f64, y: f64) -> f64 {
+    generic::fmaximum_mag(x, y)
+}
+
+/// C23 `fmaximum_mag` for f32.
+#[inline]
+pub fn fmaximum_magf(x: f32, y: f32) -> f32 {
+    generic::fmaximum_mag(x, y)
+}
+
+/// C23 `fminimum_mag`.
+#[inline]
+pub fn fminimum_mag(x: f64, y: f64) -> f64 {
+    generic::fminimum_mag(x, y)
+}
+
+/// C23 `fminimum_mag` for f32.
+#[inline]
+pub fn fminimum_magf(x: f32, y: f32) -> f32 {
+    generic::fminimum_mag(x, y)
 }
 
 #[cfg(test)]

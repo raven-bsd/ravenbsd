@@ -37,6 +37,9 @@ pub mod stdlib_musl;
 #[cfg(feature = "oracle-dtoa")]
 pub mod dtoa;
 
+#[cfg(feature = "oracle-m-core")]
+pub mod m;
+
 #[cfg(feature = "oracle-fmt-freebsd")]
 pub mod fmt_freebsd;
 
