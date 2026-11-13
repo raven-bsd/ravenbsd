@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Fixed ctype corpus: ASCII extremes, negative signed-char values and EOF.
+
+[[case]]
+c = -23
+
+[[case]]
+c = -1
+
+[[case]]
+c = 0
+
+[[case]]
+c = 9
+
+[[case]]
+c = 32
+
+[[case]]
+c = 48
+
+[[case]]
+c = 65
+
+[[case]]
+c = 97
+
+[[case]]
+c = 126
+
+[[case]]
+c = 127
+
+[[case]]
+c = 128
+
+[[case]]
+c = 233
+
+[[case]]
+c = 255

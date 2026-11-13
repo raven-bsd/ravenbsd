@@ -525,21 +525,21 @@ ring = 1
 [[header]]
 path = "ctype.h"
 owner = "C39"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "wctype.h"
 owner = "C39"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "uchar.h"
 owner = "C39"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 

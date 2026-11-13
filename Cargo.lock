@@ -880,6 +880,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-ctype"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+]
+
+[[package]]
 name = "raven-libc-hdrcheck"
 version = "0.1.0"
 
@@ -897,6 +904,7 @@ dependencies = [
 name = "raven-libc-oracle"
 version = "0.1.0"
 dependencies = [
+ "raven-libc-ctype",
  "serde",
  "toml",
 ]

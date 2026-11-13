@@ -14,11 +14,14 @@ publish = false
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 toml = "1.2"
+raven-libc-ctype = { path = "../../../libc/ravenlibc/crates/raven-libc-ctype" }
 
 [features]
 default = []
 oracle-string-basic = []
-all-oracles = ["oracle-string-basic"]
+oracle-ctype-multibyte = []
+oracle-ctype-class = []
+all-oracles = ["oracle-string-basic", "oracle-ctype-multibyte", "oracle-ctype-class"]
 
 [lints]
 workspace = true

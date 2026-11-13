@@ -2705,3 +2705,663 @@ copied = "2026-11-13"
 modified = true
 notes = "COPY per donor-map/14 5.B row 40; __RENAME/__LIBC12_SOURCE__ dropped, upstream UC Berkeley notice kept verbatim."
 
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/internal.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/internal.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1; macros ported as const fn"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/bittab.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/internal.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1; 51 entries, C/D/E/F as const fn"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/mbrtowc.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/mbrtowc.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/wcrtomb.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/wcrtomb.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/mbtowc.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/mbtowc.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1; second return value is the C return (0 for NUL)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/wctomb.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/wctomb.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/mblen.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/mblen.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/mbrlen.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/mbrlen.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/mbsinit.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/mbsinit.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1; both state words are checked"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/btowc.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/btowc.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/wctob.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/wctob.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/mbsrtowcs.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/mbsrtowcs.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1; word-at-a-time ASCII path kept with safe slices"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/mbsnrtowcs.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/mbsnrtowcs.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1; bounded direct loop (D-ct-5)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/wcsrtombs.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/wcsrtombs.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1; 4-byte temporary, no partial character"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/wcsnrtombs.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/wcsnrtombs.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/mbstowcs.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/mbstowcs.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/wcstombs.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/wcstombs.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/mbrtoc16.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/mbrtoc16.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1; shared state word, pending low surrogate positive"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/c16rtomb.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/c16rtomb.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/mbrtoc32.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/mbrtoc32.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/c32rtomb.rs"
+upstream = "musl"
+upstream_path = "src/multibyte/c32rtomb.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.1"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/mbrtoc8.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/locale/mbrtoc8.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "BSD-2 header read (Copyright (c) 2024 The NetBSD Foundation); state re-layout into word 0 (inner mbrtowc) and word 1 (nleft + 3 bytes); donor-map/02 3.1 row 13"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/utf8/c8rtomb.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/locale/c8rtomb.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "BSD-2 header read (Copyright (c) 2024 The NetBSD Foundation); state_c32 in word 0, word 1 unused (wcrtomb is stateless); donor-map/02 3.1 row 13"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/ctype/isalnum.rs"
+upstream = "musl"
+upstream_path = "src/ctype/isalnum.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/ctype/isalpha.rs"
+upstream = "musl"
+upstream_path = "src/ctype/isalpha.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2; ASCII arithmetic, total over i32"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/ctype/isascii.rs"
+upstream = "musl"
+upstream_path = "src/ctype/isascii.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/ctype/isblank.rs"
+upstream = "musl"
+upstream_path = "src/ctype/isblank.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/ctype/iscntrl.rs"
+upstream = "musl"
+upstream_path = "src/ctype/iscntrl.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/ctype/isdigit.rs"
+upstream = "musl"
+upstream_path = "src/ctype/isdigit.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/ctype/isgraph.rs"
+upstream = "musl"
+upstream_path = "src/ctype/isgraph.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/ctype/islower.rs"
+upstream = "musl"
+upstream_path = "src/ctype/islower.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/ctype/isprint.rs"
+upstream = "musl"
+upstream_path = "src/ctype/isprint.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/ctype/ispunct.rs"
+upstream = "musl"
+upstream_path = "src/ctype/ispunct.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/ctype/isspace.rs"
+upstream = "musl"
+upstream_path = "src/ctype/isspace.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/ctype/isupper.rs"
+upstream = "musl"
+upstream_path = "src/ctype/isupper.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/ctype/isxdigit.rs"
+upstream = "musl"
+upstream_path = "src/ctype/isxdigit.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/ctype/toascii.rs"
+upstream = "musl"
+upstream_path = "src/ctype/toascii.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/ctype/tolower.rs"
+upstream = "musl"
+upstream_path = "src/ctype/tolower.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/ctype/toupper.rs"
+upstream = "musl"
+upstream_path = "src/ctype/toupper.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wctype/iswalnum.rs"
+upstream = "musl"
+upstream_path = "src/ctype/iswalnum.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wctype/iswalpha.rs"
+upstream = "musl"
+upstream_path = "src/ctype/iswalpha.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY logic per donor-map/02 3.2; data regenerated from UCD 15.1.0 (alpha.h not copied)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wctype/iswblank.rs"
+upstream = "musl"
+upstream_path = "src/ctype/iswblank.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wctype/iswcntrl.rs"
+upstream = "musl"
+upstream_path = "src/ctype/iswcntrl.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wctype/iswdigit.rs"
+upstream = "musl"
+upstream_path = "src/ctype/iswdigit.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wctype/iswgraph.rs"
+upstream = "musl"
+upstream_path = "src/ctype/iswgraph.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wctype/iswlower.rs"
+upstream = "musl"
+upstream_path = "src/ctype/iswlower.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wctype/iswprint.rs"
+upstream = "musl"
+upstream_path = "src/ctype/iswprint.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wctype/iswpunct.rs"
+upstream = "musl"
+upstream_path = "src/ctype/iswpunct.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY logic per donor-map/02 3.2; data regenerated from UCD 15.1.0 (punct.h not copied); U+00AD and No added (D-ct-11)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wctype/iswspace.rs"
+upstream = "musl"
+upstream_path = "src/ctype/iswspace.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2; 21-entry list verbatim"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wctype/iswupper.rs"
+upstream = "musl"
+upstream_path = "src/ctype/iswupper.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wctype/iswxdigit.rs"
+upstream = "musl"
+upstream_path = "src/ctype/iswxdigit.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wctype/iswctype.rs"
+upstream = "musl"
+upstream_path = "src/ctype/iswctype.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2; wctype_t is u64"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wctype/wctrans.rs"
+upstream = "musl"
+upstream_path = "src/ctype/wctrans.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wctype/towctrans.rs"
+upstream = "musl"
+upstream_path = "src/ctype/towctrans.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY logic per donor-map/02 3.2; casemap.h replaced by generated CASE tables (D-ct-11)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wcwidth.rs"
+upstream = "musl"
+upstream_path = "src/ctype/wcwidth.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2; nonspacing.h/wide.h replaced by generated table"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ctype/src/wcswidth.rs"
+upstream = "musl"
+upstream_path = "src/ctype/wcswidth.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; COPY per donor-map/02 3.2"
+
+[[import]]
+path = "libc/ravenlibc/include/ctype.h"
+upstream = "musl"
+upstream_path = "include/ctype.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; static inline forms and exported symbols, all _l variants, no _ctype_"
+
+[[import]]
+path = "libc/ravenlibc/include/wctype.h"
+upstream = "musl"
+upstream_path = "include/wctype.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; WEOF (wint_t)-1, all _l forms"
+
+[[import]]
+path = "libc/ravenlibc/include/uchar.h"
+upstream = "musl"
+upstream_path = "include/uchar.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; C23 char8_t from the compiler, mbrtoc8/c8rtomb added"
+
+[[import]]
+path = "xtask/data/ucd-15.1.0/SOURCE.txt"
+upstream = "netbsd"
+upstream_path = "external/gpl3/gcc/dist/contrib/unicode/UnicodeData.txt"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-Unicode-DFS"
+tier = "A"
+copied = "2026-11-13"
+modified = false
+notes = "manifest for the six Unicode 15.1.0 data files copied byte-for-byte (UnicodeData.txt, DerivedCoreProperties.txt, EastAsianWidth.txt, PropList.txt, emoji-data.txt, unicode-license.txt); data input of the generator, doc 02 3.3; SPDX spelling is a QUESTION (LicenseRef-Unicode-DFS)"
+
