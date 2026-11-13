@@ -5170,4 +5170,257 @@ copied = "2026-11-13"
 modified = false
 notes = "the Spencer COPYRIGHT text, byte-identical to the donor; the 19 .in and 7 .dat data files and the two READMEs under the same directory are also byte-identical copies (SHA-256 list in tickets/carl/reports/C45.md) but cannot carry a directory [[import]] under the checker's provenance-notice rule (they have no Copyright line); see the report deviation"
 
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-glob/src/fnmatch.rs"
+upstream = "musl"
+upstream_path = "src/regex/fnmatch.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; COPY per donor-map/07 3.2; FreeBSD flag values (A-glob-3), locale through PatternLocale, UNMATCHABLE unchanged"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-glob/src/wordexp.rs"
+upstream = "musl"
+upstream_path = "src/misc/wordexp.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; COPY per donor-map/07 3.4; fork/pipe/wait replaced by the ShellRun trait, WRDE_* values are the FreeBSD header's"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-glob/src/glob.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/gen/glob.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/07 3.3; strcoll sorting is byte order, collation removed, DirSys/GlobEnv/PatternLocale seams, H-GL-1 (brace and PATH_MAX checks without GLOB_LIMIT)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/fts.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/gen/fts.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/07 3.5; arena nodes and DirSys; H-FTS-1..5 (forced FTS_NOCHDIR, O_NOFOLLOW, dev/ino re-check, fd budget rescue, PATH_MAX cap); ufslinks/statfs cache/whiteouts/blocks removed"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/ftw.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/gen/ftw.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/07 3.5; over the Rust fts, DARPA credit kept, FTS_DC stays fatal (ELOOP) as in the donor"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/nftw.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/gen/nftw.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/07 3.5; over the Rust fts, FTW_CHDIR is a documented no-op under forced FTS_NOCHDIR, FTS_DC is skipped"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/dirent/dirstream.rs"
+upstream = "musl"
+upstream_path = "src/dirent/__dirent.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; COPY per donor-map/07 3.6; 2048-byte buffer and field roles kept, the lock is the shell's"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/dirent/opendir.rs"
+upstream = "musl"
+upstream_path = "src/dirent/opendir.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; COPY per donor-map/07 3.6; O_RDONLY|O_DIRECTORY|O_CLOEXEC through DirSys"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/dirent/fdopendir.rs"
+upstream = "musl"
+upstream_path = "src/dirent/fdopendir.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; COPY per donor-map/07 3.6; O_PATH -> EBADF and non-directory -> ENOTDIR; ownership is taken"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/dirent/readdir.rs"
+upstream = "musl"
+upstream_path = "src/dirent/readdir.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; COPY per donor-map/07 3.6; getdents ENOENT is end of stream (A-dir-1), malformed record -> EIO (RD-new)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/dirent/readdir_r.rs"
+upstream = "musl"
+upstream_path = "src/dirent/readdir_r.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; COPY per donor-map/07 3.6; the DIR lock is the shell's (A-dir-3)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/dirent/closedir.rs"
+upstream = "musl"
+upstream_path = "src/dirent/closedir.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; COPY per donor-map/07 3.6; returns the close result"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/dirent/rewinddir.rs"
+upstream = "musl"
+upstream_path = "src/dirent/rewinddir.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; COPY per donor-map/07 3.6; lseek(0, SEEK_SET), empty buffer, tell=0"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/dirent/seekdir.rs"
+upstream = "musl"
+upstream_path = "src/dirent/seekdir.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; COPY per donor-map/07 3.6; OI-2 d_off cookie contract"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/dirent/telldir.rs"
+upstream = "musl"
+upstream_path = "src/dirent/telldir.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; COPY per donor-map/07 3.6; returns the last d_off"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/dirent/dirfd.rs"
+upstream = "musl"
+upstream_path = "src/dirent/dirfd.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; COPY per donor-map/07 3.6"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/dirent/posix_getdents.rs"
+upstream = "musl"
+upstream_path = "src/dirent/posix_getdents.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; COPY per donor-map/07 3.6; flags != 0 -> EOPNOTSUPP, len clamped to INT_MAX"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/scandir/scandir.rs"
+upstream = "musl"
+upstream_path = "src/dirent/scandir.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; COPY per donor-map/07 3.6; tolerant local merge sort (RD-new), INT_MAX -> EOVERFLOW, try_reserve -> ENOMEM; qsort_r/cancellation are the shell's"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/scandir/alphasort.rs"
+upstream = "musl"
+upstream_path = "src/dirent/alphasort.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; COPY per donor-map/07 3.6; strcoll becomes byte order (UTF-8 only, no collation)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/src/scandir/versionsort.rs"
+upstream = "musl"
+upstream_path = "src/dirent/versionsort.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; COPY per donor-map/07 3.6; strverscmp comes from raven-libc-str (RD-18)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-glob/tests/data/openbsd_fnm.rs"
+upstream = "openbsd"
+upstream_path = "regress/lib/libc/fnmatch/fnm_test.in"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "LicenseRef-PublicDomain"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "the 184 fnm_test.in vector lines converted mechanically to Rust tuples (public domain, 2008, Todd C. Miller); not a code file"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-glob/tests/data/freebsd_fnmatch.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/gen/fnmatch_testcases.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "the 138 fnmatch_testcases.h entries converted mechanically to Rust tuples; BSD-2-Clause, Jilles Tjoelker 2010; test data only"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fts/tests/data/fts_options.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/gen/fts_options_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "the ten fts_options_test.c expectation tables converted mechanically to Rust tuples; BSD-2-Clause, Klara Inc. 2025; test data only"
+
 

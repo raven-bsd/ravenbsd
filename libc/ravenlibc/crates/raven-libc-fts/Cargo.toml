@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-fts"
+version = "0.1.0"
+description = "ravenlibc fts, ftw, nftw and the DIR stream over a DirSys seam."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+# testutil is test/host-only code (17-crate-layout 10, rule L-8 c): it exports the fake directory
+# tree in `src/fake.rs` and the unit tests that need it. It never exports a symbol.
+[features]
+default = []
+testutil = []
+
+[dependencies]
+raven-libc-abi = { path = "../raven-libc-abi" }
+raven-libc-str = { path = "../raven-libc-str" }
