@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PublicDomain
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+// RavenBSD: transpiled from netbsd:lib/libc/time/localtime.c @ 36eddebcc36cb0775aa2962005b9c05419a6ff01
 //
 // RavenBSD: the POSIX TZ-string parser from
 // netbsd:lib/libc/time/localtime.c @ 36eddebcc36cb0775aa2962005b9c05419a6ff01
