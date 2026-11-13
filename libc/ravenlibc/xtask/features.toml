@@ -81,3 +81,7 @@ crates = ["raven-libc-malloc"]
 [[feature]]
 name = "debug"
 crates = ["raven-libc-malloc"]
+
+[[feature]]
+name = "testutil"
+crates = ["raven-libc-fts"]

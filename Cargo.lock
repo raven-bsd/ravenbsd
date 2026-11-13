@@ -960,6 +960,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-fts"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-str",
+]
+
+[[package]]
+name = "raven-libc-glob"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-ctype",
+ "raven-libc-str",
+]
+
+[[package]]
 name = "raven-libc-hdrcheck"
 version = "0.1.0"
 
@@ -1021,6 +1038,14 @@ version = "0.1.0"
 dependencies = [
  "raven-libc-abi",
  "raven-libc-nss",
+]
+
+[[package]]
+name = "raven-libc-regex"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-ctype",
 ]
 
 [[package]]

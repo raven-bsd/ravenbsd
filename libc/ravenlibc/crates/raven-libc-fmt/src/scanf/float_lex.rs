@@ -103,6 +103,9 @@ pub(crate) fn parse_token<C: CharUnit, S: ScanSource<C>>(
     let mut total = 0usize;
     let mut n = 0usize;
     let mut rejected: Option<C> = None;
+    let mut exp_digits = 0usize;
+    let mut bad_exp = false;
+    let mut hex_prefix = false;
 
     'read: while let Some(ch) = f.getc() {
         let c = ch.to_u32();
@@ -183,6 +186,7 @@ pub(crate) fn parse_token<C: CharUnit, S: ScanSource<C>>(
                     state = State::Digits;
                     if c == u32::from(b'X') || c == u32::from(b'x') {
                         ishex = true;
+                        hex_prefix = true;
                     } else {
                         gotmantdig = true;
                         continue 'state;
@@ -228,7 +232,9 @@ pub(crate) fn parse_token<C: CharUnit, S: ScanSource<C>>(
                 State::ExpDigits => {
                     if is_digit(c) {
                         commit_now = true;
+                        exp_digits = exp_digits.saturating_add(1);
                     } else {
+                        bad_exp = true;
                         rejected = Some(ch);
                         break 'read;
                     }
@@ -246,6 +252,25 @@ pub(crate) fn parse_token<C: CharUnit, S: ScanSource<C>>(
         }
     }
 
+    if state == State::Exp || (state == State::ExpDigits && exp_digits == 0) {
+        // musl's floatscan treats an exponent marker without at least one
+        // exponent digit as a matching failure; bionic would commit the
+        // mantissa. The musl oracle is the arbiter for scanf.
+        bad_exp = true;
+    }
+    if state == State::Inf && infnanpos != 2 && infnanpos != 7 {
+        // "inf"/"infinity" only; a partial "inity" fails in musl.
+        bad_exp = true;
+    }
+    if state == State::Nan && infnanpos >= 3 {
+        // An unclosed nan(...) is a failure in musl; the closed form leaves
+        // infnanpos at -1 after `)`.
+        bad_exp = true;
+    }
+    if hex_prefix && !gotmantdig {
+        // "0x" with no hex digit is not the token "0" for musl scanf.
+        bad_exp = true;
+    }
     if let Some(ch) = rejected {
         f.ungetc(ch);
     }
@@ -258,6 +283,9 @@ pub(crate) fn parse_token<C: CharUnit, S: ScanSource<C>>(
     }
     if let Some(slot) = buf.get_mut(commit) {
         *slot = 0;
+    }
+    if bad_exp {
+        return 0;
     }
     commit
 }

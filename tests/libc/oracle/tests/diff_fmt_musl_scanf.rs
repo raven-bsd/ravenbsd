@@ -57,7 +57,7 @@ fn run(input: &str, fmt: &str, ndest: usize) -> CaseResult {
         va.word(off as u64);
         rust_cells.push(off);
     }
-    let (cret, result) = diff_sscanf(input, fmt, &c_ptrs, &mut va);
+    let (cret, result) = diff_sscanf(input.as_bytes(), fmt, &c_ptrs, &mut va);
     CaseResult {
         cret,
         result,
