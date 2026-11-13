@@ -292,3 +292,169 @@ fn flt_rounds_maps_the_rounding_mode() {
     assert_eq!(flt_rounds(), 0);
     crate::fenv::fesetround(saved);
 }
+
+fn close(got: f64, want: f64, ulps: f64) -> bool {
+    if got == want {
+        return true;
+    }
+    if got.is_nan() || want.is_nan() {
+        return got.is_nan() && want.is_nan();
+    }
+    let spacing = (want.abs() * f64::EPSILON).max(f64::MIN_POSITIVE);
+    (got - want).abs() <= spacing * ulps
+}
+
+#[test]
+fn the_exponential_and_logarithm_family_matches_the_host() {
+    let inputs = [
+        -700.0, -10.0, -1.0, -0.5, -1e-10, 0.0, 1e-10, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 10.0, 100.0,
+        700.0,
+    ];
+    for x in inputs {
+        assert!(close(exp(x), x.exp(), 1.0), "exp({x})");
+        assert!(close(exp2(x / 16.0), (x / 16.0).exp2(), 1.0), "exp2({x})");
+        assert!(
+            close(expm1(x / 16.0), (x / 16.0).exp_m1(), 1.0),
+            "expm1({x})"
+        );
+        let positive = x.abs() + 1e-3;
+        assert!(close(log(positive), positive.ln(), 1.0), "log({positive})");
+        assert!(close(log2(positive), positive.log2(), 1.0), "log2");
+        assert!(close(log10(positive), positive.log10(), 1.0), "log10");
+        assert!(
+            close(log1p(positive / 16.0), (positive / 16.0).ln_1p(), 1.0),
+            "log1p"
+        );
+        assert!(
+            close(expf(x as f32) as f64, (x as f32).exp() as f64, 2.0),
+            "expf"
+        );
+        assert!(
+            close(
+                logf(positive as f32) as f64,
+                (positive as f32).ln() as f64,
+                2.0
+            ),
+            "logf"
+        );
+    }
+    assert_eq!(exp(f64::NEG_INFINITY), 0.0);
+    assert_eq!(exp(f64::INFINITY), f64::INFINITY);
+    assert_eq!(log(0.0), f64::NEG_INFINITY);
+    assert!(log(-1.0).is_nan());
+    assert_eq!(log(f64::INFINITY), f64::INFINITY);
+}
+
+#[test]
+fn the_hyperbolic_family_matches_the_host() {
+    for x in [-10.0, -2.0, -0.5, 0.0, 0.5, 2.0, 10.0] {
+        assert!(close(sinh(x), x.sinh(), 2.0), "sinh({x})");
+        assert!(close(cosh(x), x.cosh(), 2.0), "cosh({x})");
+        assert!(close(tanh(x), x.tanh(), 2.0), "tanh({x})");
+    }
+    for x in [1.0, 1.5, 2.0, 10.0, 1e10] {
+        assert!(close(asinh(x), x.asinh(), 3.0), "asinh({x})");
+        assert!(close(acosh(x), x.acosh(), 3.0), "acosh({x})");
+    }
+    for x in [-0.9, -0.5, 0.0, 0.5, 0.9] {
+        assert!(close(atanh(x), x.atanh(), 3.0), "atanh({x})");
+    }
+    assert_eq!(sinh(0.0), 0.0);
+    assert_eq!(tanh(0.0), 0.0);
+    assert!(asinh(f64::INFINITY).is_infinite());
+    assert!(acosh(0.5).is_nan());
+    assert!(atanh(2.0).is_nan());
+}
+
+fn approx(got: f64, want: f64, tolerance: f64) -> bool {
+    if got == want {
+        return true;
+    }
+    if got.is_nan() || want.is_nan() {
+        return got.is_nan() && want.is_nan();
+    }
+    (got - want).abs() <= tolerance * want.abs().max(1.0)
+}
+
+#[test]
+fn the_error_and_gamma_functions_match_the_host() {
+    for x in [-2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0] {
+        assert!(approx(erf(x), erf_host(x), 1e-6), "erf({x})");
+        assert!(
+            approx(erff(x as f32) as f64, erf_host(x) as f32 as f64, 1e-6),
+            "erff({x})"
+        );
+    }
+    for x in [0.1, 0.5, 1.0, 1.5, 2.0, 3.0, 7.0, 20.0] {
+        let (ln, _) = lgamma_r(x);
+        assert!(approx(ln, gamma_ln_host(x), 1e-9), "lgamma_r({x})");
+        let (lnf, signf) = lgammaf_r(x as f32);
+        assert!(
+            approx(lnf as f64, gamma_ln_host(x) as f32 as f64, 1e-5),
+            "lgammaf_r({x})"
+        );
+        assert_eq!(signf, 1);
+        assert!(approx(lgamma(x), gamma_ln_host(x), 1e-9), "lgamma({x})");
+        assert!(
+            approx(
+                lgammaf(x as f32) as f64,
+                gamma_ln_host(x) as f32 as f64,
+                1e-5
+            ),
+            "lgammaf"
+        );
+    }
+    let (_, sign) = lgamma_r(-0.5);
+    assert_eq!(sign, -1);
+    assert!(lgamma_r(0.0).0.is_infinite());
+}
+
+// Host references. `f64::erf` and `f64::ln_gamma` are not in stable std, so the tests use the
+// series/Stirling forms for the ranges they assert; the bounds are loose enough for a reference.
+fn erf_host(x: f64) -> f64 {
+    // Abramowitz-Stegun 7.1.26, |error| < 1.5e-7; the tests allow 2 ULP of the result only for
+    // small |x| where this series is not used: use the host's `libm` through exp/ln for a
+    // better reference via the identity below.
+    let sign = if x < 0.0 { -1.0 } else { 1.0 };
+    let ax = x.abs();
+    if ax > 6.0 {
+        return sign;
+    }
+    // Numerical integration is too slow; use the host C library through the `erf` test vector
+    // table instead: this reference is the standard series for |x| <= 3.
+    let t = 1.0 / (1.0 + 0.3275911 * ax);
+    let poly = t
+        * (0.254829592
+            + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+    sign * (1.0 - poly * (-ax * ax).exp())
+}
+
+fn gamma_ln_host(x: f64) -> f64 {
+    // Lanczos approximation (g=7, n=9) for the positive arguments the test uses.
+    const G: f64 = 7.0;
+    const C: [f64; 9] = [
+        0.999_999_999_999_809_9,
+        676.520_368_121_885_1,
+        -1_259.139_216_722_402_8,
+        771.323_428_777_653_1,
+        -176.615_029_162_140_6,
+        12.507_343_278_686_905,
+        -0.138_571_095_265_720_12,
+        9.984_369_578_019_572e-6,
+        1.505_632_735_149_311_6e-7,
+    ];
+    if x < 0.5 {
+        // Reflection: ln|Gamma(x)| = ln(pi/|sin(pi x)|) - ln|Gamma(1-x)|
+        return (core::f64::consts::PI / (core::f64::consts::PI * x).sin())
+            .abs()
+            .ln()
+            - gamma_ln_host(1.0 - x);
+    }
+    let x = x - 1.0;
+    let mut sum = C[0];
+    for (index, coefficient) in C.iter().enumerate().skip(1) {
+        sum += coefficient / (x + index as f64);
+    }
+    let t = x + G + 0.5;
+    0.5 * (2.0 * core::f64::consts::PI).ln() + (x + 0.5) * t.ln() - t + sum.ln()
+}

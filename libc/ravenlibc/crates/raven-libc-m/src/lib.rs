@@ -77,6 +77,7 @@ mod macros;
 #[macro_use]
 mod support;
 mod coremath;
+mod fdlibm;
 mod generic;
 mod portable;
 
@@ -379,6 +380,198 @@ pub fn modf(x: f64) -> (f64, f64) {
 #[inline]
 pub fn modff(x: f32) -> (f32, f32) {
     portable::modff(x)
+}
+
+/// The exponential of `x`.
+#[inline]
+pub fn exp(x: f64) -> f64 {
+    fdlibm::exp_fn(x)
+}
+
+/// The exponential of an f32.
+#[inline]
+pub fn expf(x: f32) -> f32 {
+    fdlibm::expf_fn(x)
+}
+
+/// `2` raised to `x`.
+#[inline]
+pub fn exp2(x: f64) -> f64 {
+    fdlibm::exp2_fn(x)
+}
+
+/// `2` raised to an f32 `x`.
+#[inline]
+pub fn exp2f(x: f32) -> f32 {
+    fdlibm::exp2f_fn(x)
+}
+
+/// `exp(x) - 1`, accurate near zero.
+#[inline]
+pub fn expm1(x: f64) -> f64 {
+    fdlibm::expm1_fn(x)
+}
+
+/// `expm1` for f32.
+#[inline]
+pub fn expm1f(x: f32) -> f32 {
+    fdlibm::expm1f_fn(x)
+}
+
+/// The natural logarithm of `x`.
+#[inline]
+pub fn log(x: f64) -> f64 {
+    fdlibm::log_fn(x)
+}
+
+/// The natural logarithm of an f32.
+#[inline]
+pub fn logf(x: f32) -> f32 {
+    fdlibm::logf_fn(x)
+}
+
+/// The base-2 logarithm of `x`.
+#[inline]
+pub fn log2(x: f64) -> f64 {
+    fdlibm::log2_fn(x)
+}
+
+/// The base-2 logarithm of an f32.
+#[inline]
+pub fn log2f(x: f32) -> f32 {
+    fdlibm::log2f_fn(x)
+}
+
+/// The base-10 logarithm of `x`.
+#[inline]
+pub fn log10(x: f64) -> f64 {
+    fdlibm::log10_fn(x)
+}
+
+/// The base-10 logarithm of an f32.
+#[inline]
+pub fn log10f(x: f32) -> f32 {
+    fdlibm::log10f_fn(x)
+}
+
+/// `log(1 + x)`, accurate near zero.
+#[inline]
+pub fn log1p(x: f64) -> f64 {
+    fdlibm::log1p_fn(x)
+}
+
+/// `log1p` for f32.
+#[inline]
+pub fn log1pf(x: f32) -> f32 {
+    fdlibm::log1pf_fn(x)
+}
+
+/// The hyperbolic sine of `x`.
+#[inline]
+pub fn sinh(x: f64) -> f64 {
+    fdlibm::sinh_fn(x)
+}
+
+/// The hyperbolic sine of an f32.
+#[inline]
+pub fn sinhf(x: f32) -> f32 {
+    fdlibm::sinhf_fn(x)
+}
+
+/// The hyperbolic cosine of `x`.
+#[inline]
+pub fn cosh(x: f64) -> f64 {
+    fdlibm::cosh_fn(x)
+}
+
+/// The hyperbolic cosine of an f32.
+#[inline]
+pub fn coshf(x: f32) -> f32 {
+    fdlibm::coshf_fn(x)
+}
+
+/// The hyperbolic tangent of `x`.
+#[inline]
+pub fn tanh(x: f64) -> f64 {
+    fdlibm::tanh_fn(x)
+}
+
+/// The hyperbolic tangent of an f32.
+#[inline]
+pub fn tanhf(x: f32) -> f32 {
+    fdlibm::tanhf_fn(x)
+}
+
+/// The inverse hyperbolic sine of `x`.
+#[inline]
+pub fn asinh(x: f64) -> f64 {
+    fdlibm::asinh_fn(x)
+}
+
+/// The inverse hyperbolic sine of an f32.
+#[inline]
+pub fn asinhf(x: f32) -> f32 {
+    fdlibm::asinhf_fn(x)
+}
+
+/// The inverse hyperbolic cosine of `x`.
+#[inline]
+pub fn acosh(x: f64) -> f64 {
+    fdlibm::acosh_fn(x)
+}
+
+/// The inverse hyperbolic cosine of an f32.
+#[inline]
+pub fn acoshf(x: f32) -> f32 {
+    fdlibm::acoshf_fn(x)
+}
+
+/// The inverse hyperbolic tangent of `x`.
+#[inline]
+pub fn atanh(x: f64) -> f64 {
+    fdlibm::atanh_fn(x)
+}
+
+/// The inverse hyperbolic tangent of an f32.
+#[inline]
+pub fn atanhf(x: f32) -> f32 {
+    fdlibm::atanhf_fn(x)
+}
+
+/// The error function of `x`.
+#[inline]
+pub fn erf(x: f64) -> f64 {
+    fdlibm::erf_fn(x)
+}
+
+/// The error function of an f32.
+#[inline]
+pub fn erff(x: f32) -> f32 {
+    fdlibm::erff_fn(x)
+}
+
+/// `log|Gamma(x)|` and the sign of `Gamma(x)`.
+#[inline]
+pub fn lgamma_r(x: f64) -> (f64, i32) {
+    fdlibm::lgamma_r_fn(x)
+}
+
+/// `lgamma_r` for f32.
+#[inline]
+pub fn lgammaf_r(x: f32) -> (f32, i32) {
+    fdlibm::lgammaf_r_fn(x)
+}
+
+/// `log|Gamma(x)|`.
+#[inline]
+pub fn lgamma(x: f64) -> f64 {
+    fdlibm::lgamma_fn(x)
+}
+
+/// `lgamma` for f32.
+#[inline]
+pub fn lgammaf(x: f32) -> f32 {
+    fdlibm::lgammaf_fn(x)
 }
 
 #[cfg(test)]

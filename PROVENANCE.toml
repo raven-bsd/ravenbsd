@@ -6499,3 +6499,443 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "the ten fts_options_test.c expectation tables converted mechanically to Rust tuples; BSD-2-Clause, Klara Inc. 2025; test data only"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/acoshf.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/acoshf.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/acosh.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/acosh.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/asinhf.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/asinhf.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/asinh.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/asinh.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/atanhf.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/atanhf.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/atanh.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/atanh.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/coshf.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/coshf.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/cosh.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/cosh.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/erff.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/erff.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/erf.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/erf.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/exp2f.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/exp2f.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/exp2.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/exp2.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/expf.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/expf.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/expm1f.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/expm1f.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/expm1.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/expm1.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/expm1_ut.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/expm1.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Donor sanity test moved out of expm1.rs into _ut.rs (handbook rule 9) plus added special-value cases."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/expo2.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/expo2.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/exp.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/exp.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/k_cosf.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/k_cosf.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/k_cos.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/k_cos.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/k_expo2f.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/k_expo2f.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/k_expo2.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/k_expo2.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/k_sinf.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/k_sinf.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/k_sin.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/k_sin.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/lgammaf_r.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/lgammaf_r.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/lgammaf.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/lgammaf.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/lgamma_r.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/lgamma_r.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/lgamma.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/lgamma.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log10f.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/log10f.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log10.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/log10.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log1pf.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/log1pf.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log1p.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/log1p.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log2f.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/log2f.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log2.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/log2.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/logf.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/logf.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/log.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/log.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/sinhf.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/sinhf.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/sinh.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/sinh.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/tanhf.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/tanhf.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fdlibm/tanh.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/tanh.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 numerics; fdlibm family file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained in the file)."
