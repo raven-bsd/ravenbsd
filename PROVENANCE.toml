@@ -6499,3 +6499,344 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "the ten fts_options_test.c expectation tables converted mechanically to Rust tuples; BSD-2-Clause, Klara Inc. 2025; test data only"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/vis/vis.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gen/vis.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled from the NetBSD vis.c (the FreeBSD contrib/libc-vis checkout is absent); UTF-8-only multibyte path via raven-libc-ctype, _DIAGASSERT dropped, weak aliases dropped"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/vis/unvis.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gen/unvis.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled from the NetBSD unvis.c; the state word is packed into the C `int *astate`, _DIAGASSERT dropped"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/stringlist.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/gen/stringlist.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; the C StringList lives in the shell, the Rust StringList is the logic"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/humanize/number.rs"
+upstream = "freebsd"
+upstream_path = "lib/libutil/humanize_number.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; localeconv decimal point fixed to `.`, hand-written snprintf formatting"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/humanize/expand.rs"
+upstream = "freebsd"
+upstream_path = "lib/libutil/expand_number.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; base-0 strtoumax parsing and the suffix table kept"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/humanize/scaled.rs"
+upstream = "netbsd"
+upstream_path = "crypto/external/bsd/openssh/dist/fmt_scaled.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled from OpenSSH's copy of openbsd:lib/libutil/fmt_scaled.c (the OpenBSD libutil checkout is absent); the fmt/scan logic is unchanged"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/fparseln.rs"
+upstream = "freebsd"
+upstream_path = "lib/libutil/fparseln.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; fgetln replaced by the LineSource seam, line cap 64 KiB"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/getbsize.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/getbsize.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; getenv is a parameter and the warnx calls move to the shell"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/getcap.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/getcap.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled text path only; every db.h/.db/cdbget/cgetusedb path deleted (R19), files via ReadFile"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/ttyent.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/getttyent.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; whole-file ReadFile, keyword union with the FreeBSD header, TtyEnt gains group"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/usershell.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/getusershell.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; the compiled default list is replaced by /etc/shells else /bin/sh (ticket T3 row)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/setmode.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/setmode.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; umask is a getmode argument, reallocarray growth is a Vec, compress_mode kept"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/readpassphrase.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/readpassphrase.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; tty/signals via the TtyOps seam, VSTATUS line not translated (Linux-layout termios)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/pty/openpty.rs"
+upstream = "freebsd"
+upstream_path = "lib/libutil/pty.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; the grp/tty lookup is dropped, syscalls via the PtyOps seam"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/pty/forkpty.rs"
+upstream = "freebsd"
+upstream_path = "lib/libutil/pty.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; fork() ENOSYS is propagated and both ends are closed"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/pty/login_tty.rs"
+upstream = "freebsd"
+upstream_path = "lib/libutil/login_tty.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; tcsetsid replaced by the set_ctty seam"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/pty/shared.rs"
+upstream = "freebsd"
+upstream_path = "lib/libutil/pty.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "the constants and the name copy shared by openpty/forkpty, from pty.c"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/uuid/compare.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/uuid/uuid_compare.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; NULL inputs are the nil UUID"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/uuid/equal.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/uuid/uuid_equal.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/uuid/nil.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/uuid/uuid_is_nil.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/uuid/string.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/uuid/uuid_from_string.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled from uuid_from_string.c and uuid_to_string.c (same donor directory); exact 36-char form"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/uuid/hash.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/uuid/uuid_hash.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/uuid/stream.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/uuid/uuid_stream.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; LE/BE octet layouts kept"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/crypt/md5.rs"
+upstream = "musl"
+upstream_path = "src/crypt/crypt_md5.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT AND BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; no per-file header, MIT via musl/COPYRIGHT plus the embedded Poul-Henning Kamp BSD-2 md5crypt notice"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/crypt/sha256.rs"
+upstream = "musl"
+upstream_path = "src/crypt/crypt_sha256.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; no per-file header, MIT via musl/COPYRIGHT; ROUNDS_MAX follows the ticket (999999999, clamped)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/crypt/sha512.rs"
+upstream = "musl"
+upstream_path = "src/crypt/crypt_sha512.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; no per-file header, MIT via musl/COPYRIGHT; ROUNDS_MAX follows the ticket (999999999, clamped)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/crypt/bcrypt.rs"
+upstream = "netbsd"
+upstream_path = "lib/libcrypt/bcrypt.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; minor b added per ticket 5.C, arc4random is the Entropy seam, bcrypt_checkpass not exported"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/src/crypt/blowfish.rs"
+upstream = "netbsd"
+upstream_path = "lib/libcrypt/blowfish.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "transpiled; the P/S tables are extracted mechanically and checked by an FNV-1a test"
+
+[[import]]
+path = "libc/ravenlibc/include/uuid.h"
+upstream = "freebsd"
+upstream_path = "include/uuid.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "copied; struct uuid and _UUID_NODE_LEN inlined from freebsd:sys/sys/uuid.h because that internal header is not installed, plus an explicit <stdint.h>"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/tests/data/vis_oracle.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gen/vis.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "generated differential data (256 bytes x 12 flag sets), not code"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-compat/tests/data/setmode_oracle.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/setmode.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "generated differential data (200 specs x 16 modes x 4 umasks), not code"

@@ -1,0 +1,415 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The C65 export table (ticket section 6.9). One [[export]] per C symbol; `rust` names the
+# crate path that the shell file of the same name calls. The shell lives in
+# `crates/raven-libc/src/compat/<name>.rs`. `Symbol.map` does not exist in this base (C60 owns
+# it), so the version node is recorded here and the map is DEFERRED (see the C65 report).
+
+schema = 1
+version = "RAVEN_1.0"
+
+[[export]]
+name = "vis"
+rust = "vis::vis::vis"
+header = "vis.h"
+
+[[export]]
+name = "svis"
+rust = "vis::vis::svis"
+header = "vis.h"
+
+[[export]]
+name = "strvis"
+rust = "vis::vis::strvis"
+header = "vis.h"
+
+[[export]]
+name = "strsvis"
+rust = "vis::vis::strsvis"
+header = "vis.h"
+
+[[export]]
+name = "strnvis"
+rust = "vis::vis::strnvis"
+header = "vis.h"
+
+[[export]]
+name = "strsnvis"
+rust = "vis::vis::strsnvis"
+header = "vis.h"
+
+[[export]]
+name = "strvisx"
+rust = "vis::vis::strvisx"
+header = "vis.h"
+
+[[export]]
+name = "strsvisx"
+rust = "vis::vis::strsvisx"
+header = "vis.h"
+
+[[export]]
+name = "strnvisx"
+rust = "vis::vis::strnvisx"
+header = "vis.h"
+
+[[export]]
+name = "nvis"
+rust = "vis::vis::nvis"
+header = "vis.h"
+
+[[export]]
+name = "snvis"
+rust = "vis::vis::snvis"
+header = "vis.h"
+
+[[export]]
+name = "unvis"
+rust = "vis::unvis::Unvis::feed"
+header = "vis.h"
+
+[[export]]
+name = "strunvis"
+rust = "vis::unvis::strunvis"
+header = "vis.h"
+
+[[export]]
+name = "strnunvis"
+rust = "vis::unvis::strnunvis"
+header = "vis.h"
+
+[[export]]
+name = "strunvisx"
+rust = "vis::unvis::strunvisx"
+header = "vis.h"
+
+[[export]]
+name = "strnunvisx"
+rust = "vis::unvis::strnunvisx"
+header = "vis.h"
+
+[[export]]
+name = "sl_init"
+rust = "stringlist::StringList::new"
+header = "stringlist.h"
+
+[[export]]
+name = "sl_add"
+rust = "stringlist::StringList::add"
+header = "stringlist.h"
+
+[[export]]
+name = "sl_free"
+rust = "stringlist::StringList::clear"
+header = "stringlist.h"
+
+[[export]]
+name = "sl_find"
+rust = "stringlist::StringList::find"
+header = "stringlist.h"
+
+[[export]]
+name = "humanize_number"
+rust = "humanize::humanize_number"
+header = "libutil.h"
+
+[[export]]
+name = "expand_number"
+rust = "humanize::expand_number"
+header = "libutil.h"
+
+[[export]]
+name = "fmt_scaled"
+rust = "humanize::fmt_scaled"
+header = "libutil.h"
+
+[[export]]
+name = "scan_scaled"
+rust = "humanize::scan_scaled"
+header = "libutil.h"
+
+[[export]]
+name = "fparseln"
+rust = "fparseln::fparseln"
+header = "libutil.h"
+
+[[export]]
+name = "pidfile"
+rust = "pidfile::pidfile"
+header = "libutil.h"
+
+[[export]]
+name = "openpty"
+rust = "pty::openpty"
+header = "libutil.h"
+
+[[export]]
+name = "login_tty"
+rust = "pty::login_tty"
+header = "libutil.h"
+
+[[export]]
+name = "forkpty"
+rust = "pty::forkpty"
+header = "libutil.h"
+
+[[export]]
+name = "getbsize"
+rust = "getbsize::getbsize"
+header = "stdlib.h"
+
+[[export]]
+name = "cgetent"
+rust = "getcap::CapDb::ent"
+header = "stdlib.h"
+
+[[export]]
+name = "cgetset"
+rust = "getcap::CapDb::set"
+header = "stdlib.h"
+
+[[export]]
+name = "cgetmatch"
+rust = "getcap::matches"
+header = "stdlib.h"
+
+[[export]]
+name = "cgetcap"
+rust = "getcap::cap"
+header = "stdlib.h"
+
+[[export]]
+name = "cgetnum"
+rust = "getcap::num"
+header = "stdlib.h"
+
+[[export]]
+name = "cgetstr"
+rust = "getcap::str_"
+header = "stdlib.h"
+
+[[export]]
+name = "cgetustr"
+rust = "getcap::ustr"
+header = "stdlib.h"
+
+[[export]]
+name = "cgetfirst"
+rust = "getcap::CapDb::first"
+header = "stdlib.h"
+
+[[export]]
+name = "cgetnext"
+rust = "getcap::CapDb::next"
+header = "stdlib.h"
+
+[[export]]
+name = "cgetclose"
+rust = "getcap::CapDb::close"
+header = "stdlib.h"
+
+[[export]]
+name = "getttyent"
+rust = "ttyent::TtyDb::next"
+header = "ttyent.h"
+
+[[export]]
+name = "getttynam"
+rust = "ttyent::TtyDb::by_name"
+header = "ttyent.h"
+
+[[export]]
+name = "setttyent"
+rust = "ttyent::TtyDb::rewind"
+header = "ttyent.h"
+
+[[export]]
+name = "endttyent"
+rust = "ttyent::TtyDb (drop)"
+header = "ttyent.h"
+
+[[export]]
+name = "getusershell"
+rust = "usershell::Shells::next"
+header = "unistd.h"
+
+[[export]]
+name = "setusershell"
+rust = "usershell::Shells::rewind"
+header = "unistd.h"
+
+[[export]]
+name = "endusershell"
+rust = "usershell::Shells (drop)"
+header = "unistd.h"
+
+[[export]]
+name = "setmode"
+rust = "setmode::setmode"
+header = "stdlib.h"
+
+[[export]]
+name = "getmode"
+rust = "setmode::ModeSet::getmode"
+header = "stdlib.h"
+
+[[export]]
+name = "readpassphrase"
+rust = "readpassphrase::readpassphrase"
+header = "readpassphrase.h"
+
+[[export]]
+name = "uuid_create"
+rust = "uuid::create"
+header = "uuid.h"
+
+[[export]]
+name = "uuid_create_nil"
+rust = "uuid::create_nil"
+header = "uuid.h"
+
+[[export]]
+name = "uuid_compare"
+rust = "uuid::compare"
+header = "uuid.h"
+
+[[export]]
+name = "uuid_equal"
+rust = "uuid::equal"
+header = "uuid.h"
+
+[[export]]
+name = "uuid_is_nil"
+rust = "uuid::is_nil"
+header = "uuid.h"
+
+[[export]]
+name = "uuid_hash"
+rust = "uuid::hash"
+header = "uuid.h"
+
+[[export]]
+name = "uuid_from_string"
+rust = "uuid::from_string"
+header = "uuid.h"
+
+[[export]]
+name = "uuid_to_string"
+rust = "uuid::to_string"
+header = "uuid.h"
+
+[[export]]
+name = "uuid_enc_le"
+rust = "uuid::enc_le"
+header = "uuid.h"
+
+[[export]]
+name = "uuid_dec_le"
+rust = "uuid::dec_le"
+header = "uuid.h"
+
+[[export]]
+name = "uuid_enc_be"
+rust = "uuid::enc_be"
+header = "uuid.h"
+
+[[export]]
+name = "uuid_dec_be"
+rust = "uuid::dec_be"
+header = "uuid.h"
+
+[[export]]
+name = "crypt"
+rust = "crypt::crypt_r"
+header = "crypt.h"
+
+[[export]]
+name = "crypt_r"
+rust = "crypt::crypt_r"
+header = "crypt.h"
+
+[[export]]
+name = "setmntent"
+rust = "mntent (shell fopen)"
+header = "mntent.h"
+
+[[export]]
+name = "getmntent"
+rust = "mntent::parse_line"
+header = "mntent.h"
+
+[[export]]
+name = "getmntent_r"
+rust = "mntent::parse_line"
+header = "mntent.h"
+
+[[export]]
+name = "addmntent"
+rust = "mntent::format"
+header = "mntent.h"
+
+[[export]]
+name = "endmntent"
+rust = "mntent (shell fclose)"
+header = "mntent.h"
+
+[[export]]
+name = "hasmntopt"
+rust = "mntent::hasmntopt"
+header = "mntent.h"
+
+[[export]]
+name = "setutxent"
+rust = "utmpx::setutxent"
+header = "utmpx.h"
+
+[[export]]
+name = "endutxent"
+rust = "utmpx::endutxent"
+header = "utmpx.h"
+
+[[export]]
+name = "getutxent"
+rust = "utmpx::getutxent"
+header = "utmpx.h"
+
+[[export]]
+name = "getutxid"
+rust = "utmpx::getutxid"
+header = "utmpx.h"
+
+[[export]]
+name = "getutxline"
+rust = "utmpx::getutxline"
+header = "utmpx.h"
+
+[[export]]
+name = "pututxline"
+rust = "utmpx::pututxline"
+header = "utmpx.h"
+
+[[export]]
+name = "updwtmpx"
+rust = "utmpx::updwtmpx"
+header = "utmpx.h"
+
+[[export]]
+name = "backtrace"
+rust = "execinfo::backtrace"
+header = "execinfo.h"
+
+[[export]]
+name = "backtrace_symbols"
+rust = "execinfo::format_symbols"
+header = "execinfo.h"
+
+[[export]]
+name = "backtrace_symbols_fd"
+rust = "execinfo::format_symbol"
+header = "execinfo.h"
+
+[[export]]
+name = "devname"
+rust = "devname::devname_stub"
+header = "stdlib.h"

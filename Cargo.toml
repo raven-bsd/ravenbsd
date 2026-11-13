@@ -65,6 +65,7 @@ members = [
     "tests/qtest",
     "tests/ufs-oracle",
     "tests/libc/oracle",
+    "tests/libc/va",
     "tests/libc/headers",
     "tests/ufs-powercut",
     "tools/fs-fuzz",

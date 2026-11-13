@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# compat-vis: netbsd:lib/libc/gen/{vis,unvis}.c (BSD-3), the donor used because the pinned
+# freebsd:contrib/libc-vis checkout is absent (RD-new in the C65 report).
+
+schema = 1
+family = "compat-vis"
+description = "NetBSD vis/unvis: byte and string encoders/decoders"
+exports = [
+  "nvis",
+  "snvis",
+  "stravis",
+  "strenvisx",
+  "strnunvis",
+  "strnunvisx",
+  "strnvis",
+  "strnvisx",
+  "strsenvisx",
+  "strsnvis",
+  "strsnvisx",
+  "strsvis",
+  "strsvisx",
+  "strunvis",
+  "strunvisx",
+  "strvis",
+  "strvisx",
+  "svis",
+  "unvis",
+  "vis",
+]
+opt = ["O2", "O0"]
+defines = ["NBBY=8", "CTASSERT(x)=", "__RENAME(x)="]
+include = ["shim:compat"]
+flags = []
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gen/vis.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gen/unvis.c"

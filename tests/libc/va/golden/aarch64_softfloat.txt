@@ -1,0 +1,21 @@
+0000000000000000 <t_snprintf>:
+       0:      	stp	x29, x30, [sp, #-240]!
+       4:      	mov	x29, sp
+       8:      	stp	x0, x1, [sp, #16]
+       c:      	stp	x2, x3, [sp, #32]
+      10:      	stp	x4, x5, [sp, #48]
+      14:      	stp	x6, x7, [sp, #64]
+      18:      	add	x9, sp, #240
+      1c:      	str	x9, [sp, #208]
+      20:      	add	x9, sp, #80
+      24:      	str	x9, [sp, #216]
+      28:      	add	x9, sp, #208
+      2c:      	str	x9, [sp, #224]
+      30:      	mov	w9, #-40
+      34:      	str	w9, [sp, #232]
+      38:      	mov	w9, #0
+      3c:      	str	w9, [sp, #236]
+      40:      	add	x3, sp, #208
+      44:      	bl	0x44 <t_snprintf+0x44>
+      48:      	ldp	x29, x30, [sp], #240
+      4c:      	ret

@@ -77,7 +77,7 @@ const GENERATED_COPIES: &[(&str, &str)] = &[
 ];
 
 const VALID_OWNERS: &[&str] = &[
-    "C37", "C38", "C39", "C40", "C41", "C45", "C48", "C53", "C57", "C67",
+    "C37", "C38", "C39", "C40", "C41", "C45", "C48", "C53", "C57", "C65", "C67",
 ];
 
 #[test]

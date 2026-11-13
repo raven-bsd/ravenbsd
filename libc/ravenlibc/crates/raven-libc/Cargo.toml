@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# C59 skeleton: only `src/va/**` is C59's; C60 fills the export modules and the rest of the
+# manifest. The one dependency is the trait crate the readers implement.
+[package]
+name = "raven-libc"
+version = "0.1.0"
+description = "ravenlibc C-ABI shell: exported symbols, variadic trampolines and va_list readers"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+
+[dependencies]
+raven-libc-abi = { path = "../raven-libc-abi" }
+raven-libc-compat = { path = "../raven-libc-compat" }
+raven-libc-fmt = { path = "../raven-libc-fmt" }

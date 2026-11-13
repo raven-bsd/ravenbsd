@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# compat-setmode: openbsd:lib/libc/gen/setmode.c (BSD-3).
+
+schema = 1
+family = "compat-setmode"
+description = "OpenBSD setmode/getmode symbolic mode parser"
+exports = ["getmode", "setmode"]
+opt = ["O2", "O0"]
+defines = ["S_ISTXT=01000"]
+include = []
+flags = []
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/gen/setmode.c"
