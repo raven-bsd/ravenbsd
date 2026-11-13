@@ -76,8 +76,8 @@ fn the_epoch_conversions() {
     assert_eq!(format(&tm, "%M"), b"00");
     assert_eq!(format(&tm, "%S"), b"00");
     assert_eq!(format(&tm, "%j"), b"001");
-    assert_eq!(format(&tm, "%w"), b"04");
-    assert_eq!(format(&tm, "%u"), b"04");
+    assert_eq!(format(&tm, "%w"), b"4");
+    assert_eq!(format(&tm, "%u"), b"4");
     assert_eq!(format(&tm, "%U"), b"00");
     assert_eq!(format(&tm, "%W"), b"00");
     assert_eq!(format(&tm, "%V"), b"01");
@@ -167,6 +167,24 @@ fn empty_output_is_zero() {
     let ctx = StrftimeCtx::default();
     let mut out = [0u8; 1];
     assert_eq!(strftime(&state, &CLocale, &mut out, b"", &tm, &ctx), 0);
+}
+
+#[test]
+fn percent_s_clears_a_daylight_saving_flag() {
+    let tm = Tm {
+        tm_sec: 0,
+        tm_min: 0,
+        tm_hour: 0,
+        tm_mday: 1,
+        tm_mon: 6,
+        tm_year: 123,
+        tm_wday: 6,
+        tm_yday: 181,
+        tm_isdst: 1,
+        tm_gmtoff: -4 * 3600,
+        tm_zone: crate::tz::NO_ZONE,
+    };
+    assert_eq!(format(&tm, "%s"), b"1688184000");
 }
 
 #[test]

@@ -16,6 +16,7 @@ use raven_libc_abi::errno::{EINVAL, EOVERFLOW};
 use crate::sys::errno;
 use crate::tz::consts::{
     DAYSPERLYEAR, EPOCH_YEAR, HOURSPERDAY, MINSPERHOUR, MONSPERYEAR, SECSPERMIN, TM_YEAR_BASE,
+    TZ_MAX_TYPES,
 };
 use crate::tz::convert::{localtime_r, offtime};
 use crate::tz::overflow::{TIME_T_MAX, TIME_T_MIN, isleap, year_days};
@@ -224,51 +225,106 @@ fn adjust_isdst(zone: Zone<'_>, t: i64, yourtm: &Tm) -> Result<i64, Errno> {
     Err(errno(EOVERFLOW))
 }
 
+/// `time2`: the first pass without seconds normalisation, then with it.
+fn time2(zone: Zone<'_>, tmp: &mut Tm) -> Result<i64, Errno> {
+    match time2sub(zone, tmp, false) {
+        Ok(t) => Ok(t),
+        Err(_) => time2sub(zone, tmp, true),
+    }
+}
+
+/// `time1`: the donor's final fallback for a `tm_isdst`/offset mismatch.
+///
+/// When `time2` cannot match the requested type, the donor tries each
+/// transition type pair, shifts `tm_sec` by the UT-offset difference and
+/// toggles `tm_isdst` before searching again.
+fn time1(zone: Zone<'_>, tmp: &mut Tm) -> Result<i64, Errno> {
+    let failure = match time2(zone, tmp) {
+        Ok(t) => return Ok(t),
+        Err(error) => error,
+    };
+    if tmp.tm_isdst < 0 {
+        return Err(failure);
+    }
+    let state = match zone {
+        Zone::Local(state) => state,
+        Zone::Fixed(_) => return Err(errno(EINVAL)),
+    };
+    let mut seen = [false; TZ_MAX_TYPES];
+    let mut types = [0usize; TZ_MAX_TYPES];
+    let mut nseen = 0usize;
+    for kind in state.types.iter().rev() {
+        let index = usize::from(*kind);
+        if index < state.typecnt && !seen.get(index).copied().unwrap_or(true) {
+            if let Some(slot) = seen.get_mut(index) {
+                *slot = true;
+            }
+            if let Some(slot) = types.get_mut(nseen) {
+                *slot = index;
+                nseen += 1;
+            }
+        }
+    }
+    for sameind in 0..nseen {
+        let Some(&same_index) = types.get(sameind) else {
+            continue;
+        };
+        let Some(same_info) = state.ttis.get(same_index).copied() else {
+            continue;
+        };
+        if (if same_info.isdst { 1 } else { 0 }) != tmp.tm_isdst {
+            continue;
+        }
+        for otherind in 0..nseen {
+            let Some(&other_index) = types.get(otherind) else {
+                continue;
+            };
+            let Some(other_info) = state.ttis.get(other_index).copied() else {
+                continue;
+            };
+            if other_info.isdst == same_info.isdst {
+                continue;
+            }
+            let saved_seconds = tmp.tm_sec;
+            let delta = i64::from(other_info.utoff) - i64::from(same_info.utoff);
+            let Some(seconds) = i64::from(saved_seconds).checked_add(delta) else {
+                continue;
+            };
+            let Ok(seconds) = i32::try_from(seconds) else {
+                continue;
+            };
+            tmp.tm_sec = seconds;
+            tmp.tm_isdst = 1 - tmp.tm_isdst;
+            if let Ok(t) = time2(zone, tmp) {
+                return Ok(t);
+            }
+            tmp.tm_isdst = 1 - tmp.tm_isdst;
+            tmp.tm_sec = saved_seconds;
+        }
+    }
+    Err(errno(EOVERFLOW))
+}
+
 /// Convert a broken-down local time in `state` to seconds since the epoch.
 pub fn mktime(state: &TzState, tm: &mut Tm) -> Result<i64, Errno> {
     if tm.tm_isdst > 1 {
         tm.tm_isdst = 1;
     }
-    let mut copy = *tm;
-    match time2sub(Zone::Local(state), &mut copy, false) {
-        Ok(t) => {
-            *tm = copy;
-            return Ok(t);
-        }
-        Err(error) if error != errno(EINVAL) => return Err(error),
-        Err(_) => {}
-    }
-    let t = time2sub(Zone::Local(state), &mut copy, true)?;
-    *tm = copy;
-    Ok(t)
+    time1(Zone::Local(state), tm)
 }
 
 /// Convert a broken-down UTC time to seconds since the epoch.
 pub fn timegm(tm: &mut Tm) -> Result<i64, Errno> {
     let mut copy = *tm;
-    let t = match time2sub(Zone::Fixed(0), &mut copy, false) {
-        Ok(t) => t,
-        Err(_) => {
-            copy = *tm;
-            time2sub(Zone::Fixed(0), &mut copy, true)?
-        }
-    };
+    let t = timeoff(&mut copy, 0)?;
     *tm = copy;
     Ok(t)
 }
 
 /// Convert a broken-down time with a fixed offset to seconds since the epoch.
 pub fn timeoff(tm: &mut Tm, offset: i64) -> Result<i64, Errno> {
-    let mut copy = *tm;
-    let t = match time2sub(Zone::Fixed(offset), &mut copy, false) {
-        Ok(t) => t,
-        Err(_) => {
-            copy = *tm;
-            time2sub(Zone::Fixed(offset), &mut copy, true)?
-        }
-    };
-    *tm = copy;
-    Ok(t)
+    tm.tm_isdst = 0;
+    time1(Zone::Fixed(offset), tm)
 }
 
 #[cfg(test)]

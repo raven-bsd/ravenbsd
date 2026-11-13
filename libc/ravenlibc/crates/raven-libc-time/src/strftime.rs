@@ -244,7 +244,8 @@ fn append_format(
                 } else {
                     i64::from(tm.tm_wday)
                 };
-                push_num(&mut piece, value, pad, 2, Pad::Zero);
+                // The donor formats `%u` with "%d": no padding, regardless of flags.
+                piece.push_str(&format!("{value}"));
             }
             b'V' | b'G' | b'g' => {
                 let (week, year, base) = iso_week(tm);
@@ -271,7 +272,8 @@ fn append_format(
                 let value = (i64::from(tm.tm_yday) + DAYSPERWEEK - weekday) / DAYSPERWEEK;
                 push_num(&mut piece, value, pad, 2, Pad::Zero);
             }
-            b'w' => push_num(&mut piece, i64::from(tm.tm_wday), pad, 2, Pad::Zero),
+            // The donor formats `%w` with "%d": no padding, regardless of flags.
+            b'w' => piece.push_str(&format!("{}", tm.tm_wday)),
             b'X' => {
                 let mut nested = Vec::new();
                 append_format(

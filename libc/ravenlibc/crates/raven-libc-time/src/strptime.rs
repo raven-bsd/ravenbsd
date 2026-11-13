@@ -522,7 +522,9 @@ fn parse<'a>(
                 } else {
                     bp += consumed;
                     tm.tm_gmtoff = offset;
-                    tm.tm_isdst = isdst;
+                    if let Some(isdst) = isdst {
+                        tm.tm_isdst = isdst;
+                    }
                     tm.tm_zone = NO_ZONE;
                 }
             }
@@ -567,7 +569,13 @@ fn finish(tm: &mut Tm, mut state: u32, day_offset: i32, week_offset: i32) {
             let leap = usize::from(isleap_sum(i64::from(tm.tm_year), i64::from(TM_YEAR_BASE)));
             let months = START_OF_MONTH.get(leap).copied().unwrap_or([0; 13]);
             let mut index = 0usize;
-            while tm.tm_yday >= months.get(index).copied().unwrap_or(0) {
+            while index < months.len() {
+                let Some(&start) = months.get(index) else {
+                    break;
+                };
+                if tm.tm_yday < start {
+                    break;
+                }
                 index += 1;
             }
             if index > 12 {
@@ -608,7 +616,7 @@ fn parse_zone(
     buf: &[u8],
     ctx: &StrptimeCtx<'_>,
     mandatory: bool,
-) -> Option<(usize, i64, i32)> {
+) -> Option<(usize, i64, Option<i32>)> {
     let first = *buf.first()?;
     if first == b'+' || first == b'-' {
         let negative = first == b'-';
@@ -645,10 +653,10 @@ fn parse_zone(
         if offset >= HOURSPERDAY * SECSPERHOUR {
             return None;
         }
-        return Some((index, if negative { -offset } else { offset }, 0));
+        return Some((index, if negative { -offset } else { offset }, Some(0)));
     }
     if buf.starts_with(b"Z") || buf.starts_with(b"z") {
-        return Some((1, 0, 0));
+        return Some((1, 0, Some(0)));
     }
     if buf.starts_with(b"GMT") || buf.starts_with(b"UT") || buf.starts_with(b"UTC") {
         let length = if buf.starts_with(b"GMT") || buf.starts_with(b"UTC") {
@@ -657,14 +665,14 @@ fn parse_zone(
             2
         };
         if delim(buf.get(length).copied()) {
-            return Some((length, 0, 0));
+            return Some((length, 0, Some(0)));
         }
     }
     if let Some((index, length)) = find_string(buf, &NAST) {
-        return Some((length, -(5 + index as i64) * SECSPERHOUR, 0));
+        return Some((length, -(5 + index as i64) * SECSPERHOUR, None));
     }
     if let Some((index, length)) = find_string(buf, &NADT) {
-        return Some((length, -(4 + index as i64) * SECSPERHOUR, 1));
+        return Some((length, -(4 + index as i64) * SECSPERHOUR, Some(1)));
     }
     if let Some((index, length)) = find_strings(
         buf,
@@ -675,9 +683,9 @@ fn parse_zone(
         &[],
     ) && let Some(info) = state.ttis.iter().find(|info| info.isdst == (index == 1))
     {
-        return Some((length, i64::from(info.utoff), i32::from(index == 1)));
+        return Some((length, i64::from(info.utoff), Some(i32::from(index == 1))));
     }
-    if mandatory { None } else { Some((0, 0, 0)) }
+    if mandatory { None } else { Some((0, 0, None)) }
 }
 
 #[cfg(test)]
