@@ -14,58 +14,62 @@ publish = false
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 toml = "1.2"
+raven-libc-abi = { path = "../../../libc/ravenlibc/crates/raven-libc-abi" }
 raven-libc-ctype = { path = "../../../libc/ravenlibc/crates/raven-libc-ctype" }
-raven-libc-str = { path = "../../../libc/ravenlibc/crates/raven-libc-str" }
-raven-libc-stdlib = { path = "../../../libc/ravenlibc/crates/raven-libc-stdlib" }
 raven-libc-dtoa = { path = "../../../libc/ravenlibc/crates/raven-libc-dtoa", features = ["alloc"] }
 raven-libc-fmt = { path = "../../../libc/ravenlibc/crates/raven-libc-fmt" }
-raven-libc-time = { path = "../../../libc/ravenlibc/crates/raven-libc-time" }
 raven-libc-m = { path = "../../../libc/ravenlibc/crates/raven-libc-m" }
+raven-libc-stdio = { path = "../../../libc/ravenlibc/crates/raven-libc-stdio" }
+raven-libc-stdlib = { path = "../../../libc/ravenlibc/crates/raven-libc-stdlib" }
+raven-libc-str = { path = "../../../libc/ravenlibc/crates/raven-libc-str" }
+raven-libc-time = { path = "../../../libc/ravenlibc/crates/raven-libc-time" }
 raven-libc-tls = { path = "../../../libc/ravenlibc/crates/raven-libc-tls" }
 
 [features]
 default = []
-oracle-string-basic = []
-oracle-ctype-multibyte = []
 oracle-ctype-class = []
-oracle-str-mem = []
-oracle-str-openbsd = []
-oracle-str-freebsd = []
-oracle-str-musl = []
-oracle-str-errmsg = []
-oracle-stdlib-netbsd = []
-oracle-stdlib-openbsd = []
-oracle-stdlib-freebsd = []
-oracle-stdlib-musl = []
+oracle-ctype-multibyte = []
 oracle-dtoa = []
-oracle-m-core = []
 oracle-dtoa-ld128 = []
 oracle-fmt-freebsd = []
 oracle-fmt-musl = []
 oracle-fmt-musl-scanf = []
+oracle-m-core = []
 oracle-raven-libc-time = []
+oracle-stdio-musl = []
+oracle-stdlib-freebsd = []
+oracle-stdlib-musl = []
+oracle-stdlib-netbsd = []
+oracle-stdlib-openbsd = []
+oracle-str-errmsg = []
+oracle-str-freebsd = []
+oracle-str-mem = []
+oracle-str-musl = []
+oracle-str-openbsd = []
+oracle-string-basic = []
 oracle-tls = []
 oracle-tls-layout = ["oracle-tls"]
 all-oracles = [
-    "oracle-string-basic",
-    "oracle-ctype-multibyte",
     "oracle-ctype-class",
-    "oracle-str-mem",
-    "oracle-str-openbsd",
-    "oracle-str-freebsd",
-    "oracle-str-musl",
-    "oracle-str-errmsg",
-    "oracle-stdlib-netbsd",
-    "oracle-stdlib-openbsd",
-    "oracle-stdlib-freebsd",
-    "oracle-stdlib-musl",
+    "oracle-ctype-multibyte",
     "oracle-dtoa",
-    "oracle-m-core",
     "oracle-dtoa-ld128",
     "oracle-fmt-freebsd",
     "oracle-fmt-musl",
     "oracle-fmt-musl-scanf",
+    "oracle-m-core",
     "oracle-raven-libc-time",
+    "oracle-stdio-musl",
+    "oracle-stdlib-freebsd",
+    "oracle-stdlib-musl",
+    "oracle-stdlib-netbsd",
+    "oracle-stdlib-openbsd",
+    "oracle-str-errmsg",
+    "oracle-str-freebsd",
+    "oracle-str-mem",
+    "oracle-str-musl",
+    "oracle-str-openbsd",
+    "oracle-string-basic",
     "oracle-tls",
 ]
 

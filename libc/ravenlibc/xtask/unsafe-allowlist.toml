@@ -42,6 +42,36 @@ path = "src/debug/debug_ut.rs"
 reason = "host test arena uses the system allocator to obtain a page-aligned block"
 
 [[allow]]
+crate = "raven-libc-stdio"
+path = "src/raw.rs"
+reason = "DR-39 audited raw module: the shareable FILE cell (unsafe impl Sync justified by the recursive lock protocol), caller buffer pairs, the fopencookie/funopen typed thunks, Box::into_raw/from_raw for heap FILEs and the list links; every unsafe block carries a // SAFETY: comment"
+
+[[allow]]
+crate = "raven-libc-stdio"
+path = "src/cookie_ut.rs"
+reason = "host unit tests define and call Rust extern \"C\" cookie callbacks over Box-owned test cookies"
+
+[[allow]]
+crate = "raven-libc-stdio"
+path = "src/funopen_ut.rs"
+reason = "host unit tests define and call Rust extern \"C\" funopen callbacks over Box-owned test cookies"
+
+[[allow]]
+crate = "raven-libc-stdio"
+path = "src/mem_ut.rs"
+reason = "host unit tests read the open_memstream out pointers through Box-owned raw pointers (the C ownership contract)"
+
+[[allow]]
+crate = "raven-libc-stdio"
+path = "src/funopen.rs"
+reason = "the public funopen signature names the caller's C callback pointer types (unsafe extern fn types only); the calls themselves are in src/raw.rs"
+
+[[allow]]
+crate = "raven-libc-stdio"
+path = "src/api_ut.rs"
+reason = "host unit test reads the open_memstream out pointers through Box-owned raw pointers (the C ownership contract)"
+
+[[allow]]
 crate = "raven-libc-tls"
 path = "src/raw.rs"
 reason = "DR-39 audited TLS raw module: initial-image writes, DTV publication, TCB conversion and the thread-pointer register helpers; every unsafe block names the mapping/DTV/thread-pointer invariant that makes it sound"

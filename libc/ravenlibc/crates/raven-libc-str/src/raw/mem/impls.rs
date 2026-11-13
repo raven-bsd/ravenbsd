@@ -369,6 +369,7 @@ pub unsafe fn compare_bytes(s1: *const u8, s2: *const u8, n: usize) -> c_int {
     0
 }
 
+#[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))] // the x86_64 arch module re-exports its own
 #[inline(always)]
 pub unsafe fn c_string_length(mut s: *const core::ffi::c_char) -> usize {
     let mut n = 0;

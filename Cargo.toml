@@ -77,9 +77,9 @@ members = [
     "tools/integration-inventory",
     "tools/libc-census",
     "tools/libc-oracle",
-    "libc/spike/va",
     "libc/ravenlibc/crates/*",
     "libc/ravenlibc/tools/hdrgen",
+    "libc/ravenlibc/tools/mkmap",
     "userland/rt",
     "userland/linux-shim",
     "userland/init",
@@ -186,6 +186,23 @@ strip = "none"
 [profile.libc-a-server]
 inherits = "libc-a"
 opt-level = "s"
+
+# The hot list of donor-map/16 R-26 keeps its own optimisation level in the server set;
+# the symbol set and behaviour are identical to the tiny set (L-8).
+[profile.libc-a-server.package."raven-libc-str"]
+opt-level = 3
+
+[profile.libc-a-server.package."raven-libc-fmt"]
+opt-level = 3
+
+[profile.libc-a-server.package."raven-libc-malloc"]
+opt-level = 3
+
+[profile.libc-a-server.package."raven-libc-dtoa"]
+opt-level = 3
+
+[profile.libc-a-server.package."raven-libc-stdlib"]
+opt-level = 3
 
 [profile.libc-so]
 inherits = "release"

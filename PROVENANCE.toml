@@ -8743,3 +8743,289 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/file.rs"
+upstream = "musl"
+upstream_path = "src/internal/stdio_impl.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; the FILE state machine, flag constants and UNGET; index-based buffers, Lock/SysFile/Env traits, typed backend enum, no -1 lock shortcut"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/backend_fd.rs"
+upstream = "musl"
+upstream_path = "src/stdio/__stdio_read.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; __stdio_read/__stdio_write/__stdio_seek/__stdio_close merged in one module; SysFile read/write2, no readv in the seam (two reads, stated in the report); no EINTR retry"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/buf.rs"
+upstream = "musl"
+upstream_path = "src/stdio/__stdout_write.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; the lazy inverted stdout probe; smakebuf and the flush-before-read walk are CLEANROOM on OpenBSD makebuf/NetBSD refill (STUDY)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/mode.rs"
+upstream = "musl"
+upstream_path = "src/stdio/__toread.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; __toread and __towrite in one module; F_LAZYBUF smakebuf hook and mark_used; orientation check moved to the public byte entry points"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/char_io.rs"
+upstream = "musl"
+upstream_path = "src/stdio/__uflow.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; __uflow/__overflow/getc.h/putc.h/getc.c/putc.c/getc_unlocked.c/putc_unlocked.c/getchar*.c/putchar*.c/fgetc.c/fputc.c merged; FileGuard replaces the lock macros"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/block_io.rs"
+upstream = "musl"
+upstream_path = "src/stdio/fread.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; fread and fwrite with __fwritex in one module; slice reads into the caller buffer; fwrite returns short counts on backend errors"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/line_io.rs"
+upstream = "musl"
+upstream_path = "src/stdio/getdelim.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; getdelim/getline/fgets/fgetln/fputs/puts merged; LineBuf wraps the C lineptr/n pair; gets is not provided"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/ungetc.rs"
+upstream = "musl"
+upstream_path = "src/stdio/ungetc.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; the UNGET prefix pushback; a write-only stream fails without F_ERR (R37) but still flushes pending output"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/seek.rs"
+upstream = "musl"
+upstream_path = "src/stdio/fseek.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; fseek/ftell/fgetpos/fsetpos/rewind merged; signed unread window; Fpos is the O12 layout pending C36"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/flush.rs"
+upstream = "musl"
+upstream_path = "src/stdio/fflush.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; fflush/fflush(NULL)/fpurge; list lock order and read-stream repositioning"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/close.rs"
+upstream = "musl"
+upstream_path = "src/stdio/fclose.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; fclose and __fclose_ca; fcloseall moved to closeall.rs (FreeBSD)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/ofl.rs"
+upstream = "musl"
+upstream_path = "src/stdio/ofl.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; ofl.c and ofl_add.c; the list lock is a raw atomic word in State"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/lock.rs"
+upstream = "musl"
+upstream_path = "src/stdio/__lockfile.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; __lockfile/flockfile/funlockfile/ftrylockfile merged; lock starts at 0 (A-stdio-9), no per-thread locked-file list (O7)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/std_streams.rs"
+upstream = "musl"
+upstream_path = "src/stdio/stdin.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; stdin/stdout/stderr merged; buffers inside StdStreams, no allocated FILE"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/setvbuf.rs"
+upstream = "musl"
+upstream_path = "src/stdio/setvbuf.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; setvbuf/setbuf/setbuffer/setlinebuf; lazy streams allocate the default region on an ignored caller buffer"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/status.rs"
+upstream = "musl"
+upstream_path = "src/stdio/clearerr.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; clearerr/feof/ferror/fileno merged"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/misc.rs"
+upstream = "musl"
+upstream_path = "src/stdio/remove.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; remove/rename/tmpfile merged; /tmp fixed (O13); tmpfile uses SysFile::random_suffix"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/popen.rs"
+upstream = "musl"
+upstream_path = "src/stdio/popen.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; the stream half only; spawn and wait4 are C53/C60; close_sibling_pipes is the A-stdio-16 helper"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/exit.rs"
+upstream = "musl"
+upstream_path = "src/stdio/__stdio_exit.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; stdio_cleanup and the fork hooks; list lock never released, FILE locks forever"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/mem.rs"
+upstream = "musl"
+upstream_path = "src/stdio/fmemopen.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; fmemopen/open_memstream/open_wmemstream merged; caller pointers are raw pairs; the final buffer ownership moves to the caller"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/cookie.rs"
+upstream = "musl"
+upstream_path = "src/stdio/fopencookie.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; the GNU cookie backend; typed raw thunks"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/wide.rs"
+upstream = "musl"
+upstream_path = "src/stdio/fgetwc.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; fgetwc/fputwc/ungetwc/fgetws/fputws/getwc/putwc/getwchar/putwchar/fwide merged; ctype mbrtowc/wcrtomb, UTF-8 only"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/ext.rs"
+upstream = "musl"
+upstream_path = "src/stdio/ext.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; ext.c and ext2.c; __fsetlocking returns the previous state and a bad type is ignored (T10)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/perror.rs"
+upstream = "musl"
+upstream_path = "src/stdio/perror.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; message text from the caller; one write2, byte orientation restored"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/open.rs"
+upstream = "musl"
+upstream_path = "src/stdio/fopen.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; index-based buffers; Lock/SysFile/Env traits; locks recursive owner-tid, no -1 shortcut; typed backend enum instead of function pointers; lazy buffers (F_LAZYBUF); stdout probe via isatty; flush-before-read; UNGET 8, BUFSIZ 4096, STD_BUF 1024; locale dropped; open-file-list lock raw futex word; fopen/__fdopen/freopen/__fmodeflags merged; lazy buffers; fdopen access check; freopen without path re-applies the flags"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdio/src/closeall.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/stdio/fcloseall.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/04 row 25; _fwalk(fclose) rewritten over the intrusive open-file list; the three standard streams are left open; SPDX BSD-2-Clause, Daniel M. Eischen 2006"

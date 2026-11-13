@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+_exit
+close
+dup
+dup2
+lseek
+pread
+pwrite
+read
+write

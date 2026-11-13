@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Fixed stdio scripts. Each entry is one operation script; `files_hex` are the initial
+# contents of /f0../f3 and `blobs_hex` the fwrite/fputs payloads.
+
+[[case]]
+files_hex = ["6162630a6465660a", "", "", ""]
+mode = "r"
+ops = [
+  { op = "open", arg0 = 0, arg1 = 0, arg2 = 0 },
+  { op = "getc", arg0 = 0, arg1 = 0, arg2 = 0 },
+  { op = "ungetc", arg0 = 65, arg1 = 0, arg2 = 0 },
+  { op = "ftell", arg0 = 0, arg1 = 0, arg2 = 0 },
+  { op = "fgets", arg0 = 8, arg1 = 0, arg2 = 0 },
+  { op = "close", arg0 = 0, arg1 = 0, arg2 = 0 },
+]
+
+[[case]]
+files_hex = ["", "", "", ""]
+blobs_hex = ["68656c6c6f0a", "776f726c64", ""]
+mode = "w+"
+ops = [
+  { op = "open", arg0 = 1, arg1 = 0, arg2 = 0 },
+  { op = "fwrite", arg0 = 0, arg1 = 1, arg2 = 6 },
+  { op = "fflush", arg0 = 0, arg1 = 0, arg2 = 0 },
+  { op = "ftell", arg0 = 0, arg1 = 0, arg2 = 0 },
+  { op = "fseek", arg0 = 0, arg1 = 0, arg2 = 0 },
+  { op = "fgets", arg0 = 8, arg1 = 0, arg2 = 0 },
+  { op = "close", arg0 = 0, arg1 = 0, arg2 = 0 },
+]
+
+[[case]]
+files_hex = ["30313233343536373839", "", "", ""]
+mode = "r+"
+ops = [
+  { op = "open", arg0 = 0, arg1 = 0, arg2 = 0 },
+  { op = "setvbuf", arg0 = 1, arg1 = 9, arg2 = 0 },
+  { op = "ungetc", arg0 = 90, arg1 = 0, arg2 = 0 },
+  { op = "fseek", arg0 = 0, arg1 = 0, arg2 = 0 },
+  { op = "putc", arg0 = 88, arg1 = 0, arg2 = 0 },
+  { op = "fflush", arg0 = 0, arg1 = 0, arg2 = 0 },
+  { op = "close", arg0 = 0, arg1 = 0, arg2 = 0 },
+]

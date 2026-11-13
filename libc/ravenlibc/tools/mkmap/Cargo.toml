@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-mkmap"
+version = "0.1.0"
+description = "Merges the ravenlibc Symbol.map bodies into libc.map and Symbols.list and checks a libc.a against them."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+toml = "1.2"
+
+[[bin]]
+name = "raven-libc-mkmap"
+path = "src/main.rs"

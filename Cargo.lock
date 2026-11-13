@@ -949,7 +949,17 @@ version = "0.1.0"
 dependencies = [
  "raven-libc-abi",
  "raven-libc-compat",
+ "raven-libc-ctype",
+ "raven-libc-dtoa",
  "raven-libc-fmt",
+ "raven-libc-m",
+ "raven-libc-malloc",
+ "raven-libc-platform",
+ "raven-libc-stdio",
+ "raven-libc-stdlib",
+ "raven-libc-str",
+ "raven-libc-sys",
+ "raven-libc-time",
 ]
 
 [[package]]
@@ -1066,6 +1076,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-mkmap"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "toml",
+]
+
+[[package]]
 name = "raven-libc-net"
 version = "0.1.0"
 dependencies = [
@@ -1088,10 +1107,12 @@ dependencies = [
 name = "raven-libc-oracle"
 version = "0.1.0"
 dependencies = [
+ "raven-libc-abi",
  "raven-libc-ctype",
  "raven-libc-dtoa",
  "raven-libc-fmt",
  "raven-libc-m",
+ "raven-libc-stdio",
  "raven-libc-stdlib",
  "raven-libc-str",
  "raven-libc-time",
@@ -1168,6 +1189,15 @@ name = "raven-libc-ssp"
 version = "0.1.0"
 dependencies = [
  "raven-libc-abi",
+]
+
+[[package]]
+name = "raven-libc-stdio"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-ctype",
+ "raven-libc-fmt",
 ]
 
 [[package]]
@@ -2038,10 +2068,6 @@ dependencies = [
  "raven-ipc",
  "raven-rt",
 ]
-
-[[package]]
-name = "raven-va-spike"
-version = "0.1.0"
 
 [[package]]
 name = "raven-vfs-core"
