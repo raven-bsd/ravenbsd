@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-platform"
+version = "0.1.0"
+description = "ravenlibc POSIX platform layer: fd table, paths, scheme clients, poll, stat, memory and system information."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+fdsan = []              # on by default in the shell profiles; off for the tiny profile probe
+cancel = ["raven-libc-sys/cancel"]
+
+[dependencies]
+raven-abi = { path = "../../../../crates/raven-abi", default-features = false }
+raven-libc-abi = { path = "../raven-libc-abi" }
+raven-libc-sys = { path = "../raven-libc-sys" }
+raven-libc-proc = { path = "../raven-libc-proc" }
+raven-proto-fs = { path = "../../../../crates/raven-proto-fs", default-features = false }
+raven-proto-tty = { path = "../../../../crates/raven-proto-tty", default-features = false }
+raven-proto-net = { path = "../../../../crates/raven-proto-net", default-features = false }
+raven-proto-svc = { path = "../../../../crates/raven-proto-svc", default-features = false }
+
+[dev-dependencies]
+raven-libc-sys = { path = "../raven-libc-sys", features = ["host-fake"] }

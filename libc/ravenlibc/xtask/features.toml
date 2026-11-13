@@ -96,3 +96,7 @@ crates = ["raven-libc-sys"]
 [[feature]]
 name = "cancel"
 crates = ["raven-libc-sys"]
+
+[[feature]]
+name = "fdsan"
+crates = ["raven-libc-platform"]
