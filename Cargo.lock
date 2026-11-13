@@ -1051,6 +1051,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-net"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-nss",
+ "raven-libc-platform",
+ "raven-libc-resolv",
+ "raven-libc-sys",
+ "raven-proto-net",
+]
+
+[[package]]
 name = "raven-libc-nss"
 version = "0.1.0"
 dependencies = [
