@@ -38,6 +38,12 @@ pub(crate) struct Recipe {
     pub(crate) family: String,
     /// One-line description.
     pub(crate) description: String,
+    /// Source kind: `c` (default) or `header`.
+    #[serde(default = "default_kind", rename = "type")]
+    pub(crate) kind: String,
+    /// Model-only differential: no donor source is compiled.
+    #[serde(default)]
+    pub(crate) model: bool,
     /// Every defined global of the merged donor object, sorted and unique.
     pub(crate) exports: Vec<String>,
     /// Optimisation levels to build; defaults to `["O2"]`.
@@ -59,6 +65,10 @@ pub(crate) struct Recipe {
 
 fn default_opt() -> Vec<String> {
     vec!["O2".to_string()]
+}
+
+fn default_kind() -> String {
+    "c".to_string()
 }
 
 /// Shared defaults, read from `<recipes>/../defaults.toml`.
@@ -188,8 +198,30 @@ impl Recipe {
         if self.description.trim().is_empty() {
             bail!("recipe {}: description is empty", self.family);
         }
-        if self.exports.is_empty() {
+        if self.kind != "c" && self.kind != "header" {
+            bail!(
+                "recipe {}: type `{}` must be `c` or `header`",
+                self.family,
+                self.kind
+            );
+        }
+        if self.model {
+            if !self.source.is_empty() || !self.exports.is_empty() {
+                bail!(
+                    "recipe {}: a model-only family has no sources or exports",
+                    self.family
+                );
+            }
+            return Ok(());
+        }
+        if self.exports.is_empty() && self.kind != "header" {
             bail!("recipe {}: exports is empty", self.family);
+        }
+        if self.kind == "header" && !self.exports.is_empty() {
+            bail!(
+                "recipe {}: a header-only family exports no globals",
+                self.family
+            );
         }
         for pair in self.exports.windows(2) {
             if pair[0] >= pair[1] {
@@ -236,9 +268,10 @@ impl Recipe {
         }
         let mut stems = BTreeSet::new();
         for source in &self.source {
-            if !valid_source_path(&source.path) {
+            if !valid_source_path(&source.path, &self.kind) {
+                let extension = if self.kind == "header" { ".h" } else { ".c" };
                 bail!(
-                    "recipe {}: source path `{}` must be relative, without `..`, and end in .c",
+                    "recipe {}: source path `{}` must be relative, without `..`, and end in {extension}",
                     self.family,
                     source.path
                 );
@@ -274,9 +307,10 @@ fn valid_family(name: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
-fn valid_source_path(path: &str) -> bool {
+fn valid_source_path(path: &str, kind: &str) -> bool {
+    let extension = if kind == "header" { ".h" } else { ".c" };
     !path.is_empty()
-        && path.ends_with(".c")
+        && path.ends_with(extension)
         && !path.starts_with('/')
         && !path.contains('\\')
         && Path::new(path)

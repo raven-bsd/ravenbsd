@@ -233,3 +233,33 @@ fn load_all_returns_sorted_families() {
         .collect();
     assert_eq!(names, vec!["alpha", "zeta"]);
 }
+
+#[test]
+fn model_only_recipe_has_no_sources() {
+    let text = r#"schema = 1
+family = "basic"
+description = "model differential"
+model = true
+exports = []
+"#;
+    let recipe = load(text).expect("model recipe");
+    assert!(recipe.model);
+    assert!(recipe.source.is_empty());
+}
+
+#[test]
+fn header_recipe_accepts_only_headers() {
+    let text = r#"schema = 1
+family = "basic"
+description = "header only"
+type = "header"
+exports = []
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/include/tiny.h"
+"#;
+    let recipe = load(text).expect("header recipe");
+    assert_eq!(recipe.kind, "header");
+    assert_eq!(recipe.source.len(), 1);
+}

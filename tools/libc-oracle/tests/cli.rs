@@ -244,3 +244,42 @@ fn vendor_writes_review_and_provenance() {
     assert!(review.contains("t_reject.c"));
     assert!(review.contains("t_unknown.c"));
 }
+
+#[test]
+fn adhoc_header_builds_with_an_explicit_type() {
+    if !Command::new("cc")
+        .arg("--version")
+        .status()
+        .is_ok_and(|status| status.success())
+    {
+        println!("SKIP: cc not found");
+        return;
+    }
+    let fixtures = fixtures();
+    let temp = TempDir::new("adhoc-header");
+    let output = run(
+        &[
+            "adhoc",
+            "fixture",
+            "lib/tiny.h",
+            "--type",
+            "header",
+            "--recipes",
+            fixtures.join("recipes").to_str().expect("utf8"),
+            "--resources",
+            fixtures.to_str().expect("utf8"),
+            "--out",
+            temp.path().to_str().expect("utf8"),
+            "--no-pin-check",
+        ],
+        &[],
+    );
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("RAVEN_ORACLE_DIR="), "{stdout}");
+}

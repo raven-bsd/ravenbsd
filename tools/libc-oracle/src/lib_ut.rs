@@ -66,10 +66,12 @@ fn adhoc_needs_two_positionals() {
 
 #[test]
 fn adhoc_paths_are_restricted() {
-    assert!(valid_adhoc_path("lib/libc/string/strlcpy.c"));
-    assert!(!valid_adhoc_path("/lib/libc/string/strlcpy.c"));
-    assert!(!valid_adhoc_path("lib/../strlcpy.c"));
-    assert!(!valid_adhoc_path("lib/libc/string/strlcpy.S"));
+    assert!(valid_adhoc_path("lib/libc/string/strlcpy.c", "c"));
+    assert!(!valid_adhoc_path("/lib/libc/string/strlcpy.c", "c"));
+    assert!(!valid_adhoc_path("lib/../strlcpy.c", "c"));
+    assert!(!valid_adhoc_path("lib/libc/string/strlcpy.S", "c"));
+    assert!(valid_adhoc_path("include/chacha_private.h", "header"));
+    assert!(!valid_adhoc_path("include/chacha_private.c", "header"));
 }
 
 #[test]

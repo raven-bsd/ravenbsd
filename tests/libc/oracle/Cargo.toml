@@ -45,6 +45,7 @@ oracle-fmt-musl = []
 oracle-fmt-musl-scanf = []
 oracle-raven-libc-time = []
 oracle-tls = []
+oracle-tls-layout = ["oracle-tls"]
 all-oracles = [
     "oracle-string-basic",
     "oracle-ctype-multibyte",

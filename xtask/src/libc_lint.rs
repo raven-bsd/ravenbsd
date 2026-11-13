@@ -34,6 +34,7 @@ pub const ALL_CHECKS: &[&str] = &[
     "provenance-link",
     "no-std",
     "no-cc",
+    "no-alloc",
     "layout",
 ];
 
@@ -44,7 +45,6 @@ pub const STUB_CHECKS: &[&str] = &[
     "sections",
     "no-fmt",
     "panic-handler",
-    "no-alloc",
     "no-registry",
     "hooks",
     "exports",
@@ -159,6 +159,15 @@ pub fn run_checks(root: &Path, checks: &[String]) -> Result<Vec<Violation>> {
             }
             if selected.contains(&"cfg") && is_crate {
                 check_cfg(&rel, &text, &features, &mut violations);
+            }
+            if selected.contains(&"no-alloc") && is_crate {
+                check_no_alloc(
+                    &rel,
+                    &text,
+                    &crates,
+                    &rules.no_alloc.allow_files,
+                    &mut violations,
+                );
             }
         }
         if rel.ends_with("Cargo.toml") {
@@ -520,6 +529,39 @@ fn check_no_std(
                 rel,
                 index + 1,
                 "alloc used by a core-only crate",
+            ));
+        }
+    }
+}
+
+fn check_no_alloc(
+    rel: &str,
+    text: &str,
+    crates: &Crates,
+    allow_files: &[String],
+    violations: &mut Vec<Violation>,
+) {
+    if allow_files.iter().any(|allowed| allowed == rel) {
+        return;
+    }
+    if rel.ends_with("_ut.rs") || rel.contains("/tests/") || rel.contains("/examples/") {
+        return;
+    }
+    let Some(row) = crates.rows.iter().find(|row| in_crate(rel, &row.path)) else {
+        return;
+    };
+    if row.std != "core" || row.alloc_feature {
+        return;
+    }
+    let lines = libc_lint_scan::scan(text);
+    for (index, line) in lines.iter().enumerate() {
+        if uses_alloc_path(&line.code) || line.code.contains("extern crate alloc") {
+            violations.push(error(
+                "no-alloc",
+                "alloc-use",
+                rel,
+                index + 1,
+                "heap allocation in a core-only crate without the alloc feature",
             ));
         }
     }

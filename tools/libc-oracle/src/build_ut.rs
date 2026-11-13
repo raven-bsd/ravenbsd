@@ -232,6 +232,8 @@ fn adhoc_build_derives_exports_from_nm() {
         schema: 1,
         family: "adhoc-single".to_string(),
         description: "ad hoc".to_string(),
+        kind: "c".to_string(),
+        model: false,
         exports: Vec::new(),
         opt: vec!["O2".to_string()],
         defines: Vec::new(),

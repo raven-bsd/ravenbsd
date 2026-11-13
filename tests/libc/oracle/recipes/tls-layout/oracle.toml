@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# tls-layout: the C57 model differential. There is deliberately no donor C: musl's
+# __init_tls.c needs a kernel, so the independent Rust model and the pinned vectors are the
+# oracle. `model = true` tells libc-oracle and xtask that no C build is required.
+
+schema = 1
+family = "tls-layout"
+description = "raven-libc-tls layout against the independent TLS model and pinned vectors"
+model = true
+exports = []

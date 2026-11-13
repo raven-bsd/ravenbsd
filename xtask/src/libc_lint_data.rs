@@ -213,6 +213,14 @@ pub struct NoStdRules {
     pub allow_files: Vec<String>,
 }
 
+/// The `[no-alloc]` table.
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct NoAllocRules {
+    /// Files exempt from `no-alloc`.
+    #[serde(default, rename = "allow-files")]
+    pub allow_files: Vec<String>,
+}
+
 /// Parsed `tools/lint/rules.toml`.
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct Rules {
@@ -222,6 +230,9 @@ pub struct Rules {
     /// `no-std` options.
     #[serde(default, rename = "no-std")]
     pub no_std: NoStdRules,
+    /// `no-alloc` options.
+    #[serde(default, rename = "no-alloc")]
+    pub no_alloc: NoAllocRules,
 }
 
 /// Load the rule table, falling back to the C34 defaults for fixture trees.
@@ -231,6 +242,7 @@ pub fn load_rules(root: &Path) -> Result<Rules> {
         return Ok(Rules {
             scope: Scope::default(),
             no_std: NoStdRules::default(),
+            no_alloc: NoAllocRules::default(),
         });
     }
     parse(&path)

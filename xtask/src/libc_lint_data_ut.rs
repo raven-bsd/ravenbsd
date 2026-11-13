@@ -17,7 +17,8 @@ fn real_data_files_parse() {
     let (crates, features, allow, tree) = load(&repo()).expect("data");
     assert!(!crates.rows.is_empty());
     assert!(!features.rows.is_empty());
-    assert!(allow.rows.is_empty());
+    assert!(!allow.rows.is_empty());
+    assert!(allow.rows.iter().all(|row| !row.reason.trim().is_empty()));
     assert!(!tree.entries.is_empty());
 }
 
@@ -40,10 +41,23 @@ fn crates_toml_has_37_rows_and_class_counts() {
 }
 
 #[test]
-fn features_toml_has_the_20_names() {
-    let (_, features, _, _) = load(&repo()).expect("data");
-    assert_eq!(features.rows.len(), 20);
-    assert!(features.rows.iter().any(|row| row.name == "float-printf"));
+fn features_toml_is_a_consistent_current_set() {
+    let (crates, features, _, _) = load(&repo()).expect("data");
+    assert!(!features.rows.is_empty());
+    let mut names = std::collections::BTreeSet::new();
+    for row in &features.rows {
+        assert!(names.insert(row.name.as_str()), "duplicate {}", row.name);
+        assert!(!row.crates.is_empty(), "{} has no crates", row.name);
+        for holder in &row.crates {
+            assert!(
+                holder == "*" || crates.rows.iter().any(|entry| &entry.name == holder),
+                "{} names unknown crate {holder}",
+                row.name
+            );
+        }
+    }
+    assert!(names.contains("float-printf"));
+    assert!(names.contains("cjk"));
 }
 
 #[test]

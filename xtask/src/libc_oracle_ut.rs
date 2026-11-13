@@ -7,6 +7,13 @@ fn root() -> &'static Path {
     Path::new("/repo")
 }
 
+fn real_root() -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("xtask parent")
+        .to_path_buf()
+}
+
 fn args(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| (*value).to_string()).collect()
 }
@@ -170,4 +177,24 @@ fn malformed_shapes_are_usage_errors() {
 #[test]
 fn help_prints_and_succeeds_without_spawning() {
     assert_eq!(run(root(), &args(&["--help"])).expect("help"), 0);
+}
+
+#[test]
+fn model_family_has_one_test_step_and_no_build() {
+    let planned = plan(&real_root(), &args(&["diff", "tls-layout"])).expect("plan");
+    assert_eq!(planned.len(), 1);
+    assert_eq!(
+        planned[0].spec.args,
+        args(&[
+            "test",
+            "-p",
+            "raven-libc-oracle",
+            "--features",
+            "oracle-tls-layout",
+        ])
+    );
+    assert_eq!(
+        planned[0].label.as_deref(),
+        Some("libc-oracle diff tls-layout")
+    );
 }

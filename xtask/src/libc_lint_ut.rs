@@ -399,7 +399,57 @@ fn stub_checks_are_listed() {
 
 #[test]
 fn all_checks_are_listed() {
-    assert_eq!(ALL_CHECKS.len(), 7);
+    assert_eq!(ALL_CHECKS.len(), 8);
+    assert!(ALL_CHECKS.contains(&"no-alloc"));
+    assert!(!STUB_CHECKS.contains(&"no-alloc"));
+}
+
+#[test]
+fn core_crate_alloc_is_reported() {
+    let tree = fixture();
+    crate_file(
+        &tree,
+        "raven-libc-str",
+        "src/lib.rs",
+        &format!("{HDR}extern crate alloc;\n"),
+    );
+    let violations = check(&tree, "no-alloc");
+    assert!(
+        violations.iter().any(|v| v.key == "alloc-use"),
+        "{violations:?}"
+    );
+}
+
+#[test]
+fn alloc_feature_crate_may_use_alloc() {
+    let tree = fixture();
+    crate_file(
+        &tree,
+        "raven-libc-dtoa",
+        "src/lib.rs",
+        &format!("{HDR}extern crate alloc;\n"),
+    );
+    let violations = check(&tree, "no-alloc");
+    assert!(violations.is_empty(), "{violations:?}");
+}
+
+#[test]
+fn no_alloc_skips_unit_tests_and_examples() {
+    let tree = fixture();
+    crate_file(
+        &tree,
+        "raven-libc-str",
+        "src/lib_ut.rs",
+        &format!("{HDR}extern crate alloc;\n"),
+    );
+    crate_file(
+        &tree,
+        "raven-libc-str",
+        "examples/gen.rs",
+        &format!("{HDR}extern crate alloc;\n"),
+    );
+    let violations = check(&tree, "no-alloc");
+    assert!(violations.is_empty(), "{violations:?}");
 }
 
 #[test]
@@ -534,9 +584,14 @@ fn provenance_import_marker_agrees() {
 }
 
 #[test]
-fn empty_allowlist_has_no_rows() {
+fn real_allowlist_rows_have_reasons() {
     let (_, _, allow, _) = crate::libc_lint_data::load(&real()).expect("data");
-    assert!(allow.rows.is_empty());
+    assert!(!allow.rows.is_empty());
+    for row in &allow.rows {
+        assert!(!row.reason.trim().is_empty(), "{}", row.path);
+        assert!(!row.crate_.is_empty());
+        assert!(!row.path.is_empty());
+    }
 }
 
 #[test]

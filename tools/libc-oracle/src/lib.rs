@@ -37,8 +37,8 @@ const USAGE: &str = "\
 usage:
   libc-oracle build  (<family> | --all) [--opt O0,O2] [--sanitize] [--out DIR]
                      [--recipes DIR] [--resources DIR] [--no-pin-check]
-  libc-oracle adhoc  <donor> <file> [--opt O2] [--out DIR] [--recipes DIR]
-                     [--resources DIR] [--no-pin-check]
+  libc-oracle adhoc  <donor> <file> [--type c|header] [--opt O2] [--out DIR]
+                     [--recipes DIR] [--resources DIR] [--no-pin-check]
   libc-oracle list   [--recipes DIR]
   libc-oracle check  [--recipes DIR] [--resources DIR]
   libc-oracle vendor --donor D --from DIR --to DIR [--data] [--dry-run]
@@ -127,6 +127,10 @@ fn command_build(args: &[String]) -> Result<u8> {
         recipes
     };
     for recipe in &loaded {
+        if recipe.model {
+            println!("{}: model-only, no C build", recipe.family);
+            continue;
+        }
         let levels = opt.clone().unwrap_or_else(|| recipe.opt.clone());
         build_recipe(
             recipe,
@@ -146,6 +150,7 @@ fn command_build(args: &[String]) -> Result<u8> {
 fn command_adhoc(args: &[String]) -> Result<u8> {
     let mut positional = Vec::new();
     let mut opt: Option<Vec<String>> = None;
+    let mut kind = "c".to_string();
     let mut no_pin_check = false;
     let mut recipes = default_recipes();
     let mut out = default_out();
@@ -160,6 +165,7 @@ fn command_adhoc(args: &[String]) -> Result<u8> {
                 resources = Some(PathBuf::from(value(args, &mut index, "--resources")?))
             }
             "--no-pin-check" => no_pin_check = true,
+            "--type" => kind = value(args, &mut index, "--type")?,
             flag if flag.starts_with('-') => bail!("unknown adhoc flag `{flag}`"),
             value => positional.push(value.to_string()),
         }
@@ -170,8 +176,12 @@ fn command_adhoc(args: &[String]) -> Result<u8> {
     }
     let donor = positional[0].clone();
     let file = positional[1].clone();
-    if !valid_adhoc_path(&file) {
-        bail!("adhoc file `{file}` must be relative, without `..`, and end in .c");
+    if kind != "c" && kind != "header" {
+        bail!("adhoc --type `{kind}` must be `c` or `header`");
+    }
+    if !valid_adhoc_path(&file, &kind) {
+        let extension = if kind == "header" { ".h" } else { ".c" };
+        bail!("adhoc file `{file}` must be relative, without `..`, and end in {extension}");
     }
     let stem = Path::new(&file)
         .file_stem()
@@ -188,6 +198,8 @@ fn command_adhoc(args: &[String]) -> Result<u8> {
         schema: 1,
         family,
         description: format!("ad-hoc build of {donor}:{file}"),
+        kind,
+        model: false,
         exports: Vec::new(),
         opt: vec!["O2".to_string()],
         defines: Vec::new(),
@@ -384,9 +396,10 @@ fn resolve_resources(explicit: Option<PathBuf>) -> Result<PathBuf> {
     )
 }
 
-fn valid_adhoc_path(path: &str) -> bool {
+fn valid_adhoc_path(path: &str, kind: &str) -> bool {
+    let extension = if kind == "header" { ".h" } else { ".c" };
     !path.is_empty()
-        && path.ends_with(".c")
+        && path.ends_with(extension)
         && !path.starts_with('/')
         && !path.contains('\\')
         && Path::new(path)
