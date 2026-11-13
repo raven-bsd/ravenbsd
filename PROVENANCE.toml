@@ -4124,3 +4124,586 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "MIT elected from MIT OR Apache-2.0 WITH LLVM-exception; ENTRY/END/L/BTI_C expanded once; .note.gnu.property dropped; symbols renamed __raven_str_*"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/conv/strtol.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/strtol.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Scanner factored to conv/scan.rs; ASCII-only classes (T-4); C23 0b prefix added (A-stdlib-6, RD-26); the donor over-read on an empty string replaced by a bounds check."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/conv/strtoul.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/strtoul.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Scanner shared with strtol; negative scan then wrapping_neg (T-5); C23 0b prefix added (RD-26)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/conv/strtonum.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/strtonum.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Built on strtol base 10; static invalid/too small/too large texts; errno restored by the shell on success."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/conv/atoi.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/atoi.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "strtol(base 10) truncated to c_int."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/conv/atol.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/atol.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "atoll is the same LP64 body."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/arith/abs.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/abs.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "wrapping_abs for INT_MIN (A-stdlib-12)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/arith/labs.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/labs.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "wrapping_abs for LONG_MIN; llabs/imaxabs are aliases."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/arith/div.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/div.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Rust / and % already truncate; wrapping_div/rem for MIN/-1; divisor 0 deliberately traps."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/arith/ldiv.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/ldiv.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "LP64 lldiv/imaxdiv aliases; wrapping_div/rem for MIN/-1."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/sort/qsort.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/qsort.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "qsort adaptations: comparator closure, element indices into &mut [u8], swap_elems replaces swaptype word tricks, CLEANROOM in-place heap fallback instead of heapsort(3) (A-stdlib-2); thresholds 7/40 unchanged."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/sort/heapsort.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/heapsort.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Key buffer is try_reserve Vec; nmemb*size checked (A-stdlib-1)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/sort/mergesort.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/merge.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "mergesort checked multiply and add (A-stdlib-1); the donor in-buffer linked list replaced by an index-based stable natural merge with the same THRESHOLD 16 and stable <= rule."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/sort/bsearch.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/bsearch.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "lim-halving loop kept; returns the index of an equal element."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/rand/random.rs"
+upstream = "netbsd"
+upstream_path = "common/lib/libc/stdlib/random.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Deviation D-1: srandom(0) behaves as srandom(1); USE_BETTER_RANDOM branch only; mutex macros dropped (shell locks); five TYPE_0..4 state sizes kept."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/rand/rand_r.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/stdlib/rand_r.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "wrapping_mul/add and & RAND_MAX."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/exit/atexit.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/atexit.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "No mmap/mprotect read-only pages (RD-new 2); first 32 entries inline and allocation-free; next_to_run marks consumed before return; restart loop kept."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/exit/thread_atexit.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/thread_atexit.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Vec node + DsoRefs add_ref/drop_ref; LIFO before TSD destructors (RD-21)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/exit/sequence.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/exit.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Exit ordering A-stdlib-8 as a pure function; _Exit.c is the shell _exit and is not translated."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/exit/abort.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/abort.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "AbortOps seam: unblock, raise, SIG_DFL, unblock, raise, terminate; no atexit handlers, no stdio flush."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/exit/quick_exit.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/stdlib/quick_exit.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Separate LIFO Vec table; quick_exit runs it and then the shell calls _Exit."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/env/table.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/stdlib/_env.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Deviation D-2: environment strings never freed or overwritten; ownership tree not translated; setenv allocates and leaks a new Box; initial array copied, strings untouched."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/env/getenv.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/stdlib/getenv.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "getenv/getenv_r over EnvTable; empty or = name returns NULL/ENOENT (A-stdlib-14)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/env/setenv.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/stdlib/setenv.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Name validation EINVAL; overwrite=0 changes nothing; D-2 no-free."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/env/putenv.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/stdlib/putenv.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Keeps the caller slice; putenv(\"NAME\") removes (RD-26, deviation from the BSD EINVAL)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/env/unsetenv.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/stdlib/unsetenv.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Removes every match; strings stay valid (D-2)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/getopt.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/getopt_long.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC AND BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Two notices reproduced. Decision D-3: getopt does not permute, getopt_long does (GETOPT_PERMUTES=false); function statics are GetoptState fields; flag pointer reported as an index; POSIXLY_CORRECT is a parameter."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/search/avl.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/stdlib/tsearch.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Also tdelete.c, tfind.c, twalk.c, tdestroy.c. AVL balance rules kept; the two-word bit path replaced by a Vec parent stack; tsearch returns the node (shell takes the key slot); tdelete root returns RootDeleted (the donor (void*)1)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/search/hsearch.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/stdlib/hsearch_r.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Also hcreate_r.c, hdestroy_r.c, hsearch.h, hcreate.c. Open addressing, quadratic probing and the used*2>=mask growth rule kept; offset basis comes from trait Entropy (donor arc4random_buf); slots are indices; hdestroy frees no keys/data (T-7)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/search/queue.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/insque.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Also remque.c, over trait ListStore."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/search/lsearch.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/lsearch.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Append offset n*width is checked_mul (A-stdlib-1)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/diag/assert.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/assert.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Structural donor only: text is H-13 glibc format, stack buffer + write, no fprintf/malloc; __assert prints ? for the function name (RD-new 4)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/diag/verr.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/verr.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Only the v* logic; errno is saved by the shell; variadic forms are C59 trampolines (H-16)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/diag/verrc.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/verrc.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Explicit code form; no strerror errno save."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/diag/verrx.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/verrx.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "No strerror part."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/diag/vwarn.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/vwarn.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "errno saved before the user message; v* logic only."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/diag/vwarnc.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/vwarnc.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Explicit code form."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/diag/vwarnx.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/vwarnx.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "No strerror part."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/diag/progname.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/setprogname.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Keeps the basename after the last /; getprogname.c is the one-line accessor and is not separately translated."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/diag/basename.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/gen/basename.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "POSIX in-place algorithm expressed as (start,len) or the static \".\"; OpenBSD static-buffer version rejected (CR-9)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/diag/dirname.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/gen/dirname.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "POSIX in-place algorithm expressed as (start,len) or the static \".\"; OpenBSD static-buffer version rejected (CR-9)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/path/realpath.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/stdlib/realpath.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "realpath1 only; __sys___realpathat fast path deleted; lstat/readlink/getcwd are Walker methods; MAXSYMLINKS 40; one PATH_MAX working buffer plus heap scratch."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/proc/system.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/system.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Signal/wait protocol kept: block CHLD/INT/QUIT, spawn before ignore, wait EINTR loop, restore; spawn is SystemBackend::spawn_sh (PG-45/RD-20)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/misc/a64l.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/a64l.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "LicenseRef-PublicDomain"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Six little-endian 6-bit digits; LP64 result is the donor positive 36-bit long; EINVAL for a bad character."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/misc/l64a.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/l64a.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "LicenseRef-PublicDomain"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Inverse mapping into an 8-byte buffer; negative is the shell EINVAL path."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-stdlib/src/misc/getsubopt.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/getsubopt.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "In-place split on , space tab; leading = is token text; suboptarg is the shell global."
+
+[[import]]
+path = "libc/ravenlibc/include/stdlib.h"
+upstream = "musl"
+upstream_path = "include/stdlib.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "No per-file header; MIT via musl/COPYRIGHT. Adapted to sys/cdefs.h and the Raven visibility engine; MB_CUR_MAX is __ctype_get_mb_cur_max (H-3); BSD/XSI extras added; strtoi/strtou absent (RD-22)."
+
+[[import]]
+path = "libc/ravenlibc/include/search.h"
+upstream = "musl"
+upstream_path = "include/search.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "No per-file header; MIT via musl/COPYRIGHT. FreeBSD AVL and hsearch_r declarations added; visibility guards from the Raven engine."
+
+[[import]]
+path = "libc/ravenlibc/include/libgen.h"
+upstream = "musl"
+upstream_path = "include/libgen.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "No per-file header; MIT via musl/COPYRIGHT. #undef basename before the POSIX declarations (CR-9)."
+
+[[import]]
+path = "libc/ravenlibc/include/assert.h"
+upstream = "musl"
+upstream_path = "include/assert.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "No per-file header; MIT via musl/COPYRIGHT. __assert_fail text is H-13; __assert2/__assert exported; C23 variadic assert and static_assert mapping kept."
+
+[[import]]
+path = "libc/ravenlibc/include/getopt.h"
+upstream = "freebsd"
+upstream_path = "include/getopt.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Declarations for the OpenBSD getopt_long engine; optreset exported; no changes to struct option layout."
+
+[[import]]
+path = "libc/ravenlibc/include/err.h"
+upstream = "freebsd"
+upstream_path = "include/err.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "err_set_file/err_set_exit omitted (SKIP); variadic forms are C59 trampolines; __builtin_va_list used instead of the absent sys/_types.h."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/queue.h"
+upstream = "freebsd"
+upstream_path = "sys/sys/queue.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "CK_* absent in this revision; QMD_TRACE* debugging and the trace field removed; kernel assertion header reference removed (userspace header)."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/tree.h"
+upstream = "freebsd"
+upstream_path = "sys/sys/tree.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Copied with only the provenance notice added."

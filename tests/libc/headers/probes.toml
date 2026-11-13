@@ -781,3 +781,87 @@ symbol = "stdc_bit_ceil_ull"
 visible_in = ["default", "posix", "xopen", "gnu", "c11", "c23", "ansi", "cxx17", "cxx20"]
 hidden_in = []
 owner = "C40"
+
+[[probe]]
+header = "stdlib.h"
+symbol = "qsort_r"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C41"
+
+[[probe]]
+header = "stdlib.h"
+symbol = "setenv"
+visible_in = ["default", "posix", "xopen", "gnu", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C41"
+
+[[probe]]
+header = "stdlib.h"
+symbol = "heapsort"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C41"
+
+[[probe]]
+header = "stdlib.h"
+symbol = "getenv_r"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C41"
+
+[[probe]]
+header = "stdlib.h"
+symbol = "a64l"
+visible_in = ["default", "xopen", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "c11", "c23", "ansi"]
+owner = "C41"
+
+[[probe]]
+header = "stdlib.h"
+symbol = "clearenv"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C41"
+
+[[probe]]
+header = "stdlib.h"
+symbol = "secure_getenv"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C41"
+
+[[probe]]
+header = "libgen.h"
+symbol = "basename"
+visible_in = ["default", "posix", "xopen", "gnu", "c11", "c23", "ansi", "cxx17", "cxx20"]
+hidden_in = []
+owner = "C41"
+
+[[probe]]
+header = "assert.h"
+symbol = "__assert_fail"
+visible_in = ["default", "posix", "xopen", "gnu", "c11", "c23", "ansi", "cxx17", "cxx20"]
+hidden_in = []
+owner = "C41"
+
+[[probe]]
+header = "getopt.h"
+symbol = "getopt_long"
+visible_in = ["default", "posix", "xopen", "gnu", "c11", "c23", "ansi", "cxx17", "cxx20"]
+hidden_in = []
+owner = "C41"
+
+[[probe]]
+header = "search.h"
+symbol = "tdestroy"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C41"
+
+[[probe]]
+header = "err.h"
+symbol = "verr"
+visible_in = ["default", "posix", "xopen", "gnu", "c11", "c23", "ansi", "cxx17", "cxx20"]
+hidden_in = []
+owner = "C41"

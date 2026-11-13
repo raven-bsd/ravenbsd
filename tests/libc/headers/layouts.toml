@@ -1928,3 +1928,71 @@ headers = ["elf.h"]
 size = 24
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "div_t"
+headers = ["stdlib.h"]
+size = 8
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "quot"
+offset = 0
+
+[[type.field]]
+name = "rem"
+offset = 4
+
+[[type]]
+name = "ldiv_t"
+headers = ["stdlib.h"]
+size = 16
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "quot"
+offset = 0
+
+[[type.field]]
+name = "rem"
+offset = 8
+
+[[type]]
+name = "lldiv_t"
+headers = ["stdlib.h"]
+size = 16
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "quot"
+offset = 0
+
+[[type.field]]
+name = "rem"
+offset = 8
+
+[[type]]
+name = "struct option"
+headers = ["getopt.h"]
+size = 32
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "name"
+offset = 0
+
+[[type.field]]
+name = "has_arg"
+offset = 8
+
+[[type.field]]
+name = "flag"
+offset = 16
+
+[[type.field]]
+name = "val"
+offset = 24

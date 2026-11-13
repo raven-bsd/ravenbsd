@@ -905,9 +905,19 @@ name = "raven-libc-oracle"
 version = "0.1.0"
 dependencies = [
  "raven-libc-ctype",
+ "raven-libc-stdlib",
  "raven-libc-str",
  "serde",
  "toml",
+]
+
+[[package]]
+name = "raven-libc-stdlib"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-ctype",
+ "raven-libc-str",
 ]
 
 [[package]]

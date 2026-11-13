@@ -21,3 +21,15 @@ pub mod str_mem;
 pub mod str_musl;
 #[cfg(feature = "oracle-str-openbsd")]
 pub mod str_openbsd;
+
+#[cfg(feature = "oracle-stdlib-netbsd")]
+pub mod stdlib_netbsd;
+
+#[cfg(feature = "oracle-stdlib-openbsd")]
+pub mod stdlib_openbsd;
+
+#[cfg(feature = "oracle-stdlib-freebsd")]
+pub mod stdlib_freebsd;
+
+#[cfg(feature = "oracle-stdlib-musl")]
+pub mod stdlib_musl;

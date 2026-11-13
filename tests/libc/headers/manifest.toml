@@ -567,56 +567,56 @@ ring = 2
 [[header]]
 path = "stdlib.h"
 owner = "C41"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 1
 
 [[header]]
 path = "search.h"
 owner = "C41"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 1
 
 [[header]]
 path = "err.h"
 owner = "C41"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 1
 
 [[header]]
 path = "libgen.h"
 owner = "C41"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 1
 
 [[header]]
 path = "getopt.h"
 owner = "C41"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 1
 
 [[header]]
 path = "assert.h"
 owner = "C41"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 1
 
 [[header]]
 path = "sys/queue.h"
 owner = "C41"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 1
 
 [[header]]
 path = "sys/tree.h"
 owner = "C41"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 1
 

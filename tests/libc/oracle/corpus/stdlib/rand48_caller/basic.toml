@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[case]]
+seed = 0
+count = 16
+
+[[case]]
+seed = 7
+count = 16
+
+[[case]]
+seed = 65535
+count = 16

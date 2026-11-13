@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[case]]
+args = ["-a"]
+optstring = "ab:c"
+only = false
+posix = false
+
+[[case]]
+args = ["--force"]
+optstring = "1bf:i:hW;-"
+only = false
+posix = false
+
+[[case]]
+args = ["file", "-a"]
+optstring = "ab:c"
+only = false
+posix = false

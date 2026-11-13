@@ -166,6 +166,9 @@ pub const PREAMBLE: &str = "\
 #include <sys/file.h>
 #include <elf.h>
 #include <sys/sysinfo.h>
+/* RavenBSD C41: the stdlib/getopt layout rows (div_t, struct option). */
+#include <stdlib.h>
+#include <getopt.h>
 /* RavenBSD: offsetof(struct stat, __unused) needs the field name, not the
  * cdefs attribute macro. */
 #undef __unused

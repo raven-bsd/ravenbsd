@@ -3804,3 +3804,45 @@ value = "202311"
 headers = ["stdbit.h"]
 arches = ["x86_64", "aarch64", "riscv64"]
 source = "C23 7.18.4 header version macro"
+
+[[constant]]
+name = "EXIT_SUCCESS"
+value = "0"
+headers = ["stdlib.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "ISO C 7.22"
+
+[[constant]]
+name = "EXIT_FAILURE"
+value = "1"
+headers = ["stdlib.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "ISO C 7.22"
+
+[[constant]]
+name = "RAND_MAX"
+value = "2147483647"
+headers = ["stdlib.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 03 3.4 / T-8 (0x7fffffff)"
+
+[[constant]]
+name = "no_argument"
+value = "0"
+headers = ["getopt.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 03 3.9"
+
+[[constant]]
+name = "required_argument"
+value = "1"
+headers = ["getopt.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 03 3.9"
+
+[[constant]]
+name = "optional_argument"
+value = "2"
+headers = ["getopt.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 03 3.9"
