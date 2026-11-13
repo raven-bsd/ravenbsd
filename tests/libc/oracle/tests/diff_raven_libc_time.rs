@@ -1208,6 +1208,11 @@ const ABMONTHS: [&str; 12] = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
+fn is_leap(year: i32) -> bool {
+    let year = i64::from(year);
+    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+}
+
 fn first_wday_of(year: i32) -> i32 {
     let year = i64::from(year);
     let value = 1 + 5 * ((year - 1) % 4) + 4 * ((year - 1) % 100) + 6 * ((year - 1) % 400);
@@ -1253,10 +1258,15 @@ fn strptime_case(rng: &mut raven_libc_oracle::rng::Rng) -> StrptimeCase {
             ),
             "%d/%m/%y %I:%M %p".to_string(),
         ),
-        3 => (
-            format!("{:03} {year:04}", 1 + rng.below(366) as i32),
-            "%j %Y".to_string(),
-        ),
+        3 => {
+            // Day 366 in a non-leap year makes the donor's month scan read
+            // start_of_month out of bounds; keep the defined cells only.
+            let last = if is_leap(year) { 366 } else { 365 };
+            (
+                format!("{:03} {year:04}", 1 + rng.below(last) as i32),
+                "%j %Y".to_string(),
+            )
+        }
         4 => {
             // The donor's month scan indexes start_of_month out of bounds when
             // the finalised yday is negative or above 364. Keep only the
