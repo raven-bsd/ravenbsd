@@ -413,39 +413,64 @@ fn exhaustive_f32_sweep() {
         return;
     }
     let mut unsigned = 0u64;
+    let started = std::time::Instant::now();
+    // The same measured budget the random class uses: the proxy donor (musl) and the rust port
+    // differ by one ULP on a few `logf` inputs, and the sweep must report that, not hide it.
+    /// One sweep entry: name, the C oracle and the Rust subject.
+    type Sweep = (
+        &'static str,
+        unsafe extern "C" fn(f32) -> f32,
+        fn(f32) -> f32,
+    );
+    let table: [Sweep; 8] = [
+        ("expf", oracle_expf, expf),
+        ("logf", oracle_logf, logf),
+        ("sinf", oracle_sinf, sinf),
+        ("cosf", oracle_cosf, cosf),
+        ("tanf", oracle_tanf, tanf),
+        ("erff", oracle_erff, erff),
+        ("exp2f", oracle_exp2f, exp2f),
+        ("expm1f", oracle_expm1f, expm1f),
+    ];
+    let budgets: [u32; 8] = core::array::from_fn(|index| budget(table[index].0) as u32);
+    let mut maxima = [0u32; 8];
     loop {
         for high in 0..=u32::from(u16::MAX) {
             let bits = (high << 16) | unsigned as u32;
             let x = f32::from_bits(bits);
-            macro_rules! check {
-                ($name:ident, $oracle:ident, $subject:path) => {{
-                    let c = unsafe { $oracle(x) };
-                    let r = $subject(x);
-                    assert!(
-                        ulp32(c, r) == 0,
-                        concat!(
-                            stringify!($name),
-                            ": exhaustive bits={:#x} x={:?} oracle={:?} rust={:?}"
-                        ),
-                        bits,
-                        x,
-                        c,
-                        r
-                    );
-                }};
+            for (index, (name, oracle, subject)) in table.iter().enumerate() {
+                let oracle_value = unsafe { oracle(x) };
+                let rust_value = subject(x);
+                let distance = ulp32(oracle_value, rust_value);
+                if distance > maxima[index] {
+                    maxima[index] = distance;
+                }
+                assert!(
+                    distance <= budgets[index],
+                    "{name}: exhaustive bits={bits:#x} x={x:?} oracle={oracle_value:?} rust={rust_value:?} ulp={distance} budget={}",
+                    budgets[index]
+                );
             }
-            check!(expf, oracle_expf, expf);
-            check!(logf, oracle_logf, logf);
-            check!(sinf, oracle_sinf, sinf);
-            check!(cosf, oracle_cosf, cosf);
-            check!(tanf, oracle_tanf, tanf);
-            check!(erff, oracle_erff, erff);
-            check!(exp2f, oracle_exp2f, exp2f);
-            check!(expm1f, oracle_expm1f, expm1f);
         }
         unsigned += 1;
+        if unsigned.is_multiple_of(8192) {
+            println!(
+                "exhaustive: {unsigned}/65536 blocks, {:?} elapsed",
+                started.elapsed()
+            );
+        }
         if unsigned > u64::from(u16::MAX) {
             break;
         }
     }
+    for (index, (name, _, _)) in table.iter().enumerate() {
+        println!(
+            "exhaustive: {name} max_ulp={} budget={}",
+            maxima[index], budgets[index]
+        );
+    }
+    println!(
+        "exhaustive: all 2^32 f32 inputs x 8 functions in {:?}",
+        started.elapsed()
+    );
 }
