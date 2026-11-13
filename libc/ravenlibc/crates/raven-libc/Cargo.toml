@@ -20,4 +20,6 @@ workspace = true
 default = []
 
 [dependencies]
+raven-libc-abi = { path = "../raven-libc-abi" }
+raven-libc-compat = { path = "../raven-libc-compat" }
 raven-libc-fmt = { path = "../raven-libc-fmt" }

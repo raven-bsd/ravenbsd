@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# Fixed humanize_number cases; the full donor tables are in the crate unit tests.
+[[case]]
+quotient = 1536
+len = 4
+scale = 32
+flags = 3
+[[case]]
+quotient = 500
+len = 4
+scale = 32
+flags = 8
+[[case]]
+quotient = -1536
+len = 8
+scale = 1
+flags = 1

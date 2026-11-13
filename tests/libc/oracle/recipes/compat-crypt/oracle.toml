@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# compat-crypt: netbsd:lib/libcrypt/{bcrypt,blowfish}.c (BSD-3) and
+# musl:src/crypt/{crypt_md5,crypt_sha256,crypt_sha512}.c (MIT via musl/COPYRIGHT). The FreeBSD
+# libcrypt checkout is absent, so the format donors are the musl files (RD-new in C65 report).
+# The build shim defines arc4random and explicit_memset and the 128-byte password buffer.
+
+schema = 1
+family = "compat-crypt"
+description = "bcrypt and the $1$/$5$/$6$ crypt formats over the donor digests"
+exports = [
+  "__bcrypt",
+  "__crypt_md5",
+  "__crypt_sha256",
+  "__crypt_sha512",
+  "bcrypt_gensalt",
+]
+opt = ["O2", "O0"]
+defines = []
+include = ["shim:compat", "donor:netbsd/lib/libcrypt"]
+flags = ["-include", "shim:compat/bcrypt_shim.h"]
+
+[[source]]
+donor = "netbsd"
+path = "lib/libcrypt/bcrypt.c"
+
+[[source]]
+donor = "musl"
+path = "src/crypt/crypt_md5.c"
+
+[[source]]
+donor = "musl"
+path = "src/crypt/crypt_sha256.c"
+
+[[source]]
+donor = "musl"
+path = "src/crypt/crypt_sha512.c"

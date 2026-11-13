@@ -1606,3 +1606,82 @@ owner = "C67"
 status = "pending"
 standalone = true
 ring = 3
+
+# C65 (raven-libc-compat): the BSD uuid header and the libbsd overlay forwarders.
+
+[[header]]
+path = "uuid.h"
+owner = "C65"
+status = "owned"
+standalone = true
+ring = 1
+
+[[header]]
+path = "bsd/bsd.h"
+owner = "C65"
+status = "owned"
+standalone = true
+ring = 2
+
+[[header]]
+path = "bsd/err.h"
+owner = "C65"
+status = "owned"
+standalone = true
+ring = 2
+
+[[header]]
+path = "bsd/libutil.h"
+owner = "C65"
+status = "owned"
+standalone = true
+ring = 2
+
+[[header]]
+path = "bsd/readpassphrase.h"
+owner = "C65"
+status = "owned"
+standalone = true
+ring = 2
+
+[[header]]
+path = "bsd/stdlib.h"
+owner = "C65"
+status = "owned"
+standalone = true
+ring = 2
+
+[[header]]
+path = "bsd/string.h"
+owner = "C65"
+status = "owned"
+standalone = true
+ring = 2
+
+[[header]]
+path = "bsd/sys/queue.h"
+owner = "C65"
+status = "owned"
+standalone = true
+ring = 2
+
+[[header]]
+path = "bsd/sys/tree.h"
+owner = "C65"
+status = "owned"
+standalone = true
+ring = 2
+
+[[header]]
+path = "bsd/unistd.h"
+owner = "C65"
+status = "owned"
+standalone = true
+ring = 2
+
+[[header]]
+path = "bsd/vis.h"
+owner = "C65"
+status = "owned"
+standalone = true
+ring = 2

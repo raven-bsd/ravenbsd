@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# The bcrypt known answers are recorded in the crate tests (`bcrypt_ut.rs`); this file holds the
+# cases the C oracle would regenerate.
+[[case]]
+password = "password"
+setting = "$2b$04$abcdefghijklmnopqrstuu"
+[[case]]
+password = "abc"
+setting = "$2a$04$......................"
+[[case]]
+password = ""
+setting = "$2b$04$abcdefghijklmnopqrstuu"

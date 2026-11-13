@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# compat-humanize: freebsd:lib/libutil/{humanize_number,expand_number}.c (BSD-2).
+
+schema = 1
+family = "compat-humanize"
+description = "FreeBSD humanize_number and expand_number"
+exports = ["expand_number", "expand_unsigned", "humanize_number"]
+opt = ["O2", "O0"]
+defines = []
+include = ["shim:compat"]
+flags = []
+
+[[source]]
+donor = "freebsd"
+path = "lib/libutil/humanize_number.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libutil/expand_number.c"

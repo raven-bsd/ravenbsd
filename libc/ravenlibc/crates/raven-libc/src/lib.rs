@@ -23,4 +23,7 @@
     clippy::unimplemented
 )]
 
+extern crate alloc;
+
+pub mod compat;
 pub mod va;
