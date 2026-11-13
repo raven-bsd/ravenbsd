@@ -220,6 +220,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "libc-oracle"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "toml",
+]
+
+[[package]]
 name = "linked_list_allocator"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -860,6 +869,14 @@ dependencies = [
  "raven-usercopy",
  "raven-vma",
  "spin",
+]
+
+[[package]]
+name = "raven-libc-oracle"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "toml",
 ]
 
 [[package]]

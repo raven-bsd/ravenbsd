@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Fixed corpus for memchr. High bytes and `c` outside a byte are mandatory: the prototype corpus
+# without them could not kill the signed/last-byte mutants.
+
+[[case]]
+c = 0
+bytes = ""
+
+[[case]]
+c = 97
+bytes = "abc"
+
+[[case]]
+c = 98
+bytes = "abc"
+
+[[case]]
+c = 99
+bytes = "abc"
+
+[[case]]
+c = 122
+bytes = "abc"
+
+[[case]]
+c = 128
+bytes_hex = "7f80"
+
+[[case]]
+c = 255
+bytes_hex = "00ff"
+
+[[case]]
+c = 353
+bytes = "abc"
+
+[[case]]
+c = -1
+bytes_hex = "00ff"
+
+[[case]]
+c = 128
+bytes_hex = "80"
+
+[[case]]
+c = 0
+bytes_hex = "00ff"
+
+[[case]]
+c = 127
+bytes_hex = "7f80"
+
+[[case]]
+c = 99
+bytes = "abcc"
+
+[[case]]
+c = 0
+bytes_hex = "61626300"

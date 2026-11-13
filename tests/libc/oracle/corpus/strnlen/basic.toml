@@ -1,0 +1,88 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Fixed corpus for strnlen. A NUL follows `bytes`; embedded zeros terminate.
+
+[[case]]
+maxlen = 0
+bytes = ""
+
+[[case]]
+maxlen = 1
+bytes = ""
+
+[[case]]
+maxlen = 10
+bytes = ""
+
+[[case]]
+maxlen = 0
+bytes = "abc"
+
+[[case]]
+maxlen = 1
+bytes = "abc"
+
+[[case]]
+maxlen = 2
+bytes = "abc"
+
+[[case]]
+maxlen = 3
+bytes = "abc"
+
+[[case]]
+maxlen = 4
+bytes = "abc"
+
+[[case]]
+maxlen = 10
+bytes = "abc"
+
+[[case]]
+maxlen = 3
+bytes = "abcdef"
+
+[[case]]
+maxlen = 4
+bytes = "abcdef"
+
+[[case]]
+maxlen = 5
+bytes = "abcdef"
+
+[[case]]
+maxlen = 6
+bytes = "abcdef"
+
+[[case]]
+maxlen = 10
+bytes_hex = "6162006364"
+
+[[case]]
+maxlen = 0
+bytes_hex = "80ff00"
+
+[[case]]
+maxlen = 1
+bytes_hex = "80ff00"
+
+[[case]]
+maxlen = 2
+bytes_hex = "80ff00"
+
+[[case]]
+maxlen = 3
+bytes_hex = "80ff00"
+
+[[case]]
+maxlen = 10
+bytes_hex = "80ff00"
+
+[[case]]
+maxlen = 255
+bytes = "abcdef"
+
+[[case]]
+maxlen = 353
+bytes = "abcdef"

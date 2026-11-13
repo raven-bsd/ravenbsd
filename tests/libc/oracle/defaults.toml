@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Shared -D definitions for every recipe: neutralise the donor macro idioms of
+# architecture/raven-libc/05-transpile-guide.md section 9. Recipe-specific definitions are added
+# after these.
+
+schema = 1
+defines = [
+    "DEF_WEAK(x)=",
+    "DEF_STRONG(x)=",
+    "__weak_alias(a,b)=",
+    "__strong_alias(a,b)=",
+    "_DIAGASSERT(x)=",
+    "__RCSID(x)=",
+    "__FBSDID(x)=",
+    "__COPYRIGHT(x)=",
+    "PROTO_NORMAL(x)=",
+    "PROTO_STD_DEPRECATED(x)=",
+    "PROTO_DEPRECATED(x)=",
+    "__predict_true(x)=(x)",
+    "__predict_false(x)=(x)",
+]
