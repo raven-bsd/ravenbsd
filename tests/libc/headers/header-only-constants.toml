@@ -34,3 +34,3328 @@ owner = "C37"
 name = "PROT_MTE"
 reason = "aarch64-specific PROT_* bit; raven-linux-abi has no per-arch PROT table."
 owner = "C37"
+
+[[constant]]
+name = "AT_BASE"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_BASE_PLATFORM"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_CLKTCK"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_DCACHEBSIZE"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_EGID"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_ENTRY"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_EUID"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_EXECFD"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_EXECFN"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_FLAGS"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_FPUCW"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_GID"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_HWCAP"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_HWCAP2"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_HWCAP3"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_HWCAP4"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_ICACHEBSIZE"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_IGNORE"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_IGNOREPPC"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_L1D_CACHEGEOMETRY"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_L1D_CACHESHAPE"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_L1D_CACHESIZE"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_L1I_CACHEGEOMETRY"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_L1I_CACHESHAPE"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_L1I_CACHESIZE"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_L2_CACHEGEOMETRY"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_L2_CACHESHAPE"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_L2_CACHESIZE"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_L3_CACHEGEOMETRY"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_L3_CACHESHAPE"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_L3_CACHESIZE"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_MINSIGSTKSZ"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_NOTELF"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_NULL"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_PAGESZ"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_PHDR"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_PHENT"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_PHNUM"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_PLATFORM"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_RANDOM"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_SECURE"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_SYSINFO"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_SYSINFO_EHDR"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_UCACHEBSIZE"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "AT_UID"
+reason = "ELF auxiliary-vector value from <elf.h>; the T4(b) AT_ family also holds file-control flags, so no C36 row exists."
+owner = "C38"
+
+[[constant]]
+name = "EAI_ADDRFAMILY"
+reason = "resolver error code from <netdb.h> (negative Linux value); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EAI_ALLDONE"
+reason = "resolver error code from <netdb.h> (negative Linux value); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EAI_CANCELED"
+reason = "resolver error code from <netdb.h> (negative Linux value); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EAI_IDN_ENCODE"
+reason = "resolver error code from <netdb.h> (negative Linux value); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EAI_INPROGRESS"
+reason = "resolver error code from <netdb.h> (negative Linux value); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EAI_INTR"
+reason = "resolver error code from <netdb.h> (negative Linux value); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EAI_NOTCANCELED"
+reason = "resolver error code from <netdb.h> (negative Linux value); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "ECHO"
+reason = "termios c_lflag or baud constant from <termios.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "ECHOCTL"
+reason = "termios c_lflag or baud constant from <termios.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "ECHOE"
+reason = "termios c_lflag or baud constant from <termios.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "ECHOK"
+reason = "termios c_lflag or baud constant from <termios.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "ECHOKE"
+reason = "termios c_lflag or baud constant from <termios.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "ECHONL"
+reason = "termios c_lflag or baud constant from <termios.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "ECHOPRT"
+reason = "termios c_lflag or baud constant from <termios.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EF_ALPHA_32BIT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ALPHA_CANRELAX"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EFA_PARISC_1_0"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EFA_PARISC_1_1"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EFA_PARISC_2_0"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_ABI_FLOAT_HARD"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_ABI_FLOAT_SOFT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_ALIGN8"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_APCS_26"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_APCS_FLOAT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_BE8"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_DYNSYMSUSESEGIDX"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_EABIMASK"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_EABI_UNKNOWN"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_EABI_VER1"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_EABI_VER2"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_EABI_VER3"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_EABI_VER4"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_EABI_VER5"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_HASENTRY"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_INTERWORK"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_LE8"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_MAPSYMSFIRST"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_MAVERICK_FLOAT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_NEW_ABI"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_OLD_ABI"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_PIC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_RELEXEC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_SOFT_FLOAT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_SYMSARESORTED"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_ARM_VFP_FLOAT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_CPU32"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EFD_CLOEXEC"
+reason = "eventfd constant from <sys/eventfd.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EFD_NONBLOCK"
+reason = "eventfd constant from <sys/eventfd.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EFD_SEMAPHORE"
+reason = "eventfd constant from <sys/eventfd.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EF_IA_64_ABI64"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_IA_64_ARCH"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_IA_64_MASKOS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_LARCH_ABI_DOUBLE_FLOAT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_LARCH_ABI_MODIFIER_MASK"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_LARCH_ABI_SINGLE_FLOAT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_LARCH_ABI_SOFT_FLOAT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_LARCH_OBJABI_V1"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_64BIT_WHIRL"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_ABI2"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_ABI_ON32"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_ARCH"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_ARCH_1"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_ARCH_2"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_ARCH_3"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_ARCH_32"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_ARCH_32R2"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_ARCH_4"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_ARCH_5"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_ARCH_64"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_ARCH_64R2"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_CPIC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_FP64"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_NAN2008"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_NOREORDER"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_PIC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_MIPS_XGOT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_PARISC_ARCH"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_PARISC_EXT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_PARISC_LAZYSWAP"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_PARISC_LSB"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_PARISC_NO_KABP"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_PARISC_TRAPNIL"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_PARISC_WIDE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_PPC64_ABI"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_PPC_EMB"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_PPC_RELOCATABLE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_PPC_RELOCATABLE_LIB"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH1"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH2"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH2A"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH2A_NOFPU"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH2A_SH3E"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH2A_SH3_NOFPU"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH2A_SH4"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH2A_SH4_NOFPU"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH2E"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH3"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH3_DSP"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH3E"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH3_NOMMU"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH4"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH4A"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH4AL_DSP"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH4A_NOFPU"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH4_NOFPU"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH4_NOMMU_NOFPU"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH_DSP"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH_MACH_MASK"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SH_UNKNOWN"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SPARC_32PLUS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SPARC_EXT_MASK"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SPARC_HAL_R1"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SPARC_LEDATA"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SPARC_SUN_US1"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SPARC_SUN_US3"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SPARCV9_MM"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SPARCV9_PSO"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SPARCV9_RMO"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EF_SPARCV9_TSO"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EI_ABIVERSION"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EI_CLASS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EI_DATA"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EI_MAG0"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EI_MAG1"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EI_MAG2"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EI_MAG3"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EI_NIDENT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EI_OSABI"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EI_PAD"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EI_VERSION"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFCLASS32"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFCLASS64"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFCLASSNONE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFCLASSNUM"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFCOMPRESS_HIOS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFCOMPRESS_HIPROC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFCOMPRESS_LOOS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFCOMPRESS_LOPROC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFCOMPRESS_ZLIB"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFCOMPRESS_ZSTD"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFDATA2LSB"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFDATA2MSB"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFDATANONE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFDATANUM"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFMAG"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFMAG0"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFMAG1"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFMAG2"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFMAG3"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELF_NOTE_ABI"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELF_NOTE_GNU"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELF_NOTE_OS_FREEBSD"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELF_NOTE_OS_GNU"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELF_NOTE_OS_LINUX"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELF_NOTE_OS_SOLARIS2"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELF_NOTE_PAGESIZE_HINT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELF_NOTE_SOLARIS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFOSABI_AIX"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFOSABI_ARM"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFOSABI_FREEBSD"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFOSABI_GNU"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFOSABI_HPUX"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFOSABI_IRIX"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFOSABI_LINUX"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFOSABI_MODESTO"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFOSABI_NETBSD"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFOSABI_NONE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFOSABI_OPENBSD"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFOSABI_SOLARIS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFOSABI_STANDALONE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFOSABI_SYSV"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ELFOSABI_TRU64"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_386"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_56800EX"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_68HC05"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_68HC08"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_68HC11"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_68HC12"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_68HC16"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_68K"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_78KOR"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_8051"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_860"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_88K"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_960"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_AARCH64"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ALPHA"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ALTERA_NIOS2"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_AMDGPU"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ARC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ARCA"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ARC_A5"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ARC_COMPACT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ARC_COMPACT2"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ARM"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_AVR"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_AVR32"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_BA1"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_BA2"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_BLACKFIN"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_BPF"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_C166"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_CDP"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_CE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_CLOUDSHIELD"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_COGE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_COLDFIRE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_COOL"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_COREA_1ST"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_COREA_2ND"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_CR"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_CR16"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_CRAYNV2"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_CRIS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_CRX"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_CSKY"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_CSR_KALIMBA"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_CUDA"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_CYPRESS_M8C"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_D10V"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_D30V"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_DSP24"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_DSPIC30F"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_DXP"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ECOG16"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ECOG1X"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ECOG2"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_EMX16"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_EMX8"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ETPU"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_EXCESS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_F2MC16"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_FAKE_ALPHA"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_FIREPATH"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_FR20"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_FR30"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_FT32"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_FX66"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_H8_300"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_H8_300H"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_H8_500"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_H8S"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_HUANY"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_IA_64"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_IP2K"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "E_MIPS_ARCH_1"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "E_MIPS_ARCH_2"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "E_MIPS_ARCH_3"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "E_MIPS_ARCH_32"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "E_MIPS_ARCH_4"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "E_MIPS_ARCH_5"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "E_MIPS_ARCH_64"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_JAVELIN"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_K10M"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_KM32"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_KMX32"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_KVARC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_L10M"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_LATTICEMICO32"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_LOONGARCH"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_M16C"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_M32"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_M32C"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_M32R"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_MANIK"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_MAX"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_MAXQ30"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_MCHP_PIC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_MCST_ELBRUS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ME16"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_METAG"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_MICROBLAZE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_MIPS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_MIPS_RS3_LE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_MIPS_X"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_MMA"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_MMDSP_PLUS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_MMIX"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_MN10200"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_MN10300"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_MOXIE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_MSP430"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_NCPU"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_NDR1"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_NDS32"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_NONE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_NORC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_NS32K"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_NUM"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_OPEN8"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_OPENRISC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_OR1K"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_PARISC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_PCP"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_PDSP"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_PJ"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_PPC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_PPC64"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_PRISM"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EMPTY"
+reason = "utmpx record type from <utmpx.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EM_QDSP6"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_R32C"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_RCE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_RH32"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_RISCV"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_RL78"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_RS08"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_RX"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_S370"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_S390"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_SCORE7"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_SE_C17"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_SE_C33"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_SEP"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_SH"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_SHARC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_SLE9X"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_SNP1K"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_SPARC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_SPARC32PLUS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_SPARCV9"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ST100"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ST19"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ST200"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ST7"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ST9PLUS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_STARCORE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_STM8"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_STXP7X"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_SVX"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_TI_ARP32"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_TI_C2000"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_TI_C5500"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_TI_C6000"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_TILE64"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_TILEGX"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_TILEPRO"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_TINYJ"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_TI_PRU"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_TMM_GPP"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_TPC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_TRICORE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_TRIMEDIA"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_TSK3000"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_UNICORE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_V800"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_V850"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_VAX"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_VIDEOCORE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_VIDEOCORE3"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_VIDEOCORE5"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_VISIUM"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_VPP500"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_X86_64"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_XCORE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_XGATE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_XIMO16"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_XTENSA"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_Z80"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EM_ZSP"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EPIOCGPARAMS"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPIOCSPARAMS"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLL_CLOEXEC"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLL_CTL_ADD"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLL_CTL_DEL"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLL_CTL_MOD"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLLERR"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLLET"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLLEXCLUSIVE"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLLHUP"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLLIN"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLL_IOC_TYPE"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLLMSG"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLL_NONBLOCK"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLLNVAL"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLLONESHOT"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLLOUT"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLLPRI"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLLRDBAND"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLLRDHUP"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLLRDNORM"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLLWAKEUP"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLLWRBAND"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EPOLLWRNORM"
+reason = "epoll constant from <sys/epoll.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "ERA"
+reason = "langinfo item from <langinfo.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "ERA_D_FMT"
+reason = "langinfo item from <langinfo.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "ERA_D_T_FMT"
+reason = "langinfo item from <langinfo.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "ERA_T_FMT"
+reason = "langinfo item from <langinfo.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "ESR_MAGIC"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "ET_CORE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ET_DYN"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ET_EXEC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ETH_ALEN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_DATA_LEN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHER_ADDR_LEN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHER_CRC_LEN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHER_HDR_LEN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHER_MAX_LEN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHERMIN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHER_MIN_LEN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHERMTU"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHERTYPE_AARP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHERTYPE_ARP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHERTYPE_AT"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHERTYPE_IP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHERTYPE_IPV6"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHERTYPE_IPX"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHER_TYPE_LEN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHERTYPE_LOOPBACK"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHERTYPE_NTRAILER"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHERTYPE_PUP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHERTYPE_REVARP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHERTYPE_SPRITE"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHERTYPE_TRAIL"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETHERTYPE_VLAN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_FCS_LEN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_FRAME_LEN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_HLEN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ET_HIOS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ET_HIPROC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ETH_MAX_MTU"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_MIN_MTU"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_1588"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_8021AD"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_8021AH"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_8021Q"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_802_2"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_80221"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_802_3"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_802_3_MIN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_802_EX1"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_AARP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_AF_IUCV"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_ALL"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_AOE"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_ARCNET"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_ARP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_ATALK"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_ATMFATE"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_ATMMPOA"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_AX25"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_BATMAN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_BPQ"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_CAIF"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_CAN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_CANFD"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_CFM"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_CONTROL"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_CUST"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_DDCMP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_DEC"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_DIAG"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_DNA_DL"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_DNA_RC"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_DNA_RT"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_DSA"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_DSA_8021Q"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_ECONET"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_EDSA"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_ERSPAN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_ERSPAN2"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_FCOE"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_FIP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_HDLC"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_HSR"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_IBOE"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_IEEE802154"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_IEEEPUP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_IEEEPUPAT"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_IFE"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_IP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_IPV6"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_IPX"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_IRDA"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_LAT"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_LINK_CTL"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_LLDP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_LOCALTALK"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_LOOP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_LOOPBACK"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_MACSEC"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_MAP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_MOBITEX"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_MPLS_MC"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_MPLS_UC"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_MRP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_MVRP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_NCSI"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_NSH"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_PAE"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_PAUSE"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_PHONET"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_PPP_DISC"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_PPP_MP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_PPP_SES"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_PPPTALK"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_PREAUTH"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_PRP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_PUP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_PUPAT"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_QINQ1"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_QINQ2"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_QINQ3"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_RARP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_SCA"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_SLOW"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_SNAP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_TDLS"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_TEB"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_TIPC"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_TR_802_2"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_TRAILER"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_TSN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_WAN_PPP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_WCCP"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_X25"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_P_XDSA"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_TLEN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ETH_ZLEN"
+reason = "Ethernet protocol/length constant from the C38 networking headers."
+owner = "C38"
+
+[[constant]]
+name = "ET_LOOS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ET_LOPROC"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ET_NONE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ET_NUM"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "ET_REL"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_ADD"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_CLEAR"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_CURRENT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_DELETE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_DISABLE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_DISPATCH"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_DROP"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_ENABLE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_EOF"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_ERROR"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EVFILT_AIO"
+reason = "kqueue constant from <sys/event.h> (BSD numbers); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EVFILT_EMPTY"
+reason = "kqueue constant from <sys/event.h> (BSD numbers); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EVFILT_FS"
+reason = "kqueue constant from <sys/event.h> (BSD numbers); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EVFILT_LIO"
+reason = "kqueue constant from <sys/event.h> (BSD numbers); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EVFILT_PROC"
+reason = "kqueue constant from <sys/event.h> (BSD numbers); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EVFILT_PROCDESC"
+reason = "kqueue constant from <sys/event.h> (BSD numbers); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EVFILT_READ"
+reason = "kqueue constant from <sys/event.h> (BSD numbers); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EVFILT_SENDFILE"
+reason = "kqueue constant from <sys/event.h> (BSD numbers); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EVFILT_SIGNAL"
+reason = "kqueue constant from <sys/event.h> (BSD numbers); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EVFILT_SYSCOUNT"
+reason = "kqueue constant from <sys/event.h> (BSD numbers); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EVFILT_TIMER"
+reason = "kqueue constant from <sys/event.h> (BSD numbers); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EVFILT_USER"
+reason = "kqueue constant from <sys/event.h> (BSD numbers); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EVFILT_VNODE"
+reason = "kqueue constant from <sys/event.h> (BSD numbers); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EVFILT_WRITE"
+reason = "kqueue constant from <sys/event.h> (BSD numbers); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EV_FLAG1"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_FLAG2"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_FORCEONESHOT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_KEEPUDATA"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_NONE"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_NUM"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_ONESHOT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_RECEIPT"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EV_SYSFLAGS"
+reason = "ELF constant from <elf.h>; the T4(b) E prefix is the errno family, not ELF."
+owner = "C38"
+
+[[constant]]
+name = "EX__BASE"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EX_CANTCREAT"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EX_CONFIG"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EX_DATAERR"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EX_IOERR"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EX__MAX"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EX_NOHOST"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EX_NOINPUT"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EX_NOPERM"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EX_NOUSER"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EX_OK"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EX_OSERR"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EX_OSFILE"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EX_PROTOCOL"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EX_SOFTWARE"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EXTA"
+reason = "termios c_lflag or baud constant from <termios.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EXTB"
+reason = "termios c_lflag or baud constant from <termios.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EX_TEMPFAIL"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EXTPROC"
+reason = "termios c_lflag or baud constant from <termios.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EXTRA_MAGIC"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "EX_UNAVAILABLE"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "EX_USAGE"
+reason = "sysexits code from <sysexits.h>; the T4(b) E prefix is the errno family."
+owner = "C38"
+
+[[constant]]
+name = "MAP_FAILED"
+reason = "sys/mman failure sentinel ((void *)-1); not an integer MAP_* flag."
+owner = "C38"
+
+[[constant]]
+name = "PF_ARM_ABS"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "PF_ARM_PI"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "PF_ARM_SB"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "PF_HP_CODE"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "PF_HP_FAR_SHARED"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "PF_HP_LAZYSWAP"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "PF_HP_MODIFY"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "PF_HP_NEAR_SHARED"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "PF_HP_PAGE_SIZE"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "PF_HP_SBP"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "PF_IA_64_NORECOV"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "PF_MASKOS"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "PF_MASKPROC"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "PF_MIPS_LOCAL"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "PF_PARISC_SBP"
+reason = "C38 header constant with a T4(b) family prefix but no C36/generator row."
+owner = "C38"
+
+[[constant]]
+name = "PF_R"
+reason = "ELF program-header permission flag from <elf.h>; not a socket PF_* family value."
+owner = "C38"
+
+[[constant]]
+name = "PF_W"
+reason = "ELF program-header permission flag from <elf.h>; not a socket PF_* family value."
+owner = "C38"
+
+[[constant]]
+name = "PF_X"
+reason = "ELF program-header permission flag from <elf.h>; not a socket PF_* family value."
+owner = "C38"
+
+[[constant]]
+name = "S_ADDT"
+reason = "STREAMS or route constant from a C38 BSD/Solaris header; the T4(b) S_ prefix also holds stat bits."
+owner = "C38"
+
+[[constant]]
+name = "S_BANDURG"
+reason = "STREAMS or route constant from a C38 BSD/Solaris header; the T4(b) S_ prefix also holds stat bits."
+owner = "C38"
+
+[[constant]]
+name = "S_ERROR"
+reason = "STREAMS or route constant from a C38 BSD/Solaris header; the T4(b) S_ prefix also holds stat bits."
+owner = "C38"
+
+[[constant]]
+name = "S_HANGUP"
+reason = "STREAMS or route constant from a C38 BSD/Solaris header; the T4(b) S_ prefix also holds stat bits."
+owner = "C38"
+
+[[constant]]
+name = "S_HIPRI"
+reason = "STREAMS or route constant from a C38 BSD/Solaris header; the T4(b) S_ prefix also holds stat bits."
+owner = "C38"
+
+[[constant]]
+name = "SIG2STR_MAX"
+reason = "signal macro from <signal.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "SIG_DFL"
+reason = "signal macro from <signal.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "SIG_ERR"
+reason = "signal macro from <signal.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "SIG_HOLD"
+reason = "signal macro from <signal.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "SIG_IGN"
+reason = "signal macro from <signal.h>; no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "S_INPUT"
+reason = "STREAMS or route constant from a C38 BSD/Solaris header; the T4(b) S_ prefix also holds stat bits."
+owner = "C38"
+
+[[constant]]
+name = "S_MSG"
+reason = "STREAMS or route constant from a C38 BSD/Solaris header; the T4(b) S_ prefix also holds stat bits."
+owner = "C38"
+
+[[constant]]
+name = "S_OUTPUT"
+reason = "STREAMS or route constant from a C38 BSD/Solaris header; the T4(b) S_ prefix also holds stat bits."
+owner = "C38"
+
+[[constant]]
+name = "S_PREREQ"
+reason = "STREAMS or route constant from a C38 BSD/Solaris header; the T4(b) S_ prefix also holds stat bits."
+owner = "C38"
+
+[[constant]]
+name = "S_RDBAND"
+reason = "STREAMS or route constant from a C38 BSD/Solaris header; the T4(b) S_ prefix also holds stat bits."
+owner = "C38"
+
+[[constant]]
+name = "S_RDNORM"
+reason = "STREAMS or route constant from a C38 BSD/Solaris header; the T4(b) S_ prefix also holds stat bits."
+owner = "C38"
+
+[[constant]]
+name = "S_UPDATE"
+reason = "STREAMS or route constant from a C38 BSD/Solaris header; the T4(b) S_ prefix also holds stat bits."
+owner = "C38"
+
+[[constant]]
+name = "S_WRBAND"
+reason = "STREAMS or route constant from a C38 BSD/Solaris header; the T4(b) S_ prefix also holds stat bits."
+owner = "C38"
+
+[[constant]]
+name = "S_WRNORM"
+reason = "STREAMS or route constant from a C38 BSD/Solaris header; the T4(b) S_ prefix also holds stat bits."
+owner = "C38"
+
+[[constant]]
+name = "S_ZONE"
+reason = "STREAMS or route constant from a C38 BSD/Solaris header; the T4(b) S_ prefix also holds stat bits."
+owner = "C38"
+
+[[constant]]
+name = "EVFILT_JAIL"
+reason = "kqueue filter from <sys/event.h> (BSD number); no C36 row."
+owner = "C38"
+
+[[constant]]
+name = "EVFILT_JAILDESC"
+reason = "kqueue filter from <sys/event.h> (BSD number); no C36 row."
+owner = "C38"

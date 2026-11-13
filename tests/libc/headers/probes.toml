@@ -292,3 +292,283 @@ hidden_in = ["default", "posix", "xopen", "gnu", "c11", "c23", "ansi", "cxx17", 
 owner = "C40"
 pending = true
 
+
+[[probe]]
+header = "sys/socket.h"
+symbol = "accept4"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "sys/socket.h"
+symbol = "sendmmsg"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "sys/event.h"
+symbol = "kqueue"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "ifaddrs.h"
+symbol = "getifaddrs"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "sys/epoll.h"
+symbol = "epoll_create1"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "unistd.h"
+symbol = "closefrom"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "unistd.h"
+symbol = "setproctitle"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "sys/file.h"
+symbol = "flock"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "sys/random.h"
+symbol = "getrandom"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "sys/prctl.h"
+symbol = "prctl"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "sys/auxv.h"
+symbol = "getauxval"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "sys/sendfile.h"
+symbol = "sendfile"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "signal.h"
+symbol = "sig2str"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "signal.h"
+symbol = "str2sig"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "pthread.h"
+symbol = "pthread_cond_clockwait"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "pthread.h"
+symbol = "pthread_mutex_clocklock"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "semaphore.h"
+symbol = "sem_clockwait"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "netdb.h"
+symbol = "getaddrinfo"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "sys/socket.h"
+symbol = "socket"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "sys/stat.h"
+symbol = "futimens"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "pthread.h"
+symbol = "pthread_create"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "signal.h"
+symbol = "sigaction"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "glob.h"
+symbol = "glob"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "fnmatch.h"
+symbol = "fnmatch"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "sys/wait.h"
+symbol = "waitpid"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "termios.h"
+symbol = "tcgetattr"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "sys/resource.h"
+symbol = "getrlimit"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "fcntl.h"
+symbol = "openat"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "sys/select.h"
+symbol = "pselect"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "sys/mman.h"
+symbol = "mmap"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "dlfcn.h"
+symbol = "dladdr"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C38"
+
+[[probe]]
+header = "signal.h"
+symbol = "SIGEMT"
+visible_in = []
+hidden_in = ["default", "posix", "xopen", "gnu", "ansi", "c11", "c23", "cxx17", "cxx20"]
+owner = "C38"
+
+[[probe]]
+header = "signal.h"
+symbol = "SIGINFO"
+visible_in = []
+hidden_in = ["default", "posix", "xopen", "gnu", "ansi", "c11", "c23", "cxx17", "cxx20"]
+owner = "C38"
+
+[[probe]]
+header = "signal.h"
+symbol = "SIGTHR"
+visible_in = []
+hidden_in = ["default", "posix", "xopen", "gnu", "ansi", "c11", "c23", "cxx17", "cxx20"]
+owner = "C38"
+
+[[probe]]
+header = "signal.h"
+symbol = "SIGLWP"
+visible_in = []
+hidden_in = ["default", "posix", "xopen", "gnu", "ansi", "c11", "c23", "cxx17", "cxx20"]
+owner = "C38"
+
+[[probe]]
+header = "signal.h"
+symbol = "SIGLIBRT"
+visible_in = []
+hidden_in = ["default", "posix", "xopen", "gnu", "ansi", "c11", "c23", "cxx17", "cxx20"]
+owner = "C38"
+
+[[probe]]
+header = "sys/socket.h"
+symbol = "SCM_CREDS"
+visible_in = []
+hidden_in = ["default", "posix", "xopen", "gnu", "ansi", "c11", "c23", "cxx17", "cxx20"]
+owner = "C38"
+
+[[probe]]
+header = "fcntl.h"
+symbol = "F_DUP2FD"
+visible_in = []
+hidden_in = ["default", "posix", "xopen", "gnu", "ansi", "c11", "c23", "cxx17", "cxx20"]
+owner = "C38"
+
+[[probe]]
+header = "sys/socket.h"
+symbol = "sa_len"
+visible_in = []
+hidden_in = ["default", "posix", "xopen", "gnu", "ansi", "c11", "c23", "cxx17", "cxx20"]
+owner = "C38"
+
+[[probe]]
+header = "dirent.h"
+symbol = "d_namlen"
+visible_in = []
+hidden_in = ["default", "posix", "xopen", "gnu", "ansi", "c11", "c23", "cxx17", "cxx20"]
+owner = "C38"

@@ -161,8 +161,8 @@ ring = 1
 [[header]]
 path = "machine/param.h"
 owner = "C38"
-status = "pending"
-standalone = true
+status = "owned"
+standalone = false
 ring = 2
 
 [[header]]
@@ -630,566 +630,566 @@ ring = 2
 [[header]]
 path = "aio.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "arpa/inet.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "arpa/nameser.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "arpa/nameser_compat.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "resolv.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "cpio.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "tar.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "dirent.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "dlfcn.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "fcntl.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "fmtmsg.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "fnmatch.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "ftw.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "glob.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "grp.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "pwd.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "iconv.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "langinfo.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "monetary.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "mqueue.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "net/if.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "net/if_arp.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "net/ethernet.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "net/route.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "netdb.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "netinet/in.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "netinet/in_systm.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "netinet/ip.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "netinet/ip6.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "netinet/ip_icmp.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "netinet/icmp6.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "netinet/igmp.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "netinet/udp.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "netinet/if_ether.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "netinet/ether.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "netinet/tcp.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "nl_types.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "poll.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "pthread.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sched.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "semaphore.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "spawn.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "stropts.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/ioctl.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/mman.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/select.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/socket.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/stat.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/statvfs.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/time.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/times.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/uio.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/un.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/utsname.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/wait.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "syslog.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "termios.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "ulimit.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "utime.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "wordexp.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "unistd.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "utmpx.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/param.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/sysctl.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/event.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "fts.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "paths.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "stringlist.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sysexits.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "ttyent.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "util.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "libutil.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "pty.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "vis.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "readpassphrase.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "ifaddrs.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/random.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/feature_tests.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "port.h"
-owner = "C38"
+owner = "C67"
 status = "pending"
 standalone = true
 ring = 2
 
 [[header]]
 path = "thread.h"
-owner = "C38"
+owner = "C67"
 status = "pending"
 standalone = true
 ring = 2
 
 [[header]]
 path = "synch.h"
-owner = "C38"
+owner = "C67"
 status = "pending"
 standalone = true
 ring = 2
@@ -1197,336 +1197,412 @@ ring = 2
 [[header]]
 path = "features.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/epoll.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/eventfd.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/timerfd.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/signalfd.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/inotify.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/prctl.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/sendfile.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/sysinfo.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/xattr.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/auxv.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/mount.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/reboot.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/personality.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/file.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/syscall.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/ucontext.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "ucontext.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/signal.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/errno.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/fcntl.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/poll.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/dir.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/syslog.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/statfs.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/vfs.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/termios.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/timeb.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/ttydefaults.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/resource.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/sem.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/shm.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/msg.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/ipc.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/acct.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/klog.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/swap.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "byteswap.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "alloca.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "malloc.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "values.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "mntent.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "stdio_ext.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "link.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "shadow.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/sysmacros.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "execinfo.h"
 owner = "C38"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "error.h"
 owner = "C38"
+status = "owned"
+standalone = true
+ring = 2
+
+[[header]]
+path = "crypt.h"
+owner = "C38"
+status = "owned"
+standalone = true
+ring = 2
+
+[[header]]
+path = "elf.h"
+owner = "C38"
+status = "owned"
+standalone = true
+ring = 2
+
+[[header]]
+path = "signal.h"
+owner = "C38"
+status = "owned"
+standalone = true
+ring = 1
+
+[[header]]
+path = "sys/single_threaded.h"
+owner = "C38"
+status = "owned"
+standalone = true
+ring = 2
+
+[[header]]
+path = "syscall.h"
+owner = "C38"
+status = "owned"
+standalone = true
+ring = 2
+
+[[header]]
+path = "libintl.h"
+owner = "C48"
 status = "pending"
 standalone = true
 ring = 2
 
+[[header]]
+path = "xlocale.h"
+owner = "C48"
+status = "pending"
+standalone = true
+ring = 2
+
+[[header]]
+path = "sys/pledge.h"
+owner = "C53"
+status = "pending"
+standalone = true
+ring = 2
+
+[[header]]
+path = "sys/capsicum.h"
+owner = "C53"
+status = "pending"
+standalone = true
+ring = 2
+
+[[header]]
+path = "pthread_np.h"
+owner = "C57"
+status = "pending"
+standalone = true
+ring = 2
+
+[[header]]
+path = "sys/port.h"
+owner = "C67"
+status = "pending"
+standalone = true
+ring = 3

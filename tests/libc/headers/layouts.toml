@@ -136,7 +136,6 @@ headers = ["sys/types.h"]
 size = 4
 align = 4
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
 
 [[type]]
 name = "time_t"
@@ -235,7 +234,6 @@ headers = ["sys/types.h"]
 size = 8
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
 
 [[type]]
 name = "mode_t"
@@ -313,7 +311,6 @@ headers = ["sys/types.h"]
 size = 4
 align = 4
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
 
 [[type]]
 name = "in_port_t"
@@ -321,7 +318,6 @@ headers = ["sys/types.h"]
 size = 2
 align = 2
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
 
 [[type]]
 name = "reclen_t"
@@ -1024,7 +1020,18 @@ headers = ["signal.h"]
 size = 24
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "ss_sp"
+offset = 0
+
+[[type.field]]
+name = "ss_flags"
+offset = 8
+
+[[type.field]]
+name = "ss_size"
+offset = 16
+
 
 [[type]]
 name = "sem_t"
@@ -1032,7 +1039,6 @@ headers = ["semaphore.h"]
 size = 32
 align = 4
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
 
 [[type]]
 name = "struct statvfs"
@@ -1040,7 +1046,54 @@ headers = ["sys/statvfs.h"]
 size = 112
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "f_bsize"
+offset = 0
+
+[[type.field]]
+name = "f_frsize"
+offset = 8
+
+[[type.field]]
+name = "f_blocks"
+offset = 16
+
+[[type.field]]
+name = "f_bfree"
+offset = 24
+
+[[type.field]]
+name = "f_bavail"
+offset = 32
+
+[[type.field]]
+name = "f_files"
+offset = 40
+
+[[type.field]]
+name = "f_ffree"
+offset = 48
+
+[[type.field]]
+name = "f_favail"
+offset = 56
+
+[[type.field]]
+name = "f_fsid"
+offset = 64
+
+[[type.field]]
+name = "f_flag"
+offset = 72
+
+[[type.field]]
+name = "f_namemax"
+offset = 80
+
+[[type.field]]
+name = "f_type"
+offset = 88
+
 
 [[type]]
 name = "struct passwd"
@@ -1048,7 +1101,34 @@ headers = ["pwd.h"]
 size = 48
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "pw_name"
+offset = 0
+
+[[type.field]]
+name = "pw_passwd"
+offset = 8
+
+[[type.field]]
+name = "pw_uid"
+offset = 16
+
+[[type.field]]
+name = "pw_gid"
+offset = 20
+
+[[type.field]]
+name = "pw_gecos"
+offset = 24
+
+[[type.field]]
+name = "pw_dir"
+offset = 32
+
+[[type.field]]
+name = "pw_shell"
+offset = 40
+
 
 [[type]]
 name = "struct group"
@@ -1056,7 +1136,22 @@ headers = ["grp.h"]
 size = 32
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "gr_name"
+offset = 0
+
+[[type.field]]
+name = "gr_passwd"
+offset = 8
+
+[[type.field]]
+name = "gr_gid"
+offset = 16
+
+[[type.field]]
+name = "gr_mem"
+offset = 24
+
 
 [[type]]
 name = "struct rlimit"
@@ -1064,7 +1159,14 @@ headers = ["sys/resource.h"]
 size = 16
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "rlim_cur"
+offset = 0
+
+[[type.field]]
+name = "rlim_max"
+offset = 8
+
 
 [[type]]
 name = "struct rusage"
@@ -1072,7 +1174,18 @@ headers = ["sys/resource.h"]
 size = 272
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "ru_utime"
+offset = 0
+
+[[type.field]]
+name = "ru_stime"
+offset = 16
+
+[[type.field]]
+name = "ru_maxrss"
+offset = 32
+
 
 [[type]]
 name = "struct sigevent"
@@ -1080,7 +1193,22 @@ headers = ["signal.h"]
 size = 64
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "sigev_value"
+offset = 0
+
+[[type.field]]
+name = "sigev_signo"
+offset = 8
+
+[[type.field]]
+name = "sigev_notify"
+offset = 12
+
+[[type.field]]
+name = "__sev_fields"
+offset = 16
+
 
 [[type]]
 name = "struct sigaction"
@@ -1088,7 +1216,22 @@ headers = ["signal.h"]
 size = 152
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "__sa_handler"
+offset = 0
+
+[[type.field]]
+name = "sa_mask"
+offset = 8
+
+[[type.field]]
+name = "sa_flags"
+offset = 136
+
+[[type.field]]
+name = "sa_restorer"
+offset = 144
+
 
 [[type]]
 name = "siginfo_t"
@@ -1096,7 +1239,22 @@ headers = ["signal.h"]
 size = 128
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "si_signo"
+offset = 0
+
+[[type.field]]
+name = "si_errno"
+offset = 4
+
+[[type.field]]
+name = "si_code"
+offset = 8
+
+[[type.field]]
+name = "__si_fields"
+offset = 16
+
 
 [[type]]
 name = "struct msghdr"
@@ -1104,7 +1262,34 @@ headers = ["sys/socket.h"]
 size = 56
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "msg_name"
+offset = 0
+
+[[type.field]]
+name = "msg_namelen"
+offset = 8
+
+[[type.field]]
+name = "msg_iov"
+offset = 16
+
+[[type.field]]
+name = "msg_iovlen"
+offset = 24
+
+[[type.field]]
+name = "msg_control"
+offset = 32
+
+[[type.field]]
+name = "msg_controllen"
+offset = 40
+
+[[type.field]]
+name = "msg_flags"
+offset = 48
+
 
 [[type]]
 name = "struct cmsghdr"
@@ -1112,7 +1297,18 @@ headers = ["sys/socket.h"]
 size = 16
 align = 4
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "cmsg_len"
+offset = 0
+
+[[type.field]]
+name = "cmsg_level"
+offset = 8
+
+[[type.field]]
+name = "cmsg_type"
+offset = 12
+
 
 [[type]]
 name = "struct sockaddr"
@@ -1120,7 +1316,14 @@ headers = ["sys/socket.h"]
 size = 16
 align = 2
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "sa_family"
+offset = 0
+
+[[type.field]]
+name = "sa_data"
+offset = 2
+
 
 [[type]]
 name = "struct sockaddr_storage"
@@ -1128,7 +1331,6 @@ headers = ["sys/socket.h"]
 size = 128
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
 
 [[type]]
 name = "struct sockaddr_in"
@@ -1136,7 +1338,22 @@ headers = ["netinet/in.h"]
 size = 16
 align = 4
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "sin_family"
+offset = 0
+
+[[type.field]]
+name = "sin_port"
+offset = 2
+
+[[type.field]]
+name = "sin_addr"
+offset = 4
+
+[[type.field]]
+name = "sin_zero"
+offset = 8
+
 
 [[type]]
 name = "struct sockaddr_in6"
@@ -1144,7 +1361,26 @@ headers = ["netinet/in.h"]
 size = 28
 align = 4
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "sin6_family"
+offset = 0
+
+[[type.field]]
+name = "sin6_port"
+offset = 2
+
+[[type.field]]
+name = "sin6_flowinfo"
+offset = 4
+
+[[type.field]]
+name = "sin6_addr"
+offset = 8
+
+[[type.field]]
+name = "sin6_scope_id"
+offset = 24
+
 
 [[type]]
 name = "struct sockaddr_un"
@@ -1152,7 +1388,14 @@ headers = ["sys/un.h"]
 size = 110
 align = 2
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "sun_family"
+offset = 0
+
+[[type.field]]
+name = "sun_path"
+offset = 2
+
 
 [[type]]
 name = "struct addrinfo"
@@ -1160,7 +1403,38 @@ headers = ["netdb.h"]
 size = 48
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "ai_flags"
+offset = 0
+
+[[type.field]]
+name = "ai_family"
+offset = 4
+
+[[type.field]]
+name = "ai_socktype"
+offset = 8
+
+[[type.field]]
+name = "ai_protocol"
+offset = 12
+
+[[type.field]]
+name = "ai_addrlen"
+offset = 16
+
+[[type.field]]
+name = "ai_addr"
+offset = 24
+
+[[type.field]]
+name = "ai_canonname"
+offset = 32
+
+[[type.field]]
+name = "ai_next"
+offset = 40
+
 
 [[type]]
 name = "struct pollfd"
@@ -1168,7 +1442,6 @@ headers = ["poll.h"]
 size = 8
 align = 4
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
 
 [[type]]
 name = "fd_set"
@@ -1176,7 +1449,10 @@ headers = ["sys/select.h"]
 size = 128
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "fds_bits"
+offset = 0
+
 
 [[type]]
 name = "cpu_set_t"
@@ -1184,7 +1460,10 @@ headers = ["sched.h"]
 size = 128
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "__bits"
+offset = 0
+
 
 [[type]]
 name = "struct epoll_event"
@@ -1192,7 +1471,14 @@ headers = ["sys/epoll.h"]
 size = 12
 align = 1
 arches = ["x86_64"]
-owner = "C38"
+[[type.field]]
+name = "events"
+offset = 0
+
+[[type.field]]
+name = "data"
+offset = 4
+
 
 [[type]]
 name = "struct epoll_event"
@@ -1200,7 +1486,14 @@ headers = ["sys/epoll.h"]
 size = 16
 align = 8
 arches = ["aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "events"
+offset = 0
+
+[[type.field]]
+name = "data"
+offset = 8
+
 
 [[type]]
 name = "struct aiocb"
@@ -1208,7 +1501,62 @@ headers = ["aio.h"]
 size = 168
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "aio_fildes"
+offset = 0
+
+[[type.field]]
+name = "aio_lio_opcode"
+offset = 4
+
+[[type.field]]
+name = "aio_reqprio"
+offset = 8
+
+[[type.field]]
+name = "aio_buf"
+offset = 16
+
+[[type.field]]
+name = "aio_nbytes"
+offset = 24
+
+[[type.field]]
+name = "aio_sigevent"
+offset = 32
+
+[[type.field]]
+name = "__td"
+offset = 96
+
+[[type.field]]
+name = "__lock"
+offset = 104
+
+[[type.field]]
+name = "__err"
+offset = 112
+
+[[type.field]]
+name = "__ret"
+offset = 120
+
+[[type.field]]
+name = "aio_offset"
+offset = 128
+
+[[type.field]]
+name = "__next"
+offset = 136
+
+[[type.field]]
+name = "__prev"
+offset = 144
+
+[[type.field]]
+name = "__dummy4"
+offset = 152
+
 
 [[type]]
 name = "glob_t"
@@ -1216,7 +1564,26 @@ headers = ["glob.h"]
 size = 72
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "gl_pathc"
+offset = 0
+
+[[type.field]]
+name = "gl_pathv"
+offset = 8
+
+[[type.field]]
+name = "gl_offs"
+offset = 16
+
+[[type.field]]
+name = "__dummy1"
+offset = 24
+
+[[type.field]]
+name = "__dummy2"
+offset = 32
+
 
 [[type]]
 name = "regex_t"
@@ -1232,7 +1599,38 @@ headers = ["spawn.h"]
 size = 336
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "__flags"
+offset = 0
+
+[[type.field]]
+name = "__pgrp"
+offset = 4
+
+[[type.field]]
+name = "__def"
+offset = 8
+
+[[type.field]]
+name = "__mask"
+offset = 136
+
+[[type.field]]
+name = "__prio"
+offset = 264
+
+[[type.field]]
+name = "__pol"
+offset = 268
+
+[[type.field]]
+name = "__fn"
+offset = 272
+
+[[type.field]]
+name = "__pad"
+offset = 280
+
 
 [[type]]
 name = "posix_spawn_file_actions_t"
@@ -1240,7 +1638,18 @@ headers = ["spawn.h"]
 size = 80
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "__pad0"
+offset = 0
+
+[[type.field]]
+name = "__actions"
+offset = 8
+
+[[type.field]]
+name = "__pad"
+offset = 16
+
 
 [[type]]
 name = "struct mq_attr"
@@ -1248,7 +1657,26 @@ headers = ["mqueue.h"]
 size = 64
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "mq_flags"
+offset = 0
+
+[[type.field]]
+name = "mq_maxmsg"
+offset = 8
+
+[[type.field]]
+name = "mq_msgsize"
+offset = 16
+
+[[type.field]]
+name = "mq_curmsgs"
+offset = 24
+
+[[type.field]]
+name = "__unused"
+offset = 32
+
 
 [[type]]
 name = "struct sched_param"
@@ -1256,7 +1684,22 @@ headers = ["sched.h"]
 size = 48
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "sched_priority"
+offset = 0
+
+[[type.field]]
+name = "__reserved1"
+offset = 4
+
+[[type.field]]
+name = "__reserved2"
+offset = 8
+
+[[type.field]]
+name = "__reserved3"
+offset = 40
+
 
 [[type]]
 name = "struct flock"
@@ -1264,7 +1707,26 @@ headers = ["fcntl.h"]
 size = 32
 align = 8
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "l_type"
+offset = 0
+
+[[type.field]]
+name = "l_whence"
+offset = 2
+
+[[type.field]]
+name = "l_start"
+offset = 8
+
+[[type.field]]
+name = "l_len"
+offset = 16
+
+[[type.field]]
+name = "l_pid"
+offset = 24
+
 
 [[type]]
 name = "struct utsname"
@@ -1272,5 +1734,197 @@ headers = ["sys/utsname.h"]
 size = 390
 align = 1
 arches = ["x86_64", "aarch64", "riscv64"]
-owner = "C38"
+[[type.field]]
+name = "sysname"
+offset = 0
 
+[[type.field]]
+name = "nodename"
+offset = 65
+
+[[type.field]]
+name = "release"
+offset = 130
+
+[[type.field]]
+name = "version"
+offset = 195
+
+[[type.field]]
+name = "machine"
+offset = 260
+
+[[type.field]]
+name = "domainname"
+offset = 325
+
+
+[[type]]
+name = "struct kevent"
+headers = ["sys/event.h"]
+size = 64
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "ident"
+offset = 0
+
+[[type.field]]
+name = "filter"
+offset = 8
+
+[[type.field]]
+name = "flags"
+offset = 10
+
+[[type.field]]
+name = "fflags"
+offset = 12
+
+[[type.field]]
+name = "data"
+offset = 16
+
+[[type.field]]
+name = "udata"
+offset = 24
+
+[[type.field]]
+name = "ext"
+offset = 32
+
+[[type]]
+name = "struct ifreq"
+headers = ["net/if.h"]
+size = 40
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "ifr_name"
+offset = 0
+
+[[type.field]]
+name = "ifr_ifru"
+offset = 16
+
+[[type]]
+name = "struct rtentry"
+headers = ["net/route.h"]
+size = 120
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "rt_pad1"
+offset = 0
+
+[[type.field]]
+name = "rt_dst"
+offset = 8
+
+[[type.field]]
+name = "rt_gateway"
+offset = 24
+
+[[type.field]]
+name = "rt_genmask"
+offset = 40
+
+[[type.field]]
+name = "rt_flags"
+offset = 56
+
+[[type.field]]
+name = "rt_dev"
+offset = 88
+
+[[type]]
+name = "struct ifaddrs"
+headers = ["ifaddrs.h"]
+size = 56
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "ifa_next"
+offset = 0
+
+[[type.field]]
+name = "ifa_name"
+offset = 8
+
+[[type.field]]
+name = "ifa_flags"
+offset = 16
+
+[[type.field]]
+name = "ifa_addr"
+offset = 24
+
+[[type.field]]
+name = "ifa_netmask"
+offset = 32
+
+[[type.field]]
+name = "ifa_ifu"
+offset = 40
+
+[[type.field]]
+name = "ifa_data"
+offset = 48
+
+[[type]]
+name = "struct tcp_info"
+headers = ["netinet/tcp.h"]
+size = 232
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "tcpi_state"
+offset = 0
+
+[[type.field]]
+name = "tcpi_total_retrans"
+offset = 100
+
+[[type.field]]
+name = "tcpi_bytes_acked"
+offset = 120
+
+[[type]]
+name = "Elf64_Ehdr"
+headers = ["elf.h"]
+size = 64
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "Elf64_Phdr"
+headers = ["elf.h"]
+size = 56
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "Elf64_Sym"
+headers = ["elf.h"]
+size = 24
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "Elf64_Dyn"
+headers = ["elf.h"]
+size = 16
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "Elf64_Rela"
+headers = ["elf.h"]
+size = 24
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]

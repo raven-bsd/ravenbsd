@@ -83,7 +83,7 @@ pub fn parse(text: &str) -> Result<Vec<LayoutRow>, String> {
     Ok(rows)
 }
 
-/// True when every header of the row is owned by C37 and present.
+/// True when every header of the row is owned and present on the architecture.
 #[must_use]
 pub fn available(row: &LayoutRow, arch: Arch, headers: &[HeaderRow]) -> bool {
     if row.owner.as_deref().is_some_and(|owner| owner != "C37") {
@@ -110,9 +110,9 @@ pub fn owner(row: &LayoutRow, headers: &[HeaderRow]) -> String {
     })
 }
 
-/// The preamble that makes every measured type visible. C38-owned pieces
-/// (`stack_t`, termios flag typedefs, `NCCS`) are spelled here only so this
-/// ticket can measure the C37-owned bodies; they do not ship from this file.
+/// The preamble that makes every measured type visible. It includes the
+/// public headers of both header tickets (C37 and C38) instead of restating
+/// their bodies; a row is measured only when its own headers are owned.
 pub const PREAMBLE: &str = "\
 #define __NEED_struct_timeval
 #define __NEED_struct_iovec
@@ -120,7 +120,6 @@ pub const PREAMBLE: &str = "\
 #define __NEED_mbstate_t
 #define __NEED_va_list
 #define __NEED_off64_t
-#define __NEED_rlim_t
 #define __NEED_socklen_t
 #define __NEED_sa_family_t
 #define __NEED_float_t
@@ -134,15 +133,39 @@ pub const PREAMBLE: &str = "\
 #include <locale.h>
 #include <fenv.h>
 #include <wchar.h>
-#include <bits/stat.h>
-#include <bits/dirent.h>
-#define NCCS 32
-typedef unsigned tcflag_t;
-typedef unsigned char cc_t;
-typedef unsigned speed_t;
-#include <bits/termios.h>
-typedef struct { void *ss_sp; int ss_flags; size_t ss_size; } stack_t;
-#include <bits/signal.h>
+#include <signal.h>
+#include <semaphore.h>
+#include <termios.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <sys/statvfs.h>
+#include <pwd.h>
+#include <grp.h>
+#include <sys/resource.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/un.h>
+#include <netdb.h>
+#include <poll.h>
+#include <sys/epoll.h>
+#include <aio.h>
+#include <glob.h>
+#include <spawn.h>
+#include <mqueue.h>
+#include <sched.h>
+#include <fcntl.h>
+#include <sys/utsname.h>
+#include <sys/select.h>
+#include <sys/param.h>
+#include <sys/event.h>
+#include <net/if.h>
+#include <net/route.h>
+#include <ifaddrs.h>
+#include <sys/time.h>
+#include <netinet/tcp.h>
+#include <sys/file.h>
+#include <elf.h>
+#include <sys/sysinfo.h>
 /* RavenBSD: offsetof(struct stat, __unused) needs the field name, not the
  * cdefs attribute macro. */
 #undef __unused

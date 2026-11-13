@@ -45,8 +45,13 @@ fn pending_row_is_not_available() {
         .iter()
         .find(|row| row.name == "struct statvfs")
         .expect("statvfs row");
-    assert!(!available(statvfs, Arch::X86_64, &headers));
-    assert_eq!(owner(statvfs, &headers), "C38");
+    assert!(available(statvfs, Arch::X86_64, &headers));
+    let regex = rows
+        .iter()
+        .find(|row| row.name == "regex_t")
+        .expect("regex_t row");
+    assert!(!available(regex, Arch::X86_64, &headers));
+    assert_eq!(owner(regex, &headers), "C45");
 }
 
 #[test]
@@ -57,5 +62,6 @@ fn assert_source_uses_expected_macros() {
     assert!(source.contains("_Static_assert(sizeof(struct stat) == 128"));
     assert!(source.contains("_Alignof(jmp_buf) == 8"));
     assert!(source.contains("offsetof(struct dirent, d_name) == 19"));
-    assert!(!source.contains("sizeof(struct statvfs)"));
+    assert!(source.contains("sizeof(struct statvfs)"));
+    assert!(!source.contains("sizeof(regex_t)"));
 }

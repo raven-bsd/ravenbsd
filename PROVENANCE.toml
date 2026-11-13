@@ -1340,3 +1340,1368 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; HWCAP/HWCAP2 values kept; x86_64/riscv64 headers are comment-only."
+
+[[import]]
+path = "libc/ravenlibc/include/aio.h"
+upstream = "musl"
+upstream_path = "include/aio.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/cpio.h"
+upstream = "musl"
+upstream_path = "include/cpio.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/tar.h"
+upstream = "musl"
+upstream_path = "include/tar.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/dirent.h"
+upstream = "musl"
+upstream_path = "include/dirent.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/dlfcn.h"
+upstream = "musl"
+upstream_path = "include/dlfcn.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/fcntl.h"
+upstream = "musl"
+upstream_path = "include/fcntl.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/fmtmsg.h"
+upstream = "musl"
+upstream_path = "include/fmtmsg.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/fnmatch.h"
+upstream = "musl"
+upstream_path = "include/fnmatch.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/ftw.h"
+upstream = "musl"
+upstream_path = "include/ftw.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/glob.h"
+upstream = "musl"
+upstream_path = "include/glob.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/grp.h"
+upstream = "musl"
+upstream_path = "include/grp.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/pwd.h"
+upstream = "musl"
+upstream_path = "include/pwd.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/iconv.h"
+upstream = "musl"
+upstream_path = "include/iconv.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/langinfo.h"
+upstream = "musl"
+upstream_path = "include/langinfo.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/monetary.h"
+upstream = "musl"
+upstream_path = "include/monetary.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/mqueue.h"
+upstream = "musl"
+upstream_path = "include/mqueue.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/netdb.h"
+upstream = "musl"
+upstream_path = "include/netdb.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/nl_types.h"
+upstream = "musl"
+upstream_path = "include/nl_types.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/poll.h"
+upstream = "musl"
+upstream_path = "include/poll.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/pthread.h"
+upstream = "musl"
+upstream_path = "include/pthread.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sched.h"
+upstream = "musl"
+upstream_path = "include/sched.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/semaphore.h"
+upstream = "musl"
+upstream_path = "include/semaphore.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/spawn.h"
+upstream = "musl"
+upstream_path = "include/spawn.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/stropts.h"
+upstream = "musl"
+upstream_path = "include/stropts.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/syslog.h"
+upstream = "musl"
+upstream_path = "include/syslog.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/termios.h"
+upstream = "musl"
+upstream_path = "include/termios.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/ulimit.h"
+upstream = "musl"
+upstream_path = "include/ulimit.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/utime.h"
+upstream = "musl"
+upstream_path = "include/utime.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/wordexp.h"
+upstream = "musl"
+upstream_path = "include/wordexp.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/unistd.h"
+upstream = "musl"
+upstream_path = "include/unistd.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/utmpx.h"
+upstream = "musl"
+upstream_path = "include/utmpx.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/signal.h"
+upstream = "musl"
+upstream_path = "include/signal.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/resolv.h"
+upstream = "musl"
+upstream_path = "include/resolv.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/ifaddrs.h"
+upstream = "musl"
+upstream_path = "include/ifaddrs.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/syscall.h"
+upstream = "musl"
+upstream_path = "include/syscall.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/ucontext.h"
+upstream = "musl"
+upstream_path = "include/ucontext.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/byteswap.h"
+upstream = "musl"
+upstream_path = "include/byteswap.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/alloca.h"
+upstream = "musl"
+upstream_path = "include/alloca.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/malloc.h"
+upstream = "musl"
+upstream_path = "include/malloc.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/values.h"
+upstream = "musl"
+upstream_path = "include/values.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/mntent.h"
+upstream = "musl"
+upstream_path = "include/mntent.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/stdio_ext.h"
+upstream = "musl"
+upstream_path = "include/stdio_ext.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/shadow.h"
+upstream = "musl"
+upstream_path = "include/shadow.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/link.h"
+upstream = "musl"
+upstream_path = "include/link.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/elf.h"
+upstream = "musl"
+upstream_path = "include/elf.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/crypt.h"
+upstream = "musl"
+upstream_path = "include/crypt.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/socket.h"
+upstream = "musl"
+upstream_path = "include/sys/socket.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/stat.h"
+upstream = "musl"
+upstream_path = "include/sys/stat.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/statvfs.h"
+upstream = "musl"
+upstream_path = "include/sys/statvfs.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/ioctl.h"
+upstream = "musl"
+upstream_path = "include/sys/ioctl.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/mman.h"
+upstream = "musl"
+upstream_path = "include/sys/mman.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/select.h"
+upstream = "musl"
+upstream_path = "include/sys/select.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/time.h"
+upstream = "musl"
+upstream_path = "include/sys/time.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/times.h"
+upstream = "musl"
+upstream_path = "include/sys/times.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/uio.h"
+upstream = "musl"
+upstream_path = "include/sys/uio.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/un.h"
+upstream = "musl"
+upstream_path = "include/sys/un.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/utsname.h"
+upstream = "musl"
+upstream_path = "include/sys/utsname.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/wait.h"
+upstream = "musl"
+upstream_path = "include/sys/wait.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/random.h"
+upstream = "musl"
+upstream_path = "include/sys/random.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/epoll.h"
+upstream = "musl"
+upstream_path = "include/sys/epoll.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/eventfd.h"
+upstream = "musl"
+upstream_path = "include/sys/eventfd.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/timerfd.h"
+upstream = "musl"
+upstream_path = "include/sys/timerfd.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/signalfd.h"
+upstream = "musl"
+upstream_path = "include/sys/signalfd.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/inotify.h"
+upstream = "musl"
+upstream_path = "include/sys/inotify.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/prctl.h"
+upstream = "musl"
+upstream_path = "include/sys/prctl.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/sendfile.h"
+upstream = "musl"
+upstream_path = "include/sys/sendfile.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/sysinfo.h"
+upstream = "musl"
+upstream_path = "include/sys/sysinfo.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/xattr.h"
+upstream = "musl"
+upstream_path = "include/sys/xattr.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/auxv.h"
+upstream = "musl"
+upstream_path = "include/sys/auxv.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/mount.h"
+upstream = "musl"
+upstream_path = "include/sys/mount.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/reboot.h"
+upstream = "musl"
+upstream_path = "include/sys/reboot.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/personality.h"
+upstream = "musl"
+upstream_path = "include/sys/personality.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/file.h"
+upstream = "musl"
+upstream_path = "include/sys/file.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/syscall.h"
+upstream = "musl"
+upstream_path = "include/sys/syscall.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/ucontext.h"
+upstream = "musl"
+upstream_path = "include/sys/ucontext.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/signal.h"
+upstream = "musl"
+upstream_path = "include/sys/signal.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/errno.h"
+upstream = "musl"
+upstream_path = "include/sys/errno.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/fcntl.h"
+upstream = "musl"
+upstream_path = "include/sys/fcntl.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/poll.h"
+upstream = "musl"
+upstream_path = "include/sys/poll.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/dir.h"
+upstream = "musl"
+upstream_path = "include/sys/dir.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/syslog.h"
+upstream = "musl"
+upstream_path = "include/sys/syslog.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/vfs.h"
+upstream = "musl"
+upstream_path = "include/sys/vfs.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/termios.h"
+upstream = "musl"
+upstream_path = "include/sys/termios.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/resource.h"
+upstream = "musl"
+upstream_path = "include/sys/resource.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/statfs.h"
+upstream = "musl"
+upstream_path = "include/sys/statfs.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/timeb.h"
+upstream = "musl"
+upstream_path = "include/sys/timeb.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/ttydefaults.h"
+upstream = "musl"
+upstream_path = "include/sys/ttydefaults.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/sem.h"
+upstream = "musl"
+upstream_path = "include/sys/sem.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/shm.h"
+upstream = "musl"
+upstream_path = "include/sys/shm.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/msg.h"
+upstream = "musl"
+upstream_path = "include/sys/msg.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/ipc.h"
+upstream = "musl"
+upstream_path = "include/sys/ipc.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/acct.h"
+upstream = "musl"
+upstream_path = "include/sys/acct.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/klog.h"
+upstream = "musl"
+upstream_path = "include/sys/klog.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/swap.h"
+upstream = "musl"
+upstream_path = "include/sys/swap.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/sysmacros.h"
+upstream = "musl"
+upstream_path = "include/sys/sysmacros.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/arpa/inet.h"
+upstream = "musl"
+upstream_path = "include/arpa/inet.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/arpa/nameser.h"
+upstream = "musl"
+upstream_path = "include/arpa/nameser.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/arpa/nameser_compat.h"
+upstream = "musl"
+upstream_path = "include/arpa/nameser_compat.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/net/if.h"
+upstream = "musl"
+upstream_path = "include/net/if.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/net/if_arp.h"
+upstream = "musl"
+upstream_path = "include/net/if_arp.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/net/ethernet.h"
+upstream = "musl"
+upstream_path = "include/net/ethernet.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/net/route.h"
+upstream = "musl"
+upstream_path = "include/net/route.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/netinet/in.h"
+upstream = "musl"
+upstream_path = "include/netinet/in.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/netinet/in_systm.h"
+upstream = "musl"
+upstream_path = "include/netinet/in_systm.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/netinet/ip.h"
+upstream = "musl"
+upstream_path = "include/netinet/ip.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/netinet/ip6.h"
+upstream = "musl"
+upstream_path = "include/netinet/ip6.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/netinet/ip_icmp.h"
+upstream = "musl"
+upstream_path = "include/netinet/ip_icmp.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/netinet/icmp6.h"
+upstream = "musl"
+upstream_path = "include/netinet/icmp6.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/netinet/igmp.h"
+upstream = "musl"
+upstream_path = "include/netinet/igmp.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/netinet/udp.h"
+upstream = "musl"
+upstream_path = "include/netinet/udp.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/netinet/if_ether.h"
+upstream = "musl"
+upstream_path = "include/netinet/if_ether.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/netinet/ether.h"
+upstream = "musl"
+upstream_path = "include/netinet/ether.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/netinet/tcp.h"
+upstream = "musl"
+upstream_path = "include/netinet/tcp.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, feature tests mapped to __*_VISIBLE, generated bits included, deviations listed in the C38 report."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/param.h"
+upstream = "freebsd"
+upstream_path = "sys/sys/param.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/14 5.B; kernel-private blocks removed, FreeBSD types replaced by ravenlibc types, the upstream notice kept verbatim."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/sysctl.h"
+upstream = "freebsd"
+upstream_path = "sys/sys/sysctl.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/14 5.B; kernel-private blocks removed, FreeBSD types replaced by ravenlibc types, the upstream notice kept verbatim."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/event.h"
+upstream = "freebsd"
+upstream_path = "sys/sys/event.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/14 5.B; kernel-private blocks removed, FreeBSD types replaced by ravenlibc types, the upstream notice kept verbatim."
+
+[[import]]
+path = "libc/ravenlibc/include/fts.h"
+upstream = "freebsd"
+upstream_path = "include/fts.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/14 5.B; kernel-private blocks removed, FreeBSD types replaced by ravenlibc types, the upstream notice kept verbatim."
+
+[[import]]
+path = "libc/ravenlibc/include/paths.h"
+upstream = "freebsd"
+upstream_path = "include/paths.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/14 5.B; kernel-private blocks removed, FreeBSD types replaced by ravenlibc types, the upstream notice kept verbatim."
+
+[[import]]
+path = "libc/ravenlibc/include/stringlist.h"
+upstream = "freebsd"
+upstream_path = "include/stringlist.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/14 5.B; kernel-private blocks removed, FreeBSD types replaced by ravenlibc types, the upstream notice kept verbatim."
+
+[[import]]
+path = "libc/ravenlibc/include/sysexits.h"
+upstream = "freebsd"
+upstream_path = "include/sysexits.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/14 5.B; kernel-private blocks removed, FreeBSD types replaced by ravenlibc types, the upstream notice kept verbatim."
+
+[[import]]
+path = "libc/ravenlibc/include/ttyent.h"
+upstream = "freebsd"
+upstream_path = "include/ttyent.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/14 5.B; kernel-private blocks removed, FreeBSD types replaced by ravenlibc types, the upstream notice kept verbatim."
+
+[[import]]
+path = "libc/ravenlibc/include/libutil.h"
+upstream = "freebsd"
+upstream_path = "lib/libutil/libutil.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/14 5.B; kernel-private blocks removed, FreeBSD types replaced by ravenlibc types, the upstream notice kept verbatim."
+
+[[import]]
+path = "libc/ravenlibc/include/readpassphrase.h"
+upstream = "freebsd"
+upstream_path = "include/readpassphrase.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/14 5.B; kernel-private blocks removed, FreeBSD types replaced by ravenlibc types, the upstream notice kept verbatim."
+
+[[import]]
+path = "libc/ravenlibc/include/vis.h"
+upstream = "netbsd"
+upstream_path = "include/vis.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/14 5.B row 40; __RENAME/__LIBC12_SOURCE__ dropped, upstream UC Berkeley notice kept verbatim."
+
