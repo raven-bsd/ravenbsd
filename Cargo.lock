@@ -389,6 +389,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-b14b-diag"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-b47-plat"
 version = "0.1.0"
 dependencies = [
@@ -962,6 +973,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-netstat"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-nulld"
 version = "0.1.0"
 dependencies = [
@@ -982,6 +1003,16 @@ dependencies = [
  "raven-abi",
  "raven-proto-dev",
  "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-ping"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
  "raven-rt",
  "raven-scheme",
 ]
@@ -1145,6 +1176,16 @@ dependencies = [
 [[package]]
 name = "raven-rmm"
 version = "0.1.0"
+
+[[package]]
+name = "raven-route"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+]
 
 [[package]]
 name = "raven-rsh"
