@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# netd over the persistent `nic:` frame service. devd launches virtio-net in
+# `serve` mode; the driver registers `nic:` before netd starts.
+name = "netd"
+exec = "/sbin/netd"
+args = ["netd", "nic"]
+needs = ["logd", "scheme:nic"]
+provides = ["scheme:net"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "on-failure"

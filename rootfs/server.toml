@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Placeholder rootfs spec for the initfs-based server image. Its presence makes
+# the image builder use release user programs for the initfs (the debug initfs
+# is too large for the boot path); the server profile itself does not mount it.
+
+size = 1048576

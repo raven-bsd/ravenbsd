@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The small server image. It is the hardware bootstrap plus the network stack,
+# all in the initfs: devd launches virtio-net in `serve` mode, the driver
+# registers `nic:`, netd maps that ring and gets a DHCP lease, and resolvd
+# applies the lease DNS to a writable `/etc`.
+#
+# `make image PROFILE=server` and a QEMU user-mode NIC are enough to get DHCP,
+# DNS and the normal socket API. No test-only fixture is part of the image.
+#
+# The UFS-root server variant is a later step; this profile deliberately keeps
+# the root in the initfs so the network path does not depend on the storage
+# bootstrap.
+
+name = "server"
+
+[initfs]
+programs = [
+    { package = "raven-init", path = "/init" },
+    { package = "raven-logd", path = "/sbin/logd" },
+    { package = "raven-initfsd", path = "/sbin/initfsd" },
+    { package = "raven-ramfsd", path = "/sbin/ramfsd" },
+    { package = "raven-nulld", path = "/sbin/nulld" },
+    { package = "raven-zerod", path = "/sbin/zerod" },
+    { package = "raven-randd", path = "/sbin/randd" },
+    { package = "raven-vfsd", path = "/sbin/vfsd" },
+    { package = "raven-pcid", path = "/sbin/pcid" },
+    { package = "raven-devd", path = "/sbin/devd" },
+    { package = "virtio-net", path = "/sbin/virtio-net" },
+    { package = "netd", path = "/sbin/netd" },
+    { package = "resolvd", path = "/sbin/resolvd" },
+    { package = "raven-ping", path = "/sbin/ping" },
+    { package = "raven-route", path = "/sbin/route" },
+    { package = "raven-netstat", path = "/sbin/netstat" },
+    { package = "raven-svcctl", path = "/bin/svcctl" },
+]
+
+files = [
+    { src = "etc/services.d/logd.toml", path = "/etc/services.d/logd.toml" },
+    { src = "etc/services.d/initfsd.toml", path = "/etc/services.d/initfsd.toml" },
+    { src = "etc/services.d/ramfsd.toml", path = "/etc/services.d/ramfsd.toml" },
+    { src = "etc/services.d/nulld.toml", path = "/etc/services.d/nulld.toml" },
+    { src = "etc/services.d/zerod.toml", path = "/etc/services.d/zerod.toml" },
+    { src = "etc/services.d/randd.toml", path = "/etc/services.d/randd.toml" },
+    { src = "etc/services.d/pcid.toml", path = "/etc/services.d/pcid.toml" },
+    { src = "profiles/server.d/vfsd.manifest", path = "/etc/services.d/vfsd.toml" },
+    { src = "profiles/server.d/devd.manifest", path = "/etc/services.d/devd.toml" },
+    { src = "profiles/server.d/drivers.conf", path = "/etc/drivers.toml" },
+    { src = "rootfs/server/etc/services.d/netd.toml", path = "/etc/services.d/netd.toml" },
+    { src = "rootfs/server/etc/services.d/resolvd.toml", path = "/etc/services.d/resolvd.toml" },
+    { src = "etc/resolv.conf", path = "/etc/resolv.conf" },
+    { src = "profiles/server.d/mounts", path = "/etc/mounts" },
+    { src = "profiles/server.d/svcd.conf", path = "/etc/svcd.conf" },
+]
+
+[boot]
+cmdline = "console=ttyS0 loglevel=info"
+log_level = "info"
