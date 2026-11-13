@@ -165,10 +165,14 @@ fn time2sub(zone: Zone<'_>, tmp: &mut Tm, do_norm_secs: bool) -> Result<i64, Err
                 *tmp = zone_time(zone, final_t)?;
                 return Ok(final_t);
             }
-            // Right time, wrong type: try the other offset.
+            // Right time, wrong type: try the other offset, then apply the
+            // saved seconds exactly as the donor's `label:` path does.
             let adjusted = adjust_isdst(zone, t, &yourtm)?;
-            *tmp = zone_time(zone, adjusted)?;
-            return Ok(adjusted);
+            let final_t = adjusted
+                .checked_add(i64::from(saved_seconds))
+                .ok_or(errno(EOVERFLOW))?;
+            *tmp = zone_time(zone, final_t)?;
+            return Ok(final_t);
         }
         if t == lo {
             if t == TIME_T_MAX {
