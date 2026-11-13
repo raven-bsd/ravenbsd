@@ -175,8 +175,9 @@ Responses use `version: u16`, `status: u16`, `tag: u16`, body:
 | 9 COUNTERS | eight `u64`: rx/tx packets, rx/tx bytes, rx/tx errors, rx/tx drops |
 
 Flags: interface `UP=0x1`, `LINK_UP=0x2`, `LOOPBACK=0x4`; ARP `COMPLETE=0x1`, `STATIC=0x2`;
-route-list `UP=0x1`, `GATEWAY=0x2`, `HOST=0x4`. A DHCP timer of `0xffffffff` means the native
-stack in this revision does not expose that timer; the other lease fields are still live.
+route-list `UP=0x1`, `GATEWAY=0x2`, `HOST=0x4`. A DHCP timer of `0xffffffff` means the record is
+not a live DHCP lease (for example a static interface); a live lease always carries real T1,
+rebind and expiry values.
 
 Socket transports are `1` TCP, `2` UDP, `3` ICMP. Socket states are `0` closed, `1` listen,
 `2` SYN sent, `3` SYN received, `4` established, `5` FIN wait 1, `6` FIN wait 2, `7` close wait,

@@ -183,6 +183,7 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
 
     fn dhcp_lease(&self) -> Option<crate::DhcpLease> {
         let lease = self.stack.dhcp_lease()?;
+        let timers = self.stack.dhcp_timers();
         Some(crate::DhcpLease {
             address: Ipv4Addr::from_octets(lease.address.octets()),
             prefix_len: lease.prefix_len,
@@ -194,9 +195,9 @@ impl<D: Device> StackBackend for RavenTcpipBackend<D> {
                 .iter()
                 .map(|server| Ipv4Addr::from_octets(server.octets()))
                 .collect(),
-            renew_in_ms: None,
-            rebind_in_ms: None,
-            expires_in_ms: None,
+            renew_at_ms: timers.map(|timers| timers.renew_at),
+            rebind_at_ms: timers.map(|timers| timers.rebind_at),
+            expires_at_ms: timers.map(|timers| timers.expires_at),
         })
     }
 

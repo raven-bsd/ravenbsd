@@ -1406,9 +1406,9 @@ impl<D: Device> Netd<D> {
                         prefix: lease.prefix_len,
                         router: lease.router.map(|router| router.octets()),
                         dns: lease.dns.iter().map(|server| server.octets()).collect(),
-                        renew_ms: lease.renew_in_ms.unwrap_or(DHCP_TIMER_UNKNOWN),
-                        rebind_ms: lease.rebind_in_ms.unwrap_or(DHCP_TIMER_UNKNOWN),
-                        expires_ms: lease.expires_in_ms.unwrap_or(DHCP_TIMER_UNKNOWN),
+                        renew_ms: lease_timer_ms(lease.renew_at_ms, self.now_ms),
+                        rebind_ms: lease_timer_ms(lease.rebind_at_ms, self.now_ms),
+                        expires_ms: lease_timer_ms(lease.expires_at_ms, self.now_ms),
                     }),
                 )?;
                 Ok(offset)
@@ -1569,6 +1569,14 @@ impl<D: Device> Netd<D> {
     fn write_socket_error(&self, response: &mut [u8], error: Errno) -> Result<usize, Errno> {
         self.write_response(response, &Response::Err(error))
     }
+}
+
+fn lease_timer_ms(at: Option<i64>, now_ms: i64) -> u32 {
+    let Some(at) = at else {
+        return DHCP_TIMER_UNKNOWN;
+    };
+    let remaining = at.saturating_sub(now_ms).max(0);
+    u32::try_from(remaining).unwrap_or(u32::MAX - 1)
 }
 
 fn interface_name(interface: Interface) -> &'static str {

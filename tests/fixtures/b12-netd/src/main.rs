@@ -232,6 +232,15 @@ mod program {
                     {
                         return Err("DHCP lease fields differ".to_string());
                     }
+                    if lease.renew_ms == DHCP_TIMER_UNKNOWN
+                        || lease.rebind_ms == DHCP_TIMER_UNKNOWN
+                        || lease.expires_ms == DHCP_TIMER_UNKNOWN
+                    {
+                        return Err("DHCP lease timers are unknown".to_string());
+                    }
+                    if !(lease.renew_ms < lease.rebind_ms && lease.rebind_ms < lease.expires_ms) {
+                        return Err("DHCP lease timers are out of order".to_string());
+                    }
                     print_lease(&lease);
                     return Ok(());
                 }
@@ -245,10 +254,12 @@ mod program {
     }
 
     fn print_lease(lease: &DhcpLeaseInfo) {
-        let renew = if lease.renew_ms == DHCP_TIMER_UNKNOWN {
-            "unknown".to_string()
-        } else {
-            format!("{}ms", lease.renew_ms)
+        let timer = |value: u32| {
+            if value == DHCP_TIMER_UNKNOWN {
+                "unknown".to_string()
+            } else {
+                format!("{value}ms")
+            }
         };
         let dns = lease
             .dns
@@ -257,7 +268,7 @@ mod program {
             .collect::<Vec<_>>()
             .join(",");
         raven_rt::println!(
-            "netd: dhcp eth0 {}.{}.{}.{}/{} router={}.{}.{}.{} dns={} renew={}",
+            "netd: dhcp eth0 {}.{}.{}.{}/{} router={}.{}.{}.{} dns={} renew={} rebind={} expires={}",
             lease.addr[0],
             lease.addr[1],
             lease.addr[2],
@@ -268,7 +279,9 @@ mod program {
             lease.router.unwrap_or([0; 4])[2],
             lease.router.unwrap_or([0; 4])[3],
             if dns.is_empty() { "-".to_string() } else { dns },
-            renew
+            timer(lease.renew_ms),
+            timer(lease.rebind_ms),
+            timer(lease.expires_ms)
         );
     }
 

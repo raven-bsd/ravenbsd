@@ -155,9 +155,9 @@ or
 Invalid prefixes and unknown interfaces are errors.
 .Dv DHCP_LEASE
 returns the live address, prefix, router, DNS servers and lease timers for an
-interface; timer values are
+interface; a live lease carries real T1, rebind and expiry values, while
 .Dv 0xffffffff
-when this stack revision cannot expose them.
+means no live DHCP lease.
 .Dv SOCKET_LIST
 returns live socket ids with transport, state, local/peer endpoints and queue
 sizes.

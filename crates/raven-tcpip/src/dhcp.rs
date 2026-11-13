@@ -109,6 +109,17 @@ impl Default for RetryConfig {
     }
 }
 
+/// Absolute lease timers, in the same millisecond epoch as [`Dhcp::poll`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DhcpTimers {
+    /// When the client starts renewing (T1).
+    pub renew_at: i64,
+    /// When the client starts rebinding (T2).
+    pub rebind_at: i64,
+    /// When the lease expires.
+    pub expires_at: i64,
+}
+
 /// An address lease and the parameters that came with it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Lease {
@@ -229,6 +240,24 @@ impl Dhcp {
     pub fn lease(&self) -> Option<&Lease> {
         match &self.state {
             State::Renewing { lease, .. } => Some(lease),
+            _ => None,
+        }
+    }
+
+    /// The active lease's absolute T1/T2/expiry timers, once acquired.
+    #[must_use]
+    pub fn timers(&self) -> Option<DhcpTimers> {
+        match &self.state {
+            State::Renewing {
+                renew_at,
+                rebind_at,
+                expires_at,
+                ..
+            } => Some(DhcpTimers {
+                renew_at: *renew_at,
+                rebind_at: *rebind_at,
+                expires_at: *expires_at,
+            }),
             _ => None,
         }
     }

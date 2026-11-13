@@ -67,7 +67,7 @@ regex = '^svcd: netd up$'
 regex = '^netd: iface eth0 10\.0\.2\.15/24$'
 
 [[expect]]
-regex = '^netd: dhcp eth0 10\.0\.2\.15/24 router=10\.0\.2\.2 dns=10\.0\.2\.3 renew=(unknown|[0-9]+ms)$'
+regex = '^netd: dhcp eth0 10\.0\.2\.15/24 router=10\.0\.2\.2 dns=10\.0\.2\.3 renew=[0-9]+ms rebind=[0-9]+ms expires=[0-9]+ms$'
 
 [[expect]]
 regex = '^netd: readiness event$'
@@ -127,7 +127,7 @@ regex = '^svcd: netd-virtio-restart up$'
 regex = '^netd: iface eth0 10\.0\.2\.15/24$'
 
 [[expect]]
-regex = '^netd: dhcp eth0 10\.0\.2\.15/24 router=10\.0\.2\.2 dns=10\.0\.2\.3 renew=(unknown|[0-9]+ms)$'
+regex = '^netd: dhcp eth0 10\.0\.2\.15/24 router=10\.0\.2\.2 dns=10\.0\.2\.3 renew=[0-9]+ms rebind=[0-9]+ms expires=[0-9]+ms$'
 
 [[expect]]
 regex = '^netd: readiness event$'

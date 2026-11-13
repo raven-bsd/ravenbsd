@@ -44,12 +44,12 @@ pub struct DhcpLease {
     pub router: Option<Ipv4Addr>,
     /// DNS servers.
     pub dns: alloc::vec::Vec<Ipv4Addr>,
-    /// Milliseconds until renewal, when the backend exposes it.
-    pub renew_in_ms: Option<u32>,
-    /// Milliseconds until rebinding, when the backend exposes it.
-    pub rebind_in_ms: Option<u32>,
-    /// Milliseconds until expiry, when the backend exposes it.
-    pub expires_in_ms: Option<u32>,
+    /// Absolute renewal (T1) time in the backend's millisecond clock.
+    pub renew_at_ms: Option<i64>,
+    /// Absolute rebinding (T2) time in the backend's millisecond clock.
+    pub rebind_at_ms: Option<i64>,
+    /// Absolute expiry time in the backend's millisecond clock.
+    pub expires_at_ms: Option<i64>,
 }
 
 /// One IPv4 route in the native table.

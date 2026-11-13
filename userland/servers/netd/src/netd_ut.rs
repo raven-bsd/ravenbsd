@@ -229,6 +229,13 @@ fn nic_core_serves_non_loopback_paths_and_lists_eth0() {
 }
 
 #[test]
+fn lease_timers_are_relative_and_static_leases_use_the_sentinel() {
+    assert_eq!(lease_timer_ms(Some(5_000), 1_000), 4_000);
+    assert_eq!(lease_timer_ms(Some(500), 1_000), 0);
+    assert_eq!(lease_timer_ms(None, 1_000), DHCP_TIMER_UNKNOWN);
+}
+
+#[test]
 fn icmp_echo_reports_payload_source_and_rtt() {
     let mut netd = new_netd();
     let file = netd.open("net:icmp/127.0.0.1").unwrap();
