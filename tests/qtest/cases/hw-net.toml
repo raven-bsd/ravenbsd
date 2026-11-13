@@ -1,23 +1,21 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# B70 M5 end-to-end, boot 1: QEMU user networking plus a host TCP forward to the guest echo
-# port. The guest side needs B12b (persistent virtio-net), B12c (netd over virtio-net),
-# B14 (ifconfig/ping/nc/netstat) and B15 (DHCP/resolver). Until those land the case is parked;
-# the profile, QEMU command line and host-echo harness are ready for the final assertions.
-#
-# The host client starts before QEMU and retries 127.0.0.1:23070; QEMU forwards that port to
-# the guest listener on 23070. The second case verifies the exact payload it received.
+# B70 M5 exit: the production `server` image with a test-only probe overlay.
+# QEMU user networking gives the guest a real DHCP lease on 10.0.2.15/24; the
+# probe checks the lease, route, gateway ping, lease-DNS resolution, a
+# host-to-guest TCP echo through hostfwd, and the guest socket table. The probe
+# exits 0 only when every step succeeds, so QEMU reports success status 33.
 
 name = "hw-net"
 arch = "x86_64"
 profile = "hw-net"
 timeout_secs = 300
-skip = "harness parked: needs B12b/B12c/B14/B15 for DHCP/ping/DNS/TCP assertions"
 pre = [
     "sh tests/fixtures/b70-net/build.sh",
     "sh tests/fixtures/b70-net/start-host-echo.sh",
 ]
+initfs = "build/fixtures/b70-net/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-nic", "none",
@@ -25,6 +23,48 @@ qemu_extra = [
     "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
 ]
 expect_exit = "success"
+
+[[expect]]
+regex = '^b70: lease eth0 10\.0\.2\.15/24 router=10\.0\.2\.2 dns=10\.0\.2\.3$'
+
+[[expect]]
+regex = '^b70: route default via 10\.0\.2\.2 dev eth0$'
+
+[[expect]]
+regex = '^b70: ping 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^b70: ping 10\.0\.2\.2 seq=2 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^b70: ping 10\.0\.2\.2 seq=3 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^b70: ping 3 packets transmitted, 3 received, 0% packet loss$'
+
+[[expect]]
+regex = '^b70: resolv\.conf nameserver=10\.0\.2\.3$'
+
+[[expect]]
+regex = '^b70: dns localhost=127\.0\.0\.1$'
+
+[[expect]]
+regex = '^b70: listening tcp 10\.0\.2\.15:23070$'
+
+[[expect]]
+regex = '^b70: echo received 21 bytes payload=b70-host-echo-payload$'
+
+[[expect]]
+regex = '^b70: socket tcp ESTABLISHED 10\.0\.2\.15:23070 remote=10\.0\.2\.2:[0-9]+ iface=eth0$'
+
+[[expect]]
+regex = '^b70: echo sent 21 bytes$'
+
+[[expect]]
+regex = '^b70: host ack b70-host-ack$'
+
+[[expect]]
+regex = '^b70: done$'
 
 [[expect]]
 regex = '^init exited \(0\)$'

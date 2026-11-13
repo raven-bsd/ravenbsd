@@ -1,30 +1,16 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# The M5 hardware-network profile: the real console service manager, PCI/devd, the
-# virtio-net driver and netd. The B70 qtest boots this with QEMU user networking and a host
-# TCP forward.
+# Test-only overlay on the real `server` image. Every product program, driver,
+# service manifest and mount comes from `server`; this profile adds only the
+# B70 end-to-end probe. The fixture build packs the probe, its service
+# manifest, and a test-only `/etc/svcd.conf` that exits with the probe status.
 #
-# B12b/B12c/B14/B15 are still in flight; the package names and service dependencies below
-# are the planned integration points and must be reconciled with those tickets before the
-# hw-net assertions can be enabled. In particular, resolvd and the B14 tools are deliberately
-# not listed yet: the docs gate expects their man pages to exist with the packages.
+# No network service is re-added here: virtio-net, netd, resolvd and the tools
+# are the same binaries and manifests the production server image boots.
 
 name = "hw-net"
-
-[initfs]
-programs = [
-    { package = "raven-init", path = "/init" },
-    { package = "raven-logd", path = "/sbin/logd" },
-    { package = "raven-pcid", path = "/sbin/pcid" },
-    { package = "raven-devd", path = "/sbin/devd" },
-    { package = "virtio-net", path = "/sbin/virtio-net" },
-    { package = "netd", path = "/sbin/netd" },
-]
-
-# B12b/B12c add the persistent virtio-net/netd integration. B14/B15 add resolvd and the
-# ifconfig/route/ping/nc/netstat packages; add them here with their man pages when those
-# tickets land, and add the tool service manifests to this profile directory.
+extends = "server"
 
 [boot]
 cmdline = "console=ttyS0 loglevel=info"

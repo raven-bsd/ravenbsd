@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-"""Host-only self-test for the B70 echo client: loopback server, exact payload, result file."""
+"""Host-only self-test for the B70 echo client: loopback server, exact payload,
+echo and acknowledgment, without QEMU."""
 
 import argparse
 import os
@@ -12,6 +13,17 @@ import tempfile
 import threading
 
 PAYLOAD = b"b70-host-echo-payload"
+ACK = b"b70-host-ack"
+
+
+def recv_exact(connection, wanted):
+    received = b""
+    while len(received) < wanted:
+        chunk = connection.recv(wanted - len(received))
+        if not chunk:
+            return None
+        received += chunk
+    return received
 
 
 def serve(listener, ready):
@@ -19,14 +31,13 @@ def serve(listener, ready):
     ready.set()
     connection, _ = listener.accept()
     with connection:
-        received = b""
-        while len(received) < len(PAYLOAD):
-            chunk = connection.recv(len(PAYLOAD) - len(received))
-            if not chunk:
-                break
-            received += chunk
-        if received == PAYLOAD:
-            connection.sendall(PAYLOAD)
+        received = recv_exact(connection, len(PAYLOAD))
+        if received != PAYLOAD:
+            return
+        connection.sendall(PAYLOAD)
+        ack = recv_exact(connection, len(ACK))
+        if ack != ACK:
+            return
 
 
 def main():
@@ -65,7 +76,7 @@ def main():
                 return 1
             with open(result, encoding="utf-8") as handle:
                 line = handle.read().strip()
-            if line != "ok payload=b70-host-echo-payload":
+            if line != "ok payload=b70-host-echo-payload ack=b70-host-ack":
                 print(f"b70: host echo self-test bad result: {line}", file=sys.stderr)
                 return 1
     finally:
