@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-regex"
+version = "0.1.0"
+description = "ravenlibc regex: NetBSD Spencer engine with hardening limits, UTF-8 and byte matchers."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+
+[dependencies]
+raven-libc-abi = { path = "../raven-libc-abi" }
+raven-libc-ctype = { path = "../raven-libc-ctype" }

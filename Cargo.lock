@@ -929,6 +929,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-regex"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-ctype",
+]
+
+[[package]]
 name = "raven-libc-stdlib"
 version = "0.1.0"
 dependencies = [
