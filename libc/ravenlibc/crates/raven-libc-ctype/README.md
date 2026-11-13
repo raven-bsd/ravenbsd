@@ -1,3 +1,8 @@
+<!--
+SPDX-License-Identifier: BSD-3-Clause
+Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+-->
+
 # raven-libc-ctype
 
 Pure-logic `<ctype.h>`, `<wctype.h>`, `wcwidth`/`wcswidth` and the UTF-8 multibyte codec of
