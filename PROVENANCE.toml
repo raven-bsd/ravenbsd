@@ -5311,3 +5311,124 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "COPY per donor-map/10 3.10: userland version constants and struct only; _KERNEL rights list removed; stdint.h added."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-time/src/tz/consts.rs"
+upstream = "netbsd"
+upstream_path = "include/tzfile.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-PublicDomain"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/06 row 1; constants and TZif header offsets only, TZ_MAX_CHARS included."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-time/src/tz/overflow.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/time/private.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-PublicDomain"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/06 row 2 (partial); isleap family and i64 overflow helpers only."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-time/src/tz/mod.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/time/localtime.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-PublicDomain"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/06 row 3 (mod split); lock/process globals moved to the shell; state uses bounded Vecs."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-time/src/tz/tzif.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/time/localtime.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-PublicDomain"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/06 row 3 (tzif split); fstat change check replaced by content comparison; EFTYPE->BadFormat, ENOTCAPABLE->Denied."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-time/src/tz/posix_tz.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/time/localtime.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-PublicDomain"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/06 row 3 (posix_tz split); TZDEFRULESTRING used for a DST name without rules."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-time/src/tz/convert.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/time/localtime.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-PublicDomain"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/06 row 3 (convert split); goahead year arithmetic kept in i64 for extreme dates."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-time/src/tz/mktime.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/time/localtime.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-PublicDomain"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/06 row 3 (mktime split); binary search and normalisation kept; errno returned as Result."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-time/src/asctime.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/time/asctime.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-PublicDomain"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/06 row 4; fixed 26-byte form, EOVERFLOW when the text does not fit."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-time/src/difftime.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/time/difftime.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-PublicDomain"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/06 row 5; subtract in integers, convert once; soft-float clean."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-time/src/strftime.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/time/strftime.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/06 row 6; UCB notice kept; %P, ^ and # added (RD-28); Y2K warning removed."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-time/src/strptime.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/time/strptime.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/06 row 7; %P alias added; fields not named by the format keep their value."
