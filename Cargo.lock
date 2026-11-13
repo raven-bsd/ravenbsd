@@ -1016,6 +1016,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-iconv"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-ctype",
+ "raven-libc-iconv-cjk",
+]
+
+[[package]]
+name = "raven-libc-iconv-cjk"
+version = "0.1.0"
+
+[[package]]
+name = "raven-libc-locale"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-ctype",
+]
+
+[[package]]
 name = "raven-libc-m"
 version = "0.1.0"
 dependencies = [
