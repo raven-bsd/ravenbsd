@@ -171,7 +171,7 @@ pub fn run_checks(root: &Path, checks: &[String]) -> Result<Vec<Violation>> {
         }
         if selected.contains(&"no-cc")
             && is_libc_source
-            && [".c", ".cc", ".cpp", ".cxx", ".s", ".S", ".h", ".hpp"]
+            && [".c", ".cc", ".cpp", ".cxx", ".h", ".hpp"]
                 .iter()
                 .any(|extension| rel.ends_with(extension))
         {
