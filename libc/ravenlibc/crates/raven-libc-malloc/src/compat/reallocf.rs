@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BSD-2-Clause
+// RavenBSD: transpiled from freebsd:lib/libc/stdlib/reallocf.c @ 133344405f532bd54ff3629a77d4c4e062f01fdb
 // Copyright (c) 1998 M. Warner Losh <imp@FreeBSD.org>
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: ISC
+// RavenBSD: transpiled from openbsd:lib/libc/stdlib/recallocarray.c @ 4ce71f2817f675745b0596aaf04de4a122b1cc52
 // Copyright (c) 2008, 2017 Otto Moerbeek <otto@drijf.net>
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //

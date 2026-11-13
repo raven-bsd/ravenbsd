@@ -73,3 +73,11 @@ crates = ["raven-libc-str"]
 [[feature]]
 name = "test-probes"
 crates = ["raven-libc-str"]
+
+[[feature]]
+name = "hardened"
+crates = ["raven-libc-malloc"]
+
+[[feature]]
+name = "debug"
+crates = ["raven-libc-malloc"]

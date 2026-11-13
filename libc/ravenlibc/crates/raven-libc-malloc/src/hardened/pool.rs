@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: ISC
+// RavenBSD: transpiled from openbsd:lib/libc/stdlib/malloc.c @ 4ce71f2817f675745b0596aaf04de4a122b1cc52
 // Copyright (c) 2008, 2010, 2011, 2016, 2023 Otto Moerbeek <otto@drijf.net>
 // Copyright (c) 2012 Matthew Dempsky <matthew@openbsd.org>
 // Copyright (c) 2008 Damien Miller <djm@openbsd.org>
