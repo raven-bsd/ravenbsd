@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[case]]
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+
+[[case]]
+year = 1969
+mon = 11
+mday = 31
+hour = 23
+min = 59
+sec = 59
+
+[[case]]
+year = 2038
+mon = 0
+mday = 19
+hour = 3
+min = 14
+sec = 7
+
+[[case]]
+year = 2106
+mon = 1
+mday = 7
+hour = 6
+min = 28
+sec = 16
+
+[[case]]
+year = 1970
+mon = 12
+mday = 1
+hour = 0
+min = 0
+sec = 0
+
+[[case]]
+year = 1970
+mon = -1
+mday = 1
+hour = 0
+min = 0
+sec = 0
+
+[[case]]
+year = 1970
+mon = 0
+mday = 0
+hour = 0
+min = 0
+sec = 0
+
+[[case]]
+year = 1970
+mon = 0
+mday = 32
+hour = 0
+min = 0
+sec = 0
+
+[[case]]
+year = 2023
+mon = 6
+mday = 1
+hour = 12
+min = 34
+sec = 56

@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# TZif v1-v4 fixtures. Times around the epoch, the 2038 boundary and the
+# generated transitions; all fields are compared, including tm_wday.
+
+[[case]]
+zone = "v1"
+t = -2000000000
+
+[[case]]
+zone = "v1"
+t = -1
+
+[[case]]
+zone = "v1"
+t = 0
+
+[[case]]
+zone = "v1"
+t = 946684800
+
+[[case]]
+zone = "v1"
+t = 1688184000
+
+[[case]]
+zone = "v1"
+t = 2145916799
+
+[[case]]
+zone = "v2"
+t = -2000000000
+
+[[case]]
+zone = "v2"
+t = -1
+
+[[case]]
+zone = "v2"
+t = 0
+
+[[case]]
+zone = "v2"
+t = 946684800
+
+[[case]]
+zone = "v2"
+t = 1688184000
+
+[[case]]
+zone = "v2"
+t = 2145916799
+
+[[case]]
+zone = "v2"
+t = 2100000000
+
+[[case]]
+zone = "v3"
+t = -2000000000
+
+[[case]]
+zone = "v3"
+t = 0
+
+[[case]]
+zone = "v3"
+t = 1688184000
+
+[[case]]
+zone = "v3"
+t = 2100000000
+
+[[case]]
+zone = "v4"
+t = -2000000000
+
+[[case]]
+zone = "v4"
+t = 0
+
+[[case]]
+zone = "v4"
+t = 1688184000
+
+[[case]]
+zone = "v4"
+t = 2100000000

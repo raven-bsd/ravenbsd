@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Standalone POSIX TZ strings. `tm_wday` is normalised for the EST5EDT and
+# <-03> fixtures; see the comment at the top of diff_raven_libc_time.rs.
+
+[[case]]
+zone = "UTC0"
+t = -2000000000
+
+[[case]]
+zone = "UTC0"
+t = -1
+
+[[case]]
+zone = "UTC0"
+t = 0
+
+[[case]]
+zone = "UTC0"
+t = 1688184000
+
+[[case]]
+zone = "EST5EDT,M3.2.0,M11.1.0"
+t = -2000000000
+
+[[case]]
+zone = "EST5EDT,M3.2.0,M11.1.0"
+t = -1
+
+[[case]]
+zone = "EST5EDT,M3.2.0,M11.1.0"
+t = 0
+
+[[case]]
+zone = "EST5EDT,M3.2.0,M11.1.0"
+t = 1688184000
+
+[[case]]
+zone = "EST5EDT,M3.2.0,M11.1.0"
+t = 2145916799
+
+[[case]]
+zone = "<-03>3<-02>,M3.5.0/-2,M10.5.0/-1"
+t = 0
+
+[[case]]
+zone = "<-03>3<-02>,M3.5.0/-2,M10.5.0/-1"
+t = 1688184000

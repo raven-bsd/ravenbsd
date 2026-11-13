@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[case]]
+year = 1970
+mon = 0
+mday = 1
+hour = 1
+min = 0
+sec = 0
+offset = 3600
+
+[[case]]
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+offset = 0
+
+[[case]]
+year = 2023
+mon = 6
+mday = 1
+hour = 12
+min = 34
+sec = 56
+offset = -14400
+
+[[case]]
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+offset = 50400
+
+[[case]]
+year = 1970
+mon = 0
+mday = 1
+hour = 0
+min = 0
+sec = 0
+offset = -50400

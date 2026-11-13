@@ -996,6 +996,7 @@ dependencies = [
  "raven-libc-fmt",
  "raven-libc-stdlib",
  "raven-libc-str",
+ "raven-libc-time",
  "serde",
  "toml",
 ]
