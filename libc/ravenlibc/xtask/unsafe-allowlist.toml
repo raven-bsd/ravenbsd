@@ -11,3 +11,28 @@
 crate = "raven-libc-str"
 path = "src/raw/"
 reason = "DR-39 audited pointer shell: the mem* entry points, the compiler-builtins adaptation, the secure-memory barriers, the caller-cursor tokenisers and the Arm asm wrappers; every unsafe block carries a // SAFETY: comment"
+
+[[allow]]
+crate = "raven-libc-malloc"
+path = "src/raw.rs"
+reason = "DR-39 audited raw module: every read, write, fill and copy of the allocator; every unsafe block carries a // SAFETY: comment"
+
+[[allow]]
+crate = "raven-libc-malloc"
+path = "src/raw_ut.rs"
+reason = "host unit tests exercise the raw module directly; the addresses come from live stack buffers"
+
+[[allow]]
+crate = "raven-libc-malloc"
+path = "src/tiny/tiny_ut.rs"
+reason = "host test arena uses the system allocator to obtain a page-aligned 4 MiB block"
+
+[[allow]]
+crate = "raven-libc-malloc"
+path = "src/hardened/hardened_ut.rs"
+reason = "host test arena uses the system allocator to obtain a page-aligned 16 MiB block"
+
+[[allow]]
+crate = "raven-libc-malloc"
+path = "src/debug/debug_ut.rs"
+reason = "host test arena uses the system allocator to obtain a page-aligned block"

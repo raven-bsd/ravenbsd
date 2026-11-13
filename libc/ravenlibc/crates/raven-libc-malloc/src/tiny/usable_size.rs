@@ -1,0 +1,4 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+//! Tiny-backend usable_size entry points; the shared implementation is in `mod.rs`.

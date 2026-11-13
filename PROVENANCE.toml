@@ -4949,3 +4949,102 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-malloc/src/hardened/mod.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/malloc.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "contains a Beerware remark by phk; accepted as ISC (H-4); COPY per donor-map/08 3.1; changes: ADAPT items 1-19, MALLOC_STATS not translated"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-malloc/src/hardened/consts.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/malloc.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "constants from the donor; Beerware remark accepted as ISC (H-4); COPY per donor-map/08 3.1"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-malloc/src/hardened/opts.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/malloc.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "option parser adapted to Platform; sysctl source removed; Beerware remark accepted as ISC (H-4)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-malloc/src/hardened/pool.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/malloc.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "pool/region/chunk metadata port; Beerware remark accepted as ISC (H-4)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-malloc/src/hardened/pages.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/malloc.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "map/unmap/cache port over PageProvider; Beerware remark accepted as ISC (H-4)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-malloc/src/hardened/chunks.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/malloc.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "chunk bitmap, delayed free, junk and canary port; Beerware remark accepted as ISC (H-4)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-malloc/src/compat/array.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/reallocarray.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "overflow threshold and condition ported; COPY per donor-map/08 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-malloc/src/compat/recallocarray.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/stdlib/recallocarray.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "size planning ported; zeroing delegated to raw; COPY per donor-map/08 3.2"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-malloc/src/compat/reallocf.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/stdlib/reallocf.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "reallocf control flow; COPY per donor-map/08 3.2"
