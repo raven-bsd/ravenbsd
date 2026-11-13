@@ -97,17 +97,18 @@ pub(crate) fn intscan<C: CharUnit, S: ScanSource<C>>(
     }
     let mut base = base;
     if (base == 0 || base == 16) && c == 0x30 {
-        let Some(n) = f.getc() else {
-            f.shlim(0);
-            return 0;
+        // The donor keeps going after a leading zero: "0" alone is a valid octal
+        // token, and "-0" must still count as a conversion. EOF is an invalid
+        // digit sentinel (0xFF), not an early return.
+        c = match f.getc() {
+            Some(n) => n.to_u32(),
+            None => 0xffff_ffff,
         };
-        c = n.to_u32();
         if (c | 0x20) == 0x78 {
-            let Some(n) = f.getc() else {
-                f.shlim(0);
-                return 0;
+            c = match f.getc() {
+                Some(n) => n.to_u32(),
+                None => 0xffff_ffff,
             };
-            c = n.to_u32();
             if digit_val(c) >= 16 {
                 f.ungetc(C::from_u32(c));
                 if pok {

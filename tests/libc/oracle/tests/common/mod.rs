@@ -197,7 +197,7 @@ impl CWide {
 /// Run one narrow `sscanf` case against musl.
 #[cfg(feature = "oracle-fmt-musl-scanf")]
 pub fn diff_sscanf(
-    input: &str,
+    input: &[u8],
     fmt: &str,
     c_ptrs: &[*mut c_void],
     va: &mut OracleVa,
@@ -205,7 +205,7 @@ pub fn diff_sscanf(
     set_utf8_locale();
     raven_libc_oracle::decls::fmt_musl_scanf::libm_probe();
     let _guard = c_guard();
-    let mut inputz = input.as_bytes().to_vec();
+    let mut inputz = input.to_vec();
     inputz.push(0);
     let mut fmtz = fmt.as_bytes().to_vec();
     fmtz.push(0);
@@ -218,7 +218,7 @@ pub fn diff_sscanf(
         )
     };
     let mut src = SliceSource {
-        input: input.as_bytes(),
+        input,
         pos: 0,
         ungets: Vec::new(),
     };
