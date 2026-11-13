@@ -5,7 +5,7 @@
 name = "b15-resolv-setup"
 exec = "/sbin/b15-resolv-probe"
 args = ["b15-resolv-probe", "setup"]
-needs = ["scheme:file"]
+needs = ["scheme:file", "scheme:initfs"]
 readiness = "exit"
 restart = "never"
 max_restarts = 0

@@ -282,8 +282,9 @@ mod program {
         let mut encoded = [0u8; 64];
         let length = request.encode(&mut encoded).map_err(|_| Errno::EINVAL)?;
         let mut response = [0u8; 256];
-        let read = client.call(handle, &encoded[..length], &mut response)?;
+        let result = client.call(handle, &encoded[..length], &mut response);
         let _ = client.close(handle);
+        let read = result?;
         match IfaceResponse::decode(&response[..read]).map_err(|_| Errno::EPROTO)? {
             IfaceResponse::DhcpLease(info) => Ok(Lease::from(info)),
             IfaceResponse::Err(error) => Err(error),

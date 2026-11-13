@@ -51,7 +51,8 @@ mod program {
     }
 
     fn setup() -> Result<(), String> {
-        write_text(CONF, "nameserver 127.0.0.1\n")?;
+        let text = read_text("initfs:/etc/b15-resolv.conf")?;
+        write_text(CONF, &text)?;
         raven_rt::println!("b15-resolv: setup static nameserver 127.0.0.1");
         Ok(())
     }

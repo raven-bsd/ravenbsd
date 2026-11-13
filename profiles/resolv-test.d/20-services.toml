@@ -40,3 +40,7 @@ path = "/etc/services.d/resolvd.toml"
 [[initfs.files]]
 src = "profiles/resolv-test.d/mounts"
 path = "/etc/mounts"
+
+[[initfs.files]]
+src = "tests/fixtures/b15-resolv/resolv.conf"
+path = "/etc/b15-resolv.conf"
