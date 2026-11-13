@@ -996,6 +996,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-m"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+]
+
+[[package]]
 name = "raven-libc-malloc"
 version = "0.1.0"
 dependencies = [

@@ -57,6 +57,9 @@ crates = ["raven-libc"]
 name = "hooks-resolved"
 crates = ["raven-libc"]
 [[feature]]
+name = "soft-float"
+crates = ["raven-libc-m"]
+[[feature]]
 name = "panic-handler"
 crates = ["raven-libc"]
 [[feature]]
