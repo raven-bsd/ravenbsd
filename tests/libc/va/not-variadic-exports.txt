@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Census names that are NOT rows of the variadic table of C59 section 4.6, with the reason.
+# The completeness test (k03_corpus / table_rows) prints "skipped: no census data" because
+# libc/ravenlibc/abi/census/symbols.toml has no `variadic` field yet; this file records the
+# set the table deliberately does not cover.
+
+# The v* consumers are ordinary functions taking a va_list; they are the TARGETS of the
+# trampolines, never variadic themselves.
+vprintf           target of printf
+vfprintf          target of fprintf
+vsprintf          target of sprintf
+vsnprintf         target of snprintf
+vdprintf          target of dprintf
+vasprintf         target of asprintf
+vscanf            target of scanf
+vfscanf           target of fscanf
+vsscanf           target of sscanf
+vwprintf          target of wprintf
+vfwprintf         target of fwprintf
+vswprintf         target of swprintf
+vwscanf           target of wscanf
+vfwscanf          target of fwscanf
+vswscanf          target of swscanf
+vsnprintf_ss      target of snprintf_ss
+verr verrx vwarn vwarnx verrc vwarnc   targets of err/errx/warn/warnx/errc/warnc
+vsyslog           target of syslog
+
+# Not exported as variadic in ravenlibc (census/mkmap decision, 02-api-surface):
+__isoc99_scanf    glibc compatibility alias; not in the census, not exported
+__isoc99_sscanf   glibc compatibility alias; not in the census, not exported
+obstack_printf    glibc-only extension; not provided (02 ring 3)
+__printf_chk      fortify variant; not provided (doc 04 R80)

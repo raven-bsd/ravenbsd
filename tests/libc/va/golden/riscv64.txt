@@ -1,0 +1,17 @@
+0000000000000000 <t_snprintf>:
+       0:      	addi	sp, sp, -80
+       2:      	sd	ra, 0(sp)
+       4:      	sd	a0, 16(sp)
+       6:      	sd	a1, 24(sp)
+       8:      	sd	a2, 32(sp)
+       a:      	sd	a3, 40(sp)
+       c:      	sd	a4, 48(sp)
+       e:      	sd	a5, 56(sp)
+      10:      	sd	a6, 64(sp)
+      12:      	sd	a7, 72(sp)
+      14:      	addi	a3, sp, 40
+      16:      	auipc	ra, 0
+      1a:      	jalr	ra
+      1e:      	ld	ra, 0(sp)
+      20:      	addi	sp, sp, 80
+      22:      	ret

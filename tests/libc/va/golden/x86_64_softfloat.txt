@@ -1,0 +1,19 @@
+0000000000000000 <t_snprintf>:
+       0:      	pushq	%rbp
+       1:      	movq	%rsp, %rbp
+       4:      	subq	$208, %rsp
+       b:      	movq	%rdi, (%rsp)
+       f:      	movq	%rsi, 8(%rsp)
+      14:      	movq	%rdx, 16(%rsp)
+      19:      	movq	%rcx, 24(%rsp)
+      1e:      	movq	%r8, 32(%rsp)
+      23:      	movq	%r9, 40(%rsp)
+      28:      	movl	$24, 176(%rsp)
+      33:      	movl	$176, 180(%rsp)
+      3e:      	leaq	16(%rbp), %rax
+      42:      	movq	%rax, 184(%rsp)
+      4a:      	movq	%rsp, 192(%rsp)
+      52:      	leaq	176(%rsp), %rcx
+      5a:      	callq	0x5f <t_snprintf+0x5f>
+      5f:      	leave
+      60:      	retq

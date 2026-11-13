@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-va-test"
+version = "0.1.0"
+description = "tests of the ravenlibc variadic trampolines and va_list readers"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+raven-libc-fmt = { path = "../../../libc/ravenlibc/crates/raven-libc-fmt" }
+
+[dev-dependencies]
+raven-libc-oracle = { path = "../oracle" }
+raven-libc-dtoa = { path = "../../../libc/ravenlibc/crates/raven-libc-dtoa" }
+raven-libc-ctype = { path = "../../../libc/ravenlibc/crates/raven-libc-ctype" }

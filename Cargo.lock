@@ -872,6 +872,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-fmt",
+]
+
+[[package]]
 name = "raven-libc-abi"
 version = "0.1.0"
 dependencies = [
@@ -967,6 +974,16 @@ name = "raven-libc-str"
 version = "0.1.0"
 dependencies = [
  "raven-libc-abi",
+]
+
+[[package]]
+name = "raven-libc-va-test"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-ctype",
+ "raven-libc-dtoa",
+ "raven-libc-fmt",
+ "raven-libc-oracle",
 ]
 
 [[package]]

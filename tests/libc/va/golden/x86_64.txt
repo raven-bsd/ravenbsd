@@ -1,0 +1,29 @@
+0000000000000000 <t_snprintf>:
+       0:      	pushq	%rbp
+       1:      	movq	%rsp, %rbp
+       4:      	subq	$208, %rsp
+       b:      	movq	%rdi, (%rsp)
+       f:      	movq	%rsi, 8(%rsp)
+      14:      	movq	%rdx, 16(%rsp)
+      19:      	movq	%rcx, 24(%rsp)
+      1e:      	movq	%r8, 32(%rsp)
+      23:      	movq	%r9, 40(%rsp)
+      28:      	testb	%al, %al
+      2a:      	je	0x5d <t_snprintf+0x5d>
+      2c:      	movaps	%xmm0, 48(%rsp)
+      31:      	movaps	%xmm1, 64(%rsp)
+      36:      	movaps	%xmm2, 80(%rsp)
+      3b:      	movaps	%xmm3, 96(%rsp)
+      40:      	movaps	%xmm4, 112(%rsp)
+      45:      	movaps	%xmm5, 128(%rsp)
+      4d:      	movaps	%xmm6, 144(%rsp)
+      55:      	movaps	%xmm7, 160(%rsp)
+      5d:      	movl	$24, 176(%rsp)
+      68:      	movl	$48, 180(%rsp)
+      73:      	leaq	16(%rbp), %rax
+      77:      	movq	%rax, 184(%rsp)
+      7f:      	movq	%rsp, 192(%rsp)
+      87:      	leaq	176(%rsp), %rcx
+      8f:      	callq	0x94 <t_snprintf+0x94>
+      94:      	leave
+      95:      	retq

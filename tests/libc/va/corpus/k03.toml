@@ -1,0 +1,355 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The 57 differential cases of the K03 spike (libc/spike/va/tests/variadic.rs),
+# copied as DATA. The spike is the project's own BSD-3-Clause code (K03, same author);
+# its printf is NOT reused: every case runs through the real engine (C43 + C42) and the
+# reference is the host glibc snprintf, called from a generated C driver.
+#
+# Grammar (parsed by tests/k03_corpus.rs): one [[case]] per case; `args` is a list of
+# `i32:N`, `u32:N`, `i64:N`, `u64:N`, `f64:0x<bits>`, `str:TEXT`, `null:str`, `null:ptr`,
+# `ptr:0xN`; an optional `exclude = "reason"` documents a C43/glibc difference.
+schema = 1
+
+[[case]]
+id = 1
+group = "strings"
+fmt = "hello"
+args = []
+
+[[case]]
+id = 2
+group = "strings"
+fmt = "%%"
+args = []
+
+[[case]]
+id = 3
+group = "strings"
+fmt = "%c"
+args = ["i32:90"]
+
+[[case]]
+id = 4
+group = "strings"
+fmt = "%5c"
+args = ["i32:120"]
+
+[[case]]
+id = 5
+group = "strings"
+fmt = "%-5c|"
+args = ["i32:121"]
+
+[[case]]
+id = 6
+group = "strings"
+fmt = "%s"
+args = ["str:world"]
+
+[[case]]
+id = 7
+group = "strings"
+fmt = "%10s"
+args = ["str:world"]
+
+[[case]]
+id = 8
+group = "strings"
+fmt = "%-10s|"
+args = ["str:world"]
+
+[[case]]
+id = 9
+group = "strings"
+fmt = "%.3s"
+args = ["str:truncate"]
+
+[[case]]
+id = 10
+group = "strings"
+fmt = "%10.3s"
+args = ["str:truncate"]
+
+[[case]]
+id = 11
+group = "strings"
+fmt = "%s"
+args = ["null:str"]
+
+[[case]]
+id = 12
+group = "strings"
+fmt = "%p"
+args = ["null:ptr"]
+exclude = "glibc prints (nil); C43/FreeBSD print 0x0"
+
+[[case]]
+id = 13
+group = "integers"
+fmt = "%d"
+args = ["i32:0"]
+
+[[case]]
+id = 14
+group = "integers"
+fmt = "%d"
+args = ["i32:-42"]
+
+[[case]]
+id = 15
+group = "integers"
+fmt = "%i"
+args = ["i32:1234"]
+
+[[case]]
+id = 16
+group = "integers"
+fmt = "%u"
+args = ["u32:4000000000"]
+
+[[case]]
+id = 17
+group = "integers"
+fmt = "%x"
+args = ["u32:3735928559"]
+
+[[case]]
+id = 18
+group = "integers"
+fmt = "%X"
+args = ["u32:3735928559"]
+
+[[case]]
+id = 19
+group = "integers"
+fmt = "%o"
+args = ["u32:493"]
+
+[[case]]
+id = 20
+group = "integers"
+fmt = "%8d"
+args = ["i32:42"]
+
+[[case]]
+id = 21
+group = "integers"
+fmt = "%-8d|"
+args = ["i32:42"]
+
+[[case]]
+id = 22
+group = "integers"
+fmt = "%08d"
+args = ["i32:-42"]
+
+[[case]]
+id = 23
+group = "integers"
+fmt = "%+d"
+args = ["i32:42"]
+
+[[case]]
+id = 24
+group = "integers"
+fmt = "% d"
+args = ["i32:42"]
+
+[[case]]
+id = 25
+group = "integers"
+fmt = "%.6d"
+args = ["i32:42"]
+
+[[case]]
+id = 26
+group = "integers"
+fmt = "%8.6d"
+args = ["i32:42"]
+
+[[case]]
+id = 27
+group = "integers"
+fmt = "%08.6d"
+args = ["i32:42"]
+
+[[case]]
+id = 28
+group = "integers"
+fmt = "%u"
+args = ["u32:0"]
+
+[[case]]
+id = 29
+group = "integers"
+fmt = "%.0u"
+args = ["u32:0"]
+
+[[case]]
+id = 30
+group = "integers"
+fmt = "%ld"
+args = ["i64:-9000000000"]
+
+[[case]]
+id = 31
+group = "integers"
+fmt = "%lu"
+args = ["i64:9000000000"]
+
+[[case]]
+id = 32
+group = "integers"
+fmt = "%lld"
+args = ["i64:-9223372036854775808"]
+
+[[case]]
+id = 33
+group = "integers"
+fmt = "%llu"
+args = ["u64:18446744073709551615"]
+
+[[case]]
+id = 34
+group = "integers"
+fmt = "%zu"
+args = ["u64:18446744073709551615"]
+
+[[case]]
+id = 35
+group = "floats"
+fmt = "%f"
+args = ["f64:0x0000000000000000"]
+
+[[case]]
+id = 36
+group = "floats"
+fmt = "%f"
+args = ["f64:0x3ff8000000000000"]
+
+[[case]]
+id = 37
+group = "floats"
+fmt = "%f"
+args = ["f64:0xc002000000000000"]
+
+[[case]]
+id = 38
+group = "floats"
+fmt = "%.0f"
+args = ["f64:0x3ff8000000000000"]
+
+[[case]]
+id = 39
+group = "floats"
+fmt = "%.2f"
+args = ["f64:0x40934a456d5cfaad"]
+
+[[case]]
+id = 40
+group = "floats"
+fmt = "%8.2f"
+args = ["f64:0x400c000000000000"]
+
+[[case]]
+id = 41
+group = "floats"
+fmt = "%-8.2f|"
+args = ["f64:0x400c000000000000"]
+
+[[case]]
+id = 42
+group = "floats"
+fmt = "%08.2f"
+args = ["f64:0x400c000000000000"]
+
+[[case]]
+id = 43
+group = "floats"
+fmt = "%+.2f"
+args = ["f64:0x400c000000000000"]
+
+[[case]]
+id = 44
+group = "floats"
+fmt = "% .2f"
+args = ["f64:0x400c000000000000"]
+
+[[case]]
+id = 45
+group = "floats"
+fmt = "%f"
+args = ["f64:0x8000000000000000"]
+
+[[case]]
+id = 46
+group = "floats"
+fmt = "%f"
+args = ["f64:0x7ff0000000000000"]
+
+[[case]]
+id = 47
+group = "floats"
+fmt = "%f"
+args = ["f64:0xfff0000000000000"]
+
+[[case]]
+id = 48
+group = "floats"
+fmt = "%f"
+args = ["f64:0x7ff8000000000000"]
+
+[[case]]
+id = 49
+group = "floats"
+fmt = "%.10f"
+args = ["f64:0x3fd5555555555555"]
+
+[[case]]
+id = 50
+group = "mixed"
+fmt = "%d %d %d %d %d %d %d %d %d %d"
+args = ["i32:1", "i32:2", "i32:3", "i32:4", "i32:5", "i32:6", "i32:7", "i32:8", "i32:9", "i32:10"]
+
+[[case]]
+id = 51
+group = "mixed"
+fmt = "%d:%f %d:%f %d:%f %d:%f %d:%f %d:%f"
+args = ["i32:1", "f64:0x3ff8000000000000", "i32:2", "f64:0x4004000000000000", "i32:3", "f64:0x400c000000000000", "i32:4", "f64:0x4012000000000000", "i32:5", "f64:0x4016000000000000", "i32:6", "f64:0x401a000000000000"]
+
+[[case]]
+id = 52
+group = "mixed"
+fmt = "%d %d %d %d %d %d %d %d %f %f"
+args = ["i32:11", "i32:12", "i32:13", "i32:14", "i32:15", "i32:16", "i32:17", "i32:18", "f64:0x3ff4000000000000", "f64:0x4006000000000000"]
+
+[[case]]
+id = 53
+group = "pointers"
+fmt = "%p"
+args = ["ptr:0x12345678"]
+
+[[case]]
+id = 54
+group = "pointers"
+fmt = "%20p"
+args = ["ptr:0x12345678"]
+
+[[case]]
+id = 55
+group = "pointers"
+fmt = "%s %s"
+args = ["str:hello", "str:hello"]
+
+[[case]]
+id = 56
+group = "pointers"
+fmt = "%.0s"
+args = ["str:hello"]
+
+[[case]]
+id = 57
+group = "pointers"
+fmt = "%5.2s"
+args = ["str:hello"]
