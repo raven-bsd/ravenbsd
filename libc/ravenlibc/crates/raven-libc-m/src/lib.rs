@@ -78,11 +78,25 @@ mod rsqrt;
 mod sinpi;
 #[macro_use]
 mod support;
+mod c23;
+mod complex;
 mod coremath;
 mod fdlibm;
 mod generic;
+mod legacy;
 mod portable;
 
+pub use c23::{
+    canonicalize, canonicalizef, getpayload, getpayloadf, issignaling, issignalingf, nextdown,
+    nextup, roundeven, setpayload, setpayloadf, setpayloadsig, setpayloadsigf, totalorder,
+    totalorderf, totalordermag, totalordermagf,
+};
+pub use complex::{
+    Complex, Real, cabs, cabsf, cacos, cacosf, cacosh, cacoshf, carg, cargf, casin, casinf, casinh,
+    casinhf, catan, catanf, catanh, catanhf, ccos, ccosf, ccosh, ccoshf, cexp, cexpf, cimag,
+    cimagf, clog, clogf, conj, conjf, cpow, cpowf, cproj, cprojf, creal, crealf, csin, csinf,
+    csinh, csinhf, csqrt, csqrtf, ctan, ctanf, ctanh, ctanhf,
+};
 pub use fenv::{
     Femode, FenvT, FexceptT, feclearexcept, fedisableexcept, feenableexcept, fegetenv, fegetexcept,
     fegetexceptflag, fegetmode, fegetround, feholdexcept, feraiseexcept, fesetenv, fesetexceptflag,
@@ -92,6 +106,10 @@ pub use fp::{flt_rounds, raise};
 pub use fp::{
     fpclassify, fpclassifyf, isfinite, isfinitef, isinf, isinff, isnan, isnanf, isnormal,
     isnormalf, nan, nanf, signbit, signbitf,
+};
+pub use legacy::{
+    drem, dremf, finite, finitef, gamma, gammaf, pow10, pow10f, scalb, scalbf, significand,
+    significandf, sincos, sincosf,
 };
 
 use support::Round;
