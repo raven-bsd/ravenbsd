@@ -562,14 +562,48 @@ pub fn sleep_until(deadline: u64) -> isize {
     current.block_token.store(token, Ordering::SeqCst);
     current.pending_wake.store(false, Ordering::SeqCst);
     current.wake_status.store(0, Ordering::SeqCst);
+    if current.kick_bits.swap(0, Ordering::AcqRel) != 0 {
+        cancel_sleep(token);
+        current.set_state(ThreadState::Running);
+        return Errno::EINTR.to_ret();
+    }
+    current.interruptible.store(true, Ordering::SeqCst);
     current.set_state(ThreadState::Blocked);
+    if current.pending_wake.swap(false, Ordering::SeqCst) {
+        cancel_sleep(token);
+        current.set_state(ThreadState::Running);
+        current.interruptible.store(false, Ordering::SeqCst);
+        return current.wake_status.load(Ordering::SeqCst) as isize;
+    }
+    if current.kick_bits.swap(0, Ordering::AcqRel) != 0 {
+        cancel_sleep(token);
+        current.set_state(ThreadState::Running);
+        current.interruptible.store(false, Ordering::SeqCst);
+        return Errno::EINTR.to_ret();
+    }
     schedule_locked();
     // A woken thread of a terminal process must not return to user mode: exit at the next
     // scheduling point instead (its stack is reaped by the next schedule on another thread).
     if current.process.exiting.load(Ordering::Acquire) {
         exit_thread(0);
     }
+    current.interruptible.store(false, Ordering::SeqCst);
+    if current.kick_bits.swap(0, Ordering::AcqRel) != 0 {
+        return Errno::EINTR.to_ret();
+    }
     current.wake_status.load(Ordering::SeqCst) as isize
+}
+
+/// Remove a sleep-list entry that was registered but not consumed.
+///
+/// The caller already holds the scheduler critical section (`sleep_until`).
+fn cancel_sleep(token: u64) {
+    let mut slot = lock_cpu(this_cpu());
+    if let Some(state) = slot.as_mut() {
+        let _ = state
+            .sleepers
+            .remove_where(|(_, entry_token, _)| *entry_token == token);
+    }
 }
 
 /// Start a blocking operation and return its wake token.
@@ -578,6 +612,15 @@ pub fn sleep_until(deadline: u64) -> isize {
 /// calls [`block_current`]. [`end_block`] clears the token and any stale timeout entry.
 #[allow(dead_code)] // Blocking primitives are consumed by the syscall/futex path (x86-64 today, S14c on aarch64).
 pub fn begin_block() -> Result<u64, Errno> {
+    begin_block_inner(false)
+}
+
+/// Start a blocking operation whose wait honours `THREAD_KICK`/`-EINTR`.
+pub fn begin_block_interruptible() -> Result<u64, Errno> {
+    begin_block_inner(true)
+}
+
+fn begin_block_inner(interruptible: bool) -> Result<u64, Errno> {
     if !INITIALIZED.load(Ordering::Acquire) {
         return Err(Errno::EINVAL);
     }
@@ -595,7 +638,13 @@ pub fn begin_block() -> Result<u64, Errno> {
     current.block_token.store(token, Ordering::SeqCst);
     current.pending_wake.store(false, Ordering::SeqCst);
     current.wake_status.store(0, Ordering::SeqCst);
+    current.interruptible.store(interruptible, Ordering::SeqCst);
     Ok(token)
+}
+
+/// Consume the calling thread's sticky kick bits.
+pub fn take_kick() -> bool {
+    current_thread().is_some_and(|thread| thread.kick_bits.swap(0, Ordering::AcqRel) != 0)
 }
 
 /// Register a timeout for the current blocking operation with its wake status.
@@ -639,14 +688,38 @@ pub fn block_current() -> isize {
     };
     if current.pending_wake.swap(false, Ordering::SeqCst) {
         current.set_state(ThreadState::Running);
+        current.interruptible.store(false, Ordering::SeqCst);
         return current.wake_status.load(Ordering::SeqCst) as isize;
     }
+    if current.interruptible.load(Ordering::Acquire)
+        && current.kick_bits.swap(0, Ordering::AcqRel) != 0
+    {
+        current.set_state(ThreadState::Running);
+        current.interruptible.store(false, Ordering::SeqCst);
+        return Errno::EINTR.to_ret();
+    }
     current.set_state(ThreadState::Blocked);
+    if current.pending_wake.swap(false, Ordering::SeqCst) {
+        current.set_state(ThreadState::Running);
+        current.interruptible.store(false, Ordering::SeqCst);
+        return current.wake_status.load(Ordering::SeqCst) as isize;
+    }
+    if current.interruptible.load(Ordering::Acquire)
+        && current.kick_bits.swap(0, Ordering::AcqRel) != 0
+    {
+        current.set_state(ThreadState::Running);
+        current.interruptible.store(false, Ordering::SeqCst);
+        return Errno::EINTR.to_ret();
+    }
     schedule_locked();
     // A woken thread of a terminal process must not return to user mode: exit at the next
     // scheduling point instead (its stack is reaped by the next schedule on another thread).
     if current.process.exiting.load(Ordering::Acquire) {
         exit_thread(0);
+    }
+    current.interruptible.store(false, Ordering::SeqCst);
+    if current.kick_bits.swap(0, Ordering::AcqRel) != 0 {
+        return Errno::EINTR.to_ret();
     }
     current.wake_status.load(Ordering::SeqCst) as isize
 }
@@ -667,6 +740,7 @@ pub fn end_block(token: u64) {
     {
         current.block_token.store(0, Ordering::SeqCst);
         current.pending_wake.store(false, Ordering::SeqCst);
+        current.interruptible.store(false, Ordering::SeqCst);
     }
     let _ = state
         .sleepers

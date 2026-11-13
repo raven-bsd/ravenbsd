@@ -149,6 +149,10 @@ pub struct Thread {
     pub pinned: AtomicBool,
     /// User TLS base (`IA32_FS_BASE` / `TPIDR_EL0`), installed on switch-in.
     pub tls_base: AtomicU64,
+    /// Sticky thread-kick bits (PG-8).
+    pub kick_bits: AtomicU32,
+    /// True while the thread is in an interruptible blocking wait.
+    pub interruptible: AtomicBool,
 }
 
 // SAFETY: all interior mutability is accessed from scheduler critical sections (interrupts off)
@@ -246,6 +250,8 @@ impl Thread {
             last_cpu: AtomicU32::new(0),
             pinned: AtomicBool::new(false),
             tls_base: AtomicU64::new(0),
+            kick_bits: AtomicU32::new(0),
+            interruptible: AtomicBool::new(false),
         });
         Ok(thread)
     }
@@ -333,6 +339,8 @@ impl Thread {
             last_cpu: AtomicU32::new(0),
             pinned: AtomicBool::new(false),
             tls_base: AtomicU64::new(0),
+            kick_bits: AtomicU32::new(0),
+            interruptible: AtomicBool::new(false),
         })
     }
 
@@ -370,6 +378,8 @@ impl Thread {
             last_cpu: AtomicU32::new(0),
             pinned: AtomicBool::new(false),
             tls_base: AtomicU64::new(0),
+            kick_bits: AtomicU32::new(0),
+            interruptible: AtomicBool::new(false),
         }))
     }
 }

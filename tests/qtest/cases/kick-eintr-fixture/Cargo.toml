@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-s43-kick"
+version = "0.1.0"
+description = "S43 fixture: thread kick, sticky -EINTR, blocked/running and cross-process cases."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "raven-s43-kick"
+path = "src/main.rs"
+
+[dependencies]
+raven-abi = { path = "../../../../crates/raven-abi" }
+raven-initfs = { path = "../../../../crates/raven-initfs" }
+raven-rt = { path = "../../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
+
+[lints]
+workspace = true

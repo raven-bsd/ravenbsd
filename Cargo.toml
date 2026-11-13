@@ -63,6 +63,7 @@ members = [
     "profiles/iommu-fixture",
     "tests/qtest/cases/linux-trap-fixture",
     "tests/qtest/cases/tls-base-fixture",
+    "tests/qtest/cases/kick-eintr-fixture",
     "xtask",
     "tests/qtest",
     "tests/ufs-oracle",

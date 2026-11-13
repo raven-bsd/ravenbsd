@@ -187,7 +187,11 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
             let _ = process::reap_unstarted(&target);
             continue;
         }
-        let token = sched::begin_block()?;
+        let token = sched::begin_block_interruptible()?;
+        if sched::take_kick() {
+            sched::end_block(token);
+            return Err(Errno::EINTR);
+        }
         // The state lock is held, so the process cannot pass Exited between the check above and
         // the enqueue; `mark_exited` takes the same lock before waking.
         let queued = target.waiters.enqueue_if(target.id, 0, || Ok(true));
@@ -203,7 +207,11 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
                 return Err(error);
             }
         }
-        let _ = sched::block_current();
+        let status = sched::block_current();
+        let kicked = sched::take_kick();
         sched::end_block(token);
+        if status == Errno::EINTR.to_ret() || kicked {
+            return Err(Errno::EINTR);
+        }
     }
 }

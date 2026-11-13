@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S43 kick/EINTR: a futex waiter is kicked, a self-kick interrupts NANOSLEEP, a
+# running thread carries the sticky word into its next wait, cross-process
+# SIGNAL rights are enforced, and bits=0 is a no-op.
+
+name = "kick-eintr"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/kick-eintr-fixture/build.sh"]
+initfs = "build/fixtures/kick-eintr/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^kick-eintr: nokick=eperm$'
+unordered = true
+
+[[expect]]
+regex = '^kick-eintr: cross kick=0$'
+unordered = true
+
+[[expect]]
+regex = '^kick-eintr: cross child=eintr$'
+unordered = true
+
+[[expect]]
+regex = '^kick-eintr: cross child exit=0$'
+unordered = true
+
+[[expect]]
+regex = '^kick-eintr: futex kick=0$'
+unordered = true
+
+[[expect]]
+regex = '^kick-eintr: futex=eintr$'
+unordered = true
+
+[[expect]]
+regex = '^kick-eintr: self=eintr$'
+unordered = true
+
+[[expect]]
+regex = '^kick-eintr: running=eintr$'
+unordered = true
+
+[[expect]]
+regex = '^kick-eintr: zero=ok$'
+
+[[expect]]
+regex = '^kick-eintr: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
