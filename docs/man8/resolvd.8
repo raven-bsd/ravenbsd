@@ -1,6 +1,6 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 12, 2026
+.Dd November 13, 2026
 .Dt RESOLVD 8
 .Os RavenBSD
 .Sh NAME
@@ -10,9 +10,7 @@
 .Nm
 .Sh DESCRIPTION
 .Nm
-reads IPv4 nameservers from
-.Pa /etc/resolv.conf
-and registers the
+registers the
 .Dq resolv:
 scheme.  A client opens the control file and sends one
 .Sy CALL
@@ -23,12 +21,47 @@ one retry per configured server, a 500 ms per-attempt timeout, and CNAME
 following bounded to eight links.  The service never invents an address and
 does not cache across queries.
 .Pp
+Nameservers come from one of two sources.  A static
+.Pa /etc/resolv.conf
+with at least one
+.Sy nameserver
+line wins and is never overwritten.  Otherwise
+.Nm
+reads the live DHCP lease through
+.Xr netd 8 Ns 's
+.Dq net:
+control channel using
+.Sy IfaceRequest::DhcpLease ,
+takes the leased address, prefix, router, DNS list and the renewal,
+rebinding and expiry timers, writes the DNS list to the runtime
+.Pa /etc/resolv.conf ,
+and queries those servers.  The lease thread refreshes at the earliest live
+timer and applies a changed lease; it never creates a second network stack.
+.Pp
 Only the
 .Sy nameserver
-directive is interpreted; IPv4 addresses are used.  A static
-.Pa /etc/resolv.conf
-wins.  DHCP lease application is not wired in this milestone: it needs the
-netd/B12b/B12c interface for a real link and lease state.
+directive is interpreted; IPv4 addresses are used.
+.Pp
+The runtime path is
+.Pa /etc/resolv.conf ,
+or
+.Pa /root/etc/resolv.conf
+when a root filesystem is mounted at
+.Pa /root .
+The following environment variables override the defaults:
+.Bl -tag -width RESOLVD_STATIC -compact
+.It Ev RESOLVD_STATIC
+Path of the read-only static override
+.Pq default Pa initfs:/etc/resolv.conf
+or the root file.
+.It Ev RESOLVD_CONF
+Path written from the lease
+.Pq default Pa file:/etc/resolv.conf
+or the root file.
+.It Ev RESOLVD_IFACE
+Interface whose lease is read
+.Pq default Dq eth0 .
+.El
 .Sh PROTOCOL
 The control file is
 .Pa resolv: .
@@ -39,7 +72,9 @@ type (u8), TTL (u32), and 4 or 16 address bytes.  At most eight records fit.
 .Sh FILES
 .Bl -tag -width /etc/services.d -compact
 .It Pa /etc/resolv.conf
-Static nameserver list.
+Static nameserver list, or the lease-derived runtime file.
+.It Pa /root/etc/resolv.conf
+The same file in a mounted root filesystem.
 .It Pa /etc/services.d/resolvd.toml
 Service manifest.
 .El
@@ -51,6 +86,8 @@ or
 A nonexistent name returns the NXDOMAIN reply.
 A timeout or transport failure is reported as an error reply, not an empty
 answer.
+A missing lease is logged and retried with bounded backoff; it is not reported
+as a successful empty answer.
 .Sh EXIT STATUS
 .Ex -std
 .Sh SEE ALSO
