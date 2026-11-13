@@ -19,13 +19,9 @@ fn unknown_command_is_rejected() {
 }
 
 #[test]
-fn oracle_stub_exits_with_c35_message() {
-    let error = run(Path::new("."), "libc-oracle", &[]).expect_err("stub");
-    assert!(
-        error
-            .to_string()
-            .contains("not implemented by C34 (ticket C35)")
-    );
+fn oracle_dispatch_requires_a_subcommand() {
+    let error = run(Path::new("."), "libc-oracle", &[]).expect_err("usage");
+    assert!(error.to_string().contains("needs a subcommand"));
 }
 
 #[test]
