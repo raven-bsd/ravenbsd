@@ -4707,3 +4707,245 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "Copied with only the provenance notice added."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/config.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/gdtoaimp.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants; configuration macros become consts"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/types.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/gdtoa.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants; FPI as a plain struct, extern prototypes dropped"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/ulp.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/ulp.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/hexdig.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/hd_init.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants; hex digit table is const"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/dtoa.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/dtoa.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/gdtoa.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/gdtoa.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/strtod.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/strtod.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/strtodg.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/strtodg.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants; fixed donor drop_down exponent (bb0) and directed lo0bits aliasing"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/gethex.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/gethex.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/hexnan.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/hexnan.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/strtof.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/strtof.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/strtord.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/strtord.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/strtold.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/strtold_subr.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-PublicDomain"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "format selection is a cfg, not an include; the decimal point is a NumericLocale parameter"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/hdtoa.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/hdtoa.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "subnormal path normalises with bit operations; Rounding is a parameter; INT_MAX decpt hidden in Kind"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/ldtoa.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/ldtoa.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "ldtoa passes Rounding (A-num-9); classifies by bits; FPI built from the format"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/fmt_ld80.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/strtorx.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants; also transcribes strtopx.c"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/fmt_ld128.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/strtorQ.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants; also transcribes strtopQ.c"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/bigint/misc.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/misc.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants; pow5mult returns b for negative k (donor hang)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/bigint/dmisc.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/dmisc.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/bigint/smisc.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/smisc.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants; signed word-count ratio scaling kept"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/bigint/gmisc.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/gmisc.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-dtoa/src/bigint/sum.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gdtoa/sum.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "LicenseRef-gdtoa"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants"

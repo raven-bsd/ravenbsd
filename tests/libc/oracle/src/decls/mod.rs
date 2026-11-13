@@ -33,3 +33,6 @@ pub mod stdlib_freebsd;
 
 #[cfg(feature = "oracle-stdlib-musl")]
 pub mod stdlib_musl;
+
+#[cfg(feature = "oracle-dtoa")]
+pub mod dtoa;
