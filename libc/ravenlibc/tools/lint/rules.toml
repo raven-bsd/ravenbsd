@@ -8,3 +8,6 @@ crate_manifest = "libc/ravenlibc/xtask/crates.toml"
 
 [no-std]
 allow-files = []
+
+[no-alloc]
+allow-files = []

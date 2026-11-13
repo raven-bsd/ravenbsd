@@ -127,7 +127,7 @@ fn build_one(
     let merged = capture(&tools.nm, &nm_args, &directory)?;
     recorded_commands.push(prefix(&tools.nm, &nm_args));
     let defined = parse_nm(&merged)?;
-    if defined.is_empty() {
+    if defined.is_empty() && request.recipe.kind != "header" {
         bail!(
             "recipe {}: merged object defines no globals",
             request.recipe.family
@@ -280,6 +280,12 @@ fn compile_args(
     }
     actual.push("-c".to_string());
     recorded.push("-c".to_string());
+    if request.recipe.kind == "header" {
+        actual.push("-x".to_string());
+        actual.push("c".to_string());
+        recorded.push("-x".to_string());
+        recorded.push("c".to_string());
+    }
     actual.push(source_path.display().to_string());
     recorded.push(format!("{}:{}", source.donor, source.path));
     actual.push("-o".to_string());

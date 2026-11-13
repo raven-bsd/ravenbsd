@@ -86,6 +86,29 @@ struct Diff {
 
 impl Diff {
     fn steps(&self, root: &Path) -> Result<Vec<Planned>> {
+        if is_model_family(root, &self.family) {
+            let mut spec = CommandSpec::new(
+                "cargo",
+                vec![
+                    "test".to_string(),
+                    "-p".to_string(),
+                    "raven-libc-oracle".to_string(),
+                    "--features".to_string(),
+                    format!("oracle-{}", self.family),
+                ],
+                root,
+            );
+            if let Some(seeds) = self.seeds {
+                spec = spec.env("RL_DIFF_SEEDS", seeds.to_string());
+            }
+            if self.exhaustive {
+                spec = spec.env("RL_DIFF_EXHAUSTIVE", "1");
+            }
+            return Ok(vec![Planned {
+                spec,
+                label: Some(format!("libc-oracle diff {}", self.family)),
+            }]);
+        }
         let mut build = vec![
             "build".to_string(),
             self.family.clone(),
@@ -134,6 +157,21 @@ impl Diff {
         }
         Ok(planned)
     }
+}
+
+/// Whether the family recipe is model-only (no donor C to build).
+fn is_model_family(root: &Path, family: &str) -> bool {
+    let path = root
+        .join("tests/libc/oracle/recipes")
+        .join(family)
+        .join("oracle.toml");
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return false;
+    };
+    let Ok(value) = toml::from_str::<toml::Value>(&text) else {
+        return false;
+    };
+    value.get("model").and_then(toml::Value::as_bool) == Some(true)
 }
 
 fn classify(args: &[String]) -> Result<Kind> {
