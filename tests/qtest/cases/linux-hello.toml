@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B20 linuxd skeleton: /init is linuxd, /hello is a static musl binary. The server loads it,
+# marks it Linux and serves its traps. The line and the exit status are asserted verbatim.
+
+name = "linux-hello"
+arch = "x86_64"
+profile = "linux-hello"
+timeout_secs = 180
+pre = ["sh tests/fixtures/b20-linux/build.sh"]
+initfs = "build/fixtures/b20-linux/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^linuxd: entry=0x[0-9a-f]+ phdr=0x[0-9a-f]+ phnum=[0-9]+ brk=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^linuxd: mapped [0-9]+ regions, sp=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^hello from linuxd$'
+
+[[expect]]
+regex = '^linuxd: syscall write calls=1 errors=0$'
+
+[[expect]]
+regex = '^linuxd: hello exit=0$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
+
+[[forbid]]
+regex = 'linuxd: syscall .* errors=1'

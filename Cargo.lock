@@ -269,6 +269,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "linuxd"
+version = "0.1.0"
+dependencies = [
+ "linux-elf",
+ "raven-abi",
+ "raven-elf",
+ "raven-initfs",
+ "raven-ipc",
+ "raven-linux-abi",
+ "raven-linux-dispatch",
+ "raven-proto-linux",
+ "raven-rt",
+]
+
+[[package]]
 name = "log"
 version = "0.4.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
