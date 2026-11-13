@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-pledge"
+version = "0.1.0"
+description = "ravenlibc pledge and unveil models, promise-to-capability table and Capsicum cap_rights operations."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+std = []
+
+[dependencies]
+raven-libc-abi = { path = "../raven-libc-abi" }
+
+[dev-dependencies]
+raven-abi = { path = "../../../../crates/raven-abi" }

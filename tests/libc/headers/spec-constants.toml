@@ -3846,3 +3846,123 @@ value = "2"
 headers = ["getopt.h"]
 arches = ["x86_64", "aarch64", "riscv64"]
 source = "doc 03 3.9"
+
+[[constant]]
+name = "CAP_READ"
+value = "144115188075855873"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 76; doc 15 3.A.7"
+
+[[constant]]
+name = "CAP_WRITE"
+value = "144115188075855874"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 78; doc 15 3.A.7"
+
+[[constant]]
+name = "CAP_SEEK_TELL"
+value = "144115188075855876"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 85; doc 15 3.A.7"
+
+[[constant]]
+name = "CAP_SEEK"
+value = "144115188075855884"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 87; doc 15 3.A.7"
+
+[[constant]]
+name = "CAP_PREAD"
+value = "144115188075855885"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 89; doc 15 3.A.7"
+
+[[constant]]
+name = "CAP_PWRITE"
+value = "144115188075855886"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 94; doc 15 3.A.7"
+
+[[constant]]
+name = "CAP_MMAP"
+value = "144115188075855888"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 96; doc 15 3.A.7"
+
+[[constant]]
+name = "CAP_MMAP_R"
+value = "144115188075855901"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 98; doc 15 3.A.7"
+
+[[constant]]
+name = "CAP_MMAP_W"
+value = "144115188075855902"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 100; doc 15 3.A.7"
+
+[[constant]]
+name = "CAP_MMAP_X"
+value = "144115188075855932"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 102; doc 15 3.A.7"
+
+[[constant]]
+name = "CAP_CREATE"
+value = "144115188075855936"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 125; doc 15 3.A.7"
+
+[[constant]]
+name = "CAP_FEXECVE"
+value = "144115188075856000"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 130; doc 15 3.A.7"
+
+[[constant]]
+name = "CAP_FSYNC"
+value = "144115188075856128"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 137; doc 15 3.A.7"
+
+[[constant]]
+name = "CAP_FTRUNCATE"
+value = "144115188075856384"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 143; doc 15 3.A.7"
+
+[[constant]]
+name = "CAP_FSTAT"
+value = "144115188076380160"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 150; doc 15 3.A.7"
+
+[[constant]]
+name = "CAP_ALL0"
+value = "144132780261900287"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 237; doc 15 3.A.7"
+
+[[constant]]
+name = "CAP_ALL1"
+value = "288230376185266175"
+headers = ["sys/capsicum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "FreeBSD capsicum.h line 339; doc 15 3.A.7"
+
