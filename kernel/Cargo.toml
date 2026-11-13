@@ -38,6 +38,7 @@ raven-mem = { path = "../crates/raven-mem" }
 # Everything below is used by the x86-64 modules only (ACPI and the TSC scale).
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 acpi = { version = "5.2.0", default-features = false }
+raven-iommu = { path = "../crates/raven-iommu" }
 raven-mem = { path = "../crates/raven-mem", features = ["export-symbols"] }
 raven-timemath = { path = "../crates/raven-timemath" }
 

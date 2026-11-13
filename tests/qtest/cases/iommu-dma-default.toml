@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S18 default path: QEMU advertises a DMAR through intel-iommu, but the boot
+# command line does not opt in with iommu=on. The kernel must leave translation
+# disabled, report the identity/unprotected domain, and the fixture must still
+# complete its DMA round trip. No VT-d table/domain/fault lines are allowed.
+
+name = "iommu-dma-default"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh profiles/iommu-fixture/build.sh"]
+initfs = "build/fixtures/iommu/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-device", "intel-iommu,pt=off", "-device", "edu"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^vtd: disabled \(iommu=on not set\); DMA unprotected$'
+
+[[expect]]
+regex = '^s18: fallback unprotected domain=0$'
+
+[[expect]]
+regex = '^s18: dma roundtrip ok$'
+
+[[expect]]
+regex = '^s18: fallback no fault injection$'
+
+[[expect]]
+regex = '^s18: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '^vtd: dmar '
+
+[[forbid]]
+regex = '^vtd: domain '
+
+[[forbid]]
+regex = '^vtd: fault '
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
