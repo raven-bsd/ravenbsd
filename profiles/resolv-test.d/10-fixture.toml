@@ -18,5 +18,17 @@ src = "profiles/resolv-test.d/dnsd.manifest"
 path = "/etc/services.d/b15-dnsd.toml"
 
 [[initfs.files]]
+src = "profiles/resolv-test.d/setup.manifest"
+path = "/etc/services.d/b15-resolv-setup.toml"
+
+[[initfs.files]]
 src = "profiles/resolv-test.d/probe.manifest"
 path = "/etc/services.d/b15-resolv-probe.toml"
+
+[[initfs.files]]
+src = "profiles/resolv-test.d/restart.manifest"
+path = "/etc/services.d/b15-resolv-restart.toml"
+
+[[initfs.files]]
+src = "profiles/resolv-test.d/probe2.manifest"
+path = "/etc/services.d/b15-resolv-probe2.toml"

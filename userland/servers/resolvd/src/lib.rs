@@ -4,8 +4,9 @@
 //! RavenBSD DNS resolver service.
 //!
 //! The resolver core is host-testable: DNS wire parsing, `/etc/resolv.conf`
-//! parsing and the A/AAAA query loop live in library modules.  `main.rs` adds
-//! the `resolv:` scheme and the `net:` UDP transport for the target.
+//! parsing, live DHCP lease application and the A/AAAA query loop live in
+//! library modules.  `main.rs` adds the `resolv:` scheme, the `net:` UDP
+//! transport and the lease refresh thread for the target.
 
 #![no_std]
 #![forbid(unsafe_code)]
@@ -17,5 +18,6 @@ extern crate std;
 
 pub mod config;
 pub mod dns;
+pub mod lease;
 pub mod proto;
 pub mod resolver;

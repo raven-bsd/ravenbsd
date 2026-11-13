@@ -1,21 +1,80 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
+# Two phases in one boot. Phase 1 uses a static loopback nameserver and the
+# b15-dnsd fixture for A/AAAA/CNAME/NXDOMAIN. Phase 1 then removes the static
+# override; svcctl restarts resolvd, which applies the real QEMU user-mode DHCP
+# lease (10.0.2.15/24, DNS 10.0.2.3) to /etc/resolv.conf. Phase 2 reads that
+# file and resolves localhost plus a reserved missing name through the lease
+# DNS server.
+
 name = "resolv"
 arch = "x86_64"
 profile = "resolv-test"
-timeout_secs = 180
-pre = ["sh tests/fixtures/b15-resolv/build.sh"]
+timeout_secs = 240
+pre = [
+    "sh tests/fixtures/b15-resolv/build.sh",
+    "sh tests/fixtures/b15-resolv/build-initfs.sh",
+]
+initfs = "build/fixtures/b15-resolv/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
-qemu_extra = []
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
 expect_exit = "success"
 
 [[expect]]
-regex = '^svcd: logd up$'
+regex = '^pcid: devices=[1-9][0-9]*$'
 unordered = true
 
 [[expect]]
-regex = '^svcd: initfsd up$'
+regex = '^svcd: pcid up$'
+unordered = true
+
+[[expect]]
+regex = '^devd: matched [0-9a-f]{2}:[0-9a-f]{2}\.[0-9] vendor=0x1af4 device=0x1041 irq_line=[0-9]+ irq_pin=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^devd: driver virtio-net bar=4 size=16384$'
+unordered = true
+
+[[expect]]
+regex = '^devd: driver virtio-net dma bus=0x[0-9a-f]+ len=65536$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: id=1af4:1041$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: mac=[0-9a-f]{2}(:[0-9a-f]{2}){5} mtu=[0-9]+ link=up$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: serving nic:$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: devd up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: vfsd up$'
+unordered = true
+
+[[expect]]
+regex = '^netd: interface eth0 10\.0\.2\.15/24$'
+unordered = true
+
+[[expect]]
+regex = '^netd: interface lo 127\.0\.0\.1/8$'
+unordered = true
+
+[[expect]]
+regex = '^netd: ready$'
 unordered = true
 
 [[expect]]
@@ -23,11 +82,11 @@ regex = '^svcd: netd up$'
 unordered = true
 
 [[expect]]
-regex = '^resolvd: nameservers=1$'
+regex = '^b15-resolv: setup static nameserver 127\.0\.0\.1$'
 unordered = true
 
 [[expect]]
-regex = '^svcd: resolvd up$'
+regex = '^svcd: b15-resolv-setup up$'
 unordered = true
 
 [[expect]]
@@ -35,19 +94,96 @@ regex = '^b15-dnsd: ready$'
 unordered = true
 
 [[expect]]
+regex = '^resolvd: static nameservers=1$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: resolvd up$'
+unordered = true
+
+[[expect]]
+regex = '^resolvd: query a\.test A via 127\.0\.0\.1$'
+
+[[expect]]
 regex = '^b15-resolv: a\.test=192\.0\.2\.10$'
+
+[[expect]]
+regex = '^resolvd: query aaaa\.test AAAA via 127\.0\.0\.1$'
 
 [[expect]]
 regex = '^b15-resolv: aaaa\.test=2001:db8:0:0:0:0:0:1$'
 
 [[expect]]
+regex = '^resolvd: query alias\.test A via 127\.0\.0\.1$'
+
+[[expect]]
 regex = '^b15-resolv: alias\.test=192\.0\.2\.10$'
+
+[[expect]]
+regex = '^resolvd: query missing\.test A via 127\.0\.0\.1$'
 
 [[expect]]
 regex = '^b15-resolv: missing\.test=NXDOMAIN$'
 
 [[expect]]
-regex = '^b15-resolv: probe ok$'
+regex = '^b15-resolv: phase1 ok$'
+
+[[expect]]
+regex = '^svcd: b15-resolv-probe up$'
+
+[[expect]]
+regex = '^resolvd stopped 0$'
+
+[[expect]]
+regex = '^resolvd running 0$'
+unordered = true
+
+[[expect]]
+regex = '^resolvd: lease eth0 10\.0\.2\.15/24 router=10\.0\.2\.2 dns=10\.0\.2\.3 renew=[0-9]+ms rebind=[0-9]+ms expires=[0-9]+ms$'
+unordered = true
+
+[[expect]]
+regex = '^resolvd: wrote file:/etc/resolv\.conf$'
+unordered = true
+
+[[expect]]
+regex = '^resolvd: resolv\.conf=nameserver 10\.0\.2\.3$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: resolvd up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: b15-resolv-restart up$'
+unordered = true
+
+[[expect]]
+regex = '^b15-resolv: resolv\.conf=nameserver 10\.0\.2\.3$'
+
+[[expect]]
+regex = '^resolvd: query localhost A via 10\.0\.2\.3$'
+
+[[expect]]
+regex = '^b15-resolv: localhost=127\.0\.0\.1$'
+
+[[expect]]
+regex = '^resolvd: query localhost AAAA via 10\.0\.2\.3$'
+
+[[expect]]
+regex = '^b15-resolv: localhost6=0:0:0:0:0:0:0:1$'
+
+[[expect]]
+regex = '^resolvd: query missing\.invalid A via 10\.0\.2\.3$'
+
+[[expect]]
+regex = '^b15-resolv: missing\.invalid=NXDOMAIN$'
+
+[[expect]]
+regex = '^b15-resolv: dhcp probe ok$'
+
+[[expect]]
+regex = '^svcd: b15-resolv-probe2 up$'
 
 [[expect]]
 regex = '^svcd: settled$'

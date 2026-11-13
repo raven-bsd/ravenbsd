@@ -403,6 +403,7 @@ name = "raven-b15-probe"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
  "resolvd",

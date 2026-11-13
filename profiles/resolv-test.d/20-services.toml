@@ -10,13 +10,33 @@ src = "etc/services.d/initfsd.toml"
 path = "/etc/services.d/initfsd.toml"
 
 [[initfs.files]]
-src = "etc/services.d/netd.toml"
+src = "etc/services.d/ramfsd.toml"
+path = "/etc/services.d/ramfsd.toml"
+
+[[initfs.files]]
+src = "profiles/resolv-test.d/vfsd.manifest"
+path = "/etc/services.d/vfsd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/pcid.toml"
+path = "/etc/services.d/pcid.toml"
+
+[[initfs.files]]
+src = "profiles/resolv-test.d/devd.manifest"
+path = "/etc/services.d/devd.toml"
+
+[[initfs.files]]
+src = "profiles/resolv-test.d/drivers.conf"
+path = "/etc/drivers.toml"
+
+[[initfs.files]]
+src = "profiles/resolv-test.d/netd.manifest"
 path = "/etc/services.d/netd.toml"
 
 [[initfs.files]]
-src = "etc/services.d/resolvd.toml"
+src = "profiles/resolv-test.d/resolvd.manifest"
 path = "/etc/services.d/resolvd.toml"
 
 [[initfs.files]]
-src = "tests/fixtures/b15-resolv/resolv.conf"
-path = "/etc/resolv.conf"
+src = "profiles/resolv-test.d/mounts"
+path = "/etc/mounts"

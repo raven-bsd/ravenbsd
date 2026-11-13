@@ -41,3 +41,21 @@ fn ignores_malformed_addresses() {
             .is_empty()
     );
 }
+
+#[test]
+fn a_static_override_requires_a_nameserver() {
+    assert!(has_static_override("nameserver 192.0.2.53\n"));
+    assert!(!has_static_override("# comment only\n"));
+    assert!(!has_static_override("nameserver 300.1.1.1\n"));
+}
+
+#[test]
+fn generated_content_is_not_a_static_override() {
+    let generated = Config {
+        servers: vec![[10, 0, 2, 3]],
+    }
+    .render();
+    assert!(is_generated(&generated));
+    assert!(!has_static_override(&generated));
+    assert!(has_static_override(&format!("# admin file\n{generated}")));
+}

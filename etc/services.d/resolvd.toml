@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# DNS resolver service.  It reads the static `/etc/resolv.conf`; DHCP lease
-# application waits for the B12b/B12c netd seam.
+# DNS resolver service. A static `/etc/resolv.conf` nameserver list wins;
+# otherwise the service applies the live DHCP lease from netd, writes the
+# lease DNS servers to the runtime resolv.conf and refreshes from the lease
+# timers.
 name = "resolvd"
 exec = "/sbin/resolvd"
 needs = ["scheme:net", "scheme:initfs"]
