@@ -93,7 +93,7 @@ mod program {
             let timeout_ms = u32::try_from(remaining.max(1)).map_err(|_| "timeout overflow")?;
             queue_echo(client, handle, id, seq, timeout_ms, payload)?;
             sent = sent.saturating_add(1);
-            match read_reply(client, handle, target, seq, payload.len())? {
+            match read_reply(client, handle, target, seq, payload.len(), timeout_ms)? {
                 Some(rtt_ms) => {
                     received = received.saturating_add(1);
                     minimum = minimum.min(rtt_ms);
@@ -168,9 +168,14 @@ mod program {
         target: [u8; 4],
         seq: u16,
         payload_len: usize,
+        timeout_ms: u32,
     ) -> Result<Option<u32>, String> {
+        let deadline = now_ms()?.saturating_add(u64::from(timeout_ms));
         let mut buffer = [0u8; 1500];
         loop {
+            if now_ms()? >= deadline {
+                return Ok(None);
+            }
             let request = SocketRequest::Read {
                 len: u32::try_from(payload_len.max(1)).map_err(|_| "read length")?,
             };
