@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The weak-hook table of this ticket (normative names: donor-map/16 3.A.4.3). C54's shipped
+# mechanism is the function-pointer cell (spike S-1), so the strong symbol is `__rl_<hook>_impl`
+# in the file named below; the weak cell lives in the caller file.
+
+[[hook]]
+name = "__rl_funcs_on_exit"
+dummy = "nothing"
+strong_symbol = "__rl_funcs_on_exit_impl"
+strong_file = "src/hooks/funcs_on_exit.rs"
+pulled_by = ["atexit", "__cxa_atexit", "on_exit", "exit"]
+weak_side = "src/stdlib/exit.rs"
+
+[[hook]]
+name = "__rl_stdio_exit"
+dummy = "nothing"
+strong_symbol = "__rl_stdio_exit_impl"
+strong_file = "src/hooks/stdio_exit.rs"
+pulled_by = ["exit"]
+weak_side = "src/stdlib/exit.rs"
+
+[[hook]]
+name = "__rl_fmt_float"
+dummy = "prints *float*"
+strong_symbol = "__rl_fmt_float_impl"
+strong_file = "src/hooks/fmt_float.rs"
+pulled_by = ["-u __rl_fmt_float_impl", "strfromd", "strfromf", "strfroml", "fcvt", "ecvt", "gcvt"]
+weak_side = "src/stdio/vprintf.rs"
+
+[[hook]]
+name = "__rl_fmt_wide"
+dummy = "skips the argument"
+strong_symbol = "__rl_fmt_wide_impl"
+strong_file = "src/hooks/fmt_wide.rs"
+pulled_by = ["wprintf"]
+weak_side = "src/stdio/vprintf.rs"
+
+[[hook]]
+name = "__rl_scan_float"
+dummy = "fails the match"
+strong_symbol = "__rl_scan_float_impl"
+strong_file = "src/hooks/scan_float.rs"
+pulled_by = ["strtod", "atof", "scanf"]
+weak_side = "src/stdio/vsscanf.rs"
+
+[[hook]]
+name = "__rl_tz_load"
+dummy = "UTC, no rules"
+strong_symbol = "__rl_tz_load_impl"
+strong_file = "src/hooks/tz_load.rs"
+pulled_by = ["tzset", "localtime", "mktime"]
+weak_side = "src/time/localtime_r.rs"
+
+[[hook]]
+name = "__rl_malloc_impl"
+dummy = "bump allocator"
+strong_symbol = "__rl_malloc_impl_impl"
+strong_file = "src/hooks/malloc_impl.rs"
+pulled_by = ["malloc", "free", "realloc", "posix_memalign"]
+weak_side = "src/malloc/malloc.rs"
+
+[[hook]]
+name = "__rl_malloc_debug"
+dummy = "nothing"
+strong_symbol = "__rl_malloc_debug_impl"
+strong_file = "src/hooks/malloc_debug.rs"
+pulled_by = ["MALLOC_OPTIONS"]
+weak_side = "src/malloc/malloc.rs"

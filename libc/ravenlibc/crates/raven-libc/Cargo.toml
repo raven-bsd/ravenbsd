@@ -1,12 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# C59 skeleton: only `src/va/**` is C59's; C60 fills the export modules and the rest of the
-# manifest. The one dependency is the trait crate the readers implement.
 [package]
 name = "raven-libc"
 version = "0.1.0"
-description = "ravenlibc C-ABI shell: exported symbols, variadic trampolines and va_list readers"
+description = "ravenlibc C-ABI shell: every #[no_mangle] extern \"C\" export of libc.a and libc.so.1."
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -16,10 +14,38 @@ publish = false
 [lints]
 workspace = true
 
+[lib]
+crate-type = ["staticlib", "rlib"]
+
 [features]
-default = []
+default = ["base"]
+tiny = ["tiny-malloc"]
+base = ["hardened-malloc", "float-printf", "wide-stdio", "locale-data", "resolver", "personality-linux", "personality-bsd"]
+server = ["base", "dlopen", "personality-solaris"]
+hardened-malloc = ["raven-libc-malloc/hardened-malloc", "raven-libc-malloc/tiny-malloc"]
+tiny-malloc = ["raven-libc-malloc/tiny-malloc"]
+float-printf = []
+wide-stdio = []
+locale-data = []
+resolver = []
+dlopen = []
+personality-linux = []
+personality-bsd = []
+personality-solaris = []
+hooks-resolved = []
+panic-handler = []
 
 [dependencies]
-raven-libc-abi = { path = "../raven-libc-abi" }
-raven-libc-compat = { path = "../raven-libc-compat" }
-raven-libc-fmt = { path = "../raven-libc-fmt" }
+raven-libc-abi = { path = "../raven-libc-abi", default-features = false }
+raven-libc-sys = { path = "../raven-libc-sys", default-features = false }
+raven-libc-platform = { path = "../raven-libc-platform", default-features = false }
+raven-libc-ctype = { path = "../raven-libc-ctype", default-features = false }
+raven-libc-str = { path = "../raven-libc-str", default-features = false }
+raven-libc-dtoa = { path = "../raven-libc-dtoa", default-features = false }
+raven-libc-fmt = { path = "../raven-libc-fmt", default-features = false }
+raven-libc-stdlib = { path = "../raven-libc-stdlib", default-features = false }
+raven-libc-time = { path = "../raven-libc-time", default-features = false }
+raven-libc-m = { path = "../raven-libc-m", default-features = false }
+raven-libc-malloc = { path = "../raven-libc-malloc", default-features = false }
+raven-libc-stdio = { path = "../raven-libc-stdio", default-features = false }
+raven-libc-compat = { path = "../raven-libc-compat", default-features = false }

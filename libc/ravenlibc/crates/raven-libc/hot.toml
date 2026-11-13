@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The hot list (`donor-map/16` 3.A.3): each member contains no `call` instruction, checked by
+# `tests/archive_hot.rs` with `llvm-objdump -d`. The body is a call-free loop in the shell file;
+# the logic crate keeps the tested generic version.
+
+[[hot]]
+name = "strlen"
+file = "src/string/strlen.rs"
+
+[[hot]]
+name = "strnlen"
+file = "src/string/strnlen.rs"
+
+[[hot]]
+name = "memchr"
+file = "src/string/memchr.rs"
+
+[[hot]]
+name = "memcmp"
+file = "src/string/memcmp.rs"
+
+[[hot]]
+name = "bcmp"
+file = "src/string/memcmp.rs"
+
+[[hot]]
+name = "strcmp"
+file = "src/string/strcmp.rs"
+
+[[hot]]
+name = "strncmp"
+file = "src/string/strcmp.rs"
+
+[[hot]]
+name = "strchr"
+file = "src/string/strchr.rs"
+
+[[hot]]
+name = "toupper"
+file = "src/ctype/toupper.rs"
+
+[[hot]]
+name = "tolower"
+file = "src/ctype/tolower.rs"
+
+[[hot]]
+name = "isalpha"
+file = "src/ctype/isalpha.rs"
+
+[[hot]]
+name = "isdigit"
+file = "src/ctype/isdigit.rs"
+
+[[hot]]
+name = "isalnum"
+file = "src/ctype/isalnum.rs"
+
+[[hot]]
+name = "isspace"
+file = "src/ctype/isspace.rs"
+
+[[hot]]
+name = "isupper"
+file = "src/ctype/isupper.rs"
+
+[[hot]]
+name = "islower"
+file = "src/ctype/islower.rs"
+
+[[hot]]
+name = "isxdigit"
+file = "src/ctype/isxdigit.rs"

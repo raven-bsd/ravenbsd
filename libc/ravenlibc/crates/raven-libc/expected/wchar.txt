@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+btowc
+mblen
+mbrlen
+mbrtowc
+mbsinit
+mbtowc
+wcrtomb
+wctob
+wctomb
+wcwidth

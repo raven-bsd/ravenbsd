@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# The optional families below shipped no shell binding in this pass; every name is in
+# DEFERRED.txt with its reason (K6).

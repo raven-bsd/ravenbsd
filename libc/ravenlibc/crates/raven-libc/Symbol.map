@@ -1,0 +1,286 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Per-crate version-node contribution of the C-ABI shell (doc 14 3.A.7). Public names go to
+# `RAVEN_1.0`; the hook strong members and the private ABI go to `RAVENprivate_1.0`. Names
+# sorted inside each family group; `# ---- C64 exports below ----` is C64's append marker.
+
+RAVEN_1.0 {
+	global:
+		# --- errno ---
+		__errno_location;
+		# --- string ---
+		__gnu_basename;
+		__xpg_strerror_r;
+		bcmp;
+		bcopy;
+		bzero;
+		explicit_bzero;
+		index;
+		memccpy;
+		memchr;
+		memcmp;
+		memcpy;
+		memmem;
+		memmove;
+		mempcpy;
+		memrchr;
+		memset;
+		memset_explicit;
+		memset_s;
+		rawmemchr;
+		rindex;
+		strcasecmp;
+		strcasecmp_l;
+		strcasestr;
+		strcat;
+		strchr;
+		strchrnul;
+		strcmp;
+		strcpy;
+		strcspn;
+		strdup;
+		strerror;
+		strerror_r;
+		strlcat;
+		strlcpy;
+		strlen;
+		strmode;
+		strncasecmp;
+		strncasecmp_l;
+		strncat;
+		strncmp;
+		strncpy;
+		strndup;
+		strnlen;
+		strnstr;
+		strpbrk;
+		strrchr;
+		strsep;
+		strsignal;
+		strspn;
+		strstr;
+		strtok;
+		strtok_r;
+		strverscmp;
+		stpcpy;
+		stpncpy;
+		swab;
+		timingsafe_bcmp;
+		timingsafe_memcmp;
+		# --- strings ---
+		ffs;
+		ffsl;
+		ffsll;
+		fls;
+		flsl;
+		flsll;
+		# --- ctype ---
+		isalnum;
+		isalnum_l;
+		isalpha;
+		isalpha_l;
+		isascii;
+		isblank;
+		isblank_l;
+		iscntrl;
+		iscntrl_l;
+		isdigit;
+		isdigit_l;
+		isgraph;
+		isgraph_l;
+		islower;
+		islower_l;
+		isprint;
+		isprint_l;
+		ispunct;
+		ispunct_l;
+		isspace;
+		isspace_l;
+		isupper;
+		isupper_l;
+		iswctype;
+		isxdigit;
+		isxdigit_l;
+		toascii;
+		tolower;
+		tolower_l;
+		toupper;
+		toupper_l;
+		towctrans;
+		towlower;
+		towupper;
+		wctrans;
+		wctype;
+		# --- wchar ---
+		btowc;
+		mblen;
+		mbrlen;
+		mbrtowc;
+		mbsinit;
+		mbtowc;
+		wcrtomb;
+		wctob;
+		wctomb;
+		wcwidth;
+		# --- wctype ---
+		iswalnum;
+		iswalpha;
+		iswblank;
+		iswcntrl;
+		iswdigit;
+		iswgraph;
+		iswlower;
+		iswprint;
+		iswpunct;
+		iswspace;
+		iswupper;
+		iswxdigit;
+		# --- stdlib ---
+		_Exit;
+		abort;
+		abs;
+		atoi;
+		atol;
+		atoll;
+		div;
+		exit;
+		imaxabs;
+		imaxdiv;
+		labs;
+		ldiv;
+		llabs;
+		lldiv;
+		strtoimax;
+		strtol;
+		strtoll;
+		strtoul;
+		strtoull;
+		strtoumax;
+		# --- malloc ---
+		aligned_alloc;
+		calloc;
+		free;
+		freezero;
+		malloc;
+		malloc_usable_size;
+		memalign;
+		posix_memalign;
+		realloc;
+		reallocarray;
+		# --- stdio ---
+		fprintf;
+		printf;
+		snprintf;
+		sprintf;
+		vfprintf;
+		vprintf;
+		vsnprintf;
+		vsprintf;
+		# --- unistd ---
+		_exit;
+		close;
+		dup;
+		dup2;
+		lseek;
+		pread;
+		pwrite;
+		read;
+		write;
+		# --- compat (C65; x86_64 only until its c_char follow-up) ---
+		addmntent; # x86_64
+		backtrace; # x86_64
+		backtrace_symbols; # x86_64
+		backtrace_symbols_fd; # x86_64
+		cgetcap; # x86_64
+		cgetclose; # x86_64
+		cgetent; # x86_64
+		cgetfirst; # x86_64
+		cgetmatch; # x86_64
+		cgetnext; # x86_64
+		cgetnum; # x86_64
+		cgetset; # x86_64
+		cgetstr; # x86_64
+		cgetustr; # x86_64
+		crypt; # x86_64
+		crypt_r; # x86_64
+		devname; # x86_64
+		endmntent; # x86_64
+		endttyent; # x86_64
+		endusershell; # x86_64
+		endutxent; # x86_64
+		expand_number; # x86_64
+		fmt_scaled; # x86_64
+		forkpty; # x86_64
+		fparseln; # x86_64
+		getbsize; # x86_64
+		getmntent; # x86_64
+		getmntent_r; # x86_64
+		getmode; # x86_64
+		getttyent; # x86_64
+		getttynam; # x86_64
+		getusershell; # x86_64
+		getutxent; # x86_64
+		getutxid; # x86_64
+		getutxline; # x86_64
+		hasmntopt; # x86_64
+		humanize_number; # x86_64
+		login_tty; # x86_64
+		nvis; # x86_64
+		openpty; # x86_64
+		pidfile; # x86_64
+		pututxline; # x86_64
+		readpassphrase; # x86_64
+		scan_scaled; # x86_64
+		setmntent; # x86_64
+		setmode; # x86_64
+		setttyent; # x86_64
+		setusershell; # x86_64
+		setutxent; # x86_64
+		sl_add; # x86_64
+		sl_find; # x86_64
+		sl_free; # x86_64
+		sl_init; # x86_64
+		snvis; # x86_64
+		strnunvis; # x86_64
+		strnunvisx; # x86_64
+		strnvis; # x86_64
+		strnvisx; # x86_64
+		strsnvis; # x86_64
+		strsnvisx; # x86_64
+		strsvis; # x86_64
+		strsvisx; # x86_64
+		strunvis; # x86_64
+		strunvisx; # x86_64
+		strvis; # x86_64
+		strvisx; # x86_64
+		svis; # x86_64
+		unvis; # x86_64
+		updwtmpx; # x86_64
+		uuid_compare; # x86_64
+		uuid_create; # x86_64
+		uuid_create_nil; # x86_64
+		uuid_dec_be; # x86_64
+		uuid_dec_le; # x86_64
+		uuid_enc_be; # x86_64
+		uuid_enc_le; # x86_64
+		uuid_equal; # x86_64
+		uuid_from_string; # x86_64
+		uuid_hash; # x86_64
+		uuid_is_nil; # x86_64
+		uuid_to_string; # x86_64
+		vis; # x86_64
+		# ---- C64 exports below ----
+};
+
+RAVENprivate_1.0 {
+	global:
+		__rl_fmt_float_impl;
+		__rl_fmt_wide_impl;
+		__rl_funcs_on_exit_impl;
+		__rl_malloc_debug_impl;
+		__rl_malloc_impl_impl;
+		__rl_scan_float_impl;
+		__rl_stdio_exit_impl;
+		__rl_tz_load_impl;
+};
