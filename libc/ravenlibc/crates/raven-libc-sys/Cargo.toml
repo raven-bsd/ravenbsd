@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-sys"
+version = "0.1.0"
+description = "ravenlibc: raw syscalls, errno, auxv and thread pointer for the Raven kernel; host fake kernel for tests."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+host-fake = []          # in-memory deterministic kernel model; std allowed only under this feature and in tests
+cancel = []             # compile cancellation-point wrappers (on in the full libc, off for the tiny profile probes)
+
+[dependencies]
+raven-abi = { path = "../../../../crates/raven-abi", default-features = false }
+raven-libc-abi = { path = "../raven-libc-abi" }
