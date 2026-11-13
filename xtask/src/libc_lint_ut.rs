@@ -537,3 +537,51 @@ fn c_source_in_crate_is_reported() {
     let violations = check(&tree, "no-cc");
     assert!(violations.iter().any(|v| v.key == "c-source"));
 }
+
+#[test]
+fn forbid_unsafe_code_attribute_is_not_an_unsafe_token() {
+    let tree = fixture();
+    manifest(&tree, "raven-libc-ctype");
+    crate_file(
+        &tree,
+        "raven-libc-ctype",
+        "src/lib.rs",
+        &format!("{HDR}#![forbid(unsafe_code)]\n"),
+    );
+    let violations = check(&tree, "unsafe-scope");
+    assert!(
+        !violations.iter().any(|v| v.key == "forbidden"),
+        "{violations:?}"
+    );
+}
+
+#[test]
+fn allow_unsafe_code_attribute_is_not_an_unsafe_token() {
+    let tree = fixture();
+    manifest(&tree, "raven-libc-str");
+    crate_file(
+        &tree,
+        "raven-libc-str",
+        "src/lib.rs",
+        &format!("{HDR}#![deny(unsafe_code)]\n#[allow(unsafe_code)]\nmod raw;\n"),
+    );
+    let violations = check(&tree, "unsafe-scope");
+    assert!(
+        !violations.iter().any(|v| v.key == "not-allowlisted"),
+        "{violations:?}"
+    );
+}
+
+#[test]
+fn unsafe_fn_in_class_p_is_still_forbidden() {
+    let tree = fixture();
+    manifest(&tree, "raven-libc-ctype");
+    crate_file(
+        &tree,
+        "raven-libc-ctype",
+        "src/lib.rs",
+        &format!("{HDR}pub unsafe fn f() {{}}\n"),
+    );
+    let violations = check(&tree, "unsafe-scope");
+    assert!(violations.iter().any(|v| v.key == "forbidden"));
+}
