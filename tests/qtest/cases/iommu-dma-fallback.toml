@@ -11,7 +11,7 @@ profile = "base"
 timeout_secs = 180
 pre = ["sh profiles/iommu-fixture/build.sh"]
 initfs = "build/fixtures/iommu/initfs.img"
-boot_cmdline = "console=ttyS0 test-exit=1"
+boot_cmdline = "console=ttyS0 test-exit=1 iommu=on"
 qemu_extra = ["-device", "edu"]
 expect_exit = "success"
 

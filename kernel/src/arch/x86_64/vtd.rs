@@ -281,7 +281,17 @@ fn unit() -> Option<Arc<Unit>> {
 
 /// Initialise VT-d from the captured ACPI bundle. Never panics; a failure
 /// leaves the machine on the identity/unprotected DMA path.
+///
+/// Translation is opt-in with the boot parameter `iommu=on`. Drivers that do
+/// not negotiate a platform IOMMU (notably the current virtio drivers) keep
+/// working when the firmware advertises a DMAR but the operator has not opted
+/// in yet.
 pub fn init() {
+    let cmdline = crate::cmdline::CmdLine::parse(crate::memory::paging::cmdline());
+    if cmdline.get("iommu") != Some("on") {
+        kprintln!("vtd: disabled (iommu=on not set); DMA unprotected");
+        return;
+    }
     match try_init() {
         Ok(unit) => {
             kprintln!(
