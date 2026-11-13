@@ -4949,3 +4949,168 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-elf/src/hash.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/13 3.1: elf_hash and gnu_hash (rtld.c:1922-1972); u32 wrapping arithmetic kept, bytes read as u8."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-elf/src/lookup.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/13 3.1: symlook_obj, matched_symbol, symlook_obj1_sysv and symlook_obj1_gnu (rtld.c:5076-5305); filtees deleted; bloom checked first; chain walks bounded (A-ld-9); hidden definitions visible only with SymFlags::SELF."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-elf/src/scope.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/13 3.1: symlook_global, symlook_default, symlook_list and symlook_needed (rtld.c:4869-5050); obj_rtld/ld_dynamic_weak/donelist become parameters and a local Vec."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-elf/src/version.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/13 3.1: object_add_name/object_match_name, locate_dependency, rtld_verify_object_versions and fetch_ventry (rtld.c:6036-6290); list_main replaced by an ObjTable scan; chain loops rejected."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-elf/src/relr.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/13 3.1: reloc_relr (rtld.c:3496-3520); yields link-time offsets instead of writing; every offset checked against PT_LOAD."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-elf/src/initorder.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/13 3.1: initlist_add_neededs/initlist_add_objects/initlist_for_loaded_obj (rtld.c:2650-2770); initfirst/iflist deleted; cycles broken at the back edge."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-elf/src/object.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/13 3.1: digest_dynamic1/digest_dynamic2/digest_phdr (rtld.c:1337-1760); two passes (T-11); bias added once (T-10); every range checked against PT_LOAD (A-ld-9); DT_REL/TEXTREL rejected."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-elf/src/segments.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/map_object.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/13 3.1 of the layout arithmetic only (map_object.c:216-290 and the PT_* walk); mmap/pread/munmap deleted (C62); validation is new."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-elf/src/search.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/13 3.1: basename, origin_subst_one/origin_subst, path_enumerate, try_library_path, search_library_path, find_library (rtld.c:1219-1335, 3726-3830, 1974-2075); hints/libmap/fdlopen deleted; $LIB/$OSNAME/$OSREL dropped."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-elf/src/trace.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/13 3.1: trace_calc_fmts/trace_print_obj/trace_loaded_objects (rtld.c:5309-5445); returns bytes and prints nothing; default formats kept."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-elf/src/env.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/13 3.1: ld_env_vars, rtld_get_env_val, rtld_init_env_vars*, rtld_get_var/rtld_set_var* (rtld.c:382-500, 6806-6960); unsetenv becomes the returned index list; libmap/fds/utrace rows dropped."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-elf/src/debug.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/debug.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/13 3.1: the debug.c/debug.h boolean debug facility; dbg() is deleted (C62 prints); the LD_DEBUG word list is PROPOSED by 13 3.1."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-elf/src/reloc/x86_64.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/amd64/reloc.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/13 3.1: the reloc_non_plt/reloc_jmpslots/reloc_iresolve switch bodies (amd64/reloc.c:203-300, 449-555) as a pure decision table; TPOFF32/DTPOFF32 rejected per 13 4.6 (RD-new)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-elf/src/reloc/aarch64.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/aarch64/reloc.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/13 3.1: the same switch bodies from aarch64/reloc.c (460-560, 254-300); classified by NUMBER so 1028 is DTPMOD and 1029 DTPREL (A-ld-21)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-elf/src/reloc/riscv64.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/riscv/reloc.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/13 3.1: the switch bodies from riscv/reloc.c (330-430, 151-154); no GLOB_DAT (T-8); TLSDESC rejected (O-3); TPREL64 keeps the donor TP/TCB bias formula."
