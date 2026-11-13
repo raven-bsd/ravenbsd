@@ -15,13 +15,28 @@ publish = false
 serde = { version = "1.0", features = ["derive"] }
 toml = "1.2"
 raven-libc-ctype = { path = "../../../libc/ravenlibc/crates/raven-libc-ctype" }
+raven-libc-str = { path = "../../../libc/ravenlibc/crates/raven-libc-str" }
 
 [features]
 default = []
 oracle-string-basic = []
 oracle-ctype-multibyte = []
 oracle-ctype-class = []
-all-oracles = ["oracle-string-basic", "oracle-ctype-multibyte", "oracle-ctype-class"]
+oracle-str-mem = []
+oracle-str-openbsd = []
+oracle-str-freebsd = []
+oracle-str-musl = []
+oracle-str-errmsg = []
+all-oracles = [
+    "oracle-string-basic",
+    "oracle-ctype-multibyte",
+    "oracle-ctype-class",
+    "oracle-str-mem",
+    "oracle-str-openbsd",
+    "oracle-str-freebsd",
+    "oracle-str-musl",
+    "oracle-str-errmsg",
+]
 
 [lints]
 workspace = true

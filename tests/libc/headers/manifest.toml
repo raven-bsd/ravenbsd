@@ -546,21 +546,21 @@ ring = 2
 [[header]]
 path = "string.h"
 owner = "C40"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "strings.h"
 owner = "C40"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "stdbit.h"
 owner = "C40"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 

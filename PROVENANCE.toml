@@ -3365,3 +3365,784 @@ copied = "2026-11-13"
 modified = false
 notes = "manifest for the six Unicode 15.1.0 data files copied byte-for-byte (UnicodeData.txt, DerivedCoreProperties.txt, EastAsianWidth.txt, PropList.txt, emoji-data.txt, unicode-license.txt); data input of the generator, doc 02 3.3; SPDX spelling is a QUESTION (LicenseRef-Unicode-DFS)"
 
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/ascii.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strcasecmp.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.2; the 256-byte table is produced by a const fn from the documented ASCII rule"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/cstr/strlcpy.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strlcpy.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.3; pointer walk replaced by indices; dst slice end bounds the scan"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/cstr/strlcat.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strlcat.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.3; no-NUL-within-dsize leaves dst untouched (trap 3)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/cstr/strncpy.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strncpy.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.3; NUL padding preserved; no terminator when src.len() >= dst.len()"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/cstr/strncat.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strncat.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.3; engine returns min(src.len(), n), caller writes the NUL"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/cstr/strcmp.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strcmp.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.2; strncmp.c of the same donor is the second function; unsigned-char difference"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/cstr/strcasecmp.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strcasecmp.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.2; ASCII table shared with ascii.rs; bytes >= 0x80 unchanged"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/cstr/strspn.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strspn.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.2; strcspn.c and strpbrk.c of the same donor are the other two functions; O(n*m) loops"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/cstr/strstr.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strstr.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.2; Two-Way core shared with memmem.rs; short-needle paths kept"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/cstr/strcasestr.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strcasestr.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.2; tolower replaced by the ascii.rs table"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/cstr/strnstr.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/string/strnstr.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.2; len-bounded NUL-terminated search"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/cstr/strverscmp.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/string/strverscmp.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.2 (RD-11); isdigit -> u8::is_ascii_digit; FreeBSD vectors are the oracle of record"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/cstr/strtok.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strtok.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.4; the file-static last is deleted, the caller cursor is the state (RD-14)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/cstr/strsep.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strsep.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.4; cursor index replaces char **; empty fields returned"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/mem/memrchr.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/memrchr.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.1; backward scan over a slice"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/mem/memccpy.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/memccpy.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.1; stops after the copied c, returns the position after it"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/mem/memmem.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/memmem.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.1; Two-Way and the 2/3/4-byte fast paths; 256-entry shift table on the stack"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/strmode.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strmode.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.7; S_IFWHT case dropped (Linux has no value); constants from raven-libc-abi"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/bits.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/ffs.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.7; the fls/flsl/flsll functions come from the FreeBSD BSD-3 donor in the same file; ffs table kept"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/secure.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/timingsafe_bcmp.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.2; timingsafe_memcmp.c of the same donor is the second function; i32 arithmetic shift kept"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/stdbit.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/stdbit/stdc_count_ones.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.8; one file holds the 14 donors (14 x 5 functions); native width methods replace __builtin_clz/popcount"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/errmsg/tables.rs"
+upstream = "musl"
+upstream_path = "src/errno/__strerror.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; MIT via musl/COPYRIGHT; 95 name-keyed rows in one blob + u16 offsets; 35 CLEANROOM texts for the names musl omits"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/errmsg/strerror.rs"
+upstream = "musl"
+upstream_path = "src/errno/strerror.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; EDQUOT_ORIG and LCTRANS dropped; slot 0 'Success' and the numbered unknown path are RD-13 deviations"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/errmsg/strerror_r.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strerror_r.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "LicenseRef-PublicDomain"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.6; algorithm shape only; never writes errno (A-str-7); __itoa helpers replaced by itoa.rs"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/errmsg/strsignal.rs"
+upstream = "musl"
+upstream_path = "src/string/strsignal.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; sigmap branch dead under Linux numbering; RT32..RT64; unknown text is 'Unknown signal: N' (RD-13)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/gnu_basename.rs"
+upstream = "bionic"
+upstream_path = "libc/bionic/__gnu_basename.cpp"
+upstream_rev = "731631f300090436d7f5df80d50b6275c8c60a93"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.7; returns the offset after the last slash"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/mem/impls.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/compiler-builtins/src/mem/impls.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "compiler-builtins crate licence allows MIT election; cfg(mem_unaligned) -> target_arch; cold_path stub; debug_assert removed (no panic edges)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/mem/mod.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/compiler-builtins/src/mem/mod.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "compiler-builtins crate licence allows MIT election; intrinsics! macro replaced by plain Rust-ABI functions; memmove selector kept"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/arch/x86_64/mem.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/compiler-builtins/src/mem/x86_64.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "compiler-builtins crate licence allows MIT election; unchecked_div/rem replaced by / and %; cld kept; rep movsb only for ermsb and forward"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/strlen.rs"
+upstream = "musl"
+upstream_path = "src/string/strlen.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; read_volatile aligned word loop (A-str-1), byte loop under size/raven_strict_reads"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/strnlen.rs"
+upstream = "musl"
+upstream_path = "src/string/strnlen.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; memchr(s,0,n) semantics, never reads byte n"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/strchr.rs"
+upstream = "musl"
+upstream_path = "src/string/strchrnul.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; strchr.c and strrchr.c of the same donor are the other two functions; weak_alias dropped"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/memchr.rs"
+upstream = "musl"
+upstream_path = "src/string/memchr.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; word loop in raw; the memrchr function here follows the OpenBSD ISC donor in the same file"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/memccpy.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/memccpy.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.1; pointer shell over the slice engine"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/memmem.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/memmem.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.1; pointer shell over the Two-Way engine"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/mempcpy.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/string/mempcpy.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.1; memcpy then dst + n"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/stpcpy.rs"
+upstream = "musl"
+upstream_path = "src/string/stpcpy.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; stpncpy.c of the same donor is the third function; strncpy pointer shell uses the OpenBSD engine"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/strcpy.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strcpy.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.3; strcat.c and strncat.c of the same donor are the other two functions; byte loop, no core::ptr::copy"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/strdup.rs"
+upstream = "musl"
+upstream_path = "src/string/strdup.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; strndup.c of the same donor is the second function; malloc is an allocator parameter"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/swab.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/swab.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.3; len <= 1 does nothing; odd last byte is not copied"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/strcoll.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strcoll.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.5; strxfrm.c of the same donor is the second function; strcoll == strcmp under UTF-8-only locales"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/explicit_bzero.rs"
+upstream = "musl"
+upstream_path = "src/string/explicit_bzero.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; memset_explicit is CLEANROOM (A-str-16); empty asm barrier kept"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/memset_s.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/string/memset_s.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.7 / CR-22 D-2; constraint handler replaced by the return code; volatile fill plus barrier"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/bsd_compat.rs"
+upstream = "musl"
+upstream_path = "src/string/bcopy.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; bcmp/bzero/index/rindex of the same donor are the other functions; OpenBSD bcopy.c is not ported (A-str-9)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/strcmp.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strcmp.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.2; strncmp.c of the same donor is the second function; pointer shell"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/strcasecmp.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strcasecmp.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.2; pointer shell; locale argument is implicit (the _l forms ignore it)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/strspn.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strspn.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.2; strcspn.c and strpbrk.c of the same donor are the other functions"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/strstr.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strstr.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.2; strnstr comes from the FreeBSD BSD-3 donor in the same file; pointer shells"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/strlcpy.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strlcpy.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.3; strlcat.c of the same donor is the second function; pointer shells"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/strtok.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strtok.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.4; strtok takes the caller cursor slot, no global state (RD-14)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/strsep.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strsep.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.4; *stringp becomes NULL after the last field"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/strverscmp.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/string/strverscmp.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.2; pointer shell"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/strmode.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/string/strmode.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.7; pointer shell over the 12-byte engine"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/gnu_basename.rs"
+upstream = "bionic"
+upstream_path = "libc/bionic/__gnu_basename.cpp"
+upstream_rev = "731631f300090436d7f5df80d50b6275c8c60a93"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.7; pointer shell"
+
+[[import]]
+path = "libc/ravenlibc/include/string.h"
+upstream = "musl"
+upstream_path = "include/string.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; public header notice kept under R-H6; BSD extensions and the XSI/GNU strerror split added"
+
+[[import]]
+path = "libc/ravenlibc/include/strings.h"
+upstream = "musl"
+upstream_path = "include/strings.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; public header notice kept under R-H6; BSD fls family added"
+
+[[import]]
+path = "libc/ravenlibc/include/stdbit.h"
+upstream = "freebsd"
+upstream_path = "include/stdbit.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/01 3.8; size_t/least-integer typedefs dropped; _Generic macros guarded for C++"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/arch/aarch64/memcpy.s"
+upstream = "freebsd"
+upstream_path = "contrib/arm-optimized-routines/string/aarch64/memcpy.S"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "MIT elected from MIT OR Apache-2.0 WITH LLVM-exception; ENTRY/END/L/BTI_C expanded once; .note.gnu.property dropped; symbols renamed __raven_str_*"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/arch/aarch64/memset.s"
+upstream = "freebsd"
+upstream_path = "contrib/arm-optimized-routines/string/aarch64/memset.S"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "MIT elected from MIT OR Apache-2.0 WITH LLVM-exception; ENTRY/END/L/BTI_C expanded once; .note.gnu.property dropped; symbols renamed __raven_str_*"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/arch/aarch64/memcmp.s"
+upstream = "freebsd"
+upstream_path = "contrib/arm-optimized-routines/string/aarch64/memcmp.S"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "MIT elected from MIT OR Apache-2.0 WITH LLVM-exception; ENTRY/END/L/BTI_C expanded once; .note.gnu.property dropped; symbols renamed __raven_str_*"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/arch/aarch64/strlen.s"
+upstream = "freebsd"
+upstream_path = "contrib/arm-optimized-routines/string/aarch64/strlen.S"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "MIT elected from MIT OR Apache-2.0 WITH LLVM-exception; ENTRY/END/L/BTI_C expanded once; .note.gnu.property dropped; symbols renamed __raven_str_*"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/arch/aarch64/strnlen.s"
+upstream = "freebsd"
+upstream_path = "contrib/arm-optimized-routines/string/aarch64/strnlen.S"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "MIT elected from MIT OR Apache-2.0 WITH LLVM-exception; ENTRY/END/L/BTI_C expanded once; .note.gnu.property dropped; symbols renamed __raven_str_*"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/arch/aarch64/strchr.s"
+upstream = "freebsd"
+upstream_path = "contrib/arm-optimized-routines/string/aarch64/strchr.S"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "MIT elected from MIT OR Apache-2.0 WITH LLVM-exception; ENTRY/END/L/BTI_C expanded once; .note.gnu.property dropped; symbols renamed __raven_str_*"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/arch/aarch64/strchrnul.s"
+upstream = "freebsd"
+upstream_path = "contrib/arm-optimized-routines/string/aarch64/strchrnul.S"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "MIT elected from MIT OR Apache-2.0 WITH LLVM-exception; ENTRY/END/L/BTI_C expanded once; .note.gnu.property dropped; symbols renamed __raven_str_*"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/arch/aarch64/strrchr.s"
+upstream = "freebsd"
+upstream_path = "contrib/arm-optimized-routines/string/aarch64/strrchr.S"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "MIT elected from MIT OR Apache-2.0 WITH LLVM-exception; ENTRY/END/L/BTI_C expanded once; .note.gnu.property dropped; symbols renamed __raven_str_*"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/arch/aarch64/memchr.s"
+upstream = "freebsd"
+upstream_path = "contrib/arm-optimized-routines/string/aarch64/memchr.S"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "MIT elected from MIT OR Apache-2.0 WITH LLVM-exception; ENTRY/END/L/BTI_C expanded once; .note.gnu.property dropped; symbols renamed __raven_str_*"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/arch/aarch64/memrchr.s"
+upstream = "freebsd"
+upstream_path = "contrib/arm-optimized-routines/string/aarch64/memrchr.S"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "MIT elected from MIT OR Apache-2.0 WITH LLVM-exception; ENTRY/END/L/BTI_C expanded once; .note.gnu.property dropped; symbols renamed __raven_str_*"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/arch/aarch64/strcmp.s"
+upstream = "freebsd"
+upstream_path = "contrib/arm-optimized-routines/string/aarch64/strcmp.S"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "MIT elected from MIT OR Apache-2.0 WITH LLVM-exception; ENTRY/END/L/BTI_C expanded once; .note.gnu.property dropped; symbols renamed __raven_str_*"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/arch/aarch64/strncmp.s"
+upstream = "freebsd"
+upstream_path = "contrib/arm-optimized-routines/string/aarch64/strncmp.S"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "MIT elected from MIT OR Apache-2.0 WITH LLVM-exception; ENTRY/END/L/BTI_C expanded once; .note.gnu.property dropped; symbols renamed __raven_str_*"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/arch/aarch64/strcpy.s"
+upstream = "freebsd"
+upstream_path = "contrib/arm-optimized-routines/string/aarch64/strcpy.S"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "MIT elected from MIT OR Apache-2.0 WITH LLVM-exception; ENTRY/END/L/BTI_C expanded once; .note.gnu.property dropped; symbols renamed __raven_str_*"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-str/src/raw/arch/aarch64/stpcpy.s"
+upstream = "freebsd"
+upstream_path = "contrib/arm-optimized-routines/string/aarch64/stpcpy.S"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "MIT elected from MIT OR Apache-2.0 WITH LLVM-exception; ENTRY/END/L/BTI_C expanded once; .note.gnu.property dropped; symbols renamed __raven_str_*"

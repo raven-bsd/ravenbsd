@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-str"
+version = "0.1.0"
+description = "ravenlibc string.h family: slice engines, pointer shell, message tables, secure memory, stdbit"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+size = []              # byte loops only (A-str-4)
+test-probes = []       # exports #[inline(never)] probe functions for the disassembly tests (host only)
+
+[dependencies]
+raven-libc-abi = { path = "../raven-libc-abi" }
+
+[dev-dependencies]
+# none. Differential tests use the C35 oracle harness crate, which depends on this crate, not the reverse.

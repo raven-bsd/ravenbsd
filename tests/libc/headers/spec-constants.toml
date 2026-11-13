@@ -3776,3 +3776,31 @@ value = "0x00000002"
 headers = ["sys/inotify.h"]
 arches = ["x86_64", "aarch64", "riscv64"]
 source = "doc 14 3.A.6"
+
+[[constant]]
+name = "__STDC_ENDIAN_LITTLE__"
+value = "1234"
+headers = ["stdbit.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "C23 7.18.4; clang __ORDER_LITTLE_ENDIAN__"
+
+[[constant]]
+name = "__STDC_ENDIAN_BIG__"
+value = "4321"
+headers = ["stdbit.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "C23 7.18.4; clang __ORDER_BIG_ENDIAN__"
+
+[[constant]]
+name = "__STDC_ENDIAN_NATIVE__"
+value = "1234"
+headers = ["stdbit.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "C23 7.18.4; the three Raven arches are little-endian"
+
+[[constant]]
+name = "__STDC_VERSION_STDBIT_H__"
+value = "202311"
+headers = ["stdbit.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "C23 7.18.4 header version macro"

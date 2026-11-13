@@ -1,0 +1,183 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# str-openbsd: every OpenBSD string COPY row of donor-map/01 section 5.2. The donors are BSD-3,
+# ISC or public domain; the gate re-reads each header at build time.
+
+schema = 1
+family = "str-openbsd"
+description = "OpenBSD string.h/strings.h implementations (mem*, str*, tokenising, strmode, ffs, timingsafe, swab)"
+exports = [
+  "bcmp",
+  "bzero",
+  "ffs",
+  "ffsl",
+  "ffsll",
+  "memccpy",
+  "memmem",
+  "memrchr",
+  "strcasecmp",
+  "strcasecmp_l",
+  "strcasestr",
+  "strcat",
+  "strcmp",
+  "strcoll",
+  "strcoll_l",
+  "strcpy",
+  "strcspn",
+  "strlcat",
+  "strlcpy",
+  "strmode",
+  "strncasecmp",
+  "strncasecmp_l",
+  "strncat",
+  "strncmp",
+  "strncpy",
+  "strpbrk",
+  "strsep",
+  "strspn",
+  "strstr",
+  "strtok",
+  "strtok_r",
+  "strxfrm",
+  "strxfrm_l",
+  "swab",
+  "timingsafe_bcmp",
+  "timingsafe_memcmp",
+]
+opt = ["O2", "O0"]
+defines = ["_GNU_SOURCE"]
+include = []
+flags = []
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/memrchr.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/memccpy.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/memmem.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/bcmp.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/bzero.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strcmp.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strncmp.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strcspn.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strspn.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strpbrk.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strcasecmp.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strcasecmp_l.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strcasestr.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strstr.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strtok.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strsep.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strlcpy.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strlcat.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strcpy.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strncpy.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strcat.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strncat.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strcoll.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strcoll_l.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strxfrm.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strxfrm_l.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/swab.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strmode.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/ffs.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/ffsl.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/ffsll.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/timingsafe_bcmp.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/timingsafe_memcmp.c"

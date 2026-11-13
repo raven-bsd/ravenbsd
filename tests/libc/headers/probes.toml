@@ -287,10 +287,9 @@ owner = "C37"
 [[probe]]
 header = "string.h"
 symbol = "strlcpy"
-visible_in = []
-hidden_in = ["default", "posix", "xopen", "gnu", "c11", "c23", "ansi", "cxx17", "cxx20"]
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
 owner = "C40"
-pending = true
 
 
 [[probe]]
@@ -572,3 +571,213 @@ symbol = "d_namlen"
 visible_in = []
 hidden_in = ["default", "posix", "xopen", "gnu", "ansi", "c11", "c23", "cxx17", "cxx20"]
 owner = "C38"
+
+[[probe]]
+header = "string.h"
+symbol = "strlcat"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "strnstr"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "strsep"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "explicit_bzero"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "timingsafe_bcmp"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "timingsafe_memcmp"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "strmode"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "__gnu_basename"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "strverscmp"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "strchrnul"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "rawmemchr"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "memrchr"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "mempcpy"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "strcasestr"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "strdup"
+visible_in = ["default", "posix", "xopen", "gnu", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "strndup"
+visible_in = ["default", "posix", "xopen", "gnu", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "stpcpy"
+visible_in = ["default", "posix", "xopen", "gnu", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "stpncpy"
+visible_in = ["default", "posix", "xopen", "gnu", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "strnlen"
+visible_in = ["default", "posix", "xopen", "gnu", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "strtok_r"
+visible_in = ["default", "posix", "xopen", "gnu", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "strsignal"
+visible_in = ["default", "posix", "xopen", "gnu", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "memccpy"
+visible_in = ["default", "gnu", "c23", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "string.h"
+symbol = "strerror_r"
+visible_in = ["default", "posix", "xopen", "gnu", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "strings.h"
+symbol = "bcmp"
+visible_in = ["default", "posix", "xopen", "gnu", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "strings.h"
+symbol = "bcopy"
+visible_in = ["default", "posix", "xopen", "gnu", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "strings.h"
+symbol = "strcasecmp"
+visible_in = ["default", "posix", "xopen", "gnu", "c11", "c23", "ansi", "cxx17", "cxx20"]
+hidden_in = []
+owner = "C40"
+
+[[probe]]
+header = "strings.h"
+symbol = "ffs"
+visible_in = ["default", "posix", "xopen", "gnu", "c11", "c23", "ansi", "cxx17", "cxx20"]
+hidden_in = []
+owner = "C40"
+
+[[probe]]
+header = "strings.h"
+symbol = "fls"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C40"
+
+[[probe]]
+header = "stdbit.h"
+symbol = "stdc_count_ones_uc"
+visible_in = ["default", "posix", "xopen", "gnu", "c11", "c23", "ansi", "cxx17", "cxx20"]
+hidden_in = []
+owner = "C40"
+
+[[probe]]
+header = "stdbit.h"
+symbol = "stdc_bit_ceil_ull"
+visible_in = ["default", "posix", "xopen", "gnu", "c11", "c23", "ansi", "cxx17", "cxx20"]
+hidden_in = []
+owner = "C40"

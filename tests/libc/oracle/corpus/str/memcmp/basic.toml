@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[case]]
+a = "abc"
+b = "abd"
+n = 3
+
+[[case]]
+a_hex = "7f80"
+b_hex = "7fffff"
+n = 2

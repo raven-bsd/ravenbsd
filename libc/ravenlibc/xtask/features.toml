@@ -65,3 +65,11 @@ crates = ["raven-libc-iconv"]
 
 [[cfg]]
 name = "raven_abi_proposed"
+
+[[feature]]
+name = "size"
+crates = ["raven-libc-str"]
+
+[[feature]]
+name = "test-probes"
+crates = ["raven-libc-str"]

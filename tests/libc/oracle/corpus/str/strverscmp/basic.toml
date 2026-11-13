@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[case]]
+a = "1.2.9"
+b = "1.2.10"
+
+[[case]]
+a = "000"
+b = "00"

@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# str-mem: the musl block primitives, the C original for raven-libc-str's raw::mem and
+# raw::memchr. The donor files have no per-file header (MIT via musl/COPYRIGHT, H-1).
+
+schema = 1
+family = "str-mem"
+description = "musl memcpy, memmove, memset, memcmp and memchr"
+exports = ["memchr", "memcmp", "memcpy", "memmove", "memset"]
+opt = ["O2", "O0"]
+defines = []
+include = []
+flags = []
+
+[[source]]
+donor = "musl"
+path = "src/string/memcpy.c"
+
+[[source]]
+donor = "musl"
+path = "src/string/memmove.c"
+
+[[source]]
+donor = "musl"
+path = "src/string/memset.c"
+
+[[source]]
+donor = "musl"
+path = "src/string/memcmp.c"
+
+[[source]]
+donor = "musl"
+path = "src/string/memchr.c"
