@@ -1208,6 +1208,16 @@ const ABMONTHS: [&str; 12] = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
+fn first_wday_of(year: i32) -> i32 {
+    let year = i64::from(year);
+    let value = 1 + 5 * ((year - 1) % 4) + 4 * ((year - 1) % 100) + 6 * ((year - 1) % 400);
+    (value % 7) as i32
+}
+
+fn week_yday(year: i32, week: i32, wday: i32, day_offset: i32) -> i32 {
+    (7 - first_wday_of(year) + day_offset) % 7 + (week - 1) * 7 + wday - day_offset
+}
+
 fn strptime_case(rng: &mut raven_libc_oracle::rng::Rng) -> StrptimeCase {
     let year = 1902 + rng.below(199) as i32;
     let mon = rng.below(12) as usize;
@@ -1247,14 +1257,23 @@ fn strptime_case(rng: &mut raven_libc_oracle::rng::Rng) -> StrptimeCase {
             format!("{:03} {year:04}", 1 + rng.below(366) as i32),
             "%j %Y".to_string(),
         ),
-        4 => (
-            format!(
-                "{:02} {} {year:04}",
-                rng.below(54) as i32,
-                rng.below(7) as i32
-            ),
-            "%U %w %Y".to_string(),
-        ),
+        4 => {
+            // The donor's month scan indexes start_of_month out of bounds when
+            // the finalised yday is negative or above 364. Keep only the
+            // defined cells; the UB reproducers are Rust-only regressions.
+            let (week, wday) = loop {
+                let week = rng.below(54) as i32;
+                let wday = rng.below(7) as i32;
+                let yday = week_yday(year, week, wday, 0);
+                if (0..=364).contains(&yday) {
+                    break (week, wday);
+                }
+            };
+            (
+                format!("{week:02} {wday} {year:04}"),
+                "%U %w %Y".to_string(),
+            )
+        }
         5 => (
             format!("{}", rng.below(2_147_483_647) as i64),
             "%s".to_string(),

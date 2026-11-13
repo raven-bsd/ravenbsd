@@ -164,9 +164,7 @@ format = "%k%p"
 text = "12:00:00 AM"
 format = "%r"
 
-# C44 defect: the Rust `finish` loop runs past the last month start when
-# `%U`/`%W` week finalisation produces a yday above 365, and never returns.
-# The C oracle returns a normalised 2028 date. This is the minimal reproducer.
-[[case]]
-text = "53 5 2028"
-format = "%U %w %Y"
+# `%U`/`%W` cells whose finalised yday is outside 0..=364 are excluded from
+# this C corpus: the donor's month scan reads start_of_month out of bounds and
+# O2/O0 return different garbage. The Rust-only defined-behaviour regressions
+# (including the week-53 hang reproducer) live in the crate's strptime_ut.rs.
