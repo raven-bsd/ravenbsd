@@ -291,7 +291,20 @@ mod program {
         for _ in 0..100 {
             let response = raw_request(client, file, &SocketRequest::Read { len: 32 })?;
             if response.get(4..6) == Some(&[6, 0]) {
-                wait_event(&queue)?;
+                let status = u16::from_le_bytes(
+                    response
+                        .get(2..4)
+                        .ok_or("short icmp error")?
+                        .try_into()
+                        .map_err(|_| "short icmp error")?,
+                );
+                if status == Errno::ETIMEDOUT.0 {
+                    return Err("icmp reply timed out in netd".to_string());
+                }
+                // A missing event is not fatal: the server may still deliver the
+                // reply after an ARP/neighbour transition. The netd deadline bounds
+                // the retry loop.
+                let _ = wait_event(&queue);
                 continue;
             }
             let header = Response::decode(response.get(..22).ok_or("short icmp header")?)
