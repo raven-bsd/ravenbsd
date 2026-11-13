@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: MIT
+# Copyright © 2005-2020 Rich Felker, et al.
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# RavenBSD: transpiled from musl:include/sys/stat.h, include/dirent.h @ 7813e9119eb5fe681b6750b8a033a0490bca0941
+# (no per-file header; covered by musl/COPYRIGHT, H-1; constants transcribed to TOML and generated)
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+schema = 1
+group = "stat"
+c_header = "bits/abi_stat.h"
+guard = "_RAVEN_BITS_ABI_STAT_H"
+rust_type = "u32"
+base = "oct"
+source = ["include/sys/stat.h", "include/dirent.h"]
+prefixes = ["S_", "DT_", "UTIME_"]
+
+consts = [
+  { name = "S_IFMT", value = 0o170000 },
+  { name = "S_IFSOCK", value = 0o140000 },
+  { name = "S_IFLNK", value = 0o120000 },
+  { name = "S_IFREG", value = 0o100000 },
+  { name = "S_IFBLK", value = 0o060000 },
+  { name = "S_IFDIR", value = 0o040000 },
+  { name = "S_IFCHR", value = 0o020000 },
+  { name = "S_IFIFO", value = 0o010000 },
+  { name = "S_ISUID", value = 0o4000 },
+  { name = "S_ISGID", value = 0o2000 },
+  { name = "S_ISVTX", value = 0o1000 },
+  { name = "S_ISTXT", alias = "S_ISVTX", visible = "bsd" },
+  { name = "S_IRWXU", value = 0o700 },
+  { name = "S_IRUSR", value = 0o400 },
+  { name = "S_IWUSR", value = 0o200 },
+  { name = "S_IXUSR", value = 0o100 },
+  { name = "S_IRWXG", value = 0o070 },
+  { name = "S_IRGRP", value = 0o040 },
+  { name = "S_IWGRP", value = 0o020 },
+  { name = "S_IXGRP", value = 0o010 },
+  { name = "S_IRWXO", value = 0o007 },
+  { name = "S_IROTH", value = 0o004 },
+  { name = "S_IWOTH", value = 0o002 },
+  { name = "S_IXOTH", value = 0o001 },
+  { name = "S_IREAD", alias = "S_IRUSR" },
+  { name = "S_IWRITE", alias = "S_IWUSR" },
+  { name = "S_IEXEC", alias = "S_IXUSR" },
+  { name = "DT_UNKNOWN", value = 0, base = "dec" },
+  { name = "DT_FIFO", value = 1, base = "dec" },
+  { name = "DT_CHR", value = 2, base = "dec" },
+  { name = "DT_DIR", value = 4, base = "dec" },
+  { name = "DT_BLK", value = 6, base = "dec" },
+  { name = "DT_REG", value = 8, base = "dec" },
+  { name = "DT_LNK", value = 10, base = "dec" },
+  { name = "DT_SOCK", value = 12, base = "dec" },
+  { name = "DT_WHT", value = 14, base = "dec" },
+  { name = "UTIME_NOW", value = 0x3fffffff, base = "hex" },
+  { name = "UTIME_OMIT", value = 0x3ffffffe, base = "hex" },
+]

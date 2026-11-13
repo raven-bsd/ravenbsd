@@ -1,0 +1,182 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The complete deviation register. `hdrgen verify` computes the actual difference set against
+# the musl measurement and against raven-linux-abi and fails when a row is missing or stale.
+# `theirs` is a scalar or a table; an architecture missing from the table has no difference.
+
+schema = 1
+
+# --- Against the musl measurement (doc 14 3.A.3) -------------------------------------------
+
+[[deviation]]
+name = "stat"
+against = "musl"
+ours = "128/8"
+theirs = { x86_64 = "144/8" }
+reason = "DV5/H-15: one 128-byte struct stat on all three arches; musl x86_64 is Linux's 144-byte kernel shape; linuxd converts"
+
+[[deviation]]
+name = "nlink_t"
+against = "musl"
+ours = "4/4"
+theirs = { x86_64 = "8/8" }
+reason = "DV1: nlink_t is 32 bits everywhere so struct stat has one layout; musl x86_64 uses 64 bits"
+
+[[deviation]]
+name = "blksize_t"
+against = "musl"
+ours = "4/4"
+theirs = { x86_64 = "8/8" }
+reason = "DV1: blksize_t is 32 bits everywhere; musl x86_64 uses 64 bits"
+
+[[deviation]]
+name = "jmp_buf"
+against = "musl"
+ours = "392/8"
+theirs = { x86_64 = "200/8", aarch64 = "312/8", riscv64 = "344/8" }
+reason = "DV3/RD-new: one 392-byte buffer on all arches for shadow-stack/PAC/BTI/GCS state; doc 14 wrote 392/16, but a 392-byte type cannot have alignment 16; clang measures 8"
+
+[[deviation]]
+name = "sigjmp_buf"
+against = "musl"
+ours = "392/8"
+theirs = { x86_64 = "200/8", aarch64 = "312/8", riscv64 = "344/8" }
+reason = "DV3/RD-new: same blob as jmp_buf on all arches"
+
+# --- Against musl constants (H1 x86_64, H3 aarch64 fcntl) ----------------------------------
+
+[[deviation]]
+name = "O_LARGEFILE"
+against = "musl"
+ours = 0
+theirs = { x86_64 = 32768, aarch64 = 131072, riscv64 = 32768 }
+reason = "files are always large; the bit carries no meaning (doc 14 3.A.6); on aarch64 musl puts it at a different bit, so H3 lists it too"
+
+[[deviation]]
+name = "O_DIRECTORY"
+against = "musl"
+ours = 65536
+theirs = { aarch64 = 16384 }
+reason = "D8: the x86_64 O_* value set is used on every arch; aarch64 musl differs; linuxd swaps the aarch64 Linux set"
+
+[[deviation]]
+name = "O_NOFOLLOW"
+against = "musl"
+ours = 131072
+theirs = { aarch64 = 32768 }
+reason = "D8: x86_64 O_* set on every arch; aarch64 musl differs"
+
+[[deviation]]
+name = "O_DIRECT"
+against = "musl"
+ours = 16384
+theirs = { aarch64 = 65536 }
+reason = "D8: x86_64 O_* set on every arch; aarch64 musl differs"
+
+[[deviation]]
+name = "O_TMPFILE"
+against = "musl"
+ours = 4259840
+theirs = { aarch64 = 4210688 }
+reason = "D8: x86_64 O_* set on every arch; aarch64 musl differs"
+
+[[deviation]]
+name = "AF_ROUTE"
+against = "musl"
+ours = 128
+theirs = 16
+reason = "O-abi-6/RD-85: the BSD route family starts at 128; musl aliases AF_ROUTE to AF_NETLINK (16); socket() fails with EAFNOSUPPORT"
+
+[[deviation]]
+name = "PF_ROUTE"
+against = "musl"
+ours = 128
+theirs = 16
+reason = "PF_* are aliases of the AF_* entries; the BSD route family is at 128"
+
+[[deviation]]
+name = "MINSIGSTKSZ"
+against = "musl"
+ours = 6144
+theirs = { x86_64 = 2048, riscv64 = 2048 }
+reason = "one value that fits AVX-512/SVE frames; musl aarch64 already uses 6144; sysconf(_SC_MINSIGSTKSZ) gives the dynamic value"
+
+[[deviation]]
+name = "SIGSTKSZ"
+against = "musl"
+ours = 16384
+theirs = { x86_64 = 8192, aarch64 = 12288, riscv64 = 8192 }
+reason = "one stack size that covers the largest signal frame; sysconf(_SC_SIGSTKSZ) gives the dynamic value"
+
+[[deviation]]
+name = "NGROUPS_MAX"
+against = "musl"
+ours = 1023
+theirs = 32
+reason = "H-19/CR-16: the kernel supports 1023 supplementary groups"
+
+[[deviation]]
+name = "HOST_NAME_MAX"
+against = "musl"
+ours = 64
+theirs = 255
+reason = "H-19/CR-20: the UTS node name is 64 bytes"
+
+[[deviation]]
+name = "PTHREAD_STACK_MIN"
+against = "musl"
+ours = 16384
+theirs = 2048
+reason = "O-abi-13/RD-85: covers the signal frame; musl's 2048 does not"
+
+[[deviation]]
+name = "NL_ARGMAX"
+against = "musl"
+ours = 64
+theirs = 9
+reason = "B.8: 64 positional printf/scanf arguments"
+
+[[deviation]]
+name = "SOMAXCONN"
+against = "musl"
+ours = 4096
+theirs = 128
+reason = "01 B.8/RD-78: the header backlog value is 4096; the runtime cap is a sysctl"
+
+# --- Against raven-linux-abi (T4b parity) --------------------------------------------------
+
+[[deviation]]
+name = "O_ACCMODE"
+against = "linux-abi"
+ours = 2097155
+theirs = 3
+reason = "musl defines O_ACCMODE as (03|O_PATH); raven-linux-abi has the kernel mask 3; doc 14 3.A.6 fixes the musl expression"
+
+[[deviation]]
+name = "O_LARGEFILE"
+against = "linux-abi"
+ours = 0
+theirs = { x86_64 = 32768, aarch64 = 131072, riscv64 = 32768 }
+reason = "files are always large; the Linux personality converts the bit at the linuxd boundary"
+
+[[deviation]]
+name = "SIGRTMIN"
+against = "linux-abi"
+ours = 35
+theirs = 32
+reason = "B.8/09 A-sig-2: libc reserves 32, 33 and 34, so the public SIGRTMIN is 35"
+
+[[deviation]]
+name = "SIGSTKSZ"
+against = "linux-abi"
+ours = 16384
+theirs = { x86_64 = 8192, riscv64 = 8192 }
+reason = "same reasoned value as the musl row; aarch64 already matches"
+
+[[deviation]]
+name = "AF_MAX"
+against = "linux-abi"
+ours = 45
+theirs = 46
+reason = "doc 14 4.6 fixes AF_MAX at 45; the pinned Linux table already counts AF_MCTP 45, so Linux's AF_MAX is 46"

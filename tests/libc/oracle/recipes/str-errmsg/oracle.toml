@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# str-errmsg: musl strerror.c/__strerror.h and strsignal.c (MIT via musl/COPYRIGHT). The strerror
+# table is name-keyed, so the oracle's Linux numbers are the same as DR-13's.
+
+schema = 1
+family = "str-errmsg"
+description = "musl strerror and strsignal message tables"
+exports = ["__strerror_l", "strerror", "strsignal"]
+opt = ["O2", "O0"]
+defines = []
+include = ["shim:str-errmsg"]
+flags = []
+
+[[source]]
+donor = "musl"
+path = "src/errno/strerror.c"
+
+[[source]]
+donor = "musl"
+path = "src/string/strsignal.c"

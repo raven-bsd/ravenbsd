@@ -1,0 +1,94 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# ctype-multibyte: the 20 code files of musl:src/multibyte (MIT via musl/COPYRIGHT).
+# The private locale_impl.h is replaced by the shim, whose `mb_cur_max` is settable at runtime.
+
+schema = 1
+family = "ctype-multibyte"
+description = "musl multibyte codec originals, both MB_CUR_MAX modes"
+exports = ["__fsmu8", "btowc", "c16rtomb", "c32rtomb", "mblen", "mbrlen", "mbrtoc16", "mbrtoc32", "mbrtowc", "mbsinit", "mbsnrtowcs", "mbsrtowcs", "mbstowcs", "mbtowc", "wcrtomb", "wcsnrtombs", "wcsrtombs", "wcstombs", "wctob", "wctomb"]
+opt = ["O2", "O0"]
+defines = ["hidden=", "weak_alias(a,b)=", "_LOCALE_IMPL_H=1", "_FORTIFY_SOURCE=0"]
+include = ["donor:musl/src/multibyte", "donor:musl/src/internal"]
+flags = []
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/internal.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/mbrtowc.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/wcrtomb.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/mbtowc.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/wctomb.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/mblen.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/mbrlen.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/mbsinit.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/btowc.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/wctob.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/mbsrtowcs.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/mbsnrtowcs.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/wcsrtombs.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/wcsnrtombs.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/mbstowcs.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/wcstombs.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/mbrtoc16.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/c16rtomb.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/mbrtoc32.c"
+
+[[source]]
+donor = "musl"
+path = "src/multibyte/c32rtomb.c"

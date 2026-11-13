@@ -300,12 +300,16 @@ fn resolve_includes(request: &BuildRequest<'_>, shim_root: &Path) -> Result<Vec<
             if !path.is_dir() {
                 bail!("include directory {} is missing", path.display());
             }
+            let path = std::path::absolute(&path)
+                .with_context(|| format!("cannot make {} absolute", path.display()))?;
             resolved.push((include.clone(), path.display().to_string()));
         } else if let Some(dir) = include.strip_prefix("shim:") {
             let path = shim_root.join(dir);
             if !path.is_dir() {
                 bail!("shim directory {} is missing", path.display());
             }
+            let path = std::path::absolute(&path)
+                .with_context(|| format!("cannot make {} absolute", path.display()))?;
             resolved.push((include.clone(), path.display().to_string()));
         } else {
             bail!("include `{include}` is malformed");

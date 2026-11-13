@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# A -Wno-* flag may appear in T1 and only through this table, one row per
+# header and flag, with a mandatory reason. C37 needs none; the file stays so
+# C38 can add its first row without inventing a format.

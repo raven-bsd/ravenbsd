@@ -1,0 +1,152 @@
+# SPDX-License-Identifier: MIT
+# Copyright © 2005-2020 Rich Felker, et al.
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# RavenBSD: transpiled from musl:include/limits.h, arch/x86_64/bits/limits.h @ 7813e9119eb5fe681b6750b8a033a0490bca0941
+# (no per-file header; covered by musl/COPYRIGHT, H-1; constants transcribed to TOML and generated)
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+schema = 1
+group = "limits"
+c_header = "bits/abi_limits.h"
+guard = "_RAVEN_BITS_ABI_LIMITS_H"
+rust_type = "i32"
+base = "dec"
+source = ["include/limits.h", "arch/x86_64/bits/limits.h"]
+prefixes = ["CHAR_", "SCHAR_", "UCHAR_", "SHRT_", "USHRT_", "INT_", "UINT_", "LONG_", "ULONG_", "LLONG_", "ULLONG_", "MB_LEN_MAX", "PIPE_BUF", "FILESIZEBITS", "NAME_MAX", "PATH_MAX", "NGROUPS_MAX", "ARG_MAX", "IOV_MAX", "SYMLOOP_MAX", "WORD_BIT", "SSIZE_MAX", "TZNAME_MAX", "TTY_NAME_MAX", "HOST_NAME_MAX", "LOGIN_NAME_MAX", "PTHREAD_", "SEM_", "DELAYTIMER_MAX", "MQ_PRIO_MAX", "BC_", "CHARCLASS_NAME_MAX", "COLL_WEIGHTS_MAX", "EXPR_NEST_MAX", "LINE_MAX", "RE_DUP_MAX", "NL_", "NZERO", "PAGE_SIZE", "PAGESIZE", "_POSIX", "_XOPEN", "CLK_TCK"]
+
+# Only the doc 14 4.6 names are data. Every other musl limit belongs to a compiler header or to
+# C37's limits.h text; the rows below are the complete completeness-scan account.
+omit = [
+  { name = "CHAR_MIN", reason = "compiler or C37 header" },
+  { name = "CHAR_MAX", reason = "compiler or C37 header" },
+  { name = "CHAR_BIT", reason = "compiler or C37 header" },
+  { name = "SCHAR_MIN", reason = "compiler or C37 header" },
+  { name = "SCHAR_MAX", reason = "compiler or C37 header" },
+  { name = "UCHAR_MAX", reason = "compiler or C37 header" },
+  { name = "SHRT_MIN", reason = "compiler or C37 header" },
+  { name = "SHRT_MAX", reason = "compiler or C37 header" },
+  { name = "USHRT_MAX", reason = "compiler or C37 header" },
+  { name = "INT_MIN", reason = "compiler or C37 header" },
+  { name = "INT_MAX", reason = "compiler or C37 header" },
+  { name = "UINT_MAX", reason = "compiler or C37 header" },
+  { name = "LONG_MIN", reason = "compiler or C37 header" },
+  { name = "LONG_MAX", reason = "compiler or C37 header" },
+  { name = "ULONG_MAX", reason = "compiler or C37 header" },
+  { name = "LLONG_MIN", reason = "compiler or C37 header" },
+  { name = "LLONG_MAX", reason = "compiler or C37 header" },
+  { name = "ULLONG_MAX", reason = "compiler or C37 header" },
+  { name = "MB_LEN_MAX", reason = "compiler or C37 header" },
+  { name = "FILESIZEBITS", reason = "compiler or C37 header" },
+  { name = "WORD_BIT", reason = "compiler or C37 header" },
+  { name = "LONG_BIT", reason = "compiler or C37 header" },
+  { name = "SSIZE_MAX", reason = "compiler or C37 header" },
+  { name = "TZNAME_MAX", reason = "compiler or C37 header" },
+  { name = "SEM_NSEMS_MAX", reason = "compiler or C37 header" },
+  { name = "DELAYTIMER_MAX", reason = "compiler or C37 header" },
+  { name = "MQ_PRIO_MAX", reason = "compiler or C37 header" },
+  { name = "BC_BASE_MAX", reason = "compiler or C37 header" },
+  { name = "BC_DIM_MAX", reason = "compiler or C37 header" },
+  { name = "BC_SCALE_MAX", reason = "compiler or C37 header" },
+  { name = "BC_STRING_MAX", reason = "compiler or C37 header" },
+  { name = "CHARCLASS_NAME_MAX", reason = "compiler or C37 header" },
+  { name = "COLL_WEIGHTS_MAX", reason = "compiler or C37 header" },
+  { name = "EXPR_NEST_MAX", reason = "compiler or C37 header" },
+  { name = "RE_DUP_MAX", reason = "compiler or C37 header" },
+  { name = "NL_MSGMAX", reason = "compiler or C37 header" },
+  { name = "NL_SETMAX", reason = "compiler or C37 header" },
+  { name = "NL_TEXTMAX", reason = "compiler or C37 header" },
+  { name = "NZERO", reason = "compiler or C37 header" },
+  { name = "NL_LANGMAX", reason = "compiler or C37 header" },
+  { name = "NL_NMAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_AIO_LISTIO_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_AIO_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_ARG_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_CHILD_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_CLOCKRES_MIN", reason = "compiler or C37 header" },
+  { name = "_POSIX_DELAYTIMER_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_HOST_NAME_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_LINK_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_LOGIN_NAME_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_MAX_CANON", reason = "compiler or C37 header" },
+  { name = "_POSIX_MAX_INPUT", reason = "compiler or C37 header" },
+  { name = "_POSIX_MQ_OPEN_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_MQ_PRIO_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_NAME_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_NGROUPS_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_OPEN_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_PATH_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_PIPE_BUF", reason = "compiler or C37 header" },
+  { name = "_POSIX_RE_DUP_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_RTSIG_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_SEM_NSEMS_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_SEM_VALUE_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_SIGQUEUE_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_SSIZE_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_STREAM_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_SS_REPL_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_SYMLINK_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_SYMLOOP_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_THREAD_DESTRUCTOR_ITERATIONS", reason = "compiler or C37 header" },
+  { name = "_POSIX_THREAD_KEYS_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_THREAD_THREADS_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_TIMER_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_TRACE_EVENT_NAME_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_TRACE_NAME_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_TRACE_SYS_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_TRACE_USER_EVENT_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_TTY_NAME_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX_TZNAME_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX2_BC_BASE_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX2_BC_DIM_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX2_BC_SCALE_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX2_BC_STRING_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX2_CHARCLASS_NAME_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX2_COLL_WEIGHTS_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX2_EXPR_NEST_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX2_LINE_MAX", reason = "compiler or C37 header" },
+  { name = "_POSIX2_RE_DUP_MAX", reason = "compiler or C37 header" },
+  { name = "_XOPEN_IOV_MAX", reason = "compiler or C37 header" },
+  { name = "_XOPEN_NAME_MAX", reason = "compiler or C37 header" },
+  { name = "_XOPEN_PATH_MAX", reason = "compiler or C37 header" },
+]
+
+consts = [
+  { name = "PIPE_BUF", value = 4096 },
+  { name = "NAME_MAX", value = 255 },
+  { name = "PATH_MAX", value = 4096 },
+  { name = "NGROUPS_MAX", value = 1023 },
+  { name = "ARG_MAX", value = 131072 },
+  { name = "IOV_MAX", value = 1024 },
+  { name = "SYMLOOP_MAX", value = 40 },
+  { name = "TTY_NAME_MAX", value = 32 },
+  { name = "HOST_NAME_MAX", value = 64 },
+  { name = "LOGIN_NAME_MAX", value = 256 },
+  { name = "LINE_MAX", value = 4096 },
+  { name = "PTHREAD_KEYS_MAX", value = 128 },
+  { name = "PTHREAD_STACK_MIN", value = 16384 },
+  { name = "PTHREAD_DESTRUCTOR_ITERATIONS", value = 4 },
+  { name = "SEM_VALUE_MAX", value = 0x7fffffff, base = "hex" },
+  { name = "NL_ARGMAX", value = 64 },
+  { name = "CLK_TCK", value = 100, doc = "B.8; not a musl object-like constant" },
+  { name = "PAGESIZE", value = 4096, arch = ["x86_64"], doc = "x86_64 header only (O-abi-5)" },
+  { name = "PAGE_SIZE", alias = "PAGESIZE", arch = ["x86_64"], doc = "alias of PAGESIZE; x86_64 only" },
+]

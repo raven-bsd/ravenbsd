@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# stdlib-openbsd: strtol/strtoul/strtonum, qsort/heapsort/mergesort/bsearch, getopt_long,
+# getsubopt and a64l/l64a. All donors are BSD-3/ISC/PD; the gate re-reads each header.
+
+schema = 1
+family = "stdlib-openbsd"
+description = "OpenBSD integer conversion, array sorting/searching, getopt_long, getsubopt and a64l"
+exports = [
+  "a64l",
+  "bsearch",
+  "getopt",
+  "getopt_long",
+  "getopt_long_only",
+  "getsubopt",
+  "heapsort",
+  "l64a",
+  "mergesort",
+  "optarg",
+  "opterr",
+  "optind",
+  "optopt",
+  "optreset",
+  "qsort",
+  "strtol",
+  "strtonum",
+  "strtoul",
+  "suboptarg",
+]
+opt = ["O2", "O0"]
+defines = []
+include = []
+flags = []
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/stdlib/strtol.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/stdlib/strtoul.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/stdlib/strtonum.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/stdlib/qsort.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/stdlib/heapsort.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/stdlib/merge.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/stdlib/bsearch.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/stdlib/getopt_long.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/stdlib/getsubopt.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/stdlib/a64l.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/stdlib/l64a.c"

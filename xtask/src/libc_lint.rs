@@ -390,7 +390,7 @@ fn check_unsafe(
         }
     }
     for (index, line) in lines.iter().enumerate() {
-        if !line.code.contains("unsafe") {
+        if !contains_unsafe_token(&line.code) {
             continue;
         }
         let line_no = index + 1;
@@ -434,6 +434,30 @@ fn check_unsafe(
             }
         }
     }
+}
+
+/// True when `code` contains the keyword `unsafe`, but not the lint name
+/// `unsafe_code` used by `forbid`, `deny` and `allow` attributes.
+fn contains_unsafe_token(code: &str) -> bool {
+    let bytes = code.as_bytes();
+    let mut index = 0;
+    while index + 6 <= bytes.len() {
+        if &bytes[index..index + 6] == b"unsafe" {
+            let before_ok = index == 0 || !is_ident_byte(bytes[index - 1]);
+            let after_ok = bytes
+                .get(index + 6)
+                .is_none_or(|byte| !is_ident_byte(*byte));
+            if before_ok && after_ok {
+                return true;
+            }
+        }
+        index += 1;
+    }
+    false
+}
+
+fn is_ident_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || byte == b'_'
 }
 
 fn crate_path<'a>(crates: &'a Crates, name: &str) -> &'a str {

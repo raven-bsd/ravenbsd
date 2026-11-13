@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[case]]
+text = "42"
+lo = 0
+hi = 100
+
+[[case]]
+text = "-1"
+lo = 0
+hi = 100
+
+[[case]]
+text = "101"
+lo = 0
+hi = 100
+
+[[case]]
+text = "x"
+lo = 0
+hi = 100
+
+[[case]]
+text = "5"
+lo = 10
+hi = 0

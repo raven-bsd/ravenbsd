@@ -1,0 +1,88 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# stdlib-freebsd: the AVL tsearch family, hsearch_r, realpath1 and basename/dirname.
+# The OpenBSD strlcpy/strlcat sources are included because the host libc has no strlcpy
+# (RD-new 3: one merged object); the realpath fast path is disabled by the libsys.h shim.
+
+schema = 1
+family = "stdlib-freebsd"
+description = "FreeBSD AVL search, hsearch_r, realpath1 and libgen basename/dirname"
+exports = [
+  "__xpg_basename",
+  "dirname",
+  "hcreate",
+  "hcreate_r",
+  "hdestroy",
+  "hdestroy_r",
+  "hsearch",
+  "hsearch_r",
+  "realpath",
+  "strlcat",
+  "strlcpy",
+  "tdelete",
+  "tdestroy",
+  "tfind",
+  "tsearch",
+  "twalk",
+]
+opt = ["O2", "O0"]
+defines = ["_SEARCH_PRIVATE", "_GNU_SOURCE", "__ssp_real(x)=x", "__unused=", "__unused2=", "__noinline=__attribute__((noinline))", "__DECONST(type,var)=(type)(var)", "arc4random_buf(p,n)=__builtin_memset((p),0,(n))"]
+include = ["shim:stdlib-freebsd"]
+flags = []
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdlib/tsearch.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdlib/tdelete.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdlib/tfind.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdlib/twalk.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdlib/tdestroy.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdlib/hsearch_r.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdlib/hcreate_r.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdlib/hdestroy_r.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdlib/hcreate.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdlib/realpath.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/gen/basename.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/gen/dirname.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strlcpy.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strlcat.c"
