@@ -135,7 +135,7 @@ fn run_case(case: &Case, options: &ExecuteOptions) -> CaseOutcome {
         );
     }
 
-    if let Err(reason) = run_pre_commands(case) {
+    if let Err(reason) = run_pre_commands(case, &arch) {
         return finish(report, Vec::new(), Some(reason), ResultKind::Error, started);
     }
 
@@ -338,11 +338,12 @@ fn last_line(text: &str) -> Option<&str> {
 ///
 /// They run from the harness working directory (the repository root for `cargo xtask qtest`)
 /// and before the image build. A non-zero exit turns the case into `error`.
-fn run_pre_commands(case: &Case) -> Result<(), String> {
+fn run_pre_commands(case: &Case, arch: &str) -> Result<(), String> {
     for (index, command) in case.spec.pre.iter().enumerate() {
         let output = Command::new("sh")
             .arg("-c")
             .arg(command)
+            .env("RAVEN_QT_ARCH", arch)
             .output()
             .map_err(|error| format!("pre[{index}] `{command}` could not start: {error}"))?;
         if output.status.success() {

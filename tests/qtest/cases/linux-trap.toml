@@ -16,7 +16,7 @@ qemu_extra = []
 expect_exit = "success"
 
 [[expect]]
-regex = '^linux-trap: req nr=1 a0=0$'
+regex = '^linux-trap: req arch=[12] nr=1 a0=0$'
 unordered = true
 
 [[expect]]
@@ -24,7 +24,7 @@ regex = '^linux-trap: reply nr=1 value=42$'
 unordered = true
 
 [[expect]]
-regex = '^linux-trap: req nr=9999 a0=42$'
+regex = '^linux-trap: req arch=[12] nr=9999 a0=42$'
 unordered = true
 
 [[expect]]
@@ -32,7 +32,7 @@ regex = '^linux-trap: reply nr=9999 value=-38$'
 unordered = true
 
 [[expect]]
-regex = '^linux-trap: req nr=9998 a0=-38$'
+regex = '^linux-trap: req arch=[12] nr=9998 a0=-38$'
 unordered = true
 
 [[expect]]
@@ -44,6 +44,9 @@ regex = '^linux-trap: native exit=7$'
 
 [[expect]]
 regex = '^linux-trap: nohandler exit=-5$'
+
+[[expect]]
+regex = '^linux-trap: flag exit=-5$'
 
 [[expect]]
 regex = '^linux-trap: linux terminated=0$'

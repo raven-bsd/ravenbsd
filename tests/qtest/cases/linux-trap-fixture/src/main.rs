@@ -21,7 +21,7 @@ use raven_ipc::protocol::{self, Opcode, PACKET_SIZE, SchemePacket};
 use raven_proto_linux::{LinuxReplyV1, LinuxSyscallV1};
 use raven_rt::entry;
 use raven_rt::println;
-use raven_rt::spawn::{SpawnOptions, spawn};
+use raven_rt::spawn::{RtSys, SpawnOptions, Sys, spawn, spawn_with};
 
 entry!(main);
 
@@ -29,6 +29,7 @@ const O_RDWR: u32 = 3;
 const PERSONALITY_LINUX: usize = 1;
 const RETRIES: usize = 2_000;
 
+#[cfg(target_arch = "x86_64")]
 #[inline(always)]
 unsafe fn syscall6(
     number: usize,
@@ -54,6 +55,36 @@ unsafe fn syscall6(
             in("r9") a5,
             lateout("rcx") _,
             lateout("r11") _,
+            options(nostack),
+        );
+    }
+    result
+}
+
+#[cfg(target_arch = "aarch64")]
+#[inline(always)]
+unsafe fn syscall6(
+    number: usize,
+    a0: usize,
+    a1: usize,
+    a2: usize,
+    a3: usize,
+    a4: usize,
+    a5: usize,
+) -> isize {
+    let result: isize;
+    // SAFETY: the caller supplies a valid RavenBSD syscall number and arguments; the kernel
+    // validates every handle and pointer.
+    unsafe {
+        asm!(
+            "svc #0",
+            in("x8") number,
+            inlateout("x0") a0 => result,
+            in("x1") a1,
+            in("x2") a2,
+            in("x3") a3,
+            in("x4") a4,
+            in("x5") a5,
             options(nostack),
         );
     }
@@ -89,7 +120,66 @@ fn main(args: raven_rt::Args) -> i32 {
         Some("linux") => linux_child(),
         Some("nohandler") => nohandler_child(),
         Some("native") => native_child(),
+        Some("flag") => flag_child(),
         Some(_) => 2,
+    }
+}
+
+/// A spawner that creates a child with `PROC_CREATE` flag bit 0 (Linux), so
+/// the flag path is tested independently of the self-set path.
+struct FlagSys(RtSys);
+
+impl Sys for FlagSys {
+    fn proc_create(&mut self) -> Result<Handle, Errno> {
+        raw_handle(Syscall::PROC_CREATE as usize, 1, 0, 0)
+    }
+
+    fn memobj_create(&mut self, len: usize) -> Result<Handle, Errno> {
+        self.0.memobj_create(len)
+    }
+
+    fn map(
+        &mut self,
+        proc: Handle,
+        memobj: Handle,
+        offset: usize,
+        addr: usize,
+        len: usize,
+        flags: usize,
+    ) -> Result<usize, Errno> {
+        self.0.map(proc, memobj, offset, addr, len, flags)
+    }
+
+    fn unmap(&mut self, proc: Handle, addr: usize, len: usize) -> Result<(), Errno> {
+        self.0.unmap(proc, addr, len)
+    }
+
+    fn protect(
+        &mut self,
+        proc: Handle,
+        addr: usize,
+        len: usize,
+        protection: u8,
+    ) -> Result<(), Errno> {
+        self.0.protect(proc, addr, len, protection)
+    }
+
+    fn thread_create(
+        &mut self,
+        proc: Handle,
+        entry: usize,
+        stack_top: usize,
+        arg: usize,
+    ) -> Result<Handle, Errno> {
+        self.0.thread_create(proc, entry, stack_top, arg)
+    }
+
+    fn handle_close(&mut self, handle: Handle) -> Result<(), Errno> {
+        self.0.handle_close(handle)
+    }
+
+    fn write_parent_mem(&mut self, addr: usize, bytes: &[u8]) {
+        self.0.write_parent_mem(addr, bytes);
     }
 }
 
@@ -147,16 +237,25 @@ fn controller() -> i32 {
             return 1;
         }
     };
+    let flag = match spawn_flag(&initfs) {
+        Ok(handle) => handle,
+        Err(_) => {
+            println!("linux-trap: flag child spawn failed");
+            return 1;
+        }
+    };
 
     let native_code = proc_wait(native);
     println!("linux-trap: native exit={native_code}");
     let nohandler_code = proc_wait(nohandler);
     println!("linux-trap: nohandler exit={nohandler_code}");
+    let flag_code = proc_wait(flag);
+    println!("linux-trap: flag exit={flag_code}");
     let _ = raven_rt::sys::nanosleep(500_000_000);
     let _ = raven_rt::sys::proc_terminate(linux, 0);
     let linux_code = proc_wait(linux);
     println!("linux-trap: linux terminated={linux_code}");
-    if native_code != 7 || nohandler_code != -5 || linux_code != 0 {
+    if native_code != 7 || nohandler_code != -5 || flag_code != -5 || linux_code != 0 {
         println!("linux-trap: unexpected exit codes");
         return 1;
     }
@@ -170,6 +269,15 @@ fn spawn_role(initfs: &Initfs<'_>, role: &str) -> Result<Handle, Errno> {
         env: &[],
     };
     spawn(initfs, "/init", &options).map_err(|_| Errno::EIO)
+}
+
+fn spawn_flag(initfs: &Initfs<'_>) -> Result<Handle, Errno> {
+    let options = SpawnOptions {
+        args: &["init", "flag"],
+        env: &[],
+    };
+    let mut sys = FlagSys(RtSys);
+    spawn_with(initfs, "/init", &options, &mut sys).map_err(|_| Errno::EIO)
 }
 
 fn open_retry(path: &str) -> Result<Handle, Errno> {
@@ -205,7 +313,10 @@ fn handler() -> i32 {
         let reply = if packet.opcode == Opcode::Call.as_u16() {
             match LinuxSyscallV1::decode(packet.data_bytes()) {
                 Ok(call) => {
-                    println!("linux-trap: req nr={} a0={}", call.nr, call.args[0] as i64);
+                    println!(
+                        "linux-trap: req arch={} nr={} a0={}",
+                        call.arch, call.nr, call.args[0] as i64
+                    );
                     let value = match call.nr {
                         1 => 42,
                         9999 => -(Errno::ENOSYS.0 as i64),
@@ -296,4 +407,23 @@ fn native_child() -> i32 {
     // Native process: number 1 is still EXIT and carries the requested code.
     let _ = raw_number(1, 7, 0, 0);
     0
+}
+
+fn flag_child() -> i32 {
+    // Created with PROC_CREATE bit 0: already Linux, with no handler.
+    let _ = raw_number(1, 0, 0, 0);
+    loop {
+        core::hint::spin_loop();
+    }
+}
+
+fn raw_handle(number: usize, a0: usize, a1: usize, a2: usize) -> Result<Handle, Errno> {
+    let result = raw_number(number, a0, a1, a2);
+    if result < 0 {
+        Err(Errno(result.unsigned_abs() as u16))
+    } else {
+        u32::try_from(result as usize)
+            .map(Handle)
+            .map_err(|_| Errno::EINVAL)
+    }
 }
