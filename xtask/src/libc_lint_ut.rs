@@ -231,6 +231,14 @@ fn no_cc_allows_assembly() {
 }
 
 #[test]
+fn assembly_outside_raw_arch_is_still_reported() {
+    let tree = fixture();
+    crate_file(&tree, "raven-libc-str", "src/memcpy.s", ".text\n");
+    let violations = check(&tree, "no-cc");
+    assert!(violations.iter().any(|v| v.key == "c-source"));
+}
+
+#[test]
 fn provenance_marker_without_import_is_reported() {
     let tree = fixture();
     crate_file(

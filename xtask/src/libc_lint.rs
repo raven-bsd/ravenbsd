@@ -169,9 +169,13 @@ pub fn run_checks(root: &Path, checks: &[String]) -> Result<Vec<Violation>> {
                 check_cfg(&rel, &text, &features, &mut violations);
             }
         }
+        let assembly = rel.ends_with(".s") || rel.ends_with(".S");
+        // Assembly is not C/C++; the audited AArch64 sources live under src/raw/arch.
+        let assembly_allowed = assembly && rel.contains("/src/raw/arch/");
         if selected.contains(&"no-cc")
             && is_libc_source
-            && [".c", ".cc", ".cpp", ".cxx", ".h", ".hpp"]
+            && !assembly_allowed
+            && [".c", ".cc", ".cpp", ".cxx", ".s", ".S", ".h", ".hpp"]
                 .iter()
                 .any(|extension| rel.ends_with(extension))
         {
