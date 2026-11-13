@@ -62,6 +62,12 @@ impl<D: Device> Stack<D> {
         self.dhcp.as_ref().and_then(Dhcp::lease)
     }
 
+    /// The current lease's absolute T1/T2/expiry timers, once the client has one.
+    #[must_use]
+    pub fn dhcp_timers(&self) -> Option<crate::dhcp::DhcpTimers> {
+        self.dhcp.as_ref().and_then(Dhcp::timers)
+    }
+
     /// When the client next needs a poll, for [`Stack::next_poll_delay`].
     pub(crate) fn dhcp_deadline(&self) -> Option<Instant> {
         self.dhcp

@@ -263,7 +263,8 @@ mod program {
             response: &mut [u8],
         ) -> HandlerResult<CallReply> {
             if let Ok(SocketRequest::Call(Call::Event)) = SocketRequest::decode(request) {
-                if self.netd.socket_id(file).is_none() {
+                if self.netd.socket_id(file).is_none() && self.netd.socket_interface(file).is_none()
+                {
                     return Err(HandlerError::Errno(Errno::EINVAL));
                 }
                 let event = event_create().map_err(HandlerError::Errno)?;

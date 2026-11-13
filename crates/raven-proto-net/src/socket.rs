@@ -29,6 +29,8 @@ pub const KIND_READ: u16 = 2;
 pub const KIND_WRITE: u16 = 3;
 /// Request kind: `CALL`, carrying a typed socket operation.
 pub const KIND_CALL: u16 = 4;
+/// Request kind: `ICMP_ECHO`, carrying one echo request.
+pub const KIND_ICMP_ECHO: u16 = 5;
 
 /// `CALL` operation: `BIND`.
 pub const OP_BIND: u16 = 1;
@@ -59,6 +61,10 @@ pub const OP_EVENT: u16 = 10;
 pub const MAX_PATH: usize = 64;
 /// Maximum UDP datagram or `READ`/`WRITE` payload in bytes (the IPv4 limitation).
 pub const MAX_DATAGRAM: usize = 65_535;
+/// Maximum ICMP echo payload in bytes (Ethernet MTU minus headers).
+pub const MAX_ICMP_PAYLOAD: usize = 1400;
+/// Largest accepted ICMP timeout in milliseconds.
+pub const MAX_ICMP_TIMEOUT_MS: u32 = 60_000;
 /// Largest accepted `LISTEN` backlog.
 pub const MAX_BACKLOG: u16 = 4096;
 
@@ -76,6 +82,8 @@ const TAG_ENDPOINT: u16 = 4;
 const TAG_VALUE: u16 = 5;
 /// Response tag: errno.
 const TAG_ERR: u16 = 6;
+/// Response tag: ICMP echo reply header.
+const TAG_ICMP: u16 = 7;
 
 /// Write flag: a destination endpoint follows.
 const WRITE_FLAG_ENDPOINT: u8 = 0x01;
@@ -245,6 +253,17 @@ pub enum SocketRequest<'a> {
     },
     /// Run a typed socket operation.
     Call(Call),
+    /// Send one ICMP echo request on an `net:icmp/<ipv4>` handle.
+    IcmpEcho {
+        /// Echo identifier; unique among live ICMP sockets.
+        id: u16,
+        /// Echo sequence number.
+        seq: u16,
+        /// Reply deadline in milliseconds, `1..=MAX_ICMP_TIMEOUT_MS`.
+        timeout_ms: u32,
+        /// Payload, at most `MAX_ICMP_PAYLOAD` bytes.
+        data: &'a [u8],
+    },
 }
 
 impl<'a> SocketRequest<'a> {
@@ -289,6 +308,25 @@ impl<'a> SocketRequest<'a> {
             Self::Call(call) => {
                 writer.put_u16(KIND_CALL)?;
                 call.write(&mut writer)?;
+            }
+            Self::IcmpEcho {
+                id,
+                seq,
+                timeout_ms,
+                data,
+            } => {
+                if *timeout_ms == 0 || *timeout_ms > MAX_ICMP_TIMEOUT_MS {
+                    return Err(WireError::Invalid);
+                }
+                if data.len() > MAX_ICMP_PAYLOAD {
+                    return Err(WireError::TooLong);
+                }
+                writer.put_u16(KIND_ICMP_ECHO)?;
+                writer.put_u16(*id)?;
+                writer.put_u16(*seq)?;
+                writer.put_u32(*timeout_ms)?;
+                writer.put_u16(u16::try_from(data.len()).map_err(|_| WireError::TooLong)?)?;
+                writer.put_bytes(data)?;
             }
         }
         Ok(writer.position())
@@ -340,6 +378,25 @@ impl<'a> SocketRequest<'a> {
                 Self::Write { data, to }
             }
             KIND_CALL => Self::Call(Call::read(&mut reader)?),
+            KIND_ICMP_ECHO => {
+                let id = reader.get_u16().map_err(DecodeError::from)?;
+                let seq = reader.get_u16().map_err(DecodeError::from)?;
+                let timeout_ms = reader.get_u32().map_err(DecodeError::from)?;
+                if timeout_ms == 0 || timeout_ms > MAX_ICMP_TIMEOUT_MS {
+                    return Err(DecodeError::malformed());
+                }
+                let length = reader.get_u16().map_err(DecodeError::from)? as usize;
+                if length > MAX_ICMP_PAYLOAD {
+                    return Err(DecodeError::length());
+                }
+                let data = reader.get_bytes(length).map_err(DecodeError::from)?;
+                Self::IcmpEcho {
+                    id,
+                    seq,
+                    timeout_ms,
+                    data,
+                }
+            }
             _ => return Err(DecodeError::tag()),
         };
         if !reader.is_empty() {
@@ -463,6 +520,19 @@ pub enum Response {
     Endpoint(Endpoint),
     /// Integer returned by `GETSOCKOPT`.
     Value(i32),
+    /// ICMP echo reply header; the requested payload follows inline.
+    Icmp {
+        /// Reply source (the requested destination).
+        source: Endpoint,
+        /// Echo identifier.
+        id: u16,
+        /// Echo sequence number.
+        seq: u16,
+        /// Round-trip time in milliseconds.
+        rtt_ms: u32,
+        /// Payload length following this header.
+        len: u16,
+    },
     /// Failure carrying the errno the caller must report.
     Err(Errno),
 }
@@ -521,6 +591,24 @@ impl Response {
                 writer.put_u16(0)?;
                 writer.put_u16(TAG_VALUE)?;
                 writer.put_i32(*value)?;
+            }
+            Self::Icmp {
+                source,
+                id,
+                seq,
+                rtt_ms,
+                len,
+            } => {
+                if usize::from(*len) > MAX_ICMP_PAYLOAD {
+                    return Err(WireError::TooLong);
+                }
+                writer.put_u16(0)?;
+                writer.put_u16(TAG_ICMP)?;
+                source.write(&mut writer)?;
+                writer.put_u16(*id)?;
+                writer.put_u16(*seq)?;
+                writer.put_u32(*rtt_ms)?;
+                writer.put_u16(*len)?;
             }
             Self::Err(errno) => {
                 writer.put_u16(errno.0)?;
@@ -594,6 +682,26 @@ impl Response {
                     return Err(DecodeError::malformed());
                 }
                 Self::Value(reader.get_i32().map_err(DecodeError::from)?)
+            }
+            TAG_ICMP => {
+                if status != 0 {
+                    return Err(DecodeError::malformed());
+                }
+                let source = Endpoint::read(&mut reader).map_err(DecodeError::from)?;
+                let id = reader.get_u16().map_err(DecodeError::from)?;
+                let seq = reader.get_u16().map_err(DecodeError::from)?;
+                let rtt_ms = reader.get_u32().map_err(DecodeError::from)?;
+                let len = reader.get_u16().map_err(DecodeError::from)?;
+                if usize::from(len) > MAX_ICMP_PAYLOAD {
+                    return Err(DecodeError::length());
+                }
+                Self::Icmp {
+                    source,
+                    id,
+                    seq,
+                    rtt_ms,
+                    len,
+                }
             }
             TAG_ERR => {
                 if status == 0 {

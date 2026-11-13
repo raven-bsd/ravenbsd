@@ -43,6 +43,8 @@ and the remote endpoint for
 .Dv CONNECT
 .It Pa net:udp/ Ns Ar ipv4 : Ns Ar port
 UDP socket
+.It Pa net:icmp/ Ns Ar ipv4
+ICMP echo socket for one destination; the port is zero and omitted
 .El
 .Pp
 After
@@ -87,6 +89,20 @@ after
 .Dv CONNECT
 sets a peer.
 .Pp
+An ICMP file sends
+.Dv SocketRequest::IcmpEcho
+with an identifier, sequence, timeout and bounded payload.  The reply is read
+with
+.Dv SocketRequest::Read
+and returns a
+.Dv Response::Icmp
+header carrying the source endpoint, identifier, sequence, measured RTT and
+payload length, followed by the echoed payload.  A pending request past its
+timeout returns
+.Er ETIMEDOUT .
+The source is the requested destination because the native stack does not
+expose the packet source separately.
+.Pp
 .Dv EVENT
 returns an S25
 .Dv UserEvent
@@ -126,19 +142,41 @@ returns an empty table;
 .Dv SET_ADDRESS
 and
 .Dv SET_STATE
-update the selected interface, while route operations return
-.Er EOPNOTSUPP .
+update the selected interface.
+.Dv ROUTE_LIST
+returns every route with destination, gateway, flags and interface;
+.Dv ROUTE_ADD_ON
+and
+.Dv ROUTE_DEL_ON
+add or remove a route on
+.Dq lo
+or
+.Dq eth0 .
+Invalid prefixes and unknown interfaces are errors.
+.Dv DHCP_LEASE
+returns the live address, prefix, router, DNS servers and lease timers for an
+interface; a live lease carries real T1, rebind and expiry values, while
+.Dv 0xffffffff
+means no live DHCP lease.
+.Dv SOCKET_LIST
+returns live socket ids with transport, state, local/peer endpoints and queue
+sizes.
+.Dv COUNTERS
+returns the device-boundary RX/TX packet/byte/error/drop counters.
 Socket paths under
 .Li 127.0.0.0/8
 use the loopback core; every other path uses the NIC core when it is attached.
+The NIC core starts the stack's DHCP client while keeping the static address as
+a fallback until a lease arrives.
 .Pp
 The server polls the native stacks after each request and after each event
 wakeup; clients sleep only when they do not ask for a readiness event.
 The loopback qtest uses a client/server pair inside one probe process, waits on
 the
 .Dv EVENT
-doorbells, checks TCP and UDP bytes, the accept path, local/peer endpoints,
-socket options and orderly close, lists
+doorbells, checks ICMP ping, route list/add/delete, socket-table and counter
+requests, TCP and UDP bytes, the accept path, local/peer endpoints, socket
+options and orderly close, lists
 .Dq lo ,
 restarts
 .Nm
@@ -157,7 +195,8 @@ side uses a QEMU
 .Dv guestfwd
 .Dq /bin/cat
 echo and the UDP side uses a one-shot host echo bound to the gateway alias.
-It restarts
+It obtains a QEMU DHCP lease, pings the gateway, lists and mutates routes, reads
+the socket table and counters, then restarts
 .Nm
 between the two probe runs and checks that the ring is remapped and both
 payloads still echo.  There is no host bridge or external network.

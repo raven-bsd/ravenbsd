@@ -22,7 +22,10 @@ mod program {
     use raven_abi::errno::Errno;
     use raven_abi::types::Handle;
     use raven_proto_net::socket::{Call, Endpoint, Response, SocketRequest};
-    use raven_proto_net::{IfaceRequest, IfaceResponse, Shutdown, SockOpt};
+    use raven_proto_net::{
+        DHCP_TIMER_UNKNOWN, DhcpLeaseInfo, IfName, IfaceRequest, IfaceResponse, RouteInfo,
+        SOCKET_STATE_UDP, SOCKET_UDP, Shutdown, SockOpt,
+    };
     use raven_rt::entry;
     use raven_rt::event::{EDGE, EventQueue, EvqEvent, SIGNALED};
 
@@ -74,6 +77,10 @@ mod program {
         let client = raven_scheme::Client::new();
         wait_netd(&client)?;
         check_control_virtio(&client)?;
+        check_dhcp(&client)?;
+        check_ping(&client, "10.0.2.2", [10, 0, 2, 2])?;
+        check_routes(&client, "eth0")?;
+        check_netstat(&client, "eth0", true)?;
         check_tcp_host(&client, phase)?;
         check_udp_host(&client, phase)?;
         raven_rt::println!(
@@ -101,6 +108,9 @@ mod program {
     fn run(phase: &str) -> Result<(), String> {
         let client = raven_scheme::Client::new();
         check_control(&client)?;
+        check_ping(&client, "127.0.0.1", [127, 0, 0, 1])?;
+        check_routes(&client, "lo")?;
+        check_netstat(&client, "lo", false)?;
         check_tcp(&client, phase)?;
         check_udp(&client)?;
         raven_rt::println!(
@@ -208,6 +218,315 @@ mod program {
         let _ = client.close(handle);
         raven_rt::println!("netd: iface eth0 10.0.2.15/24");
         Ok(())
+    }
+
+    fn check_dhcp(client: &raven_scheme::Client) -> Result<(), String> {
+        let name = IfName::new("eth0").ok_or("eth0 name")?;
+        for _ in 0..100 {
+            let response = iface_request(client, IfaceRequest::DhcpLease { name })?;
+            match IfaceResponse::decode(&response) {
+                Ok(IfaceResponse::DhcpLease(lease)) => {
+                    if lease.addr != [10, 0, 2, 15]
+                        || lease.prefix != 24
+                        || lease.router != Some([10, 0, 2, 2])
+                    {
+                        return Err("DHCP lease fields differ".to_string());
+                    }
+                    if lease.renew_ms == DHCP_TIMER_UNKNOWN
+                        || lease.rebind_ms == DHCP_TIMER_UNKNOWN
+                        || lease.expires_ms == DHCP_TIMER_UNKNOWN
+                    {
+                        return Err("DHCP lease timers are unknown".to_string());
+                    }
+                    if !(lease.renew_ms < lease.rebind_ms && lease.rebind_ms < lease.expires_ms) {
+                        return Err("DHCP lease timers are out of order".to_string());
+                    }
+                    print_lease(&lease);
+                    return Ok(());
+                }
+                Ok(IfaceResponse::Err(Errno::ENOENT)) => {
+                    let _ = raven_rt::nanosleep(50_000_000);
+                }
+                other => return Err(format!("DHCP lease response {other:?}")),
+            }
+        }
+        Err("DHCP lease timed out".to_string())
+    }
+
+    fn print_lease(lease: &DhcpLeaseInfo) {
+        let timer = |value: u32| {
+            if value == DHCP_TIMER_UNKNOWN {
+                "unknown".to_string()
+            } else {
+                format!("{value}ms")
+            }
+        };
+        let dns = lease
+            .dns
+            .iter()
+            .map(|server| format!("{}.{}.{}.{}", server[0], server[1], server[2], server[3]))
+            .collect::<Vec<_>>()
+            .join(",");
+        raven_rt::println!(
+            "netd: dhcp eth0 {}.{}.{}.{}/{} router={}.{}.{}.{} dns={} renew={} rebind={} expires={}",
+            lease.addr[0],
+            lease.addr[1],
+            lease.addr[2],
+            lease.addr[3],
+            lease.prefix,
+            lease.router.unwrap_or([0; 4])[0],
+            lease.router.unwrap_or([0; 4])[1],
+            lease.router.unwrap_or([0; 4])[2],
+            lease.router.unwrap_or([0; 4])[3],
+            if dns.is_empty() { "-".to_string() } else { dns },
+            timer(lease.renew_ms),
+            timer(lease.rebind_ms),
+            timer(lease.expires_ms)
+        );
+    }
+
+    fn check_ping(client: &raven_scheme::Client, host: &str, ip: [u8; 4]) -> Result<(), String> {
+        let path = format!("net:icmp/{host}");
+        let file = client
+            .open(&path, READ_WRITE)
+            .map_err(|error| format!("icmp open: {}", error.description()))?;
+        let (event, queue) = event_for(client, file)?;
+        let request = SocketRequest::IcmpEcho {
+            id: 0x4b42,
+            seq: 1,
+            timeout_ms: 2_000,
+            data: b"ping",
+        };
+        let response = raw_request(client, file, &request)?;
+        if Response::decode(&response) != Ok(Response::Ok) {
+            return Err("icmp echo request failed".to_string());
+        }
+        for _ in 0..100 {
+            let response = raw_request(client, file, &SocketRequest::Read { len: 32 })?;
+            if response.get(4..6) == Some(&[6, 0]) {
+                let status = u16::from_le_bytes(
+                    response
+                        .get(2..4)
+                        .ok_or("short icmp error")?
+                        .try_into()
+                        .map_err(|_| "short icmp error")?,
+                );
+                if status == Errno::ETIMEDOUT.0 {
+                    return Err("icmp reply timed out in netd".to_string());
+                }
+                // A missing event is not fatal: the server may still deliver the
+                // reply after an ARP/neighbour transition. The netd deadline bounds
+                // the retry loop.
+                let _ = wait_event(&queue);
+                continue;
+            }
+            let header = Response::decode(response.get(..22).ok_or("short icmp header")?)
+                .map_err(|_| "icmp header decode".to_string())?;
+            let Response::Icmp {
+                source,
+                seq,
+                rtt_ms,
+                len,
+                ..
+            } = header
+            else {
+                return Err("icmp response differs".to_string());
+            };
+            if source.ip != ip || seq != 1 || &response[22..22 + len as usize] != b"ping" {
+                return Err("icmp reply fields differ".to_string());
+            }
+            raven_rt::println!("netd: ping {host} rtt={rtt_ms}ms");
+            let _ = raven_rt::handle_close(event);
+            let _ = raven_rt::handle_close(queue.handle());
+            let _ = client.close(file);
+            return Ok(());
+        }
+        Err("icmp reply timed out".to_string())
+    }
+
+    fn check_routes(client: &raven_scheme::Client, iface: &str) -> Result<(), String> {
+        let response = iface_request(client, IfaceRequest::RouteList)?;
+        let count = iface_count(&response)?;
+        let mut offset = 8usize;
+        let mut found = false;
+        for _ in 0..count {
+            let route = iface_route(&response, offset)?;
+            if route.iface.as_str() == iface {
+                found = true;
+            }
+            offset += route_info_len(&response, offset);
+        }
+        if !found {
+            return Err(format!("no route on {iface}"));
+        }
+
+        let added = raven_proto_net::Route {
+            dest: [198, 51, 100, 0],
+            prefix: 24,
+            gateway: None,
+        };
+        let name = IfName::new(iface).ok_or("iface name")?;
+        let response = iface_request(client, IfaceRequest::RouteAddOn { name, route: added })?;
+        if IfaceResponse::decode(&response) != Ok(IfaceResponse::Ok) {
+            return Err("route add failed".to_string());
+        }
+        let response = iface_request(client, IfaceRequest::RouteList)?;
+        let mut offset = 8usize;
+        let mut seen = false;
+        for _ in 0..iface_count(&response)? {
+            let route = iface_route(&response, offset)?;
+            if route.dest == [198, 51, 100, 0] && route.prefix == 24 {
+                seen = true;
+            }
+            offset += route_info_len(&response, offset);
+        }
+        if !seen {
+            return Err("added route missing".to_string());
+        }
+        let response = iface_request(
+            client,
+            IfaceRequest::RouteDelOn {
+                name,
+                dest: [198, 51, 100, 0],
+                prefix: 24,
+            },
+        )?;
+        if IfaceResponse::decode(&response) != Ok(IfaceResponse::Ok) {
+            return Err("route delete failed".to_string());
+        }
+        raven_rt::println!("netd: route {iface} ok");
+        Ok(())
+    }
+
+    fn check_netstat(
+        client: &raven_scheme::Client,
+        iface: &str,
+        require_traffic: bool,
+    ) -> Result<(), String> {
+        let ip = if iface == "lo" {
+            [127, 0, 0, 1]
+        } else {
+            [10, 0, 2, 15]
+        };
+        let path = format!("net:udp/{}.{}.{}.{}:7101", ip[0], ip[1], ip[2], ip[3]);
+        let socket = client
+            .open(&path, READ_WRITE)
+            .map_err(|error| format!("netstat udp open: {}", error.description()))?;
+        let bind = Endpoint { ip, port: 7101 };
+        expect_ok(call(client, socket, Call::Bind(bind))?, "netstat bind")?;
+
+        let response = iface_request(client, IfaceRequest::SocketList)?;
+        let count = iface_count(&response)?;
+        let mut offset = 8usize;
+        let mut seen = false;
+        for _ in 0..count {
+            let entry = iface_socket(&response, offset)?;
+            if entry.iface.as_str() == iface
+                && entry.transport == SOCKET_UDP
+                && entry.local_port == 7101
+                && entry.state == SOCKET_STATE_UDP
+            {
+                seen = true;
+            }
+            offset += socket_entry_len(&response, offset);
+        }
+        if !seen {
+            return Err("netstat socket missing".to_string());
+        }
+        let _ = client.close(socket);
+
+        let response = iface_request(
+            client,
+            IfaceRequest::Counters {
+                name: IfName::new(iface).ok_or("iface name")?,
+            },
+        )?;
+        let IfaceResponse::Counters(counters) =
+            IfaceResponse::decode(&response).map_err(|_| "counter decode".to_string())?
+        else {
+            return Err("counter response differs".to_string());
+        };
+        if require_traffic && counters.tx_packets == 0 && counters.rx_packets == 0 {
+            return Err("interface counters are empty".to_string());
+        }
+        raven_rt::println!(
+            "netd: netstat {iface} sockets={count} rx={} tx={}",
+            counters.rx_packets,
+            counters.tx_packets
+        );
+        Ok(())
+    }
+
+    fn iface_request(
+        client: &raven_scheme::Client,
+        request: IfaceRequest,
+    ) -> Result<Vec<u8>, String> {
+        let handle = client
+            .open("net:", READ_WRITE)
+            .map_err(|error| format!("control open: {}", error.description()))?;
+        let mut encoded = [0u8; 256];
+        let length = request
+            .encode(&mut encoded)
+            .map_err(|_| "iface encode".to_string())?;
+        let mut response = [0u8; 1024];
+        let read = client
+            .call(handle, &encoded[..length], &mut response)
+            .map_err(|error| format!("iface call: {}", error.description()))?;
+        let _ = client.close(handle);
+        Ok(response[..read].to_vec())
+    }
+
+    fn iface_count(response: &[u8]) -> Result<u16, String> {
+        match IfaceResponse::decode(response.get(..8).ok_or("short count")?)
+            .map_err(|_| "count decode".to_string())?
+        {
+            IfaceResponse::Count { count } => Ok(count),
+            other => Err(format!("unexpected count {other:?}")),
+        }
+    }
+
+    fn route_info_len(response: &[u8], offset: usize) -> usize {
+        let name_len = response[offset + 12] as usize;
+        let flags = response[offset + 11];
+        13 + name_len
+            + if flags & raven_proto_net::ROUTE_GATEWAY != 0 {
+                4
+            } else {
+                0
+            }
+    }
+
+    fn iface_route(response: &[u8], offset: usize) -> Result<RouteInfo, String> {
+        let length = route_info_len(response, offset);
+        match IfaceResponse::decode(response.get(offset..offset + length).ok_or("short route")?)
+            .map_err(|_| "route decode".to_string())?
+        {
+            IfaceResponse::RouteInfo(route) => Ok(route),
+            other => Err(format!("unexpected route {other:?}")),
+        }
+    }
+
+    fn socket_entry_len(response: &[u8], offset: usize) -> usize {
+        let name_len = response[offset + 12] as usize;
+        let remote = response[offset + 19 + name_len] == 1;
+        if remote { 34 + name_len } else { 28 + name_len }
+    }
+
+    fn iface_socket(
+        response: &[u8],
+        offset: usize,
+    ) -> Result<raven_proto_net::SocketEntry, String> {
+        let length = socket_entry_len(response, offset);
+        match IfaceResponse::decode(
+            response
+                .get(offset..offset + length)
+                .ok_or("short socket")?,
+        )
+        .map_err(|_| "socket decode".to_string())?
+        {
+            IfaceResponse::Socket(entry) => Ok(entry),
+            other => Err(format!("unexpected socket {other:?}")),
+        }
     }
 
     fn check_tcp_host(client: &raven_scheme::Client, phase: &str) -> Result<(), String> {

@@ -31,6 +31,9 @@ golden test in `tests/golden.rs` or in the module tests.
 * Errno values in responses are `raven-abi` errno numbers (Linux values, DR-13).
 * Decoders consume exactly the whole input; trailing bytes are an error, so a short read is never
   silently accepted.
+* The ICMP socket kind, the route-list/DHCP/socket/counter control operations and their records
+  are additive version-1 extensions. Older decoders reject the new kind/op/tag instead of
+  misinterpreting it; no existing message changed.
 
 ## Socket requests
 
@@ -41,7 +44,7 @@ Common header:
 | 0 | 2 | `version` = 1 |
 | 2 | 2 | `kind` |
 
-Kinds: `1` OPEN, `2` READ, `3` WRITE, `4` CALL.
+Kinds: `1` OPEN, `2` READ, `3` WRITE, `4` CALL, `5` ICMP_ECHO.
 
 | Kind | Body after offset 4 |
 |---|---|
@@ -49,6 +52,7 @@ Kinds: `1` OPEN, `2` READ, `3` WRITE, `4` CALL.
 | READ | `len: u32` (`0..=65535`) |
 | WRITE | `flags: u8` (bit 0 = destination follows), `len: u32`, optional endpoint, then `len` bytes |
 | CALL | `op: u16`, then the operation arguments below |
+| ICMP_ECHO | `id: u16`, `seq: u16`, `timeout_ms: u32` (`1..=60000`), `len: u16` (`0..=1400`), then `len` bytes |
 
 Endpoint record (6 bytes): `ip: [u8; 4]` then `port: u16`.
 
@@ -110,12 +114,20 @@ Socket option ids (native protocol ids, not Linux `SOL_SOCKET` numbers):
 | 4 ENDPOINT | endpoint (6) |
 | 5 VALUE | `value: i32` |
 | 6 ERR | none; `status` carries the errno and must be non-zero |
+| 7 ICMP | `source` endpoint, `id: u16`, `seq: u16`, `rtt_ms: u32`, `len: u16`, then `len` payload bytes |
 
 `EAGAIN` (11) is therefore `01 00 0b 00 06 00`. A tag other than ERR with a non-zero status, or
 ERR with status 0, is malformed.
 `EVENT` replies with `OK` followed by one S25 attachment pair `[u32 user_event][u32 rights]`; the
 client registers the transferred UserEvent in an S26 event queue with `SIGNALED|EDGE` and waits
 for readable/writable/accepted/closed transitions instead of polling.
+
+`ICMP_ECHO` sends one echo request on a `net:icmp/<ipv4>` file and returns `OK` when the request
+is queued. The reply is read with the normal `READ` kind; the reply header is tag 7 followed by
+the echoed payload. A pending request that passes `timeout_ms` makes the `READ` return
+`ETIMEDOUT`. The source is the requested destination (the native stack does not expose the
+ICMP packet source separately); `rtt_ms` is measured from the queued request to the delivered
+payload. `id` is the bound echo identifier and `seq` is the request sequence.
 
 ## Interface control
 
@@ -127,9 +139,15 @@ The control channel is `net:`. Its requests use the same `version: u16`, `op: u1
 | 2 | GET | name |
 | 3 | SET_ADDRESS | name, `addr: [u8; 4]`, `prefix: u8` (`0..=32`) |
 | 4 | SET_STATE | name, `up: u8` (0 or 1) |
-| 5 | ROUTE_ADD | `dest: [u8; 4]`, `prefix: u8`, `gateway_flag: u8`, optional `gateway: [u8; 4]` |
-| 6 | ROUTE_DEL | `dest: [u8; 4]`, `prefix: u8` |
+| 5 | ROUTE_ADD | `dest: [u8; 4]`, `prefix: u8`, `gateway_flag: u8`, optional `gateway: [u8; 4]` (loopback) |
+| 6 | ROUTE_DEL | `dest: [u8; 4]`, `prefix: u8` (loopback) |
 | 7 | ARP_LIST | none (one `Count`, then that many `Arp` records) |
+| 8 | ROUTE_LIST | none (one `Count`, then that many `RouteInfo` records) |
+| 9 | ROUTE_ADD_ON | name, then the ROUTE_ADD body |
+| 10 | ROUTE_DEL_ON | name, `dest: [u8; 4]`, `prefix: u8` |
+| 11 | DHCP_LEASE | name (one `DhcpLease` record or `ENOENT`) |
+| 12 | SOCKET_LIST | none (one `Count`, then that many `Socket` records) |
+| 13 | COUNTERS | name (one `Counters` record) |
 
 A name is `len: u8` (`1..=16`) followed by ASCII letters, digits, underscore, hyphen or dot. The
 netmask is a prefix length, not a dotted mask. A default route is `dest 0.0.0.0`, `prefix 0`.
@@ -151,8 +169,19 @@ Responses use `version: u16`, `status: u16`, `tag: u16`, body:
 | 3 ROUTE | `dest`, `prefix`, `gateway_flag`, optional gateway |
 | 4 ARP | `ip: [u8;4]`, `mac: [u8;6]`, `flags: u8` |
 | 5 ERR | none; `status` carries the errno |
+| 6 ROUTE_INFO | `dest`, `prefix`, `flags`, name, optional gateway |
+| 7 DHCP_LEASE | `addr[4]`, `prefix`, router flag, optional router, dns count + addresses, renew/rebind/expire ms |
+| 8 SOCKET | `id: u32`, transport, state, name, local[4], local port, remote flag + optional remote/port, rx/tx queue |
+| 9 COUNTERS | eight `u64`: rx/tx packets, rx/tx bytes, rx/tx errors, rx/tx drops |
 
-Flags: interface `UP=0x1`, `LINK_UP=0x2`, `LOOPBACK=0x4`; ARP `COMPLETE=0x1`, `STATIC=0x2`.
+Flags: interface `UP=0x1`, `LINK_UP=0x2`, `LOOPBACK=0x4`; ARP `COMPLETE=0x1`, `STATIC=0x2`;
+route-list `UP=0x1`, `GATEWAY=0x2`, `HOST=0x4`. A DHCP timer of `0xffffffff` means the record is
+not a live DHCP lease (for example a static interface); a live lease always carries real T1,
+rebind and expiry values.
+
+Socket transports are `1` TCP, `2` UDP, `3` ICMP. Socket states are `0` closed, `1` listen,
+`2` SYN sent, `3` SYN received, `4` established, `5` FIN wait 1, `6` FIN wait 2, `7` close wait,
+`8` closing, `9` last ACK, `10` TIME-WAIT, `11` unconnected UDP, `12` bound ICMP.
 
 ## Driver rings
 
@@ -229,9 +258,10 @@ separate processes with separate mappings.
 | `net:` | interface control channel |
 | `net:tcp/<ipv4>:<port>` | TCP socket to a remote endpoint |
 | `net:udp/<ipv4>:<port>` | UDP socket |
+| `net:icmp/<ipv4>` | ICMP echo socket for one destination (port 0, no colon) |
 
-IPv4 octets are decimal `0..=255` without leading zeros; the port is `1..=65535`. Anything else
-is a `PathError`. `OPEN` validates the path before it is accepted.
+IPv4 octets are decimal `0..=255` without leading zeros; TCP/UDP ports are `1..=65535`. Anything
+else is a `PathError`. `OPEN` validates the path before it is accepted.
 
 ## Tests
 

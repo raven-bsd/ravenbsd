@@ -269,3 +269,73 @@ fn option_codes_roundtrip() {
     }
     assert_eq!(SockOpt::from_code(0), None);
 }
+
+#[test]
+fn icmp_echo_golden_bytes_and_bounds() {
+    assert_eq!(
+        encode_request(SocketRequest::IcmpEcho {
+            id: 0x1234,
+            seq: 7,
+            timeout_ms: 2_000,
+            data: b"ping",
+        }),
+        [
+            0x01, 0x00, 0x05, 0x00, 0x34, 0x12, 0x07, 0x00, 0xd0, 0x07, 0x00, 0x00, 0x04, 0x00,
+            b'p', b'i', b'n', b'g'
+        ]
+    );
+    for timeout_ms in [0, MAX_ICMP_TIMEOUT_MS + 1] {
+        let mut encoded = [0u8; 64];
+        assert!(
+            SocketRequest::IcmpEcho {
+                id: 1,
+                seq: 1,
+                timeout_ms,
+                data: b"x",
+            }
+            .encode(&mut encoded)
+            .is_err()
+        );
+    }
+    let mut encoded = [0u8; 8 + MAX_ICMP_PAYLOAD];
+    assert!(
+        SocketRequest::IcmpEcho {
+            id: 1,
+            seq: 1,
+            timeout_ms: 1000,
+            data: &vec![0u8; MAX_ICMP_PAYLOAD + 1],
+        }
+        .encode(&mut encoded)
+        .is_err()
+    );
+}
+
+#[test]
+fn icmp_reply_golden_bytes_and_roundtrip() {
+    let reply = Response::Icmp {
+        source: Endpoint {
+            ip: [127, 0, 0, 1],
+            port: 0,
+        },
+        id: 0x1234,
+        seq: 7,
+        rtt_ms: 5,
+        len: 4,
+    };
+    assert_eq!(
+        encode_response(reply),
+        [
+            0x01, 0x00, 0x00, 0x00, 0x07, 0x00, 0x7f, 0x00, 0x00, 0x01, 0x00, 0x00, 0x34, 0x12,
+            0x07, 0x00, 0x05, 0x00, 0x00, 0x00, 0x04, 0x00
+        ]
+    );
+    assert_eq!(Response::decode(&encode_response(reply)), Ok(reply));
+    let request = SocketRequest::IcmpEcho {
+        id: 0x1234,
+        seq: 7,
+        timeout_ms: 2_000,
+        data: b"ping",
+    };
+    let bytes = encode_request(request);
+    assert_eq!(SocketRequest::decode(&bytes), Ok(request));
+}

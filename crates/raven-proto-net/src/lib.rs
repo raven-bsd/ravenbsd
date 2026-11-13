@@ -9,7 +9,7 @@
 //!
 //! * [`socket`] - `OPEN`, `READ`, `WRITE` and typed `CALL` operations for a `net:` socket;
 //! * [`iface`] - interface, route and ARP control on the `net:` control channel;
-//! * [`path`] - parsing of `net:tcp/<addr>:<port>`, `net:udp/...` and `net:`;
+//! * [`path`] - parsing of `net:tcp/<addr>:<port>`, `net:udp/...`, `net:icmp/<addr>` and `net:`;
 //! * [`ring`] - the shared-memory header, descriptor rings and buffer pool between `netd` and a
 //!   driver, plus the single-producer/single-consumer helpers.
 //!
@@ -22,6 +22,8 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 
+extern crate alloc;
+
 pub mod iface;
 pub mod path;
 pub mod ring;
@@ -31,8 +33,13 @@ pub mod wire;
 use core::fmt;
 
 pub use iface::{
-    ARP_COMPLETE, ARP_STATIC, ArpEntry, IF_LINK_UP, IF_LOOPBACK, IF_UP, IfName, IfaceInfo,
-    IfaceRequest, IfaceResponse, MAX_IFNAME, Route,
+    ARP_COMPLETE, ARP_STATIC, ArpEntry, CounterInfo, DHCP_TIMER_UNKNOWN, DhcpLeaseInfo, IF_LINK_UP,
+    IF_LOOPBACK, IF_UP, IfName, IfaceInfo, IfaceRequest, IfaceResponse, MAX_DHCP_DNS, MAX_IFNAME,
+    ROUTE_FLAG_MASK, ROUTE_GATEWAY, ROUTE_HOST, ROUTE_UP, Route, RouteInfo, SOCKET_ICMP,
+    SOCKET_STATE_CLOSE_WAIT, SOCKET_STATE_CLOSED, SOCKET_STATE_CLOSING, SOCKET_STATE_ESTABLISHED,
+    SOCKET_STATE_FIN_WAIT_1, SOCKET_STATE_FIN_WAIT_2, SOCKET_STATE_ICMP, SOCKET_STATE_LAST_ACK,
+    SOCKET_STATE_LISTEN, SOCKET_STATE_SYN_RECEIVED, SOCKET_STATE_SYN_SENT, SOCKET_STATE_TIME_WAIT,
+    SOCKET_STATE_UDP, SOCKET_TCP, SOCKET_UDP, SocketEntry,
 };
 pub use path::{ACCEPT_PREFIX, PathError, SchemePath, Transport, parse_accepted};
 pub use raven_abi::errno::Errno;
@@ -42,7 +49,8 @@ pub use ring::{
     RingError, RingHeader, RingLayout, RingProducer,
 };
 pub use socket::{
-    Call, Endpoint, MAX_BACKLOG, MAX_DATAGRAM, MAX_PATH, Response, Shutdown, SockOpt, SocketRequest,
+    Call, Endpoint, MAX_BACKLOG, MAX_DATAGRAM, MAX_ICMP_PAYLOAD, MAX_ICMP_TIMEOUT_MS, MAX_PATH,
+    Response, Shutdown, SockOpt, SocketRequest,
 };
 pub use wire::{Reader, WireError, Writer};
 
