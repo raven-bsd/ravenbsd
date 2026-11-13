@@ -70,6 +70,7 @@ members = [
     "tools/libc-oracle",
     "libc/spike/va",
     "libc/ravenlibc/crates/*",
+    "libc/ravenlibc/tools/hdrgen",
     "userland/rt",
     "userland/linux-shim",
     "userland/init",

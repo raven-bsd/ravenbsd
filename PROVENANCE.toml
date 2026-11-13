@@ -313,3 +313,498 @@ tier = "A"
 copied = "2026-11-12"
 modified = true
 notes = "DHCPv4 client state machine adapted from smoltcp (0BSD): discover/request/renew/rebind/expiry transitions, the request back-off (doubling every two tries), the renew/rebind retransmit rule and the T1/T2 derivation. Rewritten sans-IO around a millisecond clock and this crate's address type, with its own RFC 2131 message codec, no heapless, and no smoltcp wire types. smoltcp's own DHCP packet representation was not copied."
+
+[[import]]
+path = "libc/ravenlibc/abi/errno.toml"
+upstream = "musl"
+upstream_path = "arch/generic/bits/errno.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/errno.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/fcntl.toml"
+upstream = "musl"
+upstream_path = "include/fcntl.h, arch/generic/bits/fcntl.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/fcntl.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/arch/aarch64/bits/syscall.h"
+upstream = "linux-raw-sys"
+upstream_path = "src/aarch64/general.rs"
+upstream_rev = "3b15c17f2688445cd3e9ef2907113829837773dd"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "via crates/raven-linux-abi sysnums"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/arch/riscv64/bits/syscall.h"
+upstream = "linux-raw-sys"
+upstream_path = "src/riscv64/general.rs"
+upstream_rev = "3b15c17f2688445cd3e9ef2907113829837773dd"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "via crates/raven-linux-abi sysnums"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/arch/x86_64/bits/syscall.h"
+upstream = "linux-raw-sys"
+upstream_path = "src/x86_64/general.rs"
+upstream_rev = "3b15c17f2688445cd3e9ef2907113829837773dd"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "via crates/raven-linux-abi sysnums"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/bits/abi_fcntl.h"
+upstream = "musl"
+upstream_path = "include/fcntl.h, arch/generic/bits/fcntl.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/fcntl.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/bits/abi_limits.h"
+upstream = "musl"
+upstream_path = "include/limits.h, arch/x86_64/bits/limits.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/limits.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/bits/abi_misc.h"
+upstream = "musl"
+upstream_path = "include/locale.h, include/dlfcn.h, include/sys/wait.h, include/sys/file.h, include/netdb.h, include/sched.h, include/sys/select.h, include/net/if.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/misc.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/bits/abi_mman.h"
+upstream = "musl"
+upstream_path = "include/sys/mman.h, arch/x86_64/bits/mman.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/mman.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/bits/abi_netinet.h"
+upstream = "musl"
+upstream_path = "include/netinet/in.h, include/netinet/tcp.h, include/netinet/udp.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/netinet.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/bits/abi_poll.h"
+upstream = "musl"
+upstream_path = "include/poll.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/poll.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/bits/abi_pthread.h"
+upstream = "musl"
+upstream_path = "include/pthread.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/pthread.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/bits/abi_resource.h"
+upstream = "musl"
+upstream_path = "include/sys/resource.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/resource.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/bits/abi_socket.h"
+upstream = "musl"
+upstream_path = "include/sys/socket.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/socket.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/bits/abi_stat.h"
+upstream = "musl"
+upstream_path = "include/sys/stat.h, include/dirent.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/stat.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/bits/abi_time.h"
+upstream = "musl"
+upstream_path = "include/time.h, include/sys/time.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/time.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/bits/errno.h"
+upstream = "musl"
+upstream_path = "arch/generic/bits/errno.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/errno.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/bits/signum.h"
+upstream = "musl"
+upstream_path = "include/signal.h, arch/x86_64/bits/signal.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/signal.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/generated/include/bits/sysconf.h"
+upstream = "musl"
+upstream_path = "include/unistd.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/sysconf.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/limits.toml"
+upstream = "musl"
+upstream_path = "include/limits.h, arch/x86_64/bits/limits.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/limits.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/misc.toml"
+upstream = "musl"
+upstream_path = "include/locale.h, include/dlfcn.h, include/sys/wait.h, include/sys/file.h, include/netdb.h, include/sched.h, include/sys/select.h, include/net/if.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/misc.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/mman.toml"
+upstream = "musl"
+upstream_path = "include/sys/mman.h, arch/x86_64/bits/mman.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/mman.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/netinet.toml"
+upstream = "musl"
+upstream_path = "include/netinet/in.h, include/netinet/tcp.h, include/netinet/udp.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/netinet.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/poll.toml"
+upstream = "musl"
+upstream_path = "include/poll.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/poll.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/pthread.toml"
+upstream = "musl"
+upstream_path = "include/pthread.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/pthread.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/resource.toml"
+upstream = "musl"
+upstream_path = "include/sys/resource.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/resource.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/signal.toml"
+upstream = "musl"
+upstream_path = "include/signal.h, arch/x86_64/bits/signal.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/signal.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/socket.toml"
+upstream = "musl"
+upstream_path = "include/sys/socket.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/socket.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/stat.toml"
+upstream = "musl"
+upstream_path = "include/sys/stat.h, include/dirent.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/stat.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/sysconf.toml"
+upstream = "musl"
+upstream_path = "include/unistd.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/sysconf.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/abi/time.toml"
+upstream = "musl"
+upstream_path = "include/time.h, include/sys/time.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/time.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/errno.rs"
+upstream = "musl"
+upstream_path = "arch/generic/bits/errno.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/errno.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/fcntl.rs"
+upstream = "musl"
+upstream_path = "include/fcntl.h, arch/generic/bits/fcntl.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/fcntl.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/limits.rs"
+upstream = "musl"
+upstream_path = "include/limits.h, arch/x86_64/bits/limits.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/limits.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/misc.rs"
+upstream = "musl"
+upstream_path = "include/locale.h, include/dlfcn.h, include/sys/wait.h, include/sys/file.h, include/netdb.h, include/sched.h, include/sys/select.h, include/net/if.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/misc.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/mman.rs"
+upstream = "musl"
+upstream_path = "include/sys/mman.h, arch/x86_64/bits/mman.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/mman.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/netinet.rs"
+upstream = "musl"
+upstream_path = "include/netinet/in.h, include/netinet/tcp.h, include/netinet/udp.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/netinet.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/poll.rs"
+upstream = "musl"
+upstream_path = "include/poll.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/poll.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/pthread.rs"
+upstream = "musl"
+upstream_path = "include/pthread.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/pthread.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/resource.rs"
+upstream = "musl"
+upstream_path = "include/sys/resource.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/resource.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/signal.rs"
+upstream = "musl"
+upstream_path = "include/signal.h, arch/x86_64/bits/signal.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/signal.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/socket.rs"
+upstream = "musl"
+upstream_path = "include/sys/socket.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/socket.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/stat.rs"
+upstream = "musl"
+upstream_path = "include/sys/stat.h, include/dirent.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/stat.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/sysconf.rs"
+upstream = "musl"
+upstream_path = "include/unistd.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/sysconf.toml; deviations in abi/deviations.toml"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-abi/src/generated/time.rs"
+upstream = "musl"
+upstream_path = "include/time.h, include/sys/time.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/time.toml; deviations in abi/deviations.toml"

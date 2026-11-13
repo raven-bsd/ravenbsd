@@ -1,0 +1,693 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# First-party data: the field lists are doc 14 3.A.3 and 3.A.3a plus the clang measurement of
+# the musl tree (`hdrgen verify`). `deviates` records the musl measurement where it differs;
+# the probe in `hdrgen verify` asserts those values.
+#
+# `musl_field = ""` marks a named padding field that musl expresses only as implicit padding;
+# the musl probe skips such a field. Records with `deviates` are compared by size/align only.
+
+schema = 1
+
+[[record]]
+name = "timespec"
+rust = "Timespec"
+c = "struct timespec"
+musl = "struct timespec"
+size = 16
+align = 8
+fields = [
+  { name = "tv_sec", ty = "i64", off = 0 },
+  { name = "tv_nsec", ty = "i64", off = 8 },
+]
+
+[[record]]
+name = "timeval"
+rust = "Timeval"
+c = "struct timeval"
+musl = "struct timeval"
+size = 16
+align = 8
+fields = [
+  { name = "tv_sec", ty = "i64", off = 0 },
+  { name = "tv_usec", ty = "i64", off = 8 },
+]
+
+[[record]]
+name = "itimerspec"
+rust = "Itimerspec"
+c = "struct itimerspec"
+musl = "struct itimerspec"
+size = 32
+align = 8
+fields = [
+  { name = "it_interval", ty = "timespec", off = 0 },
+  { name = "it_value", ty = "timespec", off = 16 },
+]
+
+[[record]]
+name = "iovec"
+rust = "Iovec"
+c = "struct iovec"
+musl = "struct iovec"
+size = 16
+align = 8
+fields = [
+  { name = "iov_base", ty = "ptr", off = 0 },
+  { name = "iov_len", ty = "u64", off = 8 },
+]
+
+[[record]]
+name = "stat"
+rust = "Stat"
+c = "struct stat"
+musl = "struct stat"
+size = 128
+align = 8
+deviates = { x86_64 = { size = 144, align = 8 } }
+doc = "H-15/DV5: 128 bytes on every architecture; st_blocks is in 512-byte units"
+fields = [
+  { name = "st_dev", ty = "u64", off = 0 },
+  { name = "st_ino", ty = "u64", off = 8 },
+  { name = "st_mode", ty = "u32", off = 16 },
+  { name = "st_nlink", ty = "u32", off = 20 },
+  { name = "st_uid", ty = "u32", off = 24 },
+  { name = "st_gid", ty = "u32", off = 28 },
+  { name = "st_rdev", ty = "u64", off = 32 },
+  { name = "__pad1", ty = "u64", off = 40 },
+  { name = "st_size", ty = "i64", off = 48 },
+  { name = "st_blksize", ty = "i32", off = 56 },
+  { name = "__pad2", ty = "i32", off = 60 },
+  { name = "st_blocks", ty = "i64", off = 64 },
+  { name = "st_atim", ty = "timespec", off = 72 },
+  { name = "st_mtim", ty = "timespec", off = 88 },
+  { name = "st_ctim", ty = "timespec", off = 104 },
+  { name = "__unused", ty = "[u32; 2]", off = 120 },
+]
+
+[[record]]
+name = "dirent"
+rust = "Dirent"
+c = "struct dirent"
+musl = "struct dirent"
+size = 280
+align = 8
+fields = [
+  { name = "d_ino", ty = "u64", off = 0 },
+  { name = "d_off", ty = "i64", off = 8 },
+  { name = "d_reclen", ty = "u16", off = 16 },
+  { name = "d_type", ty = "u8", off = 18 },
+  { name = "d_name", ty = "[c_char; 256]", off = 19 },
+]
+
+[[record]]
+name = "sockaddr"
+rust = "Sockaddr"
+c = "struct sockaddr"
+musl = "struct sockaddr"
+size = 16
+align = 2
+fields = [
+  { name = "sa_family", ty = "u16", off = 0 },
+  { name = "sa_data", ty = "[c_char; 14]", off = 2 },
+]
+
+[[record]]
+name = "sockaddr_in"
+rust = "SockaddrIn"
+c = "struct sockaddr_in"
+musl = "struct sockaddr_in"
+size = 16
+align = 4
+fields = [
+  { name = "sin_family", ty = "u16", off = 0 },
+  { name = "sin_port", ty = "u16", off = 2 },
+  { name = "sin_addr", ty = "u32", off = 4 },
+  { name = "sin_zero", ty = "[u8; 8]", off = 8 },
+]
+
+[[record]]
+name = "sockaddr_in6"
+rust = "SockaddrIn6"
+c = "struct sockaddr_in6"
+musl = "struct sockaddr_in6"
+size = 28
+align = 4
+fields = [
+  { name = "sin6_family", ty = "u16", off = 0 },
+  { name = "sin6_port", ty = "u16", off = 2 },
+  { name = "sin6_flowinfo", ty = "u32", off = 4 },
+  { name = "sin6_addr", ty = "[u8; 16]", off = 8 },
+  { name = "sin6_scope_id", ty = "u32", off = 24 },
+]
+
+[[record]]
+name = "sockaddr_un"
+rust = "SockaddrUn"
+c = "struct sockaddr_un"
+musl = "struct sockaddr_un"
+size = 110
+align = 2
+fields = [
+  { name = "sun_family", ty = "u16", off = 0 },
+  { name = "sun_path", ty = "[c_char; 108]", off = 2 },
+]
+
+[[record]]
+name = "msghdr"
+rust = "Msghdr"
+c = "struct msghdr"
+musl = "struct msghdr"
+size = 56
+align = 8
+fields = [
+  { name = "msg_name", ty = "ptr", off = 0 },
+  { name = "msg_namelen", ty = "u32", off = 8 },
+  { name = "msg_iov", ty = "ptr", off = 16 },
+  { name = "msg_iovlen", ty = "i32", off = 24 },
+  { name = "__pad1", ty = "i32", off = 28, musl_field = "" },
+  { name = "msg_control", ty = "ptr", off = 32 },
+  { name = "msg_controllen", ty = "u32", off = 40 },
+  { name = "__pad2", ty = "i32", off = 44, musl_field = "" },
+  { name = "msg_flags", ty = "i32", off = 48 },
+]
+
+[[record]]
+name = "cmsghdr"
+rust = "Cmsghdr"
+c = "struct cmsghdr"
+musl = "struct cmsghdr"
+size = 16
+align = 4
+fields = [
+  { name = "cmsg_len", ty = "u32", off = 0 },
+  { name = "__pad1", ty = "i32", off = 4, musl_field = "" },
+  { name = "cmsg_level", ty = "i32", off = 8 },
+  { name = "cmsg_type", ty = "i32", off = 12 },
+]
+
+[[record]]
+name = "addrinfo"
+rust = "Addrinfo"
+c = "struct addrinfo"
+musl = "struct addrinfo"
+size = 48
+align = 8
+fields = [
+  { name = "ai_flags", ty = "i32", off = 0 },
+  { name = "ai_family", ty = "i32", off = 4 },
+  { name = "ai_socktype", ty = "i32", off = 8 },
+  { name = "ai_protocol", ty = "i32", off = 12 },
+  { name = "ai_addrlen", ty = "u32", off = 16 },
+  { name = "ai_addr", ty = "ptr", off = 24 },
+  { name = "ai_canonname", ty = "ptr", off = 32 },
+  { name = "ai_next", ty = "ptr", off = 40 },
+]
+
+[[record]]
+name = "tm"
+rust = "Tm"
+c = "struct tm"
+musl = "struct tm"
+size = 56
+align = 8
+fields = [
+  { name = "tm_sec", ty = "i32", off = 0 },
+  { name = "tm_min", ty = "i32", off = 4 },
+  { name = "tm_hour", ty = "i32", off = 8 },
+  { name = "tm_mday", ty = "i32", off = 12 },
+  { name = "tm_mon", ty = "i32", off = 16 },
+  { name = "tm_year", ty = "i32", off = 20 },
+  { name = "tm_wday", ty = "i32", off = 24 },
+  { name = "tm_yday", ty = "i32", off = 28 },
+  { name = "tm_isdst", ty = "i32", off = 32 },
+  { name = "tm_gmtoff", ty = "i64", off = 40, musl_field = "__tm_gmtoff" },
+  { name = "tm_zone", ty = "ptr", off = 48, musl_field = "__tm_zone" },
+]
+
+[[record]]
+name = "pollfd"
+rust = "Pollfd"
+c = "struct pollfd"
+musl = "struct pollfd"
+size = 8
+align = 4
+fields = [
+  { name = "fd", ty = "i32", off = 0 },
+  { name = "events", ty = "i16", off = 4 },
+  { name = "revents", ty = "i16", off = 6 },
+]
+
+[[record]]
+name = "rlimit"
+rust = "Rlimit"
+c = "struct rlimit"
+musl = "struct rlimit"
+size = 16
+align = 8
+fields = [
+  { name = "rlim_cur", ty = "u64", off = 0 },
+  { name = "rlim_max", ty = "u64", off = 8 },
+]
+
+[[record]]
+name = "rusage"
+rust = "Rusage"
+c = "struct rusage"
+musl = "struct rusage"
+size = 272
+align = 8
+fields = [
+  { name = "ru_utime", ty = "timeval", off = 0 },
+  { name = "ru_stime", ty = "timeval", off = 16 },
+  { name = "ru_maxrss", ty = "i64", off = 32 },
+  { name = "ru_ixrss", ty = "i64", off = 40 },
+  { name = "ru_idrss", ty = "i64", off = 48 },
+  { name = "ru_isrss", ty = "i64", off = 56 },
+  { name = "ru_minflt", ty = "i64", off = 64 },
+  { name = "ru_majflt", ty = "i64", off = 72 },
+  { name = "ru_nswap", ty = "i64", off = 80 },
+  { name = "ru_inblock", ty = "i64", off = 88 },
+  { name = "ru_oublock", ty = "i64", off = 96 },
+  { name = "ru_msgsnd", ty = "i64", off = 104 },
+  { name = "ru_msgrcv", ty = "i64", off = 112 },
+  { name = "ru_nsignals", ty = "i64", off = 120 },
+  { name = "ru_nvcsw", ty = "i64", off = 128 },
+  { name = "ru_nivcsw", ty = "i64", off = 136 },
+  { name = "__reserved", ty = "[i64; 16]", off = 144 },
+]
+
+[[record]]
+name = "utsname"
+rust = "Utsname"
+c = "struct utsname"
+musl = "struct utsname"
+size = 390
+align = 1
+fields = [
+  { name = "sysname", ty = "[c_char; 65]", off = 0 },
+  { name = "nodename", ty = "[c_char; 65]", off = 65 },
+  { name = "release", ty = "[c_char; 65]", off = 130 },
+  { name = "version", ty = "[c_char; 65]", off = 195 },
+  { name = "machine", ty = "[c_char; 65]", off = 260 },
+  { name = "domainname", ty = "[c_char; 65]", off = 325 },
+]
+
+[[record]]
+name = "sigaction"
+rust = "Sigaction"
+c = "struct sigaction"
+musl = "struct sigaction"
+size = 152
+align = 8
+fields = [
+  { name = "sa_handler", ty = "ptr", off = 0, musl_field = "__sa_handler" },
+  { name = "sa_mask", ty = "sigset_t", off = 8 },
+  { name = "sa_flags", ty = "i32", off = 136 },
+  { name = "sa_restorer", ty = "ptr", off = 144 },
+]
+
+[[record]]
+name = "stack_t"
+rust = "StackT"
+c = "stack_t"
+musl = "stack_t"
+size = 24
+align = 8
+fields = [
+  { name = "ss_sp", ty = "ptr", off = 0 },
+  { name = "ss_flags", ty = "i32", off = 8 },
+  { name = "ss_size", ty = "u64", off = 16 },
+]
+
+[[record]]
+name = "siginfo_t"
+rust = "SiginfoT"
+c = "siginfo_t"
+musl = "siginfo_t"
+size = 128
+align = 8
+fields = [
+  { name = "si_signo", ty = "i32", off = 0 },
+  { name = "si_errno", ty = "i32", off = 4 },
+  { name = "si_code", ty = "i32", off = 8 },
+  { name = "__pad", ty = "i32", off = 12, musl_field = "" },
+  { name = "__si_fields", ty = "[u64; 14]", off = 16 },
+]
+
+[[record]]
+name = "termios"
+rust = "Termios"
+c = "struct termios"
+musl = "struct termios"
+size = 60
+align = 4
+fields = [
+  { name = "c_iflag", ty = "u32", off = 0 },
+  { name = "c_oflag", ty = "u32", off = 4 },
+  { name = "c_cflag", ty = "u32", off = 8 },
+  { name = "c_lflag", ty = "u32", off = 12 },
+  { name = "c_line", ty = "u8", off = 16 },
+  { name = "c_cc", ty = "[u8; 32]", off = 17 },
+  { name = "__c_ispeed", ty = "u32", off = 52 },
+  { name = "__c_ospeed", ty = "u32", off = 56 },
+]
+
+[[record]]
+name = "statvfs"
+rust = "Statvfs"
+c = "struct statvfs"
+musl = "struct statvfs"
+size = 112
+align = 8
+fields = [
+  { name = "f_bsize", ty = "u64", off = 0 },
+  { name = "f_frsize", ty = "u64", off = 8 },
+  { name = "f_blocks", ty = "u64", off = 16 },
+  { name = "f_bfree", ty = "u64", off = 24 },
+  { name = "f_bavail", ty = "u64", off = 32 },
+  { name = "f_files", ty = "u64", off = 40 },
+  { name = "f_ffree", ty = "u64", off = 48 },
+  { name = "f_favail", ty = "u64", off = 56 },
+  { name = "f_fsid", ty = "u64", off = 64 },
+  { name = "f_flag", ty = "u64", off = 72 },
+  { name = "f_namemax", ty = "u64", off = 80 },
+  { name = "f_type", ty = "u32", off = 88 },
+  { name = "__reserved", ty = "[i32; 5]", off = 92 },
+]
+
+[[record]]
+name = "passwd"
+rust = "Passwd"
+c = "struct passwd"
+musl = "struct passwd"
+size = 48
+align = 8
+fields = [
+  { name = "pw_name", ty = "ptr", off = 0 },
+  { name = "pw_passwd", ty = "ptr", off = 8 },
+  { name = "pw_uid", ty = "u32", off = 16 },
+  { name = "pw_gid", ty = "u32", off = 20 },
+  { name = "pw_gecos", ty = "ptr", off = 24 },
+  { name = "pw_dir", ty = "ptr", off = 32 },
+  { name = "pw_shell", ty = "ptr", off = 40 },
+]
+
+[[record]]
+name = "group"
+rust = "Group"
+c = "struct group"
+musl = "struct group"
+size = 32
+align = 8
+fields = [
+  { name = "gr_name", ty = "ptr", off = 0 },
+  { name = "gr_passwd", ty = "ptr", off = 8 },
+  { name = "gr_gid", ty = "u32", off = 16 },
+  { name = "gr_mem", ty = "ptr", off = 24 },
+]
+
+[[record]]
+name = "flock"
+rust = "Flock"
+c = "struct flock"
+musl = "struct flock"
+size = 32
+align = 8
+fields = [
+  { name = "l_type", ty = "i16", off = 0 },
+  { name = "l_whence", ty = "i16", off = 2 },
+  { name = "l_start", ty = "i64", off = 8 },
+  { name = "l_len", ty = "i64", off = 16 },
+  { name = "l_pid", ty = "i32", off = 24 },
+]
+
+# Opaque types: sized blobs whose contents belong to 09 (signals/threads), 04 (stdio),
+# 05 (fenv), 07 (glob/regex) and 12 (sockets). The sizes are the frozen ABI.
+
+[[opaque]]
+name = "sigset_t"
+rust = "SigsetT"
+c = "sigset_t"
+musl = "sigset_t"
+size = 128
+align = 8
+doc = "1024 bits; words 1..15 reserved zero; kernel mask is 64 bits"
+
+[[opaque]]
+name = "jmp_buf"
+rust = "JmpBuf"
+c = "jmp_buf"
+musl = "jmp_buf"
+size = 392
+align = 8
+doc = "DV3/RD-new: 392/8 on all three (unsigned long[32] + fl + ss[16]); doc 14 wrote 392/16, impossible"
+
+[[opaque]]
+name = "sigjmp_buf"
+rust = "SigjmpBuf"
+c = "sigjmp_buf"
+musl = "sigjmp_buf"
+size = 392
+align = 8
+doc = "DV3/RD-new: same blob as jmp_buf"
+
+[[opaque]]
+name = "ucontext_t"
+rust = "UcontextT"
+c = "ucontext_t"
+musl = "ucontext_t"
+size = { x86_64 = 936, aarch64 = 4560, riscv64 = 960 }
+align = { x86_64 = 8, aarch64 = 16, riscv64 = 16 }
+doc = "Contents owned by C58; extended state lives in the signal-frame trailer"
+
+[[opaque]]
+name = "mcontext_t"
+rust = "McontextT"
+c = "mcontext_t"
+musl = "mcontext_t"
+size = { x86_64 = 256, aarch64 = 4384, riscv64 = 784 }
+align = { x86_64 = 8, aarch64 = 16, riscv64 = 16 }
+
+[[opaque]]
+name = "fenv_t"
+rust = "FenvT"
+c = "fenv_t"
+musl = "fenv_t"
+size = { x86_64 = 32, aarch64 = 8, riscv64 = 4 }
+align = { x86_64 = 4, aarch64 = 4, riscv64 = 4 }
+
+[[opaque]]
+name = "fexcept_t"
+rust = "FexceptT"
+c = "fexcept_t"
+musl = "fexcept_t"
+size = { x86_64 = 2, aarch64 = 4, riscv64 = 4 }
+align = { x86_64 = 2, aarch64 = 4, riscv64 = 4 }
+
+[[opaque]]
+name = "epoll_event"
+rust = "EpollEvent"
+c = "struct epoll_event"
+musl = "struct epoll_event"
+size = { x86_64 = 12, aarch64 = 16, riscv64 = 16 }
+align = { x86_64 = 1, aarch64 = 8, riscv64 = 8 }
+doc = "Packed on x86_64, naturally aligned on the other two arches (A-abi-13)"
+
+[[opaque]]
+name = "pthread_attr_t"
+rust = "PthreadAttrT"
+c = "pthread_attr_t"
+musl = "pthread_attr_t"
+size = 56
+align = 8
+
+[[opaque]]
+name = "pthread_mutex_t"
+rust = "PthreadMutexT"
+c = "pthread_mutex_t"
+musl = "pthread_mutex_t"
+size = 40
+align = 8
+doc = "All-zero bytes are PTHREAD_MUTEX_INITIALIZER"
+
+[[opaque]]
+name = "pthread_cond_t"
+rust = "PthreadCondT"
+c = "pthread_cond_t"
+musl = "pthread_cond_t"
+size = 48
+align = 8
+doc = "All-zero bytes are PTHREAD_COND_INITIALIZER"
+
+[[opaque]]
+name = "pthread_rwlock_t"
+rust = "PthreadRwlockT"
+c = "pthread_rwlock_t"
+musl = "pthread_rwlock_t"
+size = 56
+align = 8
+doc = "All-zero bytes are PTHREAD_RWLOCK_INITIALIZER"
+
+[[opaque]]
+name = "pthread_barrier_t"
+rust = "PthreadBarrierT"
+c = "pthread_barrier_t"
+musl = "pthread_barrier_t"
+size = 32
+align = 8
+
+[[opaque]]
+name = "pthread_mutexattr_t"
+rust = "PthreadMutexattrT"
+c = "pthread_mutexattr_t"
+musl = "pthread_mutexattr_t"
+size = 4
+align = 4
+
+[[opaque]]
+name = "pthread_condattr_t"
+rust = "PthreadCondattrT"
+c = "pthread_condattr_t"
+musl = "pthread_condattr_t"
+size = 4
+align = 4
+
+[[opaque]]
+name = "pthread_barrierattr_t"
+rust = "PthreadBarrierattrT"
+c = "pthread_barrierattr_t"
+musl = "pthread_barrierattr_t"
+size = 4
+align = 4
+
+[[opaque]]
+name = "pthread_rwlockattr_t"
+rust = "PthreadRwlockattrT"
+c = "pthread_rwlockattr_t"
+musl = "pthread_rwlockattr_t"
+size = 8
+align = 4
+
+[[opaque]]
+name = "sem_t"
+rust = "SemT"
+c = "sem_t"
+musl = "sem_t"
+size = 32
+align = 4
+
+[[opaque]]
+name = "fd_set"
+rust = "FdSet"
+c = "fd_set"
+musl = "fd_set"
+size = 128
+align = 8
+doc = "FD_SETSIZE 1024"
+
+[[opaque]]
+name = "cpu_set_t"
+rust = "CpuSetT"
+c = "cpu_set_t"
+musl = "cpu_set_t"
+size = 128
+align = 8
+
+[[opaque]]
+name = "mbstate_t"
+rust = "MbstateT"
+c = "mbstate_t"
+musl = "mbstate_t"
+size = 8
+align = 4
+doc = "[u32; 2]"
+
+[[opaque]]
+name = "sockaddr_storage"
+rust = "SockaddrStorage"
+c = "struct sockaddr_storage"
+musl = "struct sockaddr_storage"
+size = 128
+align = 8
+
+[[opaque]]
+name = "posix_spawnattr_t"
+rust = "PosixSpawnattrT"
+c = "posix_spawnattr_t"
+musl = "posix_spawnattr_t"
+size = 336
+align = 8
+
+[[opaque]]
+name = "posix_spawn_file_actions_t"
+rust = "PosixSpawnFileActionsT"
+c = "posix_spawn_file_actions_t"
+musl = "posix_spawn_file_actions_t"
+size = 80
+align = 8
+
+[[opaque]]
+name = "glob_t"
+rust = "GlobT"
+c = "glob_t"
+musl = "glob_t"
+size = 72
+align = 8
+
+[[opaque]]
+name = "regex_t"
+rust = "RegexT"
+c = "regex_t"
+musl = "regex_t"
+size = 64
+align = 8
+
+[[opaque]]
+name = "aiocb"
+rust = "Aiocb"
+c = "struct aiocb"
+musl = "struct aiocb"
+size = 168
+align = 8
+
+[[opaque]]
+name = "mq_attr"
+rust = "MqAttr"
+c = "struct mq_attr"
+musl = "struct mq_attr"
+size = 64
+align = 8
+
+[[opaque]]
+name = "sched_param"
+rust = "SchedParam"
+c = "struct sched_param"
+musl = "struct sched_param"
+size = 48
+align = 8
+
+[[opaque]]
+name = "sigevent"
+rust = "Sigevent"
+c = "struct sigevent"
+musl = "struct sigevent"
+size = 64
+align = 8
+
+[[opaque]]
+name = "sigval"
+rust = "Sigval"
+c = "sigval"
+musl = "union sigval"
+size = 8
+align = 8
+
+[[opaque]]
+name = "lconv"
+rust = "Lconv"
+c = "struct lconv"
+musl = "struct lconv"
+size = 96
+align = 8

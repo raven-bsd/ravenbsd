@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-abi"
+version = "0.1.0"
+description = "ravenlibc ABI: types, constants and struct layouts generated from libc/ravenlibc/abi."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+
+[dependencies]
+
+[dev-dependencies]
+raven-abi = { path = "../../../../crates/raven-abi" }
+raven-linux-abi = { path = "../../../../crates/raven-linux-abi" }

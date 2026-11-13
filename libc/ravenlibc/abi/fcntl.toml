@@ -1,0 +1,148 @@
+# SPDX-License-Identifier: MIT
+# Copyright © 2005-2020 Rich Felker, et al.
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# RavenBSD: transpiled from musl:include/fcntl.h, arch/generic/bits/fcntl.h @ 7813e9119eb5fe681b6750b8a033a0490bca0941
+# (no per-file header; covered by musl/COPYRIGHT, H-1; constants transcribed to TOML and generated)
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+schema = 1
+group = "fcntl"
+c_header = "bits/abi_fcntl.h"
+guard = "_RAVEN_BITS_ABI_FCNTL_H"
+rust_type = "i32"
+base = "dec"
+source = ["include/fcntl.h", "arch/generic/bits/fcntl.h"]
+prefixes = ["O_", "F_", "FD_", "AT_", "SEEK_", "POSIX_FADV_"]
+
+consts = [
+  { name = "O_RDONLY", value = 0, base = "oct" },
+  { name = "O_WRONLY", value = 1, base = "oct" },
+  { name = "O_RDWR", value = 2, base = "oct" },
+  { name = "O_ACCMODE", or = [3, "O_PATH"], base = "oct" },
+  { name = "O_SEARCH", alias = "O_PATH" },
+  { name = "O_EXEC", alias = "O_PATH" },
+  { name = "O_TTY_INIT", value = 0 },
+  { name = "O_CREAT", value = 0o100, base = "oct" },
+  { name = "O_EXCL", value = 0o200, base = "oct" },
+  { name = "O_NOCTTY", value = 0o400, base = "oct" },
+  { name = "O_TRUNC", value = 0o1000, base = "oct" },
+  { name = "O_APPEND", value = 0o2000, base = "oct" },
+  { name = "O_NONBLOCK", value = 0o4000, base = "oct" },
+  { name = "O_NDELAY", alias = "O_NONBLOCK" },
+  { name = "O_DSYNC", value = 0o10000, base = "oct" },
+  { name = "O_SYNC", value = 0o4010000, base = "oct" },
+  { name = "O_RSYNC", alias = "O_SYNC" },
+  { name = "O_ASYNC", value = 0o20000, base = "oct" },
+  { name = "O_DIRECT", value = 0o40000, base = "oct" },
+  { name = "O_DIRECTORY", value = 0o200000, base = "oct" },
+  { name = "O_NOFOLLOW", value = 0o400000, base = "oct" },
+  { name = "O_CLOEXEC", value = 0o2000000, base = "oct" },
+  { name = "O_NOATIME", value = 0o1000000, base = "oct" },
+  { name = "O_PATH", value = 0o10000000, base = "oct" },
+  { name = "O_TMPFILE", value = 0o20200000, base = "oct" },
+  { name = "O_LARGEFILE", value = 0, doc = "deviation: files are always large; musl keeps the bit" },
+  { name = "O_EXLOCK", base = "hex", value = 0x10000000, visible = "bsd", doc = "BSD-only, bit 28" },
+  { name = "O_SHLOCK", base = "hex", value = 0x20000000, visible = "bsd", doc = "BSD-only, bit 29" },
+  { name = "O_RESOLVE_BENEATH", base = "hex", value = 0x40000000, visible = "bsd", doc = "BSD-only, bit 30" },
+  { name = "F_DUPFD", value = 0 },
+  { name = "F_GETFD", value = 1 },
+  { name = "F_SETFD", value = 2 },
+  { name = "F_GETFL", value = 3 },
+  { name = "F_SETFL", value = 4 },
+  { name = "F_GETLK", value = 5 },
+  { name = "F_SETLK", value = 6 },
+  { name = "F_SETLKW", value = 7 },
+  { name = "F_SETOWN", value = 8 },
+  { name = "F_GETOWN", value = 9 },
+  { name = "F_SETSIG", value = 10 },
+  { name = "F_GETSIG", value = 11 },
+  { name = "F_SETOWN_EX", value = 15 },
+  { name = "F_GETOWN_EX", value = 16 },
+  { name = "F_GETOWNER_UIDS", value = 17 },
+  { name = "F_OFD_GETLK", value = 36 },
+  { name = "F_OFD_SETLK", value = 37 },
+  { name = "F_OFD_SETLKW", value = 38 },
+  { name = "F_DUPFD_CLOEXEC", value = 1030 },
+  { name = "F_RDLCK", value = 0 },
+  { name = "F_WRLCK", value = 1 },
+  { name = "F_UNLCK", value = 2 },
+  { name = "F_CANCELLK", value = 1029 },
+  { name = "F_SETLEASE", value = 1024 },
+  { name = "F_GETLEASE", value = 1025 },
+  { name = "F_NOTIFY", value = 1026 },
+  { name = "F_SETPIPE_SZ", value = 1031 },
+  { name = "F_GETPIPE_SZ", value = 1032 },
+  { name = "F_ADD_SEALS", value = 1033 },
+  { name = "F_GET_SEALS", value = 1034 },
+  { name = "F_SEAL_SEAL", value = 0x0001 },
+  { name = "F_SEAL_SHRINK", value = 0x0002 },
+  { name = "F_SEAL_GROW", value = 0x0004 },
+  { name = "F_SEAL_WRITE", value = 0x0008 },
+  { name = "F_SEAL_FUTURE_WRITE", value = 0x0010 },
+  { name = "F_GET_RW_HINT", value = 1035 },
+  { name = "F_SET_RW_HINT", value = 1036 },
+  { name = "F_GET_FILE_RW_HINT", value = 1037 },
+  { name = "F_SET_FILE_RW_HINT", value = 1038 },
+  { name = "F_OWNER_TID", value = 0 },
+  { name = "F_OWNER_PID", value = 1 },
+  { name = "F_OWNER_PGRP", value = 2 },
+  { name = "F_OWNER_GID", value = 2 },
+  { name = "FAPPEND", alias = "O_APPEND", visible = "bsd" },
+  { name = "FFSYNC", alias = "O_SYNC", visible = "bsd" },
+  { name = "FASYNC", alias = "O_ASYNC", visible = "bsd" },
+  { name = "FNONBLOCK", alias = "O_NONBLOCK", visible = "bsd" },
+  { name = "FNDELAY", alias = "O_NDELAY", visible = "bsd" },
+  { name = "F_GETLK64", alias = "F_GETLK" },
+  { name = "F_SETLK64", alias = "F_SETLK" },
+  { name = "F_SETLKW64", alias = "F_SETLKW" },
+  { name = "FD_CLOEXEC", value = 1 },
+  { name = "AT_FDCWD", value = -100 },
+  { name = "AT_SYMLINK_NOFOLLOW", value = 0x100 },
+  { name = "AT_REMOVEDIR", value = 0x200 },
+  { name = "AT_EACCESS", value = 0x200 },
+  { name = "AT_SYMLINK_FOLLOW", value = 0x400 },
+  { name = "AT_NO_AUTOMOUNT", value = 0x800 },
+  { name = "AT_EMPTY_PATH", value = 0x1000 },
+  { name = "AT_STATX_SYNC_TYPE", value = 0x6000 },
+  { name = "AT_STATX_SYNC_AS_STAT", value = 0 },
+  { name = "AT_STATX_FORCE_SYNC", value = 0x2000 },
+  { name = "AT_STATX_DONT_SYNC", value = 0x4000 },
+  { name = "AT_RECURSIVE", value = 0x8000 },
+  { name = "AT_RESOLVE_BENEATH", value = 0x10000, visible = "bsd", doc = "BSD-only AT_ flag" },
+  { name = "SEEK_SET", value = 0 },
+  { name = "SEEK_CUR", value = 1 },
+  { name = "SEEK_END", value = 2 },
+  { name = "POSIX_FADV_NORMAL", value = 0 },
+  { name = "POSIX_FADV_RANDOM", value = 1 },
+  { name = "POSIX_FADV_SEQUENTIAL", value = 2 },
+  { name = "POSIX_FADV_WILLNEED", value = 3 },
+  { name = "POSIX_FADV_DONTNEED", value = 4 },
+  { name = "POSIX_FADV_NOREUSE", value = 5 },
+  { name = "F_OK", value = 0 },
+  { name = "R_OK", value = 4 },
+  { name = "W_OK", value = 2 },
+  { name = "X_OK", value = 1 },
+  { name = "F_ULOCK", value = 0 },
+  { name = "F_LOCK", value = 1 },
+  { name = "F_TLOCK", value = 2 },
+  { name = "F_TEST", value = 3 },
+]
