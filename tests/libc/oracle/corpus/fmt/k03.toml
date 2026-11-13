@@ -1,0 +1,307 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K03 corpus (ticket C43 section 7.2, layer G): the 57 check! cases of
+# ravenbsd/libc/spike/va/tests/variadic.rs, converted to (format, argument
+# classes). The spike code is not used; only its corpus idea and values are
+# reproduced here. The differential run lives in
+# tests/libc/oracle/tests/diff_fmt_freebsd.rs; this file is the committed
+# record for C70 (printf_format fuzz) and for the report mapping.
+#
+# Argument classes: i = i32/i64/u32/u64 word, d = double, p = pointer,
+# n = null pointer, s = C string. The expected bytes are produced by the C
+# oracle at test time, never typed here.
+
+schema = 1
+corpus = "fmt-k03"
+
+[[case]]
+group = "strings"
+format = "hello"
+args = []
+
+[[case]]
+group = "strings"
+format = "%%"
+args = []
+
+[[case]]
+group = "strings"
+format = "%c"
+args = ["i:90"]
+
+[[case]]
+group = "strings"
+format = "%5c"
+args = ["i:120"]
+
+[[case]]
+group = "strings"
+format = "%-5c|"
+args = ["i:121"]
+
+[[case]]
+group = "strings"
+format = "%s"
+args = ["s:world"]
+
+[[case]]
+group = "strings"
+format = "%10s"
+args = ["s:world"]
+
+[[case]]
+group = "strings"
+format = "%-10s|"
+args = ["s:world"]
+
+[[case]]
+group = "strings"
+format = "%.3s"
+args = ["s:truncate"]
+
+[[case]]
+group = "strings"
+format = "%10.3s"
+args = ["s:truncate"]
+
+[[case]]
+group = "strings"
+format = "%s"
+args = ["n:null"]
+
+[[case]]
+group = "strings"
+format = "%p"
+args = ["n:null"]
+
+[[case]]
+group = "integers"
+format = "%d"
+args = ["i:0"]
+
+[[case]]
+group = "integers"
+format = "%d"
+args = ["i:-42"]
+
+[[case]]
+group = "integers"
+format = "%i"
+args = ["i:1234"]
+
+[[case]]
+group = "integers"
+format = "%u"
+args = ["i:4000000000"]
+
+[[case]]
+group = "integers"
+format = "%x"
+args = ["i:0xdeadbeef"]
+
+[[case]]
+group = "integers"
+format = "%X"
+args = ["i:0xdeadbeef"]
+
+[[case]]
+group = "integers"
+format = "%o"
+args = ["i:0o755"]
+
+[[case]]
+group = "integers"
+format = "%8d"
+args = ["i:42"]
+
+[[case]]
+group = "integers"
+format = "%-8d|"
+args = ["i:42"]
+
+[[case]]
+group = "integers"
+format = "%08d"
+args = ["i:-42"]
+
+[[case]]
+group = "integers"
+format = "%+d"
+args = ["i:42"]
+
+[[case]]
+group = "integers"
+format = "% d"
+args = ["i:42"]
+
+[[case]]
+group = "integers"
+format = "%.6d"
+args = ["i:42"]
+
+[[case]]
+group = "integers"
+format = "%8.6d"
+args = ["i:42"]
+
+[[case]]
+group = "integers"
+format = "%08.6d"
+args = ["i:42"]
+
+[[case]]
+group = "integers"
+format = "%u"
+args = ["i:0"]
+
+[[case]]
+group = "integers"
+format = "%.0u"
+args = ["i:0"]
+
+[[case]]
+group = "integers"
+format = "%ld"
+args = ["i:-9000000000"]
+
+[[case]]
+group = "integers"
+format = "%lu"
+args = ["i:9000000000"]
+
+[[case]]
+group = "integers"
+format = "%lld"
+args = ["i:i64::MIN"]
+
+[[case]]
+group = "integers"
+format = "%llu"
+args = ["i:u64::MAX"]
+
+[[case]]
+group = "integers"
+format = "%zu"
+args = ["i:usize::MAX"]
+
+[[case]]
+group = "floats"
+format = "%f"
+args = ["d:0.0"]
+
+[[case]]
+group = "floats"
+format = "%f"
+args = ["d:1.5"]
+
+[[case]]
+group = "floats"
+format = "%f"
+args = ["d:-2.25"]
+
+[[case]]
+group = "floats"
+format = "%.0f"
+args = ["d:1.5"]
+
+[[case]]
+group = "floats"
+format = "%.2f"
+args = ["d:1234.5678"]
+
+[[case]]
+group = "floats"
+format = "%8.2f"
+args = ["d:3.5"]
+
+[[case]]
+group = "floats"
+format = "%-8.2f|"
+args = ["d:3.5"]
+
+[[case]]
+group = "floats"
+format = "%08.2f"
+args = ["d:3.5"]
+
+[[case]]
+group = "floats"
+format = "%+.2f"
+args = ["d:3.5"]
+
+[[case]]
+group = "floats"
+format = "% .2f"
+args = ["d:3.5"]
+
+[[case]]
+group = "floats"
+format = "%f"
+args = ["d:-0.0"]
+
+[[case]]
+group = "floats"
+format = "%f"
+args = ["d:inf"]
+
+[[case]]
+group = "floats"
+format = "%f"
+args = ["d:-inf"]
+
+[[case]]
+group = "floats"
+format = "%f"
+args = ["d:nan"]
+
+[[case]]
+group = "floats"
+format = "%.10f"
+args = ["d:1/3"]
+
+[[case]]
+group = "mixed"
+format = "%d:%d:%d:%d:%d:%d:%d:%d:%d:%d"
+args = ["i:0", "i:1", "i:2", "i:3", "i:4", "i:5", "i:6", "i:7", "i:8", "i:9"]
+
+[[case]]
+group = "mixed"
+format = "%d:%f:%d:%f:%d:%f"
+args = ["i:0", "d:1.0", "i:2", "d:3.0", "i:4", "d:5.0"]
+
+[[case]]
+group = "mixed"
+format = "%d%d%d%d%d%d%d%d%f%f"
+args = ["i:0", "i:1", "i:2", "i:3", "i:4", "i:5", "i:6", "i:7", "d:1.5", "d:2.5"]
+
+[[case]]
+group = "pointers"
+format = "%p"
+args = ["p:nonnull"]
+
+[[case]]
+group = "pointers"
+format = "%20p"
+args = ["p:nonnull"]
+
+[[case]]
+group = "pointers"
+format = "%s %s"
+args = ["s:a", "s:b"]
+
+[[case]]
+group = "pointers"
+format = "%.0s"
+args = ["s:abc"]
+
+[[case]]
+group = "pointers"
+format = "%5.2s"
+args = ["s:abc"]
+
+[[case]]
+group = "truncation"
+format = "value=%d"
+args = ["i:42"]
+cap = 4

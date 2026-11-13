@@ -4949,3 +4949,114 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fmt/src/printf/int.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/stdio/printfcommon.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/04 R02; __ultoa/__ujtoa merged into one u64 loop; PRINT/PAD/io_* not translated (Sink); narrow and wide merge over CharUnit; exponent kept"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fmt/src/printf/group.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/stdio/printfcommon.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/04 R02; grouping_init/grouping_print rewritten over NumericFormat and Sink; a guard bounds a hostile grouping string"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fmt/src/printf/spec.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/stdio/printflocal.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/04 R03; union arg -> ArgVal with float BITS; STATIC_ARG_TBL_SIZE 8 documented, the live table is NL_ARGMAX 64; flag constants"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fmt/src/printf/mod.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/stdio/vfprintf.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/04 R01; PRINT/PAD macros replaced by Sink; __sbprintf, xprintf deleted; locale_t -> NumericFormat; va_arg -> VaReader; errno EOVERFLOW -> FmtErr::Overflow; %n via FmtEnv with PctN; narrow+wide merged over CharUnit; NL_ARGMAX 64"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fmt/src/printf/pos.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/stdio/printf-pos.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/04 R04; growable table and malloc collapse into [TypeId; 65]; a gap, mixed use and a type conflict are FmtErr::Invalid; __find_warguments written once over CharUnit"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fmt/src/printf/float_layout.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/stdio/vfprintf.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/04 R05; fp_begin/fp_common and the %e %f %g/%a cases; __dtoa/__hdtoa -> FloatFmt; inf/nan via FloatClass; DEC_BUF_F64/LD buffers in an #[inline(never)] path"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fmt/src/scanf/source.rs"
+upstream = "musl"
+upstream_path = "src/internal/shgetc.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/04 R21; no per-file header, MIT via musl/COPYRIGHT; FILE -> ScanSource + Limited; shlim/shgetc/shunget/shcnt; one-byte unget plus a small look-ahead stack fed back at finish"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fmt/src/scanf/int.rs"
+upstream = "musl"
+upstream_path = "src/internal/intscan.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/04 R22; no per-file header, MIT via musl/COPYRIGHT; private copy until C41's scan_integer is usable (RD-23); errno replaced by saturation; ASCII classification"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fmt/src/scanf/float_lex.rs"
+upstream = "bionic"
+upstream_path = "libc/stdio/parsefloat.c"
+upstream_rev = "731631f300090436d7f5df80d50b6275c8c60a93"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/04 R23; Torek/Regents notice read; FILE reads -> ScanSource; BUF 513 -> SCAN_TOKEN_MAX 4096 (RD-31); decimal and hex forms, inf/nan, commit/unget; wparsefloat folded into the generic CharUnit lexer"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-fmt/src/scanf/mod.rs"
+upstream = "musl"
+upstream_path = "src/stdio/vfscanf.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/04 R20; no per-file header, MIT via musl/COPYRIGHT; FILE -> ScanSource; malloc %m -> FmtEnv::alloc_store; positional branch deleted (RD-36); floats via the lexer + FloatScan; wide is the same code over CharUnit (R61)"
+

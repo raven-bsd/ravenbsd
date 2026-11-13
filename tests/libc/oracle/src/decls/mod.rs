@@ -36,3 +36,12 @@ pub mod stdlib_musl;
 
 #[cfg(feature = "oracle-dtoa")]
 pub mod dtoa;
+
+#[cfg(feature = "oracle-fmt-freebsd")]
+pub mod fmt_freebsd;
+
+#[cfg(all(feature = "oracle-fmt-musl", not(feature = "oracle-fmt-freebsd")))]
+pub mod fmt_musl;
+
+#[cfg(feature = "oracle-fmt-musl-scanf")]
+pub mod fmt_musl_scanf;

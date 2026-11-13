@@ -29,3 +29,5 @@ pub mod norm;
 pub mod rng;
 pub mod shrink;
 pub mod standin;
+#[allow(unsafe_code)] // calls the C variadic oracle through function pointers
+pub mod support_fmt;
