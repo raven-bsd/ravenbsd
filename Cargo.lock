@@ -1089,6 +1089,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-rand"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-malloc",
+ "raven-prng",
+]
+
+[[package]]
 name = "raven-libc-regex"
 version = "0.1.0"
 dependencies = [
@@ -1103,6 +1112,13 @@ dependencies = [
  "raven-libc-abi",
  "raven-libc-ctype",
  "raven-libc-nss",
+]
+
+[[package]]
+name = "raven-libc-ssp"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
 ]
 
 [[package]]

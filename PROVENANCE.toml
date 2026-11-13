@@ -7874,3 +7874,267 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "COPY per donor-map/05 3.3 numerics; donor file taken verbatim from the pinned libm donor (its own FreeBSD origin notice is retained where present)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-rand/src/chacha.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/crypt/chacha_private.h"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "LicenseRef-PublicDomain"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "KEYSTREAM_ONLY functions only; DJB counter/IV layout kept; public-domain header read"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-rand/src/arc4random.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/crypt/arc4random.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "lock, mmap/minherit and _rs_forkdetect removed; state is caller-owned; getentropy replaced by Entropy; fork wipe of rs and rsx added (doc 15 3.A.1.1)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-rand/src/platform.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/crypt/arc4random.h"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "_getentropy_fail -> RandPlatform::no_entropy; _rs_allocate and _rs_forkdetect removed"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-rand/src/uniform.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/crypt/arc4random_uniform.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "rejection loop and upper_bound<2 case kept"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/guard.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/libc_stack_protector.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "AT_CANARY/sysctl removed; single usize guard; byte 1 cleared (musl); syslog/kill replaced by FailHooks"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/fail.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/libc_stack_protector.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "__fail order kept; block/log/reset/raise/exit-127 through FailHooks"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/overlap.rs"
+upstream = "freebsd"
+upstream_path = "include/ssp/ssp.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "__ssp_overlap arithmetic only; header macros belong to the headers area"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/fgets_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/fgets_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual fgets call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/memcpy_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/memcpy_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual memcpy call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/memmove_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/memmove_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual memmove call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/mempcpy_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/mempcpy_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual mempcpy call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/memset_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/memset_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual memset call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/snprintf_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/snprintf_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual snprintf call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/sprintf_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/sprintf_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual sprintf call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/stpcpy_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/stpcpy_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual stpcpy call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/stpncpy_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/stpncpy_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual stpncpy call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/strcat_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/strcat_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual strcat call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/strcpy_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/strcpy_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual strcpy call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/strlcat_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/strlcat_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual strlcat call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/strlcpy_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/strlcpy_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual strlcpy call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/strncat_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/strncat_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual strncat call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/strncpy_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/strncpy_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual strncpy call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/vsnprintf_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/vsnprintf_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual vsnprintf call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-ssp/src/chk/vsprintf_chk.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/secure/vsprintf_chk.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "check core only; the shell performs the actual vsprintf call"

@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-rand"
+version = "0.1.0"
+description = "ravenlibc arc4random family: ChaCha20 state machine, uniform, getentropy flags and the entropy gate"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = ["weak-entropy-interim"]
+weak-entropy-interim = []
+std = []
+
+[dependencies]
+raven-libc-abi = { path = "../raven-libc-abi" }
+raven-libc-malloc = { path = "../raven-libc-malloc", default-features = false }
+
+[dev-dependencies]
+raven-prng = { path = "../../../../crates/raven-prng" }
