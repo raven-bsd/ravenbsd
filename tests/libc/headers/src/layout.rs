@@ -86,9 +86,6 @@ pub fn parse(text: &str) -> Result<Vec<LayoutRow>, String> {
 /// True when every header of the row is owned and present on the architecture.
 #[must_use]
 pub fn available(row: &LayoutRow, arch: Arch, headers: &[HeaderRow]) -> bool {
-    if row.owner.as_deref().is_some_and(|owner| owner != "C37") {
-        return false;
-    }
     row.arches.iter().any(|name| name == arch.name())
         && row.headers.iter().all(|path| {
             if manifest::compiler_header(path) {
@@ -169,6 +166,8 @@ pub const PREAMBLE: &str = "\
 /* RavenBSD C41: the stdlib/getopt layout rows (div_t, struct option). */
 #include <stdlib.h>
 #include <getopt.h>
+/* RavenBSD C45: regex_t must be visible to its layout row. */
+#include <regex.h>
 /* RavenBSD: offsetof(struct stat, __unused) needs the field name, not the
  * cdefs attribute macro. */
 #undef __unused

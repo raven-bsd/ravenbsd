@@ -623,7 +623,7 @@ ring = 1
 [[header]]
 path = "regex.h"
 owner = "C45"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 

@@ -38,7 +38,7 @@ fn real_database_has_at_least_75_rows() {
 }
 
 #[test]
-fn pending_row_is_not_available() {
+fn availability_follows_the_manifest_not_a_hardcoded_owner() {
     let rows = load().expect("layouts");
     let headers = crate::manifest::load().expect("manifest");
     let statvfs = rows
@@ -50,8 +50,11 @@ fn pending_row_is_not_available() {
         .iter()
         .find(|row| row.name == "regex_t")
         .expect("regex_t row");
-    assert!(!available(regex, Arch::X86_64, &headers));
-    assert_eq!(owner(regex, &headers), "C45");
+    assert!(available(regex, Arch::X86_64, &headers));
+    let mut missing = statvfs.clone();
+    missing.headers = vec!["definitely-not-installed.h".to_string()];
+    assert!(!available(&missing, Arch::X86_64, &headers));
+    assert_eq!(owner(&missing, &headers), "C37");
 }
 
 #[test]
@@ -63,5 +66,5 @@ fn assert_source_uses_expected_macros() {
     assert!(source.contains("_Alignof(jmp_buf) == 8"));
     assert!(source.contains("offsetof(struct dirent, d_name) == 19"));
     assert!(source.contains("sizeof(struct statvfs)"));
-    assert!(!source.contains("sizeof(regex_t)"));
+    assert!(source.contains("sizeof(regex_t) == 64"));
 }
