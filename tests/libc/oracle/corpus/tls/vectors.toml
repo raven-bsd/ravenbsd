@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# The hand-derived golden TLS layout table of C57 7.1 (single module).
+[[vector]]
+image = 0x1000
+memsz = 0x30
+align = 16
+size = 0x30
+offset_x86_64 = 0x30
+offset_aarch64 = 16
+offset_riscv64 = 0
+
+[[vector]]
+image = 0x1008
+memsz = 0x28
+align = 16
+size = 0x28
+offset_x86_64 = 0x28
+offset_aarch64 = 24
+offset_riscv64 = 8
+
+[[vector]]
+image = 0x1004
+memsz = 0x14
+align = 4
+size = 0x14
+offset_x86_64 = 0x14
+offset_aarch64 = 16
+offset_riscv64 = 0
+
+[[vector]]
+image = 0x2000
+memsz = 0x10
+align = 64
+size = 0x40
+offset_x86_64 = 0x40
+offset_aarch64 = 64
+offset_riscv64 = 0
+
+[[vector]]
+image = 0x3000
+memsz = 0
+align = 8
+size = 0
+offset_x86_64 = 0
+offset_aarch64 = 16
+offset_riscv64 = 0

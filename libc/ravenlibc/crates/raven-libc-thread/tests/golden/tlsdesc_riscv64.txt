@@ -1,0 +1,22 @@
+# llvm-objdump -d --no-show-raw-insn on the riscv64gc-unknown-none-elf rlib object
+0000000000000000 <__rl_tlsdesc_static>:
+       0:      	ld	a0, 8(a0)
+       2:      	jr	t0
+
+0000000000000004 <__rl_tlsdesc_dynamic>:
+       4:      	addi	sp, sp, -16
+       6:      	sd	t1, 0(sp)
+       8:      	sd	t2, 8(sp)
+       a:      	ld	t2, -8(tp)
+       e:      	ld	a0, 8(a0)
+      10:      	ld	t1, 8(a0)
+      14:      	ld	a0, 0(a0)
+      16:      	slli	a0, a0, 3
+      18:      	add	a0, a0, t2
+      1a:      	ld	a0, 0(a0)
+      1c:      	add	a0, a0, t1
+      1e:      	sub	a0, a0, tp
+      22:      	ld	t1, 0(sp)
+      24:      	ld	t2, 8(sp)
+      26:      	addi	sp, sp, 16
+      28:      	jr	t0

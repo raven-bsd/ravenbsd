@@ -1,0 +1,8 @@
+# llvm-objdump -d --no-show-raw-insn on the aarch64-unknown-none-softfloat rlib object
+0000000000000000 <__rl_thread_entry>:
+       0:      	ldr	x16, [x0]
+       4:      	mov	x17, sp
+       8:      	and	x17, x17, #0xfffffffffffffff0
+       c:      	mov	sp, x17
+      10:      	mov	x29, xzr
+      14:      	br	x16

@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-thread"
+version = "0.1.0"
+description = "ravenlibc pthreads, C11 threads, TSD, cancellation, internal locks"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+
+[dependencies]
+raven-libc-abi = { path = "../raven-libc-abi" }
+raven-libc-tls = { path = "../raven-libc-tls" }
+raven-libc-sys = { path = "../raven-libc-sys" }

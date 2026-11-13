@@ -1,0 +1,16 @@
+# llvm-objdump -d --no-show-raw-insn on the aarch64-unknown-none-softfloat rlib object
+0000000000000000 <__rl_tlsdesc_static>:
+       0:      	ldr	x0, [x0, #8]
+       4:      	ret
+
+0000000000000008 <__rl_tlsdesc_dynamic>:
+       8:      	stp	x1, x2, [sp, #-16]!
+       c:      	mrs	x1, TPIDR_EL0
+      10:      	ldr	x0, [x0, #8]
+      14:      	ldp	x0, x2, [x0]
+      18:      	sub	x2, x2, x1
+      1c:      	ldur	x1, [x1, #-8]
+      20:      	ldr	x1, [x1, x0, lsl #3]
+      24:      	add	x0, x1, x2
+      28:      	ldp	x1, x2, [sp], #16
+      2c:      	ret

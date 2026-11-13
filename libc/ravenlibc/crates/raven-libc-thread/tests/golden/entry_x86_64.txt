@@ -1,0 +1,5 @@
+# llvm-objdump -d --no-show-raw-insn on the x86_64-unknown-none rlib object
+0000000000000000 <__rl_thread_entry>:
+       0:      	andq	$-16, %rsp
+       4:      	xorl	%ebp, %ebp
+       6:      	jmpq	*(%rdi)

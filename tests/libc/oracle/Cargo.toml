@@ -21,6 +21,7 @@ raven-libc-dtoa = { path = "../../../libc/ravenlibc/crates/raven-libc-dtoa", fea
 raven-libc-fmt = { path = "../../../libc/ravenlibc/crates/raven-libc-fmt" }
 raven-libc-time = { path = "../../../libc/ravenlibc/crates/raven-libc-time" }
 raven-libc-m = { path = "../../../libc/ravenlibc/crates/raven-libc-m" }
+raven-libc-tls = { path = "../../../libc/ravenlibc/crates/raven-libc-tls" }
 
 [features]
 default = []
@@ -43,6 +44,7 @@ oracle-fmt-freebsd = []
 oracle-fmt-musl = []
 oracle-fmt-musl-scanf = []
 oracle-raven-libc-time = []
+oracle-tls = []
 all-oracles = [
     "oracle-string-basic",
     "oracle-ctype-multibyte",
@@ -63,6 +65,7 @@ all-oracles = [
     "oracle-fmt-musl",
     "oracle-fmt-musl-scanf",
     "oracle-raven-libc-time",
+    "oracle-tls",
 ]
 
 [lints]
