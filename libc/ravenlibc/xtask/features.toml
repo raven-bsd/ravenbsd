@@ -88,3 +88,11 @@ crates = ["raven-libc-malloc"]
 [[feature]]
 name = "testutil"
 crates = ["raven-libc-fts"]
+
+[[feature]]
+name = "host-fake"
+crates = ["raven-libc-sys"]
+
+[[feature]]
+name = "cancel"
+crates = ["raven-libc-sys"]
