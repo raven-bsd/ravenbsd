@@ -17,7 +17,7 @@ use crate::ipc::router;
 use crate::process::{self, Process, ProcessState, handle::Object};
 use crate::sched;
 use crate::syscall::SyscallFrame;
-use crate::syscall::handle_xfer::clone_transferable;
+use crate::syscall::linux::install_handler;
 use crate::usercopy::copy_to_user;
 
 /// `proc_create(flags) -> Handle`.
@@ -69,18 +69,7 @@ pub fn set_personality(frame: &SyscallFrame) -> Result<usize, Errno> {
         return Err(Errno::ESRCH);
     }
 
-    let new_handler = if handler == Handle::NONE {
-        None
-    } else {
-        let (object, rights, parent) = clone_transferable(&caller, handler)?;
-        let mut handles = target.handles.lock();
-        let installed = handles.insert_derived(object, rights, &parent)?;
-        if let Ok(node) = handles.lineage_node(installed) {
-            drop(handles);
-            crate::process::handle::register_lineage(node);
-        }
-        Some(installed)
-    };
+    let new_handler = install_handler(&caller, &target, handler)?;
 
     let old = {
         let mut state = target.personality.lock();

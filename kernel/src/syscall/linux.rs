@@ -34,6 +34,41 @@ const ARCH: u8 = ARCH_X86_64;
 #[cfg(target_arch = "aarch64")]
 const ARCH: u8 = ARCH_AARCH64;
 
+/// Install a handler into `target` for `PROC_SET_PERSONALITY`.
+///
+/// A self-installation already owns the handle; a cross-process installation
+/// clones any object kind (the earlier S41 path used the x86-only
+/// `clone_transferable` and rejected aarch64 scheme handles).
+pub fn install_handler(
+    caller: &Arc<Process>,
+    target: &Arc<Process>,
+    handler: Handle,
+) -> Result<Option<Handle>, Errno> {
+    if handler == Handle::NONE {
+        return Ok(None);
+    }
+    if Arc::ptr_eq(caller, target) {
+        return Ok(Some(handler));
+    }
+    let (object, rights, parent) = {
+        let handles = caller.handles.lock();
+        let (entry, rights) = handles.get_with_rights(handler, Rights::TRANSFER)?;
+        let object = entry.clone();
+        let parent = handles.lineage_node(handler)?;
+        (object, rights, parent)
+    };
+    let (installed, node) = {
+        let mut handles = target.handles.lock();
+        let installed = handles.insert_derived(object, rights, &parent)?;
+        let node = handles.lineage_node(installed).ok();
+        (installed, node)
+    };
+    if let Some(node) = node {
+        crate::process::handle::register_lineage(node);
+    }
+    Ok(Some(installed))
+}
+
 /// Deliver one raw syscall frame to the process handler and return its `i64`.
 pub fn trap(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<isize, Errno> {
     let state = *caller.personality.lock();
