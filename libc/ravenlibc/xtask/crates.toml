@@ -278,7 +278,7 @@ std = "alloc"
 unsafe = "M"
 raw_modules = ["raw"]
 host = false
-deps = ["raven-libc-abi", "raven-libc-tls", "raven-libc-sys", "raven-libc-signal"]
+deps = ["raven-libc-abi", "raven-libc-tls", "raven-libc-sys"]
 
 [[crate]]
 name = "raven-libc-net"

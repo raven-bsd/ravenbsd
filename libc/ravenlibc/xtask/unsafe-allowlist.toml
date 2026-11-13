@@ -40,3 +40,18 @@ reason = "host test arena uses the system allocator to obtain a page-aligned 16 
 crate = "raven-libc-malloc"
 path = "src/debug/debug_ut.rs"
 reason = "host test arena uses the system allocator to obtain a page-aligned block"
+
+[[allow]]
+crate = "raven-libc-tls"
+path = "src/raw.rs"
+reason = "DR-39 audited TLS raw module: initial-image writes, DTV publication, TCB conversion and the thread-pointer register helpers; every unsafe block names the mapping/DTV/thread-pointer invariant that makes it sound"
+
+[[allow]]
+crate = "raven-libc-thread"
+path = "src/raw.rs"
+reason = "DR-39 audited thread raw module: TCB field views, robust-list pointer chasing, the entry trampoline and the production SysKernel; every unsafe block names the invariant that makes it sound"
+
+[[allow]]
+crate = "raven-libc-thread"
+path = "src/raw/"
+reason = "DR-39 audited raw submodules: per-architecture thread entry assembly, futex word views and TLS-descriptor calls; every unsafe block names its invariant"
