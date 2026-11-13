@@ -15,3 +15,6 @@
 .DS_Store
 .raven-env.mk
 DIRECTIVE.md
+
+# libc-pack build tree (generated)
+/xtask/build/
