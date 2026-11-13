@@ -1,0 +1,165 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# dtoa: the complete NetBSD gdtoa family (COPY rows of donor-map/05 3.1) as one merged object.
+# The host build is x86_64 little-endian, ld80 long double; the arch constants come from the
+# donor arch/x86_64/gdtoa directory and the replacement headers from shim/gdtoa. The shim README
+# records how <machine/ieee.h> is arranged.
+
+schema = 1
+family = "dtoa"
+description = "NetBSD gdtoa: strtod/strtof/strtold, dtoa/gdtoa/ldtoa, hdtoa/hldtoa, hex floats"
+exports = [
+    "__Balloc_D2A",
+    "__Bfree_D2A",
+    "__ULtod_D2A",
+    "__any_on_D2A",
+    "__b2d_D2A",
+    "__bigtens_D2A",
+    "__cmp_D2A",
+    "__copybits_D2A",
+    "__d2b_D2A",
+    "__decrement_D2A",
+    "__diff_D2A",
+    "__dtoa",
+    "__dtoa_result_D2A",
+    "__freedtoa",
+    "__gdtoa",
+    "__gethex_D2A",
+    "__hdtoa",
+    "__hexdig_D2A",
+    "__hexdig_init_D2A",
+    "__hexnan_D2A",
+    "__hi0bits_D2A",
+    "__hldtoa",
+    "__i2b_D2A",
+    "__increment_D2A",
+    "__ldtoa",
+    "__lo0bits_D2A",
+    "__lshift_D2A",
+    "__match_D2A",
+    "__mult_D2A",
+    "__multadd_D2A",
+    "__nrv_alloc_D2A",
+    "__pow5mult_D2A",
+    "__quorem_D2A",
+    "__ratio_D2A",
+    "__rshift_D2A",
+    "__rv_alloc_D2A",
+    "__s2b_D2A",
+    "__set_ones_D2A",
+    "__strcp_D2A",
+    "__strtodg_D2A",
+    "__strtopQ_D2A",
+    "__strtopx_D2A",
+    "__strtord_D2A",
+    "__sum_D2A",
+    "__tens_D2A",
+    "__tinytens_D2A",
+    "__trailz_D2A",
+    "__ulp_D2A",
+    "strtod",
+    "strtod_l",
+    "strtof",
+    "strtof_l",
+    "strtold",
+    "strtold_l",
+]
+opt = ["O2", "O0"]
+defines = [
+    "_GNU_SOURCE",
+    "Honor_FLT_ROUNDS",
+    "__HAVE_LONG_DOUBLE=1",
+    "GDTOA_LD_FMT=x",
+    "__weakref_visible=",
+    "__weak_reference(x)=",
+    "__libc_fegetround_ref=fegetround",
+    "__unused=",
+    "__UNCONST(a)=((char*)(a))",
+]
+include = [
+    "shim:gdtoa",
+    "donor:netbsd/lib/libc/arch/x86_64/gdtoa",
+    "donor:netbsd/lib/libc/gdtoa",
+]
+flags = []
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/misc.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/dmisc.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/smisc.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/gmisc.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/sum.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/ulp.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/dtoa.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/gdtoa.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/strtod.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/strtodg.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/gethex.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/hd_init.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/hexnan.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/strtof.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/strtord.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/strtopx.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/strtopQ.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/strtold_subr.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/hdtoa.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/gdtoa/ldtoa.c"

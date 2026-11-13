@@ -17,6 +17,7 @@ toml = "1.2"
 raven-libc-ctype = { path = "../../../libc/ravenlibc/crates/raven-libc-ctype" }
 raven-libc-str = { path = "../../../libc/ravenlibc/crates/raven-libc-str" }
 raven-libc-stdlib = { path = "../../../libc/ravenlibc/crates/raven-libc-stdlib" }
+raven-libc-dtoa = { path = "../../../libc/ravenlibc/crates/raven-libc-dtoa", features = ["alloc"] }
 
 [features]
 default = []
@@ -32,6 +33,8 @@ oracle-stdlib-netbsd = []
 oracle-stdlib-openbsd = []
 oracle-stdlib-freebsd = []
 oracle-stdlib-musl = []
+oracle-dtoa = []
+oracle-dtoa-ld128 = []
 all-oracles = [
     "oracle-string-basic",
     "oracle-ctype-multibyte",
@@ -45,6 +48,8 @@ all-oracles = [
     "oracle-stdlib-openbsd",
     "oracle-stdlib-freebsd",
     "oracle-stdlib-musl",
+    "oracle-dtoa",
+    "oracle-dtoa-ld128",
 ]
 
 [lints]

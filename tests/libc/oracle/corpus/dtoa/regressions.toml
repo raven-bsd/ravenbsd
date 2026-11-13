@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Regression cases found while porting.  The expected values were obtained from the C original
+# where it is correct and from exact rational arithmetic where the donor's strtodg directed path
+# corrupts rvb (nbits not a multiple of 32, see shim/gdtoa/README.md and the report).
+
+[[case]]
+text = "0.0008057503634850169"
+strtod_bits = "3f4a671fbade461c"
+strtod_consumed = 21
+
+[[case]]
+text = "-0"
+strtod_bits = "8000000000000000"
+strtod_consumed = 2
+
+[[case]]
+text = "-0000"
+strtod_bits = "8000000000000000"
+strtod_consumed = 5
+
+[[case]]
+text = "38e026"
+strtold_bytes = "de741e5bcc9474c45a40000000000000"
+
+[[case]]
+text = "0.000000000000000000001490969259563407275"
+strtold_bytes = "b17b629d59144fe1b93f000000000000"
+
+[[case]]
+text = "5e-31"
+strtof_nearest = "0d224260"
+strtof_upward = "0d224260"
+strtof_downward = "0d22425f"
+strtof_towardzero = "0d22425f"
+
+[[case]]
+text = "1e-30"
+strtof_nearest = "0da24260"
+strtof_upward = "0da24260"
+strtof_downward = "0da2425f"
+strtof_towardzero = "0da2425f"
+
+[[case]]
+text = "4.6123257e-31"
+strtof_nearest = "0d15adb4"
+strtof_upward = "0d15adb4"
+strtof_downward = "0d15adb3"
+strtof_towardzero = "0d15adb3"
