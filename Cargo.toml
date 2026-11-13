@@ -65,6 +65,7 @@ members = [
     "tools/ufs-fsck",
     "tools/ufs-mkfs",
     "tools/integration-inventory",
+    "tools/libc-census",
     "libc/spike/va",
     "libc/ravenlibc/crates/*",
     "userland/rt",

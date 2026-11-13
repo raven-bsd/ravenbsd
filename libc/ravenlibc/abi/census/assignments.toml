@@ -1,0 +1,11497 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# SEEDED by libc-census seed-assignments; review before merge.
+schema = 1
+
+[[assign]]
+name = "AF_NETLINK"
+ring = 3
+crate = "net"
+area = 12
+status = "SKIP"
+
+[[assign]]
+name = "AF_PACKET"
+ring = 3
+crate = "net"
+area = 12
+status = "SKIP"
+
+[[assign]]
+name = "LC_GLOBAL_LOCALE"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "MAX"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "MAXNAMLEN"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "MAXPATHLEN"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "MAXSYMLINKS"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "MB_CUR_MAX"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "MIN"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "NBBY"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "NOEXPR"
+ring = 0
+crate = "locale"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "YESEXPR"
+ring = 0
+crate = "locale"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "_Exit"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__assert"
+ring = 2
+personality = "bsd"
+crate = "stdlib"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__assert2"
+ring = 2
+personality = "bsd"
+crate = "stdlib"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__assert_fail"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "mixed row I01"
+
+[[assign]]
+name = "__chk_fail"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__ctype_get_mb_cur_max"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__cxa_atexit"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__cxa_finalize"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__cxa_thread_atexit_impl"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__dso_handle"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__environ"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "mixed row Z03"
+
+[[assign]]
+name = "__errno_location"
+ring = 0
+crate = "sys"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__error"
+ring = 2
+personality = "bsd"
+crate = "sys"
+area = 14
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__fbufsize"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__fgets_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__flbf"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__fpending"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__fpurge"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__fread_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__freadable"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__freadahead"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__freading"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__freadptr"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__freadptrinc"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__fseterr"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__fsetlocking"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__fwritable"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__fwriting"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__getcwd_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__gets_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__gnu_basename"
+ring = 1
+crate = "stdlib"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__h_errno_location"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__libc_calloc"
+ring = 2
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__libc_free"
+ring = 2
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__libc_malloc"
+ring = 2
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__libc_memalign"
+ring = 2
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__libc_realloc"
+ring = 2
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__libc_single_threaded"
+ring = 1
+crate = "thread"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__libc_start_main"
+ring = "private"
+crate = "shell"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__memcpy_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__memmove_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__memset_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__pread_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__progname"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__progname_full"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__raven_libc_start"
+ring = "private"
+crate = "shell"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__read_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__readlink_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__recv_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__rl_atfork_run"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_cancel_point"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_collate"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_dl_real"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_fini_array"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_fmt_float"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_fmt_wide"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_funcs_on_exit"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_locale_load"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_malloc_debug"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_malloc_impl"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_nss_dispatch"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_resolv_hosts"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_scan_float"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_stdio_exit"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_thread_exit_dtors"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_tz_load"
+ring = "private"
+crate = "shell"
+area = 16
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__snprintf_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__sprintf_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__stack_chk_fail"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__stack_chk_guard"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__stpcpy_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__strcat_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__strcpy_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__strncat_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__strncpy_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__tls_get_addr"
+ring = "private"
+crate = "rtld"
+area = 13
+status = "EXISTS-donor"
+ring_override = "mixed row Z09"
+
+[[assign]]
+name = "__tlsdesc_dynamic"
+ring = "private"
+crate = "rtld"
+area = 13
+status = "EXISTS-donor"
+ring_override = "mixed row Z09"
+
+[[assign]]
+name = "__tlsdesc_static"
+ring = "private"
+crate = "rtld"
+area = 13
+status = "EXISTS-donor"
+ring_override = "mixed row Z09"
+
+[[assign]]
+name = "__vsnprintf_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__vsprintf_chk"
+ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "_ctype_"
+ring = 3
+area = 2
+status = "SKIP"
+
+[[assign]]
+name = "_environ"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "mixed row Z03"
+
+[[assign]]
+name = "_exit"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "_flushlbf"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "_r_debug_postinit"
+ring = "private"
+crate = "rtld"
+area = 13
+status = "EXISTS-donor"
+ring_override = "mixed row Z09"
+
+[[assign]]
+name = "_raven_thread_list_head"
+ring = "private"
+crate = "thread"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "_rtld_allocate_tls"
+ring = "private"
+crate = "rtld"
+area = 13
+status = "EXISTS-donor"
+ring_override = "mixed row Z09"
+
+[[assign]]
+name = "_rtld_free_tls"
+ring = "private"
+crate = "rtld"
+area = 13
+status = "EXISTS-donor"
+ring_override = "mixed row Z09"
+
+[[assign]]
+name = "_rtld_get_stack_prot"
+ring = "private"
+crate = "rtld"
+area = 13
+status = "EXISTS-donor"
+ring_override = "mixed row Z09"
+
+[[assign]]
+name = "_rtld_set_dlerror_slot"
+ring = "private"
+crate = "rtld"
+area = 13
+status = "EXISTS-donor"
+ring_override = "mixed row Z09"
+
+[[assign]]
+name = "_rtld_version"
+ring = "private"
+crate = "rtld"
+area = 13
+status = "EXISTS-donor"
+ring_override = "mixed row Z09"
+
+[[assign]]
+name = "_thread_db_version"
+ring = "private"
+crate = "thread"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "_tolower_tab_"
+ring = 3
+area = 2
+status = "SKIP"
+
+[[assign]]
+name = "_uc"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "_ui"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "_ul"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "_ull"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "_us"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "a64l"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "abort"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "abs"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "accept"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "accept4"
+ring = 1
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "access"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "acos"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "acosh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "acospi"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "addmntent"
+ring = 1
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "adjtime"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "aio_cancel"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "aio_error"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "aio_fsync"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "aio_read"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "aio_return"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "aio_suspend"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "aio_write"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "alarm"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "aligned_alloc"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "alphasort"
+ring = 0
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "arc4random"
+ring = 1
+crate = "rand"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "arc4random_buf"
+ring = 1
+crate = "rand"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "arc4random_uniform"
+ring = 1
+crate = "rand"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "arch_prctl"
+ring = 3
+area = 10
+status = "SKIP"
+
+[[assign]]
+name = "asctime"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "asin"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "asinh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "asinpi"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "asprintf"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "assert"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "mixed row I01"
+
+[[assign]]
+name = "at_quick_exit"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "atan"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "atan2"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "atan2pi"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "atanh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "atanpi"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "atexit"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "atof"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "atof_l"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "atoi"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "atol"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "atoll"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "backtrace"
+ring = 1
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "backtrace_symbols"
+ring = 1
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "backtrace_symbols_fd"
+ring = 1
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "basename"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "bcmp"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "bcopy"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "be16toh"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "be32toh"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "be64toh"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "bgets"
+ring = 3
+area = 7
+status = "SKIP"
+
+[[assign]]
+name = "bind"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "bind_textdomain_codeset"
+ring = 1
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "bindtextdomain"
+ring = 1
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "bsearch"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "bswap16"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "bswap32"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "bswap64"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "bswap_16"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "bswap_32"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "bswap_64"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "btowc"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "bufsplit"
+ring = 3
+area = 7
+status = "SKIP"
+
+[[assign]]
+name = "bzero"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "c16rtomb"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "c32rtomb"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "c8rtomb"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cabs"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cacos"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cacosh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "caddr_t"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "call_once"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "calloc"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "canonicalize"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "canonicalize_file_name"
+ring = 2
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cap_enter"
+ring = 3
+crate = "pledge"
+area = 10
+status = "SKIP"
+
+[[assign]]
+name = "cap_getmode"
+ring = 3
+crate = "pledge"
+area = 10
+status = "SKIP"
+
+[[assign]]
+name = "cap_rights_clear"
+ring = 3
+crate = "pledge"
+area = 10
+status = "SKIP"
+
+[[assign]]
+name = "cap_rights_init"
+ring = 3
+crate = "pledge"
+area = 10
+status = "SKIP"
+
+[[assign]]
+name = "cap_rights_is_set"
+ring = 3
+crate = "pledge"
+area = 10
+status = "SKIP"
+
+[[assign]]
+name = "cap_rights_limit"
+ring = 3
+crate = "pledge"
+area = 10
+status = "SKIP"
+
+[[assign]]
+name = "cap_rights_set"
+ring = 3
+crate = "pledge"
+area = 10
+status = "SKIP"
+
+[[assign]]
+name = "cap_sandboxed"
+ring = 3
+crate = "pledge"
+area = 10
+status = "SKIP"
+
+[[assign]]
+name = "capget"
+ring = 3
+area = 11
+status = "SKIP"
+
+[[assign]]
+name = "capset"
+ring = 3
+area = 11
+status = "SKIP"
+
+[[assign]]
+name = "carg"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "casin"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "casinh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "catan"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "catanh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "catclose"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "catgets"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "catopen"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "cbrt"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ccos"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ccosh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ceil"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cexp"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cfgetispeed"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "cfgetospeed"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "cfmakeraw"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "cfsetispeed"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "cfsetospeed"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "cfsetspeed"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "cgetcap"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cgetclose"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cgetent"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cgetfirst"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cgetmatch"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cgetnext"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cgetnum"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cgetset"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cgetstr"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cgetustr"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "chdir"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "chflags"
+ring = 3
+area = 11
+status = "SKIP"
+
+[[assign]]
+name = "chmod"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "chown"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "cimag"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "clearenv"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "clearerr"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "clearerr_unlocked"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "clock"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "clock_getcpuclockid"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "clock_getres"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "clock_gettime"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "clock_nanosleep"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "clock_settime"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "clog"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "close"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "close_range"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "closedir"
+ring = 0
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "closefrom"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "closelog"
+ring = 0
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "cnd_broadcast"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cnd_destroy"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cnd_init"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cnd_signal"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cnd_timedwait"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cnd_wait"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "compoundn"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "cond_init"
+ring = 3
+status = "SKIP"
+
+[[assign]]
+name = "cond_signal"
+ring = 3
+status = "SKIP"
+
+[[assign]]
+name = "cond_wait"
+ring = 3
+status = "SKIP"
+
+[[assign]]
+name = "confstr"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "conj"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "connect"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "copy_file_range"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "copylist"
+ring = 3
+area = 7
+status = "SKIP"
+
+[[assign]]
+name = "copysign"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cos"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cosh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cospi"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "cpow"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cproj"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "creal"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "creat"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "creat64"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
+name = "crypt"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "crypt_r"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "csin"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "csinh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "csqrt"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ctan"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ctanh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ctermid"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ctime"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "daylight"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dcgettext"
+ring = 1
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "dcngettext"
+ring = 1
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "dgettext"
+ring = 1
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "difftime"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dirfd"
+ring = 0
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dirname"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "div"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dl_iterate_phdr"
+ring = 1
+crate = "shell"
+area = 13
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dladdr"
+ring = 1
+crate = "shell"
+area = 13
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dlclose"
+ring = 0
+crate = "shell"
+area = 13
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dlerror"
+ring = 0
+crate = "shell"
+area = 13
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dlinfo"
+ring = 1
+crate = "shell"
+area = 13
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dlopen"
+ring = 0
+crate = "shell"
+area = 13
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dlsym"
+ring = 0
+crate = "shell"
+area = 13
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dlvsym"
+ring = 1
+crate = "shell"
+area = 13
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dn_comp"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dn_expand"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dn_skipname"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dngettext"
+ring = 1
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "door_call"
+ring = 3
+area = 14
+status = "SKIP"
+
+[[assign]]
+name = "door_create"
+ring = 3
+area = 14
+status = "SKIP"
+
+[[assign]]
+name = "door_return"
+ring = 3
+area = 14
+status = "SKIP"
+
+[[assign]]
+name = "door_server_create"
+ring = 3
+area = 14
+status = "SKIP"
+
+[[assign]]
+name = "dprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "drand48"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "drem"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dremf"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "dup"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "dup2"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "dup3"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "duplocale"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "ecvt"
+ring = 1
+crate = "stdlib"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "ecvt_r"
+ring = 1
+crate = "stdlib"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "elf_aux_info"
+ring = 2
+personality = "bsd"
+crate = "sys"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "endgrent"
+ring = 0
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "endhostent"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "endmntent"
+ring = 1
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "endnetent"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "endprotoent"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "endpwent"
+ring = 0
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "endservent"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "endspent"
+ring = 2
+personality = "linux"
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "endttyent"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "endusershell"
+ring = 1
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "endutxent"
+ring = 0
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "environ"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "epoll_create"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "epoll_create1"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "epoll_ctl"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "epoll_pwait"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "epoll_pwait2"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "epoll_wait"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "erand48"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "erf"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "erfc"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "err"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "err_set_exit"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "err_set_file"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "errc"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "errno"
+ring = 0
+crate = "sys"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "error"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "error_at_line"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "error_message_count"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "error_one_per_line"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "error_print_progname"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "errx"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "eventfd"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "eventfd_read"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "eventfd_write"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "execl"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "execle"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "execlp"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "execv"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "execve"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "execvp"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "exit"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "exp"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "exp10"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "exp10f"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "exp10l"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "exp10m1"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "exp2"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "exp2m1"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "expand_number"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "explicit_bzero"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "expm1"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fabs"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fallocate"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fanotify_init"
+ring = 3
+area = 11
+status = "SKIP"
+
+[[assign]]
+name = "fanotify_mark"
+ring = 3
+area = 11
+status = "SKIP"
+
+[[assign]]
+name = "fchdir"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fchflags"
+ring = 3
+area = 11
+status = "SKIP"
+
+[[assign]]
+name = "fchmod"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fchmodat"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fchown"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fchownat"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fclose"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fcloseall"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fcntl"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fcvt"
+ring = 1
+crate = "stdlib"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fcvt_r"
+ring = 1
+crate = "stdlib"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fdatasync"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fdim"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fdopen"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fdopendir"
+ring = 0
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "feclearexcept"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fedisableexcept"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "feenableexcept"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fegetenv"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fegetexcept"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fegetexceptflag"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fegetmode"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fegetround"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "feholdexcept"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "feof"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "feof_unlocked"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "feraiseexcept"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ferror"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ferror_unlocked"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fesetenv"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fesetexcept"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fesetexceptflag"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fesetmode"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fesetround"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fetestexcept"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fetestexceptflag"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "feupdateenv"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fexecve"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fflush"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fflush_unlocked"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ffs"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ffsl"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ffsll"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fgetc"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fgetc_unlocked"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fgetgrent"
+ring = 1
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fgetln"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fgetpos"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fgetpwent"
+ring = 1
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fgets"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fgets_unlocked"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fgetspent"
+ring = 2
+personality = "linux"
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fgetwc"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fgetws"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fileno"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fileno_unlocked"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "finite"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "finitef"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "flock"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "flockfile"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "floor"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "flopen"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fls"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "flsl"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "flsll"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fma"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fmax"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fmaximum"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fmaximum_mag"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fmaximum_mag_num"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fmaximum_num"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fmaxmag"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fmemopen"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fmin"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fminimum"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fminimum_mag"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fminimum_mag_num"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fminimum_num"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fminmag"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fmod"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fmt_scaled"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fmtmsg"
+ring = 0
+crate = "glob"
+area = 14
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fnmatch"
+ring = 0
+crate = "glob"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fopen"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fopencookie"
+ring = 2
+personality = "linux"
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fork"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "forkpty"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fparseln"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fpathconf"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fpclassify"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fpgetmask"
+ring = 2
+personality = "bsd"
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fpgetprec"
+ring = 2
+personality = "bsd"
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fpgetround"
+ring = 2
+personality = "bsd"
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fpgetsticky"
+ring = 2
+personality = "bsd"
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fpsetmask"
+ring = 2
+personality = "bsd"
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fpsetprec"
+ring = 2
+personality = "bsd"
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fpsetround"
+ring = 2
+personality = "bsd"
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fpsetsticky"
+ring = 2
+personality = "bsd"
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fpurge"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fputc"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fputc_unlocked"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fputs"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fputs_unlocked"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fputwc"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fputws"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fread"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fread_unlocked"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "free"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "free_aligned_sized"
+ring = 0
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "free_sized"
+ring = 0
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "freeaddrinfo"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "freeifaddrs"
+ring = 1
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "freelocale"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "freezero"
+ring = 1
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "freopen"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "frexp"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fromfp"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fromfpx"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fscanf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fseek"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fseeko"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fsetpos"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fstat"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fstat64"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fstatat"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fstatat64"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fstatfs"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fstatfs64"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fstatvfs"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fsync"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "ftell"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ftello"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ftok"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "ftruncate"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "ftruncate64"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ftrylockfile"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fts_children"
+ring = 1
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fts_close"
+ring = 1
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fts_open"
+ring = 1
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fts_openat"
+ring = 1
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fts_read"
+ring = 1
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fts_set"
+ring = 1
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ftw"
+ring = 0
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "funlockfile"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "funopen"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "futimens"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "futimes"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fwide"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fwprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fwrite"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fwrite_unlocked"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fwscanf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gai_strerror"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gamma"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gammaf"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gcvt"
+ring = 1
+crate = "stdlib"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "get_avphys_pages"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "get_current_dir_name"
+ring = 2
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "get_nprocs"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "get_nprocs_conf"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "get_phys_pages"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getaddrinfo"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getauxval"
+ring = 1
+crate = "sys"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getbsize"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getc"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getc_unlocked"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getchar"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getchar_unlocked"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getcontext"
+ring = 1
+crate = "signal"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getcwd"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getdate"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+ring_override = "mixed row X62"
+
+[[assign]]
+name = "getdelim"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getdomainname"
+ring = 1
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getdtablesize"
+ring = 1
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getegid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getentropy"
+ring = 1
+crate = "platform"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getenv"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getenv_r"
+ring = 2
+personality = "bsd"
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "geteuid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getexecname"
+ring = 2
+personality = "solaris"
+crate = "p-sol"
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getfsstat"
+ring = 1
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getgid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getgrent"
+ring = 0
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getgrgid"
+ring = 0
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getgrgid_r"
+ring = 0
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getgrnam"
+ring = 0
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getgrnam_r"
+ring = 0
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getgrouplist"
+ring = 1
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getgroups"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "gethostbyaddr"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gethostbyaddr_r"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gethostbyname"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gethostbyname2"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gethostbyname2_r"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gethostbyname_r"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gethostent"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gethostid"
+ring = 1
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "gethostname"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getifaddrs"
+ring = 1
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getisax"
+ring = 2
+personality = "solaris"
+crate = "p-sol"
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getitimer"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getline"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getloadavg"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getlogin"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getlogin_r"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getmntent"
+ring = 1
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getmntent_r"
+ring = 1
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getmntinfo"
+ring = 1
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getmode"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getnameinfo"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getnetbyaddr"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getnetbyname"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getnetent"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getopt"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getopt_long"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getopt_long_only"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getpagesize"
+ring = 1
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getpass"
+ring = 1
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getpayload"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getpeername"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getpgid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getpgrp"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getpid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getppid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getppriv"
+ring = 3
+area = 14
+status = "SKIP"
+
+[[assign]]
+name = "getpriority"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getprogname"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getprotobyname"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getprotobyname_r"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getprotobynumber"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getprotobynumber_r"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getprotoent"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getpwent"
+ring = 0
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getpwent_r"
+ring = 1
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getpwnam"
+ring = 0
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getpwnam_r"
+ring = 0
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getpwuid"
+ring = 0
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getpwuid_r"
+ring = 0
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getrandom"
+ring = 1
+crate = "rand"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getrlimit"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getrusage"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getservbyname"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getservbyname_r"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getservbyport"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getservbyport_r"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getservent"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getsid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getsockname"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getsockopt"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getspent"
+ring = 2
+personality = "linux"
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getspnam"
+ring = 2
+personality = "linux"
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getspnam_r"
+ring = 2
+personality = "linux"
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getsubopt"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gettext"
+ring = 1
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "gettimeofday"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getttyent"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getttynam"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getuid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getusershell"
+ring = 1
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getutxent"
+ring = 0
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getutxid"
+ring = 0
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getutxline"
+ring = 0
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getw"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getwc"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getwchar"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getwd"
+ring = 1
+crate = "platform"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getxattr"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "SKIP"
+
+[[assign]]
+name = "gid_from_group"
+ring = 1
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "glob"
+ring = 0
+crate = "glob"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "globfree"
+ring = 0
+crate = "glob"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gmatch"
+ring = 3
+area = 7
+status = "SKIP"
+
+[[assign]]
+name = "gmtime"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gnu_dev_major"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gnu_dev_makedev"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gnu_dev_minor"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gnu_get_libc_release"
+ring = 3
+area = 14
+status = "SKIP"
+
+[[assign]]
+name = "gnu_get_libc_version"
+ring = 3
+area = 14
+status = "SKIP"
+
+[[assign]]
+name = "grantpt"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "group_from_gid"
+ring = 1
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "h_errno"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "hasmntopt"
+ring = 1
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "hcreate"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "hcreate_r"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "hdestroy"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "hdestroy_r"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "heapsort"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "herror"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "howmany"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "hsearch"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "hsearch_r"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "hstrerror"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "htobe16"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "htobe32"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "htobe64"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "htole16"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "htole32"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "htole64"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "htonl"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "htons"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "humanize_number"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "hypot"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iconv"
+ring = 0
+crate = "iconv"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iconv_close"
+ring = 0
+crate = "iconv"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iconv_open"
+ring = 0
+crate = "iconv"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "if_freenameindex"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "if_indextoname"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "if_nameindex"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "if_nametoindex"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "ilogb"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "imaxabs"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "imaxdiv"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "in6addr_any"
+ring = 0
+crate = "abi"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "in6addr_loopback"
+ring = 0
+crate = "abi"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "index"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "inet_addr"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "inet_aton"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "inet_lnaof"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "inet_makeaddr"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "inet_net_ntop"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "inet_net_pton"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "inet_netof"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "inet_network"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "inet_ntoa"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "inet_ntop"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "inet_pton"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "initgroups"
+ring = 1
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "initstate"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "inotify_add_watch"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "inotify_init"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "inotify_init1"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "inotify_rm_watch"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "insque"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ioctl"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "isalnum"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isalnum_l"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isalpha"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isalpha_l"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isatty"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "isblank"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isblank_l"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iscntrl"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iscntrl_l"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isdigit"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isdigit_l"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isfinite"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isgraph"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isgraph_l"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isinf"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "islower"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "islower_l"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isnan"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isnormal"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isprint"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isprint_l"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ispunct"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ispunct_l"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "issetugid"
+ring = 1
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "issignaling"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "isspace"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isspace_l"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isupper"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isupper_l"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iswalnum"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iswalpha"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iswblank"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iswcntrl"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iswctype"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iswdigit"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iswgraph"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iswlower"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iswprint"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iswpunct"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iswspace"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iswupper"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iswxdigit"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isxdigit"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "isxdigit_l"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "iszero"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "jrand48"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "kevent"
+ring = 2
+personality = "bsd"
+crate = "p-bsd"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "kill"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "killpg"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "kqueue"
+ring = 2
+personality = "bsd"
+crate = "p-bsd"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "kqueue1"
+ring = 2
+personality = "bsd"
+crate = "p-bsd"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "kstat_open"
+ring = 3
+area = 14
+status = "SKIP"
+
+[[assign]]
+name = "l64a"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "labs"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lchflags"
+ring = 3
+area = 11
+status = "SKIP"
+
+[[assign]]
+name = "lchmod"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "lchown"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "lckpwdf"
+ring = 2
+personality = "linux"
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lcong48"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ldexp"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ldiv"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "le16toh"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "le32toh"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "le64toh"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lfind"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lgamma"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lgamma_r"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lgammaf_r"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lgammal_r"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "link"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "link_map"
+ring = 1
+crate = "shell"
+area = 13
+status = "EXISTS-donor"
+
+[[assign]]
+name = "linkat"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "lio_listio"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "listen"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "listxattr"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "SKIP"
+
+[[assign]]
+name = "llabs"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lldiv"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "llogb"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "llrint"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "llround"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "localeconv"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "localtime"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "localtime_rz"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lockf"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "log"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "log10"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "log10p1"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "log1p"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "log2"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "log2p1"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "logb"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "login_tty"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "logp1"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "longjmp"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lrand48"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lrint"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lround"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lsearch"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lseek"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "lseek64"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lstat"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "lstat64"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lutimes"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "madvise"
+ring = 1
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+ring_override = "mixed row X70"
+
+[[assign]]
+name = "major"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "makecontext"
+ring = 1
+crate = "signal"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "makedev"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mallinfo"
+ring = 2
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mallinfo2"
+ring = 2
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "malloc"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "malloc_stats"
+ring = 2
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "malloc_trim"
+ring = 2
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "malloc_usable_size"
+ring = 1
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mallopt"
+ring = 2
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mblen"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mbrlen"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mbrtoc16"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mbrtoc32"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mbrtoc8"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mbrtowc"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mbsinit"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mbsnrtowcs"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mbsrtowcs"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mbstowcs"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mbtowc"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "memalign"
+ring = 1
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "memalignment"
+ring = 0
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "memccpy"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "memchr"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "memcmp"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "memcpy"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "memfd_create"
+ring = 1
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+ring_override = "mixed row X70"
+
+[[assign]]
+name = "memmem"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "memmove"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mempcpy"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "memrchr"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "memset"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "memset_explicit"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mergesort"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mimmutable"
+ring = 3
+area = 15
+status = "SKIP"
+
+[[assign]]
+name = "mincore"
+ring = 1
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+ring_override = "mixed row X70"
+
+[[assign]]
+name = "minherit"
+ring = 3
+area = 15
+status = "SKIP"
+
+[[assign]]
+name = "minor"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mkdir"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mkdirat"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mkdtemp"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mkfifo"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mkfifoat"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mknod"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mknodat"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mkostemp"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mkostemps"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mkstemp"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mkstemps"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mktemp"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mktime"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mktime_z"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mlock"
+ring = 0
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mlock2"
+ring = 1
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+ring_override = "mixed row X70"
+
+[[assign]]
+name = "mlockall"
+ring = 0
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mmap"
+ring = 0
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mmap64"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
+name = "modf"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mount"
+ring = 1
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mprotect"
+ring = 0
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mq_close"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mq_getattr"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mq_notify"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mq_open"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mq_receive"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mq_send"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mq_setattr"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mq_timedreceive"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mq_timedsend"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mq_unlink"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mrand48"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mremap"
+ring = 1
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+ring_override = "mixed row X70"
+
+[[assign]]
+name = "msgctl"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "msgget"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "msgrcv"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "msgsnd"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "msync"
+ring = 0
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mtx_destroy"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mtx_init"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mtx_lock"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mtx_timedlock"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mtx_trylock"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mtx_unlock"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "munlock"
+ring = 0
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "munlockall"
+ring = 0
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "munmap"
+ring = 0
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mutex_init"
+ring = 3
+status = "SKIP"
+
+[[assign]]
+name = "mutex_lock"
+ring = 3
+status = "SKIP"
+
+[[assign]]
+name = "mutex_unlock"
+ring = 3
+status = "SKIP"
+
+[[assign]]
+name = "name_to_handle_at"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "nan"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "nanosleep"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "nearbyint"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "newlocale"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "nextafter"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "nextdown"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "nexttoward"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "nexttowardf"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "nextup"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "nftw"
+ring = 0
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ngettext"
+ring = 1
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "nitems"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "nl_langinfo"
+ring = 0
+crate = "locale"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "nl_langinfo_l"
+ring = 0
+crate = "locale"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "nrand48"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ns_get16"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ns_get32"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ns_initparse"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ns_name_compress"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ns_name_ntop"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ns_name_pton"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ns_name_uncompress"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ns_parserr"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ns_put16"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ns_put32"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ns_skiprr"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ntohl"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ntohs"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "nvis"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "on_exit"
+ring = 2
+personality = "linux"
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "open"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "open64"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
+name = "open_memstream"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "open_wmemstream"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "openat"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "openat2"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "openat64"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
+name = "opendir"
+ring = 0
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "openlog"
+ring = 0
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "openpty"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "optarg"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "opterr"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "optind"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "optopt"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "optreset"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "p2close"
+ring = 3
+area = 7
+status = "SKIP"
+
+[[assign]]
+name = "p2open"
+ring = 3
+area = 7
+status = "SKIP"
+
+[[assign]]
+name = "pathconf"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pause"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pclose"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "perror"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "personality"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pidfile_close"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pidfile_open"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pidfile_remove"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pidfile_write"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pipe"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pipe2"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pledge"
+ring = 2
+personality = "bsd"
+crate = "pledge"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "poll"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "popen"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "port_alert"
+ring = 2
+personality = "solaris"
+crate = "p-sol"
+area = 14
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "port_associate"
+ring = 2
+personality = "solaris"
+crate = "p-sol"
+area = 14
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "port_create"
+ring = 2
+personality = "solaris"
+crate = "p-sol"
+area = 14
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "port_dissociate"
+ring = 2
+personality = "solaris"
+crate = "p-sol"
+area = 14
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "port_get"
+ring = 2
+personality = "solaris"
+crate = "p-sol"
+area = 14
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "port_getn"
+ring = 2
+personality = "solaris"
+crate = "p-sol"
+area = 14
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "port_send"
+ring = 2
+personality = "solaris"
+crate = "p-sol"
+area = 14
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "posix_fadvise"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "posix_fallocate"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "posix_getdents"
+ring = 0
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_madvise"
+ring = 0
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "posix_memalign"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_openpt"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawn"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "posix_spawnp"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pow"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pow10"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "powerof2"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pown"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "powr"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "ppoll"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "prctl"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pread"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pread64"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
+name = "preadv"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "preadv2"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "printf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "processor_bind"
+ring = 3
+area = 14
+status = "SKIP"
+
+[[assign]]
+name = "program_invocation_name"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "program_invocation_short_name"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pselect"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pset_create"
+ring = 3
+area = 14
+status = "SKIP"
+
+[[assign]]
+name = "psiginfo"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "psignal"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_atfork"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_get_np"
+ring = 2
+personality = "bsd"
+crate = "thread"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pthread_attr_setdefault_np"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_cancel"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_cond_clockwait"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_create"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_detach"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_equal"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_exit"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_get_name_np"
+ring = 2
+personality = "bsd"
+crate = "thread"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pthread_getaffinity_np"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_getattr_default_np"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_getattr_np"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_getconcurrency"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_getcpuclockid"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_getname_np"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_getschedparam"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_getspecific"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_join"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_key_create"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_key_delete"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_kill"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_main_np"
+ring = 2
+personality = "bsd"
+crate = "thread"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pthread_mutex_clocklock"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutex_consistent"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutex_timedlock"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+ring_override = "mixed row X59"
+
+[[assign]]
+name = "pthread_once"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_resume_np"
+ring = 2
+personality = "bsd"
+crate = "thread"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pthread_rwlock_clockrdlock"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_rwlock_clockwrlock"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_self"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_set_name_np"
+ring = 2
+personality = "bsd"
+crate = "thread"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pthread_setaffinity_np"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_setattr_default_np"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_setcancelstate"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_setcanceltype"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_setconcurrency"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_setname_np"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_setschedparam"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_setschedprio"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_setspecific"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_sigmask"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_suspend_np"
+ring = 2
+personality = "bsd"
+crate = "thread"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pthread_testcancel"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_timedjoin_np"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_tryjoin_np"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_yield"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+ring_override = "mixed row X59"
+
+[[assign]]
+name = "ptrace"
+ring = 3
+area = 10
+status = "SKIP"
+
+[[assign]]
+name = "ptsname"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ptsname_r"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "putc"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "putc_unlocked"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "putchar"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "putchar_unlocked"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "putenv"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "putgrent"
+ring = 1
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "putpwent"
+ring = 1
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "puts"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "putspent"
+ring = 2
+personality = "linux"
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pututxline"
+ring = 0
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "putw"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "putwc"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "putwchar"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pvalloc"
+ring = 1
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pwrite"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pwrite64"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pwritev"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pwritev2"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "qsort"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "qsort_r"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "quad_t"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "quick_exit"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "r_debug"
+ring = 1
+crate = "shell"
+area = 13
+status = "EXISTS-donor"
+
+[[assign]]
+name = "r_debug_state"
+ring = "private"
+crate = "rtld"
+area = 13
+status = "EXISTS-donor"
+ring_override = "mixed row Z09"
+
+[[assign]]
+name = "radixsort"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "raise"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rand"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rand_r"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "random"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rawmemchr"
+ring = 2
+personality = "linux"
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "read"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "readahead"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "readdir"
+ring = 0
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "readdir64"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
+name = "readdir_r"
+ring = 0
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "readlink"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "readlinkat"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "readpassphrase"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "readv"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "realloc"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "reallocarray"
+ring = 1
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "reallocf"
+ring = 1
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "realpath"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "reboot"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "recallocarray"
+ring = 1
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "recv"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "recvfrom"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "recvmmsg"
+ring = 1
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "recvmsg"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "regcmp"
+ring = 3
+area = 7
+status = "SKIP"
+
+[[assign]]
+name = "regcomp"
+ring = 0
+crate = "regex"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "regerror"
+ring = 0
+crate = "regex"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "regex"
+ring = 3
+area = 7
+status = "SKIP"
+
+[[assign]]
+name = "regexec"
+ring = 0
+crate = "regex"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "regfree"
+ring = 0
+crate = "regex"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "remainder"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "remap_file_pages"
+ring = 2
+personality = "linux"
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "remove"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "removexattr"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "SKIP"
+
+[[assign]]
+name = "remque"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "remquo"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rename"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "renameat"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "renameat2"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "res_init"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "res_mkquery"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "res_nclose"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "res_ninit"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "res_nmkquery"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "res_nquery"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "res_nquerydomain"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "res_nsearch"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "res_nsend"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "res_query"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "res_querydomain"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "res_search"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "res_send"
+ring = 1
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rewind"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rewinddir"
+ring = 0
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rindex"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rint"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rmdir"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "rootn"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "round"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rounddown"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "roundeven"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "roundup"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rsqrt"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "rwlock_init"
+ring = 3
+status = "SKIP"
+
+[[assign]]
+name = "scalb"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "scalbf"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "scalbln"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "scalbn"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "scandir"
+ring = 0
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "scanf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sched_get_priority_max"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sched_get_priority_min"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sched_getaffinity"
+ring = 1
+crate = "thread"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sched_getcpu"
+ring = 1
+crate = "thread"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sched_getparam"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sched_getscheduler"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sched_rr_get_interval"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sched_setaffinity"
+ring = 1
+crate = "thread"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sched_setparam"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sched_setscheduler"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sched_yield"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "secure_getenv"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "seed48"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "seekdir"
+ring = 0
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "select"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sem_clockwait"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sem_close"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sem_destroy"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sem_getvalue"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sem_init"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sem_open"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sem_post"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sem_timedwait"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sem_trywait"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sem_unlink"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sem_wait"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sema_init"
+ring = 3
+status = "SKIP"
+
+[[assign]]
+name = "semctl"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "semget"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "semop"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "send"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sendfile"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sendmmsg"
+ring = 1
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sendmsg"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sendto"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setbuf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setbuffer"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setcontext"
+ring = 1
+crate = "signal"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setdomainname"
+ring = 1
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setegid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setenv"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "seteuid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setgid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setgrent"
+ring = 0
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setgroupent"
+ring = 1
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sethostent"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sethostid"
+ring = 1
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sethostname"
+ring = 1
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setitimer"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setjmp"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setlinebuf"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setlocale"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setlogmask"
+ring = 0
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setmntent"
+ring = 1
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setmode"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setnetent"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setpassent"
+ring = 1
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setpayload"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setpayloadsig"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setpgid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setpriority"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setproctitle"
+ring = 2
+personality = "bsd"
+crate = "p-bsd"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setproctitle_fast"
+ring = 2
+personality = "bsd"
+crate = "p-bsd"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setprogname"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setprotoent"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setpwent"
+ring = 0
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setregid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setreuid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setrlimit"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setservent"
+ring = 0
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setsid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setsockopt"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setspent"
+ring = 2
+personality = "linux"
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setstate"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "settimeofday"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setttyent"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setuid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setusershell"
+ring = 1
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setutxent"
+ring = 0
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setvbuf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setxattr"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "SKIP"
+
+[[assign]]
+name = "shm_open"
+ring = 0
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "shm_unlink"
+ring = 0
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "shmat"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "shmctl"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "shmdt"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "shmget"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "shutdown"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sig2str"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigaction"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigaddset"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigaltstack"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigdelset"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigemptyset"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigfillset"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sighold"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigignore"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "siginterrupt"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigismember"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "siglongjmp"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "signal"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "signalfd"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "signbit"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "signgam"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "significand"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "significandf"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigpause"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigpending"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigprocmask"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigqueue"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigrelse"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigset"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigsetjmp"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigsuspend"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigtimedwait"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigwait"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sigwaitinfo"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sin"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sincos"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sincosf"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sincosl"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sinh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sinpi"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sl_add"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sl_find"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sl_free"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sl_init"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sleep"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "snprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "snprintf_ss"
+ring = 2
+personality = "bsd"
+crate = "fmt"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "snvis"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sockaddr_un"
+ring = 0
+crate = "abi"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sockatmark"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "socket"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "socketpair"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "splice"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sqrt"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sradixsort"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "srand"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "srand48"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sranddev"
+ring = 3
+area = 3
+status = "SKIP"
+
+[[assign]]
+name = "srandom"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "srandom_deterministic"
+ring = 3
+area = 3
+status = "SKIP"
+
+[[assign]]
+name = "srandomdev"
+ring = 3
+area = 3
+status = "SKIP"
+
+[[assign]]
+name = "sscanf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stat"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "stat64"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
+name = "statfs"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "statfs64"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "statvfs"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "statx"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 14
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "stdc_bit_ceil"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stdc_bit_floor"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stdc_bit_width"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stdc_count_ones"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stdc_count_zeros"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stdc_first_leading_one"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stdc_first_leading_zero"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stdc_first_trailing_one"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stdc_first_trailing_zero"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stdc_has_single_bit"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stdc_leading_ones"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stdc_leading_zeros"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stdc_trailing_ones"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stdc_trailing_zeros"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stderr"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stdin"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stdout"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stpcpy"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stpncpy"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "str2sig"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strcasecmp"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strcasecmp_l"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strcasestr"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strcat"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strchr"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strchrnul"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strcmp"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strcoll"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strcpy"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strcspn"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strdup"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strerror"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strerror_l"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strerror_r"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "stresep"
+ring = 2
+personality = "bsd"
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strfmon"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "strfmon_l"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "strfromd"
+ring = 0
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "strfromf"
+ring = 0
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "strfroml"
+ring = 0
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "strftime"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strftime_l"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+ring_override = "mixed row X62"
+
+[[assign]]
+name = "strftime_z"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strlcat"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strlcpy"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strlen"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strmode"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strncasecmp"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strncasecmp_l"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strncat"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strncmp"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strncpy"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strndup"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strnlen"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strnstr"
+ring = 2
+personality = "bsd"
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strnvis"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strpbrk"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strptime"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+ring_override = "mixed row X62"
+
+[[assign]]
+name = "strptime_l"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+ring_override = "mixed row X62"
+
+[[assign]]
+name = "strrchr"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strsep"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strsignal"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strsnvis"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strspn"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strstr"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strsvis"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtod"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtod_l"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtof"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtof_l"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtoi"
+ring = 2
+personality = "bsd"
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtoimax"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtok"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtok_r"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtol"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtol_l"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtold"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtold_l"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtoll"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtoll_l"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtonum"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtou"
+ring = 2
+personality = "bsd"
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtoul"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtoul_l"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtoull"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtoull_l"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strtoumax"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "struct"
+ring = 0
+crate = "abi"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strunvis"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strverscmp"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strvis"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strxfrm"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "suboptarg"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "mixed row Z16"
+
+[[assign]]
+name = "svis"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "swab"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "swapcontext"
+ring = 1
+crate = "signal"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "swprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "swscanf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "symlink"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "symlinkat"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sync"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sync_file_range"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "syscall"
+ring = 1
+crate = "shell"
+area = 14
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sysconf"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sysctl"
+ring = 2
+personality = "bsd"
+crate = "p-bsd"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sysctlbyname"
+ring = 2
+personality = "bsd"
+crate = "p-bsd"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sysctlgetmibinfo"
+ring = 2
+personality = "bsd"
+crate = "p-bsd"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sysctlnametomib"
+ring = 2
+personality = "bsd"
+crate = "p-bsd"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "sysinfo"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "syslog"
+ring = 0
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "system"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tan"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tanh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tanpi"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "tcdrain"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "tcflow"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "tcflush"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "tcgetattr"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "tcgetpgrp"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "tcgetsid"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "tcgetwinsize"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "tcsendbreak"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "tcsetattr"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "tcsetpgrp"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "tcsetwinsize"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "tdelete"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tdestroy"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tee"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "telldir"
+ring = 0
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "textdomain"
+ring = 1
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "tfind"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tgamma"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thr_create"
+ring = 3
+status = "SKIP"
+
+[[assign]]
+name = "thr_exit"
+ring = 3
+status = "SKIP"
+
+[[assign]]
+name = "thr_join"
+ring = 3
+status = "SKIP"
+
+[[assign]]
+name = "thr_kill"
+ring = 3
+status = "SKIP"
+
+[[assign]]
+name = "thr_self"
+ring = 3
+status = "SKIP"
+
+[[assign]]
+name = "thr_sigsetmask"
+ring = 3
+status = "SKIP"
+
+[[assign]]
+name = "thr_yield"
+ring = 3
+status = "SKIP"
+
+[[assign]]
+name = "thrd_create"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thrd_current"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thrd_detach"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thrd_equal"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thrd_exit"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thrd_join"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thrd_sleep"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thrd_yield"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "time"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timegm"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timelocal"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timer_create"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "timer_delete"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "timer_getoverrun"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "timer_gettime"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "timer_settime"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "timeradd"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timerclear"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timercmp"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timerfd_create"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "timerfd_gettime"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "timerfd_settime"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "timerisset"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timersub"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "times"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "timespec_get"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timespec_getres"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timespecadd"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timespecclear"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timespeccmp"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timespecisset"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timespecsub"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timezone"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timingsafe_bcmp"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timingsafe_memcmp"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tmpfile"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tmpnam"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tolower"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tolower_l"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "totalorder"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "totalordermag"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "toupper"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "toupper_l"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "towctrans"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "towlower"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "towupper"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "trunc"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "truncate"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "truncate64"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tsearch"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tss_create"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tss_delete"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tss_get"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tss_set"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ttyname"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "ttyname_r"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "twalk"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tzalloc"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tzfree"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tzname"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tzset"
+ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "u_char"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "u_int"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "u_long"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "u_short"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ualarm"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+ring_override = "mixed row X64"
+
+[[assign]]
+name = "ufromfp"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "ufromfpx"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "uid_from_user"
+ring = 1
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ulckpwdf"
+ring = 2
+personality = "linux"
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ulimit"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "umask"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "umount"
+ring = 1
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "umount2"
+ring = 1
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "uname"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "ungetc"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ungetwc"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "unlink"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "unlinkat"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "unlockpt"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "unsetenv"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "unveil"
+ring = 2
+personality = "bsd"
+crate = "pledge"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "unvis"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "uselocale"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "user_from_uid"
+ring = 1
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "usleep"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "utime"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "utimensat"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "utimes"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "uuid_compare"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "uuid_create"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "uuid_dec_le"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "uuid_enc_le"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "uuid_equal"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "uuid_from_string"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "uuid_is_nil"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "uuid_to_string"
+ring = 1
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "valloc"
+ring = 1
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vasprintf"
+ring = 1
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vdprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "verr"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "verrc"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "verrx"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "versionsort"
+ring = 0
+crate = "fts"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vfprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vfscanf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vfwprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vfwscanf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vis"
+ring = 2
+personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vmsplice"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "vprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vscanf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vsnprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vsnprintf_ss"
+ring = 2
+personality = "bsd"
+crate = "fmt"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vsprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vsscanf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vswprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vswscanf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vsyslog"
+ring = 0
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "vwarn"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vwarnc"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vwarnx"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vwprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "vwscanf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wait"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "wait3"
+ring = 1
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "wait4"
+ring = 1
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "wait6"
+ring = 1
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "waitid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "waitpid"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "warn"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "warnc"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "warnx"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcpcpy"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcpncpy"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcrtomb"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcscasecmp"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcscasecmp_l"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcscat"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcschr"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcscmp"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcscoll"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcscoll_l"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcscpy"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcscspn"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcsdup"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcsftime"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcslcat"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcslcpy"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcslen"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcsncasecmp"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcsncasecmp_l"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcsncat"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcsncmp"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcsncpy"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcsnlen"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcsnrtombs"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcspbrk"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcsrchr"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcsrtombs"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcsspn"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcsstr"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcstod"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcstof"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcstoimax"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcstok"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcstok_l"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcstol"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcstold"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcstoll"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcstombs"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcstoul"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcstoull"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcstoumax"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcswcs"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcsxfrm"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcsxfrm_l"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wctob"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wctomb"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wctrans"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wctype"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wmemchr"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wmemcmp"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wmemcpy"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wmemmove"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wmemset"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wordexp"
+ring = 0
+crate = "glob"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wordfree"
+ring = 0
+crate = "glob"
+area = 7
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "write"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "writev"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "wscanf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"

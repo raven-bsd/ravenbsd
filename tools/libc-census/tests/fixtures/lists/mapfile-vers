@@ -1,0 +1,16 @@
+$mapfile_version 2
+# Invented fixture written from the ticket grammar.
+SYMBOL_VERSION ILLUMOS_0.1 {
+    global:
+        arc4random;
+        environ;
+        epoll_create = FLAGS(0x1);
+        err;
+        getentropy { ASSERT(1, 2); };
+        memchr;
+        strlcat;
+        strlcpy;
+        warn;
+    local:
+        *;
+} ILLUMOS_0.0;

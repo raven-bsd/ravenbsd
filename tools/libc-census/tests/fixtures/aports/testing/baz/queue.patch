@@ -1,0 +1,4 @@
+--- a/z.c
++++ b/z.c
+@@ -1 +1,2 @@
++#include <sys/queue.h>

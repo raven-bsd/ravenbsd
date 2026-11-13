@@ -1,0 +1,4 @@
+--- a/one.c
++++ b/one.c
+@@ -1 +1,2 @@
++    strlcpy (dst, src, size);

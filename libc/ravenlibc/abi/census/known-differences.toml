@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# Reviewer input for compare-table; libc-census writes this file only when absent.
+schema = 1

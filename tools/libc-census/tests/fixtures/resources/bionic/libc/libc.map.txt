@@ -1,0 +1,10 @@
+LIBC {
+  global:
+    arc4random; # introduced=23
+    epoll_create; # x86
+    getentropy; # arm x86
+    strlcat; # arm
+    strlcpy; # arm
+  local:
+    *;
+};

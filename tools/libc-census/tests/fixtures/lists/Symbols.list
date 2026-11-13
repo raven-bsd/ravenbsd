@@ -1,0 +1,12 @@
+/* Invented fixture for the OpenBSD grammar; not a donor file.
+   Multi-line comment. */
+arc4random
+environ
+epoll_create
+err
+getentropy
+memchr
+strlcat
+strlcpy
+warn
+_yp_check /* trailing comment */
