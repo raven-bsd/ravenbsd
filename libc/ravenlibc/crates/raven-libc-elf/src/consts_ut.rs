@@ -1,5 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#![allow(
+    clippy::arithmetic_side_effects,
+    clippy::assertions_on_constants,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::unwrap_used
+)]
+// The header parser walks a text file; the arithmetic is over small line offsets.
 
 //! Constant checks: an independent table of the numbers, plus a re-read of `glibc/elf/elf.h`.
 
@@ -165,27 +174,33 @@ fn glibc_elf_h() -> Option<std::path::PathBuf> {
         .filter(|path| path.is_file())
 }
 
-/// Parse a `#define NAME ...` value as an integer, including hex and octal.
+/// Parse a `#define NAME ...` value as an integer, including hex, octal, `(N << S)` and decimal.
 fn define_value(text: &str, name: &str) -> Option<i64> {
     let mut rest = text;
     loop {
         let line_start = rest;
         let end = line_start.find('\n').unwrap_or(line_start.len());
-        let line = line_start.get(..end)?.trim();
+        let mut line = line_start.get(..end)?.trim();
+        // Drop a trailing comment.
+        if let Some(comment) = line.find("/*") {
+            line = line.get(..comment)?.trim();
+        }
         if let Some(tail) = line.strip_prefix("#define ") {
             let mut parts = tail.split_whitespace();
             if parts.next() == Some(name) {
-                let mut value = parts.next()?.trim_end_matches('L').trim_end_matches('U');
-                if value.starts_with('(') {
-                    value = value.trim_start_matches('(').trim_end_matches(')');
+                let expression: alloc::string::String =
+                    parts.collect::<alloc::vec::Vec<_>>().join(" ");
+                let expression = expression.trim();
+                let expression = expression
+                    .trim_start_matches('(')
+                    .trim_end_matches(')')
+                    .trim();
+                if let Some((left, right)) = expression.split_once("<<") {
+                    let left = parse_int(left.trim())?;
+                    let right = parse_int(right.trim())?;
+                    return left.checked_shl(u32::try_from(right).ok()?);
                 }
-                if let Some(hex) = value.strip_prefix("0x") {
-                    return i64::from_str_radix(hex, 16).ok();
-                }
-                if value.len() > 1 && value.starts_with('0') {
-                    return i64::from_str_radix(value.trim_start_matches('0'), 8).ok();
-                }
-                return value.parse().ok();
+                return parse_int(expression);
             }
         }
         if end >= rest.len() {
@@ -193,6 +208,18 @@ fn define_value(text: &str, name: &str) -> Option<i64> {
         }
         rest = rest.get(end + 1..)?;
     }
+}
+
+/// Parse one integer literal (`0x` hex, leading `0` octal, decimal; optional `L`/`U` suffixes).
+fn parse_int(text: &str) -> Option<i64> {
+    let value = text.trim_end_matches(['L', 'U', 'l', 'u']);
+    if let Some(hex) = value.strip_prefix("0x") {
+        return i64::from_str_radix(hex, 16).ok();
+    }
+    if value.len() > 1 && value.starts_with('0') {
+        return i64::from_str_radix(value.trim_start_matches('0'), 8).ok();
+    }
+    value.parse().ok()
 }
 
 #[test]

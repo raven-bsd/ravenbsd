@@ -375,3 +375,7 @@ pub const RTLD_DEEPBIND: u32 = 0x8;
 pub const RTLD_GLOBAL: u32 = 0x100;
 /// `RTLD_NODELETE`.
 pub const RTLD_NODELETE: u32 = 0x1000;
+
+#[cfg(test)]
+#[path = "consts_ut.rs"]
+mod tests;

@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # raven-libc-elf
 
 Pure logic for RavenBSD's dynamic loader: the ELF64 object view, the SysV and GNU hash tables,
