@@ -1,0 +1,73 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# fmt-musl: the musl printf engine as the second opinion. musl's fmt_fp uses
+# long double; the float cells compare the default-locale %e %f %g output only,
+# and the shim gives the donor its private FILE image.
+
+schema = 1
+family = "fmt-musl"
+description = "musl printf/wide-printf engine (second-opinion oracle)"
+exports = [
+    "__fputwc_unlocked",
+    "__fwritex",
+    "__lockfile",
+    "__overflow",
+    "__toread",
+    "__towrite",
+    "__uflow",
+    "__unlockfile",
+    "fprintf",
+    "fputwc",
+    "fwide",
+    "snprintf",
+    "swprintf",
+    "vfprintf",
+    "vfwprintf",
+    "vsnprintf",
+    "vswprintf",
+]
+opt = ["O2", "O0"]
+defines = ["_GNU_SOURCE"]
+include = [
+    "shim:fmt/musl",
+    "donor:musl/src/internal",
+    "donor:musl/arch/x86_64",
+]
+flags = []
+
+[[source]]
+donor = "musl"
+path = "src/stdio/vfprintf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/vsnprintf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/snprintf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/vfwprintf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/vswprintf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/swprintf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fprintf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fputwc.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fwide.c"

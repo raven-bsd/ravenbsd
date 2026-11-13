@@ -1,0 +1,125 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# fmt-musl-scanf: the musl scanf engine, the base of the Rust vscan. The wide
+# path pulls in the narrow printf engine because musl's vfwscanf formats the
+# numeric conversions through fprintf; that is a property of the donor, not of
+# the Rust design.
+
+schema = 1
+family = "fmt-musl-scanf"
+description = "musl scanf/wide-scanf engine (base of raven-libc-fmt vscan)"
+exports = [
+    "__fgetwc_unlocked",
+    "__floatscan",
+    "__fwritex",
+    "__intscan",
+    "__isoc99_swscanf",
+    "__isoc99_vfwscanf",
+    "__isoc99_vswscanf",
+    "__lockfile",
+    "__overflow",
+    "__shgetc",
+    "__shlim",
+    "__toread",
+    "__towrite",
+    "__uflow",
+    "__unlockfile",
+    "fgetwc",
+    "fprintf",
+    "fscanf",
+    "fwide",
+    "getwc",
+    "snprintf",
+    "sscanf",
+    "ungetc",
+    "ungetwc",
+    "vfprintf",
+    "vfscanf",
+    "vsnprintf",
+    "vsscanf",
+]
+opt = ["O2", "O0"]
+defines = ["_GNU_SOURCE"]
+include = [
+    "shim:fmt/musl",
+    "donor:musl/src/internal",
+    "donor:musl/arch/x86_64",
+]
+flags = []
+
+[[source]]
+donor = "musl"
+path = "src/stdio/vfscanf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/vsscanf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/sscanf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/vfwscanf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/vswscanf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/swscanf.c"
+
+[[source]]
+donor = "musl"
+path = "src/internal/shgetc.c"
+
+[[source]]
+donor = "musl"
+path = "src/internal/intscan.c"
+
+[[source]]
+donor = "musl"
+path = "src/internal/floatscan.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fgetwc.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/getwc.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/ungetwc.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/ungetc.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fscanf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fprintf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/vfprintf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/vsnprintf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/snprintf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fwide.c"

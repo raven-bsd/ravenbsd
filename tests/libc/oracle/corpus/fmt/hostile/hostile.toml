@@ -1,0 +1,90 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Hostile FmtEnv cases for C70 (review focus 7): a hostile environment may
+# report lengths larger than the buffer or return zero-length reads; the engine
+# must not panic or loop. Each format is run with SliceVa, whose arena is
+# shorter than the claimed string length in the corresponding unit test.
+
+schema = 1
+corpus = "fmt-hostile"
+
+[[case]]
+format = "%.40s"
+note = "precision beyond the buffer; cstr_len caps at the arena"
+
+[[case]]
+format = "%40.10s"
+note = "width and precision beyond the buffer"
+
+[[case]]
+format = "%ls"
+note = "wide string with no terminator in the arena"
+
+[[case]]
+format = "%.0s"
+note = "precision zero reads nothing"
+
+[[case]]
+format = "%p"
+note = "NULL pointer"
+
+[[case]]
+format = "%s"
+note = "NULL pointer"
+
+[[case]]
+format = "%l["
+note = "scanf: unterminated set (format failure)"
+
+[[case]]
+format = "%999999999d"
+note = "scanf: width larger than the input"
+
+[[case]]
+format = "%m"
+note = "%m with the error text captured at entry"
+
+[[case]]
+format = "%n"
+note = "PctN::Reject returns Invalid"
+
+[[case]]
+format = "%*c"
+note = "suppressed character conversion"
+
+[[case]]
+format = "%[^]"
+note = "scanf: inverted empty set"
+
+[[case]]
+format = "%.999999999f"
+note = "precision larger than the float buffer; NoMem/FmtErr, no panic"
+
+[[case]]
+format = "%2147483647c"
+note = "INT_MAX width; Overflow on the next directive"
+
+[[case]]
+format = "%'d"
+note = "grouping with a hostile grouping string"
+
+[[case]]
+format = "%1$d"
+note = "positional valid"
+
+[[case]]
+format = "%2$d"
+note = "positional gap -> Invalid"
+
+[[case]]
+format = "%1$d %d"
+note = "mixed positional/sequential -> Invalid"
+
+[[case]]
+format = "%1$d %1$f"
+note = "positional type conflict -> Invalid"
+
+[[case]]
+format = "%1$? "
+note = "positional invalid conversion -> Invalid"

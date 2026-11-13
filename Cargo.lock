@@ -952,6 +952,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-fmt"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-ctype",
+]
+
+[[package]]
 name = "raven-libc-hdrcheck"
 version = "0.1.0"
 
@@ -971,6 +979,7 @@ version = "0.1.0"
 dependencies = [
  "raven-libc-ctype",
  "raven-libc-dtoa",
+ "raven-libc-fmt",
  "raven-libc-stdlib",
  "raven-libc-str",
  "serde",
