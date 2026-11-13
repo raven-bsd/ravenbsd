@@ -91,6 +91,39 @@ fn est5edt_winter_and_summer() {
 }
 
 #[test]
+fn an_explicit_isdst_uses_the_donor_fallback() {
+    let state = tzparse(b"EST5EDT,M3.2.0,M11.1.0", None).expect("zone");
+    let mut tm = utc_tm(1918, 7, 12, 5, -51, 3);
+    tm.tm_isdst = 0;
+    assert_eq!(mktime(&state, &mut tm), Ok(-1_621_695_057));
+    assert_eq!((tm.tm_hour, tm.tm_min, tm.tm_sec), (5, 9, 3));
+    assert_eq!(tm.tm_isdst, 1);
+
+    let mut tm = utc_tm(1996, 0, 1, 0, 0, 0);
+    tm.tm_isdst = 1;
+    assert_eq!(mktime(&state, &mut tm), Ok(820_468_800));
+    assert_eq!((tm.tm_year, tm.tm_mon, tm.tm_mday), (95, 11, 31));
+    assert_eq!(tm.tm_isdst, 0);
+
+    let mut tm = utc_tm(2045, 0, 1, 0, 0, 0);
+    tm.tm_isdst = 1;
+    assert_eq!(mktime(&state, &mut tm), Ok(2_366_856_000));
+    assert_eq!((tm.tm_year, tm.tm_mon, tm.tm_mday), (144, 11, 31));
+    assert_eq!(tm.tm_isdst, 0);
+}
+
+#[test]
+fn negative_seconds_keep_the_donor_remainder() {
+    let state = tzparse(b"EST5EDT,M3.2.0,M11.1.0", None).expect("zone");
+    let mut tm = utc_tm(2057, 9, 34, 24, 69, -42);
+    tm.tm_isdst = 0;
+    assert_eq!(mktime(&state, &mut tm), Ok(2_772_079_698));
+    assert_eq!((tm.tm_hour, tm.tm_min, tm.tm_sec), (1, 8, 18));
+    assert_eq!((tm.tm_mon, tm.tm_mday), (10, 4));
+    assert_eq!(tm.tm_isdst, 0);
+}
+
+#[test]
 fn timeoff_uses_the_offset() {
     let mut tm = utc_tm(1970, 0, 1, 1, 0, 0);
     assert_eq!(timeoff(&mut tm, 3600), Ok(0));

@@ -195,6 +195,16 @@ fn named_zones_use_the_context() {
     let (tm, used) = parse("EST", "%Z").expect("EST");
     assert_eq!(used, 3);
     assert_eq!(tm.tm_gmtoff, -5 * 3600);
+    // The donor leaves tm_isdst unchanged for the RFC-822 standard names.
+    assert_eq!(tm.tm_isdst, -1);
+}
+
+#[test]
+fn week_53_finalises_into_the_next_year() {
+    let (tm, used) = parse("53 5 2028", "%U %w %Y").expect("week 53");
+    assert_eq!(used, 9);
+    assert_eq!((tm.tm_year, tm.tm_mon, tm.tm_mday), (129, 0, 5));
+    assert_eq!((tm.tm_wday, tm.tm_yday), (5, 4));
 }
 
 #[test]
