@@ -1,0 +1,383 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# m-core: the musl:src/math originals behind the raven-libc-m transcendental families.
+# musl is MIT (tier A) and is the C donor of the libm algorithms the Rust crate was transpiled
+# from, so the differential is expected to be bit-exact; a mismatch is a real deviation.
+#
+# erfc/erfc f32, y0/y1/yn and rsqrt/sinpi have no musl source in the pinned donor checkout and are
+# therefore not part of this family (see the C47a report).
+
+schema = 1
+family = "m-core"
+description = "musl double/float transcendental originals"
+exports = [
+    "__cosdf", "__exp2f_data", "__exp_data", "__expo2", "__expo2f", "__log2_data",
+    "__log2f_data", "__log_data", "__logf_data", "__math_divzero", "__math_divzerof",
+    "__math_invalid", "__math_invalidf", "__math_oflow", "__math_oflowf", "__math_uflow",
+    "__math_uflowf", "__math_xflow", "__math_xflowf", "__pow_log_data", "__powf_log2_data",
+    "__rem_pio2", "__rem_pio2_large", "__rem_pio2f", "__rsqrt_tab", "__sindf", "__tandf",
+    "acos", "acosf", "acosh", "acoshf", "asin", "asinf", "asinh", "asinhf", "atan", "atan2",
+    "atan2f", "atanf", "atanh", "atanhf", "cos", "cosf", "cosh", "coshf", "erf", "erfc",
+    "erfcf", "erff", "exp", "exp10", "exp10f", "exp2", "exp2f", "expf", "expm1", "expm1f",
+    "fabs", "fabsf", "floor", "floorf", "j0", "j0f", "j1", "j1f", "jn", "jnf", "log", "log10",
+    "log10f", "log1p", "log1pf", "log2", "log2f", "logf", "m_cos", "m_sin", "m_tan", "pow",
+    "powf", "sin", "sinf", "sinh", "sinhf", "sqrt", "sqrtf", "tan", "tanf", "tanh", "tanhf",
+    "y0", "y0f", "y1", "y1f", "yn", "ynf",
+]
+opt = ["O2", "O0"]
+defines = ["weak_alias(a,b)=", "hidden=", "_GNU_SOURCE=1"]
+include = ["shim:m", "donor:musl/src/math", "donor:musl/src/internal", "donor:musl/arch/x86_64", "donor:musl/arch/generic"]
+flags = ["-std=gnu11"]
+
+[[source]]
+donor = "musl"
+path = "src/math/exp2f_data.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/exp_data.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/log2_data.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/log2f_data.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/log_data.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/logf_data.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/pow_data.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/powf_data.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/sqrt_data.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__cos.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__cosdf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__expo2.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__expo2f.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__math_divzero.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__math_divzerof.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__math_invalid.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__math_invalidf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__math_oflow.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__math_oflowf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__math_uflow.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__math_uflowf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__math_xflow.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__math_xflowf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__rem_pio2.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__rem_pio2_large.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__rem_pio2f.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__sin.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__sindf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__tan.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/__tandf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/fabs.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/fabsf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/floor.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/floorf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/sqrt.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/sqrtf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/acos.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/acosf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/acosh.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/acoshf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/asin.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/asinf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/asinh.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/asinhf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/atan.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/atan2.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/atan2f.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/atanf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/atanh.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/atanhf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/cos.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/cosf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/cosh.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/coshf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/erf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/erff.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/exp.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/exp10.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/exp10f.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/exp2.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/exp2f.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/expf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/expm1.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/expm1f.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/j0.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/j0f.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/j1.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/j1f.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/jn.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/jnf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/log.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/log10.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/log10f.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/log1p.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/log1pf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/log2.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/log2f.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/logf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/pow.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/powf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/sin.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/sinf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/sinh.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/sinhf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/tan.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/tanf.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/tanh.c"
+
+[[source]]
+donor = "musl"
+path = "src/math/tanhf.c"
