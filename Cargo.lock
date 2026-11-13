@@ -966,6 +966,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-nss"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+]
+
+[[package]]
 name = "raven-libc-oracle"
 version = "0.1.0"
 dependencies = [
@@ -990,6 +997,14 @@ name = "raven-libc-proc"
 version = "0.1.0"
 dependencies = [
  "raven-libc-abi",
+]
+
+[[package]]
+name = "raven-libc-pwd"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-nss",
 ]
 
 [[package]]
