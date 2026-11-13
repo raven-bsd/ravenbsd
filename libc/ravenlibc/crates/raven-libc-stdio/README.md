@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # raven-libc-stdio
 
 The `FILE` layer of ravenlibc: the musl buffer state machine with indices, the per-stream
