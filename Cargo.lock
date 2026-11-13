@@ -969,6 +969,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-time"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-ctype",
+]
+
+[[package]]
 name = "raven-linux-abi"
 version = "0.1.0"
 dependencies = [
