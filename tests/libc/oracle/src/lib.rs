@@ -31,3 +31,6 @@ pub mod shrink;
 pub mod standin;
 #[allow(unsafe_code)] // calls the C variadic oracle through function pointers
 pub mod support_fmt;
+#[cfg(feature = "oracle-stdio-musl")]
+#[allow(unsafe_code)] // installs the C hook table and calls the oracle FILE functions
+pub mod support_stdio;

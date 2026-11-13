@@ -14,6 +14,7 @@ publish = false
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 toml = "1.2"
+raven-libc-abi = { path = "../../../libc/ravenlibc/crates/raven-libc-abi" }
 raven-libc-ctype = { path = "../../../libc/ravenlibc/crates/raven-libc-ctype" }
 raven-libc-str = { path = "../../../libc/ravenlibc/crates/raven-libc-str" }
 raven-libc-stdlib = { path = "../../../libc/ravenlibc/crates/raven-libc-stdlib" }
@@ -21,6 +22,7 @@ raven-libc-dtoa = { path = "../../../libc/ravenlibc/crates/raven-libc-dtoa", fea
 raven-libc-fmt = { path = "../../../libc/ravenlibc/crates/raven-libc-fmt" }
 raven-libc-time = { path = "../../../libc/ravenlibc/crates/raven-libc-time" }
 raven-libc-m = { path = "../../../libc/ravenlibc/crates/raven-libc-m" }
+raven-libc-stdio = { path = "../../../libc/ravenlibc/crates/raven-libc-stdio" }
 
 [features]
 default = []
@@ -43,6 +45,7 @@ oracle-fmt-freebsd = []
 oracle-fmt-musl = []
 oracle-fmt-musl-scanf = []
 oracle-raven-libc-time = []
+oracle-stdio-musl = []
 all-oracles = [
     "oracle-string-basic",
     "oracle-ctype-multibyte",
@@ -63,6 +66,7 @@ all-oracles = [
     "oracle-fmt-musl",
     "oracle-fmt-musl-scanf",
     "oracle-raven-libc-time",
+    "oracle-stdio-musl",
 ]
 
 [lints]

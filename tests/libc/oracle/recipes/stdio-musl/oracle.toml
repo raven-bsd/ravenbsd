@@ -1,0 +1,301 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# stdio-musl: the musl FILE core compiled against the replacement headers of shim/stdio/musl.
+# Every system call is forwarded to the Rust harness, so the C original and the Rust subject
+# run over the same in-memory file system. The closure is the narrow FILE surface; the wide
+# and process halves are excluded (see the report).
+
+schema = 1
+family = "stdio-musl"
+description = "musl FILE core (buffering, locks, open-file list, memory and cookie streams)"
+exports = [
+    "__do_orphaned_stdio_locks",
+    "__fbufsize",
+    "__fdopen",
+    "__flbf",
+    "__fmodeflags",
+    "__fpending",
+    "__fpurge",
+    "__freadable",
+    "__freadahead",
+    "__freading",
+    "__freadptr",
+    "__freadptrinc",
+    "__fseeko",
+    "__fseeko_unlocked",
+    "__fseterr",
+    "__fsetlocking",
+    "__ftello",
+    "__ftello_unlocked",
+    "__fwritable",
+    "__fwritex",
+    "__fwriting",
+    "__lockfile",
+    "__ofl_add",
+    "__ofl_lock",
+    "__ofl_unlock",
+    "__overflow",
+    "__register_locked_file",
+    "__stdio_close",
+    "__stdio_ofl_lockptr",
+    "__stdio_read",
+    "__stdio_seek",
+    "__stdio_write",
+    "__stdout_write",
+    "__toread",
+    "__toread_needs_stdio_exit",
+    "__towrite",
+    "__towrite_needs_stdio_exit",
+    "__uflow",
+    "__unlist_locked_file",
+    "__unlockfile",
+    "_flushlbf",
+    "clearerr",
+    "fclose",
+    "feof",
+    "ferror",
+    "fflush",
+    "fgetc",
+    "fgetpos",
+    "fgets",
+    "fileno",
+    "flockfile",
+    "fmemopen",
+    "fopen",
+    "fputc",
+    "fputs",
+    "fread",
+    "freopen",
+    "fseek",
+    "fsetpos",
+    "ftell",
+    "ftrylockfile",
+    "funlockfile",
+    "fwrite",
+    "getc",
+    "getc_unlocked",
+    "getdelim",
+    "getline",
+    "open_memstream",
+    "putc",
+    "putc_unlocked",
+    "rewind",
+    "rl_stdio_hooks",
+    "setbuf",
+    "setbuffer",
+    "setlinebuf",
+    "setvbuf",
+    "ungetc",
+]
+opt = ["O2", "O0"]
+defines = ["_GNU_SOURCE"]
+include = [
+    "shim:stdio/musl",
+    "donor:musl/src/internal",
+]
+flags = []
+
+[[source]]
+donor = "musl"
+path = "src/stdio/__stdio_read.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/__stdio_write.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/__stdio_seek.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/__stdio_close.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/__stdout_write.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/__toread.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/__towrite.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/__uflow.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/__overflow.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fread.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fwrite.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fgets.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/getdelim.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/getline.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fputs.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/ungetc.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fseek.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/ftell.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fgetpos.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fsetpos.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/rewind.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fflush.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fclose.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/ofl.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/ofl_add.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/__lockfile.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/flockfile.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/funlockfile.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/ftrylockfile.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/setvbuf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/setbuf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/setbuffer.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/setlinebuf.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/clearerr.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/feof.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/ferror.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fileno.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/ext.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/ext2.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fopen.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/__fdopen.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/freopen.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/__fmodeflags.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fmemopen.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/open_memstream.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/getc.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/putc.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/getc_unlocked.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/putc_unlocked.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fgetc.c"
+
+[[source]]
+donor = "musl"
+path = "src/stdio/fputc.c"

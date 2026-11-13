@@ -51,3 +51,6 @@ pub mod fmt_musl_scanf;
 
 #[cfg(feature = "oracle-raven-libc-time")]
 pub mod raven_libc_time;
+
+#[cfg(feature = "oracle-stdio-musl")]
+pub mod stdio_musl;

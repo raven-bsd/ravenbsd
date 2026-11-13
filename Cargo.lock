@@ -1040,10 +1040,12 @@ dependencies = [
 name = "raven-libc-oracle"
 version = "0.1.0"
 dependencies = [
+ "raven-libc-abi",
  "raven-libc-ctype",
  "raven-libc-dtoa",
  "raven-libc-fmt",
  "raven-libc-m",
+ "raven-libc-stdio",
  "raven-libc-stdlib",
  "raven-libc-str",
  "raven-libc-time",
@@ -1119,6 +1121,15 @@ name = "raven-libc-ssp"
 version = "0.1.0"
 dependencies = [
  "raven-libc-abi",
+]
+
+[[package]]
+name = "raven-libc-stdio"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-ctype",
+ "raven-libc-fmt",
 ]
 
 [[package]]
