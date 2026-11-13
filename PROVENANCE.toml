@@ -808,3 +808,535 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5fe681b6750b8a033a0490bca0941; constants transcribed into abi/time.toml; deviations in abi/deviations.toml"
+
+# ---------------------------------------------------------------------------
+# C37 ravenlibc headers (COPY per architecture/raven-libc/donor-map/14).
+# ---------------------------------------------------------------------------
+
+[[import]]
+path = "libc/ravenlibc/include/sys/_visible.h"
+upstream = "freebsd"
+upstream_path = "sys/sys/_visible.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/14 5.A row 1; ignore list, __STRICT_ANSI__ C-only mapping and A5 zero-defaults added; kernel-only text unchanged or neutralised; R-H1..R-H8 applied as applicable."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/cdefs.h"
+upstream = "freebsd"
+upstream_path = "sys/sys/cdefs.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/14 5.A row 2; kernel-only blocks removed, __RCSID/__FBSDID empty, GNU/OpenBSD aliases and CLEANROOM __nonnull() added (doc 14 3.A.11)."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/_decls.h"
+upstream = "freebsd"
+upstream_path = "sys/sys/_decls.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/14 5.A row 3; text unchanged; __BEGIN_DECLS is extern \"C\" only under __cplusplus."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/endian.h"
+upstream = "freebsd"
+upstream_path = "sys/sys/endian.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/14 5.A row 5; little-endian only, __uintN_t typedef blocks replaced by <stdint.h>, <sys/_types.h> removed (R-H5)."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/_endian.h"
+upstream = "freebsd"
+upstream_path = "sys/sys/_endian.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/14 5.A row 6; big-endian arms and the direct-include error removed; unprefixed names follow __BSD_VISIBLE (R-H2)."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/types.h"
+upstream = "musl"
+upstream_path = "include/sys/types.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; features.h replaced by sys/cdefs.h, BSD aliases under __BSD_VISIBLE, makedev/major/minor from sysmacros semantics, sys/select.h include removed until C38, the _LARGEFILE64_SOURCE macro block dropped (R-H2)."
+
+[[import]]
+path = "libc/ravenlibc/include/errno.h"
+upstream = "musl"
+upstream_path = "include/errno.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; __errno/__error ring-2 aliases and program_invocation_name/__progname under __BSD_VISIBLE."
+
+[[import]]
+path = "libc/ravenlibc/include/limits.h"
+upstream = "musl"
+upstream_path = "include/limits.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; NGROUPS_MAX 1023, HOST_NAME_MAX 64, PTHREAD_STACK_MIN 16384; no include_next; PAGESIZE only from the x86_64 bits header."
+
+[[import]]
+path = "libc/ravenlibc/include/stdint.h"
+upstream = "musl"
+upstream_path = "include/stdint.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; WINT_MIN/WINT_MAX from __WINT_MAX__; WCHAR_* from the compiler wchar_t; INT64/PRId remain long."
+
+[[import]]
+path = "libc/ravenlibc/include/inttypes.h"
+upstream = "musl"
+upstream_path = "include/inttypes.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; PRI/SCN 64-bit and PTR strings are \"l\" on LP64 (never OpenBSD's \"ll\")."
+
+[[import]]
+path = "libc/ravenlibc/include/complex.h"
+upstream = "musl"
+upstream_path = "include/complex.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; whole body under #ifndef __cplusplus (doc 14 3.B.3.a)."
+
+[[import]]
+path = "libc/ravenlibc/include/fenv.h"
+upstream = "musl"
+upstream_path = "include/fenv.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; declarations unchanged."
+
+[[import]]
+path = "libc/ravenlibc/include/locale.h"
+upstream = "musl"
+upstream_path = "include/locale.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; musl LC_* numbers kept; NULL guarded against <stddef.h>."
+
+[[import]]
+path = "libc/ravenlibc/include/math.h"
+upstream = "musl"
+upstream_path = "include/math.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; classification/comparison over clang built-ins; gamma/drem/finite/significand BSD extras from doc 05."
+
+[[import]]
+path = "libc/ravenlibc/include/setjmp.h"
+upstream = "musl"
+upstream_path = "include/setjmp.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; __jmp_buf is 32 words (DV3); jmp_buf is 392 bytes, align 8."
+
+[[import]]
+path = "libc/ravenlibc/include/stdio.h"
+upstream = "musl"
+upstream_path = "include/stdio.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; BUFSIZ 4096, opaque FILE, gets only for ISO C <= 2011 with deprecated/warn_references; BSD/GNU extras also take an excerpt from freebsd:include/stdio.h @ 133344405f532bd54ff3629a77d4c4e062f01fdb (BSD-3-Clause, second donor, notice in the file); snprintf_l/vsnprintf_l prototypes read from freebsd:include/xlocale/_stdio.h (BSD-2-Clause, same revision)."
+
+[[import]]
+path = "libc/ravenlibc/include/threads.h"
+upstream = "musl"
+upstream_path = "include/threads.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; time64 redirection removed."
+
+[[import]]
+path = "libc/ravenlibc/include/time.h"
+upstream = "musl"
+upstream_path = "include/time.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; tm_gmtoff/tm_zone always public; BSD CLOCK_* aliases; timegm/timelocal/tzalloc/tzfree/localtime_rz/mktime_z names from netbsd:include/time.h @ 36eddebcc36cb0775aa2962005b9c05419a6ff01 (BSD-3-Clause, second donor, notice in the file)."
+
+[[import]]
+path = "libc/ravenlibc/include/wchar.h"
+upstream = "musl"
+upstream_path = "include/wchar.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; WEOF is (wint_t)-1; wcslcpy/wcslcat and the _l forms added."
+
+[[import]]
+path = "libc/ravenlibc/include/bits/stat.h"
+upstream = "musl"
+upstream_path = "arch/generic/bits/stat.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; copied from arch/generic/bits (little-endian, LP64)."
+
+[[import]]
+path = "libc/ravenlibc/include/bits/fcntl.h"
+upstream = "musl"
+upstream_path = "arch/generic/bits/fcntl.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; copied from arch/generic/bits (little-endian, LP64). O_LARGEFILE is 0, SEEK_* added, BSD O_EXLOCK/O_SHLOCK/O_RESOLVE_BENEATH under __BSD_VISIBLE."
+
+[[import]]
+path = "libc/ravenlibc/include/bits/dirent.h"
+upstream = "musl"
+upstream_path = "arch/generic/bits/dirent.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; copied from arch/generic/bits (little-endian, LP64)."
+
+[[import]]
+path = "libc/ravenlibc/include/bits/ioctl.h"
+upstream = "musl"
+upstream_path = "arch/generic/bits/ioctl.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; copied from arch/generic/bits (little-endian, LP64). LP64 arm only."
+
+[[import]]
+path = "libc/ravenlibc/include/bits/ipc.h"
+upstream = "musl"
+upstream_path = "arch/generic/bits/ipc.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; copied from arch/generic/bits (little-endian, LP64)."
+
+[[import]]
+path = "libc/ravenlibc/include/bits/ipcstat.h"
+upstream = "musl"
+upstream_path = "arch/generic/bits/ipcstat.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; copied from arch/generic/bits (little-endian, LP64)."
+
+[[import]]
+path = "libc/ravenlibc/include/bits/msg.h"
+upstream = "musl"
+upstream_path = "arch/generic/bits/msg.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; copied from arch/generic/bits (little-endian, LP64)."
+
+[[import]]
+path = "libc/ravenlibc/include/bits/sem.h"
+upstream = "musl"
+upstream_path = "arch/generic/bits/sem.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; copied from arch/generic/bits (little-endian, LP64). little-endian arm only."
+
+[[import]]
+path = "libc/ravenlibc/include/bits/shm.h"
+upstream = "musl"
+upstream_path = "arch/generic/bits/shm.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; copied from arch/generic/bits (little-endian, LP64)."
+
+[[import]]
+path = "libc/ravenlibc/include/bits/statfs.h"
+upstream = "musl"
+upstream_path = "arch/generic/bits/statfs.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; copied from arch/generic/bits (little-endian, LP64)."
+
+[[import]]
+path = "libc/ravenlibc/include/bits/termios.h"
+upstream = "musl"
+upstream_path = "arch/generic/bits/termios.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; copied from arch/generic/bits (little-endian, LP64). struct and Linux numbers kept."
+
+[[import]]
+path = "libc/ravenlibc/include/bits/stdint.h"
+upstream = "musl"
+upstream_path = "arch/generic/bits/stdint.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; copied from arch/generic/bits (little-endian, LP64)."
+
+[[import]]
+path = "libc/ravenlibc/include/bits/link.h"
+upstream = "musl"
+upstream_path = "arch/generic/bits/link.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; copied from arch/generic/bits (little-endian, LP64)."
+
+[[import]]
+path = "libc/ravenlibc/arch/x86_64/include/bits/alltypes.h"
+upstream = "musl"
+upstream_path = "include/alltypes.h.in"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; generated ONCE with musl tools/mkalltypes.sed from include/alltypes.h.in + arch/x86_64/bits/alltypes.h.in, then edited by hand: DV1 nlink_t/blksize_t 32-bit, DV2 __WCHAR_TYPE__/__WINT_TYPE__, max_align_t deleted, off64_t added, FILE opaque, DV3 jmp_buf in bits/setjmp.h. No build-time sed."
+
+[[import]]
+path = "libc/ravenlibc/arch/x86_64/include/bits/signal.h"
+upstream = "musl"
+upstream_path = "arch/x86_64/bits/signal.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; SIG*/SA_*/MINSIGSTKSZ/SIGSTKSZ come from generated bits/signum.h; structs kept per doc 14 3.A.3."
+
+[[import]]
+path = "libc/ravenlibc/arch/x86_64/include/bits/fenv.h"
+upstream = "musl"
+upstream_path = "arch/x86_64/bits/fenv.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; per-arch exception flags and FE_DFL_ENV kept."
+
+[[import]]
+path = "libc/ravenlibc/arch/x86_64/include/bits/setjmp.h"
+upstream = "musl"
+upstream_path = "arch/x86_64/bits/setjmp.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; DV3: typedef unsigned long __jmp_buf[32] on all three arches (musl has 8/22/26)."
+
+[[import]]
+path = "libc/ravenlibc/arch/aarch64/include/bits/alltypes.h"
+upstream = "musl"
+upstream_path = "include/alltypes.h.in"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; generated ONCE with musl tools/mkalltypes.sed from include/alltypes.h.in + arch/aarch64/bits/alltypes.h.in, then edited by hand: DV1 nlink_t/blksize_t 32-bit, DV2 __WCHAR_TYPE__/__WINT_TYPE__, max_align_t deleted, off64_t added, FILE opaque, DV3 jmp_buf in bits/setjmp.h. No build-time sed."
+
+[[import]]
+path = "libc/ravenlibc/arch/aarch64/include/bits/signal.h"
+upstream = "musl"
+upstream_path = "arch/aarch64/bits/signal.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; SIG*/SA_*/MINSIGSTKSZ/SIGSTKSZ come from generated bits/signum.h; structs kept per doc 14 3.A.3."
+
+[[import]]
+path = "libc/ravenlibc/arch/aarch64/include/bits/fenv.h"
+upstream = "musl"
+upstream_path = "arch/aarch64/bits/fenv.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; per-arch exception flags and FE_DFL_ENV kept."
+
+[[import]]
+path = "libc/ravenlibc/arch/aarch64/include/bits/setjmp.h"
+upstream = "musl"
+upstream_path = "arch/aarch64/bits/setjmp.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; DV3: typedef unsigned long __jmp_buf[32] on all three arches (musl has 8/22/26)."
+
+[[import]]
+path = "libc/ravenlibc/arch/riscv64/include/bits/alltypes.h"
+upstream = "musl"
+upstream_path = "include/alltypes.h.in"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; generated ONCE with musl tools/mkalltypes.sed from include/alltypes.h.in + arch/riscv64/bits/alltypes.h.in, then edited by hand: DV1 nlink_t/blksize_t 32-bit, DV2 __WCHAR_TYPE__/__WINT_TYPE__, max_align_t deleted, off64_t added, FILE opaque, DV3 jmp_buf in bits/setjmp.h. No build-time sed."
+
+[[import]]
+path = "libc/ravenlibc/arch/riscv64/include/bits/signal.h"
+upstream = "musl"
+upstream_path = "arch/riscv64/bits/signal.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; SIG*/SA_*/MINSIGSTKSZ/SIGSTKSZ come from generated bits/signum.h; structs kept per doc 14 3.A.3."
+
+[[import]]
+path = "libc/ravenlibc/arch/riscv64/include/bits/fenv.h"
+upstream = "musl"
+upstream_path = "arch/riscv64/bits/fenv.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; R-H1..R-H8 applied; per-arch exception flags and FE_DFL_ENV kept."
+
+[[import]]
+path = "libc/ravenlibc/arch/riscv64/include/bits/setjmp.h"
+upstream = "musl"
+upstream_path = "arch/riscv64/bits/setjmp.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; DV3: typedef unsigned long __jmp_buf[32] on all three arches (musl has 8/22/26)."
+
+[[import]]
+path = "libc/ravenlibc/arch/x86_64/include/bits/limits.h"
+upstream = "musl"
+upstream_path = "arch/x86_64/bits/limits.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; PAGESIZE 4096 x86_64 only; aarch64/riscv64 headers are comment-only."
+
+[[import]]
+path = "libc/ravenlibc/arch/x86_64/include/bits/mman.h"
+upstream = "musl"
+upstream_path = "arch/x86_64/bits/mman.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; MAP_32BIT kept."
+
+[[import]]
+path = "libc/ravenlibc/arch/aarch64/include/bits/mman.h"
+upstream = "musl"
+upstream_path = "arch/aarch64/bits/mman.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; PROT_BTI/PROT_MTE kept."
+
+[[import]]
+path = "libc/ravenlibc/arch/aarch64/include/bits/hwcap.h"
+upstream = "musl"
+upstream_path = "arch/aarch64/bits/hwcap.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e9119eb5; HWCAP/HWCAP2 values kept; x86_64/riscv64 headers are comment-only."

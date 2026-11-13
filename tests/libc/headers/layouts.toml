@@ -1,0 +1,1276 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Sizes/alignments from doc 14 3.A.3 and 3.A.3a. Rows whose header is not
+# C37-owned are reported as PENDING, never as a pass.
+
+[[type]]
+name = "size_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "ssize_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "ptrdiff_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "intptr_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "uintptr_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "intmax_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "uintmax_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "int8_t"
+headers = ["sys/types.h"]
+size = 1
+align = 1
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "int16_t"
+headers = ["sys/types.h"]
+size = 2
+align = 2
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "int32_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "int64_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "uint8_t"
+headers = ["sys/types.h"]
+size = 1
+align = 1
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "uint16_t"
+headers = ["sys/types.h"]
+size = 2
+align = 2
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "uint32_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "uint64_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "wchar_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "wint_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "wctype_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "sig_atomic_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "time_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "suseconds_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "clock_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "useconds_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "clockid_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "timer_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "off_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "off64_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "blkcnt_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "ino_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "dev_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "fsblkcnt_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "fsfilcnt_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "rlim_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "mode_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "uid_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "gid_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "id_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "nlink_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "blksize_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "pid_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "key_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "socklen_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "sa_family_t"
+headers = ["sys/types.h"]
+size = 2
+align = 2
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "in_addr_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "in_port_t"
+headers = ["sys/types.h"]
+size = 2
+align = 2
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "reclen_t"
+headers = ["sys/types.h"]
+size = 2
+align = 2
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "float_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "double_t"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "char"
+headers = ["sys/types.h"]
+size = 1
+align = 1
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "short"
+headers = ["sys/types.h"]
+size = 2
+align = 2
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "int"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "long"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "long long"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "float"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "double"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "long double"
+headers = ["sys/types.h"]
+size = 16
+align = 16
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "max_align_t"
+headers = ["stddef.h"]
+size = 32
+align = 16
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "locale_t"
+headers = ["locale.h"]
+size = 8
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "mbstate_t"
+headers = ["sys/types.h", "stddef.h"]
+size = 8
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "__opaque1"
+offset = 0
+bytes = 4
+
+[[type.field]]
+name = "__opaque2"
+offset = 4
+bytes = 4
+
+[[type]]
+name = "va_list"
+headers = ["sys/types.h"]
+size = 24
+align = 8
+arches = ["x86_64"]
+
+[[type]]
+name = "va_list"
+headers = ["sys/types.h"]
+size = 32
+align = 8
+arches = ["aarch64"]
+
+[[type]]
+name = "va_list"
+headers = ["sys/types.h"]
+size = 8
+align = 8
+arches = ["riscv64"]
+
+[[type]]
+name = "sigset_t"
+headers = ["sys/types.h"]
+size = 128
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "__bits"
+offset = 0
+bytes = 128
+
+[[type]]
+name = "struct stat"
+headers = ["sys/types.h"]
+size = 128
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "st_dev"
+offset = 0
+
+[[type.field]]
+name = "st_ino"
+offset = 8
+
+[[type.field]]
+name = "st_mode"
+offset = 16
+
+[[type.field]]
+name = "st_nlink"
+offset = 20
+
+[[type.field]]
+name = "st_uid"
+offset = 24
+
+[[type.field]]
+name = "st_gid"
+offset = 28
+
+[[type.field]]
+name = "st_rdev"
+offset = 32
+
+[[type.field]]
+name = "__pad"
+offset = 40
+
+[[type.field]]
+name = "st_size"
+offset = 48
+
+[[type.field]]
+name = "st_blksize"
+offset = 56
+
+[[type.field]]
+name = "__pad2"
+offset = 60
+
+[[type.field]]
+name = "st_blocks"
+offset = 64
+
+[[type.field]]
+name = "st_atim"
+offset = 72
+
+[[type.field]]
+name = "st_mtim"
+offset = 88
+
+[[type.field]]
+name = "st_ctim"
+offset = 104
+
+[[type.field]]
+name = "__unused"
+offset = 120
+
+[[type]]
+name = "struct dirent"
+headers = ["sys/types.h"]
+size = 280
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "d_ino"
+offset = 0
+
+[[type.field]]
+name = "d_off"
+offset = 8
+
+[[type.field]]
+name = "d_reclen"
+offset = 16
+
+[[type.field]]
+name = "d_name"
+offset = 19
+bytes = 256
+
+[[type]]
+name = "struct tm"
+headers = ["time.h"]
+size = 56
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "tm_sec"
+offset = 0
+
+[[type.field]]
+name = "tm_min"
+offset = 4
+
+[[type.field]]
+name = "tm_hour"
+offset = 8
+
+[[type.field]]
+name = "tm_mday"
+offset = 12
+
+[[type.field]]
+name = "tm_mon"
+offset = 16
+
+[[type.field]]
+name = "tm_year"
+offset = 20
+
+[[type.field]]
+name = "tm_wday"
+offset = 24
+
+[[type.field]]
+name = "tm_yday"
+offset = 28
+
+[[type.field]]
+name = "tm_isdst"
+offset = 32
+
+[[type.field]]
+name = "tm_gmtoff"
+offset = 40
+
+[[type.field]]
+name = "tm_zone"
+offset = 48
+
+[[type]]
+name = "struct timespec"
+headers = ["time.h"]
+size = 16
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "tv_sec"
+offset = 0
+
+[[type.field]]
+name = "tv_nsec"
+offset = 8
+
+[[type]]
+name = "struct timeval"
+headers = ["sys/types.h"]
+size = 16
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "tv_sec"
+offset = 0
+
+[[type.field]]
+name = "tv_usec"
+offset = 8
+
+[[type]]
+name = "struct itimerspec"
+headers = ["time.h"]
+size = 32
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "it_interval"
+offset = 0
+
+[[type.field]]
+name = "it_value"
+offset = 16
+
+[[type]]
+name = "struct iovec"
+headers = ["sys/types.h"]
+size = 16
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "iov_base"
+offset = 0
+
+[[type.field]]
+name = "iov_len"
+offset = 8
+
+[[type]]
+name = "jmp_buf"
+headers = ["setjmp.h"]
+size = 392
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+[[type]]
+name = "sigjmp_buf"
+headers = ["setjmp.h"]
+size = 392
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type]]
+name = "struct sigaltstack"
+headers = ["bits/signal.h"]
+size = 24
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "ss_sp"
+offset = 0
+
+[[type.field]]
+name = "ss_flags"
+offset = 8
+
+[[type.field]]
+name = "ss_size"
+offset = 16
+
+[[type]]
+name = "fenv_t"
+headers = ["fenv.h"]
+size = 32
+align = 4
+arches = ["x86_64"]
+
+[[type]]
+name = "fenv_t"
+headers = ["fenv.h"]
+size = 8
+align = 4
+arches = ["aarch64"]
+
+[[type]]
+name = "fenv_t"
+headers = ["fenv.h"]
+size = 4
+align = 4
+arches = ["riscv64"]
+
+[[type]]
+name = "fexcept_t"
+headers = ["fenv.h"]
+size = 2
+align = 2
+arches = ["x86_64"]
+
+[[type]]
+name = "fexcept_t"
+headers = ["fenv.h"]
+size = 4
+align = 4
+arches = ["aarch64", "riscv64"]
+
+[[type]]
+name = "mcontext_t"
+headers = ["bits/signal.h"]
+size = 256
+align = 8
+arches = ["x86_64"]
+
+[[type]]
+name = "ucontext_t"
+headers = ["bits/signal.h"]
+size = 936
+align = 8
+arches = ["x86_64"]
+
+[[type.field]]
+name = "uc_flags"
+offset = 0
+
+[[type.field]]
+name = "uc_link"
+offset = 8
+
+[[type.field]]
+name = "uc_stack"
+offset = 16
+
+[[type.field]]
+name = "uc_mcontext"
+offset = 40
+
+[[type.field]]
+name = "uc_sigmask"
+offset = 296
+
+[[type.field]]
+name = "__fpregs_mem"
+offset = 424
+
+[[type]]
+name = "mcontext_t"
+headers = ["bits/signal.h"]
+size = 4384
+align = 16
+arches = ["aarch64"]
+
+[[type]]
+name = "ucontext_t"
+headers = ["bits/signal.h"]
+size = 4560
+align = 16
+arches = ["aarch64"]
+
+[[type.field]]
+name = "uc_flags"
+offset = 0
+
+[[type.field]]
+name = "uc_link"
+offset = 8
+
+[[type.field]]
+name = "uc_stack"
+offset = 16
+
+[[type.field]]
+name = "uc_sigmask"
+offset = 40
+
+[[type.field]]
+name = "uc_mcontext"
+offset = 176
+
+[[type]]
+name = "mcontext_t"
+headers = ["bits/signal.h"]
+size = 784
+align = 16
+arches = ["riscv64"]
+
+[[type]]
+name = "ucontext_t"
+headers = ["bits/signal.h"]
+size = 960
+align = 16
+arches = ["riscv64"]
+
+[[type.field]]
+name = "uc_flags"
+offset = 0
+
+[[type.field]]
+name = "uc_link"
+offset = 8
+
+[[type.field]]
+name = "uc_stack"
+offset = 16
+
+[[type.field]]
+name = "uc_sigmask"
+offset = 40
+
+[[type.field]]
+name = "__pad"
+offset = 168
+
+[[type.field]]
+name = "uc_mcontext"
+offset = 176
+
+[[type]]
+name = "pthread_attr_t"
+headers = ["sys/types.h"]
+size = 56
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "__u"
+offset = 0
+bytes = 56
+
+[[type]]
+name = "pthread_mutex_t"
+headers = ["sys/types.h"]
+size = 40
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "__u"
+offset = 0
+bytes = 40
+
+[[type]]
+name = "mtx_t"
+headers = ["sys/types.h"]
+size = 40
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "__u"
+offset = 0
+bytes = 40
+
+[[type]]
+name = "pthread_cond_t"
+headers = ["sys/types.h"]
+size = 48
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "__u"
+offset = 0
+bytes = 48
+
+[[type]]
+name = "cnd_t"
+headers = ["sys/types.h"]
+size = 48
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "__u"
+offset = 0
+bytes = 48
+
+[[type]]
+name = "pthread_rwlock_t"
+headers = ["sys/types.h"]
+size = 56
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "__u"
+offset = 0
+bytes = 56
+
+[[type]]
+name = "pthread_barrier_t"
+headers = ["sys/types.h"]
+size = 32
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "__u"
+offset = 0
+bytes = 32
+
+[[type]]
+name = "pthread_mutexattr_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+[[type]]
+name = "pthread_condattr_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+[[type]]
+name = "pthread_barrierattr_t"
+headers = ["sys/types.h"]
+size = 4
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+[[type]]
+name = "pthread_rwlockattr_t"
+headers = ["sys/types.h"]
+size = 8
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+[[type]]
+name = "struct lconv"
+headers = ["locale.h"]
+size = 96
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "decimal_point"
+offset = 0
+
+[[type.field]]
+name = "thousands_sep"
+offset = 8
+
+[[type.field]]
+name = "grouping"
+offset = 16
+
+[[type.field]]
+name = "int_curr_symbol"
+offset = 24
+
+[[type]]
+name = "struct termios"
+headers = ["bits/termios.h"]
+size = 60
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+
+[[type.field]]
+name = "c_iflag"
+offset = 0
+
+[[type.field]]
+name = "c_oflag"
+offset = 4
+
+[[type.field]]
+name = "c_cflag"
+offset = 8
+
+[[type.field]]
+name = "c_lflag"
+offset = 12
+
+[[type.field]]
+name = "c_line"
+offset = 16
+
+[[type.field]]
+name = "c_cc"
+offset = 17
+bytes = 32
+
+[[type.field]]
+name = "__c_ispeed"
+offset = 52
+
+[[type.field]]
+name = "__c_ospeed"
+offset = 56
+
+[[type]]
+name = "stack_t"
+headers = ["signal.h"]
+size = 24
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "sem_t"
+headers = ["semaphore.h"]
+size = 32
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct statvfs"
+headers = ["sys/statvfs.h"]
+size = 112
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct passwd"
+headers = ["pwd.h"]
+size = 48
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct group"
+headers = ["grp.h"]
+size = 32
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct rlimit"
+headers = ["sys/resource.h"]
+size = 16
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct rusage"
+headers = ["sys/resource.h"]
+size = 272
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct sigevent"
+headers = ["signal.h"]
+size = 64
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct sigaction"
+headers = ["signal.h"]
+size = 152
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "siginfo_t"
+headers = ["signal.h"]
+size = 128
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct msghdr"
+headers = ["sys/socket.h"]
+size = 56
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct cmsghdr"
+headers = ["sys/socket.h"]
+size = 16
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct sockaddr"
+headers = ["sys/socket.h"]
+size = 16
+align = 2
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct sockaddr_storage"
+headers = ["sys/socket.h"]
+size = 128
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct sockaddr_in"
+headers = ["netinet/in.h"]
+size = 16
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct sockaddr_in6"
+headers = ["netinet/in.h"]
+size = 28
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct sockaddr_un"
+headers = ["sys/un.h"]
+size = 110
+align = 2
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct addrinfo"
+headers = ["netdb.h"]
+size = 48
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct pollfd"
+headers = ["poll.h"]
+size = 8
+align = 4
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "fd_set"
+headers = ["sys/select.h"]
+size = 128
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "cpu_set_t"
+headers = ["sched.h"]
+size = 128
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct epoll_event"
+headers = ["sys/epoll.h"]
+size = 12
+align = 1
+arches = ["x86_64"]
+owner = "C38"
+
+[[type]]
+name = "struct epoll_event"
+headers = ["sys/epoll.h"]
+size = 16
+align = 8
+arches = ["aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct aiocb"
+headers = ["aio.h"]
+size = 168
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "glob_t"
+headers = ["glob.h"]
+size = 72
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "regex_t"
+headers = ["regex.h"]
+size = 64
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C45"
+
+[[type]]
+name = "posix_spawnattr_t"
+headers = ["spawn.h"]
+size = 336
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "posix_spawn_file_actions_t"
+headers = ["spawn.h"]
+size = 80
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct mq_attr"
+headers = ["mqueue.h"]
+size = 64
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct sched_param"
+headers = ["sched.h"]
+size = 48
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct flock"
+headers = ["fcntl.h"]
+size = 32
+align = 8
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+
+[[type]]
+name = "struct utsname"
+headers = ["sys/utsname.h"]
+size = 390
+align = 1
+arches = ["x86_64", "aarch64", "riscv64"]
+owner = "C38"
+

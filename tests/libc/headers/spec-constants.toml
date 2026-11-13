@@ -1,0 +1,985 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Every value is frozen by doc 14 3.A.2-3.A.6; T4 compiles these asserts.
+
+[[constant]]
+name = "PIPE_BUF"
+value = "4096"
+headers = ["limits.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "NAME_MAX"
+value = "255"
+headers = ["limits.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "PATH_MAX"
+value = "4096"
+headers = ["limits.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "NGROUPS_MAX"
+value = "1023"
+headers = ["limits.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "ARG_MAX"
+value = "131072"
+headers = ["limits.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "IOV_MAX"
+value = "1024"
+headers = ["limits.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SYMLOOP_MAX"
+value = "40"
+headers = ["limits.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "TTY_NAME_MAX"
+value = "32"
+headers = ["limits.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "HOST_NAME_MAX"
+value = "64"
+headers = ["limits.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "LOGIN_NAME_MAX"
+value = "256"
+headers = ["limits.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "LINE_MAX"
+value = "4096"
+headers = ["limits.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "PTHREAD_KEYS_MAX"
+value = "128"
+headers = ["limits.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "PTHREAD_STACK_MIN"
+value = "16384"
+headers = ["limits.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "MB_LEN_MAX"
+value = "4"
+headers = ["limits.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "BUFSIZ"
+value = "4096"
+headers = ["stdio.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "EOF"
+value = "-1"
+headers = ["stdio.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "_IOFBF"
+value = "0"
+headers = ["stdio.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "_IOLBF"
+value = "1"
+headers = ["stdio.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "_IONBF"
+value = "2"
+headers = ["stdio.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "FOPEN_MAX"
+value = "1000"
+headers = ["stdio.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "TMP_MAX"
+value = "10000"
+headers = ["stdio.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "L_tmpnam"
+value = "20"
+headers = ["stdio.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SEEK_SET"
+value = "0"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SEEK_CUR"
+value = "1"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SEEK_END"
+value = "2"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SEEK_DATA"
+value = "3"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SEEK_HOLE"
+value = "4"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "LC_CTYPE"
+value = "0"
+headers = ["locale.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "LC_NUMERIC"
+value = "1"
+headers = ["locale.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "LC_TIME"
+value = "2"
+headers = ["locale.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "LC_COLLATE"
+value = "3"
+headers = ["locale.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "LC_MONETARY"
+value = "4"
+headers = ["locale.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "LC_MESSAGES"
+value = "5"
+headers = ["locale.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "LC_ALL"
+value = "6"
+headers = ["locale.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "LC_ALL_MASK"
+value = "0x7fffffff"
+headers = ["locale.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_REALTIME"
+value = "0"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_MONOTONIC"
+value = "1"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_PROCESS_CPUTIME_ID"
+value = "2"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_THREAD_CPUTIME_ID"
+value = "3"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_MONOTONIC_RAW"
+value = "4"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_REALTIME_COARSE"
+value = "5"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_MONOTONIC_COARSE"
+value = "6"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_BOOTTIME"
+value = "7"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_REALTIME_ALARM"
+value = "8"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_BOOTTIME_ALARM"
+value = "9"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_SGI_CYCLE"
+value = "10"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_TAI"
+value = "11"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "TIMER_ABSTIME"
+value = "1"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "TIME_UTC"
+value = "1"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCKS_PER_SEC"
+value = "1000000"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_UPTIME"
+value = "CLOCK_BOOTTIME"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_UPTIME_FAST"
+value = "CLOCK_BOOTTIME"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_UPTIME_PRECISE"
+value = "CLOCK_BOOTTIME"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_MONOTONIC_FAST"
+value = "CLOCK_MONOTONIC"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_MONOTONIC_PRECISE"
+value = "CLOCK_MONOTONIC"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_REALTIME_FAST"
+value = "CLOCK_REALTIME"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "CLOCK_REALTIME_PRECISE"
+value = "CLOCK_REALTIME"
+headers = ["time.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "WEOF"
+value = "((wint_t)-1)"
+headers = ["wchar.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "MINSIGSTKSZ"
+value = "6144"
+headers = ["bits/signum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SIGSTKSZ"
+value = "16384"
+headers = ["bits/signum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "_NSIG"
+value = "65"
+headers = ["bits/signum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SIG_BLOCK"
+value = "0"
+headers = ["bits/signum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SIG_UNBLOCK"
+value = "1"
+headers = ["bits/signum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SIG_SETMASK"
+value = "2"
+headers = ["bits/signum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SA_NOCLDSTOP"
+value = "1"
+headers = ["bits/signum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SA_NOCLDWAIT"
+value = "2"
+headers = ["bits/signum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SA_SIGINFO"
+value = "4"
+headers = ["bits/signum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SA_ONSTACK"
+value = "0x08000000"
+headers = ["bits/signum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SA_RESTART"
+value = "0x10000000"
+headers = ["bits/signum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SA_NODEFER"
+value = "0x40000000"
+headers = ["bits/signum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "SA_RESETHAND"
+value = "0x80000000"
+headers = ["bits/signum.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_CREAT"
+value = "0100"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_EXCL"
+value = "0200"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_NOCTTY"
+value = "0400"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_TRUNC"
+value = "01000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_APPEND"
+value = "02000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_NONBLOCK"
+value = "04000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_DSYNC"
+value = "010000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_SYNC"
+value = "04010000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_RSYNC"
+value = "04010000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_DIRECTORY"
+value = "0200000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_NOFOLLOW"
+value = "0400000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_CLOEXEC"
+value = "02000000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_ASYNC"
+value = "020000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_DIRECT"
+value = "040000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_LARGEFILE"
+value = "0"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_NOATIME"
+value = "01000000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_PATH"
+value = "010000000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_TMPFILE"
+value = "020200000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_NDELAY"
+value = "O_NONBLOCK"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_EXLOCK"
+value = "0x10000000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_SHLOCK"
+value = "0x20000000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "O_RESOLVE_BENEATH"
+value = "0x40000000"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "F_DUPFD"
+value = "0"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "F_GETFD"
+value = "1"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "F_SETFD"
+value = "2"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "F_GETFL"
+value = "3"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "F_SETFL"
+value = "4"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "F_GETLK"
+value = "5"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "F_SETLK"
+value = "6"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "F_SETLKW"
+value = "7"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "F_SETOWN"
+value = "8"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "F_GETOWN"
+value = "9"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "F_SETSIG"
+value = "10"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "F_GETSIG"
+value = "11"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "F_SETOWN_EX"
+value = "15"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "F_GETOWN_EX"
+value = "16"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "F_GETOWNER_UIDS"
+value = "17"
+headers = ["bits/fcntl.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "PAGESIZE"
+value = "4096"
+headers = ["bits/limits.h"]
+arches = ["x86_64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "PAGE_SIZE"
+value = "4096"
+headers = ["bits/limits.h"]
+arches = ["x86_64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "EDOOFUS"
+value = "1000"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4"
+
+[[constant]]
+name = "EFTYPE"
+value = "1001"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4"
+
+[[constant]]
+name = "EAUTH"
+value = "1002"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4"
+
+[[constant]]
+name = "ENEEDAUTH"
+value = "1003"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4"
+
+[[constant]]
+name = "EPROCLIM"
+value = "1004"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4"
+
+[[constant]]
+name = "EBADRPC"
+value = "1005"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4"
+
+[[constant]]
+name = "ERPCMISMATCH"
+value = "1006"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4"
+
+[[constant]]
+name = "EPROGUNAVAIL"
+value = "1007"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4"
+
+[[constant]]
+name = "EPROGMISMATCH"
+value = "1008"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4"
+
+[[constant]]
+name = "EPROCUNAVAIL"
+value = "1009"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4"
+
+[[constant]]
+name = "ENOTCAPABLE"
+value = "1010"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4"
+
+[[constant]]
+name = "ECAPMODE"
+value = "1011"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4"
+
+[[constant]]
+name = "EINTEGRITY"
+value = "1012"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4"
+
+[[constant]]
+name = "EIPSEC"
+value = "1013"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4"
+
+[[constant]]
+name = "EWOULDBLOCK"
+value = "EAGAIN"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4 aliases"
+
+[[constant]]
+name = "EDEADLOCK"
+value = "EDEADLK"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4 aliases"
+
+[[constant]]
+name = "ENOTSUP"
+value = "EOPNOTSUPP"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4 aliases"
+
+[[constant]]
+name = "ENOATTR"
+value = "ENODATA"
+headers = ["bits/errno.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.4 aliases"
+
+[[constant]]
+name = "_SC_ARG_MAX"
+value = "0"
+headers = ["bits/sysconf.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "_SC_CHILD_MAX"
+value = "1"
+headers = ["bits/sysconf.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "_SC_CLK_TCK"
+value = "2"
+headers = ["bits/sysconf.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "_SC_NGROUPS_MAX"
+value = "3"
+headers = ["bits/sysconf.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "_SC_OPEN_MAX"
+value = "4"
+headers = ["bits/sysconf.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "_SC_PAGESIZE"
+value = "30"
+headers = ["bits/sysconf.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "_SC_MINSIGSTKSZ"
+value = "249"
+headers = ["bits/sysconf.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "_SC_SIGSTKSZ"
+value = "250"
+headers = ["bits/sysconf.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "_PC_LINK_MAX"
+value = "0"
+headers = ["bits/sysconf.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "_PC_NAME_MAX"
+value = "3"
+headers = ["bits/sysconf.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "_PC_PATH_MAX"
+value = "4"
+headers = ["bits/sysconf.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+
+[[constant]]
+name = "_PC_PIPE_BUF"
+value = "5"
+headers = ["bits/sysconf.h"]
+arches = ["x86_64", "aarch64", "riscv64"]
+source = "doc 14 3.A.6"
+

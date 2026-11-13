@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Names with a T4(b) family prefix that appear in the C headers but have no
+# row in the C36 generator output. Each row needs a reason (T4 fails without).
+# C38 may append rows here for its headers.
+
+[[constant]]
+name = "EOF"
+reason = "ISO C stdio sentinel; not an errno or driver constant, so C36 does not generate it."
+owner = "C37"
+
+[[constant]]
+name = "EXPR_NEST_MAX"
+reason = "POSIX <limits.h> limit; the name starts with E but it is not an errno value."
+owner = "C37"
+
+[[constant]]
+name = "SIG_ATOMIC_MIN"
+reason = "ISO C stdint property of sig_atomic_t; the name starts with SIG but it is not a signal number."
+owner = "C37"
+
+[[constant]]
+name = "SIG_ATOMIC_MAX"
+reason = "ISO C stdint property of sig_atomic_t; the name starts with SIG but it is not a signal number."
+owner = "C37"
+
+[[constant]]
+name = "PROT_BTI"
+reason = "aarch64-specific PROT_* bit; raven-linux-abi has no per-arch PROT table."
+owner = "C37"
+
+[[constant]]
+name = "PROT_MTE"
+reason = "aarch64-specific PROT_* bit; raven-linux-abi has no per-arch PROT table."
+owner = "C37"

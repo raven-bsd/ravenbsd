@@ -1,0 +1,294 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# T5 symbol probes: visible_in and hidden_in partition the nine modes.
+# `pending = true` rows are reported as PENDING with their owner.
+
+[[probe]]
+header = "stdio.h"
+symbol = "asprintf"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "vasprintf"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "fgetln"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "fpurge"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "funopen"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "fputc_unlocked"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "fgets_unlocked"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "fopencookie"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "fdopen"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "fileno"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "getline"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "getdelim"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "dprintf"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "open_memstream"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "fmemopen"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "getc_unlocked"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "snprintf_l"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "stdio.h"
+symbol = "gets"
+visible_in = ["c11", "posix", "xopen", "ansi"]
+hidden_in = ["default", "gnu", "c23", "cxx17", "cxx20"]
+owner = "C37"
+
+[[probe]]
+header = "locale.h"
+symbol = "newlocale"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "locale.h"
+symbol = "uselocale"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "locale.h"
+symbol = "duplocale"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "locale.h"
+symbol = "freelocale"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "time.h"
+symbol = "timegm"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "time.h"
+symbol = "timelocal"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "time.h"
+symbol = "tzalloc"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "time.h"
+symbol = "tzfree"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "time.h"
+symbol = "localtime_rz"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "time.h"
+symbol = "mktime_z"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "wchar.h"
+symbol = "wcslcpy"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "wchar.h"
+symbol = "wcslcat"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "wchar.h"
+symbol = "wcsdup"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "wchar.h"
+symbol = "wcpcpy"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "wchar.h"
+symbol = "wcsnrtombs"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "wchar.h"
+symbol = "mbsnrtowcs"
+visible_in = ["default", "gnu", "posix", "xopen", "cxx17", "cxx20"]
+hidden_in = ["c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "math.h"
+symbol = "drem"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "math.h"
+symbol = "finite"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "math.h"
+symbol = "significand"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "math.h"
+symbol = "gamma"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "errno.h"
+symbol = "program_invocation_name"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "errno.h"
+symbol = "__progname"
+visible_in = ["default", "gnu", "cxx17", "cxx20"]
+hidden_in = ["posix", "xopen", "c11", "c23", "ansi"]
+owner = "C37"
+
+[[probe]]
+header = "string.h"
+symbol = "strlcpy"
+visible_in = []
+hidden_in = ["default", "posix", "xopen", "gnu", "c11", "c23", "ansi", "cxx17", "cxx20"]
+owner = "C40"
+pending = true
+
