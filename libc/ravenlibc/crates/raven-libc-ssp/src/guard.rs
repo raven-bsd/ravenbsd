@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BSD-2-Clause
-// Copyright (c) 2006 The NetBSD Foundation, Inc.
+// Copyright (c) 2002 Hiroaki Etoh, Federico G. Schwindt, and Miodrag Vallat.
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //
 //! Canary storage and seeding.
