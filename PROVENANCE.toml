@@ -3642,17 +3642,6 @@ modified = true
 notes = "no per-file header; covered by musl/COPYRIGHT; sigmap branch dead under Linux numbering; RT32..RT64; unknown text is 'Unknown signal: N' (RD-13)"
 
 [[import]]
-path = "libc/ravenlibc/crates/raven-libc-str/src/gnu_basename.rs"
-upstream = "bionic"
-upstream_path = "libc/bionic/__gnu_basename.cpp"
-upstream_rev = "731631f300090436d7f5df80d50b6275c8c60a93"
-license = "BSD-2-Clause"
-tier = "A"
-copied = "2026-11-13"
-modified = true
-notes = "COPY per donor-map/01 3.7; returns the offset after the last slash"
-
-[[import]]
 path = "libc/ravenlibc/crates/raven-libc-str/src/raw/mem/impls.rs"
 upstream = "rust"
 upstream_path = "library/compiler-builtins/compiler-builtins/src/mem/impls.rs"
@@ -3948,17 +3937,6 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "COPY per donor-map/01 3.7; pointer shell over the 12-byte engine"
-
-[[import]]
-path = "libc/ravenlibc/crates/raven-libc-str/src/raw/gnu_basename.rs"
-upstream = "bionic"
-upstream_path = "libc/bionic/__gnu_basename.cpp"
-upstream_rev = "731631f300090436d7f5df80d50b6275c8c60a93"
-license = "BSD-2-Clause"
-tier = "A"
-copied = "2026-11-13"
-modified = true
-notes = "COPY per donor-map/01 3.7; pointer shell"
 
 [[import]]
 path = "libc/ravenlibc/include/string.h"

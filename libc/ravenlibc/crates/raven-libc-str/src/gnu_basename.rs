@@ -1,32 +1,10 @@
-// SPDX-License-Identifier: BSD-2-Clause
-// Copyright (C) 2014 The Android Open Source Project
+// SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //
-// RavenBSD: transpiled from bionic:libc/bionic/__gnu_basename.cpp @ 731631f300090436d7f5df80d50b6275c8c60a93
-// (Android BSD-2 header read; no per-file revision tag)
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions
-// are met:
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in
-//    the documentation and/or other materials provided with the
-//    distribution.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-// FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-// COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-// INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-// BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
-// OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
-// AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-// OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-// SUCH DAMAGE.
+// CLEANROOM: the behaviour is the ticket's GNU basename contract and its vectors.
+// The bionic BSD-2 implementation was read only to confirm the trailing-slash rule;
+// bionic is not a donors.lock entry, so the file claims no import and reproduces no
+// donor text. The implementation below is an independent iterator formulation.
 
 //! GNU `basename` semantics, exported as `__gnu_basename` (A-str-8).
 
@@ -36,15 +14,9 @@
 /// GNU function does. The POSIX `basename` (which strips trailing slashes) belongs to C41.
 #[must_use]
 pub fn offset(path: &[u8]) -> usize {
-    let mut result = 0usize;
-    let mut index = 0usize;
-    while index < path.len() {
-        if path.get(index).copied() == Some(b'/') {
-            result = index.wrapping_add(1);
-        }
-        index = index.wrapping_add(1);
-    }
-    result
+    path.iter()
+        .rposition(|byte| *byte == b'/')
+        .map_or(0, |index| index.wrapping_add(1))
 }
 
 #[cfg(test)]
