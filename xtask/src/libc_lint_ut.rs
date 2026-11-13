@@ -585,3 +585,25 @@ fn unsafe_fn_in_class_p_is_still_forbidden() {
     let violations = check(&tree, "unsafe-scope");
     assert!(violations.iter().any(|v| v.key == "forbidden"));
 }
+
+#[test]
+fn raw_arch_assembly_is_allowed_by_no_cc() {
+    let tree = fixture();
+    tree.write(
+        "libc/ravenlibc/crates/raven-libc-str/src/raw/arch/aarch64/memcpy.s",
+        ".text\n",
+    );
+    let violations = check(&tree, "no-cc");
+    assert!(!violations.iter().any(|v| v.key == "c-source"));
+}
+
+#[test]
+fn assembly_outside_raw_arch_is_still_reported() {
+    let tree = fixture();
+    tree.write(
+        "libc/ravenlibc/crates/raven-libc-str/src/memcpy.s",
+        ".text\n",
+    );
+    let violations = check(&tree, "no-cc");
+    assert!(violations.iter().any(|v| v.key == "c-source"));
+}
