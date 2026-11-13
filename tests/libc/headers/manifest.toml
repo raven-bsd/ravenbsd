@@ -1582,15 +1582,22 @@ ring = 2
 [[header]]
 path = "sys/pledge.h"
 owner = "C53"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "sys/capsicum.h"
 owner = "C53"
-status = "pending"
+status = "owned"
 standalone = true
+ring = 2
+
+[[header]]
+path = "sys/caprights.h"
+owner = "C53"
+status = "owned"
+standalone = false
 ring = 2
 
 [[header]]

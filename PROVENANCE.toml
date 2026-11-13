@@ -4949,3 +4949,201 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "per-call DtoaCtx arena replaces the freelist/private_mem/p5s and both locks; NO_ERRNO maps errno to RangeFlags; the decimal point is a NumericLocale parameter; Kind replaces 9999/-32768/INT_MAX; Rounding is a parameter (Honor_FLT_ROUNDS without Trust_FLT_ROUNDS); Kmax 9; CLEANROOM arch constants"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-proc/src/exec_path.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/exec.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/10 3.4: PATH search generic over a try closure; vfork/mmap workarounds removed; diagnostics via callback."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-proc/src/spawnp.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gen/posix_spawnp.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/10 3.3.1: reduced to the empty/slash/search prechecks; the access(X_OK) probe and child exec are replaced by exec_path::search_path."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-proc/src/spawn_model/api.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/gen/posix_spawn.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/10 3.3.1: API half only; Vec replaces STAILQ, musl/glibc EBADF for fd < 0, FreeBSD spawn constants replaced by Linux values."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-proc/src/wait.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/wait.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/10 3.5: the wait4 call becomes a generic Wait4 trait."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-proc/src/waitpid.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/waitpid.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/10 3.5: the wait4 call becomes a generic Wait4 trait."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-proc/src/wait3.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/wait3.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/10 3.5: the wait4 call becomes a generic Wait4 trait and fills an opaque rusage record."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-proc/src/waitid.rs"
+upstream = "netbsd"
+upstream_path = "lib/libc/gen/waitid.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/10 3.5: wait6 becomes a generic Wait6 trait; info is zeroed on a 0 pid."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-proc/src/times.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/times.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/10 3.5: getrusage/clock_gettime arguments are supplied by the caller; CONVTCK keeps the donor formula."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-proc/src/nice.rs"
+upstream = "musl"
+upstream_path = "src/unistd/nice.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT (H-1); getpriority/setpriority are a PrioOps trait."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-proc/src/popen_model.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/popen.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/10 3.5: the FILE object and vfork block are omitted; pid list, mode validation and spawn plan remain."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-proc/src/daemon.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/daemon.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/10 3.5: one fork, parent exit and /dev/null setup become a DaemonOps step model."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-proc/src/initgroups.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/initgroups.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/10 3.5: getgrouplist/setgroups become a GroupSource trait; the 1023-entry buffer and silent truncation are kept."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-proc/src/getprogname.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/getprogname.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/10 3.11: only the pure accessor; the shell owns the __progname storage."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-proc/src/setprogname.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/setprogname.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "ISC"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/10 3.11: returns the basename slice; the shell stores the pointer."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-proc/src/getauxval.rs"
+upstream = "musl"
+upstream_path = "src/misc/getauxval.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT (H-1); the linear scan is over AuxTable and AT_SECURE is a caller flag."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-proc/src/atfork.rs"
+upstream = "bionic"
+upstream_path = "libc/bionic/pthread_atfork.cpp"
+upstream_rev = "731631f300090436d7f5df80d50b6275c8c60a93"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/10 3.2.1: Vec replaces the doubly linked list; the ForkLock argument replaces the donor mutex; prepare reverse and parent/child forward."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/capsicum.h"
+upstream = "freebsd"
+upstream_path = "sys/sys/capsicum.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/10 3.10: lines 52-355, _KERNEL blocks and pd* declarations removed, userland prototypes added."
+
+[[import]]
+path = "libc/ravenlibc/include/sys/caprights.h"
+upstream = "freebsd"
+upstream_path = "sys/sys/caprights.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/10 3.10: userland version constants and struct only; _KERNEL rights list removed; stdint.h added."

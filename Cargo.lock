@@ -953,6 +953,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-pledge"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-libc-abi",
+]
+
+[[package]]
+name = "raven-libc-proc"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+]
+
+[[package]]
 name = "raven-libc-stdlib"
 version = "0.1.0"
 dependencies = [
