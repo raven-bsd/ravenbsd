@@ -56,6 +56,56 @@ impl<B: StackBackend> Core<B> {
         self.backend.dhcp_lease()
     }
 
+    /// IPv4 routes in the native table.
+    #[must_use]
+    pub fn routes(&self) -> Vec<crate::RouteEntry> {
+        self.backend.routes()
+    }
+
+    /// Add or replace one route.
+    pub fn add_route(&mut self, route: crate::RouteEntry) -> Result<(), Errno> {
+        self.backend.add_route(route)
+    }
+
+    /// Delete one route by destination prefix.
+    pub fn delete_route(&mut self, dest: Ipv4Addr, prefix_len: u8) -> Result<(), Errno> {
+        self.backend.delete_route(dest, prefix_len)
+    }
+
+    /// Live sockets in the native core.
+    #[must_use]
+    pub fn socket_table(&self) -> Vec<crate::CoreSocket> {
+        self.backend.socket_table()
+    }
+
+    /// Packet/byte counters observed at the device boundary.
+    #[must_use]
+    pub fn interface_counters(&self) -> Option<crate::InterfaceCounters> {
+        self.backend.interface_counters()
+    }
+
+    /// Bind one ICMP echo identifier.
+    pub fn icmp_bind(&mut self, id: u16) -> Result<SocketId, Errno> {
+        self.backend.icmp_bind(id)
+    }
+
+    /// Send one ICMP echo request on a bound ICMP socket.
+    pub fn icmp_echo(
+        &mut self,
+        s: SocketId,
+        to: Ipv4Addr,
+        id: u16,
+        seq: u16,
+        payload: &[u8],
+    ) -> Result<(), Errno> {
+        self.backend.icmp_echo(s, to, id, seq, payload)
+    }
+
+    /// Read one ICMP echo reply payload.
+    pub fn icmp_recv(&mut self, s: SocketId, buf: &mut [u8]) -> Result<usize, Errno> {
+        self.backend.icmp_recv(s, buf)
+    }
+
     /// Listen for TCP connections.
     pub fn tcp_listen(&mut self, port: u16, backlog: usize) -> Result<SocketId, Errno> {
         self.backend.tcp_listen(port, backlog)
@@ -127,6 +177,31 @@ impl<B: StackBackend> Core<B> {
     /// Time until the next poll.
     pub fn next_poll_delay_ms(&mut self, now_ms: i64) -> Option<u64> {
         self.backend.next_poll_delay_ms(now_ms)
+    }
+
+    /// Local endpoint of `socket`, when the backend exposes it.
+    pub fn local_endpoint(&self, socket: SocketId) -> Option<(Ipv4Addr, u16)> {
+        self.backend.local_endpoint(socket)
+    }
+
+    /// Peer endpoint of `socket`, when connected.
+    pub fn peer_endpoint(&self, socket: SocketId) -> Option<(Ipv4Addr, u16)> {
+        self.backend.peer_endpoint(socket)
+    }
+
+    /// Apply one protocol socket option (`1..=4`).
+    pub fn set_socket_option(
+        &mut self,
+        socket: SocketId,
+        option: u32,
+        value: i32,
+    ) -> Result<(), Errno> {
+        self.backend.set_socket_option(socket, option, value)
+    }
+
+    /// Read one protocol socket option (`1..=5`).
+    pub fn get_socket_option(&self, socket: SocketId, option: u32) -> Result<i32, Errno> {
+        self.backend.get_socket_option(socket, option)
     }
 }
 

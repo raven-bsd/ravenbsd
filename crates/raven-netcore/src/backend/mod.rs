@@ -9,6 +9,7 @@ use raven_abi::errno::Errno;
 
 use crate::{Event, Ipv4Addr, SocketId};
 
+mod counting;
 pub mod raven;
 
 /// A replaceable TCP/IP stack behind the nonblocking socket core.
@@ -38,6 +39,58 @@ pub trait StackBackend {
     /// The DHCP lease in force, once one was acquired.
     fn dhcp_lease(&self) -> Option<crate::DhcpLease> {
         None
+    }
+
+    /// IPv4 routes in the native table.
+    fn routes(&self) -> Vec<crate::RouteEntry> {
+        Vec::new()
+    }
+
+    /// Add or replace one route.
+    fn add_route(&mut self, route: crate::RouteEntry) -> Result<(), Errno> {
+        let _ = route;
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Delete one route by destination prefix.
+    fn delete_route(&mut self, dest: Ipv4Addr, prefix_len: u8) -> Result<(), Errno> {
+        let _ = (dest, prefix_len);
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Live sockets in the native core.
+    fn socket_table(&self) -> Vec<crate::CoreSocket> {
+        Vec::new()
+    }
+
+    /// Packet/byte counters observed at the device boundary.
+    fn interface_counters(&self) -> Option<crate::InterfaceCounters> {
+        None
+    }
+
+    /// Bind one ICMP echo identifier.
+    fn icmp_bind(&mut self, id: u16) -> Result<SocketId, Errno> {
+        let _ = id;
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Send one ICMP echo request on a bound ICMP socket.
+    fn icmp_echo(
+        &mut self,
+        s: SocketId,
+        to: Ipv4Addr,
+        id: u16,
+        seq: u16,
+        payload: &[u8],
+    ) -> Result<(), Errno> {
+        let _ = (s, to, id, seq, payload);
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Read one ICMP echo reply payload.
+    fn icmp_recv(&mut self, s: SocketId, buf: &mut [u8]) -> Result<usize, Errno> {
+        let _ = (s, buf);
+        Err(Errno::EOPNOTSUPP)
     }
 
     /// Listen on `port`.
@@ -88,4 +141,28 @@ pub trait StackBackend {
 
     /// Time until the next poll, in milliseconds.
     fn next_poll_delay_ms(&mut self, now_ms: i64) -> Option<u64>;
+
+    /// Local endpoint of `s`, when the backend exposes one.
+    fn local_endpoint(&self, s: SocketId) -> Option<(Ipv4Addr, u16)> {
+        let _ = s;
+        None
+    }
+
+    /// Peer endpoint of `s`, when connected.
+    fn peer_endpoint(&self, s: SocketId) -> Option<(Ipv4Addr, u16)> {
+        let _ = s;
+        None
+    }
+
+    /// Apply a protocol socket option; the backend owns any unsupported-option policy.
+    fn set_socket_option(&mut self, s: SocketId, option: u32, value: i32) -> Result<(), Errno> {
+        let _ = (s, option, value);
+        Err(Errno::EOPNOTSUPP)
+    }
+
+    /// Read a protocol socket option.
+    fn get_socket_option(&self, s: SocketId, option: u32) -> Result<i32, Errno> {
+        let _ = (s, option);
+        Err(Errno::EOPNOTSUPP)
+    }
 }

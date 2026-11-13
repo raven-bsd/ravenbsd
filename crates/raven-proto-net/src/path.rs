@@ -7,6 +7,7 @@
 //!
 //! * `net:tcp/<ipv4>:<port>` - a TCP socket to a remote endpoint;
 //! * `net:udp/<ipv4>:<port>` - a UDP socket;
+//! * `net:icmp/<ipv4>` - an ICMP echo socket for one destination;
 //! * `net:` - the control channel (interface table, routes, ARP).
 //!
 //! Parsing is strict: a malformed path is a [`PathError`], never a best-effort guess.
@@ -22,6 +23,8 @@ pub enum Transport {
     Tcp,
     /// A datagram socket.
     Udp,
+    /// An ICMP echo socket.
+    Icmp,
     /// The interface control channel.
     Control,
 }
@@ -40,7 +43,7 @@ pub struct SchemePath {
 pub enum PathError {
     /// The path does not start with `net:`.
     NotNet,
-    /// The part after `net:` is neither `tcp/`, `udp/` nor empty.
+    /// The part after `net:` is neither `tcp/`, `udp/`, `icmp/` nor empty.
     UnknownTransport,
     /// The endpoint has no `:` between address and port, or lacks an IPv4 address.
     MissingAddress,
@@ -62,6 +65,26 @@ impl fmt::Display for PathError {
     }
 }
 
+/// Prefix used by an accepted TCP socket's client-side file open.
+pub const ACCEPT_PREFIX: &str = "net:accept/";
+
+/// Parse the accepted-socket path `net:accept/<decimal socket id>`.
+///
+/// This is the ABI-v1 materialisation path for an `ACCEPT` result: the kernel has no
+/// server-side `SchemeFile`-create primitive, so the client opens this path to turn the numeric
+/// socket id into a scheme file. It is deliberately separate from [`parse`].
+pub fn parse_accepted(path: &str) -> Option<u32> {
+    let digits = path.strip_prefix(ACCEPT_PREFIX)?;
+    if digits.is_empty()
+        || digits.len() > 10
+        || !digits.bytes().all(|byte| byte.is_ascii_digit())
+        || (digits.len() > 1 && digits.starts_with('0'))
+    {
+        return None;
+    }
+    digits.parse().ok()
+}
+
 /// Parse a `net:` scheme path.
 pub fn parse(path: &str) -> Result<SchemePath, PathError> {
     let rest = path.strip_prefix("net:").ok_or(PathError::NotNet)?;
@@ -69,6 +92,18 @@ pub fn parse(path: &str) -> Result<SchemePath, PathError> {
         return Ok(SchemePath {
             transport: Transport::Control,
             endpoint: None,
+        });
+    }
+    if let Some(rest) = rest.strip_prefix("icmp/") {
+        if rest.contains(':') {
+            return Err(PathError::BadPort);
+        }
+        return Ok(SchemePath {
+            transport: Transport::Icmp,
+            endpoint: Some(Endpoint {
+                ip: parse_ipv4(rest)?,
+                port: 0,
+            }),
         });
     }
     let (transport, rest) = if let Some(rest) = rest.strip_prefix("tcp/") {
@@ -133,76 +168,5 @@ fn parse_port(text: &str) -> Result<u16, PathError> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_tcp_and_udp_paths() {
-        assert_eq!(
-            parse("net:tcp/10.0.0.2:8080"),
-            Ok(SchemePath {
-                transport: Transport::Tcp,
-                endpoint: Some(Endpoint {
-                    ip: [10, 0, 0, 2],
-                    port: 8080
-                }),
-            })
-        );
-        assert_eq!(
-            parse("net:udp/255.255.255.255:65535").map(|path| path.transport),
-            Ok(Transport::Udp)
-        );
-    }
-
-    #[test]
-    fn control_path_has_no_endpoint() {
-        assert_eq!(
-            parse("net:"),
-            Ok(SchemePath {
-                transport: Transport::Control,
-                endpoint: None
-            })
-        );
-    }
-
-    #[test]
-    fn rejects_foreign_schemes() {
-        assert_eq!(parse("file:/etc/passwd"), Err(PathError::NotNet));
-        assert_eq!(parse(""), Err(PathError::NotNet));
-    }
-
-    #[test]
-    fn rejects_unknown_transports() {
-        assert_eq!(parse("net:raw/1.2.3.4:1"), Err(PathError::UnknownTransport));
-        assert_eq!(parse("net:tcp"), Err(PathError::UnknownTransport));
-    }
-
-    #[test]
-    fn rejects_bad_addresses() {
-        for path in [
-            "net:tcp/1.2.3:80",
-            "net:tcp/1.2.3.4.5:80",
-            "net:tcp/256.2.3.4:80",
-            "net:tcp/1.2.3.a:80",
-            "net:tcp/01.2.3.4:80",
-            "net:tcp/:80",
-            "net:tcp/1.2.3.4",
-        ] {
-            assert!(parse(path).is_err(), "{path} must be rejected");
-        }
-    }
-
-    #[test]
-    fn rejects_bad_ports() {
-        for path in [
-            "net:tcp/1.2.3.4:0",
-            "net:tcp/1.2.3.4:65536",
-            "net:tcp/1.2.3.4:",
-            "net:tcp/1.2.3.4:8o",
-            "net:tcp/1.2.3.4:080",
-            "net:tcp/1.2.3.4:80:90",
-        ] {
-            assert!(parse(path).is_err(), "{path} must be rejected");
-        }
-    }
-}
+#[path = "path_ut.rs"]
+mod tests;

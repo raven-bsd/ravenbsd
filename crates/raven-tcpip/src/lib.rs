@@ -73,7 +73,9 @@ pub use raven_abi::errno::Errno;
 
 pub use cc::{CcContext, CongestionControl, Cubic, LossKind, NewReno, Prr, icbrt};
 pub use device::{ChecksumOffload, Device, DeviceCaps, Medium, TxError};
-pub use dhcp::{Event as DhcpEvent, Lease as DhcpLease, RetryConfig as DhcpRetryConfig};
+pub use dhcp::{
+    DhcpTimers, Event as DhcpEvent, Lease as DhcpLease, RetryConfig as DhcpRetryConfig,
+};
 pub use event::{Event, PollResult, SocketId};
 pub use ipv6_stack::{
     IpAddr, Ipv6Addr, Ipv6AddressState, Ipv6Cidr, Ipv6Config, Neighbor6Cache, Neighbor6Entry,

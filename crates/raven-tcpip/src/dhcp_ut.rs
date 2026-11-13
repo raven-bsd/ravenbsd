@@ -97,6 +97,21 @@ fn a_full_exchange_yields_a_lease_with_router_and_dns() {
 }
 
 #[test]
+fn a_bound_lease_exposes_its_absolute_timers() {
+    let mut client = Dhcp::new(MAC, 5);
+    let _ = bound(&mut client, 1_000, 3_600);
+    assert_eq!(
+        client.timers(),
+        Some(DhcpTimers {
+            renew_at: 1_801_000,
+            rebind_at: 3_151_000,
+            expires_at: 3_601_000,
+        })
+    );
+    assert_eq!(Dhcp::new(MAC, 5).timers(), None);
+}
+
+#[test]
 fn replies_for_another_transaction_or_client_are_ignored() {
     let mut client = Dhcp::new(MAC, 5);
     let discover = client.poll(0).expect("discover");

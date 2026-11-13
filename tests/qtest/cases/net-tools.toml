@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "net-tools"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/b14-tools/build.sh"]
+initfs = "build/fixtures/b14-tools/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^net-tools: netd ready$'
+
+[[expect]]
+regex = '^ifconfig: lo flags=UP,LINK_UP,LOOPBACK mtu 65535 inet 127\.0\.0\.1 netmask 255\.0\.0\.0$'
+
+[[expect]]
+regex = '^net-tools: ifconfig list ok$'
+
+[[expect]]
+regex = '^ifconfig: lo address 10\.1\.2\.3/24$'
+
+[[expect]]
+regex = '^ifconfig: lo flags=UP,LINK_UP,LOOPBACK mtu 65535 inet 10\.1\.2\.3 netmask 255\.255\.255\.0$'
+
+[[expect]]
+regex = '^ifconfig: lo address 127\.0\.0\.1/8$'
+
+[[expect]]
+regex = '^ifconfig: lo up$'
+
+[[expect]]
+regex = '^net-tools: ifconfig set ok$'
+
+[[expect]]
+regex = '^nc: listening tcp 127\.0\.0\.1:7000$'
+
+[[expect]]
+regex = '^nc: connected tcp 127\.0\.0\.1:7000$'
+
+[[expect]]
+regex = '^nc: received hello$'
+
+[[expect]]
+regex = '^nc: echo 5 bytes$'
+
+[[expect]]
+regex = '^net-tools: tcp ok$'
+
+[[expect]]
+regex = '^nc: listening udp 127\.0\.0\.1:7001$'
+
+[[expect]]
+regex = '^nc: connected udp 127\.0\.0\.1:7001$'
+
+[[expect]]
+regex = '^nc: received hello$'
+
+[[expect]]
+regex = '^nc: echo 5 bytes$'
+
+[[expect]]
+regex = '^net-tools: udp ok$'
+
+[[expect]]
+regex = '^net-tools: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

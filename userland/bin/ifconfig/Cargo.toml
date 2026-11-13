@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-ifconfig"
+version = "0.1.0"
+description = "RavenBSD network interface configuration tool (net: control)."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[lib]
+name = "raven_ifconfig"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raven-ifconfig"
+path = "src/main.rs"
+
+[dependencies]
+raven-proto-net = { path = "../../../crates/raven-proto-net" }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-rt = { path = "../../rt", features = ["alloc"] }
+raven-scheme = { path = "../../../crates/raven-scheme" }
+
+[lints]
+workspace = true

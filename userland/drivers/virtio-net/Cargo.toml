@@ -11,11 +11,14 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+raven-proto-net = { path = "../../../crates/raven-proto-net" }
 
 [target.'cfg(target_os = "none")'.dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
 raven-driver = { path = "../../../crates/raven-driver" }
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
 raven-rt = { path = "../../../userland/rt", features = ["alloc"] }
+raven-scheme = { path = "../../../crates/raven-scheme" }
 
 [lints]
 workspace = true

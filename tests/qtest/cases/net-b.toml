@@ -1,0 +1,132 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B12b: the persistent virtio-net frame service. The probe maps the B39 ring, sends one ARP
+# request and receives QEMU's reply, then the driver quits for the second devd cycle; the probe
+# waits for `nic:` to reappear and repeats the exchange.
+
+name = "net-b"
+arch = "x86_64"
+profile = "net-b-test"
+timeout_secs = 240
+pre = ["sh tests/fixtures/b12b-net/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^pcid: devices=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^svcd: pcid up$'
+
+[[expect]]
+regex = '^devd: matched [0-9a-f]{2}:[0-9a-f]{2}\.[0-9] vendor=0x1af4 device=0x1041 irq_line=[0-9]+ irq_pin=[0-9]+$'
+
+[[expect]]
+regex = '^devd: driver virtio-net bar=4 size=16384$'
+
+[[expect]]
+regex = '^devd: driver virtio-net dma bus=0x[0-9a-f]+ len=65536$'
+
+[[expect]]
+regex = '^virtio-net: id=1af4:1041$'
+
+[[expect]]
+regex = '^virtio-net: mac=[0-9a-f]{2}(:[0-9a-f]{2}){5} mtu=[0-9]+ link=up$'
+
+[[expect]]
+regex = '^virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536$'
+
+[[expect]]
+regex = '^virtio-net: serving nic:$'
+
+[[expect]]
+regex = '^net-b: cycle 1 mac=[0-9a-f]{2}(:[0-9a-f]{2}){5} mtu=[0-9]+ link=up ring offset=0x1000 len=24576 rx=8 tx=8 dma=65536$'
+
+[[expect]]
+regex = '^net-b: cycle 1 tx frame 42 bytes$'
+
+[[expect]]
+regex = '^net-b: cycle 1 rx frame [0-9]+ bytes$'
+
+[[expect]]
+regex = '^net-b: cycle 1 arp reply from [0-9a-f]{2}(:[0-9a-f]{2}){5} \(10\.0\.2\.2\)$'
+
+[[expect]]
+regex = '^net-b: cycle 1 quit$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: stats rx=[1-9][0-9]* tx=[1-9][0-9]* drops=0$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: serve done$'
+unordered = true
+
+[[expect]]
+regex = '^devd: driver virtio-net cycle 1 exit=0$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: id=1af4:1041$'
+
+[[expect]]
+regex = '^virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536$'
+
+[[expect]]
+regex = '^net-b: nic: reappeared$'
+
+[[expect]]
+regex = '^net-b: cycle 2 mac=[0-9a-f]{2}(:[0-9a-f]{2}){5} mtu=[0-9]+ link=up ring offset=0x1000 len=24576 rx=8 tx=8 dma=65536$'
+
+[[expect]]
+regex = '^net-b: cycle 2 tx frame 42 bytes$'
+
+[[expect]]
+regex = '^net-b: cycle 2 rx frame [0-9]+ bytes$'
+
+[[expect]]
+regex = '^net-b: cycle 2 arp reply from [0-9a-f]{2}(:[0-9a-f]{2}){5} \(10\.0\.2\.2\)$'
+
+[[expect]]
+regex = '^net-b: cycle 2 quit$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: stats rx=[1-9][0-9]* tx=[1-9][0-9]* drops=0$'
+unordered = true
+
+[[expect]]
+regex = '^virtio-net: serve done$'
+unordered = true
+
+[[expect]]
+regex = '^devd: driver virtio-net cycle 2 exit=0$'
+unordered = true
+
+[[expect]]
+regex = '^devd: driver virtio-net cycles=2$'
+unordered = true
+
+[[expect]]
+regex = '^net-b: devd done$'
+unordered = true
+
+[[expect]]
+regex = '^net-b: probe ok$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|net-b: error:|virtio-net: pump:'
