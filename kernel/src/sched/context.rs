@@ -27,6 +27,8 @@ use crate::sched::thread::Thread;
 use crate::sync;
 
 #[cfg(target_arch = "x86_64")]
+const IA32_FS_BASE: u32 = 0xC000_0100;
+#[cfg(target_arch = "x86_64")]
 const IA32_GS_BASE: u32 = 0xC000_0101;
 #[cfg(target_arch = "x86_64")]
 const IA32_KERNEL_GS_BASE: u32 = 0xC000_0102;
@@ -198,6 +200,10 @@ pub unsafe fn switch(from: &Thread, to: &Thread) {
         write_cr3(to.cr3);
     }
 
+    // Install the incoming user thread's TLS base. Kernel threads always get
+    // zero, so a stale user FS base never leaks into kernel execution.
+    wrmsr(IA32_FS_BASE, if to.user { to.tls_base() } else { 0 });
+
     let next_rsp = to.saved_rsp();
     // SAFETY: the frame layout was prepared by `prepare_stack` or by a previous `sched_switch`;
     // the caller keeps both threads alive across the switch.
@@ -232,6 +238,19 @@ pub unsafe fn switch(from: &Thread, to: &Thread) {
         crate::arch::mmu::switch_ttbr0(to.cr3, asid);
     }
     crate::arch::percpu::set_current_thread(to as *const Thread as u64);
+
+    // TPIDR_EL1 remains the kernel thread pointer; TPIDR_EL0 is the user TLS
+    // base and must be zero for kernel threads.
+    let tls_base = if to.user { to.tls_base() } else { 0 };
+    // SAFETY: EL1 may write TPIDR_EL0; the value is either the user-selected TLS
+    // base or zero for a kernel thread. Interrupts are masked by the scheduler.
+    unsafe {
+        core::arch::asm!(
+            "msr tpidr_el0, {}",
+            in(reg) tls_base,
+            options(nomem, nostack, preserves_flags),
+        );
+    }
 
     let next_sp = to.saved_rsp();
     // SAFETY: the frame layout was prepared by `prepare_stack` or by a previous `sched_switch`;

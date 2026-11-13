@@ -192,6 +192,14 @@ syscalls! {
 /// file/server and is duplicated into `proc`.
 pub const PROC_SET_PERSONALITY: usize = 0x34;
 
+/// `thread_set_tls(thread: Handle, tp: usize) -> 0`.
+///
+/// Sets the per-thread user TLS base (`IA32_FS_BASE` on x86-64, `TPIDR_EL0`
+/// on aarch64). `Handle::NONE` means the calling thread; otherwise the handle
+/// needs `Rights::SIGNAL`. A raw constant, not a `Syscall` variant, so existing
+/// exhaustive matches in the libc crates stay intact.
+pub const THREAD_SET_TLS: usize = 0x23;
+
 #[cfg(test)]
 mod tests {
     use super::*;

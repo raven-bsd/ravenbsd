@@ -108,6 +108,39 @@ pub fn init() {
     wrmsr(IA32_FMASK, SYSCALL_FMASK);
     wrmsr(IA32_GS_BASE, 0);
     wrmsr(IA32_KERNEL_GS_BASE, percpu_address());
+    enable_fsgsbase();
+}
+
+/// Enable user `rdfsbase`/`wrfsbase` when the CPU advertises FSGSBASE.
+///
+/// The TLS qtest uses `rdfsbase` to observe the base that the context switch
+/// installed; the kernel's authoritative source remains the `Thread` field.
+fn enable_fsgsbase() {
+    let leaf = core::arch::x86_64::__cpuid_count(7, 0);
+    if leaf.ebx & 1 == 0 {
+        return;
+    }
+    let mut cr4: u64;
+    // SAFETY: ring-0 CR4 read.
+    unsafe {
+        core::arch::asm!(
+            "mov {}, cr4",
+            out(reg) cr4,
+            options(nomem, nostack, preserves_flags),
+        );
+    }
+    if cr4 & (1 << 16) == 0 {
+        cr4 |= 1 << 16;
+        // SAFETY: FSGSBASE was advertised by CPUID; this only opens the
+        // per-thread base instructions to user mode.
+        unsafe {
+            core::arch::asm!(
+                "mov cr4, {}",
+                in(reg) cr4,
+                options(nostack, preserves_flags),
+            );
+        }
+    }
 }
 
 #[unsafe(no_mangle)]

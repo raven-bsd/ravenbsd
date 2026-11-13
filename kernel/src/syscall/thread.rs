@@ -11,6 +11,7 @@ use raven_usercopy::is_user_address;
 
 use crate::process::{self, ProcessState, handle::Object};
 use crate::sched;
+use crate::sched::thread::ThreadState;
 use crate::syscall::SyscallFrame;
 
 /// `thread_create(proc, entry, stack_top, arg, flags) -> Thread handle`.
@@ -93,4 +94,37 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
 /// `thread_exit(code) -> !`.
 pub fn exit(frame: &SyscallFrame) -> ! {
     sched::exit_thread(frame.rdi as i32)
+}
+
+/// `thread_set_tls(thread, tp) -> 0`.
+///
+/// `Handle::NONE` targets the calling thread. A non-zero base must be a
+/// canonical user address; zero clears it. The value is per-thread and is
+/// installed by the next context switch to that thread.
+pub fn set_tls(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let thread = if handle == Handle::NONE {
+        sched::current_thread().ok_or(Errno::ESRCH)?
+    } else {
+        let handles = caller.handles.lock();
+        match handles.get(handle, Rights::SIGNAL) {
+            Ok(Object::Thread(thread)) => Arc::clone(thread),
+            Ok(_) => return Err(Errno::EBADF),
+            Err(Errno::EACCES) => return Err(Errno::EPERM),
+            Err(error) => return Err(error),
+        }
+    };
+    if !thread.user {
+        return Err(Errno::EINVAL);
+    }
+    if thread.state() == ThreadState::Dead {
+        return Err(Errno::ESRCH);
+    }
+    let tp = frame.rsi;
+    if tp != 0 && !is_user_address(tp) {
+        return Err(Errno::EFAULT);
+    }
+    thread.set_tls_base(tp);
+    Ok(0)
 }

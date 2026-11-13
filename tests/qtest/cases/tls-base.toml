@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S42: two threads with distinct TLS pages survive a yield/timer switch, a
+# parent sets a child thread's base through THREAD_SET_TLS (the linuxd shape),
+# and clearing the base leaves a new thread at zero.
+
+name = "tls-base"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/tls-base-fixture/build.sh"]
+initfs = "build/fixtures/tls-base/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^tls-base: thread page=0x[0-9a-f]+ base=0x[0-9a-f]+ marker=0x1111222233334444$'
+unordered = true
+
+[[expect]]
+regex = '^tls-base: thread page=0x[0-9a-f]+ base=0x[0-9a-f]+ marker=0x5555666677778888$'
+unordered = true
+
+[[expect]]
+regex = '^tls-base: cross base=0x70000000 marker=0x9999aaaabbbbcccc$'
+
+[[expect]]
+regex = '^tls-base: clear base=0x0$'
+
+[[expect]]
+regex = '^tls-base: zero base=0x0$'
+
+[[expect]]
+regex = '^tls-base: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
