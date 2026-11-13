@@ -147,6 +147,8 @@ pub struct Thread {
     pub last_cpu: AtomicU32,
     /// Pinned threads are never stolen by another CPU (deterministic SMP self-test workers).
     pub pinned: AtomicBool,
+    /// User TLS base (`IA32_FS_BASE` / `TPIDR_EL0`), installed on switch-in.
+    pub tls_base: AtomicU64,
 }
 
 // SAFETY: all interior mutability is accessed from scheduler critical sections (interrupts off)
@@ -173,6 +175,18 @@ impl Thread {
     pub fn saved_rsp(&self) -> u64 {
         // SAFETY: the value is a plain stack pointer published by the scheduler.
         unsafe { self.saved_rsp.get().read() }
+    }
+
+    /// The current user TLS base.
+    #[inline]
+    pub fn tls_base(&self) -> u64 {
+        self.tls_base.load(Ordering::Acquire)
+    }
+
+    /// Store the user TLS base; the next switch to this thread installs it.
+    #[inline]
+    pub fn set_tls_base(&self, value: u64) {
+        self.tls_base.store(value, Ordering::Release);
     }
 
     /// Store the saved kernel stack pointer.
@@ -231,6 +245,7 @@ impl Thread {
             idle,
             last_cpu: AtomicU32::new(0),
             pinned: AtomicBool::new(false),
+            tls_base: AtomicU64::new(0),
         });
         Ok(thread)
     }
@@ -317,6 +332,7 @@ impl Thread {
             idle: true,
             last_cpu: AtomicU32::new(0),
             pinned: AtomicBool::new(false),
+            tls_base: AtomicU64::new(0),
         })
     }
 
@@ -353,6 +369,7 @@ impl Thread {
             idle: true,
             last_cpu: AtomicU32::new(0),
             pinned: AtomicBool::new(false),
+            tls_base: AtomicU64::new(0),
         }))
     }
 }

@@ -62,6 +62,7 @@ members = [
     "tests/fixtures/b70-net/overlay",
     "profiles/iommu-fixture",
     "tests/qtest/cases/linux-trap-fixture",
+    "tests/qtest/cases/tls-base-fixture",
     "xtask",
     "tests/qtest",
     "tests/ufs-oracle",

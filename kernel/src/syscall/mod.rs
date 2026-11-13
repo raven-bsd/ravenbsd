@@ -70,6 +70,9 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == raven_abi::syscall::PROC_SET_PERSONALITY {
         return process_ctl::set_personality(frame);
     }
+    if number == raven_abi::syscall::THREAD_SET_TLS {
+        return thread::set_tls(frame);
+    }
     match Syscall::from_usize(number) {
         // EXIT is process-wide: every thread of the process terminates.
         Some(Syscall::EXIT) => process::exit_process(frame.rdi as i32),
