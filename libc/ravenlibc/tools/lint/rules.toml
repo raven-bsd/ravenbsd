@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[scope]
+libc = ["libc/ravenlibc/crates", "libc/ravenlibc/crt", "libc/ravenlibc/ld", "libc/ravenlibc/tools"]
+host = ["tests/libc", "tools/libc-"]
+crate_manifest = "libc/ravenlibc/xtask/crates.toml"
+
+[no-std]
+allow-files = []

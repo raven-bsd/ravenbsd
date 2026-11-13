@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[case]]
+values = [0, 1]
+
+[[case]]
+values = [1, 0]
+
+[[case]]
+values = [2, 0, 1]

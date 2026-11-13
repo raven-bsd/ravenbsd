@@ -10,7 +10,7 @@ resolver = "3"
 exclude = ["build"]
 # A ticket that creates a new top-level crate appends ONE line to `members` (and nothing else here).
 # Planned members: "kernel", "boot/loader", "userland/rt", "userland/init", "userland/bin/<tool>",
-# "userland/servers/<server>", "userland/drivers/<driver>", "userland/linux-shim", "libc/ralibc",
+# "userland/servers/<server>", "userland/drivers/<driver>", "userland/linux-shim", "libc/ravenlibc/crates/*",
 # "xtask", "tests/qtest", "tests/fixtures/<name>".
 members = [
     "crates/*",
@@ -56,16 +56,24 @@ members = [
     "tests/fixtures/k54-ufs/mkimage",
     "tests/fixtures/k54-ufs/probe",
     "tests/fixtures/k55-ufs/probe",
+    "tests/fixtures/b15-resolv/dnsd",
+    "tests/fixtures/b15-resolv/probe",
     "xtask",
     "tests/qtest",
     "tests/ufs-oracle",
+    "tests/libc/oracle",
+    "tests/libc/headers",
     "tests/ufs-powercut",
     "tools/fs-fuzz",
     "tools/linux-corpus",
     "tools/ufs-fsck",
     "tools/ufs-mkfs",
     "tools/integration-inventory",
+    "tools/libc-census",
+    "tools/libc-oracle",
     "libc/spike/va",
+    "libc/ravenlibc/crates/*",
+    "libc/ravenlibc/tools/hdrgen",
     "userland/rt",
     "userland/linux-shim",
     "userland/init",
@@ -73,6 +81,11 @@ members = [
     "userland/bin/uname",
     "userland/bin/rsh",
     "userland/bin/echo",
+    "userland/bin/ifconfig",
+    "userland/bin/nc",
+    "userland/bin/ping",
+    "userland/bin/route",
+    "userland/bin/netstat",
     "userland/bin/hostname",
     "userland/bin/sleep",
     "userland/bin/date",
@@ -101,6 +114,7 @@ members = [
     "userland/servers/platd",
     "userland/servers/blockd",
     "userland/servers/fsd-ufs",
+    "userland/servers/resolvd",
     "userland/servers/initfsd",
     "userland/servers/initfsd-probe",
     "userland/servers/pcid",
@@ -118,19 +132,22 @@ members = [
     "tests/tcpip/interop",
     "tests/tcpip/bench",
     "tests/tcpip/oracle",
+    "tests/fixtures/b14-tools",
+    "tests/fixtures/b14b-diag",
     "tests/fixtures/b13a-driver",
     "tests/fixtures/b13c-resources",
     "tests/fixtures/k15-blk/mkdisk",
     "tests/fixtures/k15-blk/probe",
     "tests/fixtures/k72-hwfs/mkdisk",
     "tests/fixtures/k72-hwfs/probe",
+    "tests/fixtures/b12b-net/probe",
     "userland/drivers/virtio-net",
     "userland/drivers/virtio-blk",
     "tools/bench-host",
     "tools/fuzz",
     "tests/fuzz/replay",
 ]
-default-members = ["crates/*"]
+default-members = ["crates/*", "libc/ravenlibc/crates/*"]
 
 [workspace.package]
 edition = "2024"
@@ -148,6 +165,31 @@ undocumented_unsafe_blocks = "deny"
 # The kernel crate additionally opts in to `indexing_slicing` and `arithmetic_side_effects` (warn).
 
 # dev: "fat" on purpose: no optimisation, full debug info, overflow checks. Easy to debug, big binaries.
+# ravenlibc build profiles (architecture/raven-libc/17-crate-layout.md 9.2); built by `cargo xtask libc-*`, never by default.
+[profile.libc-a]
+inherits = "release"
+opt-level = "z"
+codegen-units = 4096
+lto = false
+panic = "abort"
+debug = false
+incremental = false
+strip = "none"
+
+[profile.libc-a-server]
+inherits = "libc-a"
+opt-level = "s"
+
+[profile.libc-so]
+inherits = "release"
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+debug = false
+incremental = false
+strip = "none"
+
 [profile.dev]
 opt-level = 0
 debug = 2

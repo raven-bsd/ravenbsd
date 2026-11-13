@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The server image's network integration: virtio-net is launched from the
+# initfs, netd maps the `nic:` ring and gets a QEMU user-mode DHCP lease, and
+# resolvd writes the lease DNS servers to a writable /etc. The guest is a
+# long-running server, so the case expects the harness timeout.
+
+name = "server-net"
+arch = "x86_64"
+profile = "server"
+timeout_secs = 90
+boot_cmdline = "console=ttyS0 loglevel=info"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "timeout"
+
+[[expect]]
+regex = '^devd: matched [0-9a-f]{2}:[0-9a-f]{2}\.[0-9] vendor=0x1af4 device=0x1041 irq_line=[0-9]+ irq_pin=[0-9]+$'
+
+[[expect]]
+regex = '^virtio-net: mac=[0-9a-f]{2}(:[0-9a-f]{2}){5} mtu=[0-9]+ link=up$'
+
+[[expect]]
+regex = '^virtio-net: serving nic:$'
+
+[[expect]]
+regex = '^svcd: devd up$'
+
+[[expect]]
+regex = '^netd: interface eth0 10\.0\.2\.15/24$'
+
+[[expect]]
+regex = '^netd: interface lo 127\.0\.0\.1/8$'
+
+[[expect]]
+regex = '^netd: ready$'
+
+[[expect]]
+regex = '^svcd: netd up$'
+
+[[expect]]
+regex = '^vfsd: mounted /etc on ramfs:'
+unordered = true
+
+[[expect]]
+regex = '^resolvd: wrote file:/etc/resolv\.conf$'
+
+[[expect]]
+regex = '^resolvd: lease eth0 10\.0\.2\.15/24 router=10\.0\.2\.2 dns=10\.0\.2\.3 renew=[0-9]+ms rebind=[0-9]+ms expires=[0-9]+ms$'
+
+[[expect]]
+regex = '^svcd: resolvd up$'
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
+
+[[forbid]]
+regex = '^resolvd: write .*no such file or directory$'

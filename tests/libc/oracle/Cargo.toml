@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-oracle"
+version = "0.1.0"
+description = "Differential libc oracle harness: generators, corpus, shrinking and mutation drills."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+toml = "1.2"
+raven-libc-ctype = { path = "../../../libc/ravenlibc/crates/raven-libc-ctype" }
+raven-libc-str = { path = "../../../libc/ravenlibc/crates/raven-libc-str" }
+raven-libc-stdlib = { path = "../../../libc/ravenlibc/crates/raven-libc-stdlib" }
+
+[features]
+default = []
+oracle-string-basic = []
+oracle-ctype-multibyte = []
+oracle-ctype-class = []
+oracle-str-mem = []
+oracle-str-openbsd = []
+oracle-str-freebsd = []
+oracle-str-musl = []
+oracle-str-errmsg = []
+oracle-stdlib-netbsd = []
+oracle-stdlib-openbsd = []
+oracle-stdlib-freebsd = []
+oracle-stdlib-musl = []
+all-oracles = [
+    "oracle-string-basic",
+    "oracle-ctype-multibyte",
+    "oracle-ctype-class",
+    "oracle-str-mem",
+    "oracle-str-openbsd",
+    "oracle-str-freebsd",
+    "oracle-str-musl",
+    "oracle-str-errmsg",
+    "oracle-stdlib-netbsd",
+    "oracle-stdlib-openbsd",
+    "oracle-stdlib-freebsd",
+    "oracle-stdlib-musl",
+]
+
+[lints]
+workspace = true

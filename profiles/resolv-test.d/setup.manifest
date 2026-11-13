@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Writes the static nameserver override used by phase 1.
+name = "b15-resolv-setup"
+exec = "/sbin/b15-resolv-probe"
+args = ["b15-resolv-probe", "setup"]
+needs = ["scheme:file", "scheme:initfs"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

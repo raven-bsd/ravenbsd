@@ -1,0 +1,65 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 13, 2026
+.Dt ROUTE 1
+.Os RavenBSD
+.Sh NAME
+.Nm route
+.Nd list, add and delete IPv4 routes through the net: service
+.Sh SYNOPSIS
+.Nm
+.Op Cm show
+.Nm
+.Cm add Cm default Ar gateway Op Ar interface
+.Nm
+.Cm add Cm host Ar address Op Ar interface
+.Nm
+.Cm add Ar destination Ns Op / Ns Ar prefix Op Ar interface
+.Nm
+.Cm delete Cm default Op Ar interface
+.Nm
+.Cm delete Cm host Ar address Op Ar interface
+.Nm
+.Cm delete Ar destination Ns Op / Ns Ar prefix Op Ar interface
+.Sh DESCRIPTION
+.Nm
+reads and changes the live IPv4 route table through the
+.Dq net:
+control channel. With no command, or with
+.Cm show ,
+it lists every route with its destination, optional gateway, interface and flags.
+.Pp
+The
+.Cm add
+forms install a default route (prefix 0) through
+.Ar gateway ,
+a host route (prefix 32), or a network route with an explicit prefix. A destination without a
+prefix is a host route. The address is masked to the prefix before the request is sent, so
+.Dq 198.51.100.5/24
+and
+.Dq 198.51.100.0/24
+name the same route. The
+.Cm delete
+forms remove the exact destination and prefix. When the interface is omitted,
+.Dq lo
+is used.
+.Pp
+The tool uses the
+.Dv RouteList ,
+.Dv RouteAddOn
+and
+.Dv RouteDelOn
+control requests. A malformed IPv4 address, a prefix outside
+.Dv 0..=32
+or an invalid interface name is rejected before any request. An unknown interface, a failed
+delete or a server-side rejection is reported and the tool exits non-zero.
+.Pp
+No raw socket is opened and no routing daemon is required.
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr netstat 1 ,
+.Xr ping 1 ,
+.Xr netd 8
+.Sh STANDARDS
+RavenBSD.

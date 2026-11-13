@@ -1,0 +1,160 @@
+# SPDX-License-Identifier: MIT
+# Copyright © 2005-2020 Rich Felker, et al.
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# RavenBSD: transpiled from musl:include/signal.h, arch/x86_64/bits/signal.h @ 7813e9119eb5fe681b6750b8a033a0490bca0941
+# (no per-file header; covered by musl/COPYRIGHT, H-1; constants transcribed to TOML and generated)
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+schema = 1
+group = "signal"
+c_header = "bits/signum.h"
+guard = "_RAVEN_BITS_SIGNUM_H"
+rust_type = "i32"
+base = "dec"
+source = ["include/signal.h", "arch/x86_64/bits/signal.h"]
+prefixes = ["SIG", "SA_", "SS_", "SI_", "ILL_", "FPE_", "SEGV_", "BUS_", "TRAP_", "CLD_", "POLL_", "MINSIGSTKSZ", "NSIG", "_NSIG"]
+
+omit = [
+  { name = "SIG_DFL", reason = "pointer expression ((void (*)(int)) 0); C37's signal.h text, not an object-like constant" },
+  { name = "SIG_IGN", reason = "pointer expression ((void (*)(int)) 1); C37's signal.h text" },
+  { name = "SIG_ERR", reason = "pointer expression ((void (*)(int)) -1); C37's signal.h text" },
+  { name = "SIG_HOLD", reason = "pointer expression ((void (*)(int)) 2); C37's signal.h text" },
+]
+
+consts = [
+  { name = "SIGHUP", value = 1 },
+  { name = "SIGINT", value = 2 },
+  { name = "SIGQUIT", value = 3 },
+  { name = "SIGILL", value = 4 },
+  { name = "SIGTRAP", value = 5 },
+  { name = "SIGABRT", value = 6 },
+  { name = "SIGIOT", alias = "SIGABRT" },
+  { name = "SIGBUS", value = 7 },
+  { name = "SIGFPE", value = 8 },
+  { name = "SIGKILL", value = 9 },
+  { name = "SIGUSR1", value = 10 },
+  { name = "SIGSEGV", value = 11 },
+  { name = "SIGUSR2", value = 12 },
+  { name = "SIGPIPE", value = 13 },
+  { name = "SIGALRM", value = 14 },
+  { name = "SIGTERM", value = 15 },
+  { name = "SIGSTKFLT", value = 16 },
+  { name = "SIGCHLD", value = 17 },
+  { name = "SIGCONT", value = 18 },
+  { name = "SIGSTOP", value = 19 },
+  { name = "SIGTSTP", value = 20 },
+  { name = "SIGTTIN", value = 21 },
+  { name = "SIGTTOU", value = 22 },
+  { name = "SIGURG", value = 23 },
+  { name = "SIGXCPU", value = 24 },
+  { name = "SIGXFSZ", value = 25 },
+  { name = "SIGVTALRM", value = 26 },
+  { name = "SIGPROF", value = 27 },
+  { name = "SIGWINCH", value = 28 },
+  { name = "SIGIO", value = 29 },
+  { name = "SIGPOLL", alias = "SIGIO" },
+  { name = "SIGPWR", value = 30 },
+  { name = "SIGSYS", value = 31 },
+  { name = "SIGUNUSED", alias = "SIGSYS" },
+  { name = "SIGRTMIN", value = 35, doc = "public minimum; 32, 33 and 34 are reserved" },
+  { name = "SIGRTMAX", value = 64 },
+  { name = "_NSIG", value = 65 },
+  { name = "NSIG", alias = "_NSIG" },
+  { name = "SIG_BLOCK", value = 0 },
+  { name = "SIG_UNBLOCK", value = 1 },
+  { name = "SIG_SETMASK", value = 2 },
+  { name = "SA_NOCLDSTOP", value = 1 },
+  { name = "SA_NOCLDWAIT", value = 2 },
+  { name = "SA_SIGINFO", value = 4 },
+  { name = "SA_UNSUPPORTED", base = "hex", value = 0x400 },
+  { name = "SA_EXPOSE_TAGBITS", base = "hex", value = 0x800 },
+  { name = "SA_RESTORER", base = "hex", value = 0x04000000, doc = "internal restorer trampoline flag" },
+  { name = "SA_ONSTACK", base = "hex", value = 0x08000000 },
+  { name = "SA_RESTART", base = "hex", value = 0x10000000 },
+  { name = "SA_NODEFER", base = "hex", value = 0x40000000 },
+  { name = "SA_RESETHAND", base = "hex", value = 0x80000000, ty = "u32", suffix = "U" },
+  { name = "SA_NOMASK", alias = "SA_NODEFER" },
+  { name = "SA_ONESHOT", alias = "SA_RESETHAND", ty = "u32" },
+  { name = "SS_ONSTACK", value = 1 },
+  { name = "SS_DISABLE", value = 2 },
+  { name = "SS_AUTODISARM", value = 0x80000000, ty = "u32", suffix = "U" },
+  { name = "SS_FLAG_BITS", alias = "SS_AUTODISARM", ty = "u32" },
+  { name = "MINSIGSTKSZ", value = 6144 },
+  { name = "SIGSTKSZ", value = 16384 },
+  { name = "SI_ASYNCNL", value = -60 },
+  { name = "SI_TKILL", value = -6 },
+  { name = "SI_SIGIO", value = -5 },
+  { name = "SI_ASYNCIO", value = -4 },
+  { name = "SI_MESGQ", value = -3 },
+  { name = "SI_TIMER", value = -2 },
+  { name = "SI_QUEUE", value = -1 },
+  { name = "SI_USER", value = 0 },
+  { name = "SI_KERNEL", value = 128 },
+  { name = "ILL_ILLOPC", value = 1 },
+  { name = "ILL_ILLOPN", value = 2 },
+  { name = "ILL_ILLADR", value = 3 },
+  { name = "ILL_ILLTRP", value = 4 },
+  { name = "ILL_PRVOPC", value = 5 },
+  { name = "ILL_PRVREG", value = 6 },
+  { name = "ILL_COPROC", value = 7 },
+  { name = "ILL_BADSTK", value = 8 },
+  { name = "FPE_INTDIV", value = 1 },
+  { name = "FPE_INTOVF", value = 2 },
+  { name = "FPE_FLTDIV", value = 3 },
+  { name = "FPE_FLTOVF", value = 4 },
+  { name = "FPE_FLTUND", value = 5 },
+  { name = "FPE_FLTRES", value = 6 },
+  { name = "FPE_FLTINV", value = 7 },
+  { name = "FPE_FLTSUB", value = 8 },
+  { name = "SEGV_MAPERR", value = 1 },
+  { name = "SEGV_ACCERR", value = 2 },
+  { name = "SEGV_BNDERR", value = 3 },
+  { name = "SEGV_PKUERR", value = 4 },
+  { name = "SEGV_MTEAERR", value = 8 },
+  { name = "SEGV_MTESERR", value = 9 },
+  { name = "BUS_ADRALN", value = 1 },
+  { name = "BUS_ADRERR", value = 2 },
+  { name = "BUS_OBJERR", value = 3 },
+  { name = "BUS_MCEERR_AR", value = 4 },
+  { name = "BUS_MCEERR_AO", value = 5 },
+  { name = "TRAP_BRKPT", value = 1 },
+  { name = "TRAP_TRACE", value = 2 },
+  { name = "TRAP_BRANCH", value = 3 },
+  { name = "TRAP_HWBKPT", value = 4 },
+  { name = "TRAP_UNK", value = 5 },
+  { name = "CLD_EXITED", value = 1 },
+  { name = "CLD_KILLED", value = 2 },
+  { name = "CLD_DUMPED", value = 3 },
+  { name = "CLD_TRAPPED", value = 4 },
+  { name = "CLD_STOPPED", value = 5 },
+  { name = "CLD_CONTINUED", value = 6 },
+  { name = "POLL_IN", value = 1 },
+  { name = "POLL_OUT", value = 2 },
+  { name = "POLL_MSG", value = 3 },
+  { name = "POLL_ERR", value = 4 },
+  { name = "POLL_PRI", value = 5 },
+  { name = "POLL_HUP", value = 6 },
+  { name = "SIGEV_SIGNAL", value = 0 },
+  { name = "SIGEV_NONE", value = 1 },
+  { name = "SIGEV_THREAD", value = 2 },
+  { name = "SIGEV_THREAD_ID", value = 4 },
+]

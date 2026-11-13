@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.files]]
+src = "build/fixtures/b12-netd/netd-probe"
+path = "/sbin/netd-probe"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "profiles/netd-test-virtio.d/netd-probe.manifest"
+path = "/etc/services.d/netd-virtio-probe.toml"
+
+[[initfs.files]]
+src = "profiles/netd-test-virtio.d/netd-restart.manifest"
+path = "/etc/services.d/netd-virtio-restart.toml"
+
+[[initfs.files]]
+src = "profiles/netd-test-virtio.d/netd-probe2.manifest"
+path = "/etc/services.d/netd-virtio-probe2.toml"

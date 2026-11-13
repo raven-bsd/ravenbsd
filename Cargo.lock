@@ -209,6 +209,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 
 [[package]]
+name = "libc-census"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "regex",
+ "serde",
+ "serde_json",
+ "toml",
+]
+
+[[package]]
+name = "libc-oracle"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "toml",
+]
+
+[[package]]
 name = "linked_list_allocator"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -290,6 +310,7 @@ dependencies = [
  "raven-proto-net",
  "raven-rt",
  "raven-scheme",
+ "virtio-net",
 ]
 
 [[package]]
@@ -349,6 +370,17 @@ name = "raven-audio-core"
 version = "0.1.0"
 
 [[package]]
+name = "raven-b12b-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+ "virtio-net",
+]
+
+[[package]]
 name = "raven-b13a-driver"
 version = "0.1.0"
 dependencies = [
@@ -364,6 +396,48 @@ dependencies = [
  "raven-abi",
  "raven-driver",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-b14-tools"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-b14b-diag"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-b15-dnsd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-b15-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+ "resolvd",
 ]
 
 [[package]]
@@ -612,6 +686,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-ifconfig"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-init"
 version = "0.1.0"
 dependencies = [
@@ -821,6 +905,62 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-abi"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-linux-abi",
+]
+
+[[package]]
+name = "raven-libc-ctype"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+]
+
+[[package]]
+name = "raven-libc-hdrcheck"
+version = "0.1.0"
+
+[[package]]
+name = "raven-libc-hdrgen"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "raven-linux-abi",
+ "serde",
+ "toml",
+]
+
+[[package]]
+name = "raven-libc-oracle"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-ctype",
+ "raven-libc-stdlib",
+ "raven-libc-str",
+ "serde",
+ "toml",
+]
+
+[[package]]
+name = "raven-libc-stdlib"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-ctype",
+ "raven-libc-str",
+]
+
+[[package]]
+name = "raven-libc-str"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+]
+
+[[package]]
 name = "raven-linux-abi"
 version = "0.1.0"
 dependencies = [
@@ -901,6 +1041,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-nc"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-netcore"
 version = "0.1.0"
 dependencies = [
@@ -917,6 +1067,16 @@ dependencies = [
  "raven-netcore",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "raven-netstat"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -940,6 +1100,16 @@ dependencies = [
  "raven-abi",
  "raven-proto-dev",
  "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-ping"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
  "raven-rt",
  "raven-scheme",
 ]
@@ -1103,6 +1273,16 @@ dependencies = [
 [[package]]
 name = "raven-rmm"
 version = "0.1.0"
+
+[[package]]
+name = "raven-route"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+]
 
 [[package]]
 name = "raven-rsh"
@@ -1636,6 +1816,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
+name = "resolvd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "serde"
 version = "1.0.229"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1900,7 +2091,10 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-driver",
+ "raven-proto-fs",
+ "raven-proto-net",
  "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]

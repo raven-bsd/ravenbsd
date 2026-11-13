@@ -1,0 +1,48 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 13, 2026
+.Dt NETSTAT 1
+.Os RavenBSD
+.Sh NAME
+.Nm netstat
+.Nd show the live socket table and interface counters
+.Sh SYNOPSIS
+.Nm
+.Op Fl a
+.Op Fl i | Fl s
+.Sh DESCRIPTION
+.Nm
+reads the live network state through the
+.Dq net:
+control channel. With no options it prints the socket table and then the per-interface packet
+and byte counters.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl a
+Print only the live socket table.
+.It Fl i
+Print only the interface counters.
+.It Fl s
+Print only the interface counters.
+.El
+.Pp
+Every socket row carries the transport (tcp, udp or icmp), the state, the local endpoint, the peer
+when connected, the interface, and the receive and transmit queue sizes. Every counter row carries
+the received and transmitted packet and byte counts, receive and transmit errors, and receive and
+transmit drops, all as reported by
+.Xr netd 8 .
+Rows and counters are never fabricated: when the server does not expose counters for an
+interface, the tool prints
+.Dq counters unavailable
+instead of a zero row.
+.Pp
+No raw socket is opened and no kernel memory is read directly.
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr ping 1 ,
+.Xr route 1 ,
+.Xr netd 8
+.Sh STANDARDS
+RavenBSD.

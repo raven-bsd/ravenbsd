@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Restart resolvd after phase 1 removed the static override, so the second
+# instance applies the live DHCP lease.
+name = "b15-resolv-restart"
+exec = "/bin/svcctl"
+args = ["svcctl", "restart", "resolvd"]
+needs = ["b15-resolv-probe"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

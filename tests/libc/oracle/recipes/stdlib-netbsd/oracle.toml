@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# stdlib-netbsd: random.c with USE_BETTER_RANDOM and rand_r.c (both BSD-3; the gate re-reads
+# each header). The NetBSD include directory supplies namespace.h/reentrant.h.
+
+schema = 1
+family = "stdlib-netbsd"
+description = "NetBSD random/srandom/initstate/setstate with USE_BETTER_RANDOM and rand_r"
+exports = [
+  "initstate",
+  "rand_r",
+  "random",
+  "setstate",
+  "srandom",
+]
+opt = ["O2", "O0"]
+defines = ["USE_BETTER_RANDOM", "_REENTRANT"]
+include = ["shim:stdlib-netbsd"]
+flags = []
+
+[[source]]
+donor = "netbsd"
+path = "common/lib/libc/stdlib/random.c"
+
+[[source]]
+donor = "netbsd"
+path = "lib/libc/stdlib/rand_r.c"

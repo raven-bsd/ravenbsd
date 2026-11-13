@@ -1,0 +1,99 @@
+# SPDX-License-Identifier: MIT
+# Copyright © 2005-2020 Rich Felker, et al.
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# RavenBSD: transpiled from musl:include/locale.h, include/dlfcn.h, include/sys/wait.h, include/sys/file.h, include/netdb.h, include/sched.h, include/sys/select.h, include/net/if.h @ 7813e9119eb5fe681b6750b8a033a0490bca0941
+# (no per-file header; covered by musl/COPYRIGHT, H-1; constants transcribed to TOML and generated)
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+schema = 1
+group = "misc"
+c_header = "bits/abi_misc.h"
+guard = "_RAVEN_BITS_ABI_MISC_H"
+rust_type = "i32"
+base = "dec"
+source = ["include/locale.h", "include/dlfcn.h", "include/sys/wait.h", "include/sys/file.h", "include/netdb.h", "include/sched.h", "include/sys/select.h", "include/net/if.h"]
+prefixes = ["LC_", "RTLD_", "WNOHANG", "WUNTRACED", "WSTOPPED", "WEXITED", "WCONTINUED", "WNOWAIT", "LOCK_", "EAI_", "SCHED_", "FD_SETSIZE", "IF_NAMESIZE"]
+
+omit = [
+  { name = "LC_GLOBAL_LOCALE", reason = "pointer-valued locale handle ((locale_t)-1); C37's locale.h text" },
+  { name = "RTLD_DI_LINKMAP", reason = "dlinfo request outside the frozen RTLD_ set; C38 appends through the reviewer" },
+  { name = "EAI_ADDRFAMILY", reason = "GNU/BSD extension beyond the frozen negative EAI set; C38 appends through the reviewer" },
+  { name = "EAI_INPROGRESS", reason = "GNU extension beyond the frozen EAI set; C38" },
+  { name = "EAI_CANCELED", reason = "GNU extension beyond the frozen EAI set; C38" },
+  { name = "EAI_NOTCANCELED", reason = "GNU extension beyond the frozen EAI set; C38" },
+  { name = "EAI_ALLDONE", reason = "GNU extension beyond the frozen EAI set; C38" },
+  { name = "EAI_INTR", reason = "GNU extension beyond the frozen EAI set; C38" },
+  { name = "EAI_IDN_ENCODE", reason = "GNU extension beyond the frozen EAI set; C38" },
+  { name = "SCHED_RESET_ON_FORK", reason = "Linux extension outside the frozen SCHED_ set; C38" },
+]
+
+consts = [
+  { name = "LC_CTYPE", value = 0 },
+  { name = "LC_NUMERIC", value = 1 },
+  { name = "LC_TIME", value = 2 },
+  { name = "LC_COLLATE", value = 3 },
+  { name = "LC_MONETARY", value = 4 },
+  { name = "LC_MESSAGES", value = 5 },
+  { name = "LC_ALL", value = 6 },
+  { name = "LC_CTYPE_MASK", shl = [1, 0] },
+  { name = "LC_NUMERIC_MASK", shl = [1, 1] },
+  { name = "LC_TIME_MASK", shl = [1, 2] },
+  { name = "LC_COLLATE_MASK", shl = [1, 3] },
+  { name = "LC_MONETARY_MASK", shl = [1, 4] },
+  { name = "LC_MESSAGES_MASK", shl = [1, 5] },
+  { name = "LC_ALL_MASK", value = 0x7fffffff },
+  { name = "RTLD_LAZY", value = 1 },
+  { name = "RTLD_NOW", value = 2 },
+  { name = "RTLD_NOLOAD", value = 4 },
+  { name = "RTLD_NODELETE", value = 0x1000 },
+  { name = "RTLD_GLOBAL", value = 0x100 },
+  { name = "RTLD_LOCAL", value = 0 },
+  { name = "WNOHANG", value = 1 },
+  { name = "WUNTRACED", value = 2 },
+  { name = "WSTOPPED", value = 2 },
+  { name = "WEXITED", value = 4 },
+  { name = "WCONTINUED", value = 8 },
+  { name = "WNOWAIT", value = 0x1000000 },
+  { name = "LOCK_SH", value = 1 },
+  { name = "LOCK_EX", value = 2 },
+  { name = "LOCK_NB", value = 4 },
+  { name = "LOCK_UN", value = 8 },
+  { name = "EAI_BADFLAGS", value = -1 },
+  { name = "EAI_NONAME", value = -2 },
+  { name = "EAI_AGAIN", value = -3 },
+  { name = "EAI_FAIL", value = -4 },
+  { name = "EAI_NODATA", value = -5 },
+  { name = "EAI_FAMILY", value = -6 },
+  { name = "EAI_SOCKTYPE", value = -7 },
+  { name = "EAI_SERVICE", value = -8 },
+  { name = "EAI_MEMORY", value = -10 },
+  { name = "EAI_SYSTEM", value = -11 },
+  { name = "EAI_OVERFLOW", value = -12 },
+  { name = "SCHED_OTHER", value = 0 },
+  { name = "SCHED_FIFO", value = 1 },
+  { name = "SCHED_RR", value = 2 },
+  { name = "SCHED_BATCH", value = 3 },
+  { name = "SCHED_IDLE", value = 5 },
+  { name = "SCHED_DEADLINE", value = 6 },
+  { name = "FD_SETSIZE", value = 1024 },
+  { name = "IF_NAMESIZE", value = 16 },
+]

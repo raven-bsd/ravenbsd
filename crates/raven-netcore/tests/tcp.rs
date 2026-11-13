@@ -497,3 +497,39 @@ fn tcp_set_ipv4_with_gateway_and_clamped_prefix() {
     let accepted = wait_accept(&mut client, &mut server, &mut now, listener);
     assert_ne!(socket, accepted);
 }
+
+#[test]
+fn tcp_endpoints_and_options_are_exposed() {
+    let mut now = 0;
+    let (mut client, server, listener, client_socket, server_socket) =
+        connected_pair(PairConfig::reliable(), &mut now);
+    let listener_endpoint = server.local_endpoint(listener).expect("listener local");
+    assert_eq!(listener_endpoint.1, PORT);
+    let client_local = client.local_endpoint(client_socket).expect("client local");
+    assert_eq!(client_local.0, CLIENT_IP);
+    assert_eq!(client.peer_endpoint(client_socket), Some((SERVER_IP, PORT)));
+    assert_eq!(
+        server.peer_endpoint(server_socket),
+        Some((CLIENT_IP, client_local.1))
+    );
+
+    client
+        .set_socket_option(client_socket, 4, 1)
+        .expect("TCP_NODELAY");
+    assert_eq!(client.get_socket_option(client_socket, 4), Ok(1));
+    client
+        .set_socket_option(client_socket, 2, 8192)
+        .expect("SO_RCVBUF");
+    assert_eq!(client.get_socket_option(client_socket, 2), Ok(8192));
+    let other = client.tcp_listen(PORT + 1, 1).expect("second listener");
+    assert_eq!(
+        client.get_socket_option(other, 2),
+        Ok(0),
+        "options are per socket"
+    );
+    assert_eq!(client.get_socket_option(client_socket, 5), Ok(0));
+    assert_eq!(
+        client.set_socket_option(client_socket, 99, 1),
+        Err(Errno::EINVAL)
+    );
+}

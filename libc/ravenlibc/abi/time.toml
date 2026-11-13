@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: MIT
+# Copyright © 2005-2020 Rich Felker, et al.
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# RavenBSD: transpiled from musl:include/time.h, include/sys/time.h @ 7813e9119eb5fe681b6750b8a033a0490bca0941
+# (no per-file header; covered by musl/COPYRIGHT, H-1; constants transcribed to TOML and generated)
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+schema = 1
+group = "time"
+c_header = "bits/abi_time.h"
+guard = "_RAVEN_BITS_ABI_TIME_H"
+rust_type = "i32"
+base = "dec"
+source = ["include/time.h", "include/sys/time.h"]
+prefixes = ["CLOCK_", "TIMER_", "TIME_", "ITIMER_", "CLOCKS_PER_SEC"]
+
+consts = [
+  { name = "CLOCKS_PER_SEC", value = 1000000, suffix = "L" },
+  { name = "TIME_UTC", value = 1 },
+  { name = "CLOCK_REALTIME", value = 0 },
+  { name = "CLOCK_MONOTONIC", value = 1 },
+  { name = "CLOCK_PROCESS_CPUTIME_ID", value = 2 },
+  { name = "CLOCK_THREAD_CPUTIME_ID", value = 3 },
+  { name = "CLOCK_MONOTONIC_RAW", value = 4 },
+  { name = "CLOCK_REALTIME_COARSE", value = 5 },
+  { name = "CLOCK_MONOTONIC_COARSE", value = 6 },
+  { name = "CLOCK_BOOTTIME", value = 7 },
+  { name = "CLOCK_REALTIME_ALARM", value = 8 },
+  { name = "CLOCK_BOOTTIME_ALARM", value = 9 },
+  { name = "CLOCK_SGI_CYCLE", value = 10 },
+  { name = "CLOCK_TAI", value = 11 },
+  { name = "CLOCK_UPTIME", alias = "CLOCK_BOOTTIME", visible = "bsd" },
+  { name = "CLOCK_UPTIME_FAST", alias = "CLOCK_BOOTTIME", visible = "bsd" },
+  { name = "CLOCK_UPTIME_PRECISE", alias = "CLOCK_BOOTTIME", visible = "bsd" },
+  { name = "CLOCK_MONOTONIC_FAST", alias = "CLOCK_MONOTONIC", visible = "bsd" },
+  { name = "CLOCK_MONOTONIC_PRECISE", alias = "CLOCK_MONOTONIC", visible = "bsd" },
+  { name = "CLOCK_REALTIME_FAST", alias = "CLOCK_REALTIME", visible = "bsd" },
+  { name = "CLOCK_REALTIME_PRECISE", alias = "CLOCK_REALTIME", visible = "bsd" },
+  { name = "TIMER_ABSTIME", value = 1 },
+  { name = "ITIMER_REAL", value = 0 },
+  { name = "ITIMER_VIRTUAL", value = 1 },
+  { name = "ITIMER_PROF", value = 2 },
+]

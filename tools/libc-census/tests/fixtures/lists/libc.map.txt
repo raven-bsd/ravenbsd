@@ -1,0 +1,15 @@
+LIBC {
+  global:
+    arc4random; # introduced=23
+    environ; # arm
+    epoll_create; # x86
+    err; # arm x86
+    getentropy; # introduced=23
+    memchr;
+    strlcat; # arm
+    strlcpy; # arm
+    warn;
+  local:
+    hidden_bionic;
+    *;
+};

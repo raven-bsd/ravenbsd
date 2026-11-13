@@ -1,0 +1,73 @@
+# SPDX-License-Identifier: MIT
+# Copyright © 2005-2020 Rich Felker, et al.
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# RavenBSD: transpiled from musl:include/sys/resource.h @ 7813e9119eb5fe681b6750b8a033a0490bca0941
+# (no per-file header; covered by musl/COPYRIGHT, H-1; constants transcribed to TOML and generated)
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+schema = 1
+group = "resource"
+c_header = "bits/abi_resource.h"
+guard = "_RAVEN_BITS_ABI_RESOURCE_H"
+rust_type = "i32"
+base = "dec"
+source = ["include/sys/resource.h"]
+prefixes = ["RLIMIT_", "RLIM_", "RUSAGE_", "PRIO_"]
+
+consts = [
+  { name = "RLIMIT_CPU", value = 0 },
+  { name = "RLIMIT_FSIZE", value = 1 },
+  { name = "RLIMIT_DATA", value = 2 },
+  { name = "RLIMIT_STACK", value = 3 },
+  { name = "RLIMIT_CORE", value = 4 },
+  { name = "RLIMIT_RSS", value = 5 },
+  { name = "RLIMIT_NPROC", value = 6 },
+  { name = "RLIMIT_NOFILE", value = 7 },
+  { name = "RLIMIT_MEMLOCK", value = 8 },
+  { name = "RLIMIT_AS", value = 9 },
+  { name = "RLIMIT_LOCKS", value = 10 },
+  { name = "RLIMIT_SIGPENDING", value = 11 },
+  { name = "RLIMIT_MSGQUEUE", value = 12 },
+  { name = "RLIMIT_NICE", value = 13 },
+  { name = "RLIMIT_RTPRIO", value = 14 },
+  { name = "RLIMIT_RTTIME", value = 15 },
+  { name = "RLIMIT_NLIMITS", value = 16 },
+  { name = "RLIM_NLIMITS", alias = "RLIMIT_NLIMITS" },
+  { name = "RLIM_INFINITY", value = "0xffffffffffffffff", ty = "u64", base = "hex", suffix = "ULL" },
+  { name = "RLIM_SAVED_CUR", alias = "RLIM_INFINITY", ty = "u64" },
+  { name = "RLIM_SAVED_MAX", alias = "RLIM_INFINITY", ty = "u64" },
+  { name = "RLIMIT_SBSIZE", value = 16, visible = "bsd", doc = "BSD-only ring-3 limit" },
+  { name = "RLIMIT_NPTS", value = 17, visible = "bsd" },
+  { name = "RLIMIT_SWAP", value = 18, visible = "bsd" },
+  { name = "RLIMIT_KQUEUES", value = 19, visible = "bsd" },
+  { name = "RLIMIT_UMTXP", value = 20, visible = "bsd" },
+  { name = "RLIMIT_PIPEBUF", value = 21, visible = "bsd" },
+  { name = "RLIM_NLIMITS_RAVEN", value = 22, visible = "bsd" },
+  { name = "RUSAGE_SELF", value = 0 },
+  { name = "RUSAGE_CHILDREN", value = -1 },
+  { name = "RUSAGE_THREAD", value = 1 },
+  { name = "PRIO_MIN", value = -20 },
+  { name = "PRIO_MAX", value = 20 },
+  { name = "PRIO_PROCESS", value = 0 },
+  { name = "PRIO_PGRP", value = 1 },
+  { name = "PRIO_USER", value = 2 },
+]

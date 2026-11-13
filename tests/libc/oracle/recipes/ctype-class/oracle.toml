@@ -1,0 +1,147 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# ctype-class: the 33 code files of musl:src/ctype (MIT via musl/COPYRIGHT). The private data
+# headers alpha.h, punct.h, casemap.h, nonspacing.h and wide.h are reachable through the donor
+# include directory and are used only by the oracle.
+
+schema = 1
+family = "ctype-class"
+description = "musl ctype/wctype/wcwidth originals"
+exports = ["__isalnum_l", "__isalpha_l", "__isblank_l", "__iscntrl_l", "__isdigit_l", "__isgraph_l", "__islower_l", "__isprint_l", "__ispunct_l", "__isspace_l", "__isupper_l", "__iswalnum_l", "__iswalpha_l", "__iswblank_l", "__iswcntrl_l", "__iswctype_l", "__iswdigit_l", "__iswgraph_l", "__iswlower_l", "__iswprint_l", "__iswpunct_l", "__iswspace_l", "__iswupper_l", "__iswxdigit_l", "__isxdigit_l", "__tolower_l", "__toupper_l", "__towctrans_l", "__towlower_l", "__towupper_l", "__wctrans_l", "__wctype_l", "isalnum", "isalpha", "isascii", "isblank", "iscntrl", "isdigit", "isgraph", "islower", "isprint", "ispunct", "isspace", "isupper", "iswalnum", "iswalpha", "iswblank", "iswcntrl", "iswctype", "iswdigit", "iswgraph", "iswlower", "iswprint", "iswpunct", "iswspace", "iswupper", "iswxdigit", "isxdigit", "toascii", "tolower", "toupper", "towctrans", "towlower", "towupper", "wcswidth", "wctrans", "wctype", "wcwidth"]
+opt = ["O2", "O0"]
+defines = ["weak_alias(a,b)=", "__NO_CTYPE=1", "_POSIX_C_SOURCE=200112L", "locale_t=void*", "_FORTIFY_SOURCE=0"]
+include = ["donor:musl/src/ctype"]
+flags = ["-std=gnu99"]
+
+[[source]]
+donor = "musl"
+path = "src/ctype/isalnum.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/isalpha.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/isascii.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/isblank.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/iscntrl.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/isdigit.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/isgraph.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/islower.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/isprint.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/ispunct.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/isspace.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/isupper.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/iswalnum.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/iswalpha.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/iswblank.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/iswcntrl.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/iswctype.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/iswdigit.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/iswgraph.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/iswlower.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/iswprint.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/iswpunct.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/iswspace.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/iswupper.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/iswxdigit.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/isxdigit.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/toascii.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/tolower.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/toupper.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/towctrans.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/wcswidth.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/wctrans.c"
+
+[[source]]
+donor = "musl"
+path = "src/ctype/wcwidth.c"

@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# stdlib-musl: the rand48 family (MIT via musl/COPYRIGHT; no per-file headers). This is the
+# differential oracle for the CLEANROOM `rand48` implementation (CR-11); musl code is never
+# copied into the Rust subject.
+
+schema = 1
+family = "stdlib-musl"
+description = "musl drand48/erand48/lrand48/nrand48/mrand48/jrand48/srand48/seed48/lcong48"
+exports = [
+  "__rand48_step",
+  "__seed48",
+  "drand48",
+  "erand48",
+  "jrand48",
+  "lcong48",
+  "lrand48",
+  "mrand48",
+  "nrand48",
+  "seed48",
+  "srand48",
+]
+opt = ["O2", "O0"]
+defines = ["hidden="]
+include = []
+flags = []
+
+[[source]]
+donor = "musl"
+path = "src/prng/drand48.c"
+
+[[source]]
+donor = "musl"
+path = "src/prng/lcong48.c"
+
+[[source]]
+donor = "musl"
+path = "src/prng/lrand48.c"
+
+[[source]]
+donor = "musl"
+path = "src/prng/mrand48.c"
+
+[[source]]
+donor = "musl"
+path = "src/prng/__rand48_step.c"
+
+[[source]]
+donor = "musl"
+path = "src/prng/seed48.c"
+
+[[source]]
+donor = "musl"
+path = "src/prng/srand48.c"
+
+[[source]]
+donor = "musl"
+path = "src/prng/__seed48.c"

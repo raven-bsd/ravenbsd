@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# str-musl: musl strlen, strnlen, strchr, strrchr, strchrnul, stpcpy, stpncpy, strdup, strndup
+# (all MIT via musl/COPYRIGHT; the helper memchr and memrchr are included so the merged object is
+# self-contained, RD-new 3).
+
+schema = 1
+family = "str-musl"
+description = "musl length, scanning, copy and duplicate entry points"
+exports = [
+  "__stpcpy",
+  "__stpncpy",
+  "memchr",
+  "memrchr",
+  "strchr",
+  "strchrnul",
+  "strdup",
+  "strlen",
+  "strndup",
+  "strnlen",
+  "strrchr",
+]
+opt = ["O2", "O0"]
+defines = ["_GNU_SOURCE", "__strchrnul=strchrnul", "__memrchr=memrchr"]
+include = []
+flags = []
+
+[[source]]
+donor = "musl"
+path = "src/string/strlen.c"
+
+[[source]]
+donor = "musl"
+path = "src/string/strnlen.c"
+
+[[source]]
+donor = "musl"
+path = "src/string/memchr.c"
+
+[[source]]
+donor = "musl"
+path = "src/string/strchrnul.c"
+
+[[source]]
+donor = "musl"
+path = "src/string/strchr.c"
+
+[[source]]
+donor = "musl"
+path = "src/string/memrchr.c"
+
+[[source]]
+donor = "musl"
+path = "src/string/strrchr.c"
+
+[[source]]
+donor = "musl"
+path = "src/string/stpcpy.c"
+
+[[source]]
+donor = "musl"
+path = "src/string/stpncpy.c"
+
+[[source]]
+donor = "musl"
+path = "src/string/strdup.c"
+
+[[source]]
+donor = "musl"
+path = "src/string/strndup.c"

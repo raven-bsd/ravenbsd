@@ -29,6 +29,8 @@ pub const KIND_READ: u16 = 2;
 pub const KIND_WRITE: u16 = 3;
 /// Request kind: `CALL`, carrying a typed socket operation.
 pub const KIND_CALL: u16 = 4;
+/// Request kind: `ICMP_ECHO`, carrying one echo request.
+pub const KIND_ICMP_ECHO: u16 = 5;
 
 /// `CALL` operation: `BIND`.
 pub const OP_BIND: u16 = 1;
@@ -48,11 +50,21 @@ pub const OP_GETPEERNAME: u16 = 7;
 pub const OP_SETSOCKOPT: u16 = 8;
 /// `CALL` operation: `GETSOCKOPT`.
 pub const OP_GETSOCKOPT: u16 = 9;
+/// `CALL` operation: obtain the socket readiness event.
+///
+/// The reply is `Response::Ok` inline data plus one S25 attachment: a `UserEvent` handle the
+/// client can register in an S26 event queue. The event is signalled on readable, writable,
+/// accepted or closed transitions.
+pub const OP_EVENT: u16 = 10;
 
 /// Maximum length of an `OPEN` scheme path in bytes.
 pub const MAX_PATH: usize = 64;
 /// Maximum UDP datagram or `READ`/`WRITE` payload in bytes (the IPv4 limitation).
 pub const MAX_DATAGRAM: usize = 65_535;
+/// Maximum ICMP echo payload in bytes (Ethernet MTU minus headers).
+pub const MAX_ICMP_PAYLOAD: usize = 1400;
+/// Largest accepted ICMP timeout in milliseconds.
+pub const MAX_ICMP_TIMEOUT_MS: u32 = 60_000;
 /// Largest accepted `LISTEN` backlog.
 pub const MAX_BACKLOG: u16 = 4096;
 
@@ -70,6 +82,8 @@ const TAG_ENDPOINT: u16 = 4;
 const TAG_VALUE: u16 = 5;
 /// Response tag: errno.
 const TAG_ERR: u16 = 6;
+/// Response tag: ICMP echo reply header.
+const TAG_ICMP: u16 = 7;
 
 /// Write flag: a destination endpoint follows.
 const WRITE_FLAG_ENDPOINT: u8 = 0x01;
@@ -185,7 +199,10 @@ pub enum Call {
         /// Requested backlog, `1..=MAX_BACKLOG`.
         backlog: u16,
     },
-    /// Accept a completed connection; the kernel attaches the new handle.
+    /// Accept a completed connection and return its numeric socket id.
+    ///
+    /// The client opens `net:accept/<id>` to materialise the SchemeFile; ABI v1 has no
+    /// server-side `SchemeFile`-create primitive.
     Accept,
     /// Connect to a remote endpoint.
     Connect(Endpoint),
@@ -210,6 +227,8 @@ pub enum Call {
         /// Option to read.
         opt: SockOpt,
     },
+    /// Obtain the socket readiness event (S26 `UserEvent`, attached to the reply).
+    Event,
 }
 
 /// A request sent to `netd`.
@@ -234,6 +253,17 @@ pub enum SocketRequest<'a> {
     },
     /// Run a typed socket operation.
     Call(Call),
+    /// Send one ICMP echo request on an `net:icmp/<ipv4>` handle.
+    IcmpEcho {
+        /// Echo identifier; unique among live ICMP sockets.
+        id: u16,
+        /// Echo sequence number.
+        seq: u16,
+        /// Reply deadline in milliseconds, `1..=MAX_ICMP_TIMEOUT_MS`.
+        timeout_ms: u32,
+        /// Payload, at most `MAX_ICMP_PAYLOAD` bytes.
+        data: &'a [u8],
+    },
 }
 
 impl<'a> SocketRequest<'a> {
@@ -278,6 +308,25 @@ impl<'a> SocketRequest<'a> {
             Self::Call(call) => {
                 writer.put_u16(KIND_CALL)?;
                 call.write(&mut writer)?;
+            }
+            Self::IcmpEcho {
+                id,
+                seq,
+                timeout_ms,
+                data,
+            } => {
+                if *timeout_ms == 0 || *timeout_ms > MAX_ICMP_TIMEOUT_MS {
+                    return Err(WireError::Invalid);
+                }
+                if data.len() > MAX_ICMP_PAYLOAD {
+                    return Err(WireError::TooLong);
+                }
+                writer.put_u16(KIND_ICMP_ECHO)?;
+                writer.put_u16(*id)?;
+                writer.put_u16(*seq)?;
+                writer.put_u32(*timeout_ms)?;
+                writer.put_u16(u16::try_from(data.len()).map_err(|_| WireError::TooLong)?)?;
+                writer.put_bytes(data)?;
             }
         }
         Ok(writer.position())
@@ -329,6 +378,25 @@ impl<'a> SocketRequest<'a> {
                 Self::Write { data, to }
             }
             KIND_CALL => Self::Call(Call::read(&mut reader)?),
+            KIND_ICMP_ECHO => {
+                let id = reader.get_u16().map_err(DecodeError::from)?;
+                let seq = reader.get_u16().map_err(DecodeError::from)?;
+                let timeout_ms = reader.get_u32().map_err(DecodeError::from)?;
+                if timeout_ms == 0 || timeout_ms > MAX_ICMP_TIMEOUT_MS {
+                    return Err(DecodeError::malformed());
+                }
+                let length = reader.get_u16().map_err(DecodeError::from)? as usize;
+                if length > MAX_ICMP_PAYLOAD {
+                    return Err(DecodeError::length());
+                }
+                let data = reader.get_bytes(length).map_err(DecodeError::from)?;
+                Self::IcmpEcho {
+                    id,
+                    seq,
+                    timeout_ms,
+                    data,
+                }
+            }
             _ => return Err(DecodeError::tag()),
         };
         if !reader.is_empty() {
@@ -378,6 +446,7 @@ impl Call {
                 writer.put_u16(OP_GETSOCKOPT)?;
                 writer.put_u16(opt.code())
             }
+            Self::Event => writer.put_u16(OP_EVENT),
         }
     }
 
@@ -418,6 +487,7 @@ impl Call {
                     .ok_or_else(DecodeError::tag)?;
                 Self::GetSockOpt { opt }
             }
+            OP_EVENT => Self::Event,
             _ => return Err(DecodeError::tag()),
         };
         Ok(call)
@@ -450,6 +520,19 @@ pub enum Response {
     Endpoint(Endpoint),
     /// Integer returned by `GETSOCKOPT`.
     Value(i32),
+    /// ICMP echo reply header; the requested payload follows inline.
+    Icmp {
+        /// Reply source (the requested destination).
+        source: Endpoint,
+        /// Echo identifier.
+        id: u16,
+        /// Echo sequence number.
+        seq: u16,
+        /// Round-trip time in milliseconds.
+        rtt_ms: u32,
+        /// Payload length following this header.
+        len: u16,
+    },
     /// Failure carrying the errno the caller must report.
     Err(Errno),
 }
@@ -508,6 +591,24 @@ impl Response {
                 writer.put_u16(0)?;
                 writer.put_u16(TAG_VALUE)?;
                 writer.put_i32(*value)?;
+            }
+            Self::Icmp {
+                source,
+                id,
+                seq,
+                rtt_ms,
+                len,
+            } => {
+                if usize::from(*len) > MAX_ICMP_PAYLOAD {
+                    return Err(WireError::TooLong);
+                }
+                writer.put_u16(0)?;
+                writer.put_u16(TAG_ICMP)?;
+                source.write(&mut writer)?;
+                writer.put_u16(*id)?;
+                writer.put_u16(*seq)?;
+                writer.put_u32(*rtt_ms)?;
+                writer.put_u16(*len)?;
             }
             Self::Err(errno) => {
                 writer.put_u16(errno.0)?;
@@ -582,6 +683,26 @@ impl Response {
                 }
                 Self::Value(reader.get_i32().map_err(DecodeError::from)?)
             }
+            TAG_ICMP => {
+                if status != 0 {
+                    return Err(DecodeError::malformed());
+                }
+                let source = Endpoint::read(&mut reader).map_err(DecodeError::from)?;
+                let id = reader.get_u16().map_err(DecodeError::from)?;
+                let seq = reader.get_u16().map_err(DecodeError::from)?;
+                let rtt_ms = reader.get_u32().map_err(DecodeError::from)?;
+                let len = reader.get_u16().map_err(DecodeError::from)?;
+                if usize::from(len) > MAX_ICMP_PAYLOAD {
+                    return Err(DecodeError::length());
+                }
+                Self::Icmp {
+                    source,
+                    id,
+                    seq,
+                    rtt_ms,
+                    len,
+                }
+            }
             TAG_ERR => {
                 if status == 0 {
                     return Err(DecodeError::malformed());
@@ -610,266 +731,5 @@ impl fmt::Display for SockOpt {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    const LOCAL: Endpoint = Endpoint {
-        ip: [10, 0, 0, 1],
-        port: 8080,
-    };
-
-    fn encode_request(request: SocketRequest<'_>) -> Vec<u8> {
-        let mut buffer = [0u8; 256];
-        let length = request.encode(&mut buffer).unwrap();
-        buffer[..length].to_vec()
-    }
-
-    fn encode_response(response: Response) -> Vec<u8> {
-        let mut buffer = [0u8; 256];
-        let length = response.encode(&mut buffer).unwrap();
-        buffer[..length].to_vec()
-    }
-
-    #[test]
-    fn open_golden_bytes() {
-        let bytes = encode_request(SocketRequest::Open {
-            path: "net:tcp/10.0.0.2:80",
-        });
-        assert_eq!(
-            bytes,
-            [
-                0x01, 0x00, // version 1
-                0x01, 0x00, // OPEN
-                0x13, 0x00, // 19-byte path
-                b'n', b'e', b't', b':', b't', b'c', b'p', b'/', b'1', b'0', b'.', b'0', b'.', b'0',
-                b'.', b'2', b':', b'8', b'0',
-            ]
-        );
-    }
-
-    #[test]
-    fn read_golden_bytes() {
-        assert_eq!(
-            encode_request(SocketRequest::Read { len: 1500 }),
-            [0x01, 0x00, 0x02, 0x00, 0xdc, 0x05, 0x00, 0x00]
-        );
-    }
-
-    #[test]
-    fn write_golden_bytes() {
-        assert_eq!(
-            encode_request(SocketRequest::Write {
-                data: b"hi",
-                to: None
-            }),
-            [
-                0x01, 0x00, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, b'h', b'i'
-            ]
-        );
-    }
-
-    #[test]
-    fn write_with_endpoint_golden_bytes() {
-        assert_eq!(
-            encode_request(SocketRequest::Write {
-                data: b"x",
-                to: Some(LOCAL)
-            }),
-            [
-                0x01, 0x00, 0x03, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 10, 0, 0, 1, 0x90, 0x1f, b'x'
-            ]
-        );
-    }
-
-    #[test]
-    fn bind_and_listen_golden_bytes() {
-        assert_eq!(
-            encode_request(SocketRequest::Call(Call::Bind(LOCAL))),
-            [0x01, 0x00, 0x04, 0x00, 0x01, 0x00, 10, 0, 0, 1, 0x90, 0x1f]
-        );
-        assert_eq!(
-            encode_request(SocketRequest::Call(Call::Listen { backlog: 8 })),
-            [0x01, 0x00, 0x04, 0x00, 0x02, 0x00, 0x08, 0x00]
-        );
-    }
-
-    #[test]
-    fn shutdown_and_options_golden_bytes() {
-        assert_eq!(
-            encode_request(SocketRequest::Call(Call::Shutdown {
-                how: Shutdown::Both
-            })),
-            [0x01, 0x00, 0x04, 0x00, 0x05, 0x00, 0x02]
-        );
-        assert_eq!(
-            encode_request(SocketRequest::Call(Call::SetSockOpt {
-                opt: SockOpt::ReuseAddr,
-                value: 1
-            })),
-            [
-                0x01, 0x00, 0x04, 0x00, 0x08, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00
-            ]
-        );
-        assert_eq!(
-            encode_request(SocketRequest::Call(Call::GetSockOpt {
-                opt: SockOpt::Error
-            })),
-            [0x01, 0x00, 0x04, 0x00, 0x09, 0x00, 0x05, 0x00]
-        );
-    }
-
-    #[test]
-    fn request_roundtrips() {
-        for request in [
-            SocketRequest::Open {
-                path: "net:udp/10.0.0.2:53",
-            },
-            SocketRequest::Read { len: 0 },
-            SocketRequest::Write {
-                data: b"payload",
-                to: None,
-            },
-            SocketRequest::Call(Call::Accept),
-            SocketRequest::Call(Call::Connect(LOCAL)),
-            SocketRequest::Call(Call::GetSockName),
-            SocketRequest::Call(Call::GetPeerName),
-        ] {
-            let bytes = encode_request(request);
-            assert_eq!(SocketRequest::decode(&bytes), Ok(request), "{request:?}");
-        }
-    }
-
-    #[test]
-    fn responses_roundtrip() {
-        for response in [
-            Response::Ok,
-            Response::Socket { id: 7 },
-            Response::Read {
-                len: 10,
-                from: Some(LOCAL),
-            },
-            Response::Read { len: 0, from: None },
-            Response::Write { len: 10 },
-            Response::Endpoint(LOCAL),
-            Response::Value(-1),
-            Response::Err(Errno::EAGAIN),
-        ] {
-            let bytes = encode_response(response);
-            assert_eq!(Response::decode(&bytes), Ok(response), "{response:?}");
-        }
-    }
-
-    #[test]
-    fn response_golden_bytes() {
-        assert_eq!(
-            encode_response(Response::Socket { id: 0x0102_0304 }),
-            [0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x04, 0x03, 0x02, 0x01]
-        );
-        assert_eq!(
-            encode_response(Response::Read {
-                len: 2,
-                from: Some(LOCAL)
-            }),
-            [
-                0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00, 10, 0, 0, 1,
-                0x90, 0x1f
-            ]
-        );
-        assert_eq!(
-            encode_response(Response::Err(Errno::EAGAIN)),
-            [0x01, 0x00, 0x0b, 0x00, 0x06, 0x00]
-        );
-    }
-
-    #[test]
-    fn unknown_version_is_rejected() {
-        let mut bytes = encode_request(SocketRequest::Read { len: 1 });
-        bytes[0] = 2;
-        assert_eq!(SocketRequest::decode(&bytes), Err(DecodeError::version()));
-        assert_eq!(Response::decode(&bytes), Err(DecodeError::version()));
-    }
-
-    #[test]
-    fn unknown_kind_and_tag_are_rejected() {
-        let mut bytes = encode_request(SocketRequest::Read { len: 1 });
-        bytes[2] = 9;
-        assert_eq!(SocketRequest::decode(&bytes), Err(DecodeError::tag()));
-        let mut bytes = encode_response(Response::Ok);
-        bytes[4] = 9;
-        assert_eq!(Response::decode(&bytes), Err(DecodeError::tag()));
-    }
-
-    #[test]
-    fn truncation_is_rejected_everywhere() {
-        let bytes = encode_request(SocketRequest::Call(Call::Bind(LOCAL)));
-        for length in 0..bytes.len() {
-            assert!(SocketRequest::decode(&bytes[..length]).is_err(), "{length}");
-        }
-        let bytes = encode_response(Response::Endpoint(LOCAL));
-        for length in 0..bytes.len() {
-            assert!(Response::decode(&bytes[..length]).is_err(), "{length}");
-        }
-    }
-
-    #[test]
-    fn trailing_bytes_are_rejected() {
-        let mut bytes = encode_request(SocketRequest::Read { len: 1 });
-        bytes.push(0);
-        assert_eq!(SocketRequest::decode(&bytes), Err(DecodeError::trailing()));
-        let mut bytes = encode_response(Response::Ok);
-        bytes.push(0);
-        assert_eq!(Response::decode(&bytes), Err(DecodeError::trailing()));
-    }
-
-    #[test]
-    fn oversized_lengths_are_rejected() {
-        let bytes = [
-            0x01, 0x00, 0x02, 0x00, 0x00, 0x00, 0x01, 0x00, // READ 65536
-        ];
-        assert_eq!(SocketRequest::decode(&bytes), Err(DecodeError::length()));
-        let bytes = [
-            0x01, 0x00, 0x04, 0x00, 0x02, 0x00, 0x00, 0x00, // LISTEN 0
-        ];
-        assert_eq!(SocketRequest::decode(&bytes), Err(DecodeError::length()));
-    }
-
-    #[test]
-    fn read_only_option_cannot_be_set() {
-        let mut buffer = [0u8; 32];
-        assert_eq!(
-            SocketRequest::Call(Call::SetSockOpt {
-                opt: SockOpt::Error,
-                value: 0
-            })
-            .encode(&mut buffer),
-            Err(WireError::Invalid)
-        );
-    }
-
-    #[test]
-    fn empty_path_is_rejected() {
-        let mut buffer = [0u8; 32];
-        assert_eq!(
-            SocketRequest::Open { path: "" }.encode(&mut buffer),
-            Err(WireError::TooLong)
-        );
-        assert_eq!(
-            SocketRequest::Open { path: "file:/x" }.encode(&mut buffer),
-            Err(WireError::Invalid)
-        );
-    }
-
-    #[test]
-    fn option_codes_roundtrip() {
-        for opt in [
-            SockOpt::ReuseAddr,
-            SockOpt::RcvBuf,
-            SockOpt::SndBuf,
-            SockOpt::TcpNoDelay,
-            SockOpt::Error,
-        ] {
-            assert_eq!(SockOpt::from_code(opt.code()), Some(opt));
-        }
-        assert_eq!(SockOpt::from_code(0), None);
-    }
-}
+#[path = "socket_ut.rs"]
+mod tests;

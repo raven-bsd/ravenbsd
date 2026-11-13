@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[case]]
+value = 0
+
+[[case]]
+value = 4161
+
+[[case]]
+value = 12870182

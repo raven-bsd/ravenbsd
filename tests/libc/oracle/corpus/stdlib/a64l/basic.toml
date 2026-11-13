@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[case]]
+text = ""
+
+[[case]]
+text = "///"
+
+[[case]]
+text = "a64l"
+
+[[case]]
+text = "a64l..."
+
+[[case]]
+text = "!"

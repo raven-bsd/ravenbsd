@@ -1,0 +1,61 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 13, 2026
+.Dt PING 1
+.Os RavenBSD
+.Sh NAME
+.Nm ping
+.Nd send ICMP echo requests through the net: service
+.Sh SYNOPSIS
+.Nm
+.Op Fl c Ar count
+.Op Fl w Ar seconds
+.Op Fl s Ar bytes
+.Ar host
+.Sh DESCRIPTION
+.Nm
+opens
+.Dq net:icmp/ Ns Ar host
+and sends ICMP echo requests through the native
+.Dq net:
+service. The target must be a dotted-quad IPv4 address.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl c Ar count
+Send at most
+.Ar count
+requests, from 1 to 1000. The default is 4.
+.It Fl w Ar seconds
+Bound the whole run to
+.Ar seconds
+seconds, from 1 to 60. The default is 5. Each request uses the remaining budget as its reply
+deadline.
+.It Fl s Ar bytes
+Send
+.Ar bytes
+payload bytes in each request, from 0 to 1400. The default is 32.
+.El
+.Pp
+Every request carries one echo identifier and an increasing sequence number. For each reply
+.Nm
+prints the sequence number and the round-trip time measured by the server, followed by a summary
+with the transmitted and received counts, the loss percentage and the minimum, average and maximum
+round-trip time. A timeout is reported as
+.Dq timeout
+and counted as loss.
+.Pp
+The tool exits 0 only when every requested echo was sent and answered. A timeout, a refused
+request, a malformed address or an invalid option exits non-zero.
+.Pp
+Only the
+.Dq net:
+scheme API is used. No raw socket is opened and no interface address is read.
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr netstat 1 ,
+.Xr route 1 ,
+.Xr netd 8
+.Sh STANDARDS
+RavenBSD.

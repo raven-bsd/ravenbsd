@@ -1,0 +1,189 @@
+# SPDX-License-Identifier: MIT
+# Copyright © 2005-2020 Rich Felker, et al.
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# RavenBSD: transpiled from musl:arch/generic/bits/errno.h @ 7813e9119eb5fe681b6750b8a033a0490bca0941
+# (no per-file header; covered by musl/COPYRIGHT, H-1; constants transcribed to TOML and generated)
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+schema = 1
+group = "errno"
+c_header = "bits/errno.h"
+guard = "_RAVEN_BITS_ERRNO_H"
+rust_type = "i32"
+base = "dec"
+source = ["arch/generic/bits/errno.h"]
+prefixes = ["E"]
+
+# Linux numbers 1..133 (41 and 58 unused), the three musl aliases, then the BSD-only range
+# 1000..1013 of doc 14 3.A.4.
+
+consts = [
+  { name = "EPERM", value = 1 },
+  { name = "ENOENT", value = 2 },
+  { name = "ESRCH", value = 3 },
+  { name = "EINTR", value = 4 },
+  { name = "EIO", value = 5 },
+  { name = "ENXIO", value = 6 },
+  { name = "E2BIG", value = 7 },
+  { name = "ENOEXEC", value = 8 },
+  { name = "EBADF", value = 9 },
+  { name = "ECHILD", value = 10 },
+  { name = "EAGAIN", value = 11 },
+  { name = "ENOMEM", value = 12 },
+  { name = "EACCES", value = 13 },
+  { name = "EFAULT", value = 14 },
+  { name = "ENOTBLK", value = 15 },
+  { name = "EBUSY", value = 16 },
+  { name = "EEXIST", value = 17 },
+  { name = "EXDEV", value = 18 },
+  { name = "ENODEV", value = 19 },
+  { name = "ENOTDIR", value = 20 },
+  { name = "EISDIR", value = 21 },
+  { name = "EINVAL", value = 22 },
+  { name = "ENFILE", value = 23 },
+  { name = "EMFILE", value = 24 },
+  { name = "ENOTTY", value = 25 },
+  { name = "ETXTBSY", value = 26 },
+  { name = "EFBIG", value = 27 },
+  { name = "ENOSPC", value = 28 },
+  { name = "ESPIPE", value = 29 },
+  { name = "EROFS", value = 30 },
+  { name = "EMLINK", value = 31 },
+  { name = "EPIPE", value = 32 },
+  { name = "EDOM", value = 33 },
+  { name = "ERANGE", value = 34 },
+  { name = "EDEADLK", value = 35 },
+  { name = "ENAMETOOLONG", value = 36 },
+  { name = "ENOLCK", value = 37 },
+  { name = "ENOSYS", value = 38 },
+  { name = "ENOTEMPTY", value = 39 },
+  { name = "ELOOP", value = 40 },
+  { name = "EWOULDBLOCK", alias = "EAGAIN" },
+  { name = "ENOMSG", value = 42 },
+  { name = "EIDRM", value = 43 },
+  { name = "ECHRNG", value = 44 },
+  { name = "EL2NSYNC", value = 45 },
+  { name = "EL3HLT", value = 46 },
+  { name = "EL3RST", value = 47 },
+  { name = "ELNRNG", value = 48 },
+  { name = "EUNATCH", value = 49 },
+  { name = "ENOCSI", value = 50 },
+  { name = "EL2HLT", value = 51 },
+  { name = "EBADE", value = 52 },
+  { name = "EBADR", value = 53 },
+  { name = "EXFULL", value = 54 },
+  { name = "ENOANO", value = 55 },
+  { name = "EBADRQC", value = 56 },
+  { name = "EBADSLT", value = 57 },
+  { name = "EDEADLOCK", alias = "EDEADLK" },
+  { name = "EBFONT", value = 59 },
+  { name = "ENOSTR", value = 60 },
+  { name = "ENODATA", value = 61 },
+  { name = "ETIME", value = 62 },
+  { name = "ENOSR", value = 63 },
+  { name = "ENONET", value = 64 },
+  { name = "ENOPKG", value = 65 },
+  { name = "EREMOTE", value = 66 },
+  { name = "ENOLINK", value = 67 },
+  { name = "EADV", value = 68 },
+  { name = "ESRMNT", value = 69 },
+  { name = "ECOMM", value = 70 },
+  { name = "EPROTO", value = 71 },
+  { name = "EMULTIHOP", value = 72 },
+  { name = "EDOTDOT", value = 73 },
+  { name = "EBADMSG", value = 74 },
+  { name = "EOVERFLOW", value = 75 },
+  { name = "ENOTUNIQ", value = 76 },
+  { name = "EBADFD", value = 77 },
+  { name = "EREMCHG", value = 78 },
+  { name = "ELIBACC", value = 79 },
+  { name = "ELIBBAD", value = 80 },
+  { name = "ELIBSCN", value = 81 },
+  { name = "ELIBMAX", value = 82 },
+  { name = "ELIBEXEC", value = 83 },
+  { name = "EILSEQ", value = 84 },
+  { name = "ERESTART", value = 85 },
+  { name = "ESTRPIPE", value = 86 },
+  { name = "EUSERS", value = 87 },
+  { name = "ENOTSOCK", value = 88 },
+  { name = "EDESTADDRREQ", value = 89 },
+  { name = "EMSGSIZE", value = 90 },
+  { name = "EPROTOTYPE", value = 91 },
+  { name = "ENOPROTOOPT", value = 92 },
+  { name = "EPROTONOSUPPORT", value = 93 },
+  { name = "ESOCKTNOSUPPORT", value = 94 },
+  { name = "EOPNOTSUPP", value = 95 },
+  { name = "ENOTSUP", alias = "EOPNOTSUPP" },
+  { name = "EPFNOSUPPORT", value = 96 },
+  { name = "EAFNOSUPPORT", value = 97 },
+  { name = "EADDRINUSE", value = 98 },
+  { name = "EADDRNOTAVAIL", value = 99 },
+  { name = "ENETDOWN", value = 100 },
+  { name = "ENETUNREACH", value = 101 },
+  { name = "ENETRESET", value = 102 },
+  { name = "ECONNABORTED", value = 103 },
+  { name = "ECONNRESET", value = 104 },
+  { name = "ENOBUFS", value = 105 },
+  { name = "EISCONN", value = 106 },
+  { name = "ENOTCONN", value = 107 },
+  { name = "ESHUTDOWN", value = 108 },
+  { name = "ETOOMANYREFS", value = 109 },
+  { name = "ETIMEDOUT", value = 110 },
+  { name = "ECONNREFUSED", value = 111 },
+  { name = "EHOSTDOWN", value = 112 },
+  { name = "EHOSTUNREACH", value = 113 },
+  { name = "EALREADY", value = 114 },
+  { name = "EINPROGRESS", value = 115 },
+  { name = "ESTALE", value = 116 },
+  { name = "EUCLEAN", value = 117 },
+  { name = "ENOTNAM", value = 118 },
+  { name = "ENAVAIL", value = 119 },
+  { name = "EISNAM", value = 120 },
+  { name = "EREMOTEIO", value = 121 },
+  { name = "EDQUOT", value = 122 },
+  { name = "ENOMEDIUM", value = 123 },
+  { name = "EMEDIUMTYPE", value = 124 },
+  { name = "ECANCELED", value = 125 },
+  { name = "ENOKEY", value = 126 },
+  { name = "EKEYEXPIRED", value = 127 },
+  { name = "EKEYREVOKED", value = 128 },
+  { name = "EKEYREJECTED", value = 129 },
+  { name = "EOWNERDEAD", value = 130 },
+  { name = "ENOTRECOVERABLE", value = 131 },
+  { name = "ERFKILL", value = 132 },
+  { name = "EHWPOISON", value = 133 },
+  { name = "EDOOFUS", value = 1000, visible = "bsd", doc = "BSD-only error range, doc 14 3.A.4" },
+  { name = "EFTYPE", value = 1001, visible = "bsd" },
+  { name = "EAUTH", value = 1002, visible = "bsd" },
+  { name = "ENEEDAUTH", value = 1003, visible = "bsd" },
+  { name = "EPROCLIM", value = 1004, visible = "bsd" },
+  { name = "EBADRPC", value = 1005, visible = "bsd" },
+  { name = "ERPCMISMATCH", value = 1006, visible = "bsd" },
+  { name = "EPROGUNAVAIL", value = 1007, visible = "bsd" },
+  { name = "EPROGMISMATCH", value = 1008, visible = "bsd" },
+  { name = "EPROCUNAVAIL", value = 1009, visible = "bsd" },
+  { name = "ENOTCAPABLE", value = 1010, visible = "bsd" },
+  { name = "ECAPMODE", value = 1011, visible = "bsd" },
+  { name = "EINTEGRITY", value = 1012, visible = "bsd" },
+  { name = "EIPSEC", value = 1013, visible = "bsd" },
+  { name = "ENOATTR", alias = "ENODATA", visible = "bsd" },
+]

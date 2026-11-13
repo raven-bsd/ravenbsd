@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "net-diag"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/b14b-diag/build.sh"]
+initfs = "build/fixtures/b14b-diag/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^net-diag: netd ready$'
+
+[[expect]]
+regex = '^ping: 127\.0\.0\.1 seq=1 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^ping: 127\.0\.0\.1 seq=2 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^ping: 2 packets transmitted, 2 received, 0% packet loss$'
+
+[[expect]]
+regex = '^ping: rtt min/avg/max = [0-9]+/[0-9]+/[0-9]+ ms$'
+
+[[expect]]
+regex = '^net-diag: ping ok$'
+
+[[expect]]
+regex = '^route: 127\.0\.0\.0/8 dev lo flags=UP$'
+
+[[expect]]
+regex = '^net-diag: route list ok$'
+
+[[expect]]
+regex = '^route: add 198\.51\.100\.10/32 dev lo$'
+
+[[expect]]
+regex = '^net-diag: route add ok$'
+
+[[expect]]
+regex = '^route: 198\.51\.100\.10/32 dev lo flags=UP,HOST$'
+
+[[expect]]
+regex = '^net-diag: route added list ok$'
+
+[[expect]]
+regex = '^route: delete 198\.51\.100\.10/32 dev lo$'
+
+[[expect]]
+regex = '^net-diag: route delete ok$'
+
+[[expect]]
+regex = '^netstat: udp BOUND 127\.0\.0\.1:7102 remote=- iface=lo rx=0 tx=0$'
+
+[[expect]]
+regex = '^netstat: lo rx_packets=0 tx_packets=0 rx_bytes=0 tx_bytes=0 rx_errors=0 tx_errors=0 rx_drops=0 tx_drops=0$'
+
+[[expect]]
+regex = '^net-diag: netstat ok$'
+
+[[expect]]
+regex = '^net-diag: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

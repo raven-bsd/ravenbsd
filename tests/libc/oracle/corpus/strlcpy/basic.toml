@@ -1,0 +1,172 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Fixed corpus for strlcpy. `buflen` is `dsize + guards`; the guard bytes are observed too.
+
+[[case]]
+dsize = 0
+buflen = 4
+fill = 170
+bytes = ""
+
+[[case]]
+dsize = 1
+buflen = 5
+fill = 0
+bytes = ""
+
+[[case]]
+dsize = 5
+buflen = 9
+fill = 170
+bytes = ""
+
+[[case]]
+dsize = 0
+buflen = 4
+fill = 170
+bytes = "hello"
+
+[[case]]
+dsize = 1
+buflen = 5
+fill = 0
+bytes = "hello"
+
+[[case]]
+dsize = 2
+buflen = 6
+fill = 170
+bytes = "hello"
+
+[[case]]
+dsize = 5
+buflen = 9
+fill = 0
+bytes = "hello"
+
+[[case]]
+dsize = 6
+buflen = 10
+fill = 170
+bytes = "hello"
+
+[[case]]
+dsize = 7
+buflen = 11
+fill = 0
+bytes = "hello"
+
+[[case]]
+dsize = 5
+buflen = 9
+fill = 170
+bytes = "hello world"
+
+[[case]]
+dsize = 4
+buflen = 8
+fill = 170
+bytes = "hell"
+
+[[case]]
+dsize = 6
+buflen = 10
+fill = 170
+bytes = "hello!"
+
+[[case]]
+dsize = 7
+buflen = 11
+fill = 170
+bytes = "hello!"
+
+[[case]]
+dsize = 4
+buflen = 8
+fill = 0
+bytes_hex = "ff7f80"
+
+[[case]]
+dsize = 3
+buflen = 7
+fill = 170
+bytes_hex = "00ff"
+
+[[case]]
+dsize = 3
+buflen = 7
+fill = 170
+bytes_hex = "610062"
+
+[[case]]
+dsize = 8
+buflen = 12
+fill = 0
+bytes = "abcdefg"
+
+[[case]]
+dsize = 8
+buflen = 12
+fill = 170
+bytes = "abcdefgh"
+
+[[case]]
+dsize = 8
+buflen = 12
+fill = 170
+bytes = "abcdefghi"
+
+[[case]]
+dsize = 2
+buflen = 3
+fill = 170
+bytes = "x"
+
+[[case]]
+dsize = 2
+buflen = 6
+fill = 170
+bytes = "xy"
+
+[[case]]
+dsize = 2
+buflen = 6
+fill = 170
+bytes = "xyz"
+
+[[case]]
+dsize = 1
+buflen = 4
+fill = 170
+bytes_hex = "80"
+
+[[case]]
+dsize = 0
+buflen = 1
+fill = 170
+bytes = "a"
+
+[[case]]
+dsize = 6
+buflen = 10
+fill = 170
+bytes = "hello"
+
+[[case]]
+dsize = 6
+buflen = 10
+fill = 0
+bytes = "hello"
+
+[[case]]
+dsize = 10
+buflen = 14
+fill = 170
+bytes = "0123456789"
+
+[[case]]
+dsize = 11
+buflen = 15
+fill = 170
+bytes = "0123456789"

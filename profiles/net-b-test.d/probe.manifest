@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# One-shot probe: map the ring, exchange one ARP frame per devd cycle, then exit.
+name = "net-b-probe"
+exec = "/sbin/net-b-probe"
+args = ["net-b-probe"]
+needs = ["scheme:nic"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

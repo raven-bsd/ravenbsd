@@ -1,0 +1,348 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# First-party data: the type decisions are doc 14 3.A.2 plus H-14/H-15. musl's
+# `include/alltypes.h.in` and the three `arch/*/bits/alltypes.h.in` files were read as the
+# structural base; the values below are the frozen RavenBSD decisions, not musl's.
+#
+# `hdrgen provenance` has no entry for this file (CLEANROOM row of doc 14 section 5).
+
+schema = 1
+
+# The type decisions are doc 14 3.A.2 plus H-14/H-15. musl's alltypes.h.in is the base; the
+# three deliberate changes are nlink_t/blksize_t (DV1), wchar_t (D3) and char (D2).
+# `ctype_probe` names the musl type used by the size probe (`hdrgen verify`).
+
+[[type]]
+name = "size_t"
+rust = "usize"
+c = "unsigned long"
+bits = 64
+signed = false
+
+[[type]]
+name = "uintptr_t"
+rust = "usize"
+c = "unsigned long"
+bits = 64
+signed = false
+
+[[type]]
+name = "uintmax_t"
+rust = "u64"
+c = "unsigned long"
+bits = 64
+signed = false
+
+[[type]]
+name = "ssize_t"
+rust = "isize"
+c = "long"
+bits = 64
+signed = true
+
+[[type]]
+name = "ptrdiff_t"
+rust = "isize"
+c = "long"
+bits = 64
+signed = true
+
+[[type]]
+name = "intptr_t"
+rust = "isize"
+c = "long"
+bits = 64
+signed = true
+
+[[type]]
+name = "intmax_t"
+rust = "i64"
+c = "long"
+bits = 64
+signed = true
+
+[[type]]
+name = "int64_t"
+rust = "i64"
+c = "long"
+bits = 64
+signed = true
+
+[[type]]
+name = "register_t"
+rust = "isize"
+c = "long"
+bits = 64
+signed = true
+
+[[type]]
+name = "wchar_t"
+rust = "i32"
+c = "int"
+bits = 32
+signed = true
+per_arch = { aarch64 = { rust = "u32", c = "unsigned int", signed = false } }
+doc = "D3/H-14: __WCHAR_TYPE__; x86_64 and riscv64 int, aarch64 unsigned int"
+
+[[type]]
+name = "wint_t"
+rust = "u32"
+c = "int"
+bits = 32
+signed = false
+doc = "D4: Rust is u32; __WINT_TYPE__ is int on x86_64/aarch64 and unsigned int on riscv64; WEOF is (wint_t)-1"
+
+[[type]]
+name = "wctype_t"
+rust = "u64"
+c = "unsigned long"
+bits = 64
+signed = false
+
+[[type]]
+name = "sig_atomic_t"
+rust = "i32"
+c = "int"
+bits = 32
+signed = true
+
+[[type]]
+name = "clockid_t"
+rust = "i32"
+c = "int"
+bits = 32
+signed = true
+
+[[type]]
+name = "pid_t"
+rust = "i32"
+c = "int"
+bits = 32
+signed = true
+
+[[type]]
+name = "key_t"
+rust = "i32"
+c = "int"
+bits = 32
+signed = true
+
+[[type]]
+name = "time_t"
+rust = "i64"
+c = "long"
+bits = 64
+signed = true
+
+[[type]]
+name = "suseconds_t"
+rust = "i64"
+c = "long"
+bits = 64
+signed = true
+
+[[type]]
+name = "clock_t"
+rust = "i64"
+c = "long"
+bits = 64
+signed = true
+
+[[type]]
+name = "off_t"
+rust = "i64"
+c = "long"
+bits = 64
+signed = true
+
+[[type]]
+name = "blkcnt_t"
+rust = "i64"
+c = "long"
+bits = 64
+signed = true
+
+[[type]]
+name = "ino_t"
+rust = "u64"
+c = "unsigned long"
+bits = 64
+signed = false
+
+[[type]]
+name = "dev_t"
+rust = "u64"
+c = "unsigned long"
+bits = 64
+signed = false
+
+[[type]]
+name = "fsblkcnt_t"
+rust = "u64"
+c = "unsigned long"
+bits = 64
+signed = false
+
+[[type]]
+name = "fsfilcnt_t"
+rust = "u64"
+c = "unsigned long"
+bits = 64
+signed = false
+
+[[type]]
+name = "rlim_t"
+rust = "u64"
+c = "unsigned long"
+bits = 64
+signed = false
+
+[[type]]
+name = "mode_t"
+rust = "u32"
+c = "unsigned"
+bits = 32
+signed = false
+
+[[type]]
+name = "uid_t"
+rust = "u32"
+c = "unsigned"
+bits = 32
+signed = false
+
+[[type]]
+name = "gid_t"
+rust = "u32"
+c = "unsigned"
+bits = 32
+signed = false
+
+[[type]]
+name = "id_t"
+rust = "u32"
+c = "unsigned"
+bits = 32
+signed = false
+
+[[type]]
+name = "nlink_t"
+rust = "u32"
+c = "unsigned"
+bits = 32
+signed = false
+ctype_probe = "nlink_t"
+deviates_musl = { x86_64 = { bits = 64 } }
+doc = "DV1: 32 bits everywhere; musl x86_64 is 64 bits"
+
+[[type]]
+name = "useconds_t"
+rust = "u32"
+c = "unsigned"
+bits = 32
+signed = false
+
+[[type]]
+name = "socklen_t"
+rust = "u32"
+c = "unsigned"
+bits = 32
+signed = false
+
+[[type]]
+name = "pthread_key_t"
+rust = "u32"
+c = "unsigned"
+bits = 32
+signed = false
+
+[[type]]
+name = "blksize_t"
+rust = "i32"
+c = "int"
+bits = 32
+signed = true
+ctype_probe = "blksize_t"
+deviates_musl = { x86_64 = { bits = 64 } }
+doc = "DV1: 32 bits everywhere; musl x86_64 is 64 bits"
+
+[[type]]
+name = "sa_family_t"
+rust = "u16"
+c = "unsigned short"
+bits = 16
+signed = false
+
+[[type]]
+name = "in_port_t"
+rust = "u16"
+c = "unsigned short"
+bits = 16
+signed = false
+
+[[type]]
+name = "reclen_t"
+rust = "u16"
+c = "unsigned short"
+bits = 16
+signed = false
+
+[[type]]
+name = "in_addr_t"
+rust = "u32"
+c = "uint32_t"
+bits = 32
+signed = false
+
+[[type]]
+name = "pthread_once_t"
+rust = "i32"
+c = "int"
+bits = 32
+signed = true
+
+[[type]]
+name = "pthread_spinlock_t"
+rust = "i32"
+c = "int"
+bits = 32
+signed = true
+
+[[type]]
+name = "pthread_t"
+rust = "usize"
+c = "struct __pthread *"
+bits = 64
+signed = false
+doc = "H-19: the TCB pointer"
+
+[[type]]
+name = "timer_t"
+rust = "*mut core::ffi::c_void"
+c = "void *"
+bits = 64
+signed = false
+
+[[type]]
+name = "float_t"
+rust = "f32"
+c = "float"
+bits = 32
+signed = true
+
+[[type]]
+name = "double_t"
+rust = "f64"
+c = "double"
+bits = 64
+signed = true
+
+[[type]]
+name = "char"
+rust = "core::ffi::c_char"
+c = "char"
+bits = 8
+signed = true
+per_arch = { aarch64 = { rust = "core::ffi::c_char", c = "char", signed = false }, riscv64 = { rust = "core::ffi::c_char", c = "char", signed = false } }
+doc = "D2/H-14: psABI default; x86_64 signed, aarch64 and riscv64 unsigned"

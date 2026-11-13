@@ -33,6 +33,10 @@ required-features = ["testutil"]
 name = "udp"
 required-features = ["testutil"]
 
+[[test]]
+name = "observability"
+required-features = ["testutil"]
+
 [dependencies]
 raven-abi = { path = "../raven-abi" }
 raven-tcpip = { path = "../raven-tcpip" }

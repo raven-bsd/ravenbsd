@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Network diagnostics over the loopback netd. The shell profile does not include these tools yet;
+# this profile keeps the image small and packages ping, route and netstat with netd.
+name = "net-diag"
+
+[initfs]
+programs = [
+    { package = "raven-init", path = "/init" },
+    { package = "raven-logd", path = "/sbin/logd" },
+    { package = "netd", path = "/sbin/netd" },
+    { package = "raven-ping", path = "/sbin/ping" },
+    { package = "raven-route", path = "/sbin/route" },
+    { package = "raven-netstat", path = "/sbin/netstat" },
+]
+
+files = [
+    { src = "etc/services.d/logd.toml", path = "/etc/services.d/logd.toml" },
+    { src = "etc/services.d/netd.toml", path = "/etc/services.d/netd.toml" },
+]
+
+[boot]
+cmdline = "console=ttyS0 loglevel=info"
+log_level = "info"

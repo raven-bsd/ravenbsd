@@ -4,7 +4,7 @@
 [package]
 name = "netd"
 version = "0.1.0"
-description = "RavenBSD net: socket server: loopback TCP/UDP and the interface control channel."
+description = "RavenBSD net: socket server: loopback and virtio-net TCP/UDP plus the interface control channel."
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -19,6 +19,7 @@ raven-proto-net = { path = "../../../crates/raven-proto-net" }
 [target.'cfg(target_os = "none")'.dependencies]
 raven-rt = { path = "../../rt", features = ["alloc"] }
 raven-scheme = { path = "../../../crates/raven-scheme" }
+virtio-net = { path = "../../drivers/virtio-net" }
 
 [lints]
 workspace = true

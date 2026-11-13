@@ -1,0 +1,172 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B12c: netd over the persistent virtio-net frame service. The guest uses the QEMU user-mode
+# network; a TCP `guestfwd` runs /bin/cat as the host echo and a two-shot host UDP echo server
+# answers one datagram per netd lifecycle. netd is restarted between the two probe runs.
+
+name = "netd-virtio"
+arch = "x86_64"
+profile = "netd-test-virtio"
+timeout_secs = 240
+pre = [
+    "sh tests/fixtures/b12-netd/build.sh",
+    "sh tests/fixtures/b12-netd/udp_echo_start.sh 47001",
+]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0,guestfwd=tcp:10.0.2.100:7000-cmd:/bin/cat",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^pcid: devices=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^svcd: pcid up$'
+
+[[expect]]
+regex = '^devd: matched [0-9a-f]{2}:[0-9a-f]{2}\.[0-9] vendor=0x1af4 device=0x1041 irq_line=[0-9]+ irq_pin=[0-9]+$'
+
+[[expect]]
+regex = '^devd: driver virtio-net bar=4 size=16384$'
+
+[[expect]]
+regex = '^devd: driver virtio-net dma bus=0x[0-9a-f]+ len=65536$'
+
+[[expect]]
+regex = '^virtio-net: id=1af4:1041$'
+
+[[expect]]
+regex = '^virtio-net: mac=[0-9a-f]{2}(:[0-9a-f]{2}){5} mtu=[0-9]+ link=up$'
+
+[[expect]]
+regex = '^virtio-net: ring offset=0x1000 len=24576 rx=8 tx=8 pool=22528 dma=65536$'
+
+[[expect]]
+regex = '^virtio-net: serving nic:$'
+
+[[expect]]
+regex = '^svcd: devd up$'
+
+[[expect]]
+regex = '^netd: interface eth0 10\.0\.2\.15/24$'
+
+[[expect]]
+regex = '^netd: interface lo 127\.0\.0\.1/8$'
+
+[[expect]]
+regex = '^netd: ready$'
+
+[[expect]]
+regex = '^svcd: netd up$'
+
+[[expect]]
+regex = '^netd: iface eth0 10\.0\.2\.15/24$'
+
+[[expect]]
+regex = '^netd: dhcp eth0 10\.0\.2\.15/24 router=10\.0\.2\.2 dns=10\.0\.2\.3 renew=[0-9]+ms rebind=[0-9]+ms expires=[0-9]+ms$'
+
+[[expect]]
+regex = '^netd: readiness event$'
+
+[[expect]]
+regex = '^netd: ping 10\.0\.2\.2 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^netd: route eth0 ok$'
+
+[[expect]]
+regex = '^netd: netstat eth0 sockets=[0-9]+ rx=[1-9][0-9]* tx=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^netd: virtio endpoints ok$'
+
+[[expect]]
+regex = '^netd: virtio options ok$'
+
+[[expect]]
+regex = '^netd: virtio tcp echo ok$'
+
+[[expect]]
+regex = '^netd: readiness event$'
+
+[[expect]]
+regex = '^netd: virtio udp echo ok$'
+
+[[expect]]
+regex = '^netd: virtio probe ok$'
+
+[[expect]]
+regex = '^svcd: netd-virtio-probe up$'
+
+[[expect]]
+regex = '^netd stopped 0$'
+
+[[expect]]
+regex = '^netd: interface eth0 10\.0\.2\.15/24$'
+
+[[expect]]
+regex = '^netd: interface lo 127\.0\.0\.1/8$'
+
+[[expect]]
+regex = '^netd: ready$'
+
+[[expect]]
+regex = '^svcd: netd up$'
+
+[[expect]]
+regex = '^netd running 0$'
+
+[[expect]]
+regex = '^svcd: netd-virtio-restart up$'
+
+[[expect]]
+regex = '^netd: iface eth0 10\.0\.2\.15/24$'
+
+[[expect]]
+regex = '^netd: dhcp eth0 10\.0\.2\.15/24 router=10\.0\.2\.2 dns=10\.0\.2\.3 renew=[0-9]+ms rebind=[0-9]+ms expires=[0-9]+ms$'
+
+[[expect]]
+regex = '^netd: readiness event$'
+
+[[expect]]
+regex = '^netd: ping 10\.0\.2\.2 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^netd: route eth0 ok$'
+
+[[expect]]
+regex = '^netd: netstat eth0 sockets=[0-9]+ rx=[1-9][0-9]* tx=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^netd: virtio endpoints ok$'
+
+[[expect]]
+regex = '^netd: virtio options ok$'
+
+[[expect]]
+regex = '^netd: virtio tcp echo ok$'
+
+[[expect]]
+regex = '^netd: readiness event$'
+
+[[expect]]
+regex = '^netd: virtio udp echo ok$'
+
+[[expect]]
+regex = '^netd: virtio restart ok$'
+
+[[expect]]
+regex = '^svcd: netd-virtio-probe2 up$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|netd: .*error|virtio-net: pump:'

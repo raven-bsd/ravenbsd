@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The resolver reads the live DHCP lease from netd and writes the lease DNS
+# servers to /etc/resolv.conf. A static nameserver line in that file still wins.
+name = "resolvd"
+exec = "/sbin/resolvd"
+needs = ["scheme:net", "scheme:file", "scheme:initfs"]
+provides = ["scheme:resolv"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "on-failure"
+
+[env]
+RESOLVD_CONF = "file:/etc/resolv.conf"
+RESOLVD_STATIC = "file:/etc/resolv.conf"
+RESOLVD_IFACE = "eth0"

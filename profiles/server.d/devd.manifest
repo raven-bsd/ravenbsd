@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# devd launches virtio-net in `serve` mode; the driver registers `nic:` before
+# devd finishes its device pass, so `nic:` is the readiness gate. `dev:` is
+# still provided for the rest of the system.
+name = "devd"
+exec = "/sbin/devd"
+args = ["devd"]
+needs = ["scheme:pci"]
+provides = ["scheme:nic", "scheme:dev"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0

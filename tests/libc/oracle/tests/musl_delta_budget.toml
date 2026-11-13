@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Allowed number of mismatches between musl's Unicode 12.1 tables and the generated Unicode
+# 15.1.0 tables, per function. Filled from the first differential run and reviewed; the counts must
+# only change when the Unicode version changes.
+
+alpha_allow = []
+
+[budget]
+iswalpha = 14586
+iswalnum = 14586
+iswpunct = 1139
+iswlower = 70
+iswupper = 69
+towupper = 70
+towlower = 69
+wcwidth = 887

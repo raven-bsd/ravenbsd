@@ -5,13 +5,15 @@
 .Os RavenBSD
 .Sh NAME
 .Nm virtio-net
-.Nd virtio network driver
+.Nd virtio network driver and frame service
 .Sh SYNOPSIS
 .Nm /sbin/virtio-net
 .Op Ar bar Ns = Ns Ar n
 .Op Ar bar_size Ns = Ns Ar bytes
 .Op Ar dma Ns = Ns Ar bytes
 .Op Ar irq Ns = Ns Ar line
+.Op Ar serve
+.Op Ar test
 .Sh DESCRIPTION
 .Nm
 is the userspace driver for a modern (virtio 1.0) PCI network function.  It is
@@ -21,8 +23,8 @@ for a function whose vendor and device ids match the driver table, and it
 receives four handles in the documented order: the device BAR (3), the
 function's configuration page (4), a DMA buffer (5) and a legacy interrupt (6).
 The command-line arguments are the values
-.Nm
-appends to the driver's arguments:
+.Xr devd 8
+appends:
 .Va bar ,
 .Va bar_size ,
 .Va dma
@@ -31,19 +33,58 @@ and
 .Pp
 The driver resets the function, acknowledges it, negotiates
 .Dv VIRTIO_F_VERSION_1
-plus the MAC, MTU and link-status features, and programs split RX and TX
-virtqueues in the DMA buffer.  Descriptors point directly into that buffer, so
-frames are not copied between queues, and every used-ring index and length is
-checked against the queue and buffer bounds before it is dereferenced.  The
-device is interrupted through the transferred IRQ handle; the ISR byte and the
-used rings are drained on each interrupt.  Received ARP requests directed at the
-driver's MAC address are answered from the frame ring.
+plus the MAC, MTU and link-status features, programs the split RX and TX
+virtqueues and then serves the persistent
+.Dq nic:
+control scheme.  The B39
+.Xr raven-proto-net 3
+ring lives at a documented offset in the same DMA buffer:
+.Bl -tag -width "nic:ring" -compact
+.It Pa nic:info
+MAC, MTU, link, ring offset/length, descriptor counts, pool length and DMA
+length as
+.Ql key=value
+lines.
+.It Pa nic:mac , nic:mtu , nic:link
+one line each.
+.It Pa nic:ring
+attaches the DMA buffer; the consumer maps it and slices
+.Ql ring_offset..ring_offset+ring_len .
+.It Pa nic:start , nic:stop
+arm or pause the frame pump (write one byte).
+.It Pa nic:quit
+test-only clean shutdown; ignored with
+.Er EPERM
+otherwise.
+.El
 .Pp
-When the driver exits it resets the function so the next launch starts from a
-clean device.  The DMA buffer and the interrupt line belong to
+The ring has 8 RX and 8 TX descriptors and an 11-buffer pool of 2 KiB buffers.
+RX pool buffers 0..7 are the device receive buffers; the virtio-net header lands
+before the frame, so the RX descriptor points past it.  A TX descriptor names a
+pool buffer holding a complete Ethernet frame; the driver submits a
+two-descriptor chain (a zero virtio header then the frame) and only advances the
+TX consumer index after the device completed the frame.  Every index, length,
+buffer offset and frame flag is checked.  Completion is driven by the ISR byte
+and the transferred interrupt with a bounded 10 ms wait; a timeout or a malformed
+ring resets the device and the driver reports the pump error.
+.Pp
+A pump thread owns the device so the control scheme stays responsive while
+frames flow.  When the driver exits it resets the function; the DMA buffer and
+the interrupt line belong to
 .Xr devd 8 ,
-which closes its own copies after the child exits; a crash or restart
-therefore cannot leak either resource.
+which closes its own copies after the child exits.
+.Pp
+Without
+.Ar serve
+or
+.Ar test
+the driver keeps the B13b one-shot behaviour (one ARP request and reply, then
+exit) for the old
+.Ql virtio-net
+qtest.  The production driver table uses
+.Ar serve ;
+the net-b qtest uses
+.Ar test .
 .Pp
 The device must be a modern-only function (for example QEMU's
 .Ql virtio-net-pci,disable-legacy=on ) whose registers live in a memory BAR.
@@ -59,7 +100,8 @@ the driver table that launches
 .Ex -std
 .Sh SEE ALSO
 .Xr devd 8 ,
-.Xr pcid 8
+.Xr pcid 8 ,
+.Xr raven-proto-net 3
 .Sh HISTORY
 The
 .Nm

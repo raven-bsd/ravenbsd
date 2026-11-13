@@ -1,0 +1,59 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt NC 8
+.Os RavenBSD
+.Sh NAME
+.Nm nc
+.Nd connect to or listen on TCP and UDP ports
+.Sh SYNOPSIS
+.Nm
+.Op Fl u
+.Op Fl w Ar seconds
+.Op Fl s Ar text
+.Op Fl n Ar bytes
+.Ar host port
+.Nm
+.Fl l
+.Op Fl u
+.Fl p Ar port
+.Op Fl e
+.Op Fl w Ar seconds
+.Sh DESCRIPTION
+.Nm
+opens a
+.Dq net:tcp/ Ns Ar host : Ns Ar port
+or
+.Dq net:udp/ Ns Ar host : Ns Ar port
+socket through the native
+.Dq net:
+server. In client mode it connects (TCP) or sends a datagram (UDP), optionally writes the
+.Fl s
+payload once, and with
+.Fl n
+reads at most that many bytes and prints them. A UDP client must choose its local port with
+.Fl b .
+.Pp
+In listen mode
+.Fl l
+requires
+.Fl p Ar port .
+TCP uses
+.Dv LISTEN / ACCEPT ; UDP uses
+.Dv BIND . With
+.Fl e
+the listener echoes one received message back to the sender and exits. Every operation is
+bounded by
+.Fl w
+(seconds, default 5); a refused connection, timeout or malformed option exits non-zero.
+.Pp
+The tool uses only the
+.Dq net:
+scheme API; it never opens a raw socket and never touches a NIC address.
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr ifconfig 8 ,
+.Xr netd 8
+.Sh STANDARDS
+RavenBSD.

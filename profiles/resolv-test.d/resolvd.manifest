@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The qtest makes `/etc` a writable ramfs, so the static override and the
+# lease-derived file are the same observable path. The static setup service
+# writes the phase-1 override; phase 1 clears it before the restart.
+name = "resolvd"
+exec = "/sbin/resolvd"
+needs = ["scheme:net", "scheme:initfs", "b15-resolv-setup"]
+provides = ["scheme:resolv"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0
+
+[env]
+RESOLVD_STATIC = "file:/etc/resolv.conf"
+RESOLVD_CONF = "file:/etc/resolv.conf"
+RESOLVD_IFACE = "eth0"

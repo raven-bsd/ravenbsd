@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# A feature never adds or removes an exported name (L-8).
+
+[[feature]]
+name = "default"
+crates = ["*"]
+[[feature]]
+name = "std"
+crates = ["*"]
+[[feature]]
+name = "alloc"
+crates = ["raven-libc-dtoa"]
+[[feature]]
+name = "tiny"
+crates = ["raven-libc"]
+[[feature]]
+name = "base"
+crates = ["raven-libc"]
+[[feature]]
+name = "server"
+crates = ["raven-libc"]
+[[feature]]
+name = "float-printf"
+crates = ["raven-libc", "raven-libc-fmt", "raven-libc-dtoa"]
+[[feature]]
+name = "wide-stdio"
+crates = ["raven-libc", "raven-libc-stdio"]
+[[feature]]
+name = "locale-data"
+crates = ["raven-libc", "raven-libc-locale", "raven-libc-ctype"]
+[[feature]]
+name = "resolver"
+crates = ["raven-libc", "raven-libc-resolv", "raven-libc-net"]
+[[feature]]
+name = "dlopen"
+crates = ["raven-libc"]
+[[feature]]
+name = "hardened-malloc"
+crates = ["raven-libc", "raven-libc-malloc"]
+[[feature]]
+name = "tiny-malloc"
+crates = ["raven-libc", "raven-libc-malloc"]
+[[feature]]
+name = "debug-malloc"
+crates = ["raven-libc-malloc"]
+[[feature]]
+name = "personality-linux"
+crates = ["raven-libc"]
+[[feature]]
+name = "personality-bsd"
+crates = ["raven-libc"]
+[[feature]]
+name = "personality-solaris"
+crates = ["raven-libc"]
+[[feature]]
+name = "hooks-resolved"
+crates = ["raven-libc"]
+[[feature]]
+name = "panic-handler"
+crates = ["raven-libc"]
+[[feature]]
+name = "cjk"
+crates = ["raven-libc-iconv"]
+
+[[cfg]]
+name = "raven_abi_proposed"
+
+[[feature]]
+name = "size"
+crates = ["raven-libc-str"]
+
+[[feature]]
+name = "test-probes"
+crates = ["raven-libc-str"]

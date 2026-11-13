@@ -1,0 +1,176 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# str-freebsd: mempcpy, strnstr, strverscmp, memset_s, fls* and the 14 stdbit sources
+# (all BSD-2/BSD-3; the gate re-reads each header).
+
+schema = 1
+family = "str-freebsd"
+description = "FreeBSD mempcpy, strnstr, strverscmp, memset_s, fls/flsl/flsll and stdbit"
+exports = [
+  "fls",
+  "flsl",
+  "flsll",
+  "mempcpy",
+  "memset_s",
+  "stdc_bit_ceil_uc",
+  "stdc_bit_ceil_ui",
+  "stdc_bit_ceil_ul",
+  "stdc_bit_ceil_ull",
+  "stdc_bit_ceil_us",
+  "stdc_bit_floor_uc",
+  "stdc_bit_floor_ui",
+  "stdc_bit_floor_ul",
+  "stdc_bit_floor_ull",
+  "stdc_bit_floor_us",
+  "stdc_bit_width_uc",
+  "stdc_bit_width_ui",
+  "stdc_bit_width_ul",
+  "stdc_bit_width_ull",
+  "stdc_bit_width_us",
+  "stdc_count_ones_uc",
+  "stdc_count_ones_ui",
+  "stdc_count_ones_ul",
+  "stdc_count_ones_ull",
+  "stdc_count_ones_us",
+  "stdc_count_zeros_uc",
+  "stdc_count_zeros_ui",
+  "stdc_count_zeros_ul",
+  "stdc_count_zeros_ull",
+  "stdc_count_zeros_us",
+  "stdc_first_leading_one_uc",
+  "stdc_first_leading_one_ui",
+  "stdc_first_leading_one_ul",
+  "stdc_first_leading_one_ull",
+  "stdc_first_leading_one_us",
+  "stdc_first_leading_zero_uc",
+  "stdc_first_leading_zero_ui",
+  "stdc_first_leading_zero_ul",
+  "stdc_first_leading_zero_ull",
+  "stdc_first_leading_zero_us",
+  "stdc_first_trailing_one_uc",
+  "stdc_first_trailing_one_ui",
+  "stdc_first_trailing_one_ul",
+  "stdc_first_trailing_one_ull",
+  "stdc_first_trailing_one_us",
+  "stdc_first_trailing_zero_uc",
+  "stdc_first_trailing_zero_ui",
+  "stdc_first_trailing_zero_ul",
+  "stdc_first_trailing_zero_ull",
+  "stdc_first_trailing_zero_us",
+  "stdc_has_single_bit_uc",
+  "stdc_has_single_bit_ui",
+  "stdc_has_single_bit_ul",
+  "stdc_has_single_bit_ull",
+  "stdc_has_single_bit_us",
+  "stdc_leading_ones_uc",
+  "stdc_leading_ones_ui",
+  "stdc_leading_ones_ul",
+  "stdc_leading_ones_ull",
+  "stdc_leading_ones_us",
+  "stdc_leading_zeros_uc",
+  "stdc_leading_zeros_ui",
+  "stdc_leading_zeros_ul",
+  "stdc_leading_zeros_ull",
+  "stdc_leading_zeros_us",
+  "stdc_trailing_ones_uc",
+  "stdc_trailing_ones_ui",
+  "stdc_trailing_ones_ul",
+  "stdc_trailing_ones_ull",
+  "stdc_trailing_ones_us",
+  "stdc_trailing_zeros_uc",
+  "stdc_trailing_zeros_ui",
+  "stdc_trailing_zeros_ul",
+  "stdc_trailing_zeros_ull",
+  "stdc_trailing_zeros_us",
+  "strnstr",
+  "strverscmp",
+]
+opt = ["O2", "O0"]
+defines = ["_GNU_SOURCE", "__DECONST(type,var)=(type)(var)"]
+include = ["shim:str-freebsd"]
+flags = []
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/string/mempcpy.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/string/strnstr.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/string/strverscmp.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/string/memset_s.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/string/fls.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/string/flsl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/string/flsll.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdbit/stdc_bit_ceil.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdbit/stdc_bit_floor.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdbit/stdc_bit_width.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdbit/stdc_count_ones.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdbit/stdc_count_zeros.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdbit/stdc_first_leading_one.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdbit/stdc_first_leading_zero.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdbit/stdc_first_trailing_one.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdbit/stdc_first_trailing_zero.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdbit/stdc_has_single_bit.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdbit/stdc_leading_ones.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdbit/stdc_leading_zeros.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdbit/stdc_trailing_ones.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/stdbit/stdc_trailing_zeros.c"
