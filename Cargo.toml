@@ -131,6 +131,7 @@ members = [
     "userland/servers/coretest",
     "userland/servers/consd",
     "userland/servers/consd-probe",
+    "userland/servers/linuxd",
     "tests/net/packetdrill-harness",
     "tests/tcpip",
     "tests/tcpip/conformance",
