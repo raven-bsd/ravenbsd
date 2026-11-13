@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-s18-iommu"
+version = "0.1.0"
+description = "S18 VT-d fixture: per-device IOVA DMA, edu round trip and fault injection."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "raven-s18-iommu"
+path = "src/main.rs"
+
+[dependencies]
+raven-abi = { path = "../../crates/raven-abi" }
+raven-rt = { path = "../../userland/rt", default-features = false, features = ["panic-handler"] }
+
+[lints]
+workspace = true

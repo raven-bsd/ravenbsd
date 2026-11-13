@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S18 VT-d end-to-end: QEMU's intel-iommu is enabled with pass-through off.
+# The fixture opens the edu BAR (the DMA_ALLOC device hint), gets a protected
+# IOVA domain, proves a RAM<->device round trip, then programs the device to an
+# unmapped IOVA and requires a VT-d fault record while the driver keeps running.
+
+name = "iommu-dma"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh profiles/iommu-fixture/build.sh"]
+initfs = "build/fixtures/iommu/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-device", "intel-iommu,pt=off", "-device", "edu"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^vtd: dmar units=1 drhd=0x[0-9a-f]+ haw=[0-9]+ levels=[234] flags=0x[0-9a-f]+ rmrr=[0-9]+ atsr=[0-9]+ scopes=[0-9]+ cap=0x[0-9a-f]+ ecap=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^s18: edu bdf=[0-9a-f]{2}:[0-9a-f]{2}\.[0-9]$'
+
+[[expect]]
+regex = '^vtd: domain id=[1-9][0-9]* bdf=[0-9a-f]{2}:[0-9a-f]{2}\.[0-9] iova=0x[0-9a-f]+-0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^s18: dma bus=0x[0-9a-f]+ len=1048576 domain=[1-9][0-9]* protected=yes$'
+
+[[expect]]
+regex = '^s18: dma roundtrip ok$'
+
+[[expect]]
+regex = '^s18: fault injected iova=0x8000000 completed=(true|false)$'
+
+[[expect]]
+regex = '^vtd: fault sid=0x[0-9a-f]+ reason=0x[0-9a-f]+ \([^)]*\) addr=0x[0-9a-f]+ write=(true|false)$'
+unordered = true
+
+[[expect]]
+regex = '^s18: after fault ok$'
+
+[[expect]]
+regex = '^s18: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

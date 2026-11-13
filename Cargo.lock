@@ -761,6 +761,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-iommu"
+version = "0.1.0"
+
+[[package]]
 name = "raven-ipc"
 version = "0.1.0"
 dependencies = [
@@ -912,6 +916,7 @@ dependencies = [
  "raven-esr",
  "raven-handles",
  "raven-initfs",
+ "raven-iommu",
  "raven-mem",
  "raven-pager",
  "raven-rmm",
@@ -1408,6 +1413,14 @@ dependencies = [
  "raven-initfs",
  "raven-ipc",
  "raven-pager",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-s18-iommu"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
  "raven-rt",
 ]
 

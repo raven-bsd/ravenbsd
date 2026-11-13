@@ -60,6 +60,7 @@ members = [
     "tests/fixtures/b15-resolv/probe",
     "tests/fixtures/b70-net/probe",
     "tests/fixtures/b70-net/overlay",
+    "profiles/iommu-fixture",
     "xtask",
     "tests/qtest",
     "tests/ufs-oracle",

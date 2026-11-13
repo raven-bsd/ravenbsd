@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S18 no-IOMMU fallback: the same fixture without QEMU's intel-iommu must see
+# the explicit UNPROTECTED flag, run the identity/mask-bounded DMA round trip,
+# and must not inject a device DMA to an arbitrary physical address.
+
+name = "iommu-dma-fallback"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh profiles/iommu-fixture/build.sh"]
+initfs = "build/fixtures/iommu/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-device", "edu"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^vtd: no DMAR table; DMA unprotected$'
+unordered = true
+
+[[expect]]
+regex = '^s18: edu bdf=[0-9a-f]{2}:[0-9a-f]{2}\.[0-9]$'
+
+[[expect]]
+regex = '^s18: fallback unprotected domain=0$'
+
+[[expect]]
+regex = '^s18: dma roundtrip ok$'
+
+[[expect]]
+regex = '^s18: fallback no fault injection$'
+
+[[expect]]
+regex = '^s18: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
+
+[[forbid]]
+regex = '^vtd: fault '

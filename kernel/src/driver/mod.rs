@@ -3,6 +3,8 @@
 
 //! Driver objects: the root device capability, MMIO regions and boot blobs.
 
+#[cfg(target_arch = "x86_64")]
+use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, Ordering};
@@ -58,6 +60,8 @@ pub struct DmaDomain {
     pub coherent: bool,
     /// An IOMMU protects the device's accesses.
     pub protected: bool,
+    /// Domain id reported through `DMA_INFO` (0 for the identity domain).
+    pub id: u16,
 }
 
 /// The no-IOMMU identity domain.
@@ -66,11 +70,26 @@ pub const DMA_DOMAIN_IDENTITY: DmaDomain = DmaDomain {
     max_bus_addr: u64::MAX,
     coherent: true,
     protected: false,
+    id: 0,
 };
 
-/// The domain every allocation on this machine uses. Initialised to identity and replaced once
-/// by the platform boot path when the device tree declares `dma-ranges`.
+/// The domain every allocation on this machine uses when no per-device IOMMU
+/// domain applies. Initialised to identity and replaced once by the platform
+/// boot path when the device tree declares `dma-ranges`.
 static DMA_DOMAIN: Mutex<DmaDomain> = Mutex::new(DMA_DOMAIN_IDENTITY);
+
+/// The last PCI function whose MMIO region this process created.
+///
+/// `DMA_ALLOC` has no device argument in the S21 ABI, so the kernel binds the
+/// allocation to the device whose BAR or configuration page the caller opened
+/// immediately before it (the `pcid` resource sequence is bar/config, then
+/// dma). Without a hint the allocation stays on the identity/unprotected path.
+#[cfg(target_arch = "x86_64")]
+static DEVICE_HINTS: Mutex<BTreeMap<u64, vtd::Bdf>> = Mutex::new(BTreeMap::new());
+
+#[cfg(target_arch = "x86_64")]
+#[path = "../arch/x86_64/vtd.rs"]
+mod vtd;
 
 /// A physically contiguous, zero-filled device buffer.
 pub struct DmaBuffer {
@@ -79,11 +98,20 @@ pub struct DmaBuffer {
     flags: u32,
     domain: DmaDomain,
     quota: Arc<AtomicU64>,
+    #[cfg(target_arch = "x86_64")]
+    iova: Option<u64>,
+    #[cfg(target_arch = "x86_64")]
+    iommu: Option<Arc<vtd::Domain>>,
 }
 
 impl DmaBuffer {
-    /// Bus address of the first byte (`phys + domain.bus_offset`).
+    /// Bus address of the first byte: the IOVA for a protected domain, otherwise
+    /// `phys + domain.bus_offset`.
     pub fn bus_addr(&self) -> u64 {
+        #[cfg(target_arch = "x86_64")]
+        if let Some(iova) = self.iova {
+            return iova;
+        }
         self.frames
             .first()
             .copied()
@@ -116,6 +144,10 @@ impl DmaBuffer {
 
 impl Drop for DmaBuffer {
     fn drop(&mut self) {
+        #[cfg(target_arch = "x86_64")]
+        if let (Some(iommu), Some(iova)) = (&self.iommu, self.iova) {
+            vtd::unmap_buffer(iommu, iova, self.len);
+        }
         for physical in &self.frames {
             let _ = frame::free_frame(frame::PhysAddr(*physical));
         }
@@ -167,6 +199,7 @@ pub fn init() {
         dtb: None,
         memory_map: build_memory_map_blob(),
     });
+    vtd::init();
 }
 
 /// Build the boot blobs and derive the DMA domain on aarch64.
@@ -193,6 +226,7 @@ pub fn init_aarch64(gicd: u64, gicc: u64, uart: u64) {
             max_bus_addr: window.bus_base.saturating_add(window.size),
             coherent: false,
             protected: false,
+            id: 0,
         };
         *DMA_DOMAIN.lock() = domain;
         kprintln!(
@@ -268,6 +302,13 @@ pub fn create_mmio(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     let end = phys.checked_add(len).ok_or(Errno::EINVAL)?;
     refuse_kernel_owned(phys, end)?;
+
+    #[cfg(target_arch = "x86_64")]
+    if vtd::available()
+        && let Some(bdf) = vtd::bdf_for_range(phys, len)
+    {
+        DEVICE_HINTS.lock().insert(caller.id, bdf);
+    }
 
     let region = Arc::new(MmioRegion::new(phys, len, attrs));
     let rights = Rights::READ
@@ -414,17 +455,53 @@ pub fn dma_alloc(frame: &SyscallFrame) -> Result<usize, Errno> {
     #[cfg(target_arch = "aarch64")]
     let flags = flags | DMA_FLAG_NON_CACHEABLE;
 
+    #[cfg(target_arch = "x86_64")]
+    let iommu = {
+        let hint = DEVICE_HINTS.lock().get(&caller.id).copied();
+        match hint {
+            Some(bdf) => match vtd::domain_for_bdf(bdf) {
+                Ok(domain) => Some(domain),
+                Err(reason) => {
+                    kprintln!("vtd: domain {}: {reason}; using identity", bdf.text());
+                    None
+                }
+            },
+            None => None,
+        }
+    };
+    #[cfg(target_arch = "x86_64")]
+    let protected = iommu.is_some();
+    #[cfg(not(target_arch = "x86_64"))]
+    let protected = false;
+
+    #[cfg(target_arch = "x86_64")]
+    let domain = match &iommu {
+        Some(iommu_domain) => DmaDomain {
+            bus_offset: 0,
+            max_bus_addr: iommu_domain.iova_end(),
+            coherent: true,
+            protected: true,
+            id: iommu_domain.id(),
+        },
+        None => *DMA_DOMAIN.lock(),
+    };
+    #[cfg(not(target_arch = "x86_64"))]
     let domain = *DMA_DOMAIN.lock();
+
     let bus_limit = if mask_bits >= 64 {
         u64::MAX
     } else {
         1u64 << mask_bits
     };
-    let device_limit = domain.max_bus_addr.min(bus_limit);
-    let Some(max_phys_end) = device_limit.checked_sub(domain.bus_offset) else {
-        return Err(Errno::ENOMEM);
+    let max_frame = if protected {
+        u64::MAX / frame::PAGE_SIZE
+    } else {
+        let device_limit = domain.max_bus_addr.min(bus_limit);
+        let Some(max_phys_end) = device_limit.checked_sub(domain.bus_offset) else {
+            return Err(Errno::ENOMEM);
+        };
+        max_phys_end / frame::PAGE_SIZE
     };
-    let max_frame = max_phys_end / frame::PAGE_SIZE;
     let pages = len.checked_div(frame::PAGE_SIZE).ok_or(Errno::EINVAL)?;
     if pages > max_frame || max_frame == 0 {
         return Err(Errno::ENOMEM);
@@ -448,7 +525,11 @@ pub fn dma_alloc(frame: &SyscallFrame) -> Result<usize, Errno> {
             Errno::ENOMEM
         })?;
 
-    let align_pages = align / frame::PAGE_SIZE;
+    let align_pages = if protected {
+        1
+    } else {
+        align / frame::PAGE_SIZE
+    };
     let physical = frame::alloc_contiguous(pages, align_pages, max_frame);
     let Some(physical) = physical else {
         quota.fetch_sub(len, Ordering::AcqRel);
@@ -485,12 +566,37 @@ pub fn dma_alloc(frame: &SyscallFrame) -> Result<usize, Errno> {
         return Err(Errno::ENOMEM);
     }
 
+    #[cfg(target_arch = "x86_64")]
+    let mut iova = None;
+    #[cfg(target_arch = "x86_64")]
+    if let Some(iommu_domain) = &iommu {
+        match vtd::map_buffer(iommu_domain, &frames, len, align, bus_limit) {
+            Ok(mapped) => {
+                iova = Some(mapped);
+                vtd::start_fault_worker();
+            }
+            Err(reason) => {
+                for address in &frames {
+                    let _ = frame::free_frame(frame::PhysAddr(*address));
+                }
+                quota.fetch_sub(len, Ordering::AcqRel);
+                GLOBAL_USED.fetch_sub(len, Ordering::AcqRel);
+                kprintln!("vtd: map failed: {reason}");
+                return Err(Errno::ENOMEM);
+            }
+        }
+    }
+
     let buffer = Arc::new(DmaBuffer {
         frames,
         len,
         flags,
         domain,
         quota,
+        #[cfg(target_arch = "x86_64")]
+        iova,
+        #[cfg(target_arch = "x86_64")]
+        iommu,
     });
     let rights = Rights::READ
         .union(Rights::WRITE)
@@ -506,6 +612,8 @@ pub fn dma_alloc(frame: &SyscallFrame) -> Result<usize, Errno> {
 
 /// `dma_info(h, out) -> 0`.
 pub fn dma_info(frame: &SyscallFrame) -> Result<usize, Errno> {
+    #[cfg(target_arch = "x86_64")]
+    vtd::poll_faults();
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let handle = Handle(frame.rdi as u32);
     let buffer = {
@@ -524,7 +632,7 @@ pub fn dma_info(frame: &SyscallFrame) -> Result<usize, Errno> {
         } else {
             DMA_INFO_UNPROTECTED
         },
-        pad: 0,
+        pad: u32::from(domain.id),
     };
     let destination = UserSlice::new(frame.rsi, 24)?;
     let bytes = info.as_bytes();
