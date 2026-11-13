@@ -85,6 +85,35 @@ impl Rights {
     }
 }
 
+/// A process personality.
+#[repr(u8)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Personality {
+    /// The native RavenBSD syscall table.
+    #[default]
+    Native = 0,
+    /// Linux syscall numbers are trapped to the process handler (ticket S41).
+    Linux = 1,
+}
+
+impl Personality {
+    /// Decode one raw personality value.
+    pub const fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(Self::Native),
+            1 => Some(Self::Linux),
+            _ => None,
+        }
+    }
+}
+
+/// Personality-related creation and setup flags.
+pub mod personality {
+    /// `PROC_CREATE` flag bit 0: create the process with the Linux personality
+    /// and no handler (the child sets or receives one before its first trap).
+    pub const CREATE_LINUX: usize = 1;
+}
+
 /// Memory protection bits (low byte of the `MAP` flags argument).
 pub mod prot {
     /// Readable.

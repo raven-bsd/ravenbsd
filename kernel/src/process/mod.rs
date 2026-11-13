@@ -22,7 +22,7 @@ use raven_abi::errno::Errno;
 use raven_abi::layout::aarch64::{USER_END, USER_MIN};
 #[cfg(target_arch = "x86_64")]
 use raven_abi::layout::x86_64::{USER_END, USER_MIN};
-use raven_abi::types::prot;
+use raven_abi::types::{Handle, prot};
 use raven_elf::{Elf, ElfError, LoadMode, Machine, MapStep, StepKind};
 use raven_handles::HandleTable;
 use raven_rmm::{MapError, PageFlags, PageSize, PhysAddr, VirtAddr};
@@ -116,6 +116,27 @@ pub struct Process {
     pub client_requests: Mutex<alloc::vec::Vec<Arc<PendingRequest>>>,
     /// Capture-window slots owned by this process as a server.
     pub capture_slots: Mutex<CaptureSlots>,
+    /// Syscall personality and optional Linux trap handler (S41).
+    pub personality: Mutex<PersonalityState>,
+}
+
+/// Per-process syscall personality and Linux handler handle.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PersonalityState {
+    /// Native or Linux dispatch.
+    pub personality: raven_abi::types::Personality,
+    /// Handler handle in this process's table, when personality is Linux.
+    pub handler: Option<Handle>,
+}
+
+impl PersonalityState {
+    /// Native process with no handler.
+    pub const fn native() -> Self {
+        Self {
+            personality: raven_abi::types::Personality::Native,
+            handler: None,
+        }
+    }
 }
 
 /// Why the first process could not be created.
@@ -184,6 +205,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         active_requests: Mutex::new(alloc::vec::Vec::new()),
         client_requests: Mutex::new(alloc::vec::Vec::new()),
         capture_slots: Mutex::new(CaptureSlots::new()),
+        personality: Mutex::new(PersonalityState::native()),
     }))
 }
 
@@ -216,6 +238,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         active_requests: Mutex::new(alloc::vec::Vec::new()),
         client_requests: Mutex::new(alloc::vec::Vec::new()),
         capture_slots: Mutex::new(CaptureSlots::new()),
+        personality: Mutex::new(PersonalityState::native()),
     });
     handle::install_initial(&mut process.handles.lock(), &process, false)?;
     Ok(process)
@@ -274,6 +297,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         active_requests: Mutex::new(alloc::vec::Vec::new()),
         client_requests: Mutex::new(alloc::vec::Vec::new()),
         capture_slots: Mutex::new(CaptureSlots::new()),
+        personality: Mutex::new(PersonalityState::native()),
     });
     handle::install_initial(&mut process.handles.lock(), &process, true)
         .map_err(ProcessError::Handle)?;

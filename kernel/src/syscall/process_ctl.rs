@@ -8,28 +8,93 @@ use core::sync::atomic::Ordering;
 
 use raven_abi::errno::Errno;
 use raven_abi::types::namespace;
-use raven_abi::types::{Handle, Rights};
+use raven_abi::types::personality::CREATE_LINUX;
+use raven_abi::types::{Handle, Personality, Rights};
 use raven_usercopy::UserSlice;
 
 use crate::ipc::model::{self, NAME_MAX};
 use crate::ipc::router;
-use crate::process::{self, ProcessState, handle::Object};
+use crate::process::{self, Process, ProcessState, handle::Object};
 use crate::sched;
 use crate::syscall::SyscallFrame;
+use crate::syscall::handle_xfer::clone_transferable;
 use crate::usercopy::copy_to_user;
 
 /// `proc_create(flags) -> Handle`.
 pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
-    if frame.rdi != 0 {
+    let flags = usize::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
+    if flags & !CREATE_LINUX != 0 {
         return Err(Errno::EINVAL);
     }
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let child = process::new_empty_process()?;
+    if flags & CREATE_LINUX != 0 {
+        child.personality.lock().personality = Personality::Linux;
+    }
     let raw = caller
         .handles
         .lock()
         .insert(Object::Process(child), Rights::ALL)?;
     Ok(raw.0 as usize)
+}
+
+/// `proc_set_personality(proc, personality, handler) -> 0`.
+///
+/// The child must not have started a thread unless it is the caller itself;
+/// the handler is duplicated from the caller's table and stored in the target.
+pub fn set_personality(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let raw_personality = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    let personality =
+        Personality::from_u8(u8::try_from(raw_personality).map_err(|_| Errno::EINVAL)?)
+            .ok_or(Errno::EINVAL)?;
+    let handler = Handle(u32::try_from(frame.rdx).map_err(|_| Errno::EBADF)?);
+
+    let target: Arc<Process> = if handle == Handle::SELF_PROC {
+        Arc::clone(&caller)
+    } else {
+        let handles = caller.handles.lock();
+        match handles.get(handle, Rights::ADMIN) {
+            Ok(Object::Process(target)) => Arc::clone(target),
+            Ok(_) => return Err(Errno::EBADF),
+            Err(Errno::EACCES) => return Err(Errno::EPERM),
+            Err(error) => return Err(error),
+        }
+    };
+    if !Arc::ptr_eq(&target, &caller) && target.threads.load(Ordering::Acquire) != 0 {
+        return Err(Errno::EINVAL);
+    }
+    if *target.state.lock() == ProcessState::Exited {
+        return Err(Errno::ESRCH);
+    }
+
+    let new_handler = if handler == Handle::NONE {
+        None
+    } else {
+        let (object, rights, parent) = clone_transferable(&caller, handler)?;
+        let mut handles = target.handles.lock();
+        let installed = handles.insert_derived(object, rights, &parent)?;
+        if let Ok(node) = handles.lineage_node(installed) {
+            drop(handles);
+            crate::process::handle::register_lineage(node);
+        }
+        Some(installed)
+    };
+
+    let old = {
+        let mut state = target.personality.lock();
+        let old = state.handler;
+        state.personality = personality;
+        state.handler = new_handler;
+        old
+    };
+    if let Some(old) = old
+        && new_handler != Some(old)
+    {
+        let _ = crate::event::close_handle(&target, old);
+    }
+    Ok(0)
 }
 
 /// Authorized termination (`PROC_TERMINATE`, proposed ABI number 0x32).

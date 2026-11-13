@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S41 Linux personality: a native handler serves `linux:`; a Linux child traps
+# `write`=1 and an unknown number through the handler, a no-handler Linux child
+# dies with -EIO, and a native child still exits through native syscall 1.
+
+name = "linux-trap"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/linux-trap-fixture/build.sh"]
+initfs = "build/fixtures/linux-trap/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^linux-trap: req nr=1 a0=0$'
+unordered = true
+
+[[expect]]
+regex = '^linux-trap: reply nr=1 value=42$'
+unordered = true
+
+[[expect]]
+regex = '^linux-trap: req nr=9999 a0=42$'
+unordered = true
+
+[[expect]]
+regex = '^linux-trap: reply nr=9999 value=-38$'
+unordered = true
+
+[[expect]]
+regex = '^linux-trap: req nr=9998 a0=-38$'
+unordered = true
+
+[[expect]]
+regex = '^linux-trap: reply nr=9998 value=7$'
+unordered = true
+
+[[expect]]
+regex = '^linux-trap: native exit=7$'
+
+[[expect]]
+regex = '^linux-trap: nohandler exit=-5$'
+
+[[expect]]
+regex = '^linux-trap: linux terminated=0$'
+
+[[expect]]
+regex = '^linux-trap: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

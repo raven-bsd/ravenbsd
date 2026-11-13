@@ -19,12 +19,15 @@ pub mod futex;
 pub mod handle_xfer;
 /// Scheme IPC (`0x60..0x69`) is shared by x86-64 and aarch64.
 pub mod ipc;
+/// Linux-personality trap routing to the per-process userspace handler (S41).
+pub mod linux;
 pub mod memory_ctl;
 pub mod process_ctl;
 pub mod thread;
 
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
+use raven_abi::types::Personality;
 
 use crate::process;
 
@@ -52,7 +55,21 @@ pub struct SyscallFrame {
 
 /// Dispatch one syscall frame and return its raw result.
 fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
+    // S41: a Linux-personality process never enters the native table. Route the
+    // raw number to the process handler before interpreting any native meaning;
+    // in particular Linux `write` (1) must not reach native `EXIT`.
+    if let Some(caller) = process::current()
+        && caller.personality.lock().personality == Personality::Linux
+    {
+        return match linux::trap(&caller, frame) {
+            Ok(value) => Ok(value as usize),
+            Err(error) => process::exit_process(error.to_ret() as i32),
+        };
+    }
     let number = usize::try_from(frame.rax).unwrap_or(usize::MAX);
+    if number == raven_abi::syscall::PROC_SET_PERSONALITY {
+        return process_ctl::set_personality(frame);
+    }
     match Syscall::from_usize(number) {
         // EXIT is process-wide: every thread of the process terminates.
         Some(Syscall::EXIT) => process::exit_process(frame.rdi as i32),

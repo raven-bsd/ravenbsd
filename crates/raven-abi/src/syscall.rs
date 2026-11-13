@@ -70,7 +70,8 @@ syscalls! {
     FUTEX = 0x22;
 
     /// `proc_create(flags: usize) -> Handle` creates an empty process (no threads) and returns a
-    /// handle with all rights.
+    /// handle with all rights. Flag bit 0 (`types::personality::CREATE_LINUX`) selects the Linux
+    /// personality; every other bit is rejected.
     PROC_CREATE = 0x30;
     /// `proc_wait(proc: Handle, out_code: *mut i32) -> 0` blocks until the process has exited and stores its exit code.
     PROC_WAIT = 0x31;
@@ -179,6 +180,17 @@ syscalls! {
     /// `irq_ack(irq: Handle) -> 0` re-enables (unmasks) the interrupt after the driver handled it. Ticket S21c.
     IRQ_ACK = 0x76;
 }
+
+/// `proc_set_personality(proc: Handle, personality: u32, handler: Handle) -> 0`.
+///
+/// This is a native-only control syscall in the `0x30` process-control range,
+/// but it is deliberately not a [`Syscall`] variant: adding one would break
+/// every exhaustive downstream match for a minimal ABI extension. Dispatch
+/// checks this raw number before [`Syscall::from_usize`]. `proc` is
+/// `SELF_PROC` or a process handle with `ADMIN`; a non-self target must have no
+/// threads yet. A non-`Handle::NONE` handler must be a transferable scheme
+/// file/server and is duplicated into `proc`.
+pub const PROC_SET_PERSONALITY: usize = 0x34;
 
 #[cfg(test)]
 mod tests {
