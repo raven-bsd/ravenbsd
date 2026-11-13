@@ -173,6 +173,69 @@ pub struct Provenance {
     pub imports: Vec<Import>,
 }
 
+/// The `[scope]` table of `tools/lint/rules.toml`.
+#[derive(Clone, Debug, Deserialize)]
+pub struct Scope {
+    /// S-libc roots.
+    #[serde(default)]
+    pub libc: Vec<String>,
+    /// S-host roots; a trailing `-` means "directory prefix" under the parent.
+    #[serde(default)]
+    pub host: Vec<String>,
+    /// Crate manifest path.
+    #[allow(dead_code)]
+    #[serde(default)]
+    pub crate_manifest: String,
+}
+
+impl Default for Scope {
+    fn default() -> Self {
+        Self {
+            libc: [
+                "libc/ravenlibc/crates",
+                "libc/ravenlibc/crt",
+                "libc/ravenlibc/ld",
+                "libc/ravenlibc/tools",
+            ]
+            .map(str::to_string)
+            .to_vec(),
+            host: ["tests/libc", "tools/libc-"].map(str::to_string).to_vec(),
+            crate_manifest: "libc/ravenlibc/xtask/crates.toml".to_string(),
+        }
+    }
+}
+
+/// The `[no-std]` table.
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct NoStdRules {
+    /// Files exempt from `no-std`.
+    #[serde(default, rename = "allow-files")]
+    pub allow_files: Vec<String>,
+}
+
+/// Parsed `tools/lint/rules.toml`.
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct Rules {
+    /// Scopes.
+    #[serde(default)]
+    pub scope: Scope,
+    /// `no-std` options.
+    #[serde(default, rename = "no-std")]
+    pub no_std: NoStdRules,
+}
+
+/// Load the rule table, falling back to the C34 defaults for fixture trees.
+pub fn load_rules(root: &Path) -> Result<Rules> {
+    let path = root.join("libc/ravenlibc/tools/lint/rules.toml");
+    if !path.exists() {
+        return Ok(Rules {
+            scope: Scope::default(),
+            no_std: NoStdRules::default(),
+        });
+    }
+    parse(&path)
+}
+
 fn parse<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T> {
     let text = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
     toml::from_str(&text).with_context(|| format!("parse {}", path.display()))

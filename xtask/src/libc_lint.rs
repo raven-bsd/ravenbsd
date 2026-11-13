@@ -3,7 +3,6 @@
 
 //! `cargo xtask libc-lint`: executable form of the ravenlibc layout rules.
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -108,39 +107,57 @@ pub fn run_checks(root: &Path, checks: &[String]) -> Result<Vec<Violation>> {
         }
     }
     let (crates, features, allow, tree) = libc_lint_data::load(root)?;
+    let rules = libc_lint_data::load_rules(root)?;
     let provenance = libc_lint_data::load_provenance(root)?;
     let mut violations = Vec::new();
     let mut files = Vec::new();
-    for scope in [
-        "libc/ravenlibc/crates",
-        "libc/ravenlibc/crt",
-        "libc/ravenlibc/ld",
-        "libc/ravenlibc/tools",
-        "tests/libc",
-    ] {
+    for scope in &rules.scope.libc {
         walk(root, scope, &mut files);
     }
+    for scope in &rules.scope.host {
+        walk_host(root, scope, &mut files);
+    }
+    if let Ok(entries) = fs::read_dir(root.join("xtask/src")) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file()
+                && path
+                    .file_name()
+                    .is_some_and(|name| name.to_string_lossy().starts_with("libc"))
+            {
+                files.push(path);
+            }
+        }
+    }
     files.sort();
-    let class = crate_classes(&crates);
+    files.dedup();
     for file in &files {
         let rel = relative(root, file);
         let Ok(text) = fs::read_to_string(file) else {
             continue;
         };
-        if selected.contains(&"header") {
+        let is_crate = is_s_crate(&rel, &crates);
+        let is_libc_source = is_s_libc(&rel, &rules.scope.libc);
+        if selected.contains(&"header") && rel.ends_with(".rs") {
             check_header(root, &rel, &text, &provenance, &mut violations);
         }
-        if selected.contains(&"provenance-link") {
+        if selected.contains(&"provenance-link") && rel.ends_with(".rs") {
             check_provenance(&rel, &text, &provenance, &mut violations);
         }
         if rel.ends_with(".rs") {
-            if selected.contains(&"unsafe-scope") {
+            if selected.contains(&"unsafe-scope") && is_crate {
                 check_unsafe(&rel, &text, &crates, &allow, &mut violations);
             }
-            if selected.contains(&"no-std") {
-                check_no_std(&rel, &text, &crates, &mut violations);
+            if selected.contains(&"no-std") && is_crate {
+                check_no_std(
+                    &rel,
+                    &text,
+                    &crates,
+                    &rules.no_std.allow_files,
+                    &mut violations,
+                );
             }
-            if selected.contains(&"cfg") && rel.ends_with("Cargo.toml") {
+            if selected.contains(&"cfg") && is_crate {
                 check_cfg(&rel, &text, &features, &mut violations);
             }
         }
@@ -148,11 +165,12 @@ pub fn run_checks(root: &Path, checks: &[String]) -> Result<Vec<Violation>> {
             if selected.contains(&"no-cc") {
                 check_no_cc(&rel, &text, &mut violations);
             }
-            if selected.contains(&"cfg") {
+            if selected.contains(&"cfg") && is_crate {
                 check_cfg(&rel, &text, &features, &mut violations);
             }
         }
         if selected.contains(&"no-cc")
+            && is_libc_source
             && [".c", ".cc", ".cpp", ".cxx", ".s", ".S", ".h", ".hpp"]
                 .iter()
                 .any(|extension| rel.ends_with(extension))
@@ -170,16 +188,58 @@ pub fn run_checks(root: &Path, checks: &[String]) -> Result<Vec<Violation>> {
         check_layout(root, &crates, &tree, &mut violations)?;
     }
     violations.sort();
-    let _ = class;
     Ok(violations)
 }
 
-fn crate_classes(crates: &Crates) -> BTreeMap<String, String> {
-    crates
-        .rows
+/// Walk an S-host scope. A trailing `-` means "every directory under the
+/// parent whose name starts with the prefix", e.g. `tools/libc-`.
+fn walk_host(root: &Path, scope: &str, files: &mut Vec<PathBuf>) {
+    if let Some(prefix) = scope.strip_suffix('-') {
+        let (parent, name_prefix) = match prefix.rsplit_once('/') {
+            Some((parent, name)) => (parent, name),
+            None => ("", prefix),
+        };
+        let directory = root.join(parent);
+        let Ok(entries) = fs::read_dir(directory) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir()
+                && path
+                    .file_name()
+                    .is_some_and(|name| name.to_string_lossy().starts_with(name_prefix))
+            {
+                let rel = relative(root, &path);
+                walk(root, &rel, files);
+            }
+        }
+    } else {
+        walk(root, scope, files);
+    }
+}
+
+fn is_s_libc(rel: &str, scopes: &[String]) -> bool {
+    scopes
         .iter()
-        .map(|row| (row.path.clone(), row.unsafe_.clone()))
-        .collect()
+        .any(|scope| rel == scope || rel.starts_with(&format!("{scope}/")))
+}
+
+fn is_s_crate(rel: &str, crates: &Crates) -> bool {
+    if crates.rows.iter().any(|row| in_crate(rel, &row.path)) {
+        return true;
+    }
+    // An unlisted directory under crates/ is still scanned as class P, so it
+    // cannot evade the unsafe rule by missing from crates.toml.
+    let base = "libc/ravenlibc/crates/";
+    rel.strip_prefix(base)
+        .is_some_and(|rest| rest.contains('/') && !rest.starts_with('/'))
+}
+
+/// Whether `rel` names or lives under the crate directory `path`.
+fn in_crate(rel: &str, path: &str) -> bool {
+    let base = format!("libc/ravenlibc/{path}");
+    rel == base || rel.starts_with(&format!("{base}/"))
 }
 
 fn check_header(
@@ -261,7 +321,9 @@ fn check_provenance(
     imports: &[libc_lint_data::Import],
     violations: &mut Vec<Violation>,
 ) {
-    let has_marker = text.contains("RavenBSD: transpiled from");
+    let has_marker = libc_lint_scan::scan(text)
+        .iter()
+        .any(|line| line.comment.contains("RavenBSD: transpiled from"));
     let entry = imports.iter().find(|entry| entry.path == rel);
     if has_marker && entry.is_none() {
         violations.push(error(
@@ -296,7 +358,7 @@ fn check_unsafe(
     let class = crates
         .rows
         .iter()
-        .find(|row| rel.starts_with(&format!("libc/ravenlibc/{}", row.path)))
+        .find(|row| in_crate(rel, &row.path))
         .map(|row| row.unsafe_.as_str())
         .unwrap_or("P");
     let lines = libc_lint_scan::scan(text);
@@ -379,12 +441,17 @@ fn crate_path<'a>(crates: &'a Crates, name: &str) -> &'a str {
         .unwrap_or("crates/unknown")
 }
 
-fn check_no_std(rel: &str, text: &str, crates: &Crates, violations: &mut Vec<Violation>) {
-    let Some(row) = crates
-        .rows
-        .iter()
-        .find(|row| rel.starts_with(&format!("libc/ravenlibc/{}", row.path)))
-    else {
+fn check_no_std(
+    rel: &str,
+    text: &str,
+    crates: &Crates,
+    allow_files: &[String],
+    violations: &mut Vec<Violation>,
+) {
+    if allow_files.iter().any(|allowed| allowed == rel) {
+        return;
+    }
+    let Some(row) = crates.rows.iter().find(|row| in_crate(rel, &row.path)) else {
         return;
     };
     let lines = libc_lint_scan::scan(text);

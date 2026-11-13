@@ -280,9 +280,57 @@ fn unknown_check_is_rejected() {
 
 #[test]
 fn real_tree_lint_is_clean() {
-    let violations =
-        run_checks(&real(), &["layout".to_string(), "header".to_string()]).expect("lint");
+    let violations = run_checks(&real(), &["all".to_string()]).expect("lint");
     assert!(violations.is_empty(), "{violations:?}");
+}
+
+#[test]
+fn host_crate_unsafe_is_not_scanned_by_s_crate_rules() {
+    let tree = fixture();
+    tree.write(
+        "tests/libc/oracle/src/call.rs",
+        &format!("{HDR}#[allow(unsafe_code)]\nunsafe fn f() {{}}\n"),
+    );
+    let violations = check(&tree, "unsafe-scope");
+    assert!(violations.is_empty(), "{violations:?}");
+}
+
+#[test]
+fn host_manifest_features_are_not_scanned_by_s_crate_rules() {
+    let tree = fixture();
+    tree.write(
+        "tests/libc/oracle/Cargo.toml",
+        "[features]\noracle-string-basic = []\n",
+    );
+    let violations = check(&tree, "cfg");
+    assert!(violations.is_empty(), "{violations:?}");
+}
+
+#[test]
+fn host_c_source_is_not_a_no_cc_violation() {
+    let tree = fixture();
+    tree.write("tests/libc/oracle/fixture.c", "int x;");
+    let violations = check(&tree, "no-cc");
+    assert!(violations.is_empty(), "{violations:?}");
+}
+
+#[test]
+fn libc_c_source_is_a_no_cc_violation() {
+    let tree = fixture();
+    tree.write("libc/ravenlibc/crates/raven-libc-str/src/x.c", "int x;");
+    let violations = check(&tree, "no-cc");
+    assert!(violations.iter().any(|v| v.key == "c-source"));
+}
+
+#[test]
+fn unlisted_crate_directory_is_still_scanned_as_class_p() {
+    let tree = fixture();
+    tree.write(
+        "libc/ravenlibc/crates/raven-libc-unlisted/src/lib.rs",
+        &format!("{HDR}unsafe {{}}\n"),
+    );
+    let violations = check(&tree, "unsafe-scope");
+    assert!(violations.iter().any(|v| v.key == "forbidden"));
 }
 
 #[test]
