@@ -90,3 +90,25 @@ fn rejects_bad_ports() {
         assert!(parse(path).is_err(), "{path} must be rejected");
     }
 }
+
+#[test]
+fn parses_icmp_paths() {
+    assert_eq!(
+        parse("net:icmp/10.0.2.2"),
+        Ok(SchemePath {
+            transport: Transport::Icmp,
+            endpoint: Some(Endpoint {
+                ip: [10, 0, 2, 2],
+                port: 0,
+            }),
+        })
+    );
+    for path in [
+        "net:icmp/",
+        "net:icmp/10.0.2.2:7",
+        "net:icmp/10.0.2.256",
+        "net:icmp/10.0.2",
+    ] {
+        assert!(parse(path).is_err(), "{path} must be rejected");
+    }
+}

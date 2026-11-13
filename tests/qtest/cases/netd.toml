@@ -23,6 +23,15 @@ regex = '^netd: iface lo 127\.0\.0\.1/8$'
 regex = '^netd: readiness event$'
 
 [[expect]]
+regex = '^netd: ping 127\.0\.0\.1 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^netd: route lo ok$'
+
+[[expect]]
+regex = '^netd: netstat lo sockets=[0-9]+ rx=[0-9]+ tx=[0-9]+$'
+
+[[expect]]
 regex = '^netd: accept path net:accept/[0-9]+$'
 
 [[expect]]
@@ -45,6 +54,15 @@ regex = '^netd running [0-9]+$'
 
 [[expect]]
 regex = '^netd: iface lo 127\.0\.0\.1/8$'
+
+[[expect]]
+regex = '^netd: ping 127\.0\.0\.1 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^netd: route lo ok$'
+
+[[expect]]
+regex = '^netd: netstat lo sockets=[0-9]+ rx=[0-9]+ tx=[0-9]+$'
 
 [[expect]]
 regex = '^netd: tcp echo ok$'

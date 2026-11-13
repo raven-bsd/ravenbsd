@@ -9,11 +9,18 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
-use raven_netcore::{Device, Event, Ipv4Addr, NetCore, SocketId};
+use raven_netcore::{
+    CoreSocket, Device, DhcpLease, Event, InterfaceCounters, Ipv4Addr, NetCore, RouteEntry,
+    SocketId, SocketState, SocketTransport,
+};
 use raven_proto_fs::{S_IFSOCK, Stat};
 use raven_proto_net::{
-    IF_LINK_UP, IF_LOOPBACK, IF_UP, IfName, IfaceInfo, IfaceRequest, IfaceResponse, Transport,
-    path,
+    CounterInfo, DHCP_TIMER_UNKNOWN, DhcpLeaseInfo, IF_LINK_UP, IF_LOOPBACK, IF_UP, IfName,
+    IfaceInfo, IfaceRequest, IfaceResponse, MAX_ICMP_PAYLOAD, ROUTE_GATEWAY, ROUTE_HOST, ROUTE_UP,
+    RouteInfo, SOCKET_ICMP, SOCKET_STATE_CLOSE_WAIT, SOCKET_STATE_CLOSED, SOCKET_STATE_CLOSING,
+    SOCKET_STATE_ESTABLISHED, SOCKET_STATE_FIN_WAIT_1, SOCKET_STATE_FIN_WAIT_2, SOCKET_STATE_ICMP,
+    SOCKET_STATE_LAST_ACK, SOCKET_STATE_LISTEN, SOCKET_STATE_SYN_RECEIVED, SOCKET_STATE_SYN_SENT,
+    SOCKET_STATE_TIME_WAIT, SOCKET_STATE_UDP, SOCKET_TCP, SOCKET_UDP, SocketEntry, Transport, path,
     socket::{Call, Endpoint, Response, SockOpt, SocketRequest},
 };
 
@@ -59,10 +66,28 @@ pub struct NicConfig {
     pub prefix: u8,
     /// Default gateway.
     pub gateway: Option<[u8; 4]>,
+    /// Start the stack's DHCP client on this interface.
+    pub dhcp: bool,
 }
 
 trait SocketCore {
     fn set_ipv4(&mut self, addr: Ipv4Addr, prefix: u8, gateway: Option<Ipv4Addr>);
+    fn dhcp_lease(&self) -> Option<DhcpLease>;
+    fn routes(&self) -> Vec<RouteEntry>;
+    fn add_route(&mut self, route: RouteEntry) -> Result<(), Errno>;
+    fn delete_route(&mut self, dest: Ipv4Addr, prefix_len: u8) -> Result<(), Errno>;
+    fn socket_table(&self) -> Vec<CoreSocket>;
+    fn interface_counters(&self) -> Option<InterfaceCounters>;
+    fn icmp_bind(&mut self, id: u16) -> Result<SocketId, Errno>;
+    fn icmp_echo(
+        &mut self,
+        s: SocketId,
+        to: Ipv4Addr,
+        id: u16,
+        seq: u16,
+        payload: &[u8],
+    ) -> Result<(), Errno>;
+    fn icmp_recv(&mut self, s: SocketId, buf: &mut [u8]) -> Result<usize, Errno>;
     fn poll(&mut self, now_ms: i64) -> Vec<Event>;
     fn next_poll_delay_ms(&mut self, now_ms: i64) -> Option<u64>;
     fn tcp_listen(&mut self, port: u16, backlog: usize) -> Result<SocketId, Errno>;
@@ -97,6 +122,49 @@ trait SocketCore {
 impl<D: Device> SocketCore for NetCore<D> {
     fn set_ipv4(&mut self, addr: Ipv4Addr, prefix: u8, gateway: Option<Ipv4Addr>) {
         NetCore::set_ipv4(self, addr, prefix, gateway);
+    }
+
+    fn dhcp_lease(&self) -> Option<DhcpLease> {
+        NetCore::dhcp_lease(self)
+    }
+
+    fn routes(&self) -> Vec<RouteEntry> {
+        NetCore::routes(self)
+    }
+
+    fn add_route(&mut self, route: RouteEntry) -> Result<(), Errno> {
+        NetCore::add_route(self, route)
+    }
+
+    fn delete_route(&mut self, dest: Ipv4Addr, prefix_len: u8) -> Result<(), Errno> {
+        NetCore::delete_route(self, dest, prefix_len)
+    }
+
+    fn socket_table(&self) -> Vec<CoreSocket> {
+        NetCore::socket_table(self)
+    }
+
+    fn interface_counters(&self) -> Option<InterfaceCounters> {
+        NetCore::interface_counters(self)
+    }
+
+    fn icmp_bind(&mut self, id: u16) -> Result<SocketId, Errno> {
+        NetCore::icmp_bind(self, id)
+    }
+
+    fn icmp_echo(
+        &mut self,
+        s: SocketId,
+        to: Ipv4Addr,
+        id: u16,
+        seq: u16,
+        payload: &[u8],
+    ) -> Result<(), Errno> {
+        NetCore::icmp_echo(self, s, to, id, seq, payload)
+    }
+
+    fn icmp_recv(&mut self, s: SocketId, buf: &mut [u8]) -> Result<usize, Errno> {
+        NetCore::icmp_recv(self, s, buf)
     }
 
     fn poll(&mut self, now_ms: i64) -> Vec<Event> {
@@ -193,6 +261,17 @@ enum File {
     Socket(SocketFile),
 }
 
+struct PendingIcmp {
+    target: Endpoint,
+    sent_ms: i64,
+    deadline_ms: i64,
+}
+
+struct IcmpState {
+    id: Option<u16>,
+    pending: BTreeMap<u16, PendingIcmp>,
+}
+
 struct SocketFile {
     transport: Transport,
     interface: Interface,
@@ -209,18 +288,24 @@ struct SocketFile {
     rcvbuf: i32,
     sndbuf: i32,
     nodelay: bool,
+    icmp: Option<IcmpState>,
 }
 
 impl SocketFile {
     fn new(transport: Transport, interface: Interface, path_endpoint: Endpoint) -> Self {
+        let icmp = transport == Transport::Icmp;
         Self {
             transport,
             interface,
             socket: None,
             listener: false,
             path_endpoint,
-            local: path_endpoint,
-            remote: None,
+            local: if icmp {
+                Endpoint::default()
+            } else {
+                path_endpoint
+            },
+            remote: icmp.then_some(path_endpoint),
             peer: None,
             bound: false,
             read_shutdown: false,
@@ -229,6 +314,10 @@ impl SocketFile {
             rcvbuf: 64 * 1024,
             sndbuf: 64 * 1024,
             nodelay: false,
+            icmp: icmp.then(|| IcmpState {
+                id: None,
+                pending: BTreeMap::new(),
+            }),
         }
     }
 
@@ -249,6 +338,7 @@ impl SocketFile {
             rcvbuf: 64 * 1024,
             sndbuf: 64 * 1024,
             nodelay: false,
+            icmp: None,
         }
     }
 
@@ -285,6 +375,7 @@ pub struct Netd<D: Device> {
     accepted: BTreeMap<u32, Accepted>,
     next_accept: u32,
     control: Control,
+    now_ms: i64,
 }
 
 impl<D: Device> Netd<D> {
@@ -307,6 +398,7 @@ impl<D: Device> Netd<D> {
                 prefix: 8,
                 up: true,
             },
+            now_ms,
         }
     }
 
@@ -318,6 +410,9 @@ impl<D: Device> Netd<D> {
             config.prefix,
             config.gateway.map(Ipv4Addr::from_octets),
         );
+        if config.dhcp {
+            let _ = core.try_enable_dhcp();
+        }
         self.nic = Some(Box::new(core));
         self.nic_config = Some(config);
         self.nic_control = Some(NicControl {
@@ -342,6 +437,7 @@ impl<D: Device> Netd<D> {
 
     /// Drive both stacks and return readiness transitions.
     pub fn poll(&mut self, now_ms: i64) -> Vec<NetEvent> {
+        self.now_ms = now_ms;
         let mut events: Vec<NetEvent> = self
             .core
             .poll(now_ms)
@@ -496,7 +592,7 @@ impl<D: Device> Netd<D> {
                 .core_mut(interface)
                 .udp_recv_from(id, buffer)
                 .map(|(len, _)| len),
-            Transport::Control => Err(Errno::EINVAL),
+            Transport::Icmp | Transport::Control => Err(Errno::EINVAL),
         }
     }
 
@@ -527,7 +623,7 @@ impl<D: Device> Netd<D> {
                     (Ipv4Addr::from_octets(to.ip), to.port),
                 )
             }
-            Transport::Control => Err(Errno::EINVAL),
+            Transport::Icmp | Transport::Control => Err(Errno::EINVAL),
         }
     }
 
@@ -552,6 +648,12 @@ impl<D: Device> Netd<D> {
                 self.typed_write(file, data, to.as_ref().copied(), response)
             }
             SocketRequest::Call(call) => self.socket_call(file, call, response),
+            SocketRequest::IcmpEcho {
+                id,
+                seq,
+                timeout_ms,
+                data,
+            } => self.icmp_echo(file, id, seq, timeout_ms, data, response),
         }
     }
 
@@ -585,6 +687,167 @@ impl<D: Device> Netd<D> {
         })
     }
 
+    fn icmp_echo(
+        &mut self,
+        file: u64,
+        id: u16,
+        seq: u16,
+        timeout_ms: u32,
+        data: &[u8],
+        response: &mut [u8],
+    ) -> Result<usize, Errno> {
+        if data.len() > MAX_ICMP_PAYLOAD {
+            return self.write_socket_error(response, Errno::EINVAL);
+        }
+        let (interface, transport, target, socket, bound, seq_pending) =
+            match self.files.get(&file).ok_or(Errno::EBADF)? {
+                File::Control => return Err(Errno::EINVAL),
+                File::Socket(socket) => (
+                    socket.interface,
+                    socket.transport,
+                    socket.path_endpoint,
+                    socket.socket,
+                    socket.icmp.as_ref().and_then(|icmp| icmp.id),
+                    socket
+                        .icmp
+                        .as_ref()
+                        .is_some_and(|icmp| icmp.pending.contains_key(&seq)),
+                ),
+            };
+        if transport != Transport::Icmp {
+            return self.write_socket_error(response, Errno::EINVAL);
+        }
+        if bound.is_some_and(|bound| bound != id) {
+            return self.write_socket_error(response, Errno::EINVAL);
+        }
+        if seq_pending {
+            return self.write_socket_error(response, Errno::EBUSY);
+        }
+        let socket = match socket {
+            Some(socket) => socket,
+            None => {
+                let socket = self.core_mut(interface).icmp_bind(id)?;
+                let Some(File::Socket(state)) = self.files.get_mut(&file) else {
+                    return Err(Errno::EBADF);
+                };
+                state.socket = Some(socket);
+                if let Some(icmp) = state.icmp.as_mut() {
+                    icmp.id = Some(id);
+                }
+                socket
+            }
+        };
+        let mut payload = [0u8; MAX_ICMP_PAYLOAD + 4];
+        payload[0..2].copy_from_slice(&[0x52, 0x42]);
+        payload[2..4].copy_from_slice(&seq.to_be_bytes());
+        payload[4..4 + data.len()].copy_from_slice(data);
+        let length = 4 + data.len();
+        self.core_mut(interface).icmp_echo(
+            socket,
+            Ipv4Addr::from_octets(target.ip),
+            id,
+            seq,
+            &payload[..length],
+        )?;
+        let Some(File::Socket(state)) = self.files.get_mut(&file) else {
+            return Err(Errno::EBADF);
+        };
+        if let Some(icmp) = state.icmp.as_mut() {
+            icmp.pending.insert(
+                seq,
+                PendingIcmp {
+                    target,
+                    sent_ms: self.now_ms,
+                    deadline_ms: self.now_ms.saturating_add(i64::from(timeout_ms)),
+                },
+            );
+        }
+        self.write_response(response, &Response::Ok)
+    }
+
+    fn typed_read_icmp(
+        &mut self,
+        file: u64,
+        len: u32,
+        response: &mut [u8],
+    ) -> Result<usize, Errno> {
+        const HEADER_LEN: usize = 22;
+        if len as usize > MAX_ICMP_PAYLOAD {
+            return self.write_socket_error(response, Errno::EINVAL);
+        }
+        let (interface, socket, deadline) = {
+            let Some(File::Socket(state)) = self.files.get(&file) else {
+                return Err(Errno::EBADF);
+            };
+            if state.transport != Transport::Icmp {
+                return Err(Errno::EINVAL);
+            }
+            (
+                state.interface,
+                state.socket.ok_or(Errno::ENOTCONN)?,
+                state.icmp.as_ref().and_then(|icmp| {
+                    icmp.pending
+                        .values()
+                        .map(|pending| pending.deadline_ms)
+                        .min()
+                }),
+            )
+        };
+        let mut raw = [0u8; MAX_ICMP_PAYLOAD + 4];
+        match self.core_mut(interface).icmp_recv(socket, &mut raw) {
+            Ok(length) if length >= 4 && raw[0..2] == [0x52, 0x42] => {
+                let seq = u16::from_be_bytes([raw[2], raw[3]]);
+                let payload_len = length - 4;
+                if payload_len > len as usize {
+                    return self.write_socket_error(response, Errno::E2BIG);
+                }
+                let (source, sent_ms, id) = {
+                    let Some(File::Socket(state)) = self.files.get_mut(&file) else {
+                        return Err(Errno::EBADF);
+                    };
+                    let Some(icmp) = state.icmp.as_mut() else {
+                        return Err(Errno::EINVAL);
+                    };
+                    let Some(pending) = icmp.pending.remove(&seq) else {
+                        return self.write_socket_error(response, Errno::EAGAIN);
+                    };
+                    (pending.target, pending.sent_ms, icmp.id.unwrap_or(0))
+                };
+                let rtt_ms = u32::try_from(self.now_ms.saturating_sub(sent_ms)).unwrap_or(u32::MAX);
+                let header = Response::Icmp {
+                    source,
+                    id,
+                    seq,
+                    rtt_ms,
+                    len: payload_len as u16,
+                };
+                header
+                    .encode(response.get_mut(..HEADER_LEN).ok_or(Errno::E2BIG)?)
+                    .map_err(|_| Errno::E2BIG)?;
+                response
+                    .get_mut(HEADER_LEN..HEADER_LEN + payload_len)
+                    .ok_or(Errno::E2BIG)?
+                    .copy_from_slice(&raw[4..length]);
+                Ok(HEADER_LEN + payload_len)
+            }
+            Ok(_) => self.write_socket_error(response, Errno::EAGAIN),
+            Err(Errno::EAGAIN) => {
+                let now = self.now_ms;
+                let Some(File::Socket(state)) = self.files.get_mut(&file) else {
+                    return Err(Errno::EBADF);
+                };
+                if let Some(icmp) = state.icmp.as_mut()
+                    && deadline.is_some_and(|deadline| now >= deadline)
+                {
+                    icmp.pending.retain(|_, pending| pending.deadline_ms > now);
+                    return self.write_socket_error(response, Errno::ETIMEDOUT);
+                }
+                self.write_socket_error(response, Errno::EAGAIN)
+            }
+            Err(error) => self.write_socket_error(response, error),
+        }
+    }
+
     fn typed_read(&mut self, file: u64, len: u32, response: &mut [u8]) -> Result<usize, Errno> {
         if len as usize > raven_proto_net::MAX_DATAGRAM {
             return self.write_socket_error(response, Errno::EINVAL);
@@ -605,6 +868,9 @@ impl<D: Device> Netd<D> {
                 from: (transport == Transport::Udp).then_some(Endpoint::default()),
             };
             return self.write_response(response, &header);
+        }
+        if transport == Transport::Icmp {
+            return self.typed_read_icmp(file, len, response);
         }
         let header_len: usize = if transport == Transport::Udp { 17 } else { 11 };
         let wanted = len as usize;
@@ -630,6 +896,7 @@ impl<D: Device> Netd<D> {
                     Err(error) => (Err(error), None),
                 }
             }
+            Transport::Icmp => return Err(Errno::EINVAL),
             Transport::Control => return Err(Errno::EINVAL),
         };
         let read = match read {
@@ -679,7 +946,7 @@ impl<D: Device> Netd<D> {
                     (Ipv4Addr::from_octets(endpoint.ip), endpoint.port),
                 )
             }
-            Transport::Control => Err(Errno::EINVAL),
+            Transport::Icmp | Transport::Control => Err(Errno::EINVAL),
         };
         match result {
             Ok(len) => self.write_response(response, &Response::Write { len: len as u32 }),
@@ -738,7 +1005,7 @@ impl<D: Device> Netd<D> {
                 self.apply_options(file);
                 Ok(Response::Ok)
             }
-            Transport::Control => Err(Errno::EINVAL),
+            Transport::Icmp | Transport::Control => Err(Errno::EINVAL),
         }
     }
 
@@ -864,7 +1131,7 @@ impl<D: Device> Netd<D> {
                 socket.peer = Some(endpoint);
                 Ok(Response::Ok)
             }
-            Transport::Control => Err(Errno::EINVAL),
+            Transport::Icmp | Transport::Control => Err(Errno::EINVAL),
         }
     }
 
@@ -873,7 +1140,7 @@ impl<D: Device> Netd<D> {
             File::Control => return Err(Errno::EINVAL),
             File::Socket(socket) => (socket.interface, socket.transport, socket.socket),
         };
-        if how > 2 {
+        if how > 2 || transport == Transport::Icmp {
             return Err(Errno::EINVAL);
         }
         let write = matches!(how, 1 | 2);
@@ -1072,8 +1339,119 @@ impl<D: Device> Netd<D> {
                     self.iface_error(response, Errno::ENODEV)
                 }
             }
-            IfaceRequest::RouteAdd { .. } | IfaceRequest::RouteDel { .. } => {
-                self.iface_error(response, Errno::EOPNOTSUPP)
+            IfaceRequest::RouteAdd { route } => {
+                self.add_route(Interface::Loopback, route)?;
+                self.iface_ok(response)
+            }
+            IfaceRequest::RouteDel { dest, prefix } => {
+                self.delete_route(Interface::Loopback, dest, prefix)?;
+                self.iface_ok(response)
+            }
+            IfaceRequest::RouteList => {
+                let mut offset = 0usize;
+                let mut entries = Vec::new();
+                for interface in self.interfaces() {
+                    let name = interface_name(interface);
+                    for route in self.core_ref(interface).routes() {
+                        let mut flags = ROUTE_UP;
+                        if route.gateway.is_some() {
+                            flags |= ROUTE_GATEWAY;
+                        }
+                        if route.prefix_len == 32 {
+                            flags |= ROUTE_HOST;
+                        }
+                        entries.push(IfaceResponse::RouteInfo(RouteInfo {
+                            dest: route.dest.octets(),
+                            prefix: route.prefix_len,
+                            flags,
+                            iface: IfName::new(name).ok_or(Errno::EINVAL)?,
+                            gateway: route.gateway.map(|gateway| gateway.octets()),
+                        }));
+                    }
+                }
+                let count = u16::try_from(entries.len()).map_err(|_| Errno::E2BIG)?;
+                append_iface(response, &mut offset, IfaceResponse::Count { count })?;
+                for entry in entries {
+                    append_iface(response, &mut offset, entry)?;
+                }
+                Ok(offset)
+            }
+            IfaceRequest::RouteAddOn { name, route } => {
+                let Some(interface) = self.interface_for_name(name.as_str()) else {
+                    return self.iface_error(response, Errno::ENODEV);
+                };
+                self.add_route(interface, route)?;
+                self.iface_ok(response)
+            }
+            IfaceRequest::RouteDelOn { name, dest, prefix } => {
+                let Some(interface) = self.interface_for_name(name.as_str()) else {
+                    return self.iface_error(response, Errno::ENODEV);
+                };
+                self.delete_route(interface, dest, prefix)?;
+                self.iface_ok(response)
+            }
+            IfaceRequest::DhcpLease { name } => {
+                let Some(interface) = self.interface_for_name(name.as_str()) else {
+                    return self.iface_error(response, Errno::ENODEV);
+                };
+                let Some(lease) = self.core_ref(interface).dhcp_lease() else {
+                    return self.iface_error(response, Errno::ENOENT);
+                };
+                let mut offset = 0usize;
+                append_iface(
+                    response,
+                    &mut offset,
+                    IfaceResponse::DhcpLease(DhcpLeaseInfo {
+                        addr: lease.address.octets(),
+                        prefix: lease.prefix_len,
+                        router: lease.router.map(|router| router.octets()),
+                        dns: lease.dns.iter().map(|server| server.octets()).collect(),
+                        renew_ms: lease.renew_in_ms.unwrap_or(DHCP_TIMER_UNKNOWN),
+                        rebind_ms: lease.rebind_in_ms.unwrap_or(DHCP_TIMER_UNKNOWN),
+                        expires_ms: lease.expires_in_ms.unwrap_or(DHCP_TIMER_UNKNOWN),
+                    }),
+                )?;
+                Ok(offset)
+            }
+            IfaceRequest::SocketList => {
+                let mut offset = 0usize;
+                let mut entries = Vec::new();
+                for interface in self.interfaces() {
+                    let name = interface_name(interface);
+                    for socket in self.core_ref(interface).socket_table() {
+                        entries.push(IfaceResponse::Socket(socket_entry(name, socket)?));
+                    }
+                }
+                let count = u16::try_from(entries.len()).map_err(|_| Errno::E2BIG)?;
+                append_iface(response, &mut offset, IfaceResponse::Count { count })?;
+                for entry in entries {
+                    append_iface(response, &mut offset, entry)?;
+                }
+                Ok(offset)
+            }
+            IfaceRequest::Counters { name } => {
+                let Some(interface) = self.interface_for_name(name.as_str()) else {
+                    return self.iface_error(response, Errno::ENODEV);
+                };
+                let Some(counters) = self.core_ref(interface).interface_counters() else {
+                    return self.iface_error(response, Errno::EOPNOTSUPP);
+                };
+                let mut offset = 0usize;
+                append_iface(
+                    response,
+                    &mut offset,
+                    IfaceResponse::Counters(CounterInfo {
+                        rx_packets: counters.rx_packets,
+                        tx_packets: counters.tx_packets,
+                        rx_bytes: counters.rx_bytes,
+                        tx_bytes: counters.tx_bytes,
+                        rx_errors: counters.rx_errors,
+                        tx_errors: counters.tx_errors,
+                        rx_drops: counters.rx_drops,
+                        tx_drops: counters.tx_drops,
+                    }),
+                )?;
+                Ok(offset)
             }
             IfaceRequest::ArpList => {
                 let mut offset = 0usize;
@@ -1081,6 +1459,64 @@ impl<D: Device> Netd<D> {
                 Ok(offset)
             }
         }
+    }
+
+    fn interfaces(&self) -> Vec<Interface> {
+        let mut interfaces = alloc::vec![Interface::Loopback];
+        if self.nic.is_some() {
+            interfaces.push(Interface::Nic);
+        }
+        interfaces
+    }
+
+    fn interface_for_name(&self, name: &str) -> Option<Interface> {
+        if name == LOOPBACK_NAME {
+            Some(Interface::Loopback)
+        } else if name == NIC_NAME && self.nic.is_some() {
+            Some(Interface::Nic)
+        } else {
+            None
+        }
+    }
+
+    fn interface_mtu(&self, interface: Interface) -> Result<usize, Errno> {
+        match interface {
+            Interface::Loopback => Ok(usize::from(LOOPBACK_MTU)),
+            Interface::Nic => self
+                .nic_config
+                .map(|config| usize::from(config.mtu))
+                .ok_or(Errno::ENODEV),
+        }
+    }
+
+    fn add_route(
+        &mut self,
+        interface: Interface,
+        route: raven_proto_net::Route,
+    ) -> Result<(), Errno> {
+        if route.prefix > 32 {
+            return Err(Errno::EINVAL);
+        }
+        let mtu = self.interface_mtu(interface)?;
+        self.core_mut(interface).add_route(RouteEntry {
+            dest: Ipv4Addr::from_octets(route.dest),
+            prefix_len: route.prefix,
+            gateway: route.gateway.map(Ipv4Addr::from_octets),
+            mtu,
+        })
+    }
+
+    fn delete_route(
+        &mut self,
+        interface: Interface,
+        dest: [u8; 4],
+        prefix: u8,
+    ) -> Result<(), Errno> {
+        if prefix > 32 {
+            return Err(Errno::EINVAL);
+        }
+        self.core_mut(interface)
+            .delete_route(Ipv4Addr::from_octets(dest), prefix)
     }
 
     fn iface(&self) -> IfaceInfo {
@@ -1098,11 +1534,16 @@ impl<D: Device> Netd<D> {
     fn nic_iface(&self) -> Option<IfaceInfo> {
         let config = self.nic_config?;
         let control = self.nic_control.as_ref()?;
+        let lease = self.nic.as_ref().and_then(|nic| nic.dhcp_lease());
+        let (addr, prefix) = lease
+            .as_ref()
+            .map(|lease| (lease.address.octets(), lease.prefix_len))
+            .unwrap_or((control.addr, control.prefix));
         let flags = IF_LINK_UP | if control.up { IF_UP } else { 0 };
         Some(IfaceInfo {
             name: IfName::new(NIC_NAME)?,
-            addr: control.addr,
-            prefix: control.prefix,
+            addr,
+            prefix,
             flags,
             mtu: config.mtu,
             mac: config.mac,
@@ -1130,20 +1571,59 @@ impl<D: Device> Netd<D> {
     }
 }
 
+fn interface_name(interface: Interface) -> &'static str {
+    match interface {
+        Interface::Loopback => LOOPBACK_NAME,
+        Interface::Nic => NIC_NAME,
+    }
+}
+
+fn socket_entry(name: &str, socket: CoreSocket) -> Result<SocketEntry, Errno> {
+    let (transport, state) = match (socket.transport, socket.state) {
+        (SocketTransport::Tcp, SocketState::Closed) => (SOCKET_TCP, SOCKET_STATE_CLOSED),
+        (SocketTransport::Tcp, SocketState::Listen) => (SOCKET_TCP, SOCKET_STATE_LISTEN),
+        (SocketTransport::Tcp, SocketState::SynSent) => (SOCKET_TCP, SOCKET_STATE_SYN_SENT),
+        (SocketTransport::Tcp, SocketState::SynReceived) => (SOCKET_TCP, SOCKET_STATE_SYN_RECEIVED),
+        (SocketTransport::Tcp, SocketState::Established) => (SOCKET_TCP, SOCKET_STATE_ESTABLISHED),
+        (SocketTransport::Tcp, SocketState::FinWait1) => (SOCKET_TCP, SOCKET_STATE_FIN_WAIT_1),
+        (SocketTransport::Tcp, SocketState::FinWait2) => (SOCKET_TCP, SOCKET_STATE_FIN_WAIT_2),
+        (SocketTransport::Tcp, SocketState::CloseWait) => (SOCKET_TCP, SOCKET_STATE_CLOSE_WAIT),
+        (SocketTransport::Tcp, SocketState::Closing) => (SOCKET_TCP, SOCKET_STATE_CLOSING),
+        (SocketTransport::Tcp, SocketState::LastAck) => (SOCKET_TCP, SOCKET_STATE_LAST_ACK),
+        (SocketTransport::Tcp, SocketState::TimeWait) => (SOCKET_TCP, SOCKET_STATE_TIME_WAIT),
+        (SocketTransport::Udp, _) => (SOCKET_UDP, SOCKET_STATE_UDP),
+        (SocketTransport::Icmp, _) => (SOCKET_ICMP, SOCKET_STATE_ICMP),
+        (SocketTransport::Tcp, _) => (SOCKET_TCP, SOCKET_STATE_CLOSED),
+    };
+    let (local, local_port) = socket.local.unwrap_or((Ipv4Addr::UNSPECIFIED, 0));
+    Ok(SocketEntry {
+        id: socket.id.0,
+        transport,
+        state,
+        iface: IfName::new(name).ok_or(Errno::EINVAL)?,
+        local: local.octets(),
+        local_port,
+        remote: socket.remote.map(|remote| remote.0.octets()),
+        remote_port: socket.remote.map(|remote| remote.1).unwrap_or(0),
+        rx_queue: socket.rx_queue,
+        tx_queue: socket.tx_queue,
+    })
+}
+
 fn append_iface(
     response: &mut [u8],
     offset: &mut usize,
     value: IfaceResponse,
 ) -> Result<(), Errno> {
+    let mut record = [0u8; 128];
+    let length = value.encode(&mut record).map_err(|_| Errno::E2BIG)?;
     let start = *offset;
-    let end = start.checked_add(64).ok_or(Errno::E2BIG)?;
+    let end = start.checked_add(length).ok_or(Errno::E2BIG)?;
     if end > response.len() {
         return Err(Errno::E2BIG);
     }
-    let length = value
-        .encode(&mut response[start..end])
-        .map_err(|_| Errno::E2BIG)?;
-    *offset = start.checked_add(length).ok_or(Errno::E2BIG)?;
+    response[start..end].copy_from_slice(record.get(..length).ok_or(Errno::E2BIG)?);
+    *offset = end;
     Ok(())
 }
 

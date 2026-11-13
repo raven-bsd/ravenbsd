@@ -7,6 +7,7 @@
 //!
 //! * `net:tcp/<ipv4>:<port>` - a TCP socket to a remote endpoint;
 //! * `net:udp/<ipv4>:<port>` - a UDP socket;
+//! * `net:icmp/<ipv4>` - an ICMP echo socket for one destination;
 //! * `net:` - the control channel (interface table, routes, ARP).
 //!
 //! Parsing is strict: a malformed path is a [`PathError`], never a best-effort guess.
@@ -22,6 +23,8 @@ pub enum Transport {
     Tcp,
     /// A datagram socket.
     Udp,
+    /// An ICMP echo socket.
+    Icmp,
     /// The interface control channel.
     Control,
 }
@@ -40,7 +43,7 @@ pub struct SchemePath {
 pub enum PathError {
     /// The path does not start with `net:`.
     NotNet,
-    /// The part after `net:` is neither `tcp/`, `udp/` nor empty.
+    /// The part after `net:` is neither `tcp/`, `udp/`, `icmp/` nor empty.
     UnknownTransport,
     /// The endpoint has no `:` between address and port, or lacks an IPv4 address.
     MissingAddress,
@@ -89,6 +92,18 @@ pub fn parse(path: &str) -> Result<SchemePath, PathError> {
         return Ok(SchemePath {
             transport: Transport::Control,
             endpoint: None,
+        });
+    }
+    if let Some(rest) = rest.strip_prefix("icmp/") {
+        if rest.contains(':') {
+            return Err(PathError::BadPort);
+        }
+        return Ok(SchemePath {
+            transport: Transport::Icmp,
+            endpoint: Some(Endpoint {
+                ip: parse_ipv4(rest)?,
+                port: 0,
+            }),
         });
     }
     let (transport, rest) = if let Some(rest) = rest.strip_prefix("tcp/") {

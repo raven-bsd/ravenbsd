@@ -5,7 +5,7 @@
 
 use super::*;
 use crate::Loopback;
-use raven_proto_net::{IfaceRequest, IfaceResponse, Shutdown, SockOpt};
+use raven_proto_net::{IfaceRequest, IfaceResponse, Route, Shutdown, SockOpt};
 
 const MAC: [u8; 6] = [0x02, 0, 0, 0, 0, 1];
 const SERVER: Endpoint = Endpoint {
@@ -37,6 +37,7 @@ fn new_netd_with_nic() -> Netd<Loopback> {
             addr: [10, 0, 2, 15],
             prefix: 24,
             gateway: Some([10, 0, 2, 2]),
+            dhcp: false,
         },
         0,
     );
@@ -225,6 +226,176 @@ fn nic_core_serves_non_loopback_paths_and_lists_eth0() {
     netd.close(accepted).unwrap();
     netd.close(client).unwrap();
     netd.close(listener).unwrap();
+}
+
+#[test]
+fn icmp_echo_reports_payload_source_and_rtt() {
+    let mut netd = new_netd();
+    let file = netd.open("net:icmp/127.0.0.1").unwrap();
+    let response = call_request(
+        &mut netd,
+        file,
+        &SocketRequest::IcmpEcho {
+            id: 0x1234,
+            seq: 7,
+            timeout_ms: 2_000,
+            data: b"ping",
+        },
+    );
+    assert_eq!(Response::decode(&response), Ok(Response::Ok));
+
+    let mut now = 0;
+    let mut reply = None;
+    for _ in 0..200 {
+        poll(&mut netd, &mut now);
+        let response = call_request(&mut netd, file, &SocketRequest::Read { len: 16 });
+        if response.get(4..6) == Some(&[6, 0]) {
+            continue;
+        }
+        let header = Response::decode(response.get(..22).unwrap()).unwrap();
+        if let Response::Icmp {
+            source,
+            id,
+            seq,
+            rtt_ms,
+            len,
+        } = header
+        {
+            reply = Some((source, id, seq, rtt_ms, len));
+            assert_eq!(&response[22..22 + len as usize], b"ping");
+            break;
+        }
+    }
+    let (source, id, seq, rtt_ms, len) = reply.expect("no ICMP reply");
+    assert_eq!(
+        source,
+        Endpoint {
+            ip: [127, 0, 0, 1],
+            port: 0
+        }
+    );
+    assert_eq!(id, 0x1234);
+    assert_eq!(seq, 7);
+    assert_eq!(len, 4);
+    assert!(rtt_ms < 2_000);
+
+    let control = netd.open("net:").unwrap();
+    let response = call_iface(&mut netd, control, IfaceRequest::SocketList);
+    let count = decode_count(&response);
+    assert!(count >= 1);
+    let mut offset = 8;
+    let mut seen = false;
+    for _ in 0..count {
+        let name_len = response[offset + 12] as usize;
+        let remote = response[offset + 19 + name_len] == 1;
+        let length = if remote { 34 + name_len } else { 28 + name_len };
+        let record = IfaceResponse::decode(&response[offset..offset + length]).unwrap();
+        if let IfaceResponse::Socket(entry) = record
+            && entry.transport == raven_proto_net::SOCKET_ICMP
+            && entry.state == raven_proto_net::SOCKET_STATE_ICMP
+        {
+            seen = true;
+        }
+        offset += length;
+    }
+    assert!(seen, "ICMP socket missing from table");
+
+    let response = call_iface(
+        &mut netd,
+        control,
+        IfaceRequest::Counters {
+            name: IfName::new("lo").unwrap(),
+        },
+    );
+    let counters = IfaceResponse::decode(&response).unwrap();
+    let IfaceResponse::Counters(_) = counters else {
+        panic!("missing counters");
+    };
+    netd.close(file).unwrap();
+    netd.close(control).unwrap();
+}
+
+#[test]
+fn routes_list_add_and_delete() {
+    let mut netd = new_netd();
+    let control = netd.open("net:").unwrap();
+    let response = call_iface(&mut netd, control, IfaceRequest::RouteList);
+    assert_eq!(decode_count(&response), 1);
+    let first = decode_route(&response, 8);
+    assert_eq!(first.dest, [127, 0, 0, 0]);
+    assert_eq!(first.prefix, 8);
+    assert_eq!(first.iface.as_str(), "lo");
+    assert_eq!(
+        first.flags & raven_proto_net::ROUTE_UP,
+        raven_proto_net::ROUTE_UP
+    );
+
+    let route = Route {
+        dest: [192, 0, 2, 0],
+        prefix: 24,
+        gateway: None,
+    };
+    let response = call_iface(
+        &mut netd,
+        control,
+        IfaceRequest::RouteAddOn {
+            name: IfName::new("lo").unwrap(),
+            route,
+        },
+    );
+    assert_eq!(IfaceResponse::decode(&response), Ok(IfaceResponse::Ok));
+    let response = call_iface(&mut netd, control, IfaceRequest::RouteList);
+    assert_eq!(decode_count(&response), 2);
+    let mut found = false;
+    let mut offset = 8;
+    for _ in 0..2 {
+        let record = decode_route(&response, offset);
+        if record.dest == [192, 0, 2, 0] && record.prefix == 24 {
+            found = true;
+        }
+        offset += route_info_len(&response, offset);
+    }
+    assert!(found);
+
+    let response = call_iface(
+        &mut netd,
+        control,
+        IfaceRequest::RouteDelOn {
+            name: IfName::new("lo").unwrap(),
+            dest: [192, 0, 2, 0],
+            prefix: 24,
+        },
+    );
+    assert_eq!(IfaceResponse::decode(&response), Ok(IfaceResponse::Ok));
+    let response = call_iface(&mut netd, control, IfaceRequest::RouteList);
+    assert_eq!(decode_count(&response), 1);
+    netd.close(control).unwrap();
+}
+
+fn decode_count(response: &[u8]) -> u16 {
+    match IfaceResponse::decode(response.get(..8).unwrap()).unwrap() {
+        IfaceResponse::Count { count } => count,
+        other => panic!("unexpected count: {other:?}"),
+    }
+}
+
+fn route_info_len(response: &[u8], offset: usize) -> usize {
+    let name_len = response[offset + 12] as usize;
+    let flags = response[offset + 11];
+    13 + name_len
+        + if flags & raven_proto_net::ROUTE_GATEWAY != 0 {
+            4
+        } else {
+            0
+        }
+}
+
+fn decode_route(response: &[u8], offset: usize) -> RouteInfo {
+    let length = route_info_len(response, offset);
+    match IfaceResponse::decode(&response[offset..offset + length]).unwrap() {
+        IfaceResponse::RouteInfo(route) => route,
+        other => panic!("unexpected route: {other:?}"),
+    }
 }
 
 #[test]

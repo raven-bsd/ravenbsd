@@ -67,7 +67,19 @@ regex = '^svcd: netd up$'
 regex = '^netd: iface eth0 10\.0\.2\.15/24$'
 
 [[expect]]
+regex = '^netd: dhcp eth0 10\.0\.2\.15/24 router=10\.0\.2\.2 dns=10\.0\.2\.3 renew=(unknown|[0-9]+ms)$'
+
+[[expect]]
 regex = '^netd: readiness event$'
+
+[[expect]]
+regex = '^netd: ping 10\.0\.2\.2 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^netd: route eth0 ok$'
+
+[[expect]]
+regex = '^netd: netstat eth0 sockets=[0-9]+ rx=[1-9][0-9]* tx=[1-9][0-9]*$'
 
 [[expect]]
 regex = '^netd: virtio endpoints ok$'
@@ -115,7 +127,19 @@ regex = '^svcd: netd-virtio-restart up$'
 regex = '^netd: iface eth0 10\.0\.2\.15/24$'
 
 [[expect]]
+regex = '^netd: dhcp eth0 10\.0\.2\.15/24 router=10\.0\.2\.2 dns=10\.0\.2\.3 renew=(unknown|[0-9]+ms)$'
+
+[[expect]]
 regex = '^netd: readiness event$'
+
+[[expect]]
+regex = '^netd: ping 10\.0\.2\.2 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^netd: route eth0 ok$'
+
+[[expect]]
+regex = '^netd: netstat eth0 sockets=[0-9]+ rx=[1-9][0-9]* tx=[1-9][0-9]*$'
 
 [[expect]]
 regex = '^netd: virtio endpoints ok$'

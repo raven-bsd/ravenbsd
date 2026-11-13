@@ -106,6 +106,7 @@ impl NicDevice {
             addr: GUEST_ADDR,
             prefix: GUEST_PREFIX,
             gateway: Some(GATEWAY_ADDR),
+            dhcp: true,
         };
         Ok((
             Self {

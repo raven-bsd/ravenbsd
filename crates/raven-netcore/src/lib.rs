@@ -44,6 +44,107 @@ pub struct DhcpLease {
     pub router: Option<Ipv4Addr>,
     /// DNS servers.
     pub dns: alloc::vec::Vec<Ipv4Addr>,
+    /// Milliseconds until renewal, when the backend exposes it.
+    pub renew_in_ms: Option<u32>,
+    /// Milliseconds until rebinding, when the backend exposes it.
+    pub rebind_in_ms: Option<u32>,
+    /// Milliseconds until expiry, when the backend exposes it.
+    pub expires_in_ms: Option<u32>,
+}
+
+/// One IPv4 route in the native table.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RouteEntry {
+    /// Destination prefix.
+    pub dest: Ipv4Addr,
+    /// Destination prefix length.
+    pub prefix_len: u8,
+    /// Next hop, absent for an on-link route.
+    pub gateway: Option<Ipv4Addr>,
+    /// Path MTU.
+    pub mtu: usize,
+}
+
+/// Transport of one live socket.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SocketTransport {
+    /// TCP stream or listener.
+    Tcp,
+    /// UDP datagram.
+    Udp,
+    /// ICMP echo.
+    Icmp,
+}
+
+/// State of one live socket.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SocketState {
+    /// No connection.
+    Closed,
+    /// Listening.
+    Listen,
+    /// SYN sent.
+    SynSent,
+    /// SYN received.
+    SynReceived,
+    /// Established.
+    Established,
+    /// FIN wait 1.
+    FinWait1,
+    /// FIN wait 2.
+    FinWait2,
+    /// Close wait.
+    CloseWait,
+    /// Closing.
+    Closing,
+    /// Last ACK.
+    LastAck,
+    /// TIME-WAIT.
+    TimeWait,
+    /// Unconnected UDP.
+    Udp,
+    /// Bound ICMP echo.
+    Icmp,
+}
+
+/// One live socket from the native core.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CoreSocket {
+    /// Core socket id.
+    pub id: SocketId,
+    /// Transport.
+    pub transport: SocketTransport,
+    /// Current state.
+    pub state: SocketState,
+    /// Local endpoint, when known.
+    pub local: Option<(Ipv4Addr, u16)>,
+    /// Remote endpoint, when connected.
+    pub remote: Option<(Ipv4Addr, u16)>,
+    /// Bytes queued for the application.
+    pub rx_queue: u32,
+    /// Bytes queued for the wire.
+    pub tx_queue: u32,
+}
+
+/// Packet and byte counters observed at one device boundary.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct InterfaceCounters {
+    /// Frames received.
+    pub rx_packets: u64,
+    /// Frames transmitted.
+    pub tx_packets: u64,
+    /// Bytes received.
+    pub rx_bytes: u64,
+    /// Bytes transmitted.
+    pub tx_bytes: u64,
+    /// Receive errors.
+    pub rx_errors: u64,
+    /// Transmit errors.
+    pub tx_errors: u64,
+    /// Frames dropped by the stack.
+    pub rx_drops: u64,
+    /// Frames dropped by the device.
+    pub tx_drops: u64,
 }
 
 /// Socket identifier.
