@@ -249,3 +249,46 @@ fn the_errno_policy_is_exceptions_only() {
     assert_eq!(math_errhandling(), MATH_ERREXCEPT);
     assert_eq!(math_errhandling() & MATH_ERRNO, 0);
 }
+
+#[test]
+fn raise_sets_the_hardware_flag_it_names() {
+    if crate::SOFT_FLOAT {
+        // The software backend has its own flag tests; see the fenv module.
+        return;
+    }
+    for flag in [
+        crate::consts::FE_INVALID,
+        crate::consts::FE_DIVBYZERO,
+        crate::consts::FE_OVERFLOW,
+        crate::consts::FE_UNDERFLOW,
+        crate::consts::FE_INEXACT,
+    ] {
+        crate::fenv::feclearexcept(crate::consts::FE_ALL_EXCEPT as i32);
+        raise(flag);
+        let seen = crate::fenv::fetestexcept(crate::consts::FE_ALL_EXCEPT as i32);
+        assert_ne!(
+            seen & flag as i32,
+            0,
+            "raise({flag:#x}) did not set the flag (seen {seen:#x})"
+        );
+        crate::fenv::feclearexcept(crate::consts::FE_ALL_EXCEPT as i32);
+    }
+}
+
+#[test]
+fn flt_rounds_maps_the_rounding_mode() {
+    if crate::SOFT_FLOAT {
+        assert_eq!(flt_rounds(), 1);
+        return;
+    }
+    let saved = crate::fenv::fegetround();
+    crate::fenv::fesetround(crate::consts::FE_TONEAREST as i32);
+    assert_eq!(flt_rounds(), 1);
+    crate::fenv::fesetround(crate::consts::FE_UPWARD as i32);
+    assert_eq!(flt_rounds(), 2);
+    crate::fenv::fesetround(crate::consts::FE_DOWNWARD as i32);
+    assert_eq!(flt_rounds(), 3);
+    crate::fenv::fesetround(crate::consts::FE_TOWARDZERO as i32);
+    assert_eq!(flt_rounds(), 0);
+    crate::fenv::fesetround(saved);
+}

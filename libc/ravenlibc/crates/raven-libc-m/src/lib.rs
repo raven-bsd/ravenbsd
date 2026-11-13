@@ -53,7 +53,24 @@
 // bit fields with wrapping semantics; the exhaustive tests cover them.
 
 pub mod consts;
+pub mod fenv;
 pub mod fp;
+
+/// Whether the software floating-point environment is selected.
+#[cfg(all(
+    target_arch = "x86_64",
+    not(feature = "soft-float"),
+    target_feature = "sse2"
+))]
+pub(crate) const SOFT_FLOAT: bool = false;
+
+/// Whether the software floating-point environment is selected.
+#[cfg(not(all(
+    target_arch = "x86_64",
+    not(feature = "soft-float"),
+    target_feature = "sse2"
+)))]
+pub(crate) const SOFT_FLOAT: bool = true;
 
 #[macro_use]
 mod macros;
@@ -63,6 +80,12 @@ mod coremath;
 mod generic;
 mod portable;
 
+pub use fenv::{
+    Femode, FenvT, FexceptT, feclearexcept, fedisableexcept, feenableexcept, fegetenv, fegetexcept,
+    fegetexceptflag, fegetmode, fegetround, feholdexcept, feraiseexcept, fesetenv, fesetexceptflag,
+    fesetmode, fesetround, fetestexcept, feupdateenv,
+};
+pub use fp::{flt_rounds, raise};
 pub use fp::{
     fpclassify, fpclassifyf, isfinite, isfinitef, isinf, isinff, isnan, isnanf, isnormal,
     isnormalf, nan, nanf, signbit, signbitf,

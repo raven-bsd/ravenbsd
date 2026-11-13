@@ -8,6 +8,10 @@
 # reason = "raw pointer entry points"
 
 [[allow]]
+crate = "raven-libc-m"
+path = "src/fenv/"
+reason = "DR-39 x87/SSE control-register access (fnstenv/fldenv/fnstcw/fldcw/fnstsw/stmxcsr/ldmxcsr, fnclex, fwait); each block has a // SAFETY: comment naming the valid buffer"
+[[allow]]
 crate = "raven-libc-str"
 path = "src/raw/"
 reason = "DR-39 audited pointer shell: the mem* entry points, the compiler-builtins adaptation, the secure-memory barriers, the caller-cursor tokenisers and the Arm asm wrappers; every unsafe block carries a // SAFETY: comment"

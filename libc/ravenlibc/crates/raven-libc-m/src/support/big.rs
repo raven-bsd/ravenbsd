@@ -8,6 +8,7 @@
 //! Integers used for wide operations, larger than `u128`.
 
 #[cfg(test)]
+#[path = "big/tests_ut.rs"]
 mod tests;
 
 use core::{fmt, ops};

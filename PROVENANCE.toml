@@ -4950,17 +4950,6 @@ modified = true
 notes = "COPY per donor-map/05 3.3; headerless file covered by libm/LICENSE.txt (MIT); helpers retained as upstream."
 
 [[import]]
-path = "libc/ravenlibc/crates/raven-libc-m/src/support/big/tests.rs"
-upstream = "rust"
-upstream_path = "library/compiler-builtins/libm/src/math/support/big/tests.rs"
-upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
-license = "MIT"
-tier = "A"
-copied = "2026-11-13"
-modified = true
-notes = "COPY per donor-map/05 3.3; host test module, kept with its header."
-
-[[import]]
 path = "libc/ravenlibc/crates/raven-libc-m/src/support/env.rs"
 upstream = "rust"
 upstream_path = "library/compiler-builtins/libm/src/math/support/env.rs"
@@ -5355,6 +5344,94 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "COPY per donor-map/05 3.3 row 11; _scan_nan hex payload parsing and the quiet bits."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/support/float_traits_ut.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/support/float_traits.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Tests moved out of float_traits.rs into _ut.rs (C47 rework round 1); donor test bodies kept."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/support/hex_float_ut.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/support/hex_float.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Tests moved out of hex_float.rs into _ut.rs (C47 rework round 1); the exhaustive donor tables are condensed to representative round and error cases."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/support/modular_ut.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/support/modular.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Tests moved out of modular.rs into _ut.rs (C47 rework round 1)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/support/big/tests_ut.rs"
+upstream = "rust"
+upstream_path = "library/compiler-builtins/libm/src/math/support/big/tests.rs"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Test module renamed to _ut.rs (C47 rework round 1); donor bodies kept."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fenv/x86_64.rs"
+upstream = "freebsd"
+upstream_path = "lib/msun/amd64/fenv.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 row 17; x87/SSE register access via asm!; FE_DFL_ENV and femode added for the Rust surface."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fenv/softfloat.rs"
+upstream = "freebsd"
+upstream_path = "lib/msun/src/fenv-softfloat.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "COPY per donor-map/05 3.3 row 17; one AtomicU32 holds flags/mask/round; fesetround accepts only nearest (4.8)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fenv/x86_64_ut.rs"
+upstream = "freebsd"
+upstream_path = "lib/msun/amd64/fenv.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Tests for the x86_64 fenv backend, written from the donor semantics."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-m/src/fenv/softfloat_ut.rs"
+upstream = "freebsd"
+upstream_path = "lib/msun/src/fenv-softfloat.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Tests for the software fenv backend (run with --features soft-float)."
 
 [[import]]
 path = "libc/ravenlibc/crates/raven-libc-dtoa/src/bigint/sum.rs"

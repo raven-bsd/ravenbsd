@@ -7,10 +7,4 @@ host = ["tests/libc", "tools/libc-"]
 crate_manifest = "libc/ravenlibc/xtask/crates.toml"
 
 [no-std]
-# `hex_float.rs` carries its donor unit tests inline and `big/tests.rs` is a donor test module;
-# both reach `std` only under `#[cfg(test)]`. Moving them to `_ut.rs` files is a follow-up item of
-# the C47 report; the shipped (non-test) code has no `std` path.
-allow-files = [
-    "libc/ravenlibc/crates/raven-libc-m/src/support/hex_float.rs",
-    "libc/ravenlibc/crates/raven-libc-m/src/support/big/tests.rs",
-]
+allow-files = []
