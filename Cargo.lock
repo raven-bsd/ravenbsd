@@ -462,6 +462,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-b70-overlay"
+version = "0.1.0"
+dependencies = [
+ "raven-initfs",
+]
+
+[[package]]
+name = "raven-b70-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
+ "raven-rt",
+ "raven-scheme",
+ "resolvd",
+]
+
+[[package]]
 name = "raven-blockd"
 version = "0.1.0"
 dependencies = [

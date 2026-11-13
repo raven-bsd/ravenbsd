@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The single B70 end-to-end service. It runs after netd has the virtio-net
+# socket core and resolvd has published the lease DNS, performs the checks in
+# order, and exits 0 on success. `exit_when_exits` in the test-only svcd.conf
+# propagates that status to init; the kernel's test-exit protocol then exits
+# QEMU with status 33.
+name = "b70-net-probe"
+exec = "/sbin/b70-net-probe"
+needs = ["scheme:net", "scheme:resolv"]
+readiness = "none"
+restart = "never"
+max_restarts = 0

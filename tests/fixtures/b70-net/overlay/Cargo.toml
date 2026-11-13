@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-b70-overlay"
+version = "0.1.0"
+description = "B70 fixture: rebuild an initfs with test-only file replacements."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raven-initfs = { path = "../../../../crates/raven-initfs", features = ["std"] }
+
+[lints]
+workspace = true

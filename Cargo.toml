@@ -58,6 +58,8 @@ members = [
     "tests/fixtures/k55-ufs/probe",
     "tests/fixtures/b15-resolv/dnsd",
     "tests/fixtures/b15-resolv/probe",
+    "tests/fixtures/b70-net/probe",
+    "tests/fixtures/b70-net/overlay",
     "xtask",
     "tests/qtest",
     "tests/ufs-oracle",
