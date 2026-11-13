@@ -8138,3 +8138,388 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "check core only; the shell performs the actual vsprintf call"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-tls/src/consts.rs"
+upstream = "musl"
+upstream_path = "arch/x86_64/pthread_arch.h, arch/aarch64/pthread_arch.h, arch/riscv64/pthread_arch.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-tls/src/tcb.rs"
+upstream = "musl"
+upstream_path = "src/internal/pthread_impl.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-tls/src/layout.rs"
+upstream = "musl"
+upstream_path = "src/env/__init_tls.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-tls/src/init.rs"
+upstream = "musl"
+upstream_path = "src/env/__init_tls.c, src/env/__reset_tls.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-tls/src/dtv.rs"
+upstream = "musl"
+upstream_path = "src/thread/__tls_get_addr.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-tls/src/raw.rs"
+upstream = "musl"
+upstream_path = "src/env/__init_tls.c, src/env/__reset_tls.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/sync/lock.rs"
+upstream = "musl"
+upstream_path = "src/thread/__lock.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/sync/wait.rs"
+upstream = "musl"
+upstream_path = "src/thread/__wait.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/sync/timedwait.rs"
+upstream = "musl"
+upstream_path = "src/thread/__timedwait.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/sync/ptc.rs"
+upstream = "musl"
+upstream_path = "src/thread/lock_ptc.c, src/thread/vmlock.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/sync/synccall.rs"
+upstream = "musl"
+upstream_path = "src/thread/synccall.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/mutex.rs"
+upstream = "musl"
+upstream_path = "src/thread/pthread_mutex_lock.c, pthread_mutex_trylock.c, pthread_mutex_timedlock.c, pthread_mutex_unlock.c, pthread_mutex_init.c, pthread_mutex_destroy.c, pthread_mutex_consistent.c, pthread_mutexattr_setprotocol.c, pthread_mutexattr_setpshared.c, pthread_mutexattr_setrobust.c, pthread_mutexattr_settype.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/cond.rs"
+upstream = "musl"
+upstream_path = "src/thread/pthread_cond_timedwait.c, pthread_cond_signal.c, pthread_cond_broadcast.c, pthread_cond_wait.c, pthread_cond_init.c, pthread_cond_destroy.c, pthread_condattr_setclock.c, pthread_condattr_setpshared.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/rwlock.rs"
+upstream = "musl"
+upstream_path = "src/thread/pthread_rwlock_init.c, pthread_rwlock_rdlock.c, pthread_rwlock_timedrdlock.c, pthread_rwlock_tryrdlock.c, pthread_rwlock_wrlock.c, pthread_rwlock_timedwrlock.c, pthread_rwlock_trywrlock.c, pthread_rwlock_unlock.c, pthread_rwlock_destroy.c, pthread_rwlockattr_setpshared.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/barrier.rs"
+upstream = "musl"
+upstream_path = "src/thread/pthread_barrier_init.c, pthread_barrier_wait.c, pthread_barrier_destroy.c, pthread_barrierattr_setpshared.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/spin.rs"
+upstream = "musl"
+upstream_path = "src/thread/pthread_spin_init.c, pthread_spin_lock.c, pthread_spin_trylock.c, pthread_spin_unlock.c, pthread_spin_destroy.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/sem.rs"
+upstream = "musl"
+upstream_path = "src/thread/sem_init.c, sem_post.c, sem_wait.c, sem_timedwait.c, sem_trywait.c, sem_getvalue.c, sem_destroy.c, sem_open.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/c11.rs"
+upstream = "musl"
+upstream_path = "src/thread/thrd_create.c, thrd_exit.c, thrd_join.c, thrd_sleep.c, thrd_yield.c, mtx_destroy.c, mtx_init.c, mtx_lock.c, mtx_timedlock.c, mtx_trylock.c, mtx_unlock.c, cnd_broadcast.c, cnd_destroy.c, cnd_init.c, cnd_signal.c, cnd_timedwait.c, cnd_wait.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/fork.rs"
+upstream = "musl"
+upstream_path = "src/process/fork.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/tlsdesc.rs"
+upstream = "musl"
+upstream_path = "src/ldso/tlsdesc.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/tls_access.rs"
+upstream = "musl"
+upstream_path = "src/thread/__tls_get_addr.c, src/env/__reset_tls.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/raw.rs"
+upstream = "musl"
+upstream_path = "src/internal/pthread_impl.h, src/thread/pthread_create.c, src/process/fork.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/raw/futex.rs"
+upstream = "musl"
+upstream_path = "src/internal/pthread_impl.h, src/thread/pthread_mutex_lock.c, pthread_mutex_unlock.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/raw/tlsdesc.rs"
+upstream = "musl"
+upstream_path = "src/ldso/x86_64/tlsdesc.s, src/ldso/aarch64/tlsdesc.s, src/ldso/riscv64/tlsdesc.s"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/thread/create.rs"
+upstream = "musl"
+upstream_path = "src/thread/pthread_create.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/thread/exit.rs"
+upstream = "musl"
+upstream_path = "src/thread/pthread_create.c (__pthread_exit)"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/thread/join.rs"
+upstream = "musl"
+upstream_path = "src/thread/pthread_join.c, pthread_detach.c, pthread_self.c, pthread_equal.c, pthread_getcpuclockid.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/thread/list.rs"
+upstream = "musl"
+upstream_path = "src/thread/pthread_create.c (__tl_lock/__tl_unlock/__tl_sync)"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/thread/attr.rs"
+upstream = "musl"
+upstream_path = "src/thread/pthread_attr_init.c, pthread_attr_destroy.c, pthread_attr_get.c, pthread_attr_setdetachstate.c, pthread_attr_setguardsize.c, pthread_attr_setinheritsched.c, pthread_attr_setschedparam.c, pthread_attr_setschedpolicy.c, pthread_attr_setscope.c, pthread_attr_setstack.c, pthread_attr_setstacksize.c, default_attr.c, pthread_setattr_default_np.c, pthread_getattr_np.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/thread/kill.rs"
+upstream = "musl"
+upstream_path = "src/thread/pthread_kill.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/thread/sigmask.rs"
+upstream = "musl"
+upstream_path = "src/thread/pthread_sigmask.c, src/thread/pthread_create.c (__block_app_sigs/__restore_sigs)"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/thread/once.rs"
+upstream = "musl"
+upstream_path = "src/thread/pthread_once.c, call_once.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/thread/tsd.rs"
+upstream = "musl"
+upstream_path = "src/thread/pthread_key_create.c, pthread_getspecific.c, pthread_setspecific.c, tss_create.c, tss_delete.c, tss_set.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/thread/cancel.rs"
+upstream = "musl"
+upstream_path = "src/thread/pthread_cancel.c, pthread_setcancelstate.c, pthread_setcanceltype.c, pthread_testcancel.c, pthread_cleanup_push.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-thread/src/thread/atfork.rs"
+upstream = "musl"
+upstream_path = "src/thread/pthread_atfork.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"

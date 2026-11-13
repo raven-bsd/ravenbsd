@@ -1,0 +1,6 @@
+# llvm-objdump -d --no-show-raw-insn on the riscv64gc-unknown-none-elf rlib object
+0000000000000000 <__rl_thread_entry>:
+       0:      	ld	t0, 0(a0)
+       4:      	andi	sp, sp, -16
+       8:      	li	s0, 0
+       a:      	jr	t0

@@ -1,0 +1,17 @@
+# llvm-objdump -d --no-show-raw-insn on the x86_64-unknown-none rlib object
+0000000000000000 <__rl_tlsdesc_static>:
+       0:      	movq	8(%rax), %rax
+       4:      	retq
+
+0000000000000005 <__rl_tlsdesc_dynamic>:
+       5:      	movq	8(%rax), %rax
+       9:      	pushq	%rdx
+       a:      	movq	%fs:8, %rdx
+      13:      	pushq	%rcx
+      14:      	movq	(%rax), %rcx
+      17:      	movq	8(%rax), %rax
+      1b:      	addq	(%rdx,%rcx,8), %rax
+      1f:      	popq	%rcx
+      20:      	subq	%fs:0, %rax
+      29:      	popq	%rdx
+      2a:      	retq
