@@ -6499,3 +6499,124 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "the ten fts_options_test.c expectation tables converted mechanically to Rust tuples; BSD-2-Clause, Klara Inc. 2025; test data only"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-platform/src/fd/fdsan.rs"
+upstream = "bionic"
+upstream_path = "libc/bionic/fdsan.cpp"
+upstream_rev = "731631f300090436d7f5df80d50b6275c8c60a93"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Owner-tag encoding, error-level policy and close/exchange mismatch detection transpiled from fdsan.cpp, private/bionic_fdsan.h and include/android/fdsan.h; Android property/logging/mmap replaced by RAVEN_FDSAN, DEBUG_WRITE and the fd entry tag; default level warn (H-9)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-platform/src/conf/sysconf.rs"
+upstream = "bionic"
+upstream_path = "libc/bionic/sysconf.cpp"
+upstream_rev = "731631f300090436d7f5df80d50b6275c8c60a93"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "The _SC_* switch and POSIX minimums transpiled; sysconf_caches and the __sysconf_caches variants deleted, get_nprocs/get_phys_pages/get_avphys_pages replaced by the sysinfo hook and fallback, __sysconf_rlimit by the rlimit cell."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-platform/src/conf/pathconf.rs"
+upstream = "bionic"
+upstream_path = "libc/bionic/pathconf.cpp"
+upstream_rev = "731631f300090436d7f5df80d50b6275c8c60a93"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "_PC_* dispatch and the pathconf/fpathconf split transpiled; statfs.f_type magic switches __filesizebits and __link_max deleted because Raven StatFs has no f_type; LINK_MAX 32000, FILESIZEBITS 64."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-platform/src/random/getentropy.rs"
+upstream = "bionic"
+upstream_path = "libc/bionic/getentropy.cpp"
+upstream_rev = "731631f300090436d7f5df80d50b6275c8c60a93"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "GETENTROPY_MAX 256 check, fill loop and EINTR retry transpiled; getrandom(2) and /dev/urandom replaced by S:GETRANDOM* (PG-52) and the interim cached rand: handle."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-platform/src/tty/isatty.rs"
+upstream = "bionic"
+upstream_path = "libc/bionic/isatty.cpp"
+upstream_rev = "731631f300090436d7f5df80d50b6275c8c60a93"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "isatty(fd) = tcgetattr(fd) == 0 transpiled; a non-tty server ENOSYS maps to ENOTTY; TIOCGWINSZ is not used."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-platform/src/dir/getcwd.rs"
+upstream = "bionic"
+upstream_path = "libc/bionic/getcwd.cpp"
+upstream_rev = "731631f300090436d7f5df80d50b6275c8c60a93"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Four argument cases and ERANGE handling transpiled; __getcwd replaced by the libc cwd string and the page-size allocation rule by an exact strlen(cwd)+1 allocation."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-platform/src/time/sleep.rs"
+upstream = "bionic"
+upstream_path = "libc/bionic/sleep.cpp"
+upstream_rev = "731631f300090436d7f5df80d50b6275c8c60a93"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "nanosleep loop and remaining-seconds result transpiled; LP32 INT_MAX branch dropped; remaining time returns the full request until PG-17."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-platform/src/lock/lockf.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/lockf.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "Record-lock mapping transpiled; F_TEST asks for F_WRLCK (A-sys-12) and reports EACCES instead of EAGAIN."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-platform/src/sched/nice.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/nice.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "nice() over getpriority/setpriority transpiled; the clamp to -NZERO..NZERO-1 happens before setpriority (the donor clamps after)."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-platform/src/time/usleep.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/usleep.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "The seven-line timespec conversion transpiled unchanged in behaviour."
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-platform/src/conf/confstr.rs"
+upstream = "openbsd"
+upstream_path = "lib/libc/gen/confstr.c"
+upstream_rev = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-13"
+modified = true
+notes = "_CS_* switch and LP64 width tables transpiled; _CS_PATH is /bin:/usr/bin (O-4) and POSIX_V7_THREADS_LDFLAGS is empty (no libpthread)."

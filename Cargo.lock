@@ -1030,6 +1030,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-platform"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-libc-abi",
+ "raven-libc-proc",
+ "raven-libc-sys",
+ "raven-proto-fs",
+ "raven-proto-net",
+ "raven-proto-svc",
+ "raven-proto-tty",
+]
+
+[[package]]
 name = "raven-libc-pledge"
 version = "0.1.0"
 dependencies = [
