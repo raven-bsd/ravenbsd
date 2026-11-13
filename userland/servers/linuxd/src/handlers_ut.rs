@@ -4,12 +4,13 @@
 //! Handler tests: every B20 syscall, the error paths and the dispatcher counters.
 
 use raven_abi::errno::Errno;
+use raven_abi::types::Handle;
 use raven_linux_dispatch::SyscallArgs;
 
 use super::*;
 
 fn process() -> LinuxProcess {
-    LinuxProcess::new(7, 0x4000, 0x5000, 0x8000, 0x9000)
+    LinuxProcess::new(7, Handle(9), 0x4000, 0x5000, 0x8000, 0x9000)
 }
 
 fn call(nr: usize, a: [usize; 6]) -> SyscallArgs {
@@ -128,16 +129,25 @@ fn rt_sigprocmask_checks_the_set_size() {
 }
 
 #[test]
-fn arch_prctl_set_fs_reports_the_missing_kernel_primitive() {
+fn arch_prctl_queues_the_tls_base_for_the_trap_loop() {
     let mut process = process();
-    assert_eq!(
-        dispatch(&mut process, 158, [0x1002, 0x7000, 0, 0, 0, 0]),
-        -(Errno::ENOSYS.0 as isize)
-    );
+    assert_eq!(dispatch(&mut process, 158, [0x1002, 0x7000, 0, 0, 0, 0]), 0);
+    assert_eq!(process.pending_tls, Some(0x7000));
+    assert_eq!(process.fs_base, 0);
     assert_eq!(
         dispatch(&mut process, 158, [0x9999, 0x7000, 0, 0, 0, 0]),
         -(Errno::EINVAL.0 as isize)
     );
+}
+
+#[test]
+fn arch_prctl_get_fs_copies_the_stored_base() {
+    let mut process = process();
+    process.fs_base = 0x7fff_0000;
+    assert_eq!(dispatch(&mut process, 158, [0x1003, 0x2000, 0, 0, 0, 0]), 0);
+    let (address, bytes) = process.pending_write.take().expect("a copy-out");
+    assert_eq!(address, 0x2000);
+    assert_eq!(bytes, 0x7fff_0000u64.to_le_bytes());
 }
 
 #[test]

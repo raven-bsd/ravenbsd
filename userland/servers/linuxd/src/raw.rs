@@ -53,6 +53,21 @@ pub fn set_personality(process: Handle, handler: Handle) -> Result<(), Errno> {
     Errno::from_ret(result).map(|_| ())
 }
 
+/// Install `base` as the user TLS base of `thread` (`THREAD_SET_TLS`, S42).
+pub fn set_tls(thread: Handle, base: u64) -> Result<(), Errno> {
+    // SAFETY: THREAD_SET_TLS takes two scalar words: the thread handle returned by THREAD_CREATE
+    // (which carries SIGNAL) and a canonical user address. The kernel validates the handle rights
+    // and the address, and the Linux thread is blocked in the trap that asked for this.
+    let result = unsafe {
+        raven_rt::sys::syscall2(
+            raven_abi::syscall::THREAD_SET_TLS,
+            thread.0 as usize,
+            base as usize,
+        )
+    };
+    Errno::from_ret(result).map(|_| ())
+}
+
 /// Copy `out.len()` child bytes at `address` into `out`.
 pub fn copy_in(
     sys: &mut KernelSys,

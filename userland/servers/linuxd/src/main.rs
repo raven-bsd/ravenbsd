@@ -195,13 +195,16 @@ mod program {
             Ok(stack) => stack,
             Err(_) => return 6,
         };
-        if let Err(error) = sys::thread_create(loaded.proc, entry, stack, 0) {
-            println!("linuxd: thread create failed: {}", error.description());
-            return 6;
-        }
+        let thread = match sys::thread_create(loaded.proc, entry, stack, 0) {
+            Ok(thread) => thread,
+            Err(error) => {
+                println!("linuxd: thread create failed: {}", error.description());
+                return 6;
+            }
+        };
 
         let _watchdog = raven_rt::thread::spawn(watchdog, 0, 64 * 1024);
-        serve(sys, loaded, handler)
+        serve(sys, loaded, handler, thread)
     }
 
     fn image_from_initfs(path: &str) -> Result<Vec<u8>, i32> {
@@ -241,10 +244,11 @@ mod program {
         bytes
     }
 
-    fn serve(mut sys: KernelSys, loaded: linuxd::Loaded, handler: Handle) -> i32 {
+    fn serve(mut sys: KernelSys, loaded: linuxd::Loaded, handler: Handle, thread: Handle) -> i32 {
         let mut dispatcher = dispatcher();
         let mut process = LinuxProcess::new(
             1,
+            thread,
             loaded.brk,
             loaded.brk_limit,
             loaded.mmap,
@@ -317,7 +321,15 @@ mod program {
                 return None;
             }
         }
-        let action = dispatch(process, dispatcher, &call);
+        let mut action = dispatch(process, dispatcher, &call);
+        // The Linux thread is blocked in this trap, so a queued `ARCH_SET_FS` is installed in it
+        // before the reply is sent. A failing native call replaces the success with `-errno`.
+        if let Some(base) = process.pending_tls.take() {
+            match raw::set_tls(process.thread, base) {
+                Ok(()) => process.fs_base = base,
+                Err(error) => action = TrapAction::Reply(-(error.0 as isize)),
+            }
+        }
         // The skeleton traces every trap: the line shows which Linux syscall the fixture reached
         // and what it got back. B21+ can put it behind a quiet flag.
         match action {

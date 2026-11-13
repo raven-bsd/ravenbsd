@@ -17,7 +17,14 @@ fn request(nr: u64, args: [u64; 6]) -> [u8; SYSCALL_LEN] {
 }
 
 fn process() -> LinuxProcess {
-    LinuxProcess::new(7, 0x4000, 0x5000, 0x8000, 0x9000)
+    LinuxProcess::new(
+        7,
+        raven_abi::types::Handle(9),
+        0x4000,
+        0x5000,
+        0x8000,
+        0x9000,
+    )
 }
 
 #[test]

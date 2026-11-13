@@ -8,7 +8,7 @@ use raven_abi::types::Handle;
 use super::*;
 
 fn process() -> LinuxProcess {
-    LinuxProcess::new(7, 0x4000, 0x5000, 0x8000, 0x9000)
+    LinuxProcess::new(7, Handle(9), 0x4000, 0x5000, 0x8000, 0x9000)
 }
 
 #[test]

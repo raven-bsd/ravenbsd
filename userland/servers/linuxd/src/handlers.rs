@@ -31,6 +31,9 @@ const PAGE: u64 = 4096;
 /// `ARCH_SET_FS` of x86-64.
 const ARCH_SET_FS: i32 = 0x1002;
 
+/// `ARCH_GET_FS` of x86-64.
+const ARCH_GET_FS: i32 = 0x1003;
+
 /// A dispatcher with the B20 handlers registered.
 pub fn dispatcher() -> Dispatcher {
     let mut dispatcher = Dispatcher::new(Arch::X86_64);
@@ -173,11 +176,27 @@ fn rt_sigprocmask(_ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
 /// `wrfsbase` enablement), so this handler answers `-ENOSYS` instead of pretending the base was set.
 /// musl's `__init_tls` treats a failed thread-pointer setup as fatal (`a_crash()`), which is why the
 /// static fixture stops here. See the B20 report for the exact missing primitive.
-fn arch_prctl(_ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
-    if args.int(0) == ARCH_SET_FS {
-        return -(Errno::ENOSYS.0 as isize);
-    }
-    -(Errno::EINVAL.0 as isize)
+/// `arch_prctl`: the thread's FS base lives in the native thread (`THREAD_SET_TLS`, S42).
+///
+/// The Linux thread is blocked inside this trap, so the handler records the requested base and the
+/// trap loop installs it with `THREAD_SET_TLS(child_thread, base)` **before** the reply reaches the
+/// child. `ARCH_GET_FS` copies the base the table stored when the last set succeeded. A failing
+/// native call replaces the success reply with `-errno`; success is never assumed.
+fn arch_prctl(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let operation = args.int(0);
+    let value = args.ptr(1) as u64;
+    let result = with(ctx, |process| match operation {
+        ARCH_SET_FS => {
+            process.pending_tls = Some(value);
+            0
+        }
+        ARCH_GET_FS => {
+            process.pending_write = Some((value, process.fs_base.to_le_bytes().to_vec()));
+            0
+        }
+        _ => -(Errno::EINVAL.0 as isize),
+    });
+    result.unwrap_or_else(|_| einval())
 }
 
 fn round_up(value: u64, align: u64) -> Option<u64> {

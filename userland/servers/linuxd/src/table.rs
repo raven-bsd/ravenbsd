@@ -70,11 +70,24 @@ pub struct LinuxProcess {
     pub user_buffer: Vec<u8>,
     /// Bytes a handler wants the trap loop to copy into the process, with their address.
     pub pending_write: Option<(u64, Vec<u8>)>,
+    /// Thread handle of the Linux thread (`THREAD_CREATE`), used by `THREAD_SET_TLS`.
+    pub thread: Handle,
+    /// Current user TLS base, as `arch_prctl` `ARCH_GET_FS` reports it.
+    pub fs_base: u64,
+    /// A base the `arch_prctl` handler queued for the trap loop to install before it replies.
+    pub pending_tls: Option<u64>,
 }
 
 impl LinuxProcess {
     /// Create the context for a freshly loaded process.
-    pub fn new(pid: i32, brk: u64, brk_limit: u64, mmap_next: u64, mmap_limit: u64) -> Self {
+    pub fn new(
+        pid: i32,
+        thread: Handle,
+        brk: u64,
+        brk_limit: u64,
+        mmap_next: u64,
+        mmap_limit: u64,
+    ) -> Self {
         Self {
             pid,
             exit: None,
@@ -87,6 +100,9 @@ impl LinuxProcess {
             output: Vec::new(),
             user_buffer: Vec::new(),
             pending_write: None,
+            thread,
+            fs_base: 0,
+            pending_tls: None,
         }
     }
 
