@@ -3,7 +3,7 @@
 //! Character classification, case mapping and the UTF-8 multibyte codec.
 //!
 //! This crate is the pure-logic leaf of `architecture/raven-libc/donor-map/02-ctype-locale-i18n.md`
-//! sections 3.1-3.3: the UTF-8 codec behind `mbrtowc`, the `<ctypes.h>`/`<wctype.h>` families,
+//! sections 3.1-3.3: the UTF-8 codec behind `mbrtowc`, the `<ctype.h>`/`<wctype.h>` families,
 //! `wcwidth`/`wcswidth` and the generated Unicode 15.1.0 property and case tables. Locale state,
 //! `errno`, thread-local null-`ps` states and every `extern "C"` symbol belong to the shell crate.
 //!
