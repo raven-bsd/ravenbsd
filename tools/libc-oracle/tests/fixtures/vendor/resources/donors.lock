@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+fixture  0123456789abcdef0123456789abcdef01234567  A  https://example.invalid/fixture.git

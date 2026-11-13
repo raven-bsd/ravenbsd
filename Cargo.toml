@@ -10,7 +10,7 @@ resolver = "3"
 exclude = ["build"]
 # A ticket that creates a new top-level crate appends ONE line to `members` (and nothing else here).
 # Planned members: "kernel", "boot/loader", "userland/rt", "userland/init", "userland/bin/<tool>",
-# "userland/servers/<server>", "userland/drivers/<driver>", "userland/linux-shim", "libc/ralibc",
+# "userland/servers/<server>", "userland/drivers/<driver>", "userland/linux-shim", "libc/ravenlibc/crates/*",
 # "xtask", "tests/qtest", "tests/fixtures/<name>".
 members = [
     "crates/*",
@@ -59,13 +59,17 @@ members = [
     "xtask",
     "tests/qtest",
     "tests/ufs-oracle",
+    "tests/libc/oracle",
     "tests/ufs-powercut",
     "tools/fs-fuzz",
     "tools/linux-corpus",
     "tools/ufs-fsck",
     "tools/ufs-mkfs",
     "tools/integration-inventory",
+    "tools/libc-census",
+    "tools/libc-oracle",
     "libc/spike/va",
+    "libc/ravenlibc/crates/*",
     "userland/rt",
     "userland/linux-shim",
     "userland/init",
@@ -138,7 +142,7 @@ members = [
     "tools/fuzz",
     "tests/fuzz/replay",
 ]
-default-members = ["crates/*"]
+default-members = ["crates/*", "libc/ravenlibc/crates/*"]
 
 [workspace.package]
 edition = "2024"
@@ -156,6 +160,31 @@ undocumented_unsafe_blocks = "deny"
 # The kernel crate additionally opts in to `indexing_slicing` and `arithmetic_side_effects` (warn).
 
 # dev: "fat" on purpose: no optimisation, full debug info, overflow checks. Easy to debug, big binaries.
+# ravenlibc build profiles (architecture/raven-libc/17-crate-layout.md 9.2); built by `cargo xtask libc-*`, never by default.
+[profile.libc-a]
+inherits = "release"
+opt-level = "z"
+codegen-units = 4096
+lto = false
+panic = "abort"
+debug = false
+incremental = false
+strip = "none"
+
+[profile.libc-a-server]
+inherits = "libc-a"
+opt-level = "s"
+
+[profile.libc-so]
+inherits = "release"
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+debug = false
+incremental = false
+strip = "none"
+
 [profile.dev]
 opt-level = 0
 debug = 2

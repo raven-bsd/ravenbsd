@@ -222,3 +222,42 @@ fn initfs_defaults_to_base_profile() {
         }
     );
 }
+
+#[test]
+fn parses_libc_lint() {
+    let command = parse_args(&args(&["libc-lint", "layout", "--json"])).unwrap();
+    assert_eq!(
+        command,
+        Command::Libc {
+            name: "libc-lint".into(),
+            args: vec!["layout".into(), "--json".into()],
+        }
+    );
+}
+
+#[test]
+fn parses_libc_oracle() {
+    let command = parse_args(&args(&["libc-oracle"])).unwrap();
+    assert_eq!(
+        command,
+        Command::Libc {
+            name: "libc-oracle".into(),
+            args: Vec::new(),
+        }
+    );
+}
+
+#[test]
+fn help_lists_libc_commands() {
+    for name in [
+        "libc-lint",
+        "libc-oracle",
+        "libc-headers",
+        "libc-pack",
+        "libc-size",
+        "libc-world",
+        "libc-census",
+    ] {
+        assert!(HELP.contains(name), "help is missing {name}");
+    }
+}

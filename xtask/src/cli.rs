@@ -47,6 +47,13 @@ cargo xtask commands:
   qtest   [--case <name> | --all] [--arch <a>] [--no-build]
   provenance
   docs
+  libc-lint [CHECK...] [--root DIR] [--json]
+  libc-oracle ... (not implemented yet)
+  libc-headers ... (not implemented yet)
+  libc-pack ... (not implemented yet)
+  libc-size ... (not implemented yet)
+  libc-world ... (not implemented yet)
+  libc-census ... (not implemented yet)
 ";
 
 #[derive(Debug, PartialEq, Eq)]
@@ -86,6 +93,10 @@ enum Command {
     },
     Provenance,
     Docs,
+    Libc {
+        name: String,
+        args: Vec<String>,
+    },
 }
 
 /// Parse and execute a command line. Errors are usage or infrastructure errors and exit 2.
@@ -133,6 +144,10 @@ fn parse_args(args: &[String]) -> Result<Command> {
         "image" => parse_image(rest),
         "run" => parse_run(rest),
         "qtest" => Ok(Command::Qtest {
+            args: rest.to_vec(),
+        }),
+        name if crate::libc_cmd::is_libc_command(name) => Ok(Command::Libc {
+            name: name.to_string(),
             args: rest.to_vec(),
         }),
         other => bail!("unknown command `{other}` (try `help`)"),
@@ -329,6 +344,10 @@ fn execute(command: Command) -> Result<u8> {
         Command::Docs => {
             let root = root()?;
             docs::run(&root)
+        }
+        Command::Libc { name, args } => {
+            let root = root()?;
+            crate::libc_cmd::run(&root, &name, &args)
         }
     }
 }

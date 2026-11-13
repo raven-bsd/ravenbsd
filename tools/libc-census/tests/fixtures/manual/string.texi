@@ -1,0 +1,19 @@
+@node String and Array Utilities
+@chapter String and Array Utilities
+
+@deftypefun size_t strlcpy (char *@var{to}, const char *@var{from}, size_t @var{size})
+@standards{POSIX.1-2024, string.h}
+@comment fixture prose is not copied from the donor manual
+@end deftypefun
+
+@deftypefunx size_t strlcat (char *@var{to}, const char *@var{from}, size_t @var{size})
+@standards{POSIX.1-2024, string.h}
+@end deftypefun
+
+@deftypevr {Variable} {char **} environ
+@standards{POSIX.1, unistd.h}
+@end deftypevr
+
+@deftypefun int getentropy (void *@var{buffer}, size_t @var{length})
+@standardsx{getentropy, POSIX.1-2024, unistd.h}
+@end deftypefun

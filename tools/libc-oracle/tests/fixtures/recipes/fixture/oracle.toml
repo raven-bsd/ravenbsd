@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+schema = 1
+family = "fixture"
+description = "Invented fixture: a cross-file helper and an external memcpy reference."
+exports = ["fixture_api", "fixture_helper"]
+opt = ["O2"]
+defines = []
+include = []
+flags = []
+
+[[source]]
+donor = "fixture"
+path = "lib/helper.c"
+
+[[source]]
+donor = "fixture"
+path = "lib/api.c"

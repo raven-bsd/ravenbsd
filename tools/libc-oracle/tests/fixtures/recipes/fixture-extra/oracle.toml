@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+schema = 1
+family = "fixture-extra"
+description = "Invented fixture with an export list that forgets the helper."
+exports = ["fixture_api"]
+opt = ["O2"]
+defines = []
+include = []
+flags = []
+
+[[source]]
+donor = "fixture"
+path = "lib/helper.c"
+
+[[source]]
+donor = "fixture"
+path = "lib/api.c"

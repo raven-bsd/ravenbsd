@@ -1,0 +1,347 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[crate]]
+name = "raven-libc-abi"
+path = "crates/raven-libc-abi"
+layer = "L0"
+std = "core"
+unsafe = "P"
+host = true
+
+[[crate]]
+name = "raven-libc-tls"
+path = "crates/raven-libc-tls"
+layer = "L0"
+std = "core"
+unsafe = "M"
+raw_modules = ["raw"]
+host = true
+deps = ["raven-libc-abi"]
+
+[[crate]]
+name = "raven-libc-ctype"
+path = "crates/raven-libc-ctype"
+layer = "L1"
+std = "core"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi"]
+
+[[crate]]
+name = "raven-libc-str"
+path = "crates/raven-libc-str"
+layer = "L1"
+std = "core"
+unsafe = "M"
+raw_modules = ["raw"]
+host = true
+deps = ["raven-libc-abi"]
+
+[[crate]]
+name = "raven-libc-dtoa"
+path = "crates/raven-libc-dtoa"
+layer = "L1"
+std = "core"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi"]
+alloc_feature = true
+
+[[crate]]
+name = "raven-libc-fmt"
+path = "crates/raven-libc-fmt"
+layer = "L1"
+std = "core"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi", "raven-libc-ctype"]
+
+[[crate]]
+name = "raven-libc-m"
+path = "crates/raven-libc-m"
+layer = "L1"
+std = "core"
+unsafe = "M"
+raw_modules = ["arch", "fenv"]
+host = true
+deps = ["raven-libc-abi"]
+
+[[crate]]
+name = "raven-libc-ssp"
+path = "crates/raven-libc-ssp"
+layer = "L1"
+std = "core"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi"]
+
+[[crate]]
+name = "raven-libc-malloc"
+path = "crates/raven-libc-malloc"
+layer = "L1"
+std = "core"
+unsafe = "M"
+raw_modules = ["raw"]
+host = true
+deps = ["raven-libc-abi"]
+
+[[crate]]
+name = "raven-libc-rand"
+path = "crates/raven-libc-rand"
+layer = "L1"
+std = "core"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi"]
+external = ["raven-prng"]
+
+[[crate]]
+name = "raven-libc-elf"
+path = "crates/raven-libc-elf"
+layer = "L1"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi"]
+
+[[crate]]
+name = "raven-libc-locale"
+path = "crates/raven-libc-locale"
+layer = "L1"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi", "raven-libc-ctype"]
+
+[[crate]]
+name = "raven-libc-iconv"
+path = "crates/raven-libc-iconv"
+layer = "L1"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi", "raven-libc-ctype", "raven-libc-iconv-cjk"]
+
+[[crate]]
+name = "raven-libc-iconv-cjk"
+path = "crates/raven-libc-iconv-cjk"
+layer = "L1"
+std = "core"
+unsafe = "P"
+host = true
+
+[[crate]]
+name = "raven-libc-stdlib"
+path = "crates/raven-libc-stdlib"
+layer = "L1"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi", "raven-libc-ctype", "raven-libc-str"]
+
+[[crate]]
+name = "raven-libc-time"
+path = "crates/raven-libc-time"
+layer = "L1"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi", "raven-libc-ctype", "raven-libc-locale"]
+
+[[crate]]
+name = "raven-libc-regex"
+path = "crates/raven-libc-regex"
+layer = "L1"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi", "raven-libc-ctype", "raven-libc-locale"]
+
+[[crate]]
+name = "raven-libc-glob"
+path = "crates/raven-libc-glob"
+layer = "L1"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi", "raven-libc-ctype", "raven-libc-str"]
+
+[[crate]]
+name = "raven-libc-fts"
+path = "crates/raven-libc-fts"
+layer = "L1"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi", "raven-libc-str"]
+
+[[crate]]
+name = "raven-libc-resolv"
+path = "crates/raven-libc-resolv"
+layer = "L1"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi", "raven-libc-ctype"]
+
+[[crate]]
+name = "raven-libc-nss"
+path = "crates/raven-libc-nss"
+layer = "L1"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi"]
+
+[[crate]]
+name = "raven-libc-pwd"
+path = "crates/raven-libc-pwd"
+layer = "L1"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi", "raven-libc-nss"]
+
+[[crate]]
+name = "raven-libc-proc"
+path = "crates/raven-libc-proc"
+layer = "L1"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi"]
+
+[[crate]]
+name = "raven-libc-pledge"
+path = "crates/raven-libc-pledge"
+layer = "L1"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi"]
+
+[[crate]]
+name = "raven-libc-compat"
+path = "crates/raven-libc-compat"
+layer = "L1"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi", "raven-libc-ctype", "raven-libc-str", "raven-libc-stdlib"]
+
+[[crate]]
+name = "raven-libc-stdio"
+path = "crates/raven-libc-stdio"
+layer = "L1"
+std = "alloc"
+unsafe = "M"
+raw_modules = ["raw"]
+host = true
+deps = ["raven-libc-abi", "raven-libc-ctype", "raven-libc-fmt"]
+
+[[crate]]
+name = "raven-libc-sys"
+path = "crates/raven-libc-sys"
+layer = "L2a"
+std = "core"
+unsafe = "U"
+host = false
+deps = ["raven-libc-abi", "raven-libc-tls"]
+external = ["raven-abi"]
+
+[[crate]]
+name = "raven-libc-platform"
+path = "crates/raven-libc-platform"
+layer = "L2b"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi", "raven-libc-sys", "raven-libc-malloc", "raven-libc-time", "raven-libc-glob", "raven-libc-fts", "raven-libc-resolv", "raven-libc-nss", "raven-libc-pwd", "raven-libc-proc", "raven-libc-stdio"]
+external = ["raven-abi", "raven-proto-fs", "raven-proto-net", "raven-proto-tty", "raven-scheme"]
+
+[[crate]]
+name = "raven-libc-signal"
+path = "crates/raven-libc-signal"
+layer = "L2b"
+std = "alloc"
+unsafe = "M"
+raw_modules = ["raw"]
+host = false
+deps = ["raven-libc-abi", "raven-libc-tls", "raven-libc-sys"]
+
+[[crate]]
+name = "raven-libc-thread"
+path = "crates/raven-libc-thread"
+layer = "L2b"
+std = "alloc"
+unsafe = "M"
+raw_modules = ["raw"]
+host = false
+deps = ["raven-libc-abi", "raven-libc-tls", "raven-libc-sys", "raven-libc-signal"]
+
+[[crate]]
+name = "raven-libc-net"
+path = "crates/raven-libc-net"
+layer = "L2c"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi", "raven-libc-sys", "raven-libc-platform", "raven-libc-resolv", "raven-libc-nss"]
+external = ["raven-proto-net"]
+
+[[crate]]
+name = "raven-libc-personality-linux"
+path = "crates/raven-libc-personality-linux"
+layer = "L2c"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi", "raven-libc-sys", "raven-libc-platform", "raven-libc-signal"]
+
+[[crate]]
+name = "raven-libc-personality-bsd"
+path = "crates/raven-libc-personality-bsd"
+layer = "L2c"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi", "raven-libc-sys", "raven-libc-platform", "raven-libc-pledge", "raven-libc-proc"]
+
+[[crate]]
+name = "raven-libc-personality-solaris"
+path = "crates/raven-libc-personality-solaris"
+layer = "L2c"
+std = "alloc"
+unsafe = "P"
+host = true
+deps = ["raven-libc-abi", "raven-libc-sys", "raven-libc-platform", "raven-libc-thread"]
+
+[[crate]]
+name = "raven-libc"
+path = "crates/raven-libc"
+layer = "L3"
+std = "alloc"
+unsafe = "U"
+host = false
+deps = ["raven-libc-abi", "raven-libc-tls", "raven-libc-ctype", "raven-libc-str", "raven-libc-dtoa", "raven-libc-fmt", "raven-libc-m", "raven-libc-ssp", "raven-libc-malloc", "raven-libc-rand", "raven-libc-elf", "raven-libc-locale", "raven-libc-iconv", "raven-libc-iconv-cjk", "raven-libc-stdlib", "raven-libc-time", "raven-libc-regex", "raven-libc-glob", "raven-libc-fts", "raven-libc-resolv", "raven-libc-nss", "raven-libc-pwd", "raven-libc-proc", "raven-libc-pledge", "raven-libc-compat", "raven-libc-stdio", "raven-libc-sys", "raven-libc-platform", "raven-libc-signal", "raven-libc-thread", "raven-libc-net", "raven-libc-personality-linux", "raven-libc-personality-bsd", "raven-libc-personality-solaris"]
+
+[[crate]]
+name = "raven-libc-crt"
+path = "crt"
+layer = "L3"
+std = "core"
+unsafe = "U"
+host = false
+deps = ["raven-libc-abi"]
+
+[[crate]]
+name = "raven-libc-rtld"
+path = "ld"
+layer = "L3"
+std = "core"
+unsafe = "M"
+raw_modules = ["raw"]
+host = false
+deps = ["raven-libc-abi", "raven-libc-elf", "raven-libc-tls"]
+kind = "bin"

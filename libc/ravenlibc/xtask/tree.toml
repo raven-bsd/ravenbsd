@@ -1,0 +1,107 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[entry]]
+path = "README.md"
+owner = "C34"
+required = true
+kind = "file"
+
+[[entry]]
+path = "crates"
+owner = "C34"
+required = true
+kind = "dir"
+
+[[entry]]
+path = "crates/README.md"
+owner = "C34"
+required = true
+kind = "file"
+
+[[entry]]
+path = "xtask"
+owner = "C34"
+required = true
+kind = "dir"
+
+[[entry]]
+path = "tools"
+owner = "C34"
+required = true
+kind = "dir"
+
+[[entry]]
+path = "tools/lint"
+owner = "C34"
+required = true
+kind = "dir"
+
+[[entry]]
+path = "tools/hdrgen"
+owner = "C36"
+required = false
+kind = "dir"
+
+[[entry]]
+path = "tools/mkmap"
+owner = "C60"
+required = false
+kind = "dir"
+
+[[entry]]
+path = "abi"
+owner = "C36"
+required = false
+kind = "dir"
+
+[[entry]]
+path = "include"
+owner = "C37"
+required = false
+kind = "dir"
+
+[[entry]]
+path = "arch"
+owner = "C37"
+required = false
+kind = "dir"
+
+[[entry]]
+path = "crt"
+owner = "C61"
+required = false
+kind = "dir"
+
+[[entry]]
+path = "ld"
+owner = "C62"
+required = false
+kind = "dir"
+
+[[entry]]
+path = "stubs"
+owner = "C66"
+required = false
+kind = "dir"
+
+[[entry]]
+path = "tests"
+owner = "C73"
+required = false
+kind = "dir"
+
+[[entry]]
+path = "world.toml"
+owner = "C72"
+required = false
+kind = "file"
+
+[[entry]]
+path = "GATE-REPORT.md"
+owner = "C74"
+required = false
+kind = "file"
+
+[forbidden]
+files = ["Cargo.toml"]

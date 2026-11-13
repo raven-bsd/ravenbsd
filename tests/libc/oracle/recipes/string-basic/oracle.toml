@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# string-basic: strlcpy and strnlen (OpenBSD, ISC) and memchr (musl, MIT via musl/COPYRIGHT).
+# The donor C is compiled from the read-only checkout at test time; nothing is copied here.
+
+schema = 1
+family = "string-basic"
+description = "strlcpy, strnlen (OpenBSD, ISC) and memchr (musl, MIT via COPYRIGHT): the worked examples of 05 section 4"
+exports = ["memchr", "strlcpy", "strnlen"]
+opt = ["O2", "O0"]
+defines = []
+include = []
+flags = []
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strlcpy.c"
+
+[[source]]
+donor = "openbsd"
+path = "lib/libc/string/strnlen.c"
+
+[[source]]
+donor = "musl"
+path = "src/string/memchr.c"

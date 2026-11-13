@@ -1,0 +1,18 @@
+FBSD_1.0 {
+    global:
+        arc4random;
+        environ;
+        epoll_create;
+        err;
+        getentropy;
+        memchr;
+        strlcat;
+        strlcpy;
+        warn;
+    local:
+        *;
+};
+
+FBSDprivate_1.0 {
+    hidden_freebsd;
+} FBSD_1.0;

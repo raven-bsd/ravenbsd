@@ -1,0 +1,8 @@
+--- a/x.c
++++ b/x.c
+@@ -1,2 +1,5 @@
+ #include <stdio.h>
++#include <sys/epoll.h>
++#ifdef __GLIBC__
++    epoll_create(1);
++#endif

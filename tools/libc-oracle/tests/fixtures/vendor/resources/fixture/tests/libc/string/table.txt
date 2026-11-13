@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: LicenseRef-PublicDomain
+# Public domain fixture data.
+alpha
+beta
