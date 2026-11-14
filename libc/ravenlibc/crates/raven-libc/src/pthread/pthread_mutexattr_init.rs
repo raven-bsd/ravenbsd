@@ -7,6 +7,6 @@ pub extern "C" fn pthread_mutexattr_init(attr: *mut m::MutexAttr) -> core::ffi::
     if attr.is_null() {
         return 22;
     }
-    unsafe { *attr = m::attr_init() };
+    unsafe { *attr = m::attr_init() }; // SAFETY: attr is non-NULL after the check and writable for one mutex attribute.
     0
 }

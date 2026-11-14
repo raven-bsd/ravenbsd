@@ -12,5 +12,5 @@ pub extern "C" fn mtx_timedlock(
     if mutex.is_null() || at.is_null() {
         return 2;
     }
-    c11::mtx_timedlock(&SysKernel, unsafe { &*mutex }, unsafe { *at })
+    c11::mtx_timedlock(&SysKernel, unsafe { &*mutex }, unsafe { *at }) // SAFETY: the null checks above guarantee a live mutex and a readable timespec.
 }

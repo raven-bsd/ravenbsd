@@ -8,6 +8,7 @@ pub extern "C" fn sem_trywait(sem: *mut s::Sem) -> c_int {
     if sem.is_null() {
         return 22;
     }
+    // SAFETY: sem is non-NULL after the check and points to a live initialised semaphore.
     match s::trywait(unsafe { &*sem }) {
         Ok(()) => 0,
         Err(e) => super::common::err(e),

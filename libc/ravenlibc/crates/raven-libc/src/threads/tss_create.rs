@@ -14,10 +14,10 @@ pub extern "C" fn tss_create(
         return 2;
     }
     let dtor: Option<fn(usize)> = destructor
-        .map(|f| unsafe { core::mem::transmute::<extern "C" fn(*mut c_void), fn(usize)>(f) });
+        .map(|f| unsafe { core::mem::transmute::<extern "C" fn(*mut c_void), fn(usize)>(f) }); // SAFETY: both one-argument fn types share the C ABI; the destructor is called with the thread value.
     let (code, value) = c11::tss_create(&SysKernel, dtor);
     if code == 0 {
-        unsafe { *key = value };
+        unsafe { *key = value }; // SAFETY: key is non-NULL after the check and writable for one tss_t.
     }
     code
 }

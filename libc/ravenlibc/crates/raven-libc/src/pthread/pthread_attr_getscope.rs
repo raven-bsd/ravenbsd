@@ -10,6 +10,6 @@ pub extern "C" fn pthread_attr_getscope(
     if attr.is_null() || out.is_null() {
         return 22;
     }
-    unsafe { *out = a::getscope(&*attr) };
+    unsafe { *out = a::getscope(&*attr) }; // SAFETY: the null checks above guarantee a readable attribute and a writable scope slot.
     0
 }

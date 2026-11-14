@@ -7,6 +7,6 @@ pub extern "C" fn pthread_rwlockattr_init(attr: *mut r::RwLockAttr) -> core::ffi
     if attr.is_null() {
         return 22;
     }
-    unsafe { *attr = r::attr_init() };
+    unsafe { *attr = r::attr_init() }; // SAFETY: attr is non-NULL after the check and writable for one rwlock attribute.
     0
 }

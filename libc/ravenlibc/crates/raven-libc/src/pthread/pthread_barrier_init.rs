@@ -15,9 +15,10 @@ pub extern "C" fn pthread_barrier_init(
     let a = if attr.is_null() {
         None
     } else {
-        Some(unsafe { &*attr })
+        Some(unsafe { &*attr }) // SAFETY: attr is non-NULL when Some; the caller owns a live barrier attribute.
     };
     match b::init(unsafe { &mut *barrier }, a, count) {
+        // SAFETY: barrier is non-NULL after the check and exclusively borrowed for initialisation.
         Ok(()) => 0,
         Err(e) => super::common::err(e),
     }

@@ -13,16 +13,16 @@ pub extern "C" fn pthread_cond_timedwait(
     if cond.is_null() || mutex.is_null() {
         return 22;
     }
-    let clock = unsafe { (*cond).clock() };
+    let clock = unsafe { (*cond).clock() }; // SAFETY: cond is non-NULL after the check and points to a live initialised condition variable.
     match c::timedwait(
         &raven_libc_thread::raw::SysKernel,
-        unsafe { &*cond },
-        unsafe { &*mutex },
+        unsafe { &*cond }, // SAFETY: cond is non-NULL after the check and points to a live initialised condition variable.
+        unsafe { &*mutex }, // SAFETY: mutex is non-NULL after the check and points to a live locked mutex.
         clock,
         if at.is_null() {
             None
         } else {
-            Some(unsafe { *at })
+            Some(unsafe { *at }) // SAFETY: at is non-NULL when Some and readable for one timespec.
         },
     ) {
         Ok(()) => 0,

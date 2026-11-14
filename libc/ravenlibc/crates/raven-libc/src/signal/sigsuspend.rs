@@ -13,6 +13,6 @@ pub unsafe extern "C" fn sigsuspend(set: *const SigSet) -> core::ffi::c_int {
     if set.is_null() {
         return -1;
     }
-    crate::ffi::errno::set(wait::sigsuspend(&SysKernel, &DISP, unsafe { &*set }));
+    crate::ffi::errno::set(wait::sigsuspend(&SysKernel, &DISP, unsafe { &*set })); // SAFETY: set is non-NULL after the check; the caller provides a valid sigset_t.
     -1
 }

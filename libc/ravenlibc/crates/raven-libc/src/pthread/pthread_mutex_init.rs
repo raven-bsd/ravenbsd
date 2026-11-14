@@ -11,8 +11,8 @@ pub extern "C" fn pthread_mutex_init(mutex: *mut m::Mutex, attr: *const m::Mutex
     let a = if attr.is_null() {
         None
     } else {
-        Some(unsafe { &*attr })
+        Some(unsafe { &*attr }) // SAFETY: attr is non-NULL when Some; the caller owns a live mutex attribute.
     };
-    m::init(unsafe { &mut *mutex }, a);
+    m::init(unsafe { &mut *mutex }, a); // SAFETY: mutex is non-NULL after the check and exclusively borrowed for initialisation.
     0
 }

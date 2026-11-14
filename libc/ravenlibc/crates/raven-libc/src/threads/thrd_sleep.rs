@@ -12,7 +12,7 @@ pub extern "C" fn thrd_sleep(
     if duration.is_null() {
         return -1;
     }
-    let duration = unsafe { *duration };
+    let duration = unsafe { *duration }; // SAFETY: duration is non-NULL after the check and readable for one timespec.
     let _ = remaining;
     c11::thrd_sleep(&SysKernel, duration, None)
 }

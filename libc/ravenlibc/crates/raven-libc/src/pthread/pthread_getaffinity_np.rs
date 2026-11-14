@@ -15,7 +15,7 @@ pub extern "C" fn pthread_getaffinity_np(
     }
     match sched::getaffinity() {
         Ok(value) => {
-            unsafe { *(mask as *mut u64) = value };
+            unsafe { *(mask as *mut u64) = value }; // SAFETY: mask is non-NULL after the check and writable for one cpu_set_t word.
             0
         }
         Err(e) => super::common::err(e),

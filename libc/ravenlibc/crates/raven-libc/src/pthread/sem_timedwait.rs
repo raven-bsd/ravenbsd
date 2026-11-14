@@ -13,11 +13,11 @@ pub extern "C" fn sem_timedwait(
     }
     match s::timedwait(
         &raven_libc_thread::raw::SysKernel,
-        unsafe { &*sem },
+        unsafe { &*sem }, // SAFETY: sem is non-NULL after the check and points to a live initialised semaphore.
         if at.is_null() {
             None
         } else {
-            Some(unsafe { *at })
+            Some(unsafe { *at }) // SAFETY: at is non-NULL when Some and readable for one timespec.
         },
     ) {
         Ok(()) => 0,

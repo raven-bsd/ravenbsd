@@ -24,6 +24,7 @@ use crate::ffi::platform::ShellLock;
 
 mod accept;
 mod getsockname;
+#[path = "socket.rs"]
 mod listen;
 mod recv;
 mod sendmmsg;

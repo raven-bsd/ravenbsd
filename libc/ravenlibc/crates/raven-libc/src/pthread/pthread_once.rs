@@ -12,7 +12,7 @@ pub extern "C" fn pthread_once(control: *mut Once, init: Option<extern "C" fn()>
     let Some(init) = init else {
         return 22;
     };
-    let init: fn() = unsafe { core::mem::transmute::<extern "C" fn(), fn()>(init) };
-    once::once(&SysKernel, unsafe { &*control }, init);
+    let init: fn() = unsafe { core::mem::transmute::<extern "C" fn(), fn()>(init) }; // SAFETY: both fn() types share the C ABI; the callback is only invoked as the once routine.
+    once::once(&SysKernel, unsafe { &*control }, init); // SAFETY: control is non-NULL after the check and points to the caller's live once control.
     0
 }

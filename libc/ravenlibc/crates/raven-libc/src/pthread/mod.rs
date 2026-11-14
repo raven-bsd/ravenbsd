@@ -249,7 +249,7 @@ mod sem_destroy;
 mod sem_getvalue;
 #[path = "sem_init.rs"]
 mod sem_init;
-#[path = "sem_open.rs"]
+#[path = "raven_va_sem_open.rs"]
 mod sem_open;
 #[path = "sem_post.rs"]
 mod sem_post;

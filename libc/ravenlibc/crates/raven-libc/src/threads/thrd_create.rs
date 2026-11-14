@@ -28,11 +28,12 @@ pub extern "C" fn thrd_create(
     let info = alloc::boxed::Box::into_raw(alloc::boxed::Box::new(StartInfo { start, arg }));
     match c11::thrd_create(&SysKernel, trampoline, info as usize) {
         Ok(value) => {
-            unsafe { *thread = value };
+            unsafe { *thread = value }; // SAFETY: thread is non-NULL after the check and writable for one thrd_t.
             0
         }
         Err(code) => {
             unsafe {
+                // SAFETY: info came from Box::into_raw above and thrd_create failed, so this reclaims the only owning pointer.
                 drop(alloc::boxed::Box::from_raw(info));
             };
             code

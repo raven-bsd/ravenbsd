@@ -8,6 +8,7 @@ pub extern "C" fn pthread_spin_init(lock: *mut s::SpinLock, shared: c_int) -> c_
     if lock.is_null() {
         return 22;
     }
+    // SAFETY: lock is non-NULL after the check and exclusively borrowed for initialisation.
     match s::init(unsafe { &mut *lock }, shared) {
         Ok(()) => 0,
         Err(e) => super::common::err(e),

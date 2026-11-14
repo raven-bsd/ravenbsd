@@ -15,12 +15,12 @@ pub unsafe extern "C" fn sigprocmask(how: c_int, set: *const SigSet, old: *mut S
     let s = if set.is_null() {
         None
     } else {
-        Some(unsafe { &*set })
+        Some(unsafe { &*set }) // SAFETY: set is non-NULL when Some; the caller provides a valid sigset_t.
     };
     let o = if old.is_null() {
         None
     } else {
-        Some(unsafe { &mut *old })
+        Some(unsafe { &mut *old }) // SAFETY: old is non-NULL when Some and writable for one sigset_t.
     };
     match maskops::sigprocmask(&SysKernel, how, s, o) {
         Ok(()) => 0,

@@ -7,6 +7,6 @@ pub extern "C" fn pthread_getattr_default_np(attr: *mut a::Attr) -> core::ffi::c
     if attr.is_null() {
         return 22;
     }
-    unsafe { *attr = a::getattr_default_np() };
+    unsafe { *attr = a::getattr_default_np() }; // SAFETY: attr is non-NULL after the check and writable for one attribute.
     0
 }

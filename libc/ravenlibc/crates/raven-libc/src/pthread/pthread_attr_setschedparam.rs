@@ -10,6 +10,6 @@ pub extern "C" fn pthread_attr_setschedparam(
     if attr.is_null() || param.is_null() {
         return 22;
     }
-    a::setschedparam(unsafe { &mut *attr }, unsafe { *param });
+    a::setschedparam(unsafe { &mut *attr }, unsafe { *param }); // SAFETY: the null checks above guarantee an exclusive attribute and a readable sched_param.
     0
 }

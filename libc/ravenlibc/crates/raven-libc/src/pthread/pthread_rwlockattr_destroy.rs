@@ -7,6 +7,6 @@ pub extern "C" fn pthread_rwlockattr_destroy(attr: *mut r::RwLockAttr) -> core::
     if attr.is_null() {
         return 22;
     }
-    r::attr_destroy(unsafe { &*attr });
+    r::attr_destroy(unsafe { &*attr }); // SAFETY: attr is non-NULL after the check and points to a live rwlock attribute.
     0
 }

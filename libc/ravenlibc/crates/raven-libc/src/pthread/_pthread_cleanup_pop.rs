@@ -9,5 +9,5 @@ pub extern "C" fn _pthread_cleanup_pop(node: *mut cancel::Cleanup, run: core::ff
     if node.is_null() {
         return;
     }
-    cancel::pop_cleanup(&SysKernel, unsafe { &mut *node }, run != 0);
+    cancel::pop_cleanup(&SysKernel, unsafe { &mut *node }, run != 0); // SAFETY: node is non-NULL (checked above) and the caller owns a live cleanup node for the pop.
 }

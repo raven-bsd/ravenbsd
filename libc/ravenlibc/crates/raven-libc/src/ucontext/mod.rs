@@ -3,7 +3,7 @@
 
 //! Public `getcontext`/`setcontext`/`swapcontext` entry points as tail-jumps over C58.
 
-#[path = "makecontext.rs"]
+#[path = "raven_va_makecontext.rs"]
 mod makecontext;
 
 #[cfg(target_arch = "x86_64")]

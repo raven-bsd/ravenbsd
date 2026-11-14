@@ -34,11 +34,12 @@ pub extern "C" fn pthread_create(
     };
     match thread::create(&SysKernel, a, trampoline, info as usize) {
         Ok(value) => {
-            unsafe { *thread = value };
+            unsafe { *thread = value }; // SAFETY: thread is non-NULL after the check and writable for one pthread_t.
             0
         }
         Err(error) => {
             unsafe {
+                // SAFETY: info came from Box::into_raw above and create failed, so this reclaims the only owning pointer.
                 drop(alloc::boxed::Box::from_raw(info));
             };
             super::common::err(error)

@@ -86,7 +86,7 @@ pub unsafe extern "C" fn gethostbyname_r(
     result: *mut *mut Hostent,
     herror: *mut c_int,
 ) -> c_int {
-    unsafe { lookup_r(name, 2, record, buf, buflen, result, herror) }
+    unsafe { lookup_r(name, 2, record, buf, buflen, result, herror) } // SAFETY: the caller follows the gethostbyname_r record/buffer/output contract; lookup_r only writes within buflen.
 }
 
 /// `gethostbyname2_r(3)`.
@@ -103,5 +103,5 @@ pub unsafe extern "C" fn gethostbyname2_r(
     result: *mut *mut Hostent,
     herror: *mut c_int,
 ) -> c_int {
-    unsafe { lookup_r(name, af, record, buf, buflen, result, herror) }
+    unsafe { lookup_r(name, af, record, buf, buflen, result, herror) } // SAFETY: the caller follows the gethostbyname2_r record/buffer/output contract; lookup_r only writes within buflen.
 }
