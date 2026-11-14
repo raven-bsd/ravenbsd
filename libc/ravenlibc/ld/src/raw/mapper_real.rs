@@ -100,6 +100,13 @@ impl Platform for RealPlatform {
     fn exit(&mut self, code: i32) -> ! {
         sys::exit(code)
     }
+
+    fn call_function(&mut self, address: usize) -> bool {
+        // SAFETY: the caller passes a relocated destructor from a validated object.
+        let function: extern "C" fn() = unsafe { core::mem::transmute(address) };
+        function();
+        true
+    }
 }
 
 /// The file identity is not available until PG-36; keep the type used.
