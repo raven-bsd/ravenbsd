@@ -1,6 +1,6 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 12, 2026
+.Dd November 14, 2026
 .Dt PS 1
 .Os RavenBSD
 .Sh NAME
@@ -8,6 +8,8 @@
 .Nd list services from the svc: scheme
 .Sh SYNOPSIS
 .Nm
+.Nm
+.Fl -json
 .Nm
 .Fl -selftest
 .Sh DESCRIPTION
@@ -34,12 +36,48 @@ or
 reads every status record, checks that the directory is non-empty and every
 line parses, and prints
 .Dq ps: selftest ok .
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl -json
+Print one NDJSON object per service instead of the aligned human lines.
+The object has the fixed envelope
+.Ql schema:1
+and
+.Ql kind:"process"
+followed by
+.Ql pid ,
+.Ql ppid ,
+.Ql uid ,
+.Ql gid ,
+.Ql state ,
+.Ql name ,
+.Ql command ,
+.Ql threads
+and
+.Ql rss_bytes .
+The current
+.Pa svc:
+source provides only the service name and state; the process fields it does
+not provide are
+.Ql null ,
+never invented values.
+There is no wrapper array, header or colour in this mode.
+.El
 .Sh EXIT STATUS
 .Ex -std
 A usage error exits with status 2.
 A missing or malformed
 .Pa svc:
-record exits with status 1.
+record exits with status 1; with
+.Fl -json
+the error is one
+.Ql kind:"error"
+object on standard error, and a partial listing continues.
+.Sh EXAMPLES
+.Bd -literal -offset indent
+$ ps --json
+{"schema":1,"kind":"process","pid":null,"ppid":null,"uid":null,"gid":null,"state":"running","name":"logd","command":null,"threads":null,"rss_bytes":null}
+.Ed
 .Sh SEE ALSO
 .Xr svcctl 1 ,
 .Xr init 8
