@@ -275,6 +275,8 @@ RAVEN_1.0 {
 
 RAVENprivate_1.0 {
 	global:
+		__raven_libc_start;
+		__rl_fini_array;
 		__rl_fmt_float_impl;
 		__rl_fmt_wide_impl;
 		__rl_funcs_on_exit_impl;

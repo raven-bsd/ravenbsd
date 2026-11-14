@@ -8426,3 +8426,36 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "COPY per donor-map/04 row 25; _fwalk(fclose) rewritten over the intrusive open-file list; the three standard streams are left open; SPDX BSD-2-Clause, Daniel M. Eischen 2006"
+
+[[import]]
+path = "libc/ravenlibc/crt/src/selfreloc.rs"
+upstream = "musl"
+upstream_path = "ldso/dlstart.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; Rust adaptation: FDPIC and MIPS branches removed, IRELATIVE added after RELATIVE/RELR, the __dls2 tail replaced by returning the load bias"
+
+[[import]]
+path = "libc/ravenlibc/crt/src/selfreloc_consts.rs"
+upstream = "musl"
+upstream_path = "arch/{x86_64,aarch64,riscv64}/reloc.h"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; Rust adaptation: only REL_RELATIVE is kept from the donors, REL_IRELATIVE comes from the ELF numbers of donor-map/13 3.6.1-3.6.4, TPOFF_K/NO_LEGACY_INITFINI/RISCV_FP_SUFFIX/LDSO_ARCH dropped"
+
+[[import]]
+path = "libc/ravenlibc/crt/src/rcrt1.rs"
+upstream = "musl"
+upstream_path = "{crt/rcrt1.c,arch/{x86_64,aarch64,riscv64}/crt_arch.h}"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; Rust adaptation: the donor __dls2/__libc_start_main tail is split into __raven_rcrt1_stage1 returning sp0 to the entry asm, which then calls __raven_libc_start directly"

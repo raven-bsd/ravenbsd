@@ -10,6 +10,7 @@
 //! function-pointer cell installed by `__raven_libc_init`). C61 calls [`install_all`] from the
 //! start path; until then each cell keeps its documented dummy.
 
+pub(crate) mod fini_array;
 pub(crate) mod fmt_float;
 pub(crate) mod fmt_wide;
 pub(crate) mod funcs_on_exit;

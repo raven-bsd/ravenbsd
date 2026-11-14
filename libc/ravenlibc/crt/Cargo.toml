@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-crt"
+version = "0.1.0"
+description = "ravenlibc start files: crt1, Scrt1, rcrt1, crti, crtn, crtbegin fallbacks, static-PIE self-relocation."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["lib"]
+
+[dependencies]
+raven-libc-abi = { path = "../crates/raven-libc-abi" }
