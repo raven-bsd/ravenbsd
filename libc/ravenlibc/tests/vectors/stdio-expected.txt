@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# name<TAB>expected-string. Hand-written from the C standard; never captured from ravenlibc.
+d	42
+i	-42
+u	42
+x	ff
+X	FF
+o	10
+c	A
+s	raven
+pct	%
+width	   42
+left	42   |
+zero	00042
+plus	+42
+space	 42
+hashx	0xff
+hasho	010
+precs	rav
+precd	0042
+star	   42
+l	123456789
+ll	-1234567890123
+zu	8
+jd	42
+hhd	44
+hd	4464
+ptr	0x1234
+emptys	<empty>
+zerou	0
+zerox	0
+zeroo	0
+widths	     raven
+prec5	   ra
+zeropad	00000042
+hashwidth	0x000000ff
+negwidth	-42     |
+dot	<empty>
+longmin	-9223372036854775808
+ulongmax	18446744073709551615
+intmax	9223372036854775807
+octwidth	   010
+hexzero	0
+precision	-00042
+charwidth	  Z
+sstar	rav
