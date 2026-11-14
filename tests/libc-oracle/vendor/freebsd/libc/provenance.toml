@@ -1,0 +1,552 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/Makefile"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/Makefile"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "NOASSERTION"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored data file, licence class not classified, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/Makefile.depend"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/Makefile.depend"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "NOASSERTION"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored data file, licence class not classified, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/fdopen_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/fdopen_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/flushlbuf_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/flushlbuf_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/fmemopen2_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/fmemopen2_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/fopen_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/fopen_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/freopen_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/freopen_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/getdelim_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/getdelim_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/gets_s_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/gets_s_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/mkostemp_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/mkostemp_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/open_memstream2_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/open_memstream2_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/open_wmemstream_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/open_wmemstream_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/perror_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/perror_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/print_positional_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/print_positional_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/printbasic_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/printbasic_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/printfloat_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/printfloat_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/scanfloat_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/scanfloat_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/snprintf_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/snprintf_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/sscanf_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/sscanf_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/swprintf_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/swprintf_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdio/swscanf_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdio/swscanf_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/Makefile"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/Makefile"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "NOASSERTION"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored data file, licence class not classified, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/Makefile.depend"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/Makefile.depend"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "NOASSERTION"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored data file, licence class not classified, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/bsearch_b_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/bsearch_b_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/bsearch_s_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/bsearch_s_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/bsearch_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/bsearch_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/clearenv_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/clearenv_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/cxa_atexit_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/cxa_atexit_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/cxa_thread_atexit_nothr_test.cc"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/cxa_thread_atexit_nothr_test.cc"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/cxa_thread_atexit_test.cc"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/cxa_thread_atexit_test.cc"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/dynthr_mod/Makefile"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/dynthr_mod/Makefile"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "NOASSERTION"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored data file, licence class not classified, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/dynthr_mod/dynthr_mod.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/dynthr_mod/dynthr_mod.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/dynthr_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/dynthr_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/getenv_r_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/getenv_r_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/heapsort_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/heapsort_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/libc_exit_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/libc_exit_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/mergesort_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/mergesort_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/qsort_b_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/qsort_b_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/qsort_bench.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/qsort_bench.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/qsort_r_compat_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/qsort_r_compat_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/qsort_r_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/qsort_r_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/qsort_s_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/qsort_s_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/qsort_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/qsort_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/set_constraint_handler_s_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/set_constraint_handler_s_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/strfmon_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/strfmon_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/strfrom_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/strfrom_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/system_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/system_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/test-search.h"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/test-search.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/test-sort.h"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/test-sort.h"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/freebsd/libc/stdlib/tsearch_test.c"
+upstream = "freebsd"
+upstream_path = "lib/libc/tests/stdlib/tsearch_test.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"

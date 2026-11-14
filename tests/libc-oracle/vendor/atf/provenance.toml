@@ -1,0 +1,739 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/atf_c_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/atf_c_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/build.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/build.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/build.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/build.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/build_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/build_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/check.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/check.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/check.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/check.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/check_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/check_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/config.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/config.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/config.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/config.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/config_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/config_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/dynstr.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/dynstr.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/dynstr.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/dynstr.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/dynstr_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/dynstr_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/env.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/env.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/env.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/env.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/env_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/env_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/fs.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/fs.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/fs.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/fs.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/fs_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/fs_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/list.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/list.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/list.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/list.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/list_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/list_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/map.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/map.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/map.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/map.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/map_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/map_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/process.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/process.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/process.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/process.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/process_helpers.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/process_helpers.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/process_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/process_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/sanity.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/sanity.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/sanity.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/sanity.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/sanity_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/sanity_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/test_helpers.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/test_helpers.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/test_helpers.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/test_helpers.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/text.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/text.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/text.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/text.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/text_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/text_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/tp_main.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/tp_main.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/user.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/user.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/user.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/user.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/user_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/user_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/detail/version_helper.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/detail/version_helper.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/error.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/error.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/error.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/error.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/error_fwd.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/error_fwd.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/error_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/error_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/h_build.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/h_build.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/macros.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/macros.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/macros_h_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/macros_h_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/macros_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/macros_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/tc.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/tc.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/tc.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/tc.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/tc_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/tc_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/tp.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/tp.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/tp.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/tp.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/tp_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/tp_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/unused_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/unused_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/utils.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/utils.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/utils.h"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/utils.h"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/atf-c/utils_test.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/atf-c/utils_test.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/test-programs/c_helpers.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/test-programs/c_helpers.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/tools/bad_metadata_helper.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/tools/bad_metadata_helper.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/tools/expect_helpers.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/tools/expect_helpers.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/tools/process_helpers.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/tools/process_helpers.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/tools/several_tcs_helper.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/tools/several_tcs_helper.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/atf/tools/zero_tcs_helper.c"
+upstream = "netbsd"
+upstream_path = "external/bsd/atf/dist/tools/zero_tcs_helper.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"

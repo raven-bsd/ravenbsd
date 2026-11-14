@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# G1 thresholds copied from donor-map/16 3.B.9. PROPOSED (O-B8): only the owner changes them.
+# `raven-atf-run gate --g1` reads this file; no threshold is compiled into the code.
+
+schema = 1
+
+[[criterion]]
+id = "C2"
+suites = ["netbsd-libc", "netbsd-libm", "netbsd-libpthread"]
+unit = "bodies"
+threshold = 90.0
+max_exclusions = 250
+
+[[criterion]]
+id = "C3"
+suites = ["freebsd-libc", "freebsd-msun"]
+unit = "bodies"
+threshold = 90.0
+
+[[criterion]]
+id = "C4"
+suites = ["openbsd-libc", "openbsd-libm", "openbsd-libpthread"]
+unit = "programs"
+threshold = 90.0
+
+[[criterion]]
+id = "C5"
+suites = ["picolibc"]
+unit = "programs"
+threshold = 90.0
+
+[[criterion]]
+id = "C6"
+suites = ["mlibc"]
+unit = "programs"
+threshold = 85.0
+
+[[criterion]]
+id = "C7"
+suites = ["ltp"]
+unit = "bodies"
+threshold = 80.0
+external = true
+
+[[criterion]]
+id = "C8"
+suites = ["pjdfstest"]
+unit = "bodies"
+threshold = 0.0
+external = true
+
+[[criterion]]
+id = "C9"
+suites = []
+unit = "bodies"
+threshold = 0.0
+external = true

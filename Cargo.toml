@@ -68,6 +68,7 @@ members = [
     "tests/libc/oracle",
     "tests/libc/va",
     "tests/libc/headers",
+    "tests/libc/atf",
     "tests/ufs-powercut",
     "tools/fs-fuzz",
     "tools/linux-corpus",

@@ -1,0 +1,2 @@
+# Refused donor files; O-B6 default: excluded.
+stdio/eintr_test.c	no licence class in the first 80 lines

@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Manual exclusions (16 3.B.1.1) and runner-written oracle failures. `kind = "manual"` counts
+# toward the G1 cap; every entry has a one-line reason. Nothing is deleted from the table.
+
+[[exclude]]
+suite = "netbsd-libc"
+program = "sys/t_ptrace_*"
+kind = "manual"
+reason = "NetBSD ptrace(2); no equivalent planned (16 3.B.1.1)"
+
+[[exclude]]
+suite = "netbsd-libc"
+program = "sys/t_lwp_*"
+kind = "manual"
+reason = "NetBSD lwp_* private syscalls; no equivalent planned (16 3.B.1.1)"
+
+[[exclude]]
+suite = "netbsd-libc"
+program = "sys/t_msg*"
+kind = "manual"
+reason = "SysV IPC is a SKIP area (16 3.B.1.1)"
+
+[[exclude]]
+suite = "netbsd-libc"
+program = "sys/t_mprotect*"
+kind = "manual"
+reason = "kernel memory-protection behaviour, not a libc wrapper (16 3.B.1.1)"
+
+[[exclude]]
+suite = "netbsd-libc"
+program = "rpc/*"
+kind = "manual"
+reason = "SunRPC is outside the scaffold (16 3.B.1.1)"
+
+[[exclude]]
+suite = "netbsd-libc"
+program = "arch/*"
+kind = "manual"
+reason = "per-architecture helpers are not portable tests (16 3.B.1.1)"
+
+[[exclude]]
+suite = "netbsd-libc"
+program = "c063/t_fexecve"
+kind = "manual"
+reason = "fexecve does not exist yet (16 3.B.1.1)"
+
+[[exclude]]
+suite = "picolibc"
+program = "test-crt0-page-table"
+kind = "manual"
+reason = "board page-table feature, not a libc function"
+
+[[exclude]]
+suite = "picolibc"
+program = "test-riscv-jvt"
+kind = "manual"
+reason = "RISC-V board feature, not a host libc function"
+
+[[exclude]]
+suite = "picolibc"
+program = "test-scmpu"
+kind = "manual"
+reason = "ARM SCMPU board feature, not a host libc function"
+
+[[exclude]]
+suite = "netbsd-libc"
+program = "stdio/t_fputc"
+kind = "manual"
+reason = "glibc oracle is nondeterministic for the errno cases; not a libc verdict"
+
+[[exclude]]
+suite = "freebsd-libc"
+program = "stdlib/libc_exit_test"
+case = "recursive_exit2"
+kind = "manual"
+reason = "host recursion depth makes the oracle nondeterministic; not a libc verdict"

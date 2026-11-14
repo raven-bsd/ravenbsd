@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[import]]
+path = "tests/libc-oracle/vendor/netbsd/libposix/Makefile"
+upstream = "netbsd"
+upstream_path = "tests/lib/libposix/Makefile"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "NOASSERTION"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored data file, licence class not classified, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/netbsd/libposix/Makefile.inc"
+upstream = "netbsd"
+upstream_path = "tests/lib/libposix/Makefile.inc"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "NOASSERTION"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored data file, licence class not classified, never linked into a shipped artifact"
+
+[[import]]
+path = "tests/libc-oracle/vendor/netbsd/libposix/t_rename.c"
+upstream = "netbsd"
+upstream_path = "tests/lib/libposix/t_rename.c"
+upstream_rev = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = false
+notes = "vendored test, H-10, never linked into a shipped artifact"

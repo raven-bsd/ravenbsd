@@ -366,6 +366,15 @@ name = "raven-abi"
 version = "0.1.0"
 
 [[package]]
+name = "raven-atf-run"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "toml",
+]
+
+[[package]]
 name = "raven-audio-core"
 version = "0.1.0"
 

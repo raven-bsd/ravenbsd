@@ -171,3 +171,81 @@ fn malformed_shapes_are_usage_errors() {
 fn help_prints_and_succeeds_without_spawning() {
     assert_eq!(run(root(), &args(&["--help"])).expect("help"), 0);
 }
+
+#[test]
+fn suite_forwards_to_raven_atf_run() {
+    let planned = plan(
+        root(),
+        &args(&["suite", "--suite", "netbsd-libc", "--mode", "oracle"]),
+    )
+    .expect("plan");
+    assert_eq!(planned.len(), 1);
+    assert_eq!(planned[0].spec.program, "cargo");
+    assert_eq!(
+        planned[0].spec.args,
+        args(&[
+            "run",
+            "-q",
+            "-p",
+            "raven-atf-run",
+            "--",
+            "suite",
+            "--suite",
+            "netbsd-libc",
+            "--mode",
+            "oracle",
+        ])
+    );
+}
+
+#[test]
+fn doc17_suite_spelling_is_mapped_to_the_suite_subcommand() {
+    let planned = plan(
+        root(),
+        &args(&["--suite", "netbsd", "--target", "host-oracle"]),
+    )
+    .expect("plan");
+    assert_eq!(
+        planned[0].spec.args,
+        args(&[
+            "run",
+            "-q",
+            "-p",
+            "raven-atf-run",
+            "--",
+            "suite",
+            "--suite",
+            "netbsd",
+            "--target",
+            "host-oracle",
+        ])
+    );
+}
+
+#[test]
+fn gate_forwards_to_raven_atf_run() {
+    let planned = plan(root(), &args(&["gate", "--g1"])).expect("plan");
+    assert_eq!(
+        planned[0].spec.args,
+        args(&["run", "-q", "-p", "raven-atf-run", "--", "gate", "--g1"])
+    );
+}
+
+#[test]
+fn the_doc17_g1_spelling_is_mapped_to_the_gate_subcommand() {
+    let planned = plan(root(), &args(&["--g1"])).expect("plan");
+    assert_eq!(
+        planned[0].spec.args,
+        args(&["run", "-q", "-p", "raven-atf-run", "--", "gate", "--g1"])
+    );
+}
+
+#[test]
+fn qemu_target_is_passed_through_for_the_runner_to_refuse() {
+    let planned = plan(
+        root(),
+        &args(&["suite", "--suite", "netbsd", "--target", "qemu-x86_64"]),
+    )
+    .expect("plan");
+    assert!(planned[0].spec.args.iter().any(|arg| arg == "qemu-x86_64"));
+}

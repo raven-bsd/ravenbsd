@@ -1,0 +1,23 @@
+# Refused donor files; O-B6 default: excluded.
+gen/t_fpsetround.c	reject phrase `All advertising materials mentioning features`
+gen/t_isnan.c	no licence class in the first 80 lines
+kevent_nullmnt/h_nullmnt.c	no licence class in the first 80 lines
+locale/ducet_test.h	no licence class in the first 80 lines
+net/t_ether_aton.c	reject phrase `All advertising materials mentioning features`
+net/t_if_nametoindex.c	reject phrase `All advertising materials mentioning features`
+regex/t_exhaust.c	reject phrase `All advertising materials mentioning features`
+regex/t_regex_att.c	reject phrase `All advertising materials mentioning features`
+rpc/t_rpc.c	no licence class in the first 80 lines
+setjmp/t_setjmp.c	reject phrase `All advertising materials mentioning features`
+setjmp/t_threadjmp.c	reject phrase `All advertising materials mentioning features`
+ssp/h_getcwd2.c	no licence class in the first 80 lines
+stdio/h_intr.c	no licence class in the first 80 lines
+stdio/h_makenumbers.c	no licence class in the first 80 lines
+stdio/h_testnumbers.c	no licence class in the first 80 lines
+stdlib/t_hsearch.c	reject phrase `All advertising materials mentioning features`
+sys/t_mprotect_helper.c	no licence class in the first 80 lines
+sys/t_mprotect_helper.h	no licence class in the first 80 lines
+sys/t_pipe2.c	reject phrase `All advertising materials mentioning features`
+sys/t_recvmmsg.c	reject phrase `All advertising materials mentioning features`
+sys/t_socketpair.c	reject phrase `All advertising materials mentioning features`
+t_gdtoa.c	reject phrase `All advertising materials mentioning features`
