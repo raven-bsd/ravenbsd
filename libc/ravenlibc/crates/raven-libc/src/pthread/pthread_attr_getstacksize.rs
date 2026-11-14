@@ -10,6 +10,6 @@ pub extern "C" fn pthread_attr_getstacksize(
     if attr.is_null() || out.is_null() {
         return 22;
     }
-    unsafe { *out = a::getstacksize(&*attr) };
+    unsafe { *out = a::getstacksize(&*attr) }; // SAFETY: the null checks above guarantee a readable attribute and a writable size slot.
     0
 }

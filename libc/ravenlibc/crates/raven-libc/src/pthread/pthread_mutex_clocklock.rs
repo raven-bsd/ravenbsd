@@ -14,11 +14,11 @@ pub extern "C" fn pthread_mutex_clocklock(
     }
     match m::timedlock(
         &raven_libc_thread::raw::SysKernel,
-        unsafe { &*mutex },
+        unsafe { &*mutex }, // SAFETY: mutex is non-NULL after the check and points to a live initialised mutex.
         if at.is_null() {
             None
         } else {
-            Some(unsafe { *at })
+            Some(unsafe { *at }) // SAFETY: at is non-NULL when Some and readable for one timespec.
         },
     ) {
         Ok(()) => 0,

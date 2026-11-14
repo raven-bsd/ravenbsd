@@ -9,7 +9,7 @@ pub extern "C" fn pthread_setcanceltype(kind: c_int, old: *mut c_int) -> c_int {
     match cancel::setcanceltype(&SysKernel, kind) {
         Ok(previous) => {
             if !old.is_null() {
-                unsafe { *old = previous };
+                unsafe { *old = previous }; // SAFETY: old is non-NULL after the check and writable for one cancel-type value.
             }
             0
         }

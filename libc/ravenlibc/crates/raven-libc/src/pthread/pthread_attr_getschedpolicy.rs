@@ -10,6 +10,6 @@ pub extern "C" fn pthread_attr_getschedpolicy(
     if attr.is_null() || out.is_null() {
         return 22;
     }
-    unsafe { *out = a::getschedpolicy(&*attr) };
+    unsafe { *out = a::getschedpolicy(&*attr) }; // SAFETY: the null checks above guarantee a readable attribute and a writable policy slot.
     0
 }

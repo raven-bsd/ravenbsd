@@ -7,6 +7,7 @@ pub extern "C" fn pthread_attr_setguardsize(attr: *mut a::Attr, size: usize) -> 
     if attr.is_null() {
         return 22;
     }
+    // SAFETY: attr is non-NULL after the check and exclusively borrowed for the call.
     match a::setguardsize(unsafe { &mut *attr }, size) {
         Ok(()) => 0,
         Err(e) => super::common::err(e),

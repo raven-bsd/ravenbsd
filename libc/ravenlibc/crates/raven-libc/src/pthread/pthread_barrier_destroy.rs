@@ -8,6 +8,7 @@ pub extern "C" fn pthread_barrier_destroy(barrier: *mut b::Barrier) -> c_int {
     if barrier.is_null() {
         return 22;
     }
+    // SAFETY: barrier is non-NULL after the check and points to a live initialised barrier.
     match b::destroy(&raven_libc_thread::raw::SysKernel, unsafe { &*barrier }) {
         Ok(()) => 0,
         Err(e) => super::common::err(e),

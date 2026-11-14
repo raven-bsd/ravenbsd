@@ -13,6 +13,6 @@ pub extern "C" fn call_once(flag: *mut Once, function: Option<extern "C" fn()>) 
     let Some(function) = function else {
         return;
     };
-    let function: fn() = unsafe { core::mem::transmute::<extern "C" fn(), fn()>(function) };
-    c11::call_once(&SysKernel, unsafe { &*flag }, function);
+    let function: fn() = unsafe { core::mem::transmute::<extern "C" fn(), fn()>(function) }; // SAFETY: both fn() types share the C ABI; the callback is only invoked as the once routine.
+    c11::call_once(&SysKernel, unsafe { &*flag }, function); // SAFETY: flag is non-NULL after the check and points to the caller's live once flag.
 }

@@ -10,6 +10,6 @@ pub extern "C" fn pthread_mutexattr_getpshared(
     if attr.is_null() || out.is_null() {
         return 22;
     }
-    unsafe { *out = m::attr_getpshared(&*attr) };
+    unsafe { *out = m::attr_getpshared(&*attr) }; // SAFETY: the null checks above guarantee a readable attribute and a writable out slot.
     0
 }

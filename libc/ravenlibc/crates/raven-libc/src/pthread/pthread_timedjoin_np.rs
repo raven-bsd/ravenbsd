@@ -16,12 +16,12 @@ pub extern "C" fn pthread_timedjoin_np(
         if at.is_null() {
             None
         } else {
-            Some(unsafe { *at })
+            Some(unsafe { *at }) // SAFETY: at is non-NULL when Some and readable for one timespec.
         },
     ) {
         Ok(value) => {
             if !out.is_null() {
-                unsafe { *out = value as *mut c_void };
+                unsafe { *out = value as *mut c_void }; // SAFETY: out is non-NULL after the check and writable for one thread return value.
             }
             0
         }

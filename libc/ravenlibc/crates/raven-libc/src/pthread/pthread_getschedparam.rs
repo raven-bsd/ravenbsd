@@ -13,10 +13,10 @@ pub extern "C" fn pthread_getschedparam(
     match sched::getschedparam(&SysKernel, thread) {
         Ok((p, value)) => {
             if !policy.is_null() {
-                unsafe { *policy = p };
+                unsafe { *policy = p }; // SAFETY: policy is non-NULL after the check and writable for one policy value.
             }
             if !param.is_null() {
-                unsafe { *param = value };
+                unsafe { *param = value }; // SAFETY: param is non-NULL after the check and writable for one sched_param.
             }
             0
         }

@@ -10,6 +10,7 @@ pub extern "C" fn pthread_condattr_setclock(
     if attr.is_null() {
         return 22;
     }
+    // SAFETY: attr is non-NULL after the check and exclusively borrowed for the call.
     match c::attr_setclock(unsafe { &mut *attr }, clock) {
         Ok(()) => 0,
         Err(e) => super::common::err(e),

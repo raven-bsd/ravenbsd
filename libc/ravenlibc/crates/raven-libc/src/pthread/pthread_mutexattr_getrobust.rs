@@ -10,6 +10,6 @@ pub extern "C" fn pthread_mutexattr_getrobust(
     if attr.is_null() || out.is_null() {
         return 22;
     }
-    unsafe { *out = m::attr_getrobust(&*attr) };
+    unsafe { *out = m::attr_getrobust(&*attr) }; // SAFETY: the null checks above guarantee a readable attribute and a writable out slot.
     0
 }

@@ -9,5 +9,5 @@ pub extern "C" fn cnd_wait(cond: *mut Cond, mutex: *mut Mutex) -> c_int {
     if cond.is_null() || mutex.is_null() {
         return 2;
     }
-    c11::cnd_wait(&SysKernel, unsafe { &*cond }, unsafe { &*mutex })
+    c11::cnd_wait(&SysKernel, unsafe { &*cond }, unsafe { &*mutex }) // SAFETY: the null checks above guarantee live cond and mutex objects.
 }

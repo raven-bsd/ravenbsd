@@ -13,10 +13,10 @@ pub extern "C" fn pthread_key_create(
         return 22;
     }
     let dtor: Option<fn(usize)> = destructor
-        .map(|f| unsafe { core::mem::transmute::<extern "C" fn(*mut c_void), fn(usize)>(f) });
+        .map(|f| unsafe { core::mem::transmute::<extern "C" fn(*mut c_void), fn(usize)>(f) }); // SAFETY: both one-argument fn types share the C ABI; the destructor is called with the thread value.
     match tsd::key_create(&SysKernel, dtor) {
         Ok(value) => {
-            unsafe { *key = value };
+            unsafe { *key = value }; // SAFETY: key is non-NULL after the check and writable for one key value.
             0
         }
         Err(e) => super::common::err(e),

@@ -9,5 +9,5 @@ pub extern "C" fn cnd_signal(cond: *mut Cond) -> c_int {
     if cond.is_null() {
         return 2;
     }
-    c11::cnd_signal(&SysKernel, unsafe { &*cond })
+    c11::cnd_signal(&SysKernel, unsafe { &*cond }) // SAFETY: cond is non-NULL after the check and points to a live initialised condition variable.
 }

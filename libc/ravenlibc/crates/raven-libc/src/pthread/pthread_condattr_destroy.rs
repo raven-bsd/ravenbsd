@@ -7,6 +7,6 @@ pub extern "C" fn pthread_condattr_destroy(attr: *mut c::CondAttr) -> core::ffi:
     if attr.is_null() {
         return 22;
     }
-    c::attr_destroy(unsafe { &*attr });
+    c::attr_destroy(unsafe { &*attr }); // SAFETY: attr is non-NULL after the check and points to a live condition attribute.
     0
 }

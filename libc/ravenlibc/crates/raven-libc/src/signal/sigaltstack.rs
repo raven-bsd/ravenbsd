@@ -16,12 +16,12 @@ pub unsafe extern "C" fn sigaltstack(new: *const StackT, old: *mut StackT) -> c_
     let request = if new.is_null() {
         None
     } else {
-        Some(unsafe { &*new })
+        Some(unsafe { &*new }) // SAFETY: new is non-NULL when Some; the caller provides a valid stack_t.
     };
     let previous = if old.is_null() {
         None
     } else {
-        Some(unsafe { &mut *old })
+        Some(unsafe { &mut *old }) // SAFETY: old is non-NULL when Some and writable for one stack_t.
     };
     match altstack::sigaltstack(&SysKernel, request, previous) {
         Ok(()) => 0,

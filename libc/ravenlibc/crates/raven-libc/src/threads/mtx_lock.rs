@@ -9,5 +9,5 @@ pub extern "C" fn mtx_lock(mutex: *mut Mutex) -> c_int {
     if mutex.is_null() {
         return 2;
     }
-    c11::mtx_lock(&SysKernel, unsafe { &*mutex })
+    c11::mtx_lock(&SysKernel, unsafe { &*mutex }) // SAFETY: mutex is non-NULL after the check and points to a live initialised mutex.
 }

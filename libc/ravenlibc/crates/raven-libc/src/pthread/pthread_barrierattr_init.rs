@@ -7,6 +7,6 @@ pub extern "C" fn pthread_barrierattr_init(attr: *mut b::BarrierAttr) -> core::f
     if attr.is_null() {
         return 22;
     }
-    unsafe { *attr = b::attr_init() };
+    unsafe { *attr = b::attr_init() }; // SAFETY: attr is non-NULL after the check and writable for one barrier attribute.
     0
 }

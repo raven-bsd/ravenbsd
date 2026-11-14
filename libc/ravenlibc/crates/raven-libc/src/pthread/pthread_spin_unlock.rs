@@ -8,6 +8,6 @@ pub extern "C" fn pthread_spin_unlock(lock: *mut s::SpinLock) -> c_int {
     if lock.is_null() {
         return 22;
     }
-    s::unlock(unsafe { &*lock });
+    s::unlock(unsafe { &*lock }); // SAFETY: lock is non-NULL after the check and points to a live locked spinlock.
     0
 }

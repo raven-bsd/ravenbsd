@@ -7,6 +7,6 @@ pub extern "C" fn pthread_condattr_init(attr: *mut c::CondAttr) -> core::ffi::c_
     if attr.is_null() {
         return 22;
     }
-    unsafe { *attr = c::attr_init() };
+    unsafe { *attr = c::attr_init() }; // SAFETY: attr is non-NULL after the check and writable for one condition attribute.
     0
 }

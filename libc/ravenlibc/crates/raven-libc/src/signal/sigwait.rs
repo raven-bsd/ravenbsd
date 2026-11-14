@@ -13,9 +13,10 @@ pub unsafe extern "C" fn sigwait(set: *const SigSet, sig: *mut c_int) -> c_int {
     if set.is_null() || sig.is_null() {
         return -1;
     }
+    // SAFETY: set is non-NULL after the check; the caller provides a valid sigset_t.
     match wait::sigwait(&SysKernel, unsafe { &*set }) {
         Ok(value) => {
-            unsafe { *sig = value };
+            unsafe { *sig = value }; // SAFETY: sig is non-NULL after the check and writable for one signal number.
             0
         }
         Err(error) => {

@@ -11,6 +11,86 @@ use super::shadow;
 
 static LOCK_FD: AtomicI32 = AtomicI32::new(-1);
 
+/// Append `bytes` to `out` at `position`; false when the buffer is full.
+fn push(out: &mut [u8], position: &mut usize, bytes: &[u8]) -> bool {
+    let Some(end) = position.checked_add(bytes.len()) else {
+        return false;
+    };
+    let Some(slot) = out.get_mut(*position..end) else {
+        return false;
+    };
+    slot.copy_from_slice(bytes);
+    *position = end;
+    true
+}
+
+/// Append the unsigned decimal form of `value`.
+fn push_unsigned(out: &mut [u8], position: &mut usize, value: u64) -> bool {
+    let mut digits = [0u8; 20];
+    let mut count = 0usize;
+    let mut rest = value;
+    loop {
+        let Some(slot) = digits.get_mut(count) else {
+            return false;
+        };
+        *slot = b'0'.wrapping_add((rest.wrapping_rem(10)) as u8);
+        count = count.saturating_add(1);
+        rest = rest.wrapping_div(10);
+        if rest == 0 {
+            break;
+        }
+    }
+    for index in (0..count).rev() {
+        let Some(digit) = digits.get(index).copied() else {
+            return false;
+        };
+        if !push(out, position, &[digit]) {
+            return false;
+        }
+    }
+    true
+}
+
+/// Append the signed decimal form of `value`.
+fn push_signed(out: &mut [u8], position: &mut usize, value: i64) -> bool {
+    if value < 0 && !push(out, position, b"-") {
+        return false;
+    }
+    push_unsigned(out, position, value.unsigned_abs())
+}
+
+/// Render one shadow line into `out`; `None` when it does not fit.
+fn render_line(
+    entry: &shadow::Spwd,
+    name: &[u8],
+    password: &[u8],
+    out: &mut [u8],
+) -> Option<usize> {
+    let mut position = 0usize;
+    let mut ok = push(out, &mut position, name)
+        && push(out, &mut position, b":")
+        && push(out, &mut position, password)
+        && push(out, &mut position, b":")
+        && push_signed(out, &mut position, entry.lstchg as i64)
+        && push(out, &mut position, b":")
+        && push_signed(out, &mut position, entry.min as i64)
+        && push(out, &mut position, b":")
+        && push_signed(out, &mut position, entry.max as i64)
+        && push(out, &mut position, b":")
+        && push_signed(out, &mut position, entry.warn as i64)
+        && push(out, &mut position, b":")
+        && push_signed(out, &mut position, entry.inact as i64)
+        && push(out, &mut position, b":")
+        && push_signed(out, &mut position, entry.expire as i64)
+        && push(out, &mut position, b":")
+        && push_unsigned(out, &mut position, entry.flag as u64)
+        && push(out, &mut position, b"\n");
+    if !ok {
+        position = 0;
+    }
+    ok.then_some(position)
+}
+
 /// `putspent(3)`.
 ///
 /// # Safety
@@ -36,22 +116,16 @@ pub unsafe extern "C" fn putspent(entry: *const shadow::Spwd, stream: *mut c_voi
             raven_libc_abi::errno::EINVAL as u16,
         )));
     };
-    let line = alloc::format!(
-        "{}:{}:{}:{}:{}:{}:{}:{}:{}\n",
-        name,
-        password,
-        entry.lstchg,
-        entry.min,
-        entry.max,
-        entry.warn,
-        entry.inact,
-        entry.expire,
-        entry.flag
-    );
+    let mut line = [0u8; 1024];
+    let Some(length) = render_line(entry, name.as_bytes(), password.as_bytes(), &mut line) else {
+        return crate::ffi::ret::int(Err(raven_libc_abi::errno::Errno(
+            raven_libc_abi::errno::ERANGE as u16,
+        )));
+    };
     // SAFETY: the caller's FILE.
     let file: &raven_libc_stdio::File<crate::ffi::env::ShellEnv> =
         raven_libc_stdio::file_from_ptr(stream.cast());
-    match raven_libc_stdio::fputs(file, line.as_bytes()) {
+    match raven_libc_stdio::fputs(file, line.get(..length).unwrap_or(&[])) {
         Ok(()) => 0,
         Err(_) => -1,
     }
@@ -92,3 +166,7 @@ pub extern "C" fn ulckpwdf() -> c_int {
         _ => -1,
     }
 }
+
+#[cfg(test)]
+#[path = "putspent_ut.rs"]
+mod tests;
