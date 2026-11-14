@@ -349,6 +349,50 @@ impl UserAddressSpace {
         Ok(())
     }
 
+    /// Resolve a futex address to a shared `(object id, byte offset)` key.
+    ///
+    /// Returns `Ok(None)` for a private or anonymous VMA (the caller keeps the
+    /// `(pid, virtual address)` key), and `EINVAL` when the address is outside
+    /// the VMA tree. A shared object mapping uses its object id and offset so
+    /// two mappings of the same object at different VAs share a queue.
+    pub fn shared_futex_key(&self, address: u64) -> Result<Option<(u64, u64)>, Errno> {
+        if self.vmas.find(address).is_none() {
+            return Err(Errno::EINVAL);
+        }
+        let Some(mapping) = self
+            .objects
+            .iter()
+            .find(|mapping| mapping.contains(address))
+        else {
+            return Ok(None);
+        };
+        if !mapping.shared {
+            return Ok(None);
+        }
+        let offset = address
+            .checked_sub(mapping.start)
+            .and_then(|delta| mapping.offset.checked_add(delta))
+            .ok_or(Errno::EINVAL)?;
+        Ok(Some((mapping.object.id(), offset)))
+    }
+
+    /// Shared-futex byte range covered by `[start, start + len)`, if shared.
+    pub fn shared_futex_range(&self, start: u64, len: u64) -> Option<(u64, u64, u64)> {
+        let end = start.checked_add(len)?;
+        let mapping = self.objects.iter().find(|mapping| {
+            mapping.shared
+                && mapping.start <= start
+                && mapping.start.saturating_add(mapping.len) >= end
+        })?;
+        let offset_start = mapping
+            .offset
+            .checked_add(start.checked_sub(mapping.start)?)?;
+        let offset_end = mapping
+            .offset
+            .checked_add(end.checked_sub(mapping.start)?)?;
+        Some((mapping.object.id(), offset_start, offset_end))
+    }
+
     /// Map a device window at `physical` for `len` bytes, uncached and never executable.
     ///
     /// The physical pages belong to hardware: unmapping releases the page-table entries but never

@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S48 shared futex keys: a shared memory object mapped in two processes at
+# different VAs shares the (object id, offset) key; a private waiter at the
+# same parent VA is not woken by the shared wake; a killed child removes its
+# shared waiter; unmapping the parent wakes the private waiter with EFAULT.
+
+name = "shared-futex"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/shared-futex-fixture/build.sh"]
+initfs = "build/fixtures/shared-futex/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^shared-futex: shared wake=1$'
+
+[[expect]]
+regex = '^shared-futex: child1 wake=0$'
+
+[[expect]]
+regex = '^shared-futex: child1 status=0$'
+
+[[expect]]
+regex = '^shared-futex: cleanup wake=0$'
+
+[[expect]]
+regex = '^shared-futex: child2 status=0$'
+
+[[expect]]
+regex = '^shared-futex: private result=-14$'
+unordered = true
+
+[[expect]]
+regex = '^shared-futex: private=EFAULT$'
+
+[[expect]]
+regex = '^shared-futex: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

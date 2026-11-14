@@ -2004,6 +2004,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-s48-shared-futex"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-sched-core"
 version = "0.1.0"
 

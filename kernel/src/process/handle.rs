@@ -183,6 +183,11 @@ impl MemObject {
             .saturating_mul(frame::PAGE_SIZE)
     }
 
+    /// Unique object id used by shared-futex keys (PG-4).
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
     /// Physical frame for `index` if the page is present.
     pub fn frame_at(&self, index: u64) -> Option<u64> {
         usize::try_from(index)

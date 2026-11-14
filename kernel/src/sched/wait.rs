@@ -156,6 +156,80 @@ impl WaitQueue {
         }
     }
 
+    /// Drop every waiter belonging to `thread_id` without waking it.
+    ///
+    /// Used by thread exit, where the thread is already leaving the scheduler.
+    pub fn remove_thread(&self, thread_id: u64) {
+        let mut waiters = self.waiters.lock();
+        waiters.retain(|waiter| waiter.thread.id != thread_id);
+    }
+
+    /// Drop every waiter belonging to `process_id` without waking it.
+    ///
+    /// Used by process teardown for blocked sibling threads.
+    pub fn remove_process(&self, process_id: u64) {
+        let mut waiters = self.waiters.lock();
+        waiters.retain(|waiter| waiter.thread.process.id != process_id);
+    }
+
+    /// Wake waiters of `process_id` on a private key in `[start, end)` with `EFAULT`.
+    pub fn wake_private_range(&self, process_id: u64, start: u64, end: u64) -> usize {
+        let mut count = 0usize;
+        loop {
+            let waiter = {
+                let mut waiters = self.waiters.lock();
+                waiters
+                    .iter()
+                    .position(|waiter| {
+                        waiter.space == process_id
+                            && waiter.thread.process.id == process_id
+                            && waiter.addr >= start
+                            && waiter.addr < end
+                    })
+                    .map(|index| waiters.remove(index).thread)
+            };
+            let Some(thread) = waiter else {
+                break;
+            };
+            if super::wake(thread, None, Errno::EFAULT.to_ret()) {
+                count = count.saturating_add(1);
+            }
+        }
+        count
+    }
+
+    /// Wake waiters of `process_id` on a shared object/offset range with `EFAULT`.
+    pub fn wake_shared_range(
+        &self,
+        process_id: u64,
+        object_space: u64,
+        start: u64,
+        end: u64,
+    ) -> usize {
+        let mut count = 0usize;
+        loop {
+            let waiter = {
+                let mut waiters = self.waiters.lock();
+                waiters
+                    .iter()
+                    .position(|waiter| {
+                        waiter.space == object_space
+                            && waiter.thread.process.id == process_id
+                            && waiter.addr >= start
+                            && waiter.addr < end
+                    })
+                    .map(|index| waiters.remove(index).thread)
+            };
+            let Some(thread) = waiter else {
+                break;
+            };
+            if super::wake(thread, None, Errno::EFAULT.to_ret()) {
+                count = count.saturating_add(1);
+            }
+        }
+        count
+    }
+
     /// Number of waiters (diagnostics).
     #[allow(dead_code)] // diagnostics
     pub fn len(&self) -> usize {

@@ -153,6 +153,11 @@ pub mod futex {
     pub const WAIT: u32 = 0;
     /// Wake up to `val` waiters.
     pub const WAKE: u32 = 1;
+    /// Operate on the private `(pid, virtual address)` key (PG-3).
+    ///
+    /// With this bit clear the address is resolved through its VMA and, for a
+    /// shared mapping, keyed on `(memory object id, offset)`.
+    pub const PRIVATE: u32 = 0x80;
 }
 
 /// Clock identifiers (Linux numbering).
@@ -187,34 +192,5 @@ const _: () = assert!(core::mem::size_of::<Timespec>() == 16);
 const _: () = assert!(core::mem::size_of::<Handle>() == 4);
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn handle_packing() {
-        let h = Handle::new(0x00AB_CDEF, 0x7F);
-        assert_eq!(h.index(), 0x00AB_CDEF);
-        assert_eq!(h.generation(), 0x7F);
-        assert_eq!(
-            Handle::new(0x0100_0000, 1).index(),
-            0,
-            "index is masked to 24 bits"
-        );
-    }
-
-    #[test]
-    fn rights_only_shrink_on_dup() {
-        let r = Rights::READ.union(Rights::WRITE).union(Rights::DUP);
-        let d = r.intersect(Rights::READ);
-        assert!(d.contains(Rights::READ));
-        assert!(!d.contains(Rights::WRITE));
-        assert!(!r.intersect(Rights::MAP).contains(Rights::MAP));
-    }
-
-    #[test]
-    fn map_flag_packing() {
-        let f = map::pack(prot::READ | prot::WRITE, map::FIXED | map::SHARED);
-        assert_eq!(f & prot::MASK, 3);
-        assert_eq!(f >> map::SHIFT, 3);
-    }
-}
+#[path = "types_ut.rs"]
+mod tests;
