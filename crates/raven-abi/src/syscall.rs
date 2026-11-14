@@ -220,6 +220,12 @@ pub const THREAD_SELF: usize = 0x24;
 /// `len == 0` clears it. Raw constant, not a `Syscall` variant.
 pub const ROBUST_LIST_SET: usize = 0x26;
 
+/// `handle_copy(dst_proc, src_handle, rights_mask) -> Handle`.
+///
+/// Copies a live source handle into `dst_proc`, requiring `ADMIN` on the
+/// caller and the destination process. Raw constant; not a `Syscall` variant.
+pub const HANDLE_COPY: usize = 0x54;
+
 /// `thread_exit_ex(code: i32, clear_addr: usize, unmap_addr: usize, unmap_len: usize) -> !`.
 ///
 /// Stores zero to `clear_addr`, unmaps `[unmap_addr, unmap_addr + unmap_len)`,

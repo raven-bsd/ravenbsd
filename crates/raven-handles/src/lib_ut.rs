@@ -5,6 +5,8 @@
 
 use super::*;
 
+use alloc::vec;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct TestObject(u32);
 
@@ -390,4 +392,101 @@ fn cross_table_child_sees_the_parent_revoke() {
     child_node.revoke(applied);
     assert_eq!(child_table.get(child, Rights::WRITE), Err(Errno::EPERM));
     assert_eq!(child_table.get(child, Rights::READ), Ok(&TestObject(2)));
+}
+
+#[test]
+fn for_each_live_skips_holes_and_retired_slots() {
+    let mut table = table();
+    let first = table.insert(TestObject(1), Rights::READ).expect("insert");
+    let second = table.insert(TestObject(2), Rights::WRITE).expect("insert");
+    table.close(first).expect("close");
+    let reused = table
+        .insert(TestObject(3), Rights::MAP)
+        .expect("reuse hole");
+    assert_eq!(reused.index(), first.index());
+    assert_eq!(reused.generation(), first.generation().wrapping_add(1));
+
+    let mut seen = Vec::new();
+    table.for_each_live(|handle, value, rights, lineage| {
+        let expected = table.lineage_node(handle).expect("lineage");
+        assert!(Arc::ptr_eq(lineage, &expected));
+        seen.push((handle, value.0, rights));
+    });
+    assert_eq!(
+        seen,
+        vec![(reused, 3, Rights::MAP), (second, 2, Rights::WRITE),]
+    );
+}
+
+#[test]
+fn fork_into_preserves_numbers_rights_and_lineage() {
+    let mut source = table();
+    let first = source.insert(TestObject(1), Rights::READ).expect("insert");
+    let second = source.insert(TestObject(2), Rights::WRITE).expect("insert");
+    source.close(first).expect("close");
+    let reused = source
+        .insert(TestObject(3), Rights::MAP)
+        .expect("reuse hole");
+    let source_node = source.lineage_node(second).expect("node");
+
+    let mut destination = table();
+    destination
+        .fork_into(&source, |value| Ok(value.clone()))
+        .expect("fork");
+    assert_eq!(destination.len(), 2);
+    assert_eq!(destination.get(reused, Rights::MAP), Ok(&TestObject(3)));
+    assert_eq!(destination.get(second, Rights::WRITE), Ok(&TestObject(2)));
+    let destination_node = destination.lineage_node(second).expect("node");
+    assert!(Arc::ptr_eq(&source_node, &destination_node));
+    assert_eq!(
+        destination.get(Handle::new(first.index(), first.generation()), Rights::NONE),
+        Err(Errno::EBADF)
+    );
+    let next = destination
+        .insert(TestObject(4), Rights::READ)
+        .expect("insert after fork");
+    assert_eq!(next.index(), 2);
+    assert_eq!(next.generation(), 0);
+}
+
+#[test]
+fn fork_into_preserves_retired_slots() {
+    let mut source = table();
+    let first = source.insert(TestObject(1), Rights::READ).expect("insert");
+    let mut current = first;
+    for _ in 0..255 {
+        source.close(current).expect("close");
+        current = source.insert(TestObject(1), Rights::READ).expect("insert");
+    }
+    source.close(current).expect("retire");
+    let live = source.insert(TestObject(2), Rights::READ).expect("insert");
+
+    let mut destination = table();
+    destination
+        .fork_into(&source, |value| Ok(value.clone()))
+        .expect("fork");
+    let next = destination
+        .insert(TestObject(3), Rights::READ)
+        .expect("insert after retired");
+    assert_eq!(next.index(), live.index().saturating_add(1));
+}
+
+#[test]
+fn fork_into_clone_failure_leaves_destination_empty() {
+    let mut source = table();
+    source.insert(TestObject(1), Rights::READ).expect("insert");
+    source.insert(TestObject(2), Rights::READ).expect("insert");
+    let mut destination = table();
+    let mut calls = 0u32;
+    let result = destination.fork_into(&source, |value| {
+        calls = calls.saturating_add(1);
+        if value.0 == 2 {
+            Err(Errno::ENOMEM)
+        } else {
+            Ok(value.clone())
+        }
+    });
+    assert_eq!(result, Err(Errno::ENOMEM));
+    assert!(destination.is_empty());
+    assert_eq!(calls, 2);
 }
