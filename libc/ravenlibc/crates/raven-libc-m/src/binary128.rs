@@ -269,6 +269,143 @@ impl LongDouble128 {
             bits: mul128_bits(self.bits, other.bits),
         }
     }
+
+    /// `x / y`, correctly rounded.
+    #[allow(clippy::should_implement_trait)]
+    pub fn div(self, other: Self) -> Self {
+        Self {
+            bits: div128_bits(self.bits, other.bits),
+        }
+    }
+
+    /// The square root, correctly rounded.
+    pub fn sqrt(self) -> Self {
+        Self {
+            bits: sqrt128_bits(self.bits),
+        }
+    }
+}
+
+/// `x / y` over the 113-bit significands: a restoring division of `a_sig << 113` by `b_sig`.
+pub fn div128_bits(a: u128, b: u128) -> u128 {
+    let a_class = classify(a);
+    let b_class = classify(b);
+    let negative = (a & SIGN != 0) ^ (b & SIGN != 0);
+    if a_class == FP_NAN || b_class == FP_NAN {
+        return nan_bits();
+    }
+    if a_class == FP_INFINITE {
+        if b_class == FP_INFINITE {
+            return nan_bits();
+        }
+        return infinity_bits(negative);
+    }
+    if b_class == FP_INFINITE {
+        return if negative { SIGN } else { 0 };
+    }
+    if b_class == FP_ZERO {
+        if a_class == FP_ZERO {
+            return nan_bits();
+        }
+        return infinity_bits(negative);
+    }
+    if a_class == FP_ZERO {
+        return if negative { SIGN } else { 0 };
+    }
+    let (a_exp, a_sig) = unpack(a);
+    let (b_exp, b_sig) = unpack(b);
+    let mut limbs = [0u64; 4];
+    add_shifted(&mut limbs, a_sig, 113);
+    let divisor = b_sig;
+    let mut remainder = 0u128;
+    let mut quotient = 0u128;
+    for index in (0..=225).rev() {
+        remainder = (remainder << 1) | u128::from(limb_bit(&limbs, index));
+        let subtract = remainder >= divisor;
+        if subtract {
+            remainder -= divisor;
+        }
+        // The quotient is built MSB-first; the first meaningful bit lands at index 113 and the
+        // accumulator keeps at most 114 bits.
+        if index <= 113 {
+            quotient = (quotient << 1) | u128::from(subtract);
+        }
+    }
+    // value = (quotient + remainder/divisor) * 2^(a_exp - b_exp - 113)
+    let significand = (quotient << 3) | u128::from(remainder != 0);
+    pack_binary128(negative, a_exp - b_exp - 113 - 3, significand)
+}
+
+/// The square root over the 113-bit significand: a restoring integer square root of `sig << 114`.
+pub fn sqrt128_bits(a: u128) -> u128 {
+    let class = classify(a);
+    if class == FP_NAN {
+        return nan_bits();
+    }
+    if a & SIGN != 0 {
+        if class == FP_ZERO {
+            return a;
+        }
+        return nan_bits();
+    }
+    if class == FP_INFINITE || class == FP_ZERO {
+        return a;
+    }
+    let (exponent, significand) = unpack(a);
+    let mut exponent = exponent;
+    let mut significand = significand;
+    if (exponent - 112) % 2 != 0 {
+        significand <<= 1;
+        exponent -= 1;
+    }
+    let mut radicand = [0u64; 4];
+    add_shifted(&mut radicand, significand, 114);
+    // Digit-by-digit square root over bit pairs; the running remainder stays below 2^115.
+    let mut root = 0u128;
+    let mut remainder = 0u128;
+    for pair in (0..=113u32).rev() {
+        let bits = (limb_bit(&radicand, 2 * pair + 1) << 1) | limb_bit(&radicand, 2 * pair);
+        remainder = (remainder << 2) | u128::from(bits);
+        let trial = (root << 2) | 1;
+        if remainder >= trial {
+            remainder -= trial;
+            root = (root << 1) | 1;
+        } else {
+            root <<= 1;
+        }
+    }
+    let significand = (root << 3) | u128::from(remainder != 0);
+    pack_binary128(false, (exponent - 112) / 2 - 57 - 3, significand)
+}
+
+fn infinity_bits(negative: bool) -> u128 {
+    let sign = if negative { SIGN } else { 0 };
+    sign | (EXPONENT_MASK as u128) << EXPONENT_SHIFT
+}
+
+fn limb_bit(limbs: &[u64; 4], index: u32) -> u64 {
+    let word = (index / 64) as usize;
+    let bit = index % 64;
+    limbs.get(word).map_or(0, |value| (value >> bit) & 1)
+}
+
+fn limbs_ge(a: &[u64; 4], b: &[u64; 4]) -> bool {
+    for index in (0..4).rev() {
+        if a[index] != b[index] {
+            return a[index] > b[index];
+        }
+    }
+    true
+}
+
+fn limbs_sub(a: &mut [u64; 4], b: &[u64; 4]) {
+    let mut borrow = 0u64;
+    for index in 0..4 {
+        let (difference, first) = a[index].overflowing_sub(b[index]);
+        let (difference, second) = difference.overflowing_sub(borrow);
+        a[index] = difference;
+        borrow = u64::from(first || second);
+    }
 }
 
 /// The exact-in-u128 add/sub engine for binary128 (113-bit significand + 3 guard bits).
@@ -468,12 +605,15 @@ fn add_shifted(limbs: &mut [u64; 4], value: u128, shift: u32) {
     let start = (shift / 64) as usize;
     let bit = shift % 64;
     let w0 = low << bit;
-    let w1 = if bit == 0 {
-        high
+    let (w1, w2) = if bit == 0 {
+        (high, 0)
     } else {
-        (high << bit) | (low >> (64 - bit))
+        let shifted = (high as u128) << bit;
+        (
+            (shifted as u64) | (low >> (64 - bit)),
+            (shifted >> 64) as u64,
+        )
     };
-    let w2 = if bit == 0 { 0 } else { high >> (64 - bit) };
     add_word(limbs, start, w0);
     add_word(limbs, start + 1, w1);
     add_word(limbs, start + 2, w2);

@@ -172,3 +172,70 @@ fn the_binary128_type_multiplies_correctly() {
             == core::cmp::Ordering::Greater
     );
 }
+
+#[test]
+fn the_binary128_type_divides_and_takes_square_roots() {
+    use super::LongDouble128;
+    let six = LongDouble128::from_f64(6.0);
+    let three = LongDouble128::from_f64(3.0);
+    assert_eq!(six.div(three).to_f64(), 2.0);
+    assert_eq!(
+        LongDouble128::from_f64(1.5)
+            .div(LongDouble128::from_f64(0.5))
+            .to_f64(),
+        3.0
+    );
+    // One third: the 113-bit value rounds to the f64 1/3.
+    assert_eq!(
+        LongDouble128::from_f64(1.0)
+            .div(LongDouble128::from_f64(3.0))
+            .to_f64(),
+        1.0 / 3.0
+    );
+    assert_eq!(LongDouble128::from_f64(4.0).sqrt().to_f64(), 2.0);
+    assert_eq!(
+        LongDouble128::from_f64(2.0).sqrt().to_f64(),
+        core::f64::consts::SQRT_2
+    );
+    assert_eq!(LongDouble128::zero(false).sqrt().to_bits(), 0);
+    assert!(LongDouble128::from_f64(-1.0).sqrt().is_nan());
+    assert_eq!(
+        LongDouble128::infinity(false).sqrt().to_f64(),
+        f64::INFINITY
+    );
+    // Division by zero and NaN cases.
+    assert_eq!(
+        LongDouble128::from_f64(1.0)
+            .div(LongDouble128::zero(false))
+            .to_f64(),
+        f64::INFINITY
+    );
+    assert!(
+        LongDouble128::zero(false)
+            .div(LongDouble128::zero(false))
+            .is_nan()
+    );
+    assert!(
+        LongDouble128::infinity(false)
+            .div(LongDouble128::infinity(false))
+            .is_nan()
+    );
+    assert_eq!(
+        LongDouble128::from_f64(1.0)
+            .div(LongDouble128::infinity(false))
+            .to_bits(),
+        0
+    );
+    // Sign rules.
+    assert!(
+        LongDouble128::from_f64(1.0)
+            .div(LongDouble128::from_f64(-2.0))
+            .sign_bit()
+    );
+    assert_eq!(
+        LongDouble128::from_f64(1.0)
+            .div(LongDouble128::from_f64(-2.0))
+            .to_f64(),
+        -0.5
+    );
+}
