@@ -1,0 +1,18 @@
+# strtod_input seeds
+# Inputs from netbsd:tests/lib/libc/stdlib/t_strtod.c (BSD-2, read),
+# openbsd:regress/lib/libc/strtod/strtodtest.c (ISC, read) and
+# picolibc libc-testsuite/strtod.c (BSD-2, read). Inputs only.
+\x00 1.5
+\x02-0x1p3
+\x04nan(
+\x06infinity
+\x00 .
+\x01 1e999999
+\x02 +.5
+\x04 0x.p
+\x06 1234567890123456789012345678901234567890e-400
+\x00 -0.0
+\x01 3,14
+\x00 0x
+\x00 1e+
+\x02 1e99999999999999999999

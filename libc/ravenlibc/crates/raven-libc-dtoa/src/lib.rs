@@ -334,7 +334,9 @@ pub fn strtod(
     let (value, consumed, flags) = strtod::strtod(ctx, s, loc, r)?;
     Ok(ParseResult {
         value,
-        consumed,
+        // C70: the donor's end pointer can step over the terminating NUL; a slice has no
+        // such byte, so a conversion never consumes past its input.
+        consumed: consumed.min(s.len()),
         range: range_from(flags),
     })
 }
@@ -352,7 +354,8 @@ pub fn strtof(
     let (value, consumed, flags) = strtof::strtof(ctx, s, loc, r)?;
     Ok(ParseResult {
         value,
-        consumed,
+        // C70: see `strtod`; the end pointer never passes the slice end.
+        consumed: consumed.min(s.len()),
         range: range_from(flags),
     })
 }

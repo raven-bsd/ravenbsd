@@ -1,0 +1,19 @@
+# printf_format seeds
+# Formats from picolibc:test/test-stdio/test-printf-testcases.h (BSD-2, read)
+# and netbsd:tests/lib/libc/stdio/t_printf.c (BSD-2, read). Inputs only.
+\x00%d
+\x00%s
+\x00%n
+\x00%99999999d
+\x00%.99999999s
+\x00%1$d%1$s
+\x00%0$d
+\x00%n%n%n
+\x04%ls
+\x04%lc
+\x20%512d
+\x00[%m][%c][%x][%o][%u]
+\x00%-#0 +'*.*d
+\x00%p %g %f %e %a
+\x01%n
+\x02%n

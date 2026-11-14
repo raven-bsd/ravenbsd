@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-fuzz-replay"
+version = "0.1.0"
+description = "Stable bodies, replay and regression harness for the ravenlibc fuzz targets."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+raven-libc-abi = { path = "../../../../libc/ravenlibc/crates/raven-libc-abi", default-features = false }
+raven-libc-fmt = { path = "../../../../libc/ravenlibc/crates/raven-libc-fmt", default-features = false }
+raven-libc-dtoa = { path = "../../../../libc/ravenlibc/crates/raven-libc-dtoa", default-features = false }
+raven-libc-ctype = { path = "../../../../libc/ravenlibc/crates/raven-libc-ctype", default-features = false }
+raven-libc-time = { path = "../../../../libc/ravenlibc/crates/raven-libc-time", default-features = false }
+raven-libc-regex = { path = "../../../../libc/ravenlibc/crates/raven-libc-regex", default-features = false }
+raven-libc-glob = { path = "../../../../libc/ravenlibc/crates/raven-libc-glob", default-features = false }
+raven-libc-resolv = { path = "../../../../libc/ravenlibc/crates/raven-libc-resolv", default-features = false }
+raven-libc-nss = { path = "../../../../libc/ravenlibc/crates/raven-libc-nss", default-features = false }
+raven-libc-pwd = { path = "../../../../libc/ravenlibc/crates/raven-libc-pwd", default-features = false }
+raven-libc-elf = { path = "../../../../libc/ravenlibc/crates/raven-libc-elf", default-features = false }
+raven-libc-stdlib = { path = "../../../../libc/ravenlibc/crates/raven-libc-stdlib", default-features = false }
+raven-libc-oracle = { path = "../../oracle", optional = true }
+
+[features]
+default = []
+diff = ["dep:raven-libc-oracle"]
+oracle-dtoa = ["raven-libc-oracle/oracle-dtoa"]
+oracle-stdlib-netbsd = ["raven-libc-oracle/oracle-stdlib-netbsd"]
+oracle-stdlib-openbsd = ["raven-libc-oracle/oracle-stdlib-openbsd"]
+oracle-ctype-multibyte = ["raven-libc-oracle/oracle-ctype-multibyte"]

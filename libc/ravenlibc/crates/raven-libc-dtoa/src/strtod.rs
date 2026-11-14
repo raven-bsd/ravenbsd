@@ -209,12 +209,12 @@ pub(crate) fn strtod(
                 }
             }
             if have_dig {
-                let mut first = true;
                 loop {
-                    if !first && !c.is_ascii_digit() {
+                    // C70: a trailing decimal point has no fractional digit; the slice end
+                    // (`at` returns 0) must not be folded in as one.
+                    if !c.is_ascii_digit() {
                         break;
                     }
-                    first = false;
                     nz = nz.wrapping_add(1);
                     let digit = u32::from(c.wrapping_sub(b'0'));
                     if digit != 0 {

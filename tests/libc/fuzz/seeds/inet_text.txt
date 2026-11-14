@@ -1,0 +1,15 @@
+# inet_text seeds
+# Inputs from netbsd:tests/lib/libc/inet/t_inet_addr.c and t_inet_network.c
+# (BSD-2, read). Inputs only.
+\x00 1.2.3.4
+\x01 ::1
+\x02 1.2.3.4
+\x00 0x7f.1
+\x00 010.0.0.1
+\x01 ::ffff:1.2.3.4
+\x01 1::2::3
+\x00 256.1.1.1
+\x00
+\x01 ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+\x01 ::
+\x00 1.2.3.4.5

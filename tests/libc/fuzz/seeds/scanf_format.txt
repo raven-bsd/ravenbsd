@@ -1,0 +1,17 @@
+# scanf_format seeds
+# Formats and inputs from netbsd:tests/lib/libc/stdio/t_scanf.c (BSD-2, read)
+# and picolibc:test/libc-testsuite/sscanf.c (BSD-2, read). Inputs only.
+\x00%d\x0042
+\x00%s\x00word
+\x00%[a-z]\x00abc
+\x00%m[a-z]\x00abc
+\x00%999999999d\x00999
+\x01%ls\x00wide
+\x00%*s%*s\x00a b
+\x00%n\x00
+\x00%[]]\x00]
+\x00%[^\x00
+\x00%c%c%c\x00abc
+\x00%%\x00
+\x00%d %d\x001 2
+\x00%i %o %x %u\x00010 010 10 10

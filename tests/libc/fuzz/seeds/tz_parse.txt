@@ -1,0 +1,15 @@
+# tz_parse seeds
+# POSIX TZ strings from netbsd:tests/lib/libc/time/t_strptime.c (BSD-2, read);
+# TZif images are synthetic (seedgen). Inputs only.
+UTC0
+EST5EDT,M3.2.0,M11.1.0
+<+0530>-5:30
+<
+<+
+A0B,M13.1.0
+EST5EDT,J366,J1/2
+TZif2
+TZif4
+\x00
+EST5EDT
+UTC0,

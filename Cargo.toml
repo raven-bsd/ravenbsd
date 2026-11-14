@@ -38,6 +38,7 @@ members = [
     "tests/fixtures/k71-scheme",
     "tests/fixtures/k67-fs",
     "tests/fs-fuzz/replay",
+    "tests/libc/fuzz/replay",
     "tests/fixtures/s30-irq",
     "tests/fixtures/s31-irq",
     "tests/fixtures/s34-concurrency",
