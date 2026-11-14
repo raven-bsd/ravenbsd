@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.files]]
+src = "build/libc-test/libc-test"
+path = "/bin/libc-test"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/libc-test/libc-child"
+path = "/bin/libc-child"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/libc-test/libplug.so"
+path = "/lib/libplug.so"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/libc-test/libc.so.1"
+path = "/lib/libc.so.1"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/libc-test/ld-elf.so.1"
+path = "/libexec/ld-elf.so.1"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "profiles/libc-test.d/libc-test.txt"
+path = "/etc/libc-test.txt"
+
+[[initfs.files]]
+src = "libc/ravenlibc/tests/vectors/stdio-expected.txt"
+path = "/etc/stdio-expected.txt"
+
+[[initfs.files]]
+src = "libc/ravenlibc/tests/vectors/time-expected.txt"
+path = "/etc/time-expected.txt"
+
+[[initfs.files]]
+src = "profiles/libc-test.d/libc-test.manifest"
+path = "/etc/services.d/libc-test.toml"

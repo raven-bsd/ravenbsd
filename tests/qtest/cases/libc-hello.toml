@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+name = "libc-hello"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 240
+pre = ["sh tests/libc/target/build.sh hello x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+skip = "needs PG-1 PG-13 PG-22 PG-23 PG-24 PG-29 PG-50 PG-53"
+
+[[expect]]
+regex = '^libc-hello: start$'
+
+[[expect]]
+regex = '^libc-hello: argc ok$'
+
+[[expect]]
+regex = '^libc-hello: environ ok$'
+
+[[expect]]
+regex = '^libc-hello: auxv ok$'
+
+[[expect]]
+regex = '^libc-hello: errno ok$'
+
+[[expect]]
+regex = '^libc-hello: tls ok$'
+
+[[expect]]
+regex = '^libc-hello: malloc ok$'
+
+[[expect]]
+regex = '^libc-hello: string ok$'
+
+[[expect]]
+regex = '^libc-hello: atexit ok$'
+
+[[expect]]
+regex = '^libc-hello: entropy weak=[01]$'
+
+[[expect]]
+regex = '^libc-hello: done$'
+
+[[expect]]
+regex = '^libc-hello: atexit ran$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|libc-[a-z]+: FAIL'
