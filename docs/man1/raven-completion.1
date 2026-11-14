@@ -1,0 +1,37 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 14, 2026
+.Dt RAVEN-COMPLETION 1
+.Os RavenBSD
+.Sh NAME
+.Nm raven-completion
+.Nd print a shell completion script for raven
+.Sh SYNOPSIS
+.Nm
+.Ar bash|zsh|fish
+.Sh DESCRIPTION
+.Nm
+writes a completion script for
+.Xr raven 1
+to standard output.
+The script is generated from the same command metadata used by
+.Nm raven help ,
+so it lists
+.Cm version ,
+.Cm help ,
+.Cm completion
+and every reserved command name.
+.Pp
+The output is a static shell script.
+.Nm raven
+does not evaluate the script, does not read shell configuration and does not execute any command
+while generating it.
+Install the script through the shell's normal completion directory or source it from the shell
+startup file.
+.Sh EXIT STATUS
+.Ex -std
+A missing or unknown shell argument exits 2.
+.Sh SEE ALSO
+.Xr raven 1
+.Sh STANDARDS
+RavenBSD modern userland contract, revision 1.

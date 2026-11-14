@@ -18,3 +18,7 @@ allowlist = "tests/libc/size/size-allowlist.toml"
 rules = "tests/libc/size/rules.toml"
 hooks = "tests/libc/size/hooks.toml"
 hot = "tests/libc/size/hot.toml"
+
+[abi-freeze]
+# `libc-lint abi-freeze`: the offline frozen-symbol check (C68).
+scope = "libc/ravenlibc/abi/**"

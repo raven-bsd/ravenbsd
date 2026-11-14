@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S50b PROC_FORK: a private page survives the fork copy-on-write, a NOFORK mapping is absent in
+# the child (which maps a duplicated handle there instead), a ZERO_ON_FORK page reads zero, the
+# child thread runs and exits 0, and repeated fork/exit cycles keep frames and lineage stable.
+
+name = "proc-fork"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/qtest/cases/proc-fork-fixture/build.sh"]
+initfs = "build/fixtures/proc-fork/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 s16-teardowncheck=1 s24-framecheck=1"
+qemu_extra = ["-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^proc-fork: invalid combo=1 shared-zero=1 flags=1$'
+
+[[expect]]
+regex = '^s16: exit /init handles=0 lineage=[0-9]+$'
+
+[[expect]]
+regex = '^s24: frames free=[0-9]+$'
+
+[[expect]]
+regex = '^proc-fork: child code=0$'
+
+[[expect]]
+regex = '^proc-fork: data parent=0x33334444 child-saw=1 child-wrote=0x55556666$'
+
+[[expect]]
+regex = '^proc-fork: nofork map=1 parent=0x11112222$'
+
+[[expect]]
+regex = '^proc-fork: zero child-ok=1 parent=0x77778888$'
+
+[[expect]]
+regex = '^proc-fork: nofork-object handle-absent=1 map-absent=1 parent=0x11112222$'
+
+[[expect]]
+regex = '^proc-fork: loop done cycles=4 counter=4$'
+
+[[expect]]
+regex = '^proc-fork: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|proc-fork: FAIL'

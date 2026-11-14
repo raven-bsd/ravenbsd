@@ -16,6 +16,7 @@ use raven_usercopy::UserSlice;
 use raven_vma::PAGE_SIZE;
 
 use crate::driver::DmaBuffer;
+use crate::memory::uspace::{InheritIdentity, MapInherit};
 use crate::process::handle::MmioRegion;
 use crate::process::{self, Process, handle::MemObject, handle::Object};
 use crate::syscall::SyscallFrame;
@@ -123,7 +124,8 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
     let len = frame.r8;
     let flags = usize::try_from(frame.r9).map_err(|_| Errno::EINVAL)?;
 
-    let allowed = prot::MASK | ((map::FIXED | map::SHARED) << map::SHIFT);
+    let allowed =
+        prot::MASK | ((map::FIXED | map::SHARED | map::NOFORK | map::ZERO_ON_FORK) << map::SHIFT);
     if flags & !allowed != 0 {
         return Err(Errno::EINVAL);
     }
@@ -137,11 +139,33 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
     let map_flags = flags >> map::SHIFT;
     let fixed = map_flags & map::FIXED != 0;
     let shared = map_flags & map::SHARED != 0;
+    let nofork = map_flags & map::NOFORK != 0;
+    let zero_on_fork = map_flags & map::ZERO_ON_FORK != 0;
+    if nofork && zero_on_fork {
+        return Err(Errno::EINVAL);
+    }
+    if zero_on_fork && shared {
+        return Err(Errno::EINVAL);
+    }
     if len == 0 || !len.is_multiple_of(PAGE_SIZE) || !addr.is_multiple_of(PAGE_SIZE) {
         return Err(Errno::EINVAL);
     }
 
     let object = resolve_object(&caller, raw_memobj, offset, len, protection, shared)?;
+    let inherit = if nofork {
+        MapInherit::NoFork
+    } else if zero_on_fork {
+        MapInherit::ZeroOnFork
+    } else {
+        MapInherit::Inherit
+    };
+    let identity = InheritIdentity {
+        handle: raw_memobj,
+        object: match &object {
+            MappedObject::MemObject(object) | MappedObject::BootBlob(object) => Some(object.id()),
+            _ => None,
+        },
+    };
 
     if fixed {
         let end = addr.checked_add(len).ok_or(Errno::EINVAL)?;
@@ -186,6 +210,7 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
             address_space.map_dma(vaddr, len, offset, writable, non_cacheable, buffer)?;
         }
     }
+    address_space.set_inherit(vaddr, len, inherit, identity);
     Ok(vaddr as usize)
 }
 

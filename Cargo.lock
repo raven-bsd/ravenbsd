@@ -203,6 +203,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
 
 [[package]]
+name = "lexopt"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "803ec87c9cfb29b9d2633f20cba1f488db3fd53f2158b1024cbefb47ba05d413"
+
+[[package]]
 name = "libc"
 version = "0.2.191"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -387,6 +393,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven"
+version = "0.1.0"
+dependencies = [
+ "raven-cli",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-abi"
 version = "0.1.0"
 
@@ -543,6 +557,15 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-tool-core",
+]
+
+[[package]]
+name = "raven-cli"
+version = "0.1.0"
+dependencies = [
+ "lexopt",
+ "raven-output",
+ "serde_json",
 ]
 
 [[package]]
@@ -1498,6 +1521,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-output"
+version = "0.1.0"
+
+[[package]]
 name = "raven-pager"
 version = "0.1.0"
 
@@ -2029,6 +2056,14 @@ dependencies = [
 
 [[package]]
 name = "raven-s50a-handle-copy"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-s50b-proc-fork"
 version = "0.1.0"
 dependencies = [
  "raven-abi",

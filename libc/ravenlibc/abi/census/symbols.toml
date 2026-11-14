@@ -12,6 +12,34 @@ netbsd = "36eddebcc36cb0775aa2962005b9c05419a6ff01"
 openbsd = "4ce71f2817f675745b0596aaf04de4a122b1cc52"
 
 [[symbol]]
+name = "AF_NETLINK"
+ring = 3
+kind = "func"
+families = ["bsd", "linux"]
+crate = "net"
+area = 12
+status = "SKIP"
+libcs = ["bionic", "freebsd", "glibc", "musl"]
+n6 = 4
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 L26: ring 3; constants exist but calls return EAFNOSUPPORT (doc 12 1.1)."
+
+[[symbol]]
+name = "AF_PACKET"
+ring = 3
+kind = "func"
+families = ["linux", "solaris"]
+crate = "net"
+area = 12
+status = "SKIP"
+libcs = ["bionic", "glibc", "illumos", "musl"]
+n6 = 4
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 L26: ring 3; constants exist but calls return EAFNOSUPPORT (doc 12 1.1)."
+
+[[symbol]]
 name = "ALTWERASE"
 ring = 2
 header = "termios.h"
@@ -3418,6 +3446,20 @@ ring_computed = 0
 ring_source = "computed"
 
 [[symbol]]
+name = "LC_GLOBAL_LOCALE"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
+n6 = 6
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 P15 (locale.h): ring 0 macro/constant; the census standard index has no tag."
+
+[[symbol]]
 name = "LINE_MAX"
 ring = 0
 header = "limits.h"
@@ -3576,10 +3618,13 @@ header = "stdlib.h"
 kind = "macro"
 standard = ["iso-c"]
 families = ["bsd", "linux", "solaris"]
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 0
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "MB_LEN_MAX"
@@ -3777,6 +3822,20 @@ libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "op
 n6 = 6
 ring_computed = 0
 ring_source = "computed"
+
+[[symbol]]
+name = "NOEXPR"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "locale"
+area = 2
+status = "EXISTS-donor"
+libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
+n6 = 6
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 X76 (langinfo.h): ring 0 macro/constant; the census standard index has no tag."
 
 [[symbol]]
 name = "NOFLSH"
@@ -6276,6 +6335,20 @@ libcs = ["bionic", "freebsd", "glibc", "illumos", "musl", "netbsd", "openbsd", "
 n6 = 6
 ring_computed = 0
 ring_source = "computed"
+
+[[symbol]]
+name = "YESEXPR"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "locale"
+area = 2
+status = "EXISTS-donor"
+libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
+n6 = 6
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 X76 (langinfo.h): ring 0 macro/constant; the census standard index has no tag."
 
 [[symbol]]
 name = "_Complex_I"
@@ -8787,23 +8860,33 @@ ring_source = "computed"
 
 [[symbol]]
 name = "__assert"
-ring = 1
+ring = 2
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+personality = "bsd"
+crate = "stdlib"
+area = 15
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "netbsd", "openbsd", "picolibc"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 B21: BSD __assert alias conflicts with bionic Android assert at the same name (rule 2.5), ring 2 bsd."
 
 [[symbol]]
 name = "__assert2"
-ring = 1
+ring = 2
 kind = "func"
 families = ["bsd", "linux"]
+personality = "bsd"
+crate = "stdlib"
+area = 15
+status = "EXISTS-donor"
 libcs = ["bionic", "openbsd"]
 n6 = 2
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 B21: BSD __assert2 alias conflicts with bionic Android assert at the same name (rule 2.5), ring 2 bsd."
 
 [[symbol]]
 name = "__assert_c99"
@@ -8815,6 +8898,20 @@ libcs = ["illumos"]
 n6 = 1
 ring_computed = 2
 ring_source = "computed"
+
+[[symbol]]
+name = "__assert_fail"
+ring = 2
+kind = "func"
+families = ["linux"]
+personality = "linux"
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+libcs = ["glibc", "mlibc", "musl"]
+n6 = 2
+ring_computed = 2
+ring_source = "assignment"
 
 [[symbol]]
 name = "__atomic_cmpxchg"
@@ -9251,10 +9348,13 @@ ring = 2
 kind = "func"
 families = ["linux"]
 personality = "linux"
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
 libcs = ["bionic", "glibc", "musl"]
 n6 = 3
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "__ctype_mask"
@@ -9494,10 +9594,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "__dso_handle"
-ring = 3
-kind = "func"
-ring_computed = 3
-ring_source = "computed"
+ring = 1
+kind = "data"
+families = ["linux"]
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+libcs = ["bionic", "mlibc", "picolibc"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 Z02: C++ Itanium ABI contract name, ring 1 (linker-provided; no census cell)."
 
 [[symbol]]
 name = "__dtoa"
@@ -9585,6 +9692,20 @@ ring = 3
 kind = "func"
 ring_computed = 3
 ring_source = "computed"
+
+[[symbol]]
+name = "__environ"
+ring = 2
+kind = "data"
+families = ["linux"]
+personality = "linux"
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+libcs = ["glibc", "musl"]
+n6 = 2
+ring_computed = 2
+ring_source = "assignment"
 
 [[symbol]]
 name = "__environ_lock"
@@ -10223,10 +10344,13 @@ ring = 2
 kind = "func"
 families = ["linux"]
 personality = "linux"
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
 libcs = ["bionic", "glibc"]
 n6 = 2
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "__freadable"
@@ -10636,10 +10760,13 @@ ring = 2
 kind = "func"
 families = ["linux"]
 personality = "linux"
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
 libcs = ["bionic", "glibc"]
 n6 = 2
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "__getdents64"
@@ -11626,10 +11753,13 @@ kind = "data"
 standard = ["gnu"]
 families = ["linux"]
 personality = "linux"
+crate = "thread"
+area = 9
+status = "TO-BE-DESIGNED"
 libcs = ["glibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "__libc_start1"
@@ -13335,10 +13465,13 @@ ring = 2
 kind = "func"
 families = ["linux"]
 personality = "linux"
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
 libcs = ["bionic", "glibc"]
 n6 = 2
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "__printf_arginfo_chr"
@@ -14087,10 +14220,13 @@ ring = 2
 kind = "func"
 families = ["linux"]
 personality = "linux"
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
 libcs = ["bionic", "glibc"]
 n6 = 2
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "__readlink_chk"
@@ -14098,10 +14234,13 @@ ring = 2
 kind = "func"
 families = ["linux"]
 personality = "linux"
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
 libcs = ["bionic", "glibc"]
 n6 = 2
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "__readlinkat_chk"
@@ -14152,6 +14291,20 @@ libcs = ["freebsd", "netbsd", "openbsd", "picolibc"]
 n6 = 2
 ring_computed = 2
 ring_source = "computed"
+
+[[symbol]]
+name = "__recv_chk"
+ring = 2
+kind = "func"
+families = ["linux"]
+personality = "linux"
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+libcs = ["glibc"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
 
 [[symbol]]
 name = "__recvfrom_chk"
@@ -17912,13 +18065,16 @@ ring_source = "computed"
 
 [[symbol]]
 name = "_ctype_"
-ring = 1
-kind = "func"
+ring = 3
+kind = "data"
 families = ["bsd", "linux"]
-libcs = ["bionic", "openbsd", "picolibc"]
+area = 2
+status = "SKIP"
+libcs = ["bionic", "netbsd", "openbsd", "picolibc"]
 n6 = 2
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 Z10: no exposed ctype table (doc 14)."
 
 [[symbol]]
 name = "_cuserid"
@@ -18150,13 +18306,16 @@ ring_source = "computed"
 [[symbol]]
 name = "_environ"
 ring = 2
-kind = "func"
-families = ["linux"]
-personality = "linux"
-libcs = ["glibc", "musl"]
-n6 = 2
+kind = "data"
+families = ["solaris"]
+personality = "solaris"
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+libcs = ["illumos"]
+n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "_err"
@@ -25738,14 +25897,16 @@ ring_source = "computed"
 
 [[symbol]]
 name = "_tolower_tab_"
-ring = 2
-kind = "func"
-families = ["bsd"]
-personality = "bsd"
-libcs = ["openbsd"]
-n6 = 1
-ring_computed = 2
-ring_source = "computed"
+ring = 3
+kind = "data"
+families = ["bsd", "linux"]
+area = 2
+status = "SKIP"
+libcs = ["bionic", "netbsd", "openbsd"]
+n6 = 2
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 Z10: no exposed ctype table (doc 14)."
 
 [[symbol]]
 name = "_toupper"
@@ -27482,14 +27643,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "acospi"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "acospif"
@@ -27586,15 +27750,19 @@ ring_source = "computed"
 
 [[symbol]]
 name = "adjtime"
-ring = 1
+ring = 0
 header = "sys/time.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "adjtimex"
@@ -28429,6 +28597,19 @@ ring_computed = 1
 ring_source = "assignment"
 
 [[symbol]]
+name = "arch_prctl"
+ring = 3
+kind = "func"
+families = ["linux"]
+area = 10
+status = "SKIP"
+libcs = ["bionic", "glibc", "musl"]
+n6 = 3
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 L24: ring 3, not exported (doc 10 3.8)."
+
+[[symbol]]
 name = "argp_err_exit_status"
 ring = 3
 header = "argp.h"
@@ -28865,14 +29046,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "asinpi"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "asinpif"
@@ -29040,13 +29224,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "at_quick_exit"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I17 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "atan"
@@ -29117,14 +29305,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "atan2pi"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "atan2pif"
@@ -29257,14 +29448,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "atanpi"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "atanpif"
@@ -29346,11 +29540,14 @@ name = "atof_l"
 ring = 2
 kind = "func"
 families = ["bsd"]
-personality = "bsd"
+personality = "linux"
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["freebsd"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "atoi"
@@ -31054,15 +31251,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "basename"
-ring = 1
+ring = 0
 header = "libgen.h"
 kind = "func"
 standard = ["gnu", "xpg"]
 families = ["bsd", "linux", "solaris"]
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P14 (libgen.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "basename_r"
@@ -31217,6 +31418,19 @@ libcs = ["bionic", "illumos", "musl", "openbsd"]
 n6 = 4
 ring_computed = 1
 ring_source = "computed"
+
+[[symbol]]
+name = "bgets"
+ring = 3
+kind = "func"
+families = ["solaris"]
+area = 7
+status = "SKIP"
+libcs = ["illumos"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 S08: SysV libgen extras SKIP (doc 07 section 1)."
 
 [[symbol]]
 name = "bind"
@@ -31524,6 +31738,19 @@ ring_computed = 1
 ring_source = "computed"
 
 [[symbol]]
+name = "bufsplit"
+ring = 3
+kind = "func"
+families = ["solaris"]
+area = 7
+status = "SKIP"
+libcs = ["illumos"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 S08: SysV libgen extras SKIP (doc 07 section 1)."
+
+[[symbol]]
 name = "build_iovec"
 ring = 2
 kind = "func"
@@ -31562,13 +31789,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "c16rtomb"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "c16rtomb_l"
@@ -31582,13 +31813,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "c32rtomb"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "c32rtomb_l"
@@ -31602,13 +31837,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "c8rtomb"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "solaris"]
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
 libcs = ["illumos", "netbsd", "picolibc"]
 n6 = 1
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "c8rtomb_l"
@@ -31622,13 +31861,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "cabs"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "cabsf"
@@ -31680,13 +31923,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "cacos"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "cacosf"
@@ -31718,13 +31965,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "cacosh"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "cacoshf"
@@ -31773,6 +32024,20 @@ libcs = ["bionic", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 4
 ring_computed = 1
 ring_source = "computed"
+
+[[symbol]]
+name = "caddr_t"
+ring = 1
+kind = "header-only"
+families = ["bsd"]
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+libcs = ["netbsd"]
+n6 = 0
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell)."
 
 [[symbol]]
 name = "call_once"
@@ -31845,10 +32110,13 @@ header = "stdlib.h"
 kind = "func"
 standard = ["gnu"]
 families = ["linux", "solaris"]
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
 libcs = ["glibc", "illumos", "mlibc"]
 n6 = 2
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "canonicalizef"
@@ -31890,6 +32158,48 @@ ring_computed = 3
 ring_source = "computed"
 
 [[symbol]]
+name = "cap_enter"
+ring = 3
+kind = "func"
+families = ["bsd"]
+crate = "pledge"
+area = 10
+status = "SKIP"
+libcs = ["freebsd"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 B19: ring 3 (doc 15)."
+
+[[symbol]]
+name = "cap_getmode"
+ring = 3
+kind = "func"
+families = ["bsd"]
+crate = "pledge"
+area = 10
+status = "SKIP"
+libcs = ["freebsd"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 B19: ring 3 (doc 15)."
+
+[[symbol]]
+name = "cap_rights_clear"
+ring = 3
+kind = "func"
+families = ["bsd"]
+crate = "pledge"
+area = 10
+status = "SKIP"
+libcs = ["freebsd"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 B19: ring 3 (doc 15)."
+
+[[symbol]]
 name = "cap_rights_contains"
 ring = 2
 kind = "func"
@@ -31899,6 +32209,20 @@ libcs = ["freebsd"]
 n6 = 1
 ring_computed = 2
 ring_source = "computed"
+
+[[symbol]]
+name = "cap_rights_init"
+ring = 3
+kind = "func"
+families = ["bsd"]
+crate = "pledge"
+area = 10
+status = "SKIP"
+libcs = ["freebsd"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 B19: ring 3 (doc 15)."
 
 [[symbol]]
 name = "cap_rights_is_empty"
@@ -31912,6 +32236,20 @@ ring_computed = 2
 ring_source = "computed"
 
 [[symbol]]
+name = "cap_rights_is_set"
+ring = 3
+kind = "func"
+families = ["bsd"]
+crate = "pledge"
+area = 10
+status = "SKIP"
+libcs = ["freebsd"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 B19: ring 3 (doc 15)."
+
+[[symbol]]
 name = "cap_rights_is_valid"
 ring = 2
 kind = "func"
@@ -31921,6 +32259,20 @@ libcs = ["freebsd"]
 n6 = 1
 ring_computed = 2
 ring_source = "computed"
+
+[[symbol]]
+name = "cap_rights_limit"
+ring = 3
+kind = "func"
+families = ["bsd"]
+crate = "pledge"
+area = 10
+status = "SKIP"
+libcs = ["freebsd"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 B19: ring 3 (doc 15)."
 
 [[symbol]]
 name = "cap_rights_merge"
@@ -31945,47 +32297,72 @@ ring_computed = 2
 ring_source = "computed"
 
 [[symbol]]
-name = "cap_sandboxed"
-ring = 2
+name = "cap_rights_set"
+ring = 3
 kind = "func"
 families = ["bsd"]
-personality = "bsd"
+crate = "pledge"
+area = 10
+status = "SKIP"
 libcs = ["freebsd"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 B19: ring 3 (doc 15)."
+
+[[symbol]]
+name = "cap_sandboxed"
+ring = 3
+kind = "func"
+families = ["bsd"]
+crate = "pledge"
+area = 10
+status = "SKIP"
+libcs = ["freebsd"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 B19: ring 3 (doc 15)."
 
 [[symbol]]
 name = "capget"
-ring = 2
+ring = 3
 kind = "func"
 families = ["linux"]
-personality = "linux"
+area = 11
+status = "SKIP"
 libcs = ["bionic", "mlibc", "musl"]
 n6 = 2
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R14: absent; Linux binaries use the Linux personality, not libc."
 
 [[symbol]]
 name = "capset"
-ring = 2
+ring = 3
 kind = "func"
 families = ["linux"]
-personality = "linux"
+area = 11
+status = "SKIP"
 libcs = ["bionic", "mlibc", "musl"]
 n6 = 2
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R14: absent; Linux binaries use the Linux personality, not libc."
 
 [[symbol]]
 name = "carg"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "cargf"
@@ -32027,13 +32404,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "casin"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "casinf"
@@ -32065,13 +32446,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "casinh"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "casinhf"
@@ -32123,13 +32508,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "catan"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "catanf"
@@ -32161,13 +32550,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "catanh"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "catanhf"
@@ -32219,23 +32612,31 @@ ring_source = "computed"
 
 [[symbol]]
 name = "catclose"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "illumos", "musl", "netbsd", "openbsd"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X78 (nl_types.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "catgets"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "illumos", "musl", "netbsd", "openbsd"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X78 (nl_types.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "catopen"
@@ -32319,13 +32720,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "ccos"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "ccosf"
@@ -32357,13 +32762,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "ccosh"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "ccoshf"
@@ -32469,13 +32878,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "cexp"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "cexpf"
@@ -32578,10 +32991,13 @@ header = "termios.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "cfmakesane"
@@ -32680,10 +33096,13 @@ header = "termios.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "musl", "netbsd", "openbsd"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "cftime"
@@ -32897,13 +33316,16 @@ ring_source = "computed"
 
 [[symbol]]
 name = "chflags"
-ring = 1
+ring = 3
 kind = "func"
 families = ["bsd", "linux"]
+area = 11
+status = "SKIP"
 libcs = ["freebsd", "glibc", "netbsd", "openbsd"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 B17: ring 3 stub ENOSYS; UF_*/SF_* hidden."
 
 [[symbol]]
 name = "chflagsat"
@@ -32969,13 +33391,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "cimag"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "cimagf"
@@ -33330,13 +33756,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "clock_getcpuclockid"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux"]
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "clock_getres"
@@ -33370,15 +33800,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "clock_nanosleep"
-ring = 1
+ring = 0
 header = "time.h"
 kind = "func"
 standard = ["posix.1-2001"]
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "clock_settime"
@@ -33397,13 +33831,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "clog"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "clog10"
@@ -33558,15 +33996,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "closelog"
-ring = 1
+ring = 0
 header = "syslog.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P48 (syslog.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "closelog_r"
@@ -33671,14 +34113,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "compoundn"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "compoundnf"
@@ -33820,13 +34265,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "conj"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "conjf"
@@ -33895,6 +34344,19 @@ libcs = ["bionic", "freebsd", "glibc", "mlibc", "musl"]
 n6 = 4
 ring_computed = 1
 ring_source = "assignment"
+
+[[symbol]]
+name = "copylist"
+ring = 3
+kind = "func"
+families = ["solaris"]
+area = 7
+status = "SKIP"
+libcs = ["illumos"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 S08: SysV libgen extras SKIP (doc 07 section 1)."
 
 [[symbol]]
 name = "copysign"
@@ -34214,13 +34676,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "cospi"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux"]
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "netbsd", "picolibc"]
 n6 = 1
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "cospif"
@@ -34262,13 +34728,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "cpow"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "cpowf"
@@ -34310,13 +34780,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "cproj"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "cprojf"
@@ -34369,13 +34843,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "creal"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "crealf"
@@ -34539,13 +35017,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "csin"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "csinf"
@@ -34577,13 +35059,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "csinh"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "csinhf"
@@ -34635,13 +35121,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "csqrt"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "csqrtf"
@@ -34683,13 +35173,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "ctan"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "ctanf"
@@ -34721,13 +35215,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "ctanh"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "ctanhf"
@@ -34914,10 +35412,13 @@ header = "time.h"
 kind = "data"
 standard = ["posix"]
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 0
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "dbm_clearerr"
@@ -35376,15 +35877,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "dirname"
-ring = 1
+ring = 0
 header = "libgen.h"
 kind = "func"
 standard = ["xpg"]
 families = ["bsd", "linux", "solaris"]
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P14 (libgen.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "dirname_r"
@@ -35742,25 +36247,29 @@ ring_source = "computed"
 
 [[symbol]]
 name = "door_call"
-ring = 2
+ring = 3
 kind = "func"
 families = ["solaris"]
-personality = "solaris"
+area = 14
+status = "SKIP"
 libcs = ["illumos"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R16: Solaris-only, absent."
 
 [[symbol]]
 name = "door_create"
-ring = 2
+ring = 3
 kind = "func"
 families = ["solaris"]
-personality = "solaris"
+area = 14
+status = "SKIP"
 libcs = ["illumos"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R16: Solaris-only, absent."
 
 [[symbol]]
 name = "door_cred"
@@ -35797,14 +36306,16 @@ ring_source = "computed"
 
 [[symbol]]
 name = "door_return"
-ring = 2
+ring = 3
 kind = "func"
 families = ["solaris"]
-personality = "solaris"
+area = 14
+status = "SKIP"
 libcs = ["illumos"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R16: Solaris-only, absent."
 
 [[symbol]]
 name = "door_revoke"
@@ -35819,14 +36330,16 @@ ring_source = "computed"
 
 [[symbol]]
 name = "door_server_create"
-ring = 2
+ring = 3
 kind = "func"
 families = ["solaris"]
-personality = "solaris"
+area = 14
+status = "SKIP"
 libcs = ["illumos"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R16: Solaris-only, absent."
 
 [[symbol]]
 name = "door_setparam"
@@ -36088,10 +36601,13 @@ kind = "func"
 standard = ["gnu"]
 families = ["linux"]
 personality = "linux"
+crate = "stdlib"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "elf_aux_info"
@@ -36725,22 +37241,28 @@ name = "err_set_exit"
 ring = 2
 kind = "func"
 families = ["bsd"]
-personality = "bsd"
+personality = "linux"
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["freebsd"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "err_set_file"
 ring = 2
 kind = "func"
 families = ["bsd"]
-personality = "bsd"
+personality = "linux"
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["freebsd"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "errc"
@@ -37260,21 +37782,27 @@ ring = 2
 kind = "func"
 families = ["linux"]
 personality = "linux"
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["glibc", "mlibc", "musl", "picolibc"]
 n6 = 2
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "exp10m1"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "exp10m1f"
@@ -37366,14 +37894,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "exp2m1"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "exp2m1f"
@@ -37938,6 +38469,32 @@ ring_computed = 2
 ring_source = "computed"
 
 [[symbol]]
+name = "fanotify_init"
+ring = 3
+kind = "func"
+families = ["linux"]
+area = 11
+status = "SKIP"
+libcs = ["glibc", "musl"]
+n6 = 2
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R10: absent, no primitive."
+
+[[symbol]]
+name = "fanotify_mark"
+ring = 3
+kind = "func"
+families = ["linux"]
+area = 11
+status = "SKIP"
+libcs = ["glibc", "musl"]
+n6 = 2
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R10: absent, no primitive."
+
+[[symbol]]
 name = "fattach"
 ring = 1
 kind = "func"
@@ -37949,69 +38506,92 @@ ring_source = "computed"
 
 [[symbol]]
 name = "fchdir"
-ring = 1
+ring = 0
 header = "unistd.h"
 kind = "func"
 standard = ["xpg"]
 families = ["bsd", "linux", "solaris"]
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "fchflags"
-ring = 1
+ring = 3
 kind = "func"
 families = ["bsd", "linux"]
+area = 11
+status = "SKIP"
 libcs = ["freebsd", "glibc", "netbsd", "openbsd"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 B17: ring 3 stub ENOSYS; UF_*/SF_* hidden."
 
 [[symbol]]
 name = "fchmod"
-ring = 1
+ring = 0
 header = "sys/stat.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P40 (sys/stat.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "fchmodat"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P40 (sys/stat.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "fchown"
-ring = 1
+ring = 0
 header = "unistd.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "fchownat"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "fchroot"
@@ -38102,10 +38682,13 @@ kind = "func"
 standard = ["svid"]
 families = ["linux"]
 personality = "linux"
+crate = "stdlib"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "fdatasync"
@@ -38723,10 +39306,13 @@ header = "stdio.h"
 kind = "func"
 standard = ["posix"]
 families = ["bsd", "linux"]
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "mlibc", "musl", "picolibc"]
 n6 = 4
 ring_computed = 0
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "ffma"
@@ -38820,10 +39406,13 @@ header = "stdio.h"
 kind = "func"
 standard = ["posix"]
 families = ["linux"]
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
 libcs = ["bionic", "glibc", "mlibc", "musl"]
 n6 = 3
 ring_computed = 0
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "fgetgrent"
@@ -38942,10 +39531,13 @@ kind = "func"
 standard = ["gnu"]
 families = ["linux"]
 personality = "linux"
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
 libcs = ["bionic", "glibc", "mlibc", "musl"]
 n6 = 3
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "fgetspent"
@@ -39463,14 +40055,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "fmaximum_mag_num"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "fmaximum_mag_numf"
@@ -39643,14 +40238,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "fmaxmag"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "fmaxmagf"
@@ -39773,14 +40371,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "fminimum_mag_num"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "fminimum_mag_numf"
@@ -39953,14 +40554,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "fminmag"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "fminmagf"
@@ -40075,15 +40679,19 @@ ring_source = "computed"
 
 [[symbol]]
 name = "fmtmsg"
-ring = 1
+ring = 0
 header = "fmtmsg.h"
 kind = "func"
 standard = ["xpg"]
 families = ["bsd", "linux", "solaris"]
+crate = "glob"
+area = 14
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "musl", "netbsd"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P07 (fmtmsg.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "fmul"
@@ -40154,10 +40762,13 @@ header = "stdio.h"
 kind = "func"
 standard = ["gnu"]
 families = ["bsd", "linux"]
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
 libcs = ["freebsd", "glibc", "mlibc", "musl", "picolibc"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "fork"
@@ -40302,10 +40913,13 @@ name = "fpgetmask"
 ring = 1
 kind = "func"
 families = ["bsd", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["freebsd", "illumos", "netbsd", "openbsd", "picolibc"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "fpgetprec"
@@ -40326,20 +40940,26 @@ name = "fpgetround"
 ring = 1
 kind = "func"
 families = ["bsd", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["freebsd", "illumos", "netbsd", "openbsd", "picolibc"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "fpgetsticky"
 ring = 1
 kind = "func"
 families = ["bsd", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["freebsd", "illumos", "netbsd", "openbsd", "picolibc"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "fprintf"
@@ -40372,10 +40992,13 @@ name = "fpsetmask"
 ring = 1
 kind = "func"
 families = ["bsd", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["freebsd", "illumos", "netbsd", "openbsd", "picolibc"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "fpsetprec"
@@ -40396,20 +41019,26 @@ name = "fpsetround"
 ring = 1
 kind = "func"
 families = ["bsd", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["freebsd", "illumos", "netbsd", "openbsd", "picolibc"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "fpsetsticky"
 ring = 1
 kind = "func"
 families = ["bsd", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["freebsd", "illumos", "netbsd", "openbsd", "picolibc"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "fpurge"
@@ -40446,10 +41075,13 @@ header = "stdio.h"
 kind = "func"
 standard = ["posix"]
 families = ["bsd", "linux"]
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "mlibc", "musl"]
 n6 = 4
 ring_computed = 0
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "fputs"
@@ -40853,14 +41485,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "fromfp"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "fromfpf"
@@ -40900,14 +41535,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "fromfpx"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "fromfpxf"
@@ -41133,10 +41771,13 @@ header = "sys/stat.h"
 kind = "func"
 standard = ["gnu"]
 families = ["linux", "solaris"]
+crate = "platform"
+area = 11
+status = "EXISTS-donor"
 libcs = ["bionic", "glibc", "illumos", "musl"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "fstatfs"
@@ -41157,20 +41798,27 @@ ring = 2
 kind = "func"
 families = ["linux"]
 personality = "linux"
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "glibc", "mlibc", "musl"]
 n6 = 3
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "fstatvfs"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P41 (sys/statvfs.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "fstatvfs64"
@@ -41271,13 +41919,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "ftok"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "ftruncate"
@@ -41301,10 +41953,13 @@ header = "unistd.h"
 kind = "func"
 standard = ["xsi"]
 families = ["linux", "solaris"]
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
 libcs = ["bionic", "glibc", "illumos", "mlibc", "musl"]
 n6 = 4
 ring_computed = 0
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "ftrylockfile"
@@ -42751,15 +43406,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "gethostname"
-ring = 1
+ring = 0
 header = "unistd.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "gethrtime"
@@ -42852,15 +43511,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "getitimer"
-ring = 1
+ring = 0
 header = "sys/time.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P42 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "getline"
@@ -43559,14 +44222,16 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "getppriv"
-ring = 2
+ring = 3
 kind = "func"
 families = ["solaris"]
-personality = "solaris"
+area = 14
+status = "SKIP"
 libcs = ["illumos"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R16: Solaris-only, absent."
 
 [[symbol]]
 name = "getpriority"
@@ -44760,10 +45425,13 @@ name = "getxattr"
 ring = 1
 kind = "func"
 families = ["bsd", "linux"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "glibc", "mlibc", "musl", "netbsd"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "getzoneid"
@@ -44880,6 +45548,19 @@ ring_computed = 2
 ring_source = "computed"
 
 [[symbol]]
+name = "gmatch"
+ring = 3
+kind = "func"
+families = ["solaris"]
+area = 7
+status = "SKIP"
+libcs = ["illumos"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 S08: SysV libgen extras SKIP (doc 07 section 1)."
+
+[[symbol]]
 name = "gmtime"
 ring = 0
 header = "time.h"
@@ -44930,6 +45611,74 @@ libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "op
 n6 = 6
 ring_computed = 1
 ring_source = "assignment"
+
+[[symbol]]
+name = "gnu_dev_major"
+ring = 2
+kind = "func"
+families = ["linux"]
+personality = "linux"
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+libcs = ["glibc"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+
+[[symbol]]
+name = "gnu_dev_makedev"
+ring = 2
+kind = "func"
+families = ["linux"]
+personality = "linux"
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+libcs = ["glibc"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+
+[[symbol]]
+name = "gnu_dev_minor"
+ring = 2
+kind = "func"
+families = ["linux"]
+personality = "linux"
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+libcs = ["glibc"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+
+[[symbol]]
+name = "gnu_get_libc_release"
+ring = 3
+kind = "func"
+families = ["linux"]
+area = 14
+status = "SKIP"
+libcs = ["glibc"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R13: absent; identity macros stay clean."
+
+[[symbol]]
+name = "gnu_get_libc_version"
+ring = 3
+kind = "func"
+families = ["linux"]
+area = 14
+status = "SKIP"
+libcs = ["glibc"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R13: absent; identity macros stay clean."
 
 [[symbol]]
 name = "gr_add"
@@ -45054,15 +45803,19 @@ ring_source = "computed"
 
 [[symbol]]
 name = "grantpt"
-ring = 1
+ring = 0
 header = "stdlib.h"
 kind = "func"
 standard = ["svid"]
 families = ["bsd", "linux", "solaris"]
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "group_from_gid"
@@ -45146,15 +45899,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "hcreate"
-ring = 1
+ring = 0
 header = "search.h"
 kind = "func"
 standard = ["svid"]
 families = ["bsd", "linux", "solaris"]
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P26 (search.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "hcreate_r"
@@ -45173,15 +45930,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "hdestroy"
-ring = 1
+ring = 0
 header = "search.h"
 kind = "func"
 standard = ["svid"]
 families = ["bsd", "linux", "solaris"]
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P26 (search.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "hdestroy_r"
@@ -45272,15 +46033,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "hsearch"
-ring = 1
+ring = 0
 header = "search.h"
 kind = "func"
 standard = ["svid"]
 families = ["bsd", "linux", "solaris"]
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P26 (search.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "hsearch_r"
@@ -45620,87 +46385,115 @@ ring_source = "computed"
 
 [[symbol]]
 name = "iconv"
-ring = 1
+ring = 0
 header = "iconv.h"
 kind = "func"
 standard = ["xpg2"]
 families = ["bsd", "linux", "solaris"]
+crate = "iconv"
+area = 2
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "musl", "netbsd", "picolibc"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P12 (iconv.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "iconv_close"
-ring = 1
+ring = 0
 header = "iconv.h"
 kind = "func"
 standard = ["xpg2"]
 families = ["bsd", "linux", "solaris"]
+crate = "iconv"
+area = 2
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "musl", "netbsd", "picolibc"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P12 (iconv.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "iconv_open"
-ring = 1
+ring = 0
 header = "iconv.h"
 kind = "func"
 standard = ["xpg2"]
 families = ["bsd", "linux", "solaris"]
+crate = "iconv"
+area = 2
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "musl", "netbsd", "picolibc"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P12 (iconv.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "if_freenameindex"
-ring = 1
+ring = 0
 header = "net/if.h"
 kind = "func"
 standard = ["ipv6-basic-api"]
 families = ["bsd", "linux"]
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P18 (net/if.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "if_indextoname"
-ring = 1
+ring = 0
 header = "net/if.h"
 kind = "func"
 standard = ["ipv6-basic-api"]
 families = ["bsd", "linux"]
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P18 (net/if.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "if_nameindex"
-ring = 1
+ring = 0
 header = "net/if.h"
 kind = "func"
 standard = ["ipv6-basic-api"]
 families = ["bsd", "linux"]
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P18 (net/if.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "if_nametoindex"
-ring = 1
+ring = 0
 header = "net/if.h"
 kind = "func"
 standard = ["ipv6-basic-api"]
 families = ["bsd", "linux"]
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P18 (net/if.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "ignore_handler_s"
@@ -46972,10 +47765,13 @@ name = "isinf"
 ring = 1
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "isinff"
@@ -48222,15 +49018,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "killpg"
-ring = 1
+ring = 0
 header = "signal.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P29 (signal.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "kinfo_getallproc"
@@ -48518,6 +49318,19 @@ ring_computed = 2
 ring_source = "computed"
 
 [[symbol]]
+name = "lchflags"
+ring = 3
+kind = "func"
+families = ["bsd"]
+area = 11
+status = "SKIP"
+libcs = ["freebsd", "netbsd"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 B17: ring 3 stub ENOSYS; UF_*/SF_* hidden."
+
+[[symbol]]
 name = "lchmod"
 ring = 1
 kind = "func"
@@ -48532,13 +49345,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "lchown"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "lckpwdf"
@@ -48926,6 +49743,20 @@ ring_computed = 2
 ring_source = "computed"
 
 [[symbol]]
+name = "link_map"
+ring = 1
+kind = "header-only"
+families = ["linux"]
+crate = "shell"
+area = 13
+status = "EXISTS-donor"
+libcs = ["glibc"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 X83: loader link-map type, ring 1 (header-only; no census cell)."
+
+[[symbol]]
 name = "link_ntoa"
 ring = 2
 kind = "func"
@@ -49009,10 +49840,13 @@ name = "listxattr"
 ring = 1
 kind = "func"
 families = ["bsd", "linux"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "glibc", "mlibc", "musl", "netbsd"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "llabs"
@@ -49065,14 +49899,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "llogb"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "llogbf"
@@ -49112,13 +49949,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "llrint"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "llrintf"
@@ -49160,13 +50001,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "llround"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "llroundf"
@@ -49330,13 +50175,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "lockf"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "lockf64"
@@ -49417,14 +50266,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "log10p1"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "log10p1f"
@@ -49570,14 +50422,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "log2p1"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "log2p1f"
@@ -49615,13 +50470,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "logb"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "logbf"
@@ -49965,16 +50824,19 @@ ring_source = "computed"
 
 [[symbol]]
 name = "logp1"
-ring = 2
+ring = 0
 header = "math.h"
 kind = "func"
 standard = ["ts18661"]
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "logp1f"
@@ -50102,13 +50964,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "lrint"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "lrintf"
@@ -50150,13 +51016,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "lround"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "lroundf"
@@ -50591,10 +51461,13 @@ header = "sys/mman.h"
 kind = "func"
 standard = ["posix"]
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 0
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "major"
@@ -50694,13 +51567,18 @@ ring_source = "computed"
 
 [[symbol]]
 name = "mallinfo"
-ring = 1
+ring = 2
 kind = "func"
 families = ["linux", "solaris"]
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "glibc", "illumos", "picolibc"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X69: glibc allocator API; illumos mallinfo uses the Solaris allocator contract (rule 2.5), ring 2 linux."
 
 [[symbol]]
 name = "mallinfo2"
@@ -50893,13 +51771,18 @@ ring_source = "computed"
 
 [[symbol]]
 name = "mallopt"
-ring = 1
+ring = 2
 kind = "func"
 families = ["linux", "solaris"]
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "glibc", "illumos", "picolibc"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X69: glibc allocator API; illumos mallopt commands use the Solaris allocator contract (rule 2.5), ring 2 linux."
 
 [[symbol]]
 name = "mblen"
@@ -50953,13 +51836,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "mbrtoc16"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mbrtoc16_l"
@@ -50973,13 +51860,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "mbrtoc32"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mbrtoc32_l"
@@ -50993,13 +51884,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "mbrtoc8"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "solaris"]
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
 libcs = ["illumos", "netbsd", "picolibc"]
 n6 = 1
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mbrtoc8_l"
@@ -51507,14 +52402,16 @@ ring_source = "computed"
 
 [[symbol]]
 name = "mimmutable"
-ring = 2
+ring = 3
 kind = "func"
 families = ["bsd"]
-personality = "bsd"
+area = 15
+status = "SKIP"
 libcs = ["openbsd"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 B15: ring 3 stub ENOSYS."
 
 [[symbol]]
 name = "mincore"
@@ -51532,14 +52429,16 @@ ring_override = "mixed row X70"
 
 [[symbol]]
 name = "minherit"
-ring = 2
+ring = 3
 kind = "func"
 families = ["bsd"]
-personality = "bsd"
+area = 15
+status = "SKIP"
 libcs = ["freebsd", "netbsd", "openbsd"]
 n6 = 2
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 B15: ring 3 stub ENOSYS."
 
 [[symbol]]
 name = "minor"
@@ -51586,15 +52485,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "mkdtemp"
-ring = 1
+ring = 0
 header = "stdlib.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mkdtemps"
@@ -51624,35 +52527,47 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "mkfifoat"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P40 (sys/stat.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mknod"
-ring = 1
+ring = 0
 header = "sys/stat.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P40 (sys/stat.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mknodat"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P40 (sys/stat.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mkostemp"
@@ -51713,15 +52628,19 @@ ring_source = "computed"
 
 [[symbol]]
 name = "mkstemp"
-ring = 1
+ring = 0
 header = "stdlib.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mkstemp64"
@@ -51758,15 +52677,19 @@ ring_source = "computed"
 
 [[symbol]]
 name = "mktemp"
-ring = 1
+ring = 0
 header = "stdlib.h"
 kind = "func"
 standard = ["unix"]
 families = ["bsd", "linux", "solaris"]
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mktime"
@@ -51830,10 +52753,13 @@ kind = "func"
 standard = ["linux"]
 families = ["linux"]
 personality = "linux"
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "glibc", "musl"]
 n6 = 3
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "mlockall"
@@ -52141,53 +53067,73 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "mq_close"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "musl", "netbsd"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mq_getattr"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mq_notify"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "musl", "netbsd"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mq_open"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mq_receive"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mq_reltimedreceive_np"
@@ -52213,53 +53159,73 @@ ring_source = "computed"
 
 [[symbol]]
 name = "mq_send"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "musl", "netbsd"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mq_setattr"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mq_timedreceive"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "musl", "netbsd"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mq_timedsend"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "musl", "netbsd"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mq_unlink"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "mquery"
@@ -52331,13 +53297,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "msgctl"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "msgctl64"
@@ -52351,13 +53321,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "msgget"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "msgids"
@@ -52372,13 +53346,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "msgrcv"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "msgsnap"
@@ -52393,13 +53371,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "msgsnd"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "msync"
@@ -52722,13 +53704,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "nan"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "nanf"
@@ -52805,13 +53791,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "nearbyint"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "nearbyintf"
@@ -52888,13 +53878,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "nextafter"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "nextafterf"
@@ -52986,13 +53980,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "nexttoward"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "nexttowardf"
@@ -53327,13 +54325,18 @@ ring_source = "computed"
 
 [[symbol]]
 name = "ns_name_compress"
-ring = 1
+ring = 2
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "netbsd"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X42: Linux BIND spelling; FreeBSD exports __ns_name_* and macro-renames this name, so the unqualified ABI is Linux (rule 2.5), ring 2 linux."
 
 [[symbol]]
 name = "ns_name_ntol"
@@ -53347,13 +54350,18 @@ ring_source = "computed"
 
 [[symbol]]
 name = "ns_name_ntop"
-ring = 1
+ring = 2
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "netbsd"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X42: Linux BIND spelling; FreeBSD macro-renames this name to __ns_name_ntop, so the unqualified ABI is Linux (rule 2.5), ring 2 linux."
 
 [[symbol]]
 name = "ns_name_pack"
@@ -53367,13 +54375,18 @@ ring_source = "computed"
 
 [[symbol]]
 name = "ns_name_pton"
-ring = 1
+ring = 2
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "netbsd"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X42: Linux BIND spelling; FreeBSD macro-renames this name to __ns_name_pton, so the unqualified ABI is Linux (rule 2.5), ring 2 linux."
 
 [[symbol]]
 name = "ns_name_rollback"
@@ -53397,13 +54410,18 @@ ring_source = "computed"
 
 [[symbol]]
 name = "ns_name_uncompress"
-ring = 1
+ring = 2
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X42: Linux BIND spelling; FreeBSD macro-renames this name to __ns_name_uncompress, so the unqualified ABI is Linux (rule 2.5), ring 2 linux."
 
 [[symbol]]
 name = "ns_name_unpack"
@@ -54133,13 +55151,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "open_wmemstream"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P31 (stdio.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "openat"
@@ -54204,15 +55226,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "openlog"
-ring = 1
+ring = 0
 header = "syslog.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P48 (syslog.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "openlog_r"
@@ -54324,6 +55350,32 @@ libcs = ["musl"]
 n6 = 1
 ring_computed = 2
 ring_source = "assignment"
+
+[[symbol]]
+name = "p2close"
+ring = 3
+kind = "func"
+families = ["solaris"]
+area = 7
+status = "SKIP"
+libcs = ["illumos"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 S08: SysV libgen extras SKIP (doc 07 section 1)."
+
+[[symbol]]
+name = "p2open"
+ring = 3
+kind = "func"
+families = ["solaris"]
+area = 7
+status = "SKIP"
+libcs = ["illumos"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 S08: SysV libgen extras SKIP (doc 07 section 1)."
 
 [[symbol]]
 name = "p_fqnname"
@@ -54674,13 +55726,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "pipe2"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "pkey_alloc"
@@ -54976,13 +56032,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "posix_fadvise"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P06 (fcntl.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "posix_fadvise64"
@@ -54996,13 +56056,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "posix_fallocate"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P06 (fcntl.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "posix_fallocate64"
@@ -55030,13 +56094,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "posix_madvise"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P36 (sys/mman.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "posix_memalign"
@@ -55618,14 +56686,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "pown"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "pownf"
@@ -55663,14 +56734,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "powr"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "powrf"
@@ -55797,10 +56871,13 @@ kind = "func"
 standard = ["gnu"]
 families = ["linux"]
 personality = "linux"
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "glibc", "musl"]
 n6 = 3
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "preadv64"
@@ -56247,14 +57324,16 @@ ring_source = "computed"
 
 [[symbol]]
 name = "processor_bind"
-ring = 2
+ring = 3
 kind = "func"
 families = ["solaris"]
-personality = "solaris"
+area = 14
+status = "SKIP"
 libcs = ["illumos"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R16: Solaris-only, absent."
 
 [[symbol]]
 name = "processor_info"
@@ -56388,13 +57467,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "pselect"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P38 (sys/select.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "pselect64"
@@ -56458,13 +57541,16 @@ ring_source = "computed"
 
 [[symbol]]
 name = "pset_create"
-ring = 1
+ring = 3
 kind = "func"
 families = ["bsd", "solaris"]
+area = 14
+status = "SKIP"
 libcs = ["illumos", "netbsd"]
 n6 = 1
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R16: Solaris-only, absent."
 
 [[symbol]]
 name = "pset_destroy"
@@ -56533,25 +57619,33 @@ ring_source = "computed"
 
 [[symbol]]
 name = "psiginfo"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P29 (signal.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "psignal"
-ring = 1
+ring = 0
 header = "signal.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P29 (signal.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "pthread_atfork"
@@ -56584,10 +57678,13 @@ name = "pthread_attr_get_np"
 ring = 1
 kind = "func"
 families = ["bsd", "solaris"]
+crate = "thread"
+area = 9
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "illumos", "mlibc"]
 n6 = 2
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "pthread_attr_getaffinity_np"
@@ -58617,25 +59714,32 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "ptrace"
-ring = 1
+ring = 3
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+area = 10
+status = "SKIP"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R14: absent; Linux binaries use the Linux personality, not libc."
 
 [[symbol]]
 name = "ptsname"
-ring = 1
+ring = 0
 header = "stdlib.h"
 kind = "func"
 standard = ["svid"]
 families = ["bsd", "linux", "solaris"]
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "ptsname_r"
@@ -58736,6 +59840,20 @@ status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
+ring_source = "assignment"
+
+[[symbol]]
+name = "putgrent"
+ring = 2
+kind = "func"
+families = ["linux"]
+personality = "linux"
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+libcs = ["glibc", "mlibc", "musl"]
+n6 = 2
+ring_computed = 2
 ring_source = "assignment"
 
 [[symbol]]
@@ -58938,10 +60056,13 @@ ring = 2
 kind = "func"
 families = ["linux"]
 personality = "linux"
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
 libcs = ["bionic", "glibc", "picolibc"]
 n6 = 2
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "pw_copy"
@@ -59172,10 +60293,13 @@ kind = "func"
 standard = ["gnu"]
 families = ["linux"]
 personality = "linux"
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "glibc", "musl"]
 n6 = 3
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "pwritev64"
@@ -59367,6 +60491,17 @@ ring_computed = 1
 ring_source = "computed"
 
 [[symbol]]
+name = "quad_t"
+ring = 1
+kind = "header-only"
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+ring_computed = 3
+ring_source = "assignment"
+ring_override = "doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell)."
+
+[[symbol]]
 name = "quadruple_to_decimal"
 ring = 2
 kind = "func"
@@ -59390,13 +60525,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "quick_exit"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I17 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "quota_check_path"
@@ -59541,6 +60680,17 @@ ring_computed = 1
 ring_source = "computed"
 
 [[symbol]]
+name = "r_debug"
+ring = 1
+kind = "data"
+crate = "shell"
+area = 13
+status = "EXISTS-donor"
+ring_computed = 3
+ring_source = "assignment"
+ring_override = "doc 02 X83: loader r_debug data, ring 1 (loader-provided; no census cell)."
+
+[[symbol]]
 name = "r_debug_state"
 ring = "private"
 kind = "func"
@@ -59553,14 +60703,17 @@ ring_override = "mixed row Z09"
 
 [[symbol]]
 name = "radixsort"
-ring = 2
+ring = 3
 kind = "func"
 families = ["bsd"]
-personality = "bsd"
+crate = "stdlib"
+area = 3
+status = "SKIP"
 libcs = ["freebsd", "netbsd", "openbsd"]
 n6 = 2
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R02: absent, no consumer."
 
 [[symbol]]
 name = "raise"
@@ -59998,25 +61151,33 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "readlink"
-ring = 1
+ring = 0
 header = "unistd.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "readlinkat"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "readpassphrase"
@@ -60034,15 +61195,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "readv"
-ring = 1
+ring = 0
 header = "sys/uio.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P44 (sys/uio.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "realhostname"
@@ -60111,25 +61276,34 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "realpath"
-ring = 1
+ring = 0
 header = "stdlib.h"
 kind = "func"
 standard = ["xpg"]
 families = ["bsd", "linux", "solaris"]
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "reboot"
-ring = 1
+ring = 2
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+personality = "linux"
+crate = "p-linux"
+area = 15
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 L18: Linux reboot magic; the BSD form has a different signature and is not provided (rule 2.5), ring 2 linux."
 
 [[symbol]]
 name = "recallocarray"
@@ -60202,14 +61376,16 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "regcmp"
-ring = 2
+ring = 3
 kind = "func"
 families = ["solaris"]
-personality = "solaris"
+area = 7
+status = "SKIP"
 libcs = ["illumos"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 S08: SysV libgen extras SKIP (doc 07 section 1)."
 
 [[symbol]]
 name = "regcomp"
@@ -60243,14 +61419,16 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "regex"
-ring = 2
+ring = 3
 kind = "func"
 families = ["solaris"]
-personality = "solaris"
+area = 7
+status = "SKIP"
 libcs = ["illumos"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 S08: SysV libgen extras SKIP (doc 07 section 1)."
 
 [[symbol]]
 name = "regexec"
@@ -60329,13 +61507,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "remainder"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "remainderf"
@@ -60409,10 +61591,13 @@ name = "removexattr"
 ring = 1
 kind = "func"
 families = ["bsd", "linux"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "glibc", "mlibc", "musl", "netbsd"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "remque"
@@ -60429,13 +61614,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "remquo"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "remquof"
@@ -60492,10 +61681,13 @@ name = "renameat2"
 ring = 1
 kind = "func"
 families = ["bsd", "linux"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "mlibc", "musl"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "res_init"
@@ -60522,6 +61714,111 @@ libcs = ["bionic", "freebsd", "glibc", "musl", "netbsd", "openbsd"]
 n6 = 5
 ring_computed = 1
 ring_source = "assignment"
+
+[[symbol]]
+name = "res_nclose"
+ring = 2
+kind = "func"
+families = ["bsd", "linux"]
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+libcs = ["bionic", "freebsd", "glibc", "mlibc", "netbsd"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nquery and musl exports the family; the census symbol-list cell is missing, ring 2 linux."
+
+[[symbol]]
+name = "res_ninit"
+ring = 2
+kind = "func"
+families = ["bsd", "linux"]
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+libcs = ["bionic", "freebsd", "glibc", "mlibc", "netbsd"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_ninit and musl exports the family; the census symbol-list cell is missing, ring 2 linux."
+
+[[symbol]]
+name = "res_nmkquery"
+ring = 2
+kind = "func"
+families = ["bsd", "linux"]
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+libcs = ["bionic", "freebsd", "glibc", "netbsd"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nmkquery and musl exports the family; the census symbol-list cell is missing, ring 2 linux."
+
+[[symbol]]
+name = "res_nquery"
+ring = 2
+kind = "func"
+families = ["bsd", "linux"]
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+libcs = ["bionic", "freebsd", "glibc", "netbsd"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nquery and musl exports the family; the census symbol-list cell is missing, ring 2 linux."
+
+[[symbol]]
+name = "res_nquerydomain"
+ring = 2
+kind = "func"
+families = ["bsd", "linux"]
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+libcs = ["bionic", "freebsd", "glibc", "netbsd"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nquerydomain and musl exports the family; the census symbol-list cell is missing, ring 2 linux."
+
+[[symbol]]
+name = "res_nsearch"
+ring = 2
+kind = "func"
+families = ["bsd", "linux"]
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+libcs = ["bionic", "freebsd", "glibc", "netbsd"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nsearch and musl exports the family; the census symbol-list cell is missing, ring 2 linux."
+
+[[symbol]]
+name = "res_nsend"
+ring = 2
+kind = "func"
+families = ["bsd", "linux"]
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+libcs = ["bionic", "freebsd", "glibc", "netbsd"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nsend and musl exports the family; the census symbol-list cell is missing, ring 2 linux."
 
 [[symbol]]
 name = "res_query"
@@ -60767,14 +62064,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "rootn"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "rootnf"
@@ -60821,6 +62121,20 @@ status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
+ring_source = "assignment"
+
+[[symbol]]
+name = "rounddown"
+ring = 2
+kind = "macro"
+families = ["bsd"]
+personality = "bsd"
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+libcs = ["freebsd", "netbsd"]
+n6 = 1
+ring_computed = 2
 ring_source = "assignment"
 
 [[symbol]]
@@ -61414,13 +62728,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "scalbln"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "scalblnf"
@@ -62654,13 +63972,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "semctl"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "semctl64"
@@ -62674,13 +63996,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "semget"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "semids"
@@ -62695,13 +64021,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "semop"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "semtimedop"
@@ -63170,15 +64500,19 @@ ring_source = "computed"
 
 [[symbol]]
 name = "setitimer"
-ring = 1
+ring = 0
 header = "sys/time.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P42 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "setjmp"
@@ -63258,15 +64592,19 @@ ring_source = "computed"
 
 [[symbol]]
 name = "setlogmask"
-ring = 1
+ring = 0
 header = "syslog.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P48 (syslog.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "setlogmask_r"
@@ -63907,15 +65245,19 @@ ring_source = "computed"
 
 [[symbol]]
 name = "settimeofday"
-ring = 1
+ring = 0
 header = "sys/time.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "setttyent"
@@ -64038,10 +65380,13 @@ name = "setxattr"
 ring = 1
 kind = "func"
 families = ["bsd", "linux"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "glibc", "mlibc", "musl", "netbsd"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "sfconvert"
@@ -64104,33 +65449,45 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "shm_unlink"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P36 (sys/mman.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "shmat"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "shmctl"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "shmctl64"
@@ -64144,23 +65501,31 @@ ring_source = "computed"
 
 [[symbol]]
 name = "shmdt"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "shmget"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "shmids"
@@ -64593,14 +65958,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "signgam"
-ring = 2
-kind = "func"
-families = ["linux"]
-personality = "linux"
-libcs = ["musl"]
-n6 = 1
-ring_computed = 2
-ring_source = "computed"
+ring = 0
+kind = "data"
+families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+libcs = ["bionic", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
+n6 = 5
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 Z17 ((data)): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "significand"
@@ -65293,6 +66661,17 @@ ring_computed = 2
 ring_source = "assignment"
 
 [[symbol]]
+name = "sockaddr_un"
+ring = 0
+kind = "header-only"
+crate = "abi"
+area = 12
+status = "EXISTS-donor"
+ring_computed = 3
+ring_source = "assignment"
+ring_override = "doc 02 P45: <sys/un.h> header-only type, ring 0."
+
+[[symbol]]
 name = "sockatmark"
 ring = 1
 kind = "func"
@@ -65431,14 +66810,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "sradixsort"
-ring = 2
+ring = 3
 kind = "func"
 families = ["bsd"]
-personality = "bsd"
+crate = "stdlib"
+area = 3
+status = "SKIP"
 libcs = ["freebsd", "netbsd", "openbsd"]
 n6 = 2
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R02: absent, no consumer."
 
 [[symbol]]
 name = "srand"
@@ -65531,14 +66913,16 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "srandom_deterministic"
-ring = 2
+ring = 3
 kind = "func"
 families = ["bsd"]
-personality = "bsd"
+area = 3
+status = "SKIP"
 libcs = ["openbsd"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R03: BSD-only, no port needs them (doc 03 O-6)."
 
 [[symbol]]
 name = "srandom_r"
@@ -65554,14 +66938,16 @@ ring_source = "computed"
 
 [[symbol]]
 name = "srandomdev"
-ring = 2
+ring = 3
 kind = "func"
 families = ["bsd"]
-personality = "bsd"
+area = 3
+status = "SKIP"
 libcs = ["freebsd", "openbsd"]
 n6 = 2
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 section 5 R03: BSD-only, no port needs them (doc 03 O-6)."
 
 [[symbol]]
 name = "sscanf"
@@ -65694,20 +67080,27 @@ ring = 2
 kind = "func"
 families = ["linux"]
 personality = "linux"
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "glibc", "mlibc", "musl"]
 n6 = 3
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "statvfs"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P41 (sys/statvfs.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "statvfs64"
@@ -65732,6 +67125,20 @@ libcs = ["bionic", "glibc", "mlibc", "musl"]
 n6 = 3
 ring_computed = 2
 ring_source = "assignment"
+
+[[symbol]]
+name = "stdc_bit_ceil"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+libcs = ["freebsd", "glibc", "illumos", "picolibc"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
 
 [[symbol]]
 name = "stdc_bit_ceil_uc"
@@ -65786,6 +67193,20 @@ ring_computed = 1
 ring_source = "computed"
 
 [[symbol]]
+name = "stdc_bit_floor"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+libcs = ["freebsd", "glibc", "illumos", "picolibc"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[symbol]]
 name = "stdc_bit_floor_uc"
 ring = 1
 kind = "func"
@@ -65836,6 +67257,20 @@ libcs = ["freebsd", "glibc", "illumos", "picolibc"]
 n6 = 3
 ring_computed = 1
 ring_source = "computed"
+
+[[symbol]]
+name = "stdc_bit_width"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+libcs = ["freebsd", "glibc", "illumos", "picolibc"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
 
 [[symbol]]
 name = "stdc_bit_width_uc"
@@ -65890,6 +67325,20 @@ ring_computed = 1
 ring_source = "computed"
 
 [[symbol]]
+name = "stdc_count_ones"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+libcs = ["freebsd", "glibc", "illumos", "picolibc"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[symbol]]
 name = "stdc_count_ones_uc"
 ring = 1
 kind = "func"
@@ -65940,6 +67389,20 @@ libcs = ["freebsd", "glibc", "illumos", "picolibc"]
 n6 = 3
 ring_computed = 1
 ring_source = "computed"
+
+[[symbol]]
+name = "stdc_count_zeros"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+libcs = ["freebsd", "glibc", "illumos", "picolibc"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
 
 [[symbol]]
 name = "stdc_count_zeros_uc"
@@ -65994,6 +67457,20 @@ ring_computed = 1
 ring_source = "computed"
 
 [[symbol]]
+name = "stdc_first_leading_one"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+libcs = ["freebsd", "glibc", "illumos", "picolibc"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[symbol]]
 name = "stdc_first_leading_one_uc"
 ring = 1
 kind = "func"
@@ -66044,6 +67521,20 @@ libcs = ["freebsd", "glibc", "illumos", "picolibc"]
 n6 = 3
 ring_computed = 1
 ring_source = "computed"
+
+[[symbol]]
+name = "stdc_first_leading_zero"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+libcs = ["freebsd", "glibc", "illumos", "picolibc"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
 
 [[symbol]]
 name = "stdc_first_leading_zero_uc"
@@ -66098,6 +67589,20 @@ ring_computed = 1
 ring_source = "computed"
 
 [[symbol]]
+name = "stdc_first_trailing_one"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+libcs = ["freebsd", "glibc", "illumos", "picolibc"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[symbol]]
 name = "stdc_first_trailing_one_uc"
 ring = 1
 kind = "func"
@@ -66148,6 +67653,20 @@ libcs = ["freebsd", "glibc", "illumos", "picolibc"]
 n6 = 3
 ring_computed = 1
 ring_source = "computed"
+
+[[symbol]]
+name = "stdc_first_trailing_zero"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+libcs = ["freebsd", "glibc", "illumos", "picolibc"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
 
 [[symbol]]
 name = "stdc_first_trailing_zero_uc"
@@ -66202,6 +67721,20 @@ ring_computed = 1
 ring_source = "computed"
 
 [[symbol]]
+name = "stdc_has_single_bit"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+libcs = ["freebsd", "glibc", "illumos", "picolibc"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[symbol]]
 name = "stdc_has_single_bit_uc"
 ring = 1
 kind = "func"
@@ -66252,6 +67785,20 @@ libcs = ["freebsd", "glibc", "illumos", "picolibc"]
 n6 = 3
 ring_computed = 1
 ring_source = "computed"
+
+[[symbol]]
+name = "stdc_leading_ones"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+libcs = ["freebsd", "glibc", "illumos", "picolibc"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
 
 [[symbol]]
 name = "stdc_leading_ones_uc"
@@ -66306,6 +67853,20 @@ ring_computed = 1
 ring_source = "computed"
 
 [[symbol]]
+name = "stdc_leading_zeros"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+libcs = ["freebsd", "glibc", "illumos", "picolibc"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[symbol]]
 name = "stdc_leading_zeros_uc"
 ring = 1
 kind = "func"
@@ -66358,6 +67919,20 @@ ring_computed = 1
 ring_source = "computed"
 
 [[symbol]]
+name = "stdc_trailing_ones"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+libcs = ["freebsd", "glibc", "illumos", "picolibc"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[symbol]]
 name = "stdc_trailing_ones_uc"
 ring = 1
 kind = "func"
@@ -66408,6 +67983,20 @@ libcs = ["freebsd", "glibc", "illumos", "picolibc"]
 n6 = 3
 ring_computed = 1
 ring_source = "computed"
+
+[[symbol]]
+name = "stdc_trailing_zeros"
+ring = 0
+kind = "macro"
+families = ["bsd", "linux", "solaris"]
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+libcs = ["freebsd", "glibc", "illumos", "picolibc"]
+n6 = 3
+ring_computed = 1
+ring_source = "assignment"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
 
 [[symbol]]
 name = "stdc_trailing_zeros_uc"
@@ -66896,43 +68485,59 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "strfmon"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "picolibc"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P16 (monetary.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "strfmon_l"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "picolibc"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P16 (monetary.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "strfromd"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux"]
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "picolibc"]
 n6 = 2
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I18 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "strfromf"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux"]
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "picolibc"]
 n6 = 2
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I18 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "strfromfN"
@@ -66952,15 +68557,19 @@ ring_source = "computed"
 
 [[symbol]]
 name = "strfroml"
-ring = 1
+ring = 0
 header = "stdlib.h"
 kind = "func"
 standard = ["iso/iec-ts-18661-1"]
 families = ["bsd", "linux"]
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "picolibc"]
 n6 = 2
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I18 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "strfry"
@@ -67005,6 +68614,20 @@ n6 = 6
 ring_computed = 0
 ring_source = "assignment"
 ring_override = "mixed row X62"
+
+[[symbol]]
+name = "strftime_z"
+ring = 2
+kind = "func"
+families = ["bsd"]
+personality = "bsd"
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+libcs = ["netbsd"]
+n6 = 0
+ring_computed = 2
+ring_source = "assignment"
 
 [[symbol]]
 name = "string_to_decimal"
@@ -67325,13 +68948,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "strptime_l"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "netbsd", "picolibc"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X62: strptime_l is the POSIX.1 _l form, ring 0; getdate is the ring-3 member."
 
 [[symbol]]
 name = "strrchr"
@@ -67505,13 +69132,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "strtof"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I17 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "strtofN"
@@ -68545,15 +70176,19 @@ ring_source = "computed"
 
 [[symbol]]
 name = "swprintf"
-ring = 1
+ring = 0
 header = "wchar.h"
 kind = "func"
 standard = ["gnu"]
 families = ["bsd", "linux", "solaris"]
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I25 (wchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "swprintf_l"
@@ -68624,25 +70259,33 @@ ring_source = "computed"
 
 [[symbol]]
 name = "symlink"
-ring = 1
+ring = 0
 header = "unistd.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "symlinkat"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "sync"
@@ -68879,15 +70522,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "syslog"
-ring = 1
+ring = 0
 header = "syslog.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P48 (syslog.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "syslog_r"
@@ -69048,13 +70695,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "tanpi"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux"]
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "netbsd", "picolibc"]
 n6 = 1
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "tanpif"
@@ -69186,13 +70837,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "tcgetwinsize"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "mlibc", "musl", "netbsd", "picolibc"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P49 (termios.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "tcsendbreak"
@@ -69252,13 +70907,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "tcsetwinsize"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "mlibc", "musl", "netbsd", "picolibc"]
 n6 = 3
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P49 (termios.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "tdelete"
@@ -70089,53 +71748,73 @@ ring_source = "computed"
 
 [[symbol]]
 name = "timer_create"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "timer_delete"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "timer_getoverrun"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "timer_gettime"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "timer_settime"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "timeradd"
@@ -70300,6 +71979,48 @@ ring_computed = 1
 ring_source = "assignment"
 
 [[symbol]]
+name = "timespecclear"
+ring = 2
+kind = "macro"
+families = ["bsd"]
+personality = "bsd"
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+libcs = ["freebsd", "netbsd", "openbsd", "picolibc"]
+n6 = 2
+ring_computed = 2
+ring_source = "assignment"
+
+[[symbol]]
+name = "timespeccmp"
+ring = 2
+kind = "macro"
+families = ["bsd"]
+personality = "bsd"
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+libcs = ["freebsd", "netbsd", "openbsd", "picolibc"]
+n6 = 2
+ring_computed = 2
+ring_source = "assignment"
+
+[[symbol]]
+name = "timespecisset"
+ring = 2
+kind = "macro"
+families = ["bsd"]
+personality = "bsd"
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+libcs = ["freebsd", "netbsd", "openbsd", "picolibc"]
+n6 = 2
+ring_computed = 2
+ring_source = "assignment"
+
+[[symbol]]
 name = "timespecsub"
 ring = 1
 kind = "func"
@@ -70319,10 +72040,13 @@ header = "time.h"
 kind = "data"
 standard = ["posix"]
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 0
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "timingsafe_bcmp"
@@ -70799,10 +72523,13 @@ header = "unistd.h"
 kind = "func"
 standard = ["xsi"]
 families = ["linux", "solaris"]
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
 libcs = ["bionic", "glibc", "illumos", "mlibc", "musl"]
 n6 = 4
 ring_computed = 0
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "truncf"
@@ -71021,10 +72748,13 @@ header = "time.h"
 kind = "data"
 standard = ["posix"]
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 0
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "tzset"
@@ -71033,10 +72763,13 @@ header = "time.h"
 kind = "func"
 standard = ["posix"]
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 0
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "tzsetwall"
@@ -71083,6 +72816,56 @@ ring_computed = 2
 ring_source = "computed"
 
 [[symbol]]
+name = "u_char"
+ring = 1
+kind = "header-only"
+families = ["bsd"]
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+libcs = ["openbsd"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell)."
+
+[[symbol]]
+name = "u_int"
+ring = 1
+kind = "header-only"
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+ring_computed = 3
+ring_source = "assignment"
+ring_override = "doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell)."
+
+[[symbol]]
+name = "u_long"
+ring = 1
+kind = "header-only"
+families = ["bsd"]
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+libcs = ["openbsd"]
+n6 = 1
+ring_computed = 2
+ring_source = "assignment"
+ring_override = "doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell)."
+
+[[symbol]]
+name = "u_short"
+ring = 1
+kind = "header-only"
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+ring_computed = 3
+ring_source = "assignment"
+ring_override = "doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell)."
+
+[[symbol]]
 name = "uabs"
 ring = 2
 kind = "func"
@@ -71119,10 +72902,13 @@ name = "ualarm"
 ring = 1
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 5
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "ucontext_alloc"
@@ -71456,14 +73242,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "ufromfp"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "ufromfpf"
@@ -71503,14 +73292,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "ufromfpx"
-ring = 2
+ring = 0
 kind = "func"
 families = ["linux"]
-personality = "linux"
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
 libcs = ["glibc", "picolibc"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "ufromfpxf"
@@ -71588,15 +73380,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "ulimit"
-ring = 1
+ring = 0
 header = "ulimit.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "glibc", "illumos", "musl", "netbsd"]
 n6 = 4
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "ullabs"
@@ -71765,15 +73561,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "unlockpt"
-ring = 1
+ring = 0
 header = "stdlib.h"
 kind = "func"
 standard = ["svid"]
 families = ["bsd", "linux", "solaris"]
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "unmount"
@@ -71927,13 +73727,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "usleep"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "ustat"
@@ -71978,15 +73782,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "utimes"
-ring = 1
+ring = 0
 header = "sys/time.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "time"
+area = 6
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P42 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "utmpname"
@@ -72822,15 +74630,19 @@ ring_source = "computed"
 
 [[symbol]]
 name = "vswprintf"
-ring = 1
+ring = 0
 header = "wchar.h"
 kind = "func"
 standard = ["gnu"]
 families = ["bsd", "linux", "solaris"]
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I25 (wchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "vswprintf_l"
@@ -72871,15 +74683,19 @@ ring_source = "computed"
 
 [[symbol]]
 name = "vsyslog"
-ring = 1
+ring = 0
 header = "syslog.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P48 (syslog.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "vsyslog_r"
@@ -73037,11 +74853,14 @@ name = "wait6"
 ring = 2
 kind = "func"
 families = ["bsd"]
-personality = "bsd"
+personality = "linux"
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
 libcs = ["freebsd", "netbsd"]
 n6 = 1
 ring_computed = 2
-ring_source = "computed"
+ring_source = "assignment"
 
 [[symbol]]
 name = "waitid"
@@ -73620,13 +75439,17 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "wcstod"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I24 (wchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "wcstod_l"
@@ -73640,13 +75463,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "wcstof"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I24 (wchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "wcstofN"
@@ -73744,13 +75571,17 @@ ring_source = "computed"
 
 [[symbol]]
 name = "wcstold"
-ring = 1
+ring = 0
 kind = "func"
 families = ["bsd", "linux", "solaris"]
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 I24 (wchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "wcstold_l"
@@ -74299,15 +76130,19 @@ ring_source = "assignment"
 
 [[symbol]]
 name = "writev"
-ring = 1
+ring = 0
 header = "sys/uio.h"
 kind = "func"
 standard = ["bsd"]
 families = ["bsd", "linux", "solaris"]
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
 libcs = ["bionic", "freebsd", "glibc", "illumos", "mlibc", "musl", "netbsd", "openbsd", "picolibc"]
 n6 = 6
 ring_computed = 1
-ring_source = "computed"
+ring_source = "assignment"
+ring_override = "doc 02 P44 (sys/uio.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[symbol]]
 name = "wscanf"

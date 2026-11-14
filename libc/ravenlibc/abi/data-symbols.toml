@@ -1,0 +1,174 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Reviewer-owned data-symbol sizes for the RAVEN_1.0 freeze. Sizes are LP64; every row is
+# unverified until the release procedure compares it with `llvm-nm -D -S libc.so.1`.
+
+[[data]]
+name = "environ"
+size = 8
+type = "char **"
+aliases = ["__environ", "_environ"]
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "stdin"
+size = 8
+type = "FILE *"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "stdout"
+size = 8
+type = "FILE *"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "stderr"
+size = 8
+type = "FILE *"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "optarg"
+size = 8
+type = "char *"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "optind"
+size = 4
+type = "int"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "opterr"
+size = 4
+type = "int"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "optopt"
+size = 4
+type = "int"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "optreset"
+size = 4
+type = "int"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "suboptarg"
+size = 8
+type = "char *"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "tzname"
+size = 16
+type = "char *[2]"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "timezone"
+size = 8
+type = "long"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "daylight"
+size = 4
+type = "int"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "signgam"
+size = 4
+type = "int"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "program_invocation_name"
+size = 8
+type = "char *"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "program_invocation_short_name"
+size = 8
+type = "char *"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "__progname"
+size = 8
+type = "const char *"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "__progname_full"
+size = 8
+type = "const char *"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "__stack_chk_guard"
+size = 8
+type = "uintptr_t"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "__libc_single_threaded"
+size = 1
+type = "char"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "error_message_count"
+size = 4
+type = "unsigned int"
+source = "sys/error.h"
+verified = false
+
+[[data]]
+name = "error_one_per_line"
+size = 4
+type = "int"
+source = "sys/error.h"
+verified = false
+
+[[data]]
+name = "in6addr_any"
+size = 16
+type = "struct in6_addr"
+source = "doc 02 2.2"
+verified = false
+
+[[data]]
+name = "in6addr_loopback"
+size = 16
+type = "struct in6_addr"
+source = "doc 02 2.2"
+verified = false

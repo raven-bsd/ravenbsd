@@ -252,8 +252,19 @@ fn write_undef(symbols: &Path, out: &Path) -> Result<()> {
     let text = std::fs::read_to_string(symbols)
         .with_context(|| format!("cannot read {}", symbols.display()))?;
     let mut response = String::new();
+    let mut block_comment = false;
     for line in text.lines() {
         let line = line.trim();
+        if block_comment {
+            if line.contains("*/") {
+                block_comment = false;
+            }
+            continue;
+        }
+        if line.starts_with("/*") {
+            block_comment = !line.contains("*/");
+            continue;
+        }
         if line.is_empty() || line.starts_with('#') {
             if line == "# private" {
                 break;

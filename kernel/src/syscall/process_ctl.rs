@@ -38,6 +38,44 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(raw.0 as usize)
 }
 
+/// Raw `proc_fork(src: Handle, flags: u64) -> Handle` number (S50b).
+///
+/// The ABI contract crate is reviewer-owned; the number is exposed here until the next ABI
+/// revision adds a `Syscall` variant.
+pub const PROC_FORK: usize = 0x39;
+
+/// `proc_fork(src, flags) -> Handle`.
+///
+/// Clones `src`'s address space copy-on-write, duplicates its handle table with the same handle
+/// numbers and shared lineage, copies the namespace and returns a handle to the child. The child
+/// has no thread and does not run until the caller creates one with `THREAD_CREATE`. `0x34` is
+/// `PROC_SET_PERSONALITY` and is not reused; every non-zero flag bit is `EINVAL` in v1.
+pub fn fork(frame: &SyscallFrame) -> Result<usize, Errno> {
+    if frame.rsi != 0 {
+        return Err(Errno::EINVAL);
+    }
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let source = {
+        let handles = caller.handles.lock();
+        match handles.get(handle, Rights::ADMIN) {
+            Ok(Object::Process(target)) => Arc::clone(target),
+            Ok(_) => return Err(Errno::EBADF),
+            Err(Errno::EACCES) => return Err(Errno::EPERM),
+            Err(error) => return Err(error),
+        }
+    };
+    if *source.state.lock() == ProcessState::Exited {
+        return Err(Errno::ESRCH);
+    }
+    let child = process::new_forked_process(&source)?;
+    let raw = caller
+        .handles
+        .lock()
+        .insert(Object::Process(child), Rights::ALL)?;
+    Ok(raw.0 as usize)
+}
+
 /// `proc_set_personality(proc, personality, handler) -> 0`.
 ///
 /// The child must not have started a thread unless it is the caller itself;

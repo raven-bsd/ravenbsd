@@ -1,7 +1,33 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-# C33a export assignment set; reviewer signs the new shell mappings.
+# C33b ring reconciliation: every C33a-dropped row is restored with a cited
+# ring_override, restored at the computed ring, or recorded as dropped.
 schema = 1
+
+[[assign]]
+name = "AF_NETLINK"
+ring = 3
+crate = "net"
+area = 12
+status = "SKIP"
+ring_override = "doc 02 L26: ring 3; constants exist but calls return EAFNOSUPPORT (doc 12 1.1)."
+
+[[assign]]
+name = "AF_PACKET"
+ring = 3
+crate = "net"
+area = 12
+status = "SKIP"
+ring_override = "doc 02 L26: ring 3; constants exist but calls return EAFNOSUPPORT (doc 12 1.1)."
+
+[[assign]]
+name = "LC_GLOBAL_LOCALE"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+kind = "macro"
+ring_override = "doc 02 P15 (locale.h): ring 0 macro/constant; the census standard index has no tag."
 
 [[assign]]
 name = "MAX"
@@ -32,6 +58,13 @@ area = 14
 status = "EXISTS-donor"
 
 [[assign]]
+name = "MB_CUR_MAX"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
 name = "MIN"
 ring = 1
 crate = "abi"
@@ -44,6 +77,24 @@ ring = 1
 crate = "abi"
 area = 14
 status = "EXISTS-donor"
+
+[[assign]]
+name = "NOEXPR"
+ring = 0
+crate = "locale"
+area = 2
+status = "EXISTS-donor"
+kind = "macro"
+ring_override = "doc 02 X76 (langinfo.h): ring 0 macro/constant; the census standard index has no tag."
+
+[[assign]]
+name = "YESEXPR"
+ring = 0
+crate = "locale"
+area = 2
+status = "EXISTS-donor"
+kind = "macro"
+ring_override = "doc 02 X76 (langinfo.h): ring 0 macro/constant; the census standard index has no tag."
 
 [[assign]]
 name = "_Exit"
@@ -61,10 +112,44 @@ status = "PRIVATE"
 header = "unistd.h"
 
 [[assign]]
+name = "__assert"
+ring = 2
+personality = "bsd"
+crate = "stdlib"
+area = 15
+status = "EXISTS-donor"
+ring_override = "doc 02 B21: BSD __assert alias conflicts with bionic Android assert at the same name (rule 2.5), ring 2 bsd."
+
+[[assign]]
+name = "__assert2"
+ring = 2
+personality = "bsd"
+crate = "stdlib"
+area = 15
+status = "EXISTS-donor"
+ring_override = "doc 02 B21: BSD __assert2 alias conflicts with bionic Android assert at the same name (rule 2.5), ring 2 bsd."
+
+[[assign]]
+name = "__assert_fail"
+ring = 2
+personality = "linux"
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
 name = "__chk_fail"
 ring = 1
 crate = "ssp"
 area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__ctype_get_mb_cur_max"
+ring = 2
+personality = "linux"
+crate = "ctype"
+area = 2
 status = "EXISTS-donor"
 
 [[assign]]
@@ -87,6 +172,24 @@ ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+
+[[assign]]
+name = "__dso_handle"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+kind = "data"
+ring_override = "doc 02 Z02: C++ Itanium ABI contract name, ring 1 (linker-provided; no census cell)."
+
+[[assign]]
+name = "__environ"
+ring = 2
+personality = "linux"
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+kind = "data"
 
 [[assign]]
 name = "__errno"
@@ -142,6 +245,14 @@ name = "__fpurge"
 ring = 1
 crate = "stdio"
 area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__fread_chk"
+ring = 2
+personality = "linux"
+crate = "ssp"
+area = 8
 status = "EXISTS-donor"
 
 [[assign]]
@@ -208,6 +319,14 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
+name = "__getcwd_chk"
+ring = 2
+personality = "linux"
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
 name = "__gets_chk"
 ring = 1
 crate = "ssp"
@@ -269,6 +388,14 @@ area = 8
 status = "EXISTS-donor"
 
 [[assign]]
+name = "__libc_single_threaded"
+ring = 2
+personality = "linux"
+crate = "thread"
+area = 9
+status = "TO-BE-DESIGNED"
+
+[[assign]]
 name = "__libc_start_main"
 ring = "private"
 crate = "shell"
@@ -292,6 +419,14 @@ status = "EXISTS-donor"
 [[assign]]
 name = "__memset_chk"
 ring = 1
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__pread_chk"
+ring = 2
+personality = "linux"
 crate = "ssp"
 area = 8
 status = "EXISTS-donor"
@@ -421,6 +556,30 @@ ring = 3
 crate = "personality-bsd"
 area = 15
 status = "PRIVATE"
+
+[[assign]]
+name = "__read_chk"
+ring = 2
+personality = "linux"
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__readlink_chk"
+ring = 2
+personality = "linux"
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
+name = "__recv_chk"
+ring = 2
+personality = "linux"
+crate = "ssp"
+area = 8
+status = "EXISTS-donor"
 
 [[assign]]
 name = "__rl_atfork_run"
@@ -720,6 +879,23 @@ area = 1
 status = "PRIVATE"
 
 [[assign]]
+name = "_ctype_"
+ring = 3
+area = 2
+status = "SKIP"
+kind = "data"
+ring_override = "doc 02 Z10: no exposed ctype table (doc 14)."
+
+[[assign]]
+name = "_environ"
+ring = 2
+personality = "solaris"
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+kind = "data"
+
+[[assign]]
 name = "_exit"
 ring = 0
 crate = "proc"
@@ -824,6 +1000,14 @@ area = 9
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "_tolower_tab_"
+ring = 3
+area = 2
+status = "SKIP"
+kind = "data"
+ring_override = "doc 02 Z10: no exposed ctype table (doc 14)."
+
+[[assign]]
 name = "a64l"
 ring = 1
 crate = "stdlib"
@@ -896,12 +1080,28 @@ area = 0
 status = "EXISTS-donor"
 
 [[assign]]
+name = "acospi"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "addmntent"
 ring = 2
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
 header = "mntent.h"
+
+[[assign]]
+name = "adjtime"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "aio_cancel"
@@ -997,6 +1197,13 @@ area = 15
 status = "EXISTS-donor"
 
 [[assign]]
+name = "arch_prctl"
+ring = 3
+area = 10
+status = "SKIP"
+ring_override = "doc 02 L24: ring 3, not exported (doc 10 3.8)."
+
+[[assign]]
 name = "asctime"
 ring = 0
 crate = "time"
@@ -1032,6 +1239,14 @@ area = 0
 status = "EXISTS-donor"
 
 [[assign]]
+name = "asinpi"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "asprintf"
 ring = 1
 crate = "stdio"
@@ -1045,6 +1260,14 @@ crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
 ring_override = "mixed row I01"
+
+[[assign]]
+name = "at_quick_exit"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "doc 02 I17 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "atan"
@@ -1068,6 +1291,14 @@ area = 0
 status = "EXISTS-donor"
 
 [[assign]]
+name = "atan2pi"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "atanf"
 ring = 1
 crate = "libc"
@@ -1089,6 +1320,14 @@ area = 0
 status = "EXISTS-donor"
 
 [[assign]]
+name = "atanpi"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "atexit"
 ring = 0
 crate = "stdlib"
@@ -1098,6 +1337,14 @@ status = "EXISTS-donor"
 [[assign]]
 name = "atof"
 ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "atof_l"
+ring = 2
+personality = "linux"
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
@@ -1145,6 +1392,14 @@ area = 15
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "basename"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "doc 02 P14 (libgen.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "bcmp"
 ring = 1
 crate = "str"
@@ -1180,6 +1435,13 @@ ring = 1
 crate = "abi"
 area = 14
 status = "EXISTS-donor"
+
+[[assign]]
+name = "bgets"
+ring = 3
+area = 7
+status = "SKIP"
+ring_override = "doc 02 S08: SysV libgen extras SKIP (doc 07 section 1)."
 
 [[assign]]
 name = "bind"
@@ -1262,12 +1524,76 @@ area = 2
 status = "EXISTS-donor"
 
 [[assign]]
+name = "bufsplit"
+ring = 3
+area = 7
+status = "SKIP"
+ring_override = "doc 02 S08: SysV libgen extras SKIP (doc 07 section 1)."
+
+[[assign]]
 name = "bzero"
 ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
 header = "string.h"
+
+[[assign]]
+name = "c16rtomb"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+ring_override = "doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "c32rtomb"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+ring_override = "doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "c8rtomb"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+ring_override = "doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "cabs"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "cacos"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "cacosh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "caddr_t"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+kind = "header-only"
+ring_override = "doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell)."
 
 [[assign]]
 name = "call_once"
@@ -1291,11 +1617,152 @@ area = 0
 status = "EXISTS-donor"
 
 [[assign]]
+name = "canonicalize_file_name"
+ring = 1
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
 name = "canonicalizef"
 ring = 3
 crate = "libc"
 area = 0
 status = "EXISTS-donor"
+
+[[assign]]
+name = "cap_enter"
+ring = 3
+crate = "pledge"
+area = 10
+status = "SKIP"
+ring_override = "doc 02 B19: ring 3 (doc 15)."
+
+[[assign]]
+name = "cap_getmode"
+ring = 3
+crate = "pledge"
+area = 10
+status = "SKIP"
+ring_override = "doc 02 B19: ring 3 (doc 15)."
+
+[[assign]]
+name = "cap_rights_clear"
+ring = 3
+crate = "pledge"
+area = 10
+status = "SKIP"
+ring_override = "doc 02 B19: ring 3 (doc 15)."
+
+[[assign]]
+name = "cap_rights_init"
+ring = 3
+crate = "pledge"
+area = 10
+status = "SKIP"
+ring_override = "doc 02 B19: ring 3 (doc 15)."
+
+[[assign]]
+name = "cap_rights_is_set"
+ring = 3
+crate = "pledge"
+area = 10
+status = "SKIP"
+ring_override = "doc 02 B19: ring 3 (doc 15)."
+
+[[assign]]
+name = "cap_rights_limit"
+ring = 3
+crate = "pledge"
+area = 10
+status = "SKIP"
+ring_override = "doc 02 B19: ring 3 (doc 15)."
+
+[[assign]]
+name = "cap_rights_set"
+ring = 3
+crate = "pledge"
+area = 10
+status = "SKIP"
+ring_override = "doc 02 B19: ring 3 (doc 15)."
+
+[[assign]]
+name = "cap_sandboxed"
+ring = 3
+crate = "pledge"
+area = 10
+status = "SKIP"
+ring_override = "doc 02 B19: ring 3 (doc 15)."
+
+[[assign]]
+name = "capget"
+ring = 3
+area = 11
+status = "SKIP"
+ring_override = "doc 02 section 5 R14: absent; Linux binaries use the Linux personality, not libc."
+
+[[assign]]
+name = "capset"
+ring = 3
+area = 11
+status = "SKIP"
+ring_override = "doc 02 section 5 R14: absent; Linux binaries use the Linux personality, not libc."
+
+[[assign]]
+name = "carg"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "casin"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "casinh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "catan"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "catanh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "catclose"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 X78 (nl_types.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "catgets"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 X78 (nl_types.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "catopen"
@@ -1319,6 +1786,22 @@ area = 0
 status = "EXISTS-donor"
 
 [[assign]]
+name = "ccos"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "ccosh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "ceil"
 ring = 1
 crate = "libc"
@@ -1331,6 +1814,14 @@ ring = 1
 crate = "libc"
 area = 0
 status = "EXISTS-donor"
+
+[[assign]]
+name = "cexp"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "cfgetispeed"
@@ -1347,6 +1838,13 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "cfmakeraw"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
 name = "cfsetispeed"
 ring = 0
 crate = "platform"
@@ -1356,6 +1854,13 @@ status = "TO-BE-DESIGNED"
 [[assign]]
 name = "cfsetospeed"
 ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "cfsetspeed"
+ring = 1
 crate = "platform"
 area = 11
 status = "TO-BE-DESIGNED"
@@ -1448,6 +1953,13 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "chflags"
+ring = 3
+area = 11
+status = "SKIP"
+ring_override = "doc 02 B17: ring 3 stub ENOSYS; UF_*/SF_* hidden."
+
+[[assign]]
 name = "chmod"
 ring = 0
 crate = "platform"
@@ -1460,6 +1972,14 @@ ring = 0
 crate = "proc"
 area = 10
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "cimag"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "clearenv"
@@ -1491,6 +2011,14 @@ area = 6
 status = "EXISTS-donor"
 
 [[assign]]
+name = "clock_getcpuclockid"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "clock_getres"
 ring = 0
 crate = "time"
@@ -1505,11 +2033,27 @@ area = 6
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "clock_nanosleep"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "clock_settime"
 ring = 0
 crate = "time"
 area = 6
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "clog"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "close"
@@ -1538,6 +2082,14 @@ ring = 1
 crate = "platform"
 area = 11
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "closelog"
+ring = 0
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P48 (syslog.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "cnd_broadcast"
@@ -1580,6 +2132,14 @@ ring = 0
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
+
+[[assign]]
+name = "compoundn"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "cond_broadcast"
@@ -1631,6 +2191,14 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "conj"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "connect"
 ring = 1
 crate = "net"
@@ -1645,6 +2213,13 @@ crate = "personality-linux"
 area = 15
 status = "EXISTS-donor"
 header = "unistd.h"
+
+[[assign]]
+name = "copylist"
+ring = 3
+area = 7
+status = "SKIP"
+ring_override = "doc 02 S08: SysV libgen extras SKIP (doc 07 section 1)."
 
 [[assign]]
 name = "copysign"
@@ -1689,6 +2264,38 @@ area = 0
 status = "EXISTS-donor"
 
 [[assign]]
+name = "cospi"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "cpow"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "cproj"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "creal"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "creat"
 ring = 0
 crate = "platform"
@@ -1718,6 +2325,46 @@ area = 15
 status = "EXISTS-donor"
 
 [[assign]]
+name = "csin"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "csinh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "csqrt"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "ctan"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "ctanh"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "ctermid"
 ring = 0
 crate = "stdio"
@@ -1736,6 +2383,13 @@ name = "daemon"
 ring = 1
 crate = "proc"
 area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "daylight"
+ring = 0
+crate = "time"
+area = 6
 status = "EXISTS-donor"
 
 [[assign]]
@@ -1783,6 +2437,14 @@ crate = "fts"
 area = 7
 status = "EXISTS-donor"
 header = "dirent.h"
+
+[[assign]]
+name = "dirname"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "doc 02 P14 (libgen.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "div"
@@ -1877,6 +2539,34 @@ status = "EXISTS-donor"
 header = "libintl.h"
 
 [[assign]]
+name = "door_call"
+ring = 3
+area = 14
+status = "SKIP"
+ring_override = "doc 02 section 5 R16: Solaris-only, absent."
+
+[[assign]]
+name = "door_create"
+ring = 3
+area = 14
+status = "SKIP"
+ring_override = "doc 02 section 5 R16: Solaris-only, absent."
+
+[[assign]]
+name = "door_return"
+ring = 3
+area = 14
+status = "SKIP"
+ring_override = "doc 02 section 5 R16: Solaris-only, absent."
+
+[[assign]]
+name = "door_server_create"
+ring = 3
+area = 14
+status = "SKIP"
+ring_override = "doc 02 section 5 R16: Solaris-only, absent."
+
+[[assign]]
 name = "dprintf"
 ring = 0
 crate = "stdio"
@@ -1936,6 +2626,14 @@ status = "EXISTS-donor"
 [[assign]]
 name = "ecvt"
 ring = 1
+crate = "stdlib"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "ecvt_r"
+ring = 2
+personality = "linux"
 crate = "stdlib"
 area = 5
 status = "TO-BE-DESIGNED"
@@ -2125,6 +2823,22 @@ area = 3
 status = "EXISTS-donor"
 
 [[assign]]
+name = "err_set_exit"
+ring = 2
+personality = "linux"
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
+name = "err_set_file"
+ring = 2
+personality = "linux"
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+
+[[assign]]
 name = "errc"
 ring = 1
 crate = "stdlib"
@@ -2283,6 +2997,22 @@ area = 0
 status = "EXISTS-donor"
 
 [[assign]]
+name = "exp10l"
+ring = 2
+personality = "linux"
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "exp10m1"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "exp2"
 ring = 1
 crate = "libc"
@@ -2295,6 +3025,14 @@ ring = 1
 crate = "libc"
 area = 0
 status = "EXISTS-donor"
+
+[[assign]]
+name = "exp2m1"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "expand_number"
@@ -2355,6 +3093,67 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "fanotify_init"
+ring = 3
+area = 11
+status = "SKIP"
+ring_override = "doc 02 section 5 R10: absent, no primitive."
+
+[[assign]]
+name = "fanotify_mark"
+ring = 3
+area = 11
+status = "SKIP"
+ring_override = "doc 02 section 5 R10: absent, no primitive."
+
+[[assign]]
+name = "fchdir"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "fchflags"
+ring = 3
+area = 11
+status = "SKIP"
+ring_override = "doc 02 B17: ring 3 stub ENOSYS; UF_*/SF_* hidden."
+
+[[assign]]
+name = "fchmod"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P40 (sys/stat.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "fchmodat"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P40 (sys/stat.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "fchown"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "fchownat"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "fclose"
 ring = 0
 crate = "stdio"
@@ -2378,6 +3177,14 @@ status = "TO-BE-DESIGNED"
 [[assign]]
 name = "fcvt"
 ring = 1
+crate = "stdlib"
+area = 5
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fcvt_r"
+ring = 2
+personality = "linux"
 crate = "stdlib"
 area = 5
 status = "TO-BE-DESIGNED"
@@ -2587,6 +3394,13 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
+name = "fflush_unlocked"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
 name = "ffs"
 ring = 1
 crate = "str"
@@ -2609,6 +3423,13 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "fgetc"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fgetc_unlocked"
 ring = 0
 crate = "stdio"
 area = 4
@@ -2645,6 +3466,14 @@ status = "EXISTS-donor"
 [[assign]]
 name = "fgets"
 ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fgets_unlocked"
+ring = 2
+personality = "linux"
 crate = "stdio"
 area = 4
 status = "EXISTS-donor"
@@ -2798,6 +3627,14 @@ area = 0
 status = "EXISTS-donor"
 
 [[assign]]
+name = "fmaximum_mag_num"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "fmaximum_magf"
 ring = 3
 crate = "libc"
@@ -2824,6 +3661,14 @@ ring = 3
 crate = "libc"
 area = 0
 status = "EXISTS-donor"
+
+[[assign]]
+name = "fmaxmag"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "fmemopen"
@@ -2862,6 +3707,14 @@ area = 0
 status = "EXISTS-donor"
 
 [[assign]]
+name = "fminimum_mag_num"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "fminimum_magf"
 ring = 3
 crate = "libc"
@@ -2890,6 +3743,14 @@ area = 0
 status = "EXISTS-donor"
 
 [[assign]]
+name = "fminmag"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "fmod"
 ring = 1
 crate = "libc"
@@ -2912,6 +3773,14 @@ area = 15
 status = "EXISTS-donor"
 
 [[assign]]
+name = "fmtmsg"
+ring = 0
+crate = "glob"
+area = 14
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P07 (fmtmsg.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "fnmatch"
 ring = 0
 crate = "glob"
@@ -2921,6 +3790,13 @@ status = "EXISTS-donor"
 [[assign]]
 name = "fopen"
 ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fopencookie"
+ring = 1
 crate = "stdio"
 area = 4
 status = "EXISTS-donor"
@@ -2961,9 +3837,30 @@ area = 5
 status = "EXISTS-donor"
 
 [[assign]]
+name = "fpgetmask"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
 name = "fpgetprec"
 ring = 2
 personality = "bsd"
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fpgetround"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fpgetsticky"
+ring = 1
 crate = "m"
 area = 5
 status = "EXISTS-donor"
@@ -2976,9 +3873,30 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
+name = "fpsetmask"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
 name = "fpsetprec"
 ring = 2
 personality = "bsd"
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fpsetround"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fpsetsticky"
+ring = 1
 crate = "m"
 area = 5
 status = "EXISTS-donor"
@@ -2992,6 +3910,13 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "fputc"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fputc_unlocked"
 ring = 0
 crate = "stdio"
 area = 4
@@ -3110,6 +4035,22 @@ area = 5
 status = "EXISTS-donor"
 
 [[assign]]
+name = "fromfp"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "fromfpx"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "fscanf"
 ring = 0
 crate = "stdio"
@@ -3160,11 +4101,34 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "fstatat64"
+ring = 1
+crate = "platform"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
 name = "fstatfs"
 ring = 1
 crate = "platform"
 area = 11
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fstatfs64"
+ring = 2
+personality = "linux"
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "fstatvfs"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P41 (sys/statvfs.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "fsync"
@@ -3188,11 +4152,26 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
+name = "ftok"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "ftruncate"
 ring = 0
 crate = "proc"
 area = 10
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "ftruncate64"
+ring = 0
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
 
 [[assign]]
 name = "ftrylockfile"
@@ -3653,6 +4632,14 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "gethostname"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "getifaddrs"
 ring = 1
 crate = "net"
@@ -3665,6 +4652,14 @@ ring = 2
 personality = "solaris"
 crate = "p-sol"
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getitimer"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+ring_override = "doc 02 P42 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "getline"
@@ -3838,6 +4833,13 @@ ring = 0
 crate = "proc"
 area = 10
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "getppriv"
+ring = 3
+area = 14
+status = "SKIP"
+ring_override = "doc 02 section 5 R16: Solaris-only, absent."
 
 [[assign]]
 name = "getpriority"
@@ -4143,6 +5145,13 @@ area = 11
 status = "EXISTS-donor"
 
 [[assign]]
+name = "getxattr"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
 name = "gid_from_group"
 ring = 2
 crate = "pwd"
@@ -4164,6 +5173,13 @@ area = 7
 status = "EXISTS-donor"
 
 [[assign]]
+name = "gmatch"
+ring = 3
+area = 7
+status = "SKIP"
+ring_override = "doc 02 S08: SysV libgen extras SKIP (doc 07 section 1)."
+
+[[assign]]
 name = "gmtime"
 ring = 0
 crate = "time"
@@ -4177,6 +5193,52 @@ crate = "time"
 area = 5
 status = "EXISTS-donor"
 header = "time.h"
+
+[[assign]]
+name = "gnu_dev_major"
+ring = 2
+personality = "linux"
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gnu_dev_makedev"
+ring = 2
+personality = "linux"
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gnu_dev_minor"
+ring = 2
+personality = "linux"
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+
+[[assign]]
+name = "gnu_get_libc_release"
+ring = 3
+area = 14
+status = "SKIP"
+ring_override = "doc 02 section 5 R13: absent; identity macros stay clean."
+
+[[assign]]
+name = "gnu_get_libc_version"
+ring = 3
+area = 14
+status = "SKIP"
+ring_override = "doc 02 section 5 R13: absent; identity macros stay clean."
+
+[[assign]]
+name = "grantpt"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "group_from_gid"
@@ -4200,11 +5262,27 @@ area = 15
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "hcreate"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "doc 02 P26 (search.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "hcreate_r"
 ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+
+[[assign]]
+name = "hdestroy"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "doc 02 P26 (search.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "hdestroy_r"
@@ -4233,6 +5311,14 @@ ring = 1
 crate = "abi"
 area = 14
 status = "EXISTS-donor"
+
+[[assign]]
+name = "hsearch"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "doc 02 P26 (search.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "hsearch_r"
@@ -4327,6 +5413,62 @@ ring = 1
 crate = "libc"
 area = 0
 status = "EXISTS-donor"
+
+[[assign]]
+name = "iconv"
+ring = 0
+crate = "iconv"
+area = 2
+status = "EXISTS-donor"
+ring_override = "doc 02 P12 (iconv.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "iconv_close"
+ring = 0
+crate = "iconv"
+area = 2
+status = "EXISTS-donor"
+ring_override = "doc 02 P12 (iconv.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "iconv_open"
+ring = 0
+crate = "iconv"
+area = 2
+status = "EXISTS-donor"
+ring_override = "doc 02 P12 (iconv.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "if_freenameindex"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P18 (net/if.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "if_indextoname"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P18 (net/if.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "if_nameindex"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P18 (net/if.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "if_nametoindex"
+ring = 0
+crate = "net"
+area = 12
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P18 (net/if.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "ilogb"
@@ -4625,6 +5767,13 @@ area = 2
 status = "EXISTS-donor"
 
 [[assign]]
+name = "isinf"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
 name = "islower"
 ring = 0
 crate = "ctype"
@@ -4907,6 +6056,14 @@ area = 9
 status = "EXISTS-donor"
 
 [[assign]]
+name = "killpg"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+ring_override = "doc 02 P29 (signal.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "kqueue"
 ring = 2
 personality = "bsd"
@@ -4944,11 +6101,26 @@ area = 3
 status = "EXISTS-donor"
 
 [[assign]]
+name = "lchflags"
+ring = 3
+area = 11
+status = "SKIP"
+ring_override = "doc 02 B17: ring 3 stub ENOSYS; UF_*/SF_* hidden."
+
+[[assign]]
 name = "lchmod"
 ring = 1
 crate = "platform"
 area = 11
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "lchown"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "lckpwdf"
@@ -5058,6 +6230,15 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "link_map"
+ring = 1
+crate = "shell"
+area = 13
+status = "EXISTS-donor"
+kind = "header-only"
+ring_override = "doc 02 X83: loader link-map type, ring 1 (header-only; no census cell)."
+
+[[assign]]
 name = "linkat"
 ring = 0
 crate = "proc"
@@ -5080,6 +6261,13 @@ status = "EXISTS-donor"
 header = "sys/socket.h"
 
 [[assign]]
+name = "listxattr"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
 name = "llabs"
 ring = 1
 crate = "stdlib"
@@ -5092,6 +6280,30 @@ ring = 0
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+
+[[assign]]
+name = "llogb"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "llrint"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "llround"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "localeconv"
@@ -5123,6 +6335,14 @@ area = 6
 status = "EXISTS-donor"
 
 [[assign]]
+name = "lockf"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "log"
 ring = 1
 crate = "libc"
@@ -5142,6 +6362,14 @@ ring = 1
 crate = "libc"
 area = 0
 status = "EXISTS-donor"
+
+[[assign]]
+name = "log10p1"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "log1p"
@@ -5172,6 +6400,22 @@ area = 0
 status = "EXISTS-donor"
 
 [[assign]]
+name = "log2p1"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "logb"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "logf"
 ring = 1
 crate = "libc"
@@ -5184,6 +6428,14 @@ ring = 1
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
+
+[[assign]]
+name = "logp1"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "longjmp"
@@ -5199,6 +6451,22 @@ crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
 header = "stdlib.h"
+
+[[assign]]
+name = "lrint"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "lround"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "lsearch"
@@ -5247,6 +6515,13 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "madvise"
+ring = 0
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
 name = "major"
 ring = 1
 crate = "abi"
@@ -5266,6 +6541,15 @@ ring = 1
 crate = "abi"
 area = 14
 status = "EXISTS-donor"
+
+[[assign]]
+name = "mallinfo"
+ring = 2
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 X69: glibc allocator API; illumos mallinfo uses the Solaris allocator contract (rule 2.5), ring 2 linux."
 
 [[assign]]
 name = "mallinfo2"
@@ -5306,6 +6590,15 @@ area = 8
 status = "EXISTS-donor"
 
 [[assign]]
+name = "mallopt"
+ring = 2
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 X69: glibc allocator API; illumos mallopt commands use the Solaris allocator contract (rule 2.5), ring 2 linux."
+
+[[assign]]
 name = "mblen"
 ring = 0
 crate = "stdlib"
@@ -5318,6 +6611,30 @@ ring = 0
 crate = "ctype"
 area = 2
 status = "EXISTS-donor"
+
+[[assign]]
+name = "mbrtoc16"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+ring_override = "doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "mbrtoc32"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+ring_override = "doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "mbrtoc8"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+ring_override = "doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "mbrtowc"
@@ -5470,12 +6787,26 @@ area = 3
 status = "EXISTS-donor"
 
 [[assign]]
+name = "mimmutable"
+ring = 3
+area = 15
+status = "SKIP"
+ring_override = "doc 02 B15: ring 3 stub ENOSYS."
+
+[[assign]]
 name = "mincore"
 ring = 1
 crate = "platform"
 area = 8
 status = "TO-BE-DESIGNED"
 ring_override = "mixed row X70"
+
+[[assign]]
+name = "minherit"
+ring = 3
+area = 15
+status = "SKIP"
+ring_override = "doc 02 B15: ring 3 stub ENOSYS."
 
 [[assign]]
 name = "minor"
@@ -5499,11 +6830,43 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "mkdtemp"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "mkfifo"
 ring = 0
 crate = "platform"
 area = 11
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mkfifoat"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P40 (sys/stat.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "mknod"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P40 (sys/stat.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "mknodat"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P40 (sys/stat.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "mkostemp"
@@ -5520,11 +6883,27 @@ area = 3
 status = "EXISTS-donor"
 
 [[assign]]
+name = "mkstemp"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "mkstemps"
 ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+
+[[assign]]
+name = "mktemp"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "mktime"
@@ -5543,6 +6922,14 @@ status = "EXISTS-donor"
 [[assign]]
 name = "mlock"
 ring = 0
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "mlock2"
+ring = 2
+personality = "linux"
 crate = "platform"
 area = 8
 status = "TO-BE-DESIGNED"
@@ -5598,6 +6985,86 @@ area = 8
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "mq_close"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "mq_getattr"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "mq_notify"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "mq_open"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "mq_receive"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "mq_send"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "mq_setattr"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "mq_timedreceive"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "mq_timedsend"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "mq_unlink"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "mrand48"
 ring = 1
 crate = "stdlib"
@@ -5612,6 +7079,38 @@ crate = "platform"
 area = 8
 status = "TO-BE-DESIGNED"
 ring_override = "mixed row X70"
+
+[[assign]]
+name = "msgctl"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "msgget"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "msgrcv"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "msgsnd"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "msync"
@@ -5727,11 +7226,27 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "nan"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "nanosleep"
 ring = 0
 crate = "time"
 area = 6
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "nearbyint"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "newlocale"
@@ -5741,11 +7256,27 @@ area = 2
 status = "EXISTS-donor"
 
 [[assign]]
+name = "nextafter"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "nextdown"
 ring = 2
 crate = "libc"
 area = 0
 status = "EXISTS-donor"
+
+[[assign]]
+name = "nexttoward"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "nexttowardf"
@@ -5836,6 +7367,42 @@ area = 12
 status = "EXISTS-donor"
 
 [[assign]]
+name = "ns_name_compress"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+ring_override = "doc 02 X42: Linux BIND spelling; FreeBSD exports __ns_name_* and macro-renames this name, so the unqualified ABI is Linux (rule 2.5), ring 2 linux."
+
+[[assign]]
+name = "ns_name_ntop"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+ring_override = "doc 02 X42: Linux BIND spelling; FreeBSD macro-renames this name to __ns_name_ntop, so the unqualified ABI is Linux (rule 2.5), ring 2 linux."
+
+[[assign]]
+name = "ns_name_pton"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+ring_override = "doc 02 X42: Linux BIND spelling; FreeBSD macro-renames this name to __ns_name_pton, so the unqualified ABI is Linux (rule 2.5), ring 2 linux."
+
+[[assign]]
+name = "ns_name_uncompress"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+ring_override = "doc 02 X42: Linux BIND spelling; FreeBSD macro-renames this name to __ns_name_uncompress, so the unqualified ABI is Linux (rule 2.5), ring 2 linux."
+
+[[assign]]
 name = "ns_parserr"
 ring = 1
 crate = "resolv"
@@ -5919,6 +7486,14 @@ status = "EXISTS-donor"
 header = "stdio.h"
 
 [[assign]]
+name = "open_wmemstream"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+ring_override = "doc 02 P31 (stdio.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "openat"
 ring = 0
 crate = "platform"
@@ -5947,6 +7522,14 @@ ring = 0
 crate = "fts"
 area = 7
 status = "EXISTS-donor"
+
+[[assign]]
+name = "openlog"
+ring = 0
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P48 (syslog.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "openpty"
@@ -5989,6 +7572,20 @@ ring = 2
 crate = "libc"
 area = 0
 status = "EXISTS-donor"
+
+[[assign]]
+name = "p2close"
+ring = 3
+area = 7
+status = "SKIP"
+ring_override = "doc 02 S08: SysV libgen extras SKIP (doc 07 section 1)."
+
+[[assign]]
+name = "p2open"
+ring = 3
+area = 7
+status = "SKIP"
+ring_override = "doc 02 S08: SysV libgen extras SKIP (doc 07 section 1)."
 
 [[assign]]
 name = "pathconf"
@@ -6073,6 +7670,14 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "pipe2"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "pledge"
 ring = 2
 personality = "bsd"
@@ -6151,11 +7756,35 @@ area = 14
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "posix_fadvise"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P06 (fcntl.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "posix_fallocate"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P06 (fcntl.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "posix_getdents"
 ring = 2
 crate = "fts"
 area = 7
 status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_madvise"
+ring = 0
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P36 (sys/mman.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "posix_memalign"
@@ -6375,6 +8004,22 @@ area = 0
 status = "EXISTS-donor"
 
 [[assign]]
+name = "pown"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "powr"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "ppoll"
 ring = 1
 crate = "platform"
@@ -6412,6 +8057,14 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "preadv2"
+ring = 2
+personality = "linux"
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
 name = "printf"
 ring = 0
 crate = "stdio"
@@ -6424,6 +8077,13 @@ ring = 2
 crate = "proc"
 area = 10
 status = "EXISTS-donor"
+
+[[assign]]
+name = "processor_bind"
+ring = 3
+area = 14
+status = "SKIP"
+ring_override = "doc 02 section 5 R16: Solaris-only, absent."
 
 [[assign]]
 name = "program_invocation_name"
@@ -6442,6 +8102,37 @@ status = "EXISTS-donor"
 header = "errno.h"
 
 [[assign]]
+name = "pselect"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P38 (sys/select.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "pset_create"
+ring = 3
+area = 14
+status = "SKIP"
+ring_override = "doc 02 section 5 R16: Solaris-only, absent."
+
+[[assign]]
+name = "psiginfo"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+ring_override = "doc 02 P29 (signal.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "psignal"
+ring = 0
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+ring_override = "doc 02 P29 (signal.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "pthread_atfork"
 ring = 1
 crate = "thread"
@@ -6454,6 +8145,13 @@ ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_get_np"
+ring = 1
+crate = "thread"
+area = 9
+status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "pthread_attr_getdetachstate"
@@ -7285,6 +8983,21 @@ area = 9
 status = "EXISTS-donor"
 
 [[assign]]
+name = "ptrace"
+ring = 3
+area = 10
+status = "SKIP"
+ring_override = "doc 02 section 5 R14: absent; Linux binaries use the Linux personality, not libc."
+
+[[assign]]
+name = "ptsname"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "ptsname_r"
 ring = 0
 crate = "stdlib"
@@ -7326,6 +9039,14 @@ crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
 header = "stdlib.h"
+
+[[assign]]
+name = "putgrent"
+ring = 2
+personality = "linux"
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
 
 [[assign]]
 name = "putpwent"
@@ -7377,6 +9098,14 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
+name = "pvalloc"
+ring = 2
+personality = "linux"
+crate = "malloc"
+area = 8
+status = "EXISTS-donor"
+
+[[assign]]
 name = "pwrite"
 ring = 0
 crate = "proc"
@@ -7399,6 +9128,14 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "pwritev2"
+ring = 2
+personality = "linux"
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
 name = "qsort"
 ring = 0
 crate = "stdlib"
@@ -7413,12 +9150,46 @@ area = 3
 status = "EXISTS-donor"
 
 [[assign]]
+name = "quad_t"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+kind = "header-only"
+ring_override = "doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell)."
+
+[[assign]]
+name = "quick_exit"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "doc 02 I17 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "r_debug"
+ring = 1
+crate = "shell"
+area = 13
+status = "EXISTS-donor"
+kind = "data"
+ring_override = "doc 02 X83: loader r_debug data, ring 1 (loader-provided; no census cell)."
+
+[[assign]]
 name = "r_debug_state"
 ring = "private"
 crate = "rtld"
 area = 13
 status = "EXISTS-donor"
 ring_override = "mixed row Z09"
+
+[[assign]]
+name = "radixsort"
+ring = 3
+crate = "stdlib"
+area = 3
+status = "SKIP"
+ring_override = "doc 02 section 5 R02: absent, no consumer."
 
 [[assign]]
 name = "raise"
@@ -7496,12 +9267,36 @@ status = "EXISTS-donor"
 header = "dirent.h"
 
 [[assign]]
+name = "readlink"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "readlinkat"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "readpassphrase"
 ring = 2
 personality = "bsd"
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
+
+[[assign]]
+name = "readv"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P44 (sys/uio.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "realloc"
@@ -7524,6 +9319,23 @@ ring = 1
 crate = "malloc"
 area = 8
 status = "EXISTS-donor"
+
+[[assign]]
+name = "realpath"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "reboot"
+ring = 2
+personality = "linux"
+crate = "p-linux"
+area = 15
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 L18: Linux reboot magic; the BSD form has a different signature and is not provided (rule 2.5), ring 2 linux."
 
 [[assign]]
 name = "recallocarray"
@@ -7563,6 +9375,13 @@ area = 12
 status = "EXISTS-donor"
 
 [[assign]]
+name = "regcmp"
+ring = 3
+area = 7
+status = "SKIP"
+ring_override = "doc 02 S08: SysV libgen extras SKIP (doc 07 section 1)."
+
+[[assign]]
 name = "regcomp"
 ring = 0
 crate = "regex"
@@ -7577,6 +9396,13 @@ area = 7
 status = "EXISTS-donor"
 
 [[assign]]
+name = "regex"
+ring = 3
+area = 7
+status = "SKIP"
+ring_override = "doc 02 S08: SysV libgen extras SKIP (doc 07 section 1)."
+
+[[assign]]
 name = "regexec"
 ring = 0
 crate = "regex"
@@ -7589,6 +9415,14 @@ ring = 0
 crate = "regex"
 area = 7
 status = "EXISTS-donor"
+
+[[assign]]
+name = "remainder"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "remap_file_pages"
@@ -7606,11 +9440,26 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
+name = "removexattr"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
 name = "remque"
 ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+
+[[assign]]
+name = "remquo"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "rename"
@@ -7627,6 +9476,13 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
+name = "renameat2"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
 name = "res_init"
 ring = 1
 crate = "resolv"
@@ -7639,6 +9495,69 @@ ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+
+[[assign]]
+name = "res_nclose"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+ring_override = "doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nquery and musl exports the family; the census symbol-list cell is missing, ring 2 linux."
+
+[[assign]]
+name = "res_ninit"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+ring_override = "doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_ninit and musl exports the family; the census symbol-list cell is missing, ring 2 linux."
+
+[[assign]]
+name = "res_nmkquery"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+ring_override = "doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nmkquery and musl exports the family; the census symbol-list cell is missing, ring 2 linux."
+
+[[assign]]
+name = "res_nquery"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+ring_override = "doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nquery and musl exports the family; the census symbol-list cell is missing, ring 2 linux."
+
+[[assign]]
+name = "res_nquerydomain"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+ring_override = "doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nquerydomain and musl exports the family; the census symbol-list cell is missing, ring 2 linux."
+
+[[assign]]
+name = "res_nsearch"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+ring_override = "doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nsearch and musl exports the family; the census symbol-list cell is missing, ring 2 linux."
+
+[[assign]]
+name = "res_nsend"
+ring = 2
+personality = "linux"
+crate = "resolv"
+area = 12
+status = "EXISTS-donor"
+ring_override = "doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nsend and musl exports the family; the census symbol-list cell is missing, ring 2 linux."
 
 [[assign]]
 name = "res_query"
@@ -7712,11 +9631,28 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "rootn"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "round"
 ring = 1
 crate = "libc"
 area = 0
 status = "EXISTS-donor"
+
+[[assign]]
+name = "rounddown"
+ring = 2
+personality = "bsd"
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+kind = "macro"
 
 [[assign]]
 name = "roundeven"
@@ -7815,6 +9751,14 @@ ring = 1
 crate = "m"
 area = 5
 status = "EXISTS-donor"
+
+[[assign]]
+name = "scalbln"
+ring = 0
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+ring_override = "doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "scalbn"
@@ -8073,6 +10017,30 @@ area = 15
 status = "EXISTS-donor"
 
 [[assign]]
+name = "semctl"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "semget"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "semop"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "send"
 ring = 1
 crate = "net"
@@ -8219,6 +10187,14 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "setitimer"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+ring_override = "doc 02 P42 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "setjmp"
 ring = 0
 crate = "signal"
@@ -8238,6 +10214,14 @@ ring = 0
 crate = "locale"
 area = 2
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "setlogmask"
+ring = 0
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P48 (syslog.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "setmntent"
@@ -8400,6 +10384,14 @@ status = "EXISTS-donor"
 header = "stdlib.h"
 
 [[assign]]
+name = "settimeofday"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "setttyent"
 ring = 1
 crate = "compat"
@@ -8435,11 +10427,58 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
+name = "setxattr"
+ring = 1
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
 name = "shm_open"
 ring = 0
 crate = "platform"
 area = 8
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "shm_unlink"
+ring = 0
+crate = "platform"
+area = 8
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P36 (sys/mman.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "shmat"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "shmctl"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "shmdt"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "shmget"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "shutdown"
@@ -8569,6 +10608,15 @@ ring = 0
 crate = "m"
 area = 5
 status = "EXISTS-donor"
+
+[[assign]]
+name = "signgam"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+kind = "data"
+ring_override = "doc 02 Z17 ((data)): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "significand"
@@ -8796,6 +10844,15 @@ area = 15
 status = "EXISTS-donor"
 
 [[assign]]
+name = "sockaddr_un"
+ring = 0
+crate = "abi"
+area = 12
+status = "EXISTS-donor"
+kind = "header-only"
+ring_override = "doc 02 P45: <sys/un.h> header-only type, ring 0."
+
+[[assign]]
 name = "sockatmark"
 ring = 1
 crate = "net"
@@ -8848,6 +10905,14 @@ area = 0
 status = "EXISTS-donor"
 
 [[assign]]
+name = "sradixsort"
+ring = 3
+crate = "stdlib"
+area = 3
+status = "SKIP"
+ring_override = "doc 02 section 5 R02: absent, no consumer."
+
+[[assign]]
 name = "srand"
 ring = 0
 crate = "stdlib"
@@ -8875,6 +10940,20 @@ crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
 header = "stdlib.h"
+
+[[assign]]
+name = "srandom_deterministic"
+ring = 3
+area = 3
+status = "SKIP"
+ring_override = "doc 02 section 5 R03: BSD-only, no port needs them (doc 03 O-6)."
+
+[[assign]]
+name = "srandomdev"
+ring = 3
+area = 3
+status = "SKIP"
+ring_override = "doc 02 section 5 R03: BSD-only, no port needs them (doc 03 O-6)."
 
 [[assign]]
 name = "sscanf"
@@ -8906,12 +10985,154 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "statfs64"
+ring = 2
+personality = "linux"
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "statvfs"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P41 (sys/statvfs.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "statx"
 ring = 2
 personality = "linux"
 crate = "p-linux"
 area = 14
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "stdc_bit_ceil"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+kind = "macro"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[assign]]
+name = "stdc_bit_floor"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+kind = "macro"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[assign]]
+name = "stdc_bit_width"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+kind = "macro"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[assign]]
+name = "stdc_count_ones"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+kind = "macro"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[assign]]
+name = "stdc_count_zeros"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+kind = "macro"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[assign]]
+name = "stdc_first_leading_one"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+kind = "macro"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[assign]]
+name = "stdc_first_leading_zero"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+kind = "macro"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[assign]]
+name = "stdc_first_trailing_one"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+kind = "macro"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[assign]]
+name = "stdc_first_trailing_zero"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+kind = "macro"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[assign]]
+name = "stdc_has_single_bit"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+kind = "macro"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[assign]]
+name = "stdc_leading_ones"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+kind = "macro"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[assign]]
+name = "stdc_leading_zeros"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+kind = "macro"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[assign]]
+name = "stdc_trailing_ones"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+kind = "macro"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
+
+[[assign]]
+name = "stdc_trailing_zeros"
+ring = 0
+crate = "str"
+area = 1
+status = "EXISTS-donor"
+kind = "macro"
+ring_override = "doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map)."
 
 [[assign]]
 name = "stderr"
@@ -9066,6 +11287,46 @@ area = 1
 status = "EXISTS-donor"
 
 [[assign]]
+name = "strfmon"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P16 (monetary.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "strfmon_l"
+ring = 0
+crate = "locale"
+area = 2
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P16 (monetary.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "strfromd"
+ring = 0
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I18 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "strfromf"
+ring = 0
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I18 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "strfroml"
+ring = 0
+crate = "malloc"
+area = 8
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I18 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "strftime"
 ring = 0
 crate = "time"
@@ -9079,6 +11340,14 @@ crate = "time"
 area = 6
 status = "EXISTS-donor"
 ring_override = "mixed row X62"
+
+[[assign]]
+name = "strftime_z"
+ring = 2
+personality = "bsd"
+crate = "time"
+area = 6
+status = "EXISTS-donor"
 
 [[assign]]
 name = "strlcat"
@@ -9213,6 +11482,14 @@ status = "EXISTS-donor"
 header = "time.h"
 
 [[assign]]
+name = "strptime_l"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+ring_override = "doc 02 X62: strptime_l is the POSIX.1 _l form, ring 0; getdate is the ring-3 member."
+
+[[assign]]
 name = "strrchr"
 ring = 0
 crate = "str"
@@ -9291,6 +11568,14 @@ ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+
+[[assign]]
+name = "strtof"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "doc 02 I17 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "strtof_l"
@@ -9494,11 +11779,35 @@ area = 9
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "swprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+ring_override = "doc 02 I25 (wchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "swscanf"
 ring = 0
 crate = "stdio"
 area = 4
 status = "EXISTS-donor"
+
+[[assign]]
+name = "symlink"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "symlinkat"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "sync"
@@ -9569,6 +11878,14 @@ area = 15
 status = "EXISTS-donor"
 
 [[assign]]
+name = "syslog"
+ring = 0
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P48 (syslog.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "system"
 ring = 0
 crate = "stdlib"
@@ -9602,6 +11919,14 @@ ring = 1
 crate = "libc"
 area = 0
 status = "EXISTS-donor"
+
+[[assign]]
+name = "tanpi"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "tcdrain"
@@ -9646,6 +11971,14 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "tcgetwinsize"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P49 (termios.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "tcsendbreak"
 ring = 0
 crate = "platform"
@@ -9665,6 +11998,14 @@ ring = 0
 crate = "proc"
 area = 10
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "tcsetwinsize"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P49 (termios.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "tdelete"
@@ -9933,6 +12274,46 @@ area = 6
 status = "EXISTS-donor"
 
 [[assign]]
+name = "timer_create"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "timer_delete"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "timer_getoverrun"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "timer_gettime"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "timer_settime"
+ring = 0
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "timeradd"
 ring = 1
 crate = "time"
@@ -10017,8 +12398,42 @@ area = 6
 status = "EXISTS-donor"
 
 [[assign]]
+name = "timespecclear"
+ring = 2
+personality = "bsd"
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+kind = "macro"
+
+[[assign]]
+name = "timespeccmp"
+ring = 2
+personality = "bsd"
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+kind = "macro"
+
+[[assign]]
+name = "timespecisset"
+ring = 2
+personality = "bsd"
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+kind = "macro"
+
+[[assign]]
 name = "timespecsub"
 ring = 1
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "timezone"
+ring = 0
 crate = "time"
 area = 6
 status = "EXISTS-donor"
@@ -10151,6 +12566,13 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "truncate64"
+ring = 0
+crate = "p-linux"
+area = 11
+status = "EXISTS-donor"
+
+[[assign]]
 name = "truncf"
 ring = 1
 crate = "libc"
@@ -10230,6 +12652,79 @@ area = 6
 status = "EXISTS-donor"
 
 [[assign]]
+name = "tzname"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tzset"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+
+[[assign]]
+name = "u_char"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+kind = "header-only"
+ring_override = "doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell)."
+
+[[assign]]
+name = "u_int"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+kind = "header-only"
+ring_override = "doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell)."
+
+[[assign]]
+name = "u_long"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+kind = "header-only"
+ring_override = "doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell)."
+
+[[assign]]
+name = "u_short"
+ring = 1
+crate = "abi"
+area = 14
+status = "EXISTS-donor"
+kind = "header-only"
+ring_override = "doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell)."
+
+[[assign]]
+name = "ualarm"
+ring = 1
+crate = "time"
+area = 6
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "ufromfp"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "ufromfpx"
+ring = 0
+crate = "m"
+area = 5
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "uid_from_user"
 ring = 2
 crate = "pwd"
@@ -10242,6 +12737,14 @@ ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
+
+[[assign]]
+name = "ulimit"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "umask"
@@ -10300,6 +12803,14 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "unlockpt"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+ring_override = "doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "unsetenv"
 ring = 1
 crate = "stdlib"
@@ -10345,6 +12856,14 @@ area = 12
 status = "EXISTS-donor"
 
 [[assign]]
+name = "usleep"
+ring = 0
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "utime"
 ring = 0
 crate = "time"
@@ -10357,6 +12876,14 @@ ring = 0
 crate = "platform"
 area = 11
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "utimes"
+ring = 0
+crate = "time"
+area = 6
+status = "EXISTS-donor"
+ring_override = "doc 02 P42 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "uuid_compare"
@@ -10589,11 +13116,27 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
+name = "vswprintf"
+ring = 0
+crate = "stdio"
+area = 4
+status = "EXISTS-donor"
+ring_override = "doc 02 I25 (wchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "vswscanf"
 ring = 0
 crate = "stdio"
 area = 4
 status = "EXISTS-donor"
+
+[[assign]]
+name = "vsyslog"
+ring = 0
+crate = "compat"
+area = 15
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P48 (syslog.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "vwarn"
@@ -10647,6 +13190,14 @@ status = "TO-BE-DESIGNED"
 [[assign]]
 name = "wait4"
 ring = 1
+crate = "proc"
+area = 10
+status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "wait6"
+ring = 2
+personality = "linux"
 crate = "proc"
 area = 10
 status = "TO-BE-DESIGNED"
@@ -10892,6 +13443,22 @@ area = 2
 status = "EXISTS-donor"
 
 [[assign]]
+name = "wcstod"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+ring_override = "doc 02 I24 (wchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
+name = "wcstof"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+ring_override = "doc 02 I24 (wchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
+
+[[assign]]
 name = "wcstoimax"
 ring = 0
 crate = "stdlib"
@@ -10911,6 +13478,14 @@ ring = 0
 crate = "ctype"
 area = 2
 status = "EXISTS-donor"
+
+[[assign]]
+name = "wcstold"
+ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+ring_override = "doc 02 I24 (wchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "wcstoll"
@@ -11072,6 +13647,14 @@ ring = 0
 crate = "proc"
 area = 10
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "writev"
+ring = 0
+crate = "platform"
+area = 11
+status = "TO-BE-DESIGNED"
+ring_override = "doc 02 P44 (sys/uio.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row."
 
 [[assign]]
 name = "wscanf"
