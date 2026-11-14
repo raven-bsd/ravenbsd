@@ -199,6 +199,7 @@ fn model_family_has_one_test_step_and_no_build() {
     );
 }
 
+#[test]
 fn suite_forwards_to_raven_atf_run() {
     let planned = plan(
         root(),
