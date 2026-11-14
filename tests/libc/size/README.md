@@ -11,7 +11,6 @@ Sources, rule tables, the frozen budget and the baseline result of the size gate
 | Path | What |
 |---|---|
 | `probes/rust/pN.rs`, `probes/c/pN.c` | P0-P9, identical behaviour in both languages |
-| `probes/rust/start_support.rs` | temporary C61 START-FINDING support object (see below) |
 | `rules.toml` | the probe rules of `16` 5.B |
 | `size-allowlist.toml` | reviewer-owned exceptions (R-1, R-5, R-10, R-30) |
 | `hooks.toml` | the 17 rows of `16` 3.A.4.3 |
@@ -31,14 +30,6 @@ The probe build is the protocol of `C69` 4.4: `crt1.o`, `libc.a`, `--gc-sections
 `relocation-model=static`, `-no-pie`, `opt-level=z|s`, then `llvm-strip --strip-all`. The C
 twin uses freestanding clang flags against the sysroot headers; clang 14 spells the target
 flag `-target`, so the crate passes that form.
-
-### `start_support.rs`
-
-`C61`'s `__raven_libc_start` calls `__cxa_atexit`, `__raven_init_main_thread`, the program-name
-data symbols and `__stack_chk_guard`. The owning tickets on this branch have not shipped those
-definitions, so `libc.a` alone cannot link a program. The probe build compiles this small
-test-owned object (exactly the definitions of C61's H4 fixture) and adds it to the link. It is
-not part of `libc.a`; delete it and the extra link argument when C41/C64 ship the symbols.
 
 ## Budgets and known violations
 

@@ -132,12 +132,6 @@ pub fn source_path(root: &Path, lang: Lang, id: &str) -> PathBuf {
     }
 }
 
-/// The C61 START-FINDING support object compiled into every static probe.
-#[must_use]
-pub fn start_support_path(root: &Path) -> PathBuf {
-    root.join("tests/libc/size/probes/rust/start_support.rs")
-}
-
 /// The pinned `rustc` arguments of a static Rust probe.
 ///
 /// `opt-level` is `z` for `tiny` and `s` for `server` (`R-26`).
@@ -160,7 +154,6 @@ pub fn rust_static_command(
     };
     let binary = out_dir.join(format!("{}.elf", id.to_ascii_lowercase()));
     let map = out_dir.join(format!("{}.map", id.to_ascii_lowercase()));
-    let support = out_dir.join("start_support.o");
     let mut args = vec![
         "--edition".to_string(),
         "2024".to_string(),
@@ -188,8 +181,6 @@ pub fn rust_static_command(
         format!("link-arg=-L{}", libc_dir.display()),
         "-C".to_string(),
         format!("link-arg={}", libc_dir.join("libc.a").display()),
-        "-C".to_string(),
-        format!("link-arg={}", support.display()),
     ];
     if id == "P9" {
         for symbol in p9_symbols {
@@ -223,7 +214,6 @@ pub fn rust_dynamic_command(
     };
     let binary = out_dir.join(format!("{}.elf", id.to_ascii_lowercase()));
     let map = out_dir.join(format!("{}.map", id.to_ascii_lowercase()));
-    let support = out_dir.join("start_support.o");
     let mut args = vec![
         "--edition".to_string(),
         "2024".to_string(),
@@ -257,8 +247,6 @@ pub fn rust_dynamic_command(
         format!("link-arg=-L{}", libc_dir.display()),
         "-C".to_string(),
         format!("link-arg={}", libc_dir.join("libc.so.1").display()),
-        "-C".to_string(),
-        format!("link-arg={}", support.display()),
     ];
     if id == "P9" {
         for symbol in p9_symbols {
@@ -339,7 +327,6 @@ pub fn c_link_command(
     let object = out_dir.join(format!("{}.o", id.to_ascii_lowercase()));
     let binary = out_dir.join(format!("{}.elf", id.to_ascii_lowercase()));
     let map = out_dir.join(format!("{}.map", id.to_ascii_lowercase()));
-    let support = out_dir.join("start_support.o");
     let args = vec![
         "-static".to_string(),
         "--gc-sections".to_string(),
@@ -350,7 +337,6 @@ pub fn c_link_command(
         libc_dir.join("crti.o").display().to_string(),
         object.display().to_string(),
         libc_dir.join("libc.a").display().to_string(),
-        support.display().to_string(),
         libc_dir.join("crtn.o").display().to_string(),
     ];
     CommandSpec::new(lld, args, root.to_path_buf())
@@ -369,7 +355,6 @@ pub fn c_link_dynamic_command(
     let object = out_dir.join(format!("{}.o", id.to_ascii_lowercase()));
     let binary = out_dir.join(format!("{}.elf", id.to_ascii_lowercase()));
     let map = out_dir.join(format!("{}.map", id.to_ascii_lowercase()));
-    let support = out_dir.join("start_support.o");
     let args = vec![
         "-pie".to_string(),
         "--gc-sections".to_string(),
@@ -383,7 +368,6 @@ pub fn c_link_dynamic_command(
         libc_dir.join("crti.o").display().to_string(),
         object.display().to_string(),
         libc_dir.join("libc.so.1").display().to_string(),
-        support.display().to_string(),
         libc_dir.join("crtn.o").display().to_string(),
     ];
     CommandSpec::new(lld, args, root.to_path_buf())
