@@ -2,205 +2,216 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # Every name here is part of the cited row of `02-api-surface` section 3 but has no shell
-# binding in this pass. The reason is normative for K6; the C60 report lists the same rows.
-setlocale locale.h has no logic crate on this branch
-localeconv has no logic crate on this branch
-newlocale has no logic crate on this branch
-freelocale has no logic crate on this branch
-duplocale has no logic crate on this branch
-uselocale has no logic crate on this branch
-nl_langinfo has no logic crate on this branch
-nl_langinfo_l has no logic crate on this branch
-strfmon has no logic crate on this branch
-catopen has no logic crate on this branch
-catgets has no logic crate on this branch
+# binding in this pass. The reason is normative for K6; the C60b report lists the same rows.
+
+# C60b remaining: long double, no C47c representation yet (never aliased to f64)
+acosl C47c long double is not implemented; *l must not alias f64
+acoshl C47c long double is not implemented; *l must not alias f64
+asinl C47c long double is not implemented; *l must not alias f64
+asinhl C47c long double is not implemented; *l must not alias f64
+atanl C47c long double is not implemented; *l must not alias f64
+atan2l C47c long double is not implemented; *l must not alias f64
+atanhl C47c long double is not implemented; *l must not alias f64
+cabsl C47c long double is not implemented; *l must not alias f64
+cacosl C47c long double is not implemented; *l must not alias f64
+cacoshl C47c long double is not implemented; *l must not alias f64
+casinl C47c long double is not implemented; *l must not alias f64
+casinhl C47c long double is not implemented; *l must not alias f64
+catanl C47c long double is not implemented; *l must not alias f64
+catanhl C47c long double is not implemented; *l must not alias f64
+cbrtl C47c long double is not implemented; *l must not alias f64
+ceill C47c long double is not implemented; *l must not alias f64
+cosl C47c long double is not implemented; *l must not alias f64
+coshl C47c long double is not implemented; *l must not alias f64
+dreml C47c long double is not implemented; *l must not alias f64
+erfcl C47c long double is not implemented; *l must not alias f64
+erfl C47c long double is not implemented; *l must not alias f64
+expl C47c long double is not implemented; *l must not alias f64
+exp2l C47c long double is not implemented; *l must not alias f64
+exp10l C47c long double is not implemented; *l must not alias f64
+expm1l C47c long double is not implemented; *l must not alias f64
+fabsl C47c long double is not implemented; *l must not alias f64
+fdiml C47c long double is not implemented; *l must not alias f64
+floorl C47c long double is not implemented; *l must not alias f64
+fmal C47c long double is not implemented; *l must not alias f64
+fmaxl C47c long double is not implemented; *l must not alias f64
+fmaximuml C47c long double is not implemented; *l must not alias f64
+fmaximum_magl C47c long double is not implemented; *l must not alias f64
+fmaximum_numl C47c long double is not implemented; *l must not alias f64
+fminl C47c long double is not implemented; *l must not alias f64
+fminimuml C47c long double is not implemented; *l must not alias f64
+fminimum_magl C47c long double is not implemented; *l must not alias f64
+fminimum_numl C47c long double is not implemented; *l must not alias f64
+fmodl C47c long double is not implemented; *l must not alias f64
+frexpl C47c long double is not implemented; *l must not alias f64
+gammal C47c long double is not implemented; *l must not alias f64
+hypotl C47c long double is not implemented; *l must not alias f64
+ilogbl C47c long double is not implemented; *l must not alias f64
+ldexpl C47c long double is not implemented; *l must not alias f64
+lgammal C47c long double is not implemented; *l must not alias f64
+lgamma_rl C47c long double is not implemented; *l must not alias f64
+llrintl C47c long double is not implemented; *l must not alias f64
+llroundl C47c long double is not implemented; *l must not alias f64
+logl C47c long double is not implemented; *l must not alias f64
+log10l C47c long double is not implemented; *l must not alias f64
+log1pl C47c long double is not implemented; *l must not alias f64
+log2l C47c long double is not implemented; *l must not alias f64
+lrintl C47c long double is not implemented; *l must not alias f64
+lroundl C47c long double is not implemented; *l must not alias f64
+modfl C47c long double is not implemented; *l must not alias f64
+nanl C47c long double is not implemented; *l must not alias f64
+nearbyintl C47c long double is not implemented; *l must not alias f64
+nextafterl C47c long double is not implemented; *l must not alias f64
+nextdownl C47c long double is not implemented; *l must not alias f64
+nexttowardl C47c long double is not implemented; *l must not alias f64
+nextupl C47c long double is not implemented; *l must not alias f64
+powl C47c long double is not implemented; *l must not alias f64
+pow10l C47c long double is not implemented; *l must not alias f64
+remainderl C47c long double is not implemented; *l must not alias f64
+remquol C47c long double is not implemented; *l must not alias f64
+rintl C47c long double is not implemented; *l must not alias f64
+roundl C47c long double is not implemented; *l must not alias f64
+roundevenl C47c long double is not implemented; *l must not alias f64
+rsqrtl C47c long double is not implemented; *l must not alias f64
+scalblnl C47c long double is not implemented; *l must not alias f64
+scalbnl C47c long double is not implemented; *l must not alias f64
+significandl C47c long double is not implemented; *l must not alias f64
+sinl C47c long double is not implemented; *l must not alias f64
+sincosl C47c long double is not implemented; *l must not alias f64
+sinhl C47c long double is not implemented; *l must not alias f64
+sinpil C47c long double is not implemented; *l must not alias f64
+sqrtl C47c long double is not implemented; *l must not alias f64
+tanl C47c long double is not implemented; *l must not alias f64
+tanhl C47c long double is not implemented; *l must not alias f64
+tgammal C47c long double is not implemented; *l must not alias f64
+truncl C47c long double is not implemented; *l must not alias f64
+y0l C47c long double is not implemented; *l must not alias f64
+y1l C47c long double is not implemented; *l must not alias f64
+ynl C47c long double is not implemented; *l must not alias f64
+
+# C60b remaining: wide strings the merged crates do not provide
+wcstok no shell binding: the logic crate/API is absent or needs a stateful shell object
+wcsdup no shell binding: the logic crate/API is absent or needs a stateful shell object
+wcsxfrm no shell binding: the logic crate/API is absent or needs a stateful shell object
+wcsftime no shell binding: the logic crate/API is absent or needs a stateful shell object
+
+# C60b remaining: wide FILE operations are C64's pass
+fgetwc wide FILE ops are C64's pass
+fgetws wide FILE ops are C64's pass
+fputwc wide FILE ops are C64's pass
+fputws wide FILE ops are C64's pass
+fwprintf wide FILE ops are C64's pass
+swprintf wide FILE ops are C64's pass
+wprintf wide FILE ops are C64's pass
+
+# C60b remaining: families C60c owns
+alphasort C60c shell implementation is not in this pass
+closedir C60c shell implementation is not in this pass
+fdopendir C60c shell implementation is not in this pass
+fnmatch C60c shell implementation is not in this pass
+fts_close C60c shell implementation is not in this pass
+fts_open C60c shell implementation is not in this pass
+fts_read C60c shell implementation is not in this pass
+ftw C60c shell implementation is not in this pass
+glob C60c shell implementation is not in this pass
+globfree C60c shell implementation is not in this pass
+nftw C60c shell implementation is not in this pass
+opendir C60c shell implementation is not in this pass
+readdir C60c shell implementation is not in this pass
+readdir_r C60c shell implementation is not in this pass
+regcomp C60c shell implementation is not in this pass
+regerror C60c shell implementation is not in this pass
+regexec C60c shell implementation is not in this pass
+regfree C60c shell implementation is not in this pass
+rewinddir C60c shell implementation is not in this pass
+scandir C60c shell implementation is not in this pass
+seekdir C60c shell implementation is not in this pass
+telldir C60c shell implementation is not in this pass
+versionsort C60c shell implementation is not in this pass
+wordexp C60c shell implementation is not in this pass
+wordfree C60c shell implementation is not in this pass
+
+# C60b remaining: later passes (C60c, C61, C64 or the plan-gap list)
+__cxa_atexit the atexit registry instance is C61's start hand-over
+__cxa_finalize the atexit registry instance is C61's start hand-over
+a64l C41 API is slice-level; the shell binding is C60c
+access no owner in the plan (plan gap)
+asctime the static-buffer form needs the TCB slot; C57/C61
+asprintf the vasprintf target exists but the variadic row is C55's
+at_quick_exit the quick-exit registry instance is C61's start hand-over
+atexit the atexit registry instance is C61's start hand-over
+basename C41 returns a GenName; the C81 shell binding is C60c
+bsearch C41 API is generic over a comparator closure; the shell binding is C60c
+c16rtomb C23 char16_t conversion is C60c
+c32rtomb C23 char32_t conversion is C60c
+c8rtomb C23 char8_t conversion is C60c
 catclose has no logic crate on this branch
-gettext has no logic crate on this branch
-dgettext has no logic crate on this branch
-regcomp regex crate API needs a shell RegexLocale implementation (C60b)
-regexec regex crate API needs a shell RegexLocale implementation (C60b)
-regerror regex crate API needs a shell RegexLocale implementation (C60b)
-regfree regex crate API needs a shell RegexLocale implementation (C60b)
-fnmatch glob crate API needs a shell PatternLocale/DirSys implementation (C60b)
-glob glob crate API needs a shell DirSys implementation (C60b)
-globfree glob crate API needs a shell DirSys implementation (C60b)
-wordexp glob crate API needs a shell ShellRun implementation (C60b)
-wordfree glob crate API needs a shell ShellRun implementation (C60b)
-opendir fts crate API needs a shell DirSys implementation (C60b)
-fdopendir fts crate API needs a shell DirSys implementation (C60b)
-readdir fts crate API needs a shell DirSys implementation (C60b)
-readdir_r fts crate API needs a shell DirSys implementation (C60b)
-closedir fts crate API needs a shell DirSys implementation (C60b)
-rewinddir fts crate API needs a shell DirSys implementation (C60b)
-seekdir fts crate API needs a shell DirSys implementation (C60b)
-telldir fts crate API needs a shell DirSys implementation (C60b)
-scandir fts crate API needs a shell DirSys implementation (C60b)
-alphasort fts crate API needs a shell DirSys implementation (C60b)
-versionsort fts crate API needs a shell DirSys implementation (C60b)
-fts_open fts crate API needs a shell DirSys implementation (C60b)
-fts_read fts crate API needs a shell DirSys implementation (C60b)
-fts_close fts crate API needs a shell DirSys implementation (C60b)
-ftw fts crate API needs a shell DirSys implementation (C60b)
-nftw fts crate API needs a shell DirSys implementation (C60b)
-qsort C41 API is generic over a comparator closure; the shell binding is C60b
-qsort_r C41 API is generic over a comparator closure; the shell binding is C60b
-bsearch C41 API is generic over a comparator closure; the shell binding is C60b
-heapsort C41 API is generic over a comparator closure; the shell binding is C60b
-mergesort C41 API is generic over a comparator closure; the shell binding is C60b
-tsearch C41 avl API is generic over a NodeStore; the shell binding is C60b
-tfind C41 avl API is generic over a NodeStore; the shell binding is C60b
-tdelete C41 avl API is generic over a NodeStore; the shell binding is C60b
-twalk C41 avl API is generic over a NodeStore; the shell binding is C60b
-tdestroy C41 avl API is generic over a NodeStore; the shell binding is C60b
-hcreate C41 hsearch API is generic over Entropy; the shell binding is C60b
-hsearch C41 hsearch API is generic over Entropy; the shell binding is C60b
-hdestroy C41 hsearch API is generic over Entropy; the shell binding is C60b
-lfind C41 lsearch API is generic over a comparator; the shell binding is C60b
-lsearch C41 lsearch API is generic over a comparator; the shell binding is C60b
-insque C41 queue API is generic over a ListStore; the shell binding is C60b
-remque C41 queue API is generic over a ListStore; the shell binding is C60b
-getenv the environment object is C61's start hand-over
-secure_getenv the environment object is C61's start hand-over
-setenv the environment object is C61's start hand-over
-putenv the environment object is C61's start hand-over
-unsetenv the environment object is C61's start hand-over
+catgets has no logic crate on this branch
+catopen has no logic crate on this branch
 clearenv the environment object is C61's start hand-over
+ctime the static-buffer form needs the TCB slot; C57/C61
+dirname C41 returns a GenName; the shell binding is C60c
+dprintf the vdprintf target exists but the variadic row is C55's
+drand48 C41 needs the process generator object; the shell binding is C60c
+erand48 C41 needs the process generator object; the shell binding is C60c
+getcwd no owner in the plan (plan gap)
+getenv the environment object is C61's start hand-over
 getopt the getopt state machine needs the data-symbol object owned by C61
 getopt_long the getopt state machine needs the data-symbol object owned by C61
 getopt_long_only the getopt state machine needs the data-symbol object owned by C61
-atexit the atexit registry instance is C61's start hand-over
-at_quick_exit the quick-exit registry instance is C61's start hand-over
-quick_exit the quick-exit registry instance is C61's start hand-over
-__cxa_atexit the atexit registry instance is C61's start hand-over
-__cxa_finalize the atexit registry instance is C61's start hand-over
+getsubopt C41 API is slice-level; the shell binding is C60c
+hcreate C41 hsearch API is generic over Entropy; the shell binding is C60c
+hdestroy C41 hsearch API is generic over Entropy; the shell binding is C60c
+heapsort C41 API is generic over a comparator closure; the shell binding is C60c
+hsearch C41 hsearch API is generic over Entropy; the shell binding is C60c
+insque C41 queue API is generic over a ListStore; the shell binding is C60c
+ioctl no owner in the plan (plan gap)
+jrand48 C41 needs the process generator object; the shell binding is C60c
+l64a C41 API is slice-level; the shell binding is C60c
+lcong48 C41 needs the process generator object; the shell binding is C60c
+lfind C41 lsearch API is generic over a comparator; the shell binding is C60c
+lrand48 C41 needs the process generator object; the shell binding is C60c
+lsearch C41 lsearch API is generic over a comparator; the shell binding is C60c
+mbrtoc16 C23 char16_t conversion is C60c
+mbrtoc32 C23 char32_t conversion is C60c
+mbrtoc8 C23 char8_t conversion is C60c
+mbsnrtowcs the pointer-array form needs a shell pointer walk; C60c
+mbsrtowcs the pointer-array form needs a shell pointer walk; C60c
+mbstowcs the pointer walk is C60c
+mergesort C41 API is generic over a comparator closure; the shell binding is C60c
+mmap no owner in the plan (plan gap)
+mrand48 C41 needs the process generator object; the shell binding is C60c
+nrand48 C41 needs the process generator object; the shell binding is C60c
 on_exit the atexit registry instance is C61's start hand-over
-system the C41 SystemBackend has no Raven implementation (PG-45)
-realpath the C41 Walker needs the platform path model; C60b
-basename C41 returns a GenName; the C81 shell binding is C60b
-dirname C41 returns a GenName; the shell binding is C60b
-strtonum C41 API returns a typed error; the shell binding is C60b
-getsubopt C41 API is slice-level; the shell binding is C60b
-a64l C41 API is slice-level; the shell binding is C60b
-l64a C41 API is slice-level; the shell binding is C60b
-rand C41 needs the process generator object; the shell binding is C60b
-srand C41 needs the process generator object; the shell binding is C60b
-rand_r C41 API is slice-level; the shell binding is C60b
-drand48 C41 needs the process generator object; the shell binding is C60b
-erand48 C41 needs the process generator object; the shell binding is C60b
-lrand48 C41 needs the process generator object; the shell binding is C60b
-nrand48 C41 needs the process generator object; the shell binding is C60b
-mrand48 C41 needs the process generator object; the shell binding is C60b
-jrand48 C41 needs the process generator object; the shell binding is C60b
-srand48 C41 needs the process generator object; the shell binding is C60b
-seed48 C41 needs the process generator object; the shell binding is C60b
-lcong48 C41 needs the process generator object; the shell binding is C60b
-fopen the FILE constructor needs the C60b open/mode path
-fdopen the FILE constructor needs the C60b open/mode path
-freopen the FILE constructor needs the C60b open/mode path
-fclose the FILE close path is C60b
-fflush the FILE flush path is C60b
-fread the FILE block path is C60b
-fwrite the FILE block path is C60b
-fgetc the FILE char path is C60b
-fputc the FILE char path is C60b
-fgets the FILE line path is C60b
-fputs the FILE line path is C60b
-puts the FILE line path is C60b
-getchar the FILE char path is C60b
-putchar the FILE char path is C60b
-ungetc the FILE char path is C60b
-feof the FILE status path is C60b
-ferror the FILE status path is C60b
-clearerr the FILE status path is C60b
-fileno the FILE status path is C60b
-perror the FILE write path is C60b
-dprintf the vdprintf target exists but the variadic row is C55's
-asprintf the vasprintf target exists but the variadic row is C55's
-scanf the scanf core is C64's pass
-fscanf the scanf core is C64's pass
-sscanf the scanf core is C64's pass
-vfscanf the scanf core is C64's pass
-vscanf the scanf core is C64's pass
-vsscanf the scanf core is C64's pass
-fgetwc wide FILE ops are C64's pass
-fputwc wide FILE ops are C64's pass
-fgetws wide FILE ops are C64's pass
-fputws wide FILE ops are C64's pass
-wprintf wide FILE ops are C64's pass
-swprintf wide FILE ops are C64's pass
-fwprintf wide FILE ops are C64's pass
-wcslen C39 delivered the UTF-8 codec only; no wcs engine exists
-wcscpy C39 delivered the UTF-8 codec only; no wcs engine exists
-wcsncpy C39 delivered the UTF-8 codec only; no wcs engine exists
-wcscat C39 delivered the UTF-8 codec only; no wcs engine exists
-wcsncat C39 delivered the UTF-8 codec only; no wcs engine exists
-wcscmp C39 delivered the UTF-8 codec only; no wcs engine exists
-wcsncmp C39 delivered the UTF-8 codec only; no wcs engine exists
-wcschr C39 delivered the UTF-8 codec only; no wcs engine exists
-wcsrchr C39 delivered the UTF-8 codec only; no wcs engine exists
-wcsstr C39 delivered the UTF-8 codec only; no wcs engine exists
-wmemchr C39 delivered the UTF-8 codec only; no wcs engine exists
-wmemcmp C39 delivered the UTF-8 codec only; no wcs engine exists
-wmemcpy C39 delivered the UTF-8 codec only; no wcs engine exists
-wmemmove C39 delivered the UTF-8 codec only; no wcs engine exists
-wmemset C39 delivered the UTF-8 codec only; no wcs engine exists
-mbsrtowcs the pointer-array form needs a shell pointer walk; C60b
-wcsrtombs the pointer-array form needs a shell pointer walk; C60b
-mbsnrtowcs the pointer-array form needs a shell pointer walk; C60b
-wcsnrtombs the pointer-array form needs a shell pointer walk; C60b
-mbstowcs the pointer walk is C60b
-wcstombs the pointer walk is C60b
-mbrtoc8 C23 char8_t conversion is C60b
-c8rtomb C23 char8_t conversion is C60b
-mbrtoc16 C23 char16_t conversion is C60b
-c16rtomb C23 char16_t conversion is C60b
-mbrtoc32 C23 char32_t conversion is C60b
-c32rtomb C23 char32_t conversion is C60b
-wcswidth the wide length walk is C60b
-time the TimeSys seam is installed by C61's start
-clock_gettime the TimeSys seam is installed by C61's start
-clock_getres the TimeSys seam is installed by C61's start
-gettimeofday the TimeSys seam is installed by C61's start
-gmtime_r the time pass of this ticket is DEFERRED (C60b)
-localtime_r the TZ state and TimeSys seam are C60b
-localtime the TZ state and TimeSys seam are C60b
-gmtime the TZ state and TimeSys seam are C60b
-mktime the TZ state and TimeSys seam are C60b
-timegm the time pass of this ticket is DEFERRED (C60b)
-difftime the time pass of this ticket is DEFERRED (C60b)
-strftime the time pass of this ticket is DEFERRED (C60b)
-strptime the time pass of this ticket is DEFERRED (C60b)
-asctime the static-buffer form needs the TCB slot; C60b
-ctime the static-buffer form needs the TCB slot; C60b
-nanosleep the TimeSys seam is installed by C61's start
-sin C47's facade is ready; the math family is DEFERRED to C60b
-sinf C47's facade is ready; the math family is DEFERRED to C60b
-cos C47's facade is ready; the math family is DEFERRED to C60b
-cosf C47's facade is ready; the math family is DEFERRED to C60b
-tan C47's facade is ready; the math family is DEFERRED to C60b
-tanf C47's facade is ready; the math family is DEFERRED to C60b
-sqrt C47's facade is ready; the math family is DEFERRED to C60b
-sqrtf C47's facade is ready; the math family is DEFERRED to C60b
-fabs C47's facade is ready; the math family is DEFERRED to C60b
-fabsf C47's facade is ready; the math family is DEFERRED to C60b
-floor C47's facade is ready; the math family is DEFERRED to C60b
-floorf C47's facade is ready; the math family is DEFERRED to C60b
-ceil C47's facade is ready; the math family is DEFERRED to C60b
-ceilf C47's facade is ready; the math family is DEFERRED to C60b
-fmod C47's facade is ready; the math family is DEFERRED to C60b
-fmodf C47's facade is ready; the math family is DEFERRED to C60b
-pow C47's facade is ready; the math family is DEFERRED to C60b
-powf C47's facade is ready; the math family is DEFERRED to C60b
-exp C47's facade is ready; the math family is DEFERRED to C60b
-log C47's facade is ready; the math family is DEFERRED to C60b
 open open/openat carry a variadic mode; the C55 target owns that row
 openat open/openat carry a variadic mode; the C55 target owns that row
-stat no owner in the plan (plan gap)
-mmap no owner in the plan (plan gap)
 poll no owner in the plan (plan gap)
-ioctl no owner in the plan (plan gap)
+putenv the environment object is C61's start hand-over
+qsort C41 API is generic over a comparator closure; the shell binding is C60c
+qsort_r C41 API is generic over a comparator closure; the shell binding is C60c
+quick_exit the quick-exit registry instance is C61's start hand-over
+rand C41 needs the process generator object; the shell binding is C60c
+rand_r C41 API is slice-level; the shell binding is C60c
+realpath the C41 Walker needs the platform path model; C60c
+remque C41 queue API is generic over a ListStore; the shell binding is C60c
+secure_getenv the environment object is C61's start hand-over
+seed48 C41 needs the process generator object; the shell binding is C60c
+setenv the environment object is C61's start hand-over
+srand C41 needs the process generator object; the shell binding is C60c
+srand48 C41 needs the process generator object; the shell binding is C60c
+stat no owner in the plan (plan gap)
+strfmon has no logic crate on this branch
+strtonum C41 API returns a typed error; the shell binding is C60c
 sysconf no owner in the plan (plan gap)
+system the C41 SystemBackend has no Raven implementation (PG-45)
+tdelete C41 avl API is generic over a NodeStore; the shell binding is C60c
+tdestroy C41 avl API is generic over a NodeStore; the shell binding is C60c
+tfind C41 avl API is generic over a NodeStore; the shell binding is C60c
+tsearch C41 avl API is generic over a NodeStore; the shell binding is C60c
+twalk C41 avl API is generic over a NodeStore; the shell binding is C60c
 uname no owner in the plan (plan gap)
-getcwd no owner in the plan (plan gap)
-access no owner in the plan (plan gap)
 unlink no owner in the plan (plan gap)
+unsetenv the environment object is C61's start hand-over
+wcsnrtombs the pointer-array form needs a shell pointer walk; C60c
+wcsrtombs the pointer-array form needs a shell pointer walk; C60c
+wcstombs the pointer walk is C60c

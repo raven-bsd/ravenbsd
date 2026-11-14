@@ -952,6 +952,7 @@ dependencies = [
  "raven-libc-ctype",
  "raven-libc-dtoa",
  "raven-libc-fmt",
+ "raven-libc-locale",
  "raven-libc-m",
  "raven-libc-malloc",
  "raven-libc-platform",

@@ -7,10 +7,13 @@
 //! the engine of C43. `stdin`/`stdout`/`stderr` are pointers to the `.bss` objects of the C56
 //! stdio state (R-19), not objects of this crate.
 
+pub(crate) mod file;
 pub(crate) mod streams;
 pub(crate) mod trampolines;
+pub(crate) mod trampolines_scanf;
 pub(crate) mod va;
 pub(crate) mod vfprintf;
 pub(crate) mod vprintf;
 pub(crate) mod vsnprintf;
 pub(crate) mod vsprintf;
+pub(crate) mod vsscanf;

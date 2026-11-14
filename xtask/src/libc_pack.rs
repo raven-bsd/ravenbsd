@@ -239,15 +239,16 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
     Ok(0)
 }
 
-fn build(
+/// The exact `cargo rustc` command vector of step 1, without spawning it.
+fn build_spec(
     root: &Path,
-    options: &Options,
+    arch: Arch,
     profile: &str,
     features: &str,
     target_dir: &Path,
-) -> Result<PathBuf> {
+) -> CommandSpec {
     let mut flags = String::from("-C relocation-model=pic");
-    if options.arch == Arch::X86_64 {
+    if arch == Arch::X86_64 {
         flags.push_str(" -C code-model=small");
     }
     flags.push_str(&format!(
@@ -263,16 +264,26 @@ fn build(
         "--profile".to_string(),
         profile.to_string(),
         "--target".to_string(),
-        options.arch.triple().to_string(),
+        arch.triple().to_string(),
         "--target-dir".to_string(),
         target_dir.display().to_string(),
         "--features".to_string(),
         features.to_string(),
     ];
     cargo_args.push("--".to_string());
-    let spec = CommandSpec::new("cargo", cargo_args, root)
+    CommandSpec::new("cargo", cargo_args, root)
         .env("RUSTFLAGS", flags)
-        .env_remove("CARGO_ENCODED_RUSTFLAGS");
+        .env_remove("CARGO_ENCODED_RUSTFLAGS")
+}
+
+fn build(
+    root: &Path,
+    options: &Options,
+    profile: &str,
+    features: &str,
+    target_dir: &Path,
+) -> Result<PathBuf> {
+    let spec = build_spec(root, options.arch, profile, features, target_dir);
     let code = run_command(&spec)?;
     if code != 0 {
         bail!("cargo rustc failed with exit code {code}");
@@ -346,3 +357,7 @@ fn count_no_mangle_except(dir: &Path, excluded: &Path, count: &mut usize) {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "libc_pack_ut.rs"]
+mod tests;
