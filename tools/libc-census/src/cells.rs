@@ -39,8 +39,7 @@ pub fn donor_roots(donor: &str) -> &'static [&'static str] {
         "freebsd" => &[
             "freebsd/contrib/libc-vis",
             "freebsd/contrib/libc-pwcache",
-            "freebsd/contrib/libexecinfo",
-            "freebsd/lib/libuuid",
+            // FreeBSD keeps UUID under lib/libc/uuid at this pin; lib/libuuid does not exist.
             "freebsd/lib/libc",
             "freebsd/lib/libutil",
             "freebsd/lib/libsys",

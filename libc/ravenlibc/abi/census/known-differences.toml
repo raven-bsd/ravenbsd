@@ -2,3 +2,31 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 # Reviewer input for compare-table; libc-census writes this file only when absent.
 schema = 1
+
+[[difference]]
+key = "<sys/queue.h>"
+donor = "illumos"
+doc = "kernel-private (uts)"
+tool = "yes"
+reason = "doc 15 records the illumos kernel-private annotation; the widened usr/src/head tree exposes the header."
+
+[[difference]]
+key = "<sysexits.h>"
+donor = "picolibc"
+doc = "paths only"
+tool = "yes"
+reason = "doc 15 lists only include-path usage; the picolibc tree provides the header at the pin."
+
+[[difference]]
+key = "<uuid.h>"
+donor = "bionic"
+doc = "no"
+tool = "yes"
+reason = "doc 15 predates the bionic uuid header in the pinned checkout; C33a counts the widened tree."
+
+[[difference]]
+key = "<pty.h>"
+donor = "netbsd"
+doc = "no"
+tool = "yes"
+reason = "doc 15 records no header; NetBSD libutil supplies pty.h at the pin."

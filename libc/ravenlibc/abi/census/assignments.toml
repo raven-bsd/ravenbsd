@@ -1,28 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-# SEEDED by libc-census seed-assignments; review before merge.
+# C33a export assignment set; reviewer signs the new shell mappings.
 schema = 1
-
-[[assign]]
-name = "AF_NETLINK"
-ring = 3
-crate = "net"
-area = 12
-status = "SKIP"
-
-[[assign]]
-name = "AF_PACKET"
-ring = 3
-crate = "net"
-area = 12
-status = "SKIP"
-
-[[assign]]
-name = "LC_GLOBAL_LOCALE"
-ring = 0
-crate = "locale"
-area = 2
-status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "MAX"
@@ -53,13 +32,6 @@ area = 14
 status = "EXISTS-donor"
 
 [[assign]]
-name = "MB_CUR_MAX"
-ring = 1
-crate = "ctype"
-area = 2
-status = "EXISTS-donor"
-
-[[assign]]
 name = "MIN"
 ring = 1
 crate = "abi"
@@ -74,20 +46,6 @@ area = 14
 status = "EXISTS-donor"
 
 [[assign]]
-name = "NOEXPR"
-ring = 0
-crate = "locale"
-area = 2
-status = "EXISTS-donor"
-
-[[assign]]
-name = "YESEXPR"
-ring = 0
-crate = "locale"
-area = 2
-status = "EXISTS-donor"
-
-[[assign]]
 name = "_Exit"
 ring = 0
 crate = "stdlib"
@@ -95,41 +53,18 @@ area = 3
 status = "EXISTS-donor"
 
 [[assign]]
-name = "__assert"
-ring = 2
-personality = "bsd"
-crate = "stdlib"
-area = 15
-status = "EXISTS-donor"
-
-[[assign]]
-name = "__assert2"
-ring = 2
-personality = "bsd"
-crate = "stdlib"
-area = 15
-status = "EXISTS-donor"
-
-[[assign]]
-name = "__assert_fail"
+name = "_Fork"
 ring = 0
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-ring_override = "mixed row I01"
+crate = "proc"
+area = 10
+status = "PRIVATE"
+header = "unistd.h"
 
 [[assign]]
 name = "__chk_fail"
 ring = 1
 crate = "ssp"
 area = 8
-status = "EXISTS-donor"
-
-[[assign]]
-name = "__ctype_get_mb_cur_max"
-ring = 1
-crate = "ctype"
-area = 2
 status = "EXISTS-donor"
 
 [[assign]]
@@ -154,34 +89,25 @@ area = 3
 status = "EXISTS-donor"
 
 [[assign]]
-name = "__dso_handle"
+name = "__errno"
 ring = 1
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-
-[[assign]]
-name = "__environ"
-ring = 0
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-ring_override = "mixed row Z03"
+crate = "personality-bsd"
+area = 15
+status = "PRIVATE"
 
 [[assign]]
 name = "__errno_location"
-ring = 0
-crate = "sys"
-area = 11
-status = "TO-BE-DESIGNED"
+ring = 2
+crate = "abi"
+area = 14
+status = "PRIVATE"
 
 [[assign]]
 name = "__error"
-ring = 2
-personality = "bsd"
-crate = "sys"
-area = 14
-status = "TO-BE-DESIGNED"
+ring = 1
+crate = "personality-bsd"
+area = 15
+status = "PRIVATE"
 
 [[assign]]
 name = "__fbufsize"
@@ -216,13 +142,6 @@ name = "__fpurge"
 ring = 1
 crate = "stdio"
 area = 4
-status = "EXISTS-donor"
-
-[[assign]]
-name = "__fread_chk"
-ring = 1
-crate = "ssp"
-area = 8
 status = "EXISTS-donor"
 
 [[assign]]
@@ -289,13 +208,6 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
-name = "__getcwd_chk"
-ring = 1
-crate = "ssp"
-area = 8
-status = "EXISTS-donor"
-
-[[assign]]
 name = "__gets_chk"
 ring = 1
 crate = "ssp"
@@ -304,17 +216,17 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "__gnu_basename"
-ring = 1
-crate = "stdlib"
+ring = 2
+crate = "str"
 area = 1
-status = "EXISTS-donor"
+status = "PRIVATE"
 
 [[assign]]
 name = "__h_errno_location"
-ring = 1
+ring = 2
 crate = "resolv"
 area = 12
-status = "EXISTS-donor"
+status = "PRIVATE"
 
 [[assign]]
 name = "__libc_calloc"
@@ -357,13 +269,6 @@ area = 8
 status = "EXISTS-donor"
 
 [[assign]]
-name = "__libc_single_threaded"
-ring = 1
-crate = "thread"
-area = 9
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "__libc_start_main"
 ring = "private"
 crate = "shell"
@@ -392,25 +297,32 @@ area = 8
 status = "EXISTS-donor"
 
 [[assign]]
-name = "__pread_chk"
-ring = 1
-crate = "ssp"
-area = 8
-status = "EXISTS-donor"
-
-[[assign]]
 name = "__progname"
-ring = 1
-crate = "proc"
-area = 10
-status = "EXISTS-donor"
+ring = 2
+crate = "libc"
+area = 0
+status = "PRIVATE"
 
 [[assign]]
 name = "__progname_full"
-ring = 1
-crate = "proc"
-area = 10
-status = "EXISTS-donor"
+ring = 2
+crate = "libc"
+area = 0
+status = "PRIVATE"
+
+[[assign]]
+name = "__raven_init_main_thread"
+ring = 3
+crate = "thread"
+area = 9
+status = "PRIVATE"
+
+[[assign]]
+name = "__raven_libc_init"
+ring = 3
+crate = "libc"
+area = 0
+status = "PRIVATE"
 
 [[assign]]
 name = "__raven_libc_start"
@@ -420,25 +332,95 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "__read_chk"
-ring = 1
-crate = "ssp"
-area = 8
-status = "EXISTS-donor"
+name = "__raven_va_error"
+ring = 3
+crate = "personality-linux"
+area = 15
+status = "PRIVATE"
 
 [[assign]]
-name = "__readlink_chk"
-ring = 1
-crate = "ssp"
-area = 8
-status = "EXISTS-donor"
+name = "__raven_va_error_at_line"
+ring = 3
+crate = "personality-linux"
+area = 15
+status = "PRIVATE"
 
 [[assign]]
-name = "__recv_chk"
-ring = 1
-crate = "ssp"
-area = 8
-status = "EXISTS-donor"
+name = "__raven_va_execl"
+ring = 3
+crate = "proc"
+area = 10
+status = "PRIVATE"
+
+[[assign]]
+name = "__raven_va_execle"
+ring = 3
+crate = "proc"
+area = 10
+status = "PRIVATE"
+
+[[assign]]
+name = "__raven_va_execlp"
+ring = 3
+crate = "proc"
+area = 10
+status = "PRIVATE"
+
+[[assign]]
+name = "__raven_va_ioctl"
+ring = 3
+crate = "platform"
+area = 11
+status = "PRIVATE"
+
+[[assign]]
+name = "__raven_va_makecontext"
+ring = 3
+crate = "signal"
+area = 9
+status = "PRIVATE"
+
+[[assign]]
+name = "__raven_va_open"
+ring = 3
+crate = "platform"
+area = 11
+status = "PRIVATE"
+
+[[assign]]
+name = "__raven_va_openat"
+ring = 3
+crate = "platform"
+area = 11
+status = "PRIVATE"
+
+[[assign]]
+name = "__raven_va_prctl"
+ring = 3
+crate = "personality-linux"
+area = 15
+status = "PRIVATE"
+
+[[assign]]
+name = "__raven_va_sem_open"
+ring = 3
+crate = "thread"
+area = 9
+status = "PRIVATE"
+
+[[assign]]
+name = "__raven_va_setproctitle"
+ring = 3
+crate = "personality-bsd"
+area = 15
+status = "PRIVATE"
+
+[[assign]]
+name = "__raven_va_setproctitle_fast"
+ring = 3
+crate = "personality-bsd"
+area = 15
+status = "PRIVATE"
 
 [[assign]]
 name = "__rl_atfork_run"
@@ -462,6 +444,13 @@ area = 16
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "__rl_dl_install"
+ring = 3
+crate = "elf"
+area = 13
+status = "PRIVATE"
+
+[[assign]]
 name = "__rl_dl_real"
 ring = "private"
 crate = "shell"
@@ -483,6 +472,13 @@ area = 16
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "__rl_fmt_float_impl"
+ring = 3
+crate = "libc"
+area = 0
+status = "PRIVATE"
+
+[[assign]]
 name = "__rl_fmt_wide"
 ring = "private"
 crate = "shell"
@@ -490,11 +486,25 @@ area = 16
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "__rl_fmt_wide_impl"
+ring = 3
+crate = "libc"
+area = 0
+status = "PRIVATE"
+
+[[assign]]
 name = "__rl_funcs_on_exit"
 ring = "private"
 crate = "shell"
 area = 16
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_funcs_on_exit_impl"
+ring = 3
+crate = "libc"
+area = 0
+status = "PRIVATE"
 
 [[assign]]
 name = "__rl_locale_load"
@@ -511,11 +521,25 @@ area = 16
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "__rl_malloc_debug_impl"
+ring = 3
+crate = "libc"
+area = 0
+status = "PRIVATE"
+
+[[assign]]
 name = "__rl_malloc_impl"
 ring = "private"
 crate = "shell"
 area = 16
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_malloc_impl_impl"
+ring = 3
+crate = "libc"
+area = 0
+status = "PRIVATE"
 
 [[assign]]
 name = "__rl_nss_dispatch"
@@ -539,11 +563,25 @@ area = 16
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "__rl_scan_float_impl"
+ring = 3
+crate = "libc"
+area = 0
+status = "PRIVATE"
+
+[[assign]]
 name = "__rl_stdio_exit"
 ring = "private"
 crate = "shell"
 area = 16
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_stdio_exit_impl"
+ring = 3
+crate = "libc"
+area = 0
+status = "PRIVATE"
 
 [[assign]]
 name = "__rl_thread_exit_dtors"
@@ -558,6 +596,20 @@ ring = "private"
 crate = "shell"
 area = 16
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "__rl_tz_load_impl"
+ring = 3
+crate = "libc"
+area = 0
+status = "PRIVATE"
+
+[[assign]]
+name = "__sigsetjmp"
+ring = 2
+crate = "signal"
+area = 9
+status = "PRIVATE"
 
 [[assign]]
 name = "__snprintf_chk"
@@ -582,10 +634,10 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "__stack_chk_guard"
-ring = 1
-crate = "ssp"
-area = 8
-status = "EXISTS-donor"
+ring = 3
+crate = "libc"
+area = 0
+status = "PRIVATE"
 
 [[assign]]
 name = "__stpcpy_chk"
@@ -661,18 +713,11 @@ area = 8
 status = "EXISTS-donor"
 
 [[assign]]
-name = "_ctype_"
-ring = 3
-area = 2
-status = "SKIP"
-
-[[assign]]
-name = "_environ"
-ring = 0
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-ring_override = "mixed row Z03"
+name = "__xpg_strerror_r"
+ring = 2
+crate = "str"
+area = 1
+status = "PRIVATE"
 
 [[assign]]
 name = "_exit"
@@ -687,6 +732,27 @@ ring = 1
 crate = "stdio"
 area = 4
 status = "EXISTS-donor"
+
+[[assign]]
+name = "_longjmp"
+ring = 1
+crate = "signal"
+area = 9
+status = "PRIVATE"
+
+[[assign]]
+name = "_pthread_cleanup_pop"
+ring = 2
+crate = "thread"
+area = 9
+status = "PRIVATE"
+
+[[assign]]
+name = "_pthread_cleanup_push"
+ring = 2
+crate = "thread"
+area = 9
+status = "PRIVATE"
 
 [[assign]]
 name = "_r_debug_postinit"
@@ -744,6 +810,13 @@ status = "EXISTS-donor"
 ring_override = "mixed row Z09"
 
 [[assign]]
+name = "_setjmp"
+ring = 1
+crate = "signal"
+area = 9
+status = "PRIVATE"
+
+[[assign]]
 name = "_thread_db_version"
 ring = "private"
 crate = "thread"
@@ -751,52 +824,12 @@ area = 9
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "_tolower_tab_"
-ring = 3
-area = 2
-status = "SKIP"
-
-[[assign]]
-name = "_uc"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "_ui"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "_ul"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "_ull"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "_us"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
 name = "a64l"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "abort"
@@ -807,17 +840,18 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "abs"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
 
 [[assign]]
 name = "accept"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/socket.h"
 
 [[assign]]
 name = "accept4"
@@ -835,38 +869,39 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "acos"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "acosf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "acosh"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
-name = "acospi"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+name = "acoshf"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "addmntent"
-ring = 1
+ring = 2
 crate = "compat"
 area = 15
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "adjtime"
-ring = 0
-crate = "time"
-area = 6
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "mntent.h"
 
 [[assign]]
 name = "aio_cancel"
@@ -926,17 +961,19 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "aligned_alloc"
-ring = 0
-crate = "stdlib"
-area = 3
+ring = 1
+crate = "malloc"
+area = 4
 status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "alphasort"
-ring = 0
+ring = 1
 crate = "fts"
 area = 7
 status = "EXISTS-donor"
+header = "dirent.h"
 
 [[assign]]
 name = "arc4random"
@@ -960,12 +997,6 @@ area = 15
 status = "EXISTS-donor"
 
 [[assign]]
-name = "arch_prctl"
-ring = 3
-area = 10
-status = "SKIP"
-
-[[assign]]
 name = "asctime"
 ring = 0
 crate = "time"
@@ -974,24 +1005,31 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "asin"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "asinf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "asinh"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
-name = "asinpi"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+name = "asinhf"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "asprintf"
@@ -1009,46 +1047,46 @@ status = "EXISTS-donor"
 ring_override = "mixed row I01"
 
 [[assign]]
-name = "at_quick_exit"
-ring = 0
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-
-[[assign]]
 name = "atan"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "atan2"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
-name = "atan2pi"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+name = "atan2f"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "atanf"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "atanh"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
-name = "atanpi"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+name = "atanhf"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "atexit"
@@ -1060,13 +1098,6 @@ status = "EXISTS-donor"
 [[assign]]
 name = "atof"
 ring = 0
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-
-[[assign]]
-name = "atof_l"
-ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
@@ -1114,25 +1145,20 @@ area = 15
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "basename"
-ring = 0
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-
-[[assign]]
 name = "bcmp"
-ring = 0
+ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "bcopy"
-ring = 0
+ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "be16toh"
@@ -1156,31 +1182,28 @@ area = 14
 status = "EXISTS-donor"
 
 [[assign]]
-name = "bgets"
-ring = 3
-area = 7
-status = "SKIP"
-
-[[assign]]
 name = "bind"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/socket.h"
 
 [[assign]]
 name = "bind_textdomain_codeset"
-ring = 1
+ring = 0
 crate = "locale"
 area = 2
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "libintl.h"
 
 [[assign]]
 name = "bindtextdomain"
-ring = 1
+ring = 0
 crate = "locale"
 area = 2
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "libintl.h"
 
 [[assign]]
 name = "bsearch"
@@ -1239,66 +1262,12 @@ area = 2
 status = "EXISTS-donor"
 
 [[assign]]
-name = "bufsplit"
-ring = 3
-area = 7
-status = "SKIP"
-
-[[assign]]
 name = "bzero"
-ring = 0
+ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
-
-[[assign]]
-name = "c16rtomb"
-ring = 0
-crate = "ctype"
-area = 2
-status = "EXISTS-donor"
-
-[[assign]]
-name = "c32rtomb"
-ring = 0
-crate = "ctype"
-area = 2
-status = "EXISTS-donor"
-
-[[assign]]
-name = "c8rtomb"
-ring = 0
-crate = "ctype"
-area = 2
-status = "EXISTS-donor"
-
-[[assign]]
-name = "cabs"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "cacos"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "cacosh"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "caddr_t"
-ring = 1
-crate = "abi"
-area = 14
-status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "call_once"
@@ -1316,135 +1285,17 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "canonicalize"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "canonicalize_file_name"
-ring = 2
-personality = "linux"
-crate = "malloc"
-area = 8
+ring = 3
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
-name = "cap_enter"
+name = "canonicalizef"
 ring = 3
-crate = "pledge"
-area = 10
-status = "SKIP"
-
-[[assign]]
-name = "cap_getmode"
-ring = 3
-crate = "pledge"
-area = 10
-status = "SKIP"
-
-[[assign]]
-name = "cap_rights_clear"
-ring = 3
-crate = "pledge"
-area = 10
-status = "SKIP"
-
-[[assign]]
-name = "cap_rights_init"
-ring = 3
-crate = "pledge"
-area = 10
-status = "SKIP"
-
-[[assign]]
-name = "cap_rights_is_set"
-ring = 3
-crate = "pledge"
-area = 10
-status = "SKIP"
-
-[[assign]]
-name = "cap_rights_limit"
-ring = 3
-crate = "pledge"
-area = 10
-status = "SKIP"
-
-[[assign]]
-name = "cap_rights_set"
-ring = 3
-crate = "pledge"
-area = 10
-status = "SKIP"
-
-[[assign]]
-name = "cap_sandboxed"
-ring = 3
-crate = "pledge"
-area = 10
-status = "SKIP"
-
-[[assign]]
-name = "capget"
-ring = 3
-area = 11
-status = "SKIP"
-
-[[assign]]
-name = "capset"
-ring = 3
-area = 11
-status = "SKIP"
-
-[[assign]]
-name = "carg"
-ring = 0
-crate = "m"
-area = 5
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
-
-[[assign]]
-name = "casin"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "casinh"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "catan"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "catanh"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "catclose"
-ring = 0
-crate = "locale"
-area = 2
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "catgets"
-ring = 0
-crate = "locale"
-area = 2
-status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "catopen"
@@ -1455,37 +1306,30 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "cbrt"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
-name = "ccos"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "ccosh"
-ring = 0
-crate = "m"
-area = 5
+name = "cbrtf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "ceil"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
-name = "cexp"
-ring = 0
-crate = "m"
-area = 5
+name = "ceilf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -1503,13 +1347,6 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "cfmakeraw"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "cfsetispeed"
 ring = 0
 crate = "platform"
@@ -1518,13 +1355,6 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "cfsetospeed"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "cfsetspeed"
 ring = 0
 crate = "platform"
 area = 11
@@ -1618,12 +1448,6 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "chflags"
-ring = 3
-area = 11
-status = "SKIP"
-
-[[assign]]
 name = "chmod"
 ring = 0
 crate = "platform"
@@ -1638,18 +1462,12 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "cimag"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
 name = "clearenv"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "clearerr"
@@ -1673,13 +1491,6 @@ area = 6
 status = "EXISTS-donor"
 
 [[assign]]
-name = "clock_getcpuclockid"
-ring = 0
-crate = "time"
-area = 6
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "clock_getres"
 ring = 0
 crate = "time"
@@ -1694,25 +1505,11 @@ area = 6
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "clock_nanosleep"
-ring = 0
-crate = "time"
-area = 6
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "clock_settime"
 ring = 0
 crate = "time"
 area = 6
 status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "clog"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
 
 [[assign]]
 name = "close"
@@ -1740,13 +1537,6 @@ name = "closefrom"
 ring = 1
 crate = "platform"
 area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "closelog"
-ring = 0
-crate = "compat"
-area = 15
 status = "TO-BE-DESIGNED"
 
 [[assign]]
@@ -1792,26 +1582,46 @@ area = 9
 status = "EXISTS-donor"
 
 [[assign]]
-name = "compoundn"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+name = "cond_broadcast"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cond_destroy"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "cond_init"
-ring = 3
-status = "SKIP"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "cond_signal"
-ring = 3
-status = "SKIP"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cond_timedwait"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "cond_wait"
-ring = 3
-status = "SKIP"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "confstr"
@@ -1821,80 +1631,61 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "conj"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
 name = "connect"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/socket.h"
 
 [[assign]]
 name = "copy_file_range"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "copylist"
-ring = 3
-area = 7
-status = "SKIP"
+ring = 1
+crate = "personality-linux"
+area = 15
+status = "EXISTS-donor"
+header = "unistd.h"
 
 [[assign]]
 name = "copysign"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "copysignf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "cos"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "cosf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "cosh"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
-name = "cospi"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "cpow"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "cproj"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "creal"
-ring = 0
-crate = "m"
-area = 5
+name = "coshf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -1906,11 +1697,11 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "creat64"
-ring = 2
-personality = "linux"
-crate = "p-linux"
+ring = 0
+crate = "platform"
 area = 11
 status = "EXISTS-donor"
+header = "fcntl.h"
 
 [[assign]]
 name = "crypt"
@@ -1924,41 +1715,6 @@ name = "crypt_r"
 ring = 1
 crate = "compat"
 area = 15
-status = "EXISTS-donor"
-
-[[assign]]
-name = "csin"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "csinh"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "csqrt"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "ctan"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "ctanh"
-ring = 0
-crate = "m"
-area = 5
 status = "EXISTS-donor"
 
 [[assign]]
@@ -1976,32 +1732,42 @@ area = 6
 status = "EXISTS-donor"
 
 [[assign]]
-name = "daylight"
+name = "daemon"
 ring = 1
-crate = "time"
-area = 6
+crate = "proc"
+area = 10
 status = "EXISTS-donor"
 
 [[assign]]
 name = "dcgettext"
-ring = 1
+ring = 0
 crate = "locale"
 area = 2
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "libintl.h"
 
 [[assign]]
 name = "dcngettext"
-ring = 1
+ring = 0
 crate = "locale"
 area = 2
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "libintl.h"
+
+[[assign]]
+name = "devname"
+ring = 2
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "dgettext"
-ring = 1
+ring = 0
 crate = "locale"
 area = 2
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "libintl.h"
 
 [[assign]]
 name = "difftime"
@@ -2012,17 +1778,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "dirfd"
-ring = 0
+ring = 1
 crate = "fts"
 area = 7
 status = "EXISTS-donor"
-
-[[assign]]
-name = "dirname"
-ring = 0
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
+header = "dirent.h"
 
 [[assign]]
 name = "div"
@@ -2047,15 +1807,15 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "dlclose"
-ring = 0
-crate = "shell"
+ring = 1
+crate = "elf"
 area = 13
 status = "EXISTS-donor"
 
 [[assign]]
 name = "dlerror"
-ring = 0
-crate = "shell"
+ring = 1
+crate = "elf"
 area = 13
 status = "EXISTS-donor"
 
@@ -2068,15 +1828,15 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "dlopen"
-ring = 0
-crate = "shell"
+ring = 1
+crate = "elf"
 area = 13
 status = "EXISTS-donor"
 
 [[assign]]
 name = "dlsym"
-ring = 0
-crate = "shell"
+ring = 1
+crate = "elf"
 area = 13
 status = "EXISTS-donor"
 
@@ -2110,34 +1870,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "dngettext"
-ring = 1
+ring = 0
 crate = "locale"
 area = 2
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "door_call"
-ring = 3
-area = 14
-status = "SKIP"
-
-[[assign]]
-name = "door_create"
-ring = 3
-area = 14
-status = "SKIP"
-
-[[assign]]
-name = "door_return"
-ring = 3
-area = 14
-status = "SKIP"
-
-[[assign]]
-name = "door_server_create"
-ring = 3
-area = 14
-status = "SKIP"
+status = "EXISTS-donor"
+header = "libintl.h"
 
 [[assign]]
 name = "dprintf"
@@ -2148,10 +1885,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "drand48"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "drem"
@@ -2190,20 +1928,13 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "duplocale"
-ring = 0
+ring = 1
 crate = "locale"
 area = 2
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "ecvt"
-ring = 1
-crate = "stdlib"
-area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "ecvt_r"
 ring = 1
 crate = "stdlib"
 area = 5
@@ -2219,65 +1950,70 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "endgrent"
-ring = 0
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
+header = "grp.h"
 
 [[assign]]
 name = "endhostent"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "endmntent"
-ring = 1
+ring = 2
 crate = "compat"
 area = 15
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "mntent.h"
 
 [[assign]]
 name = "endnetent"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "endprotoent"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "endpwent"
-ring = 0
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
+header = "pwd.h"
 
 [[assign]]
 name = "endservent"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "endspent"
-ring = 2
-personality = "linux"
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
 
 [[assign]]
 name = "endttyent"
-ring = 2
-personality = "bsd"
+ring = 1
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
@@ -2305,89 +2041,84 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "epoll_create"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "epoll_create1"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "epoll_ctl"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "epoll_pwait"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "epoll_pwait2"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "epoll_wait"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "erand48"
-ring = 0
-crate = "stdlib"
-area = 3
+ring = 1
+crate = "personality-linux"
+area = 15
 status = "EXISTS-donor"
 
 [[assign]]
+name = "epoll_create1"
+ring = 1
+crate = "personality-linux"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "epoll_ctl"
+ring = 1
+crate = "personality-linux"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "epoll_pwait"
+ring = 1
+crate = "personality-linux"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "epoll_pwait2"
+ring = 1
+crate = "personality-linux"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "epoll_wait"
+ring = 1
+crate = "personality-linux"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "erand48"
+ring = 1
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+header = "stdlib.h"
+
+[[assign]]
 name = "erf"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "erfc"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "erfcf"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "erff"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "err"
-ring = 1
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-
-[[assign]]
-name = "err_set_exit"
-ring = 1
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-
-[[assign]]
-name = "err_set_file"
 ring = 1
 crate = "stdlib"
 area = 3
@@ -2409,11 +2140,11 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "error"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 15
-status = "TO-BE-DESIGNED"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+header = "error.h"
 
 [[assign]]
 name = "error_at_line"
@@ -2441,11 +2172,10 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "error_print_progname"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 15
-status = "TO-BE-DESIGNED"
+ring = 3
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "errx"
@@ -2456,27 +2186,24 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "eventfd"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
+ring = 1
+crate = "personality-linux"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "eventfd_read"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
+ring = 1
+crate = "personality-linux"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "eventfd_write"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
+ring = 1
+crate = "personality-linux"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "execl"
@@ -2521,6 +2248,13 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "execvpe"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
 name = "exit"
 ring = 0
 crate = "stdlib"
@@ -2529,52 +2263,38 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "exp"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "exp10"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+ring = 2
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "exp10f"
-ring = 1
-crate = "m"
-area = 5
+ring = 2
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
-
-[[assign]]
-name = "exp10l"
-ring = 1
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "exp10m1"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "exp2"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
-name = "exp2m1"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+name = "exp2f"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "expand_number"
@@ -2582,6 +2302,13 @@ ring = 2
 personality = "bsd"
 crate = "compat"
 area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "expf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -2593,16 +2320,30 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "expm1"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "expm1f"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "fabs"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fabsf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -2611,59 +2352,6 @@ ring = 2
 personality = "linux"
 crate = "p-linux"
 area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "fanotify_init"
-ring = 3
-area = 11
-status = "SKIP"
-
-[[assign]]
-name = "fanotify_mark"
-ring = 3
-area = 11
-status = "SKIP"
-
-[[assign]]
-name = "fchdir"
-ring = 0
-crate = "proc"
-area = 10
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "fchflags"
-ring = 3
-area = 11
-status = "SKIP"
-
-[[assign]]
-name = "fchmod"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "fchmodat"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "fchown"
-ring = 0
-crate = "proc"
-area = 10
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "fchownat"
-ring = 0
-crate = "proc"
-area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
@@ -2695,13 +2383,6 @@ area = 5
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "fcvt_r"
-ring = 1
-crate = "stdlib"
-area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "fdatasync"
 ring = 0
 crate = "proc"
@@ -2710,9 +2391,16 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "fdim"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fdimf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -2724,10 +2412,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "fdopendir"
-ring = 0
+ring = 1
 crate = "fts"
 area = 7
 status = "EXISTS-donor"
+header = "dirent.h"
 
 [[assign]]
 name = "feclearexcept"
@@ -2898,15 +2587,8 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
-name = "fflush_unlocked"
-ring = 1
-crate = "stdio"
-area = 4
-status = "EXISTS-donor"
-
-[[assign]]
 name = "ffs"
-ring = 0
+ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
@@ -2928,13 +2610,6 @@ status = "EXISTS-donor"
 [[assign]]
 name = "fgetc"
 ring = 0
-crate = "stdio"
-area = 4
-status = "EXISTS-donor"
-
-[[assign]]
-name = "fgetc_unlocked"
-ring = 1
 crate = "stdio"
 area = 4
 status = "EXISTS-donor"
@@ -2975,16 +2650,8 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
-name = "fgets_unlocked"
-ring = 1
-crate = "stdio"
-area = 4
-status = "EXISTS-donor"
-
-[[assign]]
 name = "fgetspent"
-ring = 2
-personality = "linux"
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
@@ -3047,9 +2714,16 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "floor"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "floorf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -3083,107 +2757,150 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "fma"
-ring = 0
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fmaf"
+ring = 1
 crate = "m"
 area = 5
 status = "EXISTS-donor"
 
 [[assign]]
 name = "fmax"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fmaxf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "fmaximum"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "fmaximum_mag"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "fmaximum_mag_num"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "fmaximum_num"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "fmaxmag"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "fmemopen"
-ring = 0
-crate = "stdio"
-area = 4
+ring = 2
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
+name = "fmaximum_mag"
+ring = 2
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fmaximum_magf"
+ring = 3
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fmaximum_num"
+ring = 2
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fmaximum_numf"
+ring = 3
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fmaximumf"
+ring = 3
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fmemopen"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+header = "stdio.h"
+
+[[assign]]
 name = "fmin"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fminf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "fminimum"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+ring = 2
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "fminimum_mag"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+ring = 2
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
-name = "fminimum_mag_num"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+name = "fminimum_magf"
+ring = 3
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "fminimum_num"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+ring = 2
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
-name = "fminmag"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+name = "fminimum_numf"
+ring = 3
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fminimumf"
+ring = 3
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "fmod"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "fmodf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -3195,13 +2912,6 @@ area = 15
 status = "EXISTS-donor"
 
 [[assign]]
-name = "fmtmsg"
-ring = 0
-crate = "glob"
-area = 14
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "fnmatch"
 ring = 0
 crate = "glob"
@@ -3211,14 +2921,6 @@ status = "EXISTS-donor"
 [[assign]]
 name = "fopen"
 ring = 0
-crate = "stdio"
-area = 4
-status = "EXISTS-donor"
-
-[[assign]]
-name = "fopencookie"
-ring = 2
-personality = "linux"
 crate = "stdio"
 area = 4
 status = "EXISTS-donor"
@@ -3239,7 +2941,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "fparseln"
-ring = 1
+ring = 2
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
@@ -3259,31 +2961,7 @@ area = 5
 status = "EXISTS-donor"
 
 [[assign]]
-name = "fpgetmask"
-ring = 2
-personality = "bsd"
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
 name = "fpgetprec"
-ring = 2
-personality = "bsd"
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "fpgetround"
-ring = 2
-personality = "bsd"
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "fpgetsticky"
 ring = 2
 personality = "bsd"
 crate = "m"
@@ -3298,31 +2976,7 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
-name = "fpsetmask"
-ring = 2
-personality = "bsd"
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
 name = "fpsetprec"
-ring = 2
-personality = "bsd"
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "fpsetround"
-ring = 2
-personality = "bsd"
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "fpsetsticky"
 ring = 2
 personality = "bsd"
 crate = "m"
@@ -3339,13 +2993,6 @@ status = "EXISTS-donor"
 [[assign]]
 name = "fputc"
 ring = 0
-crate = "stdio"
-area = 4
-status = "EXISTS-donor"
-
-[[assign]]
-name = "fputc_unlocked"
-ring = 1
 crate = "stdio"
 area = 4
 status = "EXISTS-donor"
@@ -3415,7 +3062,7 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "freeaddrinfo"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
@@ -3429,10 +3076,10 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "freelocale"
-ring = 0
+ring = 1
 crate = "locale"
 area = 2
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "freezero"
@@ -3450,24 +3097,17 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "frexp"
-ring = 0
+ring = 1
 crate = "m"
 area = 5
 status = "EXISTS-donor"
 
 [[assign]]
-name = "fromfp"
-ring = 0
+name = "frexpf"
+ring = 1
 crate = "m"
 area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "fromfpx"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "fscanf"
@@ -3506,11 +3146,11 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "fstat64"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
+ring = 0
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
+header = "sys/stat.h"
 
 [[assign]]
 name = "fstatat"
@@ -3520,30 +3160,8 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "fstatat64"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "EXISTS-donor"
-
-[[assign]]
 name = "fstatfs"
 ring = 1
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "fstatfs64"
-ring = 1
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "fstatvfs"
-ring = 0
 crate = "platform"
 area = 11
 status = "TO-BE-DESIGNED"
@@ -3570,26 +3188,11 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
-name = "ftok"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "ftruncate"
 ring = 0
 crate = "proc"
 area = 10
 status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "ftruncate64"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "EXISTS-donor"
 
 [[assign]]
 name = "ftrylockfile"
@@ -3621,7 +3224,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "fts_openat"
-ring = 1
+ring = 2
 crate = "fts"
 area = 7
 status = "EXISTS-donor"
@@ -3642,10 +3245,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "ftw"
-ring = 0
+ring = 1
 crate = "fts"
 area = 7
 status = "EXISTS-donor"
+header = "ftw.h"
 
 [[assign]]
 name = "funlockfile"
@@ -3712,7 +3316,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "gai_strerror"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
@@ -3756,19 +3360,19 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "get_nprocs"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
+ring = 1
+crate = "personality-linux"
+area = 15
+status = "EXISTS-donor"
+header = "sys/sysinfo.h"
 
 [[assign]]
 name = "get_nprocs_conf"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
+ring = 1
+crate = "personality-linux"
+area = 15
+status = "EXISTS-donor"
+header = "sys/sysinfo.h"
 
 [[assign]]
 name = "get_phys_pages"
@@ -3780,21 +3384,22 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "getaddrinfo"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
 
 [[assign]]
 name = "getauxval"
-ring = 1
-crate = "sys"
-area = 11
-status = "TO-BE-DESIGNED"
+ring = 2
+crate = "personality-linux"
+area = 15
+status = "EXISTS-donor"
+header = "sys/auxv.h"
 
 [[assign]]
 name = "getbsize"
-ring = 1
+ring = 2
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
@@ -3915,10 +3520,10 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "getfsstat"
-ring = 1
-crate = "compat"
+ring = 2
+crate = "personality-bsd"
 area = 15
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "getgid"
@@ -3929,10 +3534,19 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "getgrent"
-ring = 0
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
+header = "grp.h"
+
+[[assign]]
+name = "getgrent_r"
+ring = 1
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+header = "grp.h"
 
 [[assign]]
 name = "getgrgid"
@@ -3943,24 +3557,27 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "getgrgid_r"
-ring = 0
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
+header = "grp.h"
 
 [[assign]]
 name = "getgrnam"
-ring = 0
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
+header = "grp.h"
 
 [[assign]]
 name = "getgrnam_r"
-ring = 0
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
+header = "grp.h"
 
 [[assign]]
 name = "getgrouplist"
@@ -3978,10 +3595,11 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "gethostbyaddr"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "gethostbyaddr_r"
@@ -3992,10 +3610,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "gethostbyname"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "gethostbyname2"
@@ -4020,21 +3639,15 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "gethostent"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "gethostid"
 ring = 1
-crate = "proc"
-area = 10
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "gethostname"
-ring = 0
 crate = "proc"
 area = 10
 status = "TO-BE-DESIGNED"
@@ -4052,13 +3665,6 @@ ring = 2
 personality = "solaris"
 crate = "p-sol"
 status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "getitimer"
-ring = 0
-crate = "time"
-area = 6
-status = "EXISTS-donor"
 
 [[assign]]
 name = "getline"
@@ -4083,10 +3689,10 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "getlogin_r"
-ring = 0
+ring = 1
 crate = "proc"
 area = 10
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "getmntent"
@@ -4097,52 +3703,56 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "getmntent_r"
-ring = 1
+ring = 2
 crate = "compat"
 area = 15
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "mntent.h"
 
 [[assign]]
 name = "getmntinfo"
-ring = 1
-crate = "compat"
+ring = 2
+crate = "personality-bsd"
 area = 15
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "getmode"
-ring = 1
+ring = 2
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
 
 [[assign]]
 name = "getnameinfo"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
 
 [[assign]]
 name = "getnetbyaddr"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "getnetbyname"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "getnetent"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "getopt"
@@ -4181,17 +3791,25 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "getpayload"
-ring = 0
+ring = 3
 crate = "m"
 area = 5
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+
+[[assign]]
+name = "getpayloadf"
+ring = 3
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 
 [[assign]]
 name = "getpeername"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/socket.h"
 
 [[assign]]
 name = "getpgid"
@@ -4222,17 +3840,12 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "getppriv"
-ring = 3
-area = 14
-status = "SKIP"
-
-[[assign]]
 name = "getpriority"
-ring = 0
+ring = 1
 crate = "proc"
 area = 10
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/resource.h"
 
 [[assign]]
 name = "getprogname"
@@ -4243,10 +3856,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "getprotobyname"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "getprotobyname_r"
@@ -4257,10 +3871,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "getprotobynumber"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "getprotobynumber_r"
@@ -4271,10 +3886,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "getprotoent"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "getpwent"
@@ -4299,10 +3915,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "getpwnam_r"
-ring = 0
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
+header = "pwd.h"
 
 [[assign]]
 name = "getpwuid"
@@ -4313,10 +3930,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "getpwuid_r"
-ring = 0
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
+header = "pwd.h"
 
 [[assign]]
 name = "getrandom"
@@ -4327,24 +3945,27 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "getrlimit"
-ring = 0
+ring = 1
 crate = "proc"
 area = 10
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/resource.h"
 
 [[assign]]
 name = "getrusage"
-ring = 0
+ring = 1
 crate = "proc"
 area = 10
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/resource.h"
 
 [[assign]]
 name = "getservbyname"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "getservbyname_r"
@@ -4355,10 +3976,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "getservbyport"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "getservbyport_r"
@@ -4369,52 +3991,53 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "getservent"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "getsid"
-ring = 0
+ring = 1
 crate = "proc"
 area = 10
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "unistd.h"
 
 [[assign]]
 name = "getsockname"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/socket.h"
 
 [[assign]]
 name = "getsockopt"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/socket.h"
 
 [[assign]]
 name = "getspent"
-ring = 2
-personality = "linux"
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
 
 [[assign]]
 name = "getspnam"
-ring = 2
-personality = "linux"
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
 
 [[assign]]
 name = "getspnam_r"
-ring = 2
-personality = "linux"
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
@@ -4428,30 +4051,30 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "gettext"
-ring = 1
+ring = 0
 crate = "locale"
 area = 2
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "libintl.h"
 
 [[assign]]
 name = "gettimeofday"
-ring = 0
+ring = 1
 crate = "time"
-area = 6
+area = 5
 status = "EXISTS-donor"
+header = "sys/time.h"
 
 [[assign]]
 name = "getttyent"
-ring = 2
-personality = "bsd"
+ring = 1
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
 
 [[assign]]
 name = "getttynam"
-ring = 2
-personality = "bsd"
+ring = 1
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
@@ -4520,16 +4143,8 @@ area = 11
 status = "EXISTS-donor"
 
 [[assign]]
-name = "getxattr"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "SKIP"
-
-[[assign]]
 name = "gid_from_group"
-ring = 1
+ring = 2
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
@@ -4549,12 +4164,6 @@ area = 7
 status = "EXISTS-donor"
 
 [[assign]]
-name = "gmatch"
-ring = 3
-area = 7
-status = "SKIP"
-
-[[assign]]
 name = "gmtime"
 ring = 0
 crate = "time"
@@ -4562,48 +4171,16 @@ area = 6
 status = "EXISTS-donor"
 
 [[assign]]
-name = "gnu_dev_major"
+name = "gmtime_r"
 ring = 1
-crate = "abi"
-area = 14
+crate = "time"
+area = 5
 status = "EXISTS-donor"
-
-[[assign]]
-name = "gnu_dev_makedev"
-ring = 1
-crate = "abi"
-area = 14
-status = "EXISTS-donor"
-
-[[assign]]
-name = "gnu_dev_minor"
-ring = 1
-crate = "abi"
-area = 14
-status = "EXISTS-donor"
-
-[[assign]]
-name = "gnu_get_libc_release"
-ring = 3
-area = 14
-status = "SKIP"
-
-[[assign]]
-name = "gnu_get_libc_version"
-ring = 3
-area = 14
-status = "SKIP"
-
-[[assign]]
-name = "grantpt"
-ring = 0
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
+header = "time.h"
 
 [[assign]]
 name = "group_from_gid"
-ring = 1
+ring = 2
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
@@ -4623,22 +4200,8 @@ area = 15
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "hcreate"
-ring = 0
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-
-[[assign]]
 name = "hcreate_r"
 ring = 1
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-
-[[assign]]
-name = "hdestroy"
-ring = 0
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
@@ -4652,7 +4215,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "heapsort"
-ring = 1
+ring = 2
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
@@ -4669,13 +4232,6 @@ name = "howmany"
 ring = 1
 crate = "abi"
 area = 14
-status = "EXISTS-donor"
-
-[[assign]]
-name = "hsearch"
-ring = 0
-crate = "stdlib"
-area = 3
 status = "EXISTS-donor"
 
 [[assign]]
@@ -4736,17 +4292,19 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "htonl"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netinet/in.h"
 
 [[assign]]
 name = "htons"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netinet/in.h"
 
 [[assign]]
 name = "humanize_number"
@@ -4758,63 +4316,28 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "hypot"
-ring = 0
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "hypotf"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ilogb"
+ring = 1
 crate = "m"
 area = 5
 status = "EXISTS-donor"
 
 [[assign]]
-name = "iconv"
-ring = 0
-crate = "iconv"
-area = 2
-status = "EXISTS-donor"
-
-[[assign]]
-name = "iconv_close"
-ring = 0
-crate = "iconv"
-area = 2
-status = "EXISTS-donor"
-
-[[assign]]
-name = "iconv_open"
-ring = 0
-crate = "iconv"
-area = 2
-status = "EXISTS-donor"
-
-[[assign]]
-name = "if_freenameindex"
-ring = 0
-crate = "net"
-area = 12
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "if_indextoname"
-ring = 0
-crate = "net"
-area = 12
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "if_nameindex"
-ring = 0
-crate = "net"
-area = 12
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "if_nametoindex"
-ring = 0
-crate = "net"
-area = 12
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "ilogb"
-ring = 0
+name = "ilogbf"
+ring = 1
 crate = "m"
 area = 5
 status = "EXISTS-donor"
@@ -4835,31 +4358,35 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "in6addr_any"
-ring = 0
-crate = "abi"
-area = 12
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
+header = "netinet/in.h"
 
 [[assign]]
 name = "in6addr_loopback"
-ring = 0
-crate = "abi"
-area = 12
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
+header = "netinet/in.h"
 
 [[assign]]
 name = "index"
-ring = 0
+ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "inet_addr"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "arpa/inet.h"
 
 [[assign]]
 name = "inet_aton"
@@ -4912,24 +4439,27 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "inet_ntoa"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "arpa/inet.h"
 
 [[assign]]
 name = "inet_ntop"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "arpa/inet.h"
 
 [[assign]]
 name = "inet_pton"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "arpa/inet.h"
 
 [[assign]]
 name = "initgroups"
@@ -4940,46 +4470,43 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "initstate"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "inotify_add_watch"
-ring = 2
-personality = "linux"
-crate = "p-linux"
+ring = 1
+crate = "personality-linux"
 area = 15
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "inotify_init"
-ring = 2
-personality = "linux"
-crate = "p-linux"
+ring = 1
+crate = "personality-linux"
 area = 15
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "inotify_init1"
-ring = 2
-personality = "linux"
-crate = "p-linux"
+ring = 1
+crate = "personality-linux"
 area = 15
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "inotify_rm_watch"
-ring = 2
-personality = "linux"
-crate = "p-linux"
+ring = 1
+crate = "personality-linux"
 area = 15
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "insque"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
@@ -5000,7 +4527,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "isalnum_l"
-ring = 0
+ring = 1
 crate = "ctype"
 area = 2
 status = "EXISTS-donor"
@@ -5014,10 +4541,18 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "isalpha_l"
-ring = 0
+ring = 1
 crate = "ctype"
 area = 2
 status = "EXISTS-donor"
+
+[[assign]]
+name = "isascii"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+header = "ctype.h"
 
 [[assign]]
 name = "isatty"
@@ -5035,7 +4570,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "isblank_l"
-ring = 0
+ring = 1
 crate = "ctype"
 area = 2
 status = "EXISTS-donor"
@@ -5049,7 +4584,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "iscntrl_l"
-ring = 0
+ring = 1
 crate = "ctype"
 area = 2
 status = "EXISTS-donor"
@@ -5063,7 +4598,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "isdigit_l"
-ring = 0
+ring = 1
 crate = "ctype"
 area = 2
 status = "EXISTS-donor"
@@ -5084,16 +4619,9 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "isgraph_l"
-ring = 0
+ring = 1
 crate = "ctype"
 area = 2
-status = "EXISTS-donor"
-
-[[assign]]
-name = "isinf"
-ring = 0
-crate = "m"
-area = 5
 status = "EXISTS-donor"
 
 [[assign]]
@@ -5105,7 +4633,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "islower_l"
-ring = 0
+ring = 1
 crate = "ctype"
 area = 2
 status = "EXISTS-donor"
@@ -5133,7 +4661,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "isprint_l"
-ring = 0
+ring = 1
 crate = "ctype"
 area = 2
 status = "EXISTS-donor"
@@ -5147,7 +4675,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "ispunct_l"
-ring = 0
+ring = 1
 crate = "ctype"
 area = 2
 status = "EXISTS-donor"
@@ -5167,6 +4695,13 @@ area = 5
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "issignalingf"
+ring = 2
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
 name = "isspace"
 ring = 0
 crate = "ctype"
@@ -5175,7 +4710,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "isspace_l"
-ring = 0
+ring = 1
 crate = "ctype"
 area = 2
 status = "EXISTS-donor"
@@ -5189,7 +4724,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "isupper_l"
-ring = 0
+ring = 1
 crate = "ctype"
 area = 2
 status = "EXISTS-donor"
@@ -5294,7 +4829,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "isxdigit_l"
-ring = 0
+ring = 1
 crate = "ctype"
 area = 2
 status = "EXISTS-donor"
@@ -5307,11 +4842,54 @@ area = 5
 status = "EXISTS-donor"
 
 [[assign]]
+name = "j0"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "j0f"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "j1"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "j1f"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "jn"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "jnf"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
 name = "jrand48"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "kevent"
@@ -5323,13 +4901,6 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "kill"
-ring = 0
-crate = "signal"
-area = 9
-status = "EXISTS-donor"
-
-[[assign]]
-name = "killpg"
 ring = 0
 crate = "signal"
 area = 9
@@ -5359,23 +4930,18 @@ status = "SKIP"
 
 [[assign]]
 name = "l64a"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "labs"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
-
-[[assign]]
-name = "lchflags"
-ring = 3
-area = 11
-status = "SKIP"
 
 [[assign]]
 name = "lchmod"
@@ -5385,32 +4951,32 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "lchown"
-ring = 0
-crate = "proc"
-area = 10
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "lckpwdf"
-ring = 2
-personality = "linux"
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
 
 [[assign]]
 name = "lcong48"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "ldexp"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ldexpf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -5443,16 +5009,17 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "lfind"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "search.h"
 
 [[assign]]
 name = "lgamma"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -5460,6 +5027,13 @@ name = "lgamma_r"
 ring = 1
 crate = "m"
 area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "lgammaf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -5484,13 +5058,6 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "link_map"
-ring = 1
-crate = "shell"
-area = 13
-status = "EXISTS-donor"
-
-[[assign]]
 name = "linkat"
 ring = 0
 crate = "proc"
@@ -5506,22 +5073,15 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "listen"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "listxattr"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "SKIP"
+status = "EXISTS-donor"
+header = "sys/socket.h"
 
 [[assign]]
 name = "llabs"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
@@ -5531,27 +5091,6 @@ name = "lldiv"
 ring = 0
 crate = "stdlib"
 area = 3
-status = "EXISTS-donor"
-
-[[assign]]
-name = "llogb"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "llrint"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "llround"
-ring = 0
-crate = "m"
-area = 5
 status = "EXISTS-donor"
 
 [[assign]]
@@ -5569,6 +5108,14 @@ area = 6
 status = "EXISTS-donor"
 
 [[assign]]
+name = "localtime_r"
+ring = 1
+crate = "time"
+area = 5
+status = "EXISTS-donor"
+header = "time.h"
+
+[[assign]]
 name = "localtime_rz"
 ring = 1
 crate = "time"
@@ -5576,59 +5123,59 @@ area = 6
 status = "EXISTS-donor"
 
 [[assign]]
-name = "lockf"
-ring = 0
-crate = "proc"
-area = 10
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "log"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "log10"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
-name = "log10p1"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+name = "log10f"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "log1p"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "log1pf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "log2"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
-name = "log2p1"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+name = "log2f"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
-name = "logb"
-ring = 0
-crate = "m"
-area = 5
+name = "logf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -5639,13 +5186,6 @@ area = 15
 status = "EXISTS-donor"
 
 [[assign]]
-name = "logp1"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "longjmp"
 ring = 0
 crate = "signal"
@@ -5654,31 +5194,19 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "lrand48"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
-
-[[assign]]
-name = "lrint"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "lround"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "lsearch"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "search.h"
 
 [[assign]]
 name = "lseek"
@@ -5689,26 +5217,27 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "lseek64"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
+ring = 0
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
+header = "unistd.h"
 
 [[assign]]
 name = "lstat"
-ring = 0
+ring = 1
 crate = "platform"
 area = 11
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/stat.h"
 
 [[assign]]
 name = "lstat64"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
+ring = 0
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
+header = "sys/stat.h"
 
 [[assign]]
 name = "lutimes"
@@ -5716,14 +5245,6 @@ ring = 1
 crate = "platform"
 area = 11
 status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "madvise"
-ring = 1
-crate = "platform"
-area = 8
-status = "TO-BE-DESIGNED"
-ring_override = "mixed row X70"
 
 [[assign]]
 name = "major"
@@ -5745,14 +5266,6 @@ ring = 1
 crate = "abi"
 area = 14
 status = "EXISTS-donor"
-
-[[assign]]
-name = "mallinfo"
-ring = 2
-personality = "linux"
-crate = "malloc"
-area = 8
-status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "mallinfo2"
@@ -5793,14 +5306,6 @@ area = 8
 status = "EXISTS-donor"
 
 [[assign]]
-name = "mallopt"
-ring = 2
-personality = "linux"
-crate = "malloc"
-area = 8
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "mblen"
 ring = 0
 crate = "stdlib"
@@ -5809,27 +5314,6 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "mbrlen"
-ring = 0
-crate = "ctype"
-area = 2
-status = "EXISTS-donor"
-
-[[assign]]
-name = "mbrtoc16"
-ring = 0
-crate = "ctype"
-area = 2
-status = "EXISTS-donor"
-
-[[assign]]
-name = "mbrtoc32"
-ring = 0
-crate = "ctype"
-area = 2
-status = "EXISTS-donor"
-
-[[assign]]
-name = "mbrtoc8"
 ring = 0
 crate = "ctype"
 area = 2
@@ -5893,10 +5377,11 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "memccpy"
-ring = 0
+ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "memchr"
@@ -5929,10 +5414,11 @@ ring_override = "mixed row X70"
 
 [[assign]]
 name = "memmem"
-ring = 1
+ring = 0
 crate = "str"
 area = 1
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "memmove"
@@ -5970,17 +5456,18 @@ area = 1
 status = "EXISTS-donor"
 
 [[assign]]
-name = "mergesort"
+name = "memset_s"
 ring = 1
-crate = "stdlib"
-area = 3
+crate = "str"
+area = 1
 status = "EXISTS-donor"
 
 [[assign]]
-name = "mimmutable"
-ring = 3
-area = 15
-status = "SKIP"
+name = "mergesort"
+ring = 2
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
 
 [[assign]]
 name = "mincore"
@@ -5989,12 +5476,6 @@ crate = "platform"
 area = 8
 status = "TO-BE-DESIGNED"
 ring_override = "mixed row X70"
-
-[[assign]]
-name = "minherit"
-ring = 3
-area = 15
-status = "SKIP"
 
 [[assign]]
 name = "minor"
@@ -6018,35 +5499,7 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "mkdtemp"
-ring = 0
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-
-[[assign]]
 name = "mkfifo"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "mkfifoat"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "mknod"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "mknodat"
 ring = 0
 crate = "platform"
 area = 11
@@ -6067,22 +5520,8 @@ area = 3
 status = "EXISTS-donor"
 
 [[assign]]
-name = "mkstemp"
-ring = 0
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-
-[[assign]]
 name = "mkstemps"
 ring = 1
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-
-[[assign]]
-name = "mktemp"
-ring = 0
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
@@ -6109,14 +5548,6 @@ area = 8
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "mlock2"
-ring = 1
-crate = "platform"
-area = 8
-status = "TO-BE-DESIGNED"
-ring_override = "mixed row X70"
-
-[[assign]]
 name = "mlockall"
 ring = 0
 crate = "platform"
@@ -6132,15 +5563,22 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "mmap64"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
+header = "sys/mman.h"
 
 [[assign]]
 name = "modf"
-ring = 0
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "modff"
+ring = 1
 crate = "m"
 area = 5
 status = "EXISTS-donor"
@@ -6160,81 +5598,12 @@ area = 8
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "mq_close"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "mq_getattr"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "mq_notify"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "mq_open"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "mq_receive"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "mq_send"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "mq_setattr"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "mq_timedreceive"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "mq_timedsend"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "mq_unlink"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "mrand48"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "mremap"
@@ -6243,34 +5612,6 @@ crate = "platform"
 area = 8
 status = "TO-BE-DESIGNED"
 ring_override = "mixed row X70"
-
-[[assign]]
-name = "msgctl"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "msgget"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "msgrcv"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "msgsnd"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "msync"
@@ -6343,19 +5684,39 @@ area = 8
 status = "TO-BE-DESIGNED"
 
 [[assign]]
+name = "mutex_destroy"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
 name = "mutex_init"
-ring = 3
-status = "SKIP"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "mutex_lock"
-ring = 3
-status = "SKIP"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "mutex_trylock"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "mutex_unlock"
-ring = 3
-status = "SKIP"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "name_to_handle_at"
@@ -6366,13 +5727,6 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "nan"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
 name = "nanosleep"
 ring = 0
 crate = "time"
@@ -6380,38 +5734,17 @@ area = 6
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "nearbyint"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
 name = "newlocale"
-ring = 0
+ring = 1
 crate = "locale"
 area = 2
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "nextafter"
-ring = 0
-crate = "m"
-area = 5
 status = "EXISTS-donor"
 
 [[assign]]
 name = "nextdown"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "nexttoward"
-ring = 0
-crate = "m"
-area = 5
+ring = 2
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -6423,10 +5756,10 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "nextup"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+ring = 2
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "nftw"
@@ -6437,10 +5770,19 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "ngettext"
-ring = 1
+ring = 0
 crate = "locale"
 area = 2
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "libintl.h"
+
+[[assign]]
+name = "nice"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+header = "unistd.h"
 
 [[assign]]
 name = "nitems"
@@ -6451,24 +5793,26 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "nl_langinfo"
-ring = 0
+ring = 1
 crate = "locale"
 area = 2
 status = "EXISTS-donor"
+header = "langinfo.h"
 
 [[assign]]
 name = "nl_langinfo_l"
-ring = 0
+ring = 1
 crate = "locale"
 area = 2
 status = "EXISTS-donor"
 
 [[assign]]
 name = "nrand48"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "ns_get16"
@@ -6487,38 +5831,6 @@ status = "EXISTS-donor"
 [[assign]]
 name = "ns_initparse"
 ring = 1
-crate = "resolv"
-area = 12
-status = "EXISTS-donor"
-
-[[assign]]
-name = "ns_name_compress"
-ring = 2
-personality = "linux"
-crate = "resolv"
-area = 12
-status = "EXISTS-donor"
-
-[[assign]]
-name = "ns_name_ntop"
-ring = 2
-personality = "linux"
-crate = "resolv"
-area = 12
-status = "EXISTS-donor"
-
-[[assign]]
-name = "ns_name_pton"
-ring = 2
-personality = "linux"
-crate = "resolv"
-area = 12
-status = "EXISTS-donor"
-
-[[assign]]
-name = "ns_name_uncompress"
-ring = 2
-personality = "linux"
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
@@ -6553,17 +5865,19 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "ntohl"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netinet/in.h"
 
 [[assign]]
 name = "ntohs"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netinet/in.h"
 
 [[assign]]
 name = "nvis"
@@ -6590,25 +5904,19 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "open64"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
+ring = 0
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
+header = "fcntl.h"
 
 [[assign]]
 name = "open_memstream"
-ring = 0
-crate = "stdio"
-area = 4
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
-
-[[assign]]
-name = "open_wmemstream"
-ring = 0
-crate = "stdio"
-area = 4
-status = "EXISTS-donor"
+header = "stdio.h"
 
 [[assign]]
 name = "openat"
@@ -6627,11 +5935,11 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "openat64"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
+header = "fcntl.h"
 
 [[assign]]
 name = "opendir"
@@ -6639,13 +5947,6 @@ ring = 0
 crate = "fts"
 area = 7
 status = "EXISTS-donor"
-
-[[assign]]
-name = "openlog"
-ring = 0
-crate = "compat"
-area = 15
-status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "openpty"
@@ -6684,22 +5985,10 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "optreset"
-ring = 1
-crate = "stdlib"
-area = 3
+ring = 2
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
-
-[[assign]]
-name = "p2close"
-ring = 3
-area = 7
-status = "SKIP"
-
-[[assign]]
-name = "p2open"
-ring = 3
-area = 7
-status = "SKIP"
 
 [[assign]]
 name = "pathconf"
@@ -6736,6 +6025,13 @@ personality = "linux"
 crate = "p-linux"
 area = 10
 status = "TO-BE-DESIGNED"
+
+[[assign]]
+name = "pidfile"
+ring = 2
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "pidfile_close"
@@ -6777,13 +6073,6 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "pipe2"
-ring = 0
-crate = "proc"
-area = 10
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "pledge"
 ring = 2
 personality = "bsd"
@@ -6793,10 +6082,10 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "poll"
-ring = 0
+ring = 1
 crate = "platform"
 area = 11
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "popen"
@@ -6862,32 +6151,11 @@ area = 14
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "posix_fadvise"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "posix_fallocate"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "posix_getdents"
-ring = 0
+ring = 2
 crate = "fts"
 area = 7
 status = "EXISTS-donor"
-
-[[assign]]
-name = "posix_madvise"
-ring = 0
-crate = "platform"
-area = 8
-status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "posix_memalign"
@@ -6905,30 +6173,191 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "posix_spawn"
-ring = 0
+ring = 1
 crate = "proc"
 area = 10
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawn_file_actions_addchdir_np"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawn_file_actions_addclose"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawn_file_actions_addclosefrom_np"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawn_file_actions_adddup2"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawn_file_actions_addfchdir_np"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawn_file_actions_addopen"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawn_file_actions_destroy"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawn_file_actions_init"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawnattr_destroy"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawnattr_getflags"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawnattr_getpgroup"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawnattr_getschedparam"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawnattr_getschedpolicy"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawnattr_getsigdefault"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawnattr_getsigmask"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawnattr_init"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawnattr_setflags"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawnattr_setpgroup"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawnattr_setschedparam"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawnattr_setschedpolicy"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawnattr_setsigdefault"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+
+[[assign]]
+name = "posix_spawnattr_setsigmask"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
 
 [[assign]]
 name = "posix_spawnp"
-ring = 0
+ring = 1
 crate = "proc"
 area = 10
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "pow"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "pow10"
-ring = 1
-crate = "m"
-area = 5
+ring = 2
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pow10f"
+ring = 2
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -6939,18 +6368,11 @@ area = 14
 status = "EXISTS-donor"
 
 [[assign]]
-name = "pown"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "powr"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+name = "powf"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "ppoll"
@@ -6976,21 +6398,14 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "pread64"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
+ring = 0
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
+header = "unistd.h"
 
 [[assign]]
 name = "preadv"
-ring = 1
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "preadv2"
 ring = 1
 crate = "platform"
 area = 11
@@ -7004,69 +6419,208 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
-name = "processor_bind"
-ring = 3
-area = 14
-status = "SKIP"
+name = "prlimit"
+ring = 2
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
 
 [[assign]]
 name = "program_invocation_name"
-ring = 1
-crate = "proc"
-area = 10
+ring = 2
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
+header = "errno.h"
 
 [[assign]]
 name = "program_invocation_short_name"
-ring = 1
-crate = "proc"
-area = 10
+ring = 2
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
-
-[[assign]]
-name = "pselect"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "pset_create"
-ring = 3
-area = 14
-status = "SKIP"
-
-[[assign]]
-name = "psiginfo"
-ring = 0
-crate = "signal"
-area = 9
-status = "EXISTS-donor"
-
-[[assign]]
-name = "psignal"
-ring = 0
-crate = "signal"
-area = 9
-status = "EXISTS-donor"
+header = "errno.h"
 
 [[assign]]
 name = "pthread_atfork"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
-name = "pthread_attr_get_np"
-ring = 2
-personality = "bsd"
+name = "pthread_attr_destroy"
+ring = 1
 crate = "thread"
 area = 9
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
-name = "pthread_attr_setdefault_np"
+name = "pthread_attr_getdetachstate"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_getguardsize"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_getinheritsched"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_getschedparam"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_getschedpolicy"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_getscope"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_getstack"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_getstacksize"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_init"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_setdetachstate"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_setguardsize"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_setinheritsched"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_setschedparam"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_setschedpolicy"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_setscope"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_setstack"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_attr_setstacksize"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_barrier_destroy"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+header = "pthread.h"
+
+[[assign]]
+name = "pthread_barrier_init"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+header = "pthread.h"
+
+[[assign]]
+name = "pthread_barrier_wait"
+ring = 0
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+header = "pthread.h"
+
+[[assign]]
+name = "pthread_barrierattr_destroy"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_barrierattr_getpshared"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_barrierattr_init"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_barrierattr_setpshared"
 ring = 1
 crate = "thread"
 area = 9
@@ -7074,7 +6628,14 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_cancel"
-ring = 0
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_cond_broadcast"
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
@@ -7087,29 +6648,106 @@ area = 9
 status = "EXISTS-donor"
 
 [[assign]]
+name = "pthread_cond_destroy"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_cond_init"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_cond_signal"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_cond_timedwait"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_cond_wait"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_condattr_destroy"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_condattr_getclock"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_condattr_getpshared"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_condattr_init"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_condattr_setclock"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_condattr_setpshared"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
 name = "pthread_create"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_detach"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_equal"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_exit"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
@@ -7131,28 +6769,29 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_getattr_default_np"
-ring = 1
+ring = 2
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
+header = "pthread.h"
 
 [[assign]]
 name = "pthread_getattr_np"
-ring = 1
+ring = 2
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_getconcurrency"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_getcpuclockid"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
@@ -7166,7 +6805,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_getschedparam"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
@@ -7180,7 +6819,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_join"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
@@ -7201,7 +6840,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_kill"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
@@ -7216,29 +6855,161 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "pthread_mutex_clocklock"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_mutex_consistent"
-ring = 0
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutex_destroy"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutex_getprioceiling"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutex_init"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutex_lock"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutex_setprioceiling"
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_mutex_timedlock"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
-ring_override = "mixed row X59"
+
+[[assign]]
+name = "pthread_mutex_trylock"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutex_unlock"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutexattr_destroy"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutexattr_getprioceiling"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutexattr_getprotocol"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutexattr_getpshared"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutexattr_getrobust"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutexattr_gettype"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutexattr_init"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutexattr_setprioceiling"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutexattr_setprotocol"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutexattr_setpshared"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutexattr_setrobust"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_mutexattr_settype"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_once"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
@@ -7266,8 +7037,99 @@ area = 9
 status = "EXISTS-donor"
 
 [[assign]]
+name = "pthread_rwlock_destroy"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_rwlock_init"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_rwlock_rdlock"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_rwlock_timedrdlock"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_rwlock_timedwrlock"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_rwlock_tryrdlock"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_rwlock_trywrlock"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_rwlock_unlock"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_rwlock_wrlock"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_rwlockattr_destroy"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_rwlockattr_getpshared"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_rwlockattr_init"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_rwlockattr_setpshared"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
 name = "pthread_self"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
@@ -7289,28 +7151,29 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_setattr_default_np"
+ring = 2
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+header = "pthread.h"
+
+[[assign]]
+name = "pthread_setcancelstate"
 ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
-name = "pthread_setcancelstate"
-ring = 0
-crate = "thread"
-area = 9
-status = "EXISTS-donor"
-
-[[assign]]
 name = "pthread_setcanceltype"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_setconcurrency"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
@@ -7324,14 +7187,14 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_setschedparam"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_setschedprio"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
@@ -7345,7 +7208,42 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_sigmask"
-ring = 0
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_spin_destroy"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_spin_init"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_spin_lock"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_spin_trylock"
+ring = 1
+crate = "thread"
+area = 9
+status = "EXISTS-donor"
+
+[[assign]]
+name = "pthread_spin_unlock"
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
@@ -7360,7 +7258,7 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "pthread_testcancel"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
 status = "EXISTS-donor"
@@ -7381,23 +7279,9 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "pthread_yield"
-ring = 0
+ring = 1
 crate = "thread"
 area = 9
-status = "EXISTS-donor"
-ring_override = "mixed row X59"
-
-[[assign]]
-name = "ptrace"
-ring = 3
-area = 10
-status = "SKIP"
-
-[[assign]]
-name = "ptsname"
-ring = 0
-crate = "stdlib"
-area = 3
 status = "EXISTS-donor"
 
 [[assign]]
@@ -7437,17 +7321,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "putenv"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
-
-[[assign]]
-name = "putgrent"
-ring = 1
-crate = "pwd"
-area = 12
-status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "putpwent"
@@ -7465,8 +7343,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "putspent"
-ring = 2
-personality = "linux"
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
@@ -7500,13 +7377,6 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
-name = "pvalloc"
-ring = 1
-crate = "malloc"
-area = 8
-status = "EXISTS-donor"
-
-[[assign]]
 name = "pwrite"
 ring = 0
 crate = "proc"
@@ -7515,21 +7385,14 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "pwrite64"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
+ring = 0
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
+header = "unistd.h"
 
 [[assign]]
 name = "pwritev"
-ring = 1
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "pwritev2"
 ring = 1
 crate = "platform"
 area = 11
@@ -7550,40 +7413,12 @@ area = 3
 status = "EXISTS-donor"
 
 [[assign]]
-name = "quad_t"
-ring = 1
-crate = "abi"
-area = 14
-status = "EXISTS-donor"
-
-[[assign]]
-name = "quick_exit"
-ring = 0
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-
-[[assign]]
-name = "r_debug"
-ring = 1
-crate = "shell"
-area = 13
-status = "EXISTS-donor"
-
-[[assign]]
 name = "r_debug_state"
 ring = "private"
 crate = "rtld"
 area = 13
 status = "EXISTS-donor"
 ring_override = "mixed row Z09"
-
-[[assign]]
-name = "radixsort"
-ring = 1
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
 
 [[assign]]
 name = "raise"
@@ -7608,10 +7443,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "random"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "rawmemchr"
@@ -7645,32 +7481,19 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "readdir64"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
+header = "dirent.h"
 
 [[assign]]
 name = "readdir_r"
-ring = 0
+ring = 1
 crate = "fts"
 area = 7
 status = "EXISTS-donor"
-
-[[assign]]
-name = "readlink"
-ring = 0
-crate = "proc"
-area = 10
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "readlinkat"
-ring = 0
-crate = "proc"
-area = 10
-status = "TO-BE-DESIGNED"
+header = "dirent.h"
 
 [[assign]]
 name = "readpassphrase"
@@ -7681,13 +7504,6 @@ area = 15
 status = "EXISTS-donor"
 
 [[assign]]
-name = "readv"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "realloc"
 ring = 0
 crate = "stdlib"
@@ -7696,10 +7512,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "reallocarray"
-ring = 1
+ring = 0
 crate = "malloc"
-area = 8
+area = 4
 status = "EXISTS-donor"
+header = "malloc.h"
 
 [[assign]]
 name = "reallocf"
@@ -7707,21 +7524,6 @@ ring = 1
 crate = "malloc"
 area = 8
 status = "EXISTS-donor"
-
-[[assign]]
-name = "realpath"
-ring = 0
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-
-[[assign]]
-name = "reboot"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 15
-status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "recallocarray"
@@ -7732,17 +7534,19 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "recv"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/socket.h"
 
 [[assign]]
 name = "recvfrom"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/socket.h"
 
 [[assign]]
 name = "recvmmsg"
@@ -7753,16 +7557,10 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "recvmsg"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "regcmp"
-ring = 3
-area = 7
-status = "SKIP"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "regcomp"
@@ -7779,12 +7577,6 @@ area = 7
 status = "EXISTS-donor"
 
 [[assign]]
-name = "regex"
-ring = 3
-area = 7
-status = "SKIP"
-
-[[assign]]
 name = "regexec"
 ring = 0
 crate = "regex"
@@ -7796,13 +7588,6 @@ name = "regfree"
 ring = 0
 crate = "regex"
 area = 7
-status = "EXISTS-donor"
-
-[[assign]]
-name = "remainder"
-ring = 0
-crate = "m"
-area = 5
 status = "EXISTS-donor"
 
 [[assign]]
@@ -7821,25 +7606,10 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
-name = "removexattr"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "SKIP"
-
-[[assign]]
 name = "remque"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
-status = "EXISTS-donor"
-
-[[assign]]
-name = "remquo"
-ring = 0
-crate = "m"
-area = 5
 status = "EXISTS-donor"
 
 [[assign]]
@@ -7857,14 +7627,6 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
-name = "renameat2"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "res_init"
 ring = 1
 crate = "resolv"
@@ -7874,62 +7636,6 @@ status = "EXISTS-donor"
 [[assign]]
 name = "res_mkquery"
 ring = 1
-crate = "resolv"
-area = 12
-status = "EXISTS-donor"
-
-[[assign]]
-name = "res_nclose"
-ring = 2
-personality = "linux"
-crate = "resolv"
-area = 12
-status = "EXISTS-donor"
-
-[[assign]]
-name = "res_ninit"
-ring = 2
-personality = "linux"
-crate = "resolv"
-area = 12
-status = "EXISTS-donor"
-
-[[assign]]
-name = "res_nmkquery"
-ring = 2
-personality = "linux"
-crate = "resolv"
-area = 12
-status = "EXISTS-donor"
-
-[[assign]]
-name = "res_nquery"
-ring = 2
-personality = "linux"
-crate = "resolv"
-area = 12
-status = "EXISTS-donor"
-
-[[assign]]
-name = "res_nquerydomain"
-ring = 2
-personality = "linux"
-crate = "resolv"
-area = 12
-status = "EXISTS-donor"
-
-[[assign]]
-name = "res_nsearch"
-ring = 2
-personality = "linux"
-crate = "resolv"
-area = 12
-status = "EXISTS-donor"
-
-[[assign]]
-name = "res_nsend"
-ring = 2
-personality = "linux"
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
@@ -7978,16 +7684,24 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "rindex"
-ring = 0
+ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "rint"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rintf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -7998,32 +7712,25 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "rootn"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "round"
-ring = 0
-crate = "m"
-area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "rounddown"
 ring = 1
-crate = "abi"
-area = 14
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "roundeven"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+ring = 2
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "roundf"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "roundup"
@@ -8034,15 +7741,66 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "rsqrt"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+ring = 2
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rsqrtf"
+ring = 3
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rw_rdlock"
+ring = 2
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rw_tryrdlock"
+ring = 2
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rw_trywrlock"
+ring = 2
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rw_unlock"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rw_wrlock"
+ring = 2
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "rwlock_destroy"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "rwlock_init"
-ring = 3
-status = "SKIP"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "scalb"
@@ -8059,25 +7817,33 @@ area = 5
 status = "EXISTS-donor"
 
 [[assign]]
-name = "scalbln"
-ring = 0
-crate = "m"
-area = 5
+name = "scalbn"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
-name = "scalbn"
-ring = 0
-crate = "m"
-area = 5
+name = "scalbnf"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "scan_scaled"
+ring = 2
+crate = "compat"
+area = 15
 status = "EXISTS-donor"
 
 [[assign]]
 name = "scandir"
-ring = 0
+ring = 1
 crate = "fts"
 area = 7
 status = "EXISTS-donor"
+header = "dirent.h"
 
 [[assign]]
 name = "scanf"
@@ -8165,24 +7931,27 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "secure_getenv"
+ring = 0
+crate = "stdlib"
+area = 3
+status = "EXISTS-donor"
+header = "stdlib.h"
+
+[[assign]]
+name = "seed48"
 ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
-
-[[assign]]
-name = "seed48"
-ring = 0
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "seekdir"
-ring = 0
+ring = 1
 crate = "fts"
 area = 7
 status = "EXISTS-donor"
+header = "dirent.h"
 
 [[assign]]
 name = "select"
@@ -8269,45 +8038,61 @@ area = 9
 status = "EXISTS-donor"
 
 [[assign]]
+name = "sema_destroy"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
 name = "sema_init"
-ring = 3
-status = "SKIP"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
-name = "semctl"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
+name = "sema_post"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
-name = "semget"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
+name = "sema_trywait"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
-name = "semop"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
+name = "sema_wait"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "send"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/socket.h"
 
 [[assign]]
 name = "sendfile"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
+ring = 1
+crate = "personality-linux"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sendfile64"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "sendmmsg"
@@ -8318,17 +8103,18 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "sendmsg"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "sendto"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/socket.h"
 
 [[assign]]
 name = "setbuf"
@@ -8367,10 +8153,11 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "setenv"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "seteuid"
@@ -8388,24 +8175,34 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "setgrent"
-ring = 0
-crate = "pwd"
-area = 12
-status = "EXISTS-donor"
-
-[[assign]]
-name = "setgroupent"
 ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
+header = "grp.h"
+
+[[assign]]
+name = "setgroupent"
+ring = 2
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
+
+[[assign]]
+name = "setgroups"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+header = "grp.h"
 
 [[assign]]
 name = "sethostent"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "sethostid"
@@ -8420,13 +8217,6 @@ ring = 1
 crate = "proc"
 area = 10
 status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "setitimer"
-ring = 0
-crate = "time"
-area = 6
-status = "EXISTS-donor"
 
 [[assign]]
 name = "setjmp"
@@ -8450,53 +8240,48 @@ area = 2
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "setlogmask"
-ring = 0
-crate = "compat"
-area = 15
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "setmntent"
-ring = 1
+ring = 2
 crate = "compat"
 area = 15
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "mntent.h"
 
 [[assign]]
 name = "setmode"
-ring = 1
+ring = 2
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
 
 [[assign]]
 name = "setnetent"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "setpassent"
-ring = 1
+ring = 2
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
 
 [[assign]]
 name = "setpayload"
-ring = 0
+ring = 3
 crate = "m"
 area = 5
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "setpayloadsig"
-ring = 0
+ring = 3
 crate = "m"
 area = 5
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "setpgid"
@@ -8507,10 +8292,11 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "setpriority"
-ring = 0
+ring = 1
 crate = "proc"
 area = 10
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/resource.h"
 
 [[assign]]
 name = "setproctitle"
@@ -8537,45 +8323,51 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "setprotoent"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "setpwent"
-ring = 0
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
+header = "pwd.h"
 
 [[assign]]
 name = "setregid"
-ring = 0
+ring = 1
 crate = "proc"
 area = 10
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "unistd.h"
 
 [[assign]]
 name = "setreuid"
-ring = 0
+ring = 1
 crate = "proc"
 area = 10
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "unistd.h"
 
 [[assign]]
 name = "setrlimit"
-ring = 0
+ring = 1
 crate = "proc"
 area = 10
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/resource.h"
 
 [[assign]]
 name = "setservent"
-ring = 0
+ring = 1
 crate = "resolv"
 area = 12
 status = "EXISTS-donor"
+header = "netdb.h"
 
 [[assign]]
 name = "setsid"
@@ -8586,37 +8378,30 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "setsockopt"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/socket.h"
 
 [[assign]]
 name = "setspent"
-ring = 2
-personality = "linux"
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
 
 [[assign]]
 name = "setstate"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
-
-[[assign]]
-name = "settimeofday"
-ring = 0
-crate = "time"
-area = 6
-status = "TO-BE-DESIGNED"
+header = "stdlib.h"
 
 [[assign]]
 name = "setttyent"
-ring = 2
-personality = "bsd"
+ring = 1
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
@@ -8650,14 +8435,6 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
-name = "setxattr"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "SKIP"
-
-[[assign]]
 name = "shm_open"
 ring = 0
 crate = "platform"
@@ -8665,50 +8442,16 @@ area = 8
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "shm_unlink"
-ring = 0
-crate = "platform"
-area = 8
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "shmat"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "shmctl"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "shmdt"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "shmget"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "shutdown"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/socket.h"
 
 [[assign]]
 name = "sig2str"
-ring = 0
+ring = 1
 crate = "signal"
 area = 9
 status = "EXISTS-donor"
@@ -8729,7 +8472,15 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "sigaltstack"
-ring = 0
+ring = 1
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+header = "signal.h"
+
+[[assign]]
+name = "sigandset"
+ring = 1
 crate = "signal"
 area = 9
 status = "EXISTS-donor"
@@ -8757,21 +8508,29 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "sighold"
-ring = 0
+ring = 1
 crate = "signal"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "sigignore"
-ring = 0
+ring = 1
 crate = "signal"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "siginterrupt"
-ring = 0
+ring = 1
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+header = "signal.h"
+
+[[assign]]
+name = "sigisemptyset"
+ring = 1
 crate = "signal"
 area = 9
 status = "EXISTS-donor"
@@ -8799,24 +8558,16 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "signalfd"
-ring = 2
-personality = "linux"
-crate = "p-linux"
+ring = 1
+crate = "personality-linux"
 area = 15
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "signbit"
 ring = 0
 crate = "m"
 area = 5
-status = "EXISTS-donor"
-
-[[assign]]
-name = "signgam"
-ring = 0
-crate = "time"
-area = 6
 status = "EXISTS-donor"
 
 [[assign]]
@@ -8834,11 +8585,19 @@ area = 5
 status = "EXISTS-donor"
 
 [[assign]]
-name = "sigpause"
-ring = 0
+name = "sigorset"
+ring = 1
 crate = "signal"
 area = 9
 status = "EXISTS-donor"
+
+[[assign]]
+name = "sigpause"
+ring = 1
+crate = "signal"
+area = 9
+status = "EXISTS-donor"
+header = "signal.h"
 
 [[assign]]
 name = "sigpending"
@@ -8856,21 +8615,21 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "sigqueue"
-ring = 0
+ring = 1
 crate = "signal"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "sigrelse"
-ring = 0
+ring = 1
 crate = "signal"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "sigset"
-ring = 0
+ring = 1
 crate = "signal"
 area = 9
 status = "EXISTS-donor"
@@ -8891,30 +8650,30 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "sigtimedwait"
-ring = 0
+ring = 1
 crate = "signal"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "sigwait"
-ring = 0
+ring = 1
 crate = "signal"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "sigwaitinfo"
-ring = 0
+ring = 1
 crate = "signal"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "sin"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -8939,18 +8698,39 @@ area = 5
 status = "EXISTS-donor"
 
 [[assign]]
+name = "sinf"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
 name = "sinh"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sinhf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "sinpi"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "sinpif"
+ring = 2
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "sl_add"
@@ -8993,10 +8773,11 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "snprintf"
-ring = 0
-crate = "stdio"
-area = 4
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
+header = "stdio.h"
 
 [[assign]]
 name = "snprintf_ss"
@@ -9015,32 +8796,27 @@ area = 15
 status = "EXISTS-donor"
 
 [[assign]]
-name = "sockaddr_un"
-ring = 0
-crate = "abi"
+name = "sockatmark"
+ring = 1
+crate = "net"
 area = 12
 status = "EXISTS-donor"
 
 [[assign]]
-name = "sockatmark"
-ring = 0
-crate = "net"
-area = 12
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "socket"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/socket.h"
 
 [[assign]]
 name = "socketpair"
-ring = 0
+ring = 1
 crate = "net"
 area = 12
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "sys/socket.h"
 
 [[assign]]
 name = "splice"
@@ -9059,16 +8835,16 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "sqrt"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
-name = "sradixsort"
+name = "sqrtf"
 ring = 1
-crate = "stdlib"
-area = 3
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -9080,10 +8856,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "srand48"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "sranddev"
@@ -9093,22 +8870,11 @@ status = "SKIP"
 
 [[assign]]
 name = "srandom"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
-
-[[assign]]
-name = "srandom_deterministic"
-ring = 3
-area = 3
-status = "SKIP"
-
-[[assign]]
-name = "srandomdev"
-ring = 3
-area = 3
-status = "SKIP"
+header = "stdlib.h"
 
 [[assign]]
 name = "sscanf"
@@ -9126,29 +8892,15 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "stat64"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
+ring = 0
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
+header = "sys/stat.h"
 
 [[assign]]
 name = "statfs"
 ring = 1
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "statfs64"
-ring = 1
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "statvfs"
-ring = 0
 crate = "platform"
 area = 11
 status = "TO-BE-DESIGNED"
@@ -9160,104 +8912,6 @@ personality = "linux"
 crate = "p-linux"
 area = 14
 status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "stdc_bit_ceil"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "stdc_bit_floor"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "stdc_bit_width"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "stdc_count_ones"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "stdc_count_zeros"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "stdc_first_leading_one"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "stdc_first_leading_zero"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "stdc_first_trailing_one"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "stdc_first_trailing_zero"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "stdc_has_single_bit"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "stdc_leading_ones"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "stdc_leading_zeros"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "stdc_trailing_ones"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
-
-[[assign]]
-name = "stdc_trailing_zeros"
-ring = 0
-crate = "str"
-area = 1
-status = "EXISTS-donor"
 
 [[assign]]
 name = "stderr"
@@ -9282,35 +8936,38 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "stpcpy"
-ring = 0
+ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "stpncpy"
-ring = 0
+ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "str2sig"
-ring = 0
+ring = 1
 crate = "signal"
 area = 9
 status = "EXISTS-donor"
 
 [[assign]]
 name = "strcasecmp"
-ring = 0
+ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "strcasecmp_l"
-ring = 0
+ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
@@ -9373,10 +9030,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "strdup"
-ring = 0
+ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "strerror"
@@ -9408,41 +9066,6 @@ area = 1
 status = "EXISTS-donor"
 
 [[assign]]
-name = "strfmon"
-ring = 0
-crate = "locale"
-area = 2
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "strfmon_l"
-ring = 0
-crate = "locale"
-area = 2
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "strfromd"
-ring = 0
-crate = "malloc"
-area = 8
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "strfromf"
-ring = 0
-crate = "malloc"
-area = 8
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "strfroml"
-ring = 0
-crate = "malloc"
-area = 8
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "strftime"
 ring = 0
 crate = "time"
@@ -9458,25 +9081,20 @@ status = "EXISTS-donor"
 ring_override = "mixed row X62"
 
 [[assign]]
-name = "strftime_z"
-ring = 1
-crate = "time"
-area = 6
-status = "EXISTS-donor"
-
-[[assign]]
 name = "strlcat"
-ring = 1
+ring = 0
 crate = "str"
 area = 1
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "strlcpy"
-ring = 1
+ring = 0
 crate = "str"
 area = 1
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "strlen"
@@ -9487,21 +9105,22 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "strmode"
-ring = 1
+ring = 2
 crate = "str"
 area = 1
 status = "EXISTS-donor"
 
 [[assign]]
 name = "strncasecmp"
-ring = 0
+ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "strncasecmp_l"
-ring = 0
+ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
@@ -9529,10 +9148,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "strndup"
-ring = 0
+ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "strnlen"
@@ -9543,16 +9163,36 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "strnstr"
-ring = 2
-personality = "bsd"
+ring = 1
 crate = "str"
 area = 1
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strnunvis"
+ring = 2
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strnunvisx"
+ring = 2
+crate = "compat"
+area = 15
 status = "EXISTS-donor"
 
 [[assign]]
 name = "strnvis"
 ring = 2
 personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strnvisx"
+ring = 2
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
@@ -9566,19 +9206,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "strptime"
-ring = 0
+ring = 1
 crate = "time"
-area = 6
+area = 5
 status = "EXISTS-donor"
-ring_override = "mixed row X62"
-
-[[assign]]
-name = "strptime_l"
-ring = 0
-crate = "time"
-area = 6
-status = "EXISTS-donor"
-ring_override = "mixed row X62"
+header = "time.h"
 
 [[assign]]
 name = "strrchr"
@@ -9596,15 +9228,23 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "strsignal"
-ring = 0
+ring = 1
 crate = "str"
 area = 1
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "strsnvis"
 ring = 2
 personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strsnvisx"
+ring = 2
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
@@ -9632,6 +9272,13 @@ area = 15
 status = "EXISTS-donor"
 
 [[assign]]
+name = "strsvisx"
+ring = 2
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
 name = "strtod"
 ring = 0
 crate = "stdlib"
@@ -9641,13 +9288,6 @@ status = "EXISTS-donor"
 [[assign]]
 name = "strtod_l"
 ring = 1
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-
-[[assign]]
-name = "strtof"
-ring = 0
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
@@ -9781,16 +9421,16 @@ area = 3
 status = "EXISTS-donor"
 
 [[assign]]
-name = "struct"
-ring = 0
-crate = "abi"
-area = 12
-status = "EXISTS-donor"
-
-[[assign]]
 name = "strunvis"
 ring = 2
 personality = "bsd"
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "strunvisx"
+ring = 2
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
@@ -9811,6 +9451,13 @@ area = 15
 status = "EXISTS-donor"
 
 [[assign]]
+name = "strvisx"
+ring = 2
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
 name = "strxfrm"
 ring = 0
 crate = "str"
@@ -9819,11 +9466,10 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "suboptarg"
-ring = 0
-crate = "stdlib"
-area = 3
+ring = 3
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
-ring_override = "mixed row Z16"
 
 [[assign]]
 name = "svis"
@@ -9835,10 +9481,10 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "swab"
-ring = 0
-crate = "proc"
-area = 10
-status = "TO-BE-DESIGNED"
+ring = 1
+crate = "str"
+area = 1
+status = "EXISTS-donor"
 
 [[assign]]
 name = "swapcontext"
@@ -9848,32 +9494,11 @@ area = 9
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "swprintf"
-ring = 0
-crate = "stdio"
-area = 4
-status = "EXISTS-donor"
-
-[[assign]]
 name = "swscanf"
 ring = 0
 crate = "stdio"
 area = 4
 status = "EXISTS-donor"
-
-[[assign]]
-name = "symlink"
-ring = 0
-crate = "proc"
-area = 10
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "symlinkat"
-ring = 0
-crate = "proc"
-area = 10
-status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "sync"
@@ -9938,18 +9563,10 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "sysinfo"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "syslog"
-ring = 0
-crate = "compat"
+ring = 1
+crate = "personality-linux"
 area = 15
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "system"
@@ -9960,24 +9577,31 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "tan"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "tanf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "tanh"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
-name = "tanpi"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
+name = "tanhf"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
 
 [[assign]]
 name = "tcdrain"
@@ -10022,13 +9646,6 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "tcgetwinsize"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "tcsendbreak"
 ring = 0
 crate = "platform"
@@ -10050,18 +9667,12 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "tcsetwinsize"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "tdelete"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "search.h"
 
 [[assign]]
 name = "tdestroy"
@@ -10080,24 +9691,27 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "telldir"
-ring = 0
+ring = 1
 crate = "fts"
 area = 7
 status = "EXISTS-donor"
+header = "dirent.h"
 
 [[assign]]
 name = "textdomain"
-ring = 1
+ring = 0
 crate = "locale"
 area = 2
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+header = "libintl.h"
 
 [[assign]]
 name = "tfind"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "search.h"
 
 [[assign]]
 name = "tgamma"
@@ -10107,39 +9721,138 @@ area = 5
 status = "EXISTS-donor"
 
 [[assign]]
+name = "tgammaf"
+ring = 0
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+header = "math.h"
+
+[[assign]]
+name = "thr_continue"
+ring = 2
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
 name = "thr_create"
-ring = 3
-status = "SKIP"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "thr_exit"
-ring = 3
-status = "SKIP"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thr_getconcurrency"
+ring = 2
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thr_getprio"
+ring = 2
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thr_getspecific"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "thr_join"
-ring = 3
-status = "SKIP"
+ring = 2
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thr_keycreate"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "thr_kill"
-ring = 3
-status = "SKIP"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thr_main"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thr_min_stack"
+ring = 2
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "thr_self"
-ring = 3
-status = "SKIP"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thr_setconcurrency"
+ring = 2
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thr_setprio"
+ring = 2
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thr_setspecific"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "thr_sigsetmask"
-ring = 3
-status = "SKIP"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "thr_suspend"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "thr_yield"
-ring = 3
-status = "SKIP"
+ring = 1
+crate = "personality-solaris"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "thrd_create"
@@ -10206,10 +9919,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "timegm"
-ring = 1
+ring = 0
 crate = "time"
-area = 6
+area = 5
 status = "EXISTS-donor"
+header = "time.h"
 
 [[assign]]
 name = "timelocal"
@@ -10217,41 +9931,6 @@ ring = 1
 crate = "time"
 area = 6
 status = "EXISTS-donor"
-
-[[assign]]
-name = "timer_create"
-ring = 0
-crate = "time"
-area = 6
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "timer_delete"
-ring = 0
-crate = "time"
-area = 6
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "timer_getoverrun"
-ring = 0
-crate = "time"
-area = 6
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "timer_gettime"
-ring = 0
-crate = "time"
-area = 6
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "timer_settime"
-ring = 0
-crate = "time"
-area = 6
-status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "timeradd"
@@ -10276,27 +9955,24 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "timerfd_create"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
+ring = 1
+crate = "personality-linux"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "timerfd_gettime"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
+ring = 1
+crate = "personality-linux"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "timerfd_settime"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
-status = "TO-BE-DESIGNED"
+ring = 1
+crate = "personality-linux"
+area = 15
+status = "EXISTS-donor"
 
 [[assign]]
 name = "timerisset"
@@ -10341,27 +10017,6 @@ area = 6
 status = "EXISTS-donor"
 
 [[assign]]
-name = "timespecclear"
-ring = 1
-crate = "time"
-area = 6
-status = "EXISTS-donor"
-
-[[assign]]
-name = "timespeccmp"
-ring = 1
-crate = "time"
-area = 6
-status = "EXISTS-donor"
-
-[[assign]]
-name = "timespecisset"
-ring = 1
-crate = "time"
-area = 6
-status = "EXISTS-donor"
-
-[[assign]]
 name = "timespecsub"
 ring = 1
 crate = "time"
@@ -10369,22 +10024,15 @@ area = 6
 status = "EXISTS-donor"
 
 [[assign]]
-name = "timezone"
-ring = 1
-crate = "time"
-area = 6
-status = "EXISTS-donor"
-
-[[assign]]
 name = "timingsafe_bcmp"
-ring = 1
+ring = 2
 crate = "str"
 area = 1
 status = "EXISTS-donor"
 
 [[assign]]
 name = "timingsafe_memcmp"
-ring = 1
+ring = 2
 crate = "str"
 area = 1
 status = "EXISTS-donor"
@@ -10404,6 +10052,14 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
+name = "toascii"
+ring = 1
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+header = "ctype.h"
+
+[[assign]]
 name = "tolower"
 ring = 0
 crate = "ctype"
@@ -10412,24 +10068,38 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "tolower_l"
-ring = 0
+ring = 1
 crate = "ctype"
 area = 2
 status = "EXISTS-donor"
 
 [[assign]]
 name = "totalorder"
-ring = 0
+ring = 3
 crate = "m"
 area = 5
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+
+[[assign]]
+name = "totalorderf"
+ring = 3
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 
 [[assign]]
 name = "totalordermag"
-ring = 0
+ring = 3
 crate = "m"
 area = 5
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
+
+[[assign]]
+name = "totalordermagf"
+ring = 3
+crate = "m"
+area = 5
+status = "EXISTS-donor"
 
 [[assign]]
 name = "toupper"
@@ -10440,7 +10110,7 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "toupper_l"
-ring = 0
+ring = 1
 crate = "ctype"
 area = 2
 status = "EXISTS-donor"
@@ -10468,9 +10138,9 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "trunc"
-ring = 0
-crate = "m"
-area = 5
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
@@ -10481,19 +10151,19 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "truncate64"
-ring = 2
-personality = "linux"
-crate = "p-linux"
-area = 11
+name = "truncf"
+ring = 1
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
 
 [[assign]]
 name = "tsearch"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "search.h"
 
 [[assign]]
 name = "tss_create"
@@ -10539,10 +10209,11 @@ status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "twalk"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "search.h"
 
 [[assign]]
 name = "tzalloc"
@@ -10559,90 +10230,18 @@ area = 6
 status = "EXISTS-donor"
 
 [[assign]]
-name = "tzname"
-ring = 1
-crate = "time"
-area = 6
-status = "EXISTS-donor"
-
-[[assign]]
-name = "tzset"
-ring = 1
-crate = "time"
-area = 6
-status = "EXISTS-donor"
-
-[[assign]]
-name = "u_char"
-ring = 1
-crate = "abi"
-area = 14
-status = "EXISTS-donor"
-
-[[assign]]
-name = "u_int"
-ring = 1
-crate = "abi"
-area = 14
-status = "EXISTS-donor"
-
-[[assign]]
-name = "u_long"
-ring = 1
-crate = "abi"
-area = 14
-status = "EXISTS-donor"
-
-[[assign]]
-name = "u_short"
-ring = 1
-crate = "abi"
-area = 14
-status = "EXISTS-donor"
-
-[[assign]]
-name = "ualarm"
-ring = 0
-crate = "time"
-area = 6
-status = "TO-BE-DESIGNED"
-ring_override = "mixed row X64"
-
-[[assign]]
-name = "ufromfp"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "ufromfpx"
-ring = 0
-crate = "m"
-area = 5
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "uid_from_user"
-ring = 1
+ring = 2
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
 
 [[assign]]
 name = "ulckpwdf"
-ring = 2
-personality = "linux"
+ring = 1
 crate = "pwd"
 area = 12
 status = "EXISTS-donor"
-
-[[assign]]
-name = "ulimit"
-ring = 0
-crate = "proc"
-area = 10
-status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "umask"
@@ -10701,18 +10300,12 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "unlockpt"
-ring = 0
-crate = "stdlib"
-area = 3
-status = "EXISTS-donor"
-
-[[assign]]
 name = "unsetenv"
-ring = 0
+ring = 1
 crate = "stdlib"
 area = 3
 status = "EXISTS-donor"
+header = "stdlib.h"
 
 [[assign]]
 name = "unveil"
@@ -10731,25 +10324,25 @@ area = 15
 status = "EXISTS-donor"
 
 [[assign]]
-name = "uselocale"
-ring = 0
-crate = "locale"
-area = 2
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "user_from_uid"
+name = "updwtmpx"
 ring = 1
-crate = "pwd"
-area = 12
+crate = "compat"
+area = 15
 status = "EXISTS-donor"
 
 [[assign]]
-name = "usleep"
-ring = 0
-crate = "proc"
-area = 10
-status = "TO-BE-DESIGNED"
+name = "uselocale"
+ring = 1
+crate = "locale"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "user_from_uid"
+ring = 2
+crate = "pwd"
+area = 12
+status = "EXISTS-donor"
 
 [[assign]]
 name = "utime"
@@ -10766,13 +10359,6 @@ area = 11
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "utimes"
-ring = 0
-crate = "time"
-area = 6
-status = "EXISTS-donor"
-
-[[assign]]
 name = "uuid_compare"
 ring = 1
 crate = "compat"
@@ -10781,49 +10367,77 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "uuid_create"
-ring = 1
+ring = 2
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "uuid_create_nil"
+ring = 2
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "uuid_dec_be"
+ring = 2
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
 
 [[assign]]
 name = "uuid_dec_le"
-ring = 1
+ring = 2
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "uuid_enc_be"
+ring = 2
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
 
 [[assign]]
 name = "uuid_enc_le"
-ring = 1
+ring = 2
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
 
 [[assign]]
 name = "uuid_equal"
-ring = 1
+ring = 2
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
 
 [[assign]]
 name = "uuid_from_string"
-ring = 1
+ring = 2
+crate = "compat"
+area = 15
+status = "EXISTS-donor"
+
+[[assign]]
+name = "uuid_hash"
+ring = 2
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
 
 [[assign]]
 name = "uuid_is_nil"
-ring = 1
+ring = 2
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
 
 [[assign]]
 name = "uuid_to_string"
-ring = 1
+ring = 2
 crate = "compat"
 area = 15
 status = "EXISTS-donor"
@@ -10872,10 +10486,19 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "versionsort"
-ring = 0
+ring = 1
 crate = "fts"
 area = 7
 status = "EXISTS-donor"
+header = "dirent.h"
+
+[[assign]]
+name = "vfork"
+ring = 1
+crate = "proc"
+area = 10
+status = "EXISTS-donor"
+header = "unistd.h"
 
 [[assign]]
 name = "vfprintf"
@@ -10937,10 +10560,11 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "vsnprintf"
-ring = 0
+ring = 1
 crate = "stdio"
 area = 4
 status = "EXISTS-donor"
+header = "stdio.h"
 
 [[assign]]
 name = "vsnprintf_ss"
@@ -10965,25 +10589,11 @@ area = 4
 status = "EXISTS-donor"
 
 [[assign]]
-name = "vswprintf"
-ring = 0
-crate = "stdio"
-area = 4
-status = "EXISTS-donor"
-
-[[assign]]
 name = "vswscanf"
 ring = 0
 crate = "stdio"
 area = 4
 status = "EXISTS-donor"
-
-[[assign]]
-name = "vsyslog"
-ring = 0
-crate = "compat"
-area = 15
-status = "TO-BE-DESIGNED"
 
 [[assign]]
 name = "vwarn"
@@ -11042,18 +10652,11 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "wait6"
+name = "waitid"
 ring = 1
 crate = "proc"
 area = 10
-status = "TO-BE-DESIGNED"
-
-[[assign]]
-name = "waitid"
-ring = 0
-crate = "proc"
-area = 10
-status = "TO-BE-DESIGNED"
+status = "EXISTS-donor"
 
 [[assign]]
 name = "waitpid"
@@ -11183,17 +10786,19 @@ status = "EXISTS-donor"
 
 [[assign]]
 name = "wcslcat"
-ring = 1
-crate = "ctype"
-area = 2
+ring = 0
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "wcslcpy"
-ring = 1
-crate = "ctype"
-area = 2
+ring = 0
+crate = "libc"
+area = 0
 status = "EXISTS-donor"
+header = "string.h"
 
 [[assign]]
 name = "wcslen"
@@ -11287,20 +10892,6 @@ area = 2
 status = "EXISTS-donor"
 
 [[assign]]
-name = "wcstod"
-ring = 0
-crate = "ctype"
-area = 2
-status = "EXISTS-donor"
-
-[[assign]]
-name = "wcstof"
-ring = 0
-crate = "ctype"
-area = 2
-status = "EXISTS-donor"
-
-[[assign]]
 name = "wcstoimax"
 ring = 0
 crate = "stdlib"
@@ -11315,21 +10906,7 @@ area = 2
 status = "EXISTS-donor"
 
 [[assign]]
-name = "wcstok_l"
-ring = 1
-crate = "ctype"
-area = 2
-status = "EXISTS-donor"
-
-[[assign]]
 name = "wcstol"
-ring = 0
-crate = "ctype"
-area = 2
-status = "EXISTS-donor"
-
-[[assign]]
-name = "wcstold"
 ring = 0
 crate = "ctype"
 area = 2
@@ -11378,6 +10955,13 @@ area = 2
 status = "EXISTS-donor"
 
 [[assign]]
+name = "wcswidth"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
 name = "wcsxfrm"
 ring = 0
 crate = "ctype"
@@ -11415,6 +10999,13 @@ status = "EXISTS-donor"
 [[assign]]
 name = "wctype"
 ring = 0
+crate = "ctype"
+area = 2
+status = "EXISTS-donor"
+
+[[assign]]
+name = "wcwidth"
+ring = 1
 crate = "ctype"
 area = 2
 status = "EXISTS-donor"
@@ -11483,15 +11074,50 @@ area = 10
 status = "TO-BE-DESIGNED"
 
 [[assign]]
-name = "writev"
-ring = 0
-crate = "platform"
-area = 11
-status = "TO-BE-DESIGNED"
-
-[[assign]]
 name = "wscanf"
 ring = 0
 crate = "stdio"
 area = 4
+status = "EXISTS-donor"
+
+[[assign]]
+name = "y0"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "y0f"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "y1"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "y1f"
+ring = 1
+crate = "libc"
+area = 0
+status = "EXISTS-donor"
+
+[[assign]]
+name = "yn"
+ring = 1
+crate = "m"
+area = 5
+status = "EXISTS-donor"
+
+[[assign]]
+name = "ynf"
+ring = 1
+crate = "m"
+area = 5
 status = "EXISTS-donor"

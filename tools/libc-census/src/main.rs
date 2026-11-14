@@ -152,7 +152,10 @@ fn command_run(args: &[String]) -> Result<u8> {
                 index += 1;
             }
             "--no-prefilter" => options.prefilter = false,
-            "--rev" => options.rev = value(args, index + 1, "--rev")?.to_string(),
+            "--rev" => {
+                options.rev = value(args, index + 1, "--rev")?.to_string();
+                index += 1;
+            }
             other => bail!("unexpected argument `{other}`\n{USAGE}"),
         }
         index += 1;
