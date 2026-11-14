@@ -35,6 +35,7 @@ pub mod loadobj;
 pub mod lock;
 pub mod main_flow;
 pub mod mapper;
+pub mod phdr;
 pub mod rdebug;
 pub mod relocate;
 pub mod search;

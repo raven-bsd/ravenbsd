@@ -6,13 +6,17 @@
 #![allow(clippy::needless_range_loop)] // the fixed module array is index-addressed
 
 use raven_libc_elf::ObjId;
-use raven_libc_tls::layout::{LayoutError, StaticLayout, TlsModuleIn, compute_static_layout};
+use raven_libc_tls::layout::{
+    LayoutError, StaticLayout, TlsModuleIn, compute_static_layout, module_offsets,
+};
 
 /// The loader's TLS bookkeeping.
 #[derive(Clone, Copy, Debug)]
 pub struct TlsState {
     /// The current static layout.
     pub layout: StaticLayout,
+    /// The module descriptions in assignment order.
+    pub modules: [TlsModuleIn; raven_libc_tls::consts::MAX_TLS_MODULES],
     /// The module offsets.
     pub offsets: [usize; raven_libc_tls::consts::MAX_TLS_MODULES],
     /// Number of assigned modules.
@@ -33,6 +37,7 @@ impl TlsState {
                 total: 0,
                 tls_cnt: 0,
             },
+            modules: [TlsModuleIn::new(0, 0, 0, 1); raven_libc_tls::consts::MAX_TLS_MODULES],
             offsets: [0; raven_libc_tls::consts::MAX_TLS_MODULES],
             count: 0,
             static_tls_extra: 1664,
@@ -44,21 +49,20 @@ impl TlsState {
         if self.count >= raven_libc_tls::consts::MAX_TLS_MODULES {
             return Err(LayoutError::TooLarge);
         }
-        let mut modules = [TlsModuleIn::new(0, 0, 0, 1); raven_libc_tls::consts::MAX_TLS_MODULES];
-        for index in 0..self.count {
-            let offset = self.offsets.get(index).copied().unwrap_or(0);
-            let size = self.layout.size;
-            modules[index] = TlsModuleIn::new(offset, 0, size, 1);
-        }
+        let mut modules = self.modules;
         modules[self.count] = module;
-        let layout = compute_static_layout(&modules[..self.count.saturating_add(1)], 64)?;
-        let offset = layout.size;
-        if let Some(slot) = self.offsets.get_mut(self.count) {
-            *slot = offset;
-        }
-        self.count = self.count.saturating_add(1);
+        let next = self.count.saturating_add(1);
+        let layout = compute_static_layout(&modules[..next], 64)?;
+        let offsets = module_offsets(&modules[..next])?;
+        self.modules = modules;
+        self.offsets = offsets.offsets;
+        self.count = next;
         self.layout = layout;
-        Ok(offset)
+        Ok(offsets
+            .offsets
+            .get(self.count.saturating_sub(1))
+            .copied()
+            .unwrap_or(0))
     }
 
     /// The offset of `id`.

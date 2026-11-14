@@ -70,8 +70,16 @@ pub enum MapErrKind {
     NoMem,
     /// `EINVAL`.
     Inval,
+    /// `ENOSYS`: the target file layer is not implemented yet.
+    NoSys,
     /// Any other I/O error.
     Io,
+}
+
+/// The target file layer's clear `ENOSYS` failure until PG-36.
+#[must_use]
+pub const fn file_layer_unavailable() -> MapErrKind {
+    MapErrKind::NoSys
 }
 
 impl MapErrKind {
@@ -84,6 +92,7 @@ impl MapErrKind {
             Self::Exists => 17,
             Self::NoMem => 12,
             Self::Inval => 22,
+            Self::NoSys => 38,
             Self::Io => 5,
         }
     }
@@ -174,6 +183,18 @@ pub trait Platform: Mapper {
     fn debug_write(&mut self, bytes: &[u8]);
     /// Terminate the process.
     fn exit(&mut self, code: i32) -> !;
+    /// Call `__rl_dl_install(table)` at `address`; the target/host supplies the unsafe call.
+    fn install_rtld_table(
+        &mut self,
+        _address: usize,
+        _table: *const crate::table::RtldTable,
+    ) -> bool {
+        false
+    }
+    /// Call a no-argument destructor at `address`; the target/host supplies the unsafe call.
+    fn call_function(&mut self, _address: usize) -> bool {
+        false
+    }
     /// A monotonic hint; the loader does not use the clock.
     fn now_hint(&self) -> u64 {
         0

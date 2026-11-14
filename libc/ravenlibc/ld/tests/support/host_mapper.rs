@@ -18,6 +18,7 @@ use std::rc::Rc;
 
 use raven_libc_elf::{ApplyError, MemView, RelocApplier};
 use raven_libc_rtld::mapper::{FileId, LoaderFile, MapErrKind, MapSource, Mapper, Platform, Prot};
+use raven_libc_rtld::table::RtldTable;
 
 const PROT_NONE: i32 = 0;
 const PROT_READ: i32 = 1;
@@ -63,6 +64,7 @@ struct FileData {
 pub enum Event {
     Ifunc(u64),
     Protect(u64),
+    Call(u64),
 }
 
 #[derive(Default)]
@@ -71,6 +73,7 @@ struct State {
     ranges: Vec<(u64, u64, bool)>,
     writes_outside: usize,
     events: Vec<Event>,
+    debug: Vec<u8>,
 }
 
 type Shared = Rc<RefCell<State>>;
@@ -113,6 +116,16 @@ impl HostMapper {
     /// The ordered IFUNC/RELRO events.
     pub fn events(&self) -> Vec<Event> {
         self.state.borrow().events.clone()
+    }
+
+    /// Everything written through the debug console.
+    pub fn debug_bytes(&self) -> Vec<u8> {
+        self.state.borrow().debug.clone()
+    }
+
+    /// Every mapped range and its writability.
+    pub fn ranges(&self) -> Vec<(u64, u64, bool)> {
+        self.state.borrow().ranges.clone()
     }
 
     /// The range containing `address`, if any.
@@ -192,8 +205,9 @@ impl Mapper for HostMapper {
         let result = unsafe { munmap(base as *mut c_void, len) };
         if result == 0 {
             let base64 = u64::try_from(base).unwrap_or(u64::MAX);
+            let end64 = base64.saturating_add(u64::try_from(len).unwrap_or(0));
             self.state.borrow_mut().ranges.retain(|(start, length, _)| {
-                base64 >= start.saturating_add(*length) || base64 < *start
+                end64 <= *start || base64 >= start.saturating_add(*length)
             });
             Ok(())
         } else {
@@ -326,11 +340,31 @@ impl Mapper for HostMapper {
 
 impl Platform for HostMapper {
     fn debug_write(&mut self, bytes: &[u8]) {
+        self.state.borrow_mut().debug.extend_from_slice(bytes);
         let _ = std::io::Write::write_all(&mut std::io::stderr(), bytes);
     }
 
     fn exit(&mut self, code: i32) -> ! {
         panic!("host loader exit {code}")
+    }
+
+    fn install_rtld_table(&mut self, address: usize, table: *const RtldTable) -> bool {
+        // SAFETY: the fixture exports `__rl_dl_install` with this exact C signature.
+        let install: extern "C" fn(*const RtldTable) = unsafe { std::mem::transmute(address) };
+        // The pointer points at the caller-owned table for the duration of the call.
+        install(table);
+        true
+    }
+
+    fn call_function(&mut self, address: usize) -> bool {
+        self.state
+            .borrow_mut()
+            .events
+            .push(Event::Call(address as u64));
+        // SAFETY: fixture destructors have the `extern "C" fn()` shape.
+        let function: extern "C" fn() = unsafe { std::mem::transmute(address) };
+        function();
+        true
     }
 }
 

@@ -149,6 +149,12 @@ fn a_write_execute_protection_is_refused() {
 }
 
 #[test]
+fn the_target_file_layer_is_a_clear_enosys() {
+    assert_eq!(file_layer_unavailable(), MapErrKind::NoSys);
+    assert_eq!(file_layer_unavailable().errno(), 38);
+}
+
+#[test]
 fn the_protection_union_is_exact() {
     assert_eq!(Prot::READ.union(Prot::WRITE), Prot::RW);
     assert!(!Prot::RW.is_wx());

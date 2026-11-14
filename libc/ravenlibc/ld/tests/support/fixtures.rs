@@ -86,6 +86,10 @@ fn build_fixtures() -> Result<PathBuf, String> {
     let out = env::temp_dir().join(format!("c62-fixtures-{}", std::process::id()));
     let _ = fs::remove_dir_all(&out);
     fs::create_dir_all(&out).map_err(|error| error.to_string())?;
+    for directory in ["rpath", "runpath", "ldpath"] {
+        fs::create_dir_all(out.join(directory)).map_err(|error| error.to_string())?;
+    }
+    build_static(&clang, &lld, &source, &out)?;
     for name in [
         "libdeep",
         "libval",
@@ -95,8 +99,24 @@ fn build_fixtures() -> Result<PathBuf, String> {
         "libhidden",
         "libcycle_b",
         "libcycle_a",
+        "libbadwx",
+        "libtextrel",
+        "libinstall",
+        "libtls",
+        "libfini",
+        "libsearch_rpath",
+        "libsearch_runpath",
     ] {
         compile(&clang, &lld, &source, &out, name)?;
+        if name == "libdeep" {
+            for directory in ["rpath", "runpath", "ldpath"] {
+                fs::copy(
+                    out.join("libdeep.so"),
+                    out.join(directory).join("libdeep.so"),
+                )
+                .map_err(|error| error.to_string())?;
+            }
+        }
     }
     Ok(out)
 }
@@ -142,6 +162,19 @@ fn compile(clang: &Path, lld: &Path, source: &Path, out: &Path, name: &str) -> R
     if name == "libcycle_a" {
         command.arg(out.join("libcycle_b.so"));
     }
+    if name == "libtextrel" {
+        command.args(["-z", "notext"]);
+    }
+    if name == "libsearch_rpath" {
+        command.args(["--disable-new-dtags", "-rpath"]);
+        command.arg(out.join("rpath"));
+        command.arg(out.join("rpath/libdeep.so"));
+    }
+    if name == "libsearch_runpath" {
+        command.args(["-rpath"]);
+        command.arg(out.join("runpath"));
+        command.arg(out.join("runpath/libdeep.so"));
+    }
     if name == "libver" {
         let script = out.join("libver.map");
         fs::write(
@@ -154,6 +187,44 @@ fn compile(clang: &Path, lld: &Path, source: &Path, out: &Path, name: &str) -> R
     let status = command.status().map_err(|error| error.to_string())?;
     if !status.success() {
         return Err(format!("rust-lld failed for {name}"));
+    }
+    Ok(())
+}
+
+/// Build the non-dynamic executable used by the `ldd` static case.
+fn build_static(clang: &Path, lld: &Path, source: &Path, out: &Path) -> Result<(), String> {
+    let asm = source.join("staticprog.s.txt");
+    if !asm.is_file() {
+        return Ok(());
+    }
+    let object = out.join("staticprog.o");
+    let status = Command::new(clang)
+        .args(["-target", X86_64_TARGET, "-c", "-x", "assembler"])
+        .arg(&asm)
+        .arg("-o")
+        .arg(&object)
+        .status()
+        .map_err(|error| error.to_string())?;
+    if !status.success() {
+        return Err("clang failed for staticprog".to_string());
+    }
+    let program = out.join("staticprog");
+    let status = Command::new(lld)
+        .args([
+            "-flavor",
+            "gnu",
+            "-static",
+            "-nostdlib",
+            "-e",
+            "_start",
+            "-o",
+        ])
+        .arg(&program)
+        .arg(&object)
+        .status()
+        .map_err(|error| error.to_string())?;
+    if !status.success() {
+        return Err("rust-lld failed for staticprog".to_string());
     }
     Ok(())
 }
