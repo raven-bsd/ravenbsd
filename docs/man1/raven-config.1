@@ -1,0 +1,66 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 14, 2026
+.Dt RAVEN-CONFIG 1
+.Os RavenBSD
+.Sh NAME
+.Nm raven-config
+.Nd validate and show the RavenBSD TOML configuration
+.Sh SYNOPSIS
+.Nm
+.Cm check
+.Nm
+.Cm show
+.Nm
+.Cm get Ar dotted.key
+.Sh DESCRIPTION
+.Nm
+reads the fixed configuration directories of
+.Pa architecture/17-modern-userland.md
+section 4.1:
+compiled defaults, the selected profile, the main
+.Pa /etc/raven/raven.toml
+and the sorted
+.Pa /etc/raven/conf.d/*.toml
+drop-ins.
+Tables merge recursively; scalars and arrays replace and a
+.Dv null
+overlay removes a key.
+Unknown keys, wrong types and paths that are not absolute or contain
+.Pa ..
+are errors with the file and key; the loader never expands the environment or evals shell text.
+.Pp
+The commands are:
+.Bl -tag -width "get dotted.key"
+.It Cm check
+Parse every file and report the result; a parse or schema failure exits 1.
+This check is also part of
+.Nm raven doctor
+and the image-build gate.
+.It Cm show
+Print the effective configuration as TOML, or as the
+.Va kind :
+.Dq config
+JSON object with
+.Fl -json .
+.It Cm get Ar dotted.key
+Print one effective value.
+.El
+.Pp
+Size values are integer bytes or strings such as
+.Dq "8 MiB" ;
+durations are integer milliseconds or strings such as
+.Dq "250ms" .
+A configured secret file must not be world-readable.
+The
+.Xr 5
+configuration format is documented once in
+.Pa architecture/17-modern-userland.md ;
+this page is the command summary.
+.Sh EXIT STATUS
+.Ex -std
+A configuration or missing-key error exits 1; a usage error exits 2.
+.Sh SEE ALSO
+.Xr raven 1
+.Sh STANDARDS
+RavenBSD modern userland contract, revision 1.

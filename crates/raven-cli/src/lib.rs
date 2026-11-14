@@ -10,6 +10,7 @@
 #![forbid(unsafe_code)]
 
 mod cli;
+mod cmd;
 mod commands;
 
 pub use cli::{Context, Io, run};

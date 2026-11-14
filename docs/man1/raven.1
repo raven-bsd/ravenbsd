@@ -45,17 +45,21 @@ Print a completion script for
 or
 .Ar fish .
 .It Cm status
-Reserved: host health.
+Show host health;
+.Xr raven-status 1 .
 .It Cm doctor
-Reserved: ordered diagnostics.
+Run ordered diagnostics;
+.Xr raven-doctor 1 .
 .It Cm svc
-Reserved: service control.
+List, inspect and control services;
+.Xr raven-svc 1 .
+.It Cm config
+Validate and show the TOML configuration;
+.Xr raven-config 1 .
 .It Cm net
 Reserved: network control.
 .It Cm log
 Reserved: log access.
-.It Cm config
-Reserved: configuration access.
 .It Cm pkg
 Reserved: package access.
 .It Cm user
@@ -137,6 +141,10 @@ with
 .Fl -quiet .
 .El
 .Sh SEE ALSO
+.Xr raven-status 1 ,
+.Xr raven-doctor 1 ,
+.Xr raven-svc 1 ,
+.Xr raven-config 1 ,
 .Xr raven-version 1 ,
 .Xr raven-completion 1 ,
 .Xr svcctl 1

@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+profile = "base"
+color = "auto"
+
+[log]
+level = "info"
+
+[services]
+enable_file = "/etc/raven/services.enable"
+
+[status]
+core_services = ["logd", "consd", "vfsd"]

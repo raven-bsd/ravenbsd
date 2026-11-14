@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[log]
+level = "info"
+ring_bytes = "64 MiB"
+retention = "168h"
+
+[status]
+core_services = ["logd", "consd", "vfsd", "netd", "resolvd"]

@@ -37,12 +37,12 @@ const GENERAL_HELP: &str = concat!(
     "  version       print version, schema and target information\n",
     "  help          show this help or help for a command\n",
     "  completion    print a shell completion script\n",
-    "  status        reserved: host health\n",
-    "  doctor        reserved: ordered diagnostics\n",
-    "  svc           reserved: service control\n",
+    "  status        show host health, services, load and memory\n",
+    "  doctor        run ordered diagnostics\n",
+    "  svc           list, inspect and control services\n",
+    "  config        validate and show the effective TOML configuration\n",
     "  net           reserved: network control\n",
     "  log           reserved: log access\n",
-    "  config        reserved: configuration access\n",
     "  pkg           reserved: package access\n",
     "  user          reserved: user identities\n",
     "  image         reserved: image management\n",
@@ -58,8 +58,21 @@ const GENERAL_HELP: &str = concat!(
     "  -V, --version      print the version\n",
 );
 
-const RESERVED: &[&str] = &[
-    "status", "doctor", "svc", "net", "log", "config", "pkg", "user", "image",
+const RESERVED: &[&str] = &["net", "log", "pkg", "user", "image"];
+
+const ALL_COMMANDS: &[&str] = &[
+    "version",
+    "help",
+    "completion",
+    "status",
+    "doctor",
+    "svc",
+    "config",
+    "net",
+    "log",
+    "pkg",
+    "user",
+    "image",
 ];
 
 #[test]
@@ -122,6 +135,22 @@ fn an_unknown_flag_is_usage() {
 }
 
 #[test]
+fn host_status_doctor_and_svc_report_the_missing_backend() {
+    for (args, command) in [
+        (vec!["--json", "status"], "status"),
+        (vec!["--json", "doctor"], "doctor"),
+        (vec!["--json", "svc", "list"], "svc"),
+    ] {
+        let (exit, stdout, stderr) = run(&args);
+        assert_eq!(exit, Exit::Failure, "{command}");
+        assert!(stdout.is_empty(), "{command}");
+        let value = json(&stderr);
+        assert_eq!(value["code"], "EUNAVAILABLE", "{command}");
+        assert_eq!(value["context"]["command"], command, "{command}");
+    }
+}
+
+#[test]
 fn reserved_commands_are_recognized_and_not_faked() {
     for name in RESERVED {
         let (exit, stdout, stderr) = run(&["--json", name]);
@@ -136,7 +165,7 @@ fn reserved_commands_are_recognized_and_not_faked() {
 
 #[test]
 fn reserved_commands_have_a_human_error() {
-    let (exit, stdout, stderr) = run(&["status"]);
+    let (exit, stdout, stderr) = run(&["net"]);
     assert_eq!(exit, Exit::Failure);
     assert!(stdout.is_empty());
     assert!(stderr.contains("not available"));
@@ -144,7 +173,7 @@ fn reserved_commands_have_a_human_error() {
 
 #[test]
 fn reserved_commands_reject_unknown_flags() {
-    let (exit, stdout, stderr) = run(&["--json", "status", "--wat"]);
+    let (exit, stdout, stderr) = run(&["--json", "net", "--wat"]);
     assert_eq!(exit, Exit::Usage);
     assert!(stdout.is_empty());
     assert_eq!(json(&stderr)["code"], "EUSAGE");
@@ -182,7 +211,7 @@ fn help_flag_after_a_command_works() {
 
 #[test]
 fn help_marks_reserved_commands() {
-    let (exit, stdout, _) = run(&["help", "status"]);
+    let (exit, stdout, _) = run(&["help", "net"]);
     assert_eq!(exit, Exit::Success);
     assert!(stdout.contains("reserved"));
     assert!(stdout.contains("EUNAVAILABLE"));
@@ -207,10 +236,7 @@ fn completion_covers_all_three_shells_and_all_commands() {
         assert_eq!(exit, Exit::Success, "{shell}");
         assert!(stderr.is_empty(), "{shell}");
         assert!(stdout.contains(marker), "{shell}");
-        for name in RESERVED
-            .iter()
-            .chain(["version", "help", "completion"].iter())
-        {
+        for name in ALL_COMMANDS {
             assert!(stdout.contains(name), "{shell} misses {name}");
         }
         assert!(!stdout.contains("eval "), "{shell} evaluates shell text");
