@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# name<TAB>expected-string for 2024-02-29 12:34:56 UTC (epoch 1709210096).
+Y	2024
+m	02
+d	29
+H	12
+M	34
+S	56
+Z	GMT
+z	+0000
+a	Thu
+A	Thursday
+b	Feb
+B	February
+j	060
+U	08
+W	09
+w	4
+y	24
+C	20
+e	29
+p	PM
+I	12
+s	1709210096
+pct	%
+F	2024-02-29
+T	12:34:56
+D	02/29/24
+R	12:34
