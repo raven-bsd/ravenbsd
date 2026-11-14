@@ -1,0 +1,13 @@
+kill
+raise
+sig2str
+sigaddset
+sigandset
+sigdelset
+sigemptyset
+sigfillset
+sigisemptyset
+sigismember
+signal
+sigorset
+str2sig

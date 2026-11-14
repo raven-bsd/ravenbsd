@@ -1,0 +1,4 @@
+pthread_equal
+pthread_exit
+pthread_self
+pthread_yield

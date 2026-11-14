@@ -104,6 +104,14 @@ dgettext
 difftime
 dirfd
 div
+dl_iterate_phdr
+dladdr
+dlclose
+dlerror
+dlinfo
+dlopen
+dlsym
+dlvsym
 dn_expand
 dn_skipname
 dngettext
@@ -384,6 +392,7 @@ jn
 jnf
 jrand48
 kevent
+kill
 kqueue
 kqueue1
 l64a
@@ -529,6 +538,10 @@ printf
 prlimit
 program_invocation_name
 program_invocation_short_name
+pthread_equal
+pthread_exit
+pthread_self
+pthread_yield
 putchar
 putenv
 puts
@@ -537,6 +550,7 @@ pwrite
 pwrite64
 qsort
 qsort_r
+raise
 rand
 rand_r
 random
@@ -627,9 +641,19 @@ setuid
 setusershell
 setutxent
 setvbuf
+sig2str
+sigaddset
+sigandset
+sigdelset
+sigemptyset
+sigfillset
+sigisemptyset
+sigismember
+signal
 signalfd
 significand
 significandf
+sigorset
 sin
 sincos
 sincosf
@@ -655,6 +679,7 @@ stat
 stat64
 stpcpy
 stpncpy
+str2sig
 strcasecmp
 strcasecmp_l
 strcasestr
@@ -861,6 +886,7 @@ __raven_va_openat
 __raven_va_prctl
 __raven_va_setproctitle
 __raven_va_setproctitle_fast
+__rl_dl_install
 __rl_fini_array
 __rl_fmt_float_impl
 __rl_fmt_wide_impl

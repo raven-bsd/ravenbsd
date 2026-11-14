@@ -830,7 +830,6 @@ RAVEN_1.0 {
 		sched_setaffinity;
 		sched_setparam;
 		sched_setscheduler;
-		sched_yield;
 		# --- netdb inet ---
 		htonl;
 		htons;
@@ -893,6 +892,35 @@ RAVEN_1.0 {
 		__cxa_finalize;
 		__stack_chk_guard;
 		atexit;
+		# --- dl ---
+		dladdr;
+		dlclose;
+		dlerror;
+		dlinfo;
+		dlopen;
+		dlsym;
+		dlvsym;
+		dl_iterate_phdr;
+		# --- signal (C58, first set) ---
+		kill;
+		raise;
+		sig2str;
+		sigaddset;
+		sigandset;
+		sigdelset;
+		sigemptyset;
+		sigfillset;
+		sigisemptyset;
+		sigismember;
+		sigorset;
+		signal;
+		str2sig;
+		# --- pthread (C57, first set) ---
+		pthread_equal;
+		pthread_exit;
+		pthread_self;
+		pthread_yield;
+		sched_yield;
 };
 
 RAVENprivate_1.0 {
@@ -910,6 +938,7 @@ RAVENprivate_1.0 {
 		__raven_va_setproctitle_fast;
 		__raven_va_open;
 		__raven_va_openat;
+		__rl_dl_install;
 		__rl_fini_array;
 		__rl_fmt_float_impl;
 		__rl_fmt_wide_impl;

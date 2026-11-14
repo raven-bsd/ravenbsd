@@ -41,7 +41,11 @@ pub mod compat;
 #[cfg(target_os = "none")]
 pub(crate) mod ctype;
 #[cfg(target_os = "none")]
+pub(crate) mod dl;
+#[cfg(target_os = "none")]
 pub(crate) mod errno;
+#[cfg(target_os = "none")]
+pub(crate) mod signal;
 // The exit registry lives in `stdlib/` but is declared here so its host unit tests build even
 // though `stdlib` is target-only (C61 integration).
 #[cfg(any(target_os = "none", test))]
