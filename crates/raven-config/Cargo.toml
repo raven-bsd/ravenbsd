@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-config"
+version = "0.1.0"
+description = "Strict TOML configuration and service-enable state for the raven admin surface."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raven-svc-manifest = { path = "../raven-svc-manifest" }
+serde_json = "1"
+toml = "1.2"
+
+[lints]
+workspace = true

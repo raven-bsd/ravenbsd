@@ -39,6 +39,26 @@ pub struct Context<'a> {
     stderr: &'a mut dyn Write,
 }
 
+impl<'a> Context<'a> {
+    /// Build a context for a command module or a host test.
+    pub fn new(
+        format: Format,
+        color: bool,
+        stdout: &'a mut dyn Write,
+        stderr: &'a mut dyn Write,
+    ) -> Self {
+        Self {
+            format,
+            color,
+            verbose: false,
+            dry_run: false,
+            yes: false,
+            stdout,
+            stderr,
+        }
+    }
+}
+
 impl Context<'_> {
     /// Write normal human output; quiet mode suppresses it.
     pub fn write_stdout(&mut self, text: &str) -> Exit {

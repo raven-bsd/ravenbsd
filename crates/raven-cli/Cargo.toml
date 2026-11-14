@@ -12,6 +12,7 @@ rust-version.workspace = true
 
 [dependencies]
 lexopt = "0.3"
+raven-config = { path = "../raven-config" }
 raven-output = { path = "../raven-output" }
 
 [dev-dependencies]

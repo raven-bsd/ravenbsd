@@ -11,7 +11,7 @@ use crate::SCHEMA;
 use crate::json::escape_json;
 
 /// One field value.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     /// A known-but-absent value.
     Null,
@@ -21,6 +21,8 @@ pub enum Value {
     Signed(i64),
     /// An unsigned integer.
     Unsigned(u64),
+    /// A finite float; a non-finite value is written as null.
+    Float(f64),
     /// A UTF-8 string, escaped by the writer.
     String(String),
     /// An ordered array.
@@ -37,6 +39,13 @@ impl Value {
             Self::Bool(value) => output.push_str(if *value { "true" } else { "false" }),
             Self::Signed(value) => write!(output, "{value}")?,
             Self::Unsigned(value) => write!(output, "{value}")?,
+            Self::Float(value) => {
+                if value.is_finite() {
+                    write!(output, "{value}")?;
+                } else {
+                    output.push_str("null");
+                }
+            }
             Self::String(value) => {
                 output.push('"');
                 escape_json(value, output);
@@ -71,7 +80,7 @@ impl Value {
 }
 
 /// One NDJSON object with the mandatory `schema` and `kind` envelope.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Record {
     kind: String,
     fields: Vec<(String, Value)>,
@@ -110,6 +119,12 @@ impl Record {
     #[must_use]
     pub fn i64(self, name: &str, value: i64) -> Self {
         self.field(name, Value::Signed(value))
+    }
+
+    /// Append a float field; non-finite values are written as null.
+    #[must_use]
+    pub fn f64(self, name: &str, value: f64) -> Self {
+        self.field(name, Value::Float(value))
     }
 
     /// Append a boolean field.

@@ -1,0 +1,36 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 14, 2026
+.Dt RAVEN-STATUS 1
+.Os RavenBSD
+.Sh NAME
+.Nm raven-status
+.Nd show RavenBSD host health
+.Sh SYNOPSIS
+.Nm
+.Op Fl -json
+.Sh DESCRIPTION
+.Nm
+collects one status snapshot from the running services and prints it as human text or, with
+.Fl -json ,
+as one object of
+.Va kind :
+.Dq status .
+The fields are the contract in
+.Pa architecture/17-modern-userland.md
+section 3.4: version, target, uptime, boot id, service counts, load, memory, root mount, links
+and log counters.
+A value the backend cannot supply is
+.Dv null ,
+never a fabricated zero.
+.Pp
+The command exits 0 when every core service is running and ready and 1 otherwise.
+If the status backend is unreachable it reports the error and prints no status object.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits 2.
+.Sh SEE ALSO
+.Xr raven 1 ,
+.Xr raven-doctor 1
+.Sh STANDARDS
+RavenBSD modern userland contract, revision 1.

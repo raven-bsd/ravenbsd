@@ -13,3 +13,19 @@ programs = [
 [boot]
 cmdline = "console=ttyS0 test-exit=1"
 log_level = "info"
+
+[[initfs.files]]
+src = "etc/raven/raven.toml"
+path = "/etc/raven/raven.toml"
+
+[[initfs.files]]
+src = "etc/raven/profiles/base.toml"
+path = "/etc/raven/profiles/base.toml"
+
+[[initfs.files]]
+src = "etc/raven/profiles/tiny.toml"
+path = "/etc/raven/profiles/tiny.toml"
+
+[[initfs.files]]
+src = "etc/raven/profiles/server.toml"
+path = "/etc/raven/profiles/server.toml"

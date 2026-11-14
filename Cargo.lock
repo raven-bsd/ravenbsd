@@ -564,6 +564,7 @@ name = "raven-cli"
 version = "0.1.0"
 dependencies = [
  "lexopt",
+ "raven-config",
  "raven-output",
  "serde_json",
 ]
@@ -571,6 +572,15 @@ dependencies = [
 [[package]]
 name = "raven-cmdline"
 version = "0.1.0"
+
+[[package]]
+name = "raven-config"
+version = "0.1.0"
+dependencies = [
+ "raven-svc-manifest",
+ "serde_json",
+ "toml",
+]
 
 [[package]]
 name = "raven-conform"

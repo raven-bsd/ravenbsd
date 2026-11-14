@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+color = "auto"
+
+[log]
+level = "info"
+
+[status]
+core_services = ["logd", "consd", "vfsd"]

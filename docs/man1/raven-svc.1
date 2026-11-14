@@ -1,0 +1,70 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 14, 2026
+.Dt RAVEN-SVC 1
+.Os RavenBSD
+.Sh NAME
+.Nm raven-svc
+.Nd list, inspect and control RavenBSD services
+.Sh SYNOPSIS
+.Nm
+.Cm list
+.Nm
+.Cm status Ar name
+.Nm
+.Cm start Ar name
+.Nm
+.Cm stop Ar name
+.Nm
+.Cm restart Ar name
+.Nm
+.Cm enable Ar name
+.Nm
+.Cm disable Ar name
+.Nm
+.Cm logs Ar name
+.Sh DESCRIPTION
+.Nm
+is the modern front end to the
+.Xr init 8
+service control protocol.
+It never kills a process directly, never reads a PID file and never scrapes
+.Pa /proc .
+.Pp
+The commands are:
+.Bl -tag -width "restart"
+.It Cm list
+List every service.
+.It Cm status Ar name
+Print one service.
+.It Cm start Ar name
+Start a stopped service.
+.It Cm stop Ar name
+Stop the service through the control protocol and wait for terminal state.
+.It Cm restart Ar name
+Stop the service and start a fresh instance.
+.It Cm enable Ar name
+Add the service to the sorted
+.Pa /etc/raven/services.enable
+file; the shipped manifest is not edited.
+.It Cm disable Ar name
+Remove the service from the enable file.
+.It Cm logs Ar name
+Alias for the log command; it is unavailable until the log crate is wired.
+.El
+.Pp
+Every mutating command reports
+.Va changed :
+true or false in JSON and is idempotent.
+The legacy
+.Xr svcctl 1
+front end keeps its existing text output and uses the same control protocol.
+.Sh EXIT STATUS
+.Ex -std
+An unavailable backend or a control failure exits 1; a usage error exits 2.
+.Sh SEE ALSO
+.Xr raven 1 ,
+.Xr svcctl 1 ,
+.Xr init 8
+.Sh STANDARDS
+RavenBSD modern userland contract, revision 1.
