@@ -27,8 +27,9 @@ cargo xtask libc-link --arch x86_64 --check
 ```
 
 Host tests load real x86_64 shared objects through `HostMapper`; the real `libc.so.1` test is
-`cargo test -p raven-libc-rtld --test host_libc` and is skipped when the file is absent. Set
-`RL_RTLD_REQUIRED=1` to turn a missing tool or file into a failure.
+`cargo test -p raven-libc-rtld --test host_libc` and is skipped when the file is absent. The
+`host_load` fixture helper honours `RL_RTLD_REQUIRED=1` and turns a missing clang/rust-lld into
+a failure.
 
 On-target work waits for PG-1 (thread pointer), PG-13 (`MAP`/`PROTECT`), PG-36 (file memory
 objects), PG-49 (spawn with `PT_INTERP`), PG-50 (auxv/`rsp`), PG-51 (`AT_SECURE`/`AT_HWCAP`) and
