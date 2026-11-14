@@ -402,3 +402,23 @@ fn missing_without_fail_p0_exits_zero() {
     );
     assert_eq!(result.status.code(), Some(0));
 }
+
+#[test]
+fn run_stamps_rev_without_treating_it_as_an_argument() {
+    let temp = TempDir::new("rev");
+    let result = command(
+        &temp,
+        &[
+            "run",
+            "--resources",
+            fixture("resources").to_str().unwrap(),
+            "--out",
+            "out",
+            "--rev",
+            "rev-42",
+        ],
+    );
+    assert!(result.status.success(), "{result:?}");
+    let summary = temp.read("out/run-summary.json");
+    assert!(summary.contains("\"census_rev\": \"rev-42\""), "{summary}");
+}

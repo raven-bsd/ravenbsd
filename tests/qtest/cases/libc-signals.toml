@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+name = "libc-signals"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/libc/target/build.sh signals x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+skip = "needs PG-1 PG-2 PG-13 PG-22 PG-23 PG-24 PG-29 PG-50 PG-53"
+
+[[expect]]
+regex = '^libc-signals: start$'
+
+[[expect]]
+regex = '^libc-signals: sigset ok$'
+
+[[expect]]
+regex = '^libc-signals: sigaction ok$'
+
+[[expect]]
+regex = '^libc-signals: raise ok$'
+
+[[expect]]
+regex = '^libc-signals: mask ok$'
+
+[[expect]]
+regex = '^libc-signals: setjmp ok$'
+
+[[expect]]
+regex = '^libc-signals: ucontext ok$'
+
+[[expect]]
+regex = '^libc-signals: sigaltstack ok$'
+
+# layer B needs PG-7 PG-8 PG-12
+# [[expect]]
+# regex = '^libc-signals: fault ok$'
+# [[expect]]
+# regex = '^libc-signals: pthread_kill ok$'
+# [[expect]]
+# regex = '^libc-signals: eintr ok$'
+# [[expect]]
+# regex = '^libc-signals: sa_restart ok$'
+# [[expect]]
+# regex = '^libc-signals: sigtimedwait ok$'
+# needs PG-19 as well
+# [[expect]]
+# regex = '^libc-signals: alarm ok$'
+# [[expect]]
+# regex = '^libc-signals: fp ok$'
+
+[[expect]]
+regex = '^libc-signals: done$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|libc-[a-z]+: FAIL'

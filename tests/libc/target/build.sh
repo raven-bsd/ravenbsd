@@ -1,0 +1,250 @@
+#!/bin/sh
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Build one C73 on-target libc case into build/libc-test/ (C73 4.4). The script is POSIX sh,
+# deterministic and never fabricates a sysroot: a missing PG, tool or sysroot exits 77 so the
+# qtest records the case as skipped. `RL_FORCE=1` builds a blocked case anyway (it never turns
+# the case on; the skip stays in the case file).
+
+set -eu
+
+usage() {
+    printf 'usage: %s <case> [<arch>]\n' "$0" >&2
+    exit 2
+}
+
+root=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd)
+cd "$root"
+
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+    usage
+fi
+
+case_name=${1#libc-}
+arch=${2:-x86_64}
+
+case $arch in
+    x86_64) ;;
+    aarch64 | riscv64)
+        printf 'skipped: arch not in this ticket\n'
+        exit 77
+        ;;
+    *) usage ;;
+esac
+
+tsv=$root/tests/libc/target/cases.tsv
+row=$(awk -F '	' -v want="$case_name" '
+    $0 ~ /^#/ || $0 == "" || $1 == "case" { next }
+    $1 == want { print; found = 1; exit }
+    END { if (found == 0) exit 1 }
+' "$tsv") || {
+    printf 'error: unknown case %s\n' "$case_name" >&2
+    exit 2
+}
+
+binaries=$(printf '%s\n' "$row" | cut -f4)
+link_kind=$(printf '%s\n' "$row" | cut -f5)
+
+probe_last=$("$root/tests/libc/target/pg-probe.sh" "$case_name" | tail -n 1)
+case $probe_last in
+    *': RUNNABLE') ;;
+    *': BLOCKED needs '*)
+        if [ "${RL_FORCE:-0}" != 1 ]; then
+            printf 'skipped: libc-%s blocked: needs %s\n' \
+                "$case_name" "${probe_last#*: BLOCKED needs }"
+            exit 77
+        fi
+        ;;
+    *)
+        printf 'skipped: libc-%s probe failed\n' "$case_name" >&2
+        exit 77
+        ;;
+esac
+
+sysroot=${RAVENLIBC_SYSROOT:-$root/build/$arch/sysroot}
+if [ ! -d "$sysroot" ]; then
+    printf 'skipped: no sysroot (run cargo xtask libc-pack --arch %s)\n' "$arch"
+    exit 77
+fi
+
+required="$sysroot/usr/lib/crt1.o $sysroot/usr/lib/crti.o $sysroot/usr/lib/crtn.o $sysroot/usr/lib/libc.a"
+if [ "$link_kind" = dynamic ]; then
+    required="$required $sysroot/usr/lib/Scrt1.o $sysroot/usr/lib/libc.so $sysroot/lib/libc.so.1 $sysroot/libexec/ld-elf.so.1"
+fi
+for file in $required; do
+    if [ ! -e "$file" ]; then
+        printf 'skipped: missing sysroot file %s\n' "$file"
+        exit 77
+    fi
+done
+
+CC=${CC:-clang}
+if ! command -v "$CC" >/dev/null 2>&1; then
+    printf 'skipped: %s not found\n' "$CC"
+    exit 77
+fi
+if ! command -v ld.lld >/dev/null 2>&1; then
+    printf 'skipped: ld.lld not found\n'
+    exit 77
+fi
+if ! command -v llvm-ar >/dev/null 2>&1; then
+    printf 'skipped: llvm-ar not found\n'
+    exit 77
+fi
+if [ -z "${READELF:-}" ] && ! command -v llvm-readelf >/dev/null 2>&1 &&
+    ! command -v readelf >/dev/null 2>&1; then
+    printf 'skipped: llvm-readelf/readelf not found\n'
+    exit 77
+fi
+
+float=${RL_TEST_FLOAT:-soft}
+case $float in
+    soft) ;;
+    hard)
+        if ! "$root/tests/libc/target/pg-probe.sh" all | grep -qx 'PG-12: present'; then
+            printf 'skipped: hard-float build needs PG-12\n'
+            exit 77
+        fi
+        ;;
+    *) usage ;;
+esac
+
+out=$root/build/libc-test
+mkdir -p "$out/obj"
+
+builtins=
+if [ -f "$sysroot/usr/lib/libclang_rt.builtins.a" ]; then
+    builtins=1
+fi
+
+compile_obj() {
+    if [ "$float" = soft ]; then
+        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" \
+            -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
+            -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float \
+            -I "$root/libc/ravenlibc/tests/c" -c "$1" -o "$2"
+    else
+        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" \
+            -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
+            -D__ravenbsd__=1 -D__unix__=1 \
+            -I "$root/libc/ravenlibc/tests/c" -c "$1" -o "$2"
+    fi
+}
+
+link_static() {
+    if [ -n "$builtins" ]; then
+        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
+            -nostdlib -nostartfiles -static \
+            -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
+            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$1" \
+            -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
+            "$sysroot/usr/lib/crtn.o" -o "$2"
+    else
+        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
+            -nostdlib -nostartfiles -static \
+            -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
+            "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$1" \
+            -L"$sysroot/usr/lib" -lc \
+            "$sysroot/usr/lib/crtn.o" -o "$2"
+    fi
+}
+
+link_dynamic() {
+    if [ -n "$builtins" ]; then
+        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
+            -nostdlib -nostartfiles -pie -Wl,-dynamic-linker,/libexec/ld-elf.so.1 \
+            -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
+            "$sysroot/usr/lib/Scrt1.o" "$sysroot/usr/lib/crti.o" "$1" \
+            -L"$sysroot/lib" -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
+            "$sysroot/usr/lib/crtn.o" -o "$2"
+    else
+        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
+            -nostdlib -nostartfiles -pie -Wl,-dynamic-linker,/libexec/ld-elf.so.1 \
+            -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
+            "$sysroot/usr/lib/Scrt1.o" "$sysroot/usr/lib/crti.o" "$1" \
+            -L"$sysroot/lib" -L"$sysroot/usr/lib" -lc \
+            "$sysroot/usr/lib/crtn.o" -o "$2"
+    fi
+}
+
+link_shared() {
+    "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
+        -shared -nostdlib -nostartfiles -Wl,-soname,libplug.so \
+        -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
+        "$1" -o "$2"
+}
+
+compile_pie() {
+    if [ "$float" = soft ]; then
+        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" \
+            -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
+            -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float -fPIE \
+            -I "$root/libc/ravenlibc/tests/c" -c "$1" -o "$2"
+    else
+        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" \
+            -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
+            -D__ravenbsd__=1 -D__unix__=1 -fPIE \
+            -I "$root/libc/ravenlibc/tests/c" -c "$1" -o "$2"
+    fi
+}
+
+compile_pic() {
+    if [ "$float" = soft ]; then
+        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" \
+            -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
+            -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float -fPIC \
+            -I "$root/libc/ravenlibc/tests/c" -c "$1" -o "$2"
+    else
+        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" \
+            -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
+            -D__ravenbsd__=1 -D__unix__=1 -fPIC \
+            -I "$root/libc/ravenlibc/tests/c" -c "$1" -o "$2"
+    fi
+}
+
+src=$root/libc/ravenlibc/tests/c/libc-$case_name.c
+if [ ! -f "$src" ]; then
+    printf 'error: missing source %s\n' "$src" >&2
+    exit 1
+fi
+
+obj=$out/obj/libc-$case_name.o
+if [ "$link_kind" = dynamic ]; then
+    compile_pie "$src" "$obj"
+else
+    compile_obj "$src" "$obj"
+fi
+
+case $binaries in
+    *libc-child*)
+        compile_obj "$root/libc/ravenlibc/tests/c/libc-child.c" "$out/obj/libc-child.o"
+        link_static "$out/obj/libc-child.o" "$out/libc-child"
+        ;;
+    *)
+        : > "$out/libc-child"
+        ;;
+esac
+
+case $link_kind in
+    static)
+        link_static "$obj" "$out/libc-test"
+        : > "$out/libplug.so"
+        : > "$out/libc.so.1"
+        : > "$out/ld-elf.so.1"
+        ;;
+    dynamic)
+        compile_pic "$root/libc/ravenlibc/tests/c/libplug.c" "$out/obj/libplug.o"
+        link_shared "$out/obj/libplug.o" "$out/libplug.so"
+        link_dynamic "$obj" "$out/libc-test"
+        cp "$sysroot/lib/libc.so.1" "$out/libc.so.1"
+        cp "$sysroot/libexec/ld-elf.so.1" "$out/ld-elf.so.1"
+        ;;
+    *)
+        printf 'error: unknown link kind %s\n' "$link_kind" >&2
+        exit 1
+        ;;
+esac
+
+printf '%s\n' "$case_name" > "$out/stamp"
+sh "$root/tests/libc/target/shape-check.sh" "$out/libc-test"
