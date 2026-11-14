@@ -410,6 +410,127 @@ impl LongDouble {
     pub fn next_after(self, other: Self) -> Self {
         arithmetic::next_after(self, other)
     }
+
+    /// `roundeven`: round to the nearest integer with ties to even (C23).
+    #[cfg(target_arch = "x86_64")]
+    pub fn roundeven(self) -> Self {
+        arithmetic::round_integral(self, arithmetic::Mode::Even)
+    }
+
+    /// `remainder`: `x - n*y` with `n` the nearest even integer to `x/y`.
+    ///
+    /// Exact while `|x/y|` fits the significand (the same bound as [`LongDouble::fmod`]).
+    #[cfg(target_arch = "x86_64")]
+    pub fn remainder(self, other: Self) -> Self {
+        self.remquo(other).0
+    }
+
+    /// `remquo`: the remainder and the low bits of the quotient with its sign.
+    #[cfg(target_arch = "x86_64")]
+    pub fn remquo(self, other: Self) -> (Self, i32) {
+        if self.is_nan() || other.is_nan() || self.is_infinite() || other.is_zero() {
+            return (LongDouble::nan(), 0);
+        }
+        if other.is_infinite() || self.is_zero() {
+            return (self, 0);
+        }
+        let quotient = self.div(other).roundeven();
+        let magnitude = quotient.abs().to_u64().unwrap_or(0) & 0x7f;
+        let negative = self.sign_bit() ^ other.sign_bit();
+        let low = if negative {
+            -(magnitude as i32)
+        } else {
+            magnitude as i32
+        };
+        let remainder = self.sub(quotient.mul(other));
+        (remainder, low)
+    }
+
+    /// `fdim`: the positive difference.
+    #[cfg(target_arch = "x86_64")]
+    pub fn fdim(self, other: Self) -> Self {
+        if self.is_nan() || other.is_nan() {
+            return LongDouble::nan();
+        }
+        if self.total_cmp(other) == Ordering::Greater {
+            self.sub(other)
+        } else {
+            LongDouble::zero(false)
+        }
+    }
+
+    /// `fmax`: the larger value, with `+0` winning over `-0` and a NaN yielding the other operand.
+    #[cfg(target_arch = "x86_64")]
+    pub fn fmax(self, other: Self) -> Self {
+        if self.is_nan() {
+            return other;
+        }
+        if other.is_nan() {
+            return self;
+        }
+        if self.total_cmp(other) == Ordering::Greater {
+            self
+        } else {
+            other
+        }
+    }
+
+    /// `fmin`: the smaller value, with `-0` winning over `+0` and a NaN yielding the other operand.
+    #[cfg(target_arch = "x86_64")]
+    pub fn fmin(self, other: Self) -> Self {
+        if self.is_nan() {
+            return other;
+        }
+        if other.is_nan() {
+            return self;
+        }
+        if self.total_cmp(other) == Ordering::Less {
+            self
+        } else {
+            other
+        }
+    }
+
+    /// Bridge from C42's `raven_libc_dtoa::LongDouble` byte image (the gdtoa `strtold` output).
+    ///
+    /// The shell parses with C42 and converts here; this crate never parses.
+    pub fn from_dtoa_bytes(bytes: [u8; 16]) -> Self {
+        Self::from_bits(u128::from_le_bytes(bytes))
+    }
+
+    /// Bridge to C42's `raven_libc_dtoa::LongDouble` byte image.
+    pub fn to_dtoa_bytes(self) -> [u8; 16] {
+        self.to_bits().to_le_bytes()
+    }
+
+    /// `scalbn`: `x * 2^n` by exponent adjustment, with overflow and subnormal rounding.
+    #[cfg(target_arch = "x86_64")]
+    pub fn scalbn(self, n: i32) -> Self {
+        if !self.is_finite() || self.is_zero() {
+            return self;
+        }
+        let negative = self.sign_bit();
+        let field = self.exponent_field() as i32 + n;
+        let mut significand = self.significand_bits();
+        if field >= 0x7fff {
+            return LongDouble::infinity(negative);
+        }
+        if field > 0 {
+            return LongDouble::from_parts(negative, field as u32, significand);
+        }
+        // Subnormal: shift the significand right by the missing exponent, with rounding.
+        let shift = (1 - field) as u32;
+        if shift >= 64 {
+            return LongDouble::zero(negative);
+        }
+        let lost = significand & ((1u64 << shift) - 1);
+        let half = 1u64 << (shift - 1);
+        significand >>= shift;
+        if lost > half || (lost == half && (significand & 1) != 0) {
+            significand += 1;
+        }
+        LongDouble::from_parts(negative, 0, significand)
+    }
 }
 
 /// Monotone key for the total order over the 80 meaningful bits: negatives are complemented, so
@@ -455,6 +576,7 @@ mod arithmetic {
         Ceil,
         Trunc,
         Round,
+        Even,
     }
 
     struct Finite {
@@ -742,7 +864,7 @@ mod arithmetic {
         let round_up = match mode {
             Mode::Floor => negative,
             Mode::Ceil => !negative,
-            Mode::Trunc => false,
+            Mode::Trunc | Mode::Even => false,
             Mode::Round => exponent == -64,
         };
         if exponent <= -64 {
@@ -767,13 +889,26 @@ mod arithmetic {
                 let half = 1u64 << (drop - 1);
                 lost >= half
             }
+            Mode::Even => {
+                let half = 1u64 << (drop - 1);
+                lost > half || (lost == half && ((kept >> drop) & 1) != 0)
+            }
         };
-        let magnitude = if increment {
-            kept + (1u64 << drop)
+        // The increment can carry out of the 64-bit significand (e.g. 1.5 -> 2.0); then the
+        // significand restarts at 2^63 with one higher exponent.
+        let (magnitude, carry) = if increment {
+            match kept.checked_add(1u64 << drop) {
+                Some(value) => (value, 0),
+                None => (1u64 << 63, 1),
+            }
         } else {
-            kept
+            (kept, 0)
         };
-        LongDouble::from_parts(negative, (exponent + EXP_BIAS + 63) as u32, magnitude)
+        LongDouble::from_parts(
+            negative,
+            (exponent + EXP_BIAS + 63 + carry) as u32,
+            magnitude,
+        )
     }
 
     pub(super) fn fmod(a: LongDouble, b: LongDouble) -> LongDouble {
@@ -903,6 +1038,89 @@ pub fn nexttowardl(x: LongDouble, y: LongDouble) -> LongDouble {
 /// `totalorderl`.
 pub fn totalorderl(x: LongDouble, y: LongDouble) -> bool {
     x.total_cmp(y) != Ordering::Greater
+}
+
+/// `remainderl`.
+#[cfg(target_arch = "x86_64")]
+pub fn remainderl(x: LongDouble, y: LongDouble) -> LongDouble {
+    x.remainder(y)
+}
+
+/// `remquol`: the remainder plus the quotient low bits.
+#[cfg(target_arch = "x86_64")]
+pub fn remquol(x: LongDouble, y: LongDouble) -> (LongDouble, i32) {
+    x.remquo(y)
+}
+
+/// `fdiml`.
+#[cfg(target_arch = "x86_64")]
+pub fn fdiml(x: LongDouble, y: LongDouble) -> LongDouble {
+    x.fdim(y)
+}
+
+/// `fmaxl`.
+#[cfg(target_arch = "x86_64")]
+pub fn fmaxl(x: LongDouble, y: LongDouble) -> LongDouble {
+    x.fmax(y)
+}
+
+/// `fminl`.
+#[cfg(target_arch = "x86_64")]
+pub fn fminl(x: LongDouble, y: LongDouble) -> LongDouble {
+    x.fmin(y)
+}
+
+/// `scalbnl`.
+#[cfg(target_arch = "x86_64")]
+pub fn scalbnl(x: LongDouble, n: i32) -> LongDouble {
+    x.scalbn(n)
+}
+
+/// `rintl`: round to the nearest integer, ties to even (the default rounding mode).
+#[cfg(target_arch = "x86_64")]
+pub fn rintl(x: LongDouble) -> LongDouble {
+    x.roundeven()
+}
+
+/// `nearbyintl`: as `rintl` (the skeleton does not raise the inexact flag differently).
+#[cfg(target_arch = "x86_64")]
+pub fn nearbyintl(x: LongDouble) -> LongDouble {
+    x.roundeven()
+}
+
+/// `roundevenl` (C23).
+#[cfg(target_arch = "x86_64")]
+pub fn roundevenl(x: LongDouble) -> LongDouble {
+    x.roundeven()
+}
+
+/// `lrintl`: `rintl` as an `i64`.
+#[cfg(target_arch = "x86_64")]
+pub fn lrintl(x: LongDouble) -> i64 {
+    x.roundeven().to_i64().unwrap_or(i64::MIN)
+}
+
+/// `llrintl`: `rintl` as an `i64`.
+#[cfg(target_arch = "x86_64")]
+pub fn llrintl(x: LongDouble) -> i64 {
+    lrintl(x)
+}
+
+/// `lroundl`: halfway cases away from zero, as an `i64`.
+#[cfg(target_arch = "x86_64")]
+pub fn lroundl(x: LongDouble) -> i64 {
+    x.round().to_i64().unwrap_or(i64::MIN)
+}
+
+/// `llroundl`: halfway cases away from zero, as an `i64`.
+#[cfg(target_arch = "x86_64")]
+pub fn llroundl(x: LongDouble) -> i64 {
+    lroundl(x)
+}
+
+/// `nanl`: a quiet NaN (the C tag argument is not represented in Rust).
+pub fn nanl() -> LongDouble {
+    LongDouble::nan()
 }
 
 #[cfg(test)]

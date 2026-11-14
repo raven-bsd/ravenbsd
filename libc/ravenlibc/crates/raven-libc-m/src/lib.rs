@@ -116,8 +116,10 @@ pub use legacy::{
 };
 #[cfg(target_arch = "x86_64")]
 pub use long_double::{
-    LongDouble, ceill, copysignl, fabsl, floorl, fmodl, fpclassifyl, isfinitel, isinfl, isnanl,
-    isnormall, nextafterl, nexttowardl, roundl, signbitl, sqrtl, totalorderl, truncl,
+    LongDouble, ceill, copysignl, fabsl, fdiml, floorl, fmaxl, fminl, fmodl, fpclassifyl,
+    isfinitel, isinfl, isnanl, isnormall, llrintl, llroundl, lrintl, lroundl, nanl, nearbyintl,
+    nextafterl, nexttowardl, remainderl, remquol, rintl, roundevenl, roundl, scalbnl, signbitl,
+    sqrtl, totalorderl, truncl,
 };
 
 use support::Round;

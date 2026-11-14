@@ -145,6 +145,74 @@ fn sqrt_and_the_integral_functions_behave() {
 
 #[cfg(target_arch = "x86_64")]
 #[test]
+fn remainder_and_remquo_round_the_quotient_to_even() {
+    assert_eq!(remainderl(ld(5.5), ld(2.0)).to_f64(), -0.5);
+    let (value, quotient) = remquol(ld(5.5), ld(2.0));
+    assert_eq!(value.to_f64(), -0.5);
+    assert_eq!(quotient, 3);
+    assert_eq!(remainderl(ld(5.0), ld(2.0)).to_f64(), 1.0);
+    let (value, quotient) = remquol(ld(5.0), ld(2.0));
+    assert_eq!(value.to_f64(), 1.0);
+    assert_eq!(quotient, 2);
+    assert_eq!(remainderl(ld(-5.0), ld(2.0)).to_f64(), -1.0);
+    assert_eq!(remainderl(ld(6.0), ld(2.0)).to_f64(), 0.0);
+    assert_eq!(
+        remainderl(ld(1.0), LongDouble::infinity(false)).to_f64(),
+        1.0
+    );
+    assert!(remainderl(LongDouble::nan(), ld(1.0)).is_nan());
+    assert!(remainderl(ld(1.0), ld(0.0)).is_nan());
+}
+
+#[cfg(target_arch = "x86_64")]
+#[test]
+fn the_rounding_integer_family_and_scalbn() {
+    assert_eq!(scalbnl(ld(1.5), 3).to_f64(), 12.0);
+    assert_eq!(scalbnl(ld(1.0), -2).to_f64(), 0.25);
+    assert_eq!(scalbnl(LongDouble::infinity(false), 4).class(), FP_INFINITE);
+    assert_eq!(scalbnl(ld(0.0), 4).to_f64(), 0.0);
+    assert_eq!(rintl(ld(2.5)).to_f64(), 2.0);
+    assert_eq!(nearbyintl(ld(3.5)).to_f64(), 4.0);
+    assert_eq!(roundevenl(ld(-2.5)).to_f64(), -2.0);
+    assert_eq!(lrintl(ld(2.5)), 2);
+    assert_eq!(llrintl(ld(-2.5)), -2);
+    assert_eq!(lroundl(ld(2.5)), 3);
+    assert_eq!(llroundl(ld(-2.5)), -3);
+    assert!(nanl().is_nan());
+}
+
+#[cfg(target_arch = "x86_64")]
+#[test]
+fn fdim_fmax_fmin_follow_the_c_rules() {
+    assert_eq!(fdiml(ld(5.0), ld(2.0)).to_f64(), 3.0);
+    assert_eq!(fdiml(ld(2.0), ld(5.0)).to_f64(), 0.0);
+    assert!(fdiml(LongDouble::nan(), ld(1.0)).is_nan());
+    assert_eq!(fmaxl(ld(1.0), ld(2.0)).to_f64(), 2.0);
+    assert_eq!(fmaxl(ld(1.0), LongDouble::nan()).to_f64(), 1.0);
+    assert!(!fmaxl(LongDouble::zero(true), LongDouble::zero(false)).sign_bit());
+    assert_eq!(fminl(ld(1.0), ld(2.0)).to_f64(), 1.0);
+    assert_eq!(fminl(LongDouble::nan(), ld(2.0)).to_f64(), 2.0);
+    assert!(fminl(LongDouble::zero(false), LongDouble::zero(true)).sign_bit());
+}
+
+#[cfg(target_arch = "x86_64")]
+#[test]
+fn roundeven_ties_to_even_and_the_dtoa_bridge_round_trips() {
+    assert_eq!(ld(0.5).roundeven().to_f64(), 0.0);
+    assert_eq!(ld(1.5).roundeven().to_f64(), 2.0);
+    assert_eq!(ld(2.5).roundeven().to_f64(), 2.0);
+    assert_eq!(ld(-2.5).roundeven().to_f64(), -2.0);
+    assert_eq!(ld(2.4).roundeven().to_f64(), 2.0);
+    let value = ld(1.5);
+    assert_eq!(
+        LongDouble::from_dtoa_bytes(value.to_dtoa_bytes()).to_bits(),
+        value.to_bits()
+    );
+    assert_eq!(value.to_dtoa_bytes(), value.to_bits().to_le_bytes());
+}
+
+#[cfg(target_arch = "x86_64")]
+#[test]
 fn fmod_and_nextafter_use_the_bit_patterns() {
     assert_eq!(ld(5.5).fmod(ld(2.0)).to_f64(), 1.5);
     assert_eq!(ld(-5.5).fmod(ld(2.0)).to_f64(), -1.5);
