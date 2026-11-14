@@ -3,10 +3,10 @@
 //!
 //! The narrow seams between the Solaris personality logic and the C-ABI shell.
 //!
-//! The shell implements each trait over `raven-libc-platform`, `raven-libc-sys` and (when C57
-//! merges) `raven-libc-thread`; the host tests in `crate::testutil` implement them
-//! deterministically. A primitive that does not exist yet returns the documented error from the
-//! trait implementation, never a silent success (`11` 3.8).
+//! The shell implements each trait over `raven-libc-platform`, `raven-libc-sys` and the merged
+//! `raven-libc-thread`; the host tests in `crate::testutil` implement them deterministically. A
+//! primitive that does not exist yet returns the documented error from the trait implementation,
+//! never a silent success (`11` 3.8).
 //!
 //! `EvqOps` and `FdTable` repeat the shape of C66 (`raven-libc-personality-linux`) because the
 //! personalities are independent siblings (C66 4.2); a later platform ticket may replace both
@@ -155,8 +155,8 @@ pub struct RwlockT {
     pub opaque: [u8; 56],
 }
 
-/// The opaque `sem_t` (32 bytes on LP64).
-#[repr(C, align(8))]
+/// The opaque `sem_t` (32 bytes, 4-byte aligned: the C type is an `int[8]`).
+#[repr(C, align(4))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SemaT {
     /// The frozen representation; the logic crate never reads it.
@@ -192,8 +192,7 @@ const _: () = assert!(core::mem::size_of::<SemaT>() == 32);
 ///
 /// One method per `pthread_*`/`sem_*` call the wrappers make, plus the three queries a valid
 /// Solaris spelling needs and POSIX answers differently (`self_`, `is_initial`, `getprio`).
-/// When `raven-libc-thread` merges, the shell implements this trait over its public API; until
-/// then the shell implementation returns `ENOSYS` for every call that needs a thread runtime.
+/// The shell implements this trait over the merged `raven-libc-thread` public API.
 pub trait PosixThreads {
     /// `pthread_create` with the attribute plan.
     fn create(&mut self, attr: &ThreadAttrPlan, start: StartFn, arg: usize)

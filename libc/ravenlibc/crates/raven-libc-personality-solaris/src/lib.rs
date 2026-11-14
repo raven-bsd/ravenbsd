@@ -16,9 +16,10 @@
 //! interaction goes through a narrow trait in [`seams`], so the host tests are deterministic
 //! and the shell decides which primitive is real and which is still `ENOSYS`.
 //!
-//! `raven-libc-thread` (C57) is absent on this branch: [`seams::PosixThreads`] is defined and
-//! implemented by the tests with a recording fake; the shell's production implementation
-//! returns the documented `ENOSYS` (the report marks those exports `DEFERRED(C57)`).
+//! `raven-libc-thread` (C57) is merged: [`seams::PosixThreads`] is implemented by the recording
+//! fake in the tests and by the shell over the real crate. The remaining kernel gaps are
+//! returned by the C57 seams (`PG-2` thread create, `PG-4` shared futex, `PG-7` kick), never
+//! hidden by a fake success.
 //!
 //! The crate is `no_std` plus `alloc`, class P (`#![forbid(unsafe_code)]`), and has no clock,
 //! environment or filesystem access of its own.

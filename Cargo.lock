@@ -987,6 +987,7 @@ dependencies = [
  "raven-libc-pwd",
  "raven-libc-regex",
  "raven-libc-resolv",
+ "raven-libc-signal",
  "raven-libc-stdio",
  "raven-libc-stdlib",
  "raven-libc-str",

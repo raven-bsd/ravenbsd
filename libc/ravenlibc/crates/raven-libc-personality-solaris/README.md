@@ -21,7 +21,7 @@ deterministic fakes in `testutil`.
 | `port` | `port_create/associate/dissociate/get/getn/send` over EVQ and a user-event doorbell | complete over the seams; a port is one EVQ handle plus one doorbell, associations are one-shot, cookies are `(fd << 32) | epoch` |
 | `port::alert` | `port_alert` | exported, always `ENOSYS` (doc 06 gives no semantics; C67 12.3 QUESTION) |
 | `identity` | `getexecname` from `AT_EXECFN`, `getisax` from `AT_HWCAP`/`AT_HWCAP2` | complete; never a file, never `/proc` (A-sol-4, `PG-50`, `PG-51`) |
-| `thread_names` | `thr_*`, `mutex_*`, `cond_*`, `rwlock_*`/`rw_*`, `sema_*` over `PosixThreads` | the wrappers and translations are complete; a body that needs the thread runtime is `DEFERRED(C57)` in the shell |
+| `thread_names` | `thr_*`, `mutex_*`, `cond_*`, `rwlock_*`/`rw_*`, `sema_*` over `PosixThreads` | the wrappers and translations are complete; the shell calls the merged C57 crate and returns its kernel-gap errors (`PG-2`, `PG-4`, `PG-7`) |
 | `consts` | `PORT_SOURCE_*`, `THR_*`, `USYNC_*`, `PortEvent` | one file, every value labelled (`doc 14` for the two public facts, `ours` for the rest) |
 
 ## Clean room
@@ -31,18 +31,19 @@ constant was copied or translated, and no illumos identifier appears in the crat
 `06-solaris-design.md` is the design source; the constants that the design does not state as
 public facts are chosen here and documented as ours.
 
-## C57 is absent on this branch
+## C57 is merged
 
-`raven-libc-thread` does not exist yet, so:
+`raven-libc-thread` is present and every pthread/semaphore-backed export calls it:
 
-* `seams::PosixThreads` is defined in this crate and implemented by the recording fake; the shell
-  implements it with the documented `ENOSYS` for every pthread-backed call.
-* The 32 exports marked `deferred = "C57"` in `exports.toml` exist (a link probe succeeds) and
-  return `ENOSYS`; the report lists them exactly.
-* The wrappers that need no thread runtime are real: `thr_min_stack` (the constant),
+* `seams::PosixThreads` is implemented by the recording fake in the host tests and by the shell
+  over `raven-libc-thread::{thread,mutex,cond,rwlock,sem,tsd}` plus C58's `pthread_sigmask`.
+* No export is marked `deferred`; the wrappers return the C57 seam's own error when a kernel
+  primitive is absent. Today that is `ENOSYS` for `thr_create` (`PG-2`) and `thr_kill` (`PG-7`);
+  process-shared `USYNC_PROCESS` locks are `ENOTSUP` (`PG-4`).
+* The wrappers that need no thread runtime remain real: `thr_min_stack` (the constant),
   `thr_main`/`thr_self` on the only thread, `thr_yield` (the kernel yield), and the process-wide
   `thr_setconcurrency`/`thr_getconcurrency` hint.
-* `thr_suspend`/`thr_continue` return `ENOSYS` for `PG-48`, independent of C57.
+* `thr_suspend`/`thr_continue` return `ENOSYS` for `PG-48`.
 
 ## Deviations recorded by C67
 
@@ -50,8 +51,8 @@ public facts are chosen here and documented as ours.
   define it as `__BSD_VISIBLE` (on by default, cleared in strict modes) until C37 adds it.
 * The ticket's 6.9 list has 50 names, not 51; all 50 are exported.
 * `raven-libc-sys` is a declared dependency (the `crates.toml` row) but the crate uses
-  `raven-libc-abi`/`raven-libc-platform` directly; `raven-libc-thread` is omitted because it does
-  not exist.
+  `raven-libc-abi`/`raven-libc-platform` directly; the shell implements `PosixThreads` over
+  `raven-libc-thread` and C58's `pthread_sigmask`.
 
 ## Tests
 
@@ -61,6 +62,7 @@ wrapper and flag rule) plus the integration tests:
 
 * `tests/header_parity.rs` parses `include/port.h`, `include/thread.h` and `include/synch.h` and
   asserts equality with `consts.rs`, the typedefs and the visibility guard.
-* `tests/thread_deferred.rs` reads `exports.toml` and reports the exact `DEFERRED(C57)` list.
+* `tests/thread_deferred.rs` reads `exports.toml`, asserts that no export is deferred and that the
+  50-name table contains every thread-runtime spelling.
 * `tests/emptiness.rs` checks a built shell archive for the presence or absence of the 50 names
   and for the absence of every `door_*`/`kstat_*` symbol (SKIP when no archive exists).

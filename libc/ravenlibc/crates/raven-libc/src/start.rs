@@ -37,11 +37,9 @@ const AT_CLKTCK: usize = 17;
 const AT_RANDOM: usize = 25;
 /// `AT_SECURE`: the privileged-exec flag (never set on Raven, H-7).
 const AT_SECURE: usize = 23;
-/// `AT_HWCAP`: CPU feature bits for the AArch64 and RISC-V IFUNC argument.
-#[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
+/// `AT_HWCAP`: CPU feature bits (the AArch64/RISC-V IFUNC argument and C67 `getisax`).
 const AT_HWCAP: usize = 16;
-/// `AT_HWCAP2`: the second CPU feature word.
-#[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
+/// `AT_HWCAP2`: the second CPU feature word (C67 `getisax`).
 const AT_HWCAP2: usize = 26;
 /// `AT_RAVEN_ABI`: the ABI revision the spawner wrote (`PG-50`).
 const AT_RAVEN_ABI: usize = 0x7006;
@@ -81,6 +79,14 @@ static PAGE_SIZE: AtomicUsize = AtomicUsize::new(4096);
 static CLK_TCK: AtomicUsize = AtomicUsize::new(100);
 /// The `AT_RANDOM` pointer, or 0.
 static RANDOM_POINTER: AtomicUsize = AtomicUsize::new(0);
+/// `AT_EXECFN` from the auxiliary vector; valid only when the matching mask bit is set.
+static SAVED_EXECFN: AtomicUsize = AtomicUsize::new(0);
+/// `AT_HWCAP` from the auxiliary vector.
+static SAVED_HWCAP: AtomicUsize = AtomicUsize::new(0);
+/// `AT_HWCAP2` from the auxiliary vector.
+static SAVED_HWCAP2: AtomicUsize = AtomicUsize::new(0);
+/// Presence bits for `AT_EXECFN`, `AT_HWCAP` and `AT_HWCAP2` (a present zero is not absent).
+static SAVED_AUX_MASK: AtomicUsize = AtomicUsize::new(0);
 
 /// The process page size recorded at start.
 #[allow(dead_code)] // consumed by the platform and allocator crates as they gain startup wiring
@@ -98,6 +104,20 @@ pub(crate) fn clk_tck() -> usize {
 #[allow(dead_code)] // consumed by the random and stack-protector crates
 pub(crate) fn random_pointer() -> usize {
     RANDOM_POINTER.load(Ordering::Relaxed)
+}
+
+/// One saved auxiliary value for the Solaris identity calls (C67 `getexecname`/`getisax`).
+///
+/// The start path copies the value and a presence bit so a present zero (`AT_HWCAP` can be 0)
+/// is distinct from an absent key (`PG-50`/`PG-51`).
+pub(crate) fn saved_aux(key: usize) -> Option<usize> {
+    let mask = SAVED_AUX_MASK.load(Ordering::Relaxed);
+    match key {
+        AT_EXECFN if mask & 1 != 0 => Some(SAVED_EXECFN.load(Ordering::Relaxed)),
+        AT_HWCAP if mask & 2 != 0 => Some(SAVED_HWCAP.load(Ordering::Relaxed)),
+        AT_HWCAP2 if mask & 4 != 0 => Some(SAVED_HWCAP2.load(Ordering::Relaxed)),
+        _ => None,
+    }
 }
 
 unsafe extern "C" {
@@ -207,9 +227,7 @@ pub unsafe extern "C" fn __raven_libc_start(
     // slots at 56..64 (`key - 0x7000 + 56`).
     let mut aux = [0usize; 64];
     // SAFETY: the parser found the `(key, value)` pairs and their `(0, 0)` terminator.
-    unsafe {
-        fill_auxv(stack.auxv, &mut aux);
-    }
+    let aux_present = unsafe { fill_auxv(stack.auxv, &mut aux) };
 
     // STEP 4: the five program-name aliases point into `argv`; no string is copied.
     // SAFETY: `argv[0]` is a NUL-terminated C8 string when `argc > 0`, and `AT_EXECFN` is one
@@ -234,6 +252,10 @@ pub unsafe extern "C" fn __raven_libc_start(
         Ordering::Relaxed,
     );
     RANDOM_POINTER.store(aux_value(&aux, AT_RANDOM), Ordering::Relaxed);
+    SAVED_EXECFN.store(aux_value(&aux, AT_EXECFN), Ordering::Relaxed);
+    SAVED_HWCAP.store(aux_value(&aux, AT_HWCAP), Ordering::Relaxed);
+    SAVED_HWCAP2.store(aux_value(&aux, AT_HWCAP2), Ordering::Relaxed);
+    SAVED_AUX_MASK.store(aux_present, Ordering::Release);
     let mut canary = 0usize;
     if aux_value(&aux, AT_RANDOM) != 0 {
         // SAFETY: `AT_RANDOM` names 16 readable bytes on the initial stack.
@@ -392,8 +414,9 @@ unsafe fn parse_stack(sp0: *const usize) -> Option<StartStack> {
 /// # Safety
 ///
 /// `auxv` must be the C8 auxiliary array terminated by `(0, 0)`.
-unsafe fn fill_auxv(auxv: *const usize, table: &mut [usize; 64]) {
+unsafe fn fill_auxv(auxv: *const usize, table: &mut [usize; 64]) -> usize {
     let mut index = 0usize;
+    let mut present = 0usize;
     loop {
         // SAFETY: the auxv array is a terminated sequence of pairs.
         let key = unsafe { *auxv.add(index) };
@@ -402,6 +425,12 @@ unsafe fn fill_auxv(auxv: *const usize, table: &mut [usize; 64]) {
         }
         // SAFETY: the value word follows the key.
         let value = unsafe { *auxv.add(index.wrapping_add(1)) };
+        match key {
+            AT_EXECFN => present |= 1,
+            AT_HWCAP => present |= 2,
+            AT_HWCAP2 => present |= 4,
+            _ => {}
+        }
         if key < table.len() {
             if let Some(slot) = table.get_mut(key) {
                 *slot = value;
@@ -414,6 +443,7 @@ unsafe fn fill_auxv(auxv: *const usize, table: &mut [usize; 64]) {
         }
         index = index.wrapping_add(2);
     }
+    present
 }
 
 /// One table value; absent keys read as 0.

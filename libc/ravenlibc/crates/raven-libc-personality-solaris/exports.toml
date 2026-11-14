@@ -3,8 +3,9 @@
 #
 # The C names of ticket C67 6.9 for the Solaris personality. `rust` is the logic entry;
 # `header` is the installed declaration; `errno` chooses the POSIX error convention.
-# `deferred = "C57"` marks an export whose body needs `raven-libc-thread`: the symbol exists
-# and returns the documented ENOSYS until C57 merges (never a fake thread implementation).
+# `raven-libc-thread` is merged: every export has a real body. The remaining kernel gaps
+# (PG-2 thread create, PG-4 shared futex, PG-7 kick) are returned by the C57 seams, never
+# hidden by a fake success.
 
 [[export]]
 name = "port_create"
@@ -176,7 +177,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "thr_join"
@@ -186,7 +186,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "thr_kill"
@@ -196,7 +195,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "thr_getprio"
@@ -206,7 +204,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "thr_getspecific"
@@ -216,7 +213,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "thr_create"
@@ -226,7 +222,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "thr_keycreate"
@@ -236,7 +231,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "thr_sigsetmask"
@@ -246,7 +240,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "thr_setprio"
@@ -256,7 +249,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "mutex_init"
@@ -266,7 +258,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "mutex_destroy"
@@ -276,7 +267,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "mutex_lock"
@@ -286,7 +276,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "mutex_trylock"
@@ -296,7 +285,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "mutex_unlock"
@@ -306,7 +294,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "cond_init"
@@ -316,7 +303,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "cond_destroy"
@@ -326,7 +312,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "cond_wait"
@@ -336,7 +321,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "cond_timedwait"
@@ -346,7 +330,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "cond_signal"
@@ -356,7 +339,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "cond_broadcast"
@@ -366,7 +348,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "rwlock_init"
@@ -376,7 +357,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "rwlock_destroy"
@@ -386,7 +366,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "rw_rdlock"
@@ -396,7 +375,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "rw_wrlock"
@@ -406,7 +384,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "rw_tryrdlock"
@@ -416,7 +393,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "rw_trywrlock"
@@ -426,7 +402,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "rw_unlock"
@@ -436,7 +411,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "sema_init"
@@ -446,7 +420,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "sema_destroy"
@@ -456,7 +429,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "sema_wait"
@@ -466,7 +438,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "sema_trywait"
@@ -476,7 +447,6 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"
 
 [[export]]
 name = "sema_post"
@@ -486,4 +456,3 @@ ring = 2
 personality = "solaris"
 version = "RAVEN_1.0"
 errno = false
-deferred = "C57"

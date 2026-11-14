@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //!
-//! C57 is absent on this branch. This test is the machine-readable status report the ticket
-//! asks for: it reads `exports.toml`, asserts that exactly the thread-runtime exports are marked
-//! `deferred = "C57"`, and prints every one of them.
+//! `raven-libc-thread` is merged: this test is the machine-readable status report that the
+//! thread-runtime exports are no longer deferred and that the 50-name table is complete.
 
 use std::path::PathBuf;
 
@@ -44,8 +43,8 @@ fn parse() -> Vec<Export> {
     rows
 }
 
-/// The 32 exports whose body needs `raven-libc-thread` (one per pthread/semaphore call).
-const C57_SYMBOLS: &[&str] = &[
+/// The 32 exports that need `raven-libc-thread` (one per pthread/semaphore call).
+const THREAD_RUNTIME_SYMBOLS: &[&str] = &[
     "thr_create",
     "thr_join",
     "thr_kill",
@@ -86,41 +85,29 @@ fn the_export_table_has_fifty_names() {
 }
 
 #[test]
-fn the_c57_deferred_list_is_exact() {
-    let rows = parse();
-    let deferred: Vec<&str> = rows
-        .iter()
-        .filter(|row| row.deferred.as_deref() == Some("C57"))
-        .map(|row| row.name.as_str())
-        .collect();
-    assert_eq!(deferred.len(), C57_SYMBOLS.len());
-    for name in C57_SYMBOLS {
-        assert!(deferred.contains(name), "missing DEFERRED(C57) {name}");
-    }
-    for name in &deferred {
-        assert!(
-            C57_SYMBOLS.contains(name),
-            "unexpected deferred symbol {name}"
+fn no_export_is_deferred() {
+    for row in parse() {
+        assert_eq!(
+            row.deferred, None,
+            "{} is still deferred after the C57 merge",
+            row.name
         );
     }
 }
 
 #[test]
-fn the_c57_list_is_reported_with_the_exact_symbols() {
+fn the_thread_runtime_exports_are_present() {
     let rows = parse();
-    let mut reported = 0usize;
-    for row in &rows {
-        if row.deferred.as_deref() == Some("C57") {
-            println!("DEFERRED(C57): {}", row.name);
-            reported += 1;
-        }
+    for name in THREAD_RUNTIME_SYMBOLS {
+        assert!(
+            rows.iter().any(|row| row.name == *name),
+            "missing thread-runtime export {name}"
+        );
     }
-    println!("DEFERRED(C57): {reported} symbols");
-    assert_eq!(reported, C57_SYMBOLS.len());
 }
 
 #[test]
-fn the_independent_exports_are_not_deferred() {
+fn the_independent_exports_are_present() {
     let rows = parse();
     for name in [
         "port_create",
@@ -142,27 +129,9 @@ fn the_independent_exports_are_not_deferred() {
         "thr_suspend",
         "thr_continue",
     ] {
-        let row = rows
-            .iter()
-            .find(|row| row.name == name)
-            .unwrap_or_else(|| panic!("{name} missing"));
-        assert_eq!(row.deferred, None, "{name} must not be DEFERRED(C57)");
-    }
-}
-
-#[test]
-fn every_deferred_name_is_a_thread_runtime_name() {
-    for row in parse() {
-        if row.deferred.as_deref() == Some("C57") {
-            assert!(
-                row.name.starts_with("thr_")
-                    || row.name.starts_with("mutex_")
-                    || row.name.starts_with("cond_")
-                    || row.name.starts_with("rw")
-                    || row.name.starts_with("sema_"),
-                "{} is not a thread-runtime export",
-                row.name
-            );
-        }
+        assert!(
+            rows.iter().any(|row| row.name == name),
+            "missing independent export {name}"
+        );
     }
 }
