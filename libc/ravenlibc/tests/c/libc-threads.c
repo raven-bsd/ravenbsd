@@ -397,9 +397,12 @@ static int check_detach(void)
 {
     pthread_attr_t attr;
     pthread_t thread;
+    struct timespec pause;
     int index;
     int checks = 0;
 
+    pause.tv_sec = 0;
+    pause.tv_nsec = 1000 * 1000;
     checks += pthread_attr_init(&attr) == 0;
     checks += pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED) == 0;
     for (index = 0; index < 200; index++) {
@@ -407,7 +410,7 @@ static int check_detach(void)
     }
     checks += pthread_attr_destroy(&attr) == 0;
     for (index = 0; index < 2000 && atomic_load(&detached_runs) < 200; index++) {
-        (void)usleep(1000);
+        (void)nanosleep(&pause, NULL);
     }
     checks += atomic_load(&detached_runs) == 200;
     return checks >= 204;
