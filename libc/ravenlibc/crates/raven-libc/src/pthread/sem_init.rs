@@ -10,7 +10,7 @@ pub extern "C" fn sem_init(sem: *mut s::Sem, pshared: c_int, value: u32) -> c_in
     }
     match s::init(
         &raven_libc_thread::raw::SysKernel,
-        unsafe { &mut *sem },
+        unsafe { &mut *sem }, // SAFETY: sem is non-NULL after the check and exclusively borrowed for initialisation.
         pshared,
         value,
     ) {

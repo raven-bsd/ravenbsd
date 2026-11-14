@@ -11,8 +11,8 @@ pub extern "C" fn pthread_cond_wait(cond: *mut c::Cond, mutex: *mut m::Mutex) ->
     }
     match c::wait(
         &raven_libc_thread::raw::SysKernel,
-        unsafe { &*cond },
-        unsafe { &*mutex },
+        unsafe { &*cond }, // SAFETY: cond is non-NULL after the check and points to a live initialised condition variable.
+        unsafe { &*mutex }, // SAFETY: mutex is non-NULL after the check and points to a live locked mutex.
     ) {
         Ok(()) => 0,
         Err(e) => super::common::err(e),

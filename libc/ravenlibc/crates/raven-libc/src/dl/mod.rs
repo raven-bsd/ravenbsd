@@ -19,5 +19,5 @@ mod dlopen;
 mod dlsym;
 #[path = "dlvsym.rs"]
 mod dlvsym;
-#[path = "table.rs"]
+#[path = "rl_dl_install.rs"]
 mod table;

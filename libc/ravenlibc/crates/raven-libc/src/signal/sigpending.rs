@@ -15,6 +15,7 @@ pub unsafe extern "C" fn sigpending(set: *mut SigSet) -> c_int {
     if set.is_null() {
         return -1;
     }
+    // SAFETY: set is non-NULL after the check and writable for one sigset_t.
     match maskops::sigpending(&SysKernel, unsafe { &mut *set }) {
         Ok(()) => 0,
         Err(error) => {

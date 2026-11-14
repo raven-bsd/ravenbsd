@@ -13,11 +13,11 @@ pub extern "C" fn pthread_rwlock_timedwrlock(
     }
     match r::timedwrlock(
         &raven_libc_thread::raw::SysKernel,
-        unsafe { &*lock },
+        unsafe { &*lock }, // SAFETY: lock is non-NULL after the check and points to a live initialised rwlock.
         if at.is_null() {
             None
         } else {
-            Some(unsafe { *at })
+            Some(unsafe { *at }) // SAFETY: at is non-NULL when Some and readable for one timespec.
         },
     ) {
         Ok(()) => 0,

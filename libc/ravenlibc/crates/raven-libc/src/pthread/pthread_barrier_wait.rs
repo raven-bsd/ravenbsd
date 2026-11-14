@@ -8,6 +8,7 @@ pub extern "C" fn pthread_barrier_wait(barrier: *mut b::Barrier) -> c_int {
     if barrier.is_null() {
         return 22;
     }
+    // SAFETY: barrier is non-NULL after the check and points to a live initialised barrier.
     match b::wait_barrier(&raven_libc_thread::raw::SysKernel, unsafe { &*barrier }) {
         Ok(value) => value,
         Err(e) => super::common::err(e),

@@ -10,6 +10,6 @@ pub extern "C" fn pthread_attr_getinheritsched(
     if attr.is_null() || out.is_null() {
         return 22;
     }
-    unsafe { *out = a::getinheritsched(&*attr) };
+    unsafe { *out = a::getinheritsched(&*attr) }; // SAFETY: the null checks above guarantee a readable attribute and a writable out slot.
     0
 }

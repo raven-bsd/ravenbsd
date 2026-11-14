@@ -7,6 +7,6 @@ pub extern "C" fn pthread_mutexattr_destroy(attr: *mut m::MutexAttr) -> core::ff
     if attr.is_null() {
         return 22;
     }
-    m::attr_destroy(unsafe { &*attr });
+    m::attr_destroy(unsafe { &*attr }); // SAFETY: attr is non-NULL after the check and points to a live mutex attribute.
     0
 }

@@ -7,6 +7,6 @@ use raven_libc_thread::{c11, mutex::Mutex};
 #[unsafe(no_mangle)]
 pub extern "C" fn mtx_destroy(mutex: *mut Mutex) {
     if !mutex.is_null() {
-        c11::mtx_destroy(unsafe { &*mutex });
+        c11::mtx_destroy(unsafe { &*mutex }); // SAFETY: mutex is non-NULL after the check and points to a live initialised mutex.
     }
 }

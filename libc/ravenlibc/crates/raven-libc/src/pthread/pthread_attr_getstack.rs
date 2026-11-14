@@ -11,10 +11,11 @@ pub extern "C" fn pthread_attr_getstack(
     if attr.is_null() || addr.is_null() || size.is_null() {
         return 22;
     }
-    let attr_ref = unsafe { &*attr };
+    let attr_ref = unsafe { &*attr }; // SAFETY: attr is non-NULL after the check; the caller owns a live attribute for the call.
     match a::getstack(attr_ref) {
         Ok((base, length)) => {
             unsafe {
+                // SAFETY: addr and size are non-NULL after the check and writable for one pointer and one usize.
                 *addr = base as *mut core::ffi::c_void;
                 *size = length;
             };

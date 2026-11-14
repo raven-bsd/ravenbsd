@@ -13,6 +13,7 @@ pub extern "C" fn pthread_setschedparam(
     if param.is_null() {
         return 22;
     }
+    // SAFETY: param is non-NULL after the check and readable for one sched_param.
     match sched::setschedparam(&SysKernel, thread, policy, unsafe { *param }) {
         Ok(()) => 0,
         Err(e) => super::common::err(e),

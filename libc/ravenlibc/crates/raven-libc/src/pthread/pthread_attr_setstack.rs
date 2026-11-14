@@ -11,6 +11,7 @@ pub extern "C" fn pthread_attr_setstack(
     if attr.is_null() {
         return 22;
     }
+    // SAFETY: attr is non-NULL after the check and exclusively borrowed for the call.
     match a::setstack(unsafe { &mut *attr }, addr as usize, size) {
         Ok(()) => 0,
         Err(e) => super::common::err(e),

@@ -10,11 +10,11 @@ pub extern "C" fn pthread_atfork(
     child: Option<extern "C" fn()>,
 ) -> c_int {
     let p: Option<fn()> =
-        prepare.map(|f| unsafe { core::mem::transmute::<extern "C" fn(), fn()>(f) });
+        prepare.map(|f| unsafe { core::mem::transmute::<extern "C" fn(), fn()>(f) }); // SAFETY: the two fn() types share the C ABI; the hook is only invoked as prepare.
     let pa: Option<fn()> =
-        parent.map(|f| unsafe { core::mem::transmute::<extern "C" fn(), fn()>(f) });
+        parent.map(|f| unsafe { core::mem::transmute::<extern "C" fn(), fn()>(f) }); // SAFETY: the two fn() types share the C ABI; the hook is only invoked as parent.
     let c: Option<fn()> =
-        child.map(|f| unsafe { core::mem::transmute::<extern "C" fn(), fn()>(f) });
+        child.map(|f| unsafe { core::mem::transmute::<extern "C" fn(), fn()>(f) }); // SAFETY: the two fn() types share the C ABI; the hook is only invoked as child.
     match atfork::pthread_atfork(p, pa, c) {
         Ok(()) => 0,
         Err(e) => super::common::err(e),

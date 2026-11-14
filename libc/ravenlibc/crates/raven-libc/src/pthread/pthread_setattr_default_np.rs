@@ -7,7 +7,7 @@ pub extern "C" fn pthread_setattr_default_np(attr: *const a::Attr) -> core::ffi:
     if attr.is_null() {
         return 22;
     }
-    let attr_ref = unsafe { &*attr };
+    let attr_ref = unsafe { &*attr }; // SAFETY: attr is non-NULL after the check; the caller owns a live attribute for the call.
     match a::setattr_default_np(attr_ref) {
         Ok(()) => 0,
         Err(e) => super::common::err(e),

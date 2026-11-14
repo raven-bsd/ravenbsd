@@ -10,6 +10,6 @@ pub extern "C" fn pthread_condattr_getclock(
     if attr.is_null() || out.is_null() {
         return 22;
     }
-    unsafe { *out = c::attr_getclock(&*attr) };
+    unsafe { *out = c::attr_getclock(&*attr) }; // SAFETY: the null checks above guarantee a readable attribute and a writable clock slot.
     0
 }

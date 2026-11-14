@@ -9,7 +9,7 @@ pub extern "C" fn thrd_join(thread: usize, result: *mut c_int) -> c_int {
     match c11::thrd_join(&raven_libc_thread::raw::SysKernel, thread) {
         Ok(value) => {
             if !result.is_null() {
-                unsafe { *result = value as c_int };
+                unsafe { *result = value as c_int }; // SAFETY: result is non-NULL after the check and writable for one int.
             }
             0
         }

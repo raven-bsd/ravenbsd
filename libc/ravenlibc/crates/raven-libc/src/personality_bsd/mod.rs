@@ -18,7 +18,9 @@ pub(crate) mod kevent;
 pub(crate) mod kqueue;
 pub(crate) mod kqueue1;
 pub(crate) mod pledge;
+#[path = "raven_va_setproctitle.rs"]
 pub(crate) mod setproctitle;
+#[path = "raven_va_setproctitle_fast.rs"]
 pub(crate) mod setproctitle_fast;
 pub(crate) mod sysctl;
 pub(crate) mod sysctlbyname;

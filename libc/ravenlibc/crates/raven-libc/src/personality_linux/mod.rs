@@ -15,7 +15,9 @@ pub(crate) mod epoll_ctl;
 pub(crate) mod epoll_pwait;
 pub(crate) mod epoll_pwait2;
 pub(crate) mod epoll_wait;
+#[path = "raven_va_error.rs"]
 pub(crate) mod error;
+#[path = "raven_va_error_at_line.rs"]
 pub(crate) mod error_at_line;
 pub(crate) mod error_globals;
 pub(crate) mod error_message_count;
@@ -34,6 +36,7 @@ pub(crate) mod inotify_init;
 pub(crate) mod inotify_init1;
 pub(crate) mod inotify_rm_watch;
 pub(crate) mod personality;
+#[path = "raven_va_prctl.rs"]
 pub(crate) mod prctl;
 pub(crate) mod sendfile;
 pub(crate) mod signalfd;

@@ -13,6 +13,7 @@ pub extern "C" fn pthread_setaffinity_np(
     if mask.is_null() || size < 8 {
         return 22;
     }
+    // SAFETY: mask is non-NULL after the check and readable for one cpu_set_t word.
     match sched::setaffinity(thread, unsafe { *(mask as *const u64) }) {
         Ok(()) => 0,
         Err(e) => super::common::err(e),

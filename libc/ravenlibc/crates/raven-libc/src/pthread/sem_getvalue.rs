@@ -8,6 +8,6 @@ pub extern "C" fn sem_getvalue(sem: *mut s::Sem, out: *mut c_int) -> c_int {
     if sem.is_null() || out.is_null() {
         return 22;
     }
-    unsafe { *out = s::getvalue(&*sem) };
+    unsafe { *out = s::getvalue(&*sem) }; // SAFETY: the null checks above guarantee a readable semaphore and a writable out slot.
     0
 }

@@ -12,8 +12,8 @@ pub extern "C" fn pthread_cond_init(cond: *mut c::Cond, attr: *const c::CondAttr
     let a = if attr.is_null() {
         None
     } else {
-        Some(unsafe { &*attr })
+        Some(unsafe { &*attr }) // SAFETY: attr is non-NULL when Some; the caller owns a live condition attribute.
     };
-    c::init(unsafe { &mut *cond }, a);
+    c::init(unsafe { &mut *cond }, a); // SAFETY: cond is non-NULL after the check and exclusively borrowed for initialisation.
     0
 }

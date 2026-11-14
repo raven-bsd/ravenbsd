@@ -10,6 +10,6 @@ pub extern "C" fn pthread_rwlockattr_getpshared(
     if attr.is_null() || out.is_null() {
         return 22;
     }
-    unsafe { *out = r::attr_getpshared(&*attr) };
+    unsafe { *out = r::attr_getpshared(&*attr) }; // SAFETY: the null checks above guarantee a readable attribute and a writable out slot.
     0
 }

@@ -13,6 +13,7 @@ pub extern "C" fn cnd_timedwait(
     if cond.is_null() || mutex.is_null() || at.is_null() {
         return 2;
     }
+    // SAFETY: the null checks above guarantee live cond/mutex objects and a readable timespec; the nested blocks dereference only those checked pointers.
     c11::cnd_timedwait(&SysKernel, unsafe { &*cond }, unsafe { &*mutex }, unsafe {
         *at
     })
