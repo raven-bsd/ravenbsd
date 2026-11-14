@@ -68,6 +68,7 @@ members = [
     "tests/qtest/cases/signal-entry-fixture",
     "tests/qtest/cases/signal-fault-fixture",
     "tests/qtest/cases/sigresend-fixture",
+    "tests/qtest/cases/thread-tid-fixture",
     "xtask",
     "tests/qtest",
     "tests/ufs-oracle",

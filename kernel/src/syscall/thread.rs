@@ -10,6 +10,7 @@ use alloc::sync::Arc;
 
 use raven_abi::errno::Errno;
 use raven_abi::signal::{CONTEXT_AREA_LIMIT, ENTRY_SP, FaultRecord, MContext};
+use raven_abi::syscall::{THREAD_CREATE_EX, ThreadCreateEx};
 use raven_abi::types::{Handle, Rights, prot};
 use raven_usercopy::{UserSlice, is_user_address};
 
@@ -35,9 +36,44 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
         }
     };
 
-    if frame.r8 != 0 {
+    let create_ex = THREAD_CREATE_EX as u64;
+    if frame.r8 & !create_ex != 0 {
         return Err(Errno::EINVAL);
     }
+    let extended = if frame.r8 & create_ex != 0 {
+        if frame.r9 == 0 {
+            return Err(Errno::EINVAL);
+        }
+        let mut extended = ThreadCreateEx {
+            tp: 0,
+            tid_out: 0,
+            clear_tid_addr: 0,
+        };
+        let bytes = unsafe {
+            // SAFETY: `extended` is a live, fully initialised `ThreadCreateEx`; the mutable byte
+            // view covers exactly its size and is not aliased during the copy.
+            core::slice::from_raw_parts_mut(
+                &mut extended as *mut ThreadCreateEx as *mut u8,
+                size_of::<ThreadCreateEx>(),
+            )
+        };
+        copy_from_user(
+            bytes,
+            UserSlice::new(frame.r9, size_of::<ThreadCreateEx>() as u64)?,
+        )?;
+        if extended.tp != 0 && !is_user_address(extended.tp as u64) {
+            return Err(Errno::EFAULT);
+        }
+        if !writable_word(&caller, extended.tid_out as u64) {
+            return Err(Errno::EFAULT);
+        }
+        if !writable_word(&target, extended.clear_tid_addr as u64) {
+            return Err(Errno::EFAULT);
+        }
+        Some(extended)
+    } else {
+        None
+    };
     let entry = frame.rsi;
     let stack_top = frame.rdx;
     if !is_user_address(entry) {
@@ -72,6 +108,22 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
 
     let thread = sched::new_user_thread(&target, entry, stack_top, frame.r10)?;
+    if let Some(extended) = extended {
+        if extended.tp != 0 {
+            thread.set_tls_base(extended.tp as u64);
+        }
+        thread
+            .clear_tid
+            .store(extended.clear_tid_addr as u64, Ordering::Release);
+        if extended.tid_out != 0 {
+            let bytes = thread.tid.to_ne_bytes();
+            let destination = UserSlice::new(extended.tid_out as u64, 4)?;
+            if copy_to_user(destination, &bytes).is_err() {
+                sched::reap_thread(thread);
+                return Err(Errno::EFAULT);
+            }
+        }
+    }
     let rights = Rights::SIGNAL.union(Rights::DUP);
     let raw = match caller
         .handles
@@ -96,8 +148,65 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(raw.0 as usize)
 }
 
+/// True when `address` is zero or a 4-byte writable user range in `process`.
+fn writable_word(process: &Arc<process::Process>, address: u64) -> bool {
+    if address == 0 {
+        return true;
+    }
+    if UserSlice::new(address, 4).is_err() {
+        return false;
+    }
+    let space = process.address_space.lock();
+    let Some(space) = space.as_ref() else {
+        return false;
+    };
+    [address, address.saturating_add(3)].iter().all(|address| {
+        space
+            .vmas()
+            .find(*address)
+            .is_some_and(|vma| vma.prot() & (prot::WRITE as u8) != 0)
+    })
+}
+
+/// Store zero to a clear-on-exit word and wake its futex waiters.
+fn clear_word(address: u64) {
+    if address == 0 {
+        return;
+    }
+    let Some(process) = process::current() else {
+        return;
+    };
+    let Ok(destination) = UserSlice::new(address, 4) else {
+        return;
+    };
+    if copy_to_user(destination, &[0u8; 4]).is_ok() {
+        crate::syscall::futex::wake_address(process.id, address);
+    }
+}
+
+/// `thread_self() -> tid`.
+pub fn self_tid() -> Result<usize, Errno> {
+    let thread = sched::current_thread().ok_or(Errno::ESRCH)?;
+    if !thread.user {
+        return Err(Errno::EINVAL);
+    }
+    Ok(thread.tid as usize)
+}
+
 /// `thread_exit(code) -> !`.
 pub fn exit(frame: &SyscallFrame) -> ! {
+    if let Some(thread) = sched::current_thread() {
+        clear_word(thread.clear_tid.load(Ordering::Acquire));
+    }
+    sched::exit_thread(frame.rdi as i32)
+}
+
+/// `thread_exit_ex(code, clear_addr, unmap_addr, unmap_len) -> !`.
+pub fn exit_ex(frame: &SyscallFrame) -> ! {
+    clear_word(frame.rsi);
+    if frame.r10 != 0 {
+        crate::syscall::memory_ctl::unmap_current(frame.rdx, frame.r10);
+    }
     sched::exit_thread(frame.rdi as i32)
 }
 

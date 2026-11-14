@@ -101,6 +101,14 @@ fn wait(
     }
 }
 
+/// Wake every futex waiter on `(space, addr)`.
+///
+/// Used by `THREAD_EXIT`/`THREAD_EXIT_EX` after the clear-on-exit word is
+/// stored; the address key matches the private-futex bucket used by `WAIT`.
+pub fn wake_address(space: u64, addr: u64) {
+    let _ = bucket(space, addr).wake(space, addr, usize::MAX);
+}
+
 fn bucket(space: u64, addr: u64) -> &'static WaitQueue {
     let mixed = addr.rotate_left(17) ^ space.wrapping_mul(0x9E37_79B9_7F4A_7C15);
     let index = (mixed as usize) & (BUCKETS - 1);

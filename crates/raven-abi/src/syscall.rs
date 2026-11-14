@@ -208,42 +208,42 @@ pub const THREAD_SET_TLS: usize = 0x23;
 /// this constant and the kernel do not raise signals.
 pub const THREAD_KICK: usize = 0x81;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::types::Handle;
+/// `thread_self() -> tid`.
+///
+/// Returns the calling thread's stable 30-bit, nonzero tid. A raw constant,
+/// not a `Syscall` variant.
+pub const THREAD_SELF: usize = 0x24;
 
-    #[test]
-    fn numbers_are_unique_and_roundtrip() {
-        for (i, a) in Syscall::ALL.iter().enumerate() {
-            assert_eq!(Syscall::from_usize(*a as usize), Some(*a));
-            for b in &Syscall::ALL[i + 1..] {
-                assert_ne!(*a as usize, *b as usize, "{a:?} and {b:?} share a number");
-            }
-        }
-    }
+/// `thread_exit_ex(code: i32, clear_addr: usize, unmap_addr: usize, unmap_len: usize) -> !`.
+///
+/// Stores zero to `clear_addr`, unmaps `[unmap_addr, unmap_addr + unmap_len)`,
+/// wakes futex waiters on `clear_addr` and exits. Raw constant.
+pub const THREAD_EXIT_EX: usize = 0x25;
 
-    #[test]
-    fn unknown_numbers_are_none() {
-        assert_eq!(Syscall::from_usize(0), None);
-        assert_eq!(Syscall::from_usize(0xdead), None);
-    }
+/// `THREAD_CREATE` flag: the sixth argument points to a [`ThreadCreateEx`].
+pub const THREAD_CREATE_EX: usize = 1;
 
-    #[test]
-    fn m1_numbers_are_frozen() {
-        assert_eq!(Syscall::EXIT as usize, 0x01);
-        assert_eq!(Syscall::DEBUG_WRITE as usize, 0x03);
-        assert_eq!(Syscall::UNAME as usize, 0x06);
-        assert_eq!(Syscall::FUTEX as usize, 0x22);
-        assert_eq!(Syscall::PROC_CREATE as usize, 0x30);
-        assert_eq!(Syscall::PROC_WAIT as usize, 0x31);
-        assert_eq!(Syscall::MAP as usize, 0x40);
-        assert_eq!(Syscall::MEMOBJ_CREATE as usize, 0x43);
-        assert_eq!(Syscall::HANDLE_DUP as usize, 0x51);
-    }
-
-    #[test]
-    fn handle_none_is_all_ones() {
-        assert_eq!(Handle::NONE.0, u32::MAX);
-    }
+/// Extended `THREAD_CREATE` payload (PG-2), passed through the sixth argument
+/// when [`THREAD_CREATE_EX`] is set.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ThreadCreateEx {
+    /// User TLS base for the new thread (zero leaves it unset).
+    pub tp: usize,
+    /// Caller address that receives the new 30-bit tid (zero skips the write).
+    pub tid_out: usize,
+    /// New thread's clear-on-exit word (zero disables it).
+    pub clear_tid_addr: usize,
 }
+
+const _: () = {
+    assert!(core::mem::size_of::<ThreadCreateEx>() == 24);
+    assert!(core::mem::align_of::<ThreadCreateEx>() == 8);
+    assert!(core::mem::offset_of!(ThreadCreateEx, tp) == 0);
+    assert!(core::mem::offset_of!(ThreadCreateEx, tid_out) == 8);
+    assert!(core::mem::offset_of!(ThreadCreateEx, clear_tid_addr) == 16);
+};
+
+#[cfg(test)]
+#[path = "syscall_ut.rs"]
+mod tests;
