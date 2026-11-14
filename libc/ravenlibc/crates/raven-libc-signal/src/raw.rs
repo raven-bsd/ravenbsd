@@ -20,8 +20,12 @@ use crate::critical::SigThreadState;
 
 #[cfg(target_arch = "aarch64")]
 mod context_aarch64;
+#[cfg(target_arch = "aarch64")]
+mod context_aarch64_handler;
 #[cfg(target_arch = "riscv64")]
 mod context_riscv64;
+#[cfg(target_arch = "riscv64")]
+mod context_riscv64_handler;
 #[cfg(target_arch = "x86_64")]
 mod context_x86_64;
 
