@@ -6,5 +6,263 @@
 
 | name | ring_computed | ring_assignment | ring_override |
 |---|---|---|---|
-
-_No differences._
+| `AF_NETLINK` | 1 | 3 | doc 02 L26: ring 3; constants exist but calls return EAFNOSUPPORT (doc 12 1.1). |
+| `AF_PACKET` | 1 | 3 | doc 02 L26: ring 3; constants exist but calls return EAFNOSUPPORT (doc 12 1.1). |
+| `LC_GLOBAL_LOCALE` | 1 | 0 | doc 02 P15 (locale.h): ring 0 macro/constant; the census standard index has no tag. |
+| `NOEXPR` | 1 | 0 | doc 02 X76 (langinfo.h): ring 0 macro/constant; the census standard index has no tag. |
+| `YESEXPR` | 1 | 0 | doc 02 X76 (langinfo.h): ring 0 macro/constant; the census standard index has no tag. |
+| `__assert` | 1 | 2 | doc 02 B21: BSD __assert alias conflicts with bionic Android assert at the same name (rule 2.5), ring 2 bsd. |
+| `__assert2` | 1 | 2 | doc 02 B21: BSD __assert2 alias conflicts with bionic Android assert at the same name (rule 2.5), ring 2 bsd. |
+| `__dso_handle` | 2 | 1 | doc 02 Z02: C++ Itanium ABI contract name, ring 1 (linker-provided; no census cell). |
+| `_ctype_` | 1 | 3 | doc 02 Z10: no exposed ctype table (doc 14). |
+| `_tolower_tab_` | 1 | 3 | doc 02 Z10: no exposed ctype table (doc 14). |
+| `acospi` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `adjtime` | 1 | 0 | doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `arch_prctl` | 2 | 3 | doc 02 L24: ring 3, not exported (doc 10 3.8). |
+| `asinpi` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `at_quick_exit` | 1 | 0 | doc 02 I17 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `atan2pi` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `atanpi` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `basename` | 1 | 0 | doc 02 P14 (libgen.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `bgets` | 2 | 3 | doc 02 S08: SysV libgen extras SKIP (doc 07 section 1). |
+| `bufsplit` | 2 | 3 | doc 02 S08: SysV libgen extras SKIP (doc 07 section 1). |
+| `c16rtomb` | 1 | 0 | doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `c32rtomb` | 1 | 0 | doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `c8rtomb` | 1 | 0 | doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `cabs` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `cacos` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `cacosh` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `caddr_t` | 2 | 1 | doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell). |
+| `cap_enter` | 2 | 3 | doc 02 B19: ring 3 (doc 15). |
+| `cap_getmode` | 2 | 3 | doc 02 B19: ring 3 (doc 15). |
+| `cap_rights_clear` | 2 | 3 | doc 02 B19: ring 3 (doc 15). |
+| `cap_rights_init` | 2 | 3 | doc 02 B19: ring 3 (doc 15). |
+| `cap_rights_is_set` | 2 | 3 | doc 02 B19: ring 3 (doc 15). |
+| `cap_rights_limit` | 2 | 3 | doc 02 B19: ring 3 (doc 15). |
+| `cap_rights_set` | 2 | 3 | doc 02 B19: ring 3 (doc 15). |
+| `cap_sandboxed` | 2 | 3 | doc 02 B19: ring 3 (doc 15). |
+| `capget` | 2 | 3 | doc 02 section 5 R14: absent; Linux binaries use the Linux personality, not libc. |
+| `capset` | 2 | 3 | doc 02 section 5 R14: absent; Linux binaries use the Linux personality, not libc. |
+| `carg` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `casin` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `casinh` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `catan` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `catanh` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `catclose` | 1 | 0 | doc 02 X78 (nl_types.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `catgets` | 1 | 0 | doc 02 X78 (nl_types.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `ccos` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `ccosh` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `cexp` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `chflags` | 1 | 3 | doc 02 B17: ring 3 stub ENOSYS; UF_*/SF_* hidden. |
+| `cimag` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `clock_getcpuclockid` | 1 | 0 | doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `clock_nanosleep` | 1 | 0 | doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `clog` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `closelog` | 1 | 0 | doc 02 P48 (syslog.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `compoundn` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `conj` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `copylist` | 2 | 3 | doc 02 S08: SysV libgen extras SKIP (doc 07 section 1). |
+| `cospi` | 1 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `cpow` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `cproj` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `creal` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `csin` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `csinh` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `csqrt` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `ctan` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `ctanh` | 1 | 0 | doc 02 I02 (complex.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `dirname` | 1 | 0 | doc 02 P14 (libgen.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `door_call` | 2 | 3 | doc 02 section 5 R16: Solaris-only, absent. |
+| `door_create` | 2 | 3 | doc 02 section 5 R16: Solaris-only, absent. |
+| `door_return` | 2 | 3 | doc 02 section 5 R16: Solaris-only, absent. |
+| `door_server_create` | 2 | 3 | doc 02 section 5 R16: Solaris-only, absent. |
+| `exp10m1` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `exp2m1` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `fanotify_init` | 2 | 3 | doc 02 section 5 R10: absent, no primitive. |
+| `fanotify_mark` | 2 | 3 | doc 02 section 5 R10: absent, no primitive. |
+| `fchdir` | 1 | 0 | doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `fchflags` | 1 | 3 | doc 02 B17: ring 3 stub ENOSYS; UF_*/SF_* hidden. |
+| `fchmod` | 1 | 0 | doc 02 P40 (sys/stat.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `fchmodat` | 1 | 0 | doc 02 P40 (sys/stat.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `fchown` | 1 | 0 | doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `fchownat` | 1 | 0 | doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `fmaximum_mag_num` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `fmaxmag` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `fminimum_mag_num` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `fminmag` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `fmtmsg` | 1 | 0 | doc 02 P07 (fmtmsg.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `fromfp` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `fromfpx` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `fstatvfs` | 1 | 0 | doc 02 P41 (sys/statvfs.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `ftok` | 1 | 0 | doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `gethostname` | 1 | 0 | doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `getitimer` | 1 | 0 | doc 02 P42 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `getppriv` | 2 | 3 | doc 02 section 5 R16: Solaris-only, absent. |
+| `gmatch` | 2 | 3 | doc 02 S08: SysV libgen extras SKIP (doc 07 section 1). |
+| `gnu_get_libc_release` | 2 | 3 | doc 02 section 5 R13: absent; identity macros stay clean. |
+| `gnu_get_libc_version` | 2 | 3 | doc 02 section 5 R13: absent; identity macros stay clean. |
+| `grantpt` | 1 | 0 | doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `hcreate` | 1 | 0 | doc 02 P26 (search.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `hdestroy` | 1 | 0 | doc 02 P26 (search.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `hsearch` | 1 | 0 | doc 02 P26 (search.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `iconv` | 1 | 0 | doc 02 P12 (iconv.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `iconv_close` | 1 | 0 | doc 02 P12 (iconv.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `iconv_open` | 1 | 0 | doc 02 P12 (iconv.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `if_freenameindex` | 1 | 0 | doc 02 P18 (net/if.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `if_indextoname` | 1 | 0 | doc 02 P18 (net/if.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `if_nameindex` | 1 | 0 | doc 02 P18 (net/if.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `if_nametoindex` | 1 | 0 | doc 02 P18 (net/if.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `killpg` | 1 | 0 | doc 02 P29 (signal.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `lchflags` | 2 | 3 | doc 02 B17: ring 3 stub ENOSYS; UF_*/SF_* hidden. |
+| `lchown` | 1 | 0 | doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `link_map` | 2 | 1 | doc 02 X83: loader link-map type, ring 1 (header-only; no census cell). |
+| `llogb` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `llrint` | 1 | 0 | doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `llround` | 1 | 0 | doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `lockf` | 1 | 0 | doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `log10p1` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `log2p1` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `logb` | 1 | 0 | doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `logp1` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `lrint` | 1 | 0 | doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `lround` | 1 | 0 | doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mallinfo` | 1 | 2 | doc 02 X69: glibc allocator API; illumos mallinfo uses the Solaris allocator contract (rule 2.5), ring 2 linux. |
+| `mallopt` | 1 | 2 | doc 02 X69: glibc allocator API; illumos mallopt commands use the Solaris allocator contract (rule 2.5), ring 2 linux. |
+| `mbrtoc16` | 1 | 0 | doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mbrtoc32` | 1 | 0 | doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mbrtoc8` | 1 | 0 | doc 02 I23 (uchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mimmutable` | 2 | 3 | doc 02 B15: ring 3 stub ENOSYS. |
+| `minherit` | 2 | 3 | doc 02 B15: ring 3 stub ENOSYS. |
+| `mkdtemp` | 1 | 0 | doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mkfifoat` | 1 | 0 | doc 02 P40 (sys/stat.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mknod` | 1 | 0 | doc 02 P40 (sys/stat.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mknodat` | 1 | 0 | doc 02 P40 (sys/stat.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mkstemp` | 1 | 0 | doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mktemp` | 1 | 0 | doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mq_close` | 1 | 0 | doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mq_getattr` | 1 | 0 | doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mq_notify` | 1 | 0 | doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mq_open` | 1 | 0 | doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mq_receive` | 1 | 0 | doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mq_send` | 1 | 0 | doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mq_setattr` | 1 | 0 | doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mq_timedreceive` | 1 | 0 | doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mq_timedsend` | 1 | 0 | doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `mq_unlink` | 1 | 0 | doc 02 P17 (mqueue.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `msgctl` | 1 | 0 | doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `msgget` | 1 | 0 | doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `msgrcv` | 1 | 0 | doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `msgsnd` | 1 | 0 | doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `nan` | 1 | 0 | doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `nearbyint` | 1 | 0 | doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `nextafter` | 1 | 0 | doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `nexttoward` | 1 | 0 | doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `ns_name_compress` | 1 | 2 | doc 02 X42: Linux BIND spelling; FreeBSD exports __ns_name_* and macro-renames this name, so the unqualified ABI is Linux (rule 2.5), ring 2 linux. |
+| `ns_name_ntop` | 1 | 2 | doc 02 X42: Linux BIND spelling; FreeBSD macro-renames this name to __ns_name_ntop, so the unqualified ABI is Linux (rule 2.5), ring 2 linux. |
+| `ns_name_pton` | 1 | 2 | doc 02 X42: Linux BIND spelling; FreeBSD macro-renames this name to __ns_name_pton, so the unqualified ABI is Linux (rule 2.5), ring 2 linux. |
+| `ns_name_uncompress` | 1 | 2 | doc 02 X42: Linux BIND spelling; FreeBSD macro-renames this name to __ns_name_uncompress, so the unqualified ABI is Linux (rule 2.5), ring 2 linux. |
+| `open_wmemstream` | 1 | 0 | doc 02 P31 (stdio.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `openlog` | 1 | 0 | doc 02 P48 (syslog.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `p2close` | 2 | 3 | doc 02 S08: SysV libgen extras SKIP (doc 07 section 1). |
+| `p2open` | 2 | 3 | doc 02 S08: SysV libgen extras SKIP (doc 07 section 1). |
+| `pipe2` | 1 | 0 | doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `posix_fadvise` | 1 | 0 | doc 02 P06 (fcntl.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `posix_fallocate` | 1 | 0 | doc 02 P06 (fcntl.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `posix_madvise` | 1 | 0 | doc 02 P36 (sys/mman.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `pown` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `powr` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `processor_bind` | 2 | 3 | doc 02 section 5 R16: Solaris-only, absent. |
+| `pselect` | 1 | 0 | doc 02 P38 (sys/select.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `pset_create` | 1 | 3 | doc 02 section 5 R16: Solaris-only, absent. |
+| `psiginfo` | 1 | 0 | doc 02 P29 (signal.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `psignal` | 1 | 0 | doc 02 P29 (signal.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `ptrace` | 1 | 3 | doc 02 section 5 R14: absent; Linux binaries use the Linux personality, not libc. |
+| `ptsname` | 1 | 0 | doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `quad_t` | 3 | 1 | doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell). |
+| `quick_exit` | 1 | 0 | doc 02 I17 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `r_debug` | 3 | 1 | doc 02 X83: loader r_debug data, ring 1 (loader-provided; no census cell). |
+| `radixsort` | 2 | 3 | doc 02 section 5 R02: absent, no consumer. |
+| `readlink` | 1 | 0 | doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `readlinkat` | 1 | 0 | doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `readv` | 1 | 0 | doc 02 P44 (sys/uio.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `realpath` | 1 | 0 | doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `reboot` | 1 | 2 | doc 02 L18: Linux reboot magic; the BSD form has a different signature and is not provided (rule 2.5), ring 2 linux. |
+| `regcmp` | 2 | 3 | doc 02 S08: SysV libgen extras SKIP (doc 07 section 1). |
+| `regex` | 2 | 3 | doc 02 S08: SysV libgen extras SKIP (doc 07 section 1). |
+| `remainder` | 1 | 0 | doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `remquo` | 1 | 0 | doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `res_nclose` | 1 | 2 | doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nquery and musl exports the family; the census symbol-list cell is missing, ring 2 linux. |
+| `res_ninit` | 1 | 2 | doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_ninit and musl exports the family; the census symbol-list cell is missing, ring 2 linux. |
+| `res_nmkquery` | 1 | 2 | doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nmkquery and musl exports the family; the census symbol-list cell is missing, ring 2 linux. |
+| `res_nquery` | 1 | 2 | doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nquery and musl exports the family; the census symbol-list cell is missing, ring 2 linux. |
+| `res_nquerydomain` | 1 | 2 | doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nquerydomain and musl exports the family; the census symbol-list cell is missing, ring 2 linux. |
+| `res_nsearch` | 1 | 2 | doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nsearch and musl exports the family; the census symbol-list cell is missing, ring 2 linux. |
+| `res_nsend` | 1 | 2 | doc 02 X42: Linux res_n* spelling; glibc resolv/Versions exports res_nsend and musl exports the family; the census symbol-list cell is missing, ring 2 linux. |
+| `rootn` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `scalbln` | 1 | 0 | doc 02 I09 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `semctl` | 1 | 0 | doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `semget` | 1 | 0 | doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `semop` | 1 | 0 | doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `setitimer` | 1 | 0 | doc 02 P42 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `setlogmask` | 1 | 0 | doc 02 P48 (syslog.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `settimeofday` | 1 | 0 | doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `shm_unlink` | 1 | 0 | doc 02 P36 (sys/mman.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `shmat` | 1 | 0 | doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `shmctl` | 1 | 0 | doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `shmdt` | 1 | 0 | doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `shmget` | 1 | 0 | doc 02 P35 (sys/ipc.h sys/msg.h sys/sem.h sys/shm.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `signgam` | 1 | 0 | doc 02 Z17 ((data)): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `sockaddr_un` | 3 | 0 | doc 02 P45: <sys/un.h> header-only type, ring 0. |
+| `sradixsort` | 2 | 3 | doc 02 section 5 R02: absent, no consumer. |
+| `srandom_deterministic` | 2 | 3 | doc 02 section 5 R03: BSD-only, no port needs them (doc 03 O-6). |
+| `srandomdev` | 2 | 3 | doc 02 section 5 R03: BSD-only, no port needs them (doc 03 O-6). |
+| `statvfs` | 1 | 0 | doc 02 P41 (sys/statvfs.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `stdc_bit_ceil` | 1 | 0 | doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map). |
+| `stdc_bit_floor` | 1 | 0 | doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map). |
+| `stdc_bit_width` | 1 | 0 | doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map). |
+| `stdc_count_ones` | 1 | 0 | doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map). |
+| `stdc_count_zeros` | 1 | 0 | doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map). |
+| `stdc_first_leading_one` | 1 | 0 | doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map). |
+| `stdc_first_leading_zero` | 1 | 0 | doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map). |
+| `stdc_first_trailing_one` | 1 | 0 | doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map). |
+| `stdc_first_trailing_zero` | 1 | 0 | doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map). |
+| `stdc_has_single_bit` | 1 | 0 | doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map). |
+| `stdc_leading_ones` | 1 | 0 | doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map). |
+| `stdc_leading_zeros` | 1 | 0 | doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map). |
+| `stdc_trailing_ones` | 1 | 0 | doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map). |
+| `stdc_trailing_zeros` | 1 | 0 | doc 02 I15: C23 <stdbit.h> type-generic macro; the exported ABI names are the suffixed stdc_*_uc/_us/_ui/_ul/_ull forms (FreeBSD Symbol.map). |
+| `strfmon` | 1 | 0 | doc 02 P16 (monetary.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `strfmon_l` | 1 | 0 | doc 02 P16 (monetary.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `strfromd` | 1 | 0 | doc 02 I18 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `strfromf` | 1 | 0 | doc 02 I18 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `strfroml` | 1 | 0 | doc 02 I18 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `strptime_l` | 1 | 0 | doc 02 X62: strptime_l is the POSIX.1 _l form, ring 0; getdate is the ring-3 member. |
+| `strtof` | 1 | 0 | doc 02 I17 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `swprintf` | 1 | 0 | doc 02 I25 (wchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `symlink` | 1 | 0 | doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `symlinkat` | 1 | 0 | doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `syslog` | 1 | 0 | doc 02 P48 (syslog.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `tanpi` | 1 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `tcgetwinsize` | 1 | 0 | doc 02 P49 (termios.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `tcsetwinsize` | 1 | 0 | doc 02 P49 (termios.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `timer_create` | 1 | 0 | doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `timer_delete` | 1 | 0 | doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `timer_getoverrun` | 1 | 0 | doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `timer_gettime` | 1 | 0 | doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `timer_settime` | 1 | 0 | doc 02 X63 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `u_char` | 2 | 1 | doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell). |
+| `u_int` | 3 | 1 | doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell). |
+| `u_long` | 2 | 1 | doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell). |
+| `u_short` | 3 | 1 | doc 02 B26: BSD typedef under __BSD_VISIBLE, ring 1 (header-only; no census cell). |
+| `ufromfp` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `ufromfpx` | 2 | 0 | doc 02 I10 (math.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `ulimit` | 1 | 0 | doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `unlockpt` | 1 | 0 | doc 02 P32 (stdlib.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `usleep` | 1 | 0 | doc 02 P50 (unistd.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `utimes` | 1 | 0 | doc 02 P42 (sys/time.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `vswprintf` | 1 | 0 | doc 02 I25 (wchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `vsyslog` | 1 | 0 | doc 02 P48 (syslog.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `wcstod` | 1 | 0 | doc 02 I24 (wchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `wcstof` | 1 | 0 | doc 02 I24 (wchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `wcstold` | 1 | 0 | doc 02 I24 (wchar.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
+| `writev` | 1 | 0 | doc 02 P44 (sys/uio.h): ring 0; the census standard index has no tag and rule 2.3 forbids demoting a ring-0 row. |
