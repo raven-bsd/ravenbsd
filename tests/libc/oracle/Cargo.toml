@@ -19,6 +19,7 @@ raven-libc-ctype = { path = "../../../libc/ravenlibc/crates/raven-libc-ctype" }
 raven-libc-dtoa = { path = "../../../libc/ravenlibc/crates/raven-libc-dtoa", features = ["alloc"] }
 raven-libc-fmt = { path = "../../../libc/ravenlibc/crates/raven-libc-fmt" }
 raven-libc-m = { path = "../../../libc/ravenlibc/crates/raven-libc-m" }
+raven-libc-signal = { path = "../../../libc/ravenlibc/crates/raven-libc-signal" }
 raven-libc-stdio = { path = "../../../libc/ravenlibc/crates/raven-libc-stdio" }
 raven-libc-stdlib = { path = "../../../libc/ravenlibc/crates/raven-libc-stdlib" }
 raven-libc-str = { path = "../../../libc/ravenlibc/crates/raven-libc-str" }
@@ -36,6 +37,8 @@ oracle-fmt-musl = []
 oracle-fmt-musl-scanf = []
 oracle-m-core = []
 oracle-raven-libc-time = []
+oracle-signal-freebsd = []
+oracle-signal-musl = []
 oracle-stdio-musl = []
 oracle-stdlib-freebsd = []
 oracle-stdlib-musl = []
@@ -59,6 +62,8 @@ all-oracles = [
     "oracle-fmt-musl-scanf",
     "oracle-m-core",
     "oracle-raven-libc-time",
+    "oracle-signal-freebsd",
+    "oracle-signal-musl",
     "oracle-stdio-musl",
     "oracle-stdlib-freebsd",
     "oracle-stdlib-musl",

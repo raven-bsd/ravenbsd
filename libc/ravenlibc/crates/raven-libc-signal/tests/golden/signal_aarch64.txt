@@ -1,0 +1,148 @@
+# aarch64-unknown-none-softfloat
+
+# llvm-objdump -d --no-show-raw-insn (build-only; not executed on this host)
+
+0000000000000000 <__rl_getcontext>:
+       0:      	stp	x19, x20, [x0, #160]
+       4:      	stp	x21, x22, [x0, #176]
+       8:      	stp	x23, x24, [x0, #192]
+       c:      	stp	x25, x26, [x0, #208]
+      10:      	stp	x27, x28, [x0, #224]
+      14:      	stp	x29, x30, [x0, #240]
+      18:      	mov	x2, sp
+      1c:      	str	x2, [x0, #256]
+      20:      	str	x30, [x0, #264]
+      24:      	mrs	x1, NZCV
+      28:      	str	x1, [x0, #272]
+      2c:      	stp	xzr, xzr, [x0, #8]
+      30:      	stp	xzr, xzr, [x0, #24]
+      34:      	stp	xzr, xzr, [x0, #40]
+      38:      	stp	xzr, xzr, [x0, #56]
+      3c:      	mov	w0, #0
+      40:      	ret
+
+0000000000000044 <__rl_setcontext>:
+      44:      	mov	x9, x0
+      48:      	ldp	x0, x1, [x9, #8]
+      4c:      	ldp	x2, x3, [x9, #24]
+      50:      	ldp	x4, x5, [x9, #40]
+      54:      	ldp	x6, x7, [x9, #56]
+      58:      	ldp	x19, x20, [x9, #160]
+      5c:      	ldp	x21, x22, [x9, #176]
+      60:      	ldp	x23, x24, [x9, #192]
+      64:      	ldp	x25, x26, [x9, #208]
+      68:      	ldp	x27, x28, [x9, #224]
+      6c:      	ldp	x29, x30, [x9, #240]
+      70:      	ldr	x10, [x9, #256]
+      74:      	mov	sp, x10
+      78:      	ldr	x10, [x9, #264]
+      7c:      	ldr	x11, [x9, #272]
+      80:      	msr	NZCV, x11
+      84:      	br	x10
+
+0000000000000088 <__rl_swapcontext>:
+      88:      	mov	x19, x30
+      8c:      	mov	x20, x1
+      90:      	mov	x21, x0
+      94:      	bl	0x94 <__rl_swapcontext+0xc>
+      98:      	adr	x10, #16
+      9c:      	str	x10, [x21, #264]
+      a0:      	mov	x0, x20
+      a4:      	b	0xa4 <__rl_swapcontext+0x1c>
+      a8:      	mov	x30, x19
+      ac:      	mov	w0, #0
+      b0:      	ret
+
+00000000000000b4 <__rl_start_context>:
+      b4:      	mov	x9, sp
+      b8:      	and	x9, x9, #0xfffffffffffffff0
+      bc:      	mov	sp, x9
+      c0:      	blr	x20
+      c4:      	cbz	x21, 0xd0 <__rl_start_context+0x1c>
+      c8:      	add	x0, x21, #176
+      cc:      	bl	0xcc <__rl_start_context+0x18>
+      d0:      	mov	w0, #0
+      d4:      	bl	0xd4 <__rl_start_context+0x20>
+      d8:      	brk	#0
+
+00000000000000dc <__rl_call_handler>:
+      dc:      	stp	x19, x20, [sp, #-16]!
+      e0:      	mov	x20, sp
+      e4:      	mov	x19, x1
+      e8:      	mov	x9, x0
+      ec:      	mov	x0, x2
+      f0:      	mov	x1, x3
+      f4:      	mov	x2, x4
+      f8:      	mov	sp, x9
+      fc:      	mov	x10, sp
+     100:      	and	x10, x10, #0xfffffffffffffff0
+     104:      	mov	sp, x10
+     108:      	blr	x19
+     10c:      	mov	sp, x20
+     110:      	ldp	x19, x20, [sp], #16
+     114:      	ret
+
+0000000000000000 <__raven_sigentry>:
+       0:      	mov	x10, sp
+       4:      	and	x10, x10, #0xfffffffffffffff0
+       8:      	mov	sp, x10
+       c:      	adrp	x9, 0x0 <__raven_sigentry+0xc>
+      10:      	ldr	x9, [x9]
+      14:      	cbz	x9, 0x1c <__raven_sigentry+0x1c>
+      18:      	blr	x9
+      1c:      	b	0x1c <__raven_sigentry+0x1c>
+
+0000000000000020 <__rl_sigreturn_stub>:
+      20:      	mov	x8, #130
+      24:      	svc	#0
+      28:      	brk	#0
+
+0000000000000000 <__rl_setjmp>:
+       0:      	stp	x19, x20, [x0]
+       4:      	stp	x21, x22, [x0, #16]
+       8:      	stp	x23, x24, [x0, #32]
+       c:      	stp	x25, x26, [x0, #48]
+      10:      	stp	x27, x28, [x0, #64]
+      14:      	stp	x29, x30, [x0, #80]
+      18:      	mov	x2, sp
+      1c:      	str	x2, [x0, #104]
+      20:      	mov	x0, #0
+      24:      	ret
+
+0000000000000028 <__rl_longjmp>:
+      28:      	ldp	x19, x20, [x0]
+      2c:      	ldp	x21, x22, [x0, #16]
+      30:      	ldp	x23, x24, [x0, #32]
+      34:      	ldp	x25, x26, [x0, #48]
+      38:      	ldp	x27, x28, [x0, #64]
+      3c:      	ldp	x29, x30, [x0, #80]
+      40:      	ldr	x2, [x0, #104]
+      44:      	mov	sp, x2
+      48:      	cmp	w1, #0
+      4c:      	csinc	w0, w1, wzr, ne
+      50:      	br	x30
+
+0000000000000000 <__rl_sigsetjmp>:
+       0:      	cbz	x1, 0x30 <__rl_sigsetjmp+0x30>
+       4:      	str	x30, [x0, #256]
+       8:      	str	x19, [x0, #272]
+       c:      	str	x2, [x0, #280]
+      10:      	mov	x19, x0
+      14:      	bl	0x14 <__rl_sigsetjmp+0x14>
+      18:      	mov	w1, w0
+      1c:      	mov	x0, x19
+      20:      	ldr	x2, [x0, #280]
+      24:      	ldr	x30, [x0, #256]
+      28:      	ldr	x19, [x0, #272]
+      2c:      	b	0x2c <__rl_sigsetjmp+0x2c>
+      30:      	b	0x30 <__rl_sigsetjmp+0x30>
+
+0000000000000034 <__rl_sigsetjmp_tail>:
+      34:      	cbz	w1, 0x44 <__rl_sigsetjmp_tail+0x10>
+      38:      	ldr	x3, [x0, #264]
+      3c:      	str	x3, [x2]
+      40:      	b	0x4c <__rl_sigsetjmp_tail+0x18>
+      44:      	ldr	x3, [x2]
+      48:      	str	x3, [x0, #264]
+      4c:      	mov	w0, w1
+      50:      	ret

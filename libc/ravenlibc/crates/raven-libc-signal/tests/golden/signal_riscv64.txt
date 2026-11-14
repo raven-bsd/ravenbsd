@@ -1,0 +1,192 @@
+# riscv64gc-unknown-none-elf
+
+# llvm-objdump -d --no-show-raw-insn (build-only; not executed on this host)
+
+0000000000000000 <__rl_setjmp>:
+       0:      	sd	s0, 0(a0)
+       2:      	sd	s1, 8(a0)
+       4:      	sd	s2, 16(a0)
+       8:      	sd	s3, 24(a0)
+       c:      	sd	s4, 32(a0)
+      10:      	sd	s5, 40(a0)
+      14:      	sd	s6, 48(a0)
+      18:      	sd	s7, 56(a0)
+      1c:      	sd	s8, 64(a0)
+      20:      	sd	s9, 72(a0)
+      24:      	sd	s10, 80(a0)
+      28:      	sd	s11, 88(a0)
+      2c:      	sd	sp, 96(a0)
+      30:      	sd	ra, 104(a0)
+      34:      	li	a0, 0
+      36:      	ret
+
+0000000000000038 <__rl_longjmp>:
+      38:      	ld	s0, 0(a0)
+      3a:      	ld	s1, 8(a0)
+      3c:      	ld	s2, 16(a0)
+      40:      	ld	s3, 24(a0)
+      44:      	ld	s4, 32(a0)
+      48:      	ld	s5, 40(a0)
+      4c:      	ld	s6, 48(a0)
+      50:      	ld	s7, 56(a0)
+      54:      	ld	s8, 64(a0)
+      58:      	ld	s9, 72(a0)
+      5c:      	ld	s10, 80(a0)
+      60:      	ld	s11, 88(a0)
+      64:      	ld	sp, 96(a0)
+      68:      	ld	ra, 104(a0)
+      6c:      	seqz	a0, a1
+      70:      	add	a0, a0, a1
+      72:      	ret
+
+0000000000000000 <__rl_sigsetjmp>:
+       0:      	bnez	a1, 0xa <__rl_sigsetjmp+0xa>
+       2:      	auipc	t1, 0
+       6:      	jr	t1
+       a:      	sd	ra, 256(a0)
+       e:      	sd	s0, 272(a0)
+      12:      	sd	a2, 280(a0)
+      16:      	mv	s0, a0
+      18:      	auipc	ra, 0
+      1c:      	jalr	ra
+      20:      	mv	a1, a0
+      22:      	mv	a0, s0
+      24:      	ld	a2, 280(a0)
+      28:      	ld	ra, 256(a0)
+      2c:      	ld	s0, 272(a0)
+      30:      	auipc	t1, 0
+      34:      	jr	t1
+
+0000000000000038 <__rl_sigsetjmp_tail>:
+      38:      	beqz	a1, 0x42 <__rl_sigsetjmp_tail+0xa>
+      3a:      	ld	a3, 264(a0)
+      3e:      	sd	a3, 0(a2)
+      40:      	j	0x48 <__rl_sigsetjmp_tail+0x10>
+      42:      	ld	a3, 0(a2)
+      44:      	sd	a3, 264(a0)
+      48:      	mv	a0, a1
+      4a:      	ret
+
+0000000000000000 <__rl_getcontext>:
+       0:      	mv	a1, a0
+       2:      	sd	s0, 64(a1)
+       4:      	sd	s1, 72(a1)
+       6:      	sd	s2, 144(a1)
+       a:      	sd	s3, 152(a1)
+       e:      	sd	s4, 160(a1)
+      12:      	sd	s5, 168(a1)
+      16:      	sd	s6, 176(a1)
+      1a:      	sd	s7, 184(a1)
+      1e:      	sd	s8, 192(a1)
+      22:      	sd	s9, 200(a1)
+      26:      	sd	s10, 208(a1)
+      2a:      	sd	s11, 216(a1)
+      2e:      	sd	ra, 0(a1)
+      32:      	sd	ra, 8(a1)
+      36:      	sd	sp, 16(a1)
+      3a:      	sd	zero, 80(a1)
+      3e:      	sd	zero, 88(a1)
+      42:      	sd	zero, 96(a1)
+      46:      	sd	zero, 104(a1)
+      4a:      	sd	zero, 112(a1)
+      4e:      	sd	zero, 120(a1)
+      52:      	sd	zero, 128(a1)
+      56:      	sd	zero, 136(a1)
+      5a:      	li	a0, 0
+      5c:      	ret
+
+000000000000005e <__rl_setcontext>:
+      5e:      	mv	t6, a0
+      60:      	ld	ra, 8(t6)
+      64:      	ld	sp, 16(t6)
+      68:      	ld	a0, 80(t6)
+      6c:      	ld	a1, 88(t6)
+      70:      	ld	a2, 96(t6)
+      74:      	ld	a3, 104(t6)
+      78:      	ld	a4, 112(t6)
+      7c:      	ld	a5, 120(t6)
+      80:      	ld	a6, 128(t6)
+      84:      	ld	a7, 136(t6)
+      88:      	ld	s0, 64(t6)
+      8c:      	ld	s1, 72(t6)
+      90:      	ld	s2, 144(t6)
+      94:      	ld	s3, 152(t6)
+      98:      	ld	s4, 160(t6)
+      9c:      	ld	s5, 168(t6)
+      a0:      	ld	s6, 176(t6)
+      a4:      	ld	s7, 184(t6)
+      a8:      	ld	s8, 192(t6)
+      ac:      	ld	s9, 200(t6)
+      b0:      	ld	s10, 208(t6)
+      b4:      	ld	s11, 216(t6)
+      b8:      	ld	t0, 0(t6)
+      bc:      	jr	t0
+
+00000000000000be <__rl_swapcontext>:
+      be:      	addi	sp, sp, -24
+      c0:      	sd	s0, 0(sp)
+      c2:      	sd	s1, 8(sp)
+      c4:      	sd	s2, 16(sp)
+      c6:      	mv	s2, a0
+      c8:      	mv	s0, a1
+      ca:      	mv	s1, ra
+      cc:      	auipc	ra, 0
+      d0:      	jalr	ra
+      d4:      	auipc	t0, 0
+      d8:      	addi	t0, t0, 26
+      dc:      	sd	t0, 0(s2)
+      e0:      	sd	s1, 8(s2)
+      e4:      	mv	a0, s0
+      e6:      	auipc	ra, 0
+      ea:      	jalr	ra
+      ee:      	ld	s0, 0(sp)
+      f0:      	ld	s1, 8(sp)
+      f2:      	ld	s2, 16(sp)
+      f4:      	addi	sp, sp, 24
+      f6:      	li	a0, 0
+      f8:      	ret
+
+00000000000000fa <__rl_start_context>:
+      fa:      	andi	sp, sp, -16
+      fe:      	jalr	s1
+     100:      	beqz	s2, 0x110 <__rl_start_context+0x16>
+     104:      	addi	a0, s2, 176
+     108:      	auipc	ra, 0
+     10c:      	jalr	ra
+     110:      	li	a0, 0
+     112:      	auipc	ra, 0
+     116:      	jalr	ra
+     11a:      	ebreak
+
+000000000000011c <__rl_call_handler>:
+     11c:      	addi	sp, sp, -16
+     11e:      	sd	s0, 0(sp)
+     120:      	sd	s1, 8(sp)
+     122:      	mv	s1, sp
+     124:      	mv	s0, a1
+     126:      	mv	t0, a0
+     128:      	mv	a0, a2
+     12a:      	mv	a1, a3
+     12c:      	mv	a2, a4
+     12e:      	mv	sp, t0
+     130:      	andi	sp, sp, -16
+     134:      	jalr	s0
+     136:      	mv	sp, s1
+     138:      	ld	s0, 0(sp)
+     13a:      	ld	s1, 8(sp)
+     13c:      	addi	sp, sp, 16
+     13e:      	ret
+
+0000000000000000 <__raven_sigentry>:
+       0:      	andi	sp, sp, -16
+       4:      	lui	t0, 0
+       8:      	mv	t0, t0
+       c:      	ld	t0, 0(t0)
+      10:      	beqz	t0, 0x16 <__raven_sigentry+0x16>
+      14:      	jalr	t0
+      16:      	j	0x16 <__raven_sigentry+0x16>
+
+000000000000001a <__rl_sigreturn_stub>:
+      1a:      	li	a7, 130
+      1e:      	ecall	
+      22:      	ebreak

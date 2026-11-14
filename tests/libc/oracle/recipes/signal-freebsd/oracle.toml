@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# signal-freebsd: freebsd:lib/libc/gen/sig2str.c plus the siglist.c that defines sys_signame,
+# compiled with the BSD numbering shim; compared to the Rust Linux-numbered implementation by
+# NAME (the numbers differ: SIGUSR1 is 30 there, 10 here).
+
+schema = 1
+family = "signal-freebsd"
+description = "FreeBSD sig2str/str2sig with BSD numbering and sys_signame"
+exports = [
+  "sig2str",
+  "str2sig",
+  "sys_nsig",
+  "sys_siglist",
+  "sys_signame",
+]
+opt = ["O2", "O0"]
+defines = []
+include = ["shim:signal-freebsd"]
+flags = []
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/gen/sig2str.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/libc/gen/siglist.c"

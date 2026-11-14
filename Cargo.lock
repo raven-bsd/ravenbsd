@@ -1119,6 +1119,7 @@ dependencies = [
  "raven-libc-dtoa",
  "raven-libc-fmt",
  "raven-libc-m",
+ "raven-libc-signal",
  "raven-libc-stdio",
  "raven-libc-stdlib",
  "raven-libc-str",
@@ -1189,6 +1190,15 @@ dependencies = [
  "raven-libc-abi",
  "raven-libc-ctype",
  "raven-libc-nss",
+]
+
+[[package]]
+name = "raven-libc-signal"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-sys",
+ "raven-libc-tls",
 ]
 
 [[package]]
