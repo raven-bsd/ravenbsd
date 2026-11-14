@@ -28,6 +28,20 @@ fn context_size_matches_c36() {
     assert_eq!(core::mem::size_of::<MContext>(), MCONTEXT_SIZE);
 }
 
+#[test]
+fn fault_record_matches_c58() {
+    assert_eq!(core::mem::size_of::<FaultRecord>(), 24);
+    assert_eq!(core::mem::align_of::<FaultRecord>(), 8);
+    let record = FaultRecord {
+        kind: FAULT_DIVIDE,
+        addr: 0x1000,
+        pc: 0x2000,
+    };
+    assert_eq!(record.kind, 3);
+    assert_eq!(record.addr, 0x1000);
+    assert_eq!(record.pc, 0x2000);
+}
+
 #[cfg(target_arch = "x86_64")]
 #[test]
 fn x86_64_register_indices_match_the_c_header() {

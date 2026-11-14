@@ -26,7 +26,36 @@ pub const SIGRETURN: usize = 0x82;
 /// `SIG_SETUP` flag: enter with the interrupted `sp` instead of a fresh `sp - 128` frame.
 pub const ENTRY_SP: u32 = 1;
 
-/// Largest allowed `ctx_offset + size_of::<MContext>()`.
+/// Fault kind: page fault with no mapping (`SIGSEGV`/`SEGV_MAPERR`).
+pub const FAULT_PAGE_NOMAP: u32 = 1;
+/// Fault kind: page fault with a permission violation (`SIGSEGV`/`SEGV_ACCERR`).
+pub const FAULT_PAGE_PERM: u32 = 2;
+/// Fault kind: integer divide error (`SIGFPE`/`FPE_INTDIV`).
+pub const FAULT_DIVIDE: u32 = 3;
+/// Fault kind: illegal instruction (`SIGILL`/`ILL_ILLOPC`).
+pub const FAULT_ILLEGAL: u32 = 4;
+/// Fault kind: misaligned or bus error (`SIGBUS`/`BUS_ADRALN`).
+pub const FAULT_MISALIGN: u32 = 5;
+/// Fault kind: breakpoint (`SIGTRAP`/`TRAP_BRKPT`).
+pub const FAULT_BREAKPOINT: u32 = 6;
+
+/// The synchronous fault record passed to the signal entry (C58 4.4/4.6.2).
+///
+/// `#[repr(C)]` with the C58 layout: 24 bytes, align 8. The kernel writes
+/// one record immediately after the registered `MContext` and passes its user
+/// address in the entry's second argument register; a kick passes zero.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FaultRecord {
+    /// One of the `FAULT_*` kinds.
+    pub kind: u32,
+    /// Faulting address (`si_addr`).
+    pub addr: usize,
+    /// Interrupted program counter.
+    pub pc: usize,
+}
+
+/// Largest allowed `ctx_offset + size_of::<MContext>() + size_of::<FaultRecord>()`.
 pub const CONTEXT_AREA_LIMIT: usize = 64 * 1024;
 
 /// `MContext` byte size on the compiling architecture (C36 `mcontext_t`).
@@ -285,6 +314,14 @@ impl MContext {
         }
     }
 }
+
+const _: () = {
+    assert!(core::mem::size_of::<FaultRecord>() == 24);
+    assert!(core::mem::align_of::<FaultRecord>() == 8);
+    assert!(core::mem::offset_of!(FaultRecord, kind) == 0);
+    assert!(core::mem::offset_of!(FaultRecord, addr) == 8);
+    assert!(core::mem::offset_of!(FaultRecord, pc) == 16);
+};
 
 #[cfg(target_arch = "x86_64")]
 const _: () = {

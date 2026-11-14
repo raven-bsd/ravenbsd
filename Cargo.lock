@@ -1985,6 +1985,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-s45-fault"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-sched-core"
 version = "0.1.0"
 
