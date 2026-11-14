@@ -37,6 +37,8 @@ panic-handler = []
 
 [dependencies]
 raven-libc-abi = { path = "../raven-libc-abi", default-features = false }
+raven-libc-thread = { path = "../raven-libc-thread", default-features = false }
+raven-libc-tls = { path = "../raven-libc-tls", default-features = false }
 raven-libc-sys = { path = "../raven-libc-sys", default-features = false }
 raven-libc-platform = { path = "../raven-libc-platform", default-features = false }
 raven-libc-ctype = { path = "../raven-libc-ctype", default-features = false }

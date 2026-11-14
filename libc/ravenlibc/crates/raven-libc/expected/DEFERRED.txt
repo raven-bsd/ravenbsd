@@ -326,7 +326,6 @@ hcreate_r C41 HTable has no accessor returning the stored C ENTRY; the reentrant
 hsearch_r C41 HTable has no accessor returning the stored C ENTRY; the reentrant hash family is deferred
 hdestroy_r C41 HTable has no accessor returning the stored C ENTRY; the reentrant hash family is deferred
 __libc_single_threaded DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-__raven_init_main_thread DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
 __rl_atfork_run DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
 __rl_cancel_point DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
 __rl_thread_exit_dtors DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc

@@ -991,7 +991,9 @@ dependencies = [
  "raven-libc-stdlib",
  "raven-libc-str",
  "raven-libc-sys",
+ "raven-libc-thread",
  "raven-libc-time",
+ "raven-libc-tls",
 ]
 
 [[package]]

@@ -897,6 +897,7 @@ RAVEN_1.0 {
 
 RAVENprivate_1.0 {
 	global:
+		__raven_init_main_thread;
 		__raven_libc_start;
 		__raven_va_error;
 		__raven_va_error_at_line;
