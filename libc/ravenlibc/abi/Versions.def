@@ -1,8 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# The version-node chain of ravenlibc (doc 14 3.A.7). `RAVENprivate_1.0` is never incremented;
-# a new public node moves its dependency to the new node.
+# Version nodes of libc.so.1; RAVENprivate_1.0 is always last.
 
 RAVEN_1.0 { };
 RAVENprivate_1.0 { } RAVEN_1.0;
