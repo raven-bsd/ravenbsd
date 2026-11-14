@@ -1643,6 +1643,7 @@ name = "raven-ps"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-output",
  "raven-proto-fs",
  "raven-rt",
 ]

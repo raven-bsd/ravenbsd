@@ -7,13 +7,20 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+extern crate alloc;
+
+use alloc::string::String;
 use core::fmt;
+
+use raven_output::{JsonWriter, Record};
 
 /// What the command line asks for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
     /// List the services.
     List,
+    /// List the services as NDJSON process records.
+    ListJson,
     /// Check the `svc:` server against the kernel.
     Selftest,
 }
@@ -24,7 +31,7 @@ pub struct UsageError;
 
 impl fmt::Display for UsageError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("usage: ps | ps --selftest")
+        formatter.write_str("usage: ps [--json] | ps --selftest")
     }
 }
 
@@ -48,23 +55,46 @@ const STATES: [&str; 6] = [
 ];
 
 /// Parse the arguments after `argv[0]`.
+///
+/// `--json` and `--selftest` are mutually exclusive; `--` ends option parsing. A positional
+/// argument, a repeated flag or an unknown flag is a usage error.
 pub fn parse_args<'a>(args: impl Iterator<Item = &'a str>) -> Result<Action, UsageError> {
-    let mut action = Action::List;
-    let mut seen = false;
+    let mut json = false;
+    let mut selftest = false;
+    let mut ended = false;
     for argument in args {
-        if seen || (argument != "--selftest" && argument != "--") {
+        if ended {
             return Err(UsageError);
         }
-        if argument == "--selftest" {
-            action = Action::Selftest;
+        match argument {
+            "--" => ended = true,
+            "--json" if !json && !selftest => json = true,
+            "--selftest" if !selftest && !json => selftest = true,
+            _ => return Err(UsageError),
         }
-        seen = true;
     }
-    Ok(action)
+    Ok(if json {
+        Action::ListJson
+    } else if selftest {
+        Action::Selftest
+    } else {
+        Action::List
+    })
 }
 
-/// Format one `<name> <state> <handle> <restarts>` line as `NAME STATE RESTARTS`.
-pub fn format_status(line: &str, out: &mut impl fmt::Write) -> Result<(), StatusError> {
+/// One parsed `svc:` status record.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Status {
+    /// Service name.
+    pub name: String,
+    /// One of the documented states.
+    pub state: String,
+    /// Restart count.
+    pub restarts: u32,
+}
+
+/// Parse `<name> <state> <handle> <restarts>`.
+pub fn parse_status(line: &str) -> Result<Status, StatusError> {
     let mut fields = line.split_whitespace();
     let name = fields.next().ok_or(StatusError)?;
     let state = fields.next().ok_or(StatusError)?;
@@ -73,10 +103,48 @@ pub fn format_status(line: &str, out: &mut impl fmt::Write) -> Result<(), Status
     if fields.next().is_some() || !STATES.contains(&state) {
         return Err(StatusError);
     }
-    if handle.parse::<u32>().is_err() || restarts.parse::<u32>().is_err() {
+    if handle.parse::<u32>().is_err() {
         return Err(StatusError);
     }
-    writeln!(out, "{name} {state} {restarts}").map_err(|_| StatusError)
+    let restarts = restarts.parse::<u32>().map_err(|_| StatusError)?;
+    Ok(Status {
+        name: String::from(name),
+        state: String::from(state),
+        restarts,
+    })
+}
+
+/// Format one parsed status line as `NAME STATE RESTARTS`.
+pub fn format_status(line: &str, out: &mut impl fmt::Write) -> Result<(), StatusError> {
+    let status = parse_status(line)?;
+    writeln!(out, "{} {} {}", status.name, status.state, status.restarts).map_err(|_| StatusError)
+}
+
+/// The JSON record for one service-derived process entry.
+///
+/// The current `svc:` source exposes only the name, state and restart count. Process fields it
+/// does not provide are `null` rather than fabricated values.
+#[must_use]
+pub fn process_record(status: &Status) -> Record {
+    Record::new("process")
+        .null("pid")
+        .null("ppid")
+        .null("uid")
+        .null("gid")
+        .string("state", &status.state)
+        .string("name", &status.name)
+        .null("command")
+        .null("threads")
+        .null("rss_bytes")
+}
+
+/// Format one status line as a single `kind:"process"` NDJSON object plus newline.
+pub fn format_json_status(line: &str, out: &mut impl fmt::Write) -> Result<(), StatusError> {
+    let status = parse_status(line)?;
+    let mut writer = JsonWriter::new(out);
+    writer
+        .write_record(&process_record(&status))
+        .map_err(|_| StatusError)
 }
 
 #[cfg(test)]
