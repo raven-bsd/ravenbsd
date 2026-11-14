@@ -134,47 +134,6 @@ pub struct Artifacts {
     pub map: PathBuf,
 }
 
-/// Build the C61 START-FINDING support object (`__progname*`, `__stack_chk_guard`,
-/// `__cxa_atexit`, `__raven_init_main_thread`).
-///
-/// # Errors
-/// A rustc or I/O failure.
-pub fn compile_start_support(
-    tools: &Tools,
-    root: &Path,
-    arch: Arch,
-    out_dir: &Path,
-) -> Result<PathBuf> {
-    std::fs::create_dir_all(out_dir)
-        .with_context(|| format!("cannot create {}", out_dir.display()))?;
-    let source = crate::probe::start_support_path(root);
-    let object = out_dir.join("start_support.o");
-    let spec = CommandSpec::new(
-        &tools.rustc,
-        vec![
-            "--edition".to_string(),
-            "2024".to_string(),
-            "--crate-type".to_string(),
-            "lib".to_string(),
-            "--emit=obj".to_string(),
-            "--target".to_string(),
-            arch.triple().to_string(),
-            "-C".to_string(),
-            "panic=abort".to_string(),
-            "-C".to_string(),
-            "opt-level=z".to_string(),
-            "-C".to_string(),
-            "strip=none".to_string(),
-            "-o".to_string(),
-            object.display().to_string(),
-            source.display().to_string(),
-        ],
-        root.to_path_buf(),
-    );
-    spec.run_checked("start support")?;
-    Ok(object)
-}
-
 /// Build one probe row.
 ///
 /// # Errors
@@ -194,8 +153,6 @@ pub fn build_probe(
 ) -> Result<Artifacts> {
     std::fs::create_dir_all(out_dir)
         .with_context(|| format!("cannot create {}", out_dir.display()))?;
-    let support = compile_start_support(tools, root, arch, out_dir)?;
-    let _ = &support;
     let spec = match (lang, linkage) {
         (Lang::Rust, Linkage::Static) => crate::probe::rust_static_command(
             &tools.rustc,

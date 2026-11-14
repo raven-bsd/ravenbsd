@@ -44,10 +44,6 @@ fn sources_follow_the_rd_new_layout() {
         source_path(root, Lang::C, "P8"),
         PathBuf::from("/repo/tests/libc/size/probes/c/p8.c")
     );
-    assert_eq!(
-        start_support_path(root),
-        PathBuf::from("/repo/tests/libc/size/probes/rust/start_support.rs")
-    );
 }
 
 #[test]
