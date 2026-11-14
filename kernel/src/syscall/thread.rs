@@ -96,6 +96,48 @@ pub fn exit(frame: &SyscallFrame) -> ! {
     sched::exit_thread(frame.rdi as i32)
 }
 
+/// `thread_kick(thread, bits) -> 0` (raw 0x81).
+///
+/// Sets the sticky kick word and wakes an interruptible blocked target. A
+/// running thread keeps the word for its next interruptible wait; `bits == 0`
+/// is a successful no-op.
+pub fn kick(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let bits = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    let thread = if handle == Handle::NONE {
+        sched::current_thread().ok_or(Errno::ESRCH)?
+    } else {
+        let handles = caller.handles.lock();
+        match handles.get(handle, Rights::SIGNAL) {
+            Ok(Object::Thread(thread)) => Arc::clone(thread),
+            Ok(_) => return Err(Errno::EBADF),
+            Err(Errno::EACCES) => return Err(Errno::EPERM),
+            Err(error) => return Err(error),
+        }
+    };
+    if thread.state() == ThreadState::Dead {
+        return Err(Errno::ESRCH);
+    }
+    if bits == 0 {
+        return Ok(0);
+    }
+    thread
+        .kick_bits
+        .fetch_or(bits, core::sync::atomic::Ordering::AcqRel);
+    if thread
+        .interruptible
+        .load(core::sync::atomic::Ordering::Acquire)
+    {
+        let token = thread
+            .block_token
+            .load(core::sync::atomic::Ordering::SeqCst);
+        let token = (token != 0).then_some(token);
+        let _ = sched::wake(thread, token, Errno::EINTR.to_ret());
+    }
+    Ok(0)
+}
+
 /// `thread_set_tls(thread, tp) -> 0`.
 ///
 /// `Handle::NONE` targets the calling thread. A non-zero base must be a

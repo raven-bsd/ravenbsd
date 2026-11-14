@@ -51,7 +51,11 @@ pub fn handle(frame: &SyscallFrame) -> Result<usize, Errno> {
         {
             return Ok(0);
         }
-        let token = sched::begin_block()?;
+        let token = sched::begin_block_interruptible()?;
+        if sched::take_kick() {
+            sched::end_block(token);
+            return Err(Errno::EINTR);
+        }
         if let Some(deadline) = deadline {
             sched::add_sleep(token, deadline, Errno::ETIMEDOUT.to_ret());
         }
@@ -59,8 +63,12 @@ pub fn handle(frame: &SyscallFrame) -> Result<usize, Errno> {
         match queued {
             Ok(true) => {
                 let status = sched::block_current();
+                let kicked = sched::take_kick();
                 console::waiters().remove(0, 0, thread_id);
                 sched::end_block(token);
+                if status == Errno::EINTR.to_ret() || kicked {
+                    return Err(Errno::EINTR);
+                }
                 if status == Errno::ETIMEDOUT.to_ret() {
                     return Ok(0);
                 }

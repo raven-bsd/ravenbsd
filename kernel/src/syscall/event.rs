@@ -221,7 +221,11 @@ fn wait_once(
     let thread_id = crate::sched::current_thread()
         .map(|thread| thread.id)
         .ok_or(Errno::ESRCH)?;
-    let token = crate::sched::begin_block()?;
+    let token = crate::sched::begin_block_interruptible()?;
+    if crate::sched::take_kick() {
+        crate::sched::end_block(token);
+        return Err(Errno::EINTR);
+    }
     if timeout_ns != 0 {
         crate::sched::add_sleep(
             token,
@@ -238,9 +242,14 @@ fn wait_once(
     match queued {
         Ok(true) => {
             let status = crate::sched::block_current();
+            let kicked = crate::sched::take_kick();
             queue.waiters.remove(process.id, 0, thread_id);
             crate::sched::end_block(token);
-            Ok(status)
+            if status == Errno::EINTR.to_ret() || kicked {
+                Err(Errno::EINTR)
+            } else {
+                Ok(status)
+            }
         }
         Ok(false) => {
             crate::sched::end_block(token);

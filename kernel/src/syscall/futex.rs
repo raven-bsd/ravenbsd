@@ -60,7 +60,11 @@ fn wait(
     let thread_id = sched::current_thread()
         .map(|thread| thread.id)
         .ok_or(Errno::ESRCH)?;
-    let token = sched::begin_block()?;
+    let token = sched::begin_block_interruptible()?;
+    if sched::take_kick() {
+        sched::end_block(token);
+        return Err(Errno::EINTR);
+    }
     if timeout_ns != 0 {
         let deadline = time::now_ns().saturating_add(timeout_ns);
         sched::add_sleep(token, deadline, Errno::ETIMEDOUT.to_ret());
@@ -85,9 +89,12 @@ fn wait(
     }
 
     let status = sched::block_current();
+    let kicked = sched::take_kick();
     queue.remove(process.id, addr, thread_id);
     sched::end_block(token);
-    if status == 0 {
+    if status == Errno::EINTR.to_ret() || kicked {
+        Err(Errno::EINTR)
+    } else if status == 0 {
         Ok(0)
     } else {
         Err(Errno::ETIMEDOUT)

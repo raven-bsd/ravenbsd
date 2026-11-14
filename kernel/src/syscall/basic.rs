@@ -30,8 +30,12 @@ pub fn dispatch(call: Syscall, frame: &SyscallFrame) -> Result<usize, Errno> {
         Syscall::DEBUG_WRITE => debug_write(frame.rdi, frame.rsi),
         Syscall::CLOCK_GET => clock_get(frame.rdi as u32, frame.rsi),
         Syscall::NANOSLEEP => {
-            let _ = crate::sched::sleep::sleep_ns(frame.rdi);
-            Ok(0)
+            let status = crate::sched::sleep::sleep_ns(frame.rdi);
+            if status == Errno::EINTR.to_ret() {
+                Err(Errno::EINTR)
+            } else {
+                Ok(0)
+            }
         }
         Syscall::UNAME => uname(frame.rdi),
         Syscall::HANDLE_CLOSE => handle_close(frame.rdi as u32),

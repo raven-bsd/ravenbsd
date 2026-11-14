@@ -200,6 +200,14 @@ pub const PROC_SET_PERSONALITY: usize = 0x34;
 /// exhaustive matches in the libc crates stay intact.
 pub const THREAD_SET_TLS: usize = 0x23;
 
+/// `thread_kick(thread: Handle, bits: u32) -> 0`.
+///
+/// ORs sticky kick bits into the per-thread word. `Handle::NONE` targets the
+/// calling thread; otherwise the thread handle needs `Rights::SIGNAL`. Bit
+/// meanings are the C58/PG-8 PROPOSED set (CHECK, CANCEL, SYNCCALL, TIMER);
+/// this constant and the kernel do not raise signals.
+pub const THREAD_KICK: usize = 0x81;
+
 #[cfg(test)]
 mod tests {
     use super::*;
