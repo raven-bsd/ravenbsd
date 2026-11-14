@@ -3,8 +3,8 @@
 
 # Gaps
 
-- ring 0: 558
-- ring 1: 1023
+- ring 0: 550
+- ring 1: 1006
 - ring 2: 1542
 
 | name | ring | header | crate | area |
@@ -1064,7 +1064,6 @@
 | _iswctype | 2 | - | UNOWNED | - |
 | _ld_libc | 2 | - | UNOWNED | - |
 | _lockf | 2 | - | UNOWNED | - |
-| _longjmp | 1 | - | UNOWNED | - |
 | _lseek | 2 | - | UNOWNED | - |
 | _ltzset | 2 | - | UNOWNED | - |
 | _lwp_cond_reltimedwait | 2 | - | UNOWNED | - |
@@ -1130,7 +1129,6 @@
 | _seekdir | 2 | - | UNOWNED | - |
 | _select | 2 | - | UNOWNED | - |
 | _setbufend | 2 | - | UNOWNED | - |
-| _setjmp | 1 | - | UNOWNED | - |
 | _sharefs | 2 | - | UNOWNED | - |
 | _sigaddset | 2 | - | UNOWNED | - |
 | _siglongjmp | 2 | - | UNOWNED | - |
@@ -1899,7 +1897,6 @@
 | getc | 0 | stdio.h | UNOWNED | - |
 | getc_unlocked | 0 | stdio.h | UNOWNED | - |
 | getchar_unlocked | 0 | stdio.h | UNOWNED | - |
-| getcontext | 1 | ucontext.h | UNOWNED | - |
 | getcontext_extd | 2 | - | UNOWNED | - |
 | getcpu | 2 | <sched.h> | UNOWNED | - |
 | getcpuid | 2 | - | UNOWNED | - |
@@ -2138,7 +2135,6 @@
 | logp1 | 2 | math.h | UNOWNED | - |
 | logp1fNx | 0 | math.h | UNOWNED | - |
 | logwtmp | 2 | utmp.h | UNOWNED | - |
-| longjmp | 0 | setjmp.h | UNOWNED | - |
 | lrand48_r | 2 | stdlib.h | UNOWNED | - |
 | lremovexattr | 1 | - | UNOWNED | - |
 | lrint | 1 | - | UNOWNED | - |
@@ -2155,7 +2151,6 @@
 | lutimes | 1 | sys/time.h | UNOWNED | - |
 | lwp_self | 2 | - | UNOWNED | - |
 | madvise | 0 | sys/mman.h | UNOWNED | - |
-| makecontext | 1 | ucontext.h | UNOWNED | - |
 | makeut | 2 | - | UNOWNED | - |
 | makeutx | 2 | - | UNOWNED | - |
 | mallinfo | 2 | - | UNOWNED | - |
@@ -2621,7 +2616,6 @@
 | setbuf | 0 | stdio.h | UNOWNED | - |
 | setbuffer | 1 | stdio.h | UNOWNED | - |
 | setcat | 2 | - | UNOWNED | - |
-| setcontext | 1 | ucontext.h | UNOWNED | - |
 | setdomainname | 1 | unistd.h | UNOWNED | - |
 | setfsent | 1 | fstab.h | UNOWNED | - |
 | setfsgid | 2 | - | UNOWNED | - |
@@ -2629,7 +2623,6 @@
 | sethostid | 1 | unistd.h | UNOWNED | - |
 | sethostname | 1 | unistd.h | UNOWNED | - |
 | setitimer | 1 | sys/time.h | UNOWNED | - |
-| setjmp | 0 | setjmp.h | UNOWNED | - |
 | setkey | 1 | - | UNOWNED | - |
 | setlabel | 2 | - | UNOWNED | - |
 | setlinebuf | 1 | stdio.h | UNOWNED | - |
@@ -2664,10 +2657,8 @@
 | shmget | 1 | - | UNOWNED | - |
 | shmids | 2 | - | UNOWNED | - |
 | sigabbrev_np | 2 | string.h | UNOWNED | - |
-| sigaction | 0 | signal.h | UNOWNED | - |
 | sigaction64 | 2 | - | UNOWNED | - |
 | sigaddset64 | 2 | - | UNOWNED | - |
-| sigaltstack | 1 | signal.h | UNOWNED | - |
 | sigblock | 1 | signal.h | UNOWNED | - |
 | sigdelset64 | 2 | - | UNOWNED | - |
 | sigdescr_np | 2 | string.h | UNOWNED | - |
@@ -2675,35 +2666,20 @@
 | sigfillset64 | 2 | - | UNOWNED | - |
 | sigflag | 2 | - | UNOWNED | - |
 | sigfpe | 2 | - | UNOWNED | - |
-| sighold | 1 | - | UNOWNED | - |
-| sigignore | 1 | - | UNOWNED | - |
-| siginterrupt | 1 | signal.h | UNOWNED | - |
 | sigismember64 | 2 | - | UNOWNED | - |
-| siglongjmp | 0 | setjmp.h | UNOWNED | - |
 | sigmask | 1 | signal.h | UNOWNED | - |
 | signalfd64 | 2 | - | UNOWNED | - |
 | signbit | 0 | math.h | UNOWNED | - |
 | significandl | 2 | math.h | UNOWNED | - |
-| sigpause | 1 | signal.h | UNOWNED | - |
-| sigpending | 0 | signal.h | UNOWNED | - |
 | sigpending64 | 2 | - | UNOWNED | - |
-| sigprocmask | 0 | signal.h | UNOWNED | - |
 | sigprocmask64 | 2 | - | UNOWNED | - |
-| sigqueue | 1 | - | UNOWNED | - |
-| sigrelse | 1 | - | UNOWNED | - |
 | sigsend | 2 | - | UNOWNED | - |
 | sigsendset | 2 | - | UNOWNED | - |
-| sigset | 1 | - | UNOWNED | - |
-| sigsetjmp | 0 | setjmp.h | UNOWNED | - |
 | sigsetmask | 1 | signal.h | UNOWNED | - |
 | sigstack | 1 | signal.h | UNOWNED | - |
-| sigsuspend | 0 | signal.h | UNOWNED | - |
 | sigsuspend64 | 2 | - | UNOWNED | - |
-| sigtimedwait | 1 | - | UNOWNED | - |
 | sigtimedwait64 | 2 | - | UNOWNED | - |
-| sigwait | 1 | - | UNOWNED | - |
 | sigwait64 | 2 | - | UNOWNED | - |
-| sigwaitinfo | 1 | - | UNOWNED | - |
 | sigwaitinfo64 | 2 | - | UNOWNED | - |
 | sincosl | 1 | - | UNOWNED | - |
 | sinfNx | 0 | math.h | UNOWNED | - |
@@ -2846,7 +2822,6 @@
 | strxfrm | 0 | string.h | UNOWNED | - |
 | strxfrm_l | 1 | - | UNOWNED | - |
 | stty | 1 | sgtty.h | UNOWNED | - |
-| swapcontext | 1 | ucontext.h | UNOWNED | - |
 | swapctl | 1 | - | UNOWNED | - |
 | swapoff | 2 | - | UNOWNED | - |
 | swapon | 1 | - | UNOWNED | - |
