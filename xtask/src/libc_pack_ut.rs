@@ -157,6 +157,8 @@ fn aarch64_build_spec_drops_the_x86_only_code_model_flag() {
         .expect("RUSTFLAGS");
     assert!(!flags.contains("code-model"));
     assert!(flags.contains("relocation-model=pic"));
+    assert!(flags.contains("lto=thin"));
+    assert!(flags.contains("embed-bitcode=yes"));
     assert_eq!(spec.env_remove, vec!["CARGO_ENCODED_RUSTFLAGS".to_string()]);
 }
 
@@ -173,6 +175,15 @@ fn riscv64_build_spec_targets_the_bare_metal_triple() {
         spec.args
             .contains(&"riscv64gc-unknown-none-elf".to_string())
     );
+    let flags = spec
+        .env
+        .iter()
+        .find(|(key, _)| key == "RUSTFLAGS")
+        .map(|(_, value)| value.as_str())
+        .expect("RUSTFLAGS");
+    assert!(flags.contains("relocation-model=pic"));
+    assert!(flags.contains("lto=thin"));
+    assert!(flags.contains("embed-bitcode=yes"));
     assert_eq!(spec.program, "cargo");
     assert_eq!(spec.cwd, Path::new("/repo"));
 }

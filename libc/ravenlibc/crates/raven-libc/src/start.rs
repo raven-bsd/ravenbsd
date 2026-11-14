@@ -151,8 +151,8 @@ core::arch::global_asm!(
     ".globl __rl_init_hook",
     ".type __rl_init_hook,%function",
     "__rl_init_hook:",
-    "adrp x0, _init",
-    "add x0, x0, :lo12:_init",
+    "adrp x0, :got:_init",
+    "ldr x0, [x0, :got_lo12:_init]",
     "ret",
 );
 
@@ -162,7 +162,9 @@ core::arch::global_asm!(
     ".globl __rl_init_hook",
     ".type __rl_init_hook,%function",
     "__rl_init_hook:",
-    "lla a0, _init",
+    "1:",
+    "auipc a0, %got_pcrel_hi(_init)",
+    "ld a0, %pcrel_lo(1b)(a0)",
     "ret",
 );
 
