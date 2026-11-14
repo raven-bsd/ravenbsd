@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! Private futexes keyed by `(address-space id, user virtual address)`.
+//! Private and shared futexes.
 //!
+//! Private waits (flag [`futex::PRIVATE`]) use `(pid, user virtual address)`. Shared waits resolve
+//! the VMA and, for a shared memory-object mapping, use `(object id, byte offset)` so two mappings
+//! of the same object at different VAs share a queue; anonymous/private VMAs keep the private key.
 //! There are 256 hash buckets, each a [`WaitQueue`]. `WAIT` checks the user word and enqueues the
 //! caller under the bucket lock, so a concurrent `WAKE` either observes the waiter or the user
 //! changed the word first (and the waiter returns `-EAGAIN`). The timeout is registered in the
@@ -23,6 +26,8 @@ use crate::usercopy::copy_from_user;
 
 /// Number of futex hash buckets.
 const BUCKETS: usize = 256;
+/// High bit tagging shared `(object id, offset)` keys apart from private `(pid, vaddr)` keys.
+const SHARED_KEY_TAG: u64 = 1 << 63;
 
 static QUEUES: [WaitQueue; BUCKETS] = [const { WaitQueue::new() }; BUCKETS];
 static FALLBACK: WaitQueue = WaitQueue::new();
@@ -38,22 +43,45 @@ pub fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     if addr & 3 != 0 {
         return Err(Errno::EINVAL);
     }
+    let private = op & futex::PRIVATE != 0;
+    let command = op & !futex::PRIVATE;
+    if command > futex::WAKE {
+        return Err(Errno::EINVAL);
+    }
     let slice = UserSlice::new(addr, 4)?;
-    match op {
-        futex::WAIT => wait(&process, slice, addr, val, timeout_ns),
+    let (space, key) = futex_key(&process, addr, private)?;
+    match command {
+        futex::WAIT => wait(slice, space, key, val, timeout_ns),
         futex::WAKE => {
             let max = val.min(i32::MAX as u32) as usize;
-            let count = bucket(process.id, addr).wake(process.id, addr, max);
+            let count = bucket(space, key).wake(space, key, max);
             Ok(count)
         }
         _ => Err(Errno::EINVAL),
     }
 }
 
-fn wait(
+/// Resolve the wait-queue key for `address`.
+fn futex_key(
     process: &Arc<process::Process>,
+    address: u64,
+    private: bool,
+) -> Result<(u64, u64), Errno> {
+    if private {
+        return Ok((process.id, address));
+    }
+    let space = process.address_space.lock();
+    let space = space.as_ref().ok_or(Errno::EINVAL)?;
+    match space.shared_futex_key(address)? {
+        Some((object, offset)) => Ok((SHARED_KEY_TAG | object, offset)),
+        None => Ok((process.id, address)),
+    }
+}
+
+fn wait(
     slice: UserSlice,
-    addr: u64,
+    space: u64,
+    key: u64,
     expected: u32,
     timeout_ns: u64,
 ) -> Result<usize, Errno> {
@@ -70,8 +98,8 @@ fn wait(
         sched::add_sleep(token, deadline, Errno::ETIMEDOUT.to_ret());
     }
 
-    let queue = bucket(process.id, addr);
-    let queued = queue.enqueue_if(process.id, addr, || {
+    let queue = bucket(space, key);
+    let queued = queue.enqueue_if(space, key, || {
         let mut bytes = [0u8; 4];
         copy_from_user(&mut bytes, slice)?;
         Ok(u32::from_le_bytes(bytes) == expected)
@@ -90,15 +118,50 @@ fn wait(
 
     let status = sched::block_current();
     let kicked = sched::take_kick();
-    queue.remove(process.id, addr, thread_id);
+    queue.remove(space, key, thread_id);
     sched::end_block(token);
     if status == Errno::EINTR.to_ret() || kicked {
         Err(Errno::EINTR)
+    } else if status == Errno::EFAULT.to_ret() {
+        Err(Errno::EFAULT)
     } else if status == 0 {
         Ok(0)
     } else {
         Err(Errno::ETIMEDOUT)
     }
+}
+
+/// Drop every futex waiter owned by `thread_id`.
+pub fn remove_thread(thread_id: u64) {
+    for queue in QUEUES.iter() {
+        queue.remove_thread(thread_id);
+    }
+    FALLBACK.remove_thread(thread_id);
+}
+
+/// Drop every futex waiter owned by `process_id` (process teardown).
+pub fn remove_process(process_id: u64) {
+    for queue in QUEUES.iter() {
+        queue.remove_process(process_id);
+    }
+    FALLBACK.remove_process(process_id);
+}
+
+/// Wake private-key waiters in `[start, end)` after an unmap.
+pub fn remove_private_range(process_id: u64, start: u64, end: u64) {
+    for queue in QUEUES.iter() {
+        let _ = queue.wake_private_range(process_id, start, end);
+    }
+    let _ = FALLBACK.wake_private_range(process_id, start, end);
+}
+
+/// Wake shared-key waiters of `object_id` in `[start, end)` after an unmap.
+pub fn remove_shared_range(process_id: u64, object_id: u64, start: u64, end: u64) {
+    let object_space = SHARED_KEY_TAG | object_id;
+    for queue in QUEUES.iter() {
+        let _ = queue.wake_shared_range(process_id, object_space, start, end);
+    }
+    let _ = FALLBACK.wake_shared_range(process_id, object_space, start, end);
 }
 
 fn bucket(space: u64, addr: u64) -> &'static WaitQueue {

@@ -778,6 +778,7 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     *state = ProcessState::Exited;
     process.exit_code.store(code, Ordering::Release);
     process.exiting.store(true, Ordering::Release);
+    crate::syscall::futex::remove_process(process.id);
     let _ = process.waiters.wake_all();
     drop(state);
     crate::event::notify_all();

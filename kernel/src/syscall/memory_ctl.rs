@@ -196,15 +196,21 @@ pub fn unmap(frame: &SyscallFrame) -> Result<usize, Errno> {
     let addr = frame.rsi;
     let len = frame.rdx;
     validate_range(addr, len)?;
-    let dirty = {
+    let shared_range = {
         let mut guard = target.address_space.lock();
         let address_space = guard.as_mut().ok_or(Errno::ESRCH)?;
+        let shared_range = address_space.shared_futex_range(addr, len);
         // Collect before the mapping disappears; the object Arcs keep the pages alive for the
         // PageOut requests below.
         let dirty = address_space.collect_pager_dirty(addr, len);
         address_space.unmap(addr, len)?;
-        dirty
+        (dirty, shared_range)
     };
+    let (dirty, shared_range) = shared_range;
+    crate::syscall::futex::remove_private_range(target.id, addr, addr.saturating_add(len));
+    if let Some((object, start, end)) = shared_range {
+        crate::syscall::futex::remove_shared_range(target.id, object, start, end);
+    }
     // C18: the address-space lock is released before the pager IPC wait.
     #[cfg(target_arch = "x86_64")]
     for (object, page) in dirty {

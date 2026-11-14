@@ -885,6 +885,7 @@ pub fn exit_thread(code: i32) -> ! {
         None => crate::arch::halt(),
     };
     thread.exit_code.store(code, Ordering::SeqCst);
+    crate::syscall::futex::remove_thread(thread.id);
     if thread.process.thread_exited() {
         crate::process::notify_exit(code);
     }
