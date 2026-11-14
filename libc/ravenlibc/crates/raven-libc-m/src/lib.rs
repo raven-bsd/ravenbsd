@@ -125,8 +125,9 @@ pub use long_double::{
 };
 #[cfg(target_arch = "x86_64")]
 pub use long_double_math::{
-    acoshl, acosl, asinhl, asinl, atan2l, atanhl, atanl, coshl, cosl, exp2l, exp10l, expl, expm1l,
-    log1pl, log2l, log10l, logl, powl, sinhl, sinl, tanhl, tanl,
+    acoshl, acosl, asinhl, asinl, atan2l, atanhl, atanl, coshl, cosl, erfcl, erfl, exp2l, exp10l,
+    expl, expm1l, lgamma_rl, lgammal, log1pl, log2l, log10l, logl, powl, sinhl, sinl, tanhl, tanl,
+    tgammal,
 };
 
 use support::Round;

@@ -170,3 +170,136 @@ fn hyperbolic_and_inverse_hyperbolic_agree_with_f64() {
     assert_eq!(atanhl(ld(1.0)).to_f64(), f64::INFINITY);
     assert!(acoshl(ld(0.5)).is_nan());
 }
+
+#[test]
+fn erf_and_erfc_agree_with_f64_and_are_complementary() {
+    for value in [-3.0, -1.0, -0.5, 0.0, 0.5, 1.0, 3.0, 6.0] {
+        assert!(
+            close(erfl(ld(value)), value_erf(value), 2e-14),
+            "erf({value})"
+        );
+        assert!(
+            close(erfcl(ld(value)), value_erfc(value), 2e-14),
+            "erfc({value})"
+        );
+    }
+    for value in [0.0, 0.5, 1.0, 2.0, 3.0] {
+        assert!(
+            near(
+                erfl(ld(value)).add(erfcl(ld(value))),
+                LongDouble::one(),
+                1e-17
+            ),
+            "erf+erfc {value}"
+        );
+    }
+    assert_eq!(erfl(ld(0.0)).to_f64(), 0.0);
+    assert_eq!(erfl(LongDouble::infinity(false)).to_f64(), 1.0);
+    assert_eq!(erfl(LongDouble::infinity(true)).to_f64(), -1.0);
+    assert_eq!(erfcl(LongDouble::infinity(false)).to_f64(), 0.0);
+    assert_eq!(erfcl(LongDouble::infinity(true)).to_f64(), 2.0);
+    assert!(erfl(LongDouble::nan()).is_nan());
+}
+
+fn value_erf(x: f64) -> f64 {
+    // Abramowitz-Stegun 7.1.26 is not accurate enough at 1e-14; use the identity with erfc below.
+    if x < 0.0 {
+        -value_erf(-x)
+    } else if x > 1.5 {
+        1.0 - value_erfc(x)
+    } else {
+        series_erf(x)
+    }
+}
+
+fn series_erf(x: f64) -> f64 {
+    let square = x * x;
+    let mut term = x;
+    let mut sum = x;
+    let mut index = 1i64;
+    while index <= 60 {
+        term = -term * square / index as f64;
+        sum += term / (2 * index + 1) as f64;
+        index += 1;
+    }
+    2.0 / core::f64::consts::PI.sqrt() * sum
+}
+
+fn value_erfc(x: f64) -> f64 {
+    if x < 0.0 {
+        return 2.0 - value_erfc(-x);
+    }
+    if x <= 1.5 {
+        return 1.0 - series_erf(x);
+    }
+    let square = x * x;
+    let mut fraction = 1.0;
+    let mut index = 60i64;
+    while index >= 1 {
+        fraction = 1.0 + (index as f64) / (2.0 * square) / fraction;
+        index -= 1;
+    }
+    (-square).exp() / (x * core::f64::consts::PI.sqrt() * fraction)
+}
+
+#[test]
+fn lgamma_and_tgamma_agree_with_f64_and_the_factorials() {
+    for value in [0.5, 1.0, 2.0, 5.0, 10.0, 20.0] {
+        assert!(
+            close(lgammal(ld(value)), value_gamma_ln(value), 3e-14),
+            "lgamma({value})"
+        );
+        assert!(
+            close(tgammal(ld(value)), value_gamma(value), 5e-13),
+            "tgamma({value})"
+        );
+    }
+    // Exact factorials in long double: 5! = 120, and Gamma(1/2) = sqrt(pi).
+    // Exact factorial in long double: Gamma(5) = 4! = 24, and Gamma(1/2) = sqrt(pi).
+    assert!(near(tgammal(ld(5.0)), ld(24.0), 1e-14));
+    assert!(near(tgammal(ld(0.5)), sqrt_pi(), 1e-15));
+    assert!(near(lgammal(ld(5.0)), logl(ld(24.0)), 1e-15));
+    // Reflection at -1/2: Gamma(-1/2) = -2 sqrt(pi).
+    assert!(near(tgammal(ld(-0.5)), sqrt_pi().mul(ld(-2.0)), 1e-14));
+    let (value, sign) = lgamma_rl(ld(-0.5));
+    assert!(near(value, logl(sqrt_pi().mul(ld(2.0))), 1e-15));
+    assert_eq!(sign, -1);
+    // Poles.
+    assert_eq!(lgammal(ld(0.0)).to_f64(), f64::INFINITY);
+    assert!(tgammal(ld(0.0)).is_nan());
+    assert!(tgammal(ld(-2.0)).is_nan());
+    assert!(lgammal(ld(-2.0)).to_f64().is_infinite());
+}
+
+fn value_gamma_ln(x: f64) -> f64 {
+    // Lanczos (g = 7, n = 9), the same reference the f64 tests use.
+    const G: f64 = 7.0;
+    const C: [f64; 9] = [
+        0.999_999_999_999_809_9,
+        676.520_368_121_885_1,
+        -1_259.139_216_722_402_8,
+        771.323_428_777_653_1,
+        -176.615_029_162_140_6,
+        12.507_343_278_686_905,
+        -0.138_571_095_265_720_12,
+        9.984_369_578_019_572e-6,
+        1.505_632_735_149_311_6e-7,
+    ];
+    if x < 0.5 {
+        return (core::f64::consts::PI / (core::f64::consts::PI * x).sin())
+            .abs()
+            .ln()
+            - value_gamma_ln(1.0 - x);
+    }
+    let x = x - 1.0;
+    let mut sum = C[0];
+    for (index, coefficient) in C.iter().enumerate().skip(1) {
+        sum += coefficient / (x + index as f64);
+    }
+    let t = x + G + 0.5;
+    0.5 * (2.0 * core::f64::consts::PI).ln() + (x + 0.5) * t.ln() - t + sum.ln()
+}
+
+fn value_gamma(x: f64) -> f64 {
+    value_gamma_ln(x).exp()
+}

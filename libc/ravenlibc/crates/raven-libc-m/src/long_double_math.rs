@@ -539,6 +539,185 @@ pub fn atanhl(x: LongDouble) -> LongDouble {
     logl(one.add(x).div(one.sub(x))).mul(ld(0.5))
 }
 
+/// `2 / sqrt(pi)`.
+fn two_over_sqrt_pi() -> LongDouble {
+    ld(1.128_379_167_095_512_5)
+}
+
+/// `sqrt(pi)`.
+fn sqrt_pi() -> LongDouble {
+    ld(1.772_453_850_905_516)
+}
+
+/// `erf x`: the Maclaurin series for `|x| <= 1.5`, `1 - erfc` above.
+pub fn erfl(x: LongDouble) -> LongDouble {
+    if x.is_nan() {
+        return x;
+    }
+    if x.is_infinite() {
+        return ld(if x.sign_bit() { -1.0 } else { 1.0 });
+    }
+    if x.is_zero() {
+        return x;
+    }
+    let magnitude = x.abs();
+    let value = if magnitude.to_f64() <= 1.5 {
+        erf_series(magnitude)
+    } else {
+        LongDouble::one().sub(erfc_large(magnitude))
+    };
+    if x.sign_bit() {
+        LongDouble::zero(false).sub(value)
+    } else {
+        value
+    }
+}
+
+/// `erfc x`: `1 - erf` below 1.5, the Laplace continued fraction above.
+pub fn erfcl(x: LongDouble) -> LongDouble {
+    if x.is_nan() {
+        return x;
+    }
+    if x.is_infinite() {
+        return if x.sign_bit() {
+            ld(2.0)
+        } else {
+            LongDouble::zero(false)
+        };
+    }
+    if x.is_zero() {
+        return LongDouble::one();
+    }
+    let magnitude = x.abs();
+    let value = if magnitude.to_f64() <= 1.5 {
+        LongDouble::one().sub(erf_series(magnitude))
+    } else {
+        erfc_large(magnitude)
+    };
+    if x.sign_bit() {
+        ld(2.0).sub(value)
+    } else {
+        value
+    }
+}
+
+fn erf_series(x: LongDouble) -> LongDouble {
+    // erf(x) = 2/sqrt(pi) * sum (-1)^n x^(2n+1) / (n! (2n+1)).
+    let square = x.mul(x);
+    let mut term = x;
+    let mut sum = x;
+    let mut index = 1i64;
+    while index <= 40 {
+        term = LongDouble::zero(false).sub(term.mul(square).div(LongDouble::from_i64(index)));
+        sum = sum.add(term.div(LongDouble::from_i64(2 * index + 1)));
+        index += 1;
+    }
+    two_over_sqrt_pi().mul(sum)
+}
+
+fn erfc_large(x: LongDouble) -> LongDouble {
+    // erfc(x) = e^(-x^2) / (x sqrt(pi)) * 1 / (1 + a1/(1 + a2/(1 + ...))),
+    // a_k = k / (2 x^2); evaluated backwards so the recurrence is stable.
+    let square = x.mul(x);
+    let denominator = square.add(square);
+    let mut fraction = LongDouble::one();
+    let mut index = 60i64;
+    while index >= 1 {
+        fraction =
+            LongDouble::one().add(LongDouble::from_i64(index).div(denominator).div(fraction));
+        index -= 1;
+    }
+    let exponent = LongDouble::zero(false).sub(square);
+    expl(exponent).div(x.mul(sqrt_pi()).mul(fraction))
+}
+
+/// `lgamma x` and the sign of `Gamma(x)`.
+pub fn lgamma_rl(x: LongDouble) -> (LongDouble, i32) {
+    if x.is_nan() {
+        return (x, 1);
+    }
+    if x.is_zero() || (x.sign_bit() && is_integral(x)) {
+        // Poles at zero and the negative integers.
+        return (LongDouble::infinity(false), 1);
+    }
+    if x.is_infinite() {
+        return (x, 1);
+    }
+    if x.total_cmp(ld(0.5)) == core::cmp::Ordering::Less {
+        // Reflection: lgamma(x) = ln(pi / |sin(pi x)|) - lgamma(1 - x).
+        let sine = sinl(pi().mul(x));
+        let value = logl(pi().div(sine.abs())).sub(lgamma_positive(LongDouble::one().sub(x)));
+        let sign = if sine.sign_bit() { -1 } else { 1 };
+        return (value, sign);
+    }
+    (lgamma_positive(x), 1)
+}
+
+/// `lgamma x`.
+pub fn lgammal(x: LongDouble) -> LongDouble {
+    lgamma_rl(x).0
+}
+
+fn lgamma_positive(x: LongDouble) -> LongDouble {
+    // Push the argument to >= 8 with the recurrence, then Stirling.
+    let mut value = x;
+    let mut correction = LongDouble::zero(false);
+    let eight = ld(8.0);
+    while value.total_cmp(eight) == core::cmp::Ordering::Less {
+        correction = correction.add(logl(value));
+        value = value.add(LongDouble::one());
+    }
+    // (x - 1/2) ln x - x + 1/2 ln(2 pi) + sum B_2n / (2n (2n-1) x^(2n-1)).
+    let half = ld(0.5);
+    let mut result = value
+        .sub(half)
+        .mul(logl(value))
+        .sub(value)
+        .add(logl(ld(core::f64::consts::TAU)).mul(half));
+    result = result.sub(correction);
+    let inverse = LongDouble::one().div(value);
+    let inverse2 = inverse.mul(inverse);
+    let mut power = inverse;
+    let mut index = 1i64;
+    const COEFFICIENTS: [f64; 7] = [
+        1.0 / 12.0,
+        -1.0 / 360.0,
+        1.0 / 1260.0,
+        -1.0 / 1680.0,
+        1.0 / 1188.0,
+        -691.0 / 360360.0,
+        1.0 / 156.0,
+    ];
+    while index <= 7 {
+        let term = ld(COEFFICIENTS[(index - 1) as usize]).mul(power);
+        result = result.add(term);
+        power = power.mul(inverse2);
+        index += 1;
+    }
+    result
+}
+
+fn is_integral(x: LongDouble) -> bool {
+    x.total_cmp(x.round()) == core::cmp::Ordering::Equal
+}
+
+/// `tgamma x`.
+pub fn tgammal(x: LongDouble) -> LongDouble {
+    if x.is_nan() {
+        return x;
+    }
+    if x.is_zero() || (x.sign_bit() && is_integral(x)) {
+        return LongDouble::nan();
+    }
+    if x.total_cmp(ld(0.5)) == core::cmp::Ordering::Less {
+        // Reflection: Gamma(x) = pi / (sin(pi x) * Gamma(1 - x)).
+        let sine = sinl(pi().mul(x));
+        let gamma = expl(lgamma_positive(LongDouble::one().sub(x)));
+        return pi().div(sine.mul(gamma));
+    }
+    expl(lgamma_positive(x))
+}
+
 #[cfg(test)]
 #[path = "long_double_math_ut.rs"]
 mod tests;
