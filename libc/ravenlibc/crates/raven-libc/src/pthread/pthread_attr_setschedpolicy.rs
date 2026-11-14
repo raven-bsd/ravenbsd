@@ -12,7 +12,7 @@ pub extern "C" fn pthread_attr_setschedpolicy(
     }
     match a::setschedpolicy(
         &raven_libc_thread::raw::SysKernel,
-        unsafe { &mut *attr },
+        unsafe { &mut *attr }, // SAFETY: attr is non-NULL after the check and exclusively borrowed for the call.
         policy,
     ) {
         Ok(()) => 0,

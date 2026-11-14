@@ -8,6 +8,6 @@ pub extern "C" fn pthread_rwlock_destroy(lock: *mut r::RwLock) -> c_int {
     if lock.is_null() {
         return 22;
     }
-    r::destroy(unsafe { &*lock });
+    r::destroy(unsafe { &*lock }); // SAFETY: lock is non-NULL after the check and points to a live initialised rwlock.
     0
 }

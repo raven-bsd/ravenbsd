@@ -7,6 +7,6 @@ pub extern "C" fn pthread_barrierattr_destroy(attr: *mut b::BarrierAttr) -> core
     if attr.is_null() {
         return 22;
     }
-    b::attr_destroy(unsafe { &*attr });
+    b::attr_destroy(unsafe { &*attr }); // SAFETY: attr is non-NULL after the check and points to a live barrier attribute.
     0
 }

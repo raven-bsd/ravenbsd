@@ -14,6 +14,7 @@ pub unsafe extern "C" fn sem_close(sem: *mut sem::Sem) -> c_int {
     if sem.is_null() {
         return 22;
     }
+    // SAFETY: sem is non-NULL after the check and points to a live named semaphore.
     match sem::close(unsafe { &*sem }) {
         Ok(()) => 0,
         Err(error) => super::common::err(error),

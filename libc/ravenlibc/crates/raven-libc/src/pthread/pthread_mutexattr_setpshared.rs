@@ -12,7 +12,7 @@ pub extern "C" fn pthread_mutexattr_setpshared(
     }
     match m::attr_setpshared(
         &raven_libc_thread::raw::SysKernel,
-        unsafe { &mut *attr },
+        unsafe { &mut *attr }, // SAFETY: attr is non-NULL after the check and exclusively borrowed for the call.
         value,
     ) {
         Ok(()) => 0,

@@ -9,6 +9,7 @@ pub extern "C" fn pthread_cond_destroy(cond: *mut c::Cond) -> c_int {
     if cond.is_null() {
         return 22;
     }
+    // SAFETY: cond is non-NULL after the check and points to a live initialised condition variable.
     match c::destroy(unsafe { &*cond }) {
         Ok(()) => 0,
         Err(e) => super::common::err(e),

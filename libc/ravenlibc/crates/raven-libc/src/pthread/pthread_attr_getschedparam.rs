@@ -10,6 +10,6 @@ pub extern "C" fn pthread_attr_getschedparam(
     if attr.is_null() || out.is_null() {
         return 22;
     }
-    unsafe { *out = a::getschedparam(&*attr) };
+    unsafe { *out = a::getschedparam(&*attr) }; // SAFETY: the null checks above guarantee a readable attribute and a writable sched_param slot.
     0
 }

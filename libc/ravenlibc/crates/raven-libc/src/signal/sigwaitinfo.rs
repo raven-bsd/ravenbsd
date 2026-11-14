@@ -14,6 +14,7 @@ pub unsafe extern "C" fn sigwaitinfo(set: *const SigSet, info: *mut SiginfoT) ->
     if set.is_null() || info.is_null() {
         return -1;
     }
+    // SAFETY: set and info are non-NULL after the check; the caller provides valid objects.
     match wait::sigwaitinfo(&SysKernel, unsafe { &*set }, unsafe { &mut *info }) {
         Ok(sig) => sig,
         Err(error) => {

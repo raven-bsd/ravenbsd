@@ -10,6 +10,7 @@ pub extern "C" fn pthread_mutexattr_setrobust(
     if attr.is_null() {
         return 22;
     }
+    // SAFETY: attr is non-NULL after the check and exclusively borrowed for the call.
     match m::attr_setrobust(unsafe { &mut *attr }, value) {
         Ok(()) => 0,
         Err(e) => super::common::err(e),

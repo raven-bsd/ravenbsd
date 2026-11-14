@@ -12,17 +12,27 @@
 //! `NsMsg` owns a borrowed slice and cannot be reconstructed from the pointer-bearing C
 //! `ns_msg`; the pointer builders (`ns_get16`/`ns_put32`/`ns_skiprr`) are exported.
 
+#[path = "gethostbyname.rs"]
 pub(crate) mod host;
+#[path = "gethostbyaddr.rs"]
 pub(crate) mod hostaddr;
+#[path = "endhostent.rs"]
 pub(crate) mod hostend;
 pub(crate) mod msg;
+#[path = "getnetbyaddr.rs"]
 pub(crate) mod net;
+#[path = "setnetent.rs"]
 pub(crate) mod netent;
+#[path = "getprotobyname.rs"]
 pub(crate) mod proto;
+#[path = "getprotoent.rs"]
 pub(crate) mod protoent;
 pub(crate) mod records;
+#[path = "getaddrinfo.rs"]
 pub(crate) mod runtime;
+#[path = "getservbyname.rs"]
 pub(crate) mod serv;
+#[path = "getservent.rs"]
 pub(crate) mod servent;
 pub(crate) mod write;
 

@@ -38,7 +38,7 @@ mod siginterrupt;
 mod sigisemptyset;
 #[path = "sigismember.rs"]
 mod sigismember;
-#[path = "signal_fn.rs"]
+#[path = "signal.rs"]
 mod signal;
 #[path = "sigorset.rs"]
 mod sigorset;

@@ -9,7 +9,7 @@ pub extern "C" fn pthread_setname_np(thread: usize, name_: *const c_char) -> c_i
     if name_.is_null() {
         return 22;
     }
-    let bytes = unsafe { crate::ffi::cstr::slice(name_) };
+    let bytes = unsafe { crate::ffi::cstr::slice(name_) }; // SAFETY: name_ is a NUL-terminated C string supplied by the caller; the slice only reads to the terminator.
     match name::setname(&SysKernel, thread, bytes) {
         Ok(()) => 0,
         Err(e) => super::common::err(e),
