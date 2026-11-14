@@ -76,6 +76,9 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == raven_abi::syscall::THREAD_KICK {
         return thread::kick(frame);
     }
+    if number == raven_abi::signal::SIG_SETUP {
+        return thread::sig_setup(frame);
+    }
     match Syscall::from_usize(number) {
         // EXIT is process-wide: every thread of the process terminates.
         Some(Syscall::EXIT) => process::exit_process(frame.rdi as i32),
@@ -151,7 +154,15 @@ pub extern "C" fn syscall_dispatch(frame: &mut crate::arch::x86_64::trapframe::T
         r8: frame.r8,
         r9: frame.r9,
     };
-    frame.rax = result_value(dispatch(&registers));
+    if usize::try_from(registers.rax).ok() == Some(raven_abi::signal::SIGRETURN) {
+        match crate::arch::x86_64::syscall::sigreturn_frame(frame) {
+            Ok(()) => crate::arch::x86_64::syscall::deliver_signal(frame),
+            Err(error) => frame.rax = error.to_ret() as u64,
+        }
+    } else {
+        frame.rax = result_value(dispatch(&registers));
+        crate::arch::x86_64::syscall::deliver_signal(frame);
+    }
     crate::sched::syscall_return();
 }
 
@@ -172,9 +183,21 @@ pub fn svc_dispatch(frame: &mut crate::arch::aarch64::vectors::TrapFrame) {
         r8: read(4),
         r9: read(5),
     };
-    let value = result_value(dispatch(&registers));
-    if let Some(slot) = frame.x.get_mut(0) {
-        *slot = value;
+    if usize::try_from(registers.rax).ok() == Some(raven_abi::signal::SIGRETURN) {
+        match crate::arch::aarch64::vectors::sigreturn_frame(frame) {
+            Ok(()) => crate::arch::aarch64::vectors::deliver_signal(frame),
+            Err(error) => {
+                if let Some(slot) = frame.x.get_mut(0) {
+                    *slot = error.to_ret() as u64;
+                }
+            }
+        }
+    } else {
+        let value = result_value(dispatch(&registers));
+        if let Some(slot) = frame.x.get_mut(0) {
+            *slot = value;
+        }
+        crate::arch::aarch64::vectors::deliver_signal(frame);
     }
     crate::sched::syscall_return();
 }

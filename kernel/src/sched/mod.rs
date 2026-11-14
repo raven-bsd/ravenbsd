@@ -562,7 +562,7 @@ pub fn sleep_until(deadline: u64) -> isize {
     current.block_token.store(token, Ordering::SeqCst);
     current.pending_wake.store(false, Ordering::SeqCst);
     current.wake_status.store(0, Ordering::SeqCst);
-    if current.kick_bits.swap(0, Ordering::AcqRel) != 0 {
+    if kick_pending(&current) {
         cancel_sleep(token);
         current.set_state(ThreadState::Running);
         return Errno::EINTR.to_ret();
@@ -575,7 +575,7 @@ pub fn sleep_until(deadline: u64) -> isize {
         current.interruptible.store(false, Ordering::SeqCst);
         return current.wake_status.load(Ordering::SeqCst) as isize;
     }
-    if current.kick_bits.swap(0, Ordering::AcqRel) != 0 {
+    if kick_pending(&current) {
         cancel_sleep(token);
         current.set_state(ThreadState::Running);
         current.interruptible.store(false, Ordering::SeqCst);
@@ -588,7 +588,7 @@ pub fn sleep_until(deadline: u64) -> isize {
         exit_thread(0);
     }
     current.interruptible.store(false, Ordering::SeqCst);
-    if current.kick_bits.swap(0, Ordering::AcqRel) != 0 {
+    if kick_pending(&current) {
         return Errno::EINTR.to_ret();
     }
     current.wake_status.load(Ordering::SeqCst) as isize
@@ -642,9 +642,24 @@ fn begin_block_inner(interruptible: bool) -> Result<u64, Errno> {
     Ok(token)
 }
 
-/// Consume the calling thread's sticky kick bits.
+/// True when the calling thread has a sticky kick pending.
+///
+/// Without a `SIG_SETUP` registration the word is consumed here, preserving S43's `-EINTR`
+/// discipline. With a registration the bits stay in the word so the return-to-user path can
+/// deliver them to the user entry point and pass the bits as the first argument.
 pub fn take_kick() -> bool {
-    current_thread().is_some_and(|thread| thread.kick_bits.swap(0, Ordering::AcqRel) != 0)
+    current_thread().is_some_and(|thread| kick_pending(&thread))
+}
+
+/// Test (and, without `SIG_SETUP`, clear) one thread's kick word.
+fn kick_pending(thread: &Thread) -> bool {
+    if thread.kick_bits.load(Ordering::Acquire) == 0 {
+        return false;
+    }
+    if thread.signal_entry.load(Ordering::Acquire) == 0 {
+        thread.kick_bits.swap(0, Ordering::AcqRel);
+    }
+    true
 }
 
 /// Register a timeout for the current blocking operation with its wake status.
@@ -691,9 +706,7 @@ pub fn block_current() -> isize {
         current.interruptible.store(false, Ordering::SeqCst);
         return current.wake_status.load(Ordering::SeqCst) as isize;
     }
-    if current.interruptible.load(Ordering::Acquire)
-        && current.kick_bits.swap(0, Ordering::AcqRel) != 0
-    {
+    if current.interruptible.load(Ordering::Acquire) && kick_pending(&current) {
         current.set_state(ThreadState::Running);
         current.interruptible.store(false, Ordering::SeqCst);
         return Errno::EINTR.to_ret();
@@ -704,9 +717,7 @@ pub fn block_current() -> isize {
         current.interruptible.store(false, Ordering::SeqCst);
         return current.wake_status.load(Ordering::SeqCst) as isize;
     }
-    if current.interruptible.load(Ordering::Acquire)
-        && current.kick_bits.swap(0, Ordering::AcqRel) != 0
-    {
+    if current.interruptible.load(Ordering::Acquire) && kick_pending(&current) {
         current.set_state(ThreadState::Running);
         current.interruptible.store(false, Ordering::SeqCst);
         return Errno::EINTR.to_ret();
@@ -718,7 +729,7 @@ pub fn block_current() -> isize {
         exit_thread(0);
     }
     current.interruptible.store(false, Ordering::SeqCst);
-    if current.kick_bits.swap(0, Ordering::AcqRel) != 0 {
+    if kick_pending(&current) {
         return Errno::EINTR.to_ret();
     }
     current.wake_status.load(Ordering::SeqCst) as isize
