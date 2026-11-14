@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The clean-room loader export map (C62 4.5).
+
+RAVEN_1.0 {
+	global:
+		_rtld_error_str;
+		dlclose;
+		dlerror;
+		dlopen;
+		dlsym;
+		dlvsym;
+		dladdr;
+		dlinfo;
+		dl_iterate_phdr;
+		__tls_get_addr;
+};
+
+RAVENprivate_1.0 {
+	global:
+		_rtld_allocate_tls;
+		_rtld_free_tls;
+		_rtld_get_stack_prot;
+		_rtld_set_dlerror_slot;
+		r_debug_state;
+		_r_debug_postinit;
+		_rtld_version;
+	local: *;
+} RAVEN_1.0;

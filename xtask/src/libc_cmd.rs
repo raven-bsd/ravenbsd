@@ -7,7 +7,9 @@ use std::path::Path;
 
 use anyhow::{Result, bail};
 
-use crate::{libc_census, libc_headers, libc_lint, libc_oracle, libc_pack, libc_size, libc_world};
+use crate::{
+    libc_census, libc_headers, libc_link, libc_lint, libc_oracle, libc_pack, libc_size, libc_world,
+};
 
 /// One command implementation.
 pub(crate) type Runner = fn(&Path, &[String]) -> Result<u8>;
@@ -17,6 +19,7 @@ pub(crate) const COMMANDS: &[(&str, Runner)] = &[
     ("libc-lint", run_lint),
     ("libc-oracle", libc_oracle::run),
     ("libc-headers", libc_headers::run),
+    ("libc-link", libc_link::run),
     ("libc-pack", libc_pack::run),
     ("libc-size", libc_size::run),
     ("libc-world", libc_world::run),

@@ -50,6 +50,7 @@ cargo xtask commands:
   libc-lint [CHECK...] [--root DIR] [--json]
   libc-oracle ... (not implemented yet)
   libc-headers ... (not implemented yet)
+  libc-link --arch A [--check] [--json]
   libc-pack ... (not implemented yet)
   libc-size ... (not implemented yet)
   libc-world ... (not implemented yet)

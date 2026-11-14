@@ -1,0 +1,13 @@
+        .text
+        .type   impl_a,@function
+impl_a: movl    $1, %eax
+        ret
+        .globl  pick
+        .type   pick,@gnu_indirect_function
+pick:   leaq    impl_a(%rip), %rax
+        ret
+        .globl  use_pick
+        .type   use_pick,@function
+use_pick:
+        jmp     pick@PLT
+        .section .note.GNU-stack,"",@progbits

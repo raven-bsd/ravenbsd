@@ -22,6 +22,7 @@ mod initfs;
 mod libc_census;
 mod libc_cmd;
 mod libc_headers;
+mod libc_link;
 mod libc_lint;
 mod libc_lint_data;
 mod libc_lint_scan;

@@ -9062,3 +9062,157 @@ tier = "A"
 copied = "2026-11-14"
 modified = true
 notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; Rust adaptation: the donor __dls2/__libc_start_main tail is split into __raven_rcrt1_stage1 returning sp0 to the entry asm, which then calls __raven_libc_start directly"
+
+[[import]]
+path = "libc/ravenlibc/ld/src/main_flow.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "Raven start-up steps; FreeBSD-only kernel/direct-exec-adjacent paths removed, Mapper seam and StartCtx added"
+
+[[import]]
+path = "libc/ravenlibc/ld/src/self_object.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "init_rtld reduced to the C52 digest; relocation is selfreloc's job"
+
+[[import]]
+path = "libc/ravenlibc/ld/src/loadobj.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "load_object/load_needed_objects/load_preload_objects; Obj_Entry replaced by ObjView and fixed tables; dangerous-env fstatfs path removed"
+
+[[import]]
+path = "libc/ravenlibc/ld/src/mapper.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/map_object.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "Raven reserve/release/map_fixed sequence (G-5), copy-load source and retry bound; segment arithmetic is C52's plan_segments"
+
+[[import]]
+path = "libc/ravenlibc/ld/src/relocate.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "relocate_object/relocate_objects/ifunc order; the write engine is C52's apply_object"
+
+[[import]]
+path = "libc/ravenlibc/ld/src/initfini.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "preinit_main/objlist_call_init/objlist_call_fini order; direct calls are in the platform glue"
+
+[[import]]
+path = "libc/ravenlibc/ld/src/dlfcn.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "dlopen/dlclose/dlsym/dlvsym/dladdr/dlinfo/dl_iterate_phdr logic; per-thread dlerror replaced by ErrBuf; RTLD_NEXT caller address kept in the API"
+
+[[import]]
+path = "libc/ravenlibc/ld/src/rdebug.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "r_debug/link_map shape; fixed link-map table"
+
+[[import]]
+path = "libc/ravenlibc/ld/src/unload.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/rtld.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "ref_dag/unref_dag/unload_object; static-TLS and NODELETE objects never unload"
+
+[[import]]
+path = "libc/ravenlibc/ld/src/lock.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/{rtld_lock.c,rtld_lock.h}"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "three locks bind/phdr/libc; futex core in raw/lock_futex.rs; dllockinit removed"
+
+[[import]]
+path = "libc/ravenlibc/ld/src/ldalloc.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/{rtld_malloc.c,rtld_malloc.h}"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-3-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "fixed first-fit pool with a 16 KiB bootstrap; FreeBSD mmap/sysarch hooks replaced by the fixed pool"
+
+[[import]]
+path = "libc/ravenlibc/ld/src/xalloc.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/xmalloc.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "xmalloc/xcalloc/xstrdup names kept; allocation goes through LdAlloc"
+
+[[import]]
+path = "libc/ravenlibc/ld/src/tls.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/{rtld.c,rtld_tls.h}"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "TLS offset bookkeeping; the size arithmetic is C57's layout crate"
+
+[[import]]
+path = "libc/ravenlibc/ld/src/raw/arch/mod.rs"
+upstream = "freebsd"
+upstream_path = "libexec/rtld-elf/{amd64,aarch64,riscv}/rtld_start.S"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "minimal _rtld_start entry stubs; the full register convention is the on-target half"

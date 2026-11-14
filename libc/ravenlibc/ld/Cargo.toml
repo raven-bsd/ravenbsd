@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-rtld"
+version = "0.1.0"
+description = "ravenlibc dynamic loader: /libexec/ld-elf.so.1"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+raven-libc-abi = { path = "../crates/raven-libc-abi", default-features = false }
+raven-libc-elf = { path = "../crates/raven-libc-elf", default-features = false }
+raven-libc-tls = { path = "../crates/raven-libc-tls", default-features = false }

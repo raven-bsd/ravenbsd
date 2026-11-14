@@ -155,6 +155,7 @@ members = [
     "tools/fuzz",
     "tests/fuzz/replay",
     "libc/ravenlibc/crt",
+    "libc/ravenlibc/ld",
 ]
 default-members = ["crates/*", "libc/ravenlibc/crates/*"]
 
