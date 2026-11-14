@@ -9414,3 +9414,14 @@ tier = "A"
 copied = "2026-11-14"
 modified = true
 notes = "minimal _rtld_start entry stubs; the full register convention is the on-target half"
+
+[[import]]
+path = "userland/brush"
+upstream = "brush"
+upstream_path = "."
+upstream_rev = "8adb6bc06815c34ccf6503902f6f292e04b1cbba"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "Pinned brush 0.4.0 workspace vendored under userland/brush; the donor fuzz, xtask, benchmarks, e2e, samples, schemas, scripts, docs and rust-toolchain.toml are omitted; MIT SPDX and copyright headers are applied to the imported source and the workspace member list is trimmed to the retained crates."

@@ -23,7 +23,7 @@ XTASK = cargo run -q -p xtask --
 -include .raven-env.mk
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check guard kernel loader dev release image run test world provenance \
+.PHONY: help setup doctor check guard kernel loader brush dev release image run test world provenance \
 	toolchain clean distclean
 
 help:
@@ -46,6 +46,9 @@ kernel:
 
 loader:
 	@$(XTASK) build loader --arch $(ARCH) $(RELFLAG)
+
+brush:
+	@$(XTASK) build brush --arch $(ARCH) $(RELFLAG)
 
 dev:
 	@sh scripts/build.sh dev $(ARCH)

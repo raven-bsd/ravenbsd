@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024 reuben olinsky
+
+name: "set -n"
+cases:
+  - name: "set -n"
+    stdin: |
+      set -n
+      touch somefile.txt
+      ls

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024 reuben olinsky
+
+name: "set -B"
+cases:
+  - name: "set -B"
+    stdin: |
+      set +B
+      echo "+B: " ${a,b}
+
+      set -B
+      echo "-B: " ${a,b}
