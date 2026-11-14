@@ -262,3 +262,25 @@ fn the_binary128_type_divides_and_takes_square_roots() {
         -0.5
     );
 }
+
+#[test]
+fn the_binary128_integral_rounding_family() {
+    use super::LongDouble128;
+    assert_eq!(LongDouble128::from_f64(2.5).floor().to_f64(), 2.0);
+    assert_eq!(LongDouble128::from_f64(2.5).ceil().to_f64(), 3.0);
+    assert_eq!(LongDouble128::from_f64(-2.5).floor().to_f64(), -3.0);
+    assert_eq!(LongDouble128::from_f64(-2.5).ceil().to_f64(), -2.0);
+    assert_eq!(LongDouble128::from_f64(-2.5).trunc().to_f64(), -2.0);
+    assert_eq!(LongDouble128::from_f64(2.5).roundeven().to_f64(), 2.0);
+    assert_eq!(LongDouble128::from_f64(3.5).roundeven().to_f64(), 4.0);
+    assert_eq!(LongDouble128::from_f64(-2.5).roundeven().to_f64(), -2.0);
+    assert_eq!(LongDouble128::from_f64(0.4).floor().to_f64(), 0.0);
+    assert_eq!(LongDouble128::from_f64(0.4).ceil().to_f64(), 1.0);
+    assert_eq!(LongDouble128::from_f64(-0.4).floor().to_f64(), -1.0);
+    assert_eq!(LongDouble128::from_f64(-0.4).trunc().to_f64(), -0.0);
+    assert_eq!(LongDouble128::from_f64(7.0).floor().to_f64(), 7.0);
+    assert_eq!(
+        LongDouble128::infinity(false).floor().to_f64(),
+        f64::INFINITY
+    );
+}

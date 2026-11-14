@@ -411,6 +411,104 @@ impl LongDouble128 {
             bits: ((BIAS as u128) << EXPONENT_SHIFT) | self.significand_bits(),
         }
     }
+
+    /// `floor`.
+    pub fn floor(self) -> Self {
+        Self {
+            bits: integral_bits(self.bits, IntegralMode::Floor),
+        }
+    }
+
+    /// `ceil`.
+    pub fn ceil(self) -> Self {
+        Self {
+            bits: integral_bits(self.bits, IntegralMode::Ceil),
+        }
+    }
+
+    /// `trunc`.
+    pub fn trunc(self) -> Self {
+        Self {
+            bits: integral_bits(self.bits, IntegralMode::Trunc),
+        }
+    }
+
+    /// `roundeven`: ties to even.
+    pub fn roundeven(self) -> Self {
+        Self {
+            bits: integral_bits(self.bits, IntegralMode::Even),
+        }
+    }
+}
+
+/// The integral rounding modes.
+enum IntegralMode {
+    Floor,
+    Ceil,
+    Trunc,
+    Even,
+}
+
+/// Round to an integer in the requested mode (the f128 integral family).
+fn integral_bits(a: u128, mode: IntegralMode) -> u128 {
+    if !matches!(classify(a), FP_ZERO | FP_SUBNORMAL | FP_NORMAL) {
+        return a;
+    }
+    if classify(a) == FP_ZERO {
+        return a;
+    }
+    let negative = a & SIGN != 0;
+    let (exponent, significand) = unpack(a);
+    if exponent >= 112 {
+        return a;
+    }
+    let sign = if negative { SIGN } else { 0 };
+    if exponent < -1 {
+        let keep = match mode {
+            IntegralMode::Floor => negative,
+            IntegralMode::Ceil => !negative,
+            IntegralMode::Trunc | IntegralMode::Even => false,
+        };
+        return if keep {
+            sign | (0x3fff_u128 << EXPONENT_SHIFT)
+        } else {
+            sign
+        };
+    }
+    if exponent == -1 {
+        // |x| in [0.5, 1).
+        let keep = match mode {
+            IntegralMode::Floor => negative,
+            IntegralMode::Ceil => !negative,
+            IntegralMode::Trunc | IntegralMode::Even => false,
+        };
+        return if keep {
+            sign | (0x3fff_u128 << EXPONENT_SHIFT)
+        } else {
+            sign
+        };
+    }
+    let drop = (112 - exponent) as u32;
+    let kept = (significand >> drop) << drop;
+    let lost = significand & ((1u128 << drop) - 1);
+    if lost == 0 {
+        return a;
+    }
+    let increment = match mode {
+        IntegralMode::Floor => negative,
+        IntegralMode::Ceil => !negative,
+        IntegralMode::Trunc => false,
+        IntegralMode::Even => {
+            let half = 1u128 << (drop - 1);
+            lost > half || (lost == half && ((kept >> drop) & 1) != 0)
+        }
+    };
+    let magnitude = if increment {
+        kept + (1u128 << drop)
+    } else {
+        kept
+    };
+    from_parts_bits(negative, exponent, magnitude)
 }
 
 /// Build a value from a sign, the unpacked exponent and a significand normalised at bit 112.
