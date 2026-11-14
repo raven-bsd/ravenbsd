@@ -61,6 +61,7 @@ raven-libc-pledge = { path = "../raven-libc-pledge", default-features = false }
 raven-libc-pwd = { path = "../raven-libc-pwd", default-features = false }
 raven-libc-nss = { path = "../raven-libc-nss", default-features = false }
 raven-libc-resolv = { path = "../raven-libc-resolv", default-features = false }
+raven-libc-net = { path = "../raven-libc-net", default-features = false }
 raven-libc-personality-linux = { path = "../raven-libc-personality-linux", default-features = false }
 raven-libc-personality-bsd = { path = "../raven-libc-personality-bsd", default-features = false }
 raven-libc-personality-solaris = { path = "../raven-libc-personality-solaris", default-features = false }

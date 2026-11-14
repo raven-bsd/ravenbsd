@@ -977,6 +977,7 @@ dependencies = [
  "raven-libc-locale",
  "raven-libc-m",
  "raven-libc-malloc",
+ "raven-libc-net",
  "raven-libc-nss",
  "raven-libc-personality-bsd",
  "raven-libc-personality-linux",

@@ -9,7 +9,11 @@
 //! deferred with C51's missing shadow source and C60b's `FILE` layer.
 
 pub(crate) mod cursor;
+pub(crate) mod getspent;
 pub(crate) mod lookup;
+pub(crate) mod putspent;
+pub(crate) mod setspent;
+pub(crate) mod shadow;
 pub(crate) mod source;
 
 pub(crate) mod endpwent;
