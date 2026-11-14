@@ -1,0 +1,91 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 14, 2026
+.Dt RAVEN-THEME 1
+.Os RavenBSD
+.Sh NAME
+.Nm raven-theme
+.Nd preview, set and apply the Raven terminal palette
+.Sh SYNOPSIS
+.Nm
+.Cm preview
+.Op Fl -json
+.Nm
+.Cm set
+.Ar name|path
+.Nm
+.Cm apply
+.Op Fl -dry-run
+.Sh DESCRIPTION
+.Nm
+is the colour front end of
+.Xr raven 1 .
+The default palette is
+.Dq raven-violet ;
+.Cm mono
+and
+.Cm classic
+are built in.
+Semantic roles are accent, muted, border, success, warning, error, info, path, number,
+string and keyword.
+.Pp
+Colour is only emitted for a terminal and is suppressed by
+.Ev NO_COLOR ,
+.Ev TERM=dumb
+and JSON output.
+.Fl -color=always
+is an explicit request for human colour.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Cm preview
+Print the roles. With
+.Fl -json
+emit one schema-1
+.Dq theme
+record with hex values and no escapes.
+.It Cm set Ar name|path
+Validate and atomically install a built-in name or a theme TOML file in the user config.
+.Fl -dry-run
+prints the target without writing.
+.It Cm apply
+Generate
+.Ev LS_COLORS
+and
+.Ev LESS_TERMCAP_*
+in
+.Pa ~/.config/raven/theme.env .
+An existing file is copied to
+.Pa ~/.config/raven/theme.env.bak
+first.
+.Fl -dry-run
+lists the target and backup paths without writing or starting any external tool.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width Ds
+.It Ev NO_COLOR
+Suppress automatic colour.
+.It Ev COLORTERM
+.Cm truecolor
+selects 24-bit output.
+.It Ev TERM
+A
+.Cm 256color
+terminal selects the 256-colour fallback.
+.El
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa /etc/raven/theme.toml
+System theme.
+.It Pa ~/.config/raven/theme.toml
+User theme; wins over the system file.
+.It Pa ~/.config/raven/theme.env
+Generated adapters.
+.El
+.Sh EXIT STATUS
+.Ex -std
+A configuration or write error exits 1; a usage error exits 2.
+.Sh SEE ALSO
+.Xr raven 1
+.Sh STANDARDS
+RavenBSD.

@@ -15,6 +15,7 @@ use crate::Context;
 pub mod completion;
 pub mod help;
 pub mod reserved;
+pub mod theme;
 pub mod version;
 
 /// Static metadata for one command.
@@ -50,6 +51,7 @@ pub static COMMANDS: &[&dyn Command] = &[
     &reserved::NET,
     &reserved::LOG,
     &reserved::CONFIG,
+    &theme::THEME_COMMAND,
     &reserved::PKG,
     &reserved::USER,
     &reserved::IMAGE,
