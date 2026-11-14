@@ -635,7 +635,9 @@ mod arithmetic {
             return LongDouble::zero(negative);
         }
         if b.is_zero() {
-            return if subtract { negate(a) } else { a };
+            // `a + 0` and `a - 0` are both `a`; only the zero sign can differ and that is set by
+            // the caller's rounding mode, not here.
+            return a;
         }
         if a.is_zero() {
             return if subtract { negate(b) } else { b };

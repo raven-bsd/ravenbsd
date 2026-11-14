@@ -87,6 +87,8 @@ mod generic;
 mod legacy;
 #[cfg(target_arch = "x86_64")]
 mod long_double;
+#[cfg(target_arch = "x86_64")]
+pub mod long_double_math;
 mod portable;
 
 pub use c23::{
@@ -120,6 +122,11 @@ pub use long_double::{
     isfinitel, isinfl, isnanl, isnormall, llrintl, llroundl, lrintl, lroundl, nanl, nearbyintl,
     nextafterl, nexttowardl, remainderl, remquol, rintl, roundevenl, roundl, scalbnl, signbitl,
     sqrtl, totalorderl, truncl,
+};
+#[cfg(target_arch = "x86_64")]
+pub use long_double_math::{
+    acoshl, acosl, asinhl, asinl, atan2l, atanhl, atanl, coshl, cosl, exp2l, exp10l, expl, expm1l,
+    log1pl, log2l, log10l, logl, powl, sinhl, sinl, tanhl, tanl,
 };
 
 use support::Round;
