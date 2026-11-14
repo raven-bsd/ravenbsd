@@ -1,0 +1,274 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+//! Host tests for the `raven` command contract.
+
+use raven_cli::{Exit, Io};
+
+fn run(args: &[&str]) -> (Exit, String, String) {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let exit = {
+        let mut io = Io {
+            stdout: &mut stdout,
+            stderr: &mut stderr,
+            is_tty: false,
+            no_color: true,
+        };
+        raven_cli::run(args.iter().copied(), &mut io)
+    };
+    (
+        exit,
+        String::from_utf8(stdout).unwrap(),
+        String::from_utf8(stderr).unwrap(),
+    )
+}
+
+fn json(text: &str) -> serde_json::Value {
+    serde_json::from_str(text.trim()).unwrap()
+}
+
+const GENERAL_HELP: &str = concat!(
+    "raven - RavenBSD administration client\n",
+    "\n",
+    "Usage: raven [OPTIONS] <COMMAND> [ARGUMENTS]\n",
+    "\n",
+    "Commands:\n",
+    "  version       print version, schema and target information\n",
+    "  help          show this help or help for a command\n",
+    "  completion    print a shell completion script\n",
+    "  status        reserved: host health\n",
+    "  doctor        reserved: ordered diagnostics\n",
+    "  svc           reserved: service control\n",
+    "  net           reserved: network control\n",
+    "  log           reserved: log access\n",
+    "  config        reserved: configuration access\n",
+    "  pkg           reserved: package access\n",
+    "  user          reserved: user identities\n",
+    "  image         reserved: image management\n",
+    "\n",
+    "Global options:\n",
+    "  --json             emit NDJSON records\n",
+    "  --quiet            suppress normal output\n",
+    "  --verbose          extra diagnostics on stderr\n",
+    "  --color=<policy>   auto, always or never (human output only)\n",
+    "  --dry-run          print a plan and change nothing\n",
+    "  --yes              assume yes for a destructive action\n",
+    "  -h, --help         show this help\n",
+    "  -V, --version      print the version\n",
+);
+
+const RESERVED: &[&str] = &[
+    "status", "doctor", "svc", "net", "log", "config", "pkg", "user", "image",
+];
+
+#[test]
+fn json_version_has_the_contract_envelope() {
+    let (exit, stdout, stderr) = run(&["--json", "version"]);
+    assert_eq!(exit, Exit::Success);
+    assert!(stderr.is_empty());
+    let value = json(&stdout);
+    assert_eq!(value["schema"], 1);
+    assert_eq!(value["kind"], "version");
+    assert_eq!(value["version"], "0.1.0");
+    assert_eq!(value["schema_version"], 1);
+    assert_eq!(value["target"], "x86_64-unknown-ravenbsd");
+    assert!(value["build"].is_null());
+    assert!(value["boot_id"].is_null());
+    assert_eq!(stdout.lines().count(), 1);
+}
+
+#[test]
+fn json_is_accepted_after_the_command() {
+    let (exit, stdout, _) = run(&["version", "--json"]);
+    assert_eq!(exit, Exit::Success);
+    assert_eq!(json(&stdout)["kind"], "version");
+}
+
+#[test]
+fn quiet_version_prints_nothing() {
+    let (exit, stdout, stderr) = run(&["--quiet", "version"]);
+    assert_eq!(exit, Exit::Success);
+    assert!(stdout.is_empty());
+    assert!(stderr.is_empty());
+}
+
+#[test]
+fn json_and_quiet_are_a_usage_error() {
+    let (exit, stdout, stderr) = run(&["--json", "--quiet", "version"]);
+    assert_eq!(exit, Exit::Usage);
+    assert!(stdout.is_empty());
+    let value = json(&stderr);
+    assert_eq!(value["kind"], "error");
+    assert_eq!(value["code"], "EUSAGE");
+}
+
+#[test]
+fn an_unknown_command_is_usage() {
+    let (exit, stdout, stderr) = run(&["--json", "does-not-exist"]);
+    assert_eq!(exit, Exit::Usage);
+    assert!(stdout.is_empty());
+    let value = json(&stderr);
+    assert_eq!(value["code"], "EUSAGE");
+    assert_eq!(value["context"]["command"], "does-not-exist");
+}
+
+#[test]
+fn an_unknown_flag_is_usage() {
+    let (exit, stdout, stderr) = run(&["--json", "--wat", "version"]);
+    assert_eq!(exit, Exit::Usage);
+    assert!(stdout.is_empty());
+    assert_eq!(json(&stderr)["code"], "EUSAGE");
+}
+
+#[test]
+fn reserved_commands_are_recognized_and_not_faked() {
+    for name in RESERVED {
+        let (exit, stdout, stderr) = run(&["--json", name]);
+        assert_eq!(exit, Exit::Failure, "{name}");
+        assert!(stdout.is_empty(), "{name}");
+        let value = json(&stderr);
+        assert_eq!(value["kind"], "error", "{name}");
+        assert_eq!(value["code"], "EUNAVAILABLE", "{name}");
+        assert_eq!(value["context"]["command"], *name, "{name}");
+    }
+}
+
+#[test]
+fn reserved_commands_have_a_human_error() {
+    let (exit, stdout, stderr) = run(&["status"]);
+    assert_eq!(exit, Exit::Failure);
+    assert!(stdout.is_empty());
+    assert!(stderr.contains("not available"));
+}
+
+#[test]
+fn reserved_commands_reject_unknown_flags() {
+    let (exit, stdout, stderr) = run(&["--json", "status", "--wat"]);
+    assert_eq!(exit, Exit::Usage);
+    assert!(stdout.is_empty());
+    assert_eq!(json(&stderr)["code"], "EUSAGE");
+}
+
+#[test]
+fn general_help_matches_the_golden_text() {
+    let (exit, stdout, stderr) = run(&["help"]);
+    assert_eq!(exit, Exit::Success);
+    assert!(stderr.is_empty());
+    assert_eq!(stdout, GENERAL_HELP);
+}
+
+#[test]
+fn no_arguments_print_general_help() {
+    let (exit, stdout, _) = run(&[]);
+    assert_eq!(exit, Exit::Success);
+    assert_eq!(stdout, GENERAL_HELP);
+}
+
+#[test]
+fn help_for_a_command_shows_its_usage() {
+    let (exit, stdout, _) = run(&["help", "version"]);
+    assert_eq!(exit, Exit::Success);
+    assert!(stdout.starts_with("Usage: raven version [--json]\n"));
+    assert!(stdout.contains("print version, schema and target information"));
+}
+
+#[test]
+fn help_flag_after_a_command_works() {
+    let (exit, stdout, _) = run(&["version", "--help"]);
+    assert_eq!(exit, Exit::Success);
+    assert!(stdout.starts_with("Usage: raven version [--json]\n"));
+}
+
+#[test]
+fn help_marks_reserved_commands() {
+    let (exit, stdout, _) = run(&["help", "status"]);
+    assert_eq!(exit, Exit::Success);
+    assert!(stdout.contains("reserved"));
+    assert!(stdout.contains("EUNAVAILABLE"));
+}
+
+#[test]
+fn help_for_an_unknown_command_is_usage() {
+    let (exit, stdout, stderr) = run(&["help", "nope"]);
+    assert_eq!(exit, Exit::Usage);
+    assert!(stdout.is_empty());
+    assert!(stderr.contains("unknown command"));
+}
+
+#[test]
+fn completion_covers_all_three_shells_and_all_commands() {
+    for (shell, marker) in [
+        ("bash", "complete -F _raven raven"),
+        ("zsh", "#compdef raven"),
+        ("fish", "complete -c raven"),
+    ] {
+        let (exit, stdout, stderr) = run(&["completion", shell]);
+        assert_eq!(exit, Exit::Success, "{shell}");
+        assert!(stderr.is_empty(), "{shell}");
+        assert!(stdout.contains(marker), "{shell}");
+        for name in RESERVED
+            .iter()
+            .chain(["version", "help", "completion"].iter())
+        {
+            assert!(stdout.contains(name), "{shell} misses {name}");
+        }
+        assert!(!stdout.contains("eval "), "{shell} evaluates shell text");
+    }
+}
+
+#[test]
+fn completion_needs_a_valid_shell() {
+    let (exit, _, _) = run(&["completion"]);
+    assert_eq!(exit, Exit::Usage);
+    let (exit, _, _) = run(&["completion", "tcsh"]);
+    assert_eq!(exit, Exit::Usage);
+}
+
+#[test]
+fn the_double_dash_terminates_global_options() {
+    let (exit, stdout, _) = run(&["--", "version"]);
+    assert_eq!(exit, Exit::Success);
+    assert!(stdout.starts_with("raven 0.1.0"));
+}
+
+#[test]
+fn command_arguments_after_double_dash_are_positional() {
+    let (exit, _, stderr) = run(&["version", "--", "--json"]);
+    assert_eq!(exit, Exit::Usage);
+    assert!(stderr.contains("version takes no arguments"));
+}
+
+#[test]
+fn global_flags_are_accepted_after_the_command() {
+    let (exit, _, _) = run(&[
+        "version",
+        "--verbose",
+        "--color=never",
+        "--dry-run",
+        "--yes",
+    ]);
+    assert_eq!(exit, Exit::Success);
+}
+
+#[test]
+fn an_invalid_colour_is_usage() {
+    let (exit, _, stderr) = run(&["--color=purple", "version"]);
+    assert_eq!(exit, Exit::Usage);
+    assert!(stderr.contains("invalid --color"));
+}
+
+#[test]
+fn json_without_a_command_is_usage() {
+    let (exit, stdout, stderr) = run(&["--json"]);
+    assert_eq!(exit, Exit::Usage);
+    assert!(stdout.is_empty());
+    assert_eq!(json(&stderr)["code"], "EUSAGE");
+}
+
+#[test]
+fn human_version_names_the_target() {
+    let (exit, stdout, _) = run(&["version"]);
+    assert_eq!(exit, Exit::Success);
+    assert_eq!(stdout, "raven 0.1.0 (x86_64-unknown-ravenbsd)\n");
+}

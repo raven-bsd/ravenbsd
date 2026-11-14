@@ -1,0 +1,52 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 14, 2026
+.Dt RAVEN-VERSION 1
+.Os RavenBSD
+.Sh NAME
+.Nm raven-version
+.Nd print RavenBSD client version information
+.Sh SYNOPSIS
+.Nm
+.Op Fl -json
+.Sh DESCRIPTION
+.Nm
+prints the version of the
+.Xr raven 1
+client.
+With
+.Fl -json
+it emits one object of
+.Va kind :
+.Dq version
+with these fields:
+.Bl -tag -width "schema_version"
+.It Va schema
+The contract schema, 1.
+.It Va kind
+.Dq version .
+.It Va version
+The client version.
+.It Va schema_version
+The output schema version, 1.
+.It Va target
+The build target triple, for example
+.Dq x86_64-unknown-ravenbsd .
+.It Va build
+The build identifier.
+.Dv null
+until the target build provides one.
+.It Va boot_id
+The running boot identifier.
+.Dv null
+until the target provides one.
+.El
+.Pp
+The target may provide the two null fields in a later ticket; this command never invents them.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits 2.
+.Sh SEE ALSO
+.Xr raven 1
+.Sh STANDARDS
+RavenBSD modern userland contract, revision 1.

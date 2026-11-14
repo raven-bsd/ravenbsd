@@ -110,6 +110,7 @@ members = [
     "userland/bin/umount",
     "userland/bin/ps",
     "userland/bin/svcctl",
+    "userland/bin/raven",
     "userland/bin/cat",
     "userland/bin/ls",
     "userland/bin/mkdir",
