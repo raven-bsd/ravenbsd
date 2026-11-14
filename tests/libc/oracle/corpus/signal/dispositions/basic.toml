@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[case]]
+steps = [
+  { sig = 10, write = true, class = 2, mask = 0, flags = 0 },
+  { sig = 10, write = false, class = 0, mask = 0, flags = 0 },
+  { sig = 32, write = true, class = 2, mask = 0, flags = 0 },
+  { sig = 9, write = true, class = 1, mask = 0, flags = 0 },
+  { sig = 64, write = true, class = 2, mask = 18446744073709551615, flags = 1073741824 },
+]

@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Functions that must never appear on the entry path (`entry.rs`, `deliver.rs`, `critical.rs`,
+# `mask.rs`), from ticket C58 4.9. One name per line.
+
+malloc
+free
+printf
+pthread_mutex_lock
+pthread_mutex_unlock
+pthread_mutex_trylock
+exit
+atexit
+getenv
+localtime
+dlopen
+strsignal
+syslog

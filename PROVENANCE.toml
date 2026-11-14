@@ -8743,3 +8743,201 @@ tier = "A"
 copied = "2026-11-13"
 modified = true
 notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; futex calls via ThreadKernel; tid from TCB; signal blocking as TCB mask stores; no weak-alias dummies; need_locks driven by thread count; PI/robust/pshared gated by capabilities; fixed arrays instead of malloc; TLS arithmetic by cfg(target_arch)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/sigset.rs"
+upstream = "musl"
+upstream_path = "src/signal/sigaddset.c, src/signal/sigdelset.c, src/signal/sigemptyset.c, src/signal/sigfillset.c, src/signal/sigismember.c, src/signal/sigisemptyset.c, src/signal/sigandset.c, src/signal/sigorset.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/psignal.rs"
+upstream = "musl"
+upstream_path = "src/signal/psignal.c, src/signal/psiginfo.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/mask.rs"
+upstream = "musl"
+upstream_path = "src/signal/block.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/action.rs"
+upstream = "musl"
+upstream_path = "src/signal/sigaction.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated ; SIGABRT serialised by the same table writer lock"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/dispositions.rs"
+upstream = "musl"
+upstream_path = "src/signal/sigaction.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated ; the kernel interaction becomes the seqlock table (RD-new 3)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/legacy.rs"
+upstream = "musl"
+upstream_path = "src/signal/signal.c, src/signal/sigpause.c, src/signal/sighold.c, src/signal/sigrelse.c, src/signal/sigignore.c, src/signal/sigset.c, src/signal/siginterrupt.c, src/signal/sigrtmin.c, src/signal/sigrtmax.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/send.rs"
+upstream = "musl"
+upstream_path = "src/signal/raise.c, src/signal/kill.c, src/signal/killpg.c, src/signal/sigqueue.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated ; raise uses the libc-only direct entry; kill/sigqueue are procd RPCs (PG-44)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/wait.rs"
+upstream = "musl"
+upstream_path = "src/signal/sigsuspend.c, src/signal/sigwait.c, src/signal/sigwaitinfo.c, src/signal/sigtimedwait.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated ; sigsuspend uses the critical-section protocol of A-sol-21"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/maskops.rs"
+upstream = "musl"
+upstream_path = "src/signal/sigprocmask.c, src/signal/sigpending.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/altstack.rs"
+upstream = "musl"
+upstream_path = "src/signal/sigaltstack.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated ; libc-only TCB bookkeeping (TBD-9)"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/sigjmp.rs"
+upstream = "musl"
+upstream_path = "src/signal/sigsetjmp_tail.c, src/signal/siglongjmp.c"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated ; the tail restores the TCB mask word instead of rt_sigprocmask"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/raw/setjmp_x86_64.rs"
+upstream = "musl"
+upstream_path = "src/setjmp/x86_64/setjmp.s, src/setjmp/x86_64/longjmp.s"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated ; Kain notice kept, no musl copyright line"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/raw/setjmp_aarch64.rs"
+upstream = "musl"
+upstream_path = "src/setjmp/aarch64/setjmp.s, src/setjmp/aarch64/longjmp.s"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/raw/setjmp_riscv64.rs"
+upstream = "musl"
+upstream_path = "src/setjmp/riscv64/setjmp.S, src/setjmp/riscv64/longjmp.S"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/raw/sigsetjmp_x86_64.rs"
+upstream = "musl"
+upstream_path = "src/signal/x86_64/sigsetjmp.s"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/raw/sigsetjmp_aarch64.rs"
+upstream = "musl"
+upstream_path = "src/signal/aarch64/sigsetjmp.s"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/raw/sigsetjmp_riscv64.rs"
+upstream = "musl"
+upstream_path = "src/signal/riscv64/sigsetjmp.s"
+upstream_rev = "7813e9119eb5fe681b6750b8a033a0490bca0941"
+license = "MIT"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "no per-file header; covered by musl/COPYRIGHT; checkout 7813e911; kernel sigprocmask replaced by TCB stores; SA_RESTORER and restore.s deleted; kernel interaction replaced by DispTable and SigKernel; jmp_buf offsets re-based onto the 392-byte layout; FP slots cfg-gated"
+
+[[import]]
+path = "libc/ravenlibc/crates/raven-libc-signal/src/sig2str.rs"
+upstream = "freebsd"
+upstream_path = "lib/libc/gen/sig2str.c"
+upstream_rev = "133344405f532bd54ff3629a77d4c4e062f01fdb"
+license = "BSD-2-Clause"
+tier = "A"
+copied = "2026-11-14"
+modified = true
+notes = "per-file header SPDX BSD-2-Clause, Copyright (c) 2025 Ricardo Branco; checkout 133344405f53; BSD signal numbering replaced by Linux names; sys_signame indexed by the Linux table; RTMIN/RTMAX formatting kept; decimal strings accepted by str2sig (POSIX.1-2024)"

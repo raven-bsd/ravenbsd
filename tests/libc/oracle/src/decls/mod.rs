@@ -51,3 +51,9 @@ pub mod fmt_musl_scanf;
 
 #[cfg(feature = "oracle-raven-libc-time")]
 pub mod raven_libc_time;
+
+#[cfg(feature = "oracle-signal-musl")]
+pub mod signal_musl;
+
+#[cfg(feature = "oracle-signal-freebsd")]
+pub mod signal_freebsd;

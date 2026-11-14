@@ -22,6 +22,7 @@ raven-libc-fmt = { path = "../../../libc/ravenlibc/crates/raven-libc-fmt" }
 raven-libc-time = { path = "../../../libc/ravenlibc/crates/raven-libc-time" }
 raven-libc-m = { path = "../../../libc/ravenlibc/crates/raven-libc-m" }
 raven-libc-tls = { path = "../../../libc/ravenlibc/crates/raven-libc-tls" }
+raven-libc-signal = { path = "../../../libc/ravenlibc/crates/raven-libc-signal" }
 
 [features]
 default = []
@@ -45,6 +46,8 @@ oracle-fmt-musl = []
 oracle-fmt-musl-scanf = []
 oracle-raven-libc-time = []
 oracle-tls = []
+oracle-signal-musl = []
+oracle-signal-freebsd = []
 all-oracles = [
     "oracle-string-basic",
     "oracle-ctype-multibyte",
@@ -66,6 +69,8 @@ all-oracles = [
     "oracle-fmt-musl-scanf",
     "oracle-raven-libc-time",
     "oracle-tls",
+    "oracle-signal-musl",
+    "oracle-signal-freebsd",
 ]
 
 [lints]

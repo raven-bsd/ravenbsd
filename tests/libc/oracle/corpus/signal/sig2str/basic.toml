@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[case]]
+number = 1
+
+[[case]]
+number = 10
+
+[[case]]
+number = 31
+
+[[case]]
+number = 32
+
+[[case]]
+number = 64
+
+[[case]]
+number = 65
+
+[[case]]
+number = 66
+
+[[case]]
+number = 126
+
+[[case]]
+number = 0
+
+[[case]]
+number = 127
+
+[[case]]
+text = "HUP"
+
+[[case]]
+text = "SIGTERM"
+
+[[case]]
+text = "USR1"
+
+[[case]]
+text = "RTMIN"
+
+[[case]]
+text = "RTMIN+1"
+
+[[case]]
+text = "RTMAX-1"
+
+[[case]]
+text = "64"
+
+[[case]]
+text = "BOGUS"

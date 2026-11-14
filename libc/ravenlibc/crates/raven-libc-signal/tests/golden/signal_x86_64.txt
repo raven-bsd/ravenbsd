@@ -1,0 +1,155 @@
+# x86_64-unknown-none
+
+# llvm-objdump -d --no-show-raw-insn (build-only; not executed on this host)
+
+0000000000000000 <__rl_sigsetjmp>:
+       0:      	testl	%esi, %esi
+       2:      	je	0x3e <__rl_sigsetjmp+0x3e>
+       4:      	popq	256(%rdi)
+       a:      	movq	%rbx, 272(%rdi)
+      11:      	movq	%rdx, 280(%rdi)
+      18:      	movq	%rdi, %rbx
+      1b:      	callq	0x20 <__rl_sigsetjmp+0x20>
+      20:      	pushq	256(%rbx)
+      26:      	movq	%rbx, %rdi
+      29:      	movl	%eax, %esi
+      2b:      	movq	280(%rbx), %rdx
+      32:      	movq	272(%rbx), %rbx
+      39:      	jmp	0x3e <__rl_sigsetjmp+0x3e>
+      3e:      	jmp	0x43 <__rl_sigsetjmp_tail>
+
+0000000000000043 <__rl_sigsetjmp_tail>:
+      43:      	testl	%esi, %esi
+      45:      	je	0x53 <__rl_sigsetjmp_tail+0x10>
+      47:      	movq	264(%rdi), %rax
+      4e:      	movq	%rax, (%rdx)
+      51:      	jmp	0x5d <__rl_sigsetjmp_tail+0x1a>
+      53:      	movq	(%rdx), %rax
+      56:      	movq	%rax, 264(%rdi)
+      5d:      	movl	%esi, %eax
+      5f:      	retq
+
+0000000000000000 <__raven_sigentry>:
+       0:      	andq	$-16, %rsp
+       4:      	movq	(%rip), %rax            # 0xb <__raven_sigentry+0xb>
+       b:      	testq	%rax, %rax
+       e:      	je	0x12 <__raven_sigentry+0x12>
+      10:      	callq	*%rax
+      12:      	jmp	0x17 <__rl_sigreturn_stub>
+
+0000000000000017 <__rl_sigreturn_stub>:
+      17:      	movl	$130, %eax
+      1c:      	syscall
+      1e:      	ud2
+
+0000000000000000 <__rl_setjmp>:
+       0:      	movq	%rbx, (%rdi)
+       3:      	movq	%rbp, 8(%rdi)
+       7:      	movq	%r12, 16(%rdi)
+       b:      	movq	%r13, 24(%rdi)
+       f:      	movq	%r14, 32(%rdi)
+      13:      	movq	%r15, 40(%rdi)
+      17:      	leaq	8(%rsp), %rdx
+      1c:      	movq	%rdx, 48(%rdi)
+      20:      	movq	(%rsp), %rdx
+      24:      	movq	%rdx, 56(%rdi)
+      28:      	xorl	%eax, %eax
+      2a:      	retq
+
+000000000000002b <__rl_longjmp>:
+      2b:      	xorl	%eax, %eax
+      2d:      	cmpl	$1, %esi
+      30:      	adcl	%esi, %eax
+      32:      	movq	(%rdi), %rbx
+      35:      	movq	8(%rdi), %rbp
+      39:      	movq	16(%rdi), %r12
+      3d:      	movq	24(%rdi), %r13
+      41:      	movq	32(%rdi), %r14
+      45:      	movq	40(%rdi), %r15
+      49:      	movq	48(%rdi), %rsp
+      4d:      	jmpq	*56(%rdi)
+
+0000000000000000 <__rl_getcontext>:
+       0:      	movq	%rbx, 88(%rdi)
+       4:      	movq	%rbp, 80(%rdi)
+       8:      	movq	%r12, 32(%rdi)
+       c:      	movq	%r13, 40(%rdi)
+      10:      	movq	%r14, 48(%rdi)
+      14:      	movq	%r15, 56(%rdi)
+      18:      	leaq	8(%rsp), %rax
+      1d:      	movq	%rax, 120(%rdi)
+      21:      	movq	(%rsp), %rax
+      25:      	movq	%rax, 128(%rdi)
+      2c:      	movq	$0, (%rdi)
+      33:      	movq	$0, 8(%rdi)
+      3b:      	movq	$0, 64(%rdi)
+      43:      	movq	$0, 72(%rdi)
+      4b:      	movq	$0, 96(%rdi)
+      53:      	movq	$0, 104(%rdi)
+      5b:      	movq	$0, 112(%rdi)
+      63:      	stmxcsr	424(%rdi)
+      6a:      	fnstcw	428(%rdi)
+      70:      	leaq	424(%rdi), %rax
+      77:      	movq	%rax, 224(%rdi)
+      7e:      	xorl	%eax, %eax
+      80:      	retq
+
+0000000000000081 <__rl_setcontext>:
+      81:      	ldmxcsr	424(%rdi)
+      88:      	fldcw	428(%rdi)
+      8e:      	movq	%rdi, %r10
+      91:      	movq	64(%r10), %rdi
+      95:      	movq	72(%r10), %rsi
+      99:      	movq	96(%r10), %rdx
+      9d:      	movq	112(%r10), %rcx
+      a1:      	movq	(%r10), %r8
+      a4:      	movq	8(%r10), %r9
+      a8:      	movq	80(%r10), %rbp
+      ac:      	movq	88(%r10), %rbx
+      b0:      	movq	32(%r10), %r12
+      b4:      	movq	40(%r10), %r13
+      b8:      	movq	48(%r10), %r14
+      bc:      	movq	56(%r10), %r15
+      c0:      	movq	120(%r10), %rsp
+      c4:      	xorl	%eax, %eax
+      c6:      	jmpq	*128(%r10)
+
+00000000000000cd <__rl_swapcontext>:
+      cd:      	pushq	%r12
+      cf:      	movq	%rsi, %r12
+      d2:      	callq	0xd7 <__rl_swapcontext+0xa>
+      d7:      	leaq	15(%rip), %rax          # 0xed <__rl_swapcontext+0x20>
+      de:      	movq	%rax, 128(%rdi)
+      e5:      	movq	%r12, %rdi
+      e8:      	callq	0xed <__rl_swapcontext+0x20>
+      ed:      	popq	%r12
+      ef:      	xorl	%eax, %eax
+      f1:      	retq
+
+00000000000000f2 <__rl_start_context>:
+      f2:      	andq	$-16, %rsp
+      f6:      	callq	*%r12
+      f9:      	testq	%r13, %r13
+      fc:      	je	0x107 <__rl_start_context+0x15>
+      fe:      	leaq	40(%r13), %rdi
+     102:      	callq	0x107 <__rl_start_context+0x15>
+     107:      	xorl	%edi, %edi
+     109:      	callq	0x10e <__rl_start_context+0x1c>
+     10e:      	ud2
+
+0000000000000110 <__rl_call_handler>:
+     110:      	pushq	%r12
+     112:      	pushq	%r13
+     114:      	movq	%rsp, %r12
+     117:      	movq	%rdi, %r13
+     11a:      	movq	%rsi, %rax
+     11d:      	movq	%rdx, %rdi
+     120:      	movq	%rcx, %rsi
+     123:      	movq	%r8, %rdx
+     126:      	movq	%r13, %rsp
+     129:      	andq	$-16, %rsp
+     12d:      	callq	*%rax
+     12f:      	movq	%r12, %rsp
+     132:      	popq	%r13
+     134:      	popq	%r12
+     136:      	retq

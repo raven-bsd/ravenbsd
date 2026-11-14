@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[case]]
+pending = 1024
+mask0 = 0
+mask1 = 16
+sig = 10
+flags = 0
+
+[[case]]
+pending = 18446744073709551615
+mask0 = 18446744073709551615
+mask1 = 0
+sig = 1
+flags = 0
+
+[[case]]
+pending = 34359738368
+mask0 = 0
+mask1 = 0
+sig = 36
+flags = 1073741824

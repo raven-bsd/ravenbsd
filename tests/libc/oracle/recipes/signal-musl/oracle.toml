@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# signal-musl: the eight sigset operations (MIT via musl/COPYRIGHT).
+
+schema = 1
+family = "signal-musl"
+description = "musl sigaddset, sigdelset, sigemptyset, sigfillset, sigismember, sigisemptyset, sigandset, sigorset"
+exports = [
+  "sigaddset",
+  "sigandset",
+  "sigdelset",
+  "sigemptyset",
+  "sigfillset",
+  "sigisemptyset",
+  "sigismember",
+  "sigorset",
+]
+opt = ["O2", "O0"]
+defines = ["_GNU_SOURCE"]
+include = ["shim:signal-musl"]
+flags = []
+
+[[source]]
+donor = "musl"
+path = "src/signal/sigaddset.c"
+
+[[source]]
+donor = "musl"
+path = "src/signal/sigdelset.c"
+
+[[source]]
+donor = "musl"
+path = "src/signal/sigemptyset.c"
+
+[[source]]
+donor = "musl"
+path = "src/signal/sigfillset.c"
+
+[[source]]
+donor = "musl"
+path = "src/signal/sigismember.c"
+
+[[source]]
+donor = "musl"
+path = "src/signal/sigisemptyset.c"
+
+[[source]]
+donor = "musl"
+path = "src/signal/sigandset.c"
+
+[[source]]
+donor = "musl"
+path = "src/signal/sigorset.c"
