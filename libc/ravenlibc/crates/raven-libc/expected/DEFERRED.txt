@@ -215,3 +215,6 @@ unsetenv the environment object is C61's start hand-over
 wcsnrtombs the pointer-array form needs a shell pointer walk; C60c
 wcsrtombs the pointer-array form needs a shell pointer walk; C60c
 wcstombs the pointer walk is C60c
+stdin the standard-stream data symbol is C61's start hand-over
+stdout the standard-stream data symbol is C61's start hand-over
+stderr the standard-stream data symbol is C61's start hand-over
