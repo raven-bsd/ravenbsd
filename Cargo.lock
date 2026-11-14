@@ -951,6 +951,7 @@ dependencies = [
 name = "raven-libc"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
  "raven-libc-abi",
  "raven-libc-compat",
  "raven-libc-ctype",
@@ -960,7 +961,11 @@ dependencies = [
  "raven-libc-glob",
  "raven-libc-m",
  "raven-libc-malloc",
+ "raven-libc-personality-bsd",
+ "raven-libc-personality-linux",
  "raven-libc-platform",
+ "raven-libc-pledge",
+ "raven-libc-proc",
  "raven-libc-regex",
  "raven-libc-stdio",
  "raven-libc-stdlib",
@@ -1099,6 +1104,26 @@ dependencies = [
  "raven-libc-time",
  "serde",
  "toml",
+]
+
+[[package]]
+name = "raven-libc-personality-bsd"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-platform",
+ "raven-libc-pledge",
+ "raven-libc-proc",
+ "raven-libc-sys",
+]
+
+[[package]]
+name = "raven-libc-personality-linux"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-platform",
+ "raven-libc-sys",
 ]
 
 [[package]]

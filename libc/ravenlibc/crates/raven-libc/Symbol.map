@@ -376,15 +376,81 @@ RAVEN_1.0 {
 		uuid_is_nil; # x86_64
 		uuid_to_string; # x86_64
 		vis; # x86_64
+		# ---- C66 Linux personality ----
+		copy_file_range;
+		epoll_create;
+		epoll_create1;
+		epoll_ctl;
+		epoll_pwait;
+		epoll_pwait2;
+		epoll_wait;
+		error;
+		error_at_line;
+		error_message_count;
+		error_one_per_line;
+		error_print_progname;
+		eventfd;
+		eventfd_read;
+		eventfd_write;
+		fstat64;
+		get_avphys_pages;
+		get_nprocs;
+		get_nprocs_conf;
+		get_phys_pages;
+		getauxval;
+		inotify_add_watch;
+		inotify_init;
+		inotify_init1;
+		inotify_rm_watch;
+		lseek64;
+		lstat64;
+		mmap64;
+		personality;
+		prctl;
+		pread64;
+		pwrite64;
+		readdir64;
+		sendfile;
+		sendfile64;
+		signalfd;
+		stat64;
+		sysinfo;
+		timerfd_create;
+		timerfd_gettime;
+		timerfd_settime;
+		# ---- C66 BSD personality ----
+		__errno;
+		__error;
+		close_range;
+		closefrom;
+		elf_aux_info;
+		getfsstat;
+		getmntinfo;
+		kevent;
+		kqueue;
+		kqueue1;
+		pledge;
+		setproctitle;
+		setproctitle_fast;
+		sysctl;
+		sysctlbyname;
+		sysctlgetmibinfo;
+		sysctlnametomib;
+		unveil;
 		# ---- C64 exports below ----
 };
 
 RAVENprivate_1.0 {
 	global:
 		__raven_libc_start;
+		__raven_va_error;
+		__raven_va_error_at_line;
 		__raven_va_ioctl;
 		__raven_va_open;
 		__raven_va_openat;
+		__raven_va_prctl;
+		__raven_va_setproctitle;
+		__raven_va_setproctitle_fast;
 		__rl_fini_array;
 		__rl_fmt_float_impl;
 		__rl_fmt_wide_impl;

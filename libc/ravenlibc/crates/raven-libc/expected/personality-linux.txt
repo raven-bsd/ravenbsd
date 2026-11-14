@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# C66 Linux personality exports (ticket 6.9). A name here must be public in Symbol.map.
+epoll_create
+epoll_create1
+epoll_ctl
+epoll_wait
+epoll_pwait
+epoll_pwait2
+eventfd
+eventfd_read
+eventfd_write
+timerfd_create
+timerfd_settime
+timerfd_gettime
+signalfd
+inotify_init
+inotify_init1
+inotify_add_watch
+inotify_rm_watch
+prctl
+personality
+error
+error_at_line
+error_print_progname
+error_message_count
+error_one_per_line
+sysinfo
+get_nprocs
+get_nprocs_conf
+get_phys_pages
+get_avphys_pages
+sendfile
+copy_file_range
+getauxval
+stat64
+fstat64
+lstat64
+pread64
+pwrite64
+lseek64
+mmap64
+sendfile64
+readdir64

@@ -51,6 +51,7 @@ cargo xtask commands:
   libc-oracle ... (not implemented yet)
   libc-headers ... (not implemented yet)
   libc-pack ... (not implemented yet)
+  libc-stubs [--arch A] [--out DIR] [--check]
   libc-size ... (not implemented yet)
   libc-world ... (not implemented yet)
   libc-census ... (not implemented yet)

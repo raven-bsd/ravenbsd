@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# RavenBSD case fragment for GNU config.sub (authored here from donor-map/14 3.A.9; it carries
+# only a case label and the OS name, no text from a GNU file).
+#
+# Insert inside the big `case $os in` before the generic `*)` arm:
+#
+#   ravenbsd*)
+#       basic_os=ravenbsd
+#       ;;
+#
+# The canonical triples are x86_64-unknown-ravenbsd, aarch64-unknown-ravenbsd and
+# riscv64-unknown-ravenbsd.

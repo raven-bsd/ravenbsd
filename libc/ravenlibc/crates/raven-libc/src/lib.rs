@@ -56,6 +56,12 @@ pub(crate) mod math;
 #[cfg(target_os = "none")]
 pub(crate) mod panic;
 #[cfg(target_os = "none")]
+pub(crate) mod personality_bsd;
+#[cfg(target_os = "none")]
+pub(crate) mod personality_common;
+#[cfg(target_os = "none")]
+pub(crate) mod personality_linux;
+#[cfg(target_os = "none")]
 pub(crate) mod platform;
 #[cfg(target_os = "none")]
 pub(crate) mod regex;

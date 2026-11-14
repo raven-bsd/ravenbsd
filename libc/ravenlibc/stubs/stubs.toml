@@ -1,0 +1,153 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The stub-library table of ticket C66 5.D / `17-crate-layout.md` 7.3.
+#
+# For every `name` the generator writes exactly two files in the output directory:
+#   libNAME.a  = the 8 bytes `!<arch>\n` (a valid archive with no members)
+#   libNAME.so = the text `INPUT(libc.so.1)\n` (a linker script)
+# Nothing else: no `libNAME.so.N`, no `.pc` file, no symbol. `libmd`, `libuuid` and
+# `libc_heap_tiny` are not stubs and must not appear in the output.
+#
+# `alias_soname` is informational: the loader's built-in alias table resolves it to the loaded
+# `libc.so.1`; the generator does not create a file for it.
+
+[[stub]]
+name = "bsd"
+ring = 2
+content = "the native libbsd names (strlcpy, strlcat, vis, ...); <bsd/*.h> are forwarders"
+alias_soname = "libbsd.so.0"
+note = "libbsd overlay; no separate library"
+
+[[stub]]
+name = "compat"
+ring = 3
+content = "none (FreeBSD libcompat held 4.3BSD calls)"
+alias_soname = ""
+note = "an unresolved clnt_*/xdr_* symbol is the honest error"
+
+[[stub]]
+name = "crypt"
+ring = 2
+content = "crypt crypt_r encrypt setkey"
+alias_soname = "libcrypt.so.1"
+note = "content is in libc.so.1"
+
+[[stub]]
+name = "dl"
+ring = 1
+content = "dlopen dlsym dlclose dlerror dladdr dl_iterate_phdr"
+alias_soname = "libdl.so.2"
+note = "libc.so.1"
+
+[[stub]]
+name = "execinfo"
+ring = 2
+content = "backtrace backtrace_symbols backtrace_symbols_fd"
+alias_soname = "libexecinfo.so.1"
+note = "delta D-5; BSD ports link -lexecinfo"
+
+[[stub]]
+name = "gen"
+ring = 2
+content = "the Solaris <libgen.h> extras present in libc"
+alias_soname = "libgen.so.1"
+note = "Solaris name"
+
+[[stub]]
+name = "intl"
+ring = 2
+content = "gettext dgettext ngettext textdomain bindtextdomain"
+alias_soname = ""
+note = "gettext stubs, 02-api-surface"
+
+[[stub]]
+name = "m"
+ring = 1
+content = "all of <math.h>, <complex.h>, <fenv.h>"
+alias_soname = "libm.so.1"
+note = "libm.so.6 is also a loader alias"
+
+[[stub]]
+name = "nsl"
+ring = 2
+content = "all sockets and gethostby*"
+alias_soname = ""
+note = "Solaris name"
+
+[[stub]]
+name = "posix4"
+ring = 2
+content = "sem_*, clock_*"
+alias_soname = "librt.so.1"
+note = "Solaris name; the content is in libc.so.1"
+
+[[stub]]
+name = "pthread"
+ring = 1
+content = "all pthread_* and semaphores"
+alias_soname = "libpthread.so.0"
+note = "no __isthreaded, no thread-stub"
+
+[[stub]]
+name = "resolv"
+ring = 2
+content = "res_*, dn_*"
+alias_soname = "libresolv.so.2"
+note = "libc.so.1"
+
+[[stub]]
+name = "rpcsvc"
+ring = 3
+content = "none (no RPC)"
+alias_soname = ""
+note = "delta D-5; missing xdr_*/clnt_* symbols are the honest error"
+
+[[stub]]
+name = "rt"
+ring = 1
+content = "clock_*, timer_*, shm_*, mq_*, aio_*, sem_*"
+alias_soname = "librt.so.1"
+note = "libc.so.1"
+
+[[stub]]
+name = "socket"
+ring = 2
+content = "all socket calls"
+alias_soname = "libsocket.so.1"
+note = "Solaris name"
+
+[[stub]]
+name = "ssp"
+ring = 1
+content = "__stack_chk_fail, __stack_chk_guard"
+alias_soname = ""
+note = "delta D-5; mlibc ships it"
+
+[[stub]]
+name = "ssp_nonshared"
+ring = 1
+content = "__stack_chk_fail, __stack_chk_guard"
+alias_soname = ""
+note = "delta D-5; the GCC -fstack-protector spelling"
+
+[[stub]]
+name = "thread"
+ring = 2
+content = "none (Solaris thr_* is refused, S03)"
+alias_soname = "libthread.so.1"
+note = "empty by design"
+
+[[stub]]
+name = "util"
+ring = 2
+content = "login_tty openpty forkpty pidfile_* humanize_number expand_number fparseln flopen"
+alias_soname = "libutil.so.1"
+note = "BSD libutil and glibc -lutil agree"
+
+[[stub]]
+name = "xnet"
+ring = 2
+content = "the XNET socket calls present in libc"
+alias_soname = ""
+note = "Solaris name"

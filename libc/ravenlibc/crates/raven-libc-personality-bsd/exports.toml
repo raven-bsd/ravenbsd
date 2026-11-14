@@ -1,0 +1,185 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The C names of ticket C66 6.9 for the BSD personality. `pthread_*_np` is deferred: C57 is
+# absent, so the shell does not define an alias whose base does not exist.
+
+[[export]]
+name = "kqueue"
+rust = "kqueue::kqueue"
+header = "sys/event.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-25"
+
+[[export]]
+name = "kqueue1"
+rust = "kqueue::kqueue1"
+header = "sys/event.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-25"
+
+[[export]]
+name = "kevent"
+rust = "kqueue::kevent"
+header = "sys/event.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-7/PG-38/PG-44"
+
+[[export]]
+name = "sysctl"
+rust = "sysctl::sysctl"
+header = "sys/sysctl.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-21/PG-58"
+
+[[export]]
+name = "sysctlbyname"
+rust = "sysctl::sysctlbyname"
+header = "sys/sysctl.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-21/PG-58"
+
+[[export]]
+name = "sysctlnametomib"
+rust = "sysctl::sysctlnametomib"
+header = "sys/sysctl.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = true
+gap = ""
+
+[[export]]
+name = "sysctlgetmibinfo"
+rust = "sysctl::sysctlgetmibinfo"
+header = "sys/sysctl.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = true
+gap = "C38 header gap"
+
+[[export]]
+name = "closefrom"
+rust = "closefrom::closefrom"
+header = "unistd.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = false
+gap = ""
+
+[[export]]
+name = "close_range"
+rust = "closefrom::close_range"
+header = "unistd.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = true
+gap = "C38 header gap"
+
+[[export]]
+name = "setproctitle"
+rust = "setproctitle::setproctitle"
+header = "unistd.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = false
+gap = "PG-44"
+
+[[export]]
+name = "setproctitle_fast"
+rust = "setproctitle::setproctitle"
+header = "unistd.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = false
+gap = "PG-44/C38 header gap"
+
+[[export]]
+name = "getmntinfo"
+rust = "getmntinfo::getmntinfo"
+header = "sys/mount.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-37"
+
+[[export]]
+name = "getfsstat"
+rust = "getmntinfo::getfsstat"
+header = "sys/mount.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-37"
+
+[[export]]
+name = "__error"
+rust = "errno cell pointer"
+header = "errno.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = false
+gap = ""
+
+[[export]]
+name = "__errno"
+rust = "errno cell pointer"
+header = "errno.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = false
+gap = ""
+
+[[export]]
+name = "pledge"
+rust = "pledge_glue::pledge"
+header = "sys/pledge.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-39"
+
+[[export]]
+name = "unveil"
+rust = "pledge_glue::unveil"
+header = "sys/pledge.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-39"
+
+[[export]]
+name = "elf_aux_info"
+rust = "aux::elf_aux_info"
+header = "sys/auxv.h"
+ring = 2
+personality = "bsd"
+version = "RAVEN_1.0"
+errno = true
+gap = "C38 header gap"

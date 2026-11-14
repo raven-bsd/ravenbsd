@@ -52,3 +52,8 @@ raven-libc-m = { path = "../raven-libc-m", default-features = false }
 raven-libc-malloc = { path = "../raven-libc-malloc", default-features = false }
 raven-libc-stdio = { path = "../raven-libc-stdio", default-features = false }
 raven-libc-compat = { path = "../raven-libc-compat", default-features = false }
+raven-libc-proc = { path = "../raven-libc-proc", default-features = false }
+raven-libc-pledge = { path = "../raven-libc-pledge", default-features = false }
+raven-libc-personality-linux = { path = "../raven-libc-personality-linux", default-features = false }
+raven-libc-personality-bsd = { path = "../raven-libc-personality-bsd", default-features = false }
+raven-abi = { path = "../../../../crates/raven-abi", default-features = false }

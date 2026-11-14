@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# RavenBSD case fragment for GNU config.guess (authored here from donor-map/14 3.A.9; one
+# `uname` test and one echo, no text from a GNU file).
+#
+# Insert before the generic Linux/BSD detection:
+#
+#   case "$(uname -s 2>/dev/null)" in
+#   RavenBSD)
+#       echo "$(uname -m)-unknown-ravenbsd"
+#       exit 0
+#       ;;
+#   esac
+#
+# uname -m is x86_64, aarch64 or riscv64; uname -s is RavenBSD (raven-abi/src/uname.rs).
