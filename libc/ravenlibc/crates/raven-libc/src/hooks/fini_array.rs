@@ -34,8 +34,8 @@ core::arch::global_asm!(
     ".globl __rl_fini_hook",
     ".type __rl_fini_hook,%function",
     "__rl_fini_hook:",
-    "adrp x0, _fini",
-    "add x0, x0, :lo12:_fini",
+    "adrp x0, :got:_fini",
+    "ldr x0, [x0, :got_lo12:_fini]",
     "ret",
 );
 
@@ -45,7 +45,9 @@ core::arch::global_asm!(
     ".globl __rl_fini_hook",
     ".type __rl_fini_hook,%function",
     "__rl_fini_hook:",
-    "lla a0, _fini",
+    "1:",
+    "auipc a0, %got_pcrel_hi(_fini)",
+    "ld a0, %pcrel_lo(1b)(a0)",
     "ret",
 );
 

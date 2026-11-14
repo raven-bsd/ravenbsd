@@ -259,6 +259,10 @@ fn build_spec(
     let mut flags = String::from("-C relocation-model=pic");
     if arch == Arch::X86_64 {
         flags.push_str(" -C code-model=small");
+    } else {
+        // The precompiled `core`/`alloc` rlibs of the ARM targets are not PIC; ThinLTO
+        // re-codegens their bitcode under the PIC relocation model with the shell.
+        flags.push_str(" -C lto=thin -C embed-bitcode=yes");
     }
     flags.push_str(&format!(
         " --remap-path-prefix={}=/ravenbsd",
