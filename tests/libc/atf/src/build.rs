@@ -142,7 +142,7 @@ impl Builder {
             "-o".to_string(),
             object.display().to_string(),
         ]);
-        let program = self.compiler();
+        let program = self.atf_compiler();
         run_checked(&program, &args, self.root())
             .with_context(|| format!("cannot compile atf-c source {}", source.display()))?;
         Ok(())
@@ -260,6 +260,8 @@ impl Builder {
                 format!("-I{}", root.display()),
                 "-I".to_string(),
                 include.display().to_string(),
+                format!("-I{}", self.vendor.join("vendor/atf").display()),
+                format!("-I{}", self.vendor.join("vendor/atf/atf-c").display()),
                 "-DHAVE_CONFIG_H".to_string(),
             ];
             if let Some(parent) = root.join(source).parent() {
@@ -381,6 +383,16 @@ impl Builder {
             "cc".to_string()
         } else {
             self.cc.clone()
+        }
+    }
+
+    /// The compiler for the ATF sources themselves: the target compiler in target mode,
+    /// because a host `cc` rejects `--target=x86_64-unknown-ravenbsd`.
+    fn atf_compiler(&self) -> String {
+        if self.mode == Mode::Target {
+            self.target_compiler()
+        } else {
+            self.compiler()
         }
     }
 
