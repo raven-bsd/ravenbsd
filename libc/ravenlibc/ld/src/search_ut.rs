@@ -35,3 +35,11 @@ fn absolute_and_slash_checks_work() {
     assert!(has_slash(b"lib/x.so"));
     assert!(!has_slash(b"libx.so"));
 }
+
+#[test]
+fn origin_is_detected() {
+    assert!(has_origin(b"$ORIGIN/lib"));
+    assert!(has_origin(b"/x/$ORIGIN/y"));
+    assert!(!has_origin(b"/x/origin/y"));
+    assert!(!has_origin(b""));
+}

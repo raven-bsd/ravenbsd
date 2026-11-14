@@ -47,6 +47,8 @@ use crate::lock::RtldLock;
 use crate::mapper::{MapErrKind, Mapped, Platform, map_object};
 use crate::rdebug::{LinkMapTable, RDebug};
 use crate::search;
+use crate::tls::TlsState;
+use raven_libc_tls::layout::{LayoutError, TlsModuleIn};
 
 /// The maximum number of objects.
 pub const MAX_OBJECTS: usize = 64;
@@ -123,6 +125,10 @@ pub struct LoadedObject {
     pub tls_offset: usize,
     /// The static TLS size.
     pub tls_size: usize,
+    /// `DT_RPATH` string offset, if present.
+    pub rpath: Option<u32>,
+    /// `DT_RUNPATH` string offset, if present.
+    pub runpath: Option<u32>,
     /// Whether the object's non-IFUNC relocation phases have run.
     pub relocated: bool,
     /// Whether the IFUNC/IRELATIVE pass has run.
@@ -217,6 +223,8 @@ pub struct Loader<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> {
     pub lock: RtldLock,
     /// The loader allocator.
     pub alloc: LdAlloc,
+    /// The static TLS assignment state.
+    pub tls: TlsState,
     /// The `dlerror` buffer.
     pub error: ErrBuf,
     /// The search path from `LD_LIBRARY_PATH`.
@@ -233,6 +241,10 @@ pub struct Loader<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> {
     pub bind_now: bool,
     /// The installed `RtldTable` address, if any.
     pub table_address: u64,
+    /// `dlpi_adds`: objects added.
+    pub adds: u32,
+    /// `dlpi_subs`: objects removed.
+    pub subs: u32,
 }
 
 impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
@@ -250,6 +262,7 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
             linkmap: LinkMapTable::new(),
             lock: RtldLock::new(),
             alloc: LdAlloc::new(),
+            tls: TlsState::empty(),
             error: ErrBuf::new(),
             library_path: [Name::empty(); MAX_DIRS],
             library_path_count: 0,
@@ -258,6 +271,8 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
             trust: true,
             bind_now: true,
             table_address: 0,
+            adds: 0,
+            subs: 0,
         }
     }
 
@@ -292,6 +307,7 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
                     *slot = Some(object);
                 }
                 self.count = self.count.saturating_add(1);
+                self.adds = self.adds.saturating_add(1);
                 return Some(ObjId(u32::try_from(index).ok()?));
             }
         }
@@ -315,6 +331,23 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
         }
     }
 
+    /// Add an `LD_PRELOAD` name; secure-exec ignores it.
+    pub fn add_preload(&mut self, name: &[u8]) -> bool {
+        if !self.trust || self.preload_count >= self.preload.len() {
+            return false;
+        }
+        let Some(value) = Name::new(name) else {
+            return false;
+        };
+        if let Some(slot) = self.preload.get_mut(self.preload_count) {
+            *slot = value;
+            self.preload_count = self.preload_count.saturating_add(1);
+            true
+        } else {
+            false
+        }
+    }
+
     /// Find an object by name.
     #[must_use]
     pub fn by_name(&self, name: &[u8]) -> Option<ObjId> {
@@ -330,6 +363,9 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
 
     /// Open and map one object.
     pub fn load_object(&mut self, path: &[u8], requested: &[u8]) -> Result<ObjId, LoadError> {
+        if !self.trust && !search::is_absolute(path) {
+            return Err(LoadError::SecurePath);
+        }
         if let Some(id) = self.by_name(requested) {
             return Ok(id);
         }
@@ -372,6 +408,8 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
         if view.gnu_stack_exec {
             return Err(LoadError::ExecutableStack);
         }
+        let rpath = view.rpath;
+        let runpath = view.runpath;
         let mut object = LoadedObject {
             view,
             mapped,
@@ -383,6 +421,8 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
             nodelete: false,
             tls_offset: 0,
             tls_size: 0,
+            rpath,
+            runpath,
             relocated: false,
             ifunc_done: false,
         };
@@ -429,7 +469,7 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
                     known
                 } else {
                     let path = self
-                        .find_library(name.as_bytes())
+                        .find_library_for(name.as_bytes(), Some(id))?
                         .ok_or(LoadError::NotFound)?;
                     self.load_object(path.as_bytes(), name.as_bytes())?
                 };
@@ -448,6 +488,36 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
         Ok(())
     }
 
+    /// Assign a static TLS offset to every loaded object that has a `PT_TLS`, in load order.
+    pub fn assign_tls_offsets(&mut self) -> Result<(), LoadError> {
+        for index in 0..MAX_OBJECTS {
+            let Some(object) = self.objects.get(index).and_then(|slot| slot.as_ref()) else {
+                continue;
+            };
+            if object.tls_size != 0 {
+                continue;
+            }
+            let Some(tls) = object.view.tls else {
+                continue;
+            };
+            let module = TlsModuleIn::new(
+                usize::try_from(tls.vaddr).map_err(|_| LoadError::Tls(LayoutError::Overflow))?,
+                usize::try_from(tls.filesz).map_err(|_| LoadError::Tls(LayoutError::Overflow))?,
+                usize::try_from(tls.memsz).map_err(|_| LoadError::Tls(LayoutError::Overflow))?,
+                usize::try_from(tls.align).map_err(|_| LoadError::Tls(LayoutError::Overflow))?,
+            );
+            let offset = self.tls.assign(module).map_err(LoadError::Tls)?;
+            let Some(id) = u32::try_from(index).ok().map(ObjId) else {
+                continue;
+            };
+            if let Some(object) = self.object_mut(id) {
+                object.tls_offset = offset;
+                object.tls_size = usize::try_from(tls.memsz).unwrap_or(0);
+            }
+        }
+        Ok(())
+    }
+
     /// Record one object in the `r_debug` link map.
     pub fn register_linkmap(&mut self, id: ObjId) {
         let Some(object) = self.object(id) else {
@@ -458,31 +528,95 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
         let _ = self.linkmap.add(id, addr, ld);
     }
 
-    /// Find a library by name.
+    /// Find a library by name, using the global search order.
     #[must_use]
     pub fn find_library(&self, name: &[u8]) -> Option<Name> {
+        self.find_library_for(name, None).ok().flatten()
+    }
+
+    /// Find a library for a referencing object.
+    ///
+    /// Order: `DT_RPATH` (only without `DT_RUNPATH`), `LD_LIBRARY_PATH`, `DT_RUNPATH`, then the
+    /// default directories.
+    ///
+    /// # Errors
+    ///
+    /// `SecurePath` for a relative path or `$ORIGIN` in secure mode.
+    pub fn find_library_for(
+        &self,
+        name: &[u8],
+        referencing: Option<ObjId>,
+    ) -> Result<Option<Name>, LoadError> {
         let canonical = search::canonical(name);
-        if search::has_slash(canonical) {
-            return Name::new(canonical);
+        if search::has_slash(canonical) || search::has_origin(canonical) {
+            if !self.trust {
+                return Err(LoadError::SecurePath);
+            }
+            if search::has_origin(canonical) {
+                // `$ORIGIN` expansion needs the executable's directory (C73).
+                return Ok(None);
+            }
+            return Ok(Name::new(canonical));
         }
         let mut buffer = [0u8; 256];
-        for directory in self.library_path.iter().take(self.library_path_count) {
-            if let Some(len) = search::join(directory.as_bytes(), canonical, &mut buffer) {
-                let candidate = Name::new(buffer.get(..len)?)?;
-                if self.platform_can_open(candidate.as_bytes()) {
-                    return Some(candidate);
-                }
+        let object = referencing.and_then(|id| self.object(id));
+        if let Some(object) = object
+            && let Some(rpath) = object.rpath
+            && object.runpath.is_none()
+            && let Ok(text) = object.view.name_at(&self.mem, rpath)
+            && let Some(found) = self.search_path(text, canonical, &mut buffer)
+        {
+            return Ok(Some(found));
+        }
+        if let Some(found) = self.search_names(
+            &self.library_path[..self.library_path_count],
+            canonical,
+            &mut buffer,
+        ) {
+            return Ok(Some(found));
+        }
+        if let Some(object) = object
+            && let Some(runpath) = object.runpath
+            && let Ok(text) = object.view.name_at(&self.mem, runpath)
+            && let Some(found) = self.search_path(text, canonical, &mut buffer)
+        {
+            return Ok(Some(found));
+        }
+        let defaults: [&[u8]; 3] = [b"/lib", b"/usr/lib", b"/usr/local/lib"];
+        for directory in defaults {
+            if let Some(found) = self.search_dir(directory, canonical, &mut buffer) {
+                return Ok(Some(found));
             }
         }
-        for directory in search::DEFAULT_DIRS {
-            if let Some(len) = search::join(directory, canonical, &mut buffer) {
-                let candidate = Name::new(buffer.get(..len)?)?;
-                if self.platform_can_open(candidate.as_bytes()) {
-                    return Some(candidate);
-                }
+        Ok(None)
+    }
+
+    fn search_names(&self, dirs: &[Name], name: &[u8], buffer: &mut [u8]) -> Option<Name> {
+        for directory in dirs {
+            if let Some(found) = self.search_dir(directory.as_bytes(), name, buffer) {
+                return Some(found);
             }
         }
         None
+    }
+
+    fn search_path(&self, text: &[u8], name: &[u8], buffer: &mut [u8]) -> Option<Name> {
+        for directory in text.split(|byte| *byte == b':') {
+            if directory.is_empty() || search::has_origin(directory) {
+                continue;
+            }
+            if let Some(found) = self.search_dir(directory, name, buffer) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
+    fn search_dir(&self, directory: &[u8], name: &[u8], buffer: &mut [u8]) -> Option<Name> {
+        let len = search::join(directory, name, buffer)?;
+        let candidate = Name::new(buffer.get(..len)?)?;
+        self.platform_can_open(candidate.as_bytes())
+            .then_some(candidate)
     }
 
     fn platform_can_open(&self, _path: &[u8]) -> bool {
@@ -510,9 +644,38 @@ pub enum LoadError {
     ExecutableStack,
     /// A relocation error.
     Reloc(raven_libc_elf::RelocError),
+    /// A static TLS layout error.
+    Tls(LayoutError),
+    /// Secure-exec refused direct execution.
+    Tainted,
+    /// A malformed direct-execution command line.
+    BadDirectArgs,
+    /// Secure mode refused a relative path.
+    SecurePath,
 }
 
 impl LoadError {
+    /// The stable message suffix used by the entry glue's `dlerror`-style diagnostics.
+    #[must_use]
+    pub const fn text(self) -> &'static str {
+        match self {
+            Self::Io(_) => "I/O error",
+            Self::Elf(ElfError::BadSegment) => "segment is writable and executable",
+            Self::Elf(_) => "invalid ELF object",
+            Self::Digest(DigestError::TextRel) => "text relocations not supported",
+            Self::Digest(_) => "invalid dynamic section",
+            Self::Map(_) => "cannot map segment",
+            Self::NotFound => "shared object not found",
+            Self::TooManyObjects => "too many loaded objects",
+            Self::ExecutableStack => "executable stack",
+            Self::Reloc(_) => "relocation failed",
+            Self::Tls(_) => "No space available for static Thread Local Storage",
+            Self::Tainted => "Tainted process refusing to run binary",
+            Self::BadDirectArgs => "bad direct-execution arguments",
+            Self::SecurePath => "relative path refused in secure mode",
+        }
+    }
+
     /// The C `errno` for this failure.
     #[must_use]
     pub const fn errno(self) -> i32 {
@@ -524,6 +687,8 @@ impl LoadError {
             Self::TooManyObjects => 12,
             Self::ExecutableStack => 8,
             Self::Reloc(_) => 8,
+            Self::Tls(_) => 12,
+            Self::Tainted | Self::BadDirectArgs | Self::SecurePath => 1,
         }
     }
 }
@@ -538,3 +703,7 @@ pub fn digest_slice(
     let mem = SliceMem::new(0, bytes);
     ObjView::digest(&mem, phdr_vaddr, phnum, bias)
 }
+
+#[cfg(test)]
+#[path = "loadobj_ut.rs"]
+mod tests;

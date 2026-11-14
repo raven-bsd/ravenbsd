@@ -57,6 +57,12 @@ pub fn has_slash(name: &[u8]) -> bool {
     name.contains(&b'/')
 }
 
+/// Whether `name` contains the `$ORIGIN` token.
+#[must_use]
+pub fn has_origin(name: &[u8]) -> bool {
+    name.windows(7).any(|window| window == b"$ORIGIN")
+}
+
 #[cfg(test)]
 #[path = "search_ut.rs"]
 mod tests;

@@ -1,0 +1,14 @@
+        .section .wx,"awx",@progbits
+        .globl  badwx_data
+        .type   badwx_data,@object
+badwx_data:
+        .byte   0x90
+        .size   badwx_data, 1
+        .text
+        .globl  badwx_fn
+        .type   badwx_fn,@function
+badwx_fn:
+        movl    $1, %eax
+        ret
+        .size   badwx_fn, .-badwx_fn
+        .section .note.GNU-stack,"",@progbits

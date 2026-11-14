@@ -12,6 +12,7 @@ mod host_mapper;
 use std::path::PathBuf;
 
 use host_mapper::{HostApplier, HostMapper, HostMem};
+use raven_libc_rtld::dlfcn::RTLD_NOLOAD;
 use raven_libc_rtld::loadobj::Loader;
 
 fn libc_path() -> PathBuf {
@@ -72,6 +73,10 @@ fn host_load_real_libc_and_call_pure_functions() {
         println!("SKIP: partial libc.so.1 (LINK-FINDING): {error:?}");
         return;
     }
+    let alias = loader
+        .dlopen(b"libm.so.6", RTLD_NOLOAD)
+        .expect("ring-2 alias");
+    assert_eq!(alias, id);
     if let Some(strlen) = loader.dlsym(Some(id), b"strlen", 0) {
         // SAFETY: `strlen` is a no-side-effect C function in the mapped image.
         let length = unsafe {
