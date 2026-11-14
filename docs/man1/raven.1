@@ -1,0 +1,144 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 14, 2026
+.Dt RAVEN 1
+.Os RavenBSD
+.Sh NAME
+.Nm raven
+.Nd RavenBSD administration client
+.Sh SYNOPSIS
+.Nm
+.Op Fl -json | Fl -quiet
+.Op Fl -color Ns = Ns Ar auto|always|never
+.Op Fl -verbose
+.Op Fl -dry-run
+.Op Fl -yes
+.Ar command
+.Op Ar arguments ...
+.Sh DESCRIPTION
+.Nm
+is the single administration client for RavenBSD services, network, logs, configuration and
+diagnosis.
+It is a client: it talks to the running servers through their versioned control protocols and
+never edits live server state behind their back.
+The machine-readable contract, including the NDJSON field rules, is maintained in
+.Pa architecture/17-modern-userland.md ;
+this page documents the user-visible command line and exit status.
+.Pp
+Every command has a human mode and, where the command supports it, a JSON mode.
+JSON output is NDJSON: one object per line, each object carrying
+.Va schema
+and
+.Va kind .
+Errors are written to standard error; standard output never contains an error object.
+.Pp
+The command set is:
+.Bl -tag -width "completion"
+.It Cm version
+Print the version, schema and target information.
+.It Cm help Op Ar command
+Show general help or help for one command.
+.It Cm completion Ar shell
+Print a completion script for
+.Ar bash ,
+.Ar zsh
+or
+.Ar fish .
+.It Cm status
+Reserved: host health.
+.It Cm doctor
+Reserved: ordered diagnostics.
+.It Cm svc
+Reserved: service control.
+.It Cm net
+Reserved: network control.
+.It Cm log
+Reserved: log access.
+.It Cm config
+Reserved: configuration access.
+.It Cm pkg
+Reserved: package access.
+.It Cm user
+Reserved: user identities.
+.It Cm image
+Reserved: image management.
+.El
+.Pp
+Reserved names are part of the namespace.
+In this build they exit 1 with the
+.Dv EUNAVAILABLE
+error code and never print placeholder data.
+.Sh GLOBAL OPTIONS
+Global options are accepted before or after the command word.
+.Bl -tag -width "--color=policy"
+.It Fl -json
+Emit NDJSON, one object per line, with no colour and no column alignment.
+.It Fl -quiet
+Suppress normal output; errors still go to standard error.
+.Fl -json
+and
+.Fl -quiet
+together are a usage error.
+.It Fl -verbose
+Write extra human diagnostics to standard error; no effect on JSON.
+.It Fl -color Ns = Ns Ar policy
+Select human colour:
+.Ar auto
+(the default),
+.Ar always
+or
+.Ar never .
+.Dv NO_COLOR
+disables automatic colour; an explicit
+.Ar always
+policy overrides it.
+JSON never contains escape codes.
+.It Fl -dry-run
+Mutating commands print a plan object and change nothing.
+.It Fl -yes
+Assume yes for a destructive action.
+.It Fl h , Fl -help
+Show help and exit 0.
+.It Fl V , Fl -version
+Print the version.
+.It Fl -
+End option parsing; every later argument is positional.
+.El
+.Sh OUTPUT
+With
+.Fl -json
+every record is one JSON object with
+.Va schema
+equal to 1 and a command-specific
+.Va kind .
+Known-but-absent values are
+.Dv null ,
+not omitted keys.
+Timestamps, when present, are RFC 3339 UTC; sizes are bytes and durations milliseconds unless the
+field name says otherwise.
+The error object has
+.Va kind :
+.Dq error
+and the fields
+.Va code ,
+.Va message
+and
+.Va context .
+.Sh EXIT STATUS
+.Bl -tag -width "2"
+.It 0
+Success; for a mutating command, the requested state is present.
+.It 1
+Operational failure, including a recognized but unavailable command.
+.It 2
+Usage error: unknown flag, missing argument, or
+.Fl -json
+with
+.Fl -quiet .
+.El
+.Sh SEE ALSO
+.Xr raven-version 1 ,
+.Xr raven-completion 1 ,
+.Xr svcctl 1
+.Sh STANDARDS
+RavenBSD modern userland contract, revision 1.
