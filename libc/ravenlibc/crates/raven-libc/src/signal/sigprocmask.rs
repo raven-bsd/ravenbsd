@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+//! `sigprocmask(3)`.
+use core::ffi::c_int;
+
+use raven_libc_signal::kernel::SysKernel;
+use raven_libc_signal::{SigSet, maskops};
+
+/// Change the calling thread's signal mask.
+///
+/// # Safety
+/// `set`/`old` are NULL or point to `sigset_t`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sigprocmask(how: c_int, set: *const SigSet, old: *mut SigSet) -> c_int {
+    let s = if set.is_null() {
+        None
+    } else {
+        Some(unsafe { &*set })
+    };
+    let o = if old.is_null() {
+        None
+    } else {
+        Some(unsafe { &mut *old })
+    };
+    match maskops::sigprocmask(&SysKernel, how, s, o) {
+        Ok(()) => 0,
+        Err(error) => {
+            crate::ffi::errno::set(error);
+            -1
+        }
+    }
+}

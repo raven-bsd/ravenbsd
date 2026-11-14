@@ -14,8 +14,12 @@ mod kill;
 mod raise;
 #[path = "sig2str.rs"]
 mod sig2str;
+#[path = "sigaction.rs"]
+mod sigaction;
 #[path = "sigaddset.rs"]
 mod sigaddset;
+#[path = "sigaltstack.rs"]
+mod sigaltstack;
 #[path = "sigandset.rs"]
 mod sigandset;
 #[path = "sigdelset.rs"]
@@ -24,6 +28,12 @@ mod sigdelset;
 mod sigemptyset;
 #[path = "sigfillset.rs"]
 mod sigfillset;
+#[path = "sighold.rs"]
+mod sighold;
+#[path = "sigignore.rs"]
+mod sigignore;
+#[path = "siginterrupt.rs"]
+mod siginterrupt;
 #[path = "sigisemptyset.rs"]
 mod sigisemptyset;
 #[path = "sigismember.rs"]
@@ -32,5 +42,25 @@ mod sigismember;
 mod signal;
 #[path = "sigorset.rs"]
 mod sigorset;
+#[path = "sigpause.rs"]
+mod sigpause;
+#[path = "sigpending.rs"]
+mod sigpending;
+#[path = "sigprocmask.rs"]
+mod sigprocmask;
+#[path = "sigqueue.rs"]
+mod sigqueue;
+#[path = "sigrelse.rs"]
+mod sigrelse;
+#[path = "sigset.rs"]
+mod sigset;
+#[path = "sigsuspend.rs"]
+mod sigsuspend;
+#[path = "sigtimedwait.rs"]
+mod sigtimedwait;
+#[path = "sigwait.rs"]
+mod sigwait;
+#[path = "sigwaitinfo.rs"]
+mod sigwaitinfo;
 #[path = "str2sig.rs"]
 mod str2sig;

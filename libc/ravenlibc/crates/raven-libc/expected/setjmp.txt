@@ -1,0 +1,7 @@
+__sigsetjmp
+_longjmp
+_setjmp
+longjmp
+setjmp
+siglongjmp
+sigsetjmp
