@@ -963,6 +963,7 @@ dependencies = [
  "raven-libc-malloc",
  "raven-libc-personality-bsd",
  "raven-libc-personality-linux",
+ "raven-libc-personality-solaris",
  "raven-libc-platform",
  "raven-libc-pledge",
  "raven-libc-proc",
@@ -1119,6 +1120,15 @@ dependencies = [
 
 [[package]]
 name = "raven-libc-personality-linux"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-platform",
+ "raven-libc-sys",
+]
+
+[[package]]
+name = "raven-libc-personality-solaris"
 version = "0.1.0"
 dependencies = [
  "raven-libc-abi",

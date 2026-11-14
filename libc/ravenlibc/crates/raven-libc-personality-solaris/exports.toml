@@ -1,0 +1,489 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The C names of ticket C67 6.9 for the Solaris personality. `rust` is the logic entry;
+# `header` is the installed declaration; `errno` chooses the POSIX error convention.
+# `deferred = "C57"` marks an export whose body needs `raven-libc-thread`: the symbol exists
+# and returns the documented ENOSYS until C57 merges (never a fake thread implementation).
+
+[[export]]
+name = "port_create"
+rust = "port::create"
+header = "port.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = true
+
+[[export]]
+name = "port_associate"
+rust = "port::associate"
+header = "port.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = true
+
+[[export]]
+name = "port_dissociate"
+rust = "port::dissociate"
+header = "port.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = true
+
+[[export]]
+name = "port_get"
+rust = "port::get"
+header = "port.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = true
+
+[[export]]
+name = "port_getn"
+rust = "port::getn"
+header = "port.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = true
+
+[[export]]
+name = "port_send"
+rust = "port::send"
+header = "port.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = true
+
+[[export]]
+name = "port_alert"
+rust = "port::alert"
+header = "port.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = true
+
+[[export]]
+name = "getexecname"
+rust = "identity::getexecname"
+header = "stdlib.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+
+[[export]]
+name = "getisax"
+rust = "identity::getisax"
+header = "sys/auxv.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+
+[[export]]
+name = "thr_exit"
+rust = "thread_names::thr_exit"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+
+[[export]]
+name = "thr_self"
+rust = "thread_names::thr_self"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+
+[[export]]
+name = "thr_yield"
+rust = "thread_names::thr_yield"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+
+[[export]]
+name = "thr_min_stack"
+rust = "thread_names::thr_min_stack"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+
+[[export]]
+name = "thr_main"
+rust = "thread_names::thr_main"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+
+[[export]]
+name = "thr_setconcurrency"
+rust = "thread_names::thr_setconcurrency"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+
+[[export]]
+name = "thr_getconcurrency"
+rust = "thread_names::thr_getconcurrency"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+
+[[export]]
+name = "thr_suspend"
+rust = "thread_names::thr_suspend"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+
+[[export]]
+name = "thr_continue"
+rust = "thread_names::thr_continue"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+
+[[export]]
+name = "thr_setspecific"
+rust = "thread_names::thr_setspecific"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "thr_join"
+rust = "thread_names::thr_join"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "thr_kill"
+rust = "thread_names::thr_kill"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "thr_getprio"
+rust = "thread_names::thr_getprio"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "thr_getspecific"
+rust = "thread_names::thr_getspecific"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "thr_create"
+rust = "thread_names::thr_create"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "thr_keycreate"
+rust = "thread_names::thr_keycreate"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "thr_sigsetmask"
+rust = "thread_names::thr_sigsetmask"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "thr_setprio"
+rust = "thread_names::thr_setprio"
+header = "thread.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "mutex_init"
+rust = "thread_names::mutex_init"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "mutex_destroy"
+rust = "thread_names::mutex_destroy"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "mutex_lock"
+rust = "thread_names::mutex_lock"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "mutex_trylock"
+rust = "thread_names::mutex_trylock"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "mutex_unlock"
+rust = "thread_names::mutex_unlock"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "cond_init"
+rust = "thread_names::cond_init"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "cond_destroy"
+rust = "thread_names::cond_destroy"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "cond_wait"
+rust = "thread_names::cond_wait"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "cond_timedwait"
+rust = "thread_names::cond_timedwait"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "cond_signal"
+rust = "thread_names::cond_signal"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "cond_broadcast"
+rust = "thread_names::cond_broadcast"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "rwlock_init"
+rust = "thread_names::rwlock_init"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "rwlock_destroy"
+rust = "thread_names::rwlock_destroy"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "rw_rdlock"
+rust = "thread_names::rw_rdlock"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "rw_wrlock"
+rust = "thread_names::rw_wrlock"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "rw_tryrdlock"
+rust = "thread_names::rw_tryrdlock"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "rw_trywrlock"
+rust = "thread_names::rw_trywrlock"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "rw_unlock"
+rust = "thread_names::rw_unlock"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "sema_init"
+rust = "thread_names::sema_init"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "sema_destroy"
+rust = "thread_names::sema_destroy"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "sema_wait"
+rust = "thread_names::sema_wait"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "sema_trywait"
+rust = "thread_names::sema_trywait"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"
+
+[[export]]
+name = "sema_post"
+rust = "thread_names::sema_post"
+header = "synch.h"
+ring = 2
+personality = "solaris"
+version = "RAVEN_1.0"
+errno = false
+deferred = "C57"

@@ -61,6 +61,8 @@ pub(crate) mod personality_bsd;
 pub(crate) mod personality_common;
 #[cfg(target_os = "none")]
 pub(crate) mod personality_linux;
+#[cfg(all(target_os = "none", feature = "personality-solaris"))]
+pub(crate) mod personality_solaris;
 #[cfg(target_os = "none")]
 pub(crate) mod platform;
 #[cfg(target_os = "none")]

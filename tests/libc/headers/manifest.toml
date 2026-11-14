@@ -1176,21 +1176,21 @@ ring = 2
 [[header]]
 path = "port.h"
 owner = "C67"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "thread.h"
 owner = "C67"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
 [[header]]
 path = "synch.h"
 owner = "C67"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 2
 
@@ -1610,7 +1610,7 @@ ring = 2
 [[header]]
 path = "sys/port.h"
 owner = "C67"
-status = "pending"
+status = "owned"
 standalone = true
 ring = 3
 

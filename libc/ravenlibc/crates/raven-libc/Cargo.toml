@@ -56,4 +56,5 @@ raven-libc-proc = { path = "../raven-libc-proc", default-features = false }
 raven-libc-pledge = { path = "../raven-libc-pledge", default-features = false }
 raven-libc-personality-linux = { path = "../raven-libc-personality-linux", default-features = false }
 raven-libc-personality-bsd = { path = "../raven-libc-personality-bsd", default-features = false }
+raven-libc-personality-solaris = { path = "../raven-libc-personality-solaris", default-features = false }
 raven-abi = { path = "../../../../crates/raven-abi", default-features = false }
