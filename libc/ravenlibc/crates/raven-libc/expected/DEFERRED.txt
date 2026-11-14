@@ -535,60 +535,8 @@ dlinfo DEFERRED(C62): raven-libc-rtld is not merged on carl/libc
 dlopen DEFERRED(C62): raven-libc-rtld is not merged on carl/libc
 dlsym DEFERRED(C62): raven-libc-rtld is not merged on carl/libc
 dlvsym DEFERRED(C62): raven-libc-rtld is not merged on carl/libc
-accept DEFERRED(C63): raven-libc-net is not merged on carl/libc
-accept4 DEFERRED(C63): raven-libc-net is not merged on carl/libc
-bind DEFERRED(C63): raven-libc-net is not merged on carl/libc
-connect DEFERRED(C63): raven-libc-net is not merged on carl/libc
-getpeername DEFERRED(C63): raven-libc-net is not merged on carl/libc
-getsockname DEFERRED(C63): raven-libc-net is not merged on carl/libc
-getsockopt DEFERRED(C63): raven-libc-net is not merged on carl/libc
-listen DEFERRED(C63): raven-libc-net is not merged on carl/libc
-recv DEFERRED(C63): raven-libc-net is not merged on carl/libc
-recvfrom DEFERRED(C63): raven-libc-net is not merged on carl/libc
-recvmsg DEFERRED(C63): raven-libc-net is not merged on carl/libc
-recvmmsg DEFERRED(C63): raven-libc-net is not merged on carl/libc
-send DEFERRED(C63): raven-libc-net is not merged on carl/libc
-sendmsg DEFERRED(C63): raven-libc-net is not merged on carl/libc
-sendto DEFERRED(C63): raven-libc-net is not merged on carl/libc
-sendmmsg DEFERRED(C63): raven-libc-net is not merged on carl/libc
-setsockopt DEFERRED(C63): raven-libc-net is not merged on carl/libc
-shutdown DEFERRED(C63): raven-libc-net is not merged on carl/libc
-socket DEFERRED(C63): raven-libc-net is not merged on carl/libc
-socketpair DEFERRED(C63): raven-libc-net is not merged on carl/libc
-sockatmark DEFERRED(C63): raven-libc-net is not merged on carl/libc
-freeaddrinfo DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-getaddrinfo DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
 getifaddrs DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
 freeifaddrs DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-getnameinfo DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-gethostbyaddr DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-gethostbyaddr_r DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-gethostbyname DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-gethostbyname2 DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-gethostbyname2_r DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-gethostbyname_r DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-gethostent DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-sethostent DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-endhostent DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-getnetbyaddr DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-getnetbyname DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-getnetent DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-setnetent DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-endnetent DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-getprotobyname DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-getprotobyname_r DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-getprotobynumber DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-getprotobynumber_r DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-getprotoent DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-setprotoent DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-endprotoent DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-getservbyname DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-getservbyname_r DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-getservbyport DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-getservbyport_r DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-getservent DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-setservent DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
-endservent DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
 if_nametoindex DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
 if_indextoname DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
 if_nameindex DEFERRED(C63): the raven-libc-net Env/DnsIo/IfNames seam is not merged
@@ -607,15 +555,6 @@ putgrent DEFERRED(C60b): the stdio FILE layer is not merged
 popen DEFERRED(C60b): the stdio FILE layer is not merged
 pclose DEFERRED(C60b): the stdio FILE layer is not merged
 syscall DEFERRED(C64): the variadic syscall table is a follow-up of this pass
-getspnam DEFERRED(C51): no master.passwd source or iterator in raven-libc-pwd
-getspnam_r DEFERRED(C51): no master.passwd source or iterator in raven-libc-pwd
-getspent DEFERRED(C51): no master.passwd source or iterator in raven-libc-pwd
-setspent DEFERRED(C51): no master.passwd source or iterator in raven-libc-pwd
-endspent DEFERRED(C51): no master.passwd source or iterator in raven-libc-pwd
-fgetspent DEFERRED(C51): no master.passwd source or iterator in raven-libc-pwd
-putspent DEFERRED(C51): no master.passwd source or iterator in raven-libc-pwd
-lckpwdf DEFERRED(C51): no master.passwd source or lock in raven-libc-pwd
-ulckpwdf DEFERRED(C51): no master.passwd source or lock in raven-libc-pwd
 ns_initparse DEFERRED(C51): NsMsg cannot be rebuilt from the pointer-bearing C ns_msg
 ns_parserr DEFERRED(C51): NsMsg cannot be rebuilt from the pointer-bearing C ns_msg
 dn_comp DEFERRED(C64): the dnptrs pointer-array ABI conversion is not in this pass

@@ -90,6 +90,8 @@ pub(crate) mod pwd;
 pub(crate) mod regex;
 #[cfg(target_os = "none")]
 pub(crate) mod sched;
+#[cfg(target_os = "none")]
+pub(crate) mod socket;
 // The guard storage is also compiled for the host unit test; it stops exporting the C name on
 // the host (the archive check covers the real symbol).
 #[cfg(any(target_os = "none", test))]
