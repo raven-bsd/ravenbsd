@@ -138,6 +138,10 @@ pub mod map {
     pub const FIXED: usize = 1;
     /// Share the pages with other mappings of the memory object (default is private copy-on-write).
     pub const SHARED: usize = 2;
+    /// Do not inherit this mapping (or its object handle) in a forked child (PG-14).
+    pub const NOFORK: usize = 8;
+    /// The forked child gets zero-filled pages at the same virtual range (PG-14).
+    pub const ZERO_ON_FORK: usize = 16;
     /// Shift of `map_flags` inside the `MAP` flags argument.
     pub const SHIFT: usize = 8;
 

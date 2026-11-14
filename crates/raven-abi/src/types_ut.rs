@@ -34,6 +34,20 @@ fn map_flag_packing() {
 }
 
 #[test]
+fn inheritance_flag_values_are_distinct() {
+    assert_eq!(map::NOFORK, 8);
+    assert_eq!(map::ZERO_ON_FORK, 16);
+    assert_eq!(map::FIXED & map::NOFORK, 0);
+    assert_eq!(map::SHARED & map::ZERO_ON_FORK, 0);
+    assert_eq!(map::NOFORK & map::ZERO_ON_FORK, 0);
+    assert_eq!(map::pack(0, map::NOFORK), map::NOFORK << map::SHIFT);
+    assert_eq!(
+        map::pack(0, map::ZERO_ON_FORK),
+        map::ZERO_ON_FORK << map::SHIFT
+    );
+}
+
+#[test]
 fn futex_private_flag_is_bit_7() {
     assert_eq!(futex::PRIVATE, 0x80);
     assert_eq!(futex::PRIVATE & (futex::WAIT | futex::WAKE), 0);

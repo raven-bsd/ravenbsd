@@ -40,6 +40,49 @@ pub struct ObjectMapping {
     pub shared: bool,
 }
 
+/// How a mapping is inherited by `PROC_FORK`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MapInherit {
+    /// The child gets a copy-on-write mapping.
+    Inherit,
+    /// The mapping and its pages are absent in the child (PG-14).
+    NoFork,
+    /// The child gets zero-filled pages at the same range (PG-14).
+    ZeroOnFork,
+}
+
+/// The object a mapping was created from, kept for the `NOFORK` handle rule.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct InheritIdentity {
+    /// Raw handle value passed to `MAP` (`Handle::NONE` for anonymous memory).
+    pub handle: u32,
+    /// Memory-object id when the handle is a `Memory` or `BootBlob` object.
+    pub object: Option<u64>,
+}
+
+/// One `NOFORK` handle the child must not receive.
+#[derive(Clone, Copy, Debug)]
+pub struct NoforkHandle {
+    /// Raw handle value the parent used for the mapping.
+    pub handle: u32,
+    /// Memory-object id; `None` for objects that cannot be verified safely.
+    pub object: Option<u64>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct InheritRange {
+    start: u64,
+    len: u64,
+    mode: MapInherit,
+    identity: InheritIdentity,
+}
+
+impl InheritRange {
+    fn contains(&self, address: u64) -> bool {
+        address >= self.start && address < self.start.saturating_add(self.len)
+    }
+}
+
 /// A fault that must be resolved outside the address-space lock.
 #[allow(dead_code)] // the `Errno` payload is diagnostic; only the pager variant is actionable
 pub enum FaultError {
@@ -110,6 +153,8 @@ pub struct UserAddressSpace {
     objects: Vec<ObjectMapping>,
     mmio: Vec<MmioMapping>,
     dma: Vec<DmaMapping>,
+    /// Per-range fork inheritance flags and the handle the mapping came from.
+    inherit: Vec<InheritRange>,
     /// Bumped on every mapping change. A capture records it at create and only copies back when
     /// the client's mapping has not been replaced meanwhile.
     mapping_generation: u64,
@@ -141,6 +186,7 @@ impl UserAddressSpace {
             objects: Vec::new(),
             mmio: Vec::new(),
             dma: Vec::new(),
+            inherit: Vec::new(),
             mapping_generation: 0,
         }
     }
@@ -172,6 +218,65 @@ impl UserAddressSpace {
     /// Mutable VMA view.
     pub fn vmas_mut(&mut self) -> &mut Vmas {
         &mut self.vmas
+    }
+
+    /// Record how the range just mapped is inherited by a forked child.
+    ///
+    /// The record is stored outside the VMA tree so `PROTECT` and partial `UNMAP` keep the
+    /// mapping's fork behaviour while they split the tree. `identity` names the object handle
+    /// when the mapping came from one; a `NOFORK` mapping with a verifiable object handle is
+    /// dropped from the child's table as well.
+    pub fn set_inherit(
+        &mut self,
+        start: u64,
+        len: u64,
+        mode: MapInherit,
+        identity: InheritIdentity,
+    ) {
+        self.inherit.push(InheritRange {
+            start,
+            len,
+            mode,
+            identity,
+        });
+    }
+
+    /// `NOFORK` mappings whose object handle must not exist in the child.
+    pub fn nofork_handles(&self) -> Vec<NoforkHandle> {
+        let mut handles: Vec<NoforkHandle> = Vec::new();
+        for range in &self.inherit {
+            if range.mode != MapInherit::NoFork
+                || range.identity.handle == raven_abi::types::Handle::NONE.0
+                || range.identity.object.is_none()
+            {
+                continue;
+            }
+            let entry = NoforkHandle {
+                handle: range.identity.handle,
+                object: range.identity.object,
+            };
+            if !handles
+                .iter()
+                .any(|existing| existing.handle == entry.handle)
+            {
+                handles.push(entry);
+            }
+        }
+        handles
+    }
+
+    /// Handles referenced by mappings that *are* inherited (kept in the child).
+    pub fn inherited_handles(&self) -> Vec<u32> {
+        let mut handles = Vec::new();
+        for range in &self.inherit {
+            if range.mode != MapInherit::NoFork
+                && range.identity.handle != raven_abi::types::Handle::NONE.0
+                && !handles.contains(&range.identity.handle)
+            {
+                handles.push(range.identity.handle);
+            }
+        }
+        handles
     }
 
     /// Map a zero-filled anonymous range. The range must already be free.
@@ -345,6 +450,142 @@ impl UserAddressSpace {
             object,
             shared,
         });
+        self.bump_generation();
+        Ok(())
+    }
+
+    /// Clone `source` into this empty address space for `PROC_FORK`.
+    ///
+    /// Anonymous private frames (including private copies of initfs and pager pages) are mapped
+    /// read-only in both spaces and registered in the shared-frame table. The parent's writable
+    /// mappings become read-only so a write on either side takes the COW fault. `NOFORK` ranges
+    /// are skipped, `ZERO_ON_FORK` ranges get fresh zeroed frames, shared object mappings keep
+    /// their shared writability, and absent pager pages stay absent. Device windows (MMIO and
+    /// DMA) are not inherited; the child keeps no mapping for them.
+    pub fn fork_clone_from(&mut self, source: &mut UserAddressSpace) -> Result<(), Errno> {
+        if self.vmas.len() != 1 || !self.objects.is_empty() {
+            return Err(Errno::EINVAL);
+        }
+        let vmas: Vec<Vma> = source.vmas.iter().copied().collect();
+        let objects = source.objects.clone();
+        let inherit = source.inherit.clone();
+        let mmio = source.mmio.clone();
+        let dma: Vec<(u64, u64)> = source
+            .dma
+            .iter()
+            .map(|mapping| (mapping.start, mapping.len))
+            .collect();
+        // Install the object side table before mapping any page: a later failure drops this
+        // address space and `free_user_frames` must be able to tell object-owned pages from
+        // private copies even when only part of the clone was built.
+        for mapping in &objects {
+            let mode = inherit
+                .iter()
+                .find(|range| range.contains(mapping.start))
+                .map_or(MapInherit::Inherit, |range| range.mode);
+            if mode == MapInherit::Inherit {
+                self.objects.push(mapping.clone());
+            }
+        }
+
+        let mut parent_mapper = source.aspace.mapper().map_err(map_errno)?;
+
+        for vma in vmas {
+            if overlaps_capture_window(vma.start(), vma.len())
+                || in_device_ranges(vma.start(), vma.len(), &mmio, &dma)
+            {
+                continue;
+            }
+            let entry = inherit
+                .iter()
+                .find(|range| range.contains(vma.start()))
+                .copied();
+            let mode = entry.map_or(MapInherit::Inherit, |range| range.mode);
+            if mode == MapInherit::NoFork {
+                continue;
+            }
+            let backing = if mode == MapInherit::ZeroOnFork {
+                Backing::Anonymous
+            } else {
+                vma.backing()
+            };
+            self.vmas
+                .insert(vma.start(), vma.len(), vma.prot(), backing)
+                .map_err(vma_errno)?;
+
+            let pages = pages_in(vma.len())?;
+            let mut child_mapper = self.aspace.mapper().map_err(map_errno)?;
+            let mut parent_changed = false;
+            let mut page = 0u64;
+            while page < pages {
+                let Some(address) = vma.start().checked_add(page.saturating_mul(PAGE_SIZE)) else {
+                    return Err(Errno::EINVAL);
+                };
+                let virt = VirtAddr::new(address).ok_or(Errno::EINVAL)?;
+                if mode == MapInherit::ZeroOnFork {
+                    let physical = frame::alloc_zeroed_frame().ok_or(Errno::ENOMEM)?;
+                    let flags = leaf_flags(vma.prot(), vma.prot() & (prot::WRITE as u8) != 0);
+                    if let Err(error) =
+                        child_mapper.map(virt, PhysAddr(physical.0), flags, PageSize::Size4K)
+                    {
+                        let _ = frame::free_frame(physical);
+                        return Err(map_errno(error));
+                    }
+                    page = page.saturating_add(1);
+                    continue;
+                }
+                let Some((physical, pte_flags, _)) = parent_mapper.translate(virt) else {
+                    // A pager-backed page that was never faulted has no PTE. Its object mapping
+                    // is copied below, so the child faults it in through the pager path.
+                    if objects
+                        .iter()
+                        .any(|mapping| mapping.contains(address) && mapping.object.is_paged())
+                    {
+                        page = page.saturating_add(1);
+                        continue;
+                    }
+                    return Err(Errno::EFAULT);
+                };
+                let private = private_frame(vma, &objects, address, physical.0);
+                let writable = !private
+                    && vma.prot() & (prot::WRITE as u8) != 0
+                    && objects
+                        .iter()
+                        .find(|mapping| mapping.contains(address))
+                        .is_some_and(|mapping| mapping.shared);
+                if private {
+                    frame::share_frame(frame::PhysAddr(physical.0));
+                }
+                if let Err(error) = child_mapper.map(
+                    virt,
+                    PhysAddr(physical.0),
+                    leaf_flags(vma.prot(), writable),
+                    PageSize::Size4K,
+                ) {
+                    if private {
+                        frame::release_shared(frame::PhysAddr(physical.0));
+                    }
+                    return Err(map_errno(error));
+                }
+                if private && pte_flags.is_writable() {
+                    if let Err(error) = parent_mapper.protect(virt, leaf_flags(vma.prot(), false)) {
+                        return Err(map_errno(error));
+                    }
+                    parent_changed = true;
+                }
+                page = page.saturating_add(1);
+            }
+            if parent_changed {
+                let _ = crate::sched::smp::shootdown::flush_range(vma.start(), vma.len());
+            }
+            self.inherit.push(InheritRange {
+                start: vma.start(),
+                len: vma.len(),
+                mode,
+                identity: entry.map_or_else(InheritIdentity::default, |range| range.identity),
+            });
+        }
+
         self.bump_generation();
         Ok(())
     }
@@ -598,20 +839,23 @@ impl UserAddressSpace {
                         virt.data() >= *map_start
                             && virt.data() < map_start.saturating_add(*map_len)
                     });
-                let owns =
-                    !in_device_range && page_owned(vma, &self.objects, virt.data(), physical.0);
-                owned.push((virt, physical.0, owns));
+                let private =
+                    !in_device_range && private_frame(vma, &self.objects, virt.data(), physical.0);
+                let owns = private && page_owned(vma, &self.objects, virt.data(), physical.0);
+                let shared = private && frame::is_shared(frame::PhysAddr(physical.0));
+                owned.push((virt, physical.0, owns || shared));
                 page = page.saturating_add(1);
             }
-            for (virt, physical, owns) in owned {
+            for (virt, physical, releasable) in owned {
                 mapper.unmap(virt).map_err(map_errno)?;
-                if owns {
+                if releasable {
                     to_free.push(physical);
                 }
             }
         }
         self.vmas.remove(start, len).map_err(vma_errno)?;
         self.remove_object_range(start, len);
+        self.remove_inherit_range(start, len);
         self.remove_mmio_range(start, len);
         self.remove_dma_range(start, len);
         // Do not recycle frames until every CPU has dropped its translation: a stale TLB entry
@@ -619,7 +863,12 @@ impl UserAddressSpace {
         let flushed = crate::sched::smp::shootdown::flush_range(start, len);
         if flushed {
             for physical in to_free {
-                let _ = frame::free_frame(frame::PhysAddr(physical));
+                let physical = frame::PhysAddr(physical);
+                if frame::is_shared(physical) {
+                    frame::release_shared(physical);
+                } else {
+                    let _ = frame::free_frame(physical);
+                }
             }
         }
         self.bump_generation();
@@ -670,29 +919,9 @@ impl UserAddressSpace {
                     }
                     return Err(Errno::ENOMEM);
                 };
-                let writable_now = if new_prot & (prot::WRITE as u8) == 0 {
-                    false
-                } else {
-                    match vma.backing() {
-                        Backing::Initfs { .. } => !initfs_contains(physical.0),
-                        Backing::Anonymous => {
-                            if let Some(mapping) = self
-                                .objects
-                                .iter()
-                                .find(|mapping| mapping.contains(virt.data()))
-                            {
-                                mapping.shared
-                                    || mapping.object.frame_at(
-                                        mapping.offset.saturating_add(
-                                            virt.data().saturating_sub(mapping.start),
-                                        ) / PAGE_SIZE,
-                                    ) != Some(physical.0)
-                            } else {
-                                true
-                            }
-                        }
-                    }
-                };
+                let writable_now = new_prot & (prot::WRITE as u8) != 0
+                    && private_frame(vma, &self.objects, virt.data(), physical.0)
+                    && !frame::is_shared(frame::PhysAddr(physical.0));
                 plans.push((virt, leaf_flags(new_prot, writable_now)));
                 page = page.saturating_add(1);
             }
@@ -781,26 +1010,9 @@ impl UserAddressSpace {
         if flags.is_writable() {
             return Err(FaultError::Errno(Errno::EFAULT));
         }
-        let already_private = match vma.backing() {
-            Backing::Initfs { .. } => !initfs_contains(physical.0),
-            Backing::Anonymous => {
-                if let Some(mapping) = self.objects.iter().find(|mapping| mapping.contains(cr2)) {
-                    if mapping.shared {
-                        false
-                    } else {
-                        mapping.object.frame_at(
-                            mapping
-                                .offset
-                                .saturating_add(cr2.saturating_sub(mapping.start))
-                                / PAGE_SIZE,
-                        ) != Some(physical.0)
-                    }
-                } else {
-                    true
-                }
-            }
-        };
-        if already_private {
+        let private = private_frame(vma, &self.objects, cr2, physical.0);
+        let shared = private && frame::is_shared(frame::PhysAddr(physical.0));
+        if private && !shared {
             let flags = leaf_flags(vma.prot(), true);
             let result = mapper.protect(virt, flags).map_err(map_errno);
             result.map_err(FaultError::Errno)?;
@@ -808,7 +1020,8 @@ impl UserAddressSpace {
             self.bump_generation();
             return Ok(());
         }
-        // Copy-on-write: the faulting page still points into the initfs or the memory object.
+        // Copy-on-write: the faulting page points into the initfs, the memory object, or a
+        // frame still shared with a forked child.
         let Some(new_frame) = frame::alloc_zeroed_frame() else {
             return Err(FaultError::Errno(Errno::ENOMEM));
         };
@@ -834,6 +1047,9 @@ impl UserAddressSpace {
         {
             let _ = frame::free_frame(new_frame);
             return Err(FaultError::Errno(Errno::EFAULT));
+        }
+        if shared {
+            frame::release_shared(frame::PhysAddr(physical.0));
         }
         let _ = crate::sched::smp::shootdown::flush_range(page, PAGE_SIZE);
         self.bump_generation();
@@ -939,9 +1155,14 @@ impl UserAddressSpace {
                         || is_capture_address(address);
                     if let Some((physical, _, _)) = mapper.translate(virt)
                         && !in_device_range
-                        && page_owned(vma, &objects, address, physical.0)
+                        && private_frame(vma, &objects, address, physical.0)
                     {
-                        let _ = frame::free_frame(frame::PhysAddr(physical.0));
+                        let physical = frame::PhysAddr(physical.0);
+                        if frame::is_shared(physical) {
+                            frame::release_shared(physical);
+                        } else if page_owned(vma, &objects, address, physical.0) {
+                            let _ = frame::free_frame(physical);
+                        }
                     }
                     page = page.saturating_add(1);
                 }
@@ -951,6 +1172,7 @@ impl UserAddressSpace {
         self.objects.clear();
         self.mmio.clear();
         self.dma.clear();
+        self.inherit.clear();
     }
 
     /// Release an address space that is currently active: free its data frames, switch back to the
@@ -1020,6 +1242,32 @@ impl UserAddressSpace {
             }
         }
         self.objects = next;
+    }
+
+    fn remove_inherit_range(&mut self, start: u64, len: u64) {
+        let end = start.saturating_add(len);
+        let mut next = Vec::with_capacity(self.inherit.len().saturating_add(2));
+        for range in &self.inherit {
+            let range_end = range.start.saturating_add(range.len);
+            if range_end <= start || range.start >= end {
+                next.push(*range);
+                continue;
+            }
+            if range.start < start {
+                next.push(InheritRange {
+                    len: start.saturating_sub(range.start),
+                    ..*range
+                });
+            }
+            if range_end > end {
+                next.push(InheritRange {
+                    start: end,
+                    len: range_end.saturating_sub(end),
+                    ..*range
+                });
+            }
+        }
+        self.inherit = next;
     }
 
     fn overlaps_mmio(&self, start: u64, len: u64) -> bool {
@@ -1098,26 +1346,44 @@ impl ObjectMapping {
     }
 }
 
-fn page_owned(vma: Vma, objects: &[ObjectMapping], address: u64, physical: u64) -> bool {
+/// True when this address space owns a private frame at `address`.
+///
+/// Initfs image pages and shared or not-yet-copied object pages belong to another owner. A
+/// private copy of either is process-owned even when a fork made it shared.
+fn private_frame(vma: Vma, objects: &[ObjectMapping], address: u64, physical: u64) -> bool {
     match vma.backing() {
         Backing::Initfs { .. } => !initfs_contains(physical),
         Backing::Anonymous => {
             if let Some(mapping) = objects.iter().find(|mapping| mapping.contains(address)) {
-                if mapping.shared {
-                    false
-                } else {
-                    mapping.object.frame_at(
+                !mapping.shared
+                    && mapping.object.frame_at(
                         mapping
                             .offset
                             .saturating_add(address.saturating_sub(mapping.start))
                             / PAGE_SIZE,
                     ) != Some(physical)
-                }
             } else {
                 true
             }
         }
     }
+}
+
+/// True when this address space is the sole owner of a private frame.
+///
+/// A frame shared with a forked child is released through [`frame::release_shared`] instead of
+/// being freed, so teardown cannot free a frame the child still maps.
+fn page_owned(vma: Vma, objects: &[ObjectMapping], address: u64, physical: u64) -> bool {
+    private_frame(vma, objects, address, physical) && !frame::is_shared(frame::PhysAddr(physical))
+}
+
+fn in_device_ranges(start: u64, len: u64, mmio: &[MmioMapping], dma: &[(u64, u64)]) -> bool {
+    let end = start.saturating_add(len);
+    mmio.iter()
+        .any(|mapping| start < mapping.start.saturating_add(mapping.len) && mapping.start < end)
+        || dma.iter().any(|(map_start, map_len)| {
+            start < map_start.saturating_add(*map_len) && *map_start < end
+        })
 }
 
 fn pages_in(len: u64) -> Result<u64, Errno> {

@@ -67,6 +67,9 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
         };
     }
     let number = usize::try_from(frame.rax).unwrap_or(usize::MAX);
+    if number == process_ctl::PROC_FORK {
+        return process_ctl::fork(frame);
+    }
     if number == raven_abi::syscall::PROC_SET_PERSONALITY {
         return process_ctl::set_personality(frame);
     }
