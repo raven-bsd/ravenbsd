@@ -566,6 +566,7 @@ dependencies = [
  "lexopt",
  "raven-config",
  "raven-output",
+ "raven-theme",
  "serde_json",
 ]
 
@@ -2229,6 +2230,14 @@ name = "raven-testsvc"
 version = "0.1.0"
 dependencies = [
  "raven-rt",
+]
+
+[[package]]
+name = "raven-theme"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "toml",
 ]
 
 [[package]]
