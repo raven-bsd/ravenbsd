@@ -89,6 +89,7 @@ fn build_fixtures() -> Result<PathBuf, String> {
     for directory in ["rpath", "runpath", "ldpath"] {
         fs::create_dir_all(out.join(directory)).map_err(|error| error.to_string())?;
     }
+    build_static(&clang, &lld, &source, &out)?;
     for name in [
         "libdeep",
         "libval",
@@ -102,6 +103,7 @@ fn build_fixtures() -> Result<PathBuf, String> {
         "libtextrel",
         "libinstall",
         "libtls",
+        "libfini",
         "libsearch_rpath",
         "libsearch_runpath",
     ] {
@@ -185,6 +187,44 @@ fn compile(clang: &Path, lld: &Path, source: &Path, out: &Path, name: &str) -> R
     let status = command.status().map_err(|error| error.to_string())?;
     if !status.success() {
         return Err(format!("rust-lld failed for {name}"));
+    }
+    Ok(())
+}
+
+/// Build the non-dynamic executable used by the `ldd` static case.
+fn build_static(clang: &Path, lld: &Path, source: &Path, out: &Path) -> Result<(), String> {
+    let asm = source.join("staticprog.s.txt");
+    if !asm.is_file() {
+        return Ok(());
+    }
+    let object = out.join("staticprog.o");
+    let status = Command::new(clang)
+        .args(["-target", X86_64_TARGET, "-c", "-x", "assembler"])
+        .arg(&asm)
+        .arg("-o")
+        .arg(&object)
+        .status()
+        .map_err(|error| error.to_string())?;
+    if !status.success() {
+        return Err("clang failed for staticprog".to_string());
+    }
+    let program = out.join("staticprog");
+    let status = Command::new(lld)
+        .args([
+            "-flavor",
+            "gnu",
+            "-static",
+            "-nostdlib",
+            "-e",
+            "_start",
+            "-o",
+        ])
+        .arg(&program)
+        .arg(&object)
+        .status()
+        .map_err(|error| error.to_string())?;
+    if !status.success() {
+        return Err("rust-lld failed for staticprog".to_string());
     }
     Ok(())
 }

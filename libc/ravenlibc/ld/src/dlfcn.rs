@@ -173,7 +173,9 @@ impl<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier> L
         if object.refcount > 0 {
             object.refcount = object.refcount.saturating_sub(1);
         }
-        if object.refcount == 0 && !object.nodelete && !object.has_tls() {
+        let unload = object.refcount == 0 && !object.nodelete && !object.has_tls();
+        if unload {
+            let _ = self.run_fini(id);
             let _ = self.unload_object(id);
         }
         self.error.clear();

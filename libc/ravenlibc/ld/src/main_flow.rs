@@ -7,7 +7,7 @@
 //! The real entry glue parses the stack and auxv; this module takes a [`StartCtx`] and executes
 //! the steps that are the same on the host and the target.
 
-use raven_libc_elf::{Arch, ObjId, Scope};
+use raven_libc_elf::{Arch, ObjId};
 
 use crate::loadobj::{LoadError, Loader, Name};
 use crate::mapper::Platform;
@@ -21,6 +21,12 @@ pub struct StartCtx<'a> {
     pub main_name: &'a [u8],
     /// Additional search directories.
     pub library_path: &'a [&'a [u8]],
+    /// Direct-execution arguments after the loader name; empty for the normal path.
+    pub args: &'a [&'a [u8]],
+    /// `LD_PRELOAD` names.
+    pub preload: &'a [&'a [u8]],
+    /// `LD_DEBUG` value.
+    pub debug: &'a [u8],
     /// The architecture.
     pub arch: Arch,
     /// The trusted flag.
@@ -47,21 +53,64 @@ pub fn rtld_main<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::Rel
     loader.arch = ctx.arch;
     // STEP 3: secure-exec trust and the environment copy. The caller has already parsed env.
     loader.trust = ctx.trust;
+    loader.debug = parse_ld_debug(ctx.debug, ctx.trust);
+    let mut main_path = ctx.main_path;
+    let mut main_name = ctx.main_name;
+    let mut trace = false;
+    if !ctx.args.is_empty() {
+        let parsed = parse_direct_exec(ctx.args, ctx.trust)?;
+        trace = parsed.list;
+        if let Some(program) = parsed.program {
+            main_path = program;
+            main_name = program;
+        }
+        if let Some(paths) = parsed.library_path {
+            for dir in paths.split(|byte| *byte == b':') {
+                if !dir.is_empty() {
+                    let _ = loader.add_library_path(dir);
+                }
+            }
+        }
+        if let Some(preload) = parsed.preload {
+            let _ = loader.add_preload(preload);
+        }
+    }
     // STEP 4: the loader's own digest and RELRO are performed by the entry glue/C61.
-    // STEP 5: direct execution; `StartCtx` names the main path in both modes.
-    // STEP 6: digest the main program.
-    let main = loader.load_object(ctx.main_path, ctx.main_name)?;
-    // STEP 7: preload (only when trusted).
+    // STEP 5: direct execution has already selected the main path above.
     if ctx.trust {
         for dir in ctx.library_path {
             let _ = loader.add_library_path(dir);
         }
+        for preload in ctx.preload {
+            let _ = loader.add_preload(preload);
+        }
     }
-    // STEP 8: the breadth-first `DT_NEEDED` closure.
-    loader.scope = Scope::new(main);
+    // STEP 6: digest the main program.
+    let main = match loader.load_object(main_path, main_name) {
+        Ok(id) => id,
+        Err(LoadError::NotDynamic | LoadError::Digest(raven_libc_elf::DigestError::NotDynamic))
+            if trace =>
+        {
+            loader.platform.debug_write(b"not a dynamic executable\n");
+            return Err(LoadError::NotDynamic);
+        }
+        Err(error) => return Err(error),
+    };
+    loader.debug_write(raven_libc_elf::debug::DebugWords::FILES, b"load main\n");
+    // STEP 7: preload the trusted objects before the main dependency closure.
+    loader.load_preload_objects()?;
+    // STEP 8: the breadth-first `DT_NEEDED` closure; keep the preload roots in the scope.
+    loader.scope.main = main;
     loader.load_needed_objects(main)?;
     // STEP 9: version verification is C52's lookup/version path.
-    // STEP 10: `LD_TRACE_LOADED_OBJECTS` is a C64/target tracing item.
+    // STEP 10: `LD_TRACE_LOADED_OBJECTS`: print and return without init.
+    if trace {
+        trace_loaded(loader);
+        return Ok(StartResult {
+            entry: 0,
+            exit_proc: 0,
+        });
+    }
     // STEP 11: static TLS offsets are assigned before relocation by the C57 layout.
     loader.assign_tls_offsets()?;
     // STEP 12: non-PLT, RELR and PLT relocations.
@@ -79,6 +128,38 @@ pub fn rtld_main<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::Rel
         entry: usize::try_from(entry).unwrap_or(0),
         exit_proc: 0,
     })
+}
+
+/// Print the loaded object list in the `ldd` shape through the platform debug console.
+fn trace_loaded<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier>(
+    loader: &mut Loader<P, M, A>,
+) {
+    let ids = loader.iterate_ids();
+    for id in ids.into_iter().flatten() {
+        let Some(object) = loader.object(id) else {
+            continue;
+        };
+        let name = object
+            .names
+            .iter()
+            .take(object.name_count)
+            .next()
+            .map(|name| name.as_bytes())
+            .unwrap_or(b"");
+        let path = object
+            .names
+            .iter()
+            .take(object.name_count)
+            .nth(1)
+            .map(|name| name.as_bytes())
+            .unwrap_or(name);
+        let mut line = [0u8; 512];
+        if let Some(len) = write_trace_line(name, path, object.mapped.base, &mut line)
+            && let Some(bytes) = line.get(..len)
+        {
+            loader.platform.debug_write(bytes);
+        }
+    }
 }
 
 /// Parse one `LD_LIBRARY_PATH` value into a search list (no allocation).

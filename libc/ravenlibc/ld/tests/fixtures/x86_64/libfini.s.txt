@@ -1,0 +1,25 @@
+        .data
+        .globl  fini_count
+        .type   fini_count,@object
+        .size   fini_count,8
+fini_count:
+        .quad   0
+        .text
+        .globl  fini_a
+        .type   fini_a,@function
+fini_a:
+        movq    fini_count@GOTPCREL(%rip), %rax
+        addq    $1, (%rax)
+        ret
+        .size   fini_a, .-fini_a
+        .globl  fini_b
+        .type   fini_b,@function
+fini_b:
+        movq    fini_count@GOTPCREL(%rip), %rax
+        addq    $2, (%rax)
+        ret
+        .size   fini_b, .-fini_b
+        .section .fini_array,"aw",@fini_array
+        .quad   fini_a
+        .quad   fini_b
+        .section .note.GNU-stack,"",@progbits

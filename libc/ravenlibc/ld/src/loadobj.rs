@@ -35,6 +35,7 @@
 //
 //! The loaded-object table, object loading and the `DT_NEEDED` closure.
 
+use raven_libc_elf::debug::DebugWords;
 use raven_libc_elf::{
     Arch, DigestError, Ehdr, ElfError, MemView, ObjId, ObjTable, ObjView, Phdr, Scope, SliceMem,
     plan_segments,
@@ -237,6 +238,8 @@ pub struct Loader<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> {
     pub preload_count: usize,
     /// The trusted (not secure-exec) flag.
     pub trust: bool,
+    /// `LD_DEBUG` words.
+    pub debug: DebugWords,
     /// Bind every relocation now.
     pub bind_now: bool,
     /// The installed `RtldTable` address, if any.
@@ -269,6 +272,7 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
             preload: [Name::empty(); 4],
             preload_count: 0,
             trust: true,
+            debug: DebugWords::default(),
             bind_now: true,
             table_address: 0,
             adds: 0,
@@ -378,6 +382,10 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
             .read(&file, 0, &mut header_bytes)
             .map_err(|error| LoadError::Io(error.errno()))?;
         let header = Ehdr::parse(&header_bytes).map_err(LoadError::Elf)?;
+        // The loader maps ET_DYN objects; an ET_EXEC is the `ldd` static case.
+        if header.e_type != 3 {
+            return Err(LoadError::NotDynamic);
+        }
         let mut phdrs = [Phdr::parse(&[0u8; 56]).ok(); 16];
         let phnum = usize::from(header.e_phnum).min(16);
         for index in 0..phnum {
@@ -486,6 +494,33 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
             }
         }
         Ok(())
+    }
+
+    /// Load the stored `LD_PRELOAD` names in order and put them at the head of the global scope.
+    pub fn load_preload_objects(&mut self) -> Result<(), LoadError> {
+        let count = self.preload_count;
+        for index in 0..count {
+            let Some(name) = self.preload.get(index).copied() else {
+                continue;
+            };
+            let path = self
+                .find_library_for(name.as_bytes(), None)?
+                .ok_or(LoadError::NotFound)?;
+            let id = self.load_object(path.as_bytes(), name.as_bytes())?;
+            self.load_needed_objects(id)?;
+            if !self.scope.preload.contains(&id) {
+                self.scope.preload.push(id);
+            }
+            self.debug_write(DebugWords::FILES, b"preload\n");
+        }
+        Ok(())
+    }
+
+    /// Write one `LD_DEBUG` line when the word is selected.
+    pub fn debug_write(&mut self, word: u32, bytes: &[u8]) {
+        if self.debug.contains(word) {
+            self.platform.debug_write(bytes);
+        }
     }
 
     /// Assign a static TLS offset to every loaded object that has a `PT_TLS`, in load order.
@@ -652,6 +687,8 @@ pub enum LoadError {
     BadDirectArgs,
     /// Secure mode refused a relative path.
     SecurePath,
+    /// The object is not a dynamic executable (the `ldd` static case).
+    NotDynamic,
 }
 
 impl LoadError {
@@ -673,6 +710,7 @@ impl LoadError {
             Self::Tainted => "Tainted process refusing to run binary",
             Self::BadDirectArgs => "bad direct-execution arguments",
             Self::SecurePath => "relative path refused in secure mode",
+            Self::NotDynamic => "not a dynamic executable",
         }
     }
 
@@ -689,6 +727,7 @@ impl LoadError {
             Self::Reloc(_) => 8,
             Self::Tls(_) => 12,
             Self::Tainted | Self::BadDirectArgs | Self::SecurePath => 1,
+            Self::NotDynamic => 1,
         }
     }
 }

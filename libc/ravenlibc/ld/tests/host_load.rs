@@ -166,6 +166,9 @@ fn host_start_flow_loads_and_relocates() {
         main_path: path.as_os_str().as_encoded_bytes(),
         main_name: b"libval.so",
         library_path: &paths,
+        args: &[],
+        preload: &[],
+        debug: b"",
         arch: raven_libc_elf::Arch::X86_64,
         trust: true,
     };
@@ -222,6 +225,93 @@ fn dt_rel_is_rejected_by_the_loader() {
         .load_object(path.as_os_str().as_encoded_bytes(), b"librel.so")
         .expect_err("DT_REL");
     assert_eq!(error, LoadError::Digest(DigestError::RelNotSupported));
+}
+
+#[test]
+fn direct_exec_wires_the_program_and_list_mode() {
+    let _guard = HOST_LOCK.lock().expect("lock");
+    let Some(dir) = fixtures::required() else {
+        return;
+    };
+    let (mapper, mem, applier) = HostMapper::new();
+    let mut loader = Loader::new(mapper, mem, applier);
+    let program = dir.join("libdeep.so");
+    let program_bytes = program.as_os_str().as_encoded_bytes();
+    let args: [&[u8]; 2] = [b"--list", program_bytes];
+    let ctx = StartCtx {
+        main_path: b"",
+        main_name: b"",
+        library_path: &[],
+        args: &args,
+        preload: &[],
+        debug: b"files",
+        arch: raven_libc_elf::Arch::X86_64,
+        trust: true,
+    };
+    let result = rtld_main(&mut loader, ctx).expect("direct list");
+    assert_eq!(result.entry, 0);
+    assert!(loader.object(loader.scope.main).is_some());
+    assert!(
+        String::from_utf8_lossy(&loader.platform.debug_bytes()).contains("=>"),
+        "missing trace output"
+    );
+}
+
+#[test]
+fn preload_objects_load_before_main_and_debug_is_emitted() {
+    let _guard = HOST_LOCK.lock().expect("lock");
+    let Some(dir) = fixtures::required() else {
+        return;
+    };
+    let (mapper, mem, applier) = HostMapper::new();
+    let mut loader = Loader::new(mapper, mem, applier);
+    let program = dir.join("libdeep.so");
+    let paths = [dir.as_os_str().as_encoded_bytes()];
+    let preload: [&[u8]; 1] = [b"libval.so"];
+    let ctx = StartCtx {
+        main_path: program.as_os_str().as_encoded_bytes(),
+        main_name: b"libdeep.so",
+        library_path: &paths,
+        args: &[],
+        preload: &preload,
+        debug: b"files",
+        arch: raven_libc_elf::Arch::X86_64,
+        trust: true,
+    };
+    let _ = rtld_main(&mut loader, ctx).expect("preload start");
+    assert_eq!(loader.scope.preload.len(), 1);
+    assert!(loader.by_name(b"libval.so").is_some());
+    let output = String::from_utf8_lossy(&loader.platform.debug_bytes()).to_string();
+    assert!(output.contains("preload"), "{output:?}");
+    assert!(output.contains("load main"), "{output:?}");
+}
+
+#[test]
+fn the_static_ldd_case_reports_not_a_dynamic_executable() {
+    let _guard = HOST_LOCK.lock().expect("lock");
+    let Some(dir) = fixtures::required() else {
+        return;
+    };
+    let (mapper, mem, applier) = HostMapper::new();
+    let mut loader = Loader::new(mapper, mem, applier);
+    let program = dir.join("staticprog");
+    let program_bytes = program.as_os_str().as_encoded_bytes();
+    let args: [&[u8]; 2] = [b"--list", program_bytes];
+    let ctx = StartCtx {
+        main_path: b"",
+        main_name: b"",
+        library_path: &[],
+        args: &args,
+        preload: &[],
+        debug: b"",
+        arch: raven_libc_elf::Arch::X86_64,
+        trust: true,
+    };
+    assert_eq!(rtld_main(&mut loader, ctx), Err(LoadError::NotDynamic));
+    assert!(
+        String::from_utf8_lossy(&loader.platform.debug_bytes())
+            .contains("not a dynamic executable")
+    );
 }
 
 #[test]
@@ -463,6 +553,9 @@ fn an_untrusted_start_ignores_the_library_path() {
         main_path: path.as_os_str().as_encoded_bytes(),
         main_name: b"libdeep.so",
         library_path: &paths,
+        args: &[],
+        preload: &[],
+        debug: b"",
         arch: raven_libc_elf::Arch::X86_64,
         trust: false,
     };
@@ -514,6 +607,29 @@ fn dlclose_uses_reference_counts_and_honours_nodelete() {
 }
 
 #[test]
+fn dlclose_runs_fini_array_in_reverse_order() {
+    let _guard = HOST_LOCK.lock().expect("lock");
+    let Some((mut loader, _dir)) = loader() else {
+        return;
+    };
+    let id = loader.dlopen(b"libfini.so", 0).expect("load");
+    let fini_a = loader.dlsym(Some(id), b"fini_a", 0).expect("fini_a") as u64;
+    let fini_b = loader.dlsym(Some(id), b"fini_b", 0).expect("fini_b") as u64;
+    assert_eq!(loader.dlclose(id), 0);
+    assert!(loader.object(id).is_none());
+    let calls: Vec<u64> = loader
+        .platform
+        .events()
+        .into_iter()
+        .filter_map(|event| match event {
+            Event::Call(address) => Some(address),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(calls, vec![fini_b, fini_a]);
+}
+
+#[test]
 fn dlerror_is_returned_once_and_cleared_by_success() {
     let _guard = HOST_LOCK.lock().expect("lock");
     let Some((mut loader, _dir)) = loader() else {
@@ -538,6 +654,27 @@ fn rtdl_next_searches_after_the_caller_object() {
         .dlsym(Some(RTLD_NEXT), b"deep_fn", caller)
         .expect("next");
     assert_ne!(deep, 0);
+}
+
+#[test]
+fn dl_phdr_info_has_the_c_shape_and_main_first_order() {
+    let _guard = HOST_LOCK.lock().expect("lock");
+    let Some((mut loader, dir)) = loader() else {
+        return;
+    };
+    let main = load(&mut loader, &dir, "libval.so");
+    loader.scope = raven_libc_elf::Scope::new(main);
+    let info = loader.dl_phdr_info(main).expect("main info");
+    assert_ne!(info.dlpi_addr, 0);
+    assert_ne!(info.dlpi_phnum, 0);
+    assert!(!info.dlpi_name.is_null());
+    let mut count = 0usize;
+    let result = loader.iterate_phdr_info(|_info| {
+        count = count.saturating_add(1);
+        if count == 1 { 0 } else { 7 }
+    });
+    assert_eq!(result, 7);
+    assert_eq!(count, 2);
 }
 
 #[test]

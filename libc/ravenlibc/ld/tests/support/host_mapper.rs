@@ -64,6 +64,7 @@ struct FileData {
 pub enum Event {
     Ifunc(u64),
     Protect(u64),
+    Call(u64),
 }
 
 #[derive(Default)]
@@ -72,6 +73,7 @@ struct State {
     ranges: Vec<(u64, u64, bool)>,
     writes_outside: usize,
     events: Vec<Event>,
+    debug: Vec<u8>,
 }
 
 type Shared = Rc<RefCell<State>>;
@@ -114,6 +116,11 @@ impl HostMapper {
     /// The ordered IFUNC/RELRO events.
     pub fn events(&self) -> Vec<Event> {
         self.state.borrow().events.clone()
+    }
+
+    /// Everything written through the debug console.
+    pub fn debug_bytes(&self) -> Vec<u8> {
+        self.state.borrow().debug.clone()
     }
 
     /// Every mapped range and its writability.
@@ -333,6 +340,7 @@ impl Mapper for HostMapper {
 
 impl Platform for HostMapper {
     fn debug_write(&mut self, bytes: &[u8]) {
+        self.state.borrow_mut().debug.extend_from_slice(bytes);
         let _ = std::io::Write::write_all(&mut std::io::stderr(), bytes);
     }
 
@@ -345,6 +353,17 @@ impl Platform for HostMapper {
         let install: extern "C" fn(*const RtldTable) = unsafe { std::mem::transmute(address) };
         // The pointer points at the caller-owned table for the duration of the call.
         install(table);
+        true
+    }
+
+    fn call_function(&mut self, address: usize) -> bool {
+        self.state
+            .borrow_mut()
+            .events
+            .push(Event::Call(address as u64));
+        // SAFETY: fixture destructors have the `extern "C" fn()` shape.
+        let function: extern "C" fn() = unsafe { std::mem::transmute(address) };
+        function();
         true
     }
 }

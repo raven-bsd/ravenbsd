@@ -7,7 +7,9 @@
 //! The actual indirect calls are in the platform entry glue; the core only produces the order
 //! and the addresses, so host tests can prove the order without executing arbitrary code.
 
-use raven_libc_elf::{ObjId, ObjTable, init_order};
+use raven_libc_elf::{
+    ObjId, ObjTable, init_order, initorder::InitKind, initorder::init_array_entries,
+};
 
 use crate::loadobj::{Loader, MAX_OBJECTS};
 use crate::mapper::Platform;
@@ -39,6 +41,27 @@ impl<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier> L
             fini_array: view.fini_array,
             preinit_array: view.preinit_array,
         })
+    }
+
+    /// Run `DT_FINI_ARRAY` backwards, then the legacy `DT_FINI`, before an object unloads.
+    pub fn run_fini(&mut self, id: ObjId) -> bool {
+        let Some(object) = self.object(id) else {
+            return false;
+        };
+        let entries =
+            init_array_entries(&object.view, &self.mem, InitKind::Fini).unwrap_or_default();
+        let fini = object.view.fini;
+        for entry in entries.iter().rev() {
+            if let Ok(address) = usize::try_from(*entry) {
+                self.platform.call_function(address);
+            }
+        }
+        if fini != 0
+            && let Ok(address) = usize::try_from(fini)
+        {
+            self.platform.call_function(address);
+        }
+        true
     }
 
     /// The dependency-first initialisation order of the initial objects.

@@ -15,7 +15,7 @@ pub struct RealPlatform;
 
 impl Mapper for RealPlatform {
     fn open(&mut self, _path: &[u8]) -> Result<LoaderFile, MapErrKind> {
-        Err(MapErrKind::NoEnt)
+        Err(crate::mapper::file_layer_unavailable())
     }
 
     fn read(
@@ -24,7 +24,7 @@ impl Mapper for RealPlatform {
         _offset: u64,
         _buf: &mut [u8],
     ) -> Result<usize, MapErrKind> {
-        Err(MapErrKind::Io)
+        Err(crate::mapper::file_layer_unavailable())
     }
 
     fn close(&mut self, _file: LoaderFile) {}
