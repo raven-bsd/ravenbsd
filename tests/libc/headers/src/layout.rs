@@ -168,6 +168,8 @@ pub const PREAMBLE: &str = "\
 #include <getopt.h>
 /* RavenBSD C45: regex_t must be visible to its layout row. */
 #include <regex.h>
+/* RavenBSD C53: cap_rights_t must be visible to its layout row. */
+#include <sys/capsicum.h>
 /* RavenBSD: offsetof(struct stat, __unused) needs the field name, not the
  * cdefs attribute macro. */
 #undef __unused
