@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Seed for tests/qtest/cases/libc-start-syscalls.toml (B1 of donor-map/16 3.A.9).
+# C73 copies this file into tests/qtest/cases/. The command needs the platform gaps:
+#   # needs PG-1 PG-50
+#   # cargo xtask qtest --case libc-start-syscalls --arch x86_64
+name = "libc-start-syscalls"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+# B1: P0 prints the syscall count seen before `main`; the expected value is 0 or 1.
+[[expect]]
+regex = '^libc-start-syscalls: before-main=\d+$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

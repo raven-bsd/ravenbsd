@@ -25,6 +25,7 @@ mod libc_headers;
 mod libc_lint;
 mod libc_lint_data;
 mod libc_lint_scan;
+mod libc_lint_size;
 #[cfg(test)]
 mod libc_lint_testutil;
 mod libc_oracle;

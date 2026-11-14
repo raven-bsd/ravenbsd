@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Probe rules of donor-map/16 3.A.2, evaluated by `libc-size run`. A rule that cannot run
+# (probe not built) is `skipped`, never `pass`. Member patterns match the object name inside
+# the archive; the shell names a member after its codegen unit, so the matcher also tries the
+# identifier components (`regex*` matches `raven_libc_regex-...`).
+schema = 1
+
+[[rule]]
+probe = "P0"
+invariant = "R-9"
+forbid_members = [
+  "malloc*", "free*", "calloc*", "realloc*", "stdio*", "vfprintf*", "fwrite*",
+  "locale*", "tz*", "dtoa*", "fmt_float*", "resolv*", "regex*", "iconv*",
+]
+forbid_symbols = ["__*df3", "__*sf3", "__*tf3", "core3fmt*"]
+max_init_array = 0
+
+[[rule]]
+probe = "P1"
+invariant = "R-15"
+forbid_members = ["stdio*", "vfprintf*", "fwrite*", "malloc*"]
+
+[[rule]]
+probe = "P2"
+invariant = "R-13"
+forbid_members = [
+  "dtoa*", "fmt_float*", "locale*", "tz*", "resolv*", "regex*", "iconv*",
+  "malloc_opts*", "ld_debug*",
+]
+
+[[rule]]
+probe = "P3"
+invariant = "R-13"
+require_members = ["fmt_float*"]
+
+[[rule]]
+probe = "P4"
+invariant = "R-17"
+forbid_members = ["malloc*", "stdio*"]
+
+[[rule]]
+probe = "P5"
+invariant = "R-14"
+forbid_members = ["fopen*", "printf*", "vfprintf*"]
+
+[[rule]]
+probe = "P6"
+invariant = "R-16"
+linkage = "static"
+forbid_members = ["malloc*", "vfprintf*"]
+max_text_over_p0 = 512
+
+[[rule]]
+probe = "P7"
+invariant = "R-14"
+forbid_members = ["locale*", "collat*", "langinfo*", "catopen*", "iconv*"]

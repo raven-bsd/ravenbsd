@@ -1,0 +1,125 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The hook table of donor-map/16 3.A.4.3. `libc-lint size [hooks]` checks that every
+# `weak_hook!` names a row here and that the strong member exists in another file.
+schema = 1
+
+[[hook]]
+hook = "__rl_funcs_on_exit"
+dummy = "nothing"
+strong_member = "atexit.o"
+pulled_by = "atexit, __cxa_atexit, on_exit"
+called_from = "exit"
+
+[[hook]]
+hook = "__rl_stdio_exit"
+dummy = "nothing"
+strong_member = "stdio_exit.o"
+pulled_by = "the stdio read/write cores"
+called_from = "exit"
+
+[[hook]]
+hook = "__rl_fini_array"
+dummy = "nothing"
+strong_member = "fini_array.o"
+pulled_by = "crt1.o"
+called_from = "exit"
+
+[[hook]]
+hook = "__rl_fmt_float"
+dummy = "prints *float*"
+strong_member = "fmt_float.o"
+pulled_by = "-u __rl_fmt_float_impl, strfromd, fcvt, ecvt, gcvt"
+called_from = "printf engine"
+
+[[hook]]
+hook = "__rl_fmt_wide"
+dummy = "skips the argument"
+strong_member = "fmt_wide.o"
+pulled_by = "wprintf, -u"
+called_from = "printf engine"
+
+[[hook]]
+hook = "__rl_scan_float"
+dummy = "fails the match"
+strong_member = "scan_float.o"
+pulled_by = "strtod, atof, scanf %f"
+called_from = "scanf engine"
+
+[[hook]]
+hook = "__rl_locale_load"
+dummy = "returns C.UTF-8"
+strong_member = "locale_load.o"
+pulled_by = "newlocale, non-C setlocale"
+called_from = "setlocale"
+
+[[hook]]
+hook = "__rl_collate"
+dummy = "bytewise compare"
+strong_member = "collate.o"
+pulled_by = "strcoll with a loaded locale"
+called_from = "strcoll, wcscoll"
+
+[[hook]]
+hook = "__rl_tz_load"
+dummy = "UTC, no rules"
+strong_member = "tz_load.o"
+pulled_by = "tzset, localtime*, mktime, %Z"
+called_from = "localtime_r"
+
+[[hook]]
+hook = "__rl_thread_exit_dtors"
+dummy = "nothing"
+strong_member = "tsd_dtors.o"
+pulled_by = "pthread_key_create, TLS destructors"
+called_from = "thread exit"
+
+[[hook]]
+hook = "__rl_atfork_run"
+dummy = "nothing"
+strong_member = "atfork.o"
+pulled_by = "pthread_atfork"
+called_from = "fork"
+
+[[hook]]
+hook = "__rl_cancel_point"
+dummy = "nothing"
+strong_member = "cancel.o"
+pulled_by = "pthread_cancel, pthread_setcancelstate"
+called_from = "read, write, ..."
+
+[[hook]]
+hook = "__rl_malloc_impl"
+dummy = "bump allocator"
+strong_member = "malloc.o"
+pulled_by = "free, realloc, posix_memalign"
+called_from = "malloc"
+
+[[hook]]
+hook = "__rl_dl_real"
+dummy = "NULL + constant error"
+strong_member = "dl_real.o"
+pulled_by = "libc.so only"
+called_from = "dlopen family"
+
+[[hook]]
+hook = "__rl_resolv_hosts"
+dummy = "no-op"
+strong_member = "resolv_hosts.o"
+pulled_by = "getaddrinfo, gethostbyname"
+called_from = "resolver"
+
+[[hook]]
+hook = "__rl_nss_dispatch"
+dummy = "files only"
+strong_member = "nss.o"
+pulled_by = "getpwnam, getgrnam, nsswitch.conf"
+called_from = "name services"
+
+[[hook]]
+hook = "__rl_malloc_debug"
+dummy = "no-op"
+strong_member = "malloc_debug.o"
+pulled_by = "MALLOC_OPTIONS"
+called_from = "malloc"

@@ -395,11 +395,12 @@ fn stub_checks_are_listed() {
     for check in ["deps", "one-symbol", "sections", "no-fmt", "exports"] {
         assert!(STUB_CHECKS.contains(&check));
     }
+    assert!(!STUB_CHECKS.contains(&"size"));
 }
 
 #[test]
 fn all_checks_are_listed() {
-    assert_eq!(ALL_CHECKS.len(), 7);
+    assert_eq!(ALL_CHECKS.len(), 8);
 }
 
 #[test]

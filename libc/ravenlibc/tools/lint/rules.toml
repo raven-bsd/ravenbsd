@@ -8,3 +8,10 @@ crate_manifest = "libc/ravenlibc/xtask/crates.toml"
 
 [no-std]
 allow-files = []
+
+[size]
+# `libc-lint size`: probe rules, R-30 member budget and the allow-list.
+allowlist = "tests/libc/size/size-allowlist.toml"
+rules = "tests/libc/size/rules.toml"
+hooks = "tests/libc/size/hooks.toml"
+hot = "tests/libc/size/hot.toml"

@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# `R-17` / `BP-2`: no allocator may be reachable from these start-path roots. The graph is
+# built from `llvm-nm -A -g libc.a`; an edge into the malloc set is `[boot-malloc]`.
+schema = 1
+roots = [
+  "__raven_libc_start",
+  "exit",
+  "_exit",
+  "_Exit",
+  "getenv",
+  "qsort",
+  "bsearch",
+  "strtok",
+  "basename",
+  "ctime",
+  "inet_ntoa",
+  "inet_aton",
+  "inet_pton",
+  "gai_strerror",
+  "strerror",
+]
+
+# Reviewed exceptions (reason required). `setenv`/`putenv` allocate by POSIX; a
+# `getaddrinfo` call with a non-numeric host is the resolver case of R-17.
+[[allow]]
+symbol = "setenv"
+reason = "POSIX environment mutation allocates; not a start-path root"
+
+[[allow]]
+symbol = "putenv"
+reason = "POSIX environment mutation allocates; not a start-path root"

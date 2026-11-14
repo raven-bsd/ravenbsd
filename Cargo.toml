@@ -76,6 +76,7 @@ members = [
     "tools/ufs-mkfs",
     "tools/integration-inventory",
     "tools/libc-census",
+    "tools/libc-size",
     "tools/libc-oracle",
     "libc/ravenlibc/crates/*",
     "libc/ravenlibc/tools/hdrgen",
