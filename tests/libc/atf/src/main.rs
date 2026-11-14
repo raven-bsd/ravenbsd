@@ -334,7 +334,9 @@ fn command_suite(args: &[String]) -> Result<u8> {
     let mut mode = None;
     let mut sysroot = None;
     let mut backend = RunBackend::None;
-    let mut cc = std::env::var("CC").unwrap_or_else(|_| "cc".to_string());
+    // Empty means "pick per mode": `cc` for the host oracle and `clang` for the
+    // ravenbsd target (the host `cc` rejects `--target=x86_64-unknown-ravenbsd`).
+    let mut cc = std::env::var("CC").unwrap_or_default();
     let mut out = PathBuf::from("build/libc-conformance");
     let mut filter = None;
     let mut jobs = default_jobs();

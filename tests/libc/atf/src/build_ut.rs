@@ -210,6 +210,17 @@ fn atf_sources_skip_tests_and_helpers() {
 }
 
 #[test]
+fn atf_sources_use_the_target_compiler_in_target_mode() {
+    let root = temp("atf-compiler");
+    let mut value = builder(&root);
+    value.cc.clear();
+    value.mode = Mode::Target;
+    assert_eq!(value.atf_compiler(), "clang");
+    value.mode = Mode::Oracle;
+    assert_eq!(value.atf_compiler(), "cc");
+}
+
+#[test]
 fn atf_string_definitions_are_complete() {
     let definitions = atf_string_definitions(Mode::Oracle).join(" ");
     assert!(definitions.contains("ATF_SHELL=\"/bin/sh\""));
