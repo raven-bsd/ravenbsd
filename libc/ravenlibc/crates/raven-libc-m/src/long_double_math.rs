@@ -718,6 +718,202 @@ pub fn tgammal(x: LongDouble) -> LongDouble {
     expl(lgamma_positive(x))
 }
 
+/// Euler's constant.
+fn euler_gamma() -> LongDouble {
+    ld(0.577_215_664_901_532_9)
+}
+
+/// `j0 x`: the power series inside the cancellation-safe range, the leading Hankel form above.
+pub fn j0l(x: LongDouble) -> LongDouble {
+    if x.is_nan() {
+        return x;
+    }
+    if x.is_zero() {
+        return LongDouble::one();
+    }
+    if x.is_infinite() {
+        return LongDouble::zero(false);
+    }
+    let magnitude = x.abs();
+    if magnitude.to_f64() > 12.0 {
+        // Leading asymptotic term: sqrt(2/(pi x)) cos(x - pi/4).
+        return asymptotic(magnitude, ld(0.25).mul(pi()), false);
+    }
+    let quarter = magnitude.mul(magnitude).div(ld(4.0));
+    let mut term = LongDouble::one();
+    let mut sum = LongDouble::one();
+    let mut index = 1i64;
+    while index <= 60 {
+        term =
+            LongDouble::zero(false).sub(term.mul(quarter).div(LongDouble::from_i64(index * index)));
+        sum = sum.add(term);
+        index += 1;
+    }
+    sum
+}
+
+/// `j1 x`.
+pub fn j1l(x: LongDouble) -> LongDouble {
+    if x.is_nan() {
+        return x;
+    }
+    if x.is_zero() {
+        return x;
+    }
+    if x.is_infinite() {
+        return LongDouble::zero(false);
+    }
+    let magnitude = x.abs();
+    let negative = x.sign_bit();
+    let value = if magnitude.to_f64() > 12.0 {
+        // Leading asymptotic term: sqrt(2/(pi x)) cos(x - 3 pi/4).
+        asymptotic(magnitude, ld(0.75).mul(pi()), false)
+    } else {
+        let quarter = magnitude.mul(magnitude).div(ld(4.0));
+        let mut term = magnitude.mul(ld(0.5));
+        let mut sum = term;
+        let mut index = 1i64;
+        while index <= 60 {
+            term = LongDouble::zero(false).sub(
+                term.mul(quarter)
+                    .div(LongDouble::from_i64(index * (index + 1))),
+            );
+            sum = sum.add(term);
+            index += 1;
+        }
+        sum
+    };
+    if negative {
+        LongDouble::zero(false).sub(value)
+    } else {
+        value
+    }
+}
+
+/// `y0 x`.
+pub fn y0l(x: LongDouble) -> LongDouble {
+    if x.is_nan() {
+        return x;
+    }
+    if x.is_zero() {
+        return LongDouble::infinity(true);
+    }
+    if x.sign_bit() {
+        return LongDouble::nan();
+    }
+    if x.is_infinite() {
+        return LongDouble::zero(false);
+    }
+    if x.to_f64() > 12.0 {
+        return asymptotic(x, ld(0.25).mul(pi()), true);
+    }
+    // y0 = (2/pi)(ln(x/2) + gamma) j0 + (2/pi) sum_{k>=1} (-1)^(k+1) H_k (x^2/4)^k / (k!)^2
+    let quarter = x.mul(x).div(ld(4.0));
+    let mut term = LongDouble::one();
+    let mut harmonic = LongDouble::zero(false);
+    let mut series = LongDouble::zero(false);
+    let mut index = 1i64;
+    while index <= 60 {
+        term = term.mul(quarter).div(LongDouble::from_i64(index * index));
+        harmonic = harmonic.add(LongDouble::one().div(LongDouble::from_i64(index)));
+        let signed = if index % 2 == 1 {
+            term
+        } else {
+            LongDouble::zero(false).sub(term)
+        };
+        series = series.add(harmonic.mul(signed));
+        index += 1;
+    }
+    let two_over_pi = ld(2.0).div(pi());
+    let logarithm = logl(x.mul(ld(0.5))).add(euler_gamma());
+    two_over_pi.mul(logarithm.mul(j0l(x)).add(series))
+}
+
+/// `y1 x`.
+///
+/// Computed from the Wronskian `J0 Y1 - J1 Y0 = -2/(pi x)`, so it is accurate where `J0` is not
+/// near a zero and loses precision at the `J0` zeros. The asymptotic branch has no such issue.
+pub fn y1l(x: LongDouble) -> LongDouble {
+    if x.is_nan() {
+        return x;
+    }
+    if x.is_zero() {
+        return LongDouble::infinity(true);
+    }
+    if x.sign_bit() {
+        return LongDouble::nan();
+    }
+    if x.is_infinite() {
+        return LongDouble::zero(false);
+    }
+    if x.to_f64() > 12.0 {
+        return asymptotic(x, ld(0.75).mul(pi()), true);
+    }
+    let two_over_pi_x = ld(2.0).div(pi().mul(x));
+    j1l(x).mul(y0l(x)).sub(two_over_pi_x).div(j0l(x))
+}
+
+/// `jn(n, x)` by upward recurrence from `j0`/`j1`.
+pub fn jnl(order: i32, x: LongDouble) -> LongDouble {
+    if order == 0 {
+        return j0l(x);
+    }
+    if order == 1 {
+        return j1l(x);
+    }
+    if order < 0 {
+        return LongDouble::nan();
+    }
+    let mut previous = j0l(x);
+    let mut current = j1l(x);
+    let mut index = 1i32;
+    while index < order {
+        let next = ld(2.0)
+            .mul(ld(index as f64))
+            .div(x)
+            .mul(current)
+            .sub(previous);
+        previous = current;
+        current = next;
+        index += 1;
+    }
+    current
+}
+
+/// `yn(n, x)` by upward recurrence from `y0`/`y1`.
+pub fn ynl(order: i32, x: LongDouble) -> LongDouble {
+    if order == 0 {
+        return y0l(x);
+    }
+    if order == 1 {
+        return y1l(x);
+    }
+    if order < 0 {
+        return LongDouble::nan();
+    }
+    let mut previous = y0l(x);
+    let mut current = y1l(x);
+    let mut index = 1i32;
+    while index < order {
+        let next = ld(2.0)
+            .mul(ld(index as f64))
+            .div(x)
+            .mul(current)
+            .sub(previous);
+        previous = current;
+        current = next;
+        index += 1;
+    }
+    current
+}
+
+/// The leading Hankel asymptotic form of the Bessel functions.
+fn asymptotic(x: LongDouble, phase: LongDouble, sine: bool) -> LongDouble {
+    let scale = ld(2.0).div(pi().mul(x)).sqrt();
+    let argument = x.sub(phase);
+    scale.mul(if sine { sinl(argument) } else { cosl(argument) })
+}
+
 #[cfg(test)]
 #[path = "long_double_math_ut.rs"]
 mod tests;
