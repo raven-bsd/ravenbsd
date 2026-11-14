@@ -87,14 +87,16 @@ mod generic;
 mod legacy;
 #[cfg(target_arch = "x86_64")]
 mod long_double;
-#[cfg(target_arch = "x86_64")]
 pub mod long_double_math;
 mod portable;
 
-/// On the binary128 targets the `long double` value is the IEEE 128-bit type; the `*l` entry
-/// points are still x86-64-only (the series module is gated), which the C47c report lists.
+/// On the binary128 targets the `long double` value is the IEEE 128-bit type.
 #[cfg(not(target_arch = "x86_64"))]
 pub use binary128::LongDouble128 as LongDouble;
+#[cfg(not(target_arch = "x86_64"))]
+mod binary128_l;
+#[cfg(not(target_arch = "x86_64"))]
+pub use binary128_l::*;
 
 pub use c23::{
     canonicalize, canonicalizef, getpayload, getpayloadf, issignaling, issignalingf, nextdown,
@@ -128,7 +130,6 @@ pub use long_double::{
     nextafterl, nexttowardl, remainderl, remquol, rintl, roundevenl, roundl, scalbnl, signbitl,
     sqrtl, totalorderl, truncl,
 };
-#[cfg(target_arch = "x86_64")]
 pub use long_double_math::{
     acoshl, acosl, asinhl, asinl, atan2l, atanhl, atanl, coshl, cosl, erfcl, erfl, exp2l, exp10l,
     expl, expm1l, j0l, j1l, jnl, lgamma_rl, lgammal, log1pl, log2l, log10l, logl, powl, sinhl,

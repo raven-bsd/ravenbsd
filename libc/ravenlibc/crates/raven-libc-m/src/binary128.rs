@@ -269,6 +269,487 @@ impl LongDouble128 {
             bits: mul128_bits(self.bits, other.bits),
         }
     }
+
+    /// `x / y`, correctly rounded.
+    #[allow(clippy::should_implement_trait)]
+    pub fn div(self, other: Self) -> Self {
+        Self {
+            bits: div128_bits(self.bits, other.bits),
+        }
+    }
+
+    /// The square root, correctly rounded.
+    pub fn sqrt(self) -> Self {
+        Self {
+            bits: sqrt128_bits(self.bits),
+        }
+    }
+
+    /// `|x|`.
+    pub fn abs(self) -> Self {
+        Self {
+            bits: self.bits & !SIGN,
+        }
+    }
+
+    /// `x` with the sign of `sign`.
+    pub fn copysign(self, sign: Self) -> Self {
+        Self {
+            bits: (self.bits & !SIGN) | (sign.bits & SIGN),
+        }
+    }
+
+    /// A signed integer, exactly.
+    pub fn from_i64(value: i64) -> Self {
+        if value == 0 {
+            return Self::zero(false);
+        }
+        let negative = value < 0;
+        let magnitude = value.unsigned_abs();
+        let msb = 63 - magnitude.leading_zeros();
+        let significand = (magnitude as u128) << (112 - msb);
+        let sign = if negative { SIGN } else { 0 };
+        Self {
+            bits: sign
+                | (((msb as i32 + BIAS) as u128 & EXPONENT_MASK as u128) << EXPONENT_SHIFT)
+                | (significand & SIGNIFICAND_MASK),
+        }
+    }
+
+    /// Truncate toward zero as `i64`; `None` when it does not fit or is not finite.
+    pub fn to_i64(self) -> Option<i64> {
+        if !self.is_finite() || self.is_zero() {
+            return if self.is_zero() { Some(0) } else { None };
+        }
+        let (exponent, significand) = unpack(self.bits);
+        if exponent < 0 {
+            return Some(0);
+        }
+        if exponent > 63 {
+            return None;
+        }
+        let magnitude = significand >> (112 - exponent);
+        let magnitude = u64::try_from(magnitude).ok()?;
+        let value = i64::try_from(magnitude).ok()?;
+        Some(if self.sign_bit() { -value } else { value })
+    }
+
+    /// `round`: halfway cases away from zero.
+    pub fn round(self) -> Self {
+        if !self.is_finite() || self.is_zero() {
+            return self;
+        }
+        let (exponent, significand) = unpack(self.bits);
+        let negative = self.sign_bit();
+        if exponent >= 112 {
+            return self;
+        }
+        if exponent < -1 {
+            return Self::zero(negative);
+        }
+        if exponent == -1 {
+            return if negative {
+                Self::zero(true).sub(Self::one())
+            } else {
+                Self::one()
+            };
+        }
+        let drop = (112 - exponent) as u32;
+        let kept = (significand >> drop) << drop;
+        let lost = significand & ((1u128 << drop) - 1);
+        if lost == 0 {
+            return self;
+        }
+        let half = 1u128 << (drop - 1);
+        let magnitude = if lost >= half {
+            kept + (1u128 << drop)
+        } else {
+            kept
+        };
+        Self {
+            bits: from_parts_bits(negative, exponent, magnitude),
+        }
+    }
+
+    /// `scalbn`: `x * 2^n` by exponent adjustment, with overflow and subnormal rounding.
+    pub fn scalbn(self, n: i32) -> Self {
+        if !self.is_finite() || self.is_zero() {
+            return self;
+        }
+        let negative = self.sign_bit();
+        let field = self.exponent_field() as i32 + n;
+        let mut significand = self.significand_bits() | HIDDEN;
+        let sign = if negative { SIGN } else { 0 };
+        if field >= EXPONENT_MASK as i32 {
+            return Self::infinity(negative);
+        }
+        if field > 0 {
+            return Self {
+                bits: sign
+                    | (((field as u128) & EXPONENT_MASK as u128) << EXPONENT_SHIFT)
+                    | (significand & SIGNIFICAND_MASK),
+            };
+        }
+        let shift = (1 - field) as u32;
+        if shift >= 113 {
+            return Self::zero(negative);
+        }
+        let lost = significand & ((1u128 << shift) - 1);
+        let half = 1u128 << (shift - 1);
+        significand >>= shift;
+        if lost > half || (lost == half && (significand & 1) != 0) {
+            significand += 1;
+        }
+        Self {
+            bits: sign | (significand & SIGNIFICAND_MASK),
+        }
+    }
+
+    /// The value scaled to `[1, 2)` (the mantissa used by the logarithm reduction).
+    pub fn mantissa(self) -> Self {
+        Self {
+            bits: ((BIAS as u128) << EXPONENT_SHIFT) | self.significand_bits(),
+        }
+    }
+
+    /// `floor`.
+    pub fn floor(self) -> Self {
+        Self {
+            bits: integral_bits(self.bits, IntegralMode::Floor),
+        }
+    }
+
+    /// `ceil`.
+    pub fn ceil(self) -> Self {
+        Self {
+            bits: integral_bits(self.bits, IntegralMode::Ceil),
+        }
+    }
+
+    /// `trunc`.
+    pub fn trunc(self) -> Self {
+        Self {
+            bits: integral_bits(self.bits, IntegralMode::Trunc),
+        }
+    }
+
+    /// `roundeven`: ties to even.
+    pub fn roundeven(self) -> Self {
+        Self {
+            bits: integral_bits(self.bits, IntegralMode::Even),
+        }
+    }
+
+    /// Whether the value is a normal number.
+    pub fn is_normal(self) -> bool {
+        classify(self.bits) == FP_NORMAL
+    }
+
+    /// The IEEE partial order; `None` when either operand is a NaN.
+    pub fn partial_cmp(self, other: Self) -> Option<core::cmp::Ordering> {
+        if self.is_nan() || other.is_nan() {
+            return None;
+        }
+        Some(self.total_cmp(other))
+    }
+
+    /// `x mod y` with the sign of `x` (`fmod`).
+    pub fn fmod(self, other: Self) -> Self {
+        if self.is_nan() || other.is_nan() || self.is_infinite() || other.is_zero() {
+            return Self::nan();
+        }
+        if other.is_infinite() || self.is_zero() {
+            return self;
+        }
+        self.sub(self.div(other).trunc().mul(other))
+    }
+
+    /// `remainder`: `x - n*y` with `n` the nearest even integer to `x/y`.
+    pub fn remainder(self, other: Self) -> Self {
+        self.remquo(other).0
+    }
+
+    /// `remquo`: the remainder and the low quotient bits with the sign.
+    pub fn remquo(self, other: Self) -> (Self, i32) {
+        if self.is_nan() || other.is_nan() || self.is_infinite() || other.is_zero() {
+            return (Self::nan(), 0);
+        }
+        if other.is_infinite() || self.is_zero() {
+            return (self, 0);
+        }
+        let quotient = self.div(other).roundeven();
+        let magnitude = quotient.abs().to_i64().unwrap_or(0) & 0x7f;
+        let negative = self.sign_bit() ^ other.sign_bit();
+        let low = if negative {
+            -(magnitude as i32)
+        } else {
+            magnitude as i32
+        };
+        (self.sub(quotient.mul(other)), low)
+    }
+
+    /// `fdim`: the positive difference.
+    pub fn fdim(self, other: Self) -> Self {
+        if self.is_nan() || other.is_nan() {
+            return Self::nan();
+        }
+        if self.total_cmp(other) == core::cmp::Ordering::Greater {
+            self.sub(other)
+        } else {
+            Self::zero(false)
+        }
+    }
+
+    /// `fmax`: the larger value, with `+0` winning over `-0` and a NaN yielding the other operand.
+    pub fn fmax(self, other: Self) -> Self {
+        if self.is_nan() {
+            return other;
+        }
+        if other.is_nan() {
+            return self;
+        }
+        if self.total_cmp(other) == core::cmp::Ordering::Greater {
+            self
+        } else {
+            other
+        }
+    }
+
+    /// `fmin`: the smaller value, with `-0` winning over `+0` and a NaN yielding the other operand.
+    pub fn fmin(self, other: Self) -> Self {
+        if self.is_nan() {
+            return other;
+        }
+        if other.is_nan() {
+            return self;
+        }
+        if self.total_cmp(other) == core::cmp::Ordering::Less {
+            self
+        } else {
+            other
+        }
+    }
+
+    /// `nextafter` towards `other`.
+    pub fn next_after(self, other: Self) -> Self {
+        if self.is_nan() || other.is_nan() {
+            return Self::nan();
+        }
+        let key = order_key(self.bits);
+        let target = order_key(other.bits);
+        if key == target {
+            return other;
+        }
+        let next = if key < target { key + 1 } else { key - 1 };
+        Self {
+            bits: if next & SIGN != 0 { next ^ SIGN } else { !next },
+        }
+    }
+}
+
+/// The integral rounding modes.
+enum IntegralMode {
+    Floor,
+    Ceil,
+    Trunc,
+    Even,
+}
+
+/// Round to an integer in the requested mode (the f128 integral family).
+fn integral_bits(a: u128, mode: IntegralMode) -> u128 {
+    if !matches!(classify(a), FP_ZERO | FP_SUBNORMAL | FP_NORMAL) {
+        return a;
+    }
+    if classify(a) == FP_ZERO {
+        return a;
+    }
+    let negative = a & SIGN != 0;
+    let (exponent, significand) = unpack(a);
+    if exponent >= 112 {
+        return a;
+    }
+    let sign = if negative { SIGN } else { 0 };
+    if exponent < -1 {
+        let keep = match mode {
+            IntegralMode::Floor => negative,
+            IntegralMode::Ceil => !negative,
+            IntegralMode::Trunc | IntegralMode::Even => false,
+        };
+        return if keep {
+            sign | (0x3fff_u128 << EXPONENT_SHIFT)
+        } else {
+            sign
+        };
+    }
+    if exponent == -1 {
+        // |x| in [0.5, 1).
+        let keep = match mode {
+            IntegralMode::Floor => negative,
+            IntegralMode::Ceil => !negative,
+            IntegralMode::Trunc | IntegralMode::Even => false,
+        };
+        return if keep {
+            sign | (0x3fff_u128 << EXPONENT_SHIFT)
+        } else {
+            sign
+        };
+    }
+    let drop = (112 - exponent) as u32;
+    let kept = (significand >> drop) << drop;
+    let lost = significand & ((1u128 << drop) - 1);
+    if lost == 0 {
+        return a;
+    }
+    let increment = match mode {
+        IntegralMode::Floor => negative,
+        IntegralMode::Ceil => !negative,
+        IntegralMode::Trunc => false,
+        IntegralMode::Even => {
+            let half = 1u128 << (drop - 1);
+            lost > half || (lost == half && ((kept >> drop) & 1) != 0)
+        }
+    };
+    let magnitude = if increment {
+        kept + (1u128 << drop)
+    } else {
+        kept
+    };
+    from_parts_bits(negative, exponent, magnitude)
+}
+
+/// Build a value from a sign, the unpacked exponent and a significand normalised at bit 112.
+fn from_parts_bits(negative: bool, exponent: i32, significand: u128) -> u128 {
+    let sign = if negative { SIGN } else { 0 };
+    let mut significand = significand;
+    let mut exponent = exponent;
+    if significand >> 113 != 0 {
+        significand >>= 1;
+        exponent += 1;
+    }
+    sign | ((((exponent + BIAS) as u128) & EXPONENT_MASK as u128) << EXPONENT_SHIFT)
+        | (significand & SIGNIFICAND_MASK)
+}
+
+/// `x / y` over the 113-bit significands: a restoring division of `a_sig << 113` by `b_sig`.
+pub fn div128_bits(a: u128, b: u128) -> u128 {
+    let a_class = classify(a);
+    let b_class = classify(b);
+    let negative = (a & SIGN != 0) ^ (b & SIGN != 0);
+    if a_class == FP_NAN || b_class == FP_NAN {
+        return nan_bits();
+    }
+    if a_class == FP_INFINITE {
+        if b_class == FP_INFINITE {
+            return nan_bits();
+        }
+        return infinity_bits(negative);
+    }
+    if b_class == FP_INFINITE {
+        return if negative { SIGN } else { 0 };
+    }
+    if b_class == FP_ZERO {
+        if a_class == FP_ZERO {
+            return nan_bits();
+        }
+        return infinity_bits(negative);
+    }
+    if a_class == FP_ZERO {
+        return if negative { SIGN } else { 0 };
+    }
+    let (a_exp, a_sig) = unpack(a);
+    let (b_exp, b_sig) = unpack(b);
+    let mut limbs = [0u64; 4];
+    add_shifted(&mut limbs, a_sig, 113);
+    let divisor = b_sig;
+    let mut remainder = 0u128;
+    let mut quotient = 0u128;
+    for index in (0..=225).rev() {
+        remainder = (remainder << 1) | u128::from(limb_bit(&limbs, index));
+        let subtract = remainder >= divisor;
+        if subtract {
+            remainder -= divisor;
+        }
+        // The quotient is built MSB-first; the first meaningful bit lands at index 113 and the
+        // accumulator keeps at most 114 bits.
+        if index <= 113 {
+            quotient = (quotient << 1) | u128::from(subtract);
+        }
+    }
+    // value = (quotient + remainder/divisor) * 2^(a_exp - b_exp - 113)
+    let significand = (quotient << 3) | u128::from(remainder != 0);
+    pack_binary128(negative, a_exp - b_exp - 113 - 3, significand)
+}
+
+/// The square root over the 113-bit significand: a restoring integer square root of `sig << 114`.
+pub fn sqrt128_bits(a: u128) -> u128 {
+    let class = classify(a);
+    if class == FP_NAN {
+        return nan_bits();
+    }
+    if a & SIGN != 0 {
+        if class == FP_ZERO {
+            return a;
+        }
+        return nan_bits();
+    }
+    if class == FP_INFINITE || class == FP_ZERO {
+        return a;
+    }
+    let (exponent, significand) = unpack(a);
+    let mut exponent = exponent;
+    let mut significand = significand;
+    if (exponent - 112) % 2 != 0 {
+        significand <<= 1;
+        exponent -= 1;
+    }
+    let mut radicand = [0u64; 4];
+    add_shifted(&mut radicand, significand, 114);
+    // Digit-by-digit square root over bit pairs; the running remainder stays below 2^115.
+    let mut root = 0u128;
+    let mut remainder = 0u128;
+    for pair in (0..=113u32).rev() {
+        let bits = (limb_bit(&radicand, 2 * pair + 1) << 1) | limb_bit(&radicand, 2 * pair);
+        remainder = (remainder << 2) | u128::from(bits);
+        let trial = (root << 2) | 1;
+        if remainder >= trial {
+            remainder -= trial;
+            root = (root << 1) | 1;
+        } else {
+            root <<= 1;
+        }
+    }
+    let significand = (root << 3) | u128::from(remainder != 0);
+    pack_binary128(false, (exponent - 112) / 2 - 57 - 3, significand)
+}
+
+fn infinity_bits(negative: bool) -> u128 {
+    let sign = if negative { SIGN } else { 0 };
+    sign | (EXPONENT_MASK as u128) << EXPONENT_SHIFT
+}
+
+fn limb_bit(limbs: &[u64; 4], index: u32) -> u64 {
+    let word = (index / 64) as usize;
+    let bit = index % 64;
+    limbs.get(word).map_or(0, |value| (value >> bit) & 1)
+}
+
+fn limbs_ge(a: &[u64; 4], b: &[u64; 4]) -> bool {
+    for index in (0..4).rev() {
+        if a[index] != b[index] {
+            return a[index] > b[index];
+        }
+    }
+    true
+}
+
+fn limbs_sub(a: &mut [u64; 4], b: &[u64; 4]) {
+    let mut borrow = 0u64;
+    for index in 0..4 {
+        let (difference, first) = a[index].overflowing_sub(b[index]);
+        let (difference, second) = difference.overflowing_sub(borrow);
+        a[index] = difference;
+        borrow = u64::from(first || second);
+    }
 }
 
 /// The exact-in-u128 add/sub engine for binary128 (113-bit significand + 3 guard bits).
@@ -468,12 +949,15 @@ fn add_shifted(limbs: &mut [u64; 4], value: u128, shift: u32) {
     let start = (shift / 64) as usize;
     let bit = shift % 64;
     let w0 = low << bit;
-    let w1 = if bit == 0 {
-        high
+    let (w1, w2) = if bit == 0 {
+        (high, 0)
     } else {
-        (high << bit) | (low >> (64 - bit))
+        let shifted = (high as u128) << bit;
+        (
+            (shifted as u64) | (low >> (64 - bit)),
+            (shifted >> 64) as u64,
+        )
     };
-    let w2 = if bit == 0 { 0 } else { high >> (64 - bit) };
     add_word(limbs, start, w0);
     add_word(limbs, start + 1, w1);
     add_word(limbs, start + 2, w2);
