@@ -8,7 +8,7 @@ fn truecolor_golden() {
     let palette = Palette::raven_violet();
     assert_eq!(
         sgr(Role::Accent, &palette, Depth::TrueColor),
-        "\x1b[38;2;157;124;255m"
+        "\x1b[38;2;179;136;255m"
     );
 }
 
@@ -17,7 +17,7 @@ fn ansi_256_colour_golden() {
     let palette = Palette::raven_violet();
     assert_eq!(
         sgr(Role::Accent, &palette, Depth::Ansi256),
-        "\x1b[38;5;141m"
+        "\x1b[38;5;183m"
     );
 }
 
@@ -27,9 +27,10 @@ fn ansi_16_colour_golden() {
     assert_eq!(sgr(Role::Error, &palette, Depth::Ansi16), "\x1b[91m");
     assert_eq!(sgr(Role::Success, &palette, Depth::Ansi16), "\x1b[92m");
     assert_eq!(sgr(Role::Warning, &palette, Depth::Ansi16), "\x1b[93m");
-    assert_eq!(sgr(Role::Info, &palette, Depth::Ansi16), "\x1b[94m");
+    assert_eq!(sgr(Role::Muted, &palette, Depth::Ansi16), "\x1b[94m");
     assert_eq!(sgr(Role::Accent, &palette, Depth::Ansi16), "\x1b[95m");
-    assert_eq!(sgr(Role::Muted, &palette, Depth::Ansi16), "\x1b[90m");
+    assert_eq!(sgr(Role::Info, &palette, Depth::Ansi16), "\x1b[96m");
+    assert_eq!(sgr(Role::Path, &palette, Depth::Ansi16), "\x1b[97m");
 }
 
 #[test]

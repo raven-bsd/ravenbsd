@@ -182,23 +182,28 @@ pub struct Palette {
 
 impl Palette {
     /// The Raven Violet default (dark).
+    ///
+    /// The nine named colours are the `raven-violet` table in
+    /// `architecture/19-modern-tools-and-theme.md` section 3.1. The extra semantic roles are
+    /// projected onto it: `path` uses the foreground, `number` the warning orange, `string` the
+    /// success green and `keyword` the alternate accent.
     #[must_use]
     pub fn raven_violet() -> Self {
         Self {
             name: "raven-violet".to_string(),
-            background: Rgb::new(0x17, 0x12, 0x24),
+            background: Rgb::new(0x28, 0x2a, 0x36),
             roles: [
-                Rgb::new(0x9d, 0x7c, 0xff),
-                Rgb::new(0x8b, 0x8b, 0x9e),
-                Rgb::new(0x6f, 0x5b, 0xd0),
-                Rgb::new(0x7b, 0xd8, 0x8f),
-                Rgb::new(0xf2, 0xc1, 0x4e),
-                Rgb::new(0xff, 0x6b, 0x81),
-                Rgb::new(0x62, 0xb6, 0xff),
-                Rgb::new(0xc4, 0xa7, 0xff),
-                Rgb::new(0xf5, 0xa9, 0x7f),
-                Rgb::new(0xa6, 0xe3, 0xa1),
-                Rgb::new(0xff, 0x9e, 0xcd),
+                Rgb::new(0xb3, 0x88, 0xff), // accent
+                Rgb::new(0x62, 0x72, 0xa4), // muted
+                Rgb::new(0x44, 0x47, 0x5a), // border
+                Rgb::new(0x50, 0xfa, 0x7b), // success
+                Rgb::new(0xff, 0xb8, 0x6c), // warning
+                Rgb::new(0xff, 0x55, 0x55), // error
+                Rgb::new(0x8b, 0xe9, 0xfd), // info
+                Rgb::new(0xf8, 0xf8, 0xf2), // path = foreground
+                Rgb::new(0xff, 0xb8, 0x6c), // number = warning
+                Rgb::new(0x50, 0xfa, 0x7b), // string = success
+                Rgb::new(0xff, 0x79, 0xc6), // keyword = accent_alt
             ],
         }
     }

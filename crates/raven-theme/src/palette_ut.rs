@@ -17,8 +17,29 @@ fn every_role_has_a_colour() {
 }
 
 #[test]
+fn raven_violet_matches_the_architecture_table() {
+    let palette = Palette::raven_violet();
+    let expected = [
+        (Role::Accent, Rgb::new(0xb3, 0x88, 0xff)),
+        (Role::Muted, Rgb::new(0x62, 0x72, 0xa4)),
+        (Role::Border, Rgb::new(0x44, 0x47, 0x5a)),
+        (Role::Success, Rgb::new(0x50, 0xfa, 0x7b)),
+        (Role::Warning, Rgb::new(0xff, 0xb8, 0x6c)),
+        (Role::Error, Rgb::new(0xff, 0x55, 0x55)),
+        (Role::Info, Rgb::new(0x8b, 0xe9, 0xfd)),
+        (Role::Path, Rgb::new(0xf8, 0xf8, 0xf2)),
+        (Role::Number, Rgb::new(0xff, 0xb8, 0x6c)),
+        (Role::String, Rgb::new(0x50, 0xfa, 0x7b)),
+        (Role::Keyword, Rgb::new(0xff, 0x79, 0xc6)),
+    ];
+    for (role, colour) in expected {
+        assert_eq!(palette.get(role), colour, "{role:?}");
+    }
+}
+
+#[test]
 fn hex_round_trips() {
-    let colour = Rgb::new(0x9d, 0x7c, 0xff);
+    let colour = Rgb::new(0xb3, 0x88, 0xff);
     assert_eq!(Rgb::parse_hex(&colour.to_hex()), Some(colour));
 }
 

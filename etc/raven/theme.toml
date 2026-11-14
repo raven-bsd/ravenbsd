@@ -1,6 +1,21 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# The default Raven Violet theme. `raven theme set` writes the user copy; base tools use the
-# compiled palette and never parse this file at runtime.
+# The default Raven Violet theme from architecture/19-modern-tools-and-theme.md section 3.1.
+# `raven theme set` writes the user copy; base tools use the compiled palette and never parse
+# this file at runtime.
+
+[theme]
 name = "raven-violet"
+variant = "dark"
+
+[colors]
+accent = "#b388ff"
+accent_alt = "#ff79c6"
+info = "#8be9fd"
+success = "#50fa7b"
+warning = "#ffb86c"
+error = "#ff5555"
+muted = "#6272a4"
+foreground = "#f8f8f2"
+border = "#44475a"

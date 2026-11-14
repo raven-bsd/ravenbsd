@@ -94,7 +94,7 @@ fn set(context: &mut Context<'_>, args: &[OsString]) -> Exit {
     };
     let value = value.to_string_lossy();
     let text = if let Some(palette) = Palette::builtin(&value) {
-        format!("name = \"{}\"\n", palette.name)
+        format!("[theme]\nname = \"{}\"\n", palette.name)
     } else {
         let path = Path::new(value.as_ref());
         match fs::read_to_string(path) {

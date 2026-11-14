@@ -77,6 +77,16 @@ terminal selects the 256-colour fallback.
 .Bl -tag -width Ds
 .It Pa /etc/raven/theme.toml
 System theme.
+The file has a
+.Ql [theme]
+table with
+.Va name ,
+.Va variant
+and an optional
+.Va background ,
+plus a
+.Ql [colors]
+table of role-to-hex values.
 .It Pa ~/.config/raven/theme.toml
 User theme; wins over the system file.
 .It Pa ~/.config/raven/theme.env

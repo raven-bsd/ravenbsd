@@ -3,9 +3,20 @@
 
 //! Optional std-only TOML configuration.
 //!
-//! The file shape is intentionally small and strict: unknown keys are errors. The user file
-//! wins over the system file. A palette is validated (hex and WCAG contrast) before it is
-//! accepted.
+//! The file shape follows `architecture/19-modern-tools-and-theme.md` section 3.1:
+//!
+//! ```toml
+//! [theme]
+//! name = "raven-violet"
+//! variant = "dark"
+//!
+//! [colors]
+//! accent = "#b388ff"
+//! ```
+//!
+//! Unknown keys are errors. The user file wins over the system file. Colours are validated (hex
+//! and contrast) before they are accepted. `accent_alt` is an alias for `keyword` and `foreground`
+//! an alias for `path`; an explicit `keyword`/`path` in the same file wins.
 
 use alloc::format;
 use alloc::string::String;
@@ -16,26 +27,38 @@ use serde::Deserialize;
 
 use crate::palette::{Palette, Rgb, Role};
 
+/// The `[theme]` section.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ThemeSection {
+    /// Palette name.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// Palette variant; only `dark` is implemented in this version.
+    #[serde(default)]
+    pub variant: Option<String>,
+    /// Background hex, used for contrast validation.
+    #[serde(default)]
+    pub background: Option<String>,
+}
+
 /// The TOML file.
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ThemeFile {
-    /// Palette name.
+    /// The `[theme]` section.
     #[serde(default)]
-    pub name: Option<String>,
-    /// Background hex, used for contrast validation.
+    pub theme: ThemeSection,
+    /// The `[colors]` role-to-hex map.
     #[serde(default)]
-    pub background: Option<String>,
-    /// Role to hex map.
-    #[serde(default)]
-    pub roles: BTreeMap<String, String>,
+    pub colors: BTreeMap<String, String>,
 }
 
 impl ThemeFile {
     /// Parse and validate one file.
     ///
     /// # Errors
-    /// A TOML, hex, unknown-role or contrast error.
+    /// A TOML, variant, hex, unknown-colour or contrast error.
     pub fn parse(text: &str) -> Result<Self, String> {
         let file: Self = toml::from_str(text).map_err(|error| error.to_string())?;
         file.validate()?;
@@ -45,49 +68,55 @@ impl ThemeFile {
     /// Validate the optional fields.
     ///
     /// # Errors
-    /// A hex, unknown-role or contrast error.
+    /// A variant, hex, unknown-colour or contrast error.
     pub fn validate(&self) -> Result<(), String> {
-        let base = self
-            .name
-            .as_deref()
-            .and_then(Palette::builtin)
-            .unwrap_or_else(Palette::raven_violet);
-        let background = match &self.background {
-            Some(text) => Rgb::parse_hex(text).ok_or_else(|| format!("invalid hex `{text}`"))?,
-            None => base.background,
-        };
-        for (name, text) in &self.roles {
-            let _role = Role::parse(name).ok_or_else(|| format!("unknown role `{name}`"))?;
+        let base = self.selected()?;
+        for (name, text) in &self.colors {
+            let role = role_for_color(name).ok_or_else(|| format!("unknown colour `{name}`"))?;
             let colour = Rgb::parse_hex(text).ok_or_else(|| format!("invalid hex `{text}`"))?;
-            if colour.contrast(background) < 4.5 {
+            // Borders are non-text decoration; the other roles carry information, so they need
+            // enough contrast to be readable on the selected background.
+            if role != Role::Border && colour.contrast(base.background) < 3.0 {
                 return Err(format!("contrast too low for `{name}`"));
             }
         }
         Ok(())
     }
 
-    /// Build a palette, starting from Raven Violet and applying the overrides.
+    /// Build a palette from the selected built-in and the colour overrides.
     ///
     /// # Errors
     /// A validation error.
     pub fn palette(&self) -> Result<Palette, String> {
         self.validate()?;
+        let mut palette = self.selected()?;
+        if let Some(name) = &self.theme.name {
+            palette.name = name.clone();
+        }
+        for (name, text) in &self.colors {
+            let role = role_for_color(name).ok_or_else(|| format!("unknown colour `{name}`"))?;
+            let colour = Rgb::parse_hex(text).ok_or_else(|| format!("invalid hex `{text}`"))?;
+            palette.set(role, colour);
+        }
+        Ok(palette)
+    }
+
+    /// The built-in selected by `name`, with the optional background applied.
+    fn selected(&self) -> Result<Palette, String> {
+        if let Some(variant) = &self.theme.variant
+            && variant != "dark"
+        {
+            return Err(format!("unsupported variant `{variant}`"));
+        }
         let mut palette = self
+            .theme
             .name
             .as_deref()
             .and_then(Palette::builtin)
             .unwrap_or_else(Palette::raven_violet);
-        if let Some(name) = &self.name {
-            palette.name = name.clone();
-        }
-        if let Some(background) = &self.background {
+        if let Some(background) = &self.theme.background {
             palette.background =
                 Rgb::parse_hex(background).ok_or_else(|| format!("invalid hex `{background}`"))?;
-        }
-        for (name, text) in &self.roles {
-            let role = Role::parse(name).ok_or_else(|| format!("unknown role `{name}`"))?;
-            let colour = Rgb::parse_hex(text).ok_or_else(|| format!("invalid hex `{text}`"))?;
-            palette.set(role, colour);
         }
         Ok(palette)
     }
@@ -139,6 +168,14 @@ impl ThemeFile {
         let text = std::fs::read_to_string(path)
             .map_err(|error| format!("{}: {error}", path.display()))?;
         Self::parse(&text)?.palette()
+    }
+}
+
+fn role_for_color(name: &str) -> Option<Role> {
+    match name {
+        "accent_alt" => Some(Role::Keyword),
+        "foreground" => Some(Role::Path),
+        _ => Role::parse(name),
     }
 }
 

@@ -387,7 +387,7 @@ fn theme_set_rejects_an_invalid_file_without_writing() {
         "raven-cli-invalid-theme-{}.toml",
         std::process::id()
     ));
-    std::fs::write(&path, "[roles]\naccent = \"violet\"\n").unwrap();
+    std::fs::write(&path, "[colors]\naccent = \"violet\"\n").unwrap();
     let (exit, stdout, stderr) = run(&["--json", "theme", "set", path.to_str().unwrap()]);
     let _ = std::fs::remove_file(&path);
     assert_eq!(exit, Exit::Failure);
