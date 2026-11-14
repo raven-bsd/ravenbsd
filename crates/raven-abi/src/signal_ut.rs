@@ -29,6 +29,13 @@ fn context_size_matches_c36() {
 }
 
 #[test]
+fn sigresend_is_the_agreed_number() {
+    assert_eq!(SIGRESEND, 0x84);
+    assert_eq!(SIG_SETUP, 0x80);
+    assert_eq!(SIGRETURN, 0x82);
+}
+
+#[test]
 fn fault_record_matches_c58() {
     assert_eq!(core::mem::size_of::<FaultRecord>(), 24);
     assert_eq!(core::mem::align_of::<FaultRecord>(), 8);

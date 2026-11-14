@@ -161,8 +161,12 @@ pub struct Thread {
     pub signal_flags: AtomicU32,
     /// Resolved user context area of the signal currently being handled.
     pub signal_active_ctx: AtomicU64,
-    /// True between kick delivery and `SIGRETURN`.
-    pub in_signal: AtomicBool,
+    /// Signal-handler nesting depth; zero outside a signal.
+    pub signal_depth: AtomicU32,
+    /// User signal mask restored by the last `SIGRESEND` (passed to the entry).
+    pub signal_mask: AtomicU64,
+    /// A `SIGRESEND` re-entry is waiting for the return-to-user path.
+    pub resend: AtomicBool,
 }
 
 // SAFETY: all interior mutability is accessed from scheduler critical sections (interrupts off)
@@ -266,7 +270,9 @@ impl Thread {
             signal_ctx_offset: AtomicU64::new(0),
             signal_flags: AtomicU32::new(0),
             signal_active_ctx: AtomicU64::new(0),
-            in_signal: AtomicBool::new(false),
+            signal_depth: AtomicU32::new(0),
+            signal_mask: AtomicU64::new(0),
+            resend: AtomicBool::new(false),
         });
         Ok(thread)
     }
@@ -360,7 +366,9 @@ impl Thread {
             signal_ctx_offset: AtomicU64::new(0),
             signal_flags: AtomicU32::new(0),
             signal_active_ctx: AtomicU64::new(0),
-            in_signal: AtomicBool::new(false),
+            signal_depth: AtomicU32::new(0),
+            signal_mask: AtomicU64::new(0),
+            resend: AtomicBool::new(false),
         })
     }
 
@@ -404,7 +412,9 @@ impl Thread {
             signal_ctx_offset: AtomicU64::new(0),
             signal_flags: AtomicU32::new(0),
             signal_active_ctx: AtomicU64::new(0),
-            in_signal: AtomicBool::new(false),
+            signal_depth: AtomicU32::new(0),
+            signal_mask: AtomicU64::new(0),
+            resend: AtomicBool::new(false),
         }))
     }
 }

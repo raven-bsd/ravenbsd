@@ -23,6 +23,15 @@ pub const SIG_SETUP: usize = 0x80;
 /// [`SIG_SETUP`].
 pub const SIGRETURN: usize = 0x82;
 
+/// `sigresend(sig: u32, info: usize, mask: u64) -> !`.
+///
+/// Atomically stores `mask` as the thread's user signal mask, sets the
+/// `CHECK` kick bit and returns through the signal entry path. The kernel does
+/// not interpret `sig` or `info`; libc's pending set owns the signal. Requires
+/// `SIG_SETUP` on the calling thread. Raw constant for the same reason as
+/// [`SIG_SETUP`].
+pub const SIGRESEND: usize = 0x84;
+
 /// `SIG_SETUP` flag: enter with the interrupted `sp` instead of a fresh `sp - 128` frame.
 pub const ENTRY_SP: u32 = 1;
 
