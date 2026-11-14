@@ -393,14 +393,10 @@ fn pton6(s0: &[u8]) -> Option<[u8; 16]> {
     if let Some(break_at) = brk {
         let count = i.checked_add(1)?.checked_sub(break_at)?;
         let dest = break_at.checked_add(7)?.checked_sub(i)?;
-        let mut offset = 0usize;
-        while offset < count {
-            let source = ip.get(break_at.checked_add(offset)?).copied().unwrap_or(0);
-            if let Some(slot) = ip.get_mut(dest.checked_add(offset)?) {
-                *slot = source;
-            }
-            offset = offset.saturating_add(1);
-        }
+        // The destination can overlap the source (for example `0::a:4e:3` moves groups one
+        // slot to the right). `copy_within` has memmove semantics; a forward element loop would
+        // overwrite the source and zero the last group (C70 FINDING 1).
+        ip.copy_within(break_at..break_at.checked_add(count)?, dest);
         for slot in ip.iter_mut().skip(break_at).take(7usize.saturating_sub(i)) {
             *slot = 0;
         }
