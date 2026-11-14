@@ -37,6 +37,7 @@ pub const ALL_CHECKS: &[&str] = &[
     "no-alloc",
     "layout",
     "size",
+    "abi-freeze",
 ];
 
 /// Checks parsed but not implemented by C34.
@@ -209,6 +210,9 @@ pub fn run_checks(root: &Path, checks: &[String]) -> Result<Vec<Violation>> {
     }
     if selected.contains(&"size") {
         crate::libc_lint_size::run(root, &files, &mut violations)?;
+    }
+    if selected.contains(&"abi-freeze") {
+        crate::libc_lint_abi::run(root, &mut violations)?;
     }
     violations.sort();
     Ok(violations)

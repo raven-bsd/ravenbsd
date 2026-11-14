@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# BSD-only reservation ledger (view of C36's abi/*.toml data).
+
+[errno]
+range = [1000, 1099]
+EDOOFUS = 1000
+EFTYPE = 1001
+EAUTH = 1002
+ENEEDAUTH = 1003
+EPROCLIM = 1004
+EBADRPC = 1005
+ERPCMISMATCH = 1006
+EPROGUNAVAIL = 1007
+EPROGMISMATCH = 1008
+EPROCUNAVAIL = 1009
+ENOTCAPABLE = 1010
+ECAPMODE = 1011
+EINTEGRITY = 1012
+EIPSEC = 1013
+ENOATTR = "ENODATA"
+
+[open]
+bits = [28, 29, 30]
+
+[af]
+min = 128
+AF_ROUTE = 128
+AF_LINK = 129
+
+[at]
+flags = ["AT_RESOLVE_BENEATH=0x10000"]
+
+[map]
+min = 0x10000000
+MAP_NOCORE = 0x10000000
+MAP_NOSYNC = 0x20000000
+MAP_PREFAULT_READ = 0x40000000
+
+[rlimit]
+range = [16, 21]
+RLIMIT_SBSIZE = 16
+RLIMIT_PIPEBUF = 21
+
+[ipproto]
+extra = ["IPPROTO_CARP=112", "IPPROTO_PFSYNC=240", "IPPROTO_DIVERT=258"]
+
+[tcp]
+alias = ["TCP_NOPUSH=TCP_CORK"]

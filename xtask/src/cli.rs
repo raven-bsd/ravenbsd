@@ -47,6 +47,7 @@ cargo xtask commands:
   qtest   [--case <name> | --all] [--arch <a>] [--no-build]
   provenance
   docs
+  libc-abi {gen|check|gaps|reconcile|release} [--root DIR]
   libc-lint [CHECK...] [--root DIR] [--json]
   libc-oracle ... (not implemented yet)
   libc-headers ... (not implemented yet)
