@@ -398,6 +398,18 @@ pub fn tzparse(name: &[u8], base: Option<&TzState>) -> Result<TzState, TzError> 
     state.chars.push(0);
     state.chars.extend_from_slice(dstname);
     state.chars.push(0);
+    // C70: the generated transition list must be strictly increasing; an extreme rule that
+    // steps backwards is a malformed TZ string, not a usable state.
+    if state
+        .ats
+        .windows(2)
+        .any(|window| match (window.first(), window.get(1)) {
+            (Some(left), Some(right)) => left >= right,
+            _ => false,
+        })
+    {
+        return Err(TzError::BadFormat);
+    }
     Ok(state)
 }
 

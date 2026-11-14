@@ -1,0 +1,107 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-fuzz"
+version = "0.1.0"
+description = "cargo-fuzz targets for ravenlibc; nightly tool only, outside the workspace."
+edition = "2024"
+license = "BSD-3-Clause"
+publish = false
+
+# Its own workspace: a stable `cargo build` or `make check` never needs nightly.
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+raven-libc-fuzz-replay = { path = "../replay" }
+
+[[bin]]
+name = "elf_dynamic"
+path = "fuzz_targets/elf_dynamic.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "getopt_args"
+path = "fuzz_targets/getopt_args.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "glob_pattern"
+path = "fuzz_targets/glob_pattern.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "inet_text"
+path = "fuzz_targets/inet_text.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "printf_format"
+path = "fuzz_targets/printf_format.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "regex_compile_exec"
+path = "fuzz_targets/regex_compile_exec.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "resolver_conf"
+path = "fuzz_targets/resolver_conf.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "resolver_message"
+path = "fuzz_targets/resolver_message.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "scanf_format"
+path = "fuzz_targets/scanf_format.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "strtod_input"
+path = "fuzz_targets/strtod_input.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "strtol_input"
+path = "fuzz_targets/strtol_input.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "time_format"
+path = "fuzz_targets/time_format.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "tz_parse"
+path = "fuzz_targets/tz_parse.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "utf8_decode"
+path = "fuzz_targets/utf8_decode.rs"
+test = false
+doc = false
+
+[profile.release]
+debug = 1

@@ -406,12 +406,11 @@ pub(crate) fn strtodg(
                 have_dig = true;
             }
             if have_dig {
-                let mut first = true;
                 loop {
-                    if !first && !c.is_ascii_digit() {
+                    // C70: a trailing decimal point has no fractional digit.
+                    if !c.is_ascii_digit() {
                         break;
                     }
-                    first = false;
                     nz = nz.wrapping_add(1);
                     let digit = u32::from(c.wrapping_sub(b'0'));
                     if digit != 0 {

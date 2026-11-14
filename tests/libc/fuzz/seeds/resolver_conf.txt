@@ -1,0 +1,16 @@
+# resolver_conf seeds
+# Files from netbsd:tests/lib/libc/net/hosts and resolv.conf (BSD-2, read)
+# and the C51 tests (BSD-3, read). Inputs only.
+\x00nameserver 192.0.2.1\n
+\x00nameserver 1.1.1.1\nnameserver 2.2.2.2\nnameserver 3.3.3.3\nnameserver 4.4.4.4\n
+\x01options edns0 use-vc rotate\n
+\x02hosts 127.0.0.1 localhost\n
+\x03tcp 6\nudp 17\n
+\x04root:x:0:0:root:/root:/bin/sh\n
+\x05wheel:x:0:root\n
+\x06root:*:0:0:0:0:0:0\n
+\x07hosts: files dns [NOTFOUND=return]\n
+\x08root:x:0:0:root:/root:/bin/sh\n
+\x09hosts: files\n
+\x00options ndots:99999999999\n
+\x00nameserver\nnameserver ::1\n

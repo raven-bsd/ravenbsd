@@ -1316,7 +1316,12 @@ fn p_bracket(p: &mut Parse) {
         }
     }
 
-    if let Some(ch) = singleton(&cs, p.loc, p.nc) {
+    // C70: a singleton alphabetic character under REG_ICASE would call `bothcases`, which
+    // re-enters `p_bracket` with the same character indefinitely. The set already carries the
+    // case flag, so emit it instead of collapsing it to `ordinary`.
+    if let Some(ch) = singleton(&cs, p.loc, p.nc)
+        && (p.g.cflags & REG_ICASE == 0 || othercase(p, ch) == ch)
+    {
         ordinary(p, ch);
         freeset(p, index, cs);
     } else {

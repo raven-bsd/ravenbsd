@@ -1,0 +1,17 @@
+# strtol_input seeds
+# Inputs from netbsd:tests/lib/libc/stdlib/t_strtol.c (BSD-2, read) and
+# openbsd:regress/lib/libc/getopt/getopt-test.c (ISC, read). Inputs only.
+\x0a\x00 42
+\x00\x00 0x2a
+\x10\x00 0x2a
+\x24\x00 zz
+\x01\x00 1
+\x25\x00 2
+\x0a\x01 -9223372036854775809
+\x00\x00 0b101
+\x08\x00 052
+\x0a\x00 +
+\x0a\x00   -
+\x10\x00 0X0
+\x10\x00 0x
+\x0a\x00 99999999999999999999999999

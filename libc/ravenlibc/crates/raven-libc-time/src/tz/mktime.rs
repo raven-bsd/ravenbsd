@@ -130,7 +130,9 @@ fn time2sub(zone: Zone<'_>, tmp: &mut Tm, do_norm_secs: bool) -> Result<i64, Err
     } else if yourtm.tm_year < EPOCH_YEAR as i32 - TM_YEAR_BASE {
         let saved = yourtm.tm_sec;
         yourtm.tm_sec = SECSPERMIN as i32 - 1;
-        saved - (SECSPERMIN as i32 - 1)
+        // C70: the donor relies on two's-complement wrap for an extreme tm_sec; keep that
+        // behaviour without a debug-build overflow panic.
+        saved.wrapping_sub(SECSPERMIN as i32 - 1)
     } else {
         let saved = yourtm.tm_sec;
         yourtm.tm_sec = 0;
