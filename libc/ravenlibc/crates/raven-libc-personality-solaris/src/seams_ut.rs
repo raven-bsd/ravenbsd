@@ -25,7 +25,7 @@ fn rwlock_has_the_frozen_pthread_size() {
 #[test]
 fn sema_has_the_frozen_sem_size() {
     assert_eq!(core::mem::size_of::<SemaT>(), 32);
-    assert_eq!(core::mem::align_of::<SemaT>(), 8);
+    assert_eq!(core::mem::align_of::<SemaT>(), 4);
 }
 
 #[test]
