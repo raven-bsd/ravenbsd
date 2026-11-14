@@ -1,0 +1,3613 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The 200-row build-the-world list of architecture/raven-libc/donor-map/16-size-testing-oracles.md
+# section 3.B.6.2. Names, build keys and `stresses` texts are transcribed from that table (RD-new:
+# names are lowercased, spaces and slashes become `-`). Versions, URLs, hashes and tarball names are
+# PLACEHOLDER until the owner freezes them (H-12); the tool never fetches anything (H-11).
+schema = 1
+freeze = "pending"
+weights = { optional = 0.5 }
+[subset]
+smoke5 = ["zlib", "lua", "sqlite", "pcre2", "toybox"]
+quick4 = ["zlib", "bzip2", "lua", "dash"]
+
+[[package]]
+n = 1
+name = "coreutils"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fts`, `stat`, `getopt_long`, locale, iconv, `strtod`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 2
+name = "bash"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fork`, signals, job control, `termios`, `glob`, `regex`, `strftime`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 3
+name = "dash"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`wait`, `pipe`, `sigaction`, `getcwd`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 4
+name = "zsh"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`pty`, `dlopen` modules, wide chars, `getpwnam`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 5
+name = "mksh"
+tier = 4
+build = "cf"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`sigsetjmp`, `$RANDOM`, locale"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 6
+name = "busybox"
+tier = 4
+build = "kc"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "300 applets: `utmp`, `syslog`, `mntent`, most of libc"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 7
+name = "toybox"
+tier = 4
+build = "kc"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`getmntent`, `sched_*`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 8
+name = "util-linux-subset"
+tier = 4
+build = "me"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`getopt`, `sysconf`, `err.h`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 9
+name = "procps-ng"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`/proc` parsing (absent: graceful failure)"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 10
+name = "psmisc"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fts`, `/proc`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 11
+name = "findutils"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fts`, `fnmatch`, `regex`, `*at` calls"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 12
+name = "diffutils"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`mmap`, `memcmp`, 64-bit offsets"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 13
+name = "sed"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`regex`, wide chars, `rename`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 14
+name = "gawk"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`printf`, `strtod`, `mktime`, `strftime`, `dlopen`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 15
+name = "onetrue-awk"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`printf %c %*d`, `popen`, `system`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 16
+name = "mawk"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`srand`, `fmod`, `strftime`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 17
+name = "grep"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "regex DFA, `mmap`, `iconv`, `wctype`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 18
+name = "patch"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`rename`, `utimensat`, `mkstemp`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 19
+name = "which"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`access`, `stat`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 20
+name = "make"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fork`, `posix_spawn`, jobserver pipe, `getloadavg`, `glob`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 21
+name = "tar"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fts`, acl/xattr probes, `utimensat`, `iconv`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 22
+name = "gzip"
+tier = 1
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`read/write`, `utimes`, `fstat`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 23
+name = "bzip2"
+tier = 1
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "plain stdio"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 24
+name = "xz-utils"
+tier = 1
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`pthread`, `mbrtowc`, `getopt_long`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 25
+name = "zlib"
+tier = 1
+build = "cf"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`off_t` width, `gz*` stdio"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 26
+name = "zstd"
+tier = 1
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`pthread`, `mmap`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 27
+name = "lz4"
+tier = 1
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`clock_gettime`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 28
+name = "brotli"
+tier = 1
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "pure compute"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 29
+name = "libarchive"
+tier = 1
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`iconv`, `statvfs`, `wchar`, `nl_langinfo`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 30
+name = "cpio"
+tier = 1
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fts`, `mknod`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 31
+name = "unzip"
+tier = 1
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`utime`, `localtime`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 32
+name = "zip"
+tier = 1
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`localtime`, `mktime`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 33
+name = "lzo"
+tier = 1
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "pure compute"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 34
+name = "snappy"
+tier = 1
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "C++ runtime"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 35
+name = "pigz"
+tier = 1
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`pthread`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 36
+name = "lzip"
+tier = 1
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "stdio"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 37
+name = "libdeflate"
+tier = 1
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "pure compute"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 38
+name = "file-libmagic"
+tier = 1
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`regex`, `mmap`, `strcasestr`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 39
+name = "libressl"
+tier = 1
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`getentropy`, `arc4random`, `explicit_bzero`, `timingsafe_bcmp`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 40
+name = "openssl"
+tier = 1
+build = "cf"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`dlopen` engines, `pthread`, 128-bit math, large symbol surface"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 41
+name = "mbedtls"
+tier = 1
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`gmtime_r`, `clock_gettime`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 42
+name = "wolfssl"
+tier = 1
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`pthread`, sockets"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 43
+name = "libsodium"
+tier = 1
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`getrandom`, `mlock`, `mprotect`, `explicit_bzero`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 44
+name = "nettle"
+tier = 1
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "pure compute"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 45
+name = "gmp"
+tier = 1
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`strtol`, inline asm"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 46
+name = "libgpg-error-libgcrypt"
+tier = 1
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`pthread`, locale"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 47
+name = "gnupg"
+tier = 1
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fork`, `exec`, `mlock`, `getpwnam`, terminal"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 48
+name = "curl"
+tier = 4
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`getaddrinfo`, `poll`, `select`, `setsockopt`; largest `HAVE_*` probe set"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 49
+name = "wget"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`getaddrinfo`, `iconv`, `regex`, `strptime`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 50
+name = "openssh"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`getpwnam`, `pty`, `utmp`, `setuid`, `getifaddrs`, `closefrom`, `res_*`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 51
+name = "dropbear"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`pty`, `crypt`, `fork`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 52
+name = "openntpd"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`adjtime`, `clock_settime`, `getifaddrs`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 53
+name = "unbound"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["libevent"]
+optional = false
+stresses = "`getaddrinfo`, poll loops, `pthread`, libevent"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 54
+name = "nsd"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`sendmmsg`, `recvmmsg`, `setrlimit`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 55
+name = "dnsmasq"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "raw sockets, `ioctl`, `getifaddrs`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 56
+name = "bind9"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`pthread`, `dlopen`, `getaddrinfo`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 57
+name = "libevent"
+tier = 4
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`epoll/poll/select`, `pthread`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 58
+name = "libuv"
+tier = 4
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`epoll`, `eventfd`, `uv_fs_*`, signals"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 59
+name = "libev"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`epoll`, `inotify`/`signalfd` absence handling"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 60
+name = "c-ares"
+tier = 4
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "resolver, `getaddrinfo`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 61
+name = "nghttp2"
+tier = 4
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "sockets"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 62
+name = "libpcap"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`ioctl`, `ifaddrs`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 63
+name = "tcpdump"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`inet_ntop`, `strftime`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 64
+name = "iperf3"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`pthread`, `clock_gettime`, `setsockopt`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 65
+name = "nmap"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "raw sockets, `getaddrinfo`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 66
+name = "socat"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`openpty`, `fork`, `select`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 67
+name = "netcat-openbsd"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`getaddrinfo`, `poll`, unix sockets"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 68
+name = "lighttpd"
+tier = 4
+build = "me"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`sendfile`, `epoll`, `mmap`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 69
+name = "nginx"
+tier = 4
+build = "cf"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`epoll`, `sendfile`, `fork`, `setrlimit`, `crypt_r`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 70
+name = "haproxy"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`splice`, `epoll`, `setrlimit`, `dlopen`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 71
+name = "mosquitto"
+tier = 4
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`pthread`, `getaddrinfo`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 72
+name = "ldns"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "resolver"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 73
+name = "rsync"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "xattr/acl probes, `iconv`, `getaddrinfo`, `utimensat`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 74
+name = "python3"
+tier = 2
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "hundreds of probes: `ctypes`, `dlopen`, `locale`, `socket`, `fcntl`, `posix_spawn`, `getrandom`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 75
+name = "perl"
+tier = 2
+build = "cf"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`Configure` probes about 1000 symbols; locale, `crypt`, `getpw*`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 76
+name = "lua"
+tier = 2
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`strtod`, `setlocale`, `popen`, `tmpnam`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 77
+name = "luajit"
+tier = 2
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "executable `mmap`, `dlopen`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 78
+name = "ruby"
+tier = 2
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fork`, `pthread`, `setjmp` heavy, `dlopen`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 79
+name = "tcl"
+tier = 2
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fcntl`, `select`, `strtod`, `dlopen`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 80
+name = "php-cli"
+tier = 2
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`getaddrinfo`, `crypt`, `iconv`, `dlopen`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 81
+name = "go"
+tier = 5
+build = "go"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "raw syscalls: tests ABI assumptions"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 82
+name = "rustc-cargo"
+tier = 5
+build = "cf"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`libc` crate expectations: layouts, constants, `pthread`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 83
+name = "llvm"
+tier = 2
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "C++ runtime, `mmap`, `pthread`, `dl_iterate_phdr`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 84
+name = "gcc"
+tier = 2
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fork`, `posix_spawn`, `mkstemp`, `getrlimit`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 85
+name = "binutils"
+tier = 2
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`mmap`, `iconv`, libiberty probes"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 86
+name = "cmake"
+tier = 2
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`posix_spawn`, libuv, libarchive, `getpwuid`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 87
+name = "ninja"
+tier = 2
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`posix_spawn`, `pselect`, `getloadavg`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 88
+name = "meson"
+tier = 2
+build = "py"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["python3", "perl"]
+optional = false
+stresses = "Python surface"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 89
+name = "autoconf"
+tier = 2
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`m4`, `sh`, `expr`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 90
+name = "automake"
+tier = 2
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["autoconf", "perl"]
+optional = false
+stresses = "perl"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 91
+name = "libtool"
+tier = 2
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`ar`, `dlopen`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 92
+name = "m4"
+tier = 2
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`popen`, `tmpfile`, `regex`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 93
+name = "bison"
+tier = 2
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`iconv`, `getopt_long`, locale"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 94
+name = "flex"
+tier = 2
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["m4"]
+optional = false
+stresses = "`getopt_long`, m4"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 95
+name = "pkgconf"
+tier = 2
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`dirent`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 96
+name = "nasm"
+tier = 2
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`strtod`, `long double`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 97
+name = "yasm"
+tier = 2
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "stdio"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 98
+name = "ccache"
+tier = 2
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fork`, `flock`, `rename`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 99
+name = "sqlite"
+tier = 2
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fcntl` locks, `mmap`, `fsync`, `pread/pwrite`, `dlopen`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 100
+name = "pcre2"
+tier = 2
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`malloc`, JIT `mmap`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 101
+name = "readline"
+tier = 3
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`termios`, termcap, signals, locale"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 102
+name = "libedit"
+tier = 3
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`termios`, `wchar`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 103
+name = "ncurses"
+tier = 3
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "terminfo, `ioctl TIOCGWINSZ`, `mbrtowc`, `setlocale`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 104
+name = "libxml2"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`iconv`, `strtod`, `mmap`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 105
+name = "libxslt"
+tier = 3
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["libxml2"]
+optional = false
+stresses = "libxml2"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 106
+name = "expat"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`getrandom`, `arc4random`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 107
+name = "jansson"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`strtod`, `%.17g` round trip"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 108
+name = "json-c"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`strtod`, `printf`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 109
+name = "libyaml"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "stdio"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 110
+name = "libffi"
+tier = 3
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "assembly closures, executable `mmap`, `mprotect`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 111
+name = "libiconv"
+tier = 3
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "built over ravenlibc `iconv` (conflict test)"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 112
+name = "gettext"
+tier = 3
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`catgets`/`dcgettext`, `nl_langinfo`, `iconv`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 113
+name = "glib"
+tier = 3
+build = "me"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`pthread`, `getpwuid_r`, `posix_spawn`, `mmap`, `dlopen`, `strtod_l`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 114
+name = "libpng"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`setjmp`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 115
+name = "libjpeg-turbo"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`setjmp`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 116
+name = "freetype"
+tier = 3
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`mmap`, `setjmp`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 117
+name = "harfbuzz"
+tier = 3
+build = "me"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "C++ runtime"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 118
+name = "zlib-ng"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`posix_memalign`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 119
+name = "icu"
+tier = 3
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`dlopen`, locale, `nl_langinfo`, big data tables (relocation stress)"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 120
+name = "boost-subset"
+tier = 3
+build = "b2"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "C++ library on ravenlibc: `pthread`, `getaddrinfo`, `epoll`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 121
+name = "protobuf"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "C++ runtime, `mmap`, `pthread`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 122
+name = "abseil"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`clock_gettime`, `getauxval`, `backtrace`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 123
+name = "fmt"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`strtod`, locale"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 124
+name = "spdlog"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`localtime_r`, `fwrite`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 125
+name = "googletest"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fork` (death tests), `regex`, signals"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 126
+name = "catch2"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`sigaltstack`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 127
+name = "google-benchmark"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`clock_gettime`, `sched_getaffinity`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 128
+name = "jemalloc"
+tier = 3
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "replaces malloc: `mmap`, `madvise`, `dl_iterate_phdr`, TLS model"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 129
+name = "mimalloc"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`mmap`, `madvise`, `pthread_key`, TLS"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 130
+name = "libunwind"
+tier = 3
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`dl_iterate_phdr`, `sigaction`, `ucontext`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 131
+name = "libbacktrace"
+tier = 3
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`mmap`, `dl_iterate_phdr`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 132
+name = "libcxx"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`pthread`, locale, `wcsrtombs`, `__cxa_atexit`, TLS destructors"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 133
+name = "compiler-rt"
+tier = 3
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`dl_iterate_phdr`, `sigaction`, interposition"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 134
+name = "vim"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`termios`, `setlocale`, `mbrtowc`, `select`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 135
+name = "nano"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["ncurses"]
+optional = false
+stresses = "ncurses, `wchar`, `regex`, `glob`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 136
+name = "tmux"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["libevent", "ncurses"]
+optional = false
+stresses = "`openpty`, `fork`, libevent, fd passing, `wcwidth`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 137
+name = "screen"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`pty`, `utmp`, `termios`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 138
+name = "htop"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["ncurses"]
+optional = false
+stresses = "`/proc`, ncurses, `getpwuid`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 139
+name = "less"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`termios`, `regex`, `fseeko`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 140
+name = "mandoc"
+tier = 4
+build = "cf"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fts`, `regex`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 141
+name = "git"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fork`, `exec`, `pipe`, `mmap`, `iconv`, `pthread`, `regex`, `fnmatch`, `utimensat`, `poll`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 142
+name = "mercurial"
+tier = 4
+build = "py"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["python3"]
+optional = false
+stresses = "Python surface"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 143
+name = "fossil"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["sqlite"]
+optional = false
+stresses = "SQLite, `fork`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 144
+name = "jq"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`strtod`, `%.17g`, regex"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 145
+name = "ripgrep"
+tier = 5
+build = "ca"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "Rust `std` + `libc` crate: `mmap`, `fstat`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 146
+name = "fd"
+tier = 5
+build = "ca"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`readdir`, `getpwuid`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 147
+name = "bat"
+tier = 5
+build = "ca"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`iconv`, libgit2"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 148
+name = "tree"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`lstat`, `getpwuid`, locale"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 149
+name = "bc-dc"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["readline"]
+optional = false
+stresses = "`strtod`, `printf`, readline"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 150
+name = "units"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["readline"]
+optional = false
+stresses = "readline, locale"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 151
+name = "texinfo"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["perl", "ncurses"]
+optional = false
+stresses = "perl, `iconv`, ncurses"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 152
+name = "groff"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "C++ runtime, locale, `popen`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 153
+name = "postgresql"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`shm_open`, `mmap`, semaphores, `fork`, `fsync`, `strcoll`/`newlocale`/`towlower`, `getaddrinfo`, `dlopen`, `sigsetjmp`, `posix_fallocate`, `pread/pwrite`, `readv`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 154
+name = "mariadb"
+tier = 4
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`pthread` heavy, `mmap`, `fdatasync`, `setrlimit`, TLS"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 155
+name = "redis"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fork` + COW, `epoll`, `clock_gettime`, `backtrace`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 156
+name = "memcached"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "libevent, `pthread`, `setrlimit`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 157
+name = "lmdb"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`mmap`, `fcntl` locks, `msync`, robust mutexes"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 158
+name = "leveldb"
+tier = 4
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "C++ runtime, `mmap`, `flock`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 159
+name = "rocksdb"
+tier = 4
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "same, huge C++ surface"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 160
+name = "etcd"
+tier = 4
+build = "go"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "Go runtime: Linux-personality check"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 161
+name = "postfix"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fork`, unix sockets, `setuid`, `getpwnam`, `syslog`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 162
+name = "dovecot"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`mmap`, `flock`, `iconv`, `dlopen`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 163
+name = "exim"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`getaddrinfo`, `crypt`, `dlopen`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 164
+name = "openldap"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`getaddrinfo`, `pthread`, `regex`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 165
+name = "sudo"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`getpwnam`, `setuid`, `ttyname`, `closefrom`, `getgrouplist`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 166
+name = "opendoas"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`setuid`, `getgrouplist`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 167
+name = "cronie"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`setuid`, `getpwnam`, `strftime`, `syslog`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 168
+name = "rsyslog"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`syslog`, sockets, `strftime`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 169
+name = "logrotate"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fts`, `rename`, `regex`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 170
+name = "smartmontools"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`ioctl`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 171
+name = "e2fsprogs"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`ioctl`, `mmap`, `pthread`, 64-bit `off_t`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 172
+name = "dosfstools"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`mmap`, `lseek`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 173
+name = "mtools"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`iconv`, `fstat`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 174
+name = "xfsprogs"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "64-bit I/O (mel lane)"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 175
+name = "fio"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`pthread`, `mmap`, `sched_setaffinity`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 176
+name = "lmbench"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "micro-benchmarks of `fork`, `exec`, signals"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 177
+name = "stress-ng-subset"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "breadth of syscalls and libc calls"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 178
+name = "sysbench"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`pthread`, `mmap`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 179
+name = "ksh"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`sigsetjmp`, `fork`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 180
+name = "uutils-coreutils"
+tier = 5
+build = "ca"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "Rust `std`; 109 utilities"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 181
+name = "brush"
+tier = 5
+build = "ca"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`fork`, `exec`, `termios`, process groups"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 182
+name = "nushell"
+tier = 5
+build = "ca"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = true
+stresses = "`std`, `libc` crate surface"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 183
+name = "starship"
+tier = 5
+build = "ca"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = true
+stresses = "`getpwuid`, `gethostname`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 184
+name = "helix"
+tier = 5
+build = "ca"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = true
+stresses = "`termios`, `poll`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 185
+name = "neovim"
+tier = 5
+build = "cm"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["libuv"]
+optional = false
+stresses = "libuv, `dlopen`, `iconv`, `pty`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 186
+name = "parallel"
+tier = 4
+build = "cf"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["perl"]
+optional = false
+stresses = "perl, `fork` heavy"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 187
+name = "expect"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["tcl"]
+optional = false
+stresses = "`pty`, `select`, tcl"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 188
+name = "openvpn"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = true
+stresses = "`tun` ioctl, `poll`, `dlopen`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 189
+name = "wireguard-tools"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "netlink absence, sockets"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 190
+name = "iproute2"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "netlink (Linux personality)"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 191
+name = "ethtool"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`ioctl SIOCETHTOOL`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 192
+name = "chrony"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`adjtimex`, `clock_*`, `getaddrinfo`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 193
+name = "opensmtpd"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "imsg, `fork`, `getpwnam`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 194
+name = "tinyproxy"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "sockets, `pthread`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 195
+name = "squid"
+tier = 4
+build = "ac"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = true
+stresses = "C++ runtime, `epoll`, huge libc surface"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 196
+name = "libc-test"
+tier = 1
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "tests the libc itself"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 197
+name = "apk-tools"
+tier = 4
+build = "me"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = ["zlib", "openssl", "lua"]
+optional = false
+stresses = "`fts`, libfetch, OpenSSL, zlib, Lua"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 198
+name = "abuild"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "shell, `fakeroot`-like preload (interposition test)"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 199
+name = "bats-core"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "shell, `fork`, `mktemp`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
+
+[[package]]
+n = 200
+name = "openrsync"
+tier = 4
+build = "mk"
+version = "PLACEHOLDER"
+url = "PLACEHOLDER"
+sha256 = "PLACEHOLDER"
+tarball = "PLACEHOLDER"
+needs = []
+optional = false
+stresses = "`getaddrinfo`, `poll`, `fts`"
+configure = []
+flag_notes = {}
+make_args = []
+jobs_make = 4
+tests = "none"
