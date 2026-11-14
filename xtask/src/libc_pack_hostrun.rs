@@ -27,16 +27,20 @@ pub(crate) fn run(root: &Path, arch: &Arch, out: &Path) -> Result<()> {
     }
     let dir = out.join("hostrun");
     std::fs::create_dir_all(&dir)?;
-    let programs = [
-        "h1_string",
-        "h2_stdlib",
-        "h3_format",
-        "h4_ctype",
-        "h5_time",
-        "h6_math",
-    ];
+    let mut programs: Vec<String> =
+        std::fs::read_dir(root.join("libc/ravenlibc/crates/raven-libc/hostrun"))
+            .context("cannot read the hostrun directory")?
+            .flatten()
+            .filter_map(|entry| {
+                let name = entry.file_name().to_string_lossy().to_string();
+                (name.starts_with('h') && name.ends_with(".rs"))
+                    .then(|| name.trim_end_matches(".rs").to_string())
+            })
+            .collect();
+    programs.sort();
     let mut ran = 0usize;
     for name in programs {
+        let name = name.as_str();
         let source = root
             .join("libc/ravenlibc/crates/raven-libc/hostrun")
             .join(format!("{name}.rs"));

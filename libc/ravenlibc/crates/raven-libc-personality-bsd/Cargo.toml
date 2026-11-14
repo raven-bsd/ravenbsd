@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-libc-personality-bsd"
+version = "0.1.0"
+description = "ravenlibc BSD personality: kqueue, sysctl, closefrom, setproctitle, getmntinfo, pledge glue and the pthread_np aliases."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+std = []
+
+[dependencies]
+raven-libc-abi = { path = "../raven-libc-abi", default-features = false }
+raven-libc-sys = { path = "../raven-libc-sys", default-features = false }
+raven-libc-platform = { path = "../raven-libc-platform", default-features = false }
+raven-libc-pledge = { path = "../raven-libc-pledge", default-features = false }
+raven-libc-proc = { path = "../raven-libc-proc", default-features = false }

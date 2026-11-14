@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Seed for tests/qtest/cases/libc-start-env.toml (B3 of donor-map/16 3.A.9).
+# C73 copies this file into tests/qtest/cases/. Reading the environment at start and the
+# spawn path need:
+#   # needs PG-1 PG-50 PG-49
+#   # cargo xtask qtest --case libc-start-env --arch x86_64
+name = "libc-start-env"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+# B3: 1 and 4096 environment variables; the start cost must be linear, not quadratic.
+[[expect]]
+regex = '^libc-start-env: one=\d+ many=\d+$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

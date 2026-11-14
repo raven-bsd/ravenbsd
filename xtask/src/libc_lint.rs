@@ -36,6 +36,7 @@ pub const ALL_CHECKS: &[&str] = &[
     "no-cc",
     "no-alloc",
     "layout",
+    "size",
 ];
 
 /// Checks parsed but not implemented by C34.
@@ -53,7 +54,13 @@ pub const STUB_CHECKS: &[&str] = &[
     "owns",
 ];
 
-fn error(check: &str, key: &str, path: &str, line: usize, message: impl Into<String>) -> Violation {
+pub(crate) fn error(
+    check: &str,
+    key: &str,
+    path: &str,
+    line: usize,
+    message: impl Into<String>,
+) -> Violation {
     Violation {
         check: check.to_string(),
         key: key.to_string(),
@@ -199,6 +206,9 @@ pub fn run_checks(root: &Path, checks: &[String]) -> Result<Vec<Violation>> {
     }
     if selected.contains(&"layout") {
         check_layout(root, &crates, &tree, &mut violations)?;
+    }
+    if selected.contains(&"size") {
+        crate::libc_lint_size::run(root, &files, &mut violations)?;
     }
     violations.sort();
     Ok(violations)

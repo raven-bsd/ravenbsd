@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Per-test flags copied by hand from picolibc's meson.build (C71 4.5). Each row names the line
+# it comes from. gen-suite never runs meson.
+
+# meson.build line 109: test_extra_src = { 'test-ilp32': ['test-ilp32-sub.c'] }
+[[override]]
+suite = "picolibc"
+program = "test-ilp32"
+sources = ["test-ilp32-sub.c"]
+
+# meson.build line 113: 'test-argv': ['-DEXPECT_PROG="test-argv"']
+[[override]]
+suite = "picolibc"
+program = "test-argv"
+cflags = ['-DEXPECT_PROG="test-argv"']
+args = ["hello world"]
+
+# meson.build line 120: oslib linux adds -DTESTS_LSEEK64 for test-lseek-overflow
+[[override]]
+suite = "picolibc"
+program = "test-lseek-overflow"
+cflags = ["-DTESTS_LSEEK64"]
+
+# meson.build line 124: other OSes add -DTESTS_LSEEK64_SKIP for test-lseek64-linux
+[[override]]
+suite = "picolibc"
+program = "test-lseek64-linux"
+cflags = ["-DTESTS_LSEEK64_SKIP"]
+
+# meson.build line 114: 'test-thread-safety': test_thread_safety_cflags (cc -Wthread-safety)
+[[override]]
+suite = "picolibc"
+program = "test-thread-safety"
+cflags = ["-Wthread-safety"]
+
+# meson.build line 52: tests_should_fail includes test-except and test-hosted-exit-fail
+[[override]]
+suite = "picolibc"
+program = "test-except"
+expect_exit = 1
+
+# meson.build line 52: test-hosted-exit-fail is expected to fail
+[[override]]
+suite = "picolibc"
+program = "test-hosted-exit-fail"
+expect_exit = 1

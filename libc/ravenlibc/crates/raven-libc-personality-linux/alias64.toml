@@ -1,0 +1,145 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The `*64` alias seed of ticket C66 5.F. `status`:
+#   active   - the shell emits one `.set` alias, both names resolve to the same address
+#   existing - the 64-bit spelling is already a separate C60 export (no C66 alias)
+#   pending  - the base symbol does not exist on this branch; no export
+
+[[alias]]
+alias = "stat64"
+base = "stat"
+status = "active"
+header = "sys/stat.h"
+
+[[alias]]
+alias = "fstat64"
+base = "fstat"
+status = "active"
+header = "sys/stat.h"
+
+[[alias]]
+alias = "lstat64"
+base = "lstat"
+status = "active"
+header = "sys/stat.h"
+
+[[alias]]
+alias = "fstatat64"
+base = "fstatat"
+status = "pending"
+header = "sys/stat.h"
+
+[[alias]]
+alias = "statfs64"
+base = "statfs"
+status = "pending"
+header = "sys/statfs.h"
+
+[[alias]]
+alias = "fstatfs64"
+base = "fstatfs"
+status = "pending"
+header = "sys/statfs.h"
+
+[[alias]]
+alias = "open64"
+base = "open"
+status = "existing"
+header = "fcntl.h"
+
+[[alias]]
+alias = "openat64"
+base = "openat"
+status = "existing"
+header = "fcntl.h"
+
+[[alias]]
+alias = "creat64"
+base = "creat"
+status = "existing"
+header = "fcntl.h"
+
+[[alias]]
+alias = "truncate64"
+base = "truncate"
+status = "pending"
+header = "unistd.h"
+
+[[alias]]
+alias = "ftruncate64"
+base = "ftruncate"
+status = "pending"
+header = "unistd.h"
+
+[[alias]]
+alias = "pread64"
+base = "pread"
+status = "active"
+header = "unistd.h"
+
+[[alias]]
+alias = "pwrite64"
+base = "pwrite"
+status = "active"
+header = "unistd.h"
+
+[[alias]]
+alias = "lseek64"
+base = "lseek"
+status = "active"
+header = "unistd.h"
+
+[[alias]]
+alias = "mmap64"
+base = "mmap"
+status = "active"
+header = "sys/mman.h"
+
+[[alias]]
+alias = "sendfile64"
+base = "sendfile"
+status = "active"
+header = "sys/sendfile.h"
+
+[[alias]]
+alias = "lockf64"
+base = "lockf"
+status = "pending"
+header = "unistd.h"
+
+[[alias]]
+alias = "posix_fadvise64"
+base = "posix_fadvise"
+status = "pending"
+header = "fcntl.h"
+
+[[alias]]
+alias = "posix_fallocate64"
+base = "posix_fallocate"
+status = "pending"
+header = "fcntl.h"
+
+[[alias]]
+alias = "fopen64"
+base = "fopen"
+status = "pending"
+header = "stdio.h"
+
+[[alias]]
+alias = "fseeko64"
+base = "fseeko"
+status = "pending"
+header = "stdio.h"
+
+[[alias]]
+alias = "readdir64"
+base = "readdir"
+status = "active"
+header = "dirent.h"
+
+[[alias]]
+alias = "getdents64"
+base = "getdents"
+status = "pending"
+header = "dirent.h"

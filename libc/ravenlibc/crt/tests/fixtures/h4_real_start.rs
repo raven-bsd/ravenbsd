@@ -2,14 +2,20 @@
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //! H4: the real `__raven_libc_start` of the shell with a static `crt1.o`.
 //!
-//! The fixture owns the symbols C61 cannot define inside the shell member: the environment
-//! pointer, the program-name aliases, the canary word, the atexit registry instance and the
-//! main-thread initialisation that C64 will replace. `main` prints `H4 OK` through the Linux
-//! write syscall and leaves through `exit_group`; the libc `_exit` would issue a Raven syscall.
+//! The fixture owns the symbols the shell does not define: the environment pointer, the
+//! program-name aliases and the main-thread initialisation that C64 will replace. The canary
+//! word and the exit registry are the shell's now (C61 integration). `main` prints `H4 OK`
+//! through the Linux write syscall and leaves through `exit_group`; the libc `_exit` would
+//! issue a Raven syscall.
 
 #![no_std]
 
-use core::ffi::{c_int, c_void};
+use core::ffi::c_int;
+
+// The shell's guard word (C61 integration: `libc.a` provides it now).
+unsafe extern "C" {
+    static __stack_chk_guard: usize;
+}
 
 #[unsafe(no_mangle)]
 pub static mut environ: *mut *mut u8 = core::ptr::null_mut();
@@ -21,18 +27,6 @@ pub static mut __progname: *const u8 = core::ptr::null();
 pub static mut program_invocation_name: *const u8 = core::ptr::null();
 #[unsafe(no_mangle)]
 pub static mut program_invocation_short_name: *const u8 = core::ptr::null();
-#[unsafe(no_mangle)]
-pub static mut __stack_chk_guard: usize = 0;
-
-/// The C41/C64 registry instance is a later ticket; the start path only registers.
-#[unsafe(no_mangle)]
-pub extern "C" fn __cxa_atexit(
-    _func: Option<extern "C" fn(*mut c_void)>,
-    _arg: *mut c_void,
-    _dso: *mut c_void,
-) -> c_int {
-    0
-}
 
 /// C64 replaces this with the real main-thread initialisation.
 #[unsafe(no_mangle)]

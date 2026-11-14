@@ -26,6 +26,7 @@ mod libc_link;
 mod libc_lint;
 mod libc_lint_data;
 mod libc_lint_scan;
+mod libc_lint_size;
 #[cfg(test)]
 mod libc_lint_testutil;
 mod libc_oracle;
@@ -36,6 +37,7 @@ mod libc_pack_probe;
 mod libc_pack_stubs;
 mod libc_pack_tools;
 mod libc_size;
+mod libc_stubs;
 mod libc_world;
 mod pi;
 mod process;

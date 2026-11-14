@@ -1,0 +1,30 @@
+# Refused donor files; O-B6 default: excluded.
+alloca/alloca.c	no licence class in the first 80 lines
+arch/alpha/divremtest/divremtest.c	reject phrase `All advertising materials mentioning features`
+arch/alpha/divremtest/mkcases.c	reject phrase `All advertising materials mentioning features`
+arch/alpha/divremtest/mktestcases.c	reject phrase `All advertising materials mentioning features`
+elf_aux_info/elf_aux_info.c	no licence class in the first 80 lines
+freeaddrinfo/freeaddrinfo.c	no licence class in the first 80 lines
+getexecpath/getexecpath.c	no licence class in the first 80 lines
+hsearch/hsearchtest.c	reject phrase `All advertising materials mentioning features`
+ieeefp/except/except.c	no licence class in the first 80 lines
+ieeefp/inf/inf.c	no licence class in the first 80 lines
+ieeefp/infinity/infinity.c	no licence class in the first 80 lines
+longjmp/longjmp.c	no licence class in the first 80 lines
+malloc/malloc_ulimit1/malloc_ulimit1.c	no licence class in the first 80 lines
+malloc/malloc_ulimit2/malloc_ulimit2.c	no licence class in the first 80 lines
+qsort/antiqsort.c	no licence class in the first 80 lines
+regex/debug.c	no licence class in the first 80 lines
+regex/main.c	no licence class in the first 80 lines
+regex/split.c	no licence class in the first 80 lines
+regex/t_exhaust.c	reject phrase `All advertising materials mentioning features`
+setjmp-fpu/_setjmp.c	no licence class in the first 80 lines
+setjmp-fpu/fpu.c	no licence class in the first 80 lines
+setjmp-fpu/setjmp-fpu.c	no licence class in the first 80 lines
+setjmp-fpu/setjmp.c	no licence class in the first 80 lines
+setjmp-fpu/sigsetjmp.c	no licence class in the first 80 lines
+setjmp-signal/setjmp-signal.c	no licence class in the first 80 lines
+setjmp/jmptest.c	reject phrase `All advertising materials mentioning features`
+sys/t_pipe2.c	reject phrase `All advertising materials mentioning features`
+sys/t_recvmmsg.c	reject phrase `All advertising materials mentioning features`
+sys/t_socketpair.c	reject phrase `All advertising materials mentioning features`

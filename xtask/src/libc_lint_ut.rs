@@ -395,6 +395,7 @@ fn stub_checks_are_listed() {
     for check in ["deps", "one-symbol", "sections", "no-fmt", "exports"] {
         assert!(STUB_CHECKS.contains(&check));
     }
+    assert!(!STUB_CHECKS.contains(&"size"));
 }
 
 #[test]

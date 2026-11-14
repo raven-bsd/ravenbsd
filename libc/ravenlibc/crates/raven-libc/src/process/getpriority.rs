@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+//! `getpriority(2)`.
+use core::ffi::c_int;
+use raven_libc_proc::backend::ProcBackend;
+
+/// Read one priority through the backend.
+#[unsafe(no_mangle)]
+pub extern "C" fn getpriority(which: c_int, who: c_int) -> c_int {
+    let Ok(which) = u32::try_from(which) else {
+        return crate::ffi::ret::int(Err(crate::ffi::map_proc::invalid()));
+    };
+    let result = crate::ffi::procbackend::backend().prio(which, who, None);
+    crate::ffi::ret::int(result.map_err(crate::ffi::map_proc::error))
+}

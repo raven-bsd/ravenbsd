@@ -23,6 +23,7 @@ usage:
 struct Planned {
     spec: CommandSpec,
     label: Option<String>,
+    passthrough: bool,
 }
 
 /// Run the command.
@@ -50,6 +51,9 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
         if code == 77 {
             return Ok(77);
         }
+        if step.passthrough && code != 0 {
+            return Ok(u8::try_from(code).unwrap_or(1));
+        }
         if code != 0 {
             failed = true;
         }
@@ -60,6 +64,7 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
 fn plan(root: &Path, args: &[String]) -> Result<Vec<Planned>> {
     match classify(args)? {
         Kind::Forward(forward) => Ok(vec![forward_step(root, &forward, Vec::new())]),
+        Kind::Atf(forward) => Ok(vec![forward_atf_step(root, &forward)]),
         Kind::Adhoc { donor, file } => Ok(vec![forward_step(
             root,
             &["adhoc".to_string(), donor, file],
@@ -71,6 +76,7 @@ fn plan(root: &Path, args: &[String]) -> Result<Vec<Planned>> {
 
 enum Kind {
     Forward(Vec<String>),
+    Atf(Vec<String>),
     Adhoc { donor: String, file: String },
     Diff(Diff),
 }
@@ -153,6 +159,7 @@ impl Diff {
             planned.push(Planned {
                 spec,
                 label: Some(format!("libc-oracle diff {} {opt}", self.family)),
+                passthrough: false,
             });
         }
         Ok(planned)
@@ -180,6 +187,17 @@ fn classify(args: &[String]) -> Result<Kind> {
     };
     match first.as_str() {
         "build" | "list" | "check" | "vendor" => Ok(Kind::Forward(args.to_vec())),
+        "suite" | "gate" => Ok(Kind::Atf(args.to_vec())),
+        "--suite" => {
+            let mut forwarded = vec!["suite".to_string()];
+            forwarded.extend(args.iter().cloned());
+            Ok(Kind::Atf(forwarded))
+        }
+        "--g1" => {
+            let mut forwarded = vec!["gate".to_string()];
+            forwarded.extend(args.iter().cloned());
+            Ok(Kind::Atf(forwarded))
+        }
         "diff" => classify_diff(&args[1..]),
         flag if flag.starts_with('-') => bail!("unknown libc-oracle flag `{flag}`\n{USAGE}"),
         donor => {
@@ -264,6 +282,18 @@ fn parse_opts(value: &str) -> Result<Vec<String>> {
     Ok(levels)
 }
 
+fn forward_atf_step(root: &Path, forwarded: &[String]) -> Planned {
+    let mut args = vec!["run".to_string(), "-q".to_string(), "-p".to_string()];
+    args.push("raven-atf-run".to_string());
+    args.push("--".to_string());
+    args.extend(forwarded.iter().cloned());
+    Planned {
+        spec: CommandSpec::new("cargo", args, root),
+        label: None,
+        passthrough: true,
+    }
+}
+
 fn forward_step(root: &Path, forwarded: &[String], env: Vec<(String, String)>) -> Planned {
     let mut args = vec!["run".to_string(), "-q".to_string(), "-p".to_string()];
     args.push("libc-oracle".to_string());
@@ -273,7 +303,11 @@ fn forward_step(root: &Path, forwarded: &[String], env: Vec<(String, String)>) -
     for (key, value) in env {
         spec = spec.env(key, value);
     }
-    Planned { spec, label: None }
+    Planned {
+        spec,
+        label: None,
+        passthrough: false,
+    }
 }
 
 #[cfg(test)]

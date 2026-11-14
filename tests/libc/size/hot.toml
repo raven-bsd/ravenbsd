@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The hot-function list of donor-map/16 3.A.3: these members must contain no `call` in the
+# `server` archive (the whole body is leaf code). `libc-size run --set server` evaluates it;
+# the symbol is located through `llvm-nm`, extracted from the archive and disassembled.
+schema = 1
+symbols = [
+  "strlen",
+  "memchr",
+  "memcpy",
+  "memmove",
+  "memset",
+  "memcmp",
+  "strchr",
+  "isalpha",
+  "toupper",
+]

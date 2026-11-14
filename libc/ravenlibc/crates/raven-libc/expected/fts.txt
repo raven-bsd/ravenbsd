@@ -1,3 +1,23 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-# The C46 crate exists; its shell binding needs a DirSys implementation (C60b).
+alphasort
+closedir
+dirfd
+fdopendir
+fts_children
+fts_close
+fts_open
+fts_openat
+fts_read
+fts_set
+ftw
+nftw
+opendir
+posix_getdents
+readdir
+readdir_r
+rewinddir
+scandir
+seekdir
+telldir
+versionsort

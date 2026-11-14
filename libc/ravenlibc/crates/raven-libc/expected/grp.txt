@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# group
+endgrent
+getgrent
+getgrent_r
+getgrgid
+getgrgid_r
+getgrnam
+getgrnam_r
+setgrent
+setgroupent
+# groups
+getgrouplist
+initgroups
+# pwcache
+gid_from_group
+group_from_gid

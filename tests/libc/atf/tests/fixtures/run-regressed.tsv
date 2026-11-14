@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# schema 1
+netbsd-libc	string/t_strchr	strchr_basic	fail	behaviour:broken	C40

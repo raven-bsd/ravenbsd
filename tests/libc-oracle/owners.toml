@@ -1,0 +1,512 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Program path -> owning ticket. The longest matching `suite:path` prefix wins. Every top-level
+# directory of every vendored suite has a row; `netbsd-libc:` and the other suite defaults keep a
+# new file from becoming an ownerless failure.
+
+[[owner]]
+prefix = "netbsd-libc:"
+ticket = "C50"
+area = "unclassified NetBSD libc test"
+
+[[owner]]
+prefix = "netbsd-libc:string/"
+ticket = "C40"
+area = "string and memory"
+
+[[owner]]
+prefix = "netbsd-libc:stdlib/"
+ticket = "C41"
+area = "stdlib: strto*, qsort, getopt, env, atexit"
+
+[[owner]]
+prefix = "netbsd-libc:stdio/"
+ticket = "C56"
+area = "stdio; C43 owns the printf/scanf engines"
+
+[[owner]]
+prefix = "netbsd-libc:regex/"
+ticket = "C45"
+area = "regex"
+
+[[owner]]
+prefix = "netbsd-libc:locale/"
+ticket = "C48"
+area = "locale and iconv; C39 for the mbrtowc-family codec"
+
+[[owner]]
+prefix = "netbsd-libc:gen/"
+ticket = "C44"
+area = "gen default: time and misc"
+
+[[owner]]
+prefix = "netbsd-libc:gen/time"
+ticket = "C44"
+area = "time"
+
+[[owner]]
+prefix = "netbsd-libc:gen/vis"
+ticket = "C46"
+area = "vis"
+
+[[owner]]
+prefix = "netbsd-libc:gen/humanize"
+ticket = "C65"
+area = "humanize_number compat"
+
+[[owner]]
+prefix = "netbsd-libc:gen/basename"
+ticket = "C46"
+area = "basename/dirname"
+
+[[owner]]
+prefix = "netbsd-libc:gen/getprogname"
+ticket = "C50"
+area = "getprogname"
+
+[[owner]]
+prefix = "netbsd-libc:gen/getcwd"
+ticket = "C50"
+area = "getcwd"
+
+[[owner]]
+prefix = "netbsd-libc:gen/arc4random"
+ticket = "C50"
+area = "arc4random (PG-52 for getrandom)"
+
+[[owner]]
+prefix = "netbsd-libc:gen/getentropy"
+ticket = "C50"
+area = "getentropy (PG-52)"
+
+[[owner]]
+prefix = "netbsd-libc:time/"
+ticket = "C44"
+area = "time"
+
+[[owner]]
+prefix = "netbsd-libc:setjmp/"
+ticket = "C58"
+area = "setjmp and signals"
+
+[[owner]]
+prefix = "netbsd-libc:atomic/"
+ticket = "C57"
+area = "threads and atomics"
+
+[[owner]]
+prefix = "netbsd-libc:tls/"
+ticket = "C57"
+area = "TLS"
+
+[[owner]]
+prefix = "netbsd-libc:membar/"
+ticket = "C57"
+area = "memory barriers"
+
+[[owner]]
+prefix = "netbsd-libc:sys/"
+ticket = "C55"
+area = "syscall wrappers; C58 signals, C53 process"
+
+[[owner]]
+prefix = "netbsd-libc:c063/"
+ticket = "C55"
+area = "*at calls"
+
+[[owner]]
+prefix = "netbsd-libc:net/"
+ticket = "C51"
+area = "network database; C63 sockets"
+
+[[owner]]
+prefix = "netbsd-libc:inet/"
+ticket = "C51"
+area = "inet"
+
+[[owner]]
+prefix = "netbsd-libc:hash/"
+ticket = "C65"
+area = "sha/hmac"
+
+[[owner]]
+prefix = "netbsd-libc:db/"
+ticket = "C65"
+area = "db(3)"
+
+[[owner]]
+prefix = "netbsd-libc:termios/"
+ticket = "C55"
+area = "termios"
+
+[[owner]]
+prefix = "netbsd-libc:ttyio/"
+ticket = "C55"
+area = "tty I/O"
+
+[[owner]]
+prefix = "netbsd-libc:ssp/"
+ticket = "C50"
+area = "stack-smash hardening"
+
+[[owner]]
+prefix = "netbsd-libc:nls/"
+ticket = "C48"
+area = "NLS catalogues"
+
+[[owner]]
+prefix = "netbsd-libc:misc/"
+ticket = "C50"
+area = "misc"
+
+[[owner]]
+prefix = "netbsd-libm:"
+ticket = "C47"
+area = "libm"
+
+[[owner]]
+prefix = "netbsd-libpthread:"
+ticket = "C57"
+area = "threads"
+
+[[owner]]
+prefix = "netbsd-libposix:"
+ticket = "C55"
+area = "POSIX data files"
+
+[[owner]]
+prefix = "netbsd-libcrypt:"
+ticket = "C65"
+area = "crypt(3)"
+
+[[owner]]
+prefix = "openbsd-libc:"
+ticket = "C46"
+area = "OpenBSD regress default"
+
+[[owner]]
+prefix = "openbsd-libc:strchr/"
+ticket = "C40"
+area = "strchr"
+
+[[owner]]
+prefix = "openbsd-libc:strlcpy/"
+ticket = "C40"
+area = "strlcpy"
+
+[[owner]]
+prefix = "openbsd-libc:strlcat/"
+ticket = "C40"
+area = "strlcat"
+
+[[owner]]
+prefix = "openbsd-libc:strnlen/"
+ticket = "C40"
+area = "strnlen"
+
+[[owner]]
+prefix = "openbsd-libc:stpncpy/"
+ticket = "C40"
+area = "stpncpy"
+
+[[owner]]
+prefix = "openbsd-libc:strerror/"
+ticket = "C40"
+area = "strerror"
+
+[[owner]]
+prefix = "openbsd-libc:strtod/"
+ticket = "C41"
+area = "strtod"
+
+[[owner]]
+prefix = "openbsd-libc:strtol/"
+ticket = "C41"
+area = "strtol"
+
+[[owner]]
+prefix = "openbsd-libc:strtonum/"
+ticket = "C41"
+area = "strtonum"
+
+[[owner]]
+prefix = "openbsd-libc:qsort/"
+ticket = "C41"
+area = "qsort and antiqsort"
+
+[[owner]]
+prefix = "openbsd-libc:getopt/"
+ticket = "C41"
+area = "getopt"
+
+[[owner]]
+prefix = "openbsd-libc:getopt_long/"
+ticket = "C41"
+area = "getopt_long"
+
+[[owner]]
+prefix = "openbsd-libc:sprintf/"
+ticket = "C56"
+area = "sprintf"
+
+[[owner]]
+prefix = "openbsd-libc:wprintf/"
+ticket = "C56"
+area = "wprintf"
+
+[[owner]]
+prefix = "openbsd-libc:fmemopen/"
+ticket = "C56"
+area = "fmemopen"
+
+[[owner]]
+prefix = "openbsd-libc:open_memstream/"
+ticket = "C56"
+area = "open_memstream"
+
+[[owner]]
+prefix = "openbsd-libc:open_wmemstream/"
+ticket = "C56"
+area = "open_wmemstream"
+
+[[owner]]
+prefix = "openbsd-libc:popen/"
+ticket = "C56"
+area = "popen"
+
+[[owner]]
+prefix = "openbsd-libc:fread/"
+ticket = "C56"
+area = "fread"
+
+[[owner]]
+prefix = "openbsd-libc:basename/"
+ticket = "C46"
+area = "basename"
+
+[[owner]]
+prefix = "openbsd-libc:dirname/"
+ticket = "C46"
+area = "dirname"
+
+[[owner]]
+prefix = "openbsd-libc:fnmatch/"
+ticket = "C46"
+area = "fnmatch"
+
+[[owner]]
+prefix = "openbsd-libc:glob/"
+ticket = "C46"
+area = "glob"
+
+[[owner]]
+prefix = "openbsd-libc:vis/"
+ticket = "C46"
+area = "vis"
+
+[[owner]]
+prefix = "openbsd-libc:getcap/"
+ticket = "C46"
+area = "getcap"
+
+[[owner]]
+prefix = "openbsd-libc:telldir/"
+ticket = "C46"
+area = "telldir"
+
+[[owner]]
+prefix = "openbsd-libc:db/"
+ticket = "C65"
+area = "db(3)"
+
+[[owner]]
+prefix = "openbsd-libc:hash/"
+ticket = "C65"
+area = "sha/hmac"
+
+[[owner]]
+prefix = "openbsd-libc:uuid/"
+ticket = "C65"
+area = "uuid"
+
+[[owner]]
+prefix = "openbsd-libc:timingsafe/"
+ticket = "C65"
+area = "timingsafe"
+
+[[owner]]
+prefix = "openbsd-libc:explicit_bzero/"
+ticket = "C65"
+area = "explicit_bzero"
+
+[[owner]]
+prefix = "openbsd-libc:cephes/"
+ticket = "C47"
+area = "libm cephes"
+
+[[owner]]
+prefix = "openbsd-libc:fpclassify/"
+ticket = "C47"
+area = "fpclassify"
+
+[[owner]]
+prefix = "openbsd-libc:ldexp/"
+ticket = "C47"
+area = "ldexp"
+
+[[owner]]
+prefix = "openbsd-libc:modf/"
+ticket = "C47"
+area = "modf"
+
+[[owner]]
+prefix = "openbsd-libc:getaddrinfo/"
+ticket = "C51"
+area = "getaddrinfo"
+
+[[owner]]
+prefix = "openbsd-libc:ifnameindex/"
+ticket = "C51"
+area = "if_nametoindex"
+
+[[owner]]
+prefix = "openbsd-libc:netdb/"
+ticket = "C51"
+area = "netdb"
+
+[[owner]]
+prefix = "openbsd-libc:atexit/"
+ticket = "C41"
+area = "atexit"
+
+[[owner]]
+prefix = "openbsd-libc:env/"
+ticket = "C41"
+area = "environment"
+
+[[owner]]
+prefix = "openbsd-libc:orientation/"
+ticket = "C55"
+area = "stdio orientation"
+
+[[owner]]
+prefix = "openbsd-libc:sigthr/"
+ticket = "C58"
+area = "signals and threads"
+
+[[owner]]
+prefix = "openbsd-libc:sleep/"
+ticket = "C44"
+area = "sleep"
+
+[[owner]]
+prefix = "openbsd-libc:arc4random-fork/"
+ticket = "C50"
+area = "arc4random after fork"
+
+[[owner]]
+prefix = "openbsd-libc:asr/"
+ticket = "C51"
+area = "asynchronous resolver"
+
+[[owner]]
+prefix = "openbsd-libc:ffs/"
+ticket = "C40"
+area = "ffs"
+
+[[owner]]
+prefix = "openbsd-libc:gcvt/"
+ticket = "C41"
+area = "gcvt"
+
+
+[[owner]]
+prefix = "openbsd-libm:"
+ticket = "C47"
+area = "OpenBSD libm regress"
+
+[[owner]]
+prefix = "openbsd-libpthread:"
+ticket = "C57"
+area = "OpenBSD pthread regress"
+
+[[owner]]
+prefix = "freebsd-libc:stdio/"
+ticket = "C56"
+area = "FreeBSD stdio"
+
+[[owner]]
+prefix = "freebsd-libc:stdlib/"
+ticket = "C41"
+area = "FreeBSD stdlib"
+
+[[owner]]
+prefix = "freebsd-msun:"
+ticket = "C47"
+area = "FreeBSD msun"
+
+[[owner]]
+prefix = "freebsd-libthr:"
+ticket = "C57"
+area = "FreeBSD libthr"
+
+[[owner]]
+prefix = "picolibc:test-stdio"
+ticket = "C56"
+area = "picolibc stdio"
+
+[[owner]]
+prefix = "picolibc:test-string"
+ticket = "C40"
+area = "picolibc string"
+
+[[owner]]
+prefix = "picolibc:test-math"
+ticket = "C47"
+area = "picolibc math"
+
+[[owner]]
+prefix = "picolibc:test-time"
+ticket = "C44"
+area = "picolibc time"
+
+[[owner]]
+prefix = "picolibc:test-strftime"
+ticket = "C44"
+area = "picolibc strftime"
+
+[[owner]]
+prefix = "picolibc:test-wcsftime"
+ticket = "C44"
+area = "picolibc wcsftime"
+
+[[owner]]
+prefix = "picolibc:test-timegm"
+ticket = "C44"
+area = "picolibc timegm"
+
+[[owner]]
+prefix = "picolibc:test-stdlib"
+ticket = "C41"
+area = "picolibc stdlib"
+
+[[owner]]
+prefix = "picolibc:test-"
+ticket = "C50"
+area = "picolibc default"
+
+[[owner]]
+prefix = "picolibc:libc-testsuite/"
+ticket = "C50"
+area = "Rich Felker suite copy"
+
+[[owner]]
+prefix = "pjdfstest:"
+ticket = "C55"
+area = "filesystem lane owns the pass list"
+
+[[owner]]
+prefix = "ltp:"
+ticket = "C74"
+area = "external LTP run"

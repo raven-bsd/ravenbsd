@@ -1,0 +1,329 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Reviewer-owned exceptions (`donor-map/16` 3.A.2). Every row has a reason. The C69 first
+# measurement fills `[[large-member]]` (R-30, `.text > 4096`) and records the R-1/R-5/R-10
+# exceptions the current shell already carries; a reviewer re-freezes the table.
+schema = 1
+
+[[one-symbol]]
+file = "libc/ravenlibc/crates/raven-libc/src/ctype/toascii.rs"
+reason = "first export does not match the file stem; existing ABI alias or hook file (R-1 review pending, C60/C60c/C61)"
+
+[[one-symbol]]
+file = "libc/ravenlibc/crates/raven-libc/src/ctype/towctrans.rs"
+reason = "first export does not match the file stem; existing ABI alias or hook file (R-1 review pending, C60/C60c/C61)"
+
+[[one-symbol]]
+file = "libc/ravenlibc/crates/raven-libc/src/hooks/fini_array.rs"
+reason = "first export does not match the file stem; existing ABI alias or hook file (R-1 review pending, C60/C60c/C61)"
+
+[[one-symbol]]
+file = "libc/ravenlibc/crates/raven-libc/src/hooks/fmt_float.rs"
+reason = "first export does not match the file stem; existing ABI alias or hook file (R-1 review pending, C60/C60c/C61)"
+
+[[one-symbol]]
+file = "libc/ravenlibc/crates/raven-libc/src/hooks/fmt_wide.rs"
+reason = "first export does not match the file stem; existing ABI alias or hook file (R-1 review pending, C60/C60c/C61)"
+
+[[one-symbol]]
+file = "libc/ravenlibc/crates/raven-libc/src/hooks/funcs_on_exit.rs"
+reason = "first export does not match the file stem; existing ABI alias or hook file (R-1 review pending, C60/C60c/C61)"
+
+[[one-symbol]]
+file = "libc/ravenlibc/crates/raven-libc/src/hooks/malloc_debug.rs"
+reason = "first export does not match the file stem; existing ABI alias or hook file (R-1 review pending, C60/C60c/C61)"
+
+[[one-symbol]]
+file = "libc/ravenlibc/crates/raven-libc/src/hooks/malloc_impl.rs"
+reason = "first export does not match the file stem; existing ABI alias or hook file (R-1 review pending, C60/C60c/C61)"
+
+[[one-symbol]]
+file = "libc/ravenlibc/crates/raven-libc/src/hooks/scan_float.rs"
+reason = "first export does not match the file stem; existing ABI alias or hook file (R-1 review pending, C60/C60c/C61)"
+
+[[one-symbol]]
+file = "libc/ravenlibc/crates/raven-libc/src/hooks/stdio_exit.rs"
+reason = "first export does not match the file stem; existing ABI alias or hook file (R-1 review pending, C60/C60c/C61)"
+
+[[one-symbol]]
+file = "libc/ravenlibc/crates/raven-libc/src/hooks/tz_load.rs"
+reason = "first export does not match the file stem; existing ABI alias or hook file (R-1 review pending, C60/C60c/C61)"
+
+[[one-symbol]]
+file = "libc/ravenlibc/crates/raven-libc/src/start.rs"
+reason = "first export does not match the file stem; existing ABI alias or hook file (R-1 review pending, C60/C60c/C61)"
+
+[[one-symbol]]
+file = "libc/ravenlibc/crates/raven-libc/src/string/strtok.rs"
+reason = "first export does not match the file stem; existing ABI alias or hook file (R-1 review pending, C60/C60c/C61)"
+
+[[no-mangle]]
+file = "libc/ravenlibc/crates/raven-libc-sys/src/macros.rs"
+reason = "macro definition file; the attribute expands only inside the shell (R-1 scope, C54)"
+
+[[no-fmt]]
+file = "libc/ravenlibc/crates/raven-libc/src/compat/mod.rs"
+reason = "existing shell diagnostic/format seam; R-5 review pending (not on the P0-P3 tiny path)"
+
+[[no-fmt]]
+file = "libc/ravenlibc/crates/raven-libc/src/compat/uuid_to_string.rs"
+reason = "existing shell diagnostic/format seam; R-5 review pending (not on the P0-P3 tiny path)"
+
+[[no-fmt]]
+file = "libc/ravenlibc/crates/raven-libc/src/ffi/env.rs"
+reason = "existing shell diagnostic/format seam; R-5 review pending (not on the P0-P3 tiny path)"
+
+[[no-fmt]]
+file = "libc/ravenlibc/crates/raven-libc/src/ffi/platform.rs"
+reason = "existing shell diagnostic/format seam; R-5 review pending (not on the P0-P3 tiny path)"
+
+[[no-fmt]]
+file = "libc/ravenlibc/crates/raven-libc/src/glob/mod.rs"
+reason = "existing shell diagnostic/format seam; R-5 review pending (not on the P0-P3 tiny path)"
+
+[[no-fmt]]
+file = "libc/ravenlibc/crates/raven-libc/src/malloc/heap.rs"
+reason = "existing shell diagnostic/format seam; R-5 review pending (not on the P0-P3 tiny path)"
+
+[[no-fmt]]
+file = "libc/ravenlibc/crates/raven-libc/src/platform/mod.rs"
+reason = "existing shell diagnostic/format seam; R-5 review pending (not on the P0-P3 tiny path)"
+
+[[no-fmt]]
+file = "libc/ravenlibc/crates/raven-libc/src/regex/mod.rs"
+reason = "existing shell diagnostic/format seam; R-5 review pending (not on the P0-P3 tiny path)"
+
+[[no-fmt]]
+file = "libc/ravenlibc/crates/raven-libc/src/stdlib/getopt_support.rs"
+reason = "existing shell diagnostic/format seam; R-5 review pending (not on the P0-P3 tiny path)"
+
+[[no-fmt]]
+file = "libc/ravenlibc/crates/raven-libc/src/stdlib/search_support.rs"
+reason = "existing shell diagnostic/format seam; R-5 review pending (not on the P0-P3 tiny path)"
+
+[[no-fmt]]
+file = "libc/ravenlibc/crates/raven-libc/src/va/mod.rs"
+reason = "existing shell diagnostic/format seam; R-5 review pending (not on the P0-P3 tiny path)"
+
+[[dyn]]
+file = "libc/ravenlibc/crates/raven-libc/src/fts/scandir.rs"
+reason = "existing trait-object seam in the shell; R-10 review pending (libc-size relocs/monomorph track the archive)"
+
+[[dyn]]
+file = "libc/ravenlibc/crates/raven-libc/src/glob/glob.rs"
+reason = "existing trait-object seam in the shell; R-10 review pending (libc-size relocs/monomorph track the archive)"
+
+[[dyn]]
+file = "libc/ravenlibc/crates/raven-libc-compat/src/backtrace/walker.rs"
+reason = "C35/C65 backtrace walker (R-10 hook-table exception)"
+
+# R-10: generic prefixes above two instantiations that the reviewer accepted.
+[[monomorph]]
+prefix = "core::fmt::Formatter"
+reason = "core formatting machinery, kept out of the tiny member set by the probe rules"
+
+
+# R-30: members above 4 KiB of .text (first measurement, x86_64 tiny libc.a); each
+# row is the reviewer sign-off the rule requires. `libc-size run` re-checks them.
+
+[[large-member]]
+member = "alloc-803a2bae416eb7d8.alloc.79bf1a8bb2c145cf-cgu.0.rcgu.o"
+reason = "alloc codegen unit pulled by stdio; compiler-provided"
+
+[[large-member]]
+member = "compiler_builtins-3e0c1777df8be2aa.compiler_builtins.4afadebc84c09139-cgu.006.rcgu.o"
+reason = "toolchain codegen unit (core/compiler_builtins), not a ravenlibc function"
+
+[[large-member]]
+member = "compiler_builtins-3e0c1777df8be2aa.compiler_builtins.4afadebc84c09139-cgu.013.rcgu.o"
+reason = "toolchain codegen unit (core/compiler_builtins), not a ravenlibc function"
+
+[[large-member]]
+member = "compiler_builtins-3e0c1777df8be2aa.compiler_builtins.4afadebc84c09139-cgu.074.rcgu.o"
+reason = "toolchain codegen unit (core/compiler_builtins), not a ravenlibc function"
+
+[[large-member]]
+member = "core-1afdb6812c6077d0.core.674a550045089fcb-cgu.0.rcgu.o"
+reason = "toolchain codegen unit (core/compiler_builtins), not a ravenlibc function"
+
+[[large-member]]
+member = "raven_libc-82827f35d4b76b70.raven_libc.7895e06d2adb5808-cgu.000.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc-82827f35d4b76b70.raven_libc.7895e06d2adb5808-cgu.001.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc-82827f35d4b76b70.raven_libc.7895e06d2adb5808-cgu.002.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc-82827f35d4b76b70.raven_libc.7895e06d2adb5808-cgu.003.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc-82827f35d4b76b70.raven_libc.7895e06d2adb5808-cgu.004.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc-82827f35d4b76b70.raven_libc.7895e06d2adb5808-cgu.005.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc-ad3bdc61da7c9401.raven_libc.6dc199050756d7d8-cgu.000.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc-ad3bdc61da7c9401.raven_libc.6dc199050756d7d8-cgu.001.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc-ad3bdc61da7c9401.raven_libc.6dc199050756d7d8-cgu.002.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc-ad3bdc61da7c9401.raven_libc.6dc199050756d7d8-cgu.003.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc-ad3bdc61da7c9401.raven_libc.6dc199050756d7d8-cgu.004.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc-ad3bdc61da7c9401.raven_libc.6dc199050756d7d8-cgu.005.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_compat-008d066787c7f694.raven_libc_compat.d85f20bfb0ffdd6c-cgu.00.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_compat-008d066787c7f694.raven_libc_compat.d85f20bfb0ffdd6c-cgu.01.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_compat-008d066787c7f694.raven_libc_compat.d85f20bfb0ffdd6c-cgu.06.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_compat-008d066787c7f694.raven_libc_compat.d85f20bfb0ffdd6c-cgu.14.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_compat-d22925482d6880d5.raven_libc_compat.e6baf2613193baa1-cgu.00.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_compat-d22925482d6880d5.raven_libc_compat.e6baf2613193baa1-cgu.01.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_compat-d22925482d6880d5.raven_libc_compat.e6baf2613193baa1-cgu.02.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_compat-d22925482d6880d5.raven_libc_compat.e6baf2613193baa1-cgu.06.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_compat-d22925482d6880d5.raven_libc_compat.e6baf2613193baa1-cgu.14.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_ctype-31ce7e3122c0624a.raven_libc_ctype.e8dd54f20f98996c-cgu.44.rcgu.o"
+reason = "ctype codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_ctype-9027e1180dc531da.raven_libc_ctype.1752a9a078287978-cgu.44.rcgu.o"
+reason = "ctype codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_dtoa-35b3af2aec80a344.raven_libc_dtoa.4530b3ab3b22f630-cgu.00.rcgu.o"
+reason = "dtoa codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_dtoa-35b3af2aec80a344.raven_libc_dtoa.4530b3ab3b22f630-cgu.01.rcgu.o"
+reason = "dtoa codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_dtoa-35b3af2aec80a344.raven_libc_dtoa.4530b3ab3b22f630-cgu.02.rcgu.o"
+reason = "dtoa codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_dtoa-35b3af2aec80a344.raven_libc_dtoa.4530b3ab3b22f630-cgu.03.rcgu.o"
+reason = "dtoa codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_dtoa-b0d69f99e3768071.raven_libc_dtoa.edf4cd5e4e468391-cgu.00.rcgu.o"
+reason = "dtoa codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_dtoa-b0d69f99e3768071.raven_libc_dtoa.edf4cd5e4e468391-cgu.01.rcgu.o"
+reason = "dtoa codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_dtoa-b0d69f99e3768071.raven_libc_dtoa.edf4cd5e4e468391-cgu.02.rcgu.o"
+reason = "dtoa codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_dtoa-b0d69f99e3768071.raven_libc_dtoa.edf4cd5e4e468391-cgu.03.rcgu.o"
+reason = "dtoa codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_dtoa-b0d69f99e3768071.raven_libc_dtoa.edf4cd5e4e468391-cgu.04.rcgu.o"
+reason = "dtoa codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_dtoa-b0d69f99e3768071.raven_libc_dtoa.edf4cd5e4e468391-cgu.05.rcgu.o"
+reason = "dtoa codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_glob-909f0de9b4a51e8f.raven_libc_glob.c11ded70579e99f2-cgu.00.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_glob-bb4e577c5a72f9d6.raven_libc_glob.f439e3290f1aaf38-cgu.00.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_platform-4b38fdb94eb610e9.raven_libc_platform.4c5a6345a889c422-cgu.00.rcgu.o"
+reason = "platform codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_platform-4b38fdb94eb610e9.raven_libc_platform.4c5a6345a889c422-cgu.01.rcgu.o"
+reason = "platform codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_platform-4b38fdb94eb610e9.raven_libc_platform.4c5a6345a889c422-cgu.04.rcgu.o"
+reason = "platform codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_platform-847c3fe2099cc8de.raven_libc_platform.43cacfbc1a830a7f-cgu.00.rcgu.o"
+reason = "platform codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_platform-847c3fe2099cc8de.raven_libc_platform.43cacfbc1a830a7f-cgu.01.rcgu.o"
+reason = "platform codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_regex-9613249de89ae1ef.raven_libc_regex.ace6f165a1da806b-cgu.00.rcgu.o"
+reason = "regex codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_regex-9613249de89ae1ef.raven_libc_regex.ace6f165a1da806b-cgu.01.rcgu.o"
+reason = "regex codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_regex-a86411995354beb5.raven_libc_regex.ffd3fc91d4b2a7c4-cgu.00.rcgu.o"
+reason = "regex codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_regex-a86411995354beb5.raven_libc_regex.ffd3fc91d4b2a7c4-cgu.01.rcgu.o"
+reason = "regex codegen unit; first measurement, reviewer sign-off pending"
+
+[[large-member]]
+member = "raven_libc_str-1d3e12a273235a6e.raven_libc_str.fe0fb177e05e64ab-cgu.05.rcgu.o"
+reason = "ravenlibc shell codegen unit; first measurement, reviewer sign-off pending"
+

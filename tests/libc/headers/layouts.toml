@@ -2008,7 +2008,3 @@ owner = "C53"
 [[type.field]]
 name = "cr_rights"
 offset = 0
-
-[[type.field]]
-name = "cr_rights"
-offset = 8

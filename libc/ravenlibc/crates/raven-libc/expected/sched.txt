@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# sched
+sched_get_priority_max
+sched_get_priority_min
+sched_getaffinity
+sched_getcpu
+sched_getparam
+sched_getscheduler
+sched_rr_get_interval
+sched_setaffinity
+sched_setparam
+sched_setscheduler
+sched_yield

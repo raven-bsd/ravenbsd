@@ -1,0 +1,418 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The C names of ticket C66 6.9 for the Linux personality. `rust` is the logic entry;
+# `header` is the installed declaration; `gap` names the PG item a missing primitive waits for.
+
+[[export]]
+name = "epoll_create"
+rust = "epoll::create"
+header = "sys/epoll.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-25"
+
+[[export]]
+name = "epoll_create1"
+rust = "epoll::create1"
+header = "sys/epoll.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-25"
+
+[[export]]
+name = "epoll_ctl"
+rust = "epoll::ctl"
+header = "sys/epoll.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-25"
+
+[[export]]
+name = "epoll_wait"
+rust = "epoll::wait"
+header = "sys/epoll.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-25"
+
+[[export]]
+name = "epoll_pwait"
+rust = "epoll::pwait"
+header = "sys/epoll.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-8/PG-25"
+
+[[export]]
+name = "epoll_pwait2"
+rust = "epoll::pwait2"
+header = "sys/epoll.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-8/PG-25"
+
+[[export]]
+name = "eventfd"
+rust = "eventfd::create"
+header = "sys/eventfd.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-19"
+
+[[export]]
+name = "eventfd_read"
+rust = "eventfd::read"
+header = "sys/eventfd.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-19"
+
+[[export]]
+name = "eventfd_write"
+rust = "eventfd::write"
+header = "sys/eventfd.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-19"
+
+[[export]]
+name = "timerfd_create"
+rust = "timerfd::create"
+header = "sys/timerfd.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-19"
+
+[[export]]
+name = "timerfd_settime"
+rust = "timerfd::settime"
+header = "sys/timerfd.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-17/PG-19"
+
+[[export]]
+name = "timerfd_gettime"
+rust = "timerfd::gettime"
+header = "sys/timerfd.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-19"
+
+[[export]]
+name = "signalfd"
+rust = "signalfd::signalfd"
+header = "sys/signalfd.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-7"
+
+[[export]]
+name = "inotify_init"
+rust = "inotify::init"
+header = "sys/inotify.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-38"
+
+[[export]]
+name = "inotify_init1"
+rust = "inotify::init1"
+header = "sys/inotify.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-38"
+
+[[export]]
+name = "inotify_add_watch"
+rust = "inotify::add_watch"
+header = "sys/inotify.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-38"
+
+[[export]]
+name = "inotify_rm_watch"
+rust = "inotify::rm_watch"
+header = "sys/inotify.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-38"
+
+[[export]]
+name = "prctl"
+rust = "prctl::prctl"
+header = "sys/prctl.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-44"
+
+[[export]]
+name = "personality"
+rust = "personality::personality"
+header = "sys/personality.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = ""
+
+[[export]]
+name = "error"
+rust = "error::format_error"
+header = "error.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = ""
+
+[[export]]
+name = "error_at_line"
+rust = "error::format_error_at_line"
+header = "error.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = ""
+
+[[export]]
+name = "error_print_progname"
+rust = "shell data"
+header = "error.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = false
+gap = ""
+
+[[export]]
+name = "error_message_count"
+rust = "shell data"
+header = "error.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = false
+gap = ""
+
+[[export]]
+name = "error_one_per_line"
+rust = "shell data"
+header = "error.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = false
+gap = ""
+
+[[export]]
+name = "sysinfo"
+rust = "sysinfo::fill"
+header = "sys/sysinfo.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-21"
+
+[[export]]
+name = "get_nprocs"
+rust = "sysinfo::get_nprocs"
+header = "sys/sysinfo.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = false
+gap = "PG-21"
+
+[[export]]
+name = "get_nprocs_conf"
+rust = "sysinfo::get_nprocs_conf"
+header = "sys/sysinfo.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = false
+gap = "PG-21"
+
+[[export]]
+name = "get_phys_pages"
+rust = "sysinfo::get_phys_pages"
+header = "sys/sysinfo.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-21"
+
+[[export]]
+name = "get_avphys_pages"
+rust = "sysinfo::get_avphys_pages"
+header = "sys/sysinfo.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-21"
+
+[[export]]
+name = "sendfile"
+rust = "sendfile::sendfile"
+header = "sys/sendfile.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-22"
+
+[[export]]
+name = "copy_file_range"
+rust = "sendfile::copy_file_range"
+header = "unistd.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-22"
+
+[[export]]
+name = "getauxval"
+rust = "auxval::getauxval"
+header = "sys/auxv.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = ""
+
+# The active *64 aliases `(alias, base)`. The rows of alias64.toml may be pending; a pending
+# row has no shell file and no export.
+
+[[export]]
+name = "stat64"
+rust = "alias of stat"
+header = "sys/stat.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = ""
+
+[[export]]
+name = "fstat64"
+rust = "alias of fstat"
+header = "sys/stat.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = ""
+
+[[export]]
+name = "lstat64"
+rust = "alias of lstat"
+header = "sys/stat.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = ""
+
+[[export]]
+name = "pread64"
+rust = "alias of pread"
+header = "unistd.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = ""
+
+[[export]]
+name = "pwrite64"
+rust = "alias of pwrite"
+header = "unistd.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = ""
+
+[[export]]
+name = "lseek64"
+rust = "alias of lseek"
+header = "unistd.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = ""
+
+[[export]]
+name = "mmap64"
+rust = "alias of mmap"
+header = "sys/mman.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = ""
+
+[[export]]
+name = "sendfile64"
+rust = "alias of sendfile"
+header = "sys/sendfile.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = "PG-22"
+
+[[export]]
+name = "readdir64"
+rust = "alias of readdir"
+header = "dirent.h"
+ring = 2
+personality = "linux"
+version = "RAVEN_1.0"
+errno = true
+gap = ""

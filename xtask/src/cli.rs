@@ -52,6 +52,7 @@ cargo xtask commands:
   libc-headers ... (not implemented yet)
   libc-link --arch A [--check] [--json]
   libc-pack ... (not implemented yet)
+  libc-stubs [--arch A] [--out DIR] [--check]
   libc-size ... (not implemented yet)
   libc-world ... (not implemented yet)
   libc-census ... (not implemented yet)

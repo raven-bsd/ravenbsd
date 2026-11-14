@@ -229,6 +229,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "libc-size"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "toml",
+]
+
+[[package]]
 name = "linked_list_allocator"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -379,6 +389,15 @@ dependencies = [
 [[package]]
 name = "raven-abi"
 version = "0.1.0"
+
+[[package]]
+name = "raven-atf-run"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "toml",
+]
 
 [[package]]
 name = "raven-audio-core"
@@ -947,15 +966,27 @@ dependencies = [
 name = "raven-libc"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
  "raven-libc-abi",
  "raven-libc-compat",
  "raven-libc-ctype",
  "raven-libc-dtoa",
  "raven-libc-fmt",
+ "raven-libc-fts",
+ "raven-libc-glob",
  "raven-libc-locale",
  "raven-libc-m",
  "raven-libc-malloc",
+ "raven-libc-nss",
+ "raven-libc-personality-bsd",
+ "raven-libc-personality-linux",
+ "raven-libc-personality-solaris",
  "raven-libc-platform",
+ "raven-libc-pledge",
+ "raven-libc-proc",
+ "raven-libc-pwd",
+ "raven-libc-regex",
+ "raven-libc-resolv",
  "raven-libc-stdio",
  "raven-libc-stdlib",
  "raven-libc-str",
@@ -1128,6 +1159,35 @@ dependencies = [
  "raven-libc-tls",
  "serde",
  "toml",
+]
+
+[[package]]
+name = "raven-libc-personality-bsd"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-platform",
+ "raven-libc-pledge",
+ "raven-libc-proc",
+ "raven-libc-sys",
+]
+
+[[package]]
+name = "raven-libc-personality-linux"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-platform",
+ "raven-libc-sys",
+]
+
+[[package]]
+name = "raven-libc-personality-solaris"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-platform",
+ "raven-libc-sys",
 ]
 
 [[package]]

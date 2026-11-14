@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Seed for tests/qtest/cases/libc-start-cycles.toml (B2 of donor-map/16 3.A.9).
+# C73 copies this file into tests/qtest/cases/. The cycle counter and the QEMU run need:
+#   # needs PG-1 PG-50
+#   # cargo xtask qtest --case libc-start-cycles --arch x86_64
+name = "libc-start-cycles"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-icount", "shift=3"]
+expect_exit = "success"
+
+# B2: the `_start` -> `main` delta is checked against BP-8 (20 microseconds, PROPOSED).
+[[expect]]
+regex = '^libc-start-cycles: delta_ns=\d+$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
