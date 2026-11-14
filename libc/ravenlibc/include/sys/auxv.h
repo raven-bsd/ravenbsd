@@ -27,6 +27,7 @@
 #ifndef _SYS_AUXV_H
 #define _SYS_AUXV_H
 #include <sys/cdefs.h>
+#include <stdint.h>
 
 __BEGIN_DECLS
 
@@ -35,6 +36,11 @@ __BEGIN_DECLS
 
 #if __BSD_VISIBLE
 unsigned long getauxval(unsigned long);
+#endif
+
+#if __SOLARIS_VISIBLE
+/* Solaris personality: CPU-capability words from the aux vector (A-sol-4). */
+unsigned int getisax (uint32_t *, unsigned int);
 #endif
 
 __END_DECLS
