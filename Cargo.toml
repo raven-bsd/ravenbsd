@@ -65,6 +65,7 @@ members = [
     "tests/qtest/cases/tls-base-fixture",
     "tests/qtest/cases/kick-eintr-fixture",
     "tests/qtest/cases/signal-entry-fixture",
+    "tests/qtest/cases/signal-fault-fixture",
     "xtask",
     "tests/qtest",
     "tests/ufs-oracle",

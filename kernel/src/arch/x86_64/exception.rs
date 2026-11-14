@@ -3,9 +3,11 @@
 
 //! Exception and interrupt stubs and reporting.
 
+use crate::arch::x86_64::syscall::{deliver_fault, terminate_fault};
 use crate::arch::x86_64::trapframe::TrapFrame;
 use crate::{backtrace, kprintln};
 use raven_abi::layout::x86_64::HHDM_BASE;
+use raven_abi::signal;
 
 /// Direct-map window above [`HHDM_BASE`] valid for PC/return-address checks.
 const HHDM_WINDOW: u64 = 1 << 47;
@@ -151,8 +153,32 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
     let vector = frame.vector as usize;
     let from_user = frame.cs & 3 == 3;
     if vector == 3 {
+        if from_user {
+            if deliver_fault(frame, signal::FAULT_BREAKPOINT, frame.rip) {
+                return;
+            }
+            terminate_fault(signal::FAULT_BREAKPOINT);
+        }
         kprintln!("EXCEPTION: breakpoint");
         return;
+    }
+    if vector == 0 && from_user {
+        if deliver_fault(frame, signal::FAULT_DIVIDE, frame.rip) {
+            return;
+        }
+        terminate_fault(signal::FAULT_DIVIDE);
+    }
+    if vector == 6 && from_user {
+        if deliver_fault(frame, signal::FAULT_ILLEGAL, frame.rip) {
+            return;
+        }
+        terminate_fault(signal::FAULT_ILLEGAL);
+    }
+    if vector == 17 && from_user {
+        if deliver_fault(frame, signal::FAULT_MISALIGN, frame.rip) {
+            return;
+        }
+        terminate_fault(signal::FAULT_MISALIGN);
     }
     if vector == 14 {
         let cr2 = read_cr2();
@@ -161,6 +187,14 @@ pub extern "C" fn exception_dispatch(frame: &mut TrapFrame) {
         }
         if from_user {
             if crate::process::handle_page_fault_access(cr2, frame.error_code & 2 != 0) {
+                return;
+            }
+            let kind = if frame.error_code & 1 == 0 {
+                signal::FAULT_PAGE_NOMAP
+            } else {
+                signal::FAULT_PAGE_PERM
+            };
+            if deliver_fault(frame, kind, cr2) {
                 return;
             }
             crate::process::page_fault(cr2);

@@ -15,8 +15,8 @@
 use core::mem::size_of;
 
 use raven_abi::errno::Errno;
-use raven_abi::signal::{ENTRY_SP, MContext};
-use raven_esr::{Esr, ec_name, slot_name};
+use raven_abi::signal::{self, ENTRY_SP, FaultRecord, MContext};
+use raven_esr::{Esr, data_abort, ec_name, slot_name};
 use raven_usercopy::is_user_address;
 
 use crate::kprintln;
@@ -157,14 +157,32 @@ __exception_restore:
 "#
 );
 
+/// Exception class: unknown reason (typically an undefined instruction).
+const EC_UNKNOWN: u8 = 0x00;
+/// Exception class: FP/SIMD access trapped.
+const EC_FP: u8 = 0x07;
+/// Exception class: illegal execution state.
+const EC_ILLEGAL: u8 = 0x0e;
 /// Exception class: SVC from AArch64.
 const EC_SVC64: u8 = 0x15;
 /// Exception class: instruction abort from a lower exception level.
 const EC_IABT_LOWER: u8 = 0x20;
+/// Exception class: PC alignment fault.
+const EC_PC_ALIGN: u8 = 0x22;
 /// Exception class: data abort from a lower exception level.
 const EC_DABT_LOWER: u8 = 0x24;
 /// Exception class: data abort taken without a change in exception level.
 const EC_DABT_SAME: u8 = 0x25;
+/// Exception class: SP alignment fault.
+const EC_SP_ALIGN: u8 = 0x26;
+/// Exception class: breakpoint from a lower exception level.
+const EC_BREAKPOINT_LOWER: u8 = 0x30;
+/// Exception class: software step from a lower exception level.
+const EC_SOFTWARE_STEP: u8 = 0x32;
+/// Exception class: watchpoint from a lower exception level.
+const EC_WATCHPOINT: u8 = 0x34;
+/// Exception class: BRK instruction.
+const EC_BRK: u8 = 0x3c;
 
 /// Rust side of every vector slot.
 ///
@@ -193,12 +211,42 @@ pub extern "C" fn exception_dispatch(slot: u64, frame: *mut TrapFrame) {
         8 => match ec {
             EC_SVC64 => crate::syscall::svc_dispatch(frame),
             EC_DABT_LOWER => {
-                if crate::process::handle_page_fault(frame.far) {
+                let kind = abort_kind(data_abort(esr.iss()).dfsc);
+                // Translation and permission faults may be COW/pager-resolvable; an
+                // alignment fault must go straight to the signal/default path.
+                if kind != signal::FAULT_MISALIGN && crate::process::handle_page_fault(frame.far) {
+                    return;
+                }
+                if deliver_fault(frame, kind, frame.far) {
                     return;
                 }
                 crate::process::page_fault(frame.far)
             }
-            EC_IABT_LOWER => crate::process::page_fault(frame.far),
+            EC_IABT_LOWER => {
+                let kind = abort_kind(data_abort(esr.iss()).dfsc);
+                if deliver_fault(frame, kind, frame.far) {
+                    return;
+                }
+                crate::process::page_fault(frame.far)
+            }
+            EC_BREAKPOINT_LOWER | EC_SOFTWARE_STEP | EC_WATCHPOINT | EC_BRK => {
+                if deliver_fault(frame, signal::FAULT_BREAKPOINT, frame.elr) {
+                    return;
+                }
+                terminate_fault(signal::FAULT_BREAKPOINT)
+            }
+            EC_UNKNOWN | EC_ILLEGAL | EC_FP => {
+                if deliver_fault(frame, signal::FAULT_ILLEGAL, frame.elr) {
+                    return;
+                }
+                terminate_fault(signal::FAULT_ILLEGAL)
+            }
+            EC_PC_ALIGN | EC_SP_ALIGN => {
+                if deliver_fault(frame, signal::FAULT_MISALIGN, frame.elr) {
+                    return;
+                }
+                terminate_fault(signal::FAULT_MISALIGN)
+            }
             _ => crate::process::user_exception(usize::from(ec)),
         },
         // Lower EL, AArch32: no 32-bit userland exists.
@@ -251,19 +299,18 @@ pub fn sigreturn_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
     Ok(())
 }
 
-/// Deliver a pending kick to the registered user entry, if one is ready.
-///
-/// Called after the `svc` result is in `x0` and before the vector restores the
-/// EL0 frame, so the saved context is the interrupted user state.
-pub fn deliver_signal(frame: &mut TrapFrame) {
-    let Some(due) = thread::signal_due() else {
-        return;
-    };
-    {
-        let mut context = SIGNAL_CONTEXT.lock();
-        context_from_frame(frame, &mut context);
-        thread::signal_commit(&due, &context);
+/// Map a data/instruction abort status code to the C58 fault kind.
+fn abort_kind(dfsc: u8) -> u32 {
+    match dfsc {
+        0x09..=0x0b | 0x0d..=0x0f => signal::FAULT_PAGE_PERM,
+        0x21 => signal::FAULT_MISALIGN,
+        _ => signal::FAULT_PAGE_NOMAP,
     }
+}
+
+/// Enter the registered entry with `bits` in `x0` and the optional fault
+/// record pointer in `x1`.
+fn enter_signal(frame: &mut TrapFrame, due: &thread::SignalEntry, bits: u64, second: u64) {
     let stack = if due.flags & ENTRY_SP != 0 {
         frame.sp
     } else {
@@ -275,11 +322,66 @@ pub fn deliver_signal(frame: &mut TrapFrame) {
     if !is_user_address(stack) {
         process::exit_process(Errno::EFAULT.to_ret() as i32);
     }
-    if let Some(argument) = frame.x.first_mut() {
-        *argument = u64::from(due.bits);
+    if let Some(argument) = frame.x.get_mut(0) {
+        *argument = bits;
+    }
+    if let Some(argument) = frame.x.get_mut(1) {
+        *argument = second;
     }
     frame.elr = due.entry;
     frame.sp = stack;
+}
+
+/// Deliver a pending kick to the registered user entry, if one is ready.
+///
+/// Called after the `svc` result is in `x0` and before the vector restores the
+/// EL0 frame, so the saved context is the interrupted user state.
+pub fn deliver_signal(frame: &mut TrapFrame) {
+    let Some(due) = thread::signal_due() else {
+        return;
+    };
+    let fault_pointer = {
+        let mut context = SIGNAL_CONTEXT.lock();
+        context_from_frame(frame, &mut context);
+        thread::signal_commit(&due, &context, None)
+    };
+    enter_signal(frame, &due, u64::from(due.bits), fault_pointer);
+}
+
+/// Deliver a synchronous user fault to the signal entry.
+///
+/// Returns false when the thread has no usable `SIG_SETUP` (no registration,
+/// already inside a signal); the caller then takes the default-action path.
+pub fn deliver_fault(frame: &mut TrapFrame, kind: u32, addr: u64) -> bool {
+    let Some(due) = thread::signal_fault_due() else {
+        return false;
+    };
+    let record = FaultRecord {
+        kind,
+        addr: addr as usize,
+        pc: frame.elr as usize,
+    };
+    let fault_pointer = {
+        let mut context = SIGNAL_CONTEXT.lock();
+        context_from_frame(frame, &mut context);
+        thread::signal_commit(&due, &context, Some(&record))
+    };
+    enter_signal(frame, &due, 0, fault_pointer);
+    true
+}
+
+/// Default action for a user fault with no signal entry: terminate with the
+/// negative signal number used by the exit-status convention.
+pub fn terminate_fault(kind: u32) -> ! {
+    let status = match kind {
+        signal::FAULT_DIVIDE => -8,
+        signal::FAULT_ILLEGAL => -4,
+        signal::FAULT_MISALIGN => -7,
+        signal::FAULT_BREAKPOINT => -5,
+        _ => -11,
+    };
+    kprintln!("process: user fault kind={kind} status={status}");
+    process::exit_current(status)
 }
 
 fn fatal(slot: u64, frame: &TrapFrame, esr: Esr, ec: u8) -> ! {

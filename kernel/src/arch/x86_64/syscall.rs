@@ -4,7 +4,7 @@
 //! `syscall` MSR setup and the assembly entry stub.
 
 use raven_abi::errno::Errno;
-use raven_abi::signal::{self, ENTRY_SP, MContext};
+use raven_abi::signal::{self, ENTRY_SP, FaultRecord, MContext};
 use raven_usercopy::is_user_address;
 
 use crate::arch::x86_64::gdt::{KERNEL_CS, KERNEL_SS, STAR_USER_BASE, USER_CS, USER_SS};
@@ -231,19 +231,9 @@ pub fn sigreturn_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
     Ok(())
 }
 
-/// Deliver a pending kick to the registered user entry, if one is ready.
-///
-/// Called after the syscall result is in the frame and before `sysretq`, so
-/// the saved context is exactly the interrupted user state.
-pub fn deliver_signal(frame: &mut TrapFrame) {
-    let Some(due) = thread::signal_due() else {
-        return;
-    };
-    {
-        let mut context = SIGNAL_CONTEXT.lock();
-        context_from_frame(frame, &mut context);
-        thread::signal_commit(&due, &context);
-    }
+/// Enter the registered entry with `bits` in `rdi` and the optional fault
+/// record pointer in `rsi`.
+fn enter_signal(frame: &mut TrapFrame, due: &thread::SignalEntry, bits: u64, second: u64) {
     let stack = if due.flags & ENTRY_SP != 0 {
         frame.rsp
     } else {
@@ -255,9 +245,62 @@ pub fn deliver_signal(frame: &mut TrapFrame) {
     if !is_user_address(stack) {
         process::exit_process(Errno::EFAULT.to_ret() as i32);
     }
-    frame.rdi = u64::from(due.bits);
+    frame.rdi = bits;
+    frame.rsi = second;
     frame.rip = due.entry;
     frame.rsp = stack;
+}
+
+/// Deliver a pending kick to the registered user entry, if one is ready.
+///
+/// Called after the syscall result is in the frame and before `sysretq`, so
+/// the saved context is exactly the interrupted user state.
+pub fn deliver_signal(frame: &mut TrapFrame) {
+    let Some(due) = thread::signal_due() else {
+        return;
+    };
+    let fault_pointer = {
+        let mut context = SIGNAL_CONTEXT.lock();
+        context_from_frame(frame, &mut context);
+        thread::signal_commit(&due, &context, None)
+    };
+    enter_signal(frame, &due, u64::from(due.bits), fault_pointer);
+}
+
+/// Deliver a synchronous user fault to the signal entry.
+///
+/// Returns false when the thread has no usable `SIG_SETUP` (no registration,
+/// already inside a signal); the caller then takes the default-action path.
+pub fn deliver_fault(frame: &mut TrapFrame, kind: u32, addr: u64) -> bool {
+    let Some(due) = thread::signal_fault_due() else {
+        return false;
+    };
+    let record = FaultRecord {
+        kind,
+        addr: addr as usize,
+        pc: frame.rip as usize,
+    };
+    let fault_pointer = {
+        let mut context = SIGNAL_CONTEXT.lock();
+        context_from_frame(frame, &mut context);
+        thread::signal_commit(&due, &context, Some(&record))
+    };
+    enter_signal(frame, &due, 0, fault_pointer);
+    true
+}
+
+/// Default action for a user fault with no signal entry: terminate with the
+/// negative signal number used by the exit-status convention.
+pub fn terminate_fault(kind: u32) -> ! {
+    let status = match kind {
+        signal::FAULT_DIVIDE => -8,
+        signal::FAULT_ILLEGAL => -4,
+        signal::FAULT_MISALIGN => -7,
+        signal::FAULT_BREAKPOINT => -5,
+        _ => -11,
+    };
+    crate::kprintln!("process: user fault kind={kind} status={status}");
+    process::exit_current(status)
 }
 
 fn rdmsr(msr: u32) -> u64 {

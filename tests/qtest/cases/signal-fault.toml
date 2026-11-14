@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S45 fault delivery: an unmapped user page is delivered as SIGSEGV/
+# SEGV_MAPERR with the FaultRecord; the handler rewrites the saved PC and
+# SIGRETURN resumes. A breakpoint is delivered as SIGTRAP, x86-64 divide as
+# SIGFPE, and a child process with no SIG_SETUP dies with the SIGSEGV status.
+
+name = "signal-fault"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/signal-fault-fixture/build.sh"]
+initfs = "build/fixtures/signal-fault/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^signal-fault: setup=0$'
+
+[[expect]]
+regex = '^signal-fault: entry scenario=1 bits=0 count=1 fault=1 kind=1 addr=0x[0-9a-f]+ pc=0x[0-9a-f]+ ctx-pc=0x[0-9a-f]+ ctx-size=(256|4384) resume=0x[0-9a-f]+ pc-match=1 addr-match=1$'
+
+[[expect]]
+regex = '^signal-fault: page entry=1$'
+
+[[expect]]
+regex = '^signal-fault: page resumed=1$'
+
+[[expect]]
+regex = '^signal-fault: entry scenario=3 bits=0 count=2 fault=1 kind=6 addr=0x[0-9a-f]+ pc=0x[0-9a-f]+ ctx-pc=0x[0-9a-f]+ ctx-size=(256|4384) resume=0x[0-9a-f]+ pc-match=1 addr-match=1$'
+
+[[expect]]
+regex = '^signal-fault: breakpoint entry=1$'
+
+[[expect]]
+regex = '^signal-fault: breakpoint resumed=1$'
+
+[[expect]]
+regex = '^signal-fault: divide=(fpe|skip)$'
+
+[[expect]]
+regex = '^signal-fault: divide done=1$'
+
+[[expect]]
+regex = '^signal-fault: child status=-11$'
+
+[[expect]]
+regex = '^signal-fault: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

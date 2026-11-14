@@ -9,7 +9,7 @@ use core::sync::atomic::Ordering;
 use alloc::sync::Arc;
 
 use raven_abi::errno::Errno;
-use raven_abi::signal::{CONTEXT_AREA_LIMIT, ENTRY_SP, MContext};
+use raven_abi::signal::{CONTEXT_AREA_LIMIT, ENTRY_SP, FaultRecord, MContext};
 use raven_abi::types::{Handle, Rights, prot};
 use raven_usercopy::{UserSlice, is_user_address};
 
@@ -207,7 +207,7 @@ pub fn sig_setup(frame: &SyscallFrame) -> Result<usize, Errno> {
     if flags & !ENTRY_SP != 0 {
         return Err(Errno::EINVAL);
     }
-    let context_size = size_of::<MContext>();
+    let context_size = size_of::<MContext>().saturating_add(size_of::<FaultRecord>());
     match offset.checked_add(context_size) {
         Some(end) if end <= CONTEXT_AREA_LIMIT => {}
         _ => return Err(Errno::EINVAL),
@@ -234,13 +234,11 @@ pub fn sig_setup(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(0)
 }
 
-/// Resolve the current thread's pending signal, if it is deliverable now.
+/// Resolve a registered entry and context area for the current thread.
 ///
-/// Returns `None` while inside a signal or without a registration (S43's
-/// sticky `-EINTR` path then owns the word). An invalid context area is a
-/// fatal delivery error, per the PG-7 contract.
-pub fn signal_due() -> Option<SignalEntry> {
-    let thread = sched::current_thread()?;
+/// Returns `None` without a registration or while already in a signal. An
+/// invalid context area is a fatal delivery error, per the PG-7 contract.
+fn signal_target(thread: &crate::sched::thread::Thread) -> Option<(u64, u64, u32)> {
     if !thread.user || thread.in_signal.load(Ordering::Acquire) {
         return None;
     }
@@ -248,30 +246,61 @@ pub fn signal_due() -> Option<SignalEntry> {
     if entry == 0 {
         return None;
     }
-    let bits = thread.kick_bits.load(Ordering::Acquire);
-    if bits == 0 {
-        return None;
-    }
     let offset = thread.signal_ctx_offset.load(Ordering::Acquire);
     let Some(ctx) = thread.tls_base().checked_add(offset) else {
         process::exit_process(Errno::EFAULT.to_ret() as i32);
     };
-    if UserSlice::new(ctx, size_of::<MContext>() as u64).is_err() {
+    let size = size_of::<MContext>().saturating_add(size_of::<FaultRecord>());
+    if UserSlice::new(ctx, size as u64).is_err() {
         process::exit_process(Errno::EFAULT.to_ret() as i32);
     }
+    Some((entry, ctx, thread.signal_flags.load(Ordering::Acquire)))
+}
+
+/// Resolve the current thread's pending kick, if it is deliverable now.
+///
+/// Returns `None` while inside a signal or without a registration (S43's
+/// sticky `-EINTR` path then owns the word).
+pub fn signal_due() -> Option<SignalEntry> {
+    let thread = sched::current_thread()?;
+    if thread.signal_entry.load(Ordering::Acquire) == 0 {
+        return None;
+    }
+    let bits = thread.kick_bits.load(Ordering::Acquire);
+    if bits == 0 {
+        return None;
+    }
+    let (entry, ctx, flags) = signal_target(&thread)?;
     Some(SignalEntry {
         bits,
         entry,
         ctx,
-        flags: thread.signal_flags.load(Ordering::Acquire),
+        flags,
     })
 }
 
-/// Save `context` to the entry's user area and mark the thread in-signal.
+/// Resolve a fault delivery target; the kick bits are not part of a fault.
+pub fn signal_fault_due() -> Option<SignalEntry> {
+    let thread = sched::current_thread()?;
+    if thread.signal_entry.load(Ordering::Acquire) == 0 {
+        return None;
+    }
+    let (entry, ctx, flags) = signal_target(&thread)?;
+    Some(SignalEntry {
+        bits: 0,
+        entry,
+        ctx,
+        flags,
+    })
+}
+
+/// Save `context` (and an optional fault record) to the entry's user area and
+/// mark the thread in-signal.
 ///
+/// Returns the user address of the fault record, or zero for a kick delivery.
 /// The bits being delivered are removed from the sticky word; bits that arrived
 /// during the copy stay pending for delivery after `SIGRETURN`.
-pub fn signal_commit(due: &SignalEntry, context: &MContext) {
+pub fn signal_commit(due: &SignalEntry, context: &MContext, fault: Option<&FaultRecord>) -> u64 {
     let Some(thread) = sched::current_thread() else {
         process::exit_process(Errno::EFAULT.to_ret() as i32);
     };
@@ -288,9 +317,32 @@ pub fn signal_commit(due: &SignalEntry, context: &MContext) {
     if copy_to_user(destination, source).is_err() {
         process::exit_process(Errno::EFAULT.to_ret() as i32);
     }
+    let mut fault_address = 0u64;
+    if let Some(record) = fault {
+        let Some(address) = due.ctx.checked_add(size as u64) else {
+            process::exit_process(Errno::EFAULT.to_ret() as i32);
+        };
+        let record_size = size_of::<FaultRecord>();
+        let destination = match UserSlice::new(address, record_size as u64) {
+            Ok(destination) => destination,
+            Err(_) => process::exit_process(Errno::EFAULT.to_ret() as i32),
+        };
+        let bytes = unsafe {
+            // SAFETY: `record` is a live `FaultRecord`; the byte view covers exactly
+            // `size_of::<FaultRecord>()` bytes and is only read for the copy.
+            core::slice::from_raw_parts(record as *const FaultRecord as *const u8, record_size)
+        };
+        if copy_to_user(destination, bytes).is_err() {
+            process::exit_process(Errno::EFAULT.to_ret() as i32);
+        }
+        fault_address = address;
+    }
     thread.signal_active_ctx.store(due.ctx, Ordering::Release);
     thread.in_signal.store(true, Ordering::Release);
-    thread.kick_bits.fetch_and(!due.bits, Ordering::AcqRel);
+    if due.bits != 0 {
+        thread.kick_bits.fetch_and(!due.bits, Ordering::AcqRel);
+    }
+    fault_address
 }
 
 /// Restore the context saved by the active signal (PG-7 `SIGRETURN`, raw 0x82).
