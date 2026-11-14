@@ -32,6 +32,10 @@ snprintf
 sprintf
 sscanf
 ungetc
+vfprintf
 vfscanf
+vprintf
 vscanf
+vsnprintf
+vsprintf
 vsscanf
