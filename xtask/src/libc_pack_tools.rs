@@ -131,6 +131,9 @@ impl Tools {
             std::fs::create_dir_all(parent)?;
         }
         let out = std::path::absolute(out)?;
+        // `ar rcsD` replaces same-named members but keeps members from an older build whose
+        // Cargo hash changed; start from a fresh archive so libc.a is exactly this build.
+        let _ = std::fs::remove_file(&out);
         let status = Command::new(&self.ar)
             .args(["rcsD"])
             .arg(&out)

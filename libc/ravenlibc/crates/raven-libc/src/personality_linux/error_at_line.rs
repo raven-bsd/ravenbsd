@@ -18,6 +18,7 @@ crate::raven_variadic!(
 ///
 /// # Safety
 /// The trampoline built `list`; `format` and `file` are NUL-terminated C strings.
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __raven_va_error_at_line(
     status: c_int,
     errnum: c_int,

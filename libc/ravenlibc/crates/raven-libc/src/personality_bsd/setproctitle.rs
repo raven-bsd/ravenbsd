@@ -53,6 +53,7 @@ pub(crate) unsafe fn run(fast: bool, format: *const c_char, list: *mut List) {
 ///
 /// # Safety
 /// The trampoline built `list`; `format` is NULL or NUL terminated.
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __raven_va_setproctitle(format: *const c_char, list: *mut List) {
     // SAFETY: forwarded from this function's contract.
     unsafe { run(false, format, list) };
