@@ -44,6 +44,7 @@ fn handle_none_is_all_ones() {
 fn thread_extensions_are_frozen() {
     assert_eq!(THREAD_SELF, 0x24);
     assert_eq!(THREAD_EXIT_EX, 0x25);
+    assert_eq!(ROBUST_LIST_SET, 0x26);
     assert_eq!(THREAD_CREATE_EX, 1);
     assert_eq!(core::mem::size_of::<ThreadCreateEx>(), 24);
     let extended = ThreadCreateEx {

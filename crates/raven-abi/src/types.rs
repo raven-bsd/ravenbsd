@@ -158,6 +158,10 @@ pub mod futex {
     /// With this bit clear the address is resolved through its VMA and, for a
     /// shared mapping, keyed on `(memory object id, offset)`.
     pub const PRIVATE: u32 = 0x80;
+    /// Robust futex word: the previous owner died while holding the lock.
+    pub const OWNER_DIED: u32 = 0x4000_0000;
+    /// Bits carrying the owner thread id in a robust futex word.
+    pub const OWNER_TID: u32 = 0x3fff_ffff;
 }
 
 /// Clock identifiers (Linux numbering).

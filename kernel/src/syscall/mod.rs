@@ -79,6 +79,9 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == raven_abi::syscall::THREAD_SELF {
         return thread::self_tid();
     }
+    if number == raven_abi::syscall::ROBUST_LIST_SET {
+        return thread::robust_list_set(frame);
+    }
     if number == raven_abi::syscall::THREAD_EXIT_EX {
         thread::exit_ex(frame);
     }

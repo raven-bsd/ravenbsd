@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S49 robust futex: a locker exits with a registered robust list and the waiter
+# sees OWNER_DIED; a terminated child holding a shared robust word wakes the
+# parent's waiter; bad head/len and the 2048-entry bound are covered.
+
+name = "robust-futex"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/robust-futex-fixture/build.sh"]
+initfs = "build/fixtures/robust-futex/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^robust-futex: bad=1$'
+
+[[expect]]
+regex = '^robust-futex: thread waiter owner-died=1 cleared=1$'
+
+[[expect]]
+regex = '^robust-futex: bound=2048$'
+
+[[expect]]
+regex = '^robust-futex: process waiter owner-died=1 cleared=1$'
+
+[[expect]]
+regex = '^robust-futex: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

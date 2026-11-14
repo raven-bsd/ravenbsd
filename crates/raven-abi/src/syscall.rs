@@ -214,6 +214,12 @@ pub const THREAD_KICK: usize = 0x81;
 /// not a `Syscall` variant.
 pub const THREAD_SELF: usize = 0x24;
 
+/// `robust_list_set(head: usize, len: usize) -> 0`.
+///
+/// Registers the calling thread's Linux `robust_list_head`; `head == 0` and
+/// `len == 0` clears it. Raw constant, not a `Syscall` variant.
+pub const ROBUST_LIST_SET: usize = 0x26;
+
 /// `thread_exit_ex(code: i32, clear_addr: usize, unmap_addr: usize, unmap_len: usize) -> !`.
 ///
 /// Stores zero to `clear_addr`, unmaps `[unmap_addr, unmap_addr + unmap_len)`,
