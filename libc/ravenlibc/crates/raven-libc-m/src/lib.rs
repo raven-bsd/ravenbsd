@@ -90,10 +90,13 @@ mod long_double;
 pub mod long_double_math;
 mod portable;
 
-/// On the binary128 targets the `long double` value is the IEEE 128-bit type; the `*l` entry
-/// points are still x86-64-only (the series module is gated), which the C47c report lists.
+/// On the binary128 targets the `long double` value is the IEEE 128-bit type.
 #[cfg(not(target_arch = "x86_64"))]
 pub use binary128::LongDouble128 as LongDouble;
+#[cfg(not(target_arch = "x86_64"))]
+mod binary128_l;
+#[cfg(not(target_arch = "x86_64"))]
+pub use binary128_l::*;
 
 pub use c23::{
     canonicalize, canonicalizef, getpayload, getpayloadf, issignaling, issignalingf, nextdown,

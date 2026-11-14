@@ -439,6 +439,112 @@ impl LongDouble128 {
             bits: integral_bits(self.bits, IntegralMode::Even),
         }
     }
+
+    /// Whether the value is a normal number.
+    pub fn is_normal(self) -> bool {
+        classify(self.bits) == FP_NORMAL
+    }
+
+    /// The IEEE partial order; `None` when either operand is a NaN.
+    pub fn partial_cmp(self, other: Self) -> Option<core::cmp::Ordering> {
+        if self.is_nan() || other.is_nan() {
+            return None;
+        }
+        Some(self.total_cmp(other))
+    }
+
+    /// `x mod y` with the sign of `x` (`fmod`).
+    pub fn fmod(self, other: Self) -> Self {
+        if self.is_nan() || other.is_nan() || self.is_infinite() || other.is_zero() {
+            return Self::nan();
+        }
+        if other.is_infinite() || self.is_zero() {
+            return self;
+        }
+        self.sub(self.div(other).trunc().mul(other))
+    }
+
+    /// `remainder`: `x - n*y` with `n` the nearest even integer to `x/y`.
+    pub fn remainder(self, other: Self) -> Self {
+        self.remquo(other).0
+    }
+
+    /// `remquo`: the remainder and the low quotient bits with the sign.
+    pub fn remquo(self, other: Self) -> (Self, i32) {
+        if self.is_nan() || other.is_nan() || self.is_infinite() || other.is_zero() {
+            return (Self::nan(), 0);
+        }
+        if other.is_infinite() || self.is_zero() {
+            return (self, 0);
+        }
+        let quotient = self.div(other).roundeven();
+        let magnitude = quotient.abs().to_i64().unwrap_or(0) & 0x7f;
+        let negative = self.sign_bit() ^ other.sign_bit();
+        let low = if negative {
+            -(magnitude as i32)
+        } else {
+            magnitude as i32
+        };
+        (self.sub(quotient.mul(other)), low)
+    }
+
+    /// `fdim`: the positive difference.
+    pub fn fdim(self, other: Self) -> Self {
+        if self.is_nan() || other.is_nan() {
+            return Self::nan();
+        }
+        if self.total_cmp(other) == core::cmp::Ordering::Greater {
+            self.sub(other)
+        } else {
+            Self::zero(false)
+        }
+    }
+
+    /// `fmax`: the larger value, with `+0` winning over `-0` and a NaN yielding the other operand.
+    pub fn fmax(self, other: Self) -> Self {
+        if self.is_nan() {
+            return other;
+        }
+        if other.is_nan() {
+            return self;
+        }
+        if self.total_cmp(other) == core::cmp::Ordering::Greater {
+            self
+        } else {
+            other
+        }
+    }
+
+    /// `fmin`: the smaller value, with `-0` winning over `+0` and a NaN yielding the other operand.
+    pub fn fmin(self, other: Self) -> Self {
+        if self.is_nan() {
+            return other;
+        }
+        if other.is_nan() {
+            return self;
+        }
+        if self.total_cmp(other) == core::cmp::Ordering::Less {
+            self
+        } else {
+            other
+        }
+    }
+
+    /// `nextafter` towards `other`.
+    pub fn next_after(self, other: Self) -> Self {
+        if self.is_nan() || other.is_nan() {
+            return Self::nan();
+        }
+        let key = order_key(self.bits);
+        let target = order_key(other.bits);
+        if key == target {
+            return other;
+        }
+        let next = if key < target { key + 1 } else { key - 1 };
+        Self {
+            bits: if next & SIGN != 0 { next ^ SIGN } else { !next },
+        }
+    }
 }
 
 /// The integral rounding modes.

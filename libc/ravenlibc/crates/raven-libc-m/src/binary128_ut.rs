@@ -284,3 +284,91 @@ fn the_binary128_integral_rounding_family() {
         f64::INFINITY
     );
 }
+
+#[test]
+fn the_binary128_exact_class_helpers() {
+    use super::LongDouble128;
+    assert!(LongDouble128::from_f64(1.0).is_normal());
+    assert!(!LongDouble128::zero(false).is_normal());
+    assert_eq!(
+        LongDouble128::from_f64(1.0).partial_cmp(LongDouble128::from_f64(2.0)),
+        Some(core::cmp::Ordering::Less)
+    );
+    assert_eq!(
+        LongDouble128::from_f64(1.0).partial_cmp(LongDouble128::nan()),
+        None
+    );
+    assert_eq!(
+        LongDouble128::from_f64(5.5)
+            .fmod(LongDouble128::from_f64(2.0))
+            .to_f64(),
+        1.5
+    );
+    assert_eq!(
+        LongDouble128::from_f64(-5.5)
+            .fmod(LongDouble128::from_f64(2.0))
+            .to_f64(),
+        -1.5
+    );
+    assert!(
+        LongDouble128::from_f64(1.0)
+            .fmod(LongDouble128::zero(false))
+            .is_nan()
+    );
+    assert_eq!(
+        LongDouble128::from_f64(5.5)
+            .remainder(LongDouble128::from_f64(2.0))
+            .to_f64(),
+        -0.5
+    );
+    let (value, quotient) = LongDouble128::from_f64(5.5).remquo(LongDouble128::from_f64(2.0));
+    assert_eq!(value.to_f64(), -0.5);
+    assert_eq!(quotient, 3);
+    assert_eq!(
+        LongDouble128::from_f64(5.0)
+            .fdim(LongDouble128::from_f64(2.0))
+            .to_f64(),
+        3.0
+    );
+    assert_eq!(
+        LongDouble128::from_f64(2.0)
+            .fdim(LongDouble128::from_f64(5.0))
+            .to_f64(),
+        0.0
+    );
+    assert_eq!(
+        LongDouble128::from_f64(1.0)
+            .fmax(LongDouble128::from_f64(2.0))
+            .to_f64(),
+        2.0
+    );
+    assert_eq!(
+        LongDouble128::from_f64(1.0)
+            .fmin(LongDouble128::from_f64(2.0))
+            .to_f64(),
+        1.0
+    );
+    assert!(
+        !LongDouble128::zero(true)
+            .fmax(LongDouble128::zero(false))
+            .sign_bit()
+    );
+    assert!(
+        LongDouble128::zero(false)
+            .fmin(LongDouble128::zero(true))
+            .sign_bit()
+    );
+    assert_eq!(
+        LongDouble128::from_f64(1.0)
+            .next_after(LongDouble128::from_f64(2.0))
+            .to_bits(),
+        LongDouble128::from_f64(1.0).to_bits() + 1
+    );
+    assert_eq!(
+        LongDouble128::from_f64(1.0)
+            .next_after(LongDouble128::from_f64(2.0))
+            .next_after(LongDouble128::from_f64(1.0))
+            .to_f64(),
+        1.0
+    );
+}
