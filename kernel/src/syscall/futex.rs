@@ -131,6 +131,14 @@ fn wait(
     }
 }
 
+/// Wake up to `max` waiters on `address` in `process` (robust-list walk).
+pub fn wake_process_address(process: &Arc<process::Process>, address: u64, max: usize) -> usize {
+    let Ok((space, key)) = futex_key(process, address, false) else {
+        return 0;
+    };
+    bucket(space, key).wake(space, key, max)
+}
+
 /// Drop every futex waiter owned by `thread_id`.
 pub fn remove_thread(thread_id: u64) {
     for queue in QUEUES.iter() {

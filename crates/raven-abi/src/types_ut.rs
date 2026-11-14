@@ -38,3 +38,10 @@ fn futex_private_flag_is_bit_7() {
     assert_eq!(futex::PRIVATE, 0x80);
     assert_eq!(futex::PRIVATE & (futex::WAIT | futex::WAKE), 0);
 }
+
+#[test]
+fn robust_owner_bits_are_disjoint() {
+    assert_eq!(futex::OWNER_DIED, 0x4000_0000);
+    assert_eq!(futex::OWNER_TID, 0x3fff_ffff);
+    assert_eq!(futex::OWNER_DIED & futex::OWNER_TID, 0);
+}

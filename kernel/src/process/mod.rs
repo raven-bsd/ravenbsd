@@ -7,6 +7,7 @@
 //! single thread owns the kernel stack used by syscall and trap entry.
 
 pub mod handle;
+pub mod robust;
 pub mod thread;
 
 use core::fmt;
@@ -778,6 +779,7 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     *state = ProcessState::Exited;
     process.exit_code.store(code, Ordering::Release);
     process.exiting.store(true, Ordering::Release);
+    robust::walk_process(process);
     crate::syscall::futex::remove_process(process.id);
     let _ = process.waiters.wake_all();
     drop(state);
@@ -794,6 +796,7 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
 /// thread is executing while this syscall runs, so the address space can be released here.
 pub fn exit_process(code: i32) -> ! {
     if let Some(process) = current() {
+        let _ = robust::walk_thread();
         let _ = terminate_once(&process, code, true);
     }
     crate::sched::exit_thread(code)

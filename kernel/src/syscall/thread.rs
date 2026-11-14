@@ -193,8 +193,17 @@ pub fn self_tid() -> Result<usize, Errno> {
     Ok(thread.tid as usize)
 }
 
+/// `robust_list_set(head, len) -> 0` (raw 0x26).
+pub fn robust_list_set(frame: &SyscallFrame) -> Result<usize, Errno> {
+    crate::process::robust::set(frame.rdi, frame.rsi)?;
+    Ok(0)
+}
+
 /// `thread_exit(code) -> !`.
 pub fn exit(frame: &SyscallFrame) -> ! {
+    if let Err(error) = process::robust::walk_thread() {
+        process::exit_process(error.to_ret() as i32);
+    }
     if let Some(thread) = sched::current_thread() {
         clear_word(thread.clear_tid.load(Ordering::Acquire));
     }
@@ -203,6 +212,9 @@ pub fn exit(frame: &SyscallFrame) -> ! {
 
 /// `thread_exit_ex(code, clear_addr, unmap_addr, unmap_len) -> !`.
 pub fn exit_ex(frame: &SyscallFrame) -> ! {
+    if let Err(error) = process::robust::walk_thread() {
+        process::exit_process(error.to_ret() as i32);
+    }
     clear_word(frame.rsi);
     if frame.r10 != 0 {
         crate::syscall::memory_ctl::unmap_current(frame.rdx, frame.r10);
