@@ -221,6 +221,24 @@ pub fn unmap(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(0)
 }
 
+/// Unmap `[addr, addr + len)` from the calling process for `THREAD_EXIT_EX`.
+///
+/// The exiting thread is already on its kernel stack, so removing its user
+/// stack is safe; an invalid or already-unmapped range is ignored (the caller
+/// never returns to user mode).
+pub fn unmap_current(addr: u64, len: u64) {
+    let Some(caller) = process::current() else {
+        return;
+    };
+    if validate_range(addr, len).is_err() {
+        return;
+    }
+    let mut guard = caller.address_space.lock();
+    if let Some(address_space) = guard.as_mut() {
+        let _ = address_space.unmap(addr, len);
+    }
+}
+
 /// `protect(proc, addr, len, prot) -> 0`.
 pub fn protect(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;

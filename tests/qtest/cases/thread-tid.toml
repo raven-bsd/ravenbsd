@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S47 thread ids: THREAD_SELF, the ThreadCreateEx tid_out/clear_tid_addr
+# extension, plain THREAD_EXIT clear-on-exit and THREAD_EXIT_EX clear + unmap.
+
+name = "thread-tid"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/thread-tid-fixture/build.sh"]
+initfs = "build/fixtures/thread-tid/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^thread-tid: self tid=0x[0-9a-f]+ ok=1$'
+
+[[expect]]
+regex = '^thread-tid: set-tid=1$'
+
+[[expect]]
+regex = '^thread-tid: a self=0x[0-9a-f]+ expected=0x[0-9a-f]+ match=1$'
+unordered = true
+
+[[expect]]
+regex = '^thread-tid: a exit clear=1 distinct=1 done=1$'
+
+[[expect]]
+regex = '^thread-tid: bad=EFAULT$'
+
+[[expect]]
+regex = '^thread-tid: b self=0x[0-9a-f]+ expected=0x[0-9a-f]+ match=1$'
+unordered = true
+
+[[expect]]
+regex = '^thread-tid: b exit clear=1 distinct=1 done=1$'
+
+[[expect]]
+regex = '^thread-tid: exit-ex unmap=1$'
+
+[[expect]]
+regex = '^thread-tid: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

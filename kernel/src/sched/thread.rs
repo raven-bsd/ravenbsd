@@ -44,6 +44,19 @@ const PAGE: u64 = 4096;
 const STACK_RESERVED_PAGES: u64 = KERNEL_STACK_PAGES + 1;
 
 static NEXT_THREAD_ID: AtomicU64 = AtomicU64::new(1);
+/// 30-bit userspace thread ids (PG-2); zero is never handed out.
+static NEXT_TID: AtomicU32 = AtomicU32::new(1);
+/// Mask keeping a tid in the musl lock-word / PG-2 30-bit range.
+const TID_MASK: u32 = 0x3fff_ffff;
+
+fn next_tid() -> u32 {
+    loop {
+        let tid = NEXT_TID.fetch_add(1, Ordering::Relaxed) & TID_MASK;
+        if tid != 0 {
+            return tid;
+        }
+    }
+}
 
 /// Thread run state.
 #[repr(u8)]
@@ -100,6 +113,10 @@ impl SchedContext {
 pub struct Thread {
     /// Monotonic thread id.
     pub id: u64,
+    /// Stable 30-bit nonzero userspace tid (PG-2).
+    pub tid: u32,
+    /// User word cleared on thread exit (zero disables it).
+    pub clear_tid: AtomicU64,
     /// Diagnostic name.
     #[allow(dead_code)] // used by diagnostics in later tickets
     pub name: String,
@@ -240,6 +257,8 @@ impl Thread {
         let (base, top) = allocate_kernel_stack().ok_or(Errno::ENOMEM)?;
         let thread = Arc::new(Thread {
             id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
+            tid: next_tid(),
+            clear_tid: AtomicU64::new(0),
             name,
             process,
             state: AtomicU8::new(ThreadState::Ready as u8),
@@ -336,6 +355,8 @@ impl Thread {
     pub fn new_idle(process: Arc<Process>, current_rsp: u64, cr3: u64) -> Arc<Thread> {
         Arc::new(Thread {
             id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
+            tid: next_tid(),
+            clear_tid: AtomicU64::new(0),
             name: String::from("idle"),
             process,
             state: AtomicU8::new(ThreadState::Running as u8),
@@ -382,6 +403,8 @@ impl Thread {
         let (base, top) = allocate_kernel_stack().ok_or(Errno::ENOMEM)?;
         Ok(Arc::new(Thread {
             id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
+            tid: next_tid(),
+            clear_tid: AtomicU64::new(0),
             name: String::from("idle-ap"),
             process,
             state: AtomicU8::new(ThreadState::Running as u8),

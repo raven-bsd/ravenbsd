@@ -76,6 +76,12 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == raven_abi::syscall::THREAD_KICK {
         return thread::kick(frame);
     }
+    if number == raven_abi::syscall::THREAD_SELF {
+        return thread::self_tid();
+    }
+    if number == raven_abi::syscall::THREAD_EXIT_EX {
+        thread::exit_ex(frame);
+    }
     if number == raven_abi::signal::SIG_SETUP {
         return thread::sig_setup(frame);
     }
