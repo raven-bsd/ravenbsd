@@ -104,10 +104,17 @@ pub fn key_delete<K: ThreadKernel>(kernel: &K, key: u32) {
     if main != 0 {
         let first = raw::tcb(main);
         let mut current = first;
+        // The list is circular and `threads` counts the live TCBs. Bound the walk by that
+        // count: an exit test (or a fork child) can leave `main_tcb` pointing at an unlinked
+        // TCB whose `next` chain never returns to the start, which made this loop spin forever
+        // under the parallel `make check` order. A live list still visits every TCB exactly
+        // once; a stale list visits at most the number of live threads.
+        let mut remaining = crate::libc_state::LIBC.threads().max(1);
         loop {
             raw::set_tsd_value(current, index, 0);
             current = raw::next_thread(current);
-            if core::ptr::eq(current, first) {
+            remaining = remaining.saturating_sub(1);
+            if core::ptr::eq(current, first) || remaining == 0 {
                 break;
             }
         }
