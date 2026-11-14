@@ -46,6 +46,24 @@ fn a_deleted_key_rejects_setspecific() {
 }
 
 #[test]
+fn key_delete_terminates_on_a_stale_exit_list() {
+    let _serial = crate::test_support::serial();
+    let stale = crate::test_support::MockKernel::new();
+    let peer = crate::test_support::MockKernel::new();
+    let stale_tcb = stale.tcb();
+    let peer_tcb = peer.tcb();
+    // Simulate the state an exiting thread leaves behind: `main_tcb` still points at the
+    // unlinked TCB, whose `next` reaches a self-linked peer and never returns to the start.
+    crate::raw::set_links(crate::raw::tcb(stale_tcb), peer_tcb, peer_tcb);
+    crate::raw::set_links(crate::raw::tcb(peer_tcb), peer_tcb, peer_tcb);
+    crate::libc_state::LIBC.reset(stale_tcb);
+    crate::thread::list::reset_for_fork_child();
+    let key = key_create(&stale, None).unwrap();
+    key_delete(&stale, key);
+    assert_eq!(setspecific(&stale, key, 1), Err(EINVAL));
+}
+
+#[test]
 fn an_out_of_range_key_is_einval() {
     let _serial = crate::test_support::serial();
     let kernel = crate::test_support::MockKernel::new();
