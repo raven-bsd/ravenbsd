@@ -79,3 +79,50 @@ fn the_significand_is_the_low_112_bits() {
     assert_eq!(nan & SIGNIFICAND_MASK, QUIET | 0x1234);
     assert_eq!(ONE & SIGNIFICAND_MASK, 0);
 }
+
+#[test]
+fn the_binary128_type_adds_and_subtracts_correctly() {
+    use super::LongDouble128;
+    let one = LongDouble128::from_f64(1.0);
+    let two = LongDouble128::from_f64(2.0);
+    assert_eq!(one.add(one).to_f64(), 2.0);
+    assert_eq!(
+        LongDouble128::from_f64(1.5)
+            .add(LongDouble128::from_f64(2.25))
+            .to_f64(),
+        3.75
+    );
+    assert_eq!(one.sub(one).to_f64(), 0.0);
+    assert_eq!(one.sub(two).to_f64(), -1.0);
+    assert_eq!(two.sub(one).to_f64(), 1.0);
+    assert!(
+        LongDouble128::zero(true)
+            .add(LongDouble128::zero(true))
+            .sign_bit()
+    );
+    assert!(!one.add(two).sub(LongDouble128::from_f64(3.0)).sign_bit());
+    assert!(
+        LongDouble128::infinity(false)
+            .add(LongDouble128::infinity(true))
+            .is_nan()
+    );
+    assert_eq!(
+        LongDouble128::infinity(false).add(one).to_f64(),
+        f64::INFINITY
+    );
+    assert!(one.add(LongDouble128::nan()).is_nan());
+    // Exact in 113 bits: 1 + 2^-100 is representable, so the sum is exact.
+    let small = LongDouble128::from_bits(0x3f8f_0000_0000_0000_0000_0000_0000_0000);
+    let sum = one.add(small);
+    assert!(sum.to_f64() == 1.0);
+    assert!(sum.total_cmp(one) == core::cmp::Ordering::Greater);
+    // Ordering and layout.
+    assert!(
+        LongDouble128::zero(true).total_cmp(LongDouble128::zero(false))
+            == core::cmp::Ordering::Less
+    );
+    assert_eq!(LongDouble128::one().to_bits(), ONE);
+    assert_eq!(LongDouble128::one().exponent_field(), 0x3fff);
+    assert_eq!(LongDouble128::one().significand_bits(), 0);
+    assert_eq!(LongDouble128::nan().class(), FP_NAN);
+}
