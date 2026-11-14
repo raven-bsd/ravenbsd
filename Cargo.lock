@@ -981,6 +981,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-crt"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+]
+
+[[package]]
 name = "raven-libc-ctype"
 version = "0.1.0"
 dependencies = [

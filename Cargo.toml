@@ -154,6 +154,7 @@ members = [
     "tools/bench-host",
     "tools/fuzz",
     "tests/fuzz/replay",
+    "libc/ravenlibc/crt",
 ]
 default-members = ["crates/*", "libc/ravenlibc/crates/*"]
 

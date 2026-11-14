@@ -68,3 +68,11 @@ strong_symbol = "__rl_malloc_debug_impl"
 strong_file = "src/hooks/malloc_debug.rs"
 pulled_by = ["MALLOC_OPTIONS"]
 weak_side = "src/malloc/malloc.rs"
+
+[[hook]]
+name = "__rl_fini_array"
+dummy = "nothing"
+strong_symbol = "__rl_fini_array"
+strong_file = "src/hooks/fini_array.rs"
+pulled_by = ["__raven_libc_start"]
+weak_side = "src/stdlib/exit.rs"
