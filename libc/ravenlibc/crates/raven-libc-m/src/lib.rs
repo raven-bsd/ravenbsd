@@ -78,12 +78,15 @@ mod rsqrt;
 mod sinpi;
 #[macro_use]
 mod support;
+pub mod binary128;
 mod c23;
 mod complex;
 mod coremath;
 mod fdlibm;
 mod generic;
 mod legacy;
+#[cfg(target_arch = "x86_64")]
+mod long_double;
 mod portable;
 
 pub use c23::{
@@ -110,6 +113,11 @@ pub use fp::{
 pub use legacy::{
     drem, dremf, finite, finitef, gamma, gammaf, pow10, pow10f, scalb, scalbf, significand,
     significandf, sincos, sincosf,
+};
+#[cfg(target_arch = "x86_64")]
+pub use long_double::{
+    LongDouble, ceill, copysignl, fabsl, floorl, fmodl, fpclassifyl, isfinitel, isinfl, isnanl,
+    isnormall, nextafterl, nexttowardl, roundl, signbitl, sqrtl, totalorderl, truncl,
 };
 
 use support::Round;
