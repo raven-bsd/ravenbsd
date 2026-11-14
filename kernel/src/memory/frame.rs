@@ -8,11 +8,13 @@
 //! BadMemory frames stay reserved. The bitmap's own frames are reserved after the usable regions
 //! are marked.
 
+use alloc::vec::Vec;
 use core::fmt;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use crate::log::SpinMutex;
 use raven_bootinfo::{MemoryKind, MemoryRegion};
+use spin::Mutex;
 
 #[path = "../../../crates/raven-frames/src/imp.rs"]
 #[allow(dead_code)] // Shared crate source includes helpers used by its own tests.
@@ -77,6 +79,13 @@ struct State {
 
 static ALLOCATOR: SpinMutex<Option<State>> = SpinMutex::new(None);
 static HHDM_OFFSET: AtomicU64 = AtomicU64::new(0);
+
+/// Physical frames mapped read-only by more than one address space.
+///
+/// A frame enters the registry with a count of two on the first fork and leaves it when the
+/// count drops back to one. Frames owned by a single address space are absent, so the common
+/// case pays nothing.
+static SHARED_FRAMES: Mutex<Vec<(u64, u32)>> = Mutex::new(Vec::new());
 
 /// Build the global allocator from `map` and return its initial statistics.
 ///
@@ -198,6 +207,43 @@ pub fn free_frame(phys: PhysAddr) -> Result<(), FreeError> {
     let mut state = ALLOCATOR.lock();
     let allocator = state.as_mut().ok_or(FreeError::OutOfRange)?;
     allocator.allocator.free(phys.0 / PAGE_SIZE)
+}
+
+/// Mark `phys` as shared by one more address space.
+///
+/// The first share records two owners (the existing one and the new one); later shares
+/// increment the count. The frame stays allocated until the count returns to one and the last
+/// owner releases it, or until that owner frees it directly.
+pub fn share_frame(phys: PhysAddr) {
+    let mut shared = SHARED_FRAMES.lock();
+    if let Some(entry) = shared.iter_mut().find(|entry| entry.0 == phys.0) {
+        entry.1 = entry.1.saturating_add(1);
+    } else {
+        shared.push((phys.0, 2));
+    }
+}
+
+/// True when more than one address space maps `phys`.
+pub fn is_shared(phys: PhysAddr) -> bool {
+    SHARED_FRAMES.lock().iter().any(|entry| entry.0 == phys.0)
+}
+
+/// Drop one shared reference to `phys`.
+///
+/// A count of two means one owner remains: the entry is removed and the frame is *not* freed.
+/// The remaining owner frees it through its normal teardown or unmap path.
+pub fn release_shared(phys: PhysAddr) {
+    let mut shared = SHARED_FRAMES.lock();
+    let Some(index) = shared.iter().position(|entry| entry.0 == phys.0) else {
+        return;
+    };
+    if let Some(entry) = shared.get_mut(index)
+        && entry.1 > 2
+    {
+        entry.1 = entry.1.saturating_sub(1);
+        return;
+    }
+    let _ = shared.swap_remove(index);
 }
 
 /// Current allocator statistics; zeros before initialisation.

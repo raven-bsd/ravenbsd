@@ -245,6 +245,85 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     Ok(process)
 }
 
+/// Create an unstarted child whose address space is a COW clone of `source`.
+///
+/// The handle table is forked with `HandleTable::fork_into`, so indices, generations, rights,
+/// retired slots and lineage nodes are preserved; the source's self-process handle is rewritten
+/// to the child. `NOFORK` mappings are absent and their verifiable object handles are closed in
+/// the child. The namespace and personality are copied. No thread is created.
+pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> {
+    let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
+    let personality = *source.personality.lock();
+    let child = Arc::new(Process {
+        id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+        path: source.path.clone(),
+        address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
+        handles: Mutex::new(HandleTable::new()),
+        exit_code: AtomicI32::new(0),
+        threads: AtomicU32::new(0),
+        exiting: AtomicBool::new(false),
+        torn_down: AtomicBool::new(false),
+        timer_count: Arc::new(AtomicU32::new(0)),
+        dma_bytes: Arc::new(AtomicU64::new(0)),
+        state: Mutex::new(ProcessState::Created),
+        waiters: WaitQueue::new(),
+        namespace: Mutex::new(Namespace::root()),
+        schemes: Mutex::new(alloc::vec::Vec::new()),
+        scheme_queue: Mutex::new(VecDeque::new()),
+        scheme_waiters: WaitQueue::new(),
+        active_requests: Mutex::new(alloc::vec::Vec::new()),
+        client_requests: Mutex::new(alloc::vec::Vec::new()),
+        capture_slots: Mutex::new(CaptureSlots::new()),
+        personality: Mutex::new(personality),
+    });
+
+    {
+        let mut source_space = source.address_space.lock();
+        let source_space = source_space.as_mut().ok_or(Errno::ESRCH)?;
+        let mut child_space = child.address_space.lock();
+        let child_space = child_space.as_mut().ok_or(Errno::ESRCH)?;
+        child_space.fork_clone_from(source_space)?;
+    }
+
+    let (nofork, inherited) = {
+        let source_space = source.address_space.lock();
+        let source_space = source_space.as_ref().ok_or(Errno::ESRCH)?;
+        (
+            source_space.nofork_handles(),
+            source_space.inherited_handles(),
+        )
+    };
+    {
+        let source_table = source.handles.lock();
+        let mut child_table = child.handles.lock();
+        child_table.fork_into(&source_table, |object| {
+            Ok(match object {
+                Object::Process(process) if Arc::ptr_eq(process, source) => {
+                    Object::Process(Arc::clone(&child))
+                }
+                other => other.clone(),
+            })
+        })?;
+        for entry in nofork {
+            if inherited.contains(&entry.handle) {
+                continue;
+            }
+            let matches = match entry.object {
+                Some(id) => matches!(
+                    source_table.get(Handle(entry.handle), raven_abi::types::Rights::NONE),
+                    Ok(Object::Memory(object)) | Ok(Object::BootBlob(object)) if object.id() == id
+                ),
+                None => false,
+            };
+            if matches {
+                let _ = child_table.close(Handle(entry.handle));
+            }
+        }
+    }
+    *child.namespace.lock() = source.namespace.lock().clone();
+    Ok(child)
+}
+
 impl Process {
     /// Account for one new thread.
     pub fn thread_started(&self) {
