@@ -8,8 +8,8 @@ use std::path::Path;
 use anyhow::{Result, bail};
 
 use crate::{
-    libc_census, libc_headers, libc_link, libc_lint, libc_oracle, libc_pack, libc_size,
-    libc_stubs, libc_world,
+    libc_census, libc_headers, libc_link, libc_lint, libc_oracle, libc_pack, libc_size, libc_stubs,
+    libc_world,
 };
 
 /// One command implementation.

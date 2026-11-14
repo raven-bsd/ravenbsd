@@ -113,6 +113,7 @@ impl Diff {
             return Ok(vec![Planned {
                 spec,
                 label: Some(format!("libc-oracle diff {}", self.family)),
+                passthrough: false,
             }]);
         }
         let mut build = vec![

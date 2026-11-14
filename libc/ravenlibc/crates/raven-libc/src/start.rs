@@ -140,7 +140,7 @@ core::arch::global_asm!(
     ".globl __rl_init_hook",
     ".type __rl_init_hook,@function",
     "__rl_init_hook:",
-    "lea _init(%rip),%rax",
+    "mov _init@GOTPCREL(%rip),%rax",
     "ret",
     options(att_syntax),
 );

@@ -23,7 +23,7 @@ core::arch::global_asm!(
     ".globl __rl_fini_hook",
     ".type __rl_fini_hook,@function",
     "__rl_fini_hook:",
-    "lea _fini(%rip),%rax",
+    "mov _fini@GOTPCREL(%rip),%rax",
     "ret",
     options(att_syntax),
 );

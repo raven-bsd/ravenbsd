@@ -898,17 +898,12 @@ RAVEN_1.0 {
 RAVENprivate_1.0 {
 	global:
 		__raven_libc_start;
-		__raven_va_error;
-		__raven_va_error_at_line;
 		__raven_va_execle;
 		__raven_va_execl;
 		__raven_va_execlp;
 		__raven_va_ioctl;
 		__raven_va_open;
 		__raven_va_openat;
-		__raven_va_prctl;
-		__raven_va_setproctitle;
-		__raven_va_setproctitle_fast;
 		__rl_fini_array;
 		__rl_fmt_float_impl;
 		__rl_fmt_wide_impl;
