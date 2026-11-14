@@ -273,16 +273,25 @@ fn a7_hot_members_have_no_call() {
 }
 
 #[test]
-fn a8_no_c64_family_symbol_is_defined() {
+fn a8_c64_family_symbols_are_defined() {
     if !archive().is_file() {
         skip_or_fail!("no archive");
     }
-    let forbidden = ["fork", "pthread_create", "socket", "dlopen"];
-    for (_, _, name) in defined() {
-        assert!(
-            !forbidden.contains(&name.as_str()),
-            "C64 symbol {name} is defined"
-        );
+    let names = defined()
+        .into_iter()
+        .map(|(_, _, name)| name)
+        .collect::<std::collections::BTreeSet<_>>();
+    for required in [
+        "fork",
+        "getpid",
+        "getpwnam",
+        "sched_yield",
+        "htons",
+        "inet_pton",
+        "__progname",
+        "in6addr_any",
+    ] {
+        assert!(names.contains(required), "C64 symbol {required} is missing");
     }
 }
 

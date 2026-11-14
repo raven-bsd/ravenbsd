@@ -9,14 +9,23 @@
 
 #![allow(dead_code)]
 
+pub mod argv;
+pub mod cast;
 pub mod cstr;
 pub mod env;
 pub mod errno;
+pub mod iov;
+pub mod lock;
 pub mod map_fmt;
 pub mod map_int;
+pub mod map_net;
+pub mod map_proc;
 pub mod out;
 pub mod platform;
+pub mod procbackend;
 pub mod ret;
+pub mod sockaddr;
+pub mod tcbbuf;
 
 /// Serialises the tests that read and write the one process-wide `errno` cell.
 #[cfg(test)]

@@ -1,0 +1,86 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# inet
+htonl
+htons
+inet_addr
+inet_aton
+inet_lnaof
+inet_makeaddr
+inet_net_ntop
+inet_net_pton
+inet_netof
+inet_network
+inet_ntoa
+inet_ntop
+inet_pton
+ntohl
+ntohs
+# data
+__h_errno_location
+h_errno
+in6addr_any
+in6addr_loopback
+# legacy
+gai_strerror
+herror
+hstrerror
+# host
+endhostent
+freeaddrinfo
+getaddrinfo
+gethostbyaddr
+gethostbyaddr_r
+gethostbyname
+gethostbyname2
+gethostbyname2_r
+gethostbyname_r
+gethostent
+getnameinfo
+sethostent
+# service
+endservent
+getservbyname
+getservbyname_r
+getservbyport
+getservbyport_r
+getservent
+setservent
+# protocol
+endprotoent
+getprotobyname
+getprotobyname_r
+getprotobynumber
+getprotobynumber_r
+getprotoent
+setprotoent
+# network
+endnetent
+getnetbyaddr
+getnetbyname
+getnetent
+setnetent
+# interface
+freeifaddrs
+getifaddrs
+if_freenameindex
+if_indextoname
+if_nameindex
+if_nametoindex
+# resolver
+dn_comp
+dn_expand
+dn_skipname
+ns_get16
+ns_get32
+ns_initparse
+ns_parserr
+ns_put16
+ns_put32
+ns_skiprr
+res_init
+res_mkquery
+res_query
+res_querydomain
+res_search
+res_send

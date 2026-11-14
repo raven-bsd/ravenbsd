@@ -61,6 +61,7 @@ pub(crate) mod strtol;
 pub(crate) mod strtonum;
 pub(crate) mod strtoul;
 pub(crate) mod suboptarg;
+pub(crate) mod system;
 pub(crate) mod tdelete;
 pub(crate) mod tdestroy;
 pub(crate) mod tfind;

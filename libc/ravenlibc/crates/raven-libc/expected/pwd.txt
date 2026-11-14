@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# passwd
+endpwent
+getpwent
+getpwent_r
+getpwnam
+getpwnam_r
+getpwuid
+getpwuid_r
+setpassent
+setpwent
+# pwcache
+uid_from_user
+user_from_uid
+# shadow
+endspent
+fgetspent
+getspent
+getspnam
+getspnam_r
+lckpwdf
+putspent
+setspent
+ulckpwdf
