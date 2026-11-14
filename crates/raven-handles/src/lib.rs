@@ -163,6 +163,28 @@ impl<T> HandleTable<T> {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    /// Visit every live slot in table-index order.
+    ///
+    /// The visitor receives the exact handle (index and generation), the object
+    /// reference, the usable rights and the slot's lineage node. Holes and
+    /// retired slots are skipped. The call is allocation-free.
+    pub fn for_each_live(&self, mut visit: impl FnMut(Handle, &T, Rights, &Arc<LineageNode>)) {
+        for (index, slot) in self.slots.iter().enumerate() {
+            if slot.retired {
+                continue;
+            }
+            let (Some(value), Some(lineage)) = (slot.value.as_ref(), slot.lineage.as_ref()) else {
+                continue;
+            };
+            visit(
+                Handle::new(index as u32, slot.generation),
+                value,
+                slot.rights,
+                lineage,
+            );
+        }
+    }
 }
 
 impl<T: Clone> HandleTable<T> {
@@ -192,6 +214,41 @@ impl<T: Clone> HandleTable<T> {
         let node = LineageNode::child(effective, parent);
         let index = self.allocate_index()?;
         Ok(self.fill(index, value, effective, node))
+    }
+
+    /// Copy every slot of `other` into this empty table.
+    ///
+    /// Indices, generations, rights, retired flags and holes are preserved; each live object is
+    /// cloned through `clone` and each live slot shares the exact `Arc<LineageNode>` with the
+    /// source, so a later revocation is visible in both tables. On a clone error the destination
+    /// is left unchanged.
+    pub fn fork_into(
+        &mut self,
+        other: &HandleTable<T>,
+        mut clone: impl FnMut(&T) -> Result<T, Errno>,
+    ) -> Result<(), Errno> {
+        if !self.is_empty() {
+            return Err(Errno::EINVAL);
+        }
+        let mut slots = Vec::new();
+        slots
+            .try_reserve(other.slots.len())
+            .map_err(|_| Errno::ENOMEM)?;
+        for slot in &other.slots {
+            let value = match slot.value.as_ref() {
+                Some(value) => Some(clone(value)?),
+                None => None,
+            };
+            slots.push(Slot {
+                value,
+                rights: slot.rights,
+                generation: slot.generation,
+                retired: slot.retired,
+                lineage: slot.lineage.clone(),
+            });
+        }
+        self.slots = slots;
+        Ok(())
     }
 
     /// Look up `handle`, requiring every right in `needed`, and return the entry with the exact

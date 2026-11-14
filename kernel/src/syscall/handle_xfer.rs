@@ -45,6 +45,80 @@ fn destination(caller: &Arc<Process>, handle: Handle) -> Result<Arc<Process>, Er
     }
 }
 
+/// `handle_copy(dst_proc, src_handle, rights_mask) -> Handle` (raw 0x54).
+///
+/// The caller is the source process; both the caller and `dst_proc` need
+/// `ADMIN`. The source handle is cloned with `rights_mask` (which must be a
+/// subset of its usable rights), derives from the source lineage node, and is
+/// installed in the destination table. `Process` objects are copied as an Arc;
+/// transferable-only C14 rules are not involved.
+pub fn copy(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let dst_handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let src_handle = Handle(u32::try_from(frame.rsi).map_err(|_| Errno::EBADF)?);
+    let mask = Rights(u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?);
+    if mask == Rights::NONE {
+        return Err(Errno::EINVAL);
+    }
+    let self_admin = {
+        let handles = caller.handles.lock();
+        handles.get(Handle::SELF_PROC, Rights::ADMIN).is_ok()
+    };
+    if !self_admin {
+        return Err(Errno::EPERM);
+    }
+    let (object, rights, lineage) = {
+        let handles = caller.handles.lock();
+        let (object, rights) = handles.get_with_rights(src_handle, Rights::NONE)?;
+        let lineage = handles.lineage_node(src_handle)?;
+        (clone_for_copy(object)?, rights, lineage)
+    };
+    let revoked = lineage.revoked();
+    if mask.0 & revoked.0 != 0 {
+        return Err(Errno::EPERM);
+    }
+    if mask.0 & !rights.0 != 0 {
+        return Err(Errno::EACCES);
+    }
+    let destination = {
+        let handles = caller.handles.lock();
+        match handles.get(dst_handle, Rights::ADMIN) {
+            Ok(Object::Process(target)) => Arc::clone(target),
+            Ok(_) => return Err(Errno::EBADF),
+            Err(Errno::EACCES) => return Err(Errno::EPERM),
+            Err(error) => return Err(error),
+        }
+    };
+    let (installed, node) = {
+        let mut handles = destination.handles.lock();
+        let installed = handles.insert_derived(object, mask, &lineage)?;
+        let node = handles.lineage_node(installed).ok();
+        (installed, node)
+    };
+    if let Some(node) = node {
+        crate::process::handle::register_lineage(node);
+    }
+    Ok(installed.0 as usize)
+}
+
+/// Clone one `Object` for `HANDLE_COPY`; unsupported kinds are rejected.
+fn clone_for_copy(object: &Object) -> Result<Object, Errno> {
+    match object {
+        Object::Process(process) => Ok(Object::Process(Arc::clone(process))),
+        Object::Memory(memory) => Ok(Object::Memory(Arc::clone(memory))),
+        Object::Timer(timer) => Ok(Object::Timer(Arc::clone(timer))),
+        Object::UserEvent(event) => Ok(Object::UserEvent(Arc::clone(event))),
+        Object::RootDevice => Ok(Object::RootDevice),
+        Object::MmioRegion(region) => Ok(Object::MmioRegion(Arc::clone(region))),
+        Object::BootBlob(blob) => Ok(Object::BootBlob(Arc::clone(blob))),
+        Object::DmaBuffer(buffer) => Ok(Object::DmaBuffer(Arc::clone(buffer))),
+        Object::Irq(irq) => Ok(Object::Irq(Arc::clone(irq))),
+        Object::SchemeFile(file) => Ok(Object::SchemeFile(Arc::clone(file))),
+        Object::SchemeServer(server) => Ok(Object::SchemeServer(Arc::clone(server))),
+        _ => Err(Errno::EINVAL),
+    }
+}
+
 /// Clone a transferable object and return the rights stored on its handle without taking two
 /// table locks.
 /// The source table is released before the destination table is acquired, so cross-process

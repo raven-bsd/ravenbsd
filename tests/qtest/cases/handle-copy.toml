@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S50a handle copy: ADMIN copies a shared memory handle into a child, the
+# child maps it and writes a marker; a Process handle copy is used for
+# PROC_WAIT; stale, revoked, missing and zero-right requests are rejected.
+
+name = "handle-copy"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/handle-copy-fixture/build.sh"]
+initfs = "build/fixtures/handle-copy/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^handle-copy: child marker=0xfeed ready=1$'
+
+[[expect]]
+regex = '^handle-copy: child status=0$'
+
+[[expect]]
+regex = '^handle-copy: stale=EBADF$'
+
+[[expect]]
+regex = '^handle-copy: revoked=EPERM$'
+
+[[expect]]
+regex = '^handle-copy: missing=EACCES$'
+
+[[expect]]
+regex = '^handle-copy: zero=EINVAL$'
+
+[[expect]]
+regex = '^handle-copy: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
