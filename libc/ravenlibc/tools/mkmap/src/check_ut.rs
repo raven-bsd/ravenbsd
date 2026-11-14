@@ -205,6 +205,14 @@ fn k3_tolerates_rust_mangled_and_private_names() {
 }
 
 #[test]
+fn k3_tolerates_the_hidden_signal_entry() {
+    let nm = format!("{NM_OK}__raven_sigentry T 0 4\n");
+    let (_dir, options) = setup("k3-sigentry", &nm, HOOKS_EMPTY, EXPECTED_OK, "# none\n");
+    let (findings, _) = run(&options).expect("check");
+    assert!(!rules(&findings).contains(&"K3"), "{findings:?}");
+}
+
+#[test]
 fn k4_rejects_five_text_symbols_in_one_member() {
     let nm = format!("{NM_OK}a1 T 0 4\na2 T 0 4\na3 T 0 4\na4 T 0 4\n");
     let (_dir, options) = setup("k4-five", &nm, HOOKS_EMPTY, EXPECTED_OK, "# none\n");

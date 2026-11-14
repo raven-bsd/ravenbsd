@@ -192,6 +192,10 @@ fn check_k1(
     }
 }
 
+/// Hidden entry points that the kernel resumes at; they are internal to a signal dependency,
+/// not shell exports, and deliberately have no `Symbol.map` row.
+const INTERNAL_SIGNAL_SYMBOLS: &[&str] = &["__raven_sigentry"];
+
 fn is_shell_member(member: &str) -> bool {
     let base = member.rsplit('/').next().unwrap_or(member);
     // A staticlib member is `<crate>-<hash>.<crate>.<hash>-cgu.N.rcgu.o`; some rustc
@@ -270,6 +274,7 @@ fn check_k2_k3_k4(archive: &[ArchiveSymbol], merged: &Merged, findings: &mut Vec
         if is_shell_member(&symbol.member) {
             if public.contains(&symbol.name)
                 || symbol.name.starts_with("__rl_")
+                || INTERNAL_SIGNAL_SYMBOLS.contains(&symbol.name.as_str())
                 || is_mangled(&symbol.name)
             {
                 continue;
