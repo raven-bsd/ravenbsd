@@ -329,177 +329,17 @@ __libc_single_threaded DEFERRED(C57): raven-libc-thread and raven-libc-tls are n
 __rl_atfork_run DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
 __rl_cancel_point DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
 __rl_thread_exit_dtors DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-_pthread_cleanup_pop DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-_pthread_cleanup_push DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_atfork DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_destroy DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_getdetachstate DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_getguardsize DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_getinheritsched DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_getschedparam DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_getschedpolicy DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_getscope DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_getstack DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_getstacksize DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_init DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_setdetachstate DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_setguardsize DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_setinheritsched DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_setschedparam DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_setschedpolicy DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_setscope DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_setstack DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_attr_setstacksize DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_barrier_destroy DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_barrier_init DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_barrier_wait DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_barrierattr_destroy DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_barrierattr_getpshared DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_barrierattr_init DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_barrierattr_setpshared DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_cancel DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_cond_broadcast DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_cond_clockwait DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_cond_destroy DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_cond_init DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_cond_signal DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_cond_timedwait DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_cond_wait DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_condattr_destroy DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_condattr_getclock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_condattr_getpshared DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_condattr_init DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_condattr_setclock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_condattr_setpshared DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_create DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_detach DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_getaffinity_np DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_getattr_default_np DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_getattr_np DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_getconcurrency DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_getcpuclockid DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_getname_np DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_getschedparam DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_getspecific DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_join DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_key_create DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_key_delete DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_kill DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutex_clocklock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutex_consistent DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutex_destroy DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutex_getprioceiling DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutex_init DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutex_lock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutex_setprioceiling DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutex_timedlock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutex_trylock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutex_unlock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutexattr_destroy DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutexattr_getprioceiling DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutexattr_getprotocol DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutexattr_getpshared DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutexattr_getrobust DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutexattr_gettype DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutexattr_init DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutexattr_setprioceiling DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutexattr_setprotocol DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutexattr_setpshared DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutexattr_setrobust DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_mutexattr_settype DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_once DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_rwlock_clockrdlock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_rwlock_clockwrlock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_rwlock_destroy DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_rwlock_init DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_rwlock_rdlock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_rwlock_timedrdlock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_rwlock_timedwrlock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_rwlock_tryrdlock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_rwlock_trywrlock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_rwlock_unlock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_rwlock_wrlock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_rwlockattr_destroy DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_rwlockattr_getpshared DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_rwlockattr_init DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_rwlockattr_setpshared DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_setaffinity_np DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_setattr_default_np DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_setcancelstate DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_setcanceltype DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_setconcurrency DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_setname_np DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_setschedparam DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_setschedprio DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_setspecific DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_sigmask DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_spin_destroy DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_spin_init DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_spin_lock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_spin_trylock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_spin_unlock DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_testcancel DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_timedjoin_np DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-pthread_tryjoin_np DEFERRED(C57): raven-libc-thread and raven-libc-tls are not merged on carl/libc
-call_once DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-cnd_broadcast DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-cnd_destroy DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-cnd_init DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-cnd_signal DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-cnd_timedwait DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-cnd_wait DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-mtx_destroy DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-mtx_init DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-mtx_lock DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-mtx_timedlock DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-mtx_trylock DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-mtx_unlock DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-thrd_create DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-thrd_current DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-thrd_detach DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-thrd_equal DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-thrd_exit DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-thrd_join DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-thrd_sleep DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-thrd_yield DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-tss_create DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-tss_delete DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-tss_get DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-tss_set DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-sem_clockwait DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-sem_close DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-sem_destroy DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-sem_getvalue DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-sem_init DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-sem_open DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-sem_post DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-sem_timedwait DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-sem_trywait DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-sem_unlink DEFERRED(C57): raven-libc-thread is not merged on carl/libc
-sem_wait DEFERRED(C57): raven-libc-thread is not merged on carl/libc
 __sigsetjmp_tail DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 bsd_signal DEFERRED(C58): raven-libc-signal is not merged on carl/libc
-kill DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 killpg DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 pause DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 psiginfo DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 psignal DEFERRED(C58): raven-libc-signal is not merged on carl/libc
-raise DEFERRED(C58): raven-libc-signal is not merged on carl/libc
-sig2str DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 sigaction DEFERRED(C58): raven-libc-signal is not merged on carl/libc
-sigaddset DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 sigaltstack DEFERRED(C58): raven-libc-signal is not merged on carl/libc
-sigandset DEFERRED(C58): raven-libc-signal is not merged on carl/libc
-sigdelset DEFERRED(C58): raven-libc-signal is not merged on carl/libc
-sigemptyset DEFERRED(C58): raven-libc-signal is not merged on carl/libc
-sigfillset DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 sighold DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 sigignore DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 siginterrupt DEFERRED(C58): raven-libc-signal is not merged on carl/libc
-sigisemptyset DEFERRED(C58): raven-libc-signal is not merged on carl/libc
-sigismember DEFERRED(C58): raven-libc-signal is not merged on carl/libc
-signal DEFERRED(C58): raven-libc-signal is not merged on carl/libc
-sigorset DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 sigpause DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 sigpending DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 sigprocmask DEFERRED(C58): raven-libc-signal is not merged on carl/libc
@@ -510,7 +350,6 @@ sigsuspend DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 sigtimedwait DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 sigwait DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 sigwaitinfo DEFERRED(C58): raven-libc-signal is not merged on carl/libc
-str2sig DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 _longjmp DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 _setjmp DEFERRED(C58): raven-libc-signal is not merged on carl/libc
 longjmp DEFERRED(C58): raven-libc-signal is not merged on carl/libc
