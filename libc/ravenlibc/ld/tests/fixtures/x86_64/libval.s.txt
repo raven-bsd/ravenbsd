@@ -1,0 +1,17 @@
+        .text
+        .globl  val
+        .type   val,@function
+val:    movl    $42, %eax
+        ret
+        .size   val, .-val
+        .globl  call_deep
+        .type   call_deep,@function
+call_deep:
+        jmp     *deep_fn@GOTPCREL(%rip)
+        .size   call_deep, .-call_deep
+        .data
+        .globl  val_table
+val_table:
+        .quad   val
+        .quad   val_table
+        .section .note.GNU-stack,"",@progbits

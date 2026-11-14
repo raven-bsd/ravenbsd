@@ -1,0 +1,8 @@
+        .text
+        .globl  weak_user
+        .type   weak_user,@function
+weak_user:
+        movq    missing_sym@GOTPCREL(%rip), %rax
+        ret
+        .weak   missing_sym
+        .section .note.GNU-stack,"",@progbits

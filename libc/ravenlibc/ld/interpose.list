@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The dynamic-list interpositions of libc.so.1 (C62 4.5, 16 R-20).
+
+{
+	environ;
+	__environ;
+	_environ;
+	stdin;
+	stdout;
+	stderr;
+	malloc;
+	free;
+	calloc;
+	realloc;
+	posix_memalign;
+	aligned_alloc;
+	memalign;
+	valloc;
+	reallocarray;
+	malloc_usable_size;
+	__errno_location;
+	__cxa_atexit;
+	__cxa_finalize;
+	__tls_get_addr;
+};

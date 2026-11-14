@@ -1194,6 +1194,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-rtld"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-elf",
+ "raven-libc-tls",
+]
+
+[[package]]
 name = "raven-libc-signal"
 version = "0.1.0"
 dependencies = [

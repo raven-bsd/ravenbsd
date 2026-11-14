@@ -1,0 +1,8 @@
+        .text
+        .globl  deep_fn
+        .type   deep_fn,@function
+deep_fn:
+        movl    $7, %eax
+        ret
+        .size   deep_fn, .-deep_fn
+        .section .note.GNU-stack,"",@progbits

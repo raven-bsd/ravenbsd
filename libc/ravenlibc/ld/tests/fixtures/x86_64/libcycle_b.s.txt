@@ -1,0 +1,7 @@
+        .text
+        .globl  b_fn
+        .type   b_fn,@function
+b_fn:   movl    $2, %eax
+        ret
+        .size   b_fn, .-b_fn
+        .section .note.GNU-stack,"",@progbits

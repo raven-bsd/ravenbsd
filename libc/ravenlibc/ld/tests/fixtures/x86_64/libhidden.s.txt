@@ -1,0 +1,9 @@
+        .text
+        .globl  hidden_fn
+        .hidden hidden_fn
+        .type   hidden_fn,@function
+hidden_fn:
+        movl    $9, %eax
+        ret
+        .size   hidden_fn, .-hidden_fn
+        .section .note.GNU-stack,"",@progbits

@@ -85,3 +85,8 @@ reason = "DR-39 audited thread raw module: TCB field views, robust-list pointer 
 crate = "raven-libc-thread"
 path = "src/raw/"
 reason = "DR-39 audited raw submodules: per-architecture thread entry assembly, futex word views and TLS-descriptor calls; every unsafe block names its invariant"
+
+[[allow]]
+crate = "raven-libc-rtld"
+path = "src/raw/"
+reason = "loader memory access, raw syscalls, C ABI exports and entry assembly (DR-39)"

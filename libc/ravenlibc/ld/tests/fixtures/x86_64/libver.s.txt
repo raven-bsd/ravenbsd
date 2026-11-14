@@ -1,0 +1,12 @@
+        .text
+        .globl  ver_new
+        .type   ver_new,@function
+ver_new: movl   $1, %eax
+        ret
+        .globl  ver_old
+        .type   ver_old,@function
+ver_old: movl   $2, %eax
+        ret
+        .symver ver_new, ver@@LIBV_1.0
+        .symver ver_old, ver@LIBV_0.9
+        .section .note.GNU-stack,"",@progbits
