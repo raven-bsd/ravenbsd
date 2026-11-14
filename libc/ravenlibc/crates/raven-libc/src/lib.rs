@@ -46,6 +46,8 @@ pub(crate) mod ffi;
 #[cfg(target_os = "none")]
 pub(crate) mod hooks;
 #[cfg(target_os = "none")]
+pub(crate) mod locale;
+#[cfg(target_os = "none")]
 pub(crate) mod malloc;
 #[cfg(target_os = "none")]
 pub(crate) mod math;
