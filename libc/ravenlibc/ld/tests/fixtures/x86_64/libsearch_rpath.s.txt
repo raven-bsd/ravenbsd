@@ -1,0 +1,7 @@
+        .text
+        .globl  search_fn
+        .type   search_fn,@function
+search_fn:
+        jmp     *deep_fn@GOTPCREL(%rip)
+        .size   search_fn, .-search_fn
+        .section .note.GNU-stack,"",@progbits

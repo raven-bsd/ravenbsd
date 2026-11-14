@@ -1,0 +1,15 @@
+        .data
+        .globl  captured
+        .type   captured,@object
+        .size   captured,8
+captured:
+        .quad   0
+        .text
+        .globl  __rl_dl_install
+        .type   __rl_dl_install,@function
+__rl_dl_install:
+        movq    captured@GOTPCREL(%rip), %rax
+        movq    %rdi, (%rax)
+        ret
+        .size   __rl_dl_install, .-__rl_dl_install
+        .section .note.GNU-stack,"",@progbits

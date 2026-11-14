@@ -118,6 +118,7 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
         &options,
         &linker,
         &libc_archive,
+        &symbols,
         &libc_map,
         &undef,
         &libc,
@@ -260,17 +261,29 @@ fn write_undef(symbols: &Path, out: &Path) -> Result<()> {
     std::fs::write(out, response).with_context(|| format!("cannot write {}", out.display()))
 }
 
-/// The compiler-builtins archive carries hidden `mem*`/`strlen` definitions. If the linker
-/// resolves one of the shell's public names from such a member, the public symbol becomes
-/// `LOCAL HIDDEN` and K7 fails. Pass the shell members that define those six names explicitly,
-/// before the archive, so the public definition wins.
+/// The compiler-builtins archive carries hidden definitions of several public names (`mem*`,
+/// `strlen`, and the soft-float math functions). If the linker resolves one from such a member,
+/// the public symbol becomes `LOCAL HIDDEN` and K7 fails. Pass the shell members that define the
+/// public `Symbols.list` names explicitly, before the archive, so the public definition wins.
 fn forced_members(
     root: &Path,
     options: &Options,
     archive: &Path,
+    symbols: &Path,
     out: &Path,
 ) -> Result<Vec<PathBuf>> {
-    const COLLIDING: [&str; 6] = ["bcmp", "memcmp", "memcpy", "memmove", "memset", "strlen"];
+    let symbol_text = std::fs::read_to_string(symbols)
+        .with_context(|| format!("cannot read {}", symbols.display()))?;
+    let mut public = BTreeSet::new();
+    for line in symbol_text.lines() {
+        let line = line.trim();
+        if line == "# private" {
+            break;
+        }
+        if !line.is_empty() && !line.starts_with('#') {
+            public.insert(line.to_string());
+        }
+    }
     let tools = crate::libc_pack_tools::Tools::discover(root, options.arch)?;
     let output = Command::new(&tools.nm)
         .args(["-A", "--defined-only"])
@@ -290,7 +303,7 @@ fn forced_members(
         let Some(symbol) = tokens.get(3) else {
             continue;
         };
-        if symbol.is_empty() || !COLLIDING.contains(symbol) || tokens.get(2) != Some(&"T") {
+        if symbol.is_empty() || !public.contains(*symbol) || tokens.get(2) != Some(&"T") {
             continue;
         }
         let Some((location, _value)) = tokens[0].rsplit_once(':') else {
@@ -304,7 +317,7 @@ fn forced_members(
         }
     }
     if members.is_empty() {
-        bail!("libc-link: no public definitions for the compiler-builtin mem functions");
+        bail!("libc-link: no shell members define the public symbol list");
     }
     let directory = out.join("link/forced");
     std::fs::create_dir_all(&directory)
@@ -332,11 +345,13 @@ fn forced_members(
     Ok(paths)
 }
 
+#[allow(clippy::too_many_arguments)] // the link inputs are clearer as explicit paths
 fn link_libc(
     root: &Path,
     options: &Options,
     linker: &Path,
     archive: &Path,
+    symbols: &Path,
     version_script: &Path,
     undef: &Path,
     output: &Path,
@@ -345,6 +360,7 @@ fn link_libc(
         root,
         options,
         archive,
+        symbols,
         output
             .parent()
             .context("libc.so.1 has no parent directory")?,

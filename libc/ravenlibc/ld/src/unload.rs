@@ -45,6 +45,7 @@ impl<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier> L
             {
                 *slot = None;
                 self.count = self.count.saturating_sub(1);
+                self.subs = self.subs.saturating_add(1);
             }
             let _ = self.platform.release(base, span);
             true

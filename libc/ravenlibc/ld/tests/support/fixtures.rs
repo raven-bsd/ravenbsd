@@ -86,6 +86,9 @@ fn build_fixtures() -> Result<PathBuf, String> {
     let out = env::temp_dir().join(format!("c62-fixtures-{}", std::process::id()));
     let _ = fs::remove_dir_all(&out);
     fs::create_dir_all(&out).map_err(|error| error.to_string())?;
+    for directory in ["rpath", "runpath", "ldpath"] {
+        fs::create_dir_all(out.join(directory)).map_err(|error| error.to_string())?;
+    }
     for name in [
         "libdeep",
         "libval",
@@ -95,8 +98,23 @@ fn build_fixtures() -> Result<PathBuf, String> {
         "libhidden",
         "libcycle_b",
         "libcycle_a",
+        "libbadwx",
+        "libtextrel",
+        "libinstall",
+        "libtls",
+        "libsearch_rpath",
+        "libsearch_runpath",
     ] {
         compile(&clang, &lld, &source, &out, name)?;
+        if name == "libdeep" {
+            for directory in ["rpath", "runpath", "ldpath"] {
+                fs::copy(
+                    out.join("libdeep.so"),
+                    out.join(directory).join("libdeep.so"),
+                )
+                .map_err(|error| error.to_string())?;
+            }
+        }
     }
     Ok(out)
 }
@@ -141,6 +159,19 @@ fn compile(clang: &Path, lld: &Path, source: &Path, out: &Path, name: &str) -> R
     }
     if name == "libcycle_a" {
         command.arg(out.join("libcycle_b.so"));
+    }
+    if name == "libtextrel" {
+        command.args(["-z", "notext"]);
+    }
+    if name == "libsearch_rpath" {
+        command.args(["--disable-new-dtags", "-rpath"]);
+        command.arg(out.join("rpath"));
+        command.arg(out.join("rpath/libdeep.so"));
+    }
+    if name == "libsearch_runpath" {
+        command.args(["-rpath"]);
+        command.arg(out.join("runpath"));
+        command.arg(out.join("runpath/libdeep.so"));
     }
     if name == "libver" {
         let script = out.join("libver.map");

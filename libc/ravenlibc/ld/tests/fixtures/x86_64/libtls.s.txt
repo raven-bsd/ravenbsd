@@ -1,0 +1,15 @@
+        .section .tdata,"awT",@progbits
+        .globl  tls_var
+        .type   tls_var,@object
+tls_var:
+        .quad   1
+        .quad   2
+        .size   tls_var, 16
+        .text
+        .globl  tls_marker
+        .type   tls_marker,@function
+tls_marker:
+        movl    $3, %eax
+        ret
+        .size   tls_marker, .-tls_marker
+        .section .note.GNU-stack,"",@progbits

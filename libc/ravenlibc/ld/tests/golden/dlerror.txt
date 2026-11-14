@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The stable loader diagnostic suffixes (C62 4.4b). The entry glue prefixes
+# `ld-elf.so.1: <path>: ` and appends the object-specific detail.
+I/O error
+invalid ELF object
+invalid dynamic section
+segment is writable and executable
+text relocations not supported
+cannot map segment
+shared object not found
+too many loaded objects
+executable stack
+relocation failed
+No space available for static Thread Local Storage
+Tainted process refusing to run binary
+bad direct-execution arguments
+relative path refused in secure mode

@@ -174,6 +174,14 @@ pub trait Platform: Mapper {
     fn debug_write(&mut self, bytes: &[u8]);
     /// Terminate the process.
     fn exit(&mut self, code: i32) -> !;
+    /// Call `__rl_dl_install(table)` at `address`; the target/host supplies the unsafe call.
+    fn install_rtld_table(
+        &mut self,
+        _address: usize,
+        _table: *const crate::table::RtldTable,
+    ) -> bool {
+        false
+    }
     /// A monotonic hint; the loader does not use the clock.
     fn now_hint(&self) -> u64 {
         0

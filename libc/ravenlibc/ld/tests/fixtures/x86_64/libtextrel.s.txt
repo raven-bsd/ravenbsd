@@ -1,0 +1,8 @@
+        .text
+        .globl  textrel_fn
+        .type   textrel_fn,@function
+textrel_fn:
+        movabsq $textrel_fn, %rax
+        ret
+        .size   textrel_fn, .-textrel_fn
+        .section .note.GNU-stack,"",@progbits
