@@ -140,6 +140,270 @@ pub fn from_f64(value: f64) -> u128 {
         | (stored & SIGNIFICAND_MASK)
 }
 
+/// A binary128 value with the IEEE 754-2019 semantics for the aarch64/riscv64 `long double`.
+///
+/// The classification, ordering, conversions and `add`/`sub` are implemented; `mul`, `div` and
+/// `sqrt` (which need a 226-bit intermediate) are the remaining item, listed in the C47c report.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+pub struct LongDouble128 {
+    bits: u128,
+}
+
+impl LongDouble128 {
+    /// From the raw pattern.
+    pub const fn from_bits(bits: u128) -> Self {
+        Self { bits }
+    }
+
+    /// The raw pattern.
+    pub const fn to_bits(self) -> u128 {
+        self.bits
+    }
+
+    /// Signed zero.
+    pub const fn zero(negative: bool) -> Self {
+        Self {
+            bits: if negative { SIGN } else { 0 },
+        }
+    }
+
+    /// One.
+    pub const fn one() -> Self {
+        Self {
+            bits: 0x3fff_0000_0000_0000_0000_0000_0000_0000,
+        }
+    }
+
+    /// A quiet NaN.
+    pub const fn nan() -> Self {
+        Self {
+            bits: (EXPONENT_MASK as u128) << EXPONENT_SHIFT | QUIET,
+        }
+    }
+
+    /// An infinity.
+    pub const fn infinity(negative: bool) -> Self {
+        let sign = if negative { SIGN } else { 0 };
+        Self {
+            bits: sign | (EXPONENT_MASK as u128) << EXPONENT_SHIFT,
+        }
+    }
+
+    /// The sign bit.
+    pub const fn sign_bit(self) -> bool {
+        self.bits & SIGN != 0
+    }
+
+    /// The biased exponent field.
+    pub const fn exponent_field(self) -> u32 {
+        ((self.bits >> EXPONENT_SHIFT) & EXPONENT_MASK as u128) as u32
+    }
+
+    /// The stored significand (112 bits, hidden bit implicit).
+    pub const fn significand_bits(self) -> u128 {
+        self.bits & SIGNIFICAND_MASK
+    }
+
+    /// The `fpclassify` class.
+    pub fn class(self) -> i32 {
+        classify(self.bits)
+    }
+
+    /// Whether the value is a NaN.
+    pub fn is_nan(self) -> bool {
+        classify(self.bits) == FP_NAN
+    }
+
+    /// Whether the value is infinite.
+    pub fn is_infinite(self) -> bool {
+        classify(self.bits) == FP_INFINITE
+    }
+
+    /// Whether the value is finite.
+    pub fn is_finite(self) -> bool {
+        matches!(classify(self.bits), FP_ZERO | FP_SUBNORMAL | FP_NORMAL)
+    }
+
+    /// Whether the value is zero.
+    pub fn is_zero(self) -> bool {
+        classify(self.bits) == FP_ZERO
+    }
+
+    /// The total order.
+    pub fn total_cmp(self, other: Self) -> core::cmp::Ordering {
+        order_key(self.bits).cmp(&order_key(other.bits))
+    }
+
+    /// The `f64` value, correctly rounded.
+    pub fn to_f64(self) -> f64 {
+        to_f64(self.bits)
+    }
+
+    /// From an `f64` (exact).
+    pub fn from_f64(value: f64) -> Self {
+        Self {
+            bits: from_f64(value),
+        }
+    }
+
+    /// `x + y`, correctly rounded.
+    #[allow(clippy::should_implement_trait)] // a soft value type: the operators are the C API
+    pub fn add(self, other: Self) -> Self {
+        Self {
+            bits: add_bits(self.bits, other.bits, false),
+        }
+    }
+
+    /// `x - y`, correctly rounded.
+    #[allow(clippy::should_implement_trait)]
+    pub fn sub(self, other: Self) -> Self {
+        Self {
+            bits: add_bits(self.bits, other.bits, true),
+        }
+    }
+}
+
+/// The exact-in-u128 add/sub engine for binary128 (113-bit significand + 3 guard bits).
+fn add_bits(a: u128, b: u128, subtract: bool) -> u128 {
+    let a_class = classify(a);
+    let b_class = classify(b);
+    if a_class == FP_NAN || b_class == FP_NAN {
+        return ((EXPONENT_MASK as u128) << EXPONENT_SHIFT) | QUIET;
+    }
+    let b_sign = (b & SIGN != 0) ^ subtract;
+    if a_class == FP_INFINITE || b_class == FP_INFINITE {
+        if a_class == FP_INFINITE && b_class == FP_INFINITE {
+            return if (a & SIGN != 0) != b_sign {
+                ((EXPONENT_MASK as u128) << EXPONENT_SHIFT) | QUIET
+            } else {
+                a
+            };
+        }
+        if a_class == FP_INFINITE {
+            return a;
+        }
+        return if b_sign { b ^ SIGN } else { b };
+    }
+    if a_class == FP_ZERO && b_class == FP_ZERO {
+        let negative = (a & SIGN != 0) == b_sign;
+        return if negative { SIGN } else { 0 };
+    }
+    if b_class == FP_ZERO {
+        return a;
+    }
+    if a_class == FP_ZERO {
+        return if subtract { b ^ SIGN } else { b };
+    }
+    let (mut large_exp, mut large_sig) = unpack(a);
+    let (mut small_exp, mut small_sig) = unpack(b);
+    let mut small_neg = b_sign;
+    let mut large_neg = a & SIGN != 0;
+    if (large_exp, large_sig) < (small_exp, small_sig) {
+        core::mem::swap(&mut large_exp, &mut small_exp);
+        core::mem::swap(&mut large_sig, &mut small_sig);
+        core::mem::swap(&mut large_neg, &mut small_neg);
+    }
+    let difference = (large_exp - small_exp) as u32;
+    let mut scaled = small_sig << 3;
+    let mut sticky = false;
+    if difference > 0 {
+        if difference >= 116 {
+            sticky = small_sig != 0;
+            scaled = 0;
+        } else {
+            sticky = small_sig & ((1u128 << difference) - 1) != 0;
+            scaled >>= difference;
+        }
+    }
+    let mut significand = large_sig << 3;
+    let negative;
+    if large_neg == small_neg {
+        significand += scaled;
+        if sticky {
+            significand |= 1;
+        }
+        negative = large_neg;
+    } else if scaled > significand {
+        significand = scaled - significand;
+        negative = small_neg;
+    } else {
+        significand -= scaled;
+        if sticky {
+            significand = significand.saturating_sub(1);
+        }
+        negative = large_neg;
+    }
+    // `unpack` carries the biased-exponent difference; the significand is scaled by 112 bits.
+    pack_binary128(negative, large_exp - 112 - 3, significand)
+}
+
+/// Unpack a finite non-zero value as `(unbiased exponent, 113-bit significand)`.
+fn unpack(bits: u128) -> (i32, u128) {
+    let field = ((bits >> EXPONENT_SHIFT) & EXPONENT_MASK as u128) as i32;
+    let stored = bits & SIGNIFICAND_MASK;
+    let mut significand = stored | HIDDEN;
+    let mut exponent = field - BIAS;
+    while significand & HIDDEN == 0 {
+        significand <<= 1;
+        exponent -= 1;
+    }
+    (exponent, significand)
+}
+
+/// Round `significand * 2^(exponent - 112)` to the 113-bit binary128 significand.
+fn pack_binary128(negative: bool, exponent: i32, significand: u128) -> u128 {
+    if significand == 0 {
+        return if negative { SIGN } else { 0 };
+    }
+    let highest = 127 - significand.leading_zeros();
+    let mut exponent = exponent;
+    let (kept, guard, round, rest, sticky_low) = if highest > 112 {
+        let drop = highest - 112;
+        let guard = (significand >> (drop - 1)) & 1 != 0;
+        let round = drop >= 2 && (significand >> (drop - 2)) & 1 != 0;
+        let rest = if drop >= 2 {
+            significand & ((1u128 << (drop - 2)) - 1) != 0
+        } else {
+            false
+        };
+        let kept = significand >> drop;
+        exponent += drop as i32;
+        (kept, guard, round, rest, kept & 1 != 0)
+    } else {
+        let shift = (112 - highest) as i32;
+        ((significand << shift), false, false, false, false)
+    };
+    let mut mantissa = kept;
+    if guard && (round || rest || sticky_low) {
+        mantissa += 1;
+        if mantissa >> 113 != 0 {
+            mantissa >>= 1;
+            exponent += 1;
+        }
+    }
+    let field = exponent + 112 + BIAS;
+    let sign = if negative { SIGN } else { 0 };
+    if field >= EXPONENT_MASK as i32 {
+        return sign | (EXPONENT_MASK as u128) << EXPONENT_SHIFT;
+    }
+    if field <= 0 {
+        // Subnormal: shift the 113-bit significand right by the missing exponent, with rounding.
+        let shift = (1 - field) as u32;
+        if shift >= 113 {
+            return sign;
+        }
+        let lost = mantissa & ((1u128 << shift) - 1);
+        let half = 1u128 << (shift - 1);
+        let mut sub = mantissa >> shift;
+        if lost > half || (lost == half && (sub & 1) != 0) {
+            sub += 1;
+        }
+        return sign | (sub & SIGNIFICAND_MASK);
+    }
+    sign | (((field as u128) & EXPONENT_MASK as u128) << EXPONENT_SHIFT)
+        | (mantissa & SIGNIFICAND_MASK)
+}
+
 #[cfg(test)]
 #[path = "binary128_ut.rs"]
 mod tests;
