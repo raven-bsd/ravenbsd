@@ -168,8 +168,15 @@ fn the_rendered_lists_are_sorted_and_split() {
     let rendered = render(&model, &census);
     let public = rendered
         .symbols
+        .split_once("\n# private\n")
+        .map_or("", |(public, _)| public)
         .lines()
-        .filter(|line| !line.starts_with('#') && !line.starts_with("/*") && !line.starts_with(" *"))
+        .filter(|line| {
+            !line.is_empty()
+                && !line.starts_with('#')
+                && !line.starts_with("/*")
+                && !line.starts_with(" *")
+        })
         .collect::<Vec<_>>();
     assert_eq!(public, vec!["__environ", "environ", "strlcpy", "strlen"]);
     assert!(rendered.private.contains("__raven_libc_start"));
@@ -253,6 +260,94 @@ fn gaps_and_reconcile_write_markdown() {
     assert!(root.join("libc/ravenlibc/abi/GAPS.md").is_file());
     assert!(root.join("libc/ravenlibc/abi/RECONCILE.md").is_file());
     let _ = fs::remove_dir_all(root);
+}
+
+const FROZEN: &str = "# node: RAVEN_1.0\n# status: candidate\n# records: 2\nstrlen F - all 0 string.h\nenviron D 8 all 0 unistd.h\n";
+
+#[test]
+fn audit_accepts_an_identical_frozen_file() {
+    assert!(audit_frozen(FROZEN, FROZEN).is_empty());
+}
+
+#[test]
+fn audit_reports_a_removed_frozen_symbol() {
+    let actual = FROZEN.replace("strlen F - all 0 string.h\n", "");
+    assert!(
+        audit_frozen(FROZEN, &actual)
+            .iter()
+            .any(|(key, _)| key == "frozen-missing")
+    );
+}
+
+#[test]
+fn audit_reports_a_changed_kind() {
+    let actual = FROZEN.replace("strlen F", "strlen D");
+    assert!(
+        audit_frozen(FROZEN, &actual)
+            .iter()
+            .any(|(key, _)| key == "frozen-kind")
+    );
+}
+
+#[test]
+fn audit_reports_a_changed_size() {
+    let actual = FROZEN.replace("environ D 8", "environ D 16");
+    assert!(
+        audit_frozen(FROZEN, &actual)
+            .iter()
+            .any(|(key, _)| key == "frozen-size")
+    );
+}
+
+#[test]
+fn audit_reports_a_narrowed_arch_list() {
+    let expected = FROZEN.replace("strlen F - all", "strlen F - x86_64,aarch64");
+    let actual = FROZEN.replace("strlen F - all", "strlen F - x86_64");
+    assert!(
+        audit_frozen(&expected, &actual)
+            .iter()
+            .any(|(key, _)| key == "frozen-arch")
+    );
+}
+
+#[test]
+fn audit_reports_a_changed_ring() {
+    let actual = FROZEN.replace("strlen F - all 0", "strlen F - all 1");
+    assert!(
+        audit_frozen(FROZEN, &actual)
+            .iter()
+            .any(|(key, _)| key == "frozen-ring")
+    );
+}
+
+#[test]
+fn audit_reports_a_new_name_in_the_frozen_node() {
+    let actual = format!("{FROZEN}newsym F - all 0 string.h\n");
+    assert!(
+        audit_frozen(FROZEN, &actual)
+            .iter()
+            .any(|(key, _)| key == "frozen-new")
+    );
+}
+
+#[test]
+fn a_bad_shell_map_is_a_parse_error() {
+    let error = parse_symbol_map("RAVEN_1.0 {\n f\n").expect_err("map");
+    assert!(error.to_string().contains("missing"));
+}
+
+#[test]
+fn a_bad_census_is_not_complete() {
+    let census = parse_census("complete = false\n").expect("census");
+    assert!(!census.complete);
+}
+
+#[test]
+fn a_bad_data_size_is_reported() {
+    let census = parse_census(CENSUS).expect("census");
+    let exports = parse_symbol_map("RAVEN_1.0 {\n environ;\n};").expect("map");
+    let error = derive(&census, &exports, &BTreeMap::new()).expect_err("data");
+    assert!(error.to_string().contains("data-size-missing"));
 }
 
 #[test]

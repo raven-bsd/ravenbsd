@@ -3,6 +3,6 @@
 
 # Reconcile
 
-- census_only: 3098
-- export_only: 111
-- both: 992
+- census_only: 4520
+- export_only: 0
+- both: 1103
