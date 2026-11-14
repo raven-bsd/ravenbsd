@@ -78,6 +78,36 @@ fn host_load_libval_calls_code_and_resolves_relative_data() {
 }
 
 #[test]
+fn host_load_versions_and_weak_symbols() {
+    let _guard = HOST_LOCK.lock().expect("lock");
+    let Some((mut loader, dir)) = loader() else {
+        return;
+    };
+    let id = load(&mut loader, &dir, "libver.so");
+    let old = loader.dlvsym(Some(id), b"ver", b"LIBV_0.9").expect("old");
+    // SAFETY: `ver` is a no-argument integer function.
+    let value = unsafe { std::mem::transmute::<usize, extern "C" fn() -> i32>(old)() };
+    assert_eq!(value, 2);
+    let default = loader.dlsym(Some(id), b"ver", 0).expect("default");
+    // SAFETY: see above.
+    let value = unsafe { std::mem::transmute::<usize, extern "C" fn() -> i32>(default)() };
+    assert_eq!(value, 1);
+
+    let weak = load(&mut loader, &dir, "libweak.so");
+    assert!(loader.dlsym(Some(weak), b"missing_sym", 0).is_none());
+}
+
+#[test]
+fn a_hidden_definition_is_not_exported() {
+    let _guard = HOST_LOCK.lock().expect("lock");
+    let Some((mut loader, dir)) = loader() else {
+        return;
+    };
+    let id = load(&mut loader, &dir, "libhidden.so");
+    assert!(loader.dlsym(Some(id), b"hidden_fn", 0).is_none());
+}
+
+#[test]
 fn host_load_ifunc_and_dependency_cycle() {
     let _guard = HOST_LOCK.lock().expect("lock");
     let Some((mut loader, dir)) = loader() else {
