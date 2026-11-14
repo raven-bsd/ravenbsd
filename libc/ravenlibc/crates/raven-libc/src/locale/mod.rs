@@ -528,8 +528,8 @@ fn _locale_name() -> Vec<u8> {
     locale_name()
 }
 
-mod e01;
-mod e02;
-mod e03;
-mod e04;
-mod e05;
+mod bind_textdomain_codeset;
+mod dngettext;
+mod freelocale;
+mod gettext;
+mod setlocale;

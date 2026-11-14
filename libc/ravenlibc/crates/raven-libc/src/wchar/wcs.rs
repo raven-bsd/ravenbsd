@@ -383,9 +383,9 @@ pub(crate) unsafe extern "C" fn wcswidth_impl(s: *const u32, n: usize) -> c_int 
 #[allow(dead_code)]
 const _: *const c_void = core::ptr::null();
 
-mod w01;
-mod w02;
-mod w03;
-mod w04;
-mod w05;
-mod w06;
+mod wcslcpy;
+mod wcslen;
+mod wcsncat;
+mod wcsrchr;
+mod wcsstr;
+mod wmemmove;

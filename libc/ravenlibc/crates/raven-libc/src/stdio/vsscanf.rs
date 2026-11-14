@@ -93,6 +93,32 @@ fn scan_options() -> ScanOptions<'static> {
     ScanOptions::default()
 }
 
+/// `vsscanf`.
+///
+/// # Safety
+/// `input` and `format` are NUL terminated and `list` is the trampoline's list.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn vsscanf(
+    input: *const c_char,
+    format: *const c_char,
+    list: *mut List,
+) -> c_int {
+    if input.is_null() || format.is_null() {
+        return crate::ffi::ret::int(Err(Errno(22)));
+    }
+    // SAFETY: both strings are NUL terminated.
+    let input = unsafe { crate::ffi::cstr::slice(input) };
+    let format = unsafe { crate::ffi::cstr::slice(format) };
+    let mut source = SliceSource::new(input);
+    let mut env = crate::va::CEnv::new(
+        unsafe { reader(list) },
+        crate::stdio::vprintf::errno_text,
+        crate::stdio::vprintf::alloc,
+    );
+    let options = scan_options();
+    result(vscan(&mut source, format, &mut env, &options, &ScanFloat))
+}
+
 /// `vscanf`.
 ///
 /// # Safety
@@ -143,32 +169,6 @@ pub unsafe extern "C" fn vfscanf(
     result(raven_libc_stdio::vfscanf_file(
         target, format, &mut env, &options, &ScanFloat,
     ))
-}
-
-/// `vsscanf`.
-///
-/// # Safety
-/// `input` and `format` are NUL terminated and `list` is the trampoline's list.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn vsscanf(
-    input: *const c_char,
-    format: *const c_char,
-    list: *mut List,
-) -> c_int {
-    if input.is_null() || format.is_null() {
-        return crate::ffi::ret::int(Err(Errno(22)));
-    }
-    // SAFETY: both strings are NUL terminated.
-    let input = unsafe { crate::ffi::cstr::slice(input) };
-    let format = unsafe { crate::ffi::cstr::slice(format) };
-    let mut source = SliceSource::new(input);
-    let mut env = crate::va::CEnv::new(
-        unsafe { reader(list) },
-        crate::stdio::vprintf::errno_text,
-        crate::stdio::vprintf::alloc,
-    );
-    let options = scan_options();
-    result(vscan(&mut source, format, &mut env, &options, &ScanFloat))
 }
 
 /// `fscanf` failure class used by the crate.

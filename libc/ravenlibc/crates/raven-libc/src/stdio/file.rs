@@ -474,10 +474,10 @@ fn unit(result: R<()>) -> c_int {
     }
 }
 
-mod f01;
-mod f02;
-mod f03;
-mod f04;
-mod f05;
-mod f06;
-mod f07;
+mod feof;
+mod fflush;
+mod fopen;
+mod fputc;
+mod ftell;
+mod getchar;
+mod perror;

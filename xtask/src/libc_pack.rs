@@ -139,6 +139,11 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
 
     // 3. pack
     let packed = options.out.join("libc.a");
+    // `llvm-ar rcsD` updates an existing archive in place and keeps members whose names are
+    // absent from the new list. A rebuild changes every CGU hash, so the old shell members
+    // would survive next to the new ones and the linker could pick the stale copy (the h2
+    // hostrun did exactly that). Start from an empty archive for every pack.
+    let _ = std::fs::remove_file(&packed);
     tools.pack(&packed, &members, &members_dir)?;
     let shell_members = members
         .iter()

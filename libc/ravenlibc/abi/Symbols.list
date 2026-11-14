@@ -848,6 +848,7 @@ y1f
 yn
 ynf
 # private
+__raven_libc_init
 __raven_libc_start
 __raven_va_execl
 __raven_va_execle

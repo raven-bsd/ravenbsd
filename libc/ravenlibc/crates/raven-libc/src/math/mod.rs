@@ -79,6 +79,10 @@ macro_rules! scalbnf {
     };
 }
 
+mod fma;
+mod frexp;
+mod getpayload;
+mod lgamma_r;
 mod m01;
 mod m02;
 mod m03;
@@ -110,10 +114,6 @@ mod m28;
 mod m29;
 mod m30;
 mod m31;
-mod s01;
-mod s02;
-mod s03;
-mod s04;
-mod s05;
-mod s06;
-mod s07;
+mod sincos;
+mod totalordermag;
+mod yn;

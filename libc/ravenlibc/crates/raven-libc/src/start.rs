@@ -281,6 +281,16 @@ pub unsafe extern "C" fn __raven_libc_start(
     unsafe { stage2(stack.argc, stack.argv, stack.envp, rtld_fini) }
 }
 
+/// Install every strong hook of the shell.
+///
+/// `__raven_libc_start` calls this once before the constructors. Programs that bring their own
+/// `_start` (the hostrun fixtures) call it directly. The hook cells are function pointers, so no
+/// allocation, file access or environment lookup happens here (`BP-1`, `R-17`).
+#[unsafe(no_mangle)]
+pub extern "C" fn __raven_libc_init() {
+    crate::hooks::install_all();
+}
+
 /// Steps 12-15: constructors, `errno`, `main`, `exit`.
 ///
 /// # Safety
@@ -300,7 +310,7 @@ unsafe fn stage2(
     // own registry; `__cxa_atexit` remains the C ABI entry for compiler-generated objects.
     // The strong exit-handler hook of C60's weak cell is installed first: without it the cell
     // keeps its no-op dummy and `exit` would skip every registered handler.
-    crate::hooks::funcs_on_exit::install();
+    __raven_libc_init();
     if rtld_fini == 0 {
         // The `__rl_fini_array` callback has the C `__cxa_atexit` shape; the registry is the
         // shell's process instance and accepts a NULL object handle.
