@@ -21,11 +21,8 @@ dgettext has no logic crate on this branch
 hcreate C41 HTable has no accessor returning the stored C ENTRY; the host C hash API needs an entry view
 hsearch C41 HTable has no accessor returning the stored C ENTRY; the host C hash API needs an entry view
 hdestroy C41 HTable has no accessor returning the stored C ENTRY; the host C hash API needs an entry view
-atexit the atexit registry instance is C61's start hand-over
 at_quick_exit the quick-exit registry instance is C61's start hand-over
 quick_exit the quick-exit registry instance is C61's start hand-over
-__cxa_atexit the atexit registry instance is C61's start hand-over
-__cxa_finalize the atexit registry instance is C61's start hand-over
 on_exit the atexit registry instance is C61's start hand-over
 realpath the C41 Walker needs the platform path model; C60b
 basename C41 returns a GenName; the C81 shell binding is C60b

@@ -576,7 +576,7 @@ fn start_uses_the_four_argument_convention() {
         assert!(source.contains(argument), "missing {argument}");
     }
     assert!(source.contains("__raven_init_main_thread"));
-    assert!(source.contains("__cxa_atexit"));
+    assert!(source.contains("register_cxa"));
     assert!(source.contains("__rl_fini_array"));
 }
 

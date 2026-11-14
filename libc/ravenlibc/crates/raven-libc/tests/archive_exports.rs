@@ -82,6 +82,28 @@ fn defined() -> Vec<(String, char, String)> {
     out
 }
 
+/// The names `nm --undefined-only` reports for any member, without a definition requirement.
+fn undefined() -> std::collections::BTreeSet<String> {
+    let output = Command::new(nm())
+        .args(["--undefined-only", "--format=posix"])
+        .arg(archive())
+        .output()
+        .expect("nm");
+    let text = String::from_utf8_lossy(&output.stdout);
+    text.lines()
+        .filter_map(|line| {
+            let mut fields = line.split_whitespace();
+            let name = fields.next()?;
+            let kind = fields.next()?;
+            if kind == "U" {
+                Some(name.to_string())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 #[test]
 fn a1_k1_to_k6_pass() {
     if !archive().is_file() {
@@ -460,5 +482,47 @@ fn a12_c60c_data_symbols_are_defined() {
         "suboptarg",
     ] {
         assert!(names.contains(name), "data symbol `{name}` is not defined");
+    }
+}
+
+#[test]
+fn a13_c61_start_link_symbols_are_defined() {
+    if !archive().is_file() {
+        skip_or_fail!("no archive");
+    }
+    let mut kinds = std::collections::BTreeMap::new();
+    for (_, kind, name) in defined() {
+        kinds.entry(name).or_insert(kind);
+    }
+    let expected = [
+        "__cxa_atexit",
+        "atexit",
+        "__cxa_finalize",
+        "__stack_chk_guard",
+    ];
+    for name in expected {
+        assert!(
+            kinds.contains_key(name),
+            "C61 integration symbol `{name}` is not defined in libc.a"
+        );
+    }
+    let guard = kinds.get("__stack_chk_guard").copied().unwrap_or('?');
+    assert!(
+        matches!(guard, 'D' | 'd' | 'B' | 'b' | 'G' | 'g' | 'R' | 'r'),
+        "`__stack_chk_guard` is not a data symbol (kind {guard})"
+    );
+    let defined_names = kinds
+        .keys()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    let unresolved = undefined()
+        .difference(&defined_names)
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    for name in expected {
+        assert!(
+            !unresolved.contains(name),
+            "`{name}` is referenced but not defined anywhere in libc.a"
+        );
     }
 }

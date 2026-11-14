@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+__cxa_atexit
+__cxa_finalize
 _Exit
 a64l
 abort
 abs
+atexit
 atoi
 atol
 atoll

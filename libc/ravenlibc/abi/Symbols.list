@@ -6,6 +6,8 @@
 # follows the private marker below.
 _Exit
 _Fork
+__cxa_atexit
+__cxa_finalize
 __errno
 __errno_location
 __error
@@ -13,6 +15,7 @@ __gnu_basename
 __h_errno_location
 __progname
 __progname_full
+__stack_chk_guard
 __xpg_strerror_r
 _exit
 a64l
@@ -22,6 +25,7 @@ access
 addmntent
 aligned_alloc
 alphasort
+atexit
 atoi
 atol
 atoll

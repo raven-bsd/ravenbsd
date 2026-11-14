@@ -42,6 +42,11 @@ pub mod compat;
 pub(crate) mod ctype;
 #[cfg(target_os = "none")]
 pub(crate) mod errno;
+// The exit registry lives in `stdlib/` but is declared here so its host unit tests build even
+// though `stdlib` is target-only (C61 integration).
+#[cfg(any(target_os = "none", test))]
+#[path = "stdlib/atexit.rs"]
+pub(crate) mod exit_registry;
 pub(crate) mod ffi;
 #[cfg(target_os = "none")]
 pub(crate) mod fts;
@@ -77,6 +82,11 @@ pub(crate) mod pwd;
 pub(crate) mod regex;
 #[cfg(target_os = "none")]
 pub(crate) mod sched;
+// The guard storage is also compiled for the host unit test; it stops exporting the C name on
+// the host (the archive check covers the real symbol).
+#[cfg(any(target_os = "none", test))]
+#[path = "__stack_chk_guard.rs"]
+pub(crate) mod stack_guard;
 #[cfg(target_os = "none")]
 pub(crate) mod start;
 #[cfg(target_os = "none")]

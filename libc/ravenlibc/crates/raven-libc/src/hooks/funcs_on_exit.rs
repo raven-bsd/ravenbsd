@@ -7,9 +7,8 @@
 /// The strong definition pulled by `atexit`/`__cxa_atexit`/`on_exit`.
 #[unsafe(no_mangle)]
 pub fn __rl_funcs_on_exit_impl() {
-    // The registry is owned by C41 and its process instance is C61's start object. The member
-    // exists so the hook cell can be installed; the body stays empty until that instance is
-    // handed over (C61 section 4.3 item 9).
+    // The registry instance is the shell's `exit_registry`; the C41 table does the work.
+    crate::exit_registry::run_all();
 }
 
 /// Install the strong hook.

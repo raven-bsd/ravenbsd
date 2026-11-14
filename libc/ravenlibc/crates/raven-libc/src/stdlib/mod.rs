@@ -5,6 +5,8 @@
 //! (`02-api-surface` I17 Z02, C60c).
 
 pub(crate) mod exit;
+// The exit registry's file is `stdlib/atexit.rs`, but the module is declared from `lib.rs` so
+// its host unit tests build although `stdlib` itself is target-only (C61 integration).
 
 pub(crate) mod a64l;
 pub(crate) mod abs;

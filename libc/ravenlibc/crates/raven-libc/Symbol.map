@@ -645,6 +645,11 @@ RAVEN_1.0 {
 		group_from_gid;
 		setgrent;
 		setgroupent;
+		# --- exit registry and the stack guard (C61 integration) ---
+		__cxa_atexit;
+		__cxa_finalize;
+		__stack_chk_guard;
+		atexit;
 };
 
 RAVENprivate_1.0 {

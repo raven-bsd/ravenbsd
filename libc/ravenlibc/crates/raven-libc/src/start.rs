@@ -104,13 +104,6 @@ unsafe extern "C" {
     /// The one main-thread initialisation of C64 (`src/pthread/__raven_init_main_thread.rs`).
     fn __raven_init_main_thread(auxv: *const usize, canary: usize);
 
-    /// The `C41`/C64 exit-handler registry instance.
-    fn __cxa_atexit(
-        func: Option<extern "C" fn(*mut c_void)>,
-        arg: *mut c_void,
-        dso: *mut c_void,
-    ) -> c_int;
-
     /// The program entry point linked into the executable.
     fn main(argc: c_int, argv: *const *const u8, envp: *const *const u8) -> c_int;
 
@@ -124,8 +117,6 @@ unsafe extern "C" {
     static mut program_invocation_name: *const u8;
     /// The GNU basename of the program name.
     static mut program_invocation_short_name: *const u8;
-    /// The stack-protector canary word.
-    static mut __stack_chk_guard: usize;
 
     /// The weak no-op constructor (absent in the modern toolchain).
     fn _init();
@@ -263,10 +254,8 @@ pub unsafe extern "C" fn __raven_libc_start(
     }
 
     // STEP 8: the global stack-protector word (a plain store; no entropy syscall, R-17).
-    // SAFETY: the shell owns the symbol; the store happens once, on the start path.
-    unsafe {
-        __stack_chk_guard = canary;
-    }
+    // The shell owns the symbol; this is the once-per-process write of the start path.
+    crate::stack_guard::set(canary);
 
     // STEP 9: the Raven ABI revision; absent is accepted (a static first process), a mismatch
     // is a hard error with a fixed diagnostic.
@@ -307,24 +296,28 @@ unsafe fn stage2(
     // STEP 12: the constructor arrays run below; the step-13 registration is made first so the
     // finaliser is the oldest exit entry and therefore runs last (10-13).
     // STEP 13: register the finaliser: the `.fini_array` runner for a static executable, or
-    // the loader's exit hook when the loader passed one (G-12).
+    // the loader's exit hook when the loader passed one (G-12). The shell registers through its
+    // own registry; `__cxa_atexit` remains the C ABI entry for compiler-generated objects.
+    // The strong exit-handler hook of C60's weak cell is installed first: without it the cell
+    // keeps its no-op dummy and `exit` would skip every registered handler.
+    crate::hooks::funcs_on_exit::install();
     if rtld_fini == 0 {
-        // SAFETY: `__rl_fini_array` has the `__cxa_atexit` callback shape; the registry is the
+        // The `__rl_fini_array` callback has the C `__cxa_atexit` shape; the registry is the
         // shell's process instance and accepts a NULL object handle.
-        unsafe {
-            let _ = __cxa_atexit(
-                Some(crate::hooks::fini_array::__rl_fini_array),
-                core::ptr::null_mut(),
-                core::ptr::null_mut(),
-            );
-        }
+        let _ = crate::exit_registry::register_cxa(
+            Some(crate::hooks::fini_array::__rl_fini_array),
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
+        );
     } else {
         // SAFETY: the loader passes a `void (*)(void)`; the callback is never called with the
         // argument word, so the cast is the psABI convention of `crt1`.
-        unsafe {
-            let hook: extern "C" fn(*mut c_void) = core::mem::transmute(rtld_fini);
-            let _ = __cxa_atexit(Some(hook), core::ptr::null_mut(), core::ptr::null_mut());
-        }
+        let hook: extern "C" fn(*mut c_void) = unsafe { core::mem::transmute(rtld_fini) };
+        let _ = crate::exit_registry::register_cxa(
+            Some(hook),
+            core::ptr::null_mut(),
+            core::ptr::null_mut(),
+        );
     }
     // STEP 12 (continued): `.preinit_array`, `_init` and `.init_array`, each entry called as
     // `fn(argc, argv, envp)`; entries 0, 1 and -1 are placeholders (A-ld-20).
