@@ -261,6 +261,14 @@ impl LongDouble128 {
             bits: add_bits(self.bits, other.bits, true),
         }
     }
+
+    /// `x * y`, correctly rounded.
+    #[allow(clippy::should_implement_trait)]
+    pub fn mul(self, other: Self) -> Self {
+        Self {
+            bits: mul128_bits(self.bits, other.bits),
+        }
+    }
 }
 
 /// The exact-in-u128 add/sub engine for binary128 (113-bit significand + 3 guard bits).
@@ -402,6 +410,129 @@ fn pack_binary128(negative: bool, exponent: i32, significand: u128) -> u128 {
     }
     sign | (((field as u128) & EXPONENT_MASK as u128) << EXPONENT_SHIFT)
         | (mantissa & SIGNIFICAND_MASK)
+}
+
+/// `x * y`, correctly rounded.
+///
+/// The 113x113-bit product needs 226 bits, so it is formed in a four-limb accumulator (three
+/// 57/56-bit partial products), reduced to the 113-bit significand with three guard bits plus a
+/// sticky bit, and rounded by the shared packer.
+pub fn mul128_bits(a: u128, b: u128) -> u128 {
+    let a_class = classify(a);
+    let b_class = classify(b);
+    let negative = (a & SIGN != 0) ^ (b & SIGN != 0);
+    if a_class == FP_NAN || b_class == FP_NAN {
+        return nan_bits();
+    }
+    if a_class == FP_INFINITE || b_class == FP_INFINITE {
+        if a_class == FP_ZERO || b_class == FP_ZERO {
+            return nan_bits();
+        }
+        return if negative {
+            SIGN | (EXPONENT_MASK as u128) << EXPONENT_SHIFT
+        } else {
+            (EXPONENT_MASK as u128) << EXPONENT_SHIFT
+        };
+    }
+    if a_class == FP_ZERO || b_class == FP_ZERO {
+        return if negative { SIGN } else { 0 };
+    }
+    let (a_exp, a_sig) = unpack(a);
+    let (b_exp, b_sig) = unpack(b);
+    const LOW_MASK: u128 = (1u128 << 56) - 1;
+    let ah = a_sig >> 56;
+    let al = a_sig & LOW_MASK;
+    let bh = b_sig >> 56;
+    let bl = b_sig & LOW_MASK;
+    let mut limbs = [0u64; 4];
+    add_shifted(&mut limbs, al * bl, 0);
+    add_shifted(&mut limbs, ah * bl + bh * al, 56);
+    add_shifted(&mut limbs, ah * bh, 112);
+    // Reduce to 116 bits (113 + 3 guard) with a sticky bit.
+    let highest = limb_highest(&limbs).expect("a non-zero product");
+    let keep = 116u32;
+    let drop = highest + 1 - keep;
+    let significand = shift_right_sticky(&limbs, drop);
+    // value = significand * 2^(a_exp + b_exp - 224 + drop)
+    pack_binary128(negative, a_exp + b_exp - 224 + drop as i32, significand)
+}
+
+fn nan_bits() -> u128 {
+    (EXPONENT_MASK as u128) << EXPONENT_SHIFT | QUIET
+}
+
+/// Add `value << shift` to the little-endian limb accumulator.
+fn add_shifted(limbs: &mut [u64; 4], value: u128, shift: u32) {
+    let low = value as u64;
+    let high = (value >> 64) as u64;
+    let start = (shift / 64) as usize;
+    let bit = shift % 64;
+    let w0 = low << bit;
+    let w1 = if bit == 0 {
+        high
+    } else {
+        (high << bit) | (low >> (64 - bit))
+    };
+    let w2 = if bit == 0 { 0 } else { high >> (64 - bit) };
+    add_word(limbs, start, w0);
+    add_word(limbs, start + 1, w1);
+    add_word(limbs, start + 2, w2);
+}
+
+fn add_word(limbs: &mut [u64; 4], index: usize, word: u64) {
+    let mut carry = word as u128;
+    let mut position = index;
+    while carry != 0 && position < 4 {
+        let sum = limbs[position] as u128 + carry;
+        limbs[position] = sum as u64;
+        carry = sum >> 64;
+        position += 1;
+    }
+}
+
+fn limb_highest(limbs: &[u64; 4]) -> Option<u32> {
+    for index in (0..4).rev() {
+        if limbs[index] != 0 {
+            return Some(index as u32 * 64 + (63 - limbs[index].leading_zeros()));
+        }
+    }
+    None
+}
+
+/// The top bits above `drop`, with any shifted-out bit folded into bit 0.
+fn shift_right_sticky(limbs: &[u64; 4], drop: u32) -> u128 {
+    let base = (drop / 64) as usize;
+    let bit = drop % 64;
+    let mut value = 0u128;
+    for offset in 0..3 {
+        let index = base + offset;
+        if index >= 4 {
+            break;
+        }
+        let word = limbs[index];
+        let part = if bit == 0 {
+            word
+        } else {
+            (word >> bit) | limbs.get(index + 1).copied().unwrap_or(0) << (64 - bit)
+        };
+        if offset * 64 < 128 {
+            value |= (part as u128) << (offset * 64);
+        } else {
+            // Bits above the 128-bit accumulator can only be sticky.
+            value |= u128::from(part != 0);
+        }
+    }
+    let mut sticky = false;
+    for word in limbs.iter().take(base.min(4)) {
+        sticky |= *word != 0;
+    }
+    if bit != 0 && base < 4 {
+        sticky |= (limbs[base] & ((1u64 << bit) - 1)) != 0;
+    }
+    if sticky {
+        value |= 1;
+    }
+    value
 }
 
 #[cfg(test)]
