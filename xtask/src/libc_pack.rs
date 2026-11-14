@@ -134,7 +134,11 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
     let _ = std::fs::remove_dir_all(&members_dir);
     std::fs::create_dir_all(&members_dir)
         .with_context(|| format!("cannot create {}", members_dir.display()))?;
-    let members = tools.extract(&archive, &members_dir)?;
+    let mut members = tools.extract(&archive, &members_dir)?;
+    // Put the shell's members before its dependencies. compiler_builtins ships hidden
+    // fallback definitions of several math names; an archive resolves left-to-right, so the
+    // public shell definition must be seen first or the hidden copy wins and K7 loses the name.
+    members.sort_by_key(|member| !member.contains("raven_libc"));
     println!("libc-pack: members: ok");
 
     // 3. pack

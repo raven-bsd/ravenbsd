@@ -22,6 +22,7 @@ crate::raven_variadic!(
 ///
 /// # Safety
 /// The trampoline built `list`; `a2` is a pointer for the name getter/setter.
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __raven_va_prctl(option: c_int, list: *mut List) -> c_int {
     // SAFETY: the trampoline's list is valid for the call.
     let mut values = unsafe { reader(list) };

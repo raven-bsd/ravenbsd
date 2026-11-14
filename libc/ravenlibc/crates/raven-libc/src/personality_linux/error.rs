@@ -68,6 +68,7 @@ fn error_impl(status: c_int, errnum: c_int, format: *const c_char, list: *mut Li
 ///
 /// # Safety
 /// The trampoline built `list`; `format` is a NUL-terminated C string.
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __raven_va_error(
     status: c_int,
     errnum: c_int,

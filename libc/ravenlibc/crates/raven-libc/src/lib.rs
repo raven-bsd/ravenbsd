@@ -79,6 +79,8 @@ pub(crate) mod platform;
 #[cfg(target_os = "none")]
 pub(crate) mod process;
 #[cfg(target_os = "none")]
+pub(crate) mod pthread;
+#[cfg(target_os = "none")]
 pub(crate) mod pwd;
 #[cfg(target_os = "none")]
 pub(crate) mod regex;
