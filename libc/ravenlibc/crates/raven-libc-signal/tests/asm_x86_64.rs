@@ -254,6 +254,33 @@ fn make_stack() -> (Vec<u8>, StackT) {
 }
 
 #[test]
+fn getcontext_saves_the_legacy_fp_area_and_pointer() {
+    let mut context = UcontextT::ZERO;
+    let mut mxcsr = 0u32;
+    let mut control = 0u16;
+    // SAFETY: both stores write one register to a live local.
+    unsafe {
+        core::arch::asm!("stmxcsr [{}]", in(reg) &mut mxcsr, options(nostack, preserves_flags));
+        core::arch::asm!("fnstcw [{}]", in(reg) &mut control, options(nostack, preserves_flags));
+    }
+    assert_eq!(raw::getcontext_save(&mut context), 0);
+    let machine = frame::mcontext_of(&context);
+    let fp_pointer = machine.bytes.get(23).copied().unwrap_or(0) as usize;
+    assert_eq!(
+        fp_pointer,
+        frame::uc_mcontext_ptr(&context) as usize + 384,
+        "mcontext.fpregs must point at ucontext.__fpregs_mem"
+    );
+    let fp_word = context.bytes.get(53).copied().unwrap_or(0);
+    assert_eq!(fp_word as u32, mxcsr, "MXCSR must be saved at __fpregs_mem");
+    assert_eq!(
+        (fp_word >> 32) as u16,
+        control,
+        "the x87 control word must follow MXCSR"
+    );
+}
+
+#[test]
 fn makecontext_zero_to_six_arguments() {
     for count in 0..=6usize {
         MADE.store(false, Ordering::SeqCst);

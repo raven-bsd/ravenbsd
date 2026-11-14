@@ -87,16 +87,16 @@
       4b:      	movq	$0, 96(%rdi)
       53:      	movq	$0, 104(%rdi)
       5b:      	movq	$0, 112(%rdi)
-      63:      	stmxcsr	424(%rdi)
-      6a:      	fnstcw	428(%rdi)
-      70:      	leaq	424(%rdi), %rax
-      77:      	movq	%rax, 224(%rdi)
+      63:      	stmxcsr	384(%rdi)
+      6a:      	fnstcw	388(%rdi)
+      70:      	leaq	384(%rdi), %rax
+      77:      	movq	%rax, 184(%rdi)
       7e:      	xorl	%eax, %eax
       80:      	retq
 
 0000000000000081 <__rl_setcontext>:
-      81:      	ldmxcsr	424(%rdi)
-      88:      	fldcw	428(%rdi)
+      81:      	ldmxcsr	384(%rdi)
+      88:      	fldcw	388(%rdi)
       8e:      	movq	%rdi, %r10
       91:      	movq	64(%r10), %rdi
       95:      	movq	72(%r10), %rsi

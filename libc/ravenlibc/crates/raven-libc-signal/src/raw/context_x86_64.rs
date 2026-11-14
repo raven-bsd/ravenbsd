@@ -32,10 +32,10 @@ __rl_getcontext:
     movq $0,96(%rdi)
     movq $0,104(%rdi)
     movq $0,112(%rdi)
-    stmxcsr 424(%rdi)
-    fnstcw 428(%rdi)
-    lea 424(%rdi),%rax
-    mov %rax,224(%rdi)
+    stmxcsr 384(%rdi)
+    fnstcw 388(%rdi)
+    lea 384(%rdi),%rax
+    mov %rax,184(%rdi)
     xor %eax,%eax
     ret
 
@@ -43,8 +43,8 @@ __rl_getcontext:
     .hidden __rl_setcontext
     .type __rl_setcontext,@function
 __rl_setcontext:
-    ldmxcsr 424(%rdi)
-    fldcw 428(%rdi)
+    ldmxcsr 384(%rdi)
+    fldcw 388(%rdi)
     mov %rdi,%r10
     mov 64(%r10),%rdi
     mov 72(%r10),%rsi

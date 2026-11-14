@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # raven-libc-signal
 
 Everything signal-shaped in ravenlibc except the kernel: the 128-byte `sigset_t` and its name
