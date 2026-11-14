@@ -303,3 +303,43 @@ fn value_gamma_ln(x: f64) -> f64 {
 fn value_gamma(x: f64) -> f64 {
     value_gamma_ln(x).exp()
 }
+
+#[test]
+fn bessel_j_and_y_match_the_known_values() {
+    assert_eq!(j0l(ld(0.0)).to_f64(), 1.0);
+    assert_eq!(j1l(ld(0.0)).to_f64(), 0.0);
+    assert!(close(j0l(ld(1.0)), 0.765_197_686_557_966_6, 1e-14));
+    assert!(close(j1l(ld(1.0)), 0.440_050_585_744_933_5, 1e-14));
+    assert!(close(j0l(ld(2.0)), 0.223_890_779_141_235_7, 1e-14));
+    assert!(close(j1l(ld(2.0)), 0.576_724_807_756_873_4, 1e-14));
+    assert!(close(j0l(ld(5.0)), -0.177_596_771_314_338_3, 1e-13));
+    assert!(close(j1l(ld(5.0)), -0.327_579_137_591_465_2, 1e-13));
+    assert!(close(y0l(ld(1.0)), 0.088_256_964_215_676_97, 1e-13));
+    assert!(close(y1l(ld(1.0)), -0.781_212_821_300_288_7, 1e-13));
+    assert!(close(y0l(ld(2.0)), 0.510_375_672_649_745_1, 1e-13));
+    assert!(close(y1l(ld(2.0)), -0.107_032_431_540_937_5, 1e-12));
+    assert!(close(jnl(2, ld(3.0)), 0.486_091_260_585_891, 1e-12));
+    assert!(close(ynl(2, ld(3.0)), -0.160_400_393_484_943_6, 1e-11));
+    // First zero of J0.
+    assert!(j0l(ld(2.404_825_557_695_773)).abs().to_f64() < 1e-3);
+    // Special values.
+    assert_eq!(y0l(ld(0.0)).to_f64(), f64::NEG_INFINITY);
+    assert!(y0l(ld(-1.0)).is_nan());
+    assert!(y1l(ld(-1.0)).is_nan());
+    assert_eq!(j0l(LongDouble::infinity(false)).to_f64(), 0.0);
+    assert!(jnl(-1, ld(1.0)).is_nan());
+}
+
+#[test]
+fn the_bessel_asymptotic_branch_satisfies_the_wronskian_identity() {
+    // j0^2 + y0^2 = 2/(pi x) up to the leading-term error O(1/x^3).
+    for value in [15.0, 20.0, 30.0] {
+        let x = ld(value);
+        let identity = j0l(x).mul(j0l(x)).add(y0l(x).mul(y0l(x)));
+        let expected = ld(2.0).div(pi().mul(x));
+        assert!(
+            close(identity, expected.to_f64(), 2.0 / (value * value * value)),
+            "wronskian {value}"
+        );
+    }
+}
