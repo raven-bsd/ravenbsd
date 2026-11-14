@@ -79,16 +79,19 @@ syscall_entry:
 
     mov rcx, [rsp]
     mov r11, [rsp + 16]
-    mov r10, [rsp + 24]
 
-    mov rdx, rcx
-    shr rdx, 47
-    cmp rdx, 0
+    /* Use r10 as the canonical-rip scratch (it is reloaded with the user rsp
+     * below), so rdx, the third syscall argument / entry mask register, stays
+     * in the return frame. */
+    mov r10, rcx
+    shr r10, 47
+    cmp r10, 0
     je 1f
-    cmp rdx, 0x1ffff
+    cmp r10, 0x1ffff
     jne 2f
 1:
     or r11, 0x200
+    mov r10, [rsp + 24]
     mov rsp, r10
     swapgs
     sysretq
@@ -231,9 +234,15 @@ pub fn sigreturn_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
     Ok(())
 }
 
-/// Enter the registered entry with `bits` in `rdi` and the optional fault
-/// record pointer in `rsi`.
-fn enter_signal(frame: &mut TrapFrame, due: &thread::SignalEntry, bits: u64, second: u64) {
+/// Enter the registered entry with `bits` in `rdi`, the optional fault record
+/// pointer in `rsi` and the current user signal mask in `rdx`.
+fn enter_signal(
+    frame: &mut TrapFrame,
+    due: &thread::SignalEntry,
+    bits: u64,
+    second: u64,
+    mask: u64,
+) {
     let stack = if due.flags & ENTRY_SP != 0 {
         frame.rsp
     } else {
@@ -247,15 +256,25 @@ fn enter_signal(frame: &mut TrapFrame, due: &thread::SignalEntry, bits: u64, sec
     }
     frame.rdi = bits;
     frame.rsi = second;
+    frame.rdx = mask;
     frame.rip = due.entry;
     frame.rsp = stack;
 }
 
-/// Deliver a pending kick to the registered user entry, if one is ready.
+/// Deliver a pending `SIGRESEND` or kick to the registered user entry.
 ///
 /// Called after the syscall result is in the frame and before `sysretq`, so
 /// the saved context is exactly the interrupted user state.
 pub fn deliver_signal(frame: &mut TrapFrame) {
+    if let Some(due) = thread::signal_resend_due() {
+        let fault_pointer = {
+            let mut context = SIGNAL_CONTEXT.lock();
+            context_from_frame(frame, &mut context);
+            thread::signal_commit(&due, &context, None)
+        };
+        enter_signal(frame, &due, u64::from(due.bits), fault_pointer, due.mask);
+        return;
+    }
     let Some(due) = thread::signal_due() else {
         return;
     };
@@ -264,7 +283,7 @@ pub fn deliver_signal(frame: &mut TrapFrame) {
         context_from_frame(frame, &mut context);
         thread::signal_commit(&due, &context, None)
     };
-    enter_signal(frame, &due, u64::from(due.bits), fault_pointer);
+    enter_signal(frame, &due, u64::from(due.bits), fault_pointer, due.mask);
 }
 
 /// Deliver a synchronous user fault to the signal entry.
@@ -285,7 +304,7 @@ pub fn deliver_fault(frame: &mut TrapFrame, kind: u32, addr: u64) -> bool {
         context_from_frame(frame, &mut context);
         thread::signal_commit(&due, &context, Some(&record))
     };
-    enter_signal(frame, &due, 0, fault_pointer);
+    enter_signal(frame, &due, 0, fault_pointer, due.mask);
     true
 }
 

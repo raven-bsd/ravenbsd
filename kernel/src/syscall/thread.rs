@@ -186,7 +186,12 @@ pub struct SignalEntry {
     pub ctx: u64,
     /// Registered `SIG_SETUP` flags.
     pub flags: u32,
+    /// Current user signal mask, passed in the entry's third argument.
+    pub mask: u64,
 }
+
+/// `THREAD_KICK` bit 0: inspect pending signal state.
+const KICK_CHECK: u32 = 1;
 
 /// `sig_setup(entry: usize, ctx_offset: usize, flags: u32) -> 0` (raw 0x80).
 ///
@@ -234,12 +239,37 @@ pub fn sig_setup(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(0)
 }
 
+/// `sigresend(sig: u32, info: usize, mask: u64) -> 0` (raw 0x84).
+///
+/// Stores the restored user mask, sets the `CHECK` kick bit and marks the
+/// thread for a nested entry on the return-to-user path. `sig` and `info` are
+/// opaque to the kernel; libc's pending set already owns the signal. Requires
+/// a `SIG_SETUP` registration on the calling thread.
+pub fn sigresend(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let _ = (frame.rdi, frame.rsi);
+    let thread = sched::current_thread().ok_or(Errno::ESRCH)?;
+    if !thread.user || thread.signal_entry.load(Ordering::Acquire) == 0 {
+        return Err(Errno::EINVAL);
+    }
+    thread.signal_mask.store(frame.rdx, Ordering::Release);
+    thread.resend.store(true, Ordering::Release);
+    thread.kick_bits.fetch_or(KICK_CHECK, Ordering::AcqRel);
+    Ok(0)
+}
+
 /// Resolve a registered entry and context area for the current thread.
 ///
-/// Returns `None` without a registration or while already in a signal. An
-/// invalid context area is a fatal delivery error, per the PG-7 contract.
-fn signal_target(thread: &crate::sched::thread::Thread) -> Option<(u64, u64, u32)> {
-    if !thread.user || thread.in_signal.load(Ordering::Acquire) {
+/// `require_idle` rejects a thread already inside a signal; `SIGRESEND` is the
+/// one operation allowed to nest. An invalid context area is a fatal delivery
+/// error, per the PG-7 contract.
+fn signal_target(
+    thread: &crate::sched::thread::Thread,
+    require_idle: bool,
+) -> Option<(u64, u64, u32)> {
+    if !thread.user {
+        return None;
+    }
+    if require_idle && thread.signal_depth.load(Ordering::Acquire) != 0 {
         return None;
     }
     let entry = thread.signal_entry.load(Ordering::Acquire);
@@ -270,12 +300,13 @@ pub fn signal_due() -> Option<SignalEntry> {
     if bits == 0 {
         return None;
     }
-    let (entry, ctx, flags) = signal_target(&thread)?;
+    let (entry, ctx, flags) = signal_target(&thread, true)?;
     Some(SignalEntry {
         bits,
         entry,
         ctx,
         flags,
+        mask: thread.signal_mask.load(Ordering::Acquire),
     })
 }
 
@@ -285,12 +316,29 @@ pub fn signal_fault_due() -> Option<SignalEntry> {
     if thread.signal_entry.load(Ordering::Acquire) == 0 {
         return None;
     }
-    let (entry, ctx, flags) = signal_target(&thread)?;
+    let (entry, ctx, flags) = signal_target(&thread, true)?;
     Some(SignalEntry {
         bits: 0,
         entry,
         ctx,
         flags,
+        mask: thread.signal_mask.load(Ordering::Acquire),
+    })
+}
+
+/// Resolve a `SIGRESEND` re-entry, which is allowed while already in a signal.
+pub fn signal_resend_due() -> Option<SignalEntry> {
+    let thread = sched::current_thread()?;
+    if !thread.resend.swap(false, Ordering::AcqRel) {
+        return None;
+    }
+    let (entry, ctx, flags) = signal_target(&thread, false)?;
+    Some(SignalEntry {
+        bits: thread.kick_bits.load(Ordering::Acquire) | KICK_CHECK,
+        entry,
+        ctx,
+        flags,
+        mask: thread.signal_mask.load(Ordering::Acquire),
     })
 }
 
@@ -338,7 +386,7 @@ pub fn signal_commit(due: &SignalEntry, context: &MContext, fault: Option<&Fault
         fault_address = address;
     }
     thread.signal_active_ctx.store(due.ctx, Ordering::Release);
-    thread.in_signal.store(true, Ordering::Release);
+    thread.signal_depth.fetch_add(1, Ordering::AcqRel);
     if due.bits != 0 {
         thread.kick_bits.fetch_and(!due.bits, Ordering::AcqRel);
     }
@@ -347,11 +395,12 @@ pub fn signal_commit(due: &SignalEntry, context: &MContext, fault: Option<&Fault
 
 /// Restore the context saved by the active signal (PG-7 `SIGRETURN`, raw 0x82).
 ///
-/// Clears `in_signal` only after a complete copy-in; the caller then applies
-/// the context to its trap frame. Not being in a signal is `EINVAL`.
+/// Decrements the nesting depth only after a complete copy-in; a nested
+/// `SIGRETURN` returns to the previous handler, the last one clears the active
+/// area. Not being in a signal is `EINVAL`.
 pub fn sigreturn(context: &mut MContext) -> Result<(), Errno> {
     let thread = sched::current_thread().ok_or(Errno::ESRCH)?;
-    if !thread.user || !thread.in_signal.load(Ordering::Acquire) {
+    if !thread.user || thread.signal_depth.load(Ordering::Acquire) == 0 {
         return Err(Errno::EINVAL);
     }
     let address = thread.signal_active_ctx.load(Ordering::Acquire);
@@ -366,7 +415,8 @@ pub fn sigreturn(context: &mut MContext) -> Result<(), Errno> {
     };
     let source = UserSlice::new(address, size as u64)?;
     copy_from_user(destination, source)?;
-    thread.in_signal.store(false, Ordering::Release);
-    thread.signal_active_ctx.store(0, Ordering::Release);
+    if thread.signal_depth.fetch_sub(1, Ordering::AcqRel) == 1 {
+        thread.signal_active_ctx.store(0, Ordering::Release);
+    }
     Ok(())
 }

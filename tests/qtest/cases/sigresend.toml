@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S46 SIGRESEND: the first entry saves the interrupted context and calls
+# SIGRESEND with a new mask; the kernel re-enters with CHECK and the mask in
+# the third argument; the second entry records the order and returns through
+# SIGRETURN to the first entry, which restores the original context. A thread
+# without SIG_SETUP gets EINVAL.
+
+name = "sigresend"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/sigresend-fixture/build.sh"]
+initfs = "build/fixtures/sigresend/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^sigresend: setup=0$'
+
+[[expect]]
+regex = '^sigresend: no-setup=EINVAL$'
+unordered = true
+
+[[expect]]
+regex = '^sigresend: first entry bits=1 mask=0x0$'
+
+[[expect]]
+regex = '^sigresend: second entry bits=1 mask=0x5555aaaa12345678 order=2 match=1$'
+
+[[expect]]
+regex = '^sigresend: first resumed order=2 raw=0$'
+
+[[expect]]
+regex = '^sigresend: original resumed=1$'
+
+[[expect]]
+regex = '^sigresend: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
