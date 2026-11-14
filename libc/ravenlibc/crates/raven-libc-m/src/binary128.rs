@@ -284,6 +284,146 @@ impl LongDouble128 {
             bits: sqrt128_bits(self.bits),
         }
     }
+
+    /// `|x|`.
+    pub fn abs(self) -> Self {
+        Self {
+            bits: self.bits & !SIGN,
+        }
+    }
+
+    /// `x` with the sign of `sign`.
+    pub fn copysign(self, sign: Self) -> Self {
+        Self {
+            bits: (self.bits & !SIGN) | (sign.bits & SIGN),
+        }
+    }
+
+    /// A signed integer, exactly.
+    pub fn from_i64(value: i64) -> Self {
+        if value == 0 {
+            return Self::zero(false);
+        }
+        let negative = value < 0;
+        let magnitude = value.unsigned_abs();
+        let msb = 63 - magnitude.leading_zeros();
+        let significand = (magnitude as u128) << (112 - msb);
+        let sign = if negative { SIGN } else { 0 };
+        Self {
+            bits: sign
+                | (((msb as i32 + BIAS) as u128 & EXPONENT_MASK as u128) << EXPONENT_SHIFT)
+                | (significand & SIGNIFICAND_MASK),
+        }
+    }
+
+    /// Truncate toward zero as `i64`; `None` when it does not fit or is not finite.
+    pub fn to_i64(self) -> Option<i64> {
+        if !self.is_finite() || self.is_zero() {
+            return if self.is_zero() { Some(0) } else { None };
+        }
+        let (exponent, significand) = unpack(self.bits);
+        if exponent < 0 {
+            return Some(0);
+        }
+        if exponent > 63 {
+            return None;
+        }
+        let magnitude = significand >> (112 - exponent);
+        let magnitude = u64::try_from(magnitude).ok()?;
+        let value = i64::try_from(magnitude).ok()?;
+        Some(if self.sign_bit() { -value } else { value })
+    }
+
+    /// `round`: halfway cases away from zero.
+    pub fn round(self) -> Self {
+        if !self.is_finite() || self.is_zero() {
+            return self;
+        }
+        let (exponent, significand) = unpack(self.bits);
+        let negative = self.sign_bit();
+        if exponent >= 112 {
+            return self;
+        }
+        if exponent < -1 {
+            return Self::zero(negative);
+        }
+        if exponent == -1 {
+            return if negative {
+                Self::zero(true).sub(Self::one())
+            } else {
+                Self::one()
+            };
+        }
+        let drop = (112 - exponent) as u32;
+        let kept = (significand >> drop) << drop;
+        let lost = significand & ((1u128 << drop) - 1);
+        if lost == 0 {
+            return self;
+        }
+        let half = 1u128 << (drop - 1);
+        let magnitude = if lost >= half {
+            kept + (1u128 << drop)
+        } else {
+            kept
+        };
+        Self {
+            bits: from_parts_bits(negative, exponent, magnitude),
+        }
+    }
+
+    /// `scalbn`: `x * 2^n` by exponent adjustment, with overflow and subnormal rounding.
+    pub fn scalbn(self, n: i32) -> Self {
+        if !self.is_finite() || self.is_zero() {
+            return self;
+        }
+        let negative = self.sign_bit();
+        let field = self.exponent_field() as i32 + n;
+        let mut significand = self.significand_bits() | HIDDEN;
+        let sign = if negative { SIGN } else { 0 };
+        if field >= EXPONENT_MASK as i32 {
+            return Self::infinity(negative);
+        }
+        if field > 0 {
+            return Self {
+                bits: sign
+                    | (((field as u128) & EXPONENT_MASK as u128) << EXPONENT_SHIFT)
+                    | (significand & SIGNIFICAND_MASK),
+            };
+        }
+        let shift = (1 - field) as u32;
+        if shift >= 113 {
+            return Self::zero(negative);
+        }
+        let lost = significand & ((1u128 << shift) - 1);
+        let half = 1u128 << (shift - 1);
+        significand >>= shift;
+        if lost > half || (lost == half && (significand & 1) != 0) {
+            significand += 1;
+        }
+        Self {
+            bits: sign | (significand & SIGNIFICAND_MASK),
+        }
+    }
+
+    /// The value scaled to `[1, 2)` (the mantissa used by the logarithm reduction).
+    pub fn mantissa(self) -> Self {
+        Self {
+            bits: ((BIAS as u128) << EXPONENT_SHIFT) | self.significand_bits(),
+        }
+    }
+}
+
+/// Build a value from a sign, the unpacked exponent and a significand normalised at bit 112.
+fn from_parts_bits(negative: bool, exponent: i32, significand: u128) -> u128 {
+    let sign = if negative { SIGN } else { 0 };
+    let mut significand = significand;
+    let mut exponent = exponent;
+    if significand >> 113 != 0 {
+        significand >>= 1;
+        exponent += 1;
+    }
+    sign | ((((exponent + BIAS) as u128) & EXPONENT_MASK as u128) << EXPONENT_SHIFT)
+        | (significand & SIGNIFICAND_MASK)
 }
 
 /// `x / y` over the 113-bit significands: a restoring division of `a_sig << 113` by `b_sig`.

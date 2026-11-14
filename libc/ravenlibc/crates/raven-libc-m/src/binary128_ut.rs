@@ -174,6 +174,29 @@ fn the_binary128_type_multiplies_correctly() {
 }
 
 #[test]
+fn the_binary128_helpers_serve_the_f128_series() {
+    use super::LongDouble128;
+    let value = LongDouble128::from_f64(-2.5);
+    assert_eq!(value.abs().to_f64(), 2.5);
+    assert_eq!(value.copysign(LongDouble128::one()).to_f64(), 2.5);
+    assert_eq!(LongDouble128::one().copysign(value).to_f64(), -1.0);
+    assert_eq!(LongDouble128::from_i64(-7).to_f64(), -7.0);
+    assert_eq!(LongDouble128::from_i64(1 << 60).to_i64(), Some(1 << 60));
+    assert_eq!(LongDouble128::from_i64(-7).to_i64(), Some(-7));
+    assert_eq!(LongDouble128::from_i64(0).to_i64(), Some(0));
+    assert_eq!(LongDouble128::from_f64(0.5).to_i64(), Some(0));
+    assert_eq!(LongDouble128::from_f64(2.5).round().to_f64(), 3.0);
+    assert_eq!(LongDouble128::from_f64(-2.5).round().to_f64(), -3.0);
+    assert_eq!(LongDouble128::from_f64(0.4).round().to_f64(), 0.0);
+    assert_eq!(LongDouble128::from_f64(1.5).scalbn(3).to_f64(), 12.0);
+    assert_eq!(LongDouble128::from_f64(1.0).scalbn(-2).to_f64(), 0.25);
+    assert_eq!(LongDouble128::one().mantissa().to_f64(), 1.0);
+    assert_eq!(LongDouble128::from_f64(6.0).mantissa().to_f64(), 1.5);
+    // The un-gated series module builds on these helpers on every target.
+    assert!(LongDouble128::from_f64(2.0).sqrt().to_f64() > 1.41);
+}
+
+#[test]
 fn the_binary128_type_divides_and_takes_square_roots() {
     use super::LongDouble128;
     let six = LongDouble128::from_f64(6.0);

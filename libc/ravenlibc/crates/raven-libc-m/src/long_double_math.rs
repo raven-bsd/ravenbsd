@@ -13,7 +13,7 @@
 //! (`1e-15`) and the long-double identities (`sin^2 + cos^2`, `exp(log x)`, `log(exp x)`) at
 //! `1e-18`; a ULP table against the donor is the remaining C47c item.
 
-use crate::long_double::LongDouble;
+use crate::LongDouble;
 
 fn ld(value: f64) -> LongDouble {
     LongDouble::from_f64(value)
@@ -171,7 +171,7 @@ pub fn logl(x: LongDouble) -> LongDouble {
     };
     let field = mantissa.exponent_field() as i32;
     let e = field - 16383 + exponent;
-    let m = LongDouble::from_parts(false, 16383, mantissa.significand_bits());
+    let m = mantissa.mantissa();
     // ln m = 2 * atanh((m - 1) / (m + 1)); the argument is in [0, 1/3).
     let one = LongDouble::one();
     let s = m.sub(one).div(m.add(one));
