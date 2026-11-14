@@ -1,3 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-# The C46 crate exists; its shell binding needs a DirSys implementation (C60b).
+fnmatch
+glob
+globfree
+wordexp
+wordfree

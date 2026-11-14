@@ -1,11 +1,30 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 _exit
+access
 close
+creat
+creat64
 dup
 dup2
+fstat
+getcwd
+ioctl
 lseek
+lstat
+mmap
+mprotect
+munmap
+open
+open64
+openat
+openat64
+poll
 pread
 pwrite
 read
+stat
+sysconf
+uname
+unlink
 write

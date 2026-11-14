@@ -44,6 +44,10 @@ pub(crate) mod ctype;
 pub(crate) mod errno;
 pub(crate) mod ffi;
 #[cfg(target_os = "none")]
+pub(crate) mod fts;
+#[cfg(target_os = "none")]
+pub(crate) mod glob;
+#[cfg(target_os = "none")]
 pub(crate) mod hooks;
 #[cfg(target_os = "none")]
 pub(crate) mod malloc;
@@ -51,6 +55,10 @@ pub(crate) mod malloc;
 pub(crate) mod math;
 #[cfg(target_os = "none")]
 pub(crate) mod panic;
+#[cfg(target_os = "none")]
+pub(crate) mod platform;
+#[cfg(target_os = "none")]
+pub(crate) mod regex;
 #[cfg(target_os = "none")]
 pub(crate) mod start;
 #[cfg(target_os = "none")]

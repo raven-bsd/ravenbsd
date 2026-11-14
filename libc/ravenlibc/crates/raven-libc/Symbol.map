@@ -187,6 +187,112 @@ RAVEN_1.0 {
 		pwrite;
 		read;
 		write;
+		# --- regex (C60c) ---
+		regcomp;
+		regerror;
+		regexec;
+		regfree;
+		# --- glob (C60c) ---
+		fnmatch;
+		glob;
+		globfree;
+		wordexp;
+		wordfree;
+		# --- fts and dirent (C60c) ---
+		alphasort;
+		closedir;
+		dirfd;
+		fdopendir;
+		fts_children;
+		fts_close;
+		fts_open;
+		fts_openat;
+		fts_read;
+		fts_set;
+		ftw;
+		nftw;
+		opendir;
+		posix_getdents;
+		readdir;
+		readdir_r;
+		rewinddir;
+		scandir;
+		seekdir;
+		telldir;
+		versionsort;
+		# --- stdlib (C60c) ---
+		a64l;
+		bsearch;
+		clearenv;
+		drand48;
+		erand48;
+		getenv;
+		getenv_r;
+		getopt;
+		getopt_long;
+		getopt_long_only;
+		getsubopt;
+		heapsort;
+		initstate;
+		insque;
+		jrand48;
+		l64a;
+		lcong48;
+		lfind;
+		lrand48;
+		lsearch;
+		mergesort;
+		mrand48;
+		nrand48;
+		putenv;
+		qsort;
+		qsort_r;
+		rand;
+		rand_r;
+		random;
+		remque;
+		secure_getenv;
+		seed48;
+		setenv;
+		setstate;
+		srand;
+		srand48;
+		srandom;
+		strtonum;
+		tdelete;
+		tdestroy;
+		tfind;
+		tsearch;
+		twalk;
+		unsetenv;
+		# --- platform and unistd (C60c) ---
+		access;
+		creat;
+		creat64;
+		fstat;
+		getcwd;
+		ioctl;
+		lstat;
+		mmap;
+		mprotect;
+		munmap;
+		open;
+		open64;
+		openat;
+		openat64;
+		poll;
+		stat;
+		sysconf;
+		uname;
+		unlink;
+		# --- data symbols (C60c) ---
+		environ;
+		optarg;
+		opterr;
+		optind;
+		optopt;
+		optreset;
+		suboptarg;
 		# --- compat (C65; x86_64 only until its c_char follow-up) ---
 		addmntent; # x86_64
 		backtrace; # x86_64
@@ -276,6 +382,9 @@ RAVEN_1.0 {
 RAVENprivate_1.0 {
 	global:
 		__raven_libc_start;
+		__raven_va_ioctl;
+		__raven_va_open;
+		__raven_va_openat;
 		__rl_fini_array;
 		__rl_fmt_float_impl;
 		__rl_fmt_wide_impl;

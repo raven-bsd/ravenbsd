@@ -285,3 +285,171 @@ fn a8_no_c64_family_symbol_is_defined() {
         );
     }
 }
+
+fn rustc() -> String {
+    std::env::var("RUSTC").unwrap_or_else(|_| "rustc".to_string())
+}
+
+fn lld() -> Option<PathBuf> {
+    if let Ok(value) = std::env::var("LD_LLD")
+        && !value.is_empty()
+    {
+        return Some(PathBuf::from(value));
+    }
+    let output = Command::new(rustc())
+        .args(["--print", "sysroot"])
+        .output()
+        .ok()?;
+    let sysroot = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let version = Command::new(rustc()).args(["-vV"]).output().ok()?;
+    let host = String::from_utf8_lossy(&version.stdout)
+        .lines()
+        .find_map(|line| line.strip_prefix("host: ").map(str::to_string))?;
+    let candidate = Path::new(&sysroot)
+        .join("lib/rustlib")
+        .join(host)
+        .join("bin/gcc-ld/ld.lld");
+    if candidate.is_file() {
+        return Some(candidate);
+    }
+    Some(PathBuf::from("ld.lld"))
+}
+
+/// Compile, link and run one `hostrun/` program natively.
+fn hostrun(name: &str) -> Option<String> {
+    if !(cfg!(all(target_os = "linux", target_arch = "x86_64"))) {
+        eprintln!("SKIP: host");
+        return None;
+    }
+    if !archive().is_file() {
+        if required() {
+            panic!("SKIP: no build/x86_64/libc.a (RL_LIBC_REQUIRED=1)");
+        }
+        eprintln!("SKIP: no build/x86_64/libc.a");
+        return None;
+    }
+    let scratch = Path::new("/tmp/opencode");
+    let work = if scratch.is_dir() {
+        scratch.join("c60c-hostrun")
+    } else {
+        std::env::temp_dir().join("c60c-hostrun")
+    };
+    std::fs::create_dir_all(&work).ok()?;
+    let source = root()
+        .join("libc/ravenlibc/crates/raven-libc/hostrun")
+        .join(format!("{name}.rs"));
+    assert!(
+        source.is_file(),
+        "missing hostrun source {}",
+        source.display()
+    );
+    let object = work.join(format!("{name}.o"));
+    let binary = work.join(name);
+    let compile = Command::new(rustc())
+        .args(["--edition", "2024", "--crate-type", "lib", "--emit=obj"])
+        .args(["--target", "x86_64-unknown-none"])
+        .args([
+            "-C",
+            "panic=abort",
+            "-C",
+            "opt-level=z",
+            "-C",
+            "relocation-model=pic",
+        ])
+        .arg("-o")
+        .arg(&object)
+        .arg(&source)
+        .output()
+        .ok()?;
+    assert!(
+        compile.status.success(),
+        "rustc failed for {name}: {}",
+        String::from_utf8_lossy(&compile.stderr)
+    );
+    let linker = lld()?;
+    let link = Command::new(&linker)
+        .args(["-static", "--gc-sections", "-e", "_start"])
+        .arg(&object)
+        .arg(archive())
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .ok()?;
+    assert!(
+        link.status.success(),
+        "ld.lld failed for {name}: {}",
+        String::from_utf8_lossy(&link.stderr)
+    );
+    let run = Command::new(&binary).output().ok()?;
+    assert!(
+        run.status.success(),
+        "{name} failed with {:?}: {}",
+        run.status.code(),
+        String::from_utf8_lossy(&run.stdout)
+    );
+    Some(String::from_utf8_lossy(&run.stdout).into_owned())
+}
+
+#[test]
+fn a9_hostrun_h5_glob_regex_qsort() {
+    let Some(output) = hostrun("h5_glob") else {
+        return;
+    };
+    assert!(output.contains("H5 OK"), "h5 output: {output}");
+}
+
+#[test]
+fn a10_hostrun_h6_platform_glue() {
+    let Some(output) = hostrun("h6_platform") else {
+        return;
+    };
+    assert!(output.contains("H6 OK"), "h6 output: {output}");
+}
+
+#[test]
+fn a11_every_expected_family_name_is_defined() {
+    if !archive().is_file() {
+        skip_or_fail!("no archive");
+    }
+    let text = defined();
+    let names = text
+        .iter()
+        .filter(|(_, kind, _)| matches!(kind, 'T' | 't'))
+        .map(|(_, _, name)| name.clone())
+        .collect::<std::collections::BTreeSet<_>>();
+    for family in ["regex", "glob", "fts", "stdlib", "unistd"] {
+        let path = root()
+            .join("libc/ravenlibc/crates/raven-libc/expected")
+            .join(format!("{family}.txt"));
+        let expected = std::fs::read_to_string(&path).expect("expected list");
+        for line in expected.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            assert!(names.contains(line), "{family}: `{line}` is not defined");
+        }
+    }
+}
+
+#[test]
+fn a12_c60c_data_symbols_are_defined() {
+    if !archive().is_file() {
+        skip_or_fail!("no archive");
+    }
+    let names = defined()
+        .into_iter()
+        .map(|(_, _, name)| name)
+        .collect::<std::collections::BTreeSet<_>>();
+    for name in [
+        "environ",
+        "optarg",
+        "opterr",
+        "optind",
+        "optopt",
+        "optreset",
+        "suboptarg",
+    ] {
+        assert!(names.contains(name), "data symbol `{name}` is not defined");
+    }
+}
