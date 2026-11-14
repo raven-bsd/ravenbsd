@@ -8,11 +8,13 @@ use std::path::Path;
 
 use anyhow::Result;
 
-/// Run the step.
-pub(crate) fn run(root: &Path, _out: &Path) -> Result<String> {
-    if root.join("libc/ravenlibc/stubs/Cargo.toml").is_file() {
-        Ok("ok".to_string())
-    } else {
-        Ok("skipped(no libc/ravenlibc/stubs)".to_string())
+/// Run the step: generate the 20 stub libraries when the C66 table is present.
+pub(crate) fn run(root: &Path, out: &Path) -> Result<String> {
+    let table_path = root.join("libc/ravenlibc/stubs/stubs.toml");
+    if !table_path.is_file() {
+        return Ok("skipped(no libc/ravenlibc/stubs)".to_string());
     }
+    let table = crate::libc_stubs::Stubs::load(&table_path)?;
+    let count = crate::libc_stubs::generate(&table, &out.join("stubs"))?;
+    Ok(format!("ok ({count} files)"))
 }
