@@ -692,9 +692,19 @@ fn reconcile_markdown(model: &Model) -> String {
 /// Compare a frozen `.symbols` file with the expected records.
 #[must_use]
 pub fn audit_frozen(expected: &str, actual: &str) -> Vec<(String, String)> {
+    let expected_node = frozen_node(expected);
+    let actual_node = frozen_node(actual);
     let expected = frozen_records(expected);
     let actual = frozen_records(actual);
     let mut findings = Vec::new();
+    if let (Some(expected_node), Some(actual_node)) = (expected_node, actual_node)
+        && expected_node != actual_node
+    {
+        findings.push((
+            "frozen-version".to_string(),
+            format!("frozen node {expected_node}, now {actual_node}"),
+        ));
+    }
     for (name, fields) in &expected {
         let Some(have) = actual.get(name) else {
             findings.push((
@@ -703,7 +713,10 @@ pub fn audit_frozen(expected: &str, actual: &str) -> Vec<(String, String)> {
             ));
             continue;
         };
-        for (index, key) in ["kind", "size", "arch", "ring"].iter().enumerate() {
+        for (index, key) in ["kind", "size", "arch", "ring", "header"]
+            .iter()
+            .enumerate()
+        {
             if fields.get(index + 1) != have.get(index + 1) {
                 findings.push((
                     format!("frozen-{key}"),
@@ -725,6 +738,23 @@ pub fn audit_frozen(expected: &str, actual: &str) -> Vec<(String, String)> {
         }
     }
     findings
+}
+
+fn frozen_node(text: &str) -> Option<&str> {
+    text.lines()
+        .find_map(|line| line.trim().strip_prefix("# node:").map(str::trim))
+}
+
+/// Whether a mkmap `.txt` candidate names exactly the `.symbols` public set.
+#[must_use]
+pub fn txt_matches_symbols(symbols: &str, txt: &str) -> bool {
+    let expected = frozen_records(symbols).into_keys().collect::<BTreeSet<_>>();
+    let actual = txt
+        .lines()
+        .filter(|line| !line.trim_start().starts_with('#'))
+        .filter_map(|line| line.split_whitespace().next().map(str::to_string))
+        .collect::<BTreeSet<_>>();
+    expected == actual
 }
 
 fn frozen_records(text: &str) -> BTreeMap<String, Vec<String>> {
@@ -760,19 +790,13 @@ pub fn lint_frozen(root: &Path) -> Result<Vec<Violation>> {
     let current = fs::read_to_string(&path)?;
     let mut findings = audit_frozen(&rendered.frozen, &current);
     let txt = root.join("libc/ravenlibc/abi/frozen/RAVEN_1.0.txt");
-    if let Ok(text) = fs::read_to_string(&txt) {
-        let names = text
-            .lines()
-            .filter(|line| !line.trim_start().starts_with('#'))
-            .filter_map(|line| line.split_whitespace().next().map(str::to_string))
-            .collect::<BTreeSet<_>>();
-        let expected = model.public.iter().cloned().collect::<BTreeSet<_>>();
-        if names != expected {
-            findings.push((
-                "frozen-txt".to_string(),
-                "mkmap .txt and .symbols name sets differ".to_string(),
-            ));
-        }
+    if let Ok(text) = fs::read_to_string(&txt)
+        && !txt_matches_symbols(&rendered.frozen, &text)
+    {
+        findings.push((
+            "frozen-txt".to_string(),
+            "mkmap .txt and .symbols name sets differ".to_string(),
+        ));
     }
     Ok(findings
         .into_iter()

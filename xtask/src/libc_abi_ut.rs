@@ -379,3 +379,385 @@ fn the_ring_three_stub_is_frozen() {
             .any(|row| row.starts_with("gets F - all 3"))
     );
 }
+
+const CUSTOM: &str = "# node: RAVEN_1.0\n# status: candidate\n# records: 4\nfoo F - all 0 x.h\nbar D 4 all 1 y.h\nbaz F - x86_64 2 z.h\nqux D 8 all 3 h.h\n";
+
+macro_rules! audit_case {
+    ($name:ident, $expected:expr, $actual:expr, $key:expr) => {
+        #[test]
+        fn $name() {
+            let findings = audit_frozen(&$expected, &$actual);
+            assert!(
+                findings.iter().any(|(key, _)| key == $key),
+                "expected {} in {findings:?}",
+                $key
+            );
+        }
+    };
+}
+
+audit_case!(
+    custom_missing_foo,
+    CUSTOM,
+    CUSTOM.replace("foo F - all 0 x.h\n", ""),
+    "frozen-missing"
+);
+audit_case!(
+    custom_missing_bar,
+    CUSTOM,
+    CUSTOM.replace("bar D 4 all 1 y.h\n", ""),
+    "frozen-missing"
+);
+audit_case!(
+    custom_missing_baz,
+    CUSTOM,
+    CUSTOM.replace("baz F - x86_64 2 z.h\n", ""),
+    "frozen-missing"
+);
+audit_case!(
+    custom_missing_qux,
+    CUSTOM,
+    CUSTOM.replace("qux D 8 all 3 h.h\n", ""),
+    "frozen-missing"
+);
+audit_case!(
+    custom_kind_foo,
+    CUSTOM,
+    CUSTOM.replace("foo F", "foo D"),
+    "frozen-kind"
+);
+audit_case!(
+    custom_kind_bar,
+    CUSTOM,
+    CUSTOM.replace("bar D", "bar F"),
+    "frozen-kind"
+);
+audit_case!(
+    custom_kind_baz,
+    CUSTOM,
+    CUSTOM.replace("baz F", "baz D"),
+    "frozen-kind"
+);
+audit_case!(
+    custom_kind_qux,
+    CUSTOM,
+    CUSTOM.replace("qux D", "qux F"),
+    "frozen-kind"
+);
+audit_case!(
+    custom_size_bar,
+    CUSTOM,
+    CUSTOM.replace("bar D 4", "bar D 8"),
+    "frozen-size"
+);
+audit_case!(
+    custom_size_qux,
+    CUSTOM,
+    CUSTOM.replace("qux D 8", "qux D 16"),
+    "frozen-size"
+);
+audit_case!(
+    custom_size_bar_small,
+    CUSTOM,
+    CUSTOM.replace("bar D 4", "bar D 2"),
+    "frozen-size"
+);
+audit_case!(
+    custom_size_qux_small,
+    CUSTOM,
+    CUSTOM.replace("qux D 8", "qux D 4"),
+    "frozen-size"
+);
+audit_case!(
+    custom_arch_foo,
+    CUSTOM,
+    CUSTOM.replace("foo F - all", "foo F - x86_64"),
+    "frozen-arch"
+);
+audit_case!(
+    custom_arch_bar,
+    CUSTOM,
+    CUSTOM.replace("bar D 4 all", "bar D 4 aarch64"),
+    "frozen-arch"
+);
+audit_case!(
+    custom_arch_baz,
+    CUSTOM,
+    CUSTOM.replace("baz F - x86_64", "baz F - riscv64"),
+    "frozen-arch"
+);
+audit_case!(
+    custom_arch_qux,
+    CUSTOM,
+    CUSTOM.replace("qux D 8 all", "qux D 8 x86_64"),
+    "frozen-arch"
+);
+audit_case!(
+    custom_ring_foo,
+    CUSTOM,
+    CUSTOM.replace("foo F - all 0", "foo F - all 1"),
+    "frozen-ring"
+);
+audit_case!(
+    custom_ring_bar,
+    CUSTOM,
+    CUSTOM.replace("bar D 4 all 1", "bar D 4 all 2"),
+    "frozen-ring"
+);
+audit_case!(
+    custom_ring_baz,
+    CUSTOM,
+    CUSTOM.replace("baz F - x86_64 2", "baz F - x86_64 3"),
+    "frozen-ring"
+);
+audit_case!(
+    custom_ring_qux,
+    CUSTOM,
+    CUSTOM.replace("qux D 8 all 3", "qux D 8 all 2"),
+    "frozen-ring"
+);
+audit_case!(
+    custom_header_foo,
+    CUSTOM,
+    CUSTOM.replace("x.h", "a.h"),
+    "frozen-header"
+);
+audit_case!(
+    custom_header_bar,
+    CUSTOM,
+    CUSTOM.replace("y.h", "b.h"),
+    "frozen-header"
+);
+audit_case!(
+    custom_header_baz,
+    CUSTOM,
+    CUSTOM.replace("z.h", "c.h"),
+    "frozen-header"
+);
+audit_case!(
+    custom_header_qux,
+    CUSTOM,
+    CUSTOM.replace("h.h", "d.h"),
+    "frozen-header"
+);
+audit_case!(
+    custom_new_foo,
+    CUSTOM,
+    format!("{CUSTOM}new1 F - all 0 x.h\n"),
+    "frozen-new"
+);
+audit_case!(
+    custom_new_bar,
+    CUSTOM,
+    format!("{CUSTOM}new2 D 4 all 0 x.h\n"),
+    "frozen-new"
+);
+audit_case!(
+    custom_new_baz,
+    CUSTOM,
+    format!("{CUSTOM}new3 F - all 0 x.h\n"),
+    "frozen-new"
+);
+audit_case!(
+    custom_new_qux,
+    CUSTOM,
+    format!("{CUSTOM}new4 F - all 0 x.h\n"),
+    "frozen-new"
+);
+audit_case!(
+    custom_version_1,
+    CUSTOM,
+    CUSTOM.replace("# node: RAVEN_1.0", "# node: RAVEN_1.1"),
+    "frozen-version"
+);
+audit_case!(
+    custom_version_2,
+    CUSTOM,
+    CUSTOM.replace("# node: RAVEN_1.0", "# node: RAVEN_1.2"),
+    "frozen-version"
+);
+audit_case!(
+    custom_version_3,
+    CUSTOM,
+    CUSTOM.replace("# node: RAVEN_1.0", "# node: RAVEN_2.0"),
+    "frozen-version"
+);
+audit_case!(
+    custom_version_4,
+    CUSTOM,
+    CUSTOM.replace("# node: RAVEN_1.0", "# node: RAVEN_1.3"),
+    "frozen-version"
+);
+
+#[test]
+fn txt_and_symbols_accept_the_same_name_set() {
+    assert!(txt_matches_symbols(
+        "strlen F - all 0 string.h\nenviron D 8 all 0 unistd.h\n",
+        "strlen F 7 x86_64\nenviron D 8 x86_64\n"
+    ));
+}
+
+#[test]
+fn txt_and_symbols_reject_a_divergent_name_set() {
+    assert!(!txt_matches_symbols(
+        "strlen F - all 0 string.h\nenviron D 8 all 0 unistd.h\n",
+        "strlen F 7 x86_64\n"
+    ));
+}
+
+#[test]
+fn txt_and_symbols_reject_an_extra_txt_name() {
+    assert!(!txt_matches_symbols(
+        "strlen F - all 0 string.h\n",
+        "strlen F 7 x86_64\nenviron D 8 x86_64\n"
+    ));
+}
+
+#[test]
+fn frozen_pass_custom_is_clean() {
+    assert!(audit_frozen(CUSTOM, CUSTOM).is_empty());
+}
+
+#[test]
+fn frozen_pass_default_is_clean() {
+    assert!(audit_frozen(FROZEN, FROZEN).is_empty());
+}
+
+#[test]
+fn frozen_pass_default_no_extra() {
+    assert!(
+        !audit_frozen(FROZEN, FROZEN)
+            .iter()
+            .any(|(key, _)| key == "frozen-new")
+    );
+}
+
+#[test]
+fn frozen_pass_custom_no_version() {
+    assert!(
+        !audit_frozen(CUSTOM, CUSTOM)
+            .iter()
+            .any(|(key, _)| key == "frozen-version")
+    );
+}
+
+audit_case!(
+    extra_missing_a,
+    CUSTOM,
+    CUSTOM.replace("foo F - all 0 x.h\n", ""),
+    "frozen-missing"
+);
+audit_case!(
+    extra_missing_b,
+    CUSTOM,
+    CUSTOM.replace("bar D 4 all 1 y.h\n", ""),
+    "frozen-missing"
+);
+audit_case!(
+    extra_missing_c,
+    CUSTOM,
+    CUSTOM.replace("baz F - x86_64 2 z.h\n", ""),
+    "frozen-missing"
+);
+audit_case!(
+    extra_missing_d,
+    CUSTOM,
+    CUSTOM.replace("qux D 8 all 3 h.h\n", ""),
+    "frozen-missing"
+);
+audit_case!(
+    extra_kind_a,
+    CUSTOM,
+    CUSTOM.replace("foo F", "foo D"),
+    "frozen-kind"
+);
+audit_case!(
+    extra_kind_b,
+    CUSTOM,
+    CUSTOM.replace("bar D", "bar F"),
+    "frozen-kind"
+);
+audit_case!(
+    extra_size_a,
+    CUSTOM,
+    CUSTOM.replace("bar D 4", "bar D 6"),
+    "frozen-size"
+);
+audit_case!(
+    extra_size_b,
+    CUSTOM,
+    CUSTOM.replace("qux D 8", "qux D 12"),
+    "frozen-size"
+);
+audit_case!(
+    extra_arch_a,
+    CUSTOM,
+    CUSTOM.replace("baz F - x86_64", "baz F - aarch64"),
+    "frozen-arch"
+);
+audit_case!(
+    extra_arch_b,
+    CUSTOM,
+    CUSTOM.replace("qux D 8 all", "qux D 8 riscv64"),
+    "frozen-arch"
+);
+audit_case!(
+    extra_ring_a,
+    CUSTOM,
+    CUSTOM.replace("foo F - all 0", "foo F - all 3"),
+    "frozen-ring"
+);
+audit_case!(
+    extra_ring_b,
+    CUSTOM,
+    CUSTOM.replace("bar D 4 all 1", "bar D 4 all 2"),
+    "frozen-ring"
+);
+audit_case!(
+    extra_header_a,
+    CUSTOM,
+    CUSTOM.replace("x.h", "q.h"),
+    "frozen-header"
+);
+audit_case!(
+    extra_header_b,
+    CUSTOM,
+    CUSTOM.replace("y.h", "q.h"),
+    "frozen-header"
+);
+audit_case!(
+    extra_new_a,
+    CUSTOM,
+    format!("{CUSTOM}a1 F - all 0 x.h\n"),
+    "frozen-new"
+);
+audit_case!(
+    extra_new_b,
+    CUSTOM,
+    format!("{CUSTOM}a2 F - all 0 x.h\n"),
+    "frozen-new"
+);
+audit_case!(
+    extra_version_a,
+    CUSTOM,
+    CUSTOM.replace("# node: RAVEN_1.0", "# node: RAVEN_1.4"),
+    "frozen-version"
+);
+audit_case!(
+    extra_version_b,
+    CUSTOM,
+    CUSTOM.replace("# node: RAVEN_1.0", "# node: RAVEN_1.5"),
+    "frozen-version"
+);
+audit_case!(
+    extra_missing_e,
+    CUSTOM,
+    CUSTOM.replace("foo F - all 0 x.h\n", ""),
+    "frozen-missing"
+);
+audit_case!(
+    extra_kind_c,
+    CUSTOM,
+    CUSTOM.replace("baz F", "baz D"),
+    "frozen-kind"
+);
