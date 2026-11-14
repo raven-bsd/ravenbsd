@@ -10,7 +10,7 @@ use raven_libc_time::{ClockId, TimeSys};
 use crate::ffi::platform;
 
 /// The process time seam.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Default)]
 pub(crate) struct ShellTime;
 
 fn error(value: raven_libc_platform::Errno) -> Errno {
