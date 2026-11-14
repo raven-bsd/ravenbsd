@@ -541,6 +541,15 @@
 #include <sys/_visible.h>
 
 /*
+ * RavenBSD C67a: the Solaris personality's declarations use the BSD visibility
+ * bit until sys/_visible.h grows a dedicated __SOLARIS_VISIBLE branch (C37).
+ * This keeps the default visible and every strict mode hidden.
+ */
+#ifndef	__SOLARIS_VISIBLE
+#define	__SOLARIS_VISIBLE	__BSD_VISIBLE
+#endif
+
+/*
  * Nullability qualifiers: currently only supported by Clang.
  */
 #if !(defined(__clang__) && __has_feature(nullability))

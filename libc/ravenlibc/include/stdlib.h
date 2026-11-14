@@ -188,6 +188,11 @@ int ptsname_r (int, char *, size_t);
 int posix_openpt (int);
 #endif
 
+#if __SOLARIS_VISIBLE
+/* Solaris personality: the executable path pointer from the aux vector (A-sol-4). */
+const char *getexecname (void);
+#endif
+
 __END_DECLS
 
 #endif /* _STDLIB_H */
