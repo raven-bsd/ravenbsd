@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # 2026-11-13 `time_format`: `mktime` with `tm_sec = i32::MIN`
 
 Target: `time_format`

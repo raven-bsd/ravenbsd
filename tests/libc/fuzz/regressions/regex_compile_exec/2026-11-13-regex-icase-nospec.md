@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # 2026-11-13 `regex_compile_exec`: REG_ICASE + REG_NOSPEC recursion
 
 Target: `regex_compile_exec`

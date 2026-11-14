@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # 2026-11-13 `strtod_input`: a trailing decimal point
 
 Target: `strtod_input`

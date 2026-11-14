@@ -11,3 +11,5 @@ tests/ufs-vectors/golden/
 tests/tcpip/fuzz/corpus/
 tests/fs-fuzz/corpus/
 tests/libc-oracle/vendor/
+
+tests/libc/fuzz/corpus/
