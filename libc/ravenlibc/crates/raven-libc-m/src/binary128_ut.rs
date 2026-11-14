@@ -126,3 +126,49 @@ fn the_binary128_type_adds_and_subtracts_correctly() {
     assert_eq!(LongDouble128::one().significand_bits(), 0);
     assert_eq!(LongDouble128::nan().class(), FP_NAN);
 }
+
+#[test]
+fn the_binary128_type_multiplies_correctly() {
+    use super::LongDouble128;
+    let one_and_a_half = LongDouble128::from_f64(1.5);
+    let two_and_a_quarter = LongDouble128::from_f64(2.25);
+    assert_eq!(one_and_a_half.mul(two_and_a_quarter).to_f64(), 3.375);
+    assert_eq!(
+        LongDouble128::from_f64(2.0)
+            .mul(LongDouble128::from_f64(3.0))
+            .to_f64(),
+        6.0
+    );
+    assert_eq!(
+        LongDouble128::from_f64(1.5)
+            .mul(LongDouble128::from_f64(-2.0))
+            .to_f64(),
+        -3.0
+    );
+    assert!(
+        LongDouble128::zero(false)
+            .mul(LongDouble128::infinity(false))
+            .is_nan()
+    );
+    assert_eq!(
+        LongDouble128::zero(true)
+            .mul(LongDouble128::from_f64(5.0))
+            .to_bits(),
+        super::SIGN
+    );
+    assert_eq!(
+        LongDouble128::from_f64(1e300)
+            .mul(LongDouble128::from_f64(1e300))
+            .to_f64(),
+        f64::INFINITY
+    );
+    // (1 + 2^-52)^2 = 1 + 2^-51 + 2^-104: the last term is below the 113-bit significand.
+    let near_one = LongDouble128::from_bits(0x3fff_0000_0000_0000_0000_1000_0000_0000);
+    let square = near_one.mul(near_one);
+    let expected = LongDouble128::from_bits(0x3fff_0000_0000_0000_0000_2000_0000_0000);
+    assert_eq!(square.to_bits(), expected.to_bits());
+    assert!(
+        one_and_a_half.mul(one_and_a_half).total_cmp(one_and_a_half)
+            == core::cmp::Ordering::Greater
+    );
+}
