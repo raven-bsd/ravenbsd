@@ -14,9 +14,14 @@
 
 use core::mem::size_of;
 
+use raven_abi::errno::Errno;
+use raven_abi::signal::{ENTRY_SP, MContext};
 use raven_esr::{Esr, ec_name, slot_name};
+use raven_usercopy::is_user_address;
 
 use crate::kprintln;
+use crate::process;
+use crate::syscall::thread;
 
 /// Number of architectural exception vector slots.
 const VECTOR_SLOTS: usize = 16;
@@ -208,6 +213,73 @@ pub extern "C" fn exception_dispatch(slot: u64, frame: *mut TrapFrame) {
         }
         _ => fatal(slot, frame, esr, ec),
     }
+}
+
+/// PSTATE bits a `SIGRETURN` context may restore: NZCV and DAIF. EL, SP and
+/// the reserved fields stay as the kernel left them for an EL0t return.
+const PSTATE_USER_MASK: u64 = 0xf000_0000_0000_03c0;
+
+/// Scratch context for one delivery; a 4384-byte local per call would overflow a 20 KiB kernel
+/// stack once the SVC and delivery frames are nested.
+static SIGNAL_CONTEXT: spin::Mutex<MContext> = spin::Mutex::new(MContext::zero());
+
+/// Snapshot the interrupted user state in the C36 `mcontext_t` layout.
+pub fn context_from_frame(frame: &TrapFrame, context: &mut MContext) {
+    context.fault_address = 0;
+    context.regs.copy_from_slice(&frame.x);
+    context.sp = frame.sp;
+    context.pc = frame.elr;
+    context.pstate = frame.spsr;
+    context.reserved.fill(0);
+}
+
+/// Apply a `SIGRETURN` context to the EL0 frame.
+pub fn restore_signal_context(frame: &mut TrapFrame, context: &MContext) {
+    frame.x.copy_from_slice(&context.regs);
+    frame.sp = context.sp;
+    frame.elr = context.pc;
+    frame.spsr = context.pstate & PSTATE_USER_MASK;
+    frame.esr = 0;
+    frame.far = 0;
+}
+
+/// Restore a `SIGRETURN` context from the registered user area into the frame.
+pub fn sigreturn_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
+    let mut context = SIGNAL_CONTEXT.lock();
+    thread::sigreturn(&mut context)?;
+    restore_signal_context(frame, &context);
+    Ok(())
+}
+
+/// Deliver a pending kick to the registered user entry, if one is ready.
+///
+/// Called after the `svc` result is in `x0` and before the vector restores the
+/// EL0 frame, so the saved context is the interrupted user state.
+pub fn deliver_signal(frame: &mut TrapFrame) {
+    let Some(due) = thread::signal_due() else {
+        return;
+    };
+    {
+        let mut context = SIGNAL_CONTEXT.lock();
+        context_from_frame(frame, &mut context);
+        thread::signal_commit(&due, &context);
+    }
+    let stack = if due.flags & ENTRY_SP != 0 {
+        frame.sp
+    } else {
+        match frame.sp.checked_sub(128) {
+            Some(stack) => stack & !0xf,
+            None => process::exit_process(Errno::EFAULT.to_ret() as i32),
+        }
+    };
+    if !is_user_address(stack) {
+        process::exit_process(Errno::EFAULT.to_ret() as i32);
+    }
+    if let Some(argument) = frame.x.first_mut() {
+        *argument = u64::from(due.bits);
+    }
+    frame.elr = due.entry;
+    frame.sp = stack;
 }
 
 fn fatal(slot: u64, frame: &TrapFrame, esr: Esr, ec: u8) -> ! {

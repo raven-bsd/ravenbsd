@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! `THREAD_CREATE` and `THREAD_EXIT`.
+//! `THREAD_CREATE`, `THREAD_EXIT` and the PG-7 signal entry/return state.
+
+use core::mem::size_of;
+use core::sync::atomic::Ordering;
 
 use alloc::sync::Arc;
 
 use raven_abi::errno::Errno;
+use raven_abi::signal::{CONTEXT_AREA_LIMIT, ENTRY_SP, MContext};
 use raven_abi::types::{Handle, Rights, prot};
-use raven_usercopy::is_user_address;
+use raven_usercopy::{UserSlice, is_user_address};
 
 use crate::process::{self, ProcessState, handle::Object};
 use crate::sched;
 use crate::sched::thread::ThreadState;
 use crate::syscall::SyscallFrame;
+use crate::usercopy::{copy_from_user, copy_to_user};
 
 /// `thread_create(proc, entry, stack_top, arg, flags) -> Thread handle`.
 ///
@@ -169,4 +174,147 @@ pub fn set_tls(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     thread.set_tls_base(tp);
     Ok(0)
+}
+
+/// One pending signal entry, resolved on the return-to-user path (PG-7).
+pub struct SignalEntry {
+    /// Kick bits delivered as the entry's first argument.
+    pub bits: u32,
+    /// Registered user entry point.
+    pub entry: u64,
+    /// Resolved user context area (TLS base + registered offset).
+    pub ctx: u64,
+    /// Registered `SIG_SETUP` flags.
+    pub flags: u32,
+}
+
+/// `sig_setup(entry: usize, ctx_offset: usize, flags: u32) -> 0` (raw 0x80).
+///
+/// Self-only and per thread. The entry must be inside an executable VMA of the
+/// caller, the context offset must be 16-byte aligned, and the context area
+/// must fit in the 64 KiB window relative to the TLS base. Replacing an existing
+/// registration is allowed, including inside a handler: the active delivery
+/// keeps its own resolved area until `SIGRETURN`.
+pub fn sig_setup(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let thread = sched::current_thread().ok_or(Errno::ESRCH)?;
+    if !thread.user {
+        return Err(Errno::EINVAL);
+    }
+    let entry = frame.rdi;
+    let offset = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    let flags = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
+    if flags & !ENTRY_SP != 0 {
+        return Err(Errno::EINVAL);
+    }
+    let context_size = size_of::<MContext>();
+    match offset.checked_add(context_size) {
+        Some(end) if end <= CONTEXT_AREA_LIMIT => {}
+        _ => return Err(Errno::EINVAL),
+    }
+    if offset & 0xf != 0 {
+        return Err(Errno::EINVAL);
+    }
+    if !is_user_address(entry) {
+        return Err(Errno::EFAULT);
+    }
+    {
+        let address_space = caller.address_space.lock();
+        let address_space = address_space.as_ref().ok_or(Errno::ESRCH)?;
+        let entry_vma = address_space.vmas().find(entry).ok_or(Errno::EFAULT)?;
+        if entry_vma.prot() & (prot::EXEC as u8) == 0 {
+            return Err(Errno::EFAULT);
+        }
+    }
+    thread
+        .signal_ctx_offset
+        .store(offset as u64, Ordering::Release);
+    thread.signal_flags.store(flags, Ordering::Release);
+    thread.signal_entry.store(entry, Ordering::Release);
+    Ok(0)
+}
+
+/// Resolve the current thread's pending signal, if it is deliverable now.
+///
+/// Returns `None` while inside a signal or without a registration (S43's
+/// sticky `-EINTR` path then owns the word). An invalid context area is a
+/// fatal delivery error, per the PG-7 contract.
+pub fn signal_due() -> Option<SignalEntry> {
+    let thread = sched::current_thread()?;
+    if !thread.user || thread.in_signal.load(Ordering::Acquire) {
+        return None;
+    }
+    let entry = thread.signal_entry.load(Ordering::Acquire);
+    if entry == 0 {
+        return None;
+    }
+    let bits = thread.kick_bits.load(Ordering::Acquire);
+    if bits == 0 {
+        return None;
+    }
+    let offset = thread.signal_ctx_offset.load(Ordering::Acquire);
+    let Some(ctx) = thread.tls_base().checked_add(offset) else {
+        process::exit_process(Errno::EFAULT.to_ret() as i32);
+    };
+    if UserSlice::new(ctx, size_of::<MContext>() as u64).is_err() {
+        process::exit_process(Errno::EFAULT.to_ret() as i32);
+    }
+    Some(SignalEntry {
+        bits,
+        entry,
+        ctx,
+        flags: thread.signal_flags.load(Ordering::Acquire),
+    })
+}
+
+/// Save `context` to the entry's user area and mark the thread in-signal.
+///
+/// The bits being delivered are removed from the sticky word; bits that arrived
+/// during the copy stay pending for delivery after `SIGRETURN`.
+pub fn signal_commit(due: &SignalEntry, context: &MContext) {
+    let Some(thread) = sched::current_thread() else {
+        process::exit_process(Errno::EFAULT.to_ret() as i32);
+    };
+    let size = size_of::<MContext>();
+    let source = unsafe {
+        // SAFETY: `context` is a live, fully initialised `MContext`; the byte view covers exactly
+        // `size_of::<MContext>()` bytes and is only read for the duration of the copy.
+        core::slice::from_raw_parts(context as *const MContext as *const u8, size)
+    };
+    let destination = match UserSlice::new(due.ctx, size as u64) {
+        Ok(destination) => destination,
+        Err(_) => process::exit_process(Errno::EFAULT.to_ret() as i32),
+    };
+    if copy_to_user(destination, source).is_err() {
+        process::exit_process(Errno::EFAULT.to_ret() as i32);
+    }
+    thread.signal_active_ctx.store(due.ctx, Ordering::Release);
+    thread.in_signal.store(true, Ordering::Release);
+    thread.kick_bits.fetch_and(!due.bits, Ordering::AcqRel);
+}
+
+/// Restore the context saved by the active signal (PG-7 `SIGRETURN`, raw 0x82).
+///
+/// Clears `in_signal` only after a complete copy-in; the caller then applies
+/// the context to its trap frame. Not being in a signal is `EINVAL`.
+pub fn sigreturn(context: &mut MContext) -> Result<(), Errno> {
+    let thread = sched::current_thread().ok_or(Errno::ESRCH)?;
+    if !thread.user || !thread.in_signal.load(Ordering::Acquire) {
+        return Err(Errno::EINVAL);
+    }
+    let address = thread.signal_active_ctx.load(Ordering::Acquire);
+    if address == 0 {
+        return Err(Errno::EINVAL);
+    }
+    let size = size_of::<MContext>();
+    let destination = unsafe {
+        // SAFETY: `context` is a live caller-provided `MContext`; the mutable byte view covers
+        // exactly `size_of::<MContext>()` bytes and is not aliased during the copy.
+        core::slice::from_raw_parts_mut(context as *mut MContext as *mut u8, size)
+    };
+    let source = UserSlice::new(address, size as u64)?;
+    copy_from_user(destination, source)?;
+    thread.in_signal.store(false, Ordering::Release);
+    thread.signal_active_ctx.store(0, Ordering::Release);
+    Ok(())
 }

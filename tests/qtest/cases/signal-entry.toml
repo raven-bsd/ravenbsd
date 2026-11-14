@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S44 signal entry: SIG_SETUP validation, self-kick delivery with the bits in
+# the first argument, blocked futex waiter delivery, SIGRETURN restore of the
+# interrupted PC/SP, the no-registration sticky -EINTR path, and EINVAL from
+# SIGRETURN outside a signal.
+
+name = "signal-entry"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/qtest/cases/signal-entry-fixture/build.sh"]
+initfs = "build/fixtures/signal-entry/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^signal-entry: setup=0$'
+
+[[expect]]
+regex = '^signal-entry: sigreturn-outside=EINVAL$'
+
+[[expect]]
+regex = '^signal-entry: bad entry=EFAULT$'
+
+[[expect]]
+regex = '^signal-entry: bad data-entry=EFAULT$'
+
+[[expect]]
+regex = '^signal-entry: bad offset=EINVAL$'
+
+[[expect]]
+regex = '^signal-entry: bad limit=EINVAL$'
+
+[[expect]]
+regex = '^signal-entry: bad flags=EINVAL$'
+
+[[expect]]
+regex = '^signal-entry: flag entry-sp=0$'
+
+[[expect]]
+regex = '^signal-entry: setup replace=0$'
+
+[[expect]]
+regex = '^signal-entry: no-setup=eintr$'
+unordered = true
+
+[[expect]]
+regex = '^signal-entry: no-setup entries=0$'
+
+[[expect]]
+regex = '^signal-entry: entry scenario=1 bits=2 count=1 pc=0x[0-9a-f]{16} sp=0x[0-9a-f]{16} entry-sp=0x[0-9a-f]{16}$'
+unordered = true
+
+[[expect]]
+regex = '^signal-entry: context size=(256|4384) pc=0x[0-9a-f]{16} sp=0x[0-9a-f]{16} result=0$'
+unordered = true
+
+[[expect]]
+regex = '^signal-entry: self resume pc=0x[0-9a-f]{16} sp=0x[0-9a-f]{16} pc-match=1 sp-match=1 bits-match=1$'
+
+[[expect]]
+regex = '^signal-entry: blocked ready$'
+unordered = true
+
+[[expect]]
+regex = '^signal-entry: entry scenario=2 bits=2 count=2 pc=0x[0-9a-f]{16} sp=0x[0-9a-f]{16} entry-sp=0x[0-9a-f]{16}$'
+unordered = true
+
+[[expect]]
+regex = '^signal-entry: context size=(256|4384) pc=0x[0-9a-f]{16} sp=0x[0-9a-f]{16} result=-4$'
+unordered = true
+
+[[expect]]
+regex = '^signal-entry: blocked eintr=1$'
+unordered = true
+
+[[expect]]
+regex = '^signal-entry: blocked kick=0$'
+unordered = true
+
+[[expect]]
+regex = '^signal-entry: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

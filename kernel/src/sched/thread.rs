@@ -153,6 +153,16 @@ pub struct Thread {
     pub kick_bits: AtomicU32,
     /// True while the thread is in an interruptible blocking wait.
     pub interruptible: AtomicBool,
+    /// Registered `SIG_SETUP` entry point; zero means no signal delivery (S44).
+    pub signal_entry: AtomicU64,
+    /// Registered context-area offset relative to the TLS base.
+    pub signal_ctx_offset: AtomicU64,
+    /// Registered `SIG_SETUP` flags.
+    pub signal_flags: AtomicU32,
+    /// Resolved user context area of the signal currently being handled.
+    pub signal_active_ctx: AtomicU64,
+    /// True between kick delivery and `SIGRETURN`.
+    pub in_signal: AtomicBool,
 }
 
 // SAFETY: all interior mutability is accessed from scheduler critical sections (interrupts off)
@@ -252,6 +262,11 @@ impl Thread {
             tls_base: AtomicU64::new(0),
             kick_bits: AtomicU32::new(0),
             interruptible: AtomicBool::new(false),
+            signal_entry: AtomicU64::new(0),
+            signal_ctx_offset: AtomicU64::new(0),
+            signal_flags: AtomicU32::new(0),
+            signal_active_ctx: AtomicU64::new(0),
+            in_signal: AtomicBool::new(false),
         });
         Ok(thread)
     }
@@ -341,6 +356,11 @@ impl Thread {
             tls_base: AtomicU64::new(0),
             kick_bits: AtomicU32::new(0),
             interruptible: AtomicBool::new(false),
+            signal_entry: AtomicU64::new(0),
+            signal_ctx_offset: AtomicU64::new(0),
+            signal_flags: AtomicU32::new(0),
+            signal_active_ctx: AtomicU64::new(0),
+            in_signal: AtomicBool::new(false),
         })
     }
 
@@ -380,6 +400,11 @@ impl Thread {
             tls_base: AtomicU64::new(0),
             kick_bits: AtomicU32::new(0),
             interruptible: AtomicBool::new(false),
+            signal_entry: AtomicU64::new(0),
+            signal_ctx_offset: AtomicU64::new(0),
+            signal_flags: AtomicU32::new(0),
+            signal_active_ctx: AtomicU64::new(0),
+            in_signal: AtomicBool::new(false),
         }))
     }
 }

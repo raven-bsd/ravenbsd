@@ -3,8 +3,15 @@
 
 //! `syscall` MSR setup and the assembly entry stub.
 
+use raven_abi::errno::Errno;
+use raven_abi::signal::{self, ENTRY_SP, MContext};
+use raven_usercopy::is_user_address;
+
 use crate::arch::x86_64::gdt::{KERNEL_CS, KERNEL_SS, STAR_USER_BASE, USER_CS, USER_SS};
+use crate::arch::x86_64::trapframe::TrapFrame;
 use crate::arch::x86_64::usermode::{percpu_address, percpu_init};
+use crate::process;
+use crate::syscall::thread;
 
 const IA32_EFER: u32 = 0xC000_0080;
 const IA32_STAR: u32 = 0xC000_0081;
@@ -146,6 +153,111 @@ fn enable_fsgsbase() {
 #[unsafe(no_mangle)]
 extern "C" fn syscall_bad_rip(rip: u64) -> ! {
     crate::process::bad_sysret(rip)
+}
+
+/// User-visible RFLAGS bits that `SIGRETURN` may restore. IOPL, NT, VM and the
+/// reserved high bits are never taken from the user context; IF and bit 1 are
+/// forced on because ring 3 cannot clear them on this kernel.
+const USER_RFLAGS_MASK: u64 = 0x0000_0000_0024_0fd7;
+/// RFLAGS value forced on return to user mode (bit 1 and IF).
+const USER_RFLAGS_SET: u64 = 0x202;
+
+/// Scratch context for one delivery; serialised because the copy is short and must not enlarge
+/// the 20 KiB kernel stack by a 256-byte frame per call.
+static SIGNAL_CONTEXT: spin::Mutex<MContext> = spin::Mutex::new(MContext::zero());
+
+/// Snapshot the interrupted user state in the C36 `mcontext_t` layout.
+#[allow(clippy::indexing_slicing)] // Register indices are compile-time constants within `gregs`.
+pub fn context_from_frame(frame: &TrapFrame, context: &mut MContext) {
+    context.gregs = [0; 23];
+    context.fpregs = 0;
+    context.reserved = [0; 8];
+    context.gregs[signal::REG_R8] = frame.r8;
+    context.gregs[signal::REG_R9] = frame.r9;
+    context.gregs[signal::REG_R10] = frame.r10;
+    context.gregs[signal::REG_R11] = frame.r11;
+    context.gregs[signal::REG_R12] = frame.r12;
+    context.gregs[signal::REG_R13] = frame.r13;
+    context.gregs[signal::REG_R14] = frame.r14;
+    context.gregs[signal::REG_R15] = frame.r15;
+    context.gregs[signal::REG_RDI] = frame.rdi;
+    context.gregs[signal::REG_RSI] = frame.rsi;
+    context.gregs[signal::REG_RBP] = frame.rbp;
+    context.gregs[signal::REG_RBX] = frame.rbx;
+    context.gregs[signal::REG_RDX] = frame.rdx;
+    context.gregs[signal::REG_RAX] = frame.rax;
+    context.gregs[signal::REG_RCX] = frame.rcx;
+    context.gregs[signal::REG_RSP] = frame.rsp;
+    context.gregs[signal::REG_RIP] = frame.rip;
+    context.gregs[signal::REG_EFL] = frame.rflags;
+    context.gregs[signal::REG_CSGSFS] = frame.cs & 0xffff;
+    context.gregs[signal::REG_ERR] = frame.error_code;
+    context.gregs[signal::REG_TRAPNO] = frame.vector;
+}
+
+/// Apply a `SIGRETURN` context to the user frame, forcing user segments and a
+/// safe RFLAGS image.
+#[allow(clippy::indexing_slicing)] // Register indices are compile-time constants within `gregs`.
+pub fn restore_signal_context(frame: &mut TrapFrame, context: &MContext) {
+    frame.r8 = context.gregs[signal::REG_R8];
+    frame.r9 = context.gregs[signal::REG_R9];
+    frame.r10 = context.gregs[signal::REG_R10];
+    frame.r11 = context.gregs[signal::REG_R11];
+    frame.r12 = context.gregs[signal::REG_R12];
+    frame.r13 = context.gregs[signal::REG_R13];
+    frame.r14 = context.gregs[signal::REG_R14];
+    frame.r15 = context.gregs[signal::REG_R15];
+    frame.rdi = context.gregs[signal::REG_RDI];
+    frame.rsi = context.gregs[signal::REG_RSI];
+    frame.rbp = context.gregs[signal::REG_RBP];
+    frame.rbx = context.gregs[signal::REG_RBX];
+    frame.rdx = context.gregs[signal::REG_RDX];
+    frame.rax = context.gregs[signal::REG_RAX];
+    frame.rcx = context.gregs[signal::REG_RCX];
+    frame.rsp = context.gregs[signal::REG_RSP];
+    frame.rip = context.gregs[signal::REG_RIP];
+    frame.rflags = (context.gregs[signal::REG_EFL] & USER_RFLAGS_MASK) | USER_RFLAGS_SET;
+    frame.cs = u64::from(USER_CS);
+    frame.ss = u64::from(USER_SS);
+    frame.error_code = 0;
+    frame.vector = 0;
+}
+
+/// Restore a `SIGRETURN` context from the registered user area into the frame.
+pub fn sigreturn_frame(frame: &mut TrapFrame) -> Result<(), Errno> {
+    let mut context = SIGNAL_CONTEXT.lock();
+    thread::sigreturn(&mut context)?;
+    restore_signal_context(frame, &context);
+    Ok(())
+}
+
+/// Deliver a pending kick to the registered user entry, if one is ready.
+///
+/// Called after the syscall result is in the frame and before `sysretq`, so
+/// the saved context is exactly the interrupted user state.
+pub fn deliver_signal(frame: &mut TrapFrame) {
+    let Some(due) = thread::signal_due() else {
+        return;
+    };
+    {
+        let mut context = SIGNAL_CONTEXT.lock();
+        context_from_frame(frame, &mut context);
+        thread::signal_commit(&due, &context);
+    }
+    let stack = if due.flags & ENTRY_SP != 0 {
+        frame.rsp
+    } else {
+        match frame.rsp.checked_sub(128) {
+            Some(stack) => stack & !0xf,
+            None => process::exit_process(Errno::EFAULT.to_ret() as i32),
+        }
+    };
+    if !is_user_address(stack) {
+        process::exit_process(Errno::EFAULT.to_ret() as i32);
+    }
+    frame.rdi = u64::from(due.bits);
+    frame.rip = due.entry;
+    frame.rsp = stack;
 }
 
 fn rdmsr(msr: u32) -> u64 {
