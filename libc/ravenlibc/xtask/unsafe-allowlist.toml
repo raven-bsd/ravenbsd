@@ -90,3 +90,23 @@ reason = "DR-39 audited raw submodules: per-architecture thread entry assembly, 
 crate = "raven-libc-rtld"
 path = "src/raw/"
 reason = "loader memory access, raw syscalls, C ABI exports and entry assembly (DR-39)"
+
+[[allow]]
+crate = "raven-libc-signal"
+path = "src/raw.rs"
+reason = "DR-39 audited signal raw module: the setjmp/ucontext/sigreturn assembly, the C entry thunks and the sigaction ABI conversions; every unsafe block names its invariant"
+
+[[allow]]
+crate = "raven-libc-signal"
+path = "src/raw/"
+reason = "DR-39 per-architecture signal assembly: setjmp/sigsetjmp/context switch and the trampoline stubs; every block is audited assembly"
+
+[[allow]]
+crate = "raven-libc-signal"
+path = "src/entry_ut.rs"
+reason = "host tests call the signal entry with a synthetic frame and raw handler pointers"
+
+[[allow]]
+crate = "raven-libc-signal"
+path = "src/host_ut.rs"
+reason = "the host fake builds synthetic signal frames and calls the entry through raw pointers"
