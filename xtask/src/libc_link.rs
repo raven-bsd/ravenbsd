@@ -87,7 +87,13 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
     std::fs::create_dir_all(&out).with_context(|| format!("cannot create {}", out.display()))?;
     let libc_archive = out.join("libc.a");
     let libc_map = out.join("libc.map");
-    let symbols = root.join("libc/ravenlibc/abi/Symbols.list");
+    let canonical = root.join("libc/ravenlibc/abi/Symbols.list");
+    let per_arch = out.join("Symbols.list");
+    let symbols = if options.arch == crate::libc_pack::Arch::X86_64 || !per_arch.is_file() {
+        canonical
+    } else {
+        per_arch
+    };
     if !libc_archive.is_file() || !libc_map.is_file() {
         println!("libc-link: mkmap: running libc-pack");
         let code = run_command(&CommandSpec::new(

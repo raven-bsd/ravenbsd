@@ -161,7 +161,14 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
     // 4. symbols
     let versions = root.join("libc/ravenlibc/abi/Versions.def");
     let symbol_map = root.join("libc/ravenlibc/crates/raven-libc/Symbol.map");
-    let list = root.join("libc/ravenlibc/abi/Symbols.list");
+    // `abi/Symbols.list` is the canonical x86_64 list used by the host archive tests.
+    // Other architectures keep their own list beside their archive so a cross-arch pack
+    // cannot overwrite the canonical file.
+    let list = if options.arch == Arch::X86_64 {
+        root.join("libc/ravenlibc/abi/Symbols.list")
+    } else {
+        options.out.join("Symbols.list")
+    };
     let libc_map = options.out.join("libc.map");
     let merged = crate::libc_pack_tools::mkmap(
         root,
