@@ -70,6 +70,18 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == process_ctl::PROC_FORK {
         return process_ctl::fork(frame);
     }
+    if number == process_ctl::PROC_SELF_INFO {
+        return process_ctl::self_info(frame);
+    }
+    if number == process_ctl::PROC_SETPGID {
+        return process_ctl::setpgid(frame);
+    }
+    if number == process_ctl::PROC_SETSID {
+        return process_ctl::setsid();
+    }
+    if number == process_ctl::PROC_SETCRED {
+        return process_ctl::setcred(frame);
+    }
     if number == raven_abi::syscall::PROC_SET_PERSONALITY {
         return process_ctl::set_personality(frame);
     }
