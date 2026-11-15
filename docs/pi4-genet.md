@@ -132,8 +132,11 @@ does not pretend a copy happened.
 
 `userland/drivers/genet` is a skeleton: `Seam` is the only place that will own MMIO and DMA.
 The host-testable `Controller` performs the typed bring-up order (probe revision, program MAC,
-program RGMII, plan rings) and rejects an out-of-order transition. The real `devd`/profile wiring,
-MMIO mapping, DMA allocation, IRQ delivery and the frame pump are the board integration step.
+program RGMII, plan rings) and rejects an out-of-order transition. `PlatformSeam` wraps the
+`raven_driver::MmioRegion` and a `DmaRegion` split into 256 RX + 256 TX 2 KiB slots; it validates
+alignment, bounds and overlap and exposes the device-visible slot addresses. The real
+`devd`/profile wiring, IRQ delivery and the B39 frame pump are the board integration step; the
+evidence kit and 12-step checklist are in `docs/pi4-genet-board.md`.
 `FrameBackend` adds the host-tested frame path:
 
 * `RxPath`/`TxPath` keep an owner (`Free`, `Driver`, `Device`) for each of the 256 slots, validate
