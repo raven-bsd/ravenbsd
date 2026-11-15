@@ -119,35 +119,53 @@ struct Prepared {
 
 #[cfg(target_os = "uefi")]
 fn run() -> Result<(), String> {
-    let mut filesystem = FileSystem::new(
+    let mut primary = FileSystem::new(
         boot::get_image_file_system(boot::image_handle())
             .map_err(|error| format!("cannot open the boot volume: {error}"))?,
     );
-
-    let boot_toml = if fs::exists(&mut filesystem, fs::BOOT_TOML_PATH)? {
-        fs::read_file(&mut filesystem, fs::BOOT_TOML_PATH)?
-    } else {
-        Vec::new()
-    };
-    let (config, warnings) = config::parse_with_warnings(&boot_toml)
-        .map_err(|error| format!("bad boot.toml: {error}"))?;
-    for warning in warnings {
+    let (mut config, warnings) = read_config(&mut primary)?;
+    for warning in &warnings {
         serial::log(format_args!("warning: {warning}"));
     }
 
-    let kernel_bytes = fs::read_file(&mut filesystem, fs::KERNEL_PATH)?;
-    let initfs_bytes = fs::read_file(&mut filesystem, fs::INITFS_PATH)?;
-    let kernel =
-        image::load(&kernel_bytes).map_err(|error| format!("cannot load kernel: {error}"))?;
-    drop(kernel_bytes);
+    // An A/B slot store may be the boot volume itself or a second FAT volume attached to the
+    // machine (the QEMU rollback fixture). The legacy single-slot image has no slot keys.
+    let mut slot_store = if config.has_slot_config {
+        None
+    } else {
+        find_slot_store()?
+    };
+    if let Some(store) = slot_store.as_mut() {
+        let (store_config, store_warnings) = read_config(store)?;
+        config = store_config;
+        for warning in &store_warnings {
+            serial::log(format_args!("warning: {warning}"));
+        }
+    }
+    let filesystem = slot_store.as_mut().unwrap_or(&mut primary);
+
+    let (kernel, initfs_bytes, confirm) = if config.has_slot_config {
+        boot_with_slots(filesystem, &mut config)?
+    } else {
+        let kernel_bytes = fs::read_file(filesystem, fs::KERNEL_PATH)?;
+        let initfs_bytes = fs::read_file(filesystem, fs::INITFS_PATH)?;
+        let kernel =
+            image::load(&kernel_bytes).map_err(|error| format!("cannot load kernel: {error}"))?;
+        (kernel, initfs_bytes, None)
+    };
 
     let verbose = config.log_level == config::LogLevel::Debug;
     let prepared = prepare(kernel, &initfs_bytes, &config.cmdline, verbose)?;
+    if let Some(slot) = confirm {
+        config.mark_healthy(slot);
+        fs::write_file(filesystem, fs::BOOT_TOML_PATH, config.render().as_bytes())?;
+        serial::log(format_args!("update: slot {} healthy", slot.as_str()));
+    }
 
-    drop(boot_toml);
-    drop(config);
     drop(initfs_bytes);
-    drop(filesystem);
+    drop(config);
+    drop(slot_store);
+    drop(primary);
 
     serial::disable_conout();
     // SAFETY: all boot-services protocols and allocator users were dropped above; every buffer
@@ -155,6 +173,114 @@ fn run() -> Result<(), String> {
     // memory it already owns and the final memory map it returns.
     let memory_map = unsafe { boot::exit_boot_services(Some(MemoryType::LOADER_DATA)) };
     finish(prepared, &memory_map)
+}
+
+#[cfg(target_os = "uefi")]
+fn read_config(
+    filesystem: &mut FileSystem,
+) -> Result<(config::Config, Vec<config::Warning>), String> {
+    let boot_toml = if fs::exists(filesystem, fs::BOOT_TOML_PATH)? {
+        fs::read_file(filesystem, fs::BOOT_TOML_PATH)?
+    } else {
+        Vec::new()
+    };
+    config::parse_with_warnings(&boot_toml).map_err(|error| format!("bad boot.toml: {error}"))
+}
+
+/// Find a slot store on a SimpleFileSystem volume other than the loader's own volume.
+#[cfg(target_os = "uefi")]
+fn find_slot_store() -> Result<Option<FileSystem>, String> {
+    use uefi::proto::media::fs::SimpleFileSystem;
+
+    let handles = boot::find_handles::<SimpleFileSystem>()
+        .map_err(|error| format!("cannot enumerate file-system volumes: {error}"))?;
+    for handle in handles {
+        let Ok(protocol) = boot::open_protocol_exclusive::<SimpleFileSystem>(handle) else {
+            continue;
+        };
+        let mut filesystem = FileSystem::new(protocol);
+        let Ok(boot_toml) = fs::read_file(&mut filesystem, fs::BOOT_TOML_PATH) else {
+            continue;
+        };
+        let Ok((config, _warnings)) = config::parse_with_warnings(&boot_toml) else {
+            continue;
+        };
+        if config.has_slot_config {
+            return Ok(Some(filesystem));
+        }
+    }
+    Ok(None)
+}
+
+#[cfg(target_os = "uefi")]
+fn slot_paths(slot: config::Slot) -> (&'static uefi::CStr16, &'static uefi::CStr16) {
+    match slot {
+        config::Slot::A => (fs::SLOT_A_KERNEL_PATH, fs::SLOT_A_INITFS_PATH),
+        config::Slot::B => (fs::SLOT_B_KERNEL_PATH, fs::SLOT_B_INITFS_PATH),
+    }
+}
+
+#[cfg(target_os = "uefi")]
+fn load_slot(
+    filesystem: &mut FileSystem,
+    slot: config::Slot,
+) -> Result<(image::LoadedKernel, Vec<u8>), String> {
+    let (kernel_path, initfs_path) = slot_paths(slot);
+    let kernel_bytes = fs::read_file(filesystem, kernel_path)?;
+    let initfs_bytes = fs::read_file(filesystem, initfs_path)?;
+    let kernel = image::load(&kernel_bytes)
+        .map_err(|error| format!("cannot load slot {} kernel: {error}", slot.as_str()))?;
+    Ok((kernel, initfs_bytes))
+}
+
+/// Select a slot, exercise the trial counter and persist rollback or health.
+#[cfg(target_os = "uefi")]
+fn boot_with_slots(
+    filesystem: &mut FileSystem,
+    config: &mut config::Config,
+) -> Result<(image::LoadedKernel, Vec<u8>, Option<config::Slot>), String> {
+    let confirmed = config.slot;
+    if let Some(trial) = config.trial {
+        if config.attempts == 0 {
+            config.rollback();
+            fs::write_file(filesystem, fs::BOOT_TOML_PATH, config.render().as_bytes())?;
+            serial::log(format_args!("update: rollback to slot {confirmed}"));
+            let (kernel, initfs) = load_slot(filesystem, confirmed)?;
+            return Ok((kernel, initfs, None));
+        }
+
+        let mut remaining = config.attempts;
+        while remaining > 0 {
+            serial::log(format_args!(
+                "update: trial slot {} attempt {remaining}",
+                trial.as_str()
+            ));
+            match load_slot(filesystem, trial) {
+                Ok((kernel, initfs)) => {
+                    config.fail_attempt();
+                    fs::write_file(filesystem, fs::BOOT_TOML_PATH, config.render().as_bytes())?;
+                    serial::log(format_args!("update: trial slot {} loaded", trial.as_str()));
+                    return Ok((kernel, initfs, Some(trial)));
+                }
+                Err(error) => {
+                    serial::log(format_args!(
+                        "update: trial slot {} failed: {error}",
+                        trial.as_str()
+                    ));
+                    config.fail_attempt();
+                    remaining = config.attempts;
+                    fs::write_file(filesystem, fs::BOOT_TOML_PATH, config.render().as_bytes())?;
+                }
+            }
+        }
+
+        config.rollback();
+        fs::write_file(filesystem, fs::BOOT_TOML_PATH, config.render().as_bytes())?;
+        serial::log(format_args!("update: rollback to slot {confirmed}"));
+    }
+
+    let (kernel, initfs) = load_slot(filesystem, confirmed)?;
+    Ok((kernel, initfs, None))
 }
 
 #[cfg(target_os = "uefi")]

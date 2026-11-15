@@ -5,14 +5,19 @@
 //!
 //! This is deliberately not a TOML implementation: the file is a small line-based sequence of
 //! `key = "value"` entries. It is pure and free of UEFI types so the host tests can exercise every
-//! error path.
+//! error path. K27 adds the optional A/B keys `slot`, `trial` and `attempts`; a file without them
+//! keeps the legacy single-slot behaviour.
 
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
+use core::fmt::Write as _;
 
 /// Longest accepted value, in bytes. Values of one MiB or more are rejected.
 pub const MAX_VALUE_LEN: usize = 1024 * 1024;
+
+/// Largest accepted trial-boot budget.
+pub const MAX_ATTEMPTS: u32 = 255;
 
 /// Loader log verbosity from `log_level`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -57,6 +62,49 @@ impl fmt::Display for LogLevel {
     }
 }
 
+/// One root slot.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Slot {
+    /// First root slot.
+    #[default]
+    A,
+    /// Second root slot.
+    B,
+}
+
+impl Slot {
+    /// Parse a slot name.
+    pub fn parse(value: &str) -> Option<Slot> {
+        match value {
+            "a" => Some(Slot::A),
+            "b" => Some(Slot::B),
+            _ => None,
+        }
+    }
+
+    /// The canonical spelling used in `boot.toml` and slot paths.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Slot::A => "a",
+            Slot::B => "b",
+        }
+    }
+
+    /// The other slot.
+    pub const fn other(self) -> Slot {
+        match self {
+            Slot::A => Slot::B,
+            Slot::B => Slot::A,
+        }
+    }
+}
+
+impl fmt::Display for Slot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// The parsed boot configuration.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Config {
@@ -64,6 +112,58 @@ pub struct Config {
     pub cmdline: String,
     /// Loader log verbosity.
     pub log_level: LogLevel,
+    /// Confirmed (known-good) root slot.
+    pub slot: Slot,
+    /// Slot being trialled, if any.
+    pub trial: Option<Slot>,
+    /// Remaining trial boots before rollback.
+    pub attempts: u32,
+    /// True when `slot`, `trial` or `attempts` appeared in the file.
+    pub has_slot_config: bool,
+}
+
+impl Config {
+    /// The slot selected for this boot.
+    pub fn boot_slot(&self) -> Slot {
+        match self.trial {
+            Some(trial) if self.attempts > 0 => trial,
+            _ => self.slot,
+        }
+    }
+
+    /// Mark a trial slot as healthy: it becomes the confirmed slot.
+    pub fn mark_healthy(&mut self, slot: Slot) {
+        self.slot = slot;
+        self.trial = None;
+        self.attempts = 0;
+        self.has_slot_config = true;
+    }
+
+    /// Drop the trial and keep the confirmed slot.
+    pub fn rollback(&mut self) {
+        self.trial = None;
+        self.attempts = 0;
+        self.has_slot_config = true;
+    }
+
+    /// Consume one failed trial attempt.
+    pub fn fail_attempt(&mut self) {
+        self.attempts = self.attempts.saturating_sub(1);
+        self.has_slot_config = true;
+    }
+
+    /// Render the loader's line-based format.
+    pub fn render(&self) -> String {
+        let mut out = String::new();
+        let _ = writeln!(out, "cmdline = \"{}\"", escape(&self.cmdline));
+        let _ = writeln!(out, "log_level = \"{}\"", self.log_level.as_str());
+        if self.has_slot_config {
+            let _ = writeln!(out, "slot = \"{}\"", self.slot.as_str());
+            let _ = writeln!(out, "trial = \"{}\"", self.trial.map_or("", Slot::as_str));
+            let _ = writeln!(out, "attempts = \"{}\"", self.attempts);
+        }
+        out
+    }
 }
 
 /// A non-fatal parse result: an unknown key was ignored.
@@ -96,6 +196,10 @@ pub enum ConfigError {
     ValueTooLong(usize),
     /// `log_level` is not one of `error`, `warn`, `info`, `debug`.
     InvalidLogLevel(usize),
+    /// `slot` or `trial` is not `a` or `b`.
+    InvalidSlot(usize),
+    /// `attempts` is not an integer in `0..=MAX_ATTEMPTS`.
+    InvalidAttempts(usize),
 }
 
 impl fmt::Display for ConfigError {
@@ -115,6 +219,13 @@ impl fmt::Display for ConfigError {
             ConfigError::InvalidLogLevel(line) => write!(
                 f,
                 "line {line}: log_level must be error, warn, info or debug"
+            ),
+            ConfigError::InvalidSlot(line) => {
+                write!(f, "line {line}: slot must be a or b")
+            }
+            ConfigError::InvalidAttempts(line) => write!(
+                f,
+                "line {line}: attempts must be an integer in 0..={MAX_ATTEMPTS}"
             ),
         }
     }
@@ -160,6 +271,28 @@ pub fn parse_with_warnings(data: &[u8]) -> Result<(Config, Vec<Warning>), Config
                 config.log_level =
                     LogLevel::parse(value).ok_or(ConfigError::InvalidLogLevel(line_number))?;
             }
+            "slot" => {
+                config.slot = Slot::parse(value).ok_or(ConfigError::InvalidSlot(line_number))?;
+                config.has_slot_config = true;
+            }
+            "trial" => {
+                config.trial = if value.is_empty() {
+                    None
+                } else {
+                    Some(Slot::parse(value).ok_or(ConfigError::InvalidSlot(line_number))?)
+                };
+                config.has_slot_config = true;
+            }
+            "attempts" => {
+                let attempts = value
+                    .parse::<u32>()
+                    .map_err(|_| ConfigError::InvalidAttempts(line_number))?;
+                if attempts > MAX_ATTEMPTS {
+                    return Err(ConfigError::InvalidAttempts(line_number));
+                }
+                config.attempts = attempts;
+                config.has_slot_config = true;
+            }
             _ => warnings.push(Warning {
                 line: line_number,
                 key: String::from(key),
@@ -170,124 +303,21 @@ pub fn parse_with_warnings(data: &[u8]) -> Result<(Config, Vec<Warning>), Config
     Ok((config, warnings))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{
-        Config, ConfigError, LogLevel, MAX_VALUE_LEN, Warning, parse, parse_with_warnings,
-    };
-    use alloc::string::String;
-    use alloc::vec;
-
-    #[test]
-    fn empty_file_uses_defaults() {
-        assert_eq!(parse(b"").unwrap(), Config::default());
-        assert_eq!(parse(b"\n\n").unwrap(), Config::default());
-    }
-
-    #[test]
-    fn only_comments_use_defaults() {
-        let text = b"# comment\n  # indented comment\n\n";
-        assert_eq!(parse(text).unwrap(), Config::default());
-    }
-
-    #[test]
-    fn cmdline_keeps_spaces_and_equals() {
-        let config = parse(b"cmdline = \"console=ttyS0 test-exit=1 foo=bar baz\"\n").unwrap();
-        assert_eq!(config.cmdline, "console=ttyS0 test-exit=1 foo=bar baz");
-    }
-
-    #[test]
-    fn unknown_key_is_a_warning() {
-        let (config, warnings) =
-            parse_with_warnings(b"mystery = \"x\"\ncmdline = \"ok\"\n").unwrap();
-        assert_eq!(config.cmdline, "ok");
-        assert_eq!(
-            warnings,
-            vec![Warning {
-                line: 1,
-                key: String::from("mystery"),
-            }]
-        );
-    }
-
-    #[test]
-    fn missing_quote_is_an_error() {
-        assert_eq!(
-            parse(b"cmdline = \"unterminated\n").unwrap_err(),
-            ConfigError::UnterminatedString(1)
-        );
-        assert_eq!(
-            parse(b"cmdline = unquoted\n").unwrap_err(),
-            ConfigError::UnterminatedString(1)
-        );
-    }
-
-    #[test]
-    fn non_utf8_is_an_error() {
-        assert_eq!(
-            parse(b"cmdline = \"\xff\"\n").unwrap_err(),
-            ConfigError::NonUtf8
-        );
-    }
-
-    #[test]
-    fn invalid_log_level_is_an_error() {
-        assert_eq!(
-            parse(b"log_level = \"loud\"\n").unwrap_err(),
-            ConfigError::InvalidLogLevel(1)
-        );
-    }
-
-    #[test]
-    fn every_log_level_is_accepted() {
-        for (text, expected) in [
-            ("error", LogLevel::Error),
-            ("warn", LogLevel::Warn),
-            ("info", LogLevel::Info),
-            ("debug", LogLevel::Debug),
-        ] {
-            let config = parse(format!("log_level = \"{text}\"\n").as_bytes()).unwrap();
-            assert_eq!(config.log_level, expected);
+fn escape(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for character in value.chars() {
+        match character {
+            '\\' => escaped.push_str("\\\\"),
+            '"' => escaped.push_str("\\\""),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            other => escaped.push(other),
         }
     }
-
-    #[test]
-    fn duplicate_keys_last_wins() {
-        let config = parse(
-            b"cmdline = \"first\"\nlog_level = \"error\"\ncmdline = \"second\"\nlog_level = \"debug\"\n",
-        )
-        .unwrap();
-        assert_eq!(config.cmdline, "second");
-        assert_eq!(config.log_level, LogLevel::Debug);
-    }
-
-    #[test]
-    fn crlf_line_endings_are_accepted() {
-        let config = parse(b"cmdline = \"hello\"\r\nlog_level = \"warn\"\r\n").unwrap();
-        assert_eq!(config.cmdline, "hello");
-        assert_eq!(config.log_level, LogLevel::Warn);
-    }
-
-    #[test]
-    fn one_mib_value_is_rejected() {
-        let mut text = String::from("cmdline = \"");
-        text.push_str(&"a".repeat(MAX_VALUE_LEN));
-        text.push_str("\"\n");
-        assert_eq!(
-            parse(text.as_bytes()).unwrap_err(),
-            ConfigError::ValueTooLong(1)
-        );
-    }
-
-    #[test]
-    fn malformed_lines_are_rejected() {
-        assert_eq!(
-            parse(b"cmdline\n").unwrap_err(),
-            ConfigError::MalformedLine(1)
-        );
-        assert_eq!(
-            parse(b" = \"value\"\n").unwrap_err(),
-            ConfigError::EmptyKey(1)
-        );
-    }
+    escaped
 }
+
+#[cfg(test)]
+#[path = "config_ut.rs"]
+mod tests;

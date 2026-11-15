@@ -19,6 +19,14 @@ pub const KERNEL_PATH: &CStr16 = cstr16!("\\raven\\kernel.elf");
 pub const INITFS_PATH: &CStr16 = cstr16!("\\raven\\initfs.img");
 /// `\raven\boot.toml`.
 pub const BOOT_TOML_PATH: &CStr16 = cstr16!("\\raven\\boot.toml");
+/// `\raven\slot-a\kernel.elf`.
+pub const SLOT_A_KERNEL_PATH: &CStr16 = cstr16!("\\raven\\slot-a\\kernel.elf");
+/// `\raven\slot-a\initfs.img`.
+pub const SLOT_A_INITFS_PATH: &CStr16 = cstr16!("\\raven\\slot-a\\initfs.img");
+/// `\raven\slot-b\kernel.elf`.
+pub const SLOT_B_KERNEL_PATH: &CStr16 = cstr16!("\\raven\\slot-b\\kernel.elf");
+/// `\raven\slot-b\initfs.img`.
+pub const SLOT_B_INITFS_PATH: &CStr16 = cstr16!("\\raven\\slot-b\\initfs.img");
 
 /// True when `path` exists on the boot volume.
 pub fn exists(fs: &mut FileSystem, path: &CStr16) -> Result<bool, String> {
@@ -39,4 +47,10 @@ pub fn read_file(fs: &mut FileSystem, path: &CStr16) -> Result<Vec<u8>, String> 
     }
     fs.read(path)
         .map_err(|error| format!("cannot read {path}: {error}"))
+}
+
+/// Replace a file with `data`, creating it when absent.
+pub fn write_file(fs: &mut FileSystem, path: &CStr16, data: &[u8]) -> Result<(), String> {
+    fs.write(path, data)
+        .map_err(|error| format!("cannot write {path}: {error}"))
 }
