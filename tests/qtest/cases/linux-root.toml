@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B32: the Alpine minirootfs staged by addons/linux-root/build.sh is packed into the initfs. The
+# fixture verifies the release, BusyBox and the musl loader, then asks linuxd to run the exact
+# `/compat/linux/bin/busybox ls` argument vector. BusyBox is a PIE with PT_INTERP; the current
+# image parser rejects its vaddr-0 segments before the interpreter check, so the serial output
+# records that boundary (B33 adds the PIE bias and interpreter paths).
+
+name = "linux-root"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh addons/linux-root/build.sh --qtest"]
+initfs = "build/linux-root/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^linux-root: release=3\.24\.4$'
+
+[[expect]]
+regex = '^linux-root: busybox bytes=[0-9]+ loader bytes=[0-9]+$'
+
+[[expect]]
+regex = '^linux-root: attempt path=/compat/linux/bin/busybox argv1=ls$'
+
+[[expect]]
+regex = '^linuxd: image plan failed: .*\(SegmentOutsideUserRange\)$'
+
+[[expect]]
+regex = '^linux-root: busybox exit=2$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|linux-root: FAIL'
