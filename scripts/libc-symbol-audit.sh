@@ -173,6 +173,9 @@ fi
 if [ "$REBUILD" -eq 1 ] || [ ! -f "$EXPORTS" ]; then
     cargo xtask libc-pack --arch x86_64
     cargo xtask libc-link --arch x86_64
+    # libc-pack writes the transient mkmap form of Symbols.list; restore the canonical generated
+    # form so the audit leaves the tracked tree unchanged.
+    cargo xtask libc-abi gen >/dev/null
 fi
 [ -f "$EXPORTS" ] || die "$EXPORTS is missing; run with --rebuild"
 [ -f "$REQUIRED" ] || die "$REQUIRED is missing"
