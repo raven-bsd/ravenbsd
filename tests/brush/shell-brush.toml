@@ -9,7 +9,7 @@ name = "shell-brush"
 arch = "x86_64"
 profile = "shell-test"
 timeout_secs = 420
-skip = "brush target build and shell profile deferred until C64f; dependency OS modules missing"
+skip = "brush target build deferred: toolchain libc target types (libc 0.2.186) are missing; nix/mio/rustix/socket2/uzers follow"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
