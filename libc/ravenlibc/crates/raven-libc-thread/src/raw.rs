@@ -194,11 +194,20 @@ impl SysKernel {
         Self
     }
 
-    /// What the current kernel actually provides: only PG-1 on the two register architectures,
-    /// and even there multi-thread TLS is not scheduled yet, so the conservative answer is none.
+    /// What the current kernel actually provides.
+    ///
+    /// x86-64 has `THREAD_SET_TLS` (0x23) and the scheduler installs the saved base on every
+    /// switch-in; the setter sleeps for one tick so the calling thread observes its new `%fs`
+    /// before it returns. AArch64 and RISC-V keep the conservative `minimal()` answer until
+    /// their context-switch path is verified on target.
     #[must_use]
     pub const fn caps_const() -> KernelCaps {
-        KernelCaps::minimal()
+        let mut caps = KernelCaps::minimal();
+        #[cfg(target_arch = "x86_64")]
+        {
+            caps.tls = true;
+        }
+        caps
     }
 }
 

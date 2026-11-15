@@ -24,7 +24,6 @@ pub type pthread_key_t = usize;
 pub type rlim_t = c_ulonglong;
 pub type sa_family_t = u16;
 pub type sem_t = *mut c_void;
-pub type sigset_t = c_ulonglong;
 pub type socklen_t = u32;
 pub type speed_t = u32;
 pub type suseconds_t = c_int;
@@ -49,6 +48,10 @@ s! {
         pub version: [c_char; UTSLENGTH],
         pub machine: [c_char; UTSLENGTH],
         pub domainname: [c_char; UTSLENGTH],
+    }
+
+    pub struct sigset_t {
+        __val: [c_ulong; 16],
     }
 
     pub struct dirent {
@@ -158,9 +161,9 @@ s! {
     #[allow(unpredictable_function_pointer_comparisons)]
     pub struct sigaction {
         pub sa_sigaction: crate::sighandler_t,
+        pub sa_mask: crate::sigset_t,
         pub sa_flags: c_int,
         pub sa_restorer: Option<extern "C" fn()>,
-        pub sa_mask: crate::sigset_t,
     }
 
     pub struct siginfo_t {
@@ -194,13 +197,15 @@ s! {
     pub struct stat {
         pub st_dev: crate::dev_t,
         pub st_ino: crate::ino_t,
-        pub st_nlink: crate::nlink_t,
-        pub st_mode: mode_t,
+        pub st_mode: u32,
+        pub st_nlink: u32,
         pub st_uid: crate::uid_t,
         pub st_gid: crate::gid_t,
         pub st_rdev: crate::dev_t,
+        pub __pad1: u64,
         pub st_size: off_t,
-        pub st_blksize: crate::blksize_t,
+        pub st_blksize: i32,
+        pub __pad2: i32,
         pub st_blocks: crate::blkcnt_t,
         pub st_atime: crate::time_t,
         pub st_atime_nsec: c_long,
@@ -208,7 +213,7 @@ s! {
         pub st_mtime_nsec: c_long,
         pub st_ctime: crate::time_t,
         pub st_ctime_nsec: c_long,
-        _pad: Padding<[c_char; 24]>,
+        pub __unused: [u32; 2],
     }
 
     pub struct statvfs {
@@ -223,6 +228,8 @@ s! {
         pub f_fsid: c_ulong,
         pub f_flag: c_ulong,
         pub f_namemax: c_ulong,
+        pub f_type: u32,
+        pub __reserved: [i32; 5],
     }
 
     pub struct termios {

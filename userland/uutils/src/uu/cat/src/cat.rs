@@ -514,7 +514,9 @@ fn print_unbuffered<R: FdReadable>(
     let mut stdout = uucore::io::RawWriter(stdout); // use raw syscall to remove buffering
     #[cfg(not(any(unix, target_os = "wasi")))]
     let mut stdout = stdout.lock();
-    let mut buf = [0; 1024 * 64];
+    // RavenBSD: every process has a 64 KiB user stack, so this 64 KiB buffer must live on the
+    // heap; the upstream stack array would overflow the stack before the first read.
+    let mut buf = vec![0; 1024 * 64];
     loop {
         match handle.reader.read(&mut buf) {
             Ok(0) => return Ok(()),

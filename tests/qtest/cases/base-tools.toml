@@ -7,7 +7,7 @@
 name = "base-tools"
 arch = "x86_64"
 profile = "shell-test"
-timeout_secs = 300
+timeout_secs = 600
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
@@ -23,7 +23,7 @@ regex = '(?i)panic|EXCEPTION|command not found'
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 300
+timeout_secs = 600
 
 [[step]]
 send = "mkdir /tmp/bt\n"

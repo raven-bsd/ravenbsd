@@ -3,10 +3,10 @@
 
 //! Thread-pointer accessors.
 //!
-//! x86-64 reads the self pointer from `%fs:0` and needs `THREAD_SET_TLS` (PG-1) to change the
-//! base; until the kernel lands it, [`set_thread_pointer`] returns `ENOSYS`. AArch64 and RISC-V
-//! write their user-writable register directly; the kernel must save and restore it per thread
-//! (PG-1), so multi-thread on-target tests are marked `# needs PG-1`.
+//! x86-64 reads the self pointer from `%fs:0`; the base is changed with the kernel
+//! `THREAD_SET_TLS` call, then a short sleep lets the scheduler install it on wake-up.
+//! AArch64 and RISC-V write their user-writable register directly; the kernel must save and
+//! restore it per thread (PG-1), so multi-thread on-target tests are marked `# needs PG-1`.
 
 #[cfg(feature = "host-fake")]
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -75,7 +75,22 @@ pub unsafe fn set_thread_pointer(tp: *mut u8) -> Result<(), Errno> {
         FAKE_TP.store(tp as usize, Ordering::Relaxed);
         Ok(())
     }
-    #[cfg(all(target_arch = "x86_64", not(feature = "host-fake")))]
+    #[cfg(all(target_arch = "x86_64", target_os = "none", not(feature = "host-fake")))]
+    {
+        // The kernel has THREAD_SET_TLS (0x23); it records the base in the thread object and
+        // installs it on the next switch-in.
+        crate::sys::thread_set_tls(raven_abi::types::Handle::NONE, tp as usize)?;
+        // A yield is not enough: when no other thread is runnable the scheduler returns
+        // without a switch and `%fs` stays 0. A 1 ms sleep always switches out and the
+        // wake-up installs the base this call recorded.
+        crate::sys::nanosleep(1_000_000)?;
+        Ok(())
+    }
+    #[cfg(all(
+        target_arch = "x86_64",
+        not(target_os = "none"),
+        not(feature = "host-fake")
+    ))]
     {
         let _ = tp;
         Err(Errno::ENOSYS)

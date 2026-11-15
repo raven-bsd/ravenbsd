@@ -45,11 +45,18 @@ fn the_arch_triples_are_the_raven_std_targets() {
 }
 
 #[test]
-fn the_default_options_are_a_debug_x86_64_build() {
+fn the_default_options_are_a_release_x86_64_build() {
     let options = parse_options(&[]).expect("options");
     assert_eq!(options.arch, "x86_64");
-    assert!(!options.release);
+    assert!(options.release);
     assert!(!options.list);
+}
+
+#[test]
+fn debug_selects_the_debug_profile() {
+    let options = parse_options(&args(&["--debug"])).expect("options");
+    assert!(!options.release);
+    assert!(!command_args(Path::new("/r"), &options).contains(&"--release".to_string()));
 }
 
 #[test]
@@ -87,7 +94,7 @@ fn the_command_uses_the_raven_toolchain_and_target() {
     assert!(vector.contains(&"x86_64-unknown-ravenbsd".to_string()));
     assert!(vector.contains(&"-p".to_string()));
     assert!(vector.contains(&"uu_ls".to_string()));
-    assert!(!vector.contains(&"--release".to_string()));
+    assert!(vector.contains(&"--release".to_string()));
 }
 
 #[test]
@@ -109,7 +116,7 @@ fn the_artifact_path_is_under_the_isolated_target_dir() {
     let options = parse_options(&[]).expect("options");
     assert_eq!(
         artifact_path(Path::new("/r"), &options, "ls"),
-        Path::new("/r/build/cargo/uutils-x86_64/x86_64-unknown-ravenbsd/debug/ls")
+        Path::new("/r/build/cargo/uutils-x86_64/x86_64-unknown-ravenbsd/release/ls")
     );
 }
 

@@ -59,6 +59,13 @@ SECTIONS {
         *(.tdata .tdata.*)
     } :data :tls
 
+    /* .tbss must be contiguous with .tdata in the PT_TLS image: the compiler's local-exec
+       offsets are relative to that block, not to .bss. */
+    .tbss ALIGN(8) (NOLOAD) : {
+        *(.tbss .tbss.*)
+        *(.tcommon)
+    } :data :tls
+
     /* The RW LOAD file part must be a page multiple. */
     .data ALIGN(4096) : {
         *(.data .data.*)
@@ -99,11 +106,6 @@ SECTIONS {
         *(.bss .bss.*)
         *(COMMON)
     } :bss
-
-    .tbss ALIGN(8) (NOLOAD) : {
-        *(.tbss .tbss.*)
-        *(.tcommon)
-    } :tls
 
     /DISCARD/ : {
         *(.eh_frame*)

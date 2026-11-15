@@ -71,6 +71,19 @@ pub fn exit(code: i32) -> ! {
     }
 }
 
+/// Set a thread's TLS base.
+///
+/// `thread` is [`Handle::NONE`](raven_abi::types::Handle::NONE) for the calling thread or a
+/// thread handle with `SIGNAL`. The kernel records the base in the thread object; the next
+/// context switch installs it in `IA32_FS_BASE`/`TPIDR_EL0`.
+pub fn thread_set_tls(thread: Handle, tp: usize) -> Result<(), Errno> {
+    // SAFETY: the raw syscall reads two scalar arguments and writes no user memory.
+    crate::errno::ret(unsafe {
+        arch::syscall2(raven_abi::syscall::THREAD_SET_TLS, thread.0 as usize, tp)
+    })
+    .map(|_| ())
+}
+
 /// Give up the CPU.
 pub fn yield_now() -> Result<(), Errno> {
     // SAFETY: YIELD takes no arguments.

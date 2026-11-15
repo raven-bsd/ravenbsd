@@ -50,14 +50,15 @@ pub(crate) const SELECTED: &[(&str, &str)] = &[
 
 const USAGE: &str = "\
 usage:
-  cargo xtask build uutils [--arch x86_64|aarch64|riscv64] [--release] [--list]";
+  cargo xtask build uutils [--arch x86_64|aarch64|riscv64] [--release|--debug] [--list]";
 
 /// Parsed options for one build.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Options {
     /// Architecture name.
     pub(crate) arch: String,
-    /// Release profile.
+    /// Release profile. Release is the default: the 64 KiB user stack cannot hold the
+    /// stack frames a debug build of `ls`/`cat` generates.
     pub(crate) release: bool,
     /// Print the selected table and do nothing.
     pub(crate) list: bool,
@@ -67,7 +68,7 @@ pub(crate) struct Options {
 pub(crate) fn parse_options(args: &[String]) -> Result<Options> {
     let mut options = Options {
         arch: "x86_64".to_string(),
-        release: false,
+        release: true,
         list: false,
     };
     let mut index = 0;
@@ -84,6 +85,7 @@ pub(crate) fn parse_options(args: &[String]) -> Result<Options> {
                 options.arch = value.clone();
             }
             "--release" => options.release = true,
+            "--debug" => options.release = false,
             "--list" => options.list = true,
             other => bail!("unknown uutils option `{other}`\n{USAGE}"),
         }
@@ -185,7 +187,7 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
     // and the getrandom custom-backend cfg are supplied here, next to the build.
     let stage = root.join("build").join(&options.arch);
     let libc = stage.join("libc.a");
-    let crt = stage.join("rcrt1.o");
+    let crt = stage.join("crt1.o");
     let crti = stage.join("crti.o");
     let crtn = stage.join("crtn.o");
     let std_linker = root
@@ -197,9 +199,15 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
         root.join("userland/linker")
             .join(format!("{}.ld", options.arch))
     };
+    let code_model = if options.arch == "x86_64" {
+        " -C code-model=small"
+    } else {
+        ""
+    };
     let rustflags = format!(
-        "--cfg getrandom_backend=\"custom\" -C strip=symbols \
+        "--cfg getrandom_backend=\"custom\" -C strip=symbols -C relocation-model=static{} \
          -C link-arg={} -C link-arg={} -C link-arg={} -C link-arg={} -C link-arg=-T{}",
+        code_model,
         crt.display(),
         crti.display(),
         libc.display(),
