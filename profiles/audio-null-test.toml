@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The audio-null integration profile. It inherits the shell profile and adds the null-sink
+# audiod plus a one-shot client that writes two 10 s streams.
+
+name = "audio-null-test"
+
+extends = "shell"
+
+[boot]
+cmdline = "console=ttyS0 loglevel=info"
+log_level = "info"

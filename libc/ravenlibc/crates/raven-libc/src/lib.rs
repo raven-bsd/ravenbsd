@@ -57,6 +57,18 @@ pub(crate) mod ucontext;
 #[cfg(any(target_os = "none", test))]
 #[path = "stdlib/atexit.rs"]
 pub(crate) mod exit_registry;
+// C64d's pure iovec and fcntl-argument helpers are host-tested without the target platform.
+#[cfg(test)]
+#[path = "unistd/fcntl_args.rs"]
+mod fcntl_args_host;
+#[cfg(test)]
+#[path = "unistd/readv.rs"]
+mod readv_host;
+#[cfg(test)]
+#[path = "unistd/writev.rs"]
+mod writev_host;
+// C64d's `realpath` path walk and the no-unwinder ABI surface are host-tested even though
+// their C exports are target-only.
 pub(crate) mod ffi;
 #[cfg(target_os = "none")]
 pub(crate) mod fts;
@@ -92,12 +104,18 @@ pub(crate) mod process;
 pub(crate) mod pthread;
 #[cfg(target_os = "none")]
 pub(crate) mod pwd;
+#[cfg(any(target_os = "none", test))]
+#[path = "stdlib/realpath.rs"]
+pub(crate) mod realpath;
 #[cfg(target_os = "none")]
 pub(crate) mod regex;
 #[cfg(target_os = "none")]
 pub(crate) mod sched;
 #[cfg(target_os = "none")]
 pub(crate) mod socket;
+#[cfg(any(target_os = "none", test))]
+#[path = "stdlib/unwind/mod.rs"]
+pub(crate) mod unwind;
 // The guard storage is also compiled for the host unit test; it stops exporting the C name on
 // the host (the archive check covers the real symbol).
 #[cfg(any(target_os = "none", test))]

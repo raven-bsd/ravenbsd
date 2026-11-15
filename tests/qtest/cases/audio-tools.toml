@@ -1,0 +1,102 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B45 audio tools against the B43 null sink. The WAV is generated on the host (never committed as
+# a binary) and installed at /tmp/tone440.wav.
+
+name = "audio-tools"
+arch = "x86_64"
+profile = "audio-tools-test"
+timeout_secs = 420
+pre = ["sh tests/fixtures/audio-tools/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^rsh: ready$'
+
+[[expect]]
+regex = '^audiod: ready \(null sink, 480 frames/period\)$'
+unordered = true
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|command not found|no sink|denied'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "play /etc/tone440.wav\n"
+delay_ms = 100
+
+[[step]]
+wait = '^play: ok 24000 frames, 48000 Hz, 2 channels$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "beep -d 100\n"
+delay_ms = 100
+
+[[step]]
+wait = '^beep: ok 440 Hz 100 ms$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mixer volume 50\n"
+delay_ms = 100
+
+[[step]]
+wait = '^mixer: volume 50% left=16384 right=16384$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mixer mute\n"
+delay_ms = 100
+
+[[step]]
+wait = '^mixer: muted left=0 right=0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mixer status\n"
+delay_ms = 100
+
+[[step]]
+wait = '^mixer: status position=0 underruns=0 stopped$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

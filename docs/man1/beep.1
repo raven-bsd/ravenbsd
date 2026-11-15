@@ -1,0 +1,42 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 15, 2026
+.Dt BEEP 1
+.Os
+.Sh NAME
+.Nm beep
+.Nd generate a tone on the audio: scheme
+.Sh SYNOPSIS
+.Nm
+.Op Fl f Ar hz
+.Op Fl d Ar ms
+.Sh DESCRIPTION
+.Nm
+generates a sine tone at 48 kHz stereo and plays it through
+.Dv audio:out0 .
+The default is 440 Hz for one second.
+.Pp
+The options are:
+.Bl -tag -width Fl
+.It Fl f Ar hz , Fl -frequency Ar hz
+Tone frequency, 1 to 20000 Hz.
+.It Fl d Ar ms , Fl -duration-ms Ar ms
+Duration in milliseconds, 1 to 60000.
+.El
+.Sh EXIT STATUS
+.Bl -tag -width Ds -compact
+.It 0
+The tone was played.
+.It 1
+The audio server returned an error.
+.It 2
+Usage error or an out-of-range value.
+.El
+.Sh SEE ALSO
+.Xr play 1 ,
+.Xr mixer 1 ,
+.Xr audiod 8
+.Sh HISTORY
+The
+.Nm
+utility first appeared in RavenBSD 0.1.
