@@ -144,7 +144,30 @@ MMIO mapping, DMA allocation, IRQ delivery and the frame pump are the board inte
 * `LinkTracker` debounces `BMSR`/`AUXSTS` samples (default two) and applies `Up`, `Down` and
   speed-change events to `UMAC_CMD` and `EXT_RGMII_OOB_CTRL`.
 
+## Interrupts, reclaim and recovery
 
+`irq.rs` decodes `INTRL2_CPU_STAT`: RX done, TX done, MDIO done, MDIO error and the unknown bits.
+`FrameBackend::service_irq` reads the status through the seam, reads the consumer-slot RX/TX
+descriptor statuses, reclaims at most a 64-completion budget per direction, writes the observed
+bits to `INTRL2_CPU_CLEAR` and returns a typed `ServiceReport`. A bigger request is clamped, so an
+interrupt storm cannot hold the CPU.
+
+`frame.rs` exposes the batch `complete_batch` and `reclaim_batch` paths plus the combined
+`FramePath::reclaim`. A still-owned descriptor stops the batch; a malformed status is counted and
+its slot is freed and advanced. `RxPath::post_next` and `TxPath::queue_next` set the descriptor
+`OWN` bit to mark device ownership, and completion requires it to be clear.
+
+`recovery.rs` bounds consecutive errors: the default policy allows eight consecutive observations,
+grants three ring resets, then returns `RecoveryAction::Fault`. A clean service pass clears the
+consecutive counter. `FrameBackend` records a malformed RX or MDIO error against the policy and
+returns the action in `ServiceReport::recovery`.
+
+## UMAC filters
+
+`filter.rs` models the 17 MDF slots: slot 0 is broadcast, slot 1 the station address and slots
+2..16 up to 15 multicast addresses. MDF word 0 is bytes 0..2 big-endian and word 1 is bytes 2..6
+big-endian. `UMAC_MDF_CTRL` enables the top contiguous slot mask; `UMAC_CMD_PROMISC` bypasses the
+table. `FrameBackend::program_filters` writes the used slots, the mask and the promiscuous bit.
 
 ## Real-link steps (UNVERIFIED)
 
@@ -164,6 +187,14 @@ MMIO mapping, DMA allocation, IRQ delivery and the frame pump are the board inte
 11. Force a packet buffer above the DMA window and prove the bounce path copies through a
     directly addressable buffer, or returns `ENOMEM` when no bounce buffer exists.
 12. Queue enough TX frames to wrap the 256-slot ring and reclaim every completion.
+13. Trigger RX and TX done interrupts; record `INTRL2_CPU_STAT`, the reclaim counts and the
+    `INTRL2_CPU_CLEAR` value.
+14. Program the broadcast, unicast and two multicast filters; prove the frames are accepted and
+    an unlisted multicast address is dropped, then flip the promiscuous bit.
+15. Inject repeated malformed RX statuses and record the recovery threshold, ring reset and
+    final fault state without a busy loop.
+16. Confirm whether the Pi 4 TX descriptor needs software `OWN` or uses the DMA consumer index
+    for completion; the model currently sets `OWN` and requires it clear on reclaim.
 
 ## Donor files read
 

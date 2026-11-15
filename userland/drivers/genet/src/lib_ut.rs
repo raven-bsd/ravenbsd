@@ -7,7 +7,7 @@ use super::*;
 use raven_genet::dtb::DmaMap;
 use raven_genet::phy::PhyMode;
 
-const REG_WORDS: usize = 0x900 / 4;
+const REG_WORDS: usize = 0x5000 / 4;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct FakeSeam {
