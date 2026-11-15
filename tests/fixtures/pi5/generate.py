@@ -72,6 +72,8 @@ RP1_ASSIGNED_RATES = [
 RP1_PIO_REG = [0xC0, 0x4017_8000, 0x0, 0x20]
 RP1_USB0_REG = [0xC0, 0x4020_0000, 0x0, 0x10_0000]
 RP1_USB1_REG = [0xC0, 0x4030_0000, 0x0, 0x10_0000]
+RP1_USB0_INTERRUPT = [0x1F, 0x1]
+RP1_USB1_INTERRUPT = [0x24, 0x1]
 RP1_SRAM_REG = [0xC0, 0x4040_0000, 0x0, 0x1_0000]
 RP1_SRAM_RANGES = [0x0, 0xC0, 0x4040_0000, 0x1_0000]
 RP1_SHMEM_REG = [0xFF00, 0x100]
@@ -346,12 +348,38 @@ def rp1_gpio_node(pins: int = RP1_GPIO_PINS) -> Node:
     )
 
 
+def rp1_usb_node(name: str, reg, interrupt, full: bool) -> Node:
+    props = [
+        text_list("compatible", ["snps,dwc3"]),
+        cells("reg", reg),
+        text("status", "okay" if full else "disabled"),
+    ]
+    if full:
+        props = [
+            text_list("compatible", ["snps,dwc3"]),
+            cells("reg", reg),
+            text("dr_mode", "host"),
+            flag("usb3-lpm-capable"),
+            cells("snps,axi-pipe-limit", [0x8]),
+            flag("snps,dis_rxdet_inp3_quirk"),
+            flag("snps,enhanced-nak-fs-quirk"),
+            flag("snps,parkmode-disable-ss-quirk"),
+            flag("snps,parkmode-disable-fsls-quirk"),
+            cells("snps,tx-max-burst", [0x8]),
+            cells("snps,tx-thr-num-pkt", [0x2]),
+            cells("interrupts", interrupt),
+            text("status", "okay"),
+        ]
+    return Node(name, props)
+
+
 def rp1_node(
     uart_status: str,
     mfd: bool = False,
     mfd_pins: int = RP1_GPIO_PINS,
     mfd_rates=None,
     mfd_mac=None,
+    xhci: bool = False,
 ) -> Node:
     mfd_rates = mfd_rates or RP1_ASSIGNED_RATES
     mfd_mac = mfd_mac or [0, 0, 0, 0, 0, 0]
@@ -428,22 +456,8 @@ def rp1_node(
                         text("status", "okay"),
                     ],
                 ),
-                Node(
-                    "usb@200000",
-                    [
-                        text_list("compatible", ["brcm,bcm2835-usb"]),
-                        cells("reg", RP1_USB0_REG),
-                        text("status", "disabled"),
-                    ],
-                ),
-                Node(
-                    "usb@300000",
-                    [
-                        text_list("compatible", ["brcm,bcm2835-usb"]),
-                        cells("reg", RP1_USB1_REG),
-                        text("status", "disabled"),
-                    ],
-                ),
+                rp1_usb_node("usb@200000", RP1_USB0_REG, RP1_USB0_INTERRUPT, xhci),
+                rp1_usb_node("usb@300000", RP1_USB1_REG, RP1_USB1_INTERRUPT, xhci),
                 Node(
                     "sram@400000",
                     [
@@ -508,6 +522,7 @@ def platform(
     mfd_pins: int = RP1_GPIO_PINS,
     mfd_rates=None,
     mfd_mac=None,
+    xhci: bool = False,
 ) -> Node:
     memory_nodes = memory_nodes or [("memory@0", [0x0, 0x0, 0x0, 0x2800_0000])]
     root_children = [
@@ -574,6 +589,7 @@ def platform(
             mfd_pins=mfd_pins,
             mfd_rates=mfd_rates,
             mfd_mac=mfd_mac,
+            xhci=xhci,
         )
         root_children.append(
             Node(
@@ -679,6 +695,10 @@ def main() -> None:
             mfd=True,
             mfd_mac=[0x02, 0x11, 0x22, 0x33, 0x44, 0x55],
         ),
+    )
+    write(
+        "pi5-rp1-xhci",
+        platform(include_rp1=True, rp1_uart="disabled", mfd=True, xhci=True),
     )
 
 

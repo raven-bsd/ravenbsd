@@ -6,7 +6,8 @@
 These fixtures are **original minimal device trees**, not copies of a donor DTB. They contain only
 the nodes and values the `raven-pi5` parser and the `raven-rp1` MFD model need. The `.dtb` files
 are generated; edit `generate.py`, not the binaries. R2 added the `pi5-rp1-mfd*` fixtures; R3 extended
-their Ethernet node with the full property set. The B54 fixtures stay byte-identical.
+their Ethernet node with the full property set; R4 added the `pi5-rp1-xhci` fixture with the full USB
+nodes. The B54 fixtures stay byte-identical.
 
 ## Regeneration
 
@@ -75,7 +76,9 @@ addresses in parentheses are the pre-translation child addresses.
 | RP1 pinctrl groups | `uart0` on gpio14/15/16/17, `i2c0` on gpio0/1 | `rp1/gpio@d0000` children |
 | RP1 clock rates | 13 assigned IDs, 1 MHz to 1.536 GHz | `rp1/clocks@18000: assigned-clock-rates` |
 | RP1 PIO | local `0xc0_4017_8000` + `0x20` | `rp1/pio@178000` |
-| RP1 USB | local `0xc0_4020_0000`, `0xc0_4030_0000`, `0x10_0000` each | `rp1/usb@200000`, `rp1/usb@300000` |
+| RP1 USB | local `0xc0_4020_0000`, `0xc0_4030_0000`, `0x10_0000` each, `snps,dwc3`, `dr_mode = host` | `rp1/usb@200000`, `rp1/usb@300000` |
+| RP1 USB interrupts | id `31` and `36`, flags `1` | `usb@*: interrupts` |
+| RP1 USB tuning | `axi-pipe-limit = 8`, `tx-max-burst = 8`, `tx-thr-num-pkt = 2`, `usb3-lpm-capable`, four `snps,*quirk` flags | `usb@*` |
 | RP1 SRAM | local `0xc0_4040_0000` + `0x1_0000` | `rp1/sram@400000` |
 | RP1 firmware shmem | local `0xc0_4040_ff00` + `0x100` | `sram@400000/shmem@ff00` |
 | RP1 firmware node | `raspberrypi,rp1-firmware`, `simple-mfd`, mailbox + shmem refs | `/rp1_firmware` |
@@ -101,6 +104,7 @@ fills it in. The actual board memory size is UNVERIFIED until a board log exists
 | `pi5-rp1-mfd-bad-pins.dtb` | The same tree with `gpio-ranges` count zero; `raven-rp1` reports `PinCount(0)`. |
 | `pi5-rp1-mfd-bad-clock.dtb` | The same tree with one assigned rate missing; `raven-rp1` reports `ClockCount { clocks: 13, rates: 12 }`. |
 | `pi5-rp1-mfd-mac.dtb` | The same tree with a non-zero `local-mac-address` (`02:11:22:33:44:55`); the Ethernet model returns it as a real address. |
+| `pi5-rp1-xhci.dtb` | The MFD tree with both RP1 USB nodes fully described and `okay`: DWC3 windows, interrupts 31/36, host mode, LPM and the Synopsys quirk/tuning properties. |
 
 The invalid fixtures use synthetic overlaps or malformed cell counts. They do not invent hardware
 addresses; every address comes from the table above.
