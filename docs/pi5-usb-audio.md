@@ -1,12 +1,13 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# USB Audio Class 1.0 model on the RP1 xHCI (R5)
+# USB Audio Class 1.0 model on the RP1 xHCI (R5, extended by R6)
 
 Status: host-side model only. **No Pi 5 hardware has been run.** The descriptor/class-request
 shapes are the public USB 2.0 and USB Audio Class 1.0 definitions; the device values, the real
-feedback behaviour, packet sizes and every board result are UNVERIFIED. R5 does not edit or import
-`audiod`; the server integration is an explicit follow-up.
+feedback behaviour, packet sizes and every board result are UNVERIFIED. R6 adds the xHCI
+Setup/Data/Status control-transfer sequence and the audiod PCM-ring seam; it does not edit or
+import `audiod`, and the server/driver integration remains an explicit follow-up.
 
 ## 1. Transport
 
@@ -68,6 +69,25 @@ into the `EventRing`, and `complete` reclaims the ring slot and the event in ord
 reported without consuming a stream packet; `feedback()` returns the feedback value. The DMA
 addresses are caller data; no controller is programmed.
 
+`control(setup, data, buffer)` queues the xHCI Setup/Data/Status sequence on a second transfer ring
+(endpoint 0, DCI 1): the Setup TRB carries the 8 setup bytes as immediate data and the TRT field
+(no data/IN/OUT), the optional Data TRB carries the direction and length, and the Status TRB carries
+the opposite direction and IOC. The xHCI crate builds the sequence; an inconsistent length is
+rejected. The UAC1 request is applied to the feature unit immediately and returned as `Response`;
+`control_device_complete` queues the endpoint-0 Transfer Event and `control_complete` drains the
+two/three TRBs and the event. Only one control transfer is in flight at a time (endpoint 0 is
+serialised).
+
+### 2.6 `pcm` — the audiod ring seam
+
+`PcmSource` is the frame-aligned source the stream consumes: `frame_bytes`, `available_frames` and
+`read`. It is implemented for the R4 `SliceSource` (plain memory) and, in the same crate, for
+`raven-proto-audio`'s `RingConsumer` (the audiod driver ring). `queue_pcm(buffer, source)` checks
+the source's frame size against the stream format, pre-checks the whole packet is available, copies
+the packet into the host scratch (`last_packet`) and queues the TRB; a short source is an
+`SourceUnderrun` and leaves the stream and ring untouched. The driver copies the same bytes into
+the DMA buffer at `buffer` before ringing the doorbell.
+
 ## 3. Tests
 
 `cargo test -p raven-usb-audio` covers:
@@ -83,6 +103,12 @@ addresses are caller data; no controller is programmed.
   44,100 frames/s, full-speed 48 frames/192 bytes, packet-too-large, feedback bytes, start/stop;
 * host: open/close, alternate/rate checks, DCI 3, queue/complete order with Transfer Events, a full
   ring that does not consume the packet, bad ring size;
+* control path: a mute request queues the 3-TRB sequence and returns `Ack`, a GET returns the model
+  state, a no-data request uses 2 TRBs, a small control ring is `RingFull`, limits can be replaced,
+  the Transfer Event/complete order;
+* PCM seam: the audiod `RingConsumer` reads whole frames, `queue_pcm` consumes 24-byte packets from
+  a 48-frame ring, the scratch packet holds the payload, a wrong frame size is rejected and a short
+  source is an underrun;
 * integration: the `pi5-rp1-xhci` fixture yields the two controllers and the host runs on their
   rings; the encoded descriptor set parses and opens.
 
@@ -91,18 +117,18 @@ construction, not a donor). The Pi 5 fixture is the R4 controller transport.
 
 ## 4. audiod integration follow-up (not done here)
 
-`audiod` already owns the PCM core and the `audio:` protocol. The follow-up (B57/R6 or a dedicated
-ticket) should:
+The host-side seam now exists (`queue_pcm` over `raven-proto-audio`'s `RingConsumer` and the
+control-transfer sequence), but the audiod/server integration is still the driver ticket's work:
 
-1. map the UAC1 stream to `raven-proto-audio`'s `Format` (S16LE, 2 channels, the negotiated rate;
-   the format type I is the source of truth);
-2. obtain PCM frames from the existing shared-memory ring and feed `AudioHost::queue` packets;
-3. drive the control requests for the initial mute/volume state through the xHCI control-transfer
-   path (the Setup/Data/Status TRB sequence), which R5 models only as requests, not TRBs;
-4. report the endpoint's `wMaxPacketSize`, the feedback value and underruns to `audiod`.
-
-R5 does not edit `userland/servers/audiod/**` and does not add the xHCI control-transfer TRBs; that
-is part of the driver integration.
+1. Map the UAC1 stream format to `raven-proto-audio`'s `Format` (S16LE, channels, negotiated rate)
+   and attach the driver-side `RingConsumer` to the PCM region.
+2. Drive `AudioHost::open`, `queue_pcm` and the completion handling from the xHCI driver's
+   transfer-event loop; map the `wMaxPacketSize`, feedback value and underruns into the ring header
+   and the `GET_STATUS`/`DRAIN` paths.
+3. Route the control requests through the driver's endpoint-0 ring and report the device answer;
+   use `GET_MIN/MAX/RES` for the initial volume range instead of the model default.
+4. The xHCI register access, doorbell and completion interrupt are still UNVERIFIED; R6 does not
+   edit `userland/servers/audiod/**`.
 
 ## 5. Board steps (all UNVERIFIED)
 
@@ -112,25 +138,29 @@ is part of the driver integration.
 3. Confirm the alternate setting, the isochronous IN endpoint's `wMaxPacketSize` and the feedback
    endpoint (present or absent) and its format.
 4. Confirm the packet cadence and the feedback value the device actually requests.
-5. Confirm the xHCI control-transfer TRB sequence for UAC1 SET/GET requests.
+5. Confirm the xHCI control-transfer TRB sequence (Setup/Data/Status, IDT/TRT/DIR) on the board.
 6. Confirm the DMA addresses, the 64-bit window and the event/transfer ring sizes with the R4
    controller.
-7. Run audiod with a 440 Hz WAV and capture the result (the M-Pi5 exit).
-8. Only then claim USB audio works on the board.
+7. Confirm the PCM ring seam: the audiod period/frame mapping, the scratch packet copy and the
+   underrun accounting.
+8. Run audiod with a 440 Hz WAV and capture the result (the M-Pi5 exit).
+9. Only then claim USB audio works on the board.
 
-None of steps 1-8 has been run. There is no Pi 5 USB descriptor dump, feedback trace or capture in
+None of steps 1-9 has been run. There is no Pi 5 USB descriptor dump, feedback trace or capture in
 this repository.
 
 ## 6. Donors and provenance
 
 | Source | Revision | Licence | Use |
 |---|---|---|---|
-| R4 report and `crates/raven-rp1-xhci` | merged R4 (`2e7a7579`) | project source | Controller windows/interrupts and the `TransferRing`/`EventRing`/`Trb` types the host model consumes. |
+| R4 report and `crates/raven-rp1-xhci` | merged R4 (`2e7a7579`) | project source | Controller windows/interrupts, the `TransferRing`/`EventRing`/`Trb` types and (R6) the control-transfer sequence. |
+| R5 report and `crates/raven-usb-audio` | merged R5 | project source | Descriptor/control/stream/host model extended by R6. |
+| `crates/raven-proto-audio` | merged | project source | The audiod PCM ring layout/consumer the `pcm` seam is implemented for. |
 | `architecture/rpi5/01-hardware.md`, `03-network-and-sound.md` | v0.1 | project docs | USB-audio path and the M-Pi5 sound exit (440 Hz capture). |
 | `tests/fixtures/pi5/pi5-rp1-xhci.dtb` | our fixture | project fixture | Two `snps,dwc3` controllers as the transport in the integration test. |
 | USB 2.0 specification | public standard | - | Descriptor field order/lengths and the setup packet. |
 | USB Audio Class 1.0 specification | public standard | - | AC/AS descriptor shapes, terminal/feature-unit entities, class requests, format type I and the 16.16 feedback form. |
-| Linux `sound/usb/*`, `drivers/usb/host/xhci*.c` | not in this workspace | GPL-2.0 (tier C) | **Not read**: no Linux checkout is present. Device quirks and the control-transfer TRB sequence are unmodelled/UNVERIFIED. |
+| Linux `sound/usb/*`, `drivers/usb/host/xhci*.c` | not in this workspace | GPL-2.0 (tier C) | **Not read**: no Linux checkout is present. Device quirks are unmodelled; the standard Setup/Data/Status TRB sequence is from the xHCI 1.1 spec. |
 
 No donor code was copied, translated or closely paraphrased. There is no new `PROVENANCE.toml`
 import entry because there is no imported code. No firmware or device blob is included.
@@ -140,6 +170,7 @@ import entry because there is no imported code. No firmware or device blob is in
 * The UAC1 test device is synthetic (stereo S16, 44.1/48 kHz) and is not a donor trace; no USB
   device is present in this workspace.
 * The host model keeps the DMA address and the slot ID as caller data; the xHCI control-transfer
-  TRB sequence and the audiod wiring are follow-ups.
-* The crate has one internal dependency (`raven-rp1-xhci`) and one dev-dependency
-  (`raven-fdt-lite`); no external crate was added.
+  sequence is modelled from the xHCI 1.1 spec, while the audiod server wiring and the real
+  register/DMA access remain follow-ups.
+* The crate has two internal dependencies (`raven-rp1-xhci`, `raven-proto-audio`) and one
+  dev-dependency (`raven-fdt-lite`); no external crate was added.
