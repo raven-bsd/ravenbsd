@@ -113,12 +113,38 @@ inside a window. GENET is not documented as cache-coherent; the driver must trea
 as non-coherent (Normal-NC or explicit cache maintenance) until a board log proves otherwise.
 OBSERVED: firmware DTB `scb/dma-ranges`; UNVERIFIED for GENET specifically.
 
-## Userspace driver seam
+## DMA bounce rules
+
+`crates/raven-genet/src/dma.rs` routes one 2 KiB packet buffer through the device-tree windows:
+
+* a range fully inside one window is used directly with its translated bus address;
+* a range outside every window, or crossing a window edge, requires a caller-supplied bounce
+  buffer that is itself directly addressable; the returned mapping then has `bounce = true`;
+* zero length, more than 2048 bytes, a zero address or a non-64-byte-aligned address is rejected;
+* the policy is non-coherent, so a ToDevice buffer is cleaned and a FromDevice buffer is
+  invalidated unless the platform declares the domain coherent.
+
+The S21d ABI currently has no copy-bounce primitive, so the userspace driver must allocate the
+bounce buffer through `DMA_ALLOC` before it uses this rule. The model states the requirement; it
+does not pretend a copy happened.
+
+## Userspace driver seam and frame path
 
 `userland/drivers/genet` is a skeleton: `Seam` is the only place that will own MMIO and DMA.
 The host-testable `Controller` performs the typed bring-up order (probe revision, program MAC,
 program RGMII, plan rings) and rejects an out-of-order transition. The real `devd`/profile wiring,
 MMIO mapping, DMA allocation, IRQ delivery and the frame pump are the board integration step.
+`FrameBackend` adds the host-tested frame path:
+
+* `RxPath`/`TxPath` keep an owner (`Free`, `Driver`, `Device`) for each of the 256 slots, validate
+  completed statuses and free a malformed RX slot instead of stalling the ring;
+* posting, completing and refilling use the wrap-aware indices; a still-owned descriptor is not
+  advanced;
+* `FrameBackend` takes packet buffers from the seam, queues TX frames and reclaims completed ones;
+* `LinkTracker` debounces `BMSR`/`AUXSTS` samples (default two) and applies `Up`, `Down` and
+  speed-change events to `UMAC_CMD` and `EXT_RGMII_OOB_CTRL`.
+
+
 
 ## Real-link steps (UNVERIFIED)
 
@@ -131,8 +157,13 @@ MMIO mapping, DMA allocation, IRQ delivery and the frame pump are the board inte
 6. Start autonegotiation and record `BMSR`/`AUXSTS` at link up, including speed and duplex.
 7. Read `UMAC_CMD` after the link update and prove the `SPEED` field.
 8. Enable the rings and prove RX/TX `OWN` transitions, then pass an ARP or ping through `netd`.
-9. Unplug/replug the cable and record the link-down/link-up transition and the interrupt counts.
-10. Inject one malformed frame and prove the error counter increments without losing ring state.
+9. Unplug/replug the cable and record the debounced link-down/link-up transitions, `UMAC_CMD`
+   speed changes and the interrupt counts.
+10. Inject one malformed frame and prove the error counter increments while the RX slot is freed
+    and refilled.
+11. Force a packet buffer above the DMA window and prove the bounce path copies through a
+    directly addressable buffer, or returns `ENOMEM` when no bounce buffer exists.
+12. Queue enough TX frames to wrap the 256-slot ring and reclaim every completion.
 
 ## Donor files read
 
