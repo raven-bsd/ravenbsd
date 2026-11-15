@@ -2034,6 +2034,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-rp1-fw"
+version = "0.1.0"
+dependencies = [
+ "raven-rp1",
+]
+
+[[package]]
 name = "raven-rp1-xhci"
 version = "0.1.0"
 dependencies = [
