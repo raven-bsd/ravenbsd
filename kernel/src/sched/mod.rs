@@ -127,7 +127,7 @@ pub fn init() -> Result<(), Errno> {
         return Ok(());
     }
     #[cfg(target_arch = "x86_64")]
-    if !context::fpu_state_ok() {
+    if !context::init_fpu() {
         return Err(Errno::EINVAL);
     }
     let kernel_process = crate::process::new_kernel_process()?;

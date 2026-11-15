@@ -58,7 +58,10 @@ syscall_entry:
     push r15
 
     mov rdi, rsp
+    call sched_syscall_enter
+    mov rdi, rsp
     call syscall_dispatch
+    call sched_syscall_exit
 
     pop r15
     pop r14

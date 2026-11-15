@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S22: two user threads keep exact dependent SSE results across timer preemption and YIELD
+# syscalls. A single CPU forces the scheduler to switch between the live XMM states.
+
+name = "fpu-preempt"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/qtest/cases/fpu-preempt-fixture/build.sh"]
+initfs = "build/fixtures/fpu-preempt/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-smp", "1", "-cpu", "max"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^fpu-preempt: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|fpu-preempt: fail'
