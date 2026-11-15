@@ -24,6 +24,9 @@ regex = '^LS\(1\)  RavenBSD  November 12, 2026$'
 regex = '^    ls - list directory contents$'
 
 [[expect]]
+regex = '^  Size: 661'
+
+[[expect]]
 regex = '^  Size: 1019'
 
 [[expect]]
@@ -71,6 +74,26 @@ timeout_secs = 30
 [[step]]
 wait = '^raven# $'
 timeout_secs = 30
+
+[[step]]
+send = "export MANPAGER=stat\n"
+delay_ms = 100
+
+[[step]]
+send = "man 1 ls\n"
+delay_ms = 100
+
+[[step]]
+wait = '^  Size: 661'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "unset MANPAGER\n"
+delay_ms = 100
 
 [[step]]
 send = "unset NO_COLOR\n"
