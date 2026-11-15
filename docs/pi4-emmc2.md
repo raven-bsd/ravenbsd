@@ -104,8 +104,8 @@ No QEMU model exists for EMMC2, so there is no qtest; the board log is the only 
 
 ## 6. Board steps (UNVERIFIED)
 
-Capture the UART line and the register values for each step. None of these has been run; there is
-no Pi 4 attached to this workspace.
+Capture the UART line and the register values for each step. None of these has been run; no board
+run was performed for this ticket.
 
 1. **Controller identity:** host-controller version, capabilities (`0x40`), capabilities 2 (`0x44`),
    the live `emmc2bus` `ranges`/`dma-ranges`, and the base clock returned for mailbox clock id 12.
