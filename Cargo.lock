@@ -1673,6 +1673,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-pi5"
+version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
+]
+
+[[package]]
 name = "raven-ping"
 version = "0.1.0"
 dependencies = [
