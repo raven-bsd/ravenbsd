@@ -227,6 +227,9 @@ struct Extra {
 fn measure(tools: &Tools, options: &RunOptions) -> Result<Results> {
     let mut results = Results::new(toolchain(tools));
     let rules_file = rules::load(&options.root.join("tests/libc/size/rules.toml")).ok();
+    let optional = libc_size::optional::OptionalSymbols::load(
+        &options.root.join("tests/libc/size/optional-symbols.toml"),
+    )?;
     let mut extras: BTreeMap<String, Extra> = BTreeMap::new();
     let mut member_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut set_dirs: BTreeMap<(Arch, Set), PathBuf> = BTreeMap::new();
@@ -378,6 +381,7 @@ fn measure(tools: &Tools, options: &RunOptions) -> Result<Results> {
             *arch,
             set_dirs.get(&(*arch, Set::Tiny)).map(PathBuf::as_path),
             set_dirs.get(&(*arch, Set::Server)).map(PathBuf::as_path),
+            &optional,
         ));
         results.libc_so.push(libc_size::relocs::measure(
             tools,
@@ -768,6 +772,7 @@ fn compare_sets(
     arch: Arch,
     tiny: Option<&Path>,
     server: Option<&Path>,
+    optional: &libc_size::optional::OptionalSymbols,
 ) -> SetSymbolRow {
     let (Some(tiny), Some(server)) = (tiny, server) else {
         return SetSymbolRow {
@@ -799,12 +804,13 @@ fn compare_sets(
             let tiny_only: Vec<String> = tiny_public.difference(&server_public).cloned().collect();
             let server_only: Vec<String> =
                 server_public.difference(&tiny_public).cloned().collect();
+            let server_only = optional.filter_server_only(server_only);
             SetSymbolRow {
                 arch,
-                status: if tiny_only.is_empty() && server_only.is_empty() {
-                    "ok".to_string()
-                } else {
+                status: if libc_size::optional::set_symbols_fail(&tiny_only, &server_only) {
                     "fail".to_string()
+                } else {
+                    "ok".to_string()
                 },
                 tiny_only: tiny_only.into_iter().take(64).collect(),
                 server_only: server_only.into_iter().take(64).collect(),
