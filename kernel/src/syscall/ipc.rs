@@ -98,14 +98,18 @@ fn dup(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
 
 fn fstat(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
-    let file = ipc::file_from_handle(caller, handle, Rights::READ)?;
+    // PG-23: `FSTAT` is metadata, not data access. Any valid SchemeFile handle may ask; the
+    // server enforces the access its open-file description actually carries.
+    let file = ipc::file_from_handle(caller, handle, Rights::NONE)?;
     router::fstat(caller, &file, frame.rsi, frame.rdx)?;
     Ok(0)
 }
 
 fn call_scheme(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
-    let file = ipc::file_from_handle(caller, handle, Rights::READ)?;
+    // PG-23: a typed `CALL` is a server operation selected by the OFD; the handle right does not
+    // gate it. A non-SchemeFile handle is still `EBADF` in `file_from_handle`.
+    let file = ipc::file_from_handle(caller, handle, Rights::NONE)?;
     router::call(caller, &file, frame.rsi, frame.rdx, frame.r10, frame.r8)
 }
 
