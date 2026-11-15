@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B21: the Linux personality serves the process/thread syscall batch. /hello checks gettid,
+# set_tid_address, set_robust_list, prctl and arch_prctl, records the documented -EINVAL/-ENOSYS
+# answers of clone and the -ECHILD of wait4, then execve("/exec") replaces its image. The target
+# proves the new argv/envp and exits 7.
+
+name = "linux-clone"
+arch = "x86_64"
+profile = "linux-hello"
+timeout_secs = 180
+pre = ["sh tests/fixtures/linuxd/build-clone.sh"]
+initfs = "build/fixtures/linuxd-clone/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^linux-clone: start$'
+
+[[expect]]
+regex = '^linux-clone: gettid tid=[0-9]+$'
+
+[[expect]]
+regex = '^linux-clone: set_tid_address=[0-9]+ same=1$'
+
+[[expect]]
+regex = '^linux-clone: set_robust_list ok=1$'
+
+[[expect]]
+regex = '^linux-clone: prctl name=clone-fixture ok=1$'
+
+[[expect]]
+regex = '^linux-clone: arch_prctl fs=[0-9]+ ok=1$'
+
+[[expect]]
+regex = '^linux-clone: clone bad-flags errno=22$'
+
+[[expect]]
+regex = '^linux-clone: clone fork-like errno=38$'
+
+[[expect]]
+regex = '^linux-clone: clone thread errno=38$'
+
+[[expect]]
+regex = '^linux-clone: clone misaligned errno=22$'
+
+[[expect]]
+regex = '^linux-clone: wait4 child errno=10$'
+
+[[expect]]
+regex = '^linux-clone: wait4 wnochang errno=10$'
+
+[[expect]]
+regex = '^linux-clone: exec start$'
+
+[[expect]]
+regex = '^linuxd: exec path=/exec pid=1 tid=[0-9]+$'
+
+[[expect]]
+regex = '^linux-exec: target ok pid=1 tid=[0-9]+ argv1=arg-one env=CLONE_TEST=1$'
+
+[[expect]]
+regex = '^linuxd: hello exit=7$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|linux-clone: FAIL|linux-exec: FAIL'
+
+[[forbid]]
+regex = 'linuxd: unimplemented nr=(56|59|61|157|158|186|218|231|273) '
