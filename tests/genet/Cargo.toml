@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-genet-stress"
+version = "0.1.0"
+description = "Deterministic host stress and fault-injection harness for the GENET ring model."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raven-fdt-lite = { path = "../../crates/raven-fdt-lite" }
+raven-genet = { path = "../../crates/raven-genet" }
+
+[lints]
+workspace = true

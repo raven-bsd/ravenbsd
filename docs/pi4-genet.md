@@ -136,7 +136,8 @@ program RGMII, plan rings) and rejects an out-of-order transition. `PlatformSeam
 `raven_driver::MmioRegion` and a `DmaRegion` split into 256 RX + 256 TX 2 KiB slots; it validates
 alignment, bounds and overlap and exposes the device-visible slot addresses. The real
 `devd`/profile wiring, IRQ delivery and the B39 frame pump are the board integration step; the
-evidence kit and 12-step checklist are in `docs/pi4-genet-board.md`.
+evidence kit and 12-step checklist are in `docs/pi4-genet-board.md`; the ring/fault stress matrix
+is in `docs/pi4-genet-stress.md`.
 `FrameBackend` adds the host-tested frame path:
 
 * `RxPath`/`TxPath` keep an owner (`Free`, `Driver`, `Device`) for each of the 256 slots, validate
