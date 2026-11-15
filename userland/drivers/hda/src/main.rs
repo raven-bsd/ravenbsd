@@ -188,6 +188,7 @@ mod program {
         result.map_err(access_string)
     }
 
+    #[derive(Default)]
     struct Node {
         sub_count: u8,
         sub_start: u8,
@@ -195,19 +196,6 @@ mod program {
         config_default: u32,
         connections: Vec<u8>,
         connection_default: u8,
-    }
-
-    impl Default for Node {
-        fn default() -> Self {
-            Self {
-                sub_count: 0,
-                sub_start: 0,
-                capabilities: 0,
-                config_default: 0,
-                connections: Vec::new(),
-                connection_default: 0,
-            }
-        }
     }
 
     struct HdaController {
@@ -361,10 +349,8 @@ mod program {
                     let node = self.read_node(widget)?;
                     match widget_type(node.capabilities) {
                         WIDGET_AUDIO_OUTPUT => outputs.push(widget),
-                        WIDGET_PIN_COMPLEX => {
-                            if config_is_output(node.config_default) {
-                                pins.push(widget);
-                            }
+                        WIDGET_PIN_COMPLEX if config_is_output(node.config_default) => {
+                            pins.push(widget);
                         }
                         _ => {}
                     }
@@ -398,7 +384,7 @@ mod program {
             }
             self.send_verb(self.pin, 0x707, 0xc0)?;
             self.send_verb(self.pin, 0x70c, 2)?;
-            self.send_verb(self.dac, 0x706, (STREAM_TAG << 4) & 0xff)?;
+            self.send_verb(self.dac, 0x706, STREAM_TAG << 4)?;
             self.send_cmd4(self.dac, 0x2, format_48k(2))?;
             for node in &path {
                 let capabilities = self.send_verb(*node, 0xf00, 0x09)?;
