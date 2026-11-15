@@ -1,0 +1,90 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 15, 2026
+.Dt MAN 1
+.Os RavenBSD
+.Sh NAME
+.Nm man
+.Nd display RavenBSD manual pages
+.Sh SYNOPSIS
+.Nm
+.Op Fl hV
+.Op Fl -color Ns = Ns Ar auto|always|never
+.Op Ar section
+.Ar name
+.Sh DESCRIPTION
+.Nm
+locates an mdoc page under
+.Pa /usr/share/man
+and renders it with the built-in first-party renderer.
+The optional
+.Ar section
+selects one manual section; without it,
+.Nm
+searches sections 1, 2, 4 and 8 in that order.
+No index is required.
+.Pp
+Colour is used only for a terminal and is never written to a pipe, to JSON-like machine output
+or when
+.Ev NO_COLOR
+or
+.Ev TERM=dumb
+is set.
+An explicit
+.Fl -color=always
+forces colour for human output.
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl h , Fl -help
+Print the usage line and exit 0.
+.It Fl V , Fl -version
+Print the version and exit 0.
+.It Fl -color Ns = Ns Ar policy
+Select
+.Ar auto ,
+.Ar always
+or
+.Ar never .
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width Ds
+.It Ev MANPATH
+Colon-separated directories added after the default root.
+.It Ev MANWIDTH
+Wrapping width; values below 20 or above 300 are ignored.
+.It Ev COLUMNS
+Fallback wrapping width when
+.Ev MANWIDTH
+is absent.
+.It Ev MANPAGER , Ev PAGER
+Pager command; the rendered page is passed as a file argument.
+The built-in renderer is used when neither is set.
+.It Ev NO_COLOR
+Disable automatic colour.
+.It Ev TERM
+A terminal name; the literal
+.Dq dumb
+disables automatic colour.
+.It Ev COLORTERM
+The value
+.Dq truecolor
+selects 24-bit output.
+.El
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa /usr/share/man
+Default manual root.
+.It Pa /etc/man.conf
+Additional manual roots, one per line.
+.It Pa /tmp/man.page
+Temporary rendered page used for an external pager.
+.El
+.Sh EXIT STATUS
+.Ex -std
+A missing page exits 1; a usage error exits 2.
+.Sh SEE ALSO
+.Xr raven 1 ,
+.Xr ls 1 ,
+.Xr init 8
+.Sh STANDARDS
+RavenBSD.
