@@ -13,7 +13,9 @@
 //! * [`control`] - the UAC1 class requests for mute and volume on a feature unit;
 //! * [`stream`] - PCM format, the isochronous packet cadence, the asynchronous feedback value and
 //!   the packet schedule;
-//! * [`host`] - the device model over the R4 xHCI transfer/event rings.
+//! * [`pcm`] - the frame-aligned PCM source seam, implemented for the audiod ring consumer;
+//! * [`host`] - the device model over the R4 xHCI transfer/event rings, including the xHCI
+//!   Setup/Data/Status control-transfer sequence and the UAC1 class requests.
 //!
 //! **No hardware claim.** The descriptor and class-request shapes are the public USB 2.0 and USB
 //! Audio Class 1.0 definitions; the device values, the real feedback behaviour and every board
@@ -27,6 +29,7 @@
 
 pub mod control;
 pub mod host;
+pub mod pcm;
 pub mod stream;
 pub mod uac1;
 pub mod usb;
@@ -38,7 +41,8 @@ pub use control::{
     FEATURE_MUTE, FEATURE_VOLUME, FeatureUnitState, GET_CUR, GET_MAX, GET_MIN, GET_RES, Response,
     SET_CUR, SET_MAX, SET_MIN, SET_RES, VolumeLimits,
 };
-pub use host::{AudioHost, Completion, HostError};
+pub use host::{AudioHost, Completion, ControlCompletion, HostError, MAX_PACKET_BYTES};
+pub use pcm::{PcmSource, SliceSource};
 pub use stream::{
     FULL_SPEED_FRAMES, Feedback, HIGH_SPEED_MICROFRAMES, IsoStream, MAX_CHANNELS, MAX_RATE,
     MIN_RATE, Packet, PcmFormat, Schedule, StreamError,
