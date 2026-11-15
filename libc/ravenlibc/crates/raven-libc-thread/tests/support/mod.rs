@@ -420,6 +420,13 @@ struct KernelState {
     next_tid: i32,
 }
 
+fn real_finished(state: &KernelState, id: u64) -> bool {
+    state
+        .real_threads
+        .get(&id)
+        .is_none_or(|handle| handle.is_finished())
+}
+
 struct Inner {
     caps: KernelCaps,
     sched: Sched,
@@ -574,7 +581,7 @@ impl ThreadKernel for HostKernel {
         let arg = args.arg;
         let tp = args.tp;
         let real = thread::Builder::new()
-            .stack_size(256 * 1024)
+            .stack_size(1024 * 1024)
             .spawn(move || {
                 let id = child.inner.sched.register();
                 child.inner.sched.set_runnable(id, false);
@@ -773,7 +780,10 @@ impl ThreadKernel for HostKernel {
                 .get(&raven_libc_tls::tcb::tp_to_pthread(self.thread_pointer()))
                 .copied();
             let owner_tcb = state.tcb_by_id.get(&owner).copied().unwrap_or(0);
-            if Some(owner) != me && !state.dead.contains(&owner_tcb) {
+            let owner_dead = state.dead.contains(&owner_tcb);
+            // A fake-dead TCB is not enough: the real host thread may still be unwinding. Never
+            // free a region it can still touch; this is the same race as the sched_cond SIGSEGV.
+            if Some(owner) != me && !(owner_dead && real_finished(&state, owner)) {
                 state.violations.push(format!(
                     "A-thr-3: stack {addr:#x} unmapped while thread {owner} is alive"
                 ));
@@ -839,14 +849,10 @@ impl ThreadKernel for HostKernel {
         // The simulated exit marks the TCB dead before the real host thread has finished
         // unwinding. Freeing its fake stack/TLS at that point is a use-after-free; wait for the
         // actual JoinHandle instead. This is the load-sensitive sched_cond SIGSEGV.
-        match state
+        state
             .id_by_tcb
             .get(&tcb)
-            .and_then(|id| state.real_threads.get(id))
-        {
-            Some(handle) => handle.is_finished(),
-            None => true,
-        }
+            .is_none_or(|id| real_finished(&state, *id))
     }
 
     fn fork_process(&self) -> Result<i32, Errno> {
