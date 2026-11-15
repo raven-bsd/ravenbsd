@@ -1,0 +1,47 @@
+." SPDX-License-Identifier: BSD-3-Clause
+." Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt SETLOCALE 3
+.Os RavenBSD
+.Sh NAME
+.Nm setlocale
+.Nm newlocale
+.Nm uselocale
+.Nm duplocale
+.Nm nl_langinfo
+.Nm localeconv
+.Nd set or query the program locale
+.Sh SYNOPSIS
+.In locale.h
+.Ft char *
+.Fn setlocale "int category" "const char *locale"
+.Ft locale_t
+.Fn newlocale "int mask" "const char *name" "locale_t base"
+.Ft locale_t
+.Fn uselocale "locale_t locale"
+.Ft locale_t
+.Fn duplocale "locale_t locale"
+.Ft char *
+.Fn nl_langinfo "nl_item item"
+.Ft struct lconv *
+.Fn localeconv void
+.Sh DESCRIPTION
+The locale family selects the character and formatting conventions used by the C library.
+RavenBSD keeps one process-wide C locale and a per-thread locale object; the default is the C
+locale.
+.Sh RETURN VALUES
+.Fn setlocale returns the selected name or a null pointer on failure. The locale constructors
+return a new object or a null pointer. .Fn nl_langinfo returns a pointer to a static string.
+.Fn localeconv returns a pointer to the current formatting table.
+.Sh ERRORS
+.Er EINVAL is returned for an unknown category. The constructors return a null pointer and set
+.Er ENOMEM when the object cannot be allocated.
+.Sh STANDARDS
+ISO C23 and POSIX.1-2024; ring 0. The personality is the C/BSD set.
+.Sh CAVEATS
+Only the C, POSIX and C.UTF-8 locale names, and names ending in .UTF-8 or .utf8, select a
+UTF-8 locale. Any other name is accepted and maps to C.UTF-8. MB_CUR_MAX is 1 in C and 4 in UTF-8.
+See H-3 and C48.
+.Sh SEE ALSO
+.Xr setlocale 3
+.Xr locale 7

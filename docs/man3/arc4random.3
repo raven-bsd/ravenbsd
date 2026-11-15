@@ -1,0 +1,41 @@
+." SPDX-License-Identifier: BSD-3-Clause
+." Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt ARC4RANDOM 3
+.Os RavenBSD
+.Sh NAME
+.Nm arc4random
+.Nm arc4random_buf
+.Nm arc4random_uniform
+.Nm getentropy
+.Nm getrandom
+.Nd random data
+.Sh SYNOPSIS
+.In stdlib.h
+.Ft uint32_t
+.Fn arc4random void
+.Ft void
+.Fn arc4random_buf "void *buffer" "size_t length"
+.Ft uint32_t
+.Fn arc4random_uniform "uint32_t bound"
+.Ft int
+.Fn getentropy "void *buffer" "size_t length"
+.Ft ssize_t
+.Fn getrandom "void *buffer" "size_t length" "unsigned int flags"
+.Sh DESCRIPTION
+These functions return random bytes from the system random source. The arc4random family
+never fails; getentropy and getrandom report errors.
+.Sh RETURN VALUES
+.Fn arc4random returns a 32-bit value. .Fn arc4random_uniform returns a value below the bound.
+.Fn getentropy returns 0. .Fn getrandom returns the byte count.
+.Sh ERRORS
+.Fn getentropy fails with .Er EIO when the source is unavailable. .Fn getrandom returns -1
+with .Er EAGAIN or .Er EINVAL.
+.Sh STANDARDS
+BSD and Linux interfaces; ring 1 and ring 2.
+.Sh CAVEATS
+The functions are seeded from the rand: scheme or GETRANDOM. The ENTROPY_WEAK interim is a
+release blocker, not a libc-gate blocker; see H-5 and C50.
+.Sh SEE ALSO
+.Xr getrandom 3
+.Xr libc 7

@@ -1,11 +1,14 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# Pi 4 EMMC2 SD preparation (J1)
+# Pi 4 EMMC2 SD path (J1/J2)
 
-Status: model and driver skeleton. Every host test below is OBSERVED on the development host; every
-real-card result is UNVERIFIED because no Pi 4 board log exists. The model is clean-room Rust: the
-donor files were read for behaviour only and no code, comment or table layout was copied.
+Status: model and driver skeleton. J1 covers the register, command/response, initialisation and
+timing model; J2 adds the SDMA/ADMA2 descriptor model, bounce-window rules, the multi-block
+transfer state and the `block:` request service. Every host test below is OBSERVED on the
+development host; every real-card result is UNVERIFIED because no Pi 4 board log exists. The model
+is clean-room Rust: the donor files were read for behaviour only and no code, comment or table
+layout was copied.
 
 ## 1. What exists
 
@@ -16,14 +19,17 @@ donor files were read for behaviour only and no code, comment or table layout wa
 | Response, card status, CID and CSD parsing | `crates/raven-pi4/src/response.rs` | OBSERVED by host tests |
 | SD card initialisation state machine | `crates/raven-pi4/src/init.rs` | OBSERVED by host tests |
 | 1-bit/4-bit, 400 kHz/25 MHz/50 MHz plans and typed transitions | `crates/raven-pi4/src/timing.rs` | OBSERVED by host tests |
+| SDMA/ADMA2 descriptors, END/VALID checks and the 4 GiB limit | `crates/raven-pi4/src/dma.rs` | OBSERVED by host tests |
+| Transfer state, block progress and error mapping | `crates/raven-pi4/src/transfer.rs` | OBSERVED by host tests |
 | EMMC2 device-tree lookup (base, SPI, DMA window) | `crates/raven-pi4/src/fdt.rs` | OBSERVED against the fixture |
-| Driver skeleton and board seam | `userland/drivers/emmc2/src/lib.rs` | OBSERVED by host tests |
+| Driver register/clock seam | `userland/drivers/emmc2/src/lib.rs` | OBSERVED by host tests |
+| `block:` request mapping and memory backend | `userland/drivers/emmc2/src/block.rs` | OBSERVED by host tests |
 | Minimal DTB fixtures (hex text plus `.dts`) | `tests/fixtures/pi4-emmc2/` | OBSERVED; facts documented in its README |
 
 The crate is `no_std`, allocation-free and `#![forbid(unsafe_code)]`. It never touches a register:
 the driver skeleton performs the register sequence through the `Host` trait, and the tests use a
-register fake. The real MMIO grant, DMA path, interrupt and `block:` scheme are the board
-integration step.
+register fake or the in-memory block backend. The real MMIO grant, DMA engine, interrupt and
+scheme entry are the board integration step.
 
 ## 2. EMMC2 facts used
 
@@ -37,6 +43,7 @@ integration step.
 | Speeds | 400 kHz identification, 25 MHz default, 50 MHz high speed | OBSERVED B42/NetBSD; UNVERIFIED on silicon |
 | Clock source | mailbox clock id 12; 50 MHz fallback | OBSERVED B42; UNVERIFIED on silicon |
 | DMA window | bus `0xC000_0000` -> CPU `0x0`, 1 GiB, firmware-edited | OBSERVED fixture; live value must come from the DTB |
+| DMA engines | SDMA (32-bit address) and ADMA2; 32/64-bit descriptors selected by capabilities | OBSERVED B42/NetBSD; widths and capability bits UNVERIFIED on silicon |
 | Quirks | capabilities register not trusted, no power 0, no high-speed host bit, 32-bit access | OBSERVED B42/NetBSD flags; UNVERIFIED on silicon |
 
 The driver must read the live device tree: the fixture values are facts for the host tests, not a
@@ -64,6 +71,17 @@ which is where a bounce buffer is required.
   25 MHz and 50 MHz plans from a 50 MHz base; typed identification -> default -> high-speed
   transitions and 4-bit-only-after-identification. The EMMC2 high-speed quirk suppresses the
   standard host-control bit.
+* **DMA:** 32-bit and 64-bit ADMA2 descriptor encode/decode, VALID/END/INT/ACT validation, the
+  zero-means-65536 length convention, 4-byte alignment, exactly one END bit on the last descriptor,
+  the 4 GiB descriptor limit, 16-descriptor tables and the SDMA 32-bit address. Buffers and the
+  descriptor table are mapped through the `dma-ranges` window; anything outside it returns a typed
+  `BounceRequired` reason instead of a truncated address.
+* **Transfers:** CMD17/18/24/25 selection from direction and block count, validated block size and
+  32-bit LBA, command and data phases, PIO block progress, DMA completion, block-count mismatch,
+  sticky failure and the command/data/ADMA/DMA error interrupt mapping.
+* **Block service:** `raven-proto-block` `INFO`/`READ`/`WRITE`/`FLUSH` decoding, 512-byte-sector and
+  range validation, read-only rejection, in-place read replies, `LIST` rejection (blockd owns the
+  partition table), backend errno propagation and a host-testable memory backend.
 * **Device tree:** the fixture parser rejects a missing node, a missing `reg`, a non-SPI or
   non-level-high interrupt and a missing DMA window.
 
@@ -85,9 +103,24 @@ programs the 25 MHz default clock and four-bit host control. The fake host exerc
 sequence, the busy ACMD41 retry, the v1 fallback, a card error, a missing APP_CMD, a command
 timeout, a stuck reset and a clock that never stabilises.
 
+The `block` module is the protocol seam:
+
+```text
+BlockService<D: BlockDevice>::handle(request, response)
+    -> raven-proto-block Request decode and range checks
+    -> BlockPlan (MultiBlockTransfer + CMD17/18/24/25 + DataTransfer)
+    -> D: BlockDevice::read/write/flush  (MemoryDisk in the host tests)
+```
+
+`MemoryDisk` is a borrowed byte slice, so the tests need no allocator. The card backend that drives
+the PIO loop or the SDMA/ADMA2 descriptor table implements the same `BlockDevice` trait; the DMA
+plan (`plan_sdma`, `plan_adma2`) is ready for that backend but the register writes, interrupt wait
+and scheme entry remain the integration step.
+
 The following are deliberately **not** in this skeleton and belong to the integration ticket:
 the `raven_driver` MMIO adapter and the `devd` service entry, the `platd` clock query wiring, the
-interrupt path, PIO/SDMA/ADMA2 data transfer, the CMD6 high-speed switch and the `block:` export.
+interrupt path, the PIO/SDMA/ADMA2 register engine, the CMD6 high-speed switch and the `disk:`
+scheme export.
 
 ## 5. Tests
 
@@ -98,9 +131,12 @@ make check-fast
 ```
 
 The crate tests cover command/response parsing, the timeout and error paths, 4-bit versus 1-bit
-setup, the clock divider table for both specification generations, and the DTB fixture. The driver
-tests cover probe, bring-up, the full card sequence and its failure paths against the register fake.
-No QEMU model exists for EMMC2, so there is no qtest; the board log is the only remaining gate.
+setup, the clock divider table for both specification generations, the DTB fixture, the ADMA2/SDMA
+descriptor encoding and validation, bounce-window boundaries and the transfer state/error paths.
+The driver tests cover probe, bring-up, the full card sequence and its failure paths against the
+register fake, the `block:` request matrix against the memory backend and command selection
+(CMD17/18/24/25). No QEMU model exists for EMMC2, so there is no qtest; the board log is the only
+remaining gate.
 
 ## 6. Board steps (UNVERIFIED)
 
@@ -108,15 +144,19 @@ Capture the UART line and the register values for each step. None of these has b
 run was performed for this ticket.
 
 1. **Controller identity:** host-controller version, capabilities (`0x40`), capabilities 2 (`0x44`),
-   the live `emmc2bus` `ranges`/`dma-ranges`, and the base clock returned for mailbox clock id 12.
+   the live `emmc2bus` `ranges`/`dma-ranges`, the base clock returned for mailbox clock id 12, and
+   whether ADMA2 is 32-bit or 64-bit.
 2. **Card initialisation:** CMD0/CMD8 response, ACMD41 OCR and CCS, CID/CSD summary, RCA, SCR
    (four-bit supported), CMD6 high-speed result, final clock and bus width.
-3. **Data:** single-block read (CMD17), multi-block read (CMD18), single write (CMD24), multi write
-   (CMD25), readback compare; mount the root filesystem and create/read/delete a file.
-4. **DMA:** SDMA/ADMA2 register values and the buffer bus addresses; confirm they are below 1 GiB
-   or that the bounce path was used.
-5. **Card details:** model and capacity, 1-bit versus 4-bit, 25 versus 50 MHz, and the CRC/timeout
-   counters after the run.
+3. **Transfer log:** CMD17/18 read and CMD24/25 write, block size/count, transfer-complete and
+   command-complete bits, block count and the CRC/timeout counters after the run.
+4. **SDMA:** `DMA_ADDR`, transfer-mode DMA-enable, the buffer bus address and the 1 GiB limit.
+   **ADMA2:** `ADMA_SYSTEM_ADDR`, the descriptor-table bus address and alignment, VALID/END/ACT
+   words, every data descriptor address below 1 GiB, and whether a bounce buffer was used.
+5. **blockd:** the driver's `disk:0` `INFO` geometry, a `READ`/`WRITE`/`FLUSH` round trip through
+   blockd, the GPT scan, a root mount, and create/read/delete of a file.
+6. **Card details:** model and capacity, 1-bit versus 4-bit, 25 versus 50 MHz, and the error/
+   timeout counters after the run.
 
 The first failing step is the evidence to attach; do not claim a later step from a partial log.
 
@@ -144,9 +184,15 @@ names the source and revision of every numeric fact.
 1. The EMMC2 capabilities register contents and the specification generation are UNVERIFIED. The
    driver records both and defaults to 50 MHz when the mailbox is silent.
 2. The live firmware edits `dma-ranges` per SoC revision; the fixture documents one 1 GiB window.
-   No bounce path exists yet because the skeleton has no data path.
+   The model returns `BounceRequired` outside it, but the physical bounce allocator and copy path
+   belong to the integration data engine.
 3. The high-speed CMD6 switch is modelled as data and a typed transition but not executed by the
    driver skeleton; the 50 MHz step remains an integration test.
 4. The command poll uses `now_ns`; a real adapter must implement it from the monotonic clock or a
    timeout becomes an infinite loop.
-5. No interrupt, DMA or `block:` code exists yet, so this ticket alone cannot boot from the card.
+5. ADMA2 32-bit versus 64-bit and the descriptor-table alignment are UNVERIFIED until the live
+   capabilities and the board log confirm them. The table's cache maintenance is S21d's job.
+6. The transfer layer uses 32-bit block addresses (SDHC/SDXC). A v1 SDSC card reached through the
+   CMD8 fallback would need byte addressing in CMD17/18/24/25; that path is not modelled.
+7. No interrupt, MMIO adapter, DMA engine or `disk:` scheme entry exists yet, so this ticket alone
+   cannot boot from the card.

@@ -10,20 +10,20 @@ use raven_genet::phy::PhyMode;
 const REG_WORDS: usize = 0x900 / 4;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct FakeSeam {
+pub(crate) struct FakeSeam {
     registers: [u32; REG_WORDS],
     fail_reads: bool,
 }
 
 impl FakeSeam {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             registers: [0; REG_WORDS],
             fail_reads: false,
         }
     }
 
-    fn info() -> GenetInfo {
+    pub(crate) fn info() -> GenetInfo {
         GenetInfo {
             base: 0xfd58_0000,
             size: 0x1_0000,
@@ -38,11 +38,11 @@ impl FakeSeam {
         }
     }
 
-    fn register(&self, offset: usize) -> u32 {
+    pub(crate) fn register(&self, offset: usize) -> u32 {
         self.registers[offset / 4]
     }
 
-    fn set_register(&mut self, offset: usize, value: u32) {
+    pub(crate) fn set_register(&mut self, offset: usize, value: u32) {
         self.registers[offset / 4] = value;
     }
 }
@@ -97,8 +97,22 @@ impl Seam for FakeSeam {
     }
 }
 
-fn controller() -> Controller<FakeSeam> {
+pub(crate) fn controller() -> Controller<FakeSeam> {
     Controller::attach(FakeSeam::new(), FakeSeam::info()).expect("attach")
+}
+
+pub(crate) fn ready_controller() -> Controller<FakeSeam> {
+    let mut controller = controller();
+    controller
+        .seam
+        .set_register(regs::SYS_REV_CTRL, 6 << regs::SYS_REV_MAJOR_SHIFT);
+    controller.probe().expect("probe");
+    controller
+        .program_mac(MacAddress::new([0xd8, 0x3a, 0xdd, 0x12, 0x34, 0x56]))
+        .expect("mac");
+    controller.program_rgmii(true).expect("rgmii");
+    controller.ready().expect("ready");
+    controller
 }
 
 #[test]

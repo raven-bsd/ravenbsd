@@ -4,7 +4,7 @@
 [package]
 name = "raven-genet"
 version = "0.1.0"
-description = "Host-testable GENET v5 Ethernet model: registers, descriptor rings, MDIO/PHY and the Pi 4 device-tree path."
+description = "Host-testable GENET v5 Ethernet model: registers, descriptor/frame rings, DMA bounce rules, MDIO/PHY, link state and the Pi 4 device-tree path."
 edition.workspace = true
 license.workspace = true
 authors.workspace = true

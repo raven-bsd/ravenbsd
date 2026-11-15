@@ -39,6 +39,44 @@ RP1_SERIAL_REG = [0xC0, 0x4003_0000, 0x0, 0x100]
 RP1_MAILBOX_REG = [0xC0, 0x4000_8000, 0x0, 0x4000]
 RP1_CLOCKS_REG = [0xC0, 0x4001_8000, 0x0, 0x1_0038]
 RP1_ETHERNET_REG = [0xC0, 0x4010_0000, 0x0, 0x4000]
+RP1_GPIO_BANKS = [
+    0xC0, 0x400D_0000, 0x0, 0xC000,
+    0xC0, 0x400E_0000, 0x0, 0xC000,
+    0xC0, 0x400F_0000, 0x0, 0xC000,
+]
+RP1_GPIO_INTERRUPTS = [0x0, 0x4, 0x1, 0x4, 0x2, 0x4]
+RP1_GPIO_PINS = 0x36
+RP1_GPIO_LINE_NAMES = [
+    "ID_SDA", "ID_SCL", "GPIO2", "GPIO3", "GPIO4", "GPIO5", "GPIO6", "GPIO7",
+    "GPIO8", "GPIO9", "GPIO10", "GPIO11", "GPIO12", "GPIO13", "GPIO14", "GPIO15",
+    "GPIO16", "GPIO17", "GPIO18", "GPIO19", "GPIO20", "GPIO21", "GPIO22", "GPIO23",
+    "GPIO24", "GPIO25", "GPIO26", "GPIO27", "PCIE_RP1_WAKE", "FAN_TACH",
+    "HOST_SDA", "HOST_SCL", "ETH_RST_N", "-", "CD0_IO0_MICCLK",
+    "CD0_IO0_MICDAT0", "RP1_PCIE_CLKREQ_N", "-", "CD0_SDA", "CD0_SCL", "CD1_SDA",
+    "CD1_SCL", "USB_VBUS_EN", "USB_OC_N", "RP1_STAT_LED", "FAN_PWM",
+    "CD1_IO0_MICCLK", "2712_WAKE", "CD1_IO1_MICDAT1", "EN_MAX_USB_CUR", "-", "-",
+    "-", "-",
+]
+RP1_ASSIGNED_CLOCKS = [
+    0x2, 0x0, 0x2, 0x1, 0x2, 0x3, 0x2, 0x9, 0x2, 0x10, 0x2, 0x4, 0x2, 0xA,
+    0x2, 0xC, 0x2, 0x6, 0x2, 0xD, 0x2, 0x1F, 0x2, 0x20, 0x2, 0x1D,
+]
+RP1_ASSIGNED_RATES = [
+    0x3B9A_CA00, 0x5B8D_8000, 0x0BEB_C200, 0x0773_5940, 0x0773_5940, 0x03A9_8000,
+    0x0927_C000, 0x0BEB_C200, 0x05F5_E100, 0x02FA_F080, 0x000F_4240, 0x0BEB_C200,
+    0x02FA_F080,
+]
+RP1_PIO_REG = [0xC0, 0x4017_8000, 0x0, 0x20]
+RP1_USB0_REG = [0xC0, 0x4020_0000, 0x0, 0x10_0000]
+RP1_USB1_REG = [0xC0, 0x4030_0000, 0x0, 0x10_0000]
+RP1_SRAM_REG = [0xC0, 0x4040_0000, 0x0, 0x1_0000]
+RP1_SRAM_RANGES = [0x0, 0xC0, 0x4040_0000, 0x1_0000]
+RP1_SHMEM_REG = [0xFF00, 0x100]
+RP1_GPIO_PHANDLE = 0x30
+RP1_CLOCKS_PHANDLE = 0x2
+RP1_MAILBOX_PHANDLE = 0x5B
+RP1_SHMEM_PHANDLE = 0x5C
+RP1_FIRMWARE_PHANDLE = 0x41
 
 
 class Node:
@@ -209,7 +247,183 @@ def soc_node(uart_status: str, include_gic: bool) -> Node:
     )
 
 
-def rp1_node(uart_status: str) -> Node:
+def rp1_gpio_node(pins: int = RP1_GPIO_PINS) -> Node:
+    return Node(
+        "gpio@d0000",
+        [
+            text_list("compatible", ["raspberrypi,rp1-gpio"]),
+            cells("reg", RP1_GPIO_BANKS),
+            cells("interrupts", RP1_GPIO_INTERRUPTS),
+            flag("gpio-controller"),
+            cells("#gpio-cells", [0x2]),
+            flag("interrupt-controller"),
+            cells("#interrupt-cells", [0x2]),
+            cells("gpio-ranges", [RP1_GPIO_PHANDLE, 0x0, 0x0, pins]),
+            text_list("gpio-line-names", RP1_GPIO_LINE_NAMES),
+            text("status", "okay"),
+            cells("phandle", [RP1_GPIO_PHANDLE]),
+        ],
+        [
+            Node(
+                "rp1_uart0_14_15",
+                [],
+                [
+                    Node(
+                        "pin_txd",
+                        [
+                            text("function", "uart0"),
+                            text_list("pins", ["gpio14"]),
+                            flag("bias-disable"),
+                        ],
+                    ),
+                    Node(
+                        "pin_rxd",
+                        [
+                            text("function", "uart0"),
+                            text_list("pins", ["gpio15"]),
+                            flag("bias-pull-up"),
+                        ],
+                    ),
+                ],
+            ),
+            Node(
+                "rp1_uart0_ctsrts_16_17",
+                [],
+                [
+                    Node(
+                        "pin_cts",
+                        [
+                            text("function", "uart0"),
+                            text_list("pins", ["gpio16"]),
+                            flag("bias-pull-up"),
+                        ],
+                    ),
+                    Node(
+                        "pin_rts",
+                        [
+                            text("function", "uart0"),
+                            text_list("pins", ["gpio17"]),
+                            flag("bias-disable"),
+                        ],
+                    ),
+                ],
+            ),
+            Node(
+                "rp1_i2c0_0_1",
+                [],
+                [
+                    Node(
+                        "pin_sda",
+                        [
+                            text("function", "i2c0"),
+                            text_list("pins", ["gpio0"]),
+                            flag("bias-pull-up"),
+                        ],
+                    ),
+                    Node(
+                        "pin_scl",
+                        [
+                            text("function", "i2c0"),
+                            text_list("pins", ["gpio1"]),
+                            flag("bias-pull-up"),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def rp1_node(
+    uart_status: str,
+    mfd: bool = False,
+    mfd_pins: int = RP1_GPIO_PINS,
+    mfd_rates=None,
+) -> Node:
+    mfd_rates = mfd_rates or RP1_ASSIGNED_RATES
+    mailbox_props = [
+        text_list("compatible", ["raspberrypi,rp1-mbox"]),
+        cells("reg", RP1_MAILBOX_REG),
+        text("status", "okay"),
+    ]
+    clocks_props = [
+        text_list("compatible", ["raspberrypi,rp1-clocks"]),
+        cells("reg", RP1_CLOCKS_REG),
+    ]
+    children = [
+        Node(
+            "serial@30000",
+            [
+                text_list("compatible", ["arm,pl011-axi", "arm,pl011"]),
+                cells("reg", RP1_SERIAL_REG),
+                text("status", uart_status),
+            ],
+        ),
+        Node("mailbox@8000", mailbox_props),
+        Node("clocks@18000", clocks_props),
+        Node(
+            "ethernet@100000",
+            [
+                text_list("compatible", ["raspberrypi,rp1-gem"]),
+                cells("reg", RP1_ETHERNET_REG),
+                text("status", "okay"),
+            ],
+        ),
+    ]
+    if mfd:
+        mailbox_props.append(cells("phandle", [RP1_MAILBOX_PHANDLE]))
+        clocks_props.append(cells("#clock-cells", [0x1]))
+        clocks_props.append(cells("phandle", [RP1_CLOCKS_PHANDLE]))
+        clocks_props.append(cells("assigned-clocks", RP1_ASSIGNED_CLOCKS))
+        clocks_props.append(cells("assigned-clock-rates", mfd_rates))
+        children.extend(
+            [
+                rp1_gpio_node(mfd_pins),
+                Node(
+                    "pio@178000",
+                    [
+                        text_list("compatible", ["raspberrypi,rp1-pio"]),
+                        cells("reg", RP1_PIO_REG),
+                        text("status", "okay"),
+                    ],
+                ),
+                Node(
+                    "usb@200000",
+                    [
+                        text_list("compatible", ["brcm,bcm2835-usb"]),
+                        cells("reg", RP1_USB0_REG),
+                        text("status", "disabled"),
+                    ],
+                ),
+                Node(
+                    "usb@300000",
+                    [
+                        text_list("compatible", ["brcm,bcm2835-usb"]),
+                        cells("reg", RP1_USB1_REG),
+                        text("status", "disabled"),
+                    ],
+                ),
+                Node(
+                    "sram@400000",
+                    [
+                        cells("reg", RP1_SRAM_REG),
+                        cells("#address-cells", [0x1]),
+                        cells("#size-cells", [0x1]),
+                        cells("ranges", RP1_SRAM_RANGES),
+                    ],
+                    [
+                        Node(
+                            "shmem@ff00",
+                            [
+                                text_list("compatible", ["raspberrypi,rp1-shmem"]),
+                                cells("reg", RP1_SHMEM_REG),
+                                cells("phandle", [RP1_SHMEM_PHANDLE]),
+                            ],
+                        )
+                    ],
+                ),
+            ]
+        )
     return Node(
         "rp1",
         [
@@ -218,39 +432,7 @@ def rp1_node(uart_status: str) -> Node:
             cells("#size-cells", [0x2]),
             cells("ranges", RP1_RANGES),
         ],
-        [
-            Node(
-                "serial@30000",
-                [
-                    text_list("compatible", ["arm,pl011-axi", "arm,pl011"]),
-                    cells("reg", RP1_SERIAL_REG),
-                    text("status", uart_status),
-                ],
-            ),
-            Node(
-                "mailbox@8000",
-                [
-                    text_list("compatible", ["raspberrypi,rp1-mbox"]),
-                    cells("reg", RP1_MAILBOX_REG),
-                    text("status", "okay"),
-                ],
-            ),
-            Node(
-                "clocks@18000",
-                [
-                    text_list("compatible", ["raspberrypi,rp1-clocks"]),
-                    cells("reg", RP1_CLOCKS_REG),
-                ],
-            ),
-            Node(
-                "ethernet@100000",
-                [
-                    text_list("compatible", ["raspberrypi,rp1-gem"]),
-                    cells("reg", RP1_ETHERNET_REG),
-                    text("status", "okay"),
-                ],
-            ),
-        ],
+        children,
     )
 
 
@@ -281,6 +463,9 @@ def platform(
     memory_nodes=None,
     include_reserved: bool = True,
     pcie_ranges=None,
+    mfd: bool = False,
+    mfd_pins: int = RP1_GPIO_PINS,
+    mfd_rates=None,
 ) -> Node:
     memory_nodes = memory_nodes or [("memory@0", [0x0, 0x0, 0x0, 0x2800_0000])]
     root_children = [
@@ -341,7 +526,7 @@ def platform(
             )
         )
     if include_rp1:
-        rp1 = rp1_node(rp1_uart)
+        rp1 = rp1_node(rp1_uart, mfd=mfd, mfd_pins=mfd_pins, mfd_rates=mfd_rates)
         root_children.append(
             Node(
                 "axi",
@@ -351,6 +536,18 @@ def platform(
                     cells("#size-cells", [0x2]),
                 ],
                 [pcie_node(rp1, pcie_ranges or PCIE_RANGES)],
+            )
+        )
+    if mfd:
+        root_children.append(
+            Node(
+                "rp1_firmware",
+                [
+                    text_list("compatible", ["raspberrypi,rp1-firmware", "simple-mfd"]),
+                    cells("mboxes", [RP1_MAILBOX_PHANDLE, 0x0]),
+                    cells("shmem", [RP1_SHMEM_PHANDLE]),
+                    cells("phandle", [RP1_FIRMWARE_PHANDLE]),
+                ],
             )
         )
     root = Node(
@@ -409,6 +606,23 @@ def main() -> None:
     )
     write("pi5-gic-missing", platform(include_gic=False))
     write("pi5-bad-magic", platform(), bad_magic=True)
+    write(
+        "pi5-rp1-mfd",
+        platform(include_rp1=True, soc_uart="okay", rp1_uart="disabled", mfd=True),
+    )
+    write(
+        "pi5-rp1-mfd-bad-pins",
+        platform(include_rp1=True, rp1_uart="disabled", mfd=True, mfd_pins=0),
+    )
+    write(
+        "pi5-rp1-mfd-bad-clock",
+        platform(
+            include_rp1=True,
+            rp1_uart="disabled",
+            mfd=True,
+            mfd_rates=RP1_ASSIGNED_RATES[:-1],
+        ),
+    )
 
 
 if __name__ == "__main__":

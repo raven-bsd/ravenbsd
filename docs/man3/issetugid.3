@@ -1,0 +1,31 @@
+." SPDX-License-Identifier: BSD-3-Clause
+." Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt ISSETUGID 3
+.Os RavenBSD
+.Sh NAME
+.Nm issetugid
+.Nm getauxval
+.Nd query process security state
+.Sh SYNOPSIS
+.In unistd.h
+.Ft int
+.Fn issetugid void
+.Ft unsigned long
+.Fn getauxval "unsigned long type"
+.Sh DESCRIPTION
+.Fn issetugid reports whether the process was started with elevated privilege. .Fn getauxval
+reads the auxiliary vector supplied by the loader.
+.Sh RETURN VALUES
+.Fn issetugid returns 0 or 1. .Fn getauxval returns the value or 0 when the entry is absent.
+.Sh ERRORS
+.Fn getauxval sets .Er ENOENT when the entry is absent in some implementations; ravenlibc
+returns 0.
+.Sh STANDARDS
+BSD and glibc extension; ring 1 and ring 2.
+.Sh CAVEATS
+.Fn issetugid is always 0 because RavenBSD has no setuid exec path. AT_SECURE is always 0.
+See H-7.
+.Sh SEE ALSO
+.Xr getauxval 3
+.Xr libc 7

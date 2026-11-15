@@ -1,0 +1,41 @@
+." SPDX-License-Identifier: BSD-3-Clause
+." Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt CLOCK 3
+.Os RavenBSD
+.Sh NAME
+.Nm clock
+.Nm times
+.Nm clock_settime
+.Nm clock_getcpuclockid
+.Nm adjtime
+.Nd process and system time
+.Sh SYNOPSIS
+.In time.h
+.Ft clock_t
+.Fn clock void
+.Ft clock_t
+.Fn times "struct tms *buffer"
+.Ft int
+.Fn clock_settime "clockid_t clock" "const struct timespec *value"
+.Ft int
+.Fn clock_getcpuclockid "pid_t pid" "clockid_t *clock"
+.Ft int
+.Fn adjtime "const struct timeval *delta" "struct timeval *olddelta"
+.Sh DESCRIPTION
+These interfaces read or adjust process and system clocks. .Fn clock reports consumed CPU
+time; .Fn times fills the process-time structure; the clock_* functions operate on a clock id.
+.Sh RETURN VALUES
+.Fn clock returns the CPU time or -1. .Fn times returns the elapsed clock or -1. The remaining
+functions return 0 or -1.
+.Sh ERRORS
+.Er EINVAL is returned for an unknown clock id. .Er EPERM is returned for a clock that cannot
+be set.
+.Sh STANDARDS
+POSIX.1-2024; ring 0.
+.Sh CAVEATS
+.Fn clock returns -1 and .Fn times fails until CPU accounting exists. .Fn clock_settime
+returns .Er EPERM. See C44 and A-time-14.
+.Sh SEE ALSO
+.Xr clock_gettime 2
+.Xr libc 7

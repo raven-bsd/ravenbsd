@@ -7,13 +7,15 @@
 //! stack pointer, then loads the incoming stack pointer and returns on it. A new thread's stack is
 //! prepared with the same frame shape, but its return address is `sched_thread_start`.
 //!
-//! * x86-64 saves `rbx, rbp, r12..r15` and switches CR3/TSS/GS state.
+//! * x86-64 saves `rbx, rbp, r12..r15`, switches CR3/TSS/GS state, and saves/restores the
+//!   per-thread x87/SSE state through `arch::x86_64::fpu`.
 //! * aarch64 saves `x19..x30` (96 bytes, SP stays 16-byte aligned), publishes the thread pointer
 //!   in `TPIDR_EL1`, and switches TTBR0 with a fixed per-process ASID. A user thread starts in
 //!   EL0 through `eret` with `SP_EL0`/`ELR_EL1`/`SPSR_EL1`; kernel threads keep the empty user
-//!   root.
+//!   root. aarch64 FP/SIMD state is not part of this ticket.
 //!
-//! No FP/SIMD state is saved: the kernel and phase-1 userland are soft-float (DR-14).
+//! The x86-64 kernel is soft-float but user threads may execute x87/SSE; the state is eager and
+//! per-thread (DR-14, PG-12).
 
 use core::sync::atomic::Ordering;
 
@@ -21,6 +23,8 @@ use raven_abi::errno::Errno;
 
 #[cfg(target_arch = "x86_64")]
 use crate::arch::x86_64::ap_start;
+#[cfg(target_arch = "x86_64")]
+use crate::arch::x86_64::fpu;
 #[cfg(target_arch = "x86_64")]
 use crate::arch::x86_64::gdt::{self, USER_CS, USER_SS};
 use crate::sched::thread::Thread;
@@ -203,6 +207,25 @@ pub unsafe fn switch(from: &Thread, to: &Thread) {
     // Install the incoming user thread's TLS base. Kernel threads always get
     // zero, so a stale user FS base never leaks into kernel execution.
     wrmsr(IA32_FS_BASE, if to.user { to.tls_base() } else { 0 });
+
+    // Save the outgoing live FP/SIMD state unless the thread is inside a syscall: in that case
+    // its user state is already parked in the thread area by `sched_syscall_enter`. Restore the
+    // incoming state unless that thread is in a syscall too; its state is restored on syscall
+    // exit. A new thread gets its FINIT/MXCSR defaults from `FpuArea::new`.
+    let from_in_syscall = from.user && from.fpu_saved.load(Ordering::Acquire);
+    if !from_in_syscall {
+        // SAFETY: the scheduler owns the CPU state and the thread's area is live.
+        unsafe {
+            fpu::save(from.fpu_area_ptr());
+        }
+    }
+    let to_in_syscall = to.user && to.fpu_saved.load(Ordering::Acquire);
+    if !to_in_syscall {
+        // SAFETY: same ownership; `to` is alive for the switch.
+        unsafe {
+            fpu::restore(to.fpu_area_const_ptr());
+        }
+    }
 
     let next_rsp = to.saved_rsp();
     // SAFETY: the frame layout was prepared by `prepare_stack` or by a previous `sched_switch`;
@@ -510,23 +533,13 @@ pub(crate) fn read_cr3() -> u64 {
     value & 0x0000_FFFF_FFFF_F000
 }
 
-/// True when CR0 has neither `EM` nor `TS` set.
+/// Configure and verify the architectural FP/SIMD controls.
 ///
-/// S05/S08 leave the boot policy: no x87 emulation and no lazy task switch. S09 does not save
-/// FP/SIMD state, so a TS/EM bit appearing later is a kernel bug and the scheduler refuses to
-/// start.
+/// Clears CR0.EM/TS, sets MP and CR4.OSFXSR/OSXMMEXCPT, and enables XSAVE when the CPU supports
+/// it. Returns false when SSE is absent, in which case the scheduler refuses to start.
 #[cfg(target_arch = "x86_64")]
-pub(crate) fn fpu_state_ok() -> bool {
-    let value: u64;
-    // SAFETY: ring-0 CR0 read.
-    unsafe {
-        core::arch::asm!(
-            "mov {}, cr0",
-            out(reg) value,
-            options(nomem, nostack, preserves_flags),
-        );
-    }
-    value & ((1 << 2) | (1 << 3)) == 0
+pub(crate) fn init_fpu() -> bool {
+    fpu::init()
 }
 
 /// Read the current stack pointer.
@@ -542,6 +555,45 @@ pub(crate) fn read_rsp() -> u64 {
         );
     }
     value
+}
+
+/// Save the current user thread's FP/SIMD state on the syscall entry path.
+///
+/// Called from `syscall_entry` after the general-purpose registers are on the kernel stack and
+/// before any Rust syscall code runs. Kernel threads are ignored.
+#[cfg(target_arch = "x86_64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn sched_syscall_enter() {
+    let Some(thread) = crate::sched::current_thread() else {
+        return;
+    };
+    if !thread.user {
+        return;
+    }
+    if !thread.fpu_saved.swap(true, Ordering::AcqRel) {
+        // SAFETY: the syscall entry path owns the CPU and the thread is current.
+        unsafe {
+            fpu::save(thread.fpu_area_ptr());
+        }
+    }
+}
+
+/// Restore the current user thread's FP/SIMD state on the syscall return path.
+#[cfg(target_arch = "x86_64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn sched_syscall_exit() {
+    let Some(thread) = crate::sched::current_thread() else {
+        return;
+    };
+    if !thread.user {
+        return;
+    }
+    if thread.fpu_saved.swap(false, Ordering::AcqRel) {
+        // SAFETY: the syscall return path owns the CPU and the thread is current.
+        unsafe {
+            fpu::restore(thread.fpu_area_const_ptr());
+        }
+    }
 }
 
 /// Read the current stack pointer.

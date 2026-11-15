@@ -7,6 +7,7 @@ pub mod acpi;
 pub mod ap_start;
 pub mod apic;
 pub mod exception;
+pub mod fpu;
 pub mod gdt;
 pub mod idt;
 pub mod ioapic;

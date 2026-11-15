@@ -155,7 +155,9 @@ dependencies = [
 name = "emmc2"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
  "raven-pi4",
+ "raven-proto-block",
 ]
 
 [[package]]
@@ -313,6 +315,16 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "regex",
+ "serde",
+ "serde_json",
+ "toml",
+]
+
+[[package]]
+name = "libc-gate"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
  "serde",
  "serde_json",
  "toml",
@@ -1731,6 +1743,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-pf"
+version = "0.1.0"
+
+[[package]]
 name = "raven-pi4"
 version = "0.1.0"
 dependencies = [
@@ -1967,6 +1983,11 @@ dependencies = [
 [[package]]
 name = "raven-rp1"
 version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
+ "raven-pci",
+ "raven-pi5",
+]
 
 [[package]]
 name = "raven-rsh"
