@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024 reuben olinsky
+
+name: "Default options"
+cases:
+  - name: "Default options"
+    stdin: |
+      echo "Default options: $-"
+
+  - name: "Default options (-c)"
+    args: ["-c", 'echo "Default options: $-"']

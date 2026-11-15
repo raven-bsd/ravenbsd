@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2024 reuben olinsky
+
+use std::io::Write;
+
+use brush_core::{ExecutionResult, builtins, timing};
+
+/// Report on usage time.
+#[derive(winnow_args::Args)]
+#[arg(disable_help_short, disable_version_flag, disable_help_subcommand)]
+pub(crate) struct TimesCommand {
+    /// Operands, which are ignored. Options before the first operand are
+    /// still misuse; everything after it is an operand.
+    #[arg(positional, stop_flags, hide)]
+    _operands: Vec<String>,
+}
+
+brush_winnow_args_adapter::impl_parse_args!(TimesCommand);
+
+impl<SE: brush_core::ShellExtensions> builtins::Builtin<SE> for TimesCommand {
+    type Error = brush_core::Error;
+
+    async fn execute(
+        self,
+        context: brush_core::ExecutionContext<'_, SE>,
+    ) -> Result<ExecutionResult, Self::Error> {
+        let (self_user, self_system) = brush_core::sys::resource::get_self_user_and_system_time()?;
+        writeln!(
+            context.stdout(),
+            "{} {}",
+            timing::format_duration_non_posixly(&self_user),
+            timing::format_duration_non_posixly(&self_system),
+        )?;
+
+        let (children_user, children_system) =
+            brush_core::sys::resource::get_children_user_and_system_time()?;
+        writeln!(
+            context.stdout(),
+            "{} {}",
+            timing::format_duration_non_posixly(&children_user),
+            timing::format_duration_non_posixly(&children_system),
+        )?;
+
+        Ok(ExecutionResult::success())
+    }
+}
