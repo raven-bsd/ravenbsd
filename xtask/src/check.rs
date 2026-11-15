@@ -3,13 +3,13 @@
 
 //! The local gate: `cargo xtask check [--fast]`.
 //!
-//! Steps run in order and stop at the first failure; every step is reported with its exit code and
-//! duration, and the ones after a failure are shown as skipped. `--fast` skips the per-target clippy
-//! passes (the slow part) but keeps the host gate and provenance.
+//! Every step runs, even after an earlier step failed, so one invocation reports every problem.
+//! A step that cannot be started is reported as failed and the remaining steps still run. `--fast`
+//! skips the per-target clippy passes (the slow part) but keeps the host gate and provenance.
 
 use std::time::Instant;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use crate::build::{self, Arch, Component};
 use crate::docs;
@@ -49,84 +49,71 @@ pub(crate) fn run(workspace: &Workspace, fast: bool) -> Result<u8> {
     let mut summaries = Vec::new();
     let mut failed = false;
     for step in steps {
-        if failed {
-            summaries.push(Summary {
-                name: step.name,
-                status: Status::Skipped("previous failure".to_string()),
-                seconds: 0.0,
-            });
-            continue;
-        }
+        let Step { name, kind } = step;
         let started = Instant::now();
-        match step.kind {
+        let status = match kind {
             StepKind::Skipped(reason) => {
-                println!("==> {}: skipped ({reason})", step.name);
-                summaries.push(Summary {
-                    name: step.name,
-                    status: Status::Skipped(reason),
-                    seconds: 0.0,
-                });
+                println!("==> {name}: skipped ({reason})");
+                Status::Skipped(reason)
             }
             StepKind::Guard => {
-                println!("==> {}", step.name);
-                let violations = guard::scan_repo(&workspace.root)?;
-                guard::print_violations(&violations);
-                let code = i32::from(!violations.is_empty());
-                let seconds = started.elapsed().as_secs_f64();
-                if code != 0 {
-                    failed = true;
+                println!("==> {name}");
+                match guard::scan_repo(&workspace.root) {
+                    Ok(violations) => {
+                        guard::print_violations(&violations);
+                        status_for(i32::from(!violations.is_empty()))
+                    }
+                    Err(error) => {
+                        eprintln!("check: `{name}` could not run: {error:#}");
+                        Status::Failed(1)
+                    }
                 }
-                summaries.push(Summary {
-                    name: step.name,
-                    status: status_for(code),
-                    seconds,
-                });
             }
             StepKind::Command(spec) => {
-                println!("==> {}", step.name);
-                let code = run_command(&spec)
-                    .with_context(|| format!("cannot run check step `{}`", step.name))?;
-                let seconds = started.elapsed().as_secs_f64();
-                if code != 0 {
-                    failed = true;
+                println!("==> {name}");
+                match run_command(&spec) {
+                    Ok(code) => status_for(code),
+                    Err(error) => {
+                        eprintln!("check: `{name}` could not run: {error:#}");
+                        Status::Failed(1)
+                    }
                 }
-                summaries.push(Summary {
-                    name: step.name,
-                    status: status_for(code),
-                    seconds,
-                });
             }
             StepKind::Docs => {
-                println!("==> {}", step.name);
-                let code = i32::from(docs::run(&workspace.root)?);
-                let seconds = started.elapsed().as_secs_f64();
-                if code != 0 {
-                    failed = true;
+                println!("==> {name}");
+                match docs::run(&workspace.root) {
+                    Ok(code) => status_for(i32::from(code)),
+                    Err(error) => {
+                        eprintln!("check: `{name}` could not run: {error:#}");
+                        Status::Failed(1)
+                    }
                 }
-                summaries.push(Summary {
-                    name: step.name,
-                    status: status_for(code),
-                    seconds,
-                });
             }
             StepKind::Profiles => {
-                println!("==> {}", step.name);
-                let violations = profiles::one_shot_restart_violations(&workspace.root)?;
-                for violation in &violations {
-                    println!("{violation}");
+                println!("==> {name}");
+                match profiles::one_shot_restart_violations(&workspace.root) {
+                    Ok(violations) => {
+                        for violation in &violations {
+                            println!("{violation}");
+                        }
+                        status_for(i32::from(!violations.is_empty()))
+                    }
+                    Err(error) => {
+                        eprintln!("check: `{name}` could not run: {error:#}");
+                        Status::Failed(1)
+                    }
                 }
-                let code = i32::from(!violations.is_empty());
-                let seconds = started.elapsed().as_secs_f64();
-                if code != 0 {
-                    failed = true;
-                }
-                summaries.push(Summary {
-                    name: step.name,
-                    status: status_for(code),
-                    seconds,
-                });
             }
+        };
+        let seconds = started.elapsed().as_secs_f64();
+        if matches!(status, Status::Failed(_)) {
+            failed = true;
         }
+        summaries.push(Summary {
+            name,
+            status,
+            seconds,
+        });
     }
     print_summary(&summaries);
     Ok(u8::from(failed))

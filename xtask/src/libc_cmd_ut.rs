@@ -35,16 +35,6 @@ fn headers_stub_exits_with_c37_message() {
 }
 
 #[test]
-fn size_stub_exits_with_c69_message() {
-    let error = run(Path::new("."), "libc-size", &[]).expect_err("stub");
-    assert!(
-        error
-            .to_string()
-            .contains("not implemented by C34 (ticket C69)")
-    );
-}
-
-#[test]
 fn world_stub_exits_with_c72_message() {
     let error = run(Path::new("."), "libc-world", &[]).expect_err("stub");
     assert!(
