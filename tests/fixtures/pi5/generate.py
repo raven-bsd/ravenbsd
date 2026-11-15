@@ -39,6 +39,9 @@ RP1_SERIAL_REG = [0xC0, 0x4003_0000, 0x0, 0x100]
 RP1_MAILBOX_REG = [0xC0, 0x4000_8000, 0x0, 0x4000]
 RP1_CLOCKS_REG = [0xC0, 0x4001_8000, 0x0, 0x1_0038]
 RP1_ETHERNET_REG = [0xC0, 0x4010_0000, 0x0, 0x4000]
+RP1_ETH_INTERRUPT = [0x6, 0x4]
+RP1_ETH_CLOCKS = [0x2, 0xC, 0x2, 0xC, 0x2, 0x1D, 0x2, 0x10]
+RP1_ETH_CLOCK_NAMES = ["pclk", "hclk", "tsu_clk", "tx_clk"]
 RP1_GPIO_BANKS = [
     0xC0, 0x400D_0000, 0x0, 0xC000,
     0xC0, 0x400E_0000, 0x0, 0xC000,
@@ -73,6 +76,7 @@ RP1_SRAM_REG = [0xC0, 0x4040_0000, 0x0, 0x1_0000]
 RP1_SRAM_RANGES = [0x0, 0xC0, 0x4040_0000, 0x1_0000]
 RP1_SHMEM_REG = [0xFF00, 0x100]
 RP1_GPIO_PHANDLE = 0x30
+RP1_ETH_RESET_GPIO = [RP1_GPIO_PHANDLE, 0x20, 0x1]
 RP1_CLOCKS_PHANDLE = 0x2
 RP1_MAILBOX_PHANDLE = 0x5B
 RP1_SHMEM_PHANDLE = 0x5C
@@ -102,6 +106,10 @@ def flag(name: str):
     return (name, "empty", None)
 
 
+def bytes_prop(name: str, values):
+    return (name, "bytes", list(values))
+
+
 def encode_prop(kind: str, value) -> bytes:
     if kind == "str":
         return value.encode() + b"\0"
@@ -109,6 +117,8 @@ def encode_prop(kind: str, value) -> bytes:
         return b"".join(item.encode() + b"\0" for item in value)
     if kind == "cells":
         return b"".join(struct.pack(">I", item) for item in value)
+    if kind == "bytes":
+        return bytes(value)
     if kind == "empty":
         return b""
     raise ValueError(f"unknown property kind {kind}")
@@ -121,6 +131,8 @@ def dts_prop(kind: str, value) -> str:
         return ", ".join(f'"{item}"' for item in value)
     if kind == "cells":
         return "<" + " ".join(f"0x{item:x}" for item in value) + ">"
+    if kind == "bytes":
+        return "[" + " ".join(f"{item:02x}" for item in value) + "]"
     if kind == "empty":
         return ""
     raise ValueError(f"unknown property kind {kind}")
@@ -339,8 +351,10 @@ def rp1_node(
     mfd: bool = False,
     mfd_pins: int = RP1_GPIO_PINS,
     mfd_rates=None,
+    mfd_mac=None,
 ) -> Node:
     mfd_rates = mfd_rates or RP1_ASSIGNED_RATES
+    mfd_mac = mfd_mac or [0, 0, 0, 0, 0, 0]
     mailbox_props = [
         text_list("compatible", ["raspberrypi,rp1-mbox"]),
         cells("reg", RP1_MAILBOX_REG),
@@ -350,6 +364,40 @@ def rp1_node(
         text_list("compatible", ["raspberrypi,rp1-clocks"]),
         cells("reg", RP1_CLOCKS_REG),
     ]
+    ethernet_props = [
+        text_list("compatible", ["raspberrypi,rp1-gem"]),
+        cells("reg", RP1_ETHERNET_REG),
+        text("status", "okay"),
+    ]
+    ethernet_children = []
+    if mfd:
+        ethernet_props = [
+            text_list("compatible", ["raspberrypi,rp1-gem", "cdns,macb"]),
+            cells("reg", RP1_ETHERNET_REG),
+            cells("#address-cells", [0x1]),
+            cells("#size-cells", [0x0]),
+            cells("interrupts", RP1_ETH_INTERRUPT),
+            cells("clocks", RP1_ETH_CLOCKS),
+            text_list("clock-names", RP1_ETH_CLOCK_NAMES),
+            text("phy-mode", "rgmii-id"),
+            bytes_prop("local-mac-address", mfd_mac),
+            cells("cdns,aw2w-max-pipe", [0x8]),
+            cells("cdns,ar2r-max-pipe", [0x8]),
+            flag("cdns,use-aw2b-fill"),
+            cells("phy-reset-gpios", RP1_ETH_RESET_GPIO),
+            cells("phy-reset-duration", [0x5]),
+            text("status", "okay"),
+        ]
+        ethernet_children = [
+            Node(
+                "ethernet-phy@1",
+                [
+                    cells("reg", [0x1]),
+                    flag("brcm,powerdown-enable"),
+                    cells("led-modes", [0x8]),
+                ],
+            )
+        ]
     children = [
         Node(
             "serial@30000",
@@ -361,14 +409,7 @@ def rp1_node(
         ),
         Node("mailbox@8000", mailbox_props),
         Node("clocks@18000", clocks_props),
-        Node(
-            "ethernet@100000",
-            [
-                text_list("compatible", ["raspberrypi,rp1-gem"]),
-                cells("reg", RP1_ETHERNET_REG),
-                text("status", "okay"),
-            ],
-        ),
+        Node("ethernet@100000", ethernet_props, ethernet_children),
     ]
     if mfd:
         mailbox_props.append(cells("phandle", [RP1_MAILBOX_PHANDLE]))
@@ -466,6 +507,7 @@ def platform(
     mfd: bool = False,
     mfd_pins: int = RP1_GPIO_PINS,
     mfd_rates=None,
+    mfd_mac=None,
 ) -> Node:
     memory_nodes = memory_nodes or [("memory@0", [0x0, 0x0, 0x0, 0x2800_0000])]
     root_children = [
@@ -526,7 +568,13 @@ def platform(
             )
         )
     if include_rp1:
-        rp1 = rp1_node(rp1_uart, mfd=mfd, mfd_pins=mfd_pins, mfd_rates=mfd_rates)
+        rp1 = rp1_node(
+            rp1_uart,
+            mfd=mfd,
+            mfd_pins=mfd_pins,
+            mfd_rates=mfd_rates,
+            mfd_mac=mfd_mac,
+        )
         root_children.append(
             Node(
                 "axi",
@@ -621,6 +669,15 @@ def main() -> None:
             rp1_uart="disabled",
             mfd=True,
             mfd_rates=RP1_ASSIGNED_RATES[:-1],
+        ),
+    )
+    write(
+        "pi5-rp1-mfd-mac",
+        platform(
+            include_rp1=True,
+            rp1_uart="disabled",
+            mfd=True,
+            mfd_mac=[0x02, 0x11, 0x22, 0x33, 0x44, 0x55],
         ),
     )
 

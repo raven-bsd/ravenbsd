@@ -5,8 +5,8 @@
 
 These fixtures are **original minimal device trees**, not copies of a donor DTB. They contain only
 the nodes and values the `raven-pi5` parser and the `raven-rp1` MFD model need. The `.dtb` files
-are generated; edit `generate.py`, not the binaries. R2 added the `pi5-rp1-mfd*` fixtures and left
-the B54 fixtures byte-identical.
+are generated; edit `generate.py`, not the binaries. R2 added the `pi5-rp1-mfd*` fixtures; R3 extended
+their Ethernet node with the full property set. The B54 fixtures stay byte-identical.
 
 ## Regeneration
 
@@ -62,6 +62,13 @@ addresses in parentheses are the pre-translation child addresses.
 | RP1 mailbox | local `0xc0_4000_8000` → CPU `0x1f_0000_8000` + `0x4000` | `rp1/mailbox@8000` |
 | RP1 clocks | local `0xc0_4001_8000` → CPU `0x1f_0001_8000` + `0x1_0038` | `rp1/clocks@18000` |
 | RP1 Ethernet | local `0xc0_4010_0000` → CPU `0x1f_0010_0000` + `0x4000` | `rp1/ethernet@100000` |
+| Ethernet compatible | `raspberrypi,rp1-gem`, `cdns,macb` | `rp1/ethernet@100000` |
+| Ethernet interrupt | id `6`, flags `4` | `rp1/ethernet@100000: interrupts` |
+| Ethernet clocks | `pclk` 12, `hclk` 12, `tsu_clk` 29, `tx_clk` 16 | `clocks`, `clock-names` |
+| Ethernet PHY | `rgmii-id`, MDIO address 1, power-down flag, `led-modes = 8` | `phy-mode`, `ethernet-phy@1` |
+| Ethernet reset | GPIO 32, active-low, duration 5 | `phy-reset-gpios`, `phy-reset-duration` |
+| Ethernet MAC | all zero (bootloader placeholder) | `local-mac-address` |
+| Ethernet Cadence hints | `aw2w-max-pipe = 8`, `ar2r-max-pipe = 8`, `use-aw2b-fill` | `cdns,*` |
 | RP1 GPIO banks | local `0xc0_400d_0000`, `0xc0_400e_0000`, `0xc0_400f_0000`, `0xc000` each | `rp1/gpio@d0000` (3 `reg` windows) |
 | RP1 GPIO pins | 54 (`gpio-ranges` count `0x36`) | `rp1/gpio@d0000` |
 | RP1 GPIO interrupts | `(0, 4)`, `(1, 4)`, `(2, 4)` | `rp1/gpio@d0000: interrupts` |
@@ -90,9 +97,10 @@ fills it in. The actual board memory size is UNVERIFIED until a board log exists
 | `pi5-memory-bad-cells.dtb` | `/memory` `reg` is three cells; `BadMemory`. Synthetic malformed shape. |
 | `pi5-gic-missing.dtb` | No GIC node; `MissingGic`. |
 | `pi5-bad-magic.dtb` | FDT magic zeroed; `Fdt(BadMagic)`. |
-| `pi5-rp1-mfd.dtb` | Valid tree with the full RP1 MFD: GPIO block (3 banks, 54 pins, 3 interrupts, pinctrl groups), clocks with assigned rates, PIO/USB/SRAM windows, and the firmware mailbox + shmem. |
+| `pi5-rp1-mfd.dtb` | Valid tree with the full RP1 MFD: GPIO block (3 banks, 54 pins, 3 interrupts, pinctrl groups), clocks with assigned rates, PIO/USB/SRAM windows, the full Ethernet node (interrupt, clocks, RGMII PHY, reset GPIO, Cadence hints) and the firmware mailbox + shmem. |
 | `pi5-rp1-mfd-bad-pins.dtb` | The same tree with `gpio-ranges` count zero; `raven-rp1` reports `PinCount(0)`. |
 | `pi5-rp1-mfd-bad-clock.dtb` | The same tree with one assigned rate missing; `raven-rp1` reports `ClockCount { clocks: 13, rates: 12 }`. |
+| `pi5-rp1-mfd-mac.dtb` | The same tree with a non-zero `local-mac-address` (`02:11:22:33:44:55`); the Ethernet model returns it as a real address. |
 
 The invalid fixtures use synthetic overlaps or malformed cell counts. They do not invent hardware
 addresses; every address comes from the table above.
