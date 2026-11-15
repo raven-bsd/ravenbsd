@@ -173,6 +173,7 @@ members = [
     "tests/fixtures/k72-hwfs/probe",
     "tests/fixtures/b12b-net/probe",
     "userland/drivers/virtio-net",
+    "userland/drivers/hda",
     "userland/drivers/virtio-blk",
     "tools/bench-host",
     "tools/fuzz",
