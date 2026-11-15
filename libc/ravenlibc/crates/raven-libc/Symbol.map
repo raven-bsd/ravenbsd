@@ -1223,11 +1223,6 @@ RAVEN_1.0 {
 		unlinkat;
 		# --- K96/F3 merge ---
 		fsync;
-		# --- P2c credential exports (F3 merge) ---
-		getresgid;
-		getresuid;
-		setresgid;
-		setresuid;
 };
 
 RAVENprivate_1.0 {
