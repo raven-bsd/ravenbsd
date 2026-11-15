@@ -37,11 +37,21 @@ struct Live {
     pattern: u8,
 }
 
-fn operations() -> usize {
+/// Operations in the routine `make check` model run: a smoke test, not the stress gate.
+const FAST_OPS: usize = 10_000;
+/// Operations in the explicit full stress gate (`make check-full`).
+const FULL_OPS: usize = 1_000_000;
+/// Hardened backend seeds.
+const HARDENED_SEEDS: [u64; 5] = [1, 2, 3, 0xdead_c0de, 0x5eed];
+/// Tiny backend seeds.
+const TINY_SEEDS: [u64; 3] = [1, 2, 3];
+
+/// Model operations for this run: `RL_MODEL_OPS` overrides the tier default.
+fn operations(default_ops: usize) -> usize {
     std::env::var("RL_MODEL_OPS")
         .ok()
         .and_then(|value| value.parse().ok())
-        .unwrap_or(1_000_000)
+        .unwrap_or(default_ops)
 }
 
 fn check_live(heap: &dyn Heap, live: &[Live]) {
@@ -289,16 +299,34 @@ fn run_tiny(seed: u64, ops: usize) {
 
 #[test]
 fn hardened_model() {
-    let ops = operations();
-    for seed in [1u64, 2, 3, 0xdead_c0de, 0x5eed] {
+    let ops = operations(FAST_OPS);
+    for seed in HARDENED_SEEDS {
+        run_hardened(seed, ops);
+    }
+}
+
+#[test]
+#[ignore = "full 1M-op allocator stress; run with make check-full"]
+fn hardened_model_full() {
+    let ops = operations(FULL_OPS);
+    for seed in HARDENED_SEEDS {
         run_hardened(seed, ops);
     }
 }
 
 #[test]
 fn tiny_model() {
-    let ops = operations();
-    for seed in [1u64, 2, 3] {
+    let ops = operations(FAST_OPS);
+    for seed in TINY_SEEDS {
+        run_tiny(seed, ops);
+    }
+}
+
+#[test]
+#[ignore = "full 1M-op allocator stress; run with make check-full"]
+fn tiny_model_full() {
+    let ops = operations(FULL_OPS);
+    for seed in TINY_SEEDS {
         run_tiny(seed, ops);
     }
 }
