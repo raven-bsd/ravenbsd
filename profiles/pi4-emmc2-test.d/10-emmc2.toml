@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The driver binary and its test-mode service. The host-backed mode has no MMIO dependency; the
+# real platform fragment is a separate follow-up.
+
+[[initfs.programs]]
+package = "emmc2"
+path = "/sbin/emmc2"
+
+[[initfs.files]]
+src = "profiles/pi4-emmc2-test.d/emmc2.manifest"
+path = "/etc/services.d/emmc2.toml"

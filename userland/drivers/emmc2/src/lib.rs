@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! Host-testable EMMC2 driver skeleton.
+//! EMMC2 driver core and board seam.
 //!
 //! The driver owns the register sequence; [`raven_pi4`] owns the register map, command encoding,
 //! card state machine, timing rules, DMA descriptors and transfer state. The board boundary is the
-//! [`Host`] trait: a real adapter implements it with the `raven_driver::MmioRegion` grant, a clock
-//! from `platd` and the S21d DMA window; the host tests implement it with a register fake.
+//! [`Host`] trait: `main.rs` implements it with the `raven_driver::MmioRegion` grant, a clock from
+//! the launcher and the S21d DMA window; the host tests implement it with a register fake.
 //!
 //! [`probe`] reads the controller version and capabilities, resolves the base clock and produces
 //! the identification/default/high-speed plans. [`bring_up`] performs reset, power and the
@@ -14,16 +14,16 @@
 //! and then programs the 25 MHz default clock and the four-bit host control.
 //!
 //! The [`block`] module maps `raven-proto-block` requests to CMD17/18/24/25 and serves them through
-//! a [`block::BlockDevice`] backend; [`block::MemoryDisk`] is the host-testable backend. The real
-//! MMIO, DMA engine, interrupt path and scheme entry remain the board-integration step.
-//!
-//! All values that only a board log can confirm are UNVERIFIED; see `docs/pi4-emmc2.md`.
+//! a [`block::BlockDevice`] backend; [`block::MemoryDisk`] is the host-testable backend. The
+//! `main.rs` program adds the SDMA/IRQ `disk:` path for the board and a host-backed `test` mode for
+//! the qtest. The real-card result remains UNVERIFIED until a board log exists.
 
 #![no_std]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 pub mod block;
+pub mod pattern;
 
 use raven_pi4::command::{Command, CommandFailure};
 use raven_pi4::fdt::DmaWindow;

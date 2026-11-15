@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# One-shot probe: verify the marker, the pattern and one scratch write through `disk:0`, then
+# flush (which ends the driver's test-serving cycle).
+name = "pi4-emmc2-probe"
+exec = "/sbin/pi4-emmc2-probe"
+needs = ["scheme:disk"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

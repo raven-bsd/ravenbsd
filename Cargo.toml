@@ -60,6 +60,7 @@ members = [
     "tests/fixtures/k33-rootfs",
     "tests/fixtures/b12-netd",
     "tests/fixtures/k14-block/controller",
+    "tests/fixtures/pi4-emmc2/probe",
     "tests/fixtures/k54-ufs/mkimage",
     "tests/fixtures/k54-ufs/probe",
     "tests/fixtures/k55-ufs/probe",

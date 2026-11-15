@@ -156,8 +156,12 @@ name = "emmc2"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-driver",
  "raven-pi4",
  "raven-proto-block",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -1770,6 +1774,17 @@ name = "raven-pi4"
 version = "0.1.0"
 dependencies = [
  "raven-fdt-lite",
+]
+
+[[package]]
+name = "raven-pi4-emmc2-probe"
+version = "0.1.0"
+dependencies = [
+ "emmc2",
+ "raven-abi",
+ "raven-proto-block",
+ "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
