@@ -45,17 +45,16 @@ check-full:
 	@$(XTASK) check
 	@cargo test -p raven-libc-malloc --test model -- --ignored --nocapture
 
-# Run the expensive full allocator stress only when the diff touches the allocator or its
-# memory/platform seam. Ordinary tickets and ordinary merges do not need it.
+# Run the expensive full allocator stress only when the allocator crate or its model test
+# changes. The platform seam is faked in this host test, so platform changes belong to qtest.
 check-full-if-needed:
 	@changed=$$(git diff --name-only $(BASE)...HEAD -- \
-		libc/ravenlibc/crates/raven-libc-malloc \
-		libc/ravenlibc/crates/raven-libc-platform); \
+		libc/ravenlibc/crates/raven-libc-malloc); \
 	if [ -n "$$changed" ]; then \
 		printf '%s\n' "$$changed"; \
 		$(MAKE) check-full; \
 	else \
-		printf '%s\n' "check-full-if-needed: no allocator/memory changes since $(BASE); skipped"; \
+		printf '%s\n' "check-full-if-needed: no allocator changes since $(BASE); skipped"; \
 	fi
 
 guard:
