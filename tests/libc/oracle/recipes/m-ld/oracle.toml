@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# m-ld: the FreeBSD lib/msun `*l` C originals behind the raven-libc-m long-double functions.
+# The C is built as an external oracle (never into a shipped artifact); the RD-33 hidden-pointer
+# mapping lives in shim/m/ld_thunk.c. This first slice covers exp/expm1.
+
+schema = 1
+family = "m-ld"
+description = "FreeBSD msun long-double originals (exp, expm1)"
+exports = ["expl", "expm1l"]
+opt = ["O2", "O0"]
+defines = ["__weak_reference(a,b)=", "__pure2=__attribute__((__pure__))", "LDBL_MANT_DIG=64", "LDBL_MAX_EXP=16384", "LDBL_MIN_EXP=-16381"]
+include = ["shim:m", "donor:freebsd/lib/msun/src", "donor:freebsd/lib/msun/ld80", "donor:freebsd/lib/libc/include", "donor:freebsd/lib/libc/amd64", "donor:freebsd/sys", "donor:freebsd/sys/amd64/include", "donor:freebsd/sys/x86/include", "donor:freebsd/sys/sys"]
+flags = ["-std=gnu11"]
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/ld80/s_expl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/ld80/b_expl.c"
