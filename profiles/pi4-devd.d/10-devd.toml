@@ -10,7 +10,7 @@ src = "userland/servers/devd/drivers.toml"
 path = "/etc/drivers.toml"
 
 [[initfs.files]]
-src = "tests/fixtures/pi4-devd/pi4-devd.dtb"
+src = "build/fixtures/pi4-devd/pi4-devd.dtb"
 path = "/etc/pi4.dtb"
 
 [[initfs.files]]

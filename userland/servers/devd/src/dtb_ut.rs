@@ -8,9 +8,24 @@ use crate::dtb::*;
 use raven_fdt_lite::{DmaWindow, FdtError};
 use raven_proto_dev::parse_drivers;
 
-const FIXTURE: &[u8] = include_bytes!("../../../../tests/fixtures/pi4-devd/pi4-devd.dtb");
-const BAD_RANGES: &[u8] =
-    include_bytes!("../../../../tests/fixtures/pi4-devd/pi4-devd-bad-ranges.dtb");
+const FIXTURE_HEX: &str = include_str!("../../../../tests/fixtures/pi4-devd/pi4-devd.dtb.hex");
+const BAD_RANGES_HEX: &str =
+    include_str!("../../../../tests/fixtures/pi4-devd/pi4-devd-bad-ranges.dtb.hex");
+
+fn decode_hex(text: &str) -> Vec<u8> {
+    let mut digits = String::new();
+    for line in text.lines() {
+        let line = line.trim();
+        if !line.is_empty() && !line.starts_with('#') {
+            digits.push_str(line);
+        }
+    }
+    digits
+        .as_bytes()
+        .chunks_exact(2)
+        .map(|pair| u8::from_str_radix(core::str::from_utf8(pair).unwrap(), 16).unwrap())
+        .collect()
+}
 
 fn device<'a>(devices: &'a [DeviceSpec], path: &str) -> &'a DeviceSpec {
     devices
@@ -21,7 +36,8 @@ fn device<'a>(devices: &'a [DeviceSpec], path: &str) -> &'a DeviceSpec {
 
 #[test]
 fn fixture_lists_genet_emmc2_pwm1_and_rng200() {
-    let devices = parse(FIXTURE).unwrap();
+    let fixture = decode_hex(FIXTURE_HEX);
+    let devices = parse(&fixture).unwrap();
     assert_eq!(
         devices.len(),
         5,
@@ -94,7 +110,7 @@ fn fixture_lists_genet_emmc2_pwm1_and_rng200() {
 
 #[test]
 fn drivers_match_by_compatible_string() {
-    let devices = parse(FIXTURE).unwrap();
+    let devices = parse(&decode_hex(FIXTURE_HEX)).unwrap();
     let drivers = parse_drivers(
         r#"
 [[driver]]
@@ -150,13 +166,17 @@ exec = "/sbin/dummy"
 
 #[test]
 fn reg_outside_the_parent_ranges_is_an_error() {
-    assert_eq!(parse(BAD_RANGES), Err(DtbError::UnmappedReg));
+    assert_eq!(
+        parse(&decode_hex(BAD_RANGES_HEX)),
+        Err(DtbError::UnmappedReg)
+    );
 }
 
 #[test]
 fn truncated_blob_is_an_fdt_error() {
+    let fixture = decode_hex(FIXTURE_HEX);
     assert_eq!(
-        parse(&FIXTURE[..20]).unwrap_err(),
+        parse(&fixture[..20]).unwrap_err(),
         DtbError::Fdt(FdtError::TooShort)
     );
 }

@@ -5,6 +5,7 @@ name = "pi4-devd"
 arch = "aarch64"
 profile = "pi4-devd"
 timeout_secs = 240
+pre = ["sh tests/fixtures/pi4-devd/build.sh"]
 boot_cmdline = "console=ttyAMA0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"

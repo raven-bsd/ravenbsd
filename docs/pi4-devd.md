@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # Pi 4 platform discovery in `devd` (K32)
 
 `devd` reads the platform bus from the firmware flattened device tree (FDT) on aarch64. This
@@ -60,17 +63,19 @@ devd: dtb matched=4
 
 ## Fixtures and qtest
 
-`tests/fixtures/pi4-devd/` contains `pi4-devd.dts`/`.dtb` (the four peripheral nodes, a GIC, the
-`soc`/`scb`/`emmc2bus` ranges and the EMMC2 DMA window) and `pi4-devd-bad-ranges.dtb`, whose
-`emmc2bus` range no longer covers the MMC node. Regenerate both with:
+`tests/fixtures/pi4-devd/` contains `pi4-devd.dtb.hex`/`.dts` (the four peripheral nodes, a GIC,
+the `soc`/`scb`/`emmc2bus` ranges and the EMMC2 DMA window) and `pi4-devd-bad-ranges.dtb.hex`,
+whose `emmc2bus` range no longer covers the MMC node. Regenerate both with:
 
 ```
 python3 tests/fixtures/pi4-devd/generate.py
 ```
 
-`profiles/pi4-devd.toml` and `profiles/pi4-devd.d/` install the fixture, the driver table and a
-one-shot `devd dtb` service. `tests/qtest/cases/pi4-devd.toml` runs that profile on aarch64 and
-asserts the five decoded devices and four compatible matches.
+`sh tests/fixtures/pi4-devd/build.sh` decodes the good fixture into
+`build/fixtures/pi4-devd/pi4-devd.dtb`; the qtest runs it as a `pre` step, and the profile
+installs the result as `/etc/pi4.dtb`. `profiles/pi4-devd.toml` and `profiles/pi4-devd.d/` install
+the driver table and a one-shot `devd dtb` service. `tests/qtest/cases/pi4-devd.toml` runs that
+profile on aarch64 and asserts the five decoded devices and four compatible matches.
 
 ## Follow-ups
 
