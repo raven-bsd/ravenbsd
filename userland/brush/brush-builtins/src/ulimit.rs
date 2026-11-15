@@ -1,0 +1,566 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2024 reuben olinsky
+
+use std::{
+    io::{self, ErrorKind, Write},
+    str::FromStr,
+};
+
+use brush_core::{ExecutionResult, builtins};
+
+#[derive(Clone, Copy)]
+enum Unit {
+    Block,
+    Bytes,
+    HalfKBytes,
+    KBytes,
+    Micros,
+    Number,
+    Seconds,
+}
+
+impl Unit {
+    const fn scale(self) -> u64 {
+        match self {
+            Self::Block | Self::HalfKBytes => 512,
+            Self::KBytes => 1024,
+            _ => 1,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Virtual {
+    Pipe,
+    VMem,
+}
+
+impl Virtual {
+    fn get(self) -> std::io::Result<(u64, u64)> {
+        match self {
+            Self::Pipe => {
+                let lim = nix::unistd::PathconfVar::PIPE_BUF as u64 * 512;
+                Ok((lim, lim))
+            }
+            Self::VMem => rlimit::Resource::AS
+                .get()
+                .or_else(|_| rlimit::Resource::VMEM.get()),
+        }
+    }
+    fn set(self, soft: u64, hard: u64) -> std::io::Result<()> {
+        match self {
+            Self::Pipe => Err(std::io::Error::from(ErrorKind::Unsupported)),
+            Self::VMem => rlimit::Resource::AS
+                .set(soft, hard)
+                .or_else(|_| rlimit::Resource::VMEM.set(soft, hard)),
+        }
+    }
+    const fn is_supported(self) -> bool {
+        match self {
+            Self::Pipe => true,
+            Self::VMem => {
+                rlimit::Resource::AS.is_supported() || rlimit::Resource::VMEM.is_supported()
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Resource {
+    Phy(rlimit::Resource),
+    Virt(Virtual),
+}
+
+impl Resource {
+    fn get(self) -> std::io::Result<(u64, u64)> {
+        match self {
+            Self::Phy(res) => res.get(),
+            Self::Virt(res) => res.get(),
+        }
+    }
+    fn set(self, soft: u64, hard: u64) -> std::io::Result<()> {
+        match self {
+            Self::Phy(res) => res.set(soft, hard),
+            Self::Virt(res) => res.set(soft, hard),
+        }
+    }
+    const fn is_supported(self) -> bool {
+        match self {
+            Self::Phy(res) => res.is_supported(),
+            Self::Virt(res) => res.is_supported(),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct ResourceDescription {
+    resource: Resource,
+    description: &'static str,
+    short: char,
+    unit: Unit,
+}
+
+impl ResourceDescription {
+    const SBSIZE: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::SBSIZE),
+        description: "socket buffer size",
+        short: 'b',
+        unit: Unit::Bytes,
+    };
+    const CORE: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::CORE),
+        description: "core file size",
+        short: 'c',
+        unit: Unit::Block,
+    };
+    const DATA: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::DATA),
+        description: "data seg size",
+        short: 'd',
+        unit: Unit::KBytes,
+    };
+    const NICE: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::NICE),
+        description: "scheduling priority",
+        short: 'e',
+        unit: Unit::Number,
+    };
+    const FSIZE: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::FSIZE),
+        description: "file size",
+        short: 'f',
+        unit: Unit::Block,
+    };
+    const SIGPENDING: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::SIGPENDING),
+        description: "pending signals",
+        short: 'i',
+        unit: Unit::Number,
+    };
+    const MEMLOCK: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::MEMLOCK),
+        description: "max locked memory",
+        short: 'l',
+        unit: Unit::KBytes,
+    };
+    const KQUEUES: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::KQUEUES),
+        description: "max kqueues",
+        short: 'k',
+        unit: Unit::Number,
+    };
+    const RSS: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::RSS),
+        description: "max memory size",
+        short: 'm',
+        unit: Unit::KBytes,
+    };
+    const LOCKS: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::LOCKS),
+        description: "file locks",
+        short: 'x',
+        unit: Unit::Number,
+    };
+    const NOFILE: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::NOFILE),
+        description: "open files",
+        short: 'n',
+        unit: Unit::Number,
+    };
+    const MSGQUEUE: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::MSGQUEUE),
+        description: "POSIX message queues",
+        short: 'q',
+        unit: Unit::Bytes,
+    };
+    const PIPE: Self = Self {
+        resource: Resource::Virt(Virtual::Pipe),
+        description: "pipe size",
+        short: 'p',
+        unit: Unit::HalfKBytes,
+    };
+    const RTPRIO: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::RTPRIO),
+        description: "real-time priority",
+        short: 'r',
+        unit: Unit::Number,
+    };
+    const RTTIME: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::RTTIME),
+        description: "real-time non-blocking time",
+        short: 'R',
+        unit: Unit::Micros,
+    };
+    const STACK: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::STACK),
+        description: "stack size",
+        short: 's',
+        unit: Unit::KBytes,
+    };
+    const CPU: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::CPU),
+        description: "cpu time",
+        short: 't',
+        unit: Unit::Seconds,
+    };
+    const NPROC: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::NPROC),
+        description: "max user processes",
+        short: 'u',
+        unit: Unit::Number,
+    };
+    const VMEM: Self = Self {
+        resource: Resource::Virt(Virtual::VMem),
+        description: "virtual memory",
+        short: 'v',
+        unit: Unit::KBytes,
+    };
+    const THREADS: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::THREADS),
+        description: "number of threads",
+        short: 'T',
+        unit: Unit::Number,
+    };
+    const NPTS: Self = Self {
+        resource: Resource::Phy(rlimit::Resource::NPTS),
+        description: "number of pseudoterminals",
+        short: 'P',
+        unit: Unit::Number,
+    };
+
+    fn get(&self, hard: bool) -> std::io::Result<String> {
+        let (soft_limit, hard_limit) = self.resource.get()?;
+        let val = if hard { hard_limit } else { soft_limit };
+
+        if val == rlimit::INFINITY {
+            Ok("unlimited".into())
+        } else {
+            Ok(format!("{}", val / self.unit.scale()))
+        }
+    }
+
+    fn set(&self, set_hard: bool, value: &LimitValue) -> std::io::Result<()> {
+        let (soft, hard) = self.resource.get()?;
+        let value = match value {
+            LimitValue::Soft => soft,
+            LimitValue::Hard => hard,
+            LimitValue::Unlimited => rlimit::INFINITY,
+            LimitValue::Value(v) => *v * self.unit.scale(),
+            LimitValue::Unset | LimitValue::Invalid(_) => return Ok(()),
+        };
+
+        if set_hard {
+            self.resource.set(soft, value)
+        } else {
+            self.resource.set(value, hard)
+        }
+    }
+
+    /// Print either soft or hard limit
+    fn print(
+        &self,
+        context: &brush_core::ExecutionContext<'_, impl brush_core::ShellExtensions>,
+        hard: bool,
+    ) -> io::Result<()> {
+        if !self.resource.is_supported() {
+            return Ok(());
+        }
+        let unit = match self.unit {
+            Unit::Block => format!("(block, -{})", self.short),
+            Unit::Bytes => format!("(bytes, -{})", self.short),
+            Unit::HalfKBytes => format!("(512 bytes, -{})", self.short),
+            Unit::KBytes => format!("(kbytes, -{})", self.short),
+            Unit::Micros => format!("(microseconds, -{})", self.short),
+            Unit::Number => format!("(-{})", self.short),
+            Unit::Seconds => format!("(seconds, -{})", self.short),
+        };
+        let resource = self.get(hard).unwrap_or_else(|e| format!("{e}"));
+        writeln!(
+            context.stdout(),
+            "{:<26}{:>16} {}",
+            self.description,
+            unit,
+            resource
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
+enum LimitValue {
+    Unset,
+    Unlimited,
+    Soft,
+    Hard,
+    Value(u64),
+    /// Not a number; reported when the limit would be set, as bash does.
+    Invalid(String),
+}
+
+impl FromStr for LimitValue {
+    type Err = <u64 as FromStr>::Err;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let v = match s {
+            "" => Self::Unset,
+            "unlimited" => Self::Unlimited,
+            "soft" => Self::Soft,
+            "hard" => Self::Hard,
+            _ if s.bytes().all(|b| b.is_ascii_digit()) => Self::Value(s.parse()?),
+            _ => Self::Invalid(s.to_owned()),
+        };
+        Ok(v)
+    }
+}
+
+impl winnow_args::FromArg for LimitValue {
+    fn from_arg(value: &winnow_args::BStr) -> Result<Self, winnow_args::error::BoxError> {
+        Ok(winnow_args::value::to_str(value)?.parse()?)
+    }
+}
+
+/// A flag's help, and whether this platform has the resource: `ulimit --help`
+/// says "(supported)" or "(unsupported)" after it.
+macro_rules! limit_help {
+    ($resource:ident, $help:literal) => {
+        if ResourceDescription::$resource.resource.is_supported() {
+            concat!($help, " (supported)")
+        } else {
+            concat!($help, " (unsupported)")
+        }
+    };
+}
+
+/// Modify shell resource limits.
+///
+/// Provides control over the resources available to the shell and processes
+/// it creates, on systems that allow such control.
+#[derive(winnow_args::Args, Debug)]
+#[arg(disable_help_short, disable_version_flag, disable_help_subcommand)]
+pub(crate) struct ULimitCommand {
+    /// use the `soft` resource limit
+    #[arg(short = 'S')]
+    soft: bool,
+    /// use the `hard` resource limit
+    #[arg(short = 'H')]
+    hard: bool,
+    /// all current limits are reported
+    #[arg(short = 'a')]
+    all: bool,
+    /// the socket buffer size
+    #[arg(short = 'b', default_missing = "", help = limit_help!(SBSIZE, "the socket buffer size"))]
+    sbsize: Option<LimitValue>,
+    /// the maximum size of core files created
+    #[arg(
+        short = 'c',
+        default_missing = "",
+        help = limit_help!(CORE, "the maximum size of core files created")
+    )]
+    core: Option<LimitValue>,
+    /// the maximum size of a process's data segment
+    #[arg(
+        short = 'd',
+        default_missing = "",
+        help = limit_help!(DATA, "the maximum size of a process's data segment")
+    )]
+    data: Option<LimitValue>,
+    /// the maximum scheduling priority (`nice`)
+    #[arg(
+        short = 'e',
+        default_missing = "",
+        help = limit_help!(NICE, "the maximum scheduling priority (`nice`)")
+    )]
+    nice: Option<LimitValue>,
+    /// the maximum size of files written by the shell and its children
+    #[arg(
+        short = 'f',
+        default_missing = "",
+        help = limit_help!(FSIZE, "the maximum size of files written by the shell and its children")
+    )]
+    file_size: Option<LimitValue>,
+    /// the maximum number of pending signals
+    #[arg(
+        short = 'i',
+        default_missing = "",
+        help = limit_help!(SIGPENDING, "the maximum number of pending signals")
+    )]
+    sigpending: Option<LimitValue>,
+    /// the maximum size a process may lock into memory
+    #[arg(
+        short = 'l',
+        default_missing = "",
+        help = limit_help!(MEMLOCK, "the maximum size a process may lock into memory")
+    )]
+    memlock: Option<LimitValue>,
+    /// the maximum number of kqueues allocated for this process
+    #[arg(
+        short = 'k',
+        default_missing = "",
+        help = limit_help!(KQUEUES, "the maximum number of kqueues allocated for this process")
+    )]
+    kqueues: Option<LimitValue>,
+    /// the maximum resident set size
+    #[arg(
+        short = 'm',
+        default_missing = "",
+        help = limit_help!(RSS, "the maximum resident set size")
+    )]
+    rss: Option<LimitValue>,
+    /// the maximum number of open file descriptors
+    #[arg(
+        short = 'n',
+        default_missing = "",
+        help = limit_help!(NOFILE, "the maximum number of open file descriptors")
+    )]
+    file_open: Option<LimitValue>,
+    /// the pipe buffer size
+    #[arg(short = 'p', default_missing = "", help = limit_help!(PIPE, "the pipe buffer size"))]
+    pipe: Option<LimitValue>,
+    /// the maximum number of bytes in POSIX message queues
+    #[arg(
+        short = 'q',
+        default_missing = "",
+        help = limit_help!(MSGQUEUE, "the maximum number of bytes in POSIX message queues")
+    )]
+    msgqueue: Option<LimitValue>,
+    /// the maximum real-time scheduling priority
+    #[arg(
+        short = 'r',
+        default_missing = "",
+        help = limit_help!(RTPRIO, "the maximum real-time scheduling priority")
+    )]
+    rtprio: Option<LimitValue>,
+    /// the maximum stack size
+    #[arg(short = 's', default_missing = "", help = limit_help!(STACK, "the maximum stack size"))]
+    stack: Option<LimitValue>,
+    /// the maximum amount of cpu time in seconds
+    #[arg(
+        short = 't',
+        default_missing = "",
+        help = limit_help!(CPU, "the maximum amount of cpu time in seconds")
+    )]
+    cpu: Option<LimitValue>,
+    /// the maximum number of user processes
+    #[arg(
+        short = 'u',
+        default_missing = "",
+        help = limit_help!(NPROC, "the maximum number of user processes")
+    )]
+    nproc: Option<LimitValue>,
+    /// the size of virtual memory
+    #[arg(short = 'v', default_missing = "", help = limit_help!(VMEM, "the size of virtual memory"))]
+    vmem: Option<LimitValue>,
+    /// the maximum number of file locks
+    #[arg(
+        short = 'x',
+        default_missing = "",
+        help = limit_help!(LOCKS, "the maximum number of file locks")
+    )]
+    file_lock: Option<LimitValue>,
+    /// the maximum number of pseudoterminals
+    #[arg(
+        short = 'P',
+        default_missing = "",
+        help = limit_help!(NPTS, "the maximum number of pseudoterminals")
+    )]
+    npts: Option<LimitValue>,
+    /// the maximum time a real-time process can run before blocking
+    #[arg(
+        short = 'R',
+        default_missing = "",
+        help = limit_help!(
+            RTTIME,
+            "the maximum time a real-time process can run before blocking"
+        )
+    )]
+    rttime: Option<LimitValue>,
+    /// the maximum number of threads
+    #[arg(
+        short = 'T',
+        default_missing = "",
+        help = limit_help!(THREADS, "the maximum number of threads")
+    )]
+    threads: Option<LimitValue>,
+
+    /// argument for the implicit limit (`-f`)
+    #[arg(positional)]
+    limit: Option<LimitValue>,
+}
+
+brush_winnow_args_adapter::impl_parse_args!(ULimitCommand);
+
+impl<SE: brush_core::ShellExtensions> builtins::Builtin<SE> for ULimitCommand {
+    type Error = brush_core::Error;
+
+    async fn execute(
+        self,
+        context: brush_core::ExecutionContext<'_, SE>,
+    ) -> Result<brush_core::ExecutionResult, Self::Error> {
+        let exit_code = ExecutionResult::success();
+        let mut resources_to_set = Vec::new();
+        let mut resources_to_get = Vec::new();
+
+        let mut set_or_get = |val, descr| {
+            match val {
+                Some(LimitValue::Unset) => resources_to_get.push(descr),
+                Some(v) => resources_to_set.push((descr, v)),
+                None => {}
+            }
+            if self.all {
+                resources_to_get.push(descr);
+            }
+        };
+
+        set_or_get(self.sbsize, ResourceDescription::SBSIZE);
+        set_or_get(self.core, ResourceDescription::CORE);
+        set_or_get(self.data, ResourceDescription::DATA);
+        set_or_get(self.file_size, ResourceDescription::FSIZE);
+        set_or_get(self.sigpending, ResourceDescription::SIGPENDING);
+        set_or_get(self.kqueues, ResourceDescription::KQUEUES);
+        set_or_get(self.memlock, ResourceDescription::MEMLOCK);
+        set_or_get(self.rss, ResourceDescription::RSS);
+        set_or_get(self.file_lock, ResourceDescription::LOCKS);
+        set_or_get(self.file_open, ResourceDescription::NOFILE);
+        set_or_get(self.pipe, ResourceDescription::PIPE);
+        set_or_get(self.npts, ResourceDescription::NPTS);
+        set_or_get(self.nice, ResourceDescription::NICE);
+        set_or_get(self.msgqueue, ResourceDescription::MSGQUEUE);
+        set_or_get(self.rtprio, ResourceDescription::RTPRIO);
+        set_or_get(self.rttime, ResourceDescription::RTTIME);
+        set_or_get(self.stack, ResourceDescription::STACK);
+        set_or_get(self.threads, ResourceDescription::THREADS);
+        set_or_get(self.cpu, ResourceDescription::CPU);
+        set_or_get(self.nproc, ResourceDescription::NPROC);
+        set_or_get(self.vmem, ResourceDescription::VMEM);
+
+        if resources_to_set.is_empty() {
+            if resources_to_get.is_empty() {
+                if let Some(fsize) = self.limit {
+                    resources_to_set.push((ResourceDescription::FSIZE, fsize));
+                } else {
+                    resources_to_get.push(ResourceDescription::FSIZE);
+                }
+            }
+        }
+
+        for (resource, value) in resources_to_set {
+            if let LimitValue::Invalid(value) = value {
+                writeln!(
+                    context.stderr(),
+                    "{}: {value}: invalid number",
+                    context.command_name
+                )?;
+                return Ok(ExecutionResult::general_error());
+            }
+            resource.set(self.hard, &value)?;
+        }
+
+        if resources_to_get.len() == 1 {
+            writeln!(context.stdout(), "{}", resources_to_get[0].get(self.hard)?)?;
+        } else {
+            for resource in resources_to_get {
+                resource.print(&context, self.hard)?;
+            }
+        }
+
+        Ok(exit_code)
+    }
+}

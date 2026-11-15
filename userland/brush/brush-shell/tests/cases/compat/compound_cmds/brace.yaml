@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024 reuben olinsky
+
+name: "Compound commands: brace"
+cases:
+  - name: "Brace command"
+    stdin: |
+      { echo 'hi'; }

@@ -10,6 +10,7 @@
 
 #![forbid(unsafe_code)]
 
+mod brush;
 mod build;
 mod check;
 mod cli;
@@ -53,4 +54,16 @@ mod run;
 
 pub use rootfs::{build_root_disk, build_ufs_root, inject_initfs_file, stage_rootfs_spec};
 
-pub use cli::run_cli;
+/// Run the CLI, intercepting the brush component and its qtest alias.
+pub fn run_cli(args: Vec<String>) -> std::process::ExitCode {
+    if let Some(result) = brush::try_run(&args) {
+        return match result {
+            Ok(code) => std::process::ExitCode::from(code),
+            Err(error) => {
+                eprintln!("error: {error:#}");
+                std::process::ExitCode::from(2)
+            }
+        };
+    }
+    cli::run_cli(brush::rewrite_qtest(args))
+}

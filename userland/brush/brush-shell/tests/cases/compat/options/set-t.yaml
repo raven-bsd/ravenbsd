@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024 reuben olinsky
+
+name: "set -t"
+cases:
+  - name: "set -t"
+    args: ["-t"]
+    stdin: |
+      echo first
+      echo second

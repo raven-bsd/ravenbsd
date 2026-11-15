@@ -1,0 +1,97 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024 reuben olinsky
+
+name: "Builtins: pwd"
+cases:
+  - name: "Basic pwd usage"
+    stdin: |
+      cd /
+      pwd
+      echo "Result: $?"
+      #
+      cd usr
+      pwd
+      echo "Result: $?"
+
+  - name: "pwd -LP"
+    stdin: |
+      mkdir -p ./level1/level2/level3
+      cd level1
+      ln -s ./level2/level3 ./symlink
+
+      (
+        cd ./symlink
+        basename $(pwd)
+        basename $(pwd -L)
+        basename $(pwd -P)
+      )
+      (
+        cd ./symlink
+        export PWD=
+        basename $(pwd)
+        basename $(pwd -L)
+        basename $(pwd -P)
+      )
+      (
+        cd ./symlink
+        export PWD=
+        # start a shell without $PWD
+        (
+          basename $(pwd)
+          basename $(pwd -L)
+          basename $(pwd -P)
+        )
+      )
+
+      cd ~
+      pwd
+      pwd -L
+      pwd -P
+
+  - name: "pwd with moved dir"
+    known_failure: true # Needs investigation
+    stdin: |
+      root=$(pwd)
+
+      mkdir -p ${root}/subdir
+      cd ${root}/subdir
+      mv ${root}/subdir ${root}/renamed
+
+      echo "pwd -L: $(basename $(pwd -L))"
+      echo "pwd -P: $(basename $(pwd -P))"
+
+  - name: "pwd with removed dir"
+    known_failure: true # Needs investigation
+    stdin: |
+      root=$(pwd)
+
+      mkdir -p ${root}/subdir
+      cd ${root}/subdir
+      rmdir ${root}/subdir
+
+      echo "pwd -L: $(basename $(pwd -L))"
+      echo "pwd -P: $(basename $(pwd -P))"
+
+  - name: "pwd takes -- and both of -L and -P"
+    stdin: |
+      cd /
+      pwd --
+
+  - name: "pwd takes the last of -L and -P"
+    stdin: |
+      mkdir real; ln -s real link; cd link
+      basename -- "$(pwd -LP)"
+      basename -- "$(pwd -PL)"
+
+  - name: "pwd ignores operands"
+    stdin: |
+      cd /
+      pwd foo; echo "rc=$?"
+
+  - name: "pwd takes options only before the first operand"
+    stdin: |
+      mkdir real; ln -s real link; cd link
+      basename -- "$(pwd -P foo)"
+      basename -- "$(pwd foo -P)"
+      basename -- "$(pwd -- -P)"
+      pwd foo bar >/dev/null; echo "rc=$?"
