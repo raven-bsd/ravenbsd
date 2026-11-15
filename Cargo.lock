@@ -918,6 +918,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-genet-stress"
+version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
+ "raven-genet",
+]
+
+[[package]]
 name = "raven-getrandom"
 version = "0.1.0"
 dependencies = [
