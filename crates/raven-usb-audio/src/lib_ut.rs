@@ -5,7 +5,7 @@
 
 use super::*;
 use raven_fdt_lite::Fdt;
-use raven_rp1_xhci::UsbControllers;
+use raven_rp1_xhci::{TrbType, UsbControllers};
 
 use crate::test_config::sample;
 
@@ -56,4 +56,25 @@ fn the_uac1_configuration_exposes_the_playback_graph() {
     assert!(config.streaming.format.supports_rate(44_100));
     assert!(config.streaming.format.supports_rate(48_000));
     assert!(!config.streaming.format.supports_rate(96_000));
+}
+
+#[test]
+fn a_control_request_runs_on_the_pi5_transport() {
+    let fdt = Fdt::parse(XHCI).expect("fixture FDT");
+    let controllers = UsbControllers::from_fdt(&fdt).expect("USB nodes");
+    assert_eq!(controllers.count(), 2);
+
+    let mut host = AudioHost::new(sample(), 8, 8).expect("host");
+    let setup = SetupPacket {
+        request_type: 0x21,
+        request: SET_CUR,
+        value: (2u16 << 8) | u16::from(FEATURE_MUTE),
+        index: 0,
+        length: 1,
+    };
+    assert_eq!(host.control(setup, &[1], 0x2000), Ok(Response::Ack));
+    host.control_device_complete(1).expect("event");
+    let completion = host.control_complete().expect("completion");
+    assert_eq!(completion.trb.kind(), TrbType::StatusStage);
+    assert!(host.controls().mute);
 }

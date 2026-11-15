@@ -45,6 +45,16 @@ pub struct VolumeLimits {
 }
 
 impl VolumeLimits {
+    /// The model's default range: -64 dB to 0 dB in 0.125 dB steps.
+    ///
+    /// This is a model default, not a device claim; the real range comes from the feature unit's
+    /// GET_MIN/GET_MAX/GET_RES requests.
+    pub const MODEL_DEFAULT: Self = Self {
+        min: -0x4000,
+        max: 0,
+        res: 0x20,
+    };
+
     /// Reject an inverted or zero range.
     #[must_use]
     pub const fn valid(self) -> bool {

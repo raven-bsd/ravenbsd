@@ -12,6 +12,7 @@ rust-version.workspace = true
 
 [dependencies]
 raven-rp1-xhci = { path = "../raven-rp1-xhci" }
+raven-proto-audio = { path = "../raven-proto-audio" }
 
 [dev-dependencies]
 raven-fdt-lite = { path = "../raven-fdt-lite" }

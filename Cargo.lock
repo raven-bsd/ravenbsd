@@ -2578,6 +2578,7 @@ name = "raven-usb-audio"
 version = "0.1.0"
 dependencies = [
  "raven-fdt-lite",
+ "raven-proto-audio",
  "raven-rp1-xhci",
 ]
 
