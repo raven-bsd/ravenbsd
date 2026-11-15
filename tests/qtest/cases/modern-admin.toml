@@ -1,0 +1,118 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K78b: the modern admin case. Boot the shell profile with the target `raven` binary and assert
+# the machine-readable admin surface: `raven --json status` (schema 1, kind `status`, at least one
+# ready service), `raven doctor` exit 0, `raven config check` exit 0 and an unchanged
+# `svcctl list`.
+#
+# The target binary runs on the C64f std startup (merged at fe1cb864). A missing fixture/build is
+# a failure, never a fallback to the host binary or the K74 stub.
+
+name = "modern-admin"
+arch = "x86_64"
+profile = "raven-admin-test"
+timeout_secs = 420
+pre = ["sh tests/fixtures/modern-admin/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^rsh: ready$'
+
+[[expect]]
+regex = '^RavenBSD raven 0\.1 .* x86_64$'
+
+[[expect]]
+regex = '^\{"schema":1,"kind":"status","version".*"ready":[1-9][0-9]*'
+
+[[expect]]
+regex = '^raven doctor: ok$'
+
+[[expect]]
+regex = '^raven config check: ok$'
+
+[[expect]]
+regex = '^consd running \d+$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|EUNAVAILABLE|target wiring arrives'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "uname -a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^RavenBSD raven 0\.1 .* x86_64$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "raven --json status\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{"schema":1,"kind":"status","version".*"ready":[1-9][0-9]*'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "raven doctor && echo raven doctor: ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven doctor: ok$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "raven config check && echo raven config check: ok\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven config check: ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "svcctl list\n"
+delay_ms = 100
+
+[[step]]
+wait = '^consd running \d+$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
