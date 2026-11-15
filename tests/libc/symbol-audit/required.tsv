@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Required libc symbols per C73c target case. Derived from the seven C sources under
+# libc/ravenlibc/tests/c/ and the C73c section 3 link failures. Columns:
+# case<TAB>symbol<TAB>owner<TAB>note
+hello	atexit	-	process exit
+hello	calloc	-	memory
+hello	close	-	file descriptor
+hello	dup2	-	console setup
+hello	free	-	memory
+hello	getauxval	-	startup auxv
+hello	malloc	-	memory
+hello	memcmp	-	string
+hello	memcpy	-	string
+hello	memmove	-	string
+hello	memset	-	string
+hello	open	-	console setup
+hello	realloc	-	memory
+hello	strchr	-	string
+hello	strcmp	-	string
+hello	strerror	-	string
+hello	strlen	-	string
+hello	strstr	-	string
+hello	write	-	console
+stdio	__ctype_get_mb_cur_max	C64i	stdio/C64i
+stdio	fgetwc	C64i	wide stdio
+stdio	fwprintf	C64i	wide stdio
+stdio	getline	C64i	stdio
+stdio	remove	C64i	stdio
+stdio	rewind	C64i	stdio
+stdio	stderr	C64i	stdio object
+stdio	stdin	C64i	stdio object
+stdio	stdout	C64i	stdio object
+time	clock_gettime	-	time
+time	difftime	-	time
+time	localtime_r	-	time
+time	nanosleep	-	time
+time	strftime	-	time
+time	time	-	time
+threads	pthread_cond_signal	-	threads
+threads	pthread_cond_wait	-	threads
+threads	pthread_create	-	threads
+threads	pthread_join	-	threads
+threads	pthread_mutex_lock	-	threads
+threads	pthread_mutex_unlock	-	threads
+signals	longjmp	-	signals
+signals	raise	-	signals
+signals	setjmp	-	signals
+signals	sigaction	-	signals
+signals	sigaddset	-	signals
+signals	sigemptyset	-	signals
+signals	sigprocmask	-	signals
+dynamic	arc4random_buf	C64i	random; C50 history
+dynamic	dlclose	-	loader
+dynamic	dlerror	-	loader
+dynamic	dlopen	-	loader
+dynamic	dlsym	-	loader
+dynamic	fgetln	C64i	string/stdio
+dynamic	grantpt	C64i	pty
+dynamic	posix_openpt	C64i	pty
+dynamic	ptsname_r	C64i	pty
+dynamic	tcgetattr	C64i	termios
+dynamic	tcsetattr	C64i	termios
+dynamic	umask	C64i	process
+dynamic	unlockpt	C64i	pty
+spawn	fork	-	process
+spawn	getpid	-	process
+spawn	posix_spawn	-	spawn ABI
+spawn	posix_spawnp	-	spawn ABI
+spawn	wait	-	process
+spawn	waitpid	-	process
