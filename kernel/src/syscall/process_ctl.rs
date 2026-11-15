@@ -18,7 +18,7 @@ use crate::process::{self, Process, ProcessState, handle::Object};
 use crate::sched;
 use crate::syscall::SyscallFrame;
 use crate::syscall::linux::install_handler;
-use crate::usercopy::copy_to_user;
+use crate::usercopy::{copy_from_user, copy_to_user};
 
 /// `proc_create(flags) -> Handle`.
 pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
@@ -84,21 +84,24 @@ pub const PROC_SETPGID: usize = 0x36;
 pub const PROC_SETSID: usize = 0x37;
 /// Raw `proc_setcred(which, value) -> 0` number.
 pub const PROC_SETCRED: usize = 0x38;
+/// Raw `proc_pid_info(pid, out, count) -> 0` number.
+pub const PROC_PID_INFO: usize = 0x3A;
+/// Raw `proc_setcred_ex(which, a, b, c, groups, count) -> 0` number.
+pub const PROC_SETCRED_EX: usize = 0x3B;
+/// Raw `proc_cred_info(out, count) -> 0` number.
+pub const PROC_CRED_INFO: usize = 0x3C;
+/// Raw `proc_getgroups(out, size) -> count` number.
+pub const PROC_GETGROUPS: usize = 0x3D;
 
-/// `proc_self_info(out: *mut u64, count: usize) -> 0`.
-///
-/// Writes `[pid, ppid, pgid, sid, uid, euid, gid, egid]` as eight little-endian u64 words.
-/// Count must be exactly eight; the destination is checked by `UserSlice`.
-pub fn self_info(frame: &SyscallFrame) -> Result<usize, Errno> {
-    let caller = process::current().ok_or(Errno::ESRCH)?;
-    let count = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+/// Write the eight identity words for `target` to user memory.
+fn write_info(target: &Process, out: u64, count: usize) -> Result<usize, Errno> {
     if count != 8 {
         return Err(Errno::EINVAL);
     }
-    let destination = UserSlice::new(frame.rdi, 64)?;
-    let ids = *caller.ids.lock();
+    let destination = UserSlice::new(out, 64)?;
+    let ids = *target.ids.lock();
     let values = [
-        caller.id,
+        target.id,
         ids.ppid,
         ids.pgid,
         ids.sid,
@@ -115,34 +118,80 @@ pub fn self_info(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(0)
 }
 
+/// `proc_self_info(out: *mut u64, count: usize) -> 0`.
+///
+/// Writes `[pid, ppid, pgid, sid, uid, euid, gid, egid]` as eight little-endian u64 words.
+/// Count must be exactly eight; the destination is checked by `UserSlice`.
+pub fn self_info(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let count = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    write_info(&caller, frame.rdi, count)
+}
+
+/// `proc_pid_info(pid: i32, out: *mut u64, count: usize) -> 0`.
+///
+/// `pid == 0` means the caller. The target must still be in the pid registry and not exited.
+pub fn pid_info(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let pid = frame.rdi as u32 as i32;
+    let target = if pid == 0 {
+        caller
+    } else {
+        let pid = u64::try_from(pid).map_err(|_| Errno::ESRCH)?;
+        let target = process::lookup_pid(pid).ok_or(Errno::ESRCH)?;
+        if *target.state.lock() == ProcessState::Exited {
+            return Err(Errno::ESRCH);
+        }
+        target
+    };
+    let count = usize::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
+    write_info(&target, frame.rsi, count)
+}
+
 /// `proc_setpgid(pid: i32, pgid: i32) -> 0`.
 ///
-/// Only pid 0 and the caller are accepted. A zero pgid means the caller's pid. The slice accepts
-/// the caller's own group or the current group (a no-op); any other group is `EPERM`.
+/// The target is the caller, or a direct child. A zero pgid means the target's pid. A session
+/// leader is `EPERM`. The target group may be the target's new own group, the current group, or
+/// any group with a live member in the target's session. There is no group table; the pid
+/// registry is scanned.
 pub fn setpgid(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let pid = frame.rdi as u32 as i32;
-    if pid != 0 && u64::try_from(pid).ok() != Some(caller.id) {
+    let target = if pid == 0 || u64::try_from(pid).ok() == Some(caller.id) {
+        Arc::clone(&caller)
+    } else {
+        let pid = u64::try_from(pid).map_err(|_| Errno::ESRCH)?;
+        let target = process::lookup_pid(pid).ok_or(Errno::ESRCH)?;
+        if *target.state.lock() == ProcessState::Exited {
+            return Err(Errno::ESRCH);
+        }
+        if target.ids.lock().ppid != caller.id {
+            return Err(Errno::EPERM);
+        }
+        target
+    };
+    let target_id = target.id;
+    let (target_sid, current_group) = {
+        let ids = target.ids.lock();
+        (ids.sid, ids.pgid)
+    };
+    if target_sid == target_id {
         return Err(Errno::EPERM);
     }
     let pgid = frame.rsi as u32 as i32;
-    let mut ids = caller.ids.lock();
-    if ids.sid == caller.id {
-        return Err(Errno::EPERM);
-    }
-    let target = if pgid == 0 {
-        caller.id
+    let group = if pgid == 0 {
+        target_id
     } else {
         u64::try_from(pgid).map_err(|_| Errno::EPERM)?
     };
-    if target == caller.id {
-        ids.pgid = caller.id;
-        Ok(0)
-    } else if target == ids.pgid {
-        Ok(0)
-    } else {
-        Err(Errno::EPERM)
+    let valid = group == target_id
+        || group == current_group
+        || process::group_in_session(group, target_sid);
+    if !valid {
+        return Err(Errno::EPERM);
     }
+    target.ids.lock().pgid = group;
+    Ok(0)
 }
 
 /// `proc_setsid() -> sid`.
@@ -181,6 +230,265 @@ pub fn setcred(frame: &SyscallFrame) -> Result<usize, Errno> {
     } else {
         Err(Errno::EPERM)
     }
+}
+
+/// `proc_cred_info(out: *mut u64, count: usize) -> 0`.
+///
+/// Writes `[uid, euid, suid, gid, egid, sgid]` as six little-endian u64 words. The caller only.
+pub fn cred_info(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let count = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    if count != 6 {
+        return Err(Errno::EINVAL);
+    }
+    let destination = UserSlice::new(frame.rdi, 48)?;
+    let ids = *caller.ids.lock();
+    let values = [
+        u64::from(ids.uid),
+        u64::from(ids.euid),
+        u64::from(ids.suid),
+        u64::from(ids.gid),
+        u64::from(ids.egid),
+        u64::from(ids.sgid),
+    ];
+    let mut bytes = [0u8; 48];
+    for (chunk, value) in bytes.chunks_exact_mut(8).zip(values) {
+        chunk.copy_from_slice(&value.to_le_bytes());
+    }
+    copy_to_user(destination, &bytes)?;
+    Ok(0)
+}
+
+/// `proc_getgroups(out: *mut u32, size: usize) -> count`.
+///
+/// `size == 0` returns the count without touching user memory. A smaller buffer is `EINVAL`;
+/// a larger buffer receives exactly `count` entries in kernel storage order.
+pub fn getgroups(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let size = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    let ids = caller.ids.lock();
+    let count = usize::try_from(ids.group_count).map_err(|_| Errno::EINVAL)?;
+    if size == 0 {
+        return Ok(count);
+    }
+    if size < count || count > process::MAX_GROUPS {
+        return Err(Errno::EINVAL);
+    }
+    let destination = UserSlice::new(
+        frame.rdi,
+        u64::try_from(count)
+            .map_err(|_| Errno::EINVAL)?
+            .saturating_mul(4),
+    )?;
+    let mut bytes = [0u8; 64];
+    for (chunk, value) in bytes.chunks_exact_mut(4).zip(ids.groups.iter()) {
+        chunk.copy_from_slice(&value.to_le_bytes());
+    }
+    copy_to_user(
+        destination,
+        bytes.get(..count.saturating_mul(4)).ok_or(Errno::EINVAL)?,
+    )?;
+    Ok(count)
+}
+
+fn read_groups(pointer: u64, count: usize) -> Result<([u32; process::MAX_GROUPS], usize), Errno> {
+    if count > process::MAX_GROUPS {
+        return Err(Errno::EINVAL);
+    }
+    let mut groups = [0u32; process::MAX_GROUPS];
+    if count == 0 {
+        return Ok((groups, 0));
+    }
+    let mut bytes = [0u8; 64];
+    copy_from_user(
+        bytes
+            .get_mut(..count.saturating_mul(4))
+            .ok_or(Errno::EINVAL)?,
+        UserSlice::new(
+            pointer,
+            u64::try_from(count)
+                .map_err(|_| Errno::EINVAL)?
+                .saturating_mul(4),
+        )?,
+    )?;
+    for (chunk, value) in bytes
+        .chunks_exact(4)
+        .take(count)
+        .zip(groups.iter_mut().take(count))
+    {
+        let mut word = [0u8; 4];
+        word.copy_from_slice(chunk);
+        *value = u32::from_le_bytes(word);
+    }
+    Ok((groups, count))
+}
+
+fn one(value: i32) -> Result<Option<u32>, Errno> {
+    if value < -1 {
+        return Err(Errno::EINVAL);
+    }
+    Ok(if value == -1 {
+        None
+    } else {
+        Some(value as u32)
+    })
+}
+
+fn unprivileged(value: Option<u32>, choices: &[u32]) -> Result<(), Errno> {
+    match value {
+        Some(value) if !choices.contains(&value) => Err(Errno::EPERM),
+        _ => Ok(()),
+    }
+}
+
+/// `proc_setcred_ex(which, a, b, c, groups, count) -> 0`.
+///
+/// `which` is the `SetCred` kind: 1 setuid, 2 seteuid, 3 setreuid, 4 setresuid, 5 setgid,
+/// 6 setegid, 7 setregid, 8 setresgid, 9 setgroups. Effective uid 0 is privileged; an
+/// unprivileged process may only target its real, effective or saved id and may never set
+/// supplementary groups.
+pub fn setcred_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let which = u32::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
+    if !(1..=9).contains(&which) {
+        return Err(Errno::EINVAL);
+    }
+    let a = frame.rsi as u32 as i32;
+    let b = frame.rdx as u32 as i32;
+    let c = frame.r10 as u32 as i32;
+    let count = usize::try_from(frame.r9).map_err(|_| Errno::EINVAL)?;
+    let (groups, group_count) = if which == 9 {
+        read_groups(frame.r8, count)?
+    } else {
+        ([0u32; process::MAX_GROUPS], 0)
+    };
+    let mut ids = caller.ids.lock();
+    let privileged = ids.euid == 0;
+    match which {
+        1 | 5 => {
+            let Some(value) = one(a)? else {
+                return Err(Errno::EINVAL);
+            };
+            if which == 1 {
+                if privileged {
+                    ids.uid = value;
+                    ids.euid = value;
+                    ids.suid = value;
+                } else {
+                    unprivileged(Some(value), &[ids.uid, ids.suid])?;
+                    ids.euid = value;
+                }
+            } else if privileged {
+                ids.gid = value;
+                ids.egid = value;
+                ids.sgid = value;
+            } else {
+                unprivileged(Some(value), &[ids.gid, ids.sgid])?;
+                ids.egid = value;
+            }
+        }
+        2 | 6 => {
+            let Some(value) = one(a)? else {
+                return Err(Errno::EINVAL);
+            };
+            if which == 2 {
+                if !privileged {
+                    unprivileged(Some(value), &[ids.uid, ids.suid])?;
+                }
+                ids.euid = value;
+            } else {
+                if !privileged {
+                    unprivileged(Some(value), &[ids.gid, ids.sgid])?;
+                }
+                ids.egid = value;
+            }
+        }
+        3 | 7 => {
+            let real = one(a)?;
+            let effective = one(b)?;
+            if privileged {
+                if let Some(real) = real {
+                    if which == 3 {
+                        ids.uid = real;
+                    } else {
+                        ids.gid = real;
+                    }
+                }
+                if let Some(effective) = effective {
+                    if which == 3 {
+                        ids.euid = effective;
+                        ids.suid = effective;
+                    } else {
+                        ids.egid = effective;
+                        ids.sgid = effective;
+                    }
+                }
+            } else if which == 3 {
+                unprivileged(real, &[ids.uid])?;
+                unprivileged(effective, &[ids.uid, ids.euid, ids.suid])?;
+                if let Some(real) = real {
+                    ids.uid = real;
+                }
+                if let Some(effective) = effective {
+                    ids.euid = effective;
+                }
+            } else {
+                unprivileged(real, &[ids.gid])?;
+                unprivileged(effective, &[ids.gid, ids.egid, ids.sgid])?;
+                if let Some(real) = real {
+                    ids.gid = real;
+                }
+                if let Some(effective) = effective {
+                    ids.egid = effective;
+                }
+            }
+        }
+        4 | 8 => {
+            let real = one(a)?;
+            let effective = one(b)?;
+            let saved = one(c)?;
+            if !privileged {
+                let (current_real, current_effective, current_saved) = if which == 4 {
+                    (ids.uid, ids.euid, ids.suid)
+                } else {
+                    (ids.gid, ids.egid, ids.sgid)
+                };
+                unprivileged(real, &[current_real, current_effective, current_saved])?;
+                unprivileged(effective, &[current_real, current_effective, current_saved])?;
+                unprivileged(saved, &[current_real, current_effective, current_saved])?;
+            }
+            if let Some(real) = real {
+                if which == 4 {
+                    ids.uid = real;
+                } else {
+                    ids.gid = real;
+                }
+            }
+            if let Some(effective) = effective {
+                if which == 4 {
+                    ids.euid = effective;
+                } else {
+                    ids.egid = effective;
+                }
+            }
+            if let Some(saved) = saved {
+                if which == 4 {
+                    ids.suid = saved;
+                } else {
+                    ids.sgid = saved;
+                }
+            }
+        }
+        9 => {
+            if !privileged {
+                return Err(Errno::EPERM);
+            }
+            ids.groups = groups;
+            ids.group_count = u32::try_from(group_count).map_err(|_| Errno::EINVAL)?;
+        }
+        _ => return Err(Errno::EINVAL),
+    }
+    Ok(0)
 }
 
 /// `proc_set_personality(proc, personality, handler) -> 0`.

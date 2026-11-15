@@ -6,7 +6,8 @@
 //! The cache holds at most [`STACK_CACHE_MAX`] default-size stacks. A cached stack is only
 //! reused when its previous owner is provably gone; the joiner never frees on a user-space flag
 //! alone (A-thr-3). Without `exit_ex` a detached thread pushes its stack on the zombie list and
-//! the next create/join/exit reaps entries whose `exit_word` is set after one yield.
+//! the next create/join/exit reaps entries whose `exit_word` is set and that the kernel reports
+//! dead after one yield.
 
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -212,7 +213,9 @@ pub fn reap<K: ThreadKernel>(kernel: &K) {
             .get(index)
             .map_or(0, |slot| slot.load(Ordering::Acquire));
         index += 1;
-        let exited = owner != 0 && raw::tcb(owner).exit_word.load(Ordering::Acquire) == 1;
+        let exited = owner != 0
+            && raw::tcb(owner).exit_word.load(Ordering::Acquire) == 1
+            && kernel.thread_is_dead(owner);
         if exited {
             let _ = kernel.unmap(base, size);
         } else {

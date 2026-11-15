@@ -55,7 +55,14 @@ fn seed(args: &[String]) -> Result<(), String> {
             .ok_or("region slice")?
             .to_vec();
         write_seed(&directory.join("seed-00"), &pristine)?;
-        for seed in 1..8usize {
+        // The whole-image GPT/FAT parsers get a wider corpus than the UFS overlays: the ticket
+        // requires at least twenty malformed vectors next to the eight-seed baseline.
+        let count = if *target == "gpt" || *target == "fat" {
+            24usize
+        } else {
+            8usize
+        };
+        for seed in 1..count {
             let mut data = pristine.clone();
             let mut state = 0x9e37_79b9_7f4a_7c15u64 ^ seed as u64;
             for _ in 0..(2 + seed % 3) {
@@ -67,7 +74,7 @@ fn seed(args: &[String]) -> Result<(), String> {
             }
             write_seed(&directory.join(format!("seed-{seed:02}")), &data)?;
         }
-        println!("seed {target}: 8 files in {}", directory.display());
+        println!("seed {target}: {count} files in {}", directory.display());
     }
     Ok(())
 }

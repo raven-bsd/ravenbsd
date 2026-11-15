@@ -8,6 +8,58 @@
 
 long double expl(long double);
 
+/* The donor calls the C library fabsl; the oracle .so is not linked against libm, so the
+ * first-party shim provides it. */
+long double fabsl(long double x)
+{
+	return x < 0 ? -x : x;
+}
+long double expm1l(long double);
+long double logl(long double);
+long double log10l(long double);
+long double log1pl(long double);
+long double log2l(long double);
+
+void rl_logl(const unsigned char *in, unsigned char *out)
+{
+	long double x;
+	long double y;
+
+	memcpy(&x, in, sizeof(x));
+	y = logl(x);
+	memcpy(out, &y, sizeof(y));
+}
+
+void rl_log10l(const unsigned char *in, unsigned char *out)
+{
+	long double x;
+	long double y;
+
+	memcpy(&x, in, sizeof(x));
+	y = log10l(x);
+	memcpy(out, &y, sizeof(y));
+}
+
+void rl_log1pl(const unsigned char *in, unsigned char *out)
+{
+	long double x;
+	long double y;
+
+	memcpy(&x, in, sizeof(x));
+	y = log1pl(x);
+	memcpy(out, &y, sizeof(y));
+}
+
+void rl_log2l(const unsigned char *in, unsigned char *out)
+{
+	long double x;
+	long double y;
+
+	memcpy(&x, in, sizeof(x));
+	y = log2l(x);
+	memcpy(out, &y, sizeof(y));
+}
+
 void rl_expl(const unsigned char *in, unsigned char *out)
 {
 	long double x;
@@ -15,5 +67,15 @@ void rl_expl(const unsigned char *in, unsigned char *out)
 
 	memcpy(&x, in, sizeof(x));
 	y = expl(x);
+	memcpy(out, &y, sizeof(y));
+}
+
+void rl_expm1l(const unsigned char *in, unsigned char *out)
+{
+	long double x;
+	long double y;
+
+	memcpy(&x, in, sizeof(x));
+	y = expm1l(x);
 	memcpy(out, &y, sizeof(y));
 }

@@ -50,6 +50,14 @@ pub trait ProcBackend {
     fn getgid(&self) -> u32;
     /// Effective gid.
     fn getegid(&self) -> u32;
+    /// Real, effective and saved user ids.
+    fn getresuid(&self) -> Result<(u32, u32, u32), Errno> {
+        Err(crate::errors::ENOSYS)
+    }
+    /// Real, effective and saved group ids.
+    fn getresgid(&self) -> Result<(u32, u32, u32), Errno> {
+        Err(crate::errors::ENOSYS)
+    }
     /// Process group of `pid`.
     fn getpgid(&self, pid: i32) -> Result<i32, Errno>;
     /// Session of `pid`.

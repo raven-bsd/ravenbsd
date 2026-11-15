@@ -125,7 +125,7 @@ pub fn expm1l(x: LongDouble) -> LongDouble {
     if x.is_zero() {
         return x;
     }
-    if x.abs().to_f64() < 1.0e-9 {
+    if x.abs().to_f64() <= 0.25 {
         // Series: x + x^2/2 + x^3/6 + ...
         let mut term = x;
         let mut sum = x;
@@ -200,17 +200,23 @@ pub fn logl(x: LongDouble) -> LongDouble {
 
 /// `ln(1 + x)`, accurate near zero.
 pub fn log1pl(x: LongDouble) -> LongDouble {
-    if x.is_nan() || x.is_infinite() {
-        return logl(LongDouble::one().add(x));
+    if x.is_nan() {
+        return x;
+    }
+    if x.is_infinite() {
+        return if x.sign_bit() { LongDouble::nan() } else { x };
     }
     if x.is_zero() {
         return x;
     }
-    if x.abs().to_f64() < 1.0e-9 {
+    // `logl(1 + x)` loses `x`'s low bits to the addition: at x = 2^-22 the rounding of
+    // `1 + x` alone is about 2.9e6 ULP of the result. The alternating series keeps
+    // full precision through |x| = 0.25; past that the addition is harmless.
+    if x.abs().to_f64() <= 0.25 {
         let mut term = x;
         let mut sum = x;
         let mut index = 2i64;
-        while index <= 30 {
+        while index <= 80 {
             let next = term.mul(x);
             let contribution = next.div(LongDouble::from_i64(index));
             sum = if index % 2 == 0 {

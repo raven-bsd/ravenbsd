@@ -13,9 +13,9 @@ pub mod thread;
 use core::fmt;
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
 
-use alloc::collections::VecDeque;
+use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::String;
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use alloc::vec;
 
 use raven_abi::errno::Errno;
@@ -65,6 +65,10 @@ const USER_STACK_SIZE: u64 = 128 * 1024;
 const USER_GUARD: u64 = 4096;
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
+/// Live process ids. The weak references never keep a process alive; teardown removes its entry,
+/// and lookup removes an entry whose last strong reference has already gone.
+static PID_REGISTRY: Mutex<BTreeMap<u64, Weak<Process>>> = Mutex::new(BTreeMap::new());
+
 /// Process lifecycle state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProcessState {
@@ -93,7 +97,18 @@ pub struct ProcessIds {
     pub gid: u32,
     /// Effective group id.
     pub egid: u32,
+    /// Saved user id.
+    pub suid: u32,
+    /// Saved group id.
+    pub sgid: u32,
+    /// Supplementary group list, in kernel storage order.
+    pub groups: [u32; MAX_GROUPS],
+    /// Number of valid entries in `groups`.
+    pub group_count: u32,
 }
+
+/// Maximum supplementary groups stored by this slice.
+pub const MAX_GROUPS: usize = 16;
 
 impl ProcessIds {
     /// The kernel process identity.
@@ -106,6 +121,10 @@ impl ProcessIds {
             euid: 0,
             gid: 0,
             egid: 0,
+            suid: 0,
+            sgid: 0,
+            groups: [0; MAX_GROUPS],
+            group_count: 0,
         }
     }
 
@@ -119,6 +138,10 @@ impl ProcessIds {
             euid: parent.euid,
             gid: parent.gid,
             egid: parent.egid,
+            suid: parent.suid,
+            sgid: parent.sgid,
+            groups: parent.groups,
+            group_count: parent.group_count,
         }
     }
 }
@@ -233,6 +256,37 @@ pub fn current() -> Option<Arc<Process>> {
     crate::sched::current_process()
 }
 
+/// Register a live process in the pid registry.
+pub fn register_pid(process: &Arc<Process>) {
+    PID_REGISTRY
+        .lock()
+        .insert(process.id, Arc::downgrade(process));
+}
+
+/// Remove a process from the pid registry at teardown.
+pub fn unregister_pid(id: u64) {
+    let _ = PID_REGISTRY.lock().remove(&id);
+}
+
+/// Look up a live process by pid. A stale weak entry is removed and reported as unknown.
+pub fn lookup_pid(pid: u64) -> Option<Arc<Process>> {
+    let mut registry = PID_REGISTRY.lock();
+    let upgraded = registry.get(&pid).and_then(Weak::upgrade);
+    if upgraded.is_none() {
+        let _ = registry.remove(&pid);
+    }
+    upgraded
+}
+
+/// True when at least one live process is in `pgid` inside `sid`.
+pub fn group_in_session(pgid: u64, sid: u64) -> bool {
+    let registry = PID_REGISTRY.lock();
+    registry.values().filter_map(Weak::upgrade).any(|process| {
+        let ids = *process.ids.lock();
+        ids.pgid == pgid && ids.sid == sid
+    })
+}
+
 /// Create the kernel process that owns kernel threads.
 pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
     Ok(Arc::new(Process {
@@ -294,6 +348,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         personality: Mutex::new(PersonalityState::native()),
     });
     handle::install_initial(&mut process.handles.lock(), &process, false)?;
+    register_pid(&process);
     Ok(process)
 }
 
@@ -375,6 +430,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         }
     }
     *child.namespace.lock() = source.namespace.lock().clone();
+    register_pid(&child);
     Ok(child)
 }
 
@@ -422,6 +478,10 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
             euid: 0,
             gid: 0,
             egid: 0,
+            suid: 0,
+            sgid: 0,
+            groups: [0; MAX_GROUPS],
+            group_count: 0,
         }),
         path: String::from(path),
         address_space: Mutex::new(Some(user_address_space)),
@@ -445,6 +505,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
     });
     handle::install_initial(&mut process.handles.lock(), &process, true)
         .map_err(ProcessError::Handle)?;
+    register_pid(&process);
     crate::sched::init().map_err(ProcessError::Sched)?;
     let thread = crate::sched::new_user_thread(&process, elf.entry(), user_stack, user_stack)
         .map_err(ProcessError::Sched)?;
@@ -807,6 +868,7 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     if process.torn_down.swap(true, Ordering::AcqRel) {
         return;
     }
+    unregister_pid(process.id);
     // Fail pending scheme requests and remove the registry entries while the server page tables
     // still exist, so capture mappings can be removed before the address space is released.
     ipc::on_process_exit(process);

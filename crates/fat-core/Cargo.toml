@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "fat-core"
+version = "0.1.0"
+description = "Read-only, panic-free FAT12/16/32 parser."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+# Golden-image builder used by the host tests and the filesystem fuzz replay harness.
+fixtures = []
+
+[lints]
+workspace = true
