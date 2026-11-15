@@ -9,9 +9,22 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
 #![forbid(unsafe_code)]
+// `target_os = "ravenbsd"` is only listed by the ravenbsd toolchain; host builds see it as unknown.
+#![allow(unexpected_cfgs)]
+
+#[cfg(any(test, target_os = "ravenbsd"))]
+mod admin;
 
 #[cfg(not(target_os = "none"))]
 fn main() {
+    #[cfg(target_os = "ravenbsd")]
+    {
+        let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+        if let Some(code) = admin::dispatch(&args) {
+            std::process::exit(code);
+        }
+    }
+
     use std::io::IsTerminal;
 
     let mut stdout = std::io::stdout();

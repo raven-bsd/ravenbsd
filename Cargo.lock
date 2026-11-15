@@ -478,7 +478,12 @@ name = "raven"
 version = "0.1.0"
 dependencies = [
  "raven-cli",
+ "raven-config",
+ "raven-output",
+ "raven-proto-fs",
+ "raven-proto-svc",
  "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]

@@ -12,6 +12,15 @@ rust-version.workspace = true
 
 [target.'cfg(not(target_os = "none"))'.dependencies]
 raven-cli = { path = "../../../crates/raven-cli" }
+raven-config = { path = "../../../crates/raven-config" }
+raven-output = { path = "../../../crates/raven-output" }
+raven-proto-svc = { path = "../../../crates/raven-proto-svc" }
+
+[target.'cfg(target_os = "ravenbsd")'.dependencies]
+# `raven-rt` is not usable here: its entry object defines `_start`, which conflicts with the std
+# crt. The scheme client and the directory-entry decoder are enough for the admin backends.
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-scheme = { path = "../../../crates/raven-scheme" }
 
 [target.'cfg(target_os = "none")'.dependencies]
 raven-rt = { path = "../../rt", features = ["alloc"] }
