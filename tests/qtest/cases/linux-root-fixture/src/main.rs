@@ -87,6 +87,6 @@ fn main(_args: raven_rt::Args) -> i32 {
         println!("linux-root: FAIL wait linuxd: {}", error.description());
         return 1;
     }
-    println!("linux-root: busybox exit={status}");
+    println!("linux-root: linuxd exit={status}");
     0
 }

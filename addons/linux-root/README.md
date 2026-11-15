@@ -42,11 +42,10 @@ absent; it never downloads during a build or test.
 `tests/qtest/cases/linux-root.toml` boots a native fixture (`tests/qtest/cases/linux-root-fixture`)
 as `/init` with the staged tree packed into the initfs. The fixture checks the release file, the
 BusyBox binary and the musl loader, then spawns `linuxd` with the exact
-`/compat/linux/bin/busybox ls` argument vector. BusyBox is a PIE with `PT_INTERP`; the current
-image parser rejects its vaddr-0 segments before the interpreter check, so the serial output records
-`linuxd: image plan failed: Elf(SegmentOutsideUserRange)`. B33 adds the PIE bias and interpreter
-paths; B25 adds the `fstat`/`stat` calls BusyBox needs after that. See `docs/linux-root.md` for the
-full status.
+`/compat/linux/bin/busybox ls` argument vector. B32a loads the PIE main at its bias and maps the
+musl interpreter at its own base, so BusyBox starts and runs `ls`; `ls` then stops at `stat(2)`,
+which is B25 work. The serial output records `ls: .: Function not implemented`, the dispatcher's
+`stat` hit and the statuses. See `docs/linux-root.md` for the full status.
 
 ## Layout
 
@@ -63,5 +62,5 @@ build/linux-root/
 └── initfs.img                                         (qtest image)
 ```
 
-B33 and later will serve the staged tree to `linuxd` as `/compat/linux`; this ticket only stages it
-and records the execution boundary.
+B33 and later can serve the staged tree as a mounted `/compat/linux`; B32a packs the regular files
+into the qtest initfs so `linuxd` can load the PIE main and its interpreter today.

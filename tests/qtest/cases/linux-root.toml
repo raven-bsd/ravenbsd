@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# B32: the Alpine minirootfs staged by addons/linux-root/build.sh is packed into the initfs. The
+# B32a: the Alpine minirootfs staged by addons/linux-root/build.sh is packed into the initfs. The
 # fixture verifies the release, BusyBox and the musl loader, then asks linuxd to run the exact
-# `/compat/linux/bin/busybox ls` argument vector. BusyBox is a PIE with PT_INTERP; the current
-# image parser rejects its vaddr-0 segments before the interpreter check, so the serial output
-# records that boundary (B33 adds the PIE bias and interpreter paths).
+# `/compat/linux/bin/busybox ls` argument vector. The PIE main and its musl interpreter now load at
+# their biases; BusyBox reaches `ls`, which stops at `stat(2)` (B25). The unimplemented `stat` hit
+# and the BusyBox error line are the recorded boundary.
 
 name = "linux-root"
 arch = "x86_64"
@@ -27,10 +27,25 @@ regex = '^linux-root: busybox bytes=[0-9]+ loader bytes=[0-9]+$'
 regex = '^linux-root: attempt path=/compat/linux/bin/busybox argv1=ls$'
 
 [[expect]]
-regex = '^linuxd: image plan failed: .*\(SegmentOutsideUserRange\)$'
+regex = '^linuxd: entry=0x[0-9a-f]+ phdr=0x[0-9a-f]+ phnum=[0-9]+ brk=0x[0-9a-f]+$'
 
 [[expect]]
-regex = '^linux-root: busybox exit=2$'
+regex = '^linuxd: dynamic=1 interp-entry=0x[0-9a-f]+ interp-bias=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^linuxd: mapped [0-9]+ regions, sp=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^ls: \.: Function not implemented$'
+
+[[expect]]
+regex = '^linuxd: unimplemented nr=4 name=stat hits=1$'
+
+[[expect]]
+regex = '^linuxd: hello exit=1$'
+
+[[expect]]
+regex = '^linux-root: linuxd exit=1$'
 
 [[expect]]
 regex = '^init exited \(0\)$'

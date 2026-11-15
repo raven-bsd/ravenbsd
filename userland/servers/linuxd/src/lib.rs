@@ -24,7 +24,9 @@ pub mod table;
 pub mod trap;
 
 pub use handlers::dispatcher;
-pub use image::{Config, ImageError, ImageSpec, plan_image};
+pub use image::{
+    Config, INTERP_BASE, ImageError, ImageSpec, LINUX_ROOT, MAIN_PIE_BASE, interp_path, plan_image,
+};
 pub use loader::{LoadError, Loaded, Sys, load};
 pub use procfs::Resource;
 pub use table::{DirEntry, FileKind, LinuxProcess, OpenFile, Region, USER_BUFFER_MAX};
