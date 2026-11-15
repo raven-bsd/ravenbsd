@@ -10,7 +10,6 @@
 use alloc::vec::Vec;
 
 use crate::backend::{ProcBackend, WaitResult};
-use crate::errors::{EINVAL, ENOSYS};
 use crate::ids::SetCred;
 use crate::local_backend::LocalBackend;
 use crate::wire::{ExecRequest, ForkRequest, SpawnRequest};
