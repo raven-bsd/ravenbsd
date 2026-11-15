@@ -187,7 +187,7 @@ mod program {
             Ok(packed)
         }
 
-        fn read_root(&mut self, file: u64, buffer: &mut [u8]) -> Result<usize, Errno> {
+        fn ensure_root(&mut self, file: u64) -> Result<(), Errno> {
             let current_generation = self.mount_generation;
             let (target, needs_build) = {
                 let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
@@ -204,6 +204,30 @@ mod program {
                 entry.file.mount_generation = current_generation;
                 entry.set_cursor(0);
             }
+            Ok(())
+        }
+
+        fn root_explicit(
+            &mut self,
+            file: u64,
+            offset: u64,
+            buffer: &mut [u8],
+        ) -> Result<usize, Errno> {
+            self.ensure_root(file)?;
+            let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
+            let packed = entry.file.merged.as_ref().ok_or(Errno::EIO)?;
+            let start = usize::try_from(offset).map_err(|_| Errno::EINVAL)?;
+            let available = packed.get(start..).unwrap_or(&[]);
+            let length = available.len().min(buffer.len());
+            buffer
+                .get_mut(..length)
+                .ok_or(Errno::EINVAL)?
+                .copy_from_slice(available.get(..length).ok_or(Errno::EINVAL)?);
+            Ok(length)
+        }
+
+        fn read_root(&mut self, file: u64, buffer: &mut [u8]) -> Result<usize, Errno> {
+            self.ensure_root(file)?;
             let (written, next) = {
                 let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
                 let packed = entry.file.merged.as_ref().ok_or(Errno::EIO)?;
@@ -422,6 +446,69 @@ mod program {
             }
             let target = self.opens.get(file).ok_or(Errno::EBADF)?.file.target;
             Ok(Client::new().write(target, 0, buffer)?)
+        }
+
+        fn pread(&mut self, file: u64, offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
+            let (target, root) = {
+                let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
+                (entry.file.target, entry.file.root_listing)
+            };
+            if root {
+                Ok(self.root_explicit(file, offset, buffer)?)
+            } else {
+                Ok(Client::new().pread(target, offset, buffer)?)
+            }
+        }
+
+        fn pwrite(&mut self, file: u64, offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
+            let (target, root) = {
+                let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
+                (entry.file.target, entry.file.root_listing)
+            };
+            if root {
+                return Err(Errno::EISDIR.into());
+            }
+            Ok(Client::new().pwrite(target, offset, buffer)?)
+        }
+
+        fn seek(&mut self, file: u64, offset: i64, whence: u32) -> HandlerResult<u64> {
+            let (target, root) = {
+                let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
+                (entry.file.target, entry.file.root_listing)
+            };
+            if !root {
+                return Ok(Client::new().seek(target, offset, whence)?);
+            }
+            self.ensure_root(file)?;
+            let (cursor, size) = {
+                let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
+                (
+                    entry.cursor(),
+                    entry
+                        .file
+                        .merged
+                        .as_ref()
+                        .map_or(0, |packed| packed.len() as u64),
+                )
+            };
+            let base = match whence {
+                0 => 0,
+                1 => cursor,
+                2 => size,
+                _ => return Err(Errno::EINVAL.into()),
+            };
+            let target = i128::from(base)
+                .checked_add(i128::from(offset))
+                .ok_or(Errno::EINVAL)?;
+            if target < 0 || target > u64::MAX as i128 {
+                return Err(Errno::EINVAL.into());
+            }
+            let new_offset = target as u64;
+            self.opens
+                .get_mut(file)
+                .ok_or(Errno::EBADF)?
+                .set_cursor(new_offset);
+            Ok(new_offset)
         }
 
         fn close(&mut self, file: u64) -> HandlerResult<()> {

@@ -93,6 +93,43 @@ mod program {
             Err(Errno::EROFS.into())
         }
 
+        fn pread(&mut self, file: u64, offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
+            let node = self.opens.get(file).ok_or(Errno::EBADF)?.file.node;
+            let read = match node {
+                NodeRef::File(index) => self.model.read_file(index, offset, buffer)?,
+                NodeRef::Dir(index) => self.model.readdir(index, offset, buffer)?,
+            };
+            Ok(read)
+        }
+
+        fn pwrite(&mut self, _file: u64, _offset: u64, _buffer: &[u8]) -> HandlerResult<usize> {
+            Err(Errno::EROFS.into())
+        }
+
+        fn seek(&mut self, file: u64, offset: i64, whence: u32) -> HandlerResult<u64> {
+            let node = self.opens.get(file).ok_or(Errno::EBADF)?.file.node;
+            let cursor = self.opens.get(file).ok_or(Errno::EBADF)?.cursor();
+            let size = if whence == 2 {
+                self.model.stat(node)?.size
+            } else {
+                0
+            };
+            let base = match whence {
+                0 => 0,
+                1 => cursor,
+                2 => size,
+                _ => return Err(Errno::EINVAL.into()),
+            };
+            let Some(new_offset) = seek_target(base, offset) else {
+                return Err(Errno::EINVAL.into());
+            };
+            self.opens
+                .get_mut(file)
+                .ok_or(Errno::EBADF)?
+                .set_cursor(new_offset);
+            Ok(new_offset)
+        }
+
         fn close(&mut self, file: u64) -> HandlerResult<()> {
             self.opens.close(file)?;
             Ok(())
@@ -122,6 +159,14 @@ mod program {
                 _ => status(response, Errno::EROFS),
             }
         }
+    }
+
+    fn seek_target(base: u64, offset: i64) -> Option<u64> {
+        let target = i128::from(base).checked_add(i128::from(offset))?;
+        if target < 0 || target > u64::MAX as i128 {
+            return None;
+        }
+        Some(target as u64)
     }
 
     fn status(response: &mut [u8], error: Errno) -> HandlerResult<usize> {
