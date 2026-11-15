@@ -84,6 +84,7 @@ members = [
     "tests/libc/va",
     "tests/libc/headers",
     "tests/libc/atf",
+    "tests/libc/toolchain-abi",
     "tests/ufs-powercut",
     "tools/fs-fuzz",
     "tools/linux-corpus",
