@@ -174,7 +174,10 @@ pub const ERROR_ADMA: u16 = 1 << 9;
 /// Error interrupt status: system DMA failed.
 pub const ERROR_DMA: u16 = 1 << 12;
 /// Error interrupt status bits the controller implements.
-pub const ERROR_STATUS_MASK: u16 = 0x03ff;
+///
+/// Bits 0..=9 are the command/data errors and bit 12 is the system DMA error. Bits 10, 11 and
+/// 13..=15 are reserved or vendor-specific and are not decoded.
+pub const ERROR_STATUS_MASK: u16 = 0x13ff;
 
 /// Present state: the command line is inhibited.
 pub const PRESENT_CMD_INHIBIT: u32 = 1 << 0;
