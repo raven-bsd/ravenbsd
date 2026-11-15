@@ -1378,6 +1378,7 @@ pub fn seed_profile(root: &Path) -> Result<Profile> {
     let mut profile = Profile {
         schema: 1,
         standard: STANDARD.to_string(),
+        platform: crate::model::PlatformStatus::new(),
         header: header_rows,
         interface: interface_rows,
         utility: utility_rows,

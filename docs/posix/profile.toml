@@ -4,6 +4,11 @@
 schema = 1
 standard = "posix-2024"
 
+[platform]
+x86_64 = "gate"
+aarch64 = "pending"
+riscv64 = "pending"
+
 [[header]]
 id = "header.aio.h"
 standard = "posix-2024"

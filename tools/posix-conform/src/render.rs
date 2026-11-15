@@ -70,6 +70,11 @@ pub fn render_gaps(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<
          `evidence` is a file or test name and never standard prose.",
         profile.standard, profile.schema
     );
+    let _ = writeln!(
+        output,
+        "Platform gate: x86_64 `{}`; aarch64 `{}`; riscv64 `{}`.",
+        profile.platform.x86_64, profile.platform.aarch64, profile.platform.riscv64
+    );
 
     let counts = profile.counts();
     let _ = writeln!(output, "\n## Summary\n");

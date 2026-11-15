@@ -41,6 +41,7 @@ fn empty_profile() -> Profile {
     Profile {
         schema: 1,
         standard: STANDARD.to_string(),
+        platform: crate::model::PlatformStatus::new(),
         header: Vec::new(),
         interface: Vec::new(),
         utility: Vec::new(),

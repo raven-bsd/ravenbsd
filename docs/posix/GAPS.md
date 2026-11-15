@@ -5,6 +5,7 @@
 # POSIX.1-2024 gap matrix
 
 Profile `posix-2024`, schema 1. Status values are `missing`, `partial`, `present` and `waived`; `evidence` is a file or test name and never standard prose.
+Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 
 ## Summary
 

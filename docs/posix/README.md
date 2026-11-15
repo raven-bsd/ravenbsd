@@ -20,3 +20,5 @@ cargo test -p posix-conform
 
 The profile assumes the full Shell and Utilities volume. No requirement is silently omitted:
 owner waivers, when decided, are explicit `status = "waived"` rows with a written `waiver`.
+x86-64 is the first gate platform; aarch64 and riscv64 are `pending` until their qtest gates
+exist.

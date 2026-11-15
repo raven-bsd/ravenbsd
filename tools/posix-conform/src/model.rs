@@ -149,6 +149,35 @@ pub struct BehaviorRow {
     pub description: String,
 }
 
+/// Platform gate status. x86-64 is the first gate; the other targets are pending their qtest.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PlatformStatus {
+    /// x86-64 gate state.
+    pub x86_64: String,
+    /// aarch64 gate state.
+    pub aarch64: String,
+    /// riscv64 gate state.
+    pub riscv64: String,
+}
+
+impl PlatformStatus {
+    /// The first-target policy: x86-64 gate, the other platforms pending.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            x86_64: "gate".to_string(),
+            aarch64: "pending".to_string(),
+            riscv64: "pending".to_string(),
+        }
+    }
+}
+
+impl Default for PlatformStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// The complete profile.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Profile {
@@ -156,6 +185,9 @@ pub struct Profile {
     pub schema: u32,
     /// Standard spelling.
     pub standard: String,
+    /// Platform gate status.
+    #[serde(default)]
+    pub platform: PlatformStatus,
     /// Headers.
     #[serde(default)]
     pub header: Vec<HeaderRow>,
@@ -388,6 +420,18 @@ pub fn validate(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<()>
             "trace standard `{}` is not `{STANDARD}`",
             trace.standard
         ));
+    }
+    for (platform, state) in [
+        ("x86_64", &profile.platform.x86_64),
+        ("aarch64", &profile.platform.aarch64),
+        ("riscv64", &profile.platform.riscv64),
+    ] {
+        if state != "gate" && state != "pending" {
+            errors.push(format!("platform {platform} has unknown state `{state}`"));
+        }
+    }
+    if profile.platform.x86_64 != "gate" {
+        errors.push("x86_64 must be the first gate platform".to_string());
     }
     for (area, meta) in profile.metas() {
         validate_meta(area, meta, &mut errors);
