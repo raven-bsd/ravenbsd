@@ -128,7 +128,7 @@ pub fn render_gaps(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<
     write_table(
         &mut output,
         "Interfaces",
-        "id | interface | header | status | owner | evidence",
+        "id | interface | status | owner | evidence | header",
         |out| {
             for entry in &profile.interface {
                 row(

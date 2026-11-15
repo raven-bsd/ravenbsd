@@ -114,7 +114,7 @@ Traceability rows: 1758; profile rows: 1758.
 
 ## Interfaces
 
-| id | interface | header | status | owner | evidence |
+| id | interface | status | owner | evidence | header |
 |---|---|---|---|---|---|
 | `interface._Exit` | `_Exit` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface._Fork` | `_Fork` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
