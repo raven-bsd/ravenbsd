@@ -3,7 +3,10 @@
 
 //! Host tests for the K27 update planner.
 
-use super::{BootMeta, Options, Slot, build_fixture, parse_boot_meta, target_slot};
+use super::{
+    BootMeta, Options, Slot, build_fixture, inject_health, parse_boot_meta, target_slot, token_for,
+};
+use raven_initfs::{Initfs, InitfsBuilder};
 use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
@@ -32,6 +35,7 @@ fn slot_meta_round_trips() {
         log_level: String::from("info"),
         slot: Slot::A,
         trial: Some(Slot::B),
+        trial_token: Some(0x1234_5678),
         attempts: 3,
         has_slot_config: true,
     };
@@ -103,4 +107,25 @@ fn fixture_contains_both_slots_and_a_bad_trial_kernel() {
 
     let _ = fs::remove_file(output);
     let _ = fs::remove_file(kernel);
+}
+
+#[test]
+fn health_record_is_injected_into_the_trial_initfs() {
+    let mut builder = InitfsBuilder::new();
+    builder.add_file("/init", b"init", 0o755).unwrap();
+    let original = builder.build();
+    let out = inject_health(&original, Slot::B, 0xdead_beef).unwrap();
+    let parsed = Initfs::parse(&out).unwrap();
+    assert_eq!(parsed.get("/init").unwrap().data, b"init");
+    let health = parsed.get("/etc/boot-health").unwrap();
+    let text = std::str::from_utf8(health.data).unwrap();
+    assert!(text.contains("slot = \"b\"\n"));
+    assert!(text.contains("token = \"deadbeef\"\n"));
+    assert!(text.contains("lba = \"34\"\n"));
+}
+
+#[test]
+fn token_changes_with_the_payload() {
+    assert_eq!(token_for(b"a", b"b"), token_for(b"a", b"b"));
+    assert_ne!(token_for(b"a", b"b"), token_for(b"a", b"c"));
 }
