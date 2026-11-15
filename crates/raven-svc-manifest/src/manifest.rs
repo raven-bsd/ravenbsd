@@ -11,6 +11,13 @@ use crate::parse::{
     is_scheme_name, is_service_name, scheme_name, split_key_value, string_value, strip_comment,
 };
 
+/// Largest accepted `ready_timeout_ms` value, in milliseconds.
+///
+/// The previous 60 s ceiling was too small for the first boot of the larger modern images:
+/// `initfsd` builds its path model and hashes the whole initfs before registering `initfs:`.
+/// Five minutes leaves headroom without making a genuinely stalled service wait forever.
+pub const MAX_READY_TIMEOUT_MS: u32 = 300_000;
+
 /// Restart policy for a service that exits.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Restart {
@@ -60,7 +67,7 @@ pub struct Manifest {
     pub max_restarts: u32,
     /// Readiness policy.
     pub readiness: Readiness,
-    /// How long readiness may take, in milliseconds, `0..=60000`.
+    /// How long readiness may take, in milliseconds, `0..=MAX_READY_TIMEOUT_MS`.
     pub ready_timeout_ms: u32,
     /// Whether the service is required for a successful boot.
     pub required: bool,
@@ -284,7 +291,7 @@ impl Manifest {
                 }
                 "ready_timeout_ms" => {
                     let value = integer_value(value, line, "ready_timeout_ms")?;
-                    if value > 60_000 {
+                    if value > u64::from(MAX_READY_TIMEOUT_MS) {
                         return Err(error(
                             line,
                             ParseErrorKind::IntegerOutOfRange("ready_timeout_ms"),
@@ -683,10 +690,10 @@ FOO = "bar"
         assert_eq!(manifest.ready_timeout_ms, 5_000);
         let manifest = parse("name = \"x\"\nexec = \"/x\"\nready_timeout_ms = 0");
         assert_eq!(manifest.ready_timeout_ms, 0);
-        let manifest = parse("name = \"x\"\nexec = \"/x\"\nready_timeout_ms = 60_000");
-        assert_eq!(manifest.ready_timeout_ms, 60_000);
+        let manifest = parse("name = \"x\"\nexec = \"/x\"\nready_timeout_ms = 300_000");
+        assert_eq!(manifest.ready_timeout_ms, MAX_READY_TIMEOUT_MS);
         assert!(matches!(
-            kind("name = \"x\"\nexec = \"/x\"\nready_timeout_ms = 60001"),
+            kind("name = \"x\"\nexec = \"/x\"\nready_timeout_ms = 300001"),
             ParseErrorKind::IntegerOutOfRange("ready_timeout_ms")
         ));
     }
@@ -758,3 +765,7 @@ FOO = "bar"
         assert!(manifest.grants.is_empty());
     }
 }
+
+#[cfg(test)]
+#[path = "manifest_ut.rs"]
+mod limits_tests;
