@@ -10,7 +10,8 @@ use core::time::Duration;
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 use raven_ipc::protocol::{
-    self, Attachment, MAX_ATTACHMENTS, MAX_DATA, MAX_TRANSFER, Opcode, PACKET_SIZE, SchemePacket,
+    self, Attachment, MAX_ATTACHMENTS, MAX_DATA, MAX_TRANSFER, OFFSET_EXPLICIT, Opcode,
+    PACKET_SIZE, SchemePacket,
 };
 use raven_proto_fs::{OpenFlags, Stat};
 
@@ -176,6 +177,24 @@ pub trait Handler {
         Err(Errno::ENOSYS.into())
     }
 
+    /// Positional read at `offset`; the open-file-description cursor must not move (PG-22).
+    fn pread(&mut self, file: u64, offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
+        let _ = (file, offset, buffer);
+        Err(Errno::ENOSYS.into())
+    }
+
+    /// Positional write at `offset`; the open-file-description cursor must not move (PG-22).
+    fn pwrite(&mut self, file: u64, offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
+        let _ = (file, offset, buffer);
+        Err(Errno::ENOSYS.into())
+    }
+
+    /// Move the sequential cursor and return the new offset (PG-22).
+    fn seek(&mut self, file: u64, offset: i64, whence: u32) -> HandlerResult<u64> {
+        let _ = (file, offset, whence);
+        Err(Errno::ENOSYS.into())
+    }
+
     /// Close `file`.
     fn close(&mut self, file: u64) -> HandlerResult<()> {
         let _ = file;
@@ -226,6 +245,8 @@ struct Deferred {
 struct Reply<'a> {
     result: Result<(), Errno>,
     server_cookie: Option<u64>,
+    /// New file offset for a `Seek` reply.
+    offset: Option<u64>,
     result_len: usize,
     data: Option<[u8; 64]>,
     attachments: &'a [Attachment],
@@ -236,6 +257,7 @@ impl<'a> Reply<'a> {
         Self {
             result: Ok(()),
             server_cookie: None,
+            offset: None,
             result_len: 0,
             data: None,
             attachments: &[],
@@ -246,6 +268,7 @@ impl<'a> Reply<'a> {
         Self {
             result: Err(error),
             server_cookie: None,
+            offset: None,
             result_len: 0,
             data: None,
             attachments: &[],
@@ -259,6 +282,11 @@ impl<'a> Reply<'a> {
 
     const fn len(mut self, length: usize) -> Self {
         self.result_len = length;
+        self
+    }
+
+    const fn new_offset(mut self, offset: u64) -> Self {
+        self.offset = Some(offset);
         self
     }
 
@@ -396,7 +424,11 @@ impl<K: Kernel> Server<K> {
                 } else {
                     request_buffer_mut(&request)?
                 };
-                let written = handler.read(request.file_id, request.offset, buffer)?;
+                let written = if request.flags & OFFSET_EXPLICIT != 0 {
+                    handler.pread(request.file_id, request.offset, buffer)?
+                } else {
+                    handler.read(request.file_id, request.offset, buffer)?
+                };
                 if written > buffer.len() {
                     return Err(Errno::EPROTO.into());
                 }
@@ -409,7 +441,11 @@ impl<K: Kernel> Server<K> {
                 } else {
                     request_buffer(&request)?
                 };
-                let written = handler.write(request.file_id, request.offset, buffer)?;
+                let written = if request.flags & OFFSET_EXPLICIT != 0 {
+                    handler.pwrite(request.file_id, request.offset, buffer)?
+                } else {
+                    handler.write(request.file_id, request.offset, buffer)?
+                };
                 if written > buffer.len() {
                     return Err(Errno::EPROTO.into());
                 }
@@ -432,6 +468,15 @@ impl<K: Kernel> Server<K> {
                 stat.encode(&mut data)
                     .map_err(|_| HandlerError::from(Errno::EPROTO))?;
                 self.send_response(ctx.request, request, Reply::ok().data(data))
+                    .map_err(HandlerError::from)
+            }
+            Opcode::Seek => {
+                let offset = handler.seek(
+                    request.file_id,
+                    request.offset as i64,
+                    u32::from(request.flags),
+                )?;
+                self.send_response(ctx.request, request, Reply::ok().new_offset(offset))
                     .map_err(HandlerError::from)
             }
             Opcode::Call => {
@@ -491,6 +536,9 @@ impl<K: Kernel> Server<K> {
                 response.status = 0;
                 if let Some(cookie) = reply.server_cookie {
                     response.server_cookie = cookie;
+                }
+                if let Some(offset) = reply.offset {
+                    response.offset = offset;
                 }
                 if let Some(data) = reply.data {
                     response.data = data;

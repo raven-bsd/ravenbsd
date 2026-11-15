@@ -19,6 +19,13 @@ use crate::ipc::{self, registry, router};
 use crate::process::{self, Process, handle::Object};
 use crate::syscall::SyscallFrame;
 
+/// Raw `pread(handle, buffer, len, offset)` number (PG-22; the ABI crate owns the enum value).
+pub const PREAD: usize = 0x6b;
+/// Raw `pwrite(handle, buffer, len, offset)` number.
+pub const PWRITE: usize = 0x6c;
+/// Raw `seek(handle, offset, whence) -> new_offset` number.
+pub const SEEK: usize = 0x6d;
+
 /// Dispatch one scheme IPC syscall.
 pub fn dispatch(call: raven_abi::syscall::Syscall, frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
@@ -81,6 +88,34 @@ fn write(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let file = ipc::file_from_handle(caller, handle, Rights::WRITE)?;
     router::write(caller, &file, frame.rsi, frame.rdx)
+}
+
+/// `pread(handle, buffer, len, offset) -> bytes` (PG-22).
+pub fn pread(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let file = ipc::file_from_handle(&caller, handle, Rights::READ)?;
+    router::pread(&caller, &file, frame.rsi, frame.rdx, frame.r10)
+}
+
+/// `pwrite(handle, buffer, len, offset) -> bytes` (PG-22).
+pub fn pwrite(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let file = ipc::file_from_handle(&caller, handle, Rights::WRITE)?;
+    router::pwrite(&caller, &file, frame.rsi, frame.rdx, frame.r10)
+}
+
+/// `seek(handle, offset: i64, whence) -> new_offset` (PG-22).
+pub fn seek(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    // Any valid SchemeFile handle may move its cursor, like FSTAT (PG-23).
+    let file = ipc::file_from_handle(&caller, handle, Rights::NONE)?;
+    let offset = frame.rsi as i64;
+    let whence = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
+    let new_offset = router::seek(&caller, &file, offset, whence)?;
+    usize::try_from(new_offset).map_err(|_| Errno::EOVERFLOW)
 }
 
 fn close(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {

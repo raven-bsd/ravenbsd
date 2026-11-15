@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S53 PG-22: lseek, pread/pwrite, SEEK_SET/CUR/END and a hole, exercised through the real
+# initfsd and ramfsd servers. The sequential read/write cursor must stay intact around the
+# positional operations, and an invalid (negative/unknown) seek must be EINVAL.
+
+name = "libc-seek"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/qtest/cases/libc-seek-fixture/build.sh"]
+initfs = "build/fixtures/libc-seek/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^libc-seek: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|libc-seek: fail'
