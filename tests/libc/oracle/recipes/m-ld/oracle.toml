@@ -3,15 +3,16 @@
 #
 # m-ld: the FreeBSD lib/msun `*l` C originals behind the raven-libc-m long-double functions.
 # The C is built as an external oracle (never into a shipped artifact); the RD-33 hidden-pointer
-# mapping lives in shim/m/ld_thunk.c. This first slice covers exp/expm1.
+# mapping lives in shim/m/ld_thunk.c. It covers exp/log, trig, hyperbolic, erf/gamma and the
+# exact-class functions.
 
 schema = 1
 family = "m-ld"
-description = "FreeBSD msun long-double originals (exp, expm1)"
-exports = ["expl", "expm1l", "fabsl", "log10l", "log1pl", "log2l", "logl", "rl_expl", "rl_expm1l", "rl_logl"]
+description = "FreeBSD msun long-double originals (exp, log, trig, hyperbolic, erf/gamma, exact)"
+exports = ["__isfinite", "__isfinitef", "__isfinitel", "__kernel_cosl", "__kernel_rem_pio2", "__kernel_sinl", "__kernel_tanl", "acoshl", "asinhl", "atanhl", "ceill", "copysignl", "coshl", "cosl", "cospil", "erfcl", "erfl", "expl", "expm1l", "fabsl", "fdim", "fdimf", "fdiml", "floor", "floorl", "fmaxl", "fminl", "fmodl", "ldexpl", "lgammal_r", "log10l", "log1pl", "log2l", "logl", "nextafterl", "nexttowardl", "remainderl", "remquol", "rintl", "rl_acoshl", "rl_asinhl", "rl_atanhl", "rl_ceill", "rl_copysignl", "rl_coshl", "rl_cosl", "rl_erfcl", "rl_erfl", "rl_expl", "rl_expm1l", "rl_fdiml", "rl_floorl", "rl_fmaxl", "rl_fminl", "rl_fmodl", "rl_lgammal_r", "rl_log10l", "rl_log1pl", "rl_log2l", "rl_logl", "rl_nextafterl", "rl_nexttowardl", "rl_remainderl", "rl_remquol", "rl_rintl", "rl_roundl", "rl_scalbnl", "rl_sinhl", "rl_sinl", "rl_tanhl", "rl_tanl", "rl_tgammal", "rl_truncl", "roundl", "scalbnl", "sinhl", "sinl", "sinpil", "sqrtl", "tanhl", "tanl", "tgammal", "truncl"]
 opt = ["O2", "O0"]
 aliases = { machine = "donor:freebsd/sys/amd64/include", x86 = "donor:freebsd/sys/x86/include" }
-defines = ["__weak_reference(a,b)=", "__pure2=__attribute__((__pure__))", "LDBL_MANT_DIG=64", "LDBL_MAX_EXP=16384", "LDBL_MIN_EXP=-16381"]
+defines = ["DBL_MAX_EXP=1024", "DBL_MIN_EXP=-1021", "FLT_EVAL_METHOD=0", "__weak_reference(a,b)=", "__pure2=__attribute__((__pure__))", "LDBL_MANT_DIG=64", "LDBL_MAX_EXP=16384", "LDBL_MIN=3.3621031431120935063E-4932L", "LDBL_MIN_EXP=-16381"]
 include = ["shim:m", "donor:freebsd/lib/msun/src", "donor:freebsd/lib/msun/ld80", "donor:freebsd/lib/libc/include", "donor:freebsd/lib/libc/amd64", "donor:freebsd/sys", "donor:freebsd/sys/amd64/include", "donor:freebsd/sys/x86/include", "donor:freebsd/sys/sys", "donor:freebsd/include"]
 flags = ["-std=gnu11"]
 
@@ -26,6 +27,138 @@ path = "lib/msun/ld80/b_expl.c"
 [[source]]
 donor = "freebsd"
 path = "lib/msun/ld80/s_logl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/k_rem_pio2.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_sinl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_cosl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_tanl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/ld80/k_sinl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/ld80/k_cosl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/ld80/k_tanl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/e_sinhl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/e_coshl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_tanhl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_asinhl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/e_acoshl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/e_atanhl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/ld80/s_erfl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/ld80/e_lgammal_r.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/ld80/b_tgammal.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_isfinite.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/ld80/s_sinpil.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/ld80/s_cospil.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_ceill.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_copysignl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_floorl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_fmaxl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_fminl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_fdim.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/e_fmodl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_scalbnl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_truncl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_roundl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_nextafterl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/e_remainderl.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_remquol.c"
+
+[[source]]
+donor = "freebsd"
+path = "lib/msun/src/s_rintl.c"
 
 [[source]]
 donor = "shim"

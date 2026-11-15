@@ -58,9 +58,9 @@ use self::handle::Object;
 const PAGE: u64 = 4096;
 /// Size of the user stack mapping.
 ///
-/// S11's controller uses `raven_rt::spawn`, which builds a child stack in a 64 KiB buffer;
-/// 128 KiB leaves room for that buffer and the call frames.
-const USER_STACK_SIZE: u64 = 128 * 1024;
+/// PG-49/PG-50: `raven_rt::spawn` sizes a child stack for `ARG_MAX` (128 KiB) plus the C8 arrays
+/// and headroom. The first process gets the same 256 KiB mapping.
+const USER_STACK_SIZE: u64 = 256 * 1024;
 /// Guard page at the top of the user range.
 const USER_GUARD: u64 = 4096;
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
@@ -627,6 +627,28 @@ fn build_stack(
     entry: u64,
     elf: &Elf<'_>,
 ) -> Result<u64, ProcessError> {
+    // PG-50: `rsp == sp0`, 16-byte aligned, with the C8 argv/envp/auxv block at `sp0`.
+    const AT_PHDR: u64 = 3;
+    const AT_PHENT: u64 = 4;
+    const AT_PHNUM: u64 = 5;
+    const AT_PAGESZ: u64 = 6;
+    const AT_BASE: u64 = 7;
+    const AT_FLAGS: u64 = 8;
+    const AT_ENTRY: u64 = 9;
+    const AT_UID: u64 = 11;
+    const AT_EUID: u64 = 12;
+    const AT_GID: u64 = 13;
+    const AT_EGID: u64 = 14;
+    const AT_PLATFORM: u64 = 15;
+    const AT_HWCAP: u64 = 16;
+    const AT_CLKTCK: u64 = 17;
+    const AT_SECURE: u64 = 23;
+    const AT_RANDOM: u64 = 25;
+    const AT_HWCAP2: u64 = 26;
+    const AT_EXECFN: u64 = 31;
+    const AT_MINSIGSTKSZ: u64 = 51;
+    const PHENT: u64 = 56;
+
     let stack_base = USER_END
         .checked_sub(USER_STACK_SIZE + USER_GUARD)
         .ok_or(ProcessError::BadAddress)?;
@@ -634,22 +656,25 @@ fn build_stack(
         .checked_sub(USER_GUARD)
         .ok_or(ProcessError::BadAddress)?;
     let sp0 = stack_top
-        .checked_sub(0x200)
+        .checked_sub(0x400)
         .ok_or(ProcessError::BadAddress)?;
 
     let mut buffer = vec![0u8; USER_STACK_SIZE as usize];
     let string_offset = USER_STACK_SIZE
-        .checked_sub(0x100)
+        .checked_sub(0x200)
+        .ok_or(ProcessError::BadAddress)?;
+    let platform_offset = USER_STACK_SIZE
+        .checked_sub(0x180)
         .ok_or(ProcessError::BadAddress)?;
     let random_offset = USER_STACK_SIZE
         .checked_sub(0x80)
         .ok_or(ProcessError::BadAddress)?;
     let sp_offset = USER_STACK_SIZE
-        .checked_sub(0x200)
+        .checked_sub(0x400)
         .ok_or(ProcessError::BadAddress)?;
 
     let path_bytes = path.as_bytes();
-    if path_bytes.len() >= 0x100 {
+    if path_bytes.len() >= 0x80 {
         return Err(ProcessError::PathTooLong);
     }
     let string_start = usize::try_from(string_offset).map_err(|_| ProcessError::BadAddress)?;
@@ -665,6 +690,20 @@ fn build_stack(
         destination.copy_from_slice(path_bytes);
     }
 
+    let platform = platform_name();
+    let platform_start = usize::try_from(platform_offset).map_err(|_| ProcessError::BadAddress)?;
+    let platform_end = platform_start
+        .checked_add(platform.len())
+        .and_then(|end| end.checked_add(1))
+        .ok_or(ProcessError::BadAddress)?;
+    let platform_slice = buffer
+        .get_mut(platform_start..platform_end)
+        .ok_or(ProcessError::BadAddress)?;
+    platform_slice.fill(0);
+    if let Some(destination) = platform_slice.get_mut(..platform.len()) {
+        destination.copy_from_slice(platform.as_bytes());
+    }
+
     let random = random16();
     let random_start = usize::try_from(random_offset).map_err(|_| ProcessError::BadAddress)?;
     let random_end = random_start
@@ -674,33 +713,45 @@ fn build_stack(
         slot.copy_from_slice(&random);
     }
 
+    let path_address = stack_base
+        .checked_add(string_offset)
+        .ok_or(ProcessError::BadAddress)?;
+    let platform_address = stack_base
+        .checked_add(platform_offset)
+        .ok_or(ProcessError::BadAddress)?;
+    let random_address = stack_base
+        .checked_add(random_offset)
+        .ok_or(ProcessError::BadAddress)?;
+
     let mut cursor = usize::try_from(sp_offset).map_err(|_| ProcessError::BadAddress)?;
     write_word(&mut buffer, &mut cursor, 1)?;
-    write_word(
-        &mut buffer,
-        &mut cursor,
-        stack_base
-            .checked_add(string_offset)
-            .ok_or(ProcessError::BadAddress)?,
-    )?;
+    write_word(&mut buffer, &mut cursor, path_address)?;
     write_word(&mut buffer, &mut cursor, 0)?;
     write_word(&mut buffer, &mut cursor, 0)?;
-    write_word(&mut buffer, &mut cursor, 6)?;
-    write_word(&mut buffer, &mut cursor, PAGE)?;
-    write_word(&mut buffer, &mut cursor, 9)?;
-    write_word(&mut buffer, &mut cursor, entry)?;
-    write_word(&mut buffer, &mut cursor, 3)?;
-    write_word(&mut buffer, &mut cursor, elf.phdr_vaddr().unwrap_or(0))?;
-    write_word(&mut buffer, &mut cursor, 5)?;
-    write_word(&mut buffer, &mut cursor, elf.phnum() as u64)?;
-    write_word(&mut buffer, &mut cursor, 25)?;
-    write_word(
-        &mut buffer,
-        &mut cursor,
-        stack_base
-            .checked_add(random_offset)
-            .ok_or(ProcessError::BadAddress)?,
-    )?;
+    for (key, value) in [
+        (AT_PHDR, elf.phdr_vaddr().unwrap_or(0)),
+        (AT_PHENT, PHENT),
+        (AT_PHNUM, elf.phnum() as u64),
+        (AT_PAGESZ, PAGE),
+        (AT_BASE, 0),
+        (AT_FLAGS, 0),
+        (AT_ENTRY, entry),
+        (AT_UID, 0),
+        (AT_EUID, 0),
+        (AT_GID, 0),
+        (AT_EGID, 0),
+        (AT_PLATFORM, platform_address),
+        (AT_HWCAP, 0),
+        (AT_CLKTCK, 100),
+        (AT_SECURE, 0),
+        (AT_RANDOM, random_address),
+        (AT_HWCAP2, 0),
+        (AT_EXECFN, path_address),
+        (AT_MINSIGSTKSZ, 8192),
+    ] {
+        write_word(&mut buffer, &mut cursor, key)?;
+        write_word(&mut buffer, &mut cursor, value)?;
+    }
     write_word(&mut buffer, &mut cursor, 0)?;
     write_word(&mut buffer, &mut cursor, 0)?;
 
@@ -750,6 +801,22 @@ fn build_stack(
         page = page.saturating_add(1);
     }
     Ok(sp0)
+}
+
+/// `AT_PLATFORM` spelling for the build architecture.
+fn platform_name() -> &'static str {
+    #[cfg(target_arch = "x86_64")]
+    {
+        "x86_64"
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        "aarch64"
+    }
+    #[cfg(target_arch = "riscv64")]
+    {
+        "riscv64"
+    }
 }
 
 fn write_word(buffer: &mut [u8], cursor: &mut usize, value: u64) -> Result<(), ProcessError> {
@@ -1125,5 +1192,5 @@ pub fn bad_sysret(rip: u64) -> ! {
 
 const _: () = {
     assert!(PAGE == 4096);
-    assert!(USER_STACK_SIZE == 128 * 1024);
+    assert!(USER_STACK_SIZE == 256 * 1024);
 };

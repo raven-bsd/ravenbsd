@@ -60,6 +60,21 @@ impl<K: Kernel> Client<K> {
         self.kernel.write(file, offset, buffer)
     }
 
+    /// Positional read at `offset`; the file cursor does not move (PG-22).
+    pub fn pread(&self, file: Handle, offset: u64, buffer: &mut [u8]) -> Result<usize, Errno> {
+        self.kernel.pread(file, offset, buffer)
+    }
+
+    /// Positional write at `offset`; the file cursor does not move (PG-22).
+    pub fn pwrite(&self, file: Handle, offset: u64, buffer: &[u8]) -> Result<usize, Errno> {
+        self.kernel.pwrite(file, offset, buffer)
+    }
+
+    /// Move the file cursor and return the new offset (PG-22).
+    pub fn seek(&self, file: Handle, offset: i64, whence: u32) -> Result<u64, Errno> {
+        self.kernel.seek(file, offset, whence)
+    }
+
     /// Close `file`.
     pub fn close(&self, file: Handle) -> Result<(), Errno> {
         self.kernel.close(file)

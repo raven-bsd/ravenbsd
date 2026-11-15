@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The hw-sound devd: launch the QEMU intel-hda function and wait for the driver's `hda:` scheme.
+# `scheme:hda` is the readiness gate that orders audiod after the driver.
+name = "devd"
+exec = "/sbin/devd"
+args = ["devd"]
+needs = ["scheme:pci"]
+provides = ["scheme:hda"]
+readiness = "scheme"
+ready_timeout_ms = 180_000
+restart = "never"
+max_restarts = 0

@@ -43,6 +43,24 @@ pub trait Kernel: Clone {
         Err(Errno::ENOSYS)
     }
 
+    /// Positional read at `offset`; the file cursor does not move (PG-22).
+    fn pread(&self, file: Handle, offset: u64, buffer: &mut [u8]) -> Result<usize, Errno> {
+        let _ = (file, offset, buffer);
+        Err(Errno::ENOSYS)
+    }
+
+    /// Positional write at `offset`; the file cursor does not move (PG-22).
+    fn pwrite(&self, file: Handle, offset: u64, buffer: &[u8]) -> Result<usize, Errno> {
+        let _ = (file, offset, buffer);
+        Err(Errno::ENOSYS)
+    }
+
+    /// Move the file cursor and return the new offset (PG-22).
+    fn seek(&self, file: Handle, offset: i64, whence: u32) -> Result<u64, Errno> {
+        let _ = (file, offset, whence);
+        Err(Errno::ENOSYS)
+    }
+
     /// Close a scheme file.
     fn close(&self, file: Handle) -> Result<(), Errno> {
         let _ = file;
@@ -146,6 +164,18 @@ impl Kernel for RtKernel {
 
     fn write(&self, file: Handle, _offset: u64, buffer: &[u8]) -> Result<usize, Errno> {
         sys::write(file, buffer)
+    }
+
+    fn pread(&self, file: Handle, offset: u64, buffer: &mut [u8]) -> Result<usize, Errno> {
+        sys::pread(file, offset, buffer)
+    }
+
+    fn pwrite(&self, file: Handle, offset: u64, buffer: &[u8]) -> Result<usize, Errno> {
+        sys::pwrite(file, offset, buffer)
+    }
+
+    fn seek(&self, file: Handle, offset: i64, whence: u32) -> Result<u64, Errno> {
+        sys::seek(file, offset, whence)
     }
 
     fn close(&self, file: Handle) -> Result<(), Errno> {

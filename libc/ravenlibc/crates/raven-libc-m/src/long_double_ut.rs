@@ -224,5 +224,28 @@ fn fmod_and_nextafter_use_the_bit_patterns() {
     assert_eq!(next.to_bits(), one.to_bits() + 1);
     assert_eq!(next.next_after(one).to_bits(), one.to_bits());
     assert_eq!(ld(0.0).next_after(ld(1.0)).to_bits(), 1);
+    // Crossing a binade must land on the maximum fraction of the lower exponent, not on a
+    // pseudo-denormal (x87 stores the integer bit explicitly).
+    assert_eq!(
+        ld(-1.0).next_after(ld(0.0)).to_bits(),
+        0xbffe_ffff_ffff_ffff_ffff
+    );
+    assert_eq!(
+        ld(1.0).next_after(ld(0.0)).to_bits(),
+        0x3ffe_ffff_ffff_ffff_ffff
+    );
+    assert_eq!(
+        ld(0.0).next_after(ld(-1.0)).to_bits(),
+        0x8000_0000_0000_0000_0001
+    );
     assert_eq!(LongDouble::nan().next_after(one).class(), FP_NAN);
+    // `rint`/`roundeven`: nearest integer, ties to even (previously anything in (0.5, 1)
+    // was truncated to zero).
+    assert_eq!(ld(0.75).roundeven().to_f64(), 1.0);
+    assert_eq!(ld(-0.75).roundeven().to_f64(), -1.0);
+    assert_eq!(ld(0.5).roundeven().to_f64(), 0.0);
+    assert_eq!(ld(-0.5).roundeven().to_f64(), 0.0);
+    assert_eq!(ld(1.5).roundeven().to_f64(), 2.0);
+    assert_eq!(ld(2.5).roundeven().to_f64(), 2.0);
+    assert_eq!(ld(3.5).roundeven().to_f64(), 4.0);
 }

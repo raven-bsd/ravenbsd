@@ -91,11 +91,24 @@ fn build_rejects_unknown_architecture() {
 fn check_fast_flag_is_parsed() {
     assert_eq!(
         parse_args(&args(&["check"])).unwrap(),
-        Command::Check { fast: false }
+        Command::Check {
+            fast: false,
+            changed: false
+        }
     );
     assert_eq!(
         parse_args(&args(&["check", "--fast"])).unwrap(),
-        Command::Check { fast: true }
+        Command::Check {
+            fast: true,
+            changed: false
+        }
+    );
+    assert_eq!(
+        parse_args(&args(&["check", "--fast", "--changed"])).unwrap(),
+        Command::Check {
+            fast: true,
+            changed: true
+        }
     );
     assert!(parse_args(&args(&["check", "--slow"])).is_err());
 }

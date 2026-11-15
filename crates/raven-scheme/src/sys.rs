@@ -11,6 +11,13 @@ use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
 use raven_abi::types::{Handle, Rights};
 
+/// Raw `pread(handle, buffer, len, offset)` number (PG-22; the ABI crate owns the enum value).
+const PREAD: usize = 0x6b;
+/// Raw `pwrite(handle, buffer, len, offset)` number.
+const PWRITE: usize = 0x6c;
+/// Raw `seek(handle, offset, whence) -> new_offset` number.
+const SEEK: usize = 0x6d;
+
 /// One raw syscall with up to six arguments.
 #[inline(always)]
 pub(crate) fn syscall6(
@@ -139,6 +146,43 @@ pub(crate) fn write(handle: Handle, buffer: &[u8]) -> Result<usize, Errno> {
         0,
         0,
     ))
+}
+
+pub(crate) fn pread(handle: Handle, offset: u64, buffer: &mut [u8]) -> Result<usize, Errno> {
+    checked(syscall6(
+        PREAD,
+        handle.0 as usize,
+        buffer.as_mut_ptr() as usize,
+        buffer.len(),
+        offset as usize,
+        0,
+        0,
+    ))
+}
+
+pub(crate) fn pwrite(handle: Handle, offset: u64, buffer: &[u8]) -> Result<usize, Errno> {
+    checked(syscall6(
+        PWRITE,
+        handle.0 as usize,
+        buffer.as_ptr() as usize,
+        buffer.len(),
+        offset as usize,
+        0,
+        0,
+    ))
+}
+
+pub(crate) fn seek(handle: Handle, offset: i64, whence: u32) -> Result<u64, Errno> {
+    let result = checked(syscall6(
+        SEEK,
+        handle.0 as usize,
+        offset as isize as usize,
+        whence as usize,
+        0,
+        0,
+        0,
+    ))?;
+    u64::try_from(result).map_err(|_| Errno::EOVERFLOW)
 }
 
 pub(crate) fn close(handle: Handle) -> Result<(), Errno> {

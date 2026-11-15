@@ -349,6 +349,8 @@ getpwnam F 608 x86_64
 getpwnam_r F 824 x86_64
 getpwuid F 569 x86_64
 getpwuid_r F 822 x86_64
+getresgid F 0 x86_64
+getresuid F 0 x86_64
 getrlimit F 306 x86_64
 getrusage F 100 x86_64
 getservbyname F 328 x86_64
@@ -851,6 +853,8 @@ setprogname F 103 x86_64
 setprotoent F 5 x86_64
 setpwent F 5 x86_64
 setregid F 150 x86_64
+setresgid F 0 x86_64
+setresuid F 0 x86_64
 setreuid F 150 x86_64
 setrlimit F 136 x86_64
 setservent F 5 x86_64

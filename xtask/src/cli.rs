@@ -70,6 +70,7 @@ enum Command {
     Guard,
     Check {
         fast: bool,
+        changed: bool,
     },
     Build {
         component: Component,
@@ -161,13 +162,15 @@ fn parse_args(args: &[String]) -> Result<Command> {
         }
         "check" => {
             let mut fast = false;
+            let mut changed = false;
             for arg in rest {
                 match arg.as_str() {
                     "--fast" => fast = true,
+                    "--changed" => changed = true,
                     other => bail!("unknown check option `{other}`"),
                 }
             }
-            Ok(Command::Check { fast })
+            Ok(Command::Check { fast, changed })
         }
         "build" => {
             if rest.first().is_some_and(|value| value == "uutils") {
@@ -323,10 +326,10 @@ fn execute(command: Command) -> Result<u8> {
             let root = root()?;
             guard::run(&root)
         }
-        Command::Check { fast } => {
+        Command::Check { fast, changed } => {
             let root = root()?;
             let workspace = repo::Workspace::load(&root)?;
-            check::run(&workspace, fast)
+            check::run(&workspace, fast, changed)
         }
         Command::Build {
             component,

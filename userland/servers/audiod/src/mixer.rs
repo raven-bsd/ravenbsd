@@ -11,6 +11,7 @@ use raven_abi::errno::Errno;
 use raven_audio_core::format::{downmix_mono, mono_to_stereo};
 use raven_audio_core::mix::{self, GAIN_UNITY};
 use raven_audio_core::resample::resample_linear;
+use raven_proto_audio::ring::{RingConsumer, RingHeader, RingLayout};
 use raven_proto_audio::stream::{Call, Status, StreamState};
 use raven_proto_audio::{Format, SampleFormat};
 
@@ -45,7 +46,6 @@ pub struct StreamView {
 }
 
 /// One client stream.
-#[derive(Clone, Debug)]
 pub struct Stream {
     /// Numeric id (assigned by [`Mixer::open`]).
     pub id: u64,
@@ -62,6 +62,7 @@ pub struct Stream {
     /// Short periods.
     pub underruns: u32,
     samples: VecDeque<i16>,
+    ring: Option<RingConsumer<'static>>,
 }
 
 impl Stream {
@@ -79,12 +80,25 @@ impl Stream {
             position_frames: 0,
             underruns: 0,
             samples: VecDeque::new(),
+            ring: None,
         }
     }
 
     /// A snapshot for status and tests.
     #[must_use]
     pub fn view(&self) -> StreamView {
+        if let Some(ring) = &self.ring {
+            return StreamView {
+                id: self.id,
+                format: self.format,
+                volume_left: self.volume_left,
+                volume_right: self.volume_right,
+                state: self.state,
+                position_frames: ring.position_frames(),
+                underruns: ring.underruns(),
+                buffered_frames: ring.available_frames() as usize,
+            };
+        }
         StreamView {
             id: self.id,
             format: self.format,
@@ -225,11 +239,23 @@ fn clamp_i16(value: i64) -> i16 {
     }
 }
 
+/// The device clock and publisher for a ring sink.
+pub trait DeviceSink {
+    /// Publish one stereo period.
+    fn write(&mut self, period: &[i16]) -> Result<(), Errno>;
+    /// Frames played by the device since it was opened.
+    fn position_frames(&self) -> u64;
+    /// Periods the device could not fill.
+    fn underruns(&self) -> u32;
+    /// The mixer has no running stream; stop the device clock.
+    fn idle(&mut self) {}
+}
+
 /// The `audio:out0` device state.
-#[derive(Clone, Debug)]
 pub struct Mixer {
     streams: BTreeMap<u64, Stream>,
     next_id: u64,
+    auto_pump: bool,
 }
 
 impl Default for Mixer {
@@ -245,7 +271,22 @@ impl Mixer {
         Self {
             streams: BTreeMap::new(),
             next_id: 1,
+            auto_pump: true,
         }
+    }
+
+    /// Enable or disable the null-sink pull-on-write behaviour.
+    ///
+    /// The null sink pulls a period whenever a producer writes; a real device sink (the HDA pump
+    /// thread) is the clock instead, so the write path must leave the samples buffered.
+    pub fn set_auto_pump(&mut self, enabled: bool) {
+        self.auto_pump = enabled;
+    }
+
+    /// Whether writes pull a null-sink period.
+    #[must_use]
+    pub fn auto_pump(&self) -> bool {
+        self.auto_pump
     }
 
     /// Open a stream on the null sink.
@@ -275,9 +316,110 @@ impl Mixer {
         self.stream(id).map(Stream::view)
     }
 
+    /// Attach a client PCM ring to a stream.
+    ///
+    /// The mapped region must be exactly the ring geometry for the stream format. The header is
+    /// initialised by audiod; the client ring is then consumed by [`Self::pump_device`]. The null
+    /// sink never calls this path, so its `SET_BUFFER` remains `EOPNOTSUPP`.
+    pub fn set_buffer(
+        &mut self,
+        id: u64,
+        region: &'static mut [u8],
+        period_frames: u32,
+        period_count: u16,
+    ) -> Result<(), Errno> {
+        let format = self.stream(id)?.format;
+        if format.sample != SampleFormat::S16Le {
+            return Err(Errno::EOPNOTSUPP);
+        }
+        if format.rate != DEVICE_RATE || format.channels != DEVICE_CHANNELS {
+            return Err(Errno::EOPNOTSUPP);
+        }
+        let layout = RingLayout::new(region.len(), format, period_frames, period_count)
+            .map_err(|_| Errno::EINVAL)?;
+        let existing = RingHeader::read_from(region);
+        let layout = match existing {
+            Ok(header)
+                if header.period_frames == period_frames
+                    && header.period_count == period_count
+                    && header.format() == format =>
+            {
+                RingLayout::from_header(&header, region.len()).map_err(|_| Errno::EINVAL)?
+            }
+            _ => {
+                layout.write_header(region, 0).map_err(|_| Errno::EINVAL)?;
+                layout
+            }
+        };
+        let consumer = RingConsumer::new(region, layout).map_err(|_| Errno::EINVAL)?;
+        let stream = self.streams.get_mut(&id).ok_or(Errno::EBADF)?;
+        stream.ring = Some(consumer);
+        Ok(())
+    }
+
+    /// Mix one period from the attached client rings and copy streams into a device sink.
+    ///
+    /// A ring underrun contributes silence and is counted by the ring header. The sink is the
+    /// device clock: one call publishes one period.
+    pub fn pump_device(&mut self, sink: &mut dyn DeviceSink) -> Result<u32, Errno> {
+        let period = PERIOD_FRAMES as usize;
+        let mut mixed = vec![0i16; period * 2];
+        let ids: Vec<u64> = self
+            .streams
+            .iter()
+            .filter(|(_, stream)| {
+                matches!(
+                    stream.state,
+                    StreamState::Running | StreamState::Underrun | StreamState::Draining
+                )
+            })
+            .map(|(id, _)| *id)
+            .collect();
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let mut buffers: Vec<Vec<i16>> = Vec::new();
+        for id in &ids {
+            let Some(stream) = self.streams.get_mut(id) else {
+                continue;
+            };
+            let mut buffer = vec![0i16; period * 2];
+            if let Some(ring) = stream.ring.as_mut() {
+                let frame_bytes = usize::from(ring.frame_bytes());
+                let mut bytes = vec![0u8; period * frame_bytes];
+                match ring.read_period(&mut bytes) {
+                    Ok(_) => {
+                        for (index, pair) in bytes.chunks_exact(2).enumerate() {
+                            if let Some(slot) = buffer.get_mut(index) {
+                                *slot = i16::from_le_bytes([pair[0], pair[1]]);
+                            }
+                        }
+                    }
+                    Err(raven_proto_audio::RingError::Underrun) => {}
+                    Err(_) => return Err(Errno::EIO),
+                }
+            } else {
+                let draining = stream.state == StreamState::Draining;
+                let _ = stream.pull_stereo(&mut buffer, draining);
+                stream.position_frames = stream.position_frames.saturating_add(period as u64);
+            }
+            buffers.push(buffer);
+        }
+        let streams: Vec<mix::Stream<'_>> = buffers
+            .iter()
+            .map(|buffer| mix::Stream::new(buffer, GAIN_UNITY))
+            .collect();
+        mix::mix(&streams, &mut mixed);
+        sink.write(&mixed)?;
+        Ok(1)
+    }
+
     /// Append PCM to a stream. `EIO` once the stream is draining.
     pub fn write(&mut self, id: u64, bytes: &[u8]) -> Result<usize, Errno> {
         let stream = self.streams.get_mut(&id).ok_or(Errno::EBADF)?;
+        if stream.ring.is_some() {
+            return Err(Errno::EOPNOTSUPP);
+        }
         if stream.state == StreamState::Draining {
             return Err(Errno::EIO);
         }
@@ -300,9 +442,14 @@ impl Mixer {
             Call::SetBuffer { .. } => Err(Errno::EOPNOTSUPP),
             Call::Start => {
                 let stream = self.streams.get_mut(&id).ok_or(Errno::EBADF)?;
+                let has_ring = stream.ring.is_some();
                 stream.state = StreamState::Running;
-                stream.position_frames = 0;
-                self.pump();
+                if !has_ring {
+                    stream.position_frames = 0;
+                    if self.auto_pump {
+                        self.pump();
+                    }
+                }
                 Ok(None)
             }
             Call::Stop => {
@@ -312,8 +459,11 @@ impl Mixer {
             }
             Call::Drain => {
                 let stream = self.streams.get_mut(&id).ok_or(Errno::EBADF)?;
+                let has_ring = stream.ring.is_some();
                 stream.state = StreamState::Draining;
-                self.pump();
+                if !has_ring && self.auto_pump {
+                    self.pump();
+                }
                 Ok(None)
             }
             Call::SetVolume { left, right } => {
@@ -324,11 +474,19 @@ impl Mixer {
             }
             Call::GetStatus => {
                 let stream = self.streams.get(&id).ok_or(Errno::EBADF)?;
-                Ok(Some(Status {
-                    position_frames: stream.position_frames,
-                    underruns: stream.underruns,
-                    state: stream.state,
-                }))
+                if let Some(ring) = &stream.ring {
+                    Ok(Some(Status {
+                        position_frames: ring.position_frames(),
+                        underruns: ring.underruns(),
+                        state: stream.state,
+                    }))
+                } else {
+                    Ok(Some(Status {
+                        position_frames: stream.position_frames,
+                        underruns: stream.underruns,
+                        state: stream.state,
+                    }))
+                }
             }
         }
     }
@@ -344,10 +502,11 @@ impl Mixer {
             .streams
             .iter()
             .filter(|(_, stream)| {
-                matches!(
-                    stream.state,
-                    StreamState::Running | StreamState::Underrun | StreamState::Draining
-                )
+                stream.ring.is_none()
+                    && matches!(
+                        stream.state,
+                        StreamState::Running | StreamState::Underrun | StreamState::Draining
+                    )
             })
             .map(|(id, _)| *id)
             .collect();
@@ -420,5 +579,10 @@ impl Mixer {
             }
         }
         periods
+    }
+
+    /// Pull null-sink periods only when no real device sink owns the clock.
+    pub fn pump_if_null(&mut self) -> u32 {
+        if self.auto_pump { self.pump() } else { 0 }
     }
 }

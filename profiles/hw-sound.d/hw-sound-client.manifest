@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# One-shot B44a client: 440 Hz through WRITE, then through the SET_BUFFER ring.
+name = "hw-sound-client"
+exec = "/bin/hw-sound-client"
+needs = ["scheme:audio"]
+grants = ["initfs"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
+ready_timeout_ms = 60_000

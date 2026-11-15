@@ -15,4 +15,6 @@ tests/fs-fuzz/corpus/
 tests/libc-oracle/vendor/
 
 tests/libc/fuzz/corpus/
-userland/uutils/
+# B54: binary Pi 5 DTB fixtures; tests/fixtures/pi5/generate.py regenerates them from the
+# documented trees, and the readable .dts/README stay under the SPDX check.
+tests/fixtures/pi5/*.dtb

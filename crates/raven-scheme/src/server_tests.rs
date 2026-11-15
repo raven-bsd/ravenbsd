@@ -11,7 +11,9 @@ use alloc::vec::Vec;
 use core::time::Duration;
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
-use raven_ipc::protocol::{self, Attachment, Opcode, PACKET_SIZE, REPLY_HANDLE, SchemePacket};
+use raven_ipc::protocol::{
+    self, Attachment, OFFSET_EXPLICIT, Opcode, PACKET_SIZE, REPLY_HANDLE, SchemePacket,
+};
 use raven_proto_fs::Stat;
 
 #[derive(Default)]
@@ -63,6 +65,31 @@ impl Handler for TestHandler {
             return Err(error.into());
         }
         Ok(buffer.len())
+    }
+
+    fn pread(&mut self, file: u64, offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
+        self.calls.push(format!("pread {file} {offset}"));
+        if let Some(error) = self.error {
+            return Err(error.into());
+        }
+        let data = b"pos";
+        let length = data.len().min(buffer.len());
+        buffer[..length].copy_from_slice(&data[..length]);
+        Ok(length)
+    }
+
+    fn pwrite(&mut self, file: u64, offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
+        self.calls
+            .push(format!("pwrite {file} {offset} {}", buffer.len()));
+        if let Some(error) = self.error {
+            return Err(error.into());
+        }
+        Ok(buffer.len())
+    }
+
+    fn seek(&mut self, file: u64, offset: i64, whence: u32) -> HandlerResult<u64> {
+        self.calls.push(format!("seek {file} {offset} {whence}"));
+        self.error.map_or(Ok(0x9999), |error| Err(error.into()))
     }
 
     fn close(&mut self, file: u64) -> HandlerResult<()> {
@@ -830,4 +857,119 @@ fn server_completer_has_a_fresh_token_per_request() {
         )
         .unwrap();
     assert_ne!(first.token, second.token);
+}
+
+#[test]
+fn positional_flag_dispatches_pread_and_pwrite() {
+    let kernel = FakeKernel::new();
+    let mut server = Server::register_with(kernel.clone(), "echo").unwrap();
+    let mut handler = TestHandler::default();
+
+    let mut buffer = [0u8; 8];
+    let mut packet = request(Opcode::Read);
+    packet.flags = OFFSET_EXPLICIT;
+    packet.offset = 3;
+    packet.buffer_addr = buffer.as_mut_ptr() as u64;
+    packet.buffer_len = buffer.len() as u64;
+    server
+        .dispatch(
+            Packet {
+                handle: Handle(9),
+                packet,
+            },
+            &mut handler,
+        )
+        .unwrap();
+    assert_eq!(handler.calls.last().map(String::as_str), Some("pread 7 3"));
+
+    let data = b"xy";
+    let mut packet = request(Opcode::Write);
+    packet.flags = OFFSET_EXPLICIT;
+    packet.offset = 11;
+    packet.buffer_addr = data.as_ptr() as u64;
+    packet.buffer_len = data.len() as u64;
+    server
+        .dispatch(
+            Packet {
+                handle: Handle(9),
+                packet,
+            },
+            &mut handler,
+        )
+        .unwrap();
+    assert_eq!(
+        handler.calls.last().map(String::as_str),
+        Some("pwrite 7 11 2")
+    );
+}
+
+#[test]
+fn plain_read_keeps_the_cursor_path() {
+    let kernel = FakeKernel::new();
+    let mut server = Server::register_with(kernel.clone(), "echo").unwrap();
+    let mut handler = TestHandler::default();
+    let mut buffer = [0u8; 8];
+    let mut packet = request(Opcode::Read);
+    packet.buffer_addr = buffer.as_mut_ptr() as u64;
+    packet.buffer_len = buffer.len() as u64;
+    server
+        .dispatch(
+            Packet {
+                handle: Handle(9),
+                packet,
+            },
+            &mut handler,
+        )
+        .unwrap();
+    assert_eq!(handler.calls.last().map(String::as_str), Some("read 7 0"));
+}
+
+#[test]
+fn seek_reply_carries_the_new_offset() {
+    let kernel = FakeKernel::new();
+    let mut server = Server::register_with(kernel.clone(), "echo").unwrap();
+    let mut handler = TestHandler::default();
+    let mut packet = request(Opcode::Seek);
+    packet.offset = (-4i64) as u64;
+    packet.flags = 2;
+    server
+        .dispatch(
+            Packet {
+                handle: Handle(9),
+                packet,
+            },
+            &mut handler,
+        )
+        .unwrap();
+    assert_eq!(
+        handler.calls.last().map(String::as_str),
+        Some("seek 7 -4 2")
+    );
+    let sent = decode_sent(&kernel);
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0].status, 0);
+    assert_eq!(sent[0].offset, 0x9999);
+}
+
+#[test]
+fn seek_error_is_reported_as_status() {
+    let kernel = FakeKernel::new();
+    let mut server = Server::register_with(kernel.clone(), "echo").unwrap();
+    let mut handler = TestHandler {
+        error: Some(Errno::EINVAL),
+        ..TestHandler::default()
+    };
+    let packet = request(Opcode::Seek);
+    server
+        .dispatch(
+            Packet {
+                handle: Handle(9),
+                packet,
+            },
+            &mut handler,
+        )
+        .unwrap();
+    let sent = decode_sent(&kernel);
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0].status, i32::from(Errno::EINVAL.0));
 }

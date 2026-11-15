@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "audiod"
+exec = "/sbin/audiod"
+needs = ["logd", "scheme:hda"]
+provides = ["scheme:audio"]
+readiness = "scheme"
+restart = "on-failure"
+ready_timeout_ms = 30_000
+
+[env]
+RAVEN_AUDIO_SINK = "hda:out0"

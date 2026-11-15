@@ -19,6 +19,7 @@ pub mod build;
 pub mod measure;
 pub mod members;
 pub mod monomorph;
+pub mod optional;
 pub mod probe;
 pub mod relocs;
 pub mod report;

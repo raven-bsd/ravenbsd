@@ -24,6 +24,7 @@ pub mod fs;
 pub mod initfs;
 pub mod print;
 pub mod spawn;
+mod spawn_error;
 pub mod sync;
 pub mod sys;
 #[cfg(feature = "alloc")]

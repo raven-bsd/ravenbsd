@@ -7,6 +7,10 @@
 schema = 1
 
 [[one-symbol]]
+file = "libc/ravenlibc/crates/raven-libc/src/ffi/procbackend.rs"
+reason = "the four getresuid/getresgid/setresuid/setresgid ABI entry points share the one syscall backend; split is deferred to the C69 review"
+
+[[one-symbol]]
 file = "libc/ravenlibc/crates/raven-libc/src/ctype/toascii.rs"
 reason = "first export does not match the file stem; existing ABI alias or hook file (R-1 review pending, C60/C60c/C61)"
 

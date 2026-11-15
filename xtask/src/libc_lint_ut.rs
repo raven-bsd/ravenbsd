@@ -400,8 +400,10 @@ fn stub_checks_are_listed() {
 
 #[test]
 fn all_checks_are_listed() {
-    assert_eq!(ALL_CHECKS.len(), 8);
+    assert_eq!(ALL_CHECKS.len(), 10);
     assert!(ALL_CHECKS.contains(&"no-alloc"));
+    assert!(ALL_CHECKS.contains(&"size"));
+    assert!(ALL_CHECKS.contains(&"abi-freeze"));
     assert!(!STUB_CHECKS.contains(&"no-alloc"));
 }
 

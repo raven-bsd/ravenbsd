@@ -1,22 +1,26 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! The local gate: `cargo xtask check [--fast]`.
+//! The local gate: `cargo xtask check [--fast] [--changed]`.
 //!
-//! Steps run in order and stop at the first failure; every step is reported with its exit code and
-//! duration, and the ones after a failure are shown as skipped. `--fast` skips the per-target clippy
-//! passes (the slow part) but keeps the host gate and provenance.
+//! Every step runs, even after an earlier step failed, so one invocation reports every problem.
+//! A step that cannot be started is reported as failed and the remaining steps still run. `--fast`
+//! skips the per-target clippy passes (the slow part) but keeps the host gate and provenance.
+//! `--changed` runs only the cargo packages touched by the branch or the working tree: the fast
+//! per-edit gate. The full `make check` remains the checkpoint gate.
 
+use std::collections::BTreeSet;
+use std::path::Path;
 use std::time::Instant;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 use crate::build::{self, Arch, Component};
 use crate::docs;
 use crate::guard;
 use crate::process::{CommandSpec, run as run_command};
 use crate::profiles;
-use crate::repo::Workspace;
+use crate::repo::{Package, Workspace};
 
 struct Step {
     name: String,
@@ -44,91 +48,78 @@ struct Summary {
 }
 
 /// Run the check gate. Returns 0 when every executed step passed, 1 otherwise.
-pub(crate) fn run(workspace: &Workspace, fast: bool) -> Result<u8> {
-    let steps = build_steps(workspace, fast)?;
+pub(crate) fn run(workspace: &Workspace, fast: bool, changed: bool) -> Result<u8> {
+    let steps = build_steps(workspace, fast, changed)?;
     let mut summaries = Vec::new();
     let mut failed = false;
     for step in steps {
-        if failed {
-            summaries.push(Summary {
-                name: step.name,
-                status: Status::Skipped("previous failure".to_string()),
-                seconds: 0.0,
-            });
-            continue;
-        }
+        let Step { name, kind } = step;
         let started = Instant::now();
-        match step.kind {
+        let status = match kind {
             StepKind::Skipped(reason) => {
-                println!("==> {}: skipped ({reason})", step.name);
-                summaries.push(Summary {
-                    name: step.name,
-                    status: Status::Skipped(reason),
-                    seconds: 0.0,
-                });
+                println!("==> {name}: skipped ({reason})");
+                Status::Skipped(reason)
             }
             StepKind::Guard => {
-                println!("==> {}", step.name);
-                let violations = guard::scan_repo(&workspace.root)?;
-                guard::print_violations(&violations);
-                let code = i32::from(!violations.is_empty());
-                let seconds = started.elapsed().as_secs_f64();
-                if code != 0 {
-                    failed = true;
+                println!("==> {name}");
+                match guard::scan_repo(&workspace.root) {
+                    Ok(violations) => {
+                        guard::print_violations(&violations);
+                        status_for(i32::from(!violations.is_empty()))
+                    }
+                    Err(error) => {
+                        eprintln!("check: `{name}` could not run: {error:#}");
+                        Status::Failed(1)
+                    }
                 }
-                summaries.push(Summary {
-                    name: step.name,
-                    status: status_for(code),
-                    seconds,
-                });
             }
             StepKind::Command(spec) => {
-                println!("==> {}", step.name);
-                let code = run_command(&spec)
-                    .with_context(|| format!("cannot run check step `{}`", step.name))?;
-                let seconds = started.elapsed().as_secs_f64();
-                if code != 0 {
-                    failed = true;
+                println!("==> {name}");
+                match run_command(&spec) {
+                    Ok(code) => status_for(code),
+                    Err(error) => {
+                        eprintln!("check: `{name}` could not run: {error:#}");
+                        Status::Failed(1)
+                    }
                 }
-                summaries.push(Summary {
-                    name: step.name,
-                    status: status_for(code),
-                    seconds,
-                });
             }
             StepKind::Docs => {
-                println!("==> {}", step.name);
-                let code = i32::from(docs::run(&workspace.root)?);
-                let seconds = started.elapsed().as_secs_f64();
-                if code != 0 {
-                    failed = true;
+                println!("==> {name}");
+                match docs::run(&workspace.root) {
+                    Ok(code) => status_for(i32::from(code)),
+                    Err(error) => {
+                        eprintln!("check: `{name}` could not run: {error:#}");
+                        Status::Failed(1)
+                    }
                 }
-                summaries.push(Summary {
-                    name: step.name,
-                    status: status_for(code),
-                    seconds,
-                });
             }
             StepKind::Profiles => {
-                println!("==> {}", step.name);
-                let violations = profiles::one_shot_restart_violations(&workspace.root)?;
-                for violation in &violations {
-                    println!("{violation}");
+                println!("==> {name}");
+                match profiles::one_shot_restart_violations(&workspace.root) {
+                    Ok(violations) => {
+                        for violation in &violations {
+                            println!("{violation}");
+                        }
+                        status_for(i32::from(!violations.is_empty()))
+                    }
+                    Err(error) => {
+                        eprintln!("check: `{name}` could not run: {error:#}");
+                        Status::Failed(1)
+                    }
                 }
-                let code = i32::from(!violations.is_empty());
-                let seconds = started.elapsed().as_secs_f64();
-                if code != 0 {
-                    failed = true;
-                }
-                summaries.push(Summary {
-                    name: step.name,
-                    status: status_for(code),
-                    seconds,
-                });
             }
+        };
+        let seconds = started.elapsed().as_secs_f64();
+        if matches!(status, Status::Failed(_)) {
+            failed = true;
         }
+        summaries.push(Summary {
+            name,
+            status,
+            seconds,
+        });
     }
-    print_summary(&summaries);
+    print_summary(&summaries, changed);
     Ok(u8::from(failed))
 }
 
@@ -140,8 +131,9 @@ fn status_for(code: i32) -> Status {
     }
 }
 
-fn print_summary(summaries: &[Summary]) {
-    println!("check summary:");
+fn print_summary(summaries: &[Summary], changed: bool) {
+    let verdict = if changed { "check-fast" } else { "check" };
+    println!("{verdict} summary:");
     for summary in summaries {
         match &summary.status {
             Status::Ok => println!(
@@ -159,14 +151,18 @@ fn print_summary(summaries: &[Summary]) {
         .iter()
         .any(|summary| matches!(summary.status, Status::Failed(_)));
     if failed {
-        println!("check: FAILED");
+        println!("{verdict}: FAILED");
     } else {
-        println!("check: PASSED");
+        println!("{verdict}: PASSED");
     }
 }
 
-fn build_steps(workspace: &Workspace, fast: bool) -> Result<Vec<Step>> {
+fn build_steps(workspace: &Workspace, fast: bool, changed: bool) -> Result<Vec<Step>> {
     let root = &workspace.root;
+    if changed && let Some(packages) = changed_packages(workspace)? {
+        return Ok(changed_steps(workspace, &packages));
+    }
+    let nextest = have_nextest();
     let mut steps = vec![
         Step {
             name: "guard".to_string(),
@@ -179,12 +175,37 @@ fn build_steps(workspace: &Workspace, fast: bool) -> Result<Vec<Step>> {
             vec!["fmt".into(), "--all".into(), "--".into(), "--check".into()],
         ),
         command_step("clippy (host)", root, "cargo", host_clippy_args(workspace)),
-        command_step("tests (host)", root, "cargo", vec!["test".into()]),
-        Step {
-            name: "profiles".to_string(),
-            kind: StepKind::Profiles,
-        },
     ];
+    if nextest {
+        steps.push(command_step(
+            "tests (host, parallel)",
+            root,
+            "cargo",
+            vec![
+                "nextest".into(),
+                "run".into(),
+                "--status-level=fail".into(),
+                "--no-fail-fast".into(),
+            ],
+        ));
+        steps.push(command_step(
+            "tests (doc)",
+            root,
+            "cargo",
+            vec!["test".into(), "--doc".into()],
+        ));
+    } else {
+        steps.push(command_step(
+            "tests (host)",
+            root,
+            "cargo",
+            vec!["test".into()],
+        ));
+    }
+    steps.push(Step {
+        name: "profiles".to_string(),
+        kind: StepKind::Profiles,
+    });
     if root.join("crates/raven-provenance/Cargo.toml").is_file() {
         steps.push(command_step(
             "provenance",
@@ -334,6 +355,197 @@ fn command_step(name: &str, root: &std::path::Path, program: &str, args: Vec<Str
     }
 }
 
+/// Whether the host has `cargo-nextest`, the parallel test runner. It schedules test binaries
+/// across cores and prints only failures; without it the gate falls back to serial `cargo test`.
+fn have_nextest() -> bool {
+    std::process::Command::new("cargo")
+        .args(["nextest", "--version"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+/// Packages touched by the branch or the working tree. `None` means "run the full gate": a
+/// sensitive root file changed, git is unavailable, or no diff could be read.
+fn changed_packages(workspace: &Workspace) -> Result<Option<Vec<&Package>>> {
+    let Some(files) = changed_files(&workspace.root) else {
+        return Ok(None);
+    };
+    if files.is_empty() {
+        return Ok(None);
+    }
+    const SENSITIVE: &[&str] = &[
+        "Cargo.toml",
+        "Cargo.lock",
+        "rust-toolchain.toml",
+        ".cargo/config.toml",
+        "Makefile",
+    ];
+    if files.iter().any(|file| {
+        SENSITIVE.contains(&file.as_str())
+            || file.starts_with("xtask/")
+            || file.starts_with("scripts/")
+    }) {
+        return Ok(None);
+    }
+    let mut names = BTreeSet::new();
+    for file in &files {
+        let mut best: Option<&Package> = None;
+        for package in &workspace.packages {
+            let inside = file == &package.rel_dir
+                || file
+                    .strip_prefix(&package.rel_dir)
+                    .is_some_and(|rest| rest.starts_with('/'));
+            if inside && best.is_none_or(|current| package.rel_dir.len() > current.rel_dir.len()) {
+                best = Some(package);
+            }
+        }
+        if let Some(package) = best {
+            names.insert(package.name.as_str());
+        }
+    }
+    Ok(Some(
+        workspace
+            .packages
+            .iter()
+            .filter(|package| names.contains(package.name.as_str()))
+            .collect(),
+    ))
+}
+
+/// Committed, unstaged and staged paths, so the fast gate sees work in progress.
+fn changed_files(root: &Path) -> Option<Vec<String>> {
+    let base = git_stdout(root, &["merge-base", "HEAD", "origin/master"])
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty());
+    let mut files = BTreeSet::new();
+    let mut saw_diff = false;
+    if let Some(base) = base
+        && let Some(text) = git_stdout(root, &["diff", "--name-only", &format!("{base}...HEAD")])
+    {
+        saw_diff = true;
+        files.extend(
+            text.lines()
+                .filter(|line| !line.is_empty())
+                .map(str::to_string),
+        );
+    }
+    for args in [
+        &["diff", "--name-only"][..],
+        &["diff", "--name-only", "--cached"][..],
+    ] {
+        if let Some(text) = git_stdout(root, args) {
+            saw_diff = true;
+            files.extend(
+                text.lines()
+                    .filter(|line| !line.is_empty())
+                    .map(str::to_string),
+            );
+        }
+    }
+    saw_diff.then(|| files.into_iter().collect())
+}
+
+fn git_stdout(root: &Path, args: &[&str]) -> Option<String> {
+    let output = std::process::Command::new("git")
+        .args(args)
+        .current_dir(root)
+        .output()
+        .ok()?;
+    output
+        .status
+        .success()
+        .then(|| String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+/// The fast per-edit gate: guard, fmt, then only the changed host packages.
+fn changed_steps(workspace: &Workspace, packages: &[&Package]) -> Vec<Step> {
+    let root = &workspace.root;
+    let host: Vec<&Package> = packages
+        .iter()
+        .copied()
+        .filter(|package| package.target.is_none())
+        .collect();
+    let mut steps = vec![
+        Step {
+            name: "guard".to_string(),
+            kind: StepKind::Guard,
+        },
+        command_step(
+            "fmt",
+            root,
+            "cargo",
+            vec!["fmt".into(), "--all".into(), "--".into(), "--check".into()],
+        ),
+    ];
+    if host.is_empty() {
+        for name in ["clippy (changed)", "tests (changed, parallel)"] {
+            steps.push(Step {
+                name: name.to_string(),
+                kind: StepKind::Skipped("no changed host-testable packages".to_string()),
+            });
+        }
+    } else {
+        steps.push(command_step(
+            "clippy (changed)",
+            root,
+            "cargo",
+            changed_clippy_args(&host),
+        ));
+        steps.push(changed_tests_step(root, &host));
+    }
+    steps.push(Step {
+        name: "profiles".to_string(),
+        kind: StepKind::Profiles,
+    });
+    steps
+}
+
+fn changed_clippy_args(packages: &[&Package]) -> Vec<String> {
+    let mut args = vec!["clippy".to_string()];
+    for package in packages {
+        args.push("-p".to_string());
+        args.push(package.name.clone());
+    }
+    args.extend([
+        "--all-targets".to_string(),
+        "--".to_string(),
+        "-D".to_string(),
+        "warnings".to_string(),
+    ]);
+    args
+}
+
+fn changed_tests_step(root: &Path, packages: &[&Package]) -> Step {
+    let nextest = have_nextest();
+    let mut args = if nextest {
+        vec![
+            "nextest".to_string(),
+            "run".to_string(),
+            "--status-level=fail".to_string(),
+            "--no-fail-fast".to_string(),
+        ]
+    } else {
+        vec!["test".to_string()]
+    };
+    for package in packages {
+        args.push("-p".to_string());
+        args.push(package.name.clone());
+    }
+    command_step(
+        if nextest {
+            "tests (changed, parallel)"
+        } else {
+            "tests (changed)"
+        },
+        root,
+        "cargo",
+        args,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -373,7 +585,7 @@ mod tests {
 
     #[test]
     fn fast_mode_skips_target_steps() {
-        let steps = build_steps(&workspace(), true).unwrap();
+        let steps = build_steps(&workspace(), true, false).unwrap();
         let target_steps: Vec<&Step> = steps
             .iter()
             .filter(|step| {
@@ -392,7 +604,7 @@ mod tests {
 
     #[test]
     fn normal_mode_runs_kernel_clippy() {
-        let steps = build_steps(&workspace(), false).unwrap();
+        let steps = build_steps(&workspace(), false, false).unwrap();
         let kernel = steps
             .iter()
             .find(|step| step.name == "clippy kernel x86_64")
@@ -402,7 +614,7 @@ mod tests {
 
     #[test]
     fn normal_mode_runs_aarch64_kernel_clippy() {
-        let steps = build_steps(&workspace(), false).unwrap();
+        let steps = build_steps(&workspace(), false, false).unwrap();
         let kernel = steps
             .iter()
             .find(|step| step.name == "clippy kernel aarch64")
@@ -420,7 +632,7 @@ mod tests {
 
     #[test]
     fn profiles_step_is_part_of_the_gate() {
-        let steps = build_steps(&workspace(), false).unwrap();
+        let steps = build_steps(&workspace(), false, false).unwrap();
         let profiles = steps
             .iter()
             .find(|step| step.name == "profiles")
@@ -441,7 +653,7 @@ mod tests {
             root: root.clone(),
             packages: Vec::new(),
         };
-        let steps = build_steps(&workspace, false).unwrap();
+        let steps = build_steps(&workspace, false, false).unwrap();
         let _ = std::fs::remove_dir_all(&root);
 
         let provenance = steps

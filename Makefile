@@ -24,8 +24,8 @@ XTASK = cargo run -q -p xtask --
 -include .raven-env.mk
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-full check-full-if-needed guard kernel loader dev release image run test world uutils provenance \
-	posix-gaps posix-check toolchain clean distclean
+.PHONY: help setup doctor check check-full check-full-if-needed guard kernel loader dev release image run test world provenance \
+	posix-gaps posix-check toolchain clean distclean check-fast
 
 help:
 	@$(XTASK) help
@@ -38,6 +38,11 @@ doctor:
 
 check:
 	@$(XTASK) check
+
+# Fast per-edit gate: guard, fmt, clippy and nextest only for the packages touched by the branch
+# or the working tree. Seconds, not minutes. The full `make check` stays the checkpoint gate.
+check-fast:
+	@$(XTASK) check --fast --changed
 
 # Full allocator stress gate: the 1M-op model runs are ignored by the routine
 # `cargo test` in `check` and are executed here, at merge/release time.
@@ -84,9 +89,6 @@ test:
 
 world:
 	@printf '%s\n' 'not implemented yet (milestone M4)' >&2; exit 1
-
-uutils:
-	@$(XTASK) build uutils --arch $(ARCH) $(RELFLAG)
 
 provenance:
 	@cargo run -q -p raven-provenance -- check --root .

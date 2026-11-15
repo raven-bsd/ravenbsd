@@ -3,10 +3,11 @@
 
 //! Thread-pointer accessors.
 //!
-//! x86-64 reads the self pointer from `%fs:0`; the base is changed with the kernel
-//! `THREAD_SET_TLS` call, then a short sleep lets the scheduler install it on wake-up.
-//! AArch64 and RISC-V write their user-writable register directly; the kernel must save and
-//! restore it per thread (PG-1), so multi-thread on-target tests are marked `# needs PG-1`.
+//! x86-64 reads the self pointer from `%fs:0`. `THREAD_SET_TLS` stores the per-thread base, and
+//! the kernel installs it in `IA32_FS_BASE` on the next context switch; a short sleep forces
+//! that switch before the caller touches TLS. AArch64 and RISC-V write their user-writable
+//! register directly; the kernel must save and restore it per thread (PG-1), so multi-thread
+//! on-target tests are marked `# needs PG-1`.
 
 #[cfg(feature = "host-fake")]
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -64,7 +65,9 @@ pub fn thread_pointer() -> *mut u8 {
 
 /// Set the calling thread's thread pointer.
 ///
-/// On x86-64 this is PG-1 and returns `ENOSYS` until the kernel provides `THREAD_SET_TLS`.
+/// On x86-64 this calls `THREAD_SET_TLS` and then sleeps for one scheduler tick
+/// so the kernel installs the stored base in `IA32_FS_BASE` before the caller
+/// uses TLS.
 ///
 /// # Safety
 ///
@@ -77,12 +80,17 @@ pub unsafe fn set_thread_pointer(tp: *mut u8) -> Result<(), Errno> {
     }
     #[cfg(all(target_arch = "x86_64", target_os = "none", not(feature = "host-fake")))]
     {
-        // The kernel has THREAD_SET_TLS (0x23); it records the base in the thread object and
-        // installs it on the next switch-in.
-        crate::sys::thread_set_tls(raven_abi::types::Handle::NONE, tp as usize)?;
-        // A yield is not enough: when no other thread is runnable the scheduler returns
-        // without a switch and `%fs` stays 0. A 1 ms sleep always switches out and the
-        // wake-up installs the base this call recorded.
+        // SAFETY: `THREAD_SET_TLS` takes the target thread handle (NONE is the caller) and a
+        // canonical user address; the caller guarantees `tp` is a live TCB.
+        crate::errno::ret(unsafe {
+            crate::arch::syscall2(
+                raven_abi::syscall::THREAD_SET_TLS,
+                raven_abi::types::Handle::NONE.0 as usize,
+                tp as usize,
+            )
+        })?;
+        // The kernel records the base per thread and writes `IA32_FS_BASE` on the next switch.
+        // Give the scheduler a tick so the current thread comes back with TLS installed.
         crate::sys::nanosleep(1_000_000)?;
         Ok(())
     }
@@ -92,6 +100,7 @@ pub unsafe fn set_thread_pointer(tp: *mut u8) -> Result<(), Errno> {
         not(feature = "host-fake")
     ))]
     {
+        // Host unit tests build this branch but do not have a Raven kernel.
         let _ = tp;
         Err(Errno::ENOSYS)
     }

@@ -6,16 +6,16 @@ use crate::prelude::*;
 pub type wchar_t = i32;
 
 pub type blkcnt_t = c_longlong;
-pub type blksize_t = c_long;
+pub type blksize_t = i32;
 pub type clock_t = c_long;
 pub type clockid_t = c_int;
 pub type dev_t = c_ulonglong;
 pub type fsblkcnt_t = c_ulong;
 pub type fsfilcnt_t = c_ulong;
 pub type ino_t = c_ulonglong;
-pub type mode_t = c_uint;
+pub type mode_t = u32;
 pub type nfds_t = c_ulong;
-pub type nlink_t = c_ulong;
+pub type nlink_t = u32;
 pub type off_t = c_longlong;
 pub type pthread_t = *mut c_void;
 // Must be usize due to library/std/sys_common/thread_local.rs,
@@ -26,14 +26,12 @@ pub type sa_family_t = u16;
 pub type sem_t = *mut c_void;
 pub type socklen_t = u32;
 pub type speed_t = u32;
-pub type suseconds_t = c_int;
+pub type suseconds_t = c_longlong;
 pub type tcflag_t = u32;
 pub type time_t = c_longlong;
 pub type id_t = c_uint;
-pub type nl_item = c_int;
-pub type timer_t = *mut c_void;
-pub type uid_t = c_int;
-pub type gid_t = c_int;
+pub type uid_t = u32;
+pub type gid_t = u32;
 
 extern_ty! {
     pub enum timezone {}
@@ -197,14 +195,14 @@ s! {
     pub struct stat {
         pub st_dev: crate::dev_t,
         pub st_ino: crate::ino_t,
-        pub st_mode: u32,
-        pub st_nlink: u32,
+        pub st_mode: mode_t,
+        pub st_nlink: crate::nlink_t,
         pub st_uid: crate::uid_t,
         pub st_gid: crate::gid_t,
         pub st_rdev: crate::dev_t,
         pub __pad1: u64,
         pub st_size: off_t,
-        pub st_blksize: i32,
+        pub st_blksize: crate::blksize_t,
         pub __pad2: i32,
         pub st_blocks: crate::blkcnt_t,
         pub st_atime: crate::time_t,
@@ -318,54 +316,6 @@ s! {
     pub struct pthread_spinlock_t {
         bytes: [u8; _PTHREAD_SPINLOCK_SIZE],
     }
-
-    pub struct rlimit {
-        pub rlim_cur: crate::rlim_t,
-        pub rlim_max: crate::rlim_t,
-    }
-
-    pub struct itimerspec {
-        pub it_interval: crate::timespec,
-        pub it_value: crate::timespec,
-    }
-
-    pub struct flock {
-        pub l_type: c_short,
-        pub l_whence: c_short,
-        pub l_start: off_t,
-        pub l_len: off_t,
-        pub l_pid: crate::pid_t,
-    }
-
-    pub struct fsid_t {
-        pub __val: [c_int; 2],
-    }
-
-    pub struct statfs {
-        pub f_type: c_ulong,
-        pub f_bsize: c_ulong,
-        pub f_blocks: crate::fsblkcnt_t,
-        pub f_bfree: crate::fsblkcnt_t,
-        pub f_bavail: crate::fsblkcnt_t,
-        pub f_files: crate::fsfilcnt_t,
-        pub f_ffree: crate::fsfilcnt_t,
-        pub f_fsid: crate::fsid_t,
-        pub f_namelen: c_ulong,
-        pub f_frsize: c_ulong,
-        pub f_flags: c_ulong,
-        pub f_spare: [c_ulong; 4],
-    }
-
-    pub struct sigevent {
-        pub sigev_value: crate::sigval,
-        pub sigev_signo: c_int,
-        pub sigev_notify: c_int,
-        pub sigev_notify_thread_id: c_int,
-        #[cfg(target_pointer_width = "64")]
-        __unused1: Padding<[c_int; 11]>,
-        #[cfg(target_pointer_width = "32")]
-        __unused1: Padding<[c_int; 12]>,
-    }
 }
 const _PTHREAD_ATTR_SIZE: usize = 32;
 const _PTHREAD_RWLOCKATTR_SIZE: usize = 1;
@@ -378,54 +328,6 @@ const _PTHREAD_MUTEX_SIZE: usize = 12;
 const _PTHREAD_MUTEXATTR_SIZE: usize = 20;
 const _PTHREAD_ONCE_SIZE: usize = 4;
 const _PTHREAD_SPINLOCK_SIZE: usize = 4;
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-struct sifields_sigchld {
-    pub si_pid: crate::pid_t,
-    pub si_uid: crate::uid_t,
-    pub si_status: c_int,
-    pub si_utime: c_long,
-    pub si_stime: c_long,
-}
-
-#[repr(C)]
-union sifields {
-    _align_pointer: *mut c_void,
-    sigchld: sifields_sigchld,
-}
-
-#[repr(C)]
-struct siginfo_f {
-    _siginfo_base: [c_int; 3],
-    sifields: sifields,
-}
-
-impl siginfo_t {
-    unsafe fn sifields(&self) -> &sifields {
-        unsafe { &(*(self as *const siginfo_t as *const siginfo_f)).sifields }
-    }
-
-    pub unsafe fn si_pid(&self) -> crate::pid_t {
-        unsafe { self.sifields().sigchld.si_pid }
-    }
-
-    pub unsafe fn si_uid(&self) -> crate::uid_t {
-        unsafe { self.sifields().sigchld.si_uid }
-    }
-
-    pub unsafe fn si_status(&self) -> c_int {
-        unsafe { self.sifields().sigchld.si_status }
-    }
-
-    pub unsafe fn si_utime(&self) -> c_long {
-        unsafe { self.sifields().sigchld.si_utime }
-    }
-
-    pub unsafe fn si_stime(&self) -> c_long {
-        unsafe { self.sifields().sigchld.si_stime }
-    }
-}
 
 pub const UTSLENGTH: usize = 65;
 
@@ -444,40 +346,72 @@ cfg_if! {
 pub const PATH_MAX: c_int = 4096;
 
 // fcntl.h
-pub const F_GETLK: c_int = 5;
-pub const F_SETLK: c_int = 6;
-pub const F_SETLKW: c_int = 7;
-pub const F_ULOCK: c_int = 0;
-pub const F_LOCK: c_int = 1;
-pub const F_TLOCK: c_int = 2;
-pub const F_TEST: c_int = 3;
-pub const POSIX_FADV_NORMAL: c_int = 0;
-pub const POSIX_FADV_RANDOM: c_int = 1;
-pub const POSIX_FADV_SEQUENTIAL: c_int = 2;
-pub const POSIX_FADV_WILLNEED: c_int = 3;
-pub const POSIX_FADV_DONTNEED: c_int = 4;
-pub const POSIX_FADV_NOREUSE: c_int = 5;
-pub const FALLOC_FL_KEEP_SIZE: c_int = 0x01;
-pub const FALLOC_FL_PUNCH_HOLE: c_int = 0x02;
-pub const FALLOC_FL_NO_HIDE_STALE: c_int = 0x04;
-pub const FALLOC_FL_COLLAPSE_RANGE: c_int = 0x08;
-pub const FALLOC_FL_ZERO_RANGE: c_int = 0x10;
-pub const FALLOC_FL_INSERT_RANGE: c_int = 0x20;
-pub const FALLOC_FL_UNSHARE_RANGE: c_int = 0x40;
 
 pub const AT_FDCWD: c_int = -100;
-pub const AT_SYMLINK_NOFOLLOW: c_int = 0x100;
-pub const AT_REMOVEDIR: c_int = 0x200;
-pub const AT_EACCESS: c_int = 0x200;
-pub const AT_SYMLINK_FOLLOW: c_int = 0x400;
-pub const AT_NO_AUTOMOUNT: c_int = 0x800;
-pub const AT_EMPTY_PATH: c_int = 0x1000;
+pub const AT_EACCESS: c_int = 512;
+pub const AT_EMPTY_PATH: c_int = 4096;
+pub const AT_NO_AUTOMOUNT: c_int = 2048;
+pub const AT_RECURSIVE: c_int = 32768;
+pub const AT_REMOVEDIR: c_int = 512;
+pub const AT_RESOLVE_BENEATH: c_int = 65536;
+pub const AT_STATX_DONT_SYNC: c_int = 16384;
+pub const AT_STATX_FORCE_SYNC: c_int = 8192;
 pub const AT_STATX_SYNC_AS_STAT: c_int = 0;
-pub const AT_STATX_FORCE_SYNC: c_int = 0x2000;
-pub const AT_STATX_DONT_SYNC: c_int = 0x4000;
-pub const F_RDLCK: c_int = 0;
-pub const F_WRLCK: c_int = 1;
-pub const F_UNLCK: c_int = 2;
+pub const AT_STATX_SYNC_TYPE: c_int = 24576;
+pub const AT_SYMLINK_FOLLOW: c_int = 1024;
+pub const AT_SYMLINK_NOFOLLOW: c_int = 256;
+
+pub const F_ADD_SEALS: i32 = 1033;
+pub const F_CANCELLK: i32 = 1029;
+pub const F_DUPFD: i32 = 0;
+pub const F_DUPFD_CLOEXEC: i32 = 1030;
+pub const F_GETFD: i32 = 1;
+pub const F_GETFL: i32 = 3;
+pub const F_GETLEASE: i32 = 1025;
+pub const F_GETLK: i32 = 5;
+pub const F_GETLK64: i32 = F_GETLK;
+pub const F_GETOWN: i32 = 9;
+pub const F_GETOWNER_UIDS: i32 = 17;
+pub const F_GETOWN_EX: i32 = 16;
+pub const F_GETPIPE_SZ: i32 = 1032;
+pub const F_GETSIG: i32 = 11;
+pub const F_GET_FILE_RW_HINT: i32 = 1037;
+pub const F_GET_RW_HINT: i32 = 1035;
+pub const F_GET_SEALS: i32 = 1034;
+pub const F_LOCK: i32 = 1;
+pub const F_NOTIFY: i32 = 1026;
+pub const F_OFD_GETLK: i32 = 36;
+pub const F_OFD_SETLK: i32 = 37;
+pub const F_OFD_SETLKW: i32 = 38;
+pub const F_OK: i32 = 0;
+pub const F_OWNER_GID: i32 = 2;
+pub const F_OWNER_PGRP: i32 = 2;
+pub const F_OWNER_PID: i32 = 1;
+pub const F_OWNER_TID: i32 = 0;
+pub const F_RDLCK: i32 = 0;
+pub const F_SEAL_FUTURE_WRITE: i32 = 16;
+pub const F_SEAL_GROW: i32 = 4;
+pub const F_SEAL_SEAL: i32 = 1;
+pub const F_SEAL_SHRINK: i32 = 2;
+pub const F_SEAL_WRITE: i32 = 8;
+pub const F_SETFD: i32 = 2;
+pub const F_SETFL: i32 = 4;
+pub const F_SETLEASE: i32 = 1024;
+pub const F_SETLK: i32 = 6;
+pub const F_SETLK64: i32 = F_SETLK;
+pub const F_SETLKW: i32 = 7;
+pub const F_SETLKW64: i32 = F_SETLKW;
+pub const F_SETOWN: i32 = 8;
+pub const F_SETOWN_EX: i32 = 15;
+pub const F_SETPIPE_SZ: i32 = 1031;
+pub const F_SETSIG: i32 = 10;
+pub const F_SET_FILE_RW_HINT: i32 = 1038;
+pub const F_SET_RW_HINT: i32 = 1036;
+pub const F_TEST: i32 = 3;
+pub const F_TLOCK: i32 = 2;
+pub const F_ULOCK: i32 = 0;
+pub const F_UNLCK: i32 = 2;
+pub const F_WRLCK: i32 = 1;
 
 // FIXME(redox): relibc {
 pub const RTLD_DEFAULT: *mut c_void = ptr::null_mut();
@@ -629,56 +563,47 @@ pub const EKEYREVOKED: c_int = 128; /* Key has been revoked */
 pub const EKEYREJECTED: c_int = 129; /* Key was rejected by service */
 pub const EOWNERDEAD: c_int = 130; /* Owner died */
 pub const ENOTRECOVERABLE: c_int = 131; /* State not recoverable */
-pub const ERFKILL: c_int = 132; /* Operation not possible due to RF-kill */
-pub const EHWPOISON: c_int = 133; /* Memory page has hardware error */
 
 // fcntl.h
-pub const F_DUPFD: c_int = 0;
-pub const F_GETFD: c_int = 1;
-pub const F_SETFD: c_int = 2;
-pub const F_GETFL: c_int = 3;
-pub const F_SETFL: c_int = 4;
-pub const F_DUPFD_CLOEXEC: c_int = 1030;
 #[allow(dead_code)] // libc exposes the full constant set; std does not use every one yet.
 pub const FD_CLOEXEC: c_int = 1;
-pub const O_RDONLY: c_int = 0o0;
+pub const O_RDONLY: c_int = 0;
 pub const O_WRONLY: c_int = 0o1;
 pub const O_RDWR: c_int = 0o2;
-pub const O_ACCMODE: c_int = 0o3;
-pub const O_SEARCH: c_int = O_PATH;
-pub const O_EXEC: c_int = O_PATH;
-pub const O_TTY_INIT: c_int = 0;
-pub const O_CREAT: c_int = 0o100;
-pub const O_EXCL: c_int = 0o200;
-pub const O_NOCTTY: c_int = 0o400;
-pub const O_TRUNC: c_int = 0o1000;
-pub const O_APPEND: c_int = 0o2000;
+pub const O_ACCMODE: c_int = 0o3 | O_PATH;
 pub const O_NONBLOCK: c_int = 0o4000;
 pub const O_NDELAY: c_int = O_NONBLOCK;
-pub const O_DSYNC: c_int = 0o10000;
-pub const O_SYNC: c_int = 0o4010000;
-pub const O_RSYNC: c_int = O_SYNC;
-pub const O_ASYNC: c_int = 0o20000;
-pub const O_DIRECT: c_int = 0o40000;
-pub const O_DIRECTORY: c_int = 0o200000;
-pub const O_NOFOLLOW: c_int = 0o400000;
-pub const O_CLOEXEC: c_int = 0o2000000;
-pub const O_NOATIME: c_int = 0o1000000;
-pub const O_PATH: c_int = 0o10000000;
-pub const O_TMPFILE: c_int = 0o20200000;
-pub const O_LARGEFILE: c_int = 0;
-pub const O_EXLOCK: c_int = 0x10000000;
+pub const O_APPEND: c_int = 0o2000;
 pub const O_SHLOCK: c_int = 0x20000000;
+pub const O_EXLOCK: c_int = 0x10000000;
+pub const O_ASYNC: c_int = 0o20000;
+pub const O_CLOEXEC: c_int = 0o2000000;
+pub const O_CREAT: c_int = 0o100;
+pub const O_TRUNC: c_int = 0o1000;
+pub const O_EXCL: c_int = 0o200;
+pub const O_DIRECTORY: c_int = 0o200000;
+pub const O_PATH: c_int = 0o10000000;
+pub const O_NOFOLLOW: c_int = 0o400000;
+pub const O_NOCTTY: c_int = 0o400;
+pub const O_DIRECT: c_int = 0o40000;
+pub const O_DSYNC: c_int = 0o10000;
+pub const O_LARGEFILE: c_int = 0;
+pub const O_NOATIME: c_int = 0o1000000;
+pub const O_RSYNC: c_int = O_SYNC;
+pub const O_SYNC: c_int = 0o4010000;
+pub const O_TMPFILE: c_int = 0o20200000;
+pub const O_EXEC: c_int = O_PATH;
+pub const O_SEARCH: c_int = O_PATH;
 pub const O_RESOLVE_BENEATH: c_int = 0x40000000;
-pub const O_FSYNC: c_int = O_SYNC;
+pub const O_TTY_INIT: c_int = 0;
 
 // locale.h
-pub const LC_CTYPE: c_int = 0;
-pub const LC_NUMERIC: c_int = 1;
-pub const LC_TIME: c_int = 2;
-pub const LC_COLLATE: c_int = 3;
-pub const LC_MONETARY: c_int = 4;
-pub const LC_MESSAGES: c_int = 5;
+pub const LC_COLLATE: c_int = 0;
+pub const LC_CTYPE: c_int = 1;
+pub const LC_MESSAGES: c_int = 2;
+pub const LC_MONETARY: c_int = 3;
+pub const LC_NUMERIC: c_int = 4;
+pub const LC_TIME: c_int = 5;
 pub const LC_ALL: c_int = 6;
 
 // netdb.h
@@ -728,11 +653,23 @@ pub const IP_ADD_MEMBERSHIP: c_int = 35;
 pub const IP_DROP_MEMBERSHIP: c_int = 36;
 pub const IP_TOS: c_int = 1;
 pub const IP_RECVTOS: c_int = 13;
+#[allow(dead_code)] // libc exposes the full constant set; std does not use every one yet.
+pub const IPPROTO_IP: c_int = 0;
+#[allow(dead_code)] // libc exposes the full constant set; std does not use every one yet.
+pub const IPPROTO_ICMP: c_int = 1;
 pub const IPPROTO_IGMP: c_int = 2;
+#[allow(dead_code)] // libc exposes the full constant set; std does not use every one yet.
+pub const IPPROTO_TCP: c_int = 6;
+#[allow(dead_code)] // libc exposes the full constant set; std does not use every one yet.
+pub const IPPROTO_UDP: c_int = 17;
+#[allow(dead_code)] // libc exposes the full constant set; std does not use every one yet.
+pub const IPPROTO_IPV6: c_int = 41;
+#[allow(dead_code)] // libc exposes the full constant set; std does not use every one yet.
+pub const IPPROTO_ICMPV6: c_int = 58;
 pub const IPPROTO_PUP: c_int = 12;
 pub const IPPROTO_IDP: c_int = 22;
 pub const IPPROTO_RAW: c_int = 255;
-pub const IPPROTO_MAX: c_int = 263;
+pub const IPPROTO_MAX: c_int = 255;
 // }
 
 // netinet/tcp.h
@@ -756,12 +693,12 @@ pub const POLLWRBAND: c_short = 0x200;
 
 // pthread.h
 pub const PTHREAD_MUTEX_DEFAULT: c_int = 0;
-pub const PTHREAD_MUTEX_NORMAL: c_int = 0;
-pub const PTHREAD_MUTEX_RECURSIVE: c_int = 1;
-pub const PTHREAD_MUTEX_ERRORCHECK: c_int = 2;
+pub const PTHREAD_MUTEX_ERRORCHECK: c_int = 1;
+pub const PTHREAD_MUTEX_NORMAL: c_int = 2;
+pub const PTHREAD_MUTEX_RECURSIVE: c_int = 3;
 
-pub const PTHREAD_MUTEX_STALLED: c_int = 0;
-pub const PTHREAD_MUTEX_ROBUST: c_int = 1;
+pub const PTHREAD_MUTEX_ROBUST: c_int = 0;
+pub const PTHREAD_MUTEX_STALLED: c_int = 1;
 
 pub const PTHREAD_MUTEX_INITIALIZER: crate::pthread_mutex_t = crate::pthread_mutex_t {
     bytes: [0; _PTHREAD_MUTEX_SIZE],
@@ -772,7 +709,7 @@ pub const PTHREAD_COND_INITIALIZER: crate::pthread_cond_t = crate::pthread_cond_
 pub const PTHREAD_RWLOCK_INITIALIZER: crate::pthread_rwlock_t = crate::pthread_rwlock_t {
     bytes: [0; _PTHREAD_RWLOCK_SIZE],
 };
-pub const PTHREAD_STACK_MIN: size_t = 16384;
+pub const PTHREAD_STACK_MIN: size_t = 4096;
 
 // signal.h
 pub const SIG_BLOCK: c_int = 0;
@@ -811,16 +748,14 @@ pub const SIGPWR: c_int = 30;
 pub const SIGSYS: c_int = 31;
 pub const NSIG: c_int = 32;
 
-pub const SA_NOCLDSTOP: c_int = 1;
-pub const SA_NOCLDWAIT: c_int = 2;
-pub const SA_SIGINFO: c_int = 4;
-pub const SA_RESTORER: c_int = 0x0400_0000;
-pub const SA_ONSTACK: c_int = 0x0800_0000;
-pub const SA_RESTART: c_int = 0x1000_0000;
-pub const SA_NODEFER: c_int = 0x4000_0000;
-pub const SA_RESETHAND: c_int = 0x8000_0000;
-pub const SA_NOMASK: c_int = SA_NODEFER;
-pub const SA_ONESHOT: c_int = SA_RESETHAND;
+pub const SA_NOCLDWAIT: c_int = 0x0000_0002;
+pub const SA_RESTORER: c_int = 0x0000_0004; // FIXME(redox): remove after relibc removes it
+pub const SA_SIGINFO: c_int = 0x0200_0000;
+pub const SA_ONSTACK: c_int = 0x0400_0000;
+pub const SA_RESTART: c_int = 0x0800_0000;
+pub const SA_NODEFER: c_int = 0x1000_0000;
+pub const SA_RESETHAND: c_int = 0x2000_0000;
+pub const SA_NOCLDSTOP: c_int = 0x4000_0000;
 
 // sys/file.h
 pub const LOCK_SH: c_int = 1;
@@ -851,28 +786,26 @@ pub const EPOLLONESHOT: c_int = 1 << 30;
 pub const EPOLLET: c_int = 1 << 31;
 
 // sys/stat.h
-pub const ST_RDONLY: c_ulong = 1;
-pub const ST_NOSUID: c_ulong = 2;
-pub const S_IFMT: mode_t = 0o17_0000;
-pub const S_IFDIR: mode_t = 0o4_0000;
-pub const S_IFCHR: mode_t = 0o2_0000;
-pub const S_IFBLK: mode_t = 0o6_0000;
-pub const S_IFREG: mode_t = 0o10_0000;
-pub const S_IFIFO: mode_t = 0o1_0000;
-pub const S_IFLNK: mode_t = 0o12_0000;
-pub const S_IFSOCK: mode_t = 0o14_0000;
-pub const S_IRWXU: mode_t = 0o0700;
-pub const S_IRUSR: mode_t = 0o0400;
-pub const S_IWUSR: mode_t = 0o0200;
-pub const S_IXUSR: mode_t = 0o0100;
-pub const S_IRWXG: mode_t = 0o0070;
-pub const S_IRGRP: mode_t = 0o0040;
-pub const S_IWGRP: mode_t = 0o0020;
-pub const S_IXGRP: mode_t = 0o0010;
-pub const S_IRWXO: mode_t = 0o0007;
-pub const S_IROTH: mode_t = 0o0004;
-pub const S_IWOTH: mode_t = 0o0002;
-pub const S_IXOTH: mode_t = 0o0001;
+pub const S_IFMT: crate::mode_t = 0o17_0000;
+pub const S_IFDIR: crate::mode_t = 0o4_0000;
+pub const S_IFCHR: crate::mode_t = 0o2_0000;
+pub const S_IFBLK: crate::mode_t = 0o6_0000;
+pub const S_IFREG: crate::mode_t = 0o10_0000;
+pub const S_IFIFO: crate::mode_t = 0o1_0000;
+pub const S_IFLNK: crate::mode_t = 0o12_0000;
+pub const S_IFSOCK: crate::mode_t = 0o14_0000;
+pub const S_IRWXU: crate::mode_t = 0o0700;
+pub const S_IRUSR: crate::mode_t = 0o0400;
+pub const S_IWUSR: crate::mode_t = 0o0200;
+pub const S_IXUSR: crate::mode_t = 0o0100;
+pub const S_IRWXG: crate::mode_t = 0o0070;
+pub const S_IRGRP: crate::mode_t = 0o0040;
+pub const S_IWGRP: crate::mode_t = 0o0020;
+pub const S_IXGRP: crate::mode_t = 0o0010;
+pub const S_IRWXO: crate::mode_t = 0o0007;
+pub const S_IROTH: crate::mode_t = 0o0004;
+pub const S_IWOTH: crate::mode_t = 0o0002;
+pub const S_IXOTH: crate::mode_t = 0o0001;
 
 // stdlib.h
 pub const EXIT_SUCCESS: c_int = 0;
@@ -892,17 +825,12 @@ pub const TIOCGPGRP: c_ulong = 0x540F;
 pub const TIOCSPGRP: c_ulong = 0x5410;
 pub const TIOCGWINSZ: c_ulong = 0x5413;
 pub const TIOCSWINSZ: c_ulong = 0x5414;
-pub const TIOCEXCL: c_ulong = 0x540C;
-pub const TIOCNXCL: c_ulong = 0x540D;
-pub const TIOCNOTTY: c_ulong = 0x5422;
-pub const TCSBRK: c_ulong = 0x5409;
-pub const TCXONC: c_ulong = 0x540A;
 
 // sys/mman.h
 pub const PROT_NONE: c_int = 0x0000;
-pub const PROT_READ: c_int = 0x0001;
+pub const PROT_READ: c_int = 0x0004;
 pub const PROT_WRITE: c_int = 0x0002;
-pub const PROT_EXEC: c_int = 0x0004;
+pub const PROT_EXEC: c_int = 0x0001;
 
 pub const MADV_NORMAL: c_int = 0;
 pub const MADV_RANDOM: c_int = 1;
@@ -914,7 +842,7 @@ pub const MAP_SHARED: c_int = 0x0001;
 pub const MAP_PRIVATE: c_int = 0x0002;
 pub const MAP_ANON: c_int = 0x0020;
 pub const MAP_ANONYMOUS: c_int = MAP_ANON;
-pub const MAP_FIXED: c_int = 0x0010;
+pub const MAP_FIXED: c_int = 0x0004;
 pub const MAP_FAILED: *mut c_void = !0 as _;
 
 pub const MS_ASYNC: c_int = 0x0001;
@@ -940,9 +868,7 @@ pub const RLIMIT_SIGPENDING: c_int = 11;
 pub const RLIMIT_MSGQUEUE: c_int = 12;
 pub const RLIMIT_NICE: c_int = 13;
 pub const RLIMIT_RTPRIO: c_int = 14;
-pub const RLIMIT_RTTIME: c_int = 15;
-pub const RLIMIT_NLIMITS: c_int = 16;
-pub const RLIM_NLIMITS: c_int = RLIMIT_NLIMITS;
+pub const RLIMIT_NLIMITS: c_int = 15;
 
 pub const RUSAGE_SELF: c_int = 0;
 pub const RUSAGE_CHILDREN: c_int = -1;
@@ -1007,26 +933,26 @@ pub const SOCK_NONBLOCK: c_int = 0o4_000;
 pub const SOCK_CLOEXEC: c_int = 0o2_000_000;
 pub const SOCK_SEQPACKET: c_int = 5;
 pub const SOL_SOCKET: c_int = 1;
-pub const SOMAXCONN: c_int = 4096;
+pub const SOMAXCONN: c_int = 128;
 
 // sys/termios.h
+pub const VEOF: usize = 4;
+pub const VEOL: usize = 11;
+pub const VEOL2: usize = 16;
+pub const VERASE: usize = 2;
+pub const VWERASE: usize = 14;
+pub const VKILL: usize = 3;
+pub const VREPRINT: usize = 12;
+pub const VSWTC: usize = 7;
 pub const VINTR: usize = 0;
 pub const VQUIT: usize = 1;
-pub const VERASE: usize = 2;
-pub const VKILL: usize = 3;
-pub const VEOF: usize = 4;
-pub const VTIME: usize = 5;
-pub const VMIN: usize = 6;
-pub const VSWTC: usize = 7;
+pub const VSUSP: usize = 10;
 pub const VSTART: usize = 8;
 pub const VSTOP: usize = 9;
-pub const VSUSP: usize = 10;
-pub const VEOL: usize = 11;
-pub const VREPRINT: usize = 12;
-pub const VDISCARD: usize = 13;
-pub const VWERASE: usize = 14;
 pub const VLNEXT: usize = 15;
-pub const VEOL2: usize = 16;
+pub const VDISCARD: usize = 13;
+pub const VMIN: usize = 6;
+pub const VTIME: usize = 5;
 pub const NCCS: usize = 32;
 
 pub const IGNBRK: crate::tcflag_t = 0o000_001;
@@ -1038,44 +964,18 @@ pub const ISTRIP: crate::tcflag_t = 0o000_040;
 pub const INLCR: crate::tcflag_t = 0o000_100;
 pub const IGNCR: crate::tcflag_t = 0o000_200;
 pub const ICRNL: crate::tcflag_t = 0o000_400;
-pub const IUCLC: crate::tcflag_t = 0o001_000;
 pub const IXON: crate::tcflag_t = 0o002_000;
 pub const IXANY: crate::tcflag_t = 0o004_000;
 pub const IXOFF: crate::tcflag_t = 0o010_000;
-pub const IMAXBEL: crate::tcflag_t = 0o020_000;
-pub const IUTF8: crate::tcflag_t = 0o040_000;
 
 pub const OPOST: crate::tcflag_t = 0o000_001;
-pub const OLCUC: crate::tcflag_t = 0o000_002;
 pub const ONLCR: crate::tcflag_t = 0o000_004;
+pub const OLCUC: crate::tcflag_t = 0o000_004;
 pub const OCRNL: crate::tcflag_t = 0o000_010;
 pub const ONOCR: crate::tcflag_t = 0o000_020;
 pub const ONLRET: crate::tcflag_t = 0o000_040;
-pub const OFILL: crate::tcflag_t = 0o000_100;
-pub const OFDEL: crate::tcflag_t = 0o000_200;
-pub const NLDLY: crate::tcflag_t = 0o000_400;
-pub const NL0: crate::tcflag_t = 0o000_000;
-pub const NL1: crate::tcflag_t = 0o000_400;
-pub const CRDLY: crate::tcflag_t = 0o003_000;
-pub const CR0: crate::tcflag_t = 0o000_000;
-pub const CR1: crate::tcflag_t = 0o001_000;
-pub const CR2: crate::tcflag_t = 0o002_000;
-pub const CR3: crate::tcflag_t = 0o003_000;
-pub const TABDLY: crate::tcflag_t = 0o014_000;
-pub const TAB0: crate::tcflag_t = 0o000_000;
-pub const TAB1: crate::tcflag_t = 0o004_000;
-pub const TAB2: crate::tcflag_t = 0o010_000;
-pub const TAB3: crate::tcflag_t = 0o014_000;
-pub const BSDLY: crate::tcflag_t = 0o020_000;
-pub const BS0: crate::tcflag_t = 0o000_000;
-pub const BS1: crate::tcflag_t = 0o020_000;
-pub const FFDLY: crate::tcflag_t = 0o100_000;
-pub const FF0: crate::tcflag_t = 0o000_000;
-pub const FF1: crate::tcflag_t = 0o100_000;
-pub const VTDLY: crate::tcflag_t = 0o040_000;
-pub const VT0: crate::tcflag_t = 0o000_000;
-pub const VT1: crate::tcflag_t = 0o040_000;
-pub const XTABS: crate::tcflag_t = 0o014_000;
+pub const OFILL: crate::tcflag_t = 0o0000_100;
+pub const OFDEL: crate::tcflag_t = 0o0000_200;
 
 pub const B0: speed_t = 0o000_000;
 pub const B50: speed_t = 0o000_001;
@@ -1093,40 +993,36 @@ pub const B4800: speed_t = 0o000_014;
 pub const B9600: speed_t = 0o000_015;
 pub const B19200: speed_t = 0o000_016;
 pub const B38400: speed_t = 0o000_017;
-pub const B57600: speed_t = 0o010_001;
-pub const B115200: speed_t = 0o010_002;
-pub const B230400: speed_t = 0o010_003;
-pub const B460800: speed_t = 0o010_004;
-pub const B500000: speed_t = 0o010_005;
-pub const B576000: speed_t = 0o010_006;
-pub const B921600: speed_t = 0o010_007;
-pub const B1000000: speed_t = 0o010_010;
-pub const B1152000: speed_t = 0o010_011;
-pub const B1500000: speed_t = 0o010_012;
-pub const B2000000: speed_t = 0o010_013;
-pub const B2500000: speed_t = 0o010_014;
-pub const B3000000: speed_t = 0o010_015;
-pub const B3500000: speed_t = 0o010_016;
-pub const B4000000: speed_t = 0o010_017;
+
+pub const B57600: speed_t = 0o0_020;
+pub const B115200: speed_t = 0o0_021;
+pub const B230400: speed_t = 0o0_022;
+pub const B460800: speed_t = 0o0_023;
+pub const B500000: speed_t = 0o0_024;
+pub const B576000: speed_t = 0o0_025;
+pub const B921600: speed_t = 0o0_026;
+pub const B1000000: speed_t = 0o0_027;
+pub const B1152000: speed_t = 0o0_030;
+pub const B1500000: speed_t = 0o0_031;
+pub const B2000000: speed_t = 0o0_032;
+pub const B2500000: speed_t = 0o0_033;
+pub const B3000000: speed_t = 0o0_034;
+pub const B3500000: speed_t = 0o0_035;
+pub const B4000000: speed_t = 0o0_036;
 
 pub const CSIZE: crate::tcflag_t = 0o000_060;
 pub const CS5: crate::tcflag_t = 0o000_000;
 pub const CS6: crate::tcflag_t = 0o000_020;
 pub const CS7: crate::tcflag_t = 0o000_040;
 pub const CS8: crate::tcflag_t = 0o000_060;
+
 pub const CSTOPB: crate::tcflag_t = 0o000_100;
 pub const CREAD: crate::tcflag_t = 0o000_200;
 pub const PARENB: crate::tcflag_t = 0o000_400;
 pub const PARODD: crate::tcflag_t = 0o001_000;
 pub const HUPCL: crate::tcflag_t = 0o002_000;
+
 pub const CLOCAL: crate::tcflag_t = 0o004_000;
-pub const CBAUD: crate::tcflag_t = 0o010_017;
-pub const EXTA: speed_t = B19200;
-pub const EXTB: speed_t = B38400;
-pub const CBAUDEX: crate::tcflag_t = 0o010_000;
-pub const CIBAUD: crate::tcflag_t = 0o020_036_000_00;
-pub const CMSPAR: crate::tcflag_t = 0o100_000_000_00;
-pub const CRTSCTS: crate::tcflag_t = 0o200_000_000_00;
 
 pub const ISIG: crate::tcflag_t = 0o000_001;
 pub const ICANON: crate::tcflag_t = 0o000_002;
@@ -1137,7 +1033,6 @@ pub const ECHONL: crate::tcflag_t = 0o000_100;
 pub const NOFLSH: crate::tcflag_t = 0o000_200;
 pub const TOSTOP: crate::tcflag_t = 0o000_400;
 pub const IEXTEN: crate::tcflag_t = 0o100_000;
-pub const XCASE: crate::tcflag_t = 0o000_004;
 pub const ECHOCTL: crate::tcflag_t = 0o001_000;
 pub const ECHOPRT: crate::tcflag_t = 0o002_000;
 pub const ECHOKE: crate::tcflag_t = 0o004_000;
@@ -1149,27 +1044,18 @@ pub const TCOOFF: c_int = 0;
 pub const TCOON: c_int = 1;
 pub const TCIOFF: c_int = 2;
 pub const TCION: c_int = 3;
+
 pub const TCIFLUSH: c_int = 0;
 pub const TCOFLUSH: c_int = 1;
 pub const TCIOFLUSH: c_int = 2;
+
 pub const TCSANOW: c_int = 0;
 pub const TCSADRAIN: c_int = 1;
 pub const TCSAFLUSH: c_int = 2;
 
 pub const _POSIX_VDISABLE: crate::cc_t = 0;
 
-
-// signal.h sigevent values
-pub const SIGEV_SIGNAL: c_int = 0;
-pub const SIGEV_NONE: c_int = 1;
-pub const SIGEV_THREAD: c_int = 2;
-pub const SIGEV_THREAD_ID: c_int = 4;
-
 // sys/wait.h
-pub type idtype_t = c_int;
-pub const P_ALL: idtype_t = 0;
-pub const P_PID: idtype_t = 1;
-pub const P_PGID: idtype_t = 2;
 pub const WNOHANG: c_int = 1;
 pub const WUNTRACED: c_int = 2;
 
@@ -1178,32 +1064,15 @@ pub const WEXITED: c_int = 4;
 pub const WCONTINUED: c_int = 8;
 pub const WNOWAIT: c_int = 0x0100_0000;
 
-pub const CLD_EXITED: c_int = 1;
-pub const CLD_KILLED: c_int = 2;
-pub const CLD_DUMPED: c_int = 3;
-pub const CLD_TRAPPED: c_int = 4;
-pub const CLD_STOPPED: c_int = 5;
-pub const CLD_CONTINUED: c_int = 6;
-
 pub const __WNOTHREAD: c_int = 0x2000_0000;
 pub const __WALL: c_int = 0x4000_0000;
 #[allow(overflowing_literals)]
 pub const __WCLONE: c_int = 0x8000_0000;
 
 // time.h
-pub const UTIME_NOW: c_long = 0x3fffffff;
-pub const UTIME_OMIT: c_long = 0x3ffffffe;
-pub const PIPE_BUF: usize = 4096;
-pub const CLOCK_REALTIME: c_int = 0;
-pub const CLOCK_MONOTONIC: c_int = 1;
+pub const CLOCK_REALTIME: c_int = 1;
+pub const CLOCK_MONOTONIC: c_int = 4;
 pub const CLOCK_PROCESS_CPUTIME_ID: crate::clockid_t = 2;
-pub const CLOCK_THREAD_CPUTIME_ID: crate::clockid_t = 3;
-pub const CLOCK_MONOTONIC_RAW: crate::clockid_t = 4;
-pub const CLOCK_REALTIME_COARSE: crate::clockid_t = 5;
-pub const CLOCK_MONOTONIC_COARSE: crate::clockid_t = 6;
-pub const CLOCK_BOOTTIME: crate::clockid_t = 7;
-pub const CLOCK_REALTIME_ALARM: crate::clockid_t = 8;
-pub const CLOCK_BOOTTIME_ALARM: crate::clockid_t = 9;
 pub const CLOCKS_PER_SEC: crate::clock_t = 1_000_000;
 
 // unistd.h
@@ -1222,8 +1091,8 @@ pub const _SC_PAGE_SIZE: c_int = 30;
 // ...
 pub const _SC_RE_DUP_MAX: c_int = 44;
 
-pub const _SC_NPROCESSORS_CONF: c_int = 83;
-pub const _SC_NPROCESSORS_ONLN: c_int = 84;
+pub const _SC_NPROCESSORS_CONF: c_int = 57;
+pub const _SC_NPROCESSORS_ONLN: c_int = 58;
 
 // ...
 pub const _SC_GETGR_R_SIZE_MAX: c_int = 69;
@@ -1234,154 +1103,9 @@ pub const _SC_TTY_NAME_MAX: c_int = 72;
 pub const _SC_SYMLOOP_MAX: c_int = 173;
 // ...
 pub const _SC_HOST_NAME_MAX: c_int = 180;
-
-
-// langinfo.h
-pub const ABMON_1: c_int = 0x2000E;
-pub const ABMON_2: c_int = 0x2000F;
-pub const ABMON_3: c_int = 0x20010;
-pub const ABMON_4: c_int = 0x20011;
-pub const ABMON_5: c_int = 0x20012;
-pub const ABMON_6: c_int = 0x20013;
-pub const ABMON_7: c_int = 0x20014;
-pub const ABMON_8: c_int = 0x20015;
-pub const ABMON_9: c_int = 0x20016;
-pub const ABMON_10: c_int = 0x20017;
-pub const ABMON_11: c_int = 0x20018;
-pub const ABMON_12: c_int = 0x20019;
-pub const AM_STR: c_int = 0x20026;
-pub const PM_STR: c_int = 0x20027;
-pub const D_T_FMT: c_int = 0x20028;
-pub const D_FMT: c_int = 0x20029;
-pub const T_FMT: c_int = 0x2002A;
-pub const T_FMT_AMPM: c_int = 0x2002B;
-
-// sysconf.h
-pub const _SC_2_CHAR_TERM: c_int = 95;
-pub const _SC_2_C_BIND: c_int = 47;
-pub const _SC_2_C_DEV: c_int = 48;
-pub const _SC_2_FORT_DEV: c_int = 49;
-pub const _SC_2_FORT_RUN: c_int = 50;
-pub const _SC_2_LOCALEDEF: c_int = 52;
-pub const _SC_2_PBS: c_int = 168;
-pub const _SC_2_PBS_ACCOUNTING: c_int = 169;
-pub const _SC_2_PBS_CHECKPOINT: c_int = 175;
-pub const _SC_2_PBS_LOCATE: c_int = 170;
-pub const _SC_2_PBS_MESSAGE: c_int = 171;
-pub const _SC_2_PBS_TRACK: c_int = 172;
-pub const _SC_2_SW_DEV: c_int = 51;
-pub const _SC_2_UPE: c_int = 97;
-pub const _SC_2_VERSION: c_int = 46;
-pub const _SC_ADVISORY_INFO: c_int = 132;
-pub const _SC_AIO_LISTIO_MAX: c_int = 23;
-pub const _SC_AIO_MAX: c_int = 24;
-pub const _SC_AIO_PRIO_DELTA_MAX: c_int = 25;
-pub const _SC_ASYNCHRONOUS_IO: c_int = 12;
-pub const _SC_ATEXIT_MAX: c_int = 87;
-pub const _SC_AVPHYS_PAGES: c_int = 86;
-pub const _SC_BARRIERS: c_int = 133;
-pub const _SC_BC_BASE_MAX: c_int = 36;
-pub const _SC_BC_DIM_MAX: c_int = 37;
-pub const _SC_BC_SCALE_MAX: c_int = 38;
-pub const _SC_BC_STRING_MAX: c_int = 39;
-pub const _SC_CLOCK_SELECTION: c_int = 137;
-pub const _SC_COLL_WEIGHTS_MAX: c_int = 40;
-pub const _SC_CPUTIME: c_int = 138;
-pub const _SC_DELAYTIMER_MAX: c_int = 26;
-pub const _SC_EXPR_NEST_MAX: c_int = 42;
-pub const _SC_FSYNC: c_int = 15;
-pub const _SC_IOV_MAX: c_int = 60;
-pub const _SC_IPV6: c_int = 235;
-pub const _SC_JOB_CONTROL: c_int = 7;
-pub const _SC_LINE_MAX: c_int = 43;
-pub const _SC_MAPPED_FILES: c_int = 16;
-pub const _SC_MEMLOCK: c_int = 17;
-pub const _SC_MEMLOCK_RANGE: c_int = 18;
-pub const _SC_MEMORY_PROTECTION: c_int = 19;
-pub const _SC_MESSAGE_PASSING: c_int = 20;
-pub const _SC_MINSIGSTKSZ: c_int = 249;
-pub const _SC_MONOTONIC_CLOCK: c_int = 149;
-pub const _SC_MQ_OPEN_MAX: c_int = 27;
-pub const _SC_MQ_PRIO_MAX: c_int = 28;
-pub const _SC_NZERO: c_int = 109;
-pub const _SC_PASS_MAX: c_int = 88;
-pub const _SC_PHYS_PAGES: c_int = 85;
-pub const _SC_PRIORITIZED_IO: c_int = 13;
-pub const _SC_PRIORITY_SCHEDULING: c_int = 10;
-pub const _SC_RAW_SOCKETS: c_int = 236;
-pub const _SC_READER_WRITER_LOCKS: c_int = 153;
-pub const _SC_REGEXP: c_int = 155;
-pub const _SC_RTSIG_MAX: c_int = 31;
-pub const _SC_SAVED_IDS: c_int = 8;
-pub const _SC_SEMAPHORES: c_int = 21;
-pub const _SC_SEM_NSEMS_MAX: c_int = 32;
-pub const _SC_SEM_VALUE_MAX: c_int = 33;
-pub const _SC_SHARED_MEMORY_OBJECTS: c_int = 22;
-pub const _SC_SHELL: c_int = 157;
-pub const _SC_SIGSTKSZ: c_int = 250;
-pub const _SC_SPAWN: c_int = 159;
-pub const _SC_SPIN_LOCKS: c_int = 154;
-pub const _SC_SPORADIC_SERVER: c_int = 160;
-pub const _SC_SS_REPL_MAX: c_int = 241;
-pub const _SC_STREAMS: c_int = 174;
-pub const _SC_SYNCHRONIZED_IO: c_int = 14;
-pub const _SC_THREADS: c_int = 67;
-pub const _SC_THREAD_ATTR_STACKADDR: c_int = 77;
-pub const _SC_THREAD_ATTR_STACKSIZE: c_int = 78;
-pub const _SC_THREAD_CPUTIME: c_int = 139;
-pub const _SC_THREAD_DESTRUCTOR_ITERATIONS: c_int = 73;
-pub const _SC_THREAD_KEYS_MAX: c_int = 74;
-pub const _SC_THREAD_PRIORITY_SCHEDULING: c_int = 79;
-pub const _SC_THREAD_PRIO_INHERIT: c_int = 80;
-pub const _SC_THREAD_PRIO_PROTECT: c_int = 81;
-pub const _SC_THREAD_PROCESS_SHARED: c_int = 82;
-pub const _SC_THREAD_ROBUST_PRIO_INHERIT: c_int = 247;
-pub const _SC_THREAD_ROBUST_PRIO_PROTECT: c_int = 248;
-pub const _SC_THREAD_SAFE_FUNCTIONS: c_int = 68;
-pub const _SC_THREAD_SPORADIC_SERVER: c_int = 161;
-pub const _SC_THREAD_STACK_MIN: c_int = 75;
-pub const _SC_THREAD_THREADS_MAX: c_int = 76;
-pub const _SC_TIMEOUTS: c_int = 164;
-pub const _SC_TIMERS: c_int = 11;
-pub const _SC_TIMER_MAX: c_int = 35;
-pub const _SC_TRACE: c_int = 181;
-pub const _SC_TRACE_EVENT_FILTER: c_int = 182;
-pub const _SC_TRACE_EVENT_NAME_MAX: c_int = 242;
-pub const _SC_TRACE_INHERIT: c_int = 183;
-pub const _SC_TRACE_LOG: c_int = 184;
-pub const _SC_TRACE_NAME_MAX: c_int = 243;
-pub const _SC_TRACE_SYS_MAX: c_int = 244;
-pub const _SC_TRACE_USER_EVENT_MAX: c_int = 245;
-pub const _SC_TYPED_MEMORY_OBJECTS: c_int = 165;
-pub const _SC_UIO_MAXIOV: c_int = 60;
-pub const _SC_V6_ILP32_OFF32: c_int = 176;
-pub const _SC_V6_ILP32_OFFBIG: c_int = 177;
-pub const _SC_V6_LP64_OFF64: c_int = 178;
-pub const _SC_V6_LPBIG_OFFBIG: c_int = 179;
-pub const _SC_V7_ILP32_OFF32: c_int = 237;
-pub const _SC_V7_ILP32_OFFBIG: c_int = 238;
-pub const _SC_V7_LP64_OFF64: c_int = 239;
-pub const _SC_V7_LPBIG_OFFBIG: c_int = 240;
-pub const _SC_XBS5_ILP32_OFF32: c_int = 125;
-pub const _SC_XBS5_ILP32_OFFBIG: c_int = 126;
-pub const _SC_XBS5_LP64_OFF64: c_int = 127;
-pub const _SC_XBS5_LPBIG_OFFBIG: c_int = 128;
-pub const _SC_XOPEN_CRYPT: c_int = 92;
-pub const _SC_XOPEN_ENH_I18N: c_int = 93;
-pub const _SC_XOPEN_LEGACY: c_int = 129;
-pub const _SC_XOPEN_REALTIME: c_int = 130;
-pub const _SC_XOPEN_REALTIME_THREADS: c_int = 131;
-pub const _SC_XOPEN_SHM: c_int = 94;
-pub const _SC_XOPEN_STREAMS: c_int = 246;
-pub const _SC_XOPEN_UNIX: c_int = 91;
-pub const _SC_XOPEN_VERSION: c_int = 89;
-pub const _SC_XOPEN_XCU_VERSION: c_int = 90;
-pub const _SC_XOPEN_XPG2: c_int = 98;
-pub const _SC_XOPEN_XPG3: c_int = 99;
-pub const _SC_XOPEN_XPG4: c_int = 100;
 // ...
-pub const _SC_SIGQUEUE_MAX: c_int = 34;
-pub const _SC_REALTIME_SIGNALS: c_int = 9;
+pub const _SC_SIGQUEUE_MAX: c_int = 190;
+pub const _SC_REALTIME_SIGNALS: c_int = 191;
 // } POSIX.1
 
 // confstr
@@ -1422,7 +1146,6 @@ pub const _CS_POSIX_V7_LPBIG_OFFBIG_LDFLAGS: c_int = 1145;
 pub const _CS_POSIX_V7_LPBIG_OFFBIG_LIBS: c_int = 1146;
 pub const _CS_POSIX_V7_LPBIG_OFFBIG_LINTFLAGS: c_int = 1147;
 
-pub const F_OK: c_int = 0;
 pub const R_OK: c_int = 4;
 pub const W_OK: c_int = 2;
 pub const X_OK: c_int = 1;
@@ -1567,38 +1290,6 @@ extern "C" {
     // errno.h
     pub fn __errno_location() -> *mut c_int;
     pub fn strerror_r(errnum: c_int, buf: *mut c_char, buflen: size_t) -> c_int;
-
-    // langinfo.h
-    pub fn nl_langinfo(item: nl_item) -> *mut c_char;
-
-    // time.h timers
-    pub fn timer_create(
-        clockid: crate::clockid_t,
-        sevp: *mut sigevent,
-        timerid: *mut crate::timer_t,
-    ) -> c_int;
-    pub fn timer_delete(timerid: crate::timer_t) -> c_int;
-    pub fn timer_settime(
-        timerid: crate::timer_t,
-        flags: c_int,
-        new_value: *const itimerspec,
-        old_value: *mut itimerspec,
-    ) -> c_int;
-    pub fn timer_gettime(timerid: crate::timer_t, curr_value: *mut itimerspec) -> c_int;
-    pub fn timer_getoverrun(timerid: crate::timer_t) -> c_int;
-
-    // signal.h
-    pub fn sigsuspend(mask: *const sigset_t) -> c_int;
-
-    // unistd.h
-    pub fn daemon(nochdir: c_int, noclose: c_int) -> c_int;
-
-    // grp.h
-    pub fn setgroups(size: size_t, ptr: *const crate::gid_t) -> c_int;
-    pub fn initgroups(user: *const c_char, group: crate::gid_t) -> c_int;
-
-    // sys/stat.h
-    pub fn mkfifoat(dirfd: c_int, pathname: *const c_char, mode: mode_t) -> c_int;
 
     // dirent.h
     pub fn dirfd(dirp: *mut crate::DIR) -> c_int;
@@ -1823,40 +1514,6 @@ extern "C" {
         format: *const c_char,
         tm: *const crate::tm,
     ) -> size_t;
-
-    // sys/statfs.h
-    pub fn statfs(path: *const c_char, buf: *mut statfs) -> c_int;
-    pub fn fstatfs(fd: c_int, buf: *mut statfs) -> c_int;
-
-    // sys/stat.h and fcntl.h extras
-    pub fn lutimes(filename: *const c_char, times: *const crate::timeval) -> c_int;
-    pub fn utimensat(
-        dirfd: c_int,
-        pathname: *const c_char,
-        times: *const crate::timespec,
-        flags: c_int,
-    ) -> c_int;
-    pub fn mknodat(dirfd: c_int, pathname: *const c_char, mode: mode_t, dev: crate::dev_t)
-        -> c_int;
-    pub fn faccessat(dirfd: c_int, pathname: *const c_char, mode: c_int, flags: c_int) -> c_int;
-    pub fn dup3(oldfd: c_int, newfd: c_int, flags: c_int) -> c_int;
-    pub fn fdatasync(fd: c_int) -> c_int;
-    pub fn posix_fadvise(fd: c_int, offset: off_t, len: off_t, advice: c_int) -> c_int;
-    pub fn posix_fallocate(fd: c_int, offset: off_t, len: off_t) -> c_int;
-    pub fn flock(fd: c_int, operation: c_int) -> c_int;
-    pub fn sync();
-    pub fn sethostname(name: *const c_char, len: size_t) -> c_int;
-    pub fn setdomainname(name: *const c_char, len: size_t) -> c_int;
-
-    // time.h extras
-    pub fn clock_getres(clk_id: crate::clockid_t, tp: *mut crate::timespec) -> c_int;
-    pub fn clock_settime(clk_id: crate::clockid_t, tp: *const crate::timespec) -> c_int;
-
-    // sys/wait.h
-    pub fn waitid(idtype: idtype_t, id: id_t, infop: *mut siginfo_t, options: c_int) -> c_int;
-
-    // dirent.h
-    pub fn seekdir(dirp: *mut crate::DIR, loc: c_long);
 
     // utmp.h
     pub fn login_tty(fd: c_int) -> c_int;
