@@ -10,7 +10,7 @@
 use alloc::vec::Vec;
 
 use crate::backend::{ProcBackend, WaitResult};
-use crate::errors::{EINVAL, ENOSYS, ESRCH};
+use crate::errors::{EINVAL, ENOSYS};
 use crate::ids::SetCred;
 use crate::local_backend::LocalBackend;
 use crate::wire::{ExecRequest, ForkRequest, SpawnRequest};
@@ -23,6 +23,8 @@ pub const PROC_SETPGID: usize = 0x36;
 pub const PROC_SETSID: usize = 0x37;
 /// Raw `proc_setcred(which, value)`.
 pub const PROC_SETCRED: usize = 0x38;
+/// Raw `proc_pid_info(pid, out, count)`.
+pub const PROC_PID_INFO: usize = 0x3A;
 
 /// The eight identity words returned by `PROC_SELF_INFO`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -49,6 +51,8 @@ pub struct SelfInfo {
 pub trait Syscall {
     /// Read the caller's identity.
     fn self_info(&self) -> Result<SelfInfo, i32>;
+    /// Read another live process's identity.
+    fn pid_info(&self, pid: i32) -> Result<SelfInfo, i32>;
     /// Set a process group.
     fn setpgid(&self, pid: i32, pgid: i32) -> Result<(), i32>;
     /// Create a session and return its id.
@@ -109,18 +113,18 @@ impl<S: Syscall> ProcBackend for SyscallBackend<S> {
 
     fn getpgid(&self, pid: i32) -> Result<i32, i32> {
         let info = self.info()?;
-        if pid != 0 && small(info.pid) != pid {
-            return Err(ESRCH);
+        if pid == 0 || small(info.pid) == pid {
+            return Ok(small(info.pgid));
         }
-        Ok(small(info.pgid))
+        Ok(small(self.sys.pid_info(pid)?.pgid))
     }
 
     fn getsid(&self, pid: i32) -> Result<i32, i32> {
         let info = self.info()?;
-        if pid != 0 && small(info.pid) != pid {
-            return Err(ESRCH);
+        if pid == 0 || small(info.pid) == pid {
+            return Ok(small(info.sid));
         }
-        Ok(small(info.sid))
+        Ok(small(self.sys.pid_info(pid)?.sid))
     }
 
     fn getgroups(&self, _out: &mut [u32]) -> Result<usize, i32> {

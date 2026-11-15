@@ -82,6 +82,9 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == process_ctl::PROC_SETCRED {
         return process_ctl::setcred(frame);
     }
+    if number == process_ctl::PROC_PID_INFO {
+        return process_ctl::pid_info(frame);
+    }
     if number == raven_abi::syscall::PROC_SET_PERSONALITY {
         return process_ctl::set_personality(frame);
     }
