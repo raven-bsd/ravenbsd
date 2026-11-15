@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
+use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 use raven_audio_core::mix::GAIN_UNITY;
+use raven_proto_audio::ring::{RingLayout, RingProducer};
 use raven_proto_audio::stream::{Call, StreamState};
 use raven_proto_audio::{Format, SampleFormat};
 
 use super::*;
+use crate::mixer::DeviceSink;
 
 fn cd() -> Format {
     Format {
@@ -303,4 +306,102 @@ fn the_null_sink_holds_ten_seconds_without_underrun() {
     assert_eq!(a.underruns, 0);
     assert_eq!(b.underruns, 0);
     assert_eq!(a.state, StreamState::Running);
+}
+
+struct FakeSink {
+    periods: u32,
+    position_frames: u64,
+    underruns: u32,
+}
+
+impl FakeSink {
+    fn new() -> Self {
+        Self {
+            periods: 0,
+            position_frames: 0,
+            underruns: 0,
+        }
+    }
+}
+
+impl DeviceSink for FakeSink {
+    fn write(&mut self, period: &[i16]) -> Result<(), Errno> {
+        self.periods = self.periods.saturating_add(1);
+        self.position_frames = self
+            .position_frames
+            .saturating_add((period.len() / 2) as u64);
+        Ok(())
+    }
+
+    fn position_frames(&self) -> u64 {
+        self.position_frames
+    }
+
+    fn underruns(&self) -> u32 {
+        self.underruns
+    }
+}
+
+fn ring_region(period_frames: u32, period_count: u16) -> &'static mut [u8] {
+    let data = usize::try_from(period_frames).unwrap() * usize::from(period_count) * 4;
+    let region = vec![0u8; 128 + data];
+    Box::leak(region.into_boxed_slice())
+}
+
+#[test]
+fn a_set_buffer_ring_stream_reaches_the_device_sink() {
+    let mut mixer = Mixer::new();
+    let id = started(&mut mixer, cd());
+    let region = ring_region(PERIOD_FRAMES, 4);
+    let layout = RingLayout::new(region.len(), cd(), PERIOD_FRAMES, 4).expect("layout");
+    layout.write_header(region, 0).expect("header");
+    {
+        let mut producer = RingProducer::new(region, layout).expect("producer");
+        let period = pcm(&vec![1000i16; PERIOD_FRAMES as usize * 2]);
+        assert_eq!(
+            producer.write(&period).expect("write"),
+            PERIOD_FRAMES as usize
+        );
+    }
+    mixer
+        .set_buffer(id, region, PERIOD_FRAMES, 4)
+        .expect("buffer");
+    assert_eq!(mixer.call(id, Call::Start).expect("start"), None);
+    let mut sink = FakeSink::new();
+    assert_eq!(mixer.pump_device(&mut sink).expect("pump"), 1);
+    assert_eq!(sink.periods, 1);
+    assert_eq!(sink.position_frames(), PERIOD_FRAMES as u64);
+    let view = mixer.view(id).expect("view");
+    assert_eq!(view.position_frames, PERIOD_FRAMES as u64);
+    assert_eq!(view.underruns, 0);
+    assert_eq!(view.state, StreamState::Running);
+}
+
+#[test]
+fn a_ring_underrun_is_counted_and_plays_silence() {
+    let mut mixer = Mixer::new();
+    let id = started(&mut mixer, cd());
+    let region = ring_region(PERIOD_FRAMES, 2);
+    let layout = RingLayout::new(region.len(), cd(), PERIOD_FRAMES, 2).expect("layout");
+    layout.write_header(region, 0).expect("header");
+    mixer
+        .set_buffer(id, region, PERIOD_FRAMES, 2)
+        .expect("buffer");
+    mixer.call(id, Call::Start).expect("start");
+    let mut sink = FakeSink::new();
+    assert_eq!(mixer.pump_device(&mut sink).expect("pump"), 1);
+    assert_eq!(sink.periods, 1);
+    let view = mixer.view(id).expect("view");
+    assert_eq!(view.underruns, 1);
+}
+
+#[test]
+fn an_invalid_client_ring_geometry_is_einval() {
+    let mut mixer = Mixer::new();
+    let id = started(&mut mixer, cd());
+    let region = ring_region(PERIOD_FRAMES, 1);
+    let error = mixer
+        .set_buffer(id, region, PERIOD_FRAMES, 4)
+        .expect_err("geometry");
+    assert_eq!(error, Errno::EINVAL);
 }

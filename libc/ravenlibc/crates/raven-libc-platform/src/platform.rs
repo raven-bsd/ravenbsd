@@ -921,28 +921,27 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         })
     }
 
-    /// `fchmod` through `OP_CHMOD` on the open file handle.
+    /// `fchmod`: change the permission bits of the open file.
     ///
-    /// The protocol has one path-bearing `OP_CHMOD`; `"."` is resolved by
-    /// `vfsd` relative to the handle, so the operation applies to the open
-    /// object instead of a path remembered by libc. The mode is masked to the
-    /// permission bits, matching `chmod`.
+    /// `OP_CHMOD` is directory-relative: the scheme resolves its path against
+    /// the handle it is sent on, and an attached file handle is not a
+    /// directory, so the handle-relative `"."` form is rejected (`EINVAL` in
+    /// the ramfs name check). The protocol has no handle-based `FCHMOD`, so
+    /// send `OP_CHMOD` through the VFS root (`file:/`) with the path the OFD
+    /// was opened with. The mode is masked to the permission bits, matching
+    /// `chmod`.
+    ///
+    /// A descriptor without a remembered path (an adopted descriptor, PG-31)
+    /// has no path to name and returns `EOPNOTSUPP` until the protocol grows a
+    /// handle-based operation.
     pub fn fchmod(&self, fd: i32, mode: u32) -> Result<(), Errno> {
         let reference = self.get(fd)?;
-        let mut request = [0u8; 64];
-        let encoded = CallRequest::new(Call::Chmod {
+        let path = reference.path().ok_or(Errno::EOPNOTSUPP)?;
+        drop(reference);
+        self.root_call(Call::Chmod {
             mode: mode & 0o7777,
-            path: b".",
+            path: &path,
         })
-        .encode(&mut request)
-        .map_err(|error| error.errno())?;
-        let mut response = [0u8; 8];
-        let count = self
-            .backend
-            .call(reference.handle(), &request[..encoded], &mut response)?;
-        let call_response = CallResponse::decode(raven_proto_fs::OP_CHMOD, &response[..count])
-            .map_err(|error| error.errno())?;
-        xlat::call_status(call_response.status())
     }
 
     /// `truncate(path, size)`: open for write, `OP_TRUNCATE`, close.
