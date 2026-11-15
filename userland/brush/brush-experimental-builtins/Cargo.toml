@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024 reuben olinsky
+
+[package]
+name = "brush-experimental-builtins"
+description = "*EXPERIMENTAL builtins for a POSIX/bash shell (used by brush-shell)"
+version = "0.1.0"
+categories.workspace = true
+edition.workspace = true
+keywords.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+bench = false
+
+[features]
+default = ['builtin.save']
+'builtin.save' = ["brush-core/serde", "dep:serde_json"]
+
+[lints]
+workspace = true
+
+[dependencies]
+brush-core = { version = "^0.5.0", path = "../brush-core" }
+brush-winnow-args-adapter = { version = "^0.1.0", path = "../brush-winnow-args-adapter" }
+winnow-args = { version = "0.6.0", default-features = false, features = ["derive", "help-text"] }
+serde_json = { version = "1.0.149", optional = true }

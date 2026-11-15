@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024 reuben olinsky
+
+name: "Builtins: unalias"
+cases:
+  - name: "Unalias basic usage"
+    stdin: |
+      shopt -s expand_aliases
+      alias echo='echo prefixed'
+      echo 'something'
+      unalias echo
+      echo 'something'
+
+  - name: "Unalias non-existent alias"
+    ignore_stderr: true # Slightly different error messages
+    stdin: |
+      shopt -s expand_aliases
+      unalias not_an_alias
+
+  - name: "unalias with no names fails with status 2"
+    ignore_stderr: true
+    stdin: |
+      unalias; echo "rc=$?"
+
+  - name: "unalias with no names leaves the aliases alone, and -a needs none"
+    stdin: |
+      alias a1='echo one'
+      unalias -- 2>err.txt; echo "unalias --: $?"
+      [[ -s err.txt ]] && echo "reported"
+      alias
+      unalias -a; echo "unalias -a: $?"
+      alias
+      rm err.txt
