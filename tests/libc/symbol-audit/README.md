@@ -11,12 +11,14 @@ cases reference. The runner is `scripts/libc-symbol-audit.sh`; C64l adds the bui
 |---|---|
 | `required.tsv` | Per-case required symbols: `case<TAB>symbol<TAB>owner<TAB>note`. Derived from the seven C sources under `libc/ravenlibc/tests/c/` and the C73c section 3 link failures. |
 | `expected.tsv` | Current deterministic matrix (`case<TAB>symbol<TAB>status<TAB>owner<TAB>note`); update it after a fix changes a status. |
-| `gate-row.toml` | The exact C74 `[[check]]` block for the audit (`cargo xtask libc-audit`). Merge it into `tests/libc/gate/rows.toml`; that file is C74's, not C64l's. |
 | `self-test/required.tsv` | Fake required table for the self-test. |
 | `self-test/exports-present.txt` | Fake export set with every fake symbol present. |
 | `self-test/exports-missing.txt` | Fake export set with one fake symbol absent. |
 | `self-test/expected-present.tsv` | Expected all-present matrix. |
 | `self-test/expected-missing.tsv` | Expected one-missing matrix. |
+
+The C74 gate row `1.1.audit` in `tests/libc/gate/rows.toml` runs `cargo xtask libc-audit` and
+records `build/libc-gate/1.1.audit.txt`; the host test parses that real row.
 
 Run:
 

@@ -88,15 +88,17 @@ fn the_script_self_test_is_wired() {
 }
 
 #[test]
-fn the_c74_gate_row_fragment_runs_this_command() {
-    let text = include_str!("../../tests/libc/symbol-audit/gate-row.toml");
+fn the_c74_gate_row_runs_this_command() {
+    let text = include_str!("../../tests/libc/gate/rows.toml");
     let value: toml::Value = toml::from_str(text).expect("gate row toml");
     let checks = value
         .get("check")
         .and_then(toml::Value::as_array)
         .expect("check array");
-    assert_eq!(checks.len(), 1);
-    let check = checks.first().expect("one check");
+    let check = checks
+        .iter()
+        .find(|check| check.get("id").and_then(toml::Value::as_str) == Some("1.1.audit"))
+        .expect("1.1.audit check");
     assert_eq!(
         check.get("id").and_then(toml::Value::as_str),
         Some("1.1.audit")
