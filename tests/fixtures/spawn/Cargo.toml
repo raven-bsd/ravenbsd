@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-spawn-smoke"
+version = "0.1.0"
+description = "B71a spawn-smoke fixture: runtime spawn, wait and getpid."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+
+[workspace]
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-initfs = { path = "../../../crates/raven-initfs" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["panic-handler"] }
