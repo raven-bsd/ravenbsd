@@ -212,6 +212,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "genet"
+version = "0.1.0"
+dependencies = [
+ "raven-genet",
+ "raven-rt",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -864,6 +872,16 @@ name = "raven-fuzz-replay"
 version = "0.1.0"
 dependencies = [
  "raven-fuzz-model",
+]
+
+[[package]]
+name = "raven-genet"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-fdt-lite",
+ "raven-plat",
+ "raven-proto-net",
 ]
 
 [[package]]
