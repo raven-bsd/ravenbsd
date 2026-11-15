@@ -23,7 +23,7 @@ XTASK = cargo run -q -p xtask --
 -include .raven-env.mk
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check guard kernel loader dev release image run test world provenance \
+.PHONY: help setup doctor check guard kernel loader dev release image run test world uutils provenance \
 	toolchain clean distclean
 
 help:
@@ -65,6 +65,9 @@ test:
 
 world:
 	@printf '%s\n' 'not implemented yet (milestone M4)' >&2; exit 1
+
+uutils:
+	@$(XTASK) build uutils --arch $(ARCH) $(RELFLAG)
 
 provenance:
 	@cargo run -q -p raven-provenance -- check --root .

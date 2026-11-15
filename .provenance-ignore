@@ -13,3 +13,4 @@ tests/fs-fuzz/corpus/
 tests/libc-oracle/vendor/
 
 tests/libc/fuzz/corpus/
+userland/uutils/

@@ -32,6 +32,7 @@ targets:
   run           run the image under QEMU (ticket K05)
   test          check plus QEMU integration tests
   world         build kernel, loader and userland (milestone M4)
+  uutils        build the selected uutils coreutils for the Raven std target
   provenance    validate SPDX headers and PROVENANCE.toml
   toolchain     build the RavenBSD Rust toolchain (ticket K19)
   clean         remove target/ and build/
@@ -71,6 +72,9 @@ enum Command {
         arch: Arch,
         release: bool,
         packages: Vec<String>,
+    },
+    Uutils {
+        args: Vec<String>,
     },
     Initfs {
         arch: Arch,
@@ -142,7 +146,15 @@ fn parse_args(args: &[String]) -> Result<Command> {
             }
             Ok(Command::Check { fast })
         }
-        "build" => parse_build(rest),
+        "build" => {
+            if rest.first().is_some_and(|value| value == "uutils") {
+                Ok(Command::Uutils {
+                    args: rest[1..].to_vec(),
+                })
+            } else {
+                parse_build(rest)
+            }
+        }
         "initfs" => parse_initfs(rest),
         "image" => parse_image(rest),
         "run" => parse_run(rest),
@@ -342,6 +354,10 @@ fn execute(command: Command) -> Result<u8> {
         Command::Qtest { args } => {
             let root = root()?;
             qtest::run(&root, &args)
+        }
+        Command::Uutils { args } => {
+            let root = root()?;
+            crate::uutils::run(&root, &args)
         }
         Command::Provenance => provenance(),
         Command::Docs => {
