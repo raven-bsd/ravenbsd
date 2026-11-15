@@ -169,12 +169,12 @@
                     status = "okay";
                 };
                 usb@200000 {
-                    compatible = "brcm,bcm2835-usb";
+                    compatible = "snps,dwc3";
                     reg = <0xc0 0x40200000 0x0 0x100000>;
                     status = "disabled";
                 };
                 usb@300000 {
-                    compatible = "brcm,bcm2835-usb";
+                    compatible = "snps,dwc3";
                     reg = <0xc0 0x40300000 0x0 0x100000>;
                     status = "disabled";
                 };
