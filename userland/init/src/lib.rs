@@ -15,6 +15,7 @@ extern crate alloc;
 
 pub mod config;
 pub mod grants;
+pub mod health;
 pub mod state;
 
 #[cfg(target_os = "none")]

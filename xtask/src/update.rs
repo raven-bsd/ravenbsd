@@ -11,12 +11,13 @@
 //! attaches it as a second disk so the normal image builder does not need an A/B profile.
 
 use std::fs::{self, File};
-use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use fatfs::{FileSystem as FatFileSystem, FsOptions};
+use raven_initfs::{Initfs, InitfsBuilder};
 
 use crate::build::{self, Arch, Component};
 use crate::fat::FatImageBuilder;
@@ -58,6 +59,15 @@ impl Slot {
     }
 }
 
+/// Fixture health marker state.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FixtureHealth {
+    /// Marker confirms the trial slot.
+    Good,
+    /// Marker is stale and cannot confirm.
+    Bad,
+}
+
 /// Parsed `update` options.
 #[derive(Clone, Debug)]
 struct Options {
@@ -69,6 +79,8 @@ struct Options {
     slot: Option<Slot>,
     attempts: u32,
     fixture: Option<PathBuf>,
+    health: Option<FixtureHealth>,
+    blank: Option<PathBuf>,
 }
 
 impl Default for Options {
@@ -82,6 +94,8 @@ impl Default for Options {
             slot: None,
             attempts: 2,
             fixture: None,
+            health: None,
+            blank: None,
         }
     }
 }
@@ -93,6 +107,7 @@ struct BootMeta {
     log_level: String,
     slot: Slot,
     trial: Option<Slot>,
+    trial_token: Option<u32>,
     attempts: u32,
     has_slot_config: bool,
 }
@@ -104,6 +119,7 @@ impl Default for BootMeta {
             log_level: String::from("info"),
             slot: Slot::A,
             trial: None,
+            trial_token: None,
             attempts: 0,
             has_slot_config: false,
         }
@@ -122,6 +138,11 @@ impl BootMeta {
             out.push_str(&format!(
                 "trial = \"{}\"\n",
                 self.trial.map_or("", Slot::as_str)
+            ));
+            out.push_str(&format!(
+                "trial_token = \"{}\"\n",
+                self.trial_token
+                    .map_or_else(String::new, |token| format!("{token:08x}"))
             ));
             out.push_str(&format!("attempts = \"{}\"\n", self.attempts));
         }
@@ -148,6 +169,9 @@ pub(crate) fn run_cli(args: &[String]) -> ExitCode {
 }
 
 fn execute(options: &Options) -> Result<()> {
+    if let Some(path) = &options.blank {
+        return build_blank(path);
+    }
     if let Some(path) = &options.fixture {
         return build_fixture(options, path);
     }
@@ -227,6 +251,24 @@ fn parse(args: &[String]) -> Result<Option<Options>> {
                         .ok_or_else(|| anyhow!("--fixture needs a value"))?,
                 ));
             }
+            "--health" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| anyhow!("--health needs a value"))?;
+                options.health = Some(match value.as_str() {
+                    "good" => FixtureHealth::Good,
+                    "bad" => FixtureHealth::Bad,
+                    other => bail!("--health must be good or bad, found `{other}`"),
+                });
+            }
+            "--blank" => {
+                index += 1;
+                options.blank = Some(PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| anyhow!("--blank needs a value"))?,
+                ));
+            }
             other => bail!("unknown update option `{other}`"),
         }
         index += 1;
@@ -253,6 +295,8 @@ fn print_help() {
            --slot <a|b>              inactive slot (default: the other slot)\n\
            --attempts <n>            trial boot budget (default 2)\n\
            --fixture <path>          build the QEMU rollback slot volume\n\
+           --health <good|bad>       fixture health marker state\n\
+           --blank <path>            build a blank GPT disk for the init fixture\n\
            --help                    show this help\n\
          \n\
          The planner writes both root slots, records slot/trial/attempts in\n\
@@ -307,13 +351,19 @@ fn update_image(root: &Path, options: &Options) -> Result<()> {
     let mut slot_b_initfs =
         fat_read(&mut esp, "raven/slot-b/initfs.img")?.unwrap_or(legacy_initfs.clone());
 
+    let (built_kernel, built_initfs) = if options.kernel.is_none() || options.initfs.is_none() {
+        let (kernel, initfs) = build_latest_files(root, arch, &options.profile)?;
+        (Some(kernel), Some(initfs))
+    } else {
+        (None, None)
+    };
     let new_kernel = match &options.kernel {
         Some(path) => fs::read(path).with_context(|| format!("cannot read {}", path.display()))?,
-        None => legacy_kernel.clone(),
+        None => built_kernel.unwrap_or_else(|| legacy_kernel.clone()),
     };
     let new_initfs = match &options.initfs {
         Some(path) => fs::read(path).with_context(|| format!("cannot read {}", path.display()))?,
-        None => legacy_initfs.clone(),
+        None => built_initfs.unwrap_or_else(|| legacy_initfs.clone()),
     };
 
     let target = target_slot(&meta, options.slot);
@@ -321,6 +371,8 @@ fn update_image(root: &Path, options: &Options) -> Result<()> {
         target != meta.slot,
         "the inactive slot must differ from the confirmed slot"
     );
+    let token = token_for(&new_kernel, &new_initfs);
+    let new_initfs = inject_health(&new_initfs, target, token)?;
     match target {
         Slot::A => {
             slot_a_kernel = new_kernel;
@@ -334,6 +386,7 @@ fn update_image(root: &Path, options: &Options) -> Result<()> {
 
     let mut next_meta = meta;
     next_meta.trial = Some(target);
+    next_meta.trial_token = Some(token);
     next_meta.attempts = options.attempts;
     next_meta.has_slot_config = true;
 
@@ -392,6 +445,27 @@ fn update_image(root: &Path, options: &Options) -> Result<()> {
     Ok(())
 }
 
+fn build_blank(output: &Path) -> Result<()> {
+    let gpt = GptLayout::new(
+        image::TOTAL_SECTORS,
+        vec![Partition::new(
+            TYPE_LINUX_DATA,
+            0,
+            image::ESP_START_LBA,
+            image::ESP_START_LBA + image::ESP_SECTORS - 1,
+            "ROOT",
+        )],
+    )?;
+    let esp = vec![0u8; usize::try_from(image::ESP_SECTORS * SECTOR_SIZE)?];
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("cannot create {}", parent.display()))?;
+    }
+    image::write_image(output, &gpt, &esp)?;
+    println!("{}", output.display());
+    Ok(())
+}
+
 fn build_fixture(options: &Options, output: &Path) -> Result<()> {
     let kernel = options
         .kernel
@@ -402,11 +476,18 @@ fn build_fixture(options: &Options, output: &Path) -> Result<()> {
         Some(path) => fs::read(path).with_context(|| format!("cannot read {}", path.display()))?,
         None => b"fixture initfs".to_vec(),
     };
+    let token = token_for(&kernel, &initfs);
+    let health = options.health.unwrap_or(FixtureHealth::Bad);
+    let trial_kernel: &[u8] = match health {
+        FixtureHealth::Good => &kernel,
+        FixtureHealth::Bad => b"not an ELF64 image\n",
+    };
     let meta = BootMeta {
         cmdline: String::from(FIXTURE_CMDLINE),
         log_level: String::from("info"),
         slot: Slot::A,
         trial: Some(Slot::B),
+        trial_token: Some(token),
         attempts: options.attempts,
         has_slot_config: true,
     };
@@ -418,7 +499,7 @@ fn build_fixture(options: &Options, output: &Path) -> Result<()> {
     builder.add_file("raven/boot.toml", meta.render().as_bytes())?;
     builder.add_file("raven/slot-a/kernel.elf", &kernel)?;
     builder.add_file("raven/slot-a/initfs.img", &initfs)?;
-    builder.add_file("raven/slot-b/kernel.elf", b"not an ELF64 image\n")?;
+    builder.add_file("raven/slot-b/kernel.elf", trial_kernel)?;
     builder.add_file("raven/slot-b/initfs.img", &initfs)?;
     let esp = builder.finish()?;
     let gpt = GptLayout::new(
@@ -436,8 +517,47 @@ fn build_fixture(options: &Options, output: &Path) -> Result<()> {
             .with_context(|| format!("cannot create {}", parent.display()))?;
     }
     image::write_image(output, &gpt, &esp)?;
+    let (marker_token, state) = match health {
+        FixtureHealth::Good => (token, HEALTH_STATE_HEALTHY),
+        FixtureHealth::Bad => (token, HEALTH_STATE_TRIAL),
+    };
+    write_marker(output, Slot::B, marker_token, state)?;
     println!("{}", output.display());
     Ok(())
+}
+
+const HEALTH_STATE_HEALTHY: u8 = 1;
+const HEALTH_STATE_TRIAL: u8 = 2;
+
+fn write_marker(path: &Path, slot: Slot, token: u32, state: u8) -> Result<()> {
+    let mut sector = [0u8; SECTOR_SIZE as usize];
+    sector[..8].copy_from_slice(b"RAVENHLT");
+    sector[8..10].copy_from_slice(&1u16.to_le_bytes());
+    sector[10] = match slot {
+        Slot::A => 0,
+        Slot::B => 1,
+    };
+    sector[11] = state;
+    sector[12..16].copy_from_slice(&token.to_le_bytes());
+    let checksum = marker_checksum(&sector[..20]);
+    sector[20..24].copy_from_slice(&checksum.to_le_bytes());
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .open(path)
+        .with_context(|| format!("cannot open {}", path.display()))?;
+    file.seek(SeekFrom::Start(MARKER_LBA * SECTOR_SIZE))?;
+    file.write_all(&sector)?;
+    file.flush()?;
+    Ok(())
+}
+
+fn marker_checksum(bytes: &[u8]) -> u32 {
+    let mut hash = 0x811c_9dc5u32;
+    for byte in bytes {
+        hash ^= u32::from(*byte);
+        hash = hash.wrapping_mul(0x0100_0193);
+    }
+    hash
 }
 
 fn default_image_path(arch: Arch) -> PathBuf {
@@ -445,6 +565,61 @@ fn default_image_path(arch: Arch) -> PathBuf {
         .join(arch.as_str())
         .join(format!("ravenbsd-{}.img", arch.as_str()))
 }
+
+fn build_latest_files(root: &Path, arch: Arch, profile: &str) -> Result<(Vec<u8>, Vec<u8>)> {
+    let base = root
+        .join("build")
+        .join("update")
+        .join(format!("base-{}.img", arch.as_str()));
+    let code = image::run_with_overrides(
+        root,
+        arch,
+        profile,
+        None,
+        Overrides {
+            output: Some(&base),
+            ..Overrides::default()
+        },
+        Platform::Generic,
+    )?;
+    ensure!(code == 0, "base image build failed with exit code {code}");
+    let mut esp = read_esp(&base)?;
+    let kernel = fat_read(&mut esp, "raven/kernel.elf")?
+        .ok_or_else(|| anyhow!("base image has no raven/kernel.elf"))?;
+    let initfs = fat_read(&mut esp, "raven/initfs.img")?
+        .ok_or_else(|| anyhow!("base image has no raven/initfs.img"))?;
+    Ok((kernel, initfs))
+}
+
+fn token_for(kernel: &[u8], initfs: &[u8]) -> u32 {
+    let mut hash = 0x811c_9dc5u32;
+    for byte in kernel.iter().chain(initfs) {
+        hash ^= u32::from(*byte);
+        hash = hash.wrapping_mul(0x0100_0193);
+    }
+    hash
+}
+
+/// Add `/etc/boot-health` to the trial initfs so init can write the marker.
+fn inject_health(initfs: &[u8], slot: Slot, token: u32) -> Result<Vec<u8>> {
+    let parsed = Initfs::parse(initfs).context("trial initfs is not a valid initfs image")?;
+    let mut builder = InitfsBuilder::new();
+    for entry in parsed.entries() {
+        if entry.path == "/etc/boot-health" {
+            continue;
+        }
+        builder.add_file(entry.path, entry.data, entry.mode)?;
+    }
+    let text = format!(
+        "slot = \"{}\"\ntoken = \"{token:08x}\"\nlba = \"{}\"\n",
+        slot.as_str(),
+        MARKER_LBA
+    );
+    builder.add_file("/etc/boot-health", text.as_bytes(), 0o444)?;
+    Ok(builder.build())
+}
+
+const MARKER_LBA: u64 = 34;
 
 fn target_slot(meta: &BootMeta, requested: Option<Slot>) -> Slot {
     requested.unwrap_or_else(|| meta.trial.map_or_else(|| meta.slot.other(), Slot::other))
@@ -511,6 +686,17 @@ fn parse_boot_meta(bytes: &[u8]) -> Result<BootMeta> {
             }
             "trial" => {
                 meta.trial = Slot::parse(value);
+                meta.has_slot_config = true;
+            }
+            "trial_token" => {
+                meta.trial_token = if value.is_empty() {
+                    None
+                } else {
+                    Some(
+                        u32::from_str_radix(value, 16)
+                            .map_err(|_| anyhow!("invalid trial_token `{value}`"))?,
+                    )
+                };
                 meta.has_slot_config = true;
             }
             "attempts" => {
