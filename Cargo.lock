@@ -155,7 +155,9 @@ dependencies = [
 name = "emmc2"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
  "raven-pi4",
+ "raven-proto-block",
 ]
 
 [[package]]

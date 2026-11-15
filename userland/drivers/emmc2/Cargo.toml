@@ -11,7 +11,9 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
 raven-pi4 = { path = "../../../crates/raven-pi4" }
+raven-proto-block = { path = "../../../crates/raven-proto-block" }
 
 [lints]
 workspace = true
