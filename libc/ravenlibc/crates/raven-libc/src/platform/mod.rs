@@ -11,6 +11,7 @@
 //! hand over. `ShellDirSys` is the descriptor seam of `raven-libc-fts` (C46) and is reused by
 //! `glob`; no directory parser or path algorithm lives here.
 
+pub(crate) mod __getrandom_v03_custom;
 pub(crate) mod __raven_va_ioctl;
 pub(crate) mod __raven_va_open;
 pub(crate) mod __raven_va_openat;
@@ -26,7 +27,6 @@ pub(crate) mod fstat;
 pub(crate) mod ftruncate;
 pub(crate) mod getcwd;
 pub(crate) mod gethostname;
-pub(crate) mod getrandom_custom;
 pub(crate) mod ioctl;
 pub(crate) mod lstat;
 pub(crate) mod mmap;
