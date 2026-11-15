@@ -1,0 +1,141 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Page-to-name map for `libc-gate man-check`. Every candidate of the M1-M4 rule set is covered;
+# the page names are the files under docs/man3 (or docs/man7 for libc).
+
+[[page]]
+name = "setlocale"
+section = 3
+names = ["setlocale", "newlocale", "uselocale", "duplocale", "nl_langinfo", "localeconv"]
+reasons = ["M4"]
+areas = [2]
+sources = ["architecture/raven-libc/02-api-surface.md", "architecture/raven-libc/01-decisions.md", "libc/ravenlibc/abi/census/symbols.toml"]
+
+[[page]]
+name = "printf"
+section = 3
+names = ["printf", "fprintf", "sprintf", "snprintf", "dprintf", "vprintf"]
+reasons = ["M4"]
+areas = [2]
+sources = ["architecture/raven-libc/02-api-surface.md", "architecture/raven-libc/01-decisions.md", "libc/ravenlibc/abi/census/symbols.toml"]
+
+[[page]]
+name = "iconv"
+section = 3
+names = ["iconv", "iconv_open", "iconv_close"]
+reasons = ["M4"]
+areas = [2]
+sources = ["architecture/raven-libc/02-api-surface.md", "architecture/raven-libc/01-decisions.md", "libc/ravenlibc/abi/census/symbols.toml"]
+
+[[page]]
+name = "assert"
+section = 3
+names = ["assert", "__assert_fail"]
+reasons = ["M4"]
+areas = [2]
+sources = ["architecture/raven-libc/02-api-surface.md", "architecture/raven-libc/01-decisions.md", "libc/ravenlibc/abi/census/symbols.toml"]
+
+[[page]]
+name = "fork"
+section = 3
+names = ["fork", "vfork"]
+reasons = ["M4"]
+areas = [2]
+sources = ["architecture/raven-libc/02-api-surface.md", "architecture/raven-libc/01-decisions.md", "libc/ravenlibc/abi/census/symbols.toml"]
+
+[[page]]
+name = "posix_spawn"
+section = 3
+names = ["posix_spawn", "posix_spawnp", "system", "popen"]
+reasons = ["M4"]
+areas = [2]
+sources = ["architecture/raven-libc/02-api-surface.md", "architecture/raven-libc/01-decisions.md", "libc/ravenlibc/abi/census/symbols.toml"]
+
+[[page]]
+name = "issetugid"
+section = 3
+names = ["issetugid", "getauxval"]
+reasons = ["M4"]
+areas = [2]
+sources = ["architecture/raven-libc/02-api-surface.md", "architecture/raven-libc/01-decisions.md", "libc/ravenlibc/abi/census/symbols.toml"]
+
+[[page]]
+name = "arc4random"
+section = 3
+names = ["arc4random", "arc4random_buf", "arc4random_uniform", "getentropy", "getrandom"]
+reasons = ["M4"]
+areas = [2]
+sources = ["architecture/raven-libc/02-api-surface.md", "architecture/raven-libc/01-decisions.md", "libc/ravenlibc/abi/census/symbols.toml"]
+
+[[page]]
+name = "malloc"
+section = 3
+names = ["malloc", "free", "calloc", "realloc", "posix_memalign", "aligned_alloc"]
+reasons = ["M4"]
+areas = [2]
+sources = ["architecture/raven-libc/02-api-surface.md", "architecture/raven-libc/01-decisions.md", "libc/ravenlibc/abi/census/symbols.toml"]
+
+[[page]]
+name = "clock"
+section = 3
+names = ["clock", "times", "clock_settime", "clock_getcpuclockid", "adjtime"]
+reasons = ["M4"]
+areas = [2]
+sources = ["architecture/raven-libc/02-api-surface.md", "architecture/raven-libc/01-decisions.md", "libc/ravenlibc/abi/census/symbols.toml"]
+
+[[page]]
+name = "mmap"
+section = 3
+names = ["mmap", "munmap", "mprotect", "madvise", "mincore"]
+reasons = ["M4"]
+areas = [2]
+sources = ["architecture/raven-libc/02-api-surface.md", "architecture/raven-libc/01-decisions.md", "libc/ravenlibc/abi/census/symbols.toml"]
+
+[[page]]
+name = "open"
+section = 3
+names = ["open", "openat", "fcntl", "ioctl"]
+reasons = ["M4"]
+areas = [2]
+sources = ["architecture/raven-libc/02-api-surface.md", "architecture/raven-libc/01-decisions.md", "libc/ravenlibc/abi/census/symbols.toml"]
+
+[[page]]
+name = "pledge"
+section = 3
+names = ["pledge", "unveil"]
+reasons = ["M4"]
+areas = [2]
+sources = ["architecture/raven-libc/02-api-surface.md", "architecture/raven-libc/01-decisions.md", "libc/ravenlibc/abi/census/symbols.toml"]
+
+[[page]]
+name = "pthread_create"
+section = 3
+names = ["pthread_create", "pthread_cancel", "pthread_mutex_lock"]
+reasons = ["M4"]
+areas = [2]
+sources = ["architecture/raven-libc/02-api-surface.md", "architecture/raven-libc/01-decisions.md", "libc/ravenlibc/abi/census/symbols.toml"]
+
+[[page]]
+name = "dlopen"
+section = 3
+names = ["dlopen", "dlsym", "dlerror", "dl_iterate_phdr"]
+reasons = ["M4"]
+areas = [2]
+sources = ["architecture/raven-libc/02-api-surface.md", "architecture/raven-libc/01-decisions.md", "libc/ravenlibc/abi/census/symbols.toml"]
+
+[[page]]
+name = "sysconf"
+section = 3
+names = ["sysconf", "ARG_MAX", "NGROUPS_MAX"]
+reasons = ["M4"]
+areas = [2]
+sources = ["architecture/raven-libc/02-api-surface.md", "architecture/raven-libc/01-decisions.md", "libc/ravenlibc/abi/census/symbols.toml"]
+
+[[page]]
+name = "libc"
+section = 7
+names = ["libc"]
+reasons = ["extra"]
+areas = []
+sources = ["architecture/raven-libc/17-crate-layout.md", "architecture/raven-libc/01-decisions.md"]

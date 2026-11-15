@@ -1,0 +1,31 @@
+." SPDX-License-Identifier: BSD-3-Clause
+." Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt PLEDGE 3
+.Os RavenBSD
+.Sh NAME
+.Nm pledge
+.Nm unveil
+.Nd restrict process capabilities and paths
+.Sh SYNOPSIS
+.In unistd.h
+.Ft int
+.Fn pledge "const char *promises" "const char *execpromises"
+.Ft int
+.Fn unveil "const char *path" "const char *permissions"
+.Sh DESCRIPTION
+.Fn pledge limits the system calls a process may use. .Fn unveil limits the paths the process
+may access. Both are RavenBSD compatibility interfaces.
+.Sh RETURN VALUES
+Both functions return 0 on success and -1 on failure.
+.Sh ERRORS
+.Er EINVAL is returned for an unknown promise or permission. .Er EPERM is returned when the
+process cannot tighten its own policy.
+.Sh STANDARDS
+OpenBSD compatibility; ring 2.
+.Sh CAVEATS
+The enforcement model and its current coverage are documented in C53; unsupported promises
+do not silently grant access.
+.Sh SEE ALSO
+.Xr pledge 2
+.Xr libc 7

@@ -1,0 +1,44 @@
+." SPDX-License-Identifier: BSD-3-Clause
+." Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt PRINTF 3
+.Os RavenBSD
+.Sh NAME
+.Nm printf
+.Nm fprintf
+.Nm sprintf
+.Nm snprintf
+.Nm dprintf
+.Nm vprintf
+.Nd formatted output
+.Sh SYNOPSIS
+.In stdio.h
+.Ft int
+.Fn printf "const char *format" ...
+.Ft int
+.Fn fprintf "FILE *stream" "const char *format" ...
+.Ft int
+.Fn sprintf "char *buffer" "const char *format" ...
+.Ft int
+.Fn snprintf "char *buffer" "size_t size" "const char *format" ...
+.Ft int
+.Fn dprintf "int fd" "const char *format" ...
+.Ft int
+.Fn vprintf "const char *format" "va_list ap"
+.Sh DESCRIPTION
+These functions format their arguments and write the result to a stream, a descriptor or a
+buffer. The conversion set follows ISO C23 and the POSIX additions implemented by ravenlibc.
+.Sh RETURN VALUES
+The functions return the number of bytes that would have been written, or a negative value on
+failure. .Fn snprintf truncates the output to the supplied size but returns the untruncated length.
+.Sh ERRORS
+.Er EINVAL is returned for a malformed conversion. Output errors are reported with
+.Er EIO, .Er ENOSPC or .Er EBADF as appropriate for the destination.
+.Sh STANDARDS
+ISO C23 and POSIX.1-2024; ring 0.
+.Sh CAVEATS
+The %n conversion stores the count in the default build and aborts in the hardened profile.
+The %m conversion is supported. See H-6 and C43.
+.Sh SEE ALSO
+.Xr printf 3
+.Xr stdio 3
