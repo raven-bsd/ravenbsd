@@ -17,12 +17,16 @@
 #![warn(missing_docs)]
 
 use raven_genet::dtb::GenetInfo;
+use raven_genet::frame::FrameError;
 use raven_genet::mac::MacAddress;
 use raven_genet::phy;
+use raven_genet::phy::LinkError;
 use raven_genet::regs;
 use raven_genet::ring::{
     RingError, RingIndices, RingSetup, RxDescriptor, RxStatus, TxDescriptor, TxStatus,
 };
+
+pub mod frame;
 
 /// A read or write refused by the seam.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -94,8 +98,19 @@ pub enum DriverError {
     Seam(SeamError),
     /// The requested packet buffer is not mapped.
     MissingBuffer(usize),
+    /// The packet buffer is shorter than the request.
+    ShortBuffer {
+        /// Buffer index.
+        index: usize,
+        /// Buffer length.
+        len: usize,
+    },
     /// The ring model rejected an index operation.
     Ring(RingError),
+    /// The frame ownership path rejected an operation.
+    Frame(FrameError),
+    /// The PHY link tracker rejected a sample.
+    Link(LinkError),
 }
 
 impl From<SeamError> for DriverError {
@@ -107,6 +122,18 @@ impl From<SeamError> for DriverError {
 impl From<RingError> for DriverError {
     fn from(error: RingError) -> Self {
         Self::Ring(error)
+    }
+}
+
+impl From<FrameError> for DriverError {
+    fn from(error: FrameError) -> Self {
+        Self::Frame(error)
+    }
+}
+
+impl From<LinkError> for DriverError {
+    fn from(error: LinkError) -> Self {
+        Self::Link(error)
     }
 }
 
