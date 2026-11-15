@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S51 PG-13 kernel semantics: PROT_NONE reservations, PROTECT split, partial UNMAP and the
+# atomic FIXED | REPLACE primitive. The reviewer added `map::REPLACE` to the contract crate;
+# this case runs the kernel behaviour directly so the probe's grep is backed by execution.
+
+name = "libc-map"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/qtest/cases/libc-map-fixture/build.sh"]
+initfs = "build/fixtures/libc-map/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^libc-map: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|libc-map: fail'

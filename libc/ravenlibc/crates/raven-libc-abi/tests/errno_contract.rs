@@ -44,12 +44,11 @@ fn parse_raven_abi(text: &str) -> BTreeMap<String, u16> {
 }
 
 #[test]
-fn subset_is_the_observed_54_entries() {
-    // Doc 14 3.A.4 and ticket C36 call this a 62-value subset; the contract crate as committed
-    // has 54 `NAME = N, "text";` rows (OBSERVED). The number is asserted so a silent change is
-    // caught, and the report records the discrepancy.
+fn subset_is_the_observed_84_entries() {
+    // Doc 14 3.A.4 and ticket C36 called this a 62-value subset; the contract crate had 54
+    // rows before PG-29. PG-29 added the 30 Linux values this test now freezes (54 + 30 = 84).
     let rows = parse_raven_abi(&raven_abi_source());
-    assert_eq!(rows.len(), 54, "raven-abi errno subset changed size");
+    assert_eq!(rows.len(), 84, "raven-abi errno subset changed size");
 }
 
 #[test]
@@ -95,7 +94,8 @@ fn every_described_value_is_a_linux_value_in_our_table() {
 }
 
 #[test]
-fn the_four_missing_kernel_names_are_present() {
+fn the_four_former_kernel_gaps_are_now_present() {
+    let rows = parse_raven_abi(&raven_abi_source());
     for (name, value) in [
         ("ENOTBLK", 15),
         ("ETXTBSY", 26),
@@ -107,13 +107,7 @@ fn the_four_missing_kernel_names_are_present() {
             .find(|(candidate, _)| *candidate == name)
             .unwrap_or_else(|| panic!("libc errno table lacks {name}"));
         assert_eq!(found.1, i128::from(value), "{name}");
-    }
-    let rows = parse_raven_abi(&raven_abi_source());
-    for name in ["ENOTBLK", "ETXTBSY", "EDEADLK", "ENOLCK"] {
-        assert!(
-            !rows.contains_key(name),
-            "raven-abi unexpectedly has {name}"
-        );
+        assert_eq!(rows.get(name), Some(&value), "raven-abi lacks {name}");
     }
 }
 

@@ -86,7 +86,13 @@ probe() {
             fi
             ;;
         23)
-            unknown
+            count=$(grep -c 'file_from_handle(caller, handle, Rights::NONE)' \
+                "$root/kernel/src/syscall/ipc.rs" || true)
+            if [ "$count" -ge 2 ]; then
+                present
+            else
+                absent
+            fi
             ;;
         24)
             if grep -RqsE 'create_mode|CREATE_MODE' "$root/crates/raven-proto-fs/src"; then
