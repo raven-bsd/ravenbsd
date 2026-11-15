@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The host-backed EMMC2 driver. It serves the memory disk's `disk:` scheme; the probe is the only
+# client in this qtest. The real platform mode is a separate follow-up fragment.
+name = "emmc2"
+exec = "/sbin/emmc2"
+args = ["test"]
+provides = ["scheme:disk"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0
+required = true

@@ -95,11 +95,12 @@ fn main() {
 
 #[cfg(target_os = "none")]
 mod program {
+    use alloc::format;
     use alloc::vec::Vec;
 
     use linuxd::{
-        LinuxProcess, TrapAction, copy_in_len, decode, dispatch, dispatcher, encode_reply, load,
-        plan_image,
+        LinuxProcess, TrapAction, copy_in_len, decode, dispatch, dispatcher, encode_reply,
+        interp_path, load, plan_image,
     };
     use raven_abi::errno::Errno;
     use raven_abi::types::{Handle, clock};
@@ -132,9 +133,25 @@ mod program {
             Ok(image) => image,
             Err(code) => return code,
         };
+        // A dynamic main names its interpreter with an absolute path inside the Linux root; the
+        // B32 recipe stages that root at `/compat/linux` in the initfs.
+        let interpreter = match interp_path(&image) {
+            Ok(Some(interpreter)) => match read_interp(interpreter) {
+                Some(bytes) => Some(bytes),
+                None => {
+                    println!("linuxd: interpreter {interpreter} is not in the initfs");
+                    return 2;
+                }
+            },
+            Ok(None) => None,
+            Err(error) => {
+                println!("linuxd: image plan failed: {error:?}");
+                return 2;
+            }
+        };
         let config = linuxd::Config {
-            main_pie_base: 0,
-            interp_base: 0,
+            main_pie_base: linuxd::MAIN_PIE_BASE,
+            interp_base: linuxd::INTERP_BASE,
             page: 4096,
             uid: 0,
             euid: 0,
@@ -147,10 +164,12 @@ mod program {
             sysinfo_ehdr: None,
             random: random_bytes(),
         };
+        let argv_refs: Vec<&[u8]> = argv.iter().map(Vec::as_slice).collect();
         let spec = match plan_image(
             &image,
+            interpreter.as_deref(),
             &config,
-            &[path.as_bytes()],
+            &argv_refs,
             &[],
             path.as_bytes(),
             raven_abi::layout::x86_64::USER_END,
@@ -165,9 +184,17 @@ mod program {
             "linuxd: entry={:#x} phdr={:#x} phnum={} brk={:#x}",
             spec.entry, spec.phdr, spec.phnum, spec.brk_start
         );
+        if spec.interp_steps.is_empty() {
+            println!("linuxd: dynamic=0");
+        } else {
+            println!(
+                "linuxd: dynamic=1 interp-entry={:#x} interp-bias={:#x}",
+                spec.entry, spec.interp_bias
+            );
+        }
 
         let mut sys = KernelSys;
-        let loaded = match load(&spec, &image, &mut sys) {
+        let loaded = match load(&spec, &image, interpreter.as_deref(), &mut sys) {
             Ok(loaded) => loaded,
             Err(error) => {
                 println!("linuxd: load failed: {error:?}");
@@ -237,6 +264,18 @@ mod program {
                 Err(2)
             }
         }
+    }
+
+    /// Read a `PT_INTERP` image. The path is absolute inside the Linux root; the recipe stages the
+    /// root under [`linuxd::LINUX_ROOT`], so try the literal path first and then the rooted one.
+    fn read_interp(path: &str) -> Option<Vec<u8>> {
+        let mapped = sys::map_initfs().ok()?;
+        let initfs = Initfs::parse(mapped).ok()?;
+        if let Some(entry) = initfs.get(path) {
+            return Some(entry.data.to_vec());
+        }
+        let rooted = format!("{}{}", linuxd::LINUX_ROOT, path);
+        initfs.get(&rooted).map(|entry| entry.data.to_vec())
     }
 
     fn random_bytes() -> [u8; 16] {
@@ -313,7 +352,10 @@ mod program {
                 let mut status = code;
                 let _ = rt.proc_wait(loaded.proc, &mut status);
                 println!("linuxd: hello exit={status}");
-                return 0;
+                // Propagate the Linux status to this server's parent: the boot init's test-exit
+                // observes linuxd itself, while a supervisor (the linux-root fixture) can print
+                // the Linux program's status without parsing the console.
+                return status;
             }
         }
     }

@@ -4,8 +4,13 @@
 //! Host tests for the K27 update planner.
 
 use super::{
-    BootMeta, Options, Slot, build_fixture, inject_health, parse_boot_meta, target_slot, token_for,
+    BootMeta, Options, Platform, Slot, build_fixture, detect_layout, ensure_pi4_kernel,
+    inject_health, parse, parse_boot_meta, pi4_trial_from_flat, stage_pi4_esp, target_slot,
+    token_for,
 };
+use crate::fat::FatImageBuilder;
+use crate::gpt::SECTOR_SIZE;
+use crate::image;
 use raven_initfs::{Initfs, InitfsBuilder};
 use std::fs;
 use std::io::Read;
@@ -128,4 +133,147 @@ fn health_record_is_injected_into_the_trial_initfs() {
 fn token_changes_with_the_payload() {
     assert_eq!(token_for(b"a", b"b"), token_for(b"a", b"b"));
     assert_ne!(token_for(b"a", b"b"), token_for(b"a", b"c"));
+}
+
+#[test]
+fn pi4_platform_requires_aarch64() {
+    let error = parse(&["--platform".to_string(), "pi4".to_string()]).unwrap_err();
+    assert!(error.to_string().contains("requires --arch aarch64"));
+}
+
+#[test]
+fn pi4_defaults_to_the_pi4_profile() {
+    let options = parse(&[
+        "--platform".to_string(),
+        "pi4".to_string(),
+        "--arch".to_string(),
+        "aarch64".to_string(),
+    ])
+    .unwrap()
+    .unwrap();
+    assert_eq!(options.profile, "pi4");
+}
+
+#[test]
+fn layout_detection_reads_the_boot_partition() {
+    let size = usize::try_from(image::ESP_SECTORS * SECTOR_SIZE).unwrap();
+    let mut builder = FatImageBuilder::new(size).unwrap();
+    builder.add_dir("raven").unwrap();
+    builder.add_file("raven/kernel.elf", b"elf").unwrap();
+    let mut esp = builder.finish().unwrap();
+    assert_eq!(detect_layout(&mut esp).unwrap(), Platform::Generic);
+
+    let mut builder = FatImageBuilder::new(size).unwrap();
+    builder.add_file("kernel8.img", b"flat").unwrap();
+    let mut esp = builder.finish().unwrap();
+    assert_eq!(detect_layout(&mut esp).unwrap(), Platform::Pi4);
+}
+
+#[test]
+fn pi4_kernel_entry_is_checked() {
+    let elf = aarch64_elf();
+    ensure_pi4_kernel(&elf).unwrap();
+    let mut uefi = elf;
+    uefi[24..32].copy_from_slice(&0xffff_ffff_8020_0000u64.to_le_bytes());
+    assert!(ensure_pi4_kernel(&uefi).is_err());
+}
+
+#[test]
+fn pi4_update_stages_slots_and_metadata() {
+    let mut init_builder = InitfsBuilder::new();
+    init_builder.add_file("/init", b"init", 0o755).unwrap();
+    let initfs = init_builder.build();
+    let legacy = b"legacy flat image".to_vec();
+    let flat = [legacy.as_slice(), initfs.as_slice()].concat();
+    let (trial, token) = pi4_trial_from_flat(flat.clone(), &initfs, Slot::B).unwrap();
+    assert!(trial.starts_with(&legacy));
+    let injected = Initfs::parse(&trial[legacy.len()..]).unwrap();
+    let health = injected.get("/etc/boot-health").unwrap();
+    let text = std::str::from_utf8(health.data).unwrap();
+    assert!(text.contains(&format!("token = \"{token:08x}\"\n")));
+
+    let mut esp = base_pi4_esp();
+    let meta = BootMeta {
+        cmdline: String::from("console=ttyAMA0 loglevel=info"),
+        log_level: String::from("info"),
+        slot: Slot::A,
+        trial: Some(Slot::B),
+        trial_token: Some(token),
+        attempts: 3,
+        has_slot_config: true,
+    };
+    let staged = stage_pi4_esp(&mut esp, &meta, &flat, &trial, &trial).unwrap();
+
+    let mut staged = staged;
+    assert_eq!(
+        super::fat_read(&mut staged, "config.txt").unwrap().unwrap(),
+        b"arm_64bit=1\nkernel=kernel8.img\n"
+    );
+    assert_eq!(
+        super::fat_read(&mut staged, "start4.elf").unwrap().unwrap(),
+        b"firmware"
+    );
+    assert_eq!(
+        super::fat_read(&mut staged, "overlays/disable-bt.dtbo")
+            .unwrap()
+            .unwrap(),
+        b"overlay"
+    );
+    let boot = super::fat_read(&mut staged, "raven/boot.toml")
+        .unwrap()
+        .unwrap();
+    assert_eq!(parse_boot_meta(&boot).unwrap(), meta);
+    assert_eq!(
+        super::fat_read(&mut staged, "raven/slot-a/kernel8.img")
+            .unwrap()
+            .unwrap(),
+        flat
+    );
+    assert_eq!(
+        super::fat_read(&mut staged, "raven/slot-b/kernel8.img")
+            .unwrap()
+            .unwrap(),
+        trial
+    );
+    assert_eq!(
+        super::fat_read(&mut staged, "kernel8.img")
+            .unwrap()
+            .unwrap(),
+        trial
+    );
+}
+
+fn base_pi4_esp() -> Vec<u8> {
+    let size = usize::try_from(image::ESP_SECTORS * SECTOR_SIZE).unwrap();
+    let mut builder = FatImageBuilder::new(size).unwrap();
+    builder
+        .add_file("config.txt", b"arm_64bit=1\nkernel=kernel8.img\n")
+        .unwrap();
+    builder
+        .add_file("kernel8.img", b"legacy flat image")
+        .unwrap();
+    builder.add_file("start4.elf", b"firmware").unwrap();
+    builder.add_dir("overlays").unwrap();
+    builder
+        .add_file("overlays/disable-bt.dtbo", b"overlay")
+        .unwrap();
+    builder.add_dir("raven").unwrap();
+    builder
+        .add_file(
+            "raven/boot.toml",
+            b"cmdline = \"console=ttyAMA0\"\nlog_level = \"info\"\n",
+        )
+        .unwrap();
+    builder.finish().unwrap()
+}
+
+/// Minimal aarch64 ELF whose entry point is the Pi 4 firmware load address.
+fn aarch64_elf() -> Vec<u8> {
+    let mut elf = vec![0u8; 64];
+    elf[..4].copy_from_slice(b"\x7fELF");
+    elf[4] = 2;
+    elf[5] = 1;
+    elf[18..20].copy_from_slice(&183u16.to_le_bytes());
+    elf[24..32].copy_from_slice(&0x80000u64.to_le_bytes());
+    elf
 }

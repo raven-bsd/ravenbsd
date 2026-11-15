@@ -244,3 +244,53 @@ fn address_overflow_is_reported() {
         Err(LinuxElfError::AddressOverflow)
     );
 }
+
+#[test]
+fn a_zero_based_pie_is_biased_from_address_zero() {
+    let data = build_elf(&ElfOptions {
+        e_type: ET_DYN,
+        entry: 0,
+        load_vaddr: 0,
+        ..ElfOptions::default()
+    });
+    let main = parse_elf(&data);
+    let plan = plan_image(&main, None, &config()).unwrap();
+
+    assert_eq!(plan.main_bias, 0x1000_0000);
+    assert_eq!(plan.main.start, 0x1000_0000);
+    assert_eq!(plan.main.end, 0x1000_3000);
+    assert_eq!(plan.main.entry, 0x1000_0000);
+    assert_eq!(plan.phdr_addr, 0x1000_0040);
+    assert_eq!(plan.brk_start, 0x1000_3000);
+}
+
+#[test]
+fn a_zero_based_interpreter_is_biased_at_its_own_base() {
+    let main_data = build_elf(&ElfOptions {
+        e_type: ET_DYN,
+        entry: 0,
+        load_vaddr: 0,
+        interp: Some(INTERP),
+        ..ElfOptions::default()
+    });
+    let interp_data = build_elf(&ElfOptions {
+        e_type: ET_DYN,
+        entry: 0,
+        load_vaddr: 0,
+        ..ElfOptions::default()
+    });
+    let main = parse_elf(&main_data);
+    let interp = parse_elf(&interp_data);
+    let plan = plan_image(&main, Some(&interp), &config()).unwrap();
+
+    let (path, summary) = plan.interp.unwrap();
+    assert_eq!(path, INTERP);
+    assert_eq!(plan.main_bias, 0x1000_0000);
+    assert_eq!(plan.interp_bias, 0x2000_0000);
+    assert_eq!(summary.start, 0x2000_0000);
+    assert_eq!(summary.end, 0x2000_3000);
+    assert_eq!(summary.entry, 0x2000_0000);
+    assert_eq!(plan.entry, 0x2000_0000);
+    assert_eq!(plan.main.entry, 0x1000_0000);
+    assert_eq!(plan.phdr_addr, 0x1000_0040);
+}
