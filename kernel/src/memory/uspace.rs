@@ -17,6 +17,7 @@ use raven_abi::layout::aarch64::{USER_END, USER_MIN};
 use raven_abi::layout::x86_64::{USER_END, USER_MIN};
 use raven_abi::types::prot;
 use raven_pager::PageState;
+use raven_rmm::page::{NO_EXECUTE, PRESENT};
 use raven_rmm::{MapError, PageFlags, PageSize, PhysAddr, VirtAddr};
 use raven_vma::{Backing, PAGE_SIZE, Vma, VmaError, Vmas};
 
@@ -220,6 +221,46 @@ impl UserAddressSpace {
         &mut self.vmas
     }
 
+    /// True when every page of `start..start + len` is a `PROT_NONE` reservation.
+    ///
+    /// `map::REPLACE` may only overwrite such reservations (CR-24); a range with a hole or any
+    /// page carrying a real protection is not replaceable.
+    pub fn is_reservation(&self, start: u64, len: u64) -> bool {
+        if len == 0
+            || !start.is_multiple_of(PAGE_SIZE)
+            || !len.is_multiple_of(PAGE_SIZE)
+            || !self.vmas.is_fully_mapped(start, len)
+        {
+            return false;
+        }
+        let Some(end) = start.checked_add(len) else {
+            return false;
+        };
+        // Only anonymous reservations are replaceable. A file-backed or pager-backed mapping
+        // carries dirty pages that the replace path does not page out under the lock.
+        if self
+            .objects
+            .iter()
+            .any(|mapping| mapping.start < end && start < mapping.start.saturating_add(mapping.len))
+        {
+            return false;
+        }
+        let mut page = start;
+        while page < end {
+            let Some(vma) = self.vmas.find(page) else {
+                return false;
+            };
+            if vma.prot() != 0 || vma.backing() != Backing::Anonymous {
+                return false;
+            }
+            let Some(next) = page.checked_add(PAGE_SIZE) else {
+                return false;
+            };
+            page = next;
+        }
+        true
+    }
+
     /// Record how the range just mapped is inherited by a forked child.
     ///
     /// The record is stored outside the VMA tree so `PROTECT` and partial `UNMAP` keep the
@@ -301,7 +342,7 @@ impl UserAddressSpace {
                     failure = Some(Errno::ENOMEM);
                     break;
                 };
-                match mapper.map(virt, PhysAddr(physical.0), flags, PageSize::Size4K) {
+                match map_user_page(&mut mapper, virt, PhysAddr(physical.0), prot, flags) {
                     Ok(()) => mapped = mapped.saturating_add(1),
                     Err(error) => {
                         let _ = frame::free_frame(physical);
@@ -358,7 +399,7 @@ impl UserAddressSpace {
                         break;
                     }
                 };
-                match mapper.map(virt, PhysAddr(physical), flags, PageSize::Size4K) {
+                match map_user_page(&mut mapper, virt, PhysAddr(physical), prot, flags) {
                     Ok(()) => mapped = mapped.saturating_add(1),
                     Err(error) => {
                         failure = Some(map_errno(error));
@@ -419,7 +460,7 @@ impl UserAddressSpace {
                     failure = Some(Errno::EINVAL);
                     break;
                 };
-                match mapper.map(virt, PhysAddr(physical), flags, PageSize::Size4K) {
+                match map_user_page(&mut mapper, virt, PhysAddr(physical), prot, flags) {
                     Ok(()) => {
                         if writable {
                             // C18: a shared writable mapping is conservatively dirty.
@@ -525,9 +566,13 @@ impl UserAddressSpace {
                 if mode == MapInherit::ZeroOnFork {
                     let physical = frame::alloc_zeroed_frame().ok_or(Errno::ENOMEM)?;
                     let flags = leaf_flags(vma.prot(), vma.prot() & (prot::WRITE as u8) != 0);
-                    if let Err(error) =
-                        child_mapper.map(virt, PhysAddr(physical.0), flags, PageSize::Size4K)
-                    {
+                    if let Err(error) = map_user_page(
+                        &mut child_mapper,
+                        virt,
+                        PhysAddr(physical.0),
+                        vma.prot(),
+                        flags,
+                    ) {
                         let _ = frame::free_frame(physical);
                         return Err(map_errno(error));
                     }
@@ -556,11 +601,12 @@ impl UserAddressSpace {
                 if private {
                     frame::share_frame(frame::PhysAddr(physical.0));
                 }
-                if let Err(error) = child_mapper.map(
+                if let Err(error) = map_user_page(
+                    &mut child_mapper,
                     virt,
                     PhysAddr(physical.0),
+                    vma.prot(),
                     leaf_flags(vma.prot(), writable),
-                    PageSize::Size4K,
                 ) {
                     if private {
                         frame::release_shared(frame::PhysAddr(physical.0));
@@ -1080,13 +1126,13 @@ impl UserAddressSpace {
             }
             Some(_) => {
                 let _ = mapper.unmap(virt);
-                mapper
-                    .map(virt, PhysAddr(physical), flags, PageSize::Size4K)
+                map_user_page(&mut mapper, virt, PhysAddr(physical), vma.prot(), flags)
                     .map_err(map_errno)?;
             }
-            None => mapper
-                .map(virt, PhysAddr(physical), flags, PageSize::Size4K)
-                .map_err(map_errno)?,
+            None => {
+                map_user_page(&mut mapper, virt, PhysAddr(physical), vma.prot(), flags)
+                    .map_err(map_errno)?;
+            }
         }
         if writable {
             mapping.object.mark_dirty(object_page);
@@ -1394,13 +1440,48 @@ fn pages_in(len: u64) -> Result<u64, Errno> {
 }
 
 fn leaf_flags(prot: u8, writable: bool) -> PageFlags {
-    if prot & (prot::EXEC as u8) != 0 {
+    if prot == 0 {
+        none_leaf_flags()
+    } else if prot & (prot::EXEC as u8) != 0 {
         PageFlags::user_rx()
     } else if writable && prot & (prot::WRITE as u8) != 0 {
         PageFlags::user_rw()
     } else {
         PageFlags::user_ro()
     }
+}
+
+/// A present but supervisor-only leaf, the x86-64 encoding of `PROT_NONE`.
+///
+/// The hardware has no separate "no read" bit, so clearing the user bit is what makes every
+/// ring-3 access fault. The frame stays present so `UNMAP` and `PROTECT` can find and re-use it.
+fn none_leaf_flags() -> PageFlags {
+    PageFlags::from_bits(PRESENT | NO_EXECUTE)
+}
+
+/// Map one 4 KiB user leaf, seeding the intermediate tables as user-owned for `PROT_NONE`.
+///
+/// The mapper derives the user bit of every intermediate table from the flags of the *first*
+/// mapping under it. A reservation therefore has to be created with a user leaf and narrowed to
+/// supervisor-only afterwards; otherwise a later `PROTECT` could change the leaf but the user
+/// access would still stop at a supervisor-only table.
+fn map_user_page(
+    mapper: &mut paging::KernelMapper<'_>,
+    virt: VirtAddr,
+    physical: PhysAddr,
+    prot: u8,
+    flags: PageFlags,
+) -> Result<(), MapError> {
+    let seed = if prot == 0 {
+        PageFlags::user_ro()
+    } else {
+        flags
+    };
+    mapper.map(virt, physical, seed, PageSize::Size4K)?;
+    if prot == 0 {
+        mapper.protect(virt, none_leaf_flags())?;
+    }
+    Ok(())
 }
 
 fn initfs_physical_range() -> Option<(u64, u64)> {

@@ -80,9 +80,10 @@ syscall_entry:
     mov rcx, [rsp]
     mov r11, [rsp + 16]
 
-    /* Use r10 as the canonical-rip scratch (it is reloaded with the user rsp
-     * below), so rdx, the third syscall argument / entry mask register, stays
-     * in the return frame. */
+    /* Use r10 as the canonical-rip scratch, but preserve the user's r10 across
+     * the check: it is a normal callee-saved-by-ABI register for the syscall
+     * instruction and user code may keep live values in it. */
+    push r10
     mov r10, rcx
     shr r10, 47
     cmp r10, 0
@@ -91,11 +92,12 @@ syscall_entry:
     jne 2f
 1:
     or r11, 0x200
-    mov r10, [rsp + 24]
-    mov rsp, r10
+    pop r10
+    mov rsp, [rsp + 24]
     swapgs
     sysretq
 2:
+    pop r10
     mov rdi, rcx
     call syscall_bad_rip
     ud2
