@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //!
-//! Minimal Rust std filesystem probe for C64e. It exercises the five symbols
-//! that `std::fs` needs from ravenlibc: `mkdir`, `rename`, `fsync`, `isatty`
-//! and (link-only) `fchmod`. The body runs on the target under the
-//! `libc-test` profile; it is not a host fallback.
+//! Minimal Rust std filesystem probe for C64f. It exercises `std::fs` over
+//! ravenlibc: `mkdir`, write/`fsync`, metadata, `rename`, `fchmod` and
+//! `isatty`. The body runs on the target under the `libc-test` profile; it is
+//! not a host fallback.
 
 use std::fs;
 use std::io::{IsTerminal, Write};
