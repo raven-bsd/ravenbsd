@@ -35,6 +35,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
+name = "audio-client"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-audio",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "audiod"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-audio-core",
+ "raven-proto-audio",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "bench-host"
 version = "0.1.0"
 dependencies = [

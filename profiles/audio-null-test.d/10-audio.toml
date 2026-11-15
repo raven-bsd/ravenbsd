@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.programs]]
+package = "audiod"
+path = "/sbin/audiod"
+
+[[initfs.files]]
+src = "build/fixtures/audio/client"
+path = "/bin/audio-client"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "profiles/audio-null-test.d/audiod.manifest"
+path = "/etc/services.d/audiod.toml"
+
+[[initfs.files]]
+src = "profiles/audio-null-test.d/audio-client.manifest"
+path = "/etc/services.d/audio-client.toml"
