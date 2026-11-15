@@ -131,6 +131,15 @@ impl Seam for FakeSeam {
             } else {
                 value & !CM_CTL_BUSY
             }
+        } else if window == Window::Dma && offset < 0xf00 && offset.is_multiple_of(0x100) {
+            // Model the channel CS handshake: RESET and ABORT are self-clearing and drop ACTIVE.
+            let mut cs = value;
+            if value & CS_RESET_START != 0 {
+                cs &= !(CS_RESET_START | CS_ACTIVE);
+            } else if value & CS_ABORT != 0 {
+                cs &= !(CS_ABORT | CS_ACTIVE);
+            }
+            cs
         } else {
             value
         };
@@ -441,6 +450,10 @@ fn start_and_stop_toggle_the_pwm_and_dma_channel() {
         state.last_register_write(Window::Dma, RingGeometry::enable_register()),
         Some(1 << 5)
     );
+    assert_eq!(
+        state.register_writes(Window::Dma, 0x500),
+        [CS_RESET_START, CS_COMPLETION_CLEAR, CS_ACTIVE]
+    );
     drop(state);
 
     driver.stop().expect("stop");
@@ -451,6 +464,11 @@ fn start_and_stop_toggle_the_pwm_and_dma_channel() {
     assert_eq!(
         state.last_register_write(Window::Dma, 0x500),
         Some(CS_RESET_START)
+    );
+    assert!(
+        state
+            .register_writes(Window::Dma, 0x500)
+            .contains(&CS_ABORT)
     );
     assert_eq!(
         state.last_register_write(Window::Dma, RingGeometry::enable_register()),

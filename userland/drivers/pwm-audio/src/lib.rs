@@ -21,7 +21,10 @@ use raven_proto_audio::{Format, SampleFormat, StreamState};
 use raven_pwm::clock::{
     CM_BUSY_POLLS, CM_CTL_START, CM_DIV_START, PWM_CLOCK_HZ, clock_busy, clock_stop_value,
 };
-use raven_pwm::dma::{CONTROL_BLOCK_LEN, CS_ACTIVE, CS_RESET_START, DmaError, RingGeometry};
+use raven_pwm::dma::{
+    CONTROL_BLOCK_LEN, CS_ABORT, CS_ACTIVE, CS_COMPLETION_CLEAR, CS_RESET_START, DmaError,
+    RingGeometry,
+};
 use raven_pwm::duty::{DutyError, STEREO_FRAME_BYTES, SampleOrder, convert_period, silence_period};
 use raven_pwm::gpio::configure as configure_pins;
 use raven_pwm::registers::{
@@ -288,6 +291,15 @@ impl<S: Seam> PwmAudio<S> {
             .geometry
             .channel_base()
             .ok_or(DriverError::Dma(DmaError::InvalidChannel))?;
+        let enable = self
+            .seam
+            .read32(Window::Dma, RingGeometry::enable_register())?
+            | self.geometry.enable_bit();
+        self.seam
+            .write32(Window::Dma, RingGeometry::enable_register(), enable)?;
+        self.seam.write32(Window::Dma, base, CS_RESET_START)?;
+        self.wait_channel(base, CS_RESET_START, false)?;
+        self.seam.write32(Window::Dma, base, CS_COMPLETION_CLEAR)?;
         self.seam.write32(
             Window::Dma,
             base + 0x04,
@@ -297,12 +309,6 @@ impl<S: Seam> PwmAudio<S> {
         )?;
         self.seam.write32(Window::Pwm, CTL, CTL_AUDIO)?;
         self.seam.write32(Window::Dma, base, CS_ACTIVE)?;
-        let enable = self
-            .seam
-            .read32(Window::Dma, RingGeometry::enable_register())?
-            | self.geometry.enable_bit();
-        self.seam
-            .write32(Window::Dma, RingGeometry::enable_register(), enable)?;
         self.state = State::Running;
         Ok(())
     }
@@ -318,7 +324,12 @@ impl<S: Seam> PwmAudio<S> {
             .geometry
             .channel_base()
             .ok_or(DriverError::Dma(DmaError::InvalidChannel))?;
+        let cs = self.seam.read32(Window::Dma, base)?;
+        self.seam
+            .write32(Window::Dma, base, (cs & !CS_ACTIVE) | CS_ABORT)?;
+        self.wait_channel(base, CS_ACTIVE, false)?;
         self.seam.write32(Window::Dma, base, CS_RESET_START)?;
+        self.wait_channel(base, CS_RESET_START, false)?;
         let enable = self
             .seam
             .read32(Window::Dma, RingGeometry::enable_register())?
@@ -409,6 +420,17 @@ impl<S: Seam> PwmAudio<S> {
             self.seam.delay_us(10);
         }
         Err(DriverError::UnsupportedClock(0))
+    }
+
+    fn wait_channel(&mut self, base: usize, bit: u32, set: bool) -> Result<(), DriverError> {
+        for _ in 0..CM_BUSY_POLLS {
+            let cs = self.seam.read32(Window::Dma, base)?;
+            if ((cs & bit) != 0) == set {
+                return Ok(());
+            }
+            self.seam.delay_us(10);
+        }
+        Err(DriverError::Dma(DmaError::ResetTimeout))
     }
 
     fn program_pins(&mut self) -> Result<(), DriverError> {

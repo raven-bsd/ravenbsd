@@ -118,6 +118,8 @@ pub enum DmaError {
     InvalidChannel,
     /// The requested control block is outside the ring.
     NoBlock,
+    /// The channel did not leave reset/abort within the bounded poll.
+    ResetTimeout,
 }
 
 /// A circular DMA control-block and duty-buffer ring inside one DMA window.

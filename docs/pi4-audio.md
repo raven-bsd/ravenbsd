@@ -101,9 +101,10 @@ PCM sink:
 PwmAudio::new(seam, config)   validate format, ring layout and DMA geometry
 prepare()                     claim pins, check 100 MHz, clock, pins, PWM regs,
                               prefill silence, write four control blocks
-start()                       write the first CB, CTL_AUDIO, DMA ACTIVE, ENABLE bit
+start()                       set ENABLE, reset the channel, clear END/INT/ERROR,
+                              write the first CB, CTL_AUDIO, DMA ACTIVE
 service(pcm_region)           consume one period, convert to duty, write the next slot
-stop()                        clear PWM CTL/DMAC, reset the DMA channel, clear ENABLE
+stop()                        clear PWM CTL/DMAC, abort and reset the channel, clear ENABLE
 ```
 
 `service` reads the B40 `RingHeader`, verifies the layout, and honours the stream state:
