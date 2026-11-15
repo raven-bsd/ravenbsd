@@ -8,7 +8,7 @@
 schema = 1
 family = "m-ld"
 description = "FreeBSD msun long-double originals (exp, expm1)"
-exports = ["expl", "expm1l", "rl_expl"]
+exports = ["expl", "expm1l", "fabsl", "rl_expl", "rl_expm1l"]
 opt = ["O2", "O0"]
 aliases = { machine = "donor:freebsd/sys/amd64/include", x86 = "donor:freebsd/sys/x86/include" }
 defines = ["__weak_reference(a,b)=", "__pure2=__attribute__((__pure__))", "LDBL_MANT_DIG=64", "LDBL_MAX_EXP=16384", "LDBL_MIN_EXP=-16381"]

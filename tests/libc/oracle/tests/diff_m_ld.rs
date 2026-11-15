@@ -21,13 +21,15 @@
 
 use std::os::raw::c_void;
 
-use raven_libc_m::{LongDouble, expl};
+use raven_libc_m::{LongDouble, expl, expm1l};
 use raven_libc_oracle::config::Config;
-use raven_libc_oracle::decls::m_ld::oracle_rl_expl;
+use raven_libc_oracle::decls::m_ld::{oracle_rl_expl, oracle_rl_expm1l};
 use raven_libc_oracle::rng::Rng;
 
 /// The ULP budget of the default run (measured, see the C47e report).
 const EXPL_BUDGET: u128 = 4;
+/// The ULP budget of `expm1l` (measured, see the C47i report).
+const EXPM1_BUDGET: u128 = 256;
 
 const VALUE_MASK: u128 = (1u128 << 80) - 1;
 const SIGN: u128 = 1 << 79;
@@ -61,6 +63,19 @@ fn oracle(x: LongDouble) -> LongDouble {
     let mut output = [0u8; 16];
     unsafe {
         oracle_rl_expl(
+            input.as_ptr().cast::<c_void>(),
+            output.as_mut_ptr().cast::<c_void>(),
+        );
+    }
+    LongDouble::from_bits(u128::from_le_bytes(output))
+}
+
+/// Call the donor `expm1l` through the thunk.
+fn oracle_expm1(x: LongDouble) -> LongDouble {
+    let input = x.to_bits().to_le_bytes();
+    let mut output = [0u8; 16];
+    unsafe {
+        oracle_rl_expm1l(
             input.as_ptr().cast::<c_void>(),
             output.as_mut_ptr().cast::<c_void>(),
         );
@@ -111,8 +126,58 @@ const EDGES: &[f64] = &[
     -100.0,
 ];
 
+fn run(
+    subject: fn(LongDouble) -> LongDouble,
+    donor: fn(LongDouble) -> LongDouble,
+    budget: u128,
+    name: &str,
+) {
+    let config = Config::from_env();
+    let mut cases = 0u64;
+    let mut max_ulp = 0u128;
+    for &value in EDGES {
+        let x = ld(value);
+        let distance = ulp(subject(x), donor(x));
+        max_ulp = max_ulp.max(distance);
+        assert!(
+            distance <= budget,
+            "{name} edge x={value:?} oracle={:#x} rust={:#x} ulp={distance}",
+            donor(x).to_bits(),
+            subject(x).to_bits()
+        );
+        cases += 1;
+    }
+    for seed in config.seed_base..config.seed_base + config.seeds {
+        let mut rng = Rng::seed_from_u64(seed);
+        for index in 0..config.cases {
+            let x = ld(full_input(&mut rng, index));
+            let distance = ulp(subject(x), donor(x));
+            assert!(
+                distance <= budget,
+                "{name} mismatch seed={seed} index={index} x={:?} oracle={:#x} rust={:#x} ulp={distance}",
+                x.to_f64(),
+                donor(x).to_bits(),
+                subject(x).to_bits()
+            );
+            max_ulp = max_ulp.max(distance);
+            cases += 1;
+        }
+    }
+    println!("m-ld: {name} cases={cases} max_ulp={max_ulp} budget={budget}");
+}
+
 #[test]
 fn diff_expl() {
+    run(expl, oracle, EXPL_BUDGET, "expl");
+}
+
+#[test]
+fn diff_expm1l() {
+    run(expm1l, oracle_expm1, EXPM1_BUDGET, "expm1l");
+}
+
+#[test]
+fn diff_expl_legacy() {
     let config = Config::from_env();
     let mut cases = 0u64;
     let mut max_ulp = 0u128;
