@@ -12,6 +12,10 @@ fn rx_frame(length: u32) -> RxStatus {
     RxStatus::from_raw((length << RX_STATUS_BUFLEN_SHIFT) | RX_STATUS_SOP | RX_STATUS_EOP)
 }
 
+fn completed_tx(status: TxStatus) -> TxStatus {
+    TxStatus::from_raw(status.raw() & !TX_STATUS_OWN)
+}
+
 #[test]
 fn a_zero_or_oversized_slot_count_is_rejected() {
     assert_eq!(RxPath::new(0), Err(FrameError::Ring(RingError::ZeroCount)));
@@ -142,9 +146,10 @@ fn a_completed_tx_frame_is_reclaimed_and_the_slot_is_freed() {
     let post = path.queue_next(0x8000, 64).expect("queue");
     assert_eq!(post.index, 0);
     assert_eq!(post.descriptor.status.length(), 64);
+    assert!(post.descriptor.status.own());
     assert_eq!(path.slot_owner(0), Some(SlotOwner::Device));
     let completion = path
-        .reclaim_next(post.descriptor.status)
+        .reclaim_next(completed_tx(post.descriptor.status))
         .expect("reclaim")
         .expect("entry");
     assert_eq!(completion.index, 0);
@@ -183,8 +188,9 @@ fn tx_queue_and_reclaim_wrap_over_the_ring() {
     let second = path.queue_next(0x8800, 128).expect("queue");
     assert_eq!(first.index, 0);
     assert_eq!(second.index, 1);
-    path.reclaim_next(first.descriptor.status).expect("reclaim");
-    path.reclaim_next(second.descriptor.status)
+    path.reclaim_next(completed_tx(first.descriptor.status))
+        .expect("reclaim");
+    path.reclaim_next(completed_tx(second.descriptor.status))
         .expect("reclaim");
     assert_eq!(path.indices().producer(), 2);
     assert_eq!(path.indices().consumer(), 2);
@@ -218,6 +224,99 @@ fn frame_path_creates_both_directions() {
     assert_eq!(path.tx.count(), 8);
     assert_eq!(path.rx.free_slots(), Ok(8));
     assert_eq!(path.tx.free_slots(), Ok(8));
+}
+
+#[test]
+fn posting_rx_marks_the_device_as_owner() {
+    let mut path = RxPath::new(4).expect("path");
+    let post = path.post_next(0x1000).expect("post");
+    assert!(post.descriptor.status.own());
+}
+
+#[test]
+fn rx_complete_batch_stops_at_the_budget_and_reports_more_work() {
+    let mut path = RxPath::new(8).expect("path");
+    for index in 0..3 {
+        path.post_next(0x1000 + index * 0x80).expect("post");
+    }
+    let statuses = [rx_frame(64), rx_frame(128), rx_frame(256)];
+    let report = path.complete_batch(&statuses, 2).expect("batch");
+    assert_eq!(report.rx_completed, 2);
+    assert_eq!(report.rx_errors, 0);
+    assert!(report.rx_truncated);
+    assert_eq!(path.posted(), Ok(1));
+    let report = path.complete_batch(&statuses[2..], 2).expect("batch");
+    assert_eq!(report.rx_completed, 1);
+    assert!(!report.rx_truncated);
+    assert_eq!(path.posted(), Ok(0));
+}
+
+#[test]
+fn rx_complete_batch_counts_malformed_statuses() {
+    let mut path = RxPath::new(4).expect("path");
+    path.post_next(0x1000).expect("post");
+    let statuses = [RxStatus::from_raw(rx_frame(64).raw() | RX_STATUS_CRC_ERR)];
+    let report = path.complete_batch(&statuses, 4).expect("batch");
+    assert_eq!(report.rx_completed, 1);
+    assert_eq!(report.rx_errors, 1);
+    assert_eq!(path.posted(), Ok(0));
+}
+
+#[test]
+fn tx_reclaim_batch_stops_at_the_budget_and_reports_more_work() {
+    let mut path = TxPath::new(8).expect("path");
+    for index in 0..3 {
+        path.queue_next(0x8000 + index * 0x80, 64).expect("queue");
+    }
+    let first = path.indices().consumer_slot();
+    let second = (first + 1) % 8;
+    let statuses = [
+        completed_tx(path.descriptor(first as u16).expect("descriptor").status),
+        completed_tx(path.descriptor(second as u16).expect("descriptor").status),
+    ];
+    let report = path.reclaim_batch(&statuses, 2).expect("batch");
+    assert_eq!(report.tx_completed, 2);
+    assert!(report.tx_truncated);
+    assert_eq!(path.posted(), Ok(1));
+    let next = path.indices().consumer_slot();
+    let status = completed_tx(path.descriptor(next as u16).expect("descriptor").status);
+    let report = path.reclaim_batch(&[status], 2).expect("batch");
+    assert_eq!(report.tx_completed, 1);
+    assert!(!report.tx_truncated);
+    assert_eq!(path.posted(), Ok(0));
+}
+
+#[test]
+fn frame_path_reclaim_combines_both_directions() {
+    let mut path = FramePath::new(4).expect("path");
+    path.rx.post_next(0x1000).expect("rx post");
+    path.tx.queue_next(0x8000, 64).expect("tx queue");
+    let rx_status = [rx_frame(64)];
+    let tx_descriptor = path.tx.descriptor(0).expect("descriptor");
+    let tx_status = [completed_tx(tx_descriptor.status)];
+    let report = path
+        .reclaim(ReclaimBudget::new(1, 1), &rx_status, &tx_status)
+        .expect("reclaim");
+    assert_eq!(report.rx_completed, 1);
+    assert_eq!(report.tx_completed, 1);
+    assert!(!report.rx_truncated);
+    assert!(!report.tx_truncated);
+}
+
+#[test]
+fn a_zero_budget_reports_outstanding_work_as_truncated() {
+    let mut path = FramePath::new(4).expect("path");
+    path.rx.post_next(0x1000).expect("rx post");
+    path.tx.queue_next(0x8000, 64).expect("tx queue");
+    let tx_descriptor = path.tx.descriptor(0).expect("descriptor");
+    let tx_status = [completed_tx(tx_descriptor.status)];
+    let report = path
+        .reclaim(ReclaimBudget::new(0, 0), &[rx_frame(64)], &tx_status)
+        .expect("reclaim");
+    assert_eq!(report.rx_completed, 0);
+    assert_eq!(report.tx_completed, 0);
+    assert!(report.rx_truncated);
+    assert!(report.tx_truncated);
 }
 
 #[test]

@@ -17,6 +17,7 @@
 #![warn(missing_docs)]
 
 use raven_genet::dtb::GenetInfo;
+use raven_genet::filter::FilterError;
 use raven_genet::frame::FrameError;
 use raven_genet::mac::MacAddress;
 use raven_genet::phy;
@@ -61,6 +62,11 @@ pub trait Seam {
     fn rx_buffer(&mut self, index: usize) -> Option<Buffer>;
     /// Return the TX packet buffer for `index`.
     fn tx_buffer(&mut self, index: usize) -> Option<Buffer>;
+
+    /// Read `INTRL2_CPU_STAT` for the interrupt loop.
+    fn interrupt_status(&mut self) -> Result<u32, SeamError> {
+        self.read32(regs::INTRL2_CPU_STAT)
+    }
 }
 
 /// The typed bring-up stage.
@@ -111,6 +117,8 @@ pub enum DriverError {
     Frame(FrameError),
     /// The PHY link tracker rejected a sample.
     Link(LinkError),
+    /// The filter table rejected an address list.
+    Filter(FilterError),
 }
 
 impl From<SeamError> for DriverError {
@@ -134,6 +142,12 @@ impl From<FrameError> for DriverError {
 impl From<LinkError> for DriverError {
     fn from(error: LinkError) -> Self {
         Self::Link(error)
+    }
+}
+
+impl From<FilterError> for DriverError {
+    fn from(error: FilterError) -> Self {
+        Self::Filter(error)
     }
 }
 
