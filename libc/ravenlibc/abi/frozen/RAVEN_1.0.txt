@@ -202,6 +202,7 @@ expm1 F 6 x86_64
 expm1f F 6 x86_64
 fabs F 34 x86_64
 fabsf F 33 x86_64
+fchmod F 103 x86_64
 fclose F 5 x86_64
 fcntl F 336 x86_64
 fdim F 67 x86_64
@@ -269,6 +270,7 @@ fseek F 5 x86_64
 fstat F 276 x86_64
 fstat64 F 6 x86_64
 fstatat F 355 x86_64
+fsync F 86 x86_64
 ftell F 5 x86_64
 fts_children F 118 x86_64
 fts_close F 297 x86_64
@@ -415,6 +417,7 @@ isalnum_l F 41 x86_64
 isalpha F 21 x86_64
 isalpha_l F 21 x86_64
 isascii F 18 x86_64
+isatty F 71 x86_64
 isblank F 24 x86_64
 isblank_l F 24 x86_64
 iscntrl F 24 x86_64
@@ -517,6 +520,7 @@ memset F 105 x86_64
 memset_explicit F 6 x86_64
 memset_s F 112 x86_64
 mergesort F 281 x86_64
+mkdir F 260 x86_64
 mktime F 610 x86_64
 mmap F 281 x86_64
 mmap64 F 6 x86_64
@@ -751,7 +755,7 @@ readpassphrase F 1334 x86_64
 readv F 823 x86_64
 realloc F 24 x86_64
 reallocarray F 69 x86_64
-realpath F 10291 x86_64
+realpath F 10327 x86_64
 recv F 352 x86_64
 recvfrom F 600 x86_64
 recvmmsg F 390 x86_64
@@ -761,6 +765,7 @@ regerror F 129 x86_64
 regexec F 665 x86_64
 regfree F 368 x86_64
 remque F 36 x86_64
+rename F 321 x86_64
 res_init F 3 x86_64
 rewinddir F 115 x86_64
 rindex F 6 x86_64
