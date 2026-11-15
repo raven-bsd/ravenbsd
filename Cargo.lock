@@ -1967,6 +1967,11 @@ dependencies = [
 [[package]]
 name = "raven-rp1"
 version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
+ "raven-pci",
+ "raven-pi5",
+]
 
 [[package]]
 name = "raven-rsh"
