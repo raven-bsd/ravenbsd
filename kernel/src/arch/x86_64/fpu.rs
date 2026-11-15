@@ -114,8 +114,8 @@ pub unsafe fn save(area: *mut u8) {
             core::arch::asm!(
                 "xsave64 [{}]",
                 in(reg) area,
-                in("eax") u32::MAX,
-                in("edx") u32::MAX,
+                in("eax") 0b11u32,
+                in("edx") 0u32,
                 options(nostack),
             );
         }
@@ -144,8 +144,8 @@ pub unsafe fn restore(area: *const u8) {
             core::arch::asm!(
                 "xrstor64 [{}]",
                 in(reg) area,
-                in("eax") u32::MAX,
-                in("edx") u32::MAX,
+                in("eax") 0b11u32,
+                in("edx") 0u32,
                 options(nostack),
             );
         }
