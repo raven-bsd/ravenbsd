@@ -204,6 +204,7 @@ expm1
 expm1f
 fabs
 fabsf
+fchmod
 fclose
 fcntl
 fdim
@@ -271,6 +272,7 @@ fseek
 fstat
 fstat64
 fstatat
+fsync
 ftell
 fts_children
 fts_close
@@ -417,6 +419,7 @@ isalnum_l
 isalpha
 isalpha_l
 isascii
+isatty
 isblank
 isblank_l
 iscntrl
@@ -519,6 +522,7 @@ memset
 memset_explicit
 memset_s
 mergesort
+mkdir
 mktime
 mmap
 mmap64
@@ -763,6 +767,7 @@ regerror
 regexec
 regfree
 remque
+rename
 res_init
 rewinddir
 rindex

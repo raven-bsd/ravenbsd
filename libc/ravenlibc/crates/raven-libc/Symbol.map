@@ -1183,6 +1183,12 @@ RAVEN_1.0 {
 		readv;
 		realpath;
 		writev;
+		# --- C64e std/fs exports ---
+		fchmod;
+		fsync;
+		isatty;
+		mkdir;
+		rename;
 };
 
 RAVENprivate_1.0 {

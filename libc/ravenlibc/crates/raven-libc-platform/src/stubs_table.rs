@@ -24,7 +24,6 @@ pub const STUBS: &[Stub] = &[
     Stub { name: "splice", gap: "PG-21", errno: 38 },
     Stub { name: "tee", gap: "PG-35", errno: 38 },
     Stub { name: "statx", gap: "PG-30", errno: 38 },
-    Stub { name: "fchmod", gap: "PG-21", errno: 38 },
     Stub { name: "chown", gap: "PG-31", errno: 38 },
     Stub { name: "fchown", gap: "PG-31", errno: 38 },
     Stub { name: "lchown", gap: "PG-31", errno: 38 },

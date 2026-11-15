@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# C64e: a minimal Rust std filesystem client. The pre step builds the probe
+# into the libc-test profile's /bin/libc-test slot; the target runs it under
+# the one-shot libc-test profile and the case asserts the real std::fs calls.
+
+name = "std-fs"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/libc/std-link/build-fs-probe.sh x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^fs-probe: start$'
+
+[[expect]]
+regex = '^fs-probe: mkdir ok$'
+
+[[expect]]
+regex = '^fs-probe: write\+fsync ok$'
+
+[[expect]]
+regex = '^fs-probe: metadata\+rename ok$'
+
+[[expect]]
+regex = '^fs-probe: fchmod ok$'
+
+[[expect]]
+regex = '^fs-probe: isatty=(true|false)$'
+
+[[expect]]
+regex = '^fs-probe: done$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|fs-probe: .* failed'
