@@ -345,18 +345,23 @@ fn resolve_aliases(
         return Ok(Vec::new());
     }
     let root = directory.join("aliases");
-    fs::create_dir_all(&root)
-        .with_context(|| format!("cannot create {}", root.display()))?;
+    fs::create_dir_all(&root).with_context(|| format!("cannot create {}", root.display()))?;
     for (name, target) in &request.recipe.aliases {
         let target_path = if let Some(rest) = target.strip_prefix("donor:") {
             let Some((donor, dir)) = rest.split_once('/') else {
-                bail!("recipe {}: alias `{name}` target is malformed", request.recipe.family);
+                bail!(
+                    "recipe {}: alias `{name}` target is malformed",
+                    request.recipe.family
+                );
             };
             request.resources.join(donor).join(dir)
         } else if let Some(dir) = target.strip_prefix("shim:") {
             shim_root.join(dir)
         } else {
-            bail!("recipe {}: alias `{name}` target is malformed", request.recipe.family);
+            bail!(
+                "recipe {}: alias `{name}` target is malformed",
+                request.recipe.family
+            );
         };
         if !target_path.is_dir() {
             bail!(
@@ -373,7 +378,11 @@ fn resolve_aliases(
                 fs::remove_file(&link)
                     .with_context(|| format!("cannot replace alias {}", link.display()))?;
             } else {
-                bail!("recipe {}: alias path {} is not a file", request.recipe.family, link.display());
+                bail!(
+                    "recipe {}: alias path {} is not a file",
+                    request.recipe.family,
+                    link.display()
+                );
             }
         }
         std::os::unix::fs::symlink(&target_absolute, &link)
@@ -381,7 +390,10 @@ fn resolve_aliases(
     }
     let root_absolute = std::path::absolute(&root)
         .with_context(|| format!("cannot make {} absolute", root.display()))?;
-    Ok(vec![("aliases".to_string(), root_absolute.display().to_string())])
+    Ok(vec![(
+        "aliases".to_string(),
+        root_absolute.display().to_string(),
+    )])
 }
 
 fn donors_of(
