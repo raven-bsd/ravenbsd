@@ -6,6 +6,8 @@
 # seven on-target C cases reference. The required inventory is in
 # tests/libc/symbol-audit/required.tsv; the current snapshot is expected.tsv. Host-only: no QEMU.
 #
+# C64l: `cargo xtask libc-audit` forwards here; the C74 gate row runs that command.
+#
 # usage: scripts/libc-symbol-audit.sh [--rebuild] [--exports FILE] [--required FILE]
 #                                    [--out FILE] [--expected FILE] [--self-test]
 #

@@ -21,6 +21,7 @@ mod guard;
 mod image;
 mod initfs;
 mod libc_abi;
+mod libc_audit;
 mod libc_census;
 mod libc_cmd;
 mod libc_headers;
@@ -58,6 +59,9 @@ pub use rootfs::{build_root_disk, build_ufs_root, inject_initfs_file, stage_root
 /// Dispatch `cargo xtask` arguments, with the K27 `update` planner and the brush component
 /// beside the K05 commands.
 pub fn run_cli(args: Vec<String>) -> std::process::ExitCode {
+    if args.first().map(String::as_str) == Some("libc-audit") {
+        return libc_audit::run_cli(&args[1..]);
+    }
     if args.first().map(String::as_str) == Some("update") {
         return update::run_cli(&args[1..]);
     }
