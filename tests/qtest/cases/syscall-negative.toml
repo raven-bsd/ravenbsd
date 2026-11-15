@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S55: native syscall negative and boundary probes.
+# The fixture calls the native syscall surface directly and checks EFAULT, EINVAL, EPERM,
+# EBADF and the size/overflow boundaries across the syscall groups.
+
+name = "syscall-negative"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/syscall/build.sh"]
+initfs = "build/fixtures/syscall/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^syscall-negative: ok '
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|syscall-negative: fail|killed by page fault'
