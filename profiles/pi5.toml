@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The Raspberry Pi 5 host-side profile skeleton. B54 does not build a bootable image; B59 owns
+# the image/evidence kit. The UART name is UNVERIFIED until a board log exists.
+name = "pi5"
+extends = "base"
+
+[boot]
+cmdline = "console=ttyAMA0 loglevel=info"
+log_level = "info"
