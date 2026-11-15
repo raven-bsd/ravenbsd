@@ -1,9 +1,25 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1103
+# records: 1124
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
+_Unwind_Backtrace F - all 2 -
+_Unwind_DeleteException F - all 1 -
+_Unwind_FindEnclosingFunction F - all 2 -
+_Unwind_ForcedUnwind F - all 1 -
+_Unwind_GetCFA F - all 1 -
+_Unwind_GetDataRelBase F - all 2 -
+_Unwind_GetGR F - all 1 -
+_Unwind_GetIP F - all 1 -
+_Unwind_GetIPInfo F - all 3 -
+_Unwind_GetLanguageSpecificData F - all 1 -
+_Unwind_GetRegionStart F - all 1 -
+_Unwind_GetTextRelBase F - all 2 -
+_Unwind_RaiseException F - all 1 -
+_Unwind_Resume F - all 1 -
+_Unwind_SetGR F - all 1 -
+_Unwind_SetIP F - all 1 -
 __cxa_atexit F - all 1 -
 __cxa_finalize F - all 1 -
 __errno F - all 1 -
@@ -188,6 +204,7 @@ expm1f F - all 1 -
 fabs F - all 1 -
 fabsf F - all 1 -
 fclose F - all 0 stdio.h
+fcntl F - all 0 fcntl.h
 fdim F - all 1 -
 fdimf F - all 1 -
 fdopen F - all 0 stdio.h
@@ -252,6 +269,7 @@ fscanf F - all 0 stdio.h
 fseek F - all 0 stdio.h
 fstat F - all 0 sys/stat.h
 fstat64 F - all 0 sys/stat.h
+fstatat F - all 0 sys/stat.h
 ftell F - all 0 stdio.h
 fts_children F - all 1 -
 fts_close F - all 1 -
@@ -731,8 +749,10 @@ readdir F - all 0 dirent.h
 readdir64 F - all 1 dirent.h
 readdir_r F - all 1 dirent.h
 readpassphrase F - x86_64 2 -
+readv F - all 0 sys/uio.h
 realloc F - all 0 malloc.h
 reallocarray F - all 0 malloc.h
+realpath F - all 0 stdlib.h
 recv F - all 1 sys/socket.h
 recvfrom F - all 1 sys/socket.h
 recvmmsg F - all 1 -
@@ -1099,6 +1119,7 @@ wmemset F - all 0 wchar.h
 wordexp F - all 0 wordexp.h
 wordfree F - all 0 wordexp.h
 write F - all 0 unistd.h
+writev F - all 0 sys/uio.h
 y0 F - all 1 -
 y0f F - all 1 -
 y1 F - all 1 -
