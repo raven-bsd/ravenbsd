@@ -1,0 +1,79 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# J4: the EMMC2 driver in host-backed test mode. QEMU has no BCM2711 EMMC2 model, so this case
+# exercises the real driver program, the `disk:` scheme, the block framing and the deterministic
+# pattern/checksum path against a memory disk. The board-only MMIO/DMA path is not covered here.
+
+name = "pi4-emmc2"
+arch = "aarch64"
+profile = "pi4-emmc2-test"
+timeout_secs = 180
+pre = ["sh tests/fixtures/pi4-emmc2/build.sh"]
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^emmc2: backend=memory sectors=8192$'
+unordered = true
+
+[[expect]]
+regex = '^emmc2: pattern sectors=2048 checksum=0x[0-9a-f]{16}$'
+unordered = true
+
+[[expect]]
+regex = '^emmc2: marker ok$'
+unordered = true
+
+[[expect]]
+regex = '^emmc2: registered disk$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: emmc2 up$'
+unordered = true
+
+[[expect]]
+regex = '^emmc2: serving$'
+unordered = true
+
+[[expect]]
+regex = '^pi4-emmc2: probe info sectors=8192 ro=0$'
+unordered = true
+
+[[expect]]
+regex = '^pi4-emmc2: probe marker checksum=0x[0-9a-f]{16}$'
+unordered = true
+
+[[expect]]
+regex = '^pi4-emmc2: probe pattern sectors=2048 checksum=0x[0-9a-f]{16}$'
+unordered = true
+
+[[expect]]
+regex = '^pi4-emmc2: probe write ok$'
+unordered = true
+
+[[expect]]
+regex = '^pi4-emmc2: probe flush ok$'
+unordered = true
+
+[[expect]]
+regex = '^pi4-emmc2: probe ok$'
+unordered = true
+
+[[expect]]
+regex = '^emmc2: serve done$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: pi4-emmc2-probe up$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|emmc2: .*timed out'

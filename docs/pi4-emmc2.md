@@ -1,14 +1,15 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# Pi 4 EMMC2 SD path (J1/J2)
+# Pi 4 EMMC2 SD path (J1-J4)
 
-Status: model and driver skeleton. J1 covers the register, command/response, initialisation and
-timing model; J2 adds the SDMA/ADMA2 descriptor model, bounce-window rules, the multi-block
-transfer state and the `block:` request service. Every host test below is OBSERVED on the
-development host; every real-card result is UNVERIFIED because no Pi 4 board log exists. The model
-is clean-room Rust: the donor files were read for behaviour only and no code, comment or table
-layout was copied.
+Status: model, driver and host-backed qtest. J1 covers the register, command/response,
+initialisation and timing model; J2 adds the SDMA/ADMA2 descriptor model, bounce-window rules, the
+multi-block transfer state and the `block:` request service; J3 adds the image/evidence kit; J4 adds
+the real MMIO/DMA/IRQ seam, the `disk:` scheme entry, a deterministic test mode and the
+`pi4-emmc2` qtest. Host tests and the host-backed qtest are OBSERVED; every real-card result remains
+UNVERIFIED because no Pi 4 board log exists. The model is clean-room Rust: the donor files were read
+for behaviour only and no code, comment or table layout was copied.
 
 ## 1. What exists
 
@@ -22,14 +23,16 @@ layout was copied.
 | SDMA/ADMA2 descriptors, END/VALID checks and the 4 GiB limit | `crates/raven-pi4/src/dma.rs` | OBSERVED by host tests |
 | Transfer state, block progress and error mapping | `crates/raven-pi4/src/transfer.rs` | OBSERVED by host tests |
 | EMMC2 device-tree lookup (base, SPI, DMA window) | `crates/raven-pi4/src/fdt.rs` | OBSERVED against the fixture |
-| Driver register/clock seam | `userland/drivers/emmc2/src/lib.rs` | OBSERVED by host tests |
-| `block:` request mapping and memory backend | `userland/drivers/emmc2/src/block.rs` | OBSERVED by host tests |
+| Host register/clock seam, bring-up, card init and block service | `userland/drivers/emmc2/src/lib.rs` | OBSERVED by host tests |
+| Pattern, checksum and marker | `userland/drivers/emmc2/src/pattern.rs` | OBSERVED by host tests and qtest |
+| Real `MmioRegion`/`DmaRegion`/`Irq` seam and `disk:` scheme | `userland/drivers/emmc2/src/main.rs` | OBSERVED in host-backed test mode; board UNVERIFIED |
+| `pi4-emmc2` qtest and probe fixture | `tests/fixtures/pi4-emmc2/**`, `tests/qtest/cases/pi4-emmc2.toml` | OBSERVED (exit 33) |
 | Minimal DTB fixtures (hex text plus `.dts`) | `tests/fixtures/pi4-emmc2/` | OBSERVED; facts documented in its README |
 
-The crate is `no_std`, allocation-free and `#![forbid(unsafe_code)]`. It never touches a register:
-the driver skeleton performs the register sequence through the `Host` trait, and the tests use a
-register fake or the in-memory block backend. The real MMIO grant, DMA engine, interrupt and
-scheme entry are the board integration step.
+The crate is `no_std`, allocation-free and `#![forbid(unsafe_code)]`. It never touches a register in
+the host tests: the driver performs the register sequence through the `Host` trait, and the tests use
+a register fake or the in-memory block backend. The real adapter uses `raven_driver`'s safe MMIO/DMA
+types; the interrupt wait/ack path is compiled for the target and remains UNVERIFIED on silicon.
 
 ## 2. EMMC2 facts used
 
@@ -82,6 +85,15 @@ which is where a bounce buffer is required.
 * **Block service:** `raven-proto-block` `INFO`/`READ`/`WRITE`/`FLUSH` decoding, 512-byte-sector and
   range validation, read-only rejection, in-place read replies, `LIST` rejection (blockd owns the
   partition table), backend errno propagation and a host-testable memory backend.
+* **Driver entry:** the real `MmioHost` reads/writes SDHCI registers through `MmioRegion`, derives
+  the monotonic clock, and the `CardDevice` maps the DMA buffer's bus address through the window,
+  programs SDMA (`DMA_ADDR`, transfer mode, block size/count, argument, command), waits on `Irq`
+  and feeds the normal/error status to `MultiBlockTransfer`. The `disk:` handler owns the scheme
+  open-file table, checks read/write flags and delegates to the block service.
+* **Test mode:** `args = ["test"]` selects a memory disk with a sector-stamped pattern and an FNV-1a
+  checksum marker; the driver prints the backend, pattern checksum and marker before serving, and
+  stops after a client flush. The `pi4-emmc2` qtest drives the real program, handler and block
+  framing against that disk.
 * **Device tree:** the fixture parser rejects a missing node, a missing `reg`, a non-SPI or
   non-level-high interrupt and a missing DMA window.
 
@@ -91,42 +103,37 @@ which is where a bounce buffer is required.
 
 ```text
 read/write(Register)     -> the MMIO grant (raven_driver::MmioRegion)
-now_ns()                 -> the monotonic clock
-clock_hz()               -> platd mailbox clock id 12
-dma_window()             -> the DTB / S21d DMA window
+now_ns()                 -> CLOCK_MONOTONIC
+clock_hz()               -> the launcher's clock argument; platd query is a follow-up
+dma_window()             -> the DTB / S21d DMA window passed by the launcher
 ```
 
-`probe` records the version, raw and effective capabilities, the clock source and the three timing
-plans. `bring_up` resets the host, applies 3.3 V, sets the maximum timeout and programs the
-identification clock with a bounded stable-clock poll. `init_card` drives the state machine, then
-programs the 25 MHz default clock and four-bit host control. The fake host exercises the full
-sequence, the busy ACMD41 retry, the v1 fallback, a card error, a missing APP_CMD, a command
-timeout, a stuck reset and a clock that never stabilises.
+The program has two modes:
 
-The `block` module is the protocol seam:
+* **Real mode (default).** It maps handles 3/4/5 as MMIO/DMA/IRQ unless `mmio_handle=`,
+  `dma_handle=` and `irq_handle=` override them, plus `mmio_size=`, `dma_size=`, `clock=`,
+  `window_bus=`, `window_cpu=` and `window_size=`. It runs `init_card`, enables the command/
+  transfer/error interrupts, keeps the four-bit default timing and serves `disk:` with SDMA over
+  the mapped DMA buffer. The buffer's bus address is mapped back through the window and checked by
+  `plan_sdma`; an out-of-window buffer fails with `EIO` instead of a truncated address.
+* **Test mode (`test`).** It uses a memory disk, writes the sector-stamped pattern and checksum
+  marker, prints the backend/pattern/marker lines, serves `disk:` and stops after a client flush.
+  This is the mode the `pi4-emmc2` qtest runs.
 
-```text
-BlockService<D: BlockDevice>::handle(request, response)
-    -> raven-proto-block Request decode and range checks
-    -> BlockPlan (MultiBlockTransfer + CMD17/18/24/25 + DataTransfer)
-    -> D: BlockDevice::read/write/flush  (MemoryDisk in the host tests)
-```
+The `disk:` handler opens path `0` (or the root), uses `OpenTable`, checks read/write flags, and
+delegates `INFO`/`READ`/`WRITE`/`FLUSH` to `BlockService`; `LIST` is rejected because blockd owns the
+partition table. The real platform launcher (devd/platform wiring) is a follow-up: the J3 profile
+fragment is disabled until the driver entry is authorized for the real image.
 
-`MemoryDisk` is a borrowed byte slice, so the tests need no allocator. The card backend that drives
-the PIO loop or the SDMA/ADMA2 descriptor table implements the same `BlockDevice` trait; the DMA
-plan (`plan_sdma`, `plan_adma2`) is ready for that backend but the register writes, interrupt wait
-and scheme entry remain the integration step.
-
-The following are deliberately **not** in this skeleton and belong to the integration ticket:
-the `raven_driver` MMIO adapter and the `devd` service entry, the `platd` clock query wiring, the
-interrupt path, the PIO/SDMA/ADMA2 register engine, the CMD6 high-speed switch and the `disk:`
-scheme export.
+The real SDMA/IRQ path is constructed and compiled, but has no hardware log; see the UNVERIFIED
+board steps below. ADMA2 is modelled and tested in `raven-pi4`; the current real data path uses SDMA.
 
 ## 5. Tests
 
 ```
 cargo test -p raven-pi4
 cargo test -p emmc2
+cargo xtask qtest --case pi4-emmc2 --arch aarch64
 make check-fast
 ```
 
@@ -134,31 +141,40 @@ The crate tests cover command/response parsing, the timeout and error paths, 4-b
 setup, the clock divider table for both specification generations, the DTB fixture, the ADMA2/SDMA
 descriptor encoding and validation, bounce-window boundaries and the transfer state/error paths.
 The driver tests cover probe, bring-up, the full card sequence and its failure paths against the
-register fake, the `block:` request matrix against the memory backend and command selection
-(CMD17/18/24/25). No QEMU model exists for EMMC2, so there is no qtest; the board log is the only
-remaining gate.
+register fake, the `block:` request matrix against the memory backend, command selection
+(CMD17/18/24/25), and the sector-stamped pattern/checksum/marker. The `pi4-emmc2` qtest boots the
+aarch64 image, runs the real driver binary in host-backed mode, and checks the `disk:` scheme
+through the block framing: info, marker checksum, 2048-sector pattern checksum, a scratch write,
+flush, `svcd: settled` and `init exited (0)` (guest exit 33). No QEMU model exists for EMMC2, so the
+real MMIO/IRQ/SDMA path has no qtest and the board log is the only remaining gate.
 
 ## 6. Board steps (UNVERIFIED)
 
 Capture the UART line and the register values for each step. None of these has been run; no board
 run was performed for this ticket.
 
-1. **Controller identity:** host-controller version, capabilities (`0x40`), capabilities 2 (`0x44`),
+1. **Driver launch:** the platform launcher passes the MMIO, DMA and IRQ handles and the window/
+   clock values (or the defaults); capture `emmc2: card`, `emmc2: dma`, `emmc2: registered disk`
+   and `emmc2: serving`, and the first failing line if the driver exits.
+2. **Controller identity:** host-controller version, capabilities (`0x40`), capabilities 2 (`0x44`),
    the live `emmc2bus` `ranges`/`dma-ranges`, the base clock returned for mailbox clock id 12, and
    whether ADMA2 is 32-bit or 64-bit.
-2. **Card initialisation:** CMD0/CMD8 response, ACMD41 OCR and CCS, CID/CSD summary, RCA, SCR
+3. **Card initialisation:** CMD0/CMD8 response, ACMD41 OCR and CCS, CID/CSD summary, RCA, SCR
    (four-bit supported), CMD6 high-speed result, final clock and bus width.
-3. **Transfer log:** CMD17/18 read and CMD24/25 write, block size/count, transfer-complete and
+4. **Transfer log:** CMD17/18 read and CMD24/25 write, block size/count, transfer-complete and
    command-complete bits, block count and the CRC/timeout counters after the run.
-4. **SDMA:** `DMA_ADDR`, transfer-mode DMA-enable, the buffer bus address and the 1 GiB limit.
+5. **SDMA:** `DMA_ADDR`, transfer-mode DMA-enable, the buffer bus address and the 1 GiB limit.
    **ADMA2:** `ADMA_SYSTEM_ADDR`, the descriptor-table bus address and alignment, VALID/END/ACT
-   words, every data descriptor address below 1 GiB, and whether a bounce buffer was used.
-5. **blockd:** the driver's `disk:0` `INFO` geometry, a `READ`/`WRITE`/`FLUSH` round trip through
+   words, every data descriptor address below 1 GiB, and whether a bounce buffer was used. The
+   current real data path uses SDMA; the ADMA2 plan is model-tested until the path adopts it.
+6. **blockd:** the driver's `disk:0` `INFO` geometry, a `READ`/`WRITE`/`FLUSH` round trip through
    blockd, the GPT scan, a root mount, and create/read/delete of a file.
-6. **Card details:** model and capacity, 1-bit versus 4-bit, 25 versus 50 MHz, and the error/
+7. **Card details:** model and capacity, 1-bit versus 4-bit, 25 versus 50 MHz, and the error/
    timeout counters after the run.
 
-The first failing step is the evidence to attach; do not claim a later step from a partial log.
+The `pi4-emmc2` qtest is host-backed: it proves the program, scheme, block framing and pattern
+paths, not the MMIO/IRQ/SDMA path. Attach the first failing board line; do not claim a later step
+from a partial log.
 
 ## 7. Provenance
 
@@ -184,15 +200,18 @@ names the source and revision of every numeric fact.
 1. The EMMC2 capabilities register contents and the specification generation are UNVERIFIED. The
    driver records both and defaults to 50 MHz when the mailbox is silent.
 2. The live firmware edits `dma-ranges` per SoC revision; the fixture documents one 1 GiB window.
-   The model returns `BounceRequired` outside it, but the physical bounce allocator and copy path
-   belong to the integration data engine.
+   The real path fails with `EIO` outside it; there is no physical bounce allocator/copy yet.
 3. The high-speed CMD6 switch is modelled as data and a typed transition but not executed by the
-   driver skeleton; the 50 MHz step remains an integration test.
-4. The command poll uses `now_ns`; a real adapter must implement it from the monotonic clock or a
-   timeout becomes an infinite loop.
+   driver; the 50 MHz step remains an integration test.
+4. The real `now_ns` uses `CLOCK_MONOTONIC` and returns `u64::MAX` on a clock failure so a deadline
+   fails rather than spins; that path has no board log.
 5. ADMA2 32-bit versus 64-bit and the descriptor-table alignment are UNVERIFIED until the live
-   capabilities and the board log confirm them. The table's cache maintenance is S21d's job.
+   capabilities and the board log confirm them. The current real data path uses SDMA; the ADMA2
+   plan is model-tested.
 6. The transfer layer uses 32-bit block addresses (SDHC/SDXC). A v1 SDSC card reached through the
    CMD8 fallback would need byte addressing in CMD17/18/24/25; that path is not modelled.
-7. No interrupt, MMIO adapter, DMA engine or `disk:` scheme entry exists yet, so this ticket alone
-   cannot boot from the card.
+7. The real MMIO/DMA/IRQ seam is compiled but not booted. The platform launcher must pass the
+   handles and window/clock values; the J3 real-image fragment stays disabled until that wiring is
+   authorized.
+8. The `pi4-emmc2` qtest is host-backed (memory disk); it does not prove the SDMA, interrupt or
+   real-card paths.
