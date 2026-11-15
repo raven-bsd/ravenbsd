@@ -195,7 +195,7 @@ pub fn spawn_image_with<S: Sys>(
     #[cfg(all(target_os = "none", feature = "alloc"))]
     {
         let interpreter = read_file_image(interp_path)?;
-        return spawn_image_with_interp(image, Some(&interpreter), path, options, sys);
+        spawn_image_with_interp(image, Some(&interpreter), path, options, sys)
     }
     #[cfg(not(all(target_os = "none", feature = "alloc")))]
     {
