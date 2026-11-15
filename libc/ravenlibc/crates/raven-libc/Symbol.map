@@ -1161,6 +1161,28 @@ RAVEN_1.0 {
 		pthread_self;
 		pthread_yield;
 		sched_yield;
+		# --- C64d std/shell exports ---
+		_Unwind_Backtrace;
+		_Unwind_DeleteException;
+		_Unwind_FindEnclosingFunction;
+		_Unwind_ForcedUnwind;
+		_Unwind_GetCFA;
+		_Unwind_GetDataRelBase;
+		_Unwind_GetGR;
+		_Unwind_GetIP;
+		_Unwind_GetIPInfo;
+		_Unwind_GetLanguageSpecificData;
+		_Unwind_GetRegionStart;
+		_Unwind_GetTextRelBase;
+		_Unwind_RaiseException;
+		_Unwind_Resume;
+		_Unwind_SetGR;
+		_Unwind_SetIP;
+		fcntl;
+		fstatat;
+		readv;
+		realpath;
+		writev;
 };
 
 RAVENprivate_1.0 {
@@ -1173,6 +1195,7 @@ RAVENprivate_1.0 {
 		__raven_va_execle;
 		__raven_va_execl;
 		__raven_va_execlp;
+		__raven_va_fcntl;
 		__raven_va_ioctl;
 		__raven_va_prctl;
 		__raven_va_makecontext;

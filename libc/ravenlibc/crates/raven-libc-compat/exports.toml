@@ -413,3 +413,130 @@ header = "execinfo.h"
 name = "devname"
 rust = "devname::devname_stub"
 header = "stdlib.h"
+
+# --- C64d: std/shell exports, all architectures ---------------------------------------------
+[[export]]
+name = "fcntl"
+rust = "unistd::fcntl"
+header = "fcntl.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "readv"
+rust = "unistd::readv"
+header = "sys/uio.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "writev"
+rust = "unistd::writev"
+header = "sys/uio.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "fstatat"
+rust = "unistd::fstatat"
+header = "sys/stat.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "realpath"
+rust = "stdlib::realpath"
+header = "stdlib.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "_Unwind_Backtrace"
+rust = "stdlib::unwind::backtrace"
+header = "unwind.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "_Unwind_DeleteException"
+rust = "stdlib::unwind::delete_exception"
+header = "unwind.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "_Unwind_FindEnclosingFunction"
+rust = "stdlib::unwind::find_enclosing_function"
+header = "unwind.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "_Unwind_ForcedUnwind"
+rust = "stdlib::unwind::forced_unwind"
+header = "unwind.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "_Unwind_GetCFA"
+rust = "stdlib::unwind::get_cfa"
+header = "unwind.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "_Unwind_GetDataRelBase"
+rust = "stdlib::unwind::get_data_rel_base"
+header = "unwind.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "_Unwind_GetGR"
+rust = "stdlib::unwind::get_gr"
+header = "unwind.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "_Unwind_GetIP"
+rust = "stdlib::unwind::get_ip"
+header = "unwind.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "_Unwind_GetIPInfo"
+rust = "stdlib::unwind::get_ip_info"
+header = "unwind.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "_Unwind_GetLanguageSpecificData"
+rust = "stdlib::unwind::get_language_specific_data"
+header = "unwind.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "_Unwind_GetRegionStart"
+rust = "stdlib::unwind::get_region_start"
+header = "unwind.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "_Unwind_GetTextRelBase"
+rust = "stdlib::unwind::get_text_rel_base"
+header = "unwind.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "_Unwind_RaiseException"
+rust = "stdlib::unwind::raise_exception"
+header = "unwind.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "_Unwind_Resume"
+rust = "stdlib::unwind::resume"
+header = "unwind.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "_Unwind_SetGR"
+rust = "stdlib::unwind::set_gr"
+header = "unwind.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "_Unwind_SetIP"
+rust = "stdlib::unwind::set_ip"
+header = "unwind.h"
+version = "RAVEN_1.0"

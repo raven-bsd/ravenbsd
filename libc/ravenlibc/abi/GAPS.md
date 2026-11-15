@@ -3,9 +3,9 @@
 
 # Gaps
 
-- ring 0: 741
-- ring 1: 1223
-- ring 2: 2579
+- ring 0: 736
+- ring 1: 1212
+- ring 2: 2575
 
 | name | ring | header | crate | area |
 |---|---|---|---|---|
@@ -624,22 +624,7 @@
 | _UA_FORCE_UNWIND | 2 | - | UNOWNED | - |
 | _UA_HANDLER_FRAME | 2 | - | UNOWNED | - |
 | _UA_SEARCH_PHASE | 2 | - | UNOWNED | - |
-| _Unwind_Backtrace | 2 | - | UNOWNED | - |
-| _Unwind_DeleteException | 1 | - | UNOWNED | - |
-| _Unwind_FindEnclosingFunction | 2 | - | UNOWNED | - |
 | _Unwind_Find_FDE | 2 | - | UNOWNED | - |
-| _Unwind_ForcedUnwind | 1 | - | UNOWNED | - |
-| _Unwind_GetCFA | 1 | - | UNOWNED | - |
-| _Unwind_GetDataRelBase | 2 | - | UNOWNED | - |
-| _Unwind_GetGR | 1 | - | UNOWNED | - |
-| _Unwind_GetIP | 1 | - | UNOWNED | - |
-| _Unwind_GetLanguageSpecificData | 1 | - | UNOWNED | - |
-| _Unwind_GetRegionStart | 1 | - | UNOWNED | - |
-| _Unwind_GetTextRelBase | 2 | - | UNOWNED | - |
-| _Unwind_RaiseException | 1 | - | UNOWNED | - |
-| _Unwind_Resume | 1 | - | UNOWNED | - |
-| _Unwind_SetGR | 1 | - | UNOWNED | - |
-| _Unwind_SetIP | 1 | - | UNOWNED | - |
 | _X_cplx_div | 2 | - | UNOWNED | - |
 | _X_cplx_div_ix | 2 | - | UNOWNED | - |
 | _X_cplx_div_rx | 2 | - | UNOWNED | - |
@@ -2453,7 +2438,6 @@
 | fchownat | 0 | - | proc | - |
 | fchroot | 1 | - | UNOWNED | - |
 | fcloseall | 1 | stdio.h | stdio | - |
-| fcntl | 0 | fcntl.h | platform | - |
 | fconvert | 2 | - | UNOWNED | - |
 | fcvt | 1 | stdlib.h | stdlib | - |
 | fcvt_r | 2 | stdlib.h | stdlib | - |
@@ -2604,7 +2588,6 @@
 | fsetpos64 | 0 | stdio.h | UNOWNED | - |
 | fsetxattr | 1 | - | UNOWNED | - |
 | fsqrt | 2 | - | UNOWNED | - |
-| fstatat | 0 | sys/stat.h | platform | - |
 | fstatat64 | 1 | sys/stat.h | platform | - |
 | fstatfs | 1 | - | platform | - |
 | fstatfs64 | 2 | - | platform | - |
@@ -3615,11 +3598,9 @@
 | readdir64_r | 1 | dirent.h | UNOWNED | - |
 | readlink | 0 | unistd.h | proc | - |
 | readlinkat | 0 | - | proc | - |
-| readv | 0 | sys/uio.h | platform | - |
 | realhostname | 2 | - | UNOWNED | - |
 | realhostname_sa | 2 | - | UNOWNED | - |
 | reallocf | 1 | - | malloc | - |
-| realpath | 0 | stdlib.h | stdlib | - |
 | reboot | 2 | - | p-linux | - |
 | recallocarray | 1 | - | malloc | - |
 | register_printf_function | 1 | printf.h | UNOWNED | - |
@@ -4380,7 +4361,6 @@
 | wprintf | 0 | wchar.h | stdio | - |
 | wprintf_l | 2 | - | UNOWNED | - |
 | wracct | 2 | - | UNOWNED | - |
-| writev | 0 | sys/uio.h | platform | - |
 | wscanf | 0 | wchar.h | stdio | - |
 | wscanf_l | 2 | - | UNOWNED | - |
 | wscasecmp | 2 | - | UNOWNED | - |
