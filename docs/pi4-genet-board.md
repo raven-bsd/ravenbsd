@@ -8,8 +8,8 @@ value below is UNVERIFIED. The host tests are the observed evidence.
 
 ## What to capture
 
-The board record is printed by the driver after `Controller` reaches `Ready`. Its six stable
-markers are:
+The board record is available after `Controller` reaches `Ready`; the integration loop formats it
+with `Display`. Its six stable markers are:
 
 | Marker | Fields | Meaning |
 |---|---|---|
