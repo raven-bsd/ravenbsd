@@ -25,6 +25,7 @@ fn build(
         env,
         auxv,
         &[0xAB; RANDOM_LEN],
+        "x86_64",
     )
     .expect("stack image should fit");
     (buffer, offset, sp0)
@@ -186,7 +187,8 @@ fn overlong_strings_are_too_large() {
             &[&long],
             &[],
             &[],
-            &[0; 16]
+            &[0; 16],
+            "x86_64"
         ),
         Err(SpawnError::TooLarge)
     ));
@@ -197,7 +199,16 @@ fn too_many_arguments_are_too_large() {
     let names: Vec<&str> = vec![""; 9000];
     let mut buffer = vec![0u8; TEST_BUFFER];
     assert!(matches!(
-        build_stack(&mut buffer, TEST_TOP, "/child", &names, &[], &[], &[0; 16]),
+        build_stack(
+            &mut buffer,
+            TEST_TOP,
+            "/child",
+            &names,
+            &[],
+            &[],
+            &[0; 16],
+            "x86_64"
+        ),
         Err(SpawnError::TooLarge)
     ));
 }
@@ -206,7 +217,16 @@ fn too_many_arguments_are_too_large() {
 fn misaligned_stack_top_is_rejected() {
     let mut buffer = vec![0u8; TEST_BUFFER];
     assert!(matches!(
-        build_stack(&mut buffer, TEST_TOP + 1, "/child", &[], &[], &[], &[0; 16]),
+        build_stack(
+            &mut buffer,
+            TEST_TOP + 1,
+            "/child",
+            &[],
+            &[],
+            &[],
+            &[0; 16],
+            "x86_64"
+        ),
         Err(SpawnError::TooLarge)
     ));
 }
@@ -215,7 +235,16 @@ fn misaligned_stack_top_is_rejected() {
 fn small_buffer_is_rejected() {
     let mut buffer = [0u8; 64];
     assert!(matches!(
-        build_stack(&mut buffer, TEST_TOP, "/child", &["a"], &[], &[], &[0; 16]),
+        build_stack(
+            &mut buffer,
+            TEST_TOP,
+            "/child",
+            &["a"],
+            &[],
+            &[],
+            &[0; 16],
+            "x86_64"
+        ),
         Err(SpawnError::TooLarge)
     ));
 }
@@ -223,8 +252,17 @@ fn small_buffer_is_rejected() {
 #[test]
 fn image_only_touches_the_top_of_the_buffer() {
     let mut buffer = vec![0xFFu8; TEST_BUFFER];
-    let (offset, _) =
-        build_stack(&mut buffer, TEST_TOP, "/child", &["a"], &[], &[], &[0; 16]).unwrap();
+    let (offset, _) = build_stack(
+        &mut buffer,
+        TEST_TOP,
+        "/child",
+        &["a"],
+        &[],
+        &[],
+        &[0; 16],
+        "x86_64",
+    )
+    .unwrap();
     assert_eq!(&buffer[..offset], vec![0xFFu8; offset]);
     assert!(buffer[offset..].iter().any(|&byte| byte != 0xFF));
 }
@@ -293,6 +331,11 @@ enum Call {
     HandleClose(u32),
     WriteParentMem {
         addr: usize,
+        len: usize,
+    },
+    CopyMapping {
+        destination: usize,
+        source: usize,
         len: usize,
     },
 }
@@ -435,6 +478,14 @@ impl Sys for Mock {
             len: bytes.len(),
         });
         *self.image.borrow_mut() = bytes.to_vec();
+    }
+
+    fn copy_mapping(&mut self, destination: usize, source: usize, len: usize) {
+        self.push(Call::CopyMapping {
+            destination,
+            source,
+            len,
+        });
     }
 }
 
@@ -611,13 +662,139 @@ fn not_found_does_nothing() {
 }
 
 #[test]
-fn interpreter_is_rejected() {
+fn missing_interpreter_is_reported() {
     let image = initfs_with(&child_elf(true, false));
     let initfs = Initfs::parse(&image).unwrap();
     let mut mock = Mock::default();
     let error = spawn_with(&initfs, "/child", &options(&[], &[]), &mut mock).unwrap_err();
-    assert_eq!(error, SpawnError::HasInterpreter);
+    assert_eq!(error, SpawnError::NotFound);
     assert!(mock.calls().is_empty());
+}
+
+fn interp_elf() -> Vec<u8> {
+    let mut elf = child_elf(false, false);
+    put_u16(&mut elf, 16, 3);
+    elf
+}
+
+fn two_file_initfs(main: &[u8], interpreter: &[u8]) -> Vec<u8> {
+    let mut builder = raven_initfs::InitfsBuilder::new();
+    builder.add_file("/child", main, 0o755).unwrap();
+    builder.add_file("/lib/ld.so", interpreter, 0o755).unwrap();
+    builder.build()
+}
+
+#[test]
+fn interpreter_is_mapped_and_the_thread_starts_at_its_entry() {
+    let main = child_elf(true, false);
+    let interpreter = interp_elf();
+    let image = two_file_initfs(&main, &interpreter);
+    let initfs = Initfs::parse(&image).unwrap();
+    let mut mock = Mock::default();
+    let child = spawn_with(&initfs, "/child", &options(&[], &[]), &mut mock).unwrap();
+    assert_eq!(child, CHILD);
+    let calls = mock.calls();
+    let interp_base = usize::try_from(INTERP_BASE).unwrap();
+    assert!(calls.iter().any(|call| matches!(
+        call,
+        Call::Map {
+            proc,
+            memobj,
+            addr,
+            ..
+        } if *proc == CHILD.0
+            && *memobj == Handle::INITFS.0
+            && *addr == interp_base + 0x0040_0000
+    )));
+    assert!(calls.iter().any(|call| matches!(
+        call,
+        Call::Map {
+            proc,
+            memobj,
+            addr,
+            ..
+        } if *proc == CHILD.0
+            && *memobj == Handle::INITFS.0
+            && *addr == 0x0040_0000
+    )));
+    assert!(calls.iter().any(|call| matches!(
+        call,
+        Call::ThreadCreate { entry, .. } if *entry == interp_base + 0x0040_0100
+    )));
+}
+
+#[test]
+fn platform_and_execfn_point_into_the_stack() {
+    let (buffer, _, sp0) = build(
+        "/child",
+        &["/child"],
+        &[],
+        &[(AT_PLATFORM, 0), (AT_EXECFN, 0)],
+    );
+    let argc = word(&buffer, sp0) as u64;
+    let argv_null = sp0 + WORD as u64 * (1 + argc);
+    let auxv0 = argv_null + 2 * WORD as u64;
+    assert_eq!(word(&buffer, auxv0), AT_PLATFORM);
+    let platform = word(&buffer, auxv0 + WORD as u64);
+    assert_eq!(bytes_at(&buffer, platform), b"x86_64");
+    assert_eq!(word(&buffer, auxv0 + 2 * WORD as u64), AT_EXECFN);
+    let execfn = word(&buffer, auxv0 + 3 * WORD as u64);
+    assert_eq!(bytes_at(&buffer, execfn), b"/child");
+}
+
+#[test]
+fn a_dynamic_partial_page_uses_copy_tail() {
+    let mut main = child_elf(true, true);
+    put_u16(&mut main, 16, 3);
+    let interpreter = interp_elf();
+    let mut mock = Mock::default();
+    spawn_image_with_interp(
+        &main,
+        Some(&interpreter),
+        "/child",
+        &options(&[], &[]),
+        &mut mock,
+    )
+    .unwrap();
+    let calls = mock.calls();
+    assert!(calls.contains(&Call::MemobjCreate(4096)));
+    assert!(calls.iter().any(|call| matches!(
+        call,
+        Call::CopyMapping { len, .. } if *len == 0x800
+    )));
+    assert!(calls.iter().any(|call| matches!(
+        call,
+        Call::Protect {
+            proc,
+            addr,
+            protection,
+            ..
+        } if *proc == CHILD.0 && *addr == usize::try_from(MAIN_PIE_BASE).unwrap() + 0x0040_0000 && usize::from(*protection) == prot::READ | prot::EXEC
+    )));
+}
+
+#[test]
+fn auxv_has_the_pg50_keys_and_at_base() {
+    let interpreter = interp_elf();
+    let main = child_elf(true, false);
+    let main_elf = Elf::parse(&main, target_machine(), USER_MIN..USER_END).unwrap();
+    let (auxv, len) = build_auxv(&main_elf, 0, INTERP_BASE);
+    let pairs = &auxv[..len];
+    let has = |key: usize, value: Option<usize>| {
+        pairs
+            .iter()
+            .any(|(k, v)| *k == key && value.is_none_or(|want| *v == want))
+    };
+    assert!(has(AT_BASE, Some(usize::try_from(INTERP_BASE).unwrap())));
+    assert!(has(AT_PHENT, Some(PHENT)));
+    assert!(has(AT_PHNUM, None));
+    assert!(has(AT_ENTRY, Some(0x0040_0100)));
+    assert!(has(AT_PLATFORM, Some(0)));
+    assert!(has(AT_EXECFN, Some(0)));
+    assert!(has(AT_MINSIGSTKSZ, Some(8192)));
+    let interp_elf = Elf::parse(&interpreter, target_machine(), USER_MIN..USER_END).unwrap();
+    assert_eq!(main_elf.interp(), Some("/lib/ld.so"));
+    assert_eq!(interp_elf.interp(), None);
 }
 
 #[test]
@@ -732,7 +909,7 @@ fn thread_create_failure_closes_the_child() {
 
 #[test]
 fn oversized_stack_image_cleans_up() {
-    let long = "x".repeat(70_000);
+    let long = "x".repeat(STACK_SIZE + 1);
     let image = valid_initfs();
     let initfs = Initfs::parse(&image).unwrap();
     let mut mock = Mock::default();
