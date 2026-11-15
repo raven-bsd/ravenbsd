@@ -256,23 +256,32 @@ pub fn depth(colorterm: Option<&str>, term: Option<&str>) -> Depth {
     Depth::detect(colorterm, term)
 }
 
-/// Render one page, optionally with ANSI escapes.
+/// Resolve the runtime palette from an environment value.
+///
+/// Invalid or absent values silently fall back to [`Palette::current`].
+#[must_use]
+pub fn palette_from_env_spec(spec: Option<&str>) -> Palette {
+    spec.and_then(Palette::from_env_spec)
+        .unwrap_or_else(Palette::current)
+}
+
+/// Render one page with `palette`, optionally with ANSI escapes.
 ///
 /// # Errors
 /// A page parse error.
 pub fn render_page(
     source: &str,
     width: usize,
+    palette: &Palette,
     enabled: bool,
     colorterm: Option<&str>,
     term: Option<&str>,
 ) -> Result<String, String> {
     let document = Document::parse(source).map_err(|error| error.to_string())?;
-    let palette = Palette::raven_violet();
     let depth = depth(colorterm, term);
     let mut out = String::new();
     for line in document.render(width) {
-        out.push_str(&line.painted(&palette, depth, enabled));
+        out.push_str(&line.painted(palette, depth, enabled));
         out.push('\n');
     }
     Ok(out)
