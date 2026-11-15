@@ -22,7 +22,9 @@ use crate::usercopy::{copy_from_user, copy_to_user};
 
 use super::capture;
 use super::model;
-use super::protocol::{self, Opcode, PACKET_SIZE, REPLY_HANDLE, SchemePacket, attachment_rights};
+use super::protocol::{
+    self, OFFSET_EXPLICIT, Opcode, PACKET_SIZE, REPLY_HANDLE, SchemePacket, attachment_rights,
+};
 use super::{PendingRequest, RequestBuffers, SchemeFile};
 use super::{next_file_id, next_request_id, registry};
 
@@ -130,12 +132,33 @@ pub fn open(
     }
 }
 
-/// Read from a scheme file.
+/// Read from a scheme file at the open-file-description cursor.
 pub fn read(
     caller: &Arc<Process>,
     file: &Arc<SchemeFile>,
     address: u64,
     len: u64,
+) -> Result<usize, Errno> {
+    read_at(caller, file, address, len, None)
+}
+
+/// Positional read; the server cursor must not move (PG-22).
+pub fn pread(
+    caller: &Arc<Process>,
+    file: &Arc<SchemeFile>,
+    address: u64,
+    len: u64,
+    offset: u64,
+) -> Result<usize, Errno> {
+    read_at(caller, file, address, len, Some(offset))
+}
+
+fn read_at(
+    caller: &Arc<Process>,
+    file: &Arc<SchemeFile>,
+    address: u64,
+    len: u64,
+    positional: Option<u64>,
 ) -> Result<usize, Errno> {
     if len == 0 {
         return Ok(0);
@@ -144,7 +167,12 @@ pub fn read(
     let capture = capture::create(caller, &file.server, address, len, true)?;
     let mut packet = SchemePacket::request(Opcode::Read, next_request_id(), file.server_id());
     packet.buffer_len = len;
-    packet.offset = 0;
+    packet.offset = positional.unwrap_or(0);
+    packet.flags = if positional.is_some() {
+        OFFSET_EXPLICIT
+    } else {
+        0
+    };
     packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
     let request = PendingRequest::new(
         Arc::clone(caller),
@@ -164,12 +192,33 @@ pub fn read(
     Ok(usize::try_from(result).unwrap_or(usize::MAX))
 }
 
-/// Write to a scheme file.
+/// Write to a scheme file at the open-file-description cursor.
 pub fn write(
     caller: &Arc<Process>,
     file: &Arc<SchemeFile>,
     address: u64,
     len: u64,
+) -> Result<usize, Errno> {
+    write_at(caller, file, address, len, None)
+}
+
+/// Positional write; the server cursor must not move (PG-22).
+pub fn pwrite(
+    caller: &Arc<Process>,
+    file: &Arc<SchemeFile>,
+    address: u64,
+    len: u64,
+    offset: u64,
+) -> Result<usize, Errno> {
+    write_at(caller, file, address, len, Some(offset))
+}
+
+fn write_at(
+    caller: &Arc<Process>,
+    file: &Arc<SchemeFile>,
+    address: u64,
+    len: u64,
+    positional: Option<u64>,
 ) -> Result<usize, Errno> {
     if len == 0 {
         return Ok(0);
@@ -178,7 +227,12 @@ pub fn write(
     let capture = capture::create(caller, &file.server, address, len, false)?;
     let mut packet = SchemePacket::request(Opcode::Write, next_request_id(), file.server_id());
     packet.buffer_len = len;
-    packet.offset = 0;
+    packet.offset = positional.unwrap_or(0);
+    packet.flags = if positional.is_some() {
+        OFFSET_EXPLICIT
+    } else {
+        0
+    };
     packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
     let request = PendingRequest::new(
         Arc::clone(caller),
@@ -196,6 +250,33 @@ pub fn write(
         return Err(status_errno(status));
     }
     Ok(usize::try_from(result).unwrap_or(usize::MAX))
+}
+
+/// Move the server-side file cursor and return the new offset (PG-22).
+pub fn seek(
+    caller: &Arc<Process>,
+    file: &Arc<SchemeFile>,
+    offset: i64,
+    whence: u32,
+) -> Result<u64, Errno> {
+    ensure_server(&file.server)?;
+    let mut packet = SchemePacket::request(Opcode::Seek, next_request_id(), file.server_id());
+    packet.offset = offset as u64;
+    packet.flags = u16::try_from(whence).map_err(|_| Errno::EINVAL)?;
+    packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
+    let request = PendingRequest::new(
+        Arc::clone(caller),
+        Arc::clone(&file.server),
+        Some(Arc::clone(file)),
+        Opcode::Seek,
+        packet,
+        RequestBuffers::default(),
+    );
+    let (status, _) = submit(&request).and_then(|_| wait(caller, &request))?;
+    if status != 0 {
+        return Err(status_errno(status));
+    }
+    Ok(request.response.lock().offset)
 }
 
 /// Close a scheme file (the local handle is always closed; the server sees the CLOSE only when
@@ -682,7 +763,7 @@ fn write_reply_buffer(request: &Arc<PendingRequest>, packet: &SchemePacket) -> R
                 request_packet.response_len,
                 true,
             ),
-            Opcode::Write | Opcode::Close | Opcode::Dup => {
+            Opcode::Write | Opcode::Close | Opcode::Dup | Opcode::Seek => {
                 if count == 0 {
                     return Ok(());
                 }

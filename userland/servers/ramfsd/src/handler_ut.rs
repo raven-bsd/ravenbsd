@@ -467,3 +467,108 @@ fn encode_call(call: Call<'_>) -> Vec<u8> {
     let length = request.encode(&mut encoded).expect("encode");
     encoded[..length].to_vec()
 }
+
+fn pread(
+    handler: &mut RamfsHandler,
+    file: u64,
+    offset: u64,
+    buffer: &mut [u8],
+) -> Result<usize, Errno> {
+    handler.pread(file, offset, buffer).map_err(handler_error)
+}
+
+fn pwrite(handler: &mut RamfsHandler, file: u64, offset: u64, data: &[u8]) -> Result<usize, Errno> {
+    handler.pwrite(file, offset, data).map_err(handler_error)
+}
+
+fn seek(handler: &mut RamfsHandler, file: u64, offset: i64, whence: u32) -> Result<u64, Errno> {
+    handler.seek(file, offset, whence).map_err(handler_error)
+}
+
+#[test]
+fn positional_io_does_not_move_the_cursor() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    let file = open(&mut handler, 10, "a", flags(O_RDWR | O_CREAT)).expect("open");
+    assert_eq!(
+        pwrite(&mut handler, file, 0, b"abcdefghij").expect("pwrite"),
+        10
+    );
+    assert_eq!(seek(&mut handler, file, 0, 1).expect("cursor"), 0);
+
+    let mut data = [0u8; 3];
+    assert_eq!(pread(&mut handler, file, 2, &mut data).expect("pread"), 3);
+    assert_eq!(&data, b"cde");
+    assert_eq!(
+        seek(&mut handler, file, 0, 1).expect("cursor after pread"),
+        0
+    );
+
+    // A sequential read moves the cursor; positional I/O around it does not.
+    assert_eq!(seek(&mut handler, file, 4, 0).expect("seek set"), 4);
+    assert_eq!(read(&mut handler, file, &mut data[..2]).expect("read"), 2);
+    assert_eq!(&data[..2], b"ef");
+    assert_eq!(
+        seek(&mut handler, file, 0, 1).expect("cursor after read"),
+        6
+    );
+    assert_eq!(pwrite(&mut handler, file, 8, b"XY").expect("pwrite"), 2);
+    assert_eq!(
+        seek(&mut handler, file, 0, 1).expect("cursor after pwrite"),
+        6
+    );
+    assert_eq!(
+        pread(&mut handler, file, 8, &mut data[..2]).expect("pread"),
+        2
+    );
+    assert_eq!(&data[..2], b"XY");
+}
+
+#[test]
+fn seek_set_cur_end_and_hole() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    let file = open(&mut handler, 10, "b", flags(O_RDWR | O_CREAT)).expect("open");
+    assert_eq!(write(&mut handler, file, b"abcdefghij").expect("write"), 10);
+    assert_eq!(seek(&mut handler, file, 0, 0).expect("set"), 0);
+    assert_eq!(seek(&mut handler, file, 4, 1).expect("cur"), 4);
+    assert_eq!(seek(&mut handler, file, -2, 2).expect("end"), 8);
+    assert_eq!(seek(&mut handler, file, 0, 2).expect("end"), 10);
+    assert_eq!(seek(&mut handler, file, 100, 0).expect("past eof"), 100);
+    let mut data = [0u8; 4];
+    assert_eq!(
+        read(&mut handler, file, &mut data).expect("past eof read"),
+        0
+    );
+
+    assert_eq!(
+        pwrite(&mut handler, file, 15, b"XY").expect("hole pwrite"),
+        2
+    );
+    assert_eq!(handler.fstat(file).expect("stat").size, 17);
+    let mut hole = [0xffu8; 7];
+    assert_eq!(
+        pread(&mut handler, file, 10, &mut hole).expect("hole pread"),
+        7
+    );
+    assert_eq!(&hole, &[0, 0, 0, 0, 0, b'X', b'Y']);
+    assert_eq!(seek(&mut handler, file, -2, 2).expect("end"), 15);
+    assert_eq!(read(&mut handler, file, &mut data[..2]).expect("read"), 2);
+    assert_eq!(&data[..2], b"XY");
+}
+
+#[test]
+fn seek_rejects_negative_and_unknown_whence() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    let file = open(&mut handler, 10, "c", flags(O_RDWR | O_CREAT)).expect("open");
+    assert_eq!(seek(&mut handler, file, -1, 0), Err(Errno::EINVAL));
+    assert_eq!(seek(&mut handler, file, 0, 9), Err(Errno::EINVAL));
+}
+
+#[test]
+fn positional_io_respects_access_mode() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    let reader = open(&mut handler, 10, "d", flags(O_RDONLY | O_CREAT)).expect("read open");
+    assert_eq!(pwrite(&mut handler, reader, 0, b"x"), Err(Errno::EBADF));
+    let writer = open(&mut handler, 11, "e", flags(O_WRONLY | O_CREAT)).expect("write open");
+    let mut data = [0u8; 1];
+    assert_eq!(pread(&mut handler, writer, 0, &mut data), Err(Errno::EBADF));
+}
