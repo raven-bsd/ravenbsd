@@ -542,6 +542,15 @@ pub(crate) fn init_fpu() -> bool {
     fpu::init()
 }
 
+/// Install `tp` in `IA32_FS_BASE` for the calling thread.
+///
+/// `THREAD_SET_TLS` must be effective immediately for the caller: a user thread may read `%fs:`
+/// as soon as the syscall returns, without waiting for a context switch.
+#[cfg(target_arch = "x86_64")]
+pub(crate) fn install_tls_base(tp: u64) {
+    wrmsr(IA32_FS_BASE, tp);
+}
+
 /// Read the current stack pointer.
 #[cfg(target_arch = "x86_64")]
 pub(crate) fn read_rsp() -> u64 {
