@@ -339,10 +339,7 @@ fn program_filters_can_enable_promiscuous_mode() {
         backend.controller().seam.register(regs::UMAC_CMD) & regs::UMAC_CMD_PROMISC,
         regs::UMAC_CMD_PROMISC
     );
-    assert_eq!(
-        backend.controller().seam.register(regs::UMAC_MDF_CTRL),
-        0x1_8000
-    );
+    assert_eq!(backend.controller().seam.register(regs::UMAC_MDF_CTRL), 0);
 }
 
 #[test]

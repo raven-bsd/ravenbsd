@@ -102,9 +102,11 @@ fn promiscuous_mode_sets_the_umac_command_bit() {
     assert!(!table.is_promiscuous());
     table.set_promiscuous(true);
     assert_eq!(table.command_bits(), UMAC_CMD_PROMISC);
+    assert_eq!(table.mdf_ctrl(), 0);
     assert!(table.is_promiscuous());
     table.set_promiscuous(false);
     assert_eq!(table.command_bits(), 0);
+    assert_eq!(table.mdf_ctrl(), 0x1_8000);
 }
 
 #[test]

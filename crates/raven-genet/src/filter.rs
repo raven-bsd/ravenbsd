@@ -119,14 +119,15 @@ impl FilterTable {
     }
 
     /// The value for `UMAC_MDF_CTRL`.
+    ///
+    /// Promiscuous mode bypasses the table, so the mask is zero as in the donor path.
     #[must_use]
     pub const fn mdf_ctrl(self) -> u32 {
-        let used = self.slot_count() as u32;
-        if used == 0 {
-            0
-        } else {
-            ((1u32 << used) - 1) << (MDF_SLOTS as u32 - used)
+        if self.promiscuous {
+            return 0;
         }
+        let used = self.slot_count() as u32;
+        ((1u32 << used) - 1) << (MDF_SLOTS as u32 - used)
     }
 
     /// `UMAC_CMD` bits this table needs.
