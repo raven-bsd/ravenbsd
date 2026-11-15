@@ -1123,6 +1123,7 @@ dependencies = [
  "raven-iommu",
  "raven-mem",
  "raven-pager",
+ "raven-pci",
  "raven-proto-linux",
  "raven-rmm",
  "raven-sched-core",
@@ -1693,6 +1694,13 @@ name = "raven-pager"
 version = "0.1.0"
 
 [[package]]
+name = "raven-pci"
+version = "0.1.0"
+dependencies = [
+ "raven-pi5",
+]
+
+[[package]]
 name = "raven-pcid"
 version = "0.1.0"
 dependencies = [
@@ -1936,6 +1944,10 @@ dependencies = [
  "raven-rt",
  "raven-scheme",
 ]
+
+[[package]]
+name = "raven-rp1"
+version = "0.1.0"
 
 [[package]]
 name = "raven-rsh"
