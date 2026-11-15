@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# K27a good-marker case: the second disk carries slot A, a valid slot B and a health marker whose
-# slot/token match boot.toml. The loader confirms slot B and boots its test kernel.
+# K27a/K27b good-marker case: the second disk carries slot A, a valid slot B and a health marker
+# whose slot/token match boot.toml. The loader confirms slot B and boots its test kernel. The
+# fixture script follows --arch, so the case also runs on aarch64 with --arch aarch64.
 
 name = "update-health"
 arch = "x86_64"
@@ -10,14 +11,16 @@ profile = "base"
 timeout_secs = 420
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = ["-drive", "format=raw,file=build/qtest/update-health-good.img,index=1"]
-pre = ["sh tests/fixtures/update/prepare.sh"]
-expect_exit = "success"
+pre = ["sh tests/qtest/cases/update-health-prepare.sh"]
+# The aarch64 test kernel powers off through PSCI, which QEMU reports as exit 0, not the C5
+# semihosting numbers. Completion is asserted through the serial lines for both architectures.
+expect_exit = "any"
 
 [[expect]]
 regex = '^loader: update: health marker matches slot b; confirmed$'
 
 [[expect]]
-regex = '^TESTKERNEL OK arch=1 .*$'
+regex = '^TESTKERNEL OK arch=[12] .*$'
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION'
