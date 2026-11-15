@@ -84,21 +84,18 @@ pub const PROC_SETPGID: usize = 0x36;
 pub const PROC_SETSID: usize = 0x37;
 /// Raw `proc_setcred(which, value) -> 0` number.
 pub const PROC_SETCRED: usize = 0x38;
+/// Raw `proc_pid_info(pid, out, count) -> 0` number.
+pub const PROC_PID_INFO: usize = 0x3A;
 
-/// `proc_self_info(out: *mut u64, count: usize) -> 0`.
-///
-/// Writes `[pid, ppid, pgid, sid, uid, euid, gid, egid]` as eight little-endian u64 words.
-/// Count must be exactly eight; the destination is checked by `UserSlice`.
-pub fn self_info(frame: &SyscallFrame) -> Result<usize, Errno> {
-    let caller = process::current().ok_or(Errno::ESRCH)?;
-    let count = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+/// Write the eight identity words for `target` to user memory.
+fn write_info(target: &Process, out: u64, count: usize) -> Result<usize, Errno> {
     if count != 8 {
         return Err(Errno::EINVAL);
     }
-    let destination = UserSlice::new(frame.rdi, 64)?;
-    let ids = *caller.ids.lock();
+    let destination = UserSlice::new(out, 64)?;
+    let ids = *target.ids.lock();
     let values = [
-        caller.id,
+        target.id,
         ids.ppid,
         ids.pgid,
         ids.sid,
@@ -115,34 +112,80 @@ pub fn self_info(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(0)
 }
 
+/// `proc_self_info(out: *mut u64, count: usize) -> 0`.
+///
+/// Writes `[pid, ppid, pgid, sid, uid, euid, gid, egid]` as eight little-endian u64 words.
+/// Count must be exactly eight; the destination is checked by `UserSlice`.
+pub fn self_info(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let count = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    write_info(&caller, frame.rdi, count)
+}
+
+/// `proc_pid_info(pid: i32, out: *mut u64, count: usize) -> 0`.
+///
+/// `pid == 0` means the caller. The target must still be in the pid registry and not exited.
+pub fn pid_info(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let pid = frame.rdi as u32 as i32;
+    let target = if pid == 0 {
+        caller
+    } else {
+        let pid = u64::try_from(pid).map_err(|_| Errno::ESRCH)?;
+        let target = process::lookup_pid(pid).ok_or(Errno::ESRCH)?;
+        if *target.state.lock() == ProcessState::Exited {
+            return Err(Errno::ESRCH);
+        }
+        target
+    };
+    let count = usize::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
+    write_info(&target, frame.rsi, count)
+}
+
 /// `proc_setpgid(pid: i32, pgid: i32) -> 0`.
 ///
-/// Only pid 0 and the caller are accepted. A zero pgid means the caller's pid. The slice accepts
-/// the caller's own group or the current group (a no-op); any other group is `EPERM`.
+/// The target is the caller, or a direct child. A zero pgid means the target's pid. A session
+/// leader is `EPERM`. The target group may be the target's new own group, the current group, or
+/// any group with a live member in the target's session. There is no group table; the pid
+/// registry is scanned.
 pub fn setpgid(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let pid = frame.rdi as u32 as i32;
-    if pid != 0 && u64::try_from(pid).ok() != Some(caller.id) {
+    let target = if pid == 0 || u64::try_from(pid).ok() == Some(caller.id) {
+        Arc::clone(&caller)
+    } else {
+        let pid = u64::try_from(pid).map_err(|_| Errno::ESRCH)?;
+        let target = process::lookup_pid(pid).ok_or(Errno::ESRCH)?;
+        if *target.state.lock() == ProcessState::Exited {
+            return Err(Errno::ESRCH);
+        }
+        if target.ids.lock().ppid != caller.id {
+            return Err(Errno::EPERM);
+        }
+        target
+    };
+    let target_id = target.id;
+    let (target_sid, current_group) = {
+        let ids = target.ids.lock();
+        (ids.sid, ids.pgid)
+    };
+    if target_sid == target_id {
         return Err(Errno::EPERM);
     }
     let pgid = frame.rsi as u32 as i32;
-    let mut ids = caller.ids.lock();
-    if ids.sid == caller.id {
-        return Err(Errno::EPERM);
-    }
-    let target = if pgid == 0 {
-        caller.id
+    let group = if pgid == 0 {
+        target_id
     } else {
         u64::try_from(pgid).map_err(|_| Errno::EPERM)?
     };
-    if target == caller.id {
-        ids.pgid = caller.id;
-        Ok(0)
-    } else if target == ids.pgid {
-        Ok(0)
-    } else {
-        Err(Errno::EPERM)
+    let valid = group == target_id
+        || group == current_group
+        || process::group_in_session(group, target_sid);
+    if !valid {
+        return Err(Errno::EPERM);
     }
+    target.ids.lock().pgid = group;
+    Ok(0)
 }
 
 /// `proc_setsid() -> sid`.

@@ -12,6 +12,7 @@ use crate::syscall_backend::{SelfInfo, Syscall, SyscallBackend};
 
 struct Fake {
     info: Cell<SelfInfo>,
+    child: Cell<Option<SelfInfo>>,
     setpgid: Cell<Option<(i32, i32)>>,
     cred: Cell<Option<(u32, u32)>>,
     sid: i32,
@@ -30,6 +31,16 @@ impl Fake {
                 gid: 0,
                 egid: 0,
             }),
+            child: Cell::new(Some(SelfInfo {
+                pid: 7,
+                ppid: 42,
+                pgid: 7,
+                sid: 1,
+                uid: 0,
+                euid: 0,
+                gid: 0,
+                egid: 0,
+            })),
             setpgid: Cell::new(None),
             cred: Cell::new(None),
             sid: 42,
@@ -40,6 +51,13 @@ impl Fake {
 impl Syscall for Fake {
     fn self_info(&self) -> Result<SelfInfo, i32> {
         Ok(self.info.get())
+    }
+
+    fn pid_info(&self, pid: i32) -> Result<SelfInfo, i32> {
+        self.child
+            .get()
+            .filter(|child| child.pid == u64::try_from(pid).unwrap_or(u64::MAX))
+            .ok_or(ESRCH)
     }
 
     fn setpgid(&self, pid: i32, pgid: i32) -> Result<(), i32> {
@@ -68,9 +86,10 @@ fn identity_getters_use_self_info() {
     assert_eq!(backend.getegid(), 0);
     assert_eq!(backend.getpgid(0), Ok(1));
     assert_eq!(backend.getpgid(42), Ok(1));
-    assert_eq!(backend.getpgid(7), Err(ESRCH));
+    assert_eq!(backend.getpgid(7), Ok(7));
     assert_eq!(backend.getsid(0), Ok(1));
-    assert_eq!(backend.getsid(7), Err(ESRCH));
+    assert_eq!(backend.getsid(7), Ok(1));
+    assert_eq!(backend.getpgid(8), Err(ESRCH));
 }
 
 #[test]
