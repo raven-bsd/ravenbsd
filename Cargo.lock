@@ -628,6 +628,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-b32-linux-root"
+version = "0.1.0"
+dependencies = [
+ "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-b47-plat"
 version = "0.1.0"
 dependencies = [
