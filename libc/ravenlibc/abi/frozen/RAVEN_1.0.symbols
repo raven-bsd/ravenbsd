@@ -1,7 +1,7 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1129
+# records: 1133
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
 _Unwind_Backtrace F - all 2 -
@@ -350,6 +350,8 @@ getpwnam F - all 0 pwd.h
 getpwnam_r F - all 1 pwd.h
 getpwuid F - all 0 pwd.h
 getpwuid_r F - all 1 pwd.h
+getresgid F - all 1 -
+getresuid F - all 1 -
 getrlimit F - all 1 sys/resource.h
 getrusage F - all 1 sys/resource.h
 getservbyname F - all 1 netdb.h
@@ -852,6 +854,8 @@ setprogname F - all 1 -
 setprotoent F - all 1 netdb.h
 setpwent F - all 1 pwd.h
 setregid F - all 1 unistd.h
+setresgid F - all 1 -
+setresuid F - all 1 -
 setreuid F - all 1 unistd.h
 setrlimit F - all 1 sys/resource.h
 setservent F - all 1 netdb.h

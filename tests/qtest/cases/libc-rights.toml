@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S52 PG-23: FSTAT and CALL are metadata/server operations, not data reads. A write-only
+# SchemeFile handle must support both, and a handle with its WRITE right revoked must still
+# support both. Non-SchemeFile and closed handles stay EBADF.
+
+name = "libc-rights"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/qtest/cases/libc-rights-fixture/build.sh"]
+initfs = "build/fixtures/libc-rights/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^libc-rights: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|libc-rights: fail'

@@ -70,6 +70,15 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == process_ctl::PROC_FORK {
         return process_ctl::fork(frame);
     }
+    if number == ipc::PREAD {
+        return ipc::pread(frame);
+    }
+    if number == ipc::PWRITE {
+        return ipc::pwrite(frame);
+    }
+    if number == ipc::SEEK {
+        return ipc::seek(frame);
+    }
     if number == process_ctl::PROC_SELF_INFO {
         return process_ctl::self_info(frame);
     }

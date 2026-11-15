@@ -11,6 +11,10 @@
 //! Two image sources are supported: the read-only initfs archive (zero-copy segment mapping) and
 //! bytes read from a `file:` path (bounded copy into a memory object, then segment mapping). The
 //! latter is how root services start from a UFS root.
+//!
+//! PG-49 adds `PT_INTERP`: an `ET_DYN` interpreter is loaded at [`INTERP_BASE`], the main image at
+//! [`MAIN_PIE_BASE`] when it is `ET_DYN`, and the first thread starts at the interpreter entry with
+//! `AT_BASE` pointing at its bias. PG-50 builds the extended auxiliary vector in [`build_auxv`].
 
 #[cfg(all(target_os = "none", feature = "alloc"))]
 use alloc_crate::vec::Vec;
@@ -19,9 +23,10 @@ use raven_abi::syscall::Syscall;
 use raven_abi::types::Handle;
 #[cfg(any(target_os = "none", test))]
 use raven_abi::types::{map, prot};
+#[cfg(any(target_os = "none", test))]
 use raven_elf::ElfError;
 #[cfg(any(target_os = "none", test))]
-use raven_elf::{Elf, LoadMode, Machine, MapStep, StepKind, plan_load};
+use raven_elf::{Elf, LoadMode, Machine, MapStep, StepKind};
 #[cfg(any(target_os = "none", test))]
 use raven_initfs::Initfs;
 #[cfg(all(target_os = "none", feature = "alloc"))]
@@ -42,22 +47,7 @@ pub struct SpawnOptions<'a> {
 /// server from making PID 1 allocate without limit.
 pub const MAX_FILE_IMAGE: usize = 8 * 1024 * 1024;
 
-/// Why a spawn failed.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SpawnError {
-    /// The path is not present in the initfs.
-    NotFound,
-    /// The path is not present on the file server.
-    FileNotFound,
-    /// The ELF image is invalid or cannot be loaded strictly.
-    BadElf(ElfError),
-    /// The ELF requests an interpreter, which the M1 loader does not support.
-    HasInterpreter,
-    /// The stack image, an address or a file image exceeds its bound.
-    TooLarge,
-    /// A kernel syscall failed.
-    Sys(Errno),
-}
+pub use crate::spawn_error::SpawnError;
 
 /// The syscall surface used by [`spawn_with`].
 ///
@@ -105,6 +95,17 @@ pub trait Sys {
     fn handle_close(&mut self, handle: Handle) -> Result<(), Errno>;
     /// Copy bytes into a mapping owned by the parent.
     fn write_parent_mem(&mut self, addr: usize, bytes: &[u8]);
+    /// Copy `len` bytes between two mappings owned by the parent.
+    ///
+    /// The default is correct for every implementation whose `map` creates process-local
+    /// mappings; a recording test double overrides it.
+    fn copy_mapping(&mut self, destination: usize, source: usize, len: usize) {
+        // SAFETY: both addresses are mappings in this process: `destination` is writable and
+        // `source` is readable, each at least `len` bytes, and they do not overlap.
+        unsafe {
+            core::ptr::copy_nonoverlapping(source as *const u8, destination as *mut u8, len);
+        }
+    }
 }
 
 /// Spawn `/path` from `initfs` using the real syscall implementation.
@@ -120,9 +121,10 @@ pub fn spawn(
 
 /// Spawn `/path` using a caller-provided [`Sys`] implementation.
 ///
-/// This is the full sequence: parse and plan, create the process, map every segment, build a
-/// 64 KiB stack through a shared memory object, start the first thread, and return the process
-/// handle. On failure after `proc_create`, the child handle is closed.
+/// This is the full sequence: parse and plan the main image (and its `PT_INTERP`, if any), create
+/// the process, map both images, build a [`STACK_SIZE`] stack (at least `ARG_MAX`) through a shared
+/// memory object, start the first thread, and return the process handle. On failure after
+/// `proc_create`, the child handle and the temporary image objects are closed.
 #[cfg(any(target_os = "none", test))]
 pub fn spawn_with<S: Sys>(
     initfs: &Initfs<'_>,
@@ -131,18 +133,30 @@ pub fn spawn_with<S: Sys>(
     sys: &mut S,
 ) -> Result<Handle, SpawnError> {
     let entry = initfs.get(path).ok_or(SpawnError::NotFound)?;
-    let elf =
-        Elf::parse(entry.data, target_machine(), USER_MIN..USER_END).map_err(SpawnError::BadElf)?;
-    if elf.interp().is_some() {
-        return Err(SpawnError::HasInterpreter);
-    }
-    let steps = plan_load(&elf, PAGE, LoadMode::Strict).map_err(SpawnError::BadElf)?;
+    let (main, main_steps, main_bias) = plan_image(entry.data, false)?;
+    let interp = match main.interp() {
+        Some(interp_path) => {
+            let interpreter = initfs.get(interp_path).ok_or(SpawnError::NotFound)?;
+            let (elf, steps, bias) = plan_image(interpreter.data, true)?;
+            Some((
+                elf,
+                steps,
+                ImageSource::Initfs {
+                    data_offset: interpreter.data_offset,
+                },
+                bias,
+            ))
+        }
+        None => None,
+    };
     spawn_elf(
-        &elf,
-        steps,
+        &main,
+        main_steps,
         ImageSource::Initfs {
             data_offset: entry.data_offset,
         },
+        main_bias,
+        interp,
         path,
         options,
         sys,
@@ -165,13 +179,72 @@ pub fn spawn_image_with<S: Sys>(
     if image.len() > MAX_FILE_IMAGE {
         return Err(SpawnError::TooLarge);
     }
-    let elf =
-        Elf::parse(image, target_machine(), USER_MIN..USER_END).map_err(SpawnError::BadElf)?;
-    if elf.interp().is_some() {
-        return Err(SpawnError::HasInterpreter);
+    let (main, main_steps, main_bias) = plan_image(image, false)?;
+    let Some(interp_path) = main.interp() else {
+        return spawn_elf(
+            &main,
+            main_steps,
+            ImageSource::Bytes(image),
+            main_bias,
+            None,
+            path,
+            options,
+            sys,
+        );
+    };
+    #[cfg(all(target_os = "none", feature = "alloc"))]
+    {
+        let interpreter = read_file_image(interp_path)?;
+        spawn_image_with_interp(image, Some(&interpreter), path, options, sys)
     }
-    let steps = plan_load(&elf, PAGE, LoadMode::Strict).map_err(SpawnError::BadElf)?;
-    spawn_elf(&elf, steps, ImageSource::Bytes(image), path, options, sys)
+    #[cfg(not(all(target_os = "none", feature = "alloc")))]
+    {
+        let _ = interp_path;
+        let _ = main_steps;
+        let _ = main_bias;
+        Err(SpawnError::NotFound)
+    }
+}
+
+/// Spawn an in-memory image with an explicit interpreter image.
+///
+/// File-image callers on a target with `alloc` use [`spawn_image_with`], which reads the
+/// interpreter from the file server. Tests and callers that already have the bytes use this entry
+/// point.
+#[cfg(any(target_os = "none", test))]
+pub fn spawn_image_with_interp<S: Sys>(
+    image: &[u8],
+    interpreter: Option<&[u8]>,
+    path: &str,
+    options: &SpawnOptions<'_>,
+    sys: &mut S,
+) -> Result<Handle, SpawnError> {
+    if image.len() > MAX_FILE_IMAGE {
+        return Err(SpawnError::TooLarge);
+    }
+    let (main, main_steps, main_bias) = plan_image(image, false)?;
+    let interp = match (main.interp(), interpreter) {
+        (Some(_), Some(data)) => {
+            if data.len() > MAX_FILE_IMAGE {
+                return Err(SpawnError::TooLarge);
+            }
+            let (elf, steps, bias) = plan_image(data, true)?;
+            Some((elf, steps, ImageSource::Bytes(data), bias))
+        }
+        (Some(_), None) => return Err(SpawnError::NotFound),
+        (None, Some(_)) => return Err(SpawnError::BadElf(ElfError::BadType)),
+        (None, None) => None,
+    };
+    spawn_elf(
+        &main,
+        main_steps,
+        ImageSource::Bytes(image),
+        main_bias,
+        interp,
+        path,
+        options,
+        sys,
+    )
 }
 
 /// Spawn `path` from an in-memory image with the real syscall implementation.
@@ -238,6 +311,7 @@ pub fn read_file_image(path: &str) -> Result<Vec<u8>, SpawnError> {
 
 /// One executable source.
 #[cfg(any(target_os = "none", test))]
+#[derive(Clone, Copy)]
 enum ImageSource<'a> {
     /// A file inside the mapped initfs archive.
     Initfs {
@@ -259,16 +333,12 @@ enum MapSource {
 }
 
 #[cfg(any(target_os = "none", test))]
-fn spawn_elf<S: Sys, I: IntoIterator<Item = MapStep>>(
-    elf: &Elf<'_>,
-    steps: I,
+fn prepare_source<S: Sys>(
     source: ImageSource<'_>,
-    path: &str,
-    options: &SpawnOptions<'_>,
     sys: &mut S,
-) -> Result<Handle, SpawnError> {
-    let (map_source, image_object) = match source {
-        ImageSource::Initfs { data_offset, .. } => (MapSource::Initfs { data_offset }, None),
+) -> Result<(MapSource, Option<Handle>), SpawnError> {
+    match source {
+        ImageSource::Initfs { data_offset } => Ok((MapSource::Initfs { data_offset }, None)),
         ImageSource::Bytes(bytes) => {
             let page_len = bytes
                 .len()
@@ -293,59 +363,104 @@ fn spawn_elf<S: Sys, I: IntoIterator<Item = MapStep>>(
                 let _ = sys.handle_close(object);
                 return Err(SpawnError::Sys(error));
             }
-            (MapSource::Object(object), Some(object))
+            Ok((MapSource::Object(object), Some(object)))
         }
-    };
-
-    let entry_address = usize::try_from(elf.entry()).map_err(|_| SpawnError::TooLarge)?;
-    let stack_top = STACK_TOP;
-    let stack_base = stack_top
-        .checked_sub(STACK_SIZE as u64)
-        .ok_or(SpawnError::TooLarge)?;
-    let stack_base_address = usize::try_from(stack_base).map_err(|_| SpawnError::TooLarge)?;
-
-    let mut auxv = [(0usize, 0usize); MAX_AUXV];
-    let mut auxv_len = 0usize;
-    auxv[auxv_len] = (AT_PAGESZ, PAGE as usize);
-    auxv_len += 1;
-    auxv[auxv_len] = (AT_ENTRY, entry_address);
-    auxv_len += 1;
-    if let Some(phdr) = elf.phdr_vaddr() {
-        let phdr = usize::try_from(phdr).map_err(|_| SpawnError::TooLarge)?;
-        auxv[auxv_len] = (AT_PHDR, phdr);
-        auxv_len += 1;
-        auxv[auxv_len] = (AT_PHNUM, elf.phnum());
-        auxv_len += 1;
     }
-    auxv[auxv_len] = (AT_RANDOM, 0);
-    auxv_len += 1;
+}
+
+#[cfg(any(target_os = "none", test))]
+fn map_plan<S: Sys>(
+    sys: &mut S,
+    child: Handle,
+    source: MapSource,
+    steps: BiasedPlan,
+) -> Result<(), SpawnError> {
+    for step in steps {
+        map_step(sys, child, source, step)?;
+    }
+    Ok(())
+}
+
+#[cfg(any(target_os = "none", test))]
+#[allow(clippy::too_many_arguments)] // the image pair, entry state and syscall sink
+fn spawn_elf<S: Sys>(
+    main_elf: &Elf<'_>,
+    main_steps: BiasedPlan,
+    main_source: ImageSource<'_>,
+    main_bias: u64,
+    interp: Option<(Elf<'_>, BiasedPlan, ImageSource<'_>, u64)>,
+    path: &str,
+    options: &SpawnOptions<'_>,
+    sys: &mut S,
+) -> Result<Handle, SpawnError> {
+    let (main_map, main_object) = prepare_source(main_source, sys)?;
+    let mut interp_map: Option<(Elf<'_>, BiasedPlan, MapSource, u64, Option<Handle>)> = None;
+    if let Some((elf, steps, source, bias)) = interp {
+        match prepare_source(source, sys) {
+            Ok((map, object)) => interp_map = Some((elf, steps, map, bias, object)),
+            Err(error) => {
+                if let Some(object) = main_object {
+                    let _ = sys.handle_close(object);
+                }
+                return Err(error);
+            }
+        }
+    }
+
+    let interp_bias = interp_map.as_ref().map_or(0, |entry| entry.3);
+    let entry_address = match &interp_map {
+        Some((elf, _, _, bias, _)) => elf
+            .entry()
+            .checked_add(*bias)
+            .and_then(|value| usize::try_from(value).ok())
+            .ok_or(SpawnError::TooLarge)?,
+        None => main_elf
+            .entry()
+            .checked_add(main_bias)
+            .and_then(|value| usize::try_from(value).ok())
+            .ok_or(SpawnError::TooLarge)?,
+    };
+    let (auxv, auxv_len) = build_auxv(main_elf, main_bias, interp_bias);
     let random = random_bytes(&auxv as *const _ as usize);
 
     let child = match sys.proc_create() {
         Ok(child) => child,
         Err(error) => {
-            if let Some(object) = image_object {
-                let _ = sys.handle_close(object);
-            }
+            close_objects(
+                sys,
+                main_object,
+                interp_map.as_ref().and_then(|entry| entry.4),
+            );
             return Err(SpawnError::Sys(error));
         }
     };
-    for step in steps {
-        if let Err(error) = map_step(sys, child, map_source, step) {
-            if let Some(object) = image_object {
-                let _ = sys.handle_close(object);
-            }
+    if let Err(error) = map_plan(sys, child, main_map, main_steps) {
+        close_objects(
+            sys,
+            main_object,
+            interp_map.as_ref().and_then(|entry| entry.4),
+        );
+        let _ = sys.handle_close(child);
+        return Err(error);
+    }
+    if let Some((_, steps, map, _, object)) = interp_map {
+        if let Err(error) = map_plan(sys, child, map, steps) {
+            close_objects(sys, main_object, object);
             let _ = sys.handle_close(child);
             return Err(error);
         }
+        if let Some(object) = object {
+            let _ = sys.handle_close(object);
+        }
     }
-    if let Some(object) = image_object
-        && let Err(error) = sys.handle_close(object)
-    {
-        let _ = sys.handle_close(child);
-        return Err(SpawnError::Sys(error));
+    if let Some(object) = main_object {
+        let _ = sys.handle_close(object);
     }
 
+    let stack_base = STACK_TOP
+        .checked_sub(STACK_SIZE as u64)
+        .ok_or(SpawnError::TooLarge)?;
+    let stack_base_address = usize::try_from(stack_base).map_err(|_| SpawnError::TooLarge)?;
     let memobj = match sys.memobj_create(STACK_SIZE) {
         Ok(handle) => handle,
         Err(error) => {
@@ -363,32 +478,35 @@ fn spawn_elf<S: Sys, I: IntoIterator<Item = MapStep>>(
         }
     };
 
-    // The image builder needs a whole temporary stack. Keeping it on the caller's stack would
-    // overflow the fixed-size stack of a service that spawns a child (all RavenBSD processes have
-    // 64 KiB); the heap allocation is the same size and lives only for this spawn.
     #[cfg(feature = "alloc")]
     let mut stack_buffer = alloc_crate::vec![0u8; STACK_SIZE];
     #[cfg(not(feature = "alloc"))]
-    let mut stack_buffer = [0u8; STACK_SIZE];
+    let mut stack_buffer = [0u8; 64 * 1024];
+    #[cfg(not(feature = "alloc"))]
+    let stack_size = stack_buffer.len();
+    #[cfg(feature = "alloc")]
+    let stack_size = STACK_SIZE;
+
     let (image_offset, sp0) = match build_stack(
         &mut stack_buffer,
-        stack_top,
+        STACK_TOP,
         path,
         options.args,
         options.env,
         &auxv[..auxv_len],
         &random,
+        platform_name(),
     ) {
         Ok(image) => image,
         Err(error) => {
-            let _ = sys.unmap(Handle::SELF_PROC, scratch, STACK_SIZE);
+            let _ = sys.unmap(Handle::SELF_PROC, scratch, stack_size);
             let _ = sys.handle_close(memobj);
             let _ = sys.handle_close(child);
             return Err(error);
         }
     };
     let Some(write_address) = scratch.checked_add(image_offset) else {
-        let _ = sys.unmap(Handle::SELF_PROC, scratch, STACK_SIZE);
+        let _ = sys.unmap(Handle::SELF_PROC, scratch, stack_size);
         let _ = sys.handle_close(memobj);
         let _ = sys.handle_close(child);
         return Err(SpawnError::TooLarge);
@@ -396,7 +514,7 @@ fn spawn_elf<S: Sys, I: IntoIterator<Item = MapStep>>(
     let image = match stack_buffer.get(image_offset..) {
         Some(image) => image,
         None => {
-            let _ = sys.unmap(Handle::SELF_PROC, scratch, STACK_SIZE);
+            let _ = sys.unmap(Handle::SELF_PROC, scratch, stack_size);
             let _ = sys.handle_close(memobj);
             let _ = sys.handle_close(child);
             return Err(SpawnError::TooLarge);
@@ -410,15 +528,15 @@ fn spawn_elf<S: Sys, I: IntoIterator<Item = MapStep>>(
         memobj,
         0,
         stack_base_address,
-        STACK_SIZE,
+        stack_size,
         child_flags,
     ) {
-        let _ = sys.unmap(Handle::SELF_PROC, scratch, STACK_SIZE);
+        let _ = sys.unmap(Handle::SELF_PROC, scratch, stack_size);
         let _ = sys.handle_close(memobj);
         let _ = sys.handle_close(child);
         return Err(SpawnError::Sys(error));
     }
-    if let Err(error) = sys.unmap(Handle::SELF_PROC, scratch, STACK_SIZE) {
+    if let Err(error) = sys.unmap(Handle::SELF_PROC, scratch, stack_size) {
         let _ = sys.handle_close(memobj);
         let _ = sys.handle_close(child);
         return Err(SpawnError::Sys(error));
@@ -444,6 +562,16 @@ fn spawn_elf<S: Sys, I: IntoIterator<Item = MapStep>>(
 }
 
 #[cfg(any(target_os = "none", test))]
+fn close_objects<S: Sys>(sys: &mut S, first: Option<Handle>, second: Option<Handle>) {
+    if let Some(object) = first {
+        let _ = sys.handle_close(object);
+    }
+    if let Some(object) = second {
+        let _ = sys.handle_close(object);
+    }
+}
+
+#[cfg(any(target_os = "none", test))]
 fn map_step<S: Sys>(
     sys: &mut S,
     child: Handle,
@@ -455,15 +583,7 @@ fn map_step<S: Sys>(
     let flags = step.prot as usize;
     match step.kind {
         StepKind::File { offset } => {
-            let (handle, offset) = match source {
-                MapSource::Initfs { data_offset } => {
-                    let offset = data_offset
-                        .checked_add(offset)
-                        .ok_or(SpawnError::TooLarge)?;
-                    (Handle::INITFS, offset)
-                }
-                MapSource::Object(handle) => (handle, offset),
-            };
+            let (handle, offset) = source_request(source, offset)?;
             let offset = usize::try_from(offset).map_err(|_| SpawnError::TooLarge)?;
             // A generic memory object has no EXEC right in ABI v1. Text is therefore populated
             // read-write and protected to read-execute before the child's first thread exists;
@@ -488,8 +608,72 @@ fn map_step<S: Sys>(
             .map(child, Handle::NONE, 0, vaddr, len, flags)
             .map(|_| ())
             .map_err(SpawnError::Sys),
-        StepKind::CopyTail { .. } => Err(SpawnError::BadElf(ElfError::FileTailNotPageAligned)),
+        StepKind::CopyTail { offset, len: tail } => {
+            copy_tail(sys, child, source, step, offset, tail)
+        }
     }
+}
+
+#[cfg(any(target_os = "none", test))]
+fn source_request(source: MapSource, offset: u64) -> Result<(Handle, u64), SpawnError> {
+    match source {
+        MapSource::Initfs { data_offset } => {
+            let offset = data_offset
+                .checked_add(offset)
+                .ok_or(SpawnError::TooLarge)?;
+            Ok((Handle::INITFS, offset))
+        }
+        MapSource::Object(handle) => Ok((handle, offset)),
+    }
+}
+
+/// Fill one page from a partial file tail, then map it into the child.
+#[cfg(any(target_os = "none", test))]
+fn copy_tail<S: Sys>(
+    sys: &mut S,
+    child: Handle,
+    source: MapSource,
+    step: MapStep,
+    offset: u64,
+    len: u64,
+) -> Result<(), SpawnError> {
+    let vaddr = usize::try_from(step.vaddr).map_err(|_| SpawnError::TooLarge)?;
+    let len = usize::try_from(len).map_err(|_| SpawnError::TooLarge)?;
+    let page = usize::try_from(PAGE).map_err(|_| SpawnError::TooLarge)?;
+    let (handle, offset) = source_request(source, offset)?;
+    let offset = usize::try_from(offset).map_err(|_| SpawnError::TooLarge)?;
+    let object = sys.memobj_create(page).map_err(SpawnError::Sys)?;
+    let scratch_flags = map::pack(prot::READ | prot::WRITE, map::SHARED);
+    let scratch = match sys.map(Handle::SELF_PROC, object, 0, 0, page, scratch_flags) {
+        Ok(address) => address,
+        Err(error) => {
+            let _ = sys.handle_close(object);
+            return Err(SpawnError::Sys(error));
+        }
+    };
+    let source_flags = map::pack(prot::READ, map::SHARED);
+    let source_map = match sys.map(Handle::SELF_PROC, handle, offset, 0, page, source_flags) {
+        Ok(address) => address,
+        Err(error) => {
+            let _ = sys.unmap(Handle::SELF_PROC, scratch, page);
+            let _ = sys.handle_close(object);
+            return Err(SpawnError::Sys(error));
+        }
+    };
+    sys.copy_mapping(scratch, source_map, len);
+    let _ = sys.unmap(Handle::SELF_PROC, source_map, page);
+    let child_flags = map::pack(prot::READ | prot::WRITE, map::SHARED | map::FIXED);
+    if let Err(error) = sys.map(child, object, 0, vaddr, page, child_flags) {
+        let _ = sys.unmap(Handle::SELF_PROC, scratch, page);
+        let _ = sys.handle_close(object);
+        return Err(SpawnError::Sys(error));
+    }
+    let _ = sys.unmap(Handle::SELF_PROC, scratch, page);
+    if let Err(error) = sys.protect(child, vaddr, page, step.prot) {
+        let _ = sys.handle_close(object);
+        return Err(SpawnError::Sys(error));
+    }
+    sys.handle_close(object).map_err(SpawnError::Sys)
 }
 
 /// The real syscall implementation used by [`spawn`].
@@ -614,6 +798,14 @@ impl Sys for RtSys {
             core::ptr::copy_nonoverlapping(bytes.as_ptr(), addr as *mut u8, bytes.len());
         }
     }
+
+    fn copy_mapping(&mut self, destination: usize, source: usize, len: usize) {
+        // SAFETY: both addresses are mappings in this process: `destination` is writable and
+        // `source` is readable, each at least `len` bytes, and they do not overlap.
+        unsafe {
+            core::ptr::copy_nonoverlapping(source as *const u8, destination as *mut u8, len);
+        }
+    }
 }
 
 fn handle_from_ret(result: isize) -> Result<Handle, Errno> {
@@ -624,23 +816,65 @@ fn handle_from_ret(result: isize) -> Result<Handle, Errno> {
 #[cfg(any(target_os = "none", test))]
 const PAGE: u64 = 4096;
 #[cfg(any(target_os = "none", test))]
-const STACK_SIZE: usize = 64 * 1024;
-#[cfg(any(target_os = "none", test))]
 const WORD: usize = core::mem::size_of::<usize>();
+/// Minimum child stack: `ARG_MAX` (CR-15) plus the C8 arrays and headroom.
 #[cfg(any(target_os = "none", test))]
-const MAX_AUXV: usize = 5;
+const STACK_SIZE: usize = 256 * 1024;
 #[cfg(any(target_os = "none", test))]
-const AT_PAGESZ: usize = 6;
+const ARG_MAX: usize = 128 * 1024;
+#[cfg(any(target_os = "none", test))]
+const _: () = assert!(STACK_SIZE >= ARG_MAX);
+#[cfg(any(target_os = "none", test))]
+const MAX_AUXV: usize = 20;
 #[cfg(any(target_os = "none", test))]
 const AT_PHDR: usize = 3;
 #[cfg(any(target_os = "none", test))]
+const AT_PHENT: usize = 4;
+#[cfg(any(target_os = "none", test))]
 const AT_PHNUM: usize = 5;
+#[cfg(any(target_os = "none", test))]
+const AT_PAGESZ: usize = 6;
+#[cfg(any(target_os = "none", test))]
+const AT_BASE: usize = 7;
+#[cfg(any(target_os = "none", test))]
+const AT_FLAGS: usize = 8;
 #[cfg(any(target_os = "none", test))]
 const AT_ENTRY: usize = 9;
 #[cfg(any(target_os = "none", test))]
+const AT_UID: usize = 11;
+#[cfg(any(target_os = "none", test))]
+const AT_EUID: usize = 12;
+#[cfg(any(target_os = "none", test))]
+const AT_GID: usize = 13;
+#[cfg(any(target_os = "none", test))]
+const AT_EGID: usize = 14;
+#[cfg(any(target_os = "none", test))]
+const AT_PLATFORM: usize = 15;
+#[cfg(any(target_os = "none", test))]
+const AT_HWCAP: usize = 16;
+#[cfg(any(target_os = "none", test))]
+const AT_CLKTCK: usize = 17;
+#[cfg(any(target_os = "none", test))]
+const AT_SECURE: usize = 23;
+#[cfg(any(target_os = "none", test))]
 const AT_RANDOM: usize = 25;
 #[cfg(any(target_os = "none", test))]
+const AT_HWCAP2: usize = 26;
+#[cfg(any(target_os = "none", test))]
+const AT_EXECFN: usize = 31;
+#[cfg(any(target_os = "none", test))]
+const AT_MINSIGSTKSZ: usize = 51;
+#[cfg(any(target_os = "none", test))]
 const RANDOM_LEN: usize = 16;
+/// Address where an `ET_DYN` main image is based.
+#[cfg(any(target_os = "none", test))]
+const MAIN_PIE_BASE: u64 = 0x0000_1000_0000_0000;
+/// Address where a `PT_INTERP` image is based.
+#[cfg(any(target_os = "none", test))]
+const INTERP_BASE: u64 = 0x0000_2000_0000_0000;
+/// Size of one ELF64 program header.
+#[cfg(any(target_os = "none", test))]
+const PHENT: usize = 56;
 
 #[cfg(any(target_os = "none", test))]
 #[cfg(target_arch = "x86_64")]
@@ -673,8 +907,339 @@ const USER_MIN: u64 = 0x0000_0000_0000_1000;
 const USER_END: u64 = 0x0000_7FFF_FFFF_F000;
 
 #[cfg(any(target_os = "none", test))]
-/// The stack top is the top of the user range; the stack occupies the 64 KiB below it.
+/// The stack top is the top of the user range; the stack occupies [`STACK_SIZE`] and `rsp == sp0`.
 const STACK_TOP: u64 = USER_END;
+
+/// `e_type` from an ELF64 header (`2 = ET_EXEC`, `3 = ET_DYN`).
+#[cfg(any(target_os = "none", test))]
+fn elf_type(data: &[u8]) -> u16 {
+    match data.get(16..18) {
+        Some(bytes) => u16::from_le_bytes([bytes[0], bytes[1]]),
+        None => 0,
+    }
+}
+
+/// The `AT_PLATFORM` spelling for the build architecture.
+#[cfg(any(target_os = "none", test))]
+fn platform_name() -> &'static str {
+    #[cfg(target_arch = "x86_64")]
+    {
+        "x86_64"
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        "aarch64"
+    }
+    #[cfg(target_arch = "riscv64")]
+    {
+        "riscv64"
+    }
+}
+
+/// One page-aligned mapping step of a biased image.
+#[cfg(any(target_os = "none", test))]
+#[derive(Clone, Copy)]
+struct SegPlan {
+    prot: u8,
+    filesz: u64,
+    start: u64,
+    file_end: u64,
+    file_whole_end: u64,
+    zero_start: u64,
+    end: u64,
+    file_offset_base: u64,
+}
+
+#[cfg(any(target_os = "none", test))]
+impl SegPlan {
+    const EMPTY: Self = Self {
+        prot: 0,
+        filesz: 0,
+        start: 0,
+        file_end: 0,
+        file_whole_end: 0,
+        zero_start: 0,
+        end: 0,
+        file_offset_base: 0,
+    };
+
+    fn has_file_tail(&self) -> bool {
+        self.filesz > 0 && self.file_end != self.file_whole_end
+    }
+}
+
+#[cfg(any(target_os = "none", test))]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Phase {
+    Start,
+    File,
+    CopyTail,
+    Zero,
+    Done,
+}
+
+/// The page plan of one image with its load bias applied.
+#[cfg(any(target_os = "none", test))]
+struct BiasedPlan {
+    plans: [SegPlan; MAX_SEGMENTS],
+    count: usize,
+    page: u64,
+    segment_index: usize,
+    phase: Phase,
+    cursor: u64,
+}
+
+#[cfg(any(target_os = "none", test))]
+const MAX_SEGMENTS: usize = 16;
+
+#[cfg(any(target_os = "none", test))]
+impl Iterator for BiasedPlan {
+    type Item = MapStep;
+
+    fn next(&mut self) -> Option<MapStep> {
+        loop {
+            if self.segment_index >= self.count {
+                return None;
+            }
+            let plan = *self.plans.get(self.segment_index)?;
+            match self.phase {
+                Phase::Start => {
+                    self.cursor = plan.start;
+                    self.phase = Phase::File;
+                }
+                Phase::File => {
+                    if self.cursor < plan.file_whole_end {
+                        let delta = self.cursor.checked_sub(plan.start)?;
+                        let offset = plan.file_offset_base.checked_add(delta)?;
+                        let step = MapStep {
+                            vaddr: self.cursor,
+                            len: self.page,
+                            prot: plan.prot,
+                            kind: StepKind::File { offset },
+                        };
+                        self.cursor = self.cursor.checked_add(self.page)?;
+                        return Some(step);
+                    }
+                    self.phase = if plan.has_file_tail() {
+                        Phase::CopyTail
+                    } else {
+                        Phase::Zero
+                    };
+                    self.cursor = plan.zero_start;
+                }
+                Phase::CopyTail => {
+                    self.phase = Phase::Zero;
+                    if plan.has_file_tail() {
+                        let offset = plan
+                            .file_offset_base
+                            .checked_add(plan.file_whole_end.checked_sub(plan.start)?)?;
+                        let len = plan.file_end.checked_sub(plan.file_whole_end)?;
+                        return Some(MapStep {
+                            vaddr: plan.file_whole_end,
+                            len: self.page,
+                            prot: plan.prot,
+                            kind: StepKind::CopyTail { offset, len },
+                        });
+                    }
+                }
+                Phase::Zero => {
+                    if self.cursor < plan.end {
+                        let step = MapStep {
+                            vaddr: self.cursor,
+                            len: self.page,
+                            prot: plan.prot,
+                            kind: StepKind::Zero,
+                        };
+                        self.cursor = self.cursor.checked_add(self.page)?;
+                        return Some(step);
+                    }
+                    self.phase = Phase::Done;
+                }
+                Phase::Done => {
+                    self.segment_index += 1;
+                    self.phase = Phase::Start;
+                }
+            }
+        }
+    }
+}
+
+/// Plan `elf` with `bias` applied to every segment and entry.
+///
+/// [`raven_elf::plan_load`] validates the unbiased addresses against the user range, so an
+/// `ET_DYN` image at address zero cannot use it. This is the same split into whole file pages,
+/// one optional `CopyTail` page and zero pages, with the bias applied first.
+#[cfg(any(target_os = "none", test))]
+fn plan_biased(
+    elf: &Elf<'_>,
+    page: u64,
+    bias: u64,
+    mode: LoadMode,
+) -> Result<BiasedPlan, ElfError> {
+    if page == 0 || !bias.is_multiple_of(page) {
+        return Err(ElfError::BadPhdr);
+    }
+    let mut plans = [SegPlan::EMPTY; MAX_SEGMENTS];
+    let mut count = 0usize;
+    let mut previous_end: Option<u64> = None;
+    for segment in elf.segments() {
+        if segment.memsz == 0 {
+            continue;
+        }
+        let biased_vaddr = segment
+            .vaddr
+            .checked_add(bias)
+            .ok_or(ElfError::SegmentOutsideUserRange)?;
+        let start = page_floor(biased_vaddr);
+        let file_end = biased_vaddr
+            .checked_add(segment.filesz)
+            .ok_or(ElfError::SegmentOutsideUserRange)?;
+        let mem_end = biased_vaddr
+            .checked_add(segment.memsz)
+            .ok_or(ElfError::SegmentOutsideUserRange)?;
+        let end = page_ceil(mem_end).ok_or(ElfError::SegmentOutsideUserRange)?;
+        let file_whole_end = page_floor(file_end);
+        let zero_start = if segment.filesz == 0 {
+            start
+        } else {
+            page_ceil(file_end).ok_or(ElfError::SegmentOutsideUserRange)?
+        };
+        if mode == LoadMode::Strict && segment.filesz > 0 && zero_start != file_end {
+            return Err(ElfError::FileTailNotPageAligned);
+        }
+        if start < USER_MIN || end > USER_END {
+            return Err(ElfError::SegmentOutsideUserRange);
+        }
+        let delta = biased_vaddr.checked_sub(start).ok_or(ElfError::BadPhdr)?;
+        let file_offset_base = segment.offset.checked_sub(delta).ok_or(ElfError::BadPhdr)?;
+        if let Some(previous) = previous_end
+            && start < previous
+        {
+            return Err(ElfError::SegmentOverlap);
+        }
+        previous_end = Some(end);
+        let Some(slot) = plans.get_mut(count) else {
+            return Err(ElfError::TooManySegments);
+        };
+        *slot = SegPlan {
+            prot: segment.prot,
+            filesz: segment.filesz,
+            start,
+            file_end,
+            file_whole_end,
+            zero_start,
+            end,
+            file_offset_base,
+        };
+        count += 1;
+    }
+    Ok(BiasedPlan {
+        plans,
+        count,
+        page,
+        segment_index: 0,
+        phase: Phase::Start,
+        cursor: 0,
+    })
+}
+
+#[cfg(any(target_os = "none", test))]
+fn page_floor(value: u64) -> u64 {
+    value - (value % PAGE)
+}
+
+#[cfg(any(target_os = "none", test))]
+fn page_ceil(value: u64) -> Option<u64> {
+    let remainder = value % PAGE;
+    if remainder == 0 {
+        Some(value)
+    } else {
+        value.checked_add(PAGE - remainder)
+    }
+}
+
+/// Parse and plan one image. `interpreter` selects the `PT_INTERP` rules: the file must be
+/// `ET_DYN` and is based at [`INTERP_BASE`].
+#[cfg(any(target_os = "none", test))]
+fn plan_image<'a>(
+    data: &'a [u8],
+    interpreter: bool,
+) -> Result<(Elf<'a>, BiasedPlan, u64), SpawnError> {
+    let elf = Elf::parse(data, target_machine(), USER_MIN..USER_END).map_err(SpawnError::BadElf)?;
+    if let Some(path) = elf.interp()
+        && !path.starts_with('/')
+    {
+        return Err(SpawnError::BadElf(ElfError::BadPhdr));
+    }
+    let kind = elf_type(data);
+    let bias = if interpreter {
+        if kind != 3 {
+            return Err(SpawnError::BadElf(ElfError::BadType));
+        }
+        INTERP_BASE
+    } else {
+        match kind {
+            2 => 0,
+            3 => MAIN_PIE_BASE,
+            _ => return Err(SpawnError::BadElf(ElfError::BadType)),
+        }
+    };
+    let mode = if kind == 3 {
+        LoadMode::Copy
+    } else {
+        LoadMode::Strict
+    };
+    let steps = plan_biased(&elf, PAGE, bias, mode).map_err(SpawnError::BadElf)?;
+    Ok((elf, steps, bias))
+}
+
+/// Build the PG-50 auxiliary vector for the main image and an optional interpreter.
+///
+/// `AT_PLATFORM`, `AT_RANDOM` and `AT_EXECFN` carry zero here; [`build_stack`] replaces them with
+/// the stack addresses it creates.
+#[cfg(any(target_os = "none", test))]
+fn build_auxv(
+    elf: &Elf<'_>,
+    main_bias: u64,
+    interp_bias: u64,
+) -> ([(usize, usize); MAX_AUXV], usize) {
+    let mut auxv = [(0usize, 0usize); MAX_AUXV];
+    let mut len = 0usize;
+    let mut push = |key: usize, value: usize| {
+        if let Some(slot) = auxv.get_mut(len) {
+            *slot = (key, value);
+            len += 1;
+        }
+    };
+    let phdr = elf
+        .phdr_vaddr()
+        .and_then(|value| value.checked_add(main_bias))
+        .and_then(|value| usize::try_from(value).ok())
+        .unwrap_or(0);
+    push(AT_PHDR, phdr);
+    push(AT_PHENT, PHENT);
+    push(AT_PHNUM, elf.phnum());
+    push(AT_PAGESZ, PAGE as usize);
+    push(AT_BASE, usize::try_from(interp_bias).unwrap_or_default());
+    push(AT_FLAGS, 0);
+    push(
+        AT_ENTRY,
+        usize::try_from(elf.entry().saturating_add(main_bias)).unwrap_or_default(),
+    );
+    push(AT_UID, 0);
+    push(AT_EUID, 0);
+    push(AT_GID, 0);
+    push(AT_EGID, 0);
+    push(AT_PLATFORM, 0);
+    push(AT_HWCAP, 0);
+    push(AT_CLKTCK, 100);
+    push(AT_SECURE, 0);
+    push(AT_RANDOM, 0);
+    push(AT_HWCAP2, 0);
+    push(AT_EXECFN, 0);
+    push(AT_MINSIGSTKSZ, 8192);
+    (auxv, len)
+}
 
 /// Build the C8 initial stack image in `buffer`.
 ///
@@ -684,6 +1249,7 @@ const STACK_TOP: u64 = USER_END;
 /// argument/environment order; pointer arrays follow the C8 order. `AT_RANDOM` in `auxv` is
 /// replaced with the address of `random`, which is placed immediately below the strings.
 #[cfg(any(target_os = "none", test))]
+#[allow(clippy::too_many_arguments)] // the C8 block is passed explicitly
 fn build_stack(
     buffer: &mut [u8],
     stack_top: u64,
@@ -692,6 +1258,7 @@ fn build_stack(
     env: &[&str],
     auxv: &[(usize, usize)],
     random: &[u8; RANDOM_LEN],
+    platform: &str,
 ) -> Result<(usize, u64), SpawnError> {
     if !stack_top.is_multiple_of(16) || buffer.is_empty() {
         return Err(SpawnError::TooLarge);
@@ -715,6 +1282,10 @@ fn build_stack(
             .and_then(|value| value.checked_add(1))
             .ok_or(SpawnError::TooLarge)?;
     }
+    strings_len = strings_len
+        .checked_add(platform.len())
+        .and_then(|value| value.checked_add(1))
+        .ok_or(SpawnError::TooLarge)?;
 
     let auxv_words = auxv.len().checked_mul(2).ok_or(SpawnError::TooLarge)?;
     let words = 5usize
@@ -769,6 +1340,7 @@ fn build_stack(
 
     let mut cursor =
         usize::try_from(strings_start - stack_base).map_err(|_| SpawnError::TooLarge)?;
+    let mut argv_zero = 0usize;
     for index in 0..argc {
         let text = if args.is_empty() {
             path
@@ -776,6 +1348,9 @@ fn build_stack(
             args.get(index).copied().ok_or(SpawnError::TooLarge)?
         };
         let pointer = write_string(buffer, &mut cursor, text, stack_base)?;
+        if index == 0 {
+            argv_zero = pointer;
+        }
         write_word(
             buffer,
             argv_offset
@@ -810,6 +1385,13 @@ fn build_stack(
         0,
     )?;
 
+    let platform_address = {
+        let start = stack_base
+            .checked_add(u64::try_from(cursor).map_err(|_| SpawnError::TooLarge)?)
+            .ok_or(SpawnError::TooLarge)?;
+        let _ = write_string(buffer, &mut cursor, platform, stack_base)?;
+        start
+    };
     let random_offset =
         usize::try_from(random_start - stack_base).map_err(|_| SpawnError::TooLarge)?;
     let random_end = random_offset
@@ -823,6 +1405,10 @@ fn build_stack(
     for (index, (key, value)) in auxv.iter().enumerate() {
         let value = if *key == AT_RANDOM {
             usize::try_from(random_start).map_err(|_| SpawnError::TooLarge)?
+        } else if *key == AT_PLATFORM {
+            usize::try_from(platform_address).map_err(|_| SpawnError::TooLarge)?
+        } else if *key == AT_EXECFN {
+            argv_zero
         } else {
             *value
         };

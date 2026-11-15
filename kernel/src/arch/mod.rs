@@ -13,6 +13,14 @@ pub mod aarch64;
 #[cfg(target_arch = "aarch64")]
 pub use aarch64::*;
 
+/// The BCM2712 PCIe/RP1 kernel seam (Pi 5); UNVERIFIED until a board log exists.
+///
+/// The module lives in `aarch64/` but is declared here with `#[path]` because the shared
+/// architecture module list is the additive wiring point; the file itself is the seam ticket's.
+#[cfg(target_arch = "aarch64")]
+#[path = "aarch64/pcie.rs"]
+pub mod pcie;
+
 /// Architecture name printed in the C4 boot banner.
 #[cfg(target_arch = "x86_64")]
 pub const ARCH_NAME: &str = "x86_64";

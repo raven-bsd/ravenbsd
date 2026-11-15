@@ -124,8 +124,9 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
     let len = frame.r8;
     let flags = usize::try_from(frame.r9).map_err(|_| Errno::EINVAL)?;
 
-    let allowed =
-        prot::MASK | ((map::FIXED | map::SHARED | map::NOFORK | map::ZERO_ON_FORK) << map::SHIFT);
+    let allowed = prot::MASK
+        | ((map::FIXED | map::REPLACE | map::SHARED | map::NOFORK | map::ZERO_ON_FORK)
+            << map::SHIFT);
     if flags & !allowed != 0 {
         return Err(Errno::EINVAL);
     }
@@ -138,9 +139,13 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     let map_flags = flags >> map::SHIFT;
     let fixed = map_flags & map::FIXED != 0;
+    let replace = map_flags & map::REPLACE != 0;
     let shared = map_flags & map::SHARED != 0;
     let nofork = map_flags & map::NOFORK != 0;
     let zero_on_fork = map_flags & map::ZERO_ON_FORK != 0;
+    if replace && !fixed {
+        return Err(Errno::EINVAL);
+    }
     if nofork && zero_on_fork {
         return Err(Errno::EINVAL);
     }
@@ -176,7 +181,15 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
 
     let mut guard = target.address_space.lock();
     let address_space = guard.as_mut().ok_or(Errno::ESRCH)?;
-    let vaddr = if fixed {
+    let vaddr = if replace {
+        // CR-24: REPLACE is the atomic form of FIXED for a PROT_NONE reservation. It refuses a
+        // range carrying any real mapping (EEXIST) instead of silently discarding it.
+        if !address_space.is_reservation(addr, len) {
+            return Err(Errno::EEXIST);
+        }
+        address_space.unmap(addr, len)?;
+        addr
+    } else if fixed {
         if !address_space.vmas().is_free(addr, len) {
             return Err(Errno::EEXIST);
         }
@@ -188,27 +201,42 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
             .ok_or(Errno::ENOMEM)?
     };
 
-    match object {
-        MappedObject::Anonymous => address_space.map_anonymous(vaddr, len, protection)?,
-        MappedObject::Initfs => {
-            address_space.map_initfs(vaddr, len, offset, protection)?;
-        }
+    let mapped = match object {
+        MappedObject::Anonymous => address_space.map_anonymous(vaddr, len, protection),
+        MappedObject::Initfs => address_space.map_initfs(vaddr, len, offset, protection),
         MappedObject::MemObject(object) => {
-            address_space.map_memobj(vaddr, len, offset, protection, object, shared)?;
+            address_space.map_memobj(vaddr, len, offset, protection, object, shared)
         }
-        MappedObject::Mmio(region) => {
-            let physical = region.phys().checked_add(offset).ok_or(Errno::EINVAL)?;
-            let writable = protection & (prot::WRITE as u8) != 0;
-            address_space.map_mmio(vaddr, len, physical, writable)?;
-        }
+        MappedObject::Mmio(region) => match region.phys().checked_add(offset) {
+            Some(physical) => {
+                let writable = protection & (prot::WRITE as u8) != 0;
+                address_space.map_mmio(vaddr, len, physical, writable)
+            }
+            None => Err(Errno::EINVAL),
+        },
         MappedObject::BootBlob(object) => {
-            address_space.map_memobj(vaddr, len, offset, protection, object, false)?;
+            address_space.map_memobj(vaddr, len, offset, protection, object, false)
         }
         MappedObject::Dma(buffer) => {
             let non_cacheable = buffer.flags() & crate::driver::DMA_FLAG_NON_CACHEABLE != 0;
             let writable = protection & (prot::WRITE as u8) != 0;
-            address_space.map_dma(vaddr, len, offset, writable, non_cacheable, buffer)?;
+            address_space.map_dma(vaddr, len, offset, writable, non_cacheable, buffer)
         }
+    };
+    if let Err(error) = mapped {
+        if replace {
+            // The old reservation was removed under the lock; put an equivalent PROT_NONE
+            // reservation back so a failed replace does not leave a hole.
+            if address_space.map_anonymous(addr, len, 0).is_ok() {
+                address_space.set_inherit(
+                    addr,
+                    len,
+                    MapInherit::Inherit,
+                    InheritIdentity::default(),
+                );
+            }
+        }
+        return Err(error);
     }
     address_space.set_inherit(vaddr, len, inherit, identity);
     Ok(vaddr as usize)

@@ -271,6 +271,62 @@ impl Handler for RamfsHandler {
         Ok(written)
     }
 
+    fn pread(&mut self, file: u64, offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
+        let (ino, flags) = {
+            let open = self.opens.get(file).ok_or(Errno::EBADF)?;
+            (open.file.ino, open.flags)
+        };
+        if !flags.readable() {
+            return Err(Errno::EBADF.into());
+        }
+        let stat = self.fs.stat(ino)?;
+        if stat.mode & S_IFMT == S_IFDIR {
+            return Err(Errno::EISDIR.into());
+        }
+        Ok(self.fs.read(ino, offset, buffer, self.clock())?)
+    }
+
+    fn pwrite(&mut self, file: u64, offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
+        let (ino, flags) = {
+            let open = self.opens.get(file).ok_or(Errno::EBADF)?;
+            (open.file.ino, open.flags)
+        };
+        if !flags.writable() {
+            return Err(Errno::EBADF.into());
+        }
+        let stat = self.fs.stat(ino)?;
+        if stat.mode & S_IFMT == S_IFDIR {
+            return Err(Errno::EISDIR.into());
+        }
+        Ok(self.fs.write(ino, offset, buffer, self.clock())?)
+    }
+
+    fn seek(&mut self, file: u64, offset: i64, whence: u32) -> HandlerResult<u64> {
+        let (ino, cursor) = {
+            let open = self.opens.get(file).ok_or(Errno::EBADF)?;
+            (open.file.ino, open.cursor())
+        };
+        let size = if whence == 2 {
+            self.fs.stat(ino)?.size
+        } else {
+            0
+        };
+        let base = match whence {
+            0 => 0,
+            1 => cursor,
+            2 => size,
+            _ => return Err(Errno::EINVAL.into()),
+        };
+        let Some(new_offset) = seek_target(base, offset) else {
+            return Err(Errno::EINVAL.into());
+        };
+        self.opens
+            .get_mut(file)
+            .ok_or(Errno::EBADF)?
+            .set_cursor(new_offset);
+        Ok(new_offset)
+    }
+
     fn close(&mut self, file: u64) -> HandlerResult<()> {
         if let Some(state) = self.opens.close(file)? {
             self.dereference(state.ino);
@@ -409,6 +465,14 @@ impl Handler for RamfsHandler {
 
 fn text(bytes: &[u8]) -> Result<&str, Errno> {
     core::str::from_utf8(bytes).map_err(|_| Errno::EINVAL)
+}
+
+fn seek_target(base: u64, offset: i64) -> Option<u64> {
+    let target = i128::from(base).checked_add(i128::from(offset))?;
+    if target < 0 || target > u64::MAX as i128 {
+        return None;
+    }
+    Some(target as u64)
 }
 
 #[cfg(test)]
