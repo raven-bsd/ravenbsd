@@ -21,15 +21,26 @@
 
 use std::os::raw::c_void;
 
-use raven_libc_m::{LongDouble, expl, expm1l};
+use raven_libc_m::{LongDouble, expl, expm1l, log1pl, log2l, log10l, logl};
 use raven_libc_oracle::config::Config;
-use raven_libc_oracle::decls::m_ld::{oracle_rl_expl, oracle_rl_expm1l};
+use raven_libc_oracle::decls::m_ld::{
+    oracle_rl_expl, oracle_rl_expm1l, oracle_rl_log1pl, oracle_rl_log2l, oracle_rl_log10l,
+    oracle_rl_logl,
+};
 use raven_libc_oracle::rng::Rng;
 
 /// The ULP budget of the default run (measured, see the C47e report).
 const EXPL_BUDGET: u128 = 4;
 /// The ULP budget of `expm1l` (measured, see the C47i report).
 const EXPM1_BUDGET: u128 = 256;
+/// Measured 985 ULP at 200,017 cases (default seeds), budget is ~2x.
+const LOGL_BUDGET: u128 = 2_048;
+/// Measured 1,106 ULP at 200,017 cases (default seeds), budget is ~2x.
+const LOG10L_BUDGET: u128 = 2_048;
+/// Measured 5 ULP at 200,017 cases (the series path avoids `1 + x` cancellation).
+const LOG1PL_BUDGET: u128 = 64;
+/// Measured 1,181 ULP at 200,017 cases (default seeds), budget is ~2x.
+const LOG2L_BUDGET: u128 = 2_048;
 
 const VALUE_MASK: u128 = (1u128 << 80) - 1;
 const SIGN: u128 = 1 << 79;
@@ -76,6 +87,54 @@ fn oracle_expm1(x: LongDouble) -> LongDouble {
     let mut output = [0u8; 16];
     unsafe {
         oracle_rl_expm1l(
+            input.as_ptr().cast::<c_void>(),
+            output.as_mut_ptr().cast::<c_void>(),
+        );
+    }
+    LongDouble::from_bits(u128::from_le_bytes(output))
+}
+
+fn oracle_logl(x: LongDouble) -> LongDouble {
+    let input = x.to_bits().to_le_bytes();
+    let mut output = [0u8; 16];
+    unsafe {
+        oracle_rl_logl(
+            input.as_ptr().cast::<c_void>(),
+            output.as_mut_ptr().cast::<c_void>(),
+        );
+    }
+    LongDouble::from_bits(u128::from_le_bytes(output))
+}
+
+fn oracle_log10l(x: LongDouble) -> LongDouble {
+    let input = x.to_bits().to_le_bytes();
+    let mut output = [0u8; 16];
+    unsafe {
+        oracle_rl_log10l(
+            input.as_ptr().cast::<c_void>(),
+            output.as_mut_ptr().cast::<c_void>(),
+        );
+    }
+    LongDouble::from_bits(u128::from_le_bytes(output))
+}
+
+fn oracle_log1pl(x: LongDouble) -> LongDouble {
+    let input = x.to_bits().to_le_bytes();
+    let mut output = [0u8; 16];
+    unsafe {
+        oracle_rl_log1pl(
+            input.as_ptr().cast::<c_void>(),
+            output.as_mut_ptr().cast::<c_void>(),
+        );
+    }
+    LongDouble::from_bits(u128::from_le_bytes(output))
+}
+
+fn oracle_log2l(x: LongDouble) -> LongDouble {
+    let input = x.to_bits().to_le_bytes();
+    let mut output = [0u8; 16];
+    unsafe {
+        oracle_rl_log2l(
             input.as_ptr().cast::<c_void>(),
             output.as_mut_ptr().cast::<c_void>(),
         );
@@ -174,6 +233,26 @@ fn diff_expl() {
 #[test]
 fn diff_expm1l() {
     run(expm1l, oracle_expm1, EXPM1_BUDGET, "expm1l");
+}
+
+#[test]
+fn diff_logl() {
+    run(logl, oracle_logl, LOGL_BUDGET, "logl");
+}
+
+#[test]
+fn diff_log10l() {
+    run(log10l, oracle_log10l, LOG10L_BUDGET, "log10l");
+}
+
+#[test]
+fn diff_log1pl() {
+    run(log1pl, oracle_log1pl, LOG1PL_BUDGET, "log1pl");
+}
+
+#[test]
+fn diff_log2l() {
+    run(log2l, oracle_log2l, LOG2L_BUDGET, "log2l");
 }
 
 #[test]

@@ -69,6 +69,8 @@ fn the_exp_family_special_cases() {
     assert!(close(log10l(ld(1000.0)), 3.0, 1e-15));
     assert!(close(log1pl(ld(1.0)), core::f64::consts::LN_2, 1e-15));
     assert_eq!(log1pl(ld(0.0)).to_f64(), 0.0);
+    assert!(log1pl(LongDouble::infinity(true)).is_nan());
+    assert!(log1pl(LongDouble::infinity(false)).is_infinite());
 }
 
 #[test]
