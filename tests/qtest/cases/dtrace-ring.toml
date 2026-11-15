@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S57: DTrace provider probe registry, per-CPU rings, wakeups and the syscall probe.
+
+name = "dtrace-ring"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/dtrace/build.sh"]
+initfs = "build/fixtures/dtrace/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-smp", "4"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^smp: 4 cpus online$'
+
+[[expect]]
+regex = '^dtrace: probe id=1 provider=syscall$'
+
+[[expect]]
+regex = '^dtrace: wrap produced=[0-9]+ retained=[0-9]+ dropped=[0-9]+$'
+
+[[expect]]
+regex = '^dtrace: wakeup ok$'
+
+[[expect]]
+regex = '^dtrace: records=[0-9]+ dropped=0 cpus=[1-9]$'
+
+[[expect]]
+regex = '^dtrace-ring: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|dtrace: fail'
