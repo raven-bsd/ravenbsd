@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Standalone host regression crate for C64k. It includes the shell's real
+# `src/ucontext/context_abi.rs`, so it is not part of the product workspace.
+[workspace]
+
+[package]
+name = "raven-libc-ucontext-test"
+version = "0.1.0"
+description = "C64k host regression: the C ucontext_t pointer ABI of getcontext/swapcontext"
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+publish = false
+
+[dependencies]
+raven-libc-abi = { path = "../../../libc/ravenlibc/crates/raven-libc-abi" }
+raven-libc-signal = { path = "../../../libc/ravenlibc/crates/raven-libc-signal" }
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
