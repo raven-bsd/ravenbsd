@@ -921,10 +921,28 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         })
     }
 
-    /// `fchmod` via `OP_CHMOD` with an empty path after PG-21; `ENOSYS` until then.
-    pub fn fchmod(&self, fd: i32, _mode: u32) -> Result<(), Errno> {
-        let _ = self.get(fd)?;
-        Err(Errno::ENOSYS)
+    /// `fchmod` through `OP_CHMOD` on the open file handle.
+    ///
+    /// The protocol has one path-bearing `OP_CHMOD`; `"."` is resolved by
+    /// `vfsd` relative to the handle, so the operation applies to the open
+    /// object instead of a path remembered by libc. The mode is masked to the
+    /// permission bits, matching `chmod`.
+    pub fn fchmod(&self, fd: i32, mode: u32) -> Result<(), Errno> {
+        let reference = self.get(fd)?;
+        let mut request = [0u8; 64];
+        let encoded = CallRequest::new(Call::Chmod {
+            mode: mode & 0o7777,
+            path: b".",
+        })
+        .encode(&mut request)
+        .map_err(|error| error.errno())?;
+        let mut response = [0u8; 8];
+        let count = self
+            .backend
+            .call(reference.handle(), &request[..encoded], &mut response)?;
+        let call_response = CallResponse::decode(raven_proto_fs::OP_CHMOD, &response[..count])
+            .map_err(|error| error.errno())?;
+        xlat::call_status(call_response.status())
     }
 
     /// `truncate(path, size)`: open for write, `OP_TRUNCATE`, close.

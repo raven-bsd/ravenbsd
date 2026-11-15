@@ -1,7 +1,7 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1124
+# records: 1129
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
 _Unwind_Backtrace F - all 2 -
@@ -203,6 +203,7 @@ expm1 F - all 1 -
 expm1f F - all 1 -
 fabs F - all 1 -
 fabsf F - all 1 -
+fchmod F - all 0 sys/stat.h
 fclose F - all 0 stdio.h
 fcntl F - all 0 fcntl.h
 fdim F - all 1 -
@@ -270,6 +271,7 @@ fseek F - all 0 stdio.h
 fstat F - all 0 sys/stat.h
 fstat64 F - all 0 sys/stat.h
 fstatat F - all 0 sys/stat.h
+fsync F - all 0 unistd.h
 ftell F - all 0 stdio.h
 fts_children F - all 1 -
 fts_close F - all 1 -
@@ -416,6 +418,7 @@ isalnum_l F - all 1 -
 isalpha F - all 0 ctype.h
 isalpha_l F - all 1 -
 isascii F - all 1 ctype.h
+isatty F - all 0 unistd.h
 isblank F - all 0 ctype.h
 isblank_l F - all 1 -
 iscntrl F - all 0 ctype.h
@@ -518,6 +521,7 @@ memset F - all 0 string.h
 memset_explicit F - all 0 string.h
 memset_s F - all 1 -
 mergesort F - all 2 -
+mkdir F - all 0 sys/stat.h
 mktime F - all 0 time.h
 mmap F - all 0 sys/mman.h
 mmap64 F - all 1 sys/mman.h
@@ -762,6 +766,7 @@ regerror F - all 0 regex.h
 regexec F - all 0 regex.h
 regfree F - all 0 regex.h
 remque F - all 1 -
+rename F - all 0 stdio.h
 res_init F - all 1 -
 rewinddir F - all 0 dirent.h
 rindex F - all 1 string.h

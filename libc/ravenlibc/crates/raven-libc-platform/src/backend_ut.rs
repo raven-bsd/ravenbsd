@@ -548,6 +548,18 @@ fn platform_pread_is_enosys_and_pipe_is_espipe() {
 }
 
 #[test]
+fn platform_fchmod_changes_the_open_handle_mode() {
+    let fake = FakeSys::new();
+    fake.file(b"/a", b"x");
+    let platform = Platform::new(fake);
+    let fd = platform.open(b"/a", fcntl::O_RDWR as u32, 0).expect("open");
+    platform.fchmod(fd, 0o17_0644).expect("fchmod");
+    let stat = platform.fstat(fd).expect("fstat");
+    assert_eq!(stat.st_mode & 0o7777, 0o644);
+    assert_eq!(platform.fchmod(99, 0o600), Err(Errno::EBADF));
+}
+
+#[test]
 fn platform_ftruncate_needs_write_access() {
     let fake = FakeSys::new();
     fake.file(b"/a", b"x");

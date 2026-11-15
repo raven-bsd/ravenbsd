@@ -11,7 +11,9 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+fat-core = { path = "../../../crates/fat-core", features = ["fixtures"] }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+gpt-core = { path = "../../../crates/gpt-core", features = ["fixtures"] }
 ufs-core = { path = "../../../crates/ufs-core" }
 
 [lints]

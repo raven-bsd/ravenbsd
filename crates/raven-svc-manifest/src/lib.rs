@@ -24,5 +24,7 @@ pub mod overrides;
 mod parse;
 
 pub use graph::{GraphError, Plan, start_order};
-pub use manifest::{Manifest, ParseError, ParseErrorKind, Readiness, Restart};
+pub use manifest::{
+    MAX_READY_TIMEOUT_MS, Manifest, ParseError, ParseErrorKind, Readiness, Restart,
+};
 pub use overrides::{Override, Overrides, UnknownService, apply_overrides, parse_overrides};

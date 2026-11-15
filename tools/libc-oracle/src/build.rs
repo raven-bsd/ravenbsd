@@ -190,6 +190,12 @@ fn build_one(
     run_tool(&tools.objcopy, &objcopy_args, &directory)?;
     recorded_commands.push(prefix(&tools.objcopy, &objcopy_args));
 
+    let prefixed: BTreeSet<String> = defined
+        .iter()
+        .map(|name| format!("oracle_{name}"))
+        .collect();
+    make_symbols_visible(&directory.join("merged_pfx.o"), &prefixed)?;
+
     let library = format!("liboracle_{}.so", request.recipe.family.replace('-', "_"));
     let mut shared_args = Vec::new();
     if request.sanitize {
@@ -217,6 +223,17 @@ fn build_one(
         .map(|name| format!("oracle_{name}"))
         .collect();
     wanted.sort();
+    if !request.adhoc && request.recipe.kind != "header" {
+        for export in &request.recipe.exports {
+            let symbol = format!("oracle_{export}");
+            if !exported.contains(&symbol) {
+                return Err(Failure::refused(format!(
+                    "built {} is missing recipe export `{export}`",
+                    library
+                )));
+            }
+        }
+    }
     if exported != wanted {
         let missing: Vec<&String> = wanted
             .iter()
@@ -250,6 +267,128 @@ fn build_one(
     }
     println!("RAVEN_ORACLE_DIR={}", directory.display());
     Ok((directory, defined.into_iter().collect()))
+}
+
+/// Clear ELF hidden visibility on the named global symbols in an object file.
+///
+/// NetBSD's `crypt.h` marks `__bcrypt` and `__gensalt_blowfish` hidden. `objcopy
+/// --redefine-syms` keeps the visibility bit, and a hidden symbol cannot be exported by the
+/// linker even with `--dynamic-list` or `--export-dynamic-symbol`. The oracle owns the merged
+/// object, so normalise the expected export names to `STV_DEFAULT` before linking. The object is
+/// host ELF64 little-endian (the oracle runs the host toolchain).
+fn make_symbols_visible(path: &Path, names: &BTreeSet<String>) -> Result<()> {
+    let mut data = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+    if data.get(..4) != Some(b"\x7fELF") {
+        bail!("{}: not an ELF file", path.display());
+    }
+    if data.get(4) != Some(&2) || data.get(5) != Some(&1) {
+        bail!("{}: expected ELF64 little-endian", path.display());
+    }
+    let section_offset = read_u64(&data, 0x28)? as usize;
+    let section_entry = read_u16(&data, 0x3a)? as usize;
+    let section_count = read_u16(&data, 0x3c)? as usize;
+    let mut symtab = None;
+    for index in 0..section_count {
+        let header = section_offset
+            .checked_add(index.saturating_mul(section_entry))
+            .ok_or_else(|| anyhow::anyhow!("{}: section table overflow", path.display()))?;
+        if read_u32(&data, header + 4)? == 2 {
+            symtab = Some((
+                read_u32(&data, header + 40)? as usize,
+                read_u64(&data, header + 24)? as usize,
+                read_u64(&data, header + 32)? as usize,
+                read_u64(&data, header + 56)? as usize,
+            ));
+            break;
+        }
+    }
+    let (string_index, symbols_offset, symbols_size, symbol_entry) =
+        symtab.ok_or_else(|| anyhow::anyhow!("{}: no symbol table", path.display()))?;
+    if symbol_entry < 24 || symbols_size % symbol_entry != 0 {
+        bail!("{}: malformed symbol table", path.display());
+    }
+    let string_header =
+        section_offset
+            .checked_add(string_index.checked_mul(section_entry).ok_or_else(|| {
+                anyhow::anyhow!("{}: string table index overflow", path.display())
+            })?)
+            .ok_or_else(|| anyhow::anyhow!("{}: string table offset overflow", path.display()))?;
+    let strings_offset = read_u64(&data, string_header + 24)? as usize;
+    let strings_size = read_u64(&data, string_header + 32)? as usize;
+
+    let mut found = BTreeSet::new();
+    for position in (0..symbols_size).step_by(symbol_entry) {
+        let symbol = symbols_offset
+            .checked_add(position)
+            .ok_or_else(|| anyhow::anyhow!("{}: symbol offset overflow", path.display()))?;
+        let name_offset = read_u32(&data, symbol)? as usize;
+        if name_offset >= strings_size {
+            bail!("{}: symbol name outside the string table", path.display());
+        }
+        let name_start = strings_offset
+            .checked_add(name_offset)
+            .ok_or_else(|| anyhow::anyhow!("{}: symbol name overflow", path.display()))?;
+        let name = read_string(&data, name_start, strings_offset + strings_size)?.to_string();
+        if !names.contains(&name) {
+            continue;
+        }
+        let other = *data
+            .get(symbol + 5)
+            .ok_or_else(|| anyhow::anyhow!("{}: truncated symbol", path.display()))?;
+        if other & 0x3 != 0 {
+            if let Some(slot) = data.get_mut(symbol + 5) {
+                *slot = other & !0x3;
+            } else {
+                bail!("{}: truncated symbol", path.display());
+            }
+        }
+        found.insert(name);
+    }
+    for name in names {
+        if !found.contains(name) {
+            bail!(
+                "{}: export `{name}` is not in the symbol table",
+                path.display()
+            );
+        }
+    }
+    fs::write(path, data).with_context(|| format!("cannot write {}", path.display()))
+}
+
+fn read_u16(data: &[u8], offset: usize) -> Result<u16> {
+    let bytes = data
+        .get(offset..offset + 2)
+        .ok_or_else(|| anyhow::anyhow!("truncated ELF field"))?;
+    Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
+}
+
+fn read_u32(data: &[u8], offset: usize) -> Result<u32> {
+    let bytes = data
+        .get(offset..offset + 4)
+        .ok_or_else(|| anyhow::anyhow!("truncated ELF field"))?;
+    Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+}
+
+fn read_u64(data: &[u8], offset: usize) -> Result<u64> {
+    let bytes = data
+        .get(offset..offset + 8)
+        .ok_or_else(|| anyhow::anyhow!("truncated ELF field"))?;
+    let mut value = [0u8; 8];
+    value.copy_from_slice(bytes);
+    Ok(u64::from_le_bytes(value))
+}
+
+fn read_string(data: &[u8], start: usize, limit: usize) -> Result<&str> {
+    let end = data
+        .get(start..limit)
+        .and_then(|slice| slice.iter().position(|byte| *byte == 0))
+        .map(|length| start + length)
+        .ok_or_else(|| anyhow::anyhow!("unterminated ELF symbol name"))?;
+    core::str::from_utf8(
+        data.get(start..end)
+            .ok_or_else(|| anyhow::anyhow!("truncated ELF symbol name"))?,
+    )
+    .map_err(|_| anyhow::anyhow!("non-UTF-8 ELF symbol name"))
 }
 
 fn compile_args(

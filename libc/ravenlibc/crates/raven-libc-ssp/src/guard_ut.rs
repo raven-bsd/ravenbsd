@@ -4,6 +4,10 @@
 use super::*;
 use core::cell::Cell;
 use core::sync::atomic::Ordering;
+use std::sync::{Mutex, MutexGuard};
+
+/// Tests share `GUARD` and `SSP_WEAK`; serialize them so `reset()` cannot land mid-test.
+static TEST_LOCK: Mutex<()> = Mutex::new(());
 
 struct Sink {
     global: Cell<usize>,
@@ -33,9 +37,18 @@ fn reset() {
     GUARD.store(0, Ordering::SeqCst);
 }
 
+/// Take the module lock and reset the shared state; hold the guard for the test body.
+fn setup() -> MutexGuard<'static, ()> {
+    let guard = TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    reset();
+    guard
+}
+
 #[test]
 fn sixteen_random_bytes_are_preserved_except_byte_one() {
-    reset();
+    let _guard = setup();
     let random = [0x11u8; 16];
     let (value, source) = compute_guard(Some(&random));
     assert_eq!(source, GuardSource::Kernel);
@@ -47,7 +60,7 @@ fn sixteen_random_bytes_are_preserved_except_byte_one() {
 
 #[test]
 fn eight_random_bytes_are_enough() {
-    reset();
+    let _guard = setup();
     let (value, source) = compute_guard(Some(&[0x22; 8]));
     assert_eq!(source, GuardSource::Kernel);
     assert_eq!(value.to_le_bytes()[1], 0);
@@ -55,7 +68,7 @@ fn eight_random_bytes_are_enough() {
 
 #[test]
 fn thirty_two_random_bytes_use_the_first_word() {
-    reset();
+    let _guard = setup();
     let (value, source) = compute_guard(Some(&[0x33; 32]));
     assert_eq!(source, GuardSource::Kernel);
     assert_ne!(value, 0);
@@ -63,7 +76,7 @@ fn thirty_two_random_bytes_use_the_first_word() {
 
 #[test]
 fn missing_random_uses_the_terminator() {
-    reset();
+    let _guard = setup();
     let (value, source) = compute_guard(None);
     assert_eq!(source, GuardSource::Terminator);
     let bytes = value.to_le_bytes();
@@ -75,21 +88,21 @@ fn missing_random_uses_the_terminator() {
 
 #[test]
 fn all_zero_random_uses_the_terminator() {
-    reset();
+    let _guard = setup();
     let (_, source) = compute_guard(Some(&[0u8; 16]));
     assert_eq!(source, GuardSource::Terminator);
 }
 
 #[test]
 fn too_short_random_uses_the_terminator() {
-    reset();
+    let _guard = setup();
     let (_, source) = compute_guard(Some(&[0x44; 3]));
     assert_eq!(source, GuardSource::Terminator);
 }
 
 #[test]
 fn init_writes_both_copies() {
-    reset();
+    let _guard = setup();
     let sink = Sink::new();
     let source = init_guard(Some(&[0x55; 16]), &sink);
     assert_eq!(source, GuardSource::Kernel);
@@ -99,7 +112,7 @@ fn init_writes_both_copies() {
 
 #[test]
 fn terminator_sets_the_weak_flag() {
-    reset();
+    let _guard = setup();
     let sink = Sink::new();
     let _ = init_guard(None, &sink);
     assert!(SSP_WEAK.load(Ordering::SeqCst));
@@ -107,7 +120,7 @@ fn terminator_sets_the_weak_flag() {
 
 #[test]
 fn width_four_has_no_byte_one_clear() {
-    reset();
+    let _guard = setup();
     let (value, source) = compute_guard_width(Some(&[0x11, 0x22, 0x33, 0x44]), 4);
     assert_eq!(source, GuardSource::Kernel);
     assert_eq!(value as u32, 0x4433_2211);
