@@ -6,8 +6,8 @@
 # ready service), `raven doctor` exit 0, `raven config check` exit 0 and an unchanged
 # `svcctl list`.
 #
-# The target binary needs the C64f std startup/runtime on x86_64-unknown-ravenbsd; until that
-# ticket merges the case is skipped instead of falling back to the host binary or the K74 stub.
+# The target binary runs on the C64f std startup (merged at fe1cb864). A missing fixture/build is
+# a failure, never a fallback to the host binary or the K74 stub.
 
 name = "modern-admin"
 arch = "x86_64"
@@ -17,7 +17,6 @@ pre = ["sh tests/fixtures/modern-admin/build.sh"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
-skip = "deferred to C64f: the target x86_64-unknown-ravenbsd std runtime does not start yet; the case, profile and fixture are ready"
 
 [[expect]]
 regex = '^svcd: all services up$'

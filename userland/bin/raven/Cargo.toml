@@ -19,6 +19,7 @@ raven-proto-svc = { path = "../../../crates/raven-proto-svc" }
 [target.'cfg(target_os = "ravenbsd")'.dependencies]
 # `raven-rt` is not usable here: its entry object defines `_start`, which conflicts with the std
 # crt. The scheme client and the directory-entry decoder are enough for the admin backends.
+raven-libc-sys = { path = "../../../libc/ravenlibc/crates/raven-libc-sys" }
 raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
 raven-scheme = { path = "../../../crates/raven-scheme" }
 

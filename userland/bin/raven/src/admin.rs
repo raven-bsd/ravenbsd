@@ -14,6 +14,7 @@
 #![allow(dead_code)] // helpers are used by the target dispatch or by the host tests
 
 use std::ffi::OsString;
+use std::io::Write;
 use std::path::Path;
 
 use raven_config::{ConfigLoader, set_enabled};
@@ -62,13 +63,13 @@ struct Globals {
 
 /// Dispatch a target admin command. `None` means "not mine": the caller runs the full CLI.
 #[cfg(target_os = "ravenbsd")]
-pub(crate) fn dispatch(args: &[OsString]) -> Option<i32> {
+pub(crate) fn dispatch(args: &[OsString], out: &mut dyn Write, err: &mut dyn Write) -> Option<i32> {
     let (globals, command, rest) = parse(args)?;
     let scheme = RtScheme;
     let code = match command.as_str() {
-        "status" => run_status(&globals, &scheme, &rest),
-        "doctor" => run_doctor(&globals, &scheme, &rest),
-        "svc" => run_svc(&globals, &scheme, &rest),
+        "status" => run_status(&globals, &scheme, &rest, out, err),
+        "doctor" => run_doctor(&globals, &scheme, &rest, out, err),
+        "svc" => run_svc(&globals, &scheme, &rest, out, err),
         _ => return None,
     };
     Some(code)
@@ -102,13 +103,25 @@ fn parse(args: &[OsString]) -> Option<(Globals, String, Vec<String>)> {
     None
 }
 
-fn run_status(globals: &Globals, scheme: &dyn Scheme, args: &[String]) -> i32 {
+fn run_status(
+    globals: &Globals,
+    scheme: &dyn Scheme,
+    args: &[String],
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> i32 {
     if !args.is_empty() {
-        return error(globals, "EUSAGE", "status takes no arguments", "status");
+        return error(
+            globals,
+            "EUSAGE",
+            "status takes no arguments",
+            "status",
+            err,
+        );
     }
     let services = match read_services(scheme) {
         Ok(services) => services,
-        Err(message) => return error(globals, "EUNAVAILABLE", &message, "status"),
+        Err(message) => return error(globals, "EUNAVAILABLE", &message, "status", err),
     };
     let core = core_services().unwrap_or_default();
     let core_ok = !core.is_empty()
@@ -153,15 +166,21 @@ fn run_status(globals: &Globals, scheme: &dyn Scheme, args: &[String]) -> i32 {
         if record.write_json(&mut line).is_err() {
             return 1;
         }
-        println!("{line}");
+        let _ = writeln!(out, "{line}");
     } else {
-        println!("version: {}", version.as_deref().unwrap_or("null"));
-        println!("services: {running}/{running}/{total}");
+        let _ = writeln!(out, "version: {}", version.as_deref().unwrap_or("null"));
+        let _ = writeln!(out, "services: {running}/{running}/{total}");
     }
     if core_ok { 0 } else { 1 }
 }
 
-fn run_doctor(globals: &Globals, scheme: &dyn Scheme, args: &[String]) -> i32 {
+fn run_doctor(
+    globals: &Globals,
+    scheme: &dyn Scheme,
+    args: &[String],
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> i32 {
     let mut strict = false;
     for argument in args {
         match argument.as_str() {
@@ -172,6 +191,7 @@ fn run_doctor(globals: &Globals, scheme: &dyn Scheme, args: &[String]) -> i32 {
                     "EUSAGE",
                     &format!("unknown doctor argument `{other}`"),
                     "doctor",
+                    err,
                 );
             }
         }
@@ -192,29 +212,35 @@ fn run_doctor(globals: &Globals, scheme: &dyn Scheme, args: &[String]) -> i32 {
                 .string("status", check.status)
                 .string("detail", &check.detail);
             if record.write_json(&mut line).is_ok() {
-                println!("{line}");
+                let _ = writeln!(out, "{line}");
             }
         } else {
-            println!("{}: {} {}", check.id, check.status, check.detail);
+            let _ = writeln!(out, "{}: {} {}", check.id, check.status, check.detail);
         }
     }
     if failed { 1 } else { 0 }
 }
 
-fn run_svc(globals: &Globals, scheme: &dyn Scheme, args: &[String]) -> i32 {
+fn run_svc(
+    globals: &Globals,
+    scheme: &dyn Scheme,
+    args: &[String],
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> i32 {
     let Some(command) = args.first() else {
-        return error(globals, "EUSAGE", "svc needs a subcommand", "svc");
+        return error(globals, "EUSAGE", "svc needs a subcommand", "svc", err);
     };
     let rest = &args[1..];
     match command.as_str() {
         "list" if rest.is_empty() => match read_services(scheme) {
             Ok(services) => {
                 for service in &services {
-                    emit_service(globals, service, false);
+                    emit_service(globals, service, false, out);
                 }
                 0
             }
-            Err(message) => error(globals, "EUNAVAILABLE", &message, "svc"),
+            Err(message) => error(globals, "EUNAVAILABLE", &message, "svc", err),
         },
         "status" | "start" | "stop" | "restart" => {
             let [name] = rest else {
@@ -223,6 +249,7 @@ fn run_svc(globals: &Globals, scheme: &dyn Scheme, args: &[String]) -> i32 {
                     "EUSAGE",
                     "this svc subcommand needs exactly one service name",
                     "svc",
+                    err,
                 );
             };
             let result = match command.as_str() {
@@ -234,10 +261,10 @@ fn run_svc(globals: &Globals, scheme: &dyn Scheme, args: &[String]) -> i32 {
             };
             match result {
                 Ok(service) => {
-                    emit_service(globals, &service, command != "status");
+                    emit_service(globals, &service, command != "status", out);
                     0
                 }
-                Err(message) => error(globals, "EUNAVAILABLE", &message, "svc"),
+                Err(message) => error(globals, "EUNAVAILABLE", &message, "svc", err),
             }
         }
         "enable" | "disable" => {
@@ -247,6 +274,7 @@ fn run_svc(globals: &Globals, scheme: &dyn Scheme, args: &[String]) -> i32 {
                     "EUSAGE",
                     "svc enable/disable needs exactly one service name",
                     "svc",
+                    err,
                 );
             };
             let enabled = command == "enable";
@@ -258,10 +286,10 @@ fn run_svc(globals: &Globals, scheme: &dyn Scheme, args: &[String]) -> i32 {
                         ready: enabled,
                         restarts: 0,
                     };
-                    emit_service(globals, &service, changed);
+                    emit_service(globals, &service, changed, out);
                     0
                 }
-                Err(cause) => error(globals, "ECONFIG", &cause.to_string(), "svc"),
+                Err(cause) => error(globals, "ECONFIG", &cause.to_string(), "svc", err),
             }
         }
         "logs" => error(
@@ -269,17 +297,19 @@ fn run_svc(globals: &Globals, scheme: &dyn Scheme, args: &[String]) -> i32 {
             "EUNAVAILABLE",
             "svc logs is the raven log command, which arrives with K76",
             "svc",
+            err,
         ),
         _ => error(
             globals,
             "EUSAGE",
             "svc subcommand is list, status, start, stop, restart, enable, disable or logs",
             "svc",
+            err,
         ),
     }
 }
 
-fn emit_service(globals: &Globals, service: &Service, changed: bool) {
+fn emit_service(globals: &Globals, service: &Service, changed: bool, out: &mut dyn Write) {
     if globals.quiet {
         return;
     }
@@ -292,11 +322,12 @@ fn emit_service(globals: &Globals, service: &Service, changed: bool) {
             .null("pid")
             .bool("changed", changed);
         if record.write_json(&mut line).is_ok() {
-            println!("{line}");
+            let _ = writeln!(out, "{line}");
         }
     } else {
         let suffix = if changed { " changed" } else { "" };
-        println!(
+        let _ = writeln!(
+            out,
             "{} {} {}{suffix}",
             service.name,
             service.state,
@@ -305,7 +336,7 @@ fn emit_service(globals: &Globals, service: &Service, changed: bool) {
     }
 }
 
-fn error(globals: &Globals, code: &str, message: &str, command: &str) -> i32 {
+fn error(globals: &Globals, code: &str, message: &str, command: &str, err: &mut dyn Write) -> i32 {
     if globals.json {
         let mut line = String::new();
         let record = Record::new("error")
@@ -316,10 +347,10 @@ fn error(globals: &Globals, code: &str, message: &str, command: &str) -> i32 {
                 vec![("command".into(), Value::String(command.into()))],
             );
         if record.write_json(&mut line).is_ok() {
-            println!("{line}");
+            let _ = writeln!(err, "{line}");
         }
     } else {
-        eprintln!("raven: {message}");
+        let _ = writeln!(err, "raven: {message}");
     }
     1
 }
@@ -456,6 +487,15 @@ fn core_services() -> Result<Vec<String>, String> {
 #[cfg(target_os = "ravenbsd")]
 struct RtScheme;
 
+/// The kernel `OPEN` needs a scheme; bare absolute paths are the `file:` scheme.
+#[cfg(target_os = "ravenbsd")]
+fn wire_path(path: &str) -> String {
+    match path.find(':') {
+        Some(colon) if !path[..colon].contains('/') => path.to_string(),
+        _ => format!("file:{path}"),
+    }
+}
+
 #[cfg(target_os = "ravenbsd")]
 impl RtScheme {
     fn read_all(&self, path: &str, flags: u32) -> Result<Vec<u8>, String> {
@@ -482,26 +522,45 @@ impl RtScheme {
 #[cfg(target_os = "ravenbsd")]
 impl Scheme for RtScheme {
     fn read(&self, path: &str) -> Result<String, String> {
-        let bytes = self.read_all(path, raven_proto_fs::O_RDONLY)?;
-        String::from_utf8(bytes).map_err(|_| format!("{path}: not UTF-8"))
+        let wire = wire_path(path);
+        let flags = u32::from(raven_proto_fs::WIRE_OPEN_READ);
+        let bytes = self.read_all(&wire, flags)?;
+        String::from_utf8(bytes).map_err(|_| format!("{wire}: not UTF-8"))
     }
 
     fn list(&self, path: &str) -> Result<Vec<String>, String> {
-        let bytes = self.read_all(path, raven_proto_fs::O_RDONLY | raven_proto_fs::O_DIRECTORY)?;
+        let wire = wire_path(path);
+        let client = raven_scheme::Client::new();
+        let flags = u32::from(raven_proto_fs::WIRE_OPEN_READ);
+        let handle = client
+            .open(&wire, flags)
+            .map_err(|error| format!("{wire}: {error:?}"))?;
         let mut names = Vec::new();
-        for entry in raven_proto_fs::DirEntryIter::new(&bytes) {
-            let entry = entry.map_err(|error| format!("{path}: {error:?}"))?;
-            let name = std::str::from_utf8(entry.name)
-                .map_err(|_| format!("{path}: a directory entry is not UTF-8"))?;
-            names.push(name.to_string());
+        let mut buffer = [0u8; 4096];
+        loop {
+            let read = client
+                .read(handle, 0, &mut buffer)
+                .map_err(|error| format!("{wire}: {error:?}"))?;
+            if read == 0 {
+                break;
+            }
+            let chunk = buffer.get(..read).unwrap_or_default();
+            // Directory entries are packed per read; decode each chunk on its own.
+            for entry in raven_proto_fs::DirEntryIter::new(chunk) {
+                let entry = entry.map_err(|error| format!("{wire}: {error:?}"))?;
+                let name = std::str::from_utf8(entry.name)
+                    .map_err(|_| format!("{wire}: a directory entry is not UTF-8"))?;
+                names.push(name.to_string());
+            }
         }
+        let _ = client.close(handle);
         Ok(names)
     }
 
     fn call(&self, path: &str, op: u8) -> Result<(), String> {
         let client = raven_scheme::Client::new();
         let handle = client
-            .open(path, 1)
+            .open(path, u32::from(raven_proto_fs::WIRE_OPEN_READ))
             .map_err(|error| format!("{path}: {error:?}"))?;
         let mut response = [0u8; 1];
         let result = client.call(handle, &[op], &mut response);

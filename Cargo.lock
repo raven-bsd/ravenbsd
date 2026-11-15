@@ -483,6 +483,7 @@ version = "0.1.0"
 dependencies = [
  "raven-cli",
  "raven-config",
+ "raven-libc-sys",
  "raven-output",
  "raven-proto-fs",
  "raven-proto-svc",

@@ -5,7 +5,7 @@
 # Stage the target `raven` admin binary for the modern-admin profile. The binary is the std CLI
 # linked against the packed ravenlibc archive and the C64d crt objects; it is installed at
 # `/bin/raven` by profiles/raven-admin-test.d/20-raven.toml. The K74 host/stub binary is never
-# used here.
+# used here. The debug user programs nearly fill the 64 MiB ESP, so the admin binary is stripped
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../../.." && pwd)
@@ -29,11 +29,15 @@ target_dir=$root/build/cargo/modern-admin
 
 RUSTUP_TOOLCHAIN=ravenbsd cargo rustc -q -p raven --target x86_64-unknown-ravenbsd \
     --target-dir "$target_dir" -- \
+    -C relocation-model=static \
+    -C link-arg=-no-pie \
+    -C "link-arg=-T$root/tests/fixtures/modern-admin/raven.ld" \
     -C "link-arg=$root/build/x86_64/crt1.o" \
     -C "link-arg=$root/build/x86_64/crti.o" \
     -C "link-arg=-L$root/build/x86_64" \
     -C "link-arg=-lc" \
-    -C "link-arg=$root/build/x86_64/crtn.o"
+    -C "link-arg=$root/build/x86_64/crtn.o" \
+    -C strip=symbols \
 
 binary=$target_dir/x86_64-unknown-ravenbsd/debug/raven
 if [ ! -f "$binary" ]; then
