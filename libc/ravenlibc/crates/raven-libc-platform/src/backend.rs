@@ -741,14 +741,9 @@ impl SysBackend for FakeSys {
                 raven_proto_fs::CallResponse::Status(0)
             }
             raven_proto_fs::Call::Chmod { mode, path } => {
-                // `fchmod` sends `CHMOD(".")` on the open handle; resolve it to
-                // the path the fake stored for that open file.
-                let target = if path == b"." {
-                    open.path.clone()
-                } else {
-                    key(path)
-                };
-                if let Some(node) = world.nodes.get_mut(&target) {
+                // `fchmod` resolves the OFD's remembered path through the root
+                // handle, so the fake keys it like `chmod`.
+                if let Some(node) = world.nodes.get_mut(&key(path)) {
                     node.mode = (node.mode & raven_libc_abi::stat::S_IFMT) | (mode & 0o7777);
                 }
                 raven_proto_fs::CallResponse::Status(0)
