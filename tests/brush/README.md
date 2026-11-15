@@ -17,6 +17,9 @@ suitable for the on-target `shell-brush` qtest once the target build and the
 shell-profile wiring are unblocked.
 
 The on-target qtest is not present yet: the brush target build currently stops
-in its dependency tree (see `tickets/carl/reports/K26a.md`) and the profile
-cannot switch the active login service without editing paths outside this
-ticket's Owns list.
+in its dependency tree (see `tickets/carl/reports/K26a.md`). Installing a
+`build/brush` artifact in the shared `shell`/`shell-test` profile would make the
+currently passing `shell-session` qtest depend on a binary that cannot be
+built. A dedicated brush profile also needs a new top-level
+`profiles/shell-brush.toml` and `etc/services.d/brush.toml`, which are outside
+this ticket's Owns list.

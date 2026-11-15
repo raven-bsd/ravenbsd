@@ -3,6 +3,11 @@
 
 # Vendored libc 0.2.185 provenance (K02)
 
+> Superseded on the K26a branch by
+> `toolchain/libc-0.2.186-provenance.md`: `nix 0.31.3` requires `libc ^0.2.186`.
+> This file remains the record for the K19a branch and for
+> `toolchain/patches/0002-libc-ravenbsd.patch`.
+
 This is the source/provenance record for `toolchain/patches/0002-libc-ravenbsd.patch`.
 The root `PROVENANCE.toml` is lead-owned and remains unchanged; the reviewer integrates this
 record into the root ledger before eventual acceptance.

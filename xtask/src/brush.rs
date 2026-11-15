@@ -111,7 +111,7 @@ fn build(root: &Path, options: BuildOptions) -> Result<u8> {
         .join("build/cargo")
         .join(format!("brush-{}", options.arch.as_str()));
     let flags = format!(
-        "-C link-arg={} -C link-arg={} -C link-arg=-L{} -C link-arg=-lc -C link-arg={}",
+        "--cfg getrandom_backend=\"custom\" -C link-arg={} -C link-arg={} -C link-arg=-L{} -C link-arg=-lc -C link-arg={}",
         crt1.display(),
         crti.display(),
         crt_dir.display(),
