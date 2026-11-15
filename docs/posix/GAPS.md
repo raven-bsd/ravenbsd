@@ -1845,7 +1845,7 @@ Traceability rows: 1758; profile rows: 1758.
 
 ## Current tree
 
-- frozen exported symbols: 1129
+- frozen exported symbols: 1151
 - `userland/bin` directories: 27
 - headers under `libc/ravenlibc/include`: 220
 - utility directories: cat, cp, date, df, dmesg, echo, hostname, ifconfig, ls, mkdir, mount, mv, nc, netstat, ping, ps, raven, rm, rmdir, route, rsh, sleep, stat, svcctl, touch, umount, uname
