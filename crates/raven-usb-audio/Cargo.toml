@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-usb-audio"
+version = "0.1.0"
+description = "USB Audio Class 1.0 model: descriptors, control requests, isochronous streaming."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raven-rp1-xhci = { path = "../raven-rp1-xhci" }
+
+[dev-dependencies]
+raven-fdt-lite = { path = "../raven-fdt-lite" }
+
+[lints]
+workspace = true

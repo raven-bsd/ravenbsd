@@ -2565,6 +2565,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-usb-audio"
+version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
+ "raven-rp1-xhci",
+]
+
+[[package]]
 name = "raven-usercopy"
 version = "0.1.0"
 dependencies = [
