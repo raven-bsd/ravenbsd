@@ -229,6 +229,16 @@ fn atf_string_definitions_are_complete() {
 }
 
 #[test]
+fn pinned_lld_directory_requires_the_tool() {
+    let root = temp("pinned-lld");
+    assert_eq!(pinned_lld_directory(&root, "x86_64-test"), None);
+    let directory = root.join("lib/rustlib/x86_64-test/bin/gcc-ld");
+    fs::create_dir_all(&directory).expect("gcc-ld");
+    fs::write(directory.join("ld.lld"), b"").expect("lld");
+    assert_eq!(pinned_lld_directory(&root, "x86_64-test"), Some(directory));
+}
+
+#[test]
 fn a_target_build_without_a_sysroot_is_an_error() {
     let root = temp("no-sysroot");
     let mut value = builder(&root);

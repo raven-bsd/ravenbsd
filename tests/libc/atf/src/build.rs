@@ -11,6 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::OnceLock;
 
 use anyhow::{Context, Result, bail};
 
@@ -319,7 +320,7 @@ impl Builder {
             "-o".to_string(),
             binary.display().to_string(),
         ]);
-        let output = run(self.target_compiler(), &args, self.root())?;
+        let output = run_link(self.target_compiler(), &args, self.root())?;
         log.push_str(&output.text);
         if output.success {
             Ok(BuildReport {
@@ -489,9 +490,36 @@ struct CommandOutput {
 }
 
 fn run(program: String, args: &[String], cwd: &Path) -> Result<CommandOutput> {
-    let output = Command::new(&program)
-        .args(args)
-        .current_dir(cwd)
+    run_with_path(program, args, cwd, None)
+}
+
+/// Link the target program with the pinned `ld.lld` when the host has no `ld.lld` on `PATH`.
+///
+/// clang falls back to the host GCC for the unknown Raven target; GCC's `-fuse-ld=lld` searches
+/// `PATH` for `ld.lld`. The toolchain always ships one under its `gcc-ld` directory, so the
+/// runner adds that directory without changing the caller's environment.
+fn run_link(program: String, args: &[String], cwd: &Path) -> Result<CommandOutput> {
+    run_with_path(program, args, cwd, lld_directory().as_deref())
+}
+
+fn run_with_path(
+    program: String,
+    args: &[String],
+    cwd: &Path,
+    extra_path: Option<&Path>,
+) -> Result<CommandOutput> {
+    let mut command = Command::new(&program);
+    command.args(args).current_dir(cwd);
+    if let Some(directory) = extra_path {
+        let mut paths = vec![directory.to_path_buf()];
+        if let Some(current) = std::env::var_os("PATH") {
+            paths.extend(std::env::split_paths(&current));
+        }
+        if let Ok(joined) = std::env::join_paths(paths) {
+            command.env("PATH", joined);
+        }
+    }
+    let output = command
         .output()
         .with_context(|| format!("cannot run `{program}`"))?;
     let mut text = String::from_utf8_lossy(&output.stderr).into_owned();
@@ -500,6 +528,45 @@ fn run(program: String, args: &[String], cwd: &Path) -> Result<CommandOutput> {
         success: output.status.success(),
         text,
     })
+}
+
+/// The toolchain's `gcc-ld` directory when `ld.lld` is absent from `PATH`.
+fn lld_directory() -> Option<PathBuf> {
+    static DIRECTORY: OnceLock<Option<PathBuf>> = OnceLock::new();
+    DIRECTORY
+        .get_or_init(|| {
+            if path_has("ld.lld") {
+                return None;
+            }
+            let sysroot = rustc_output(&["--print", "sysroot"])?;
+            let version = rustc_output(&["-vV"])?;
+            let host = version
+                .lines()
+                .find_map(|line| line.strip_prefix("host: "))?
+                .trim();
+            pinned_lld_directory(Path::new(sysroot.trim()), host)
+        })
+        .clone()
+}
+
+fn path_has(tool: &str) -> bool {
+    std::env::var_os("PATH").is_some_and(|value| {
+        std::env::split_paths(&value).any(|directory| directory.join(tool).is_file())
+    })
+}
+
+fn rustc_output(args: &[&str]) -> Option<String> {
+    let output = Command::new("rustc").args(args).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    String::from_utf8(output.stdout).ok()
+}
+
+/// The `gcc-ld` directory under a Rust sysroot, when it contains `ld.lld`.
+fn pinned_lld_directory(sysroot: &Path, host: &str) -> Option<PathBuf> {
+    let directory = sysroot.join("lib/rustlib").join(host).join("bin/gcc-ld");
+    directory.join("ld.lld").is_file().then_some(directory)
 }
 
 fn run_checked(program: &str, args: &[String], cwd: &Path) -> Result<()> {
