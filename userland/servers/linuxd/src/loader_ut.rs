@@ -191,7 +191,15 @@ fn the_child_gets_every_segment_and_the_arenas() {
             .iter()
             .any(|(addr, _, prot)| *addr == 0x40_0000 && *prot == 5)
     );
-    assert_eq!(child_maps[2].address as u64, loaded.sp - (loaded.sp % PAGE));
+    assert_eq!(
+        child_maps[2].address as u64,
+        loaded
+            .regions
+            .iter()
+            .find(|region| region.start <= loaded.sp && loaded.sp < region.start + region.len)
+            .expect("the stack region")
+            .start
+    );
     assert_eq!(
         child_maps[2].flags & (map::FIXED << map::SHIFT),
         map::FIXED << map::SHIFT
@@ -271,6 +279,6 @@ fn the_stack_and_image_are_written_through_the_scratch_mapping() {
     assert!(
         mock.creations
             .iter()
-            .any(|len| *len == spec.stack.bytes.len().div_ceil(PAGE as usize) * PAGE as usize)
+            .any(|len| *len >= usize::try_from(STACK_RESERVE).expect("reserve fits"))
     );
 }

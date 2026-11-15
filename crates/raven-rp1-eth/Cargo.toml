@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-rp1-eth"
+version = "0.1.0"
+description = "RP1 Ethernet host model: register map, MAC filter, MDIO, rings and link."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raven-fdt-lite = { path = "../raven-fdt-lite" }
+raven-pci = { path = "../raven-pci" }
+raven-rp1 = { path = "../raven-rp1" }
+
+[dev-dependencies]
+raven-pi5 = { path = "../raven-pi5" }
+
+[lints]
+workspace = true

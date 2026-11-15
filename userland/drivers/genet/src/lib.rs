@@ -16,9 +16,14 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+#[cfg(test)]
+extern crate std;
+
 use raven_genet::dtb::GenetInfo;
+use raven_genet::filter::FilterError;
 use raven_genet::frame::FrameError;
 use raven_genet::mac::MacAddress;
+use raven_genet::mdio::MdioError;
 use raven_genet::phy;
 use raven_genet::phy::LinkError;
 use raven_genet::regs;
@@ -26,7 +31,9 @@ use raven_genet::ring::{
     RingError, RingIndices, RingSetup, RxDescriptor, RxStatus, TxDescriptor, TxStatus,
 };
 
+pub mod board;
 pub mod frame;
+pub mod platform;
 
 /// A read or write refused by the seam.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -61,6 +68,14 @@ pub trait Seam {
     fn rx_buffer(&mut self, index: usize) -> Option<Buffer>;
     /// Return the TX packet buffer for `index`.
     fn tx_buffer(&mut self, index: usize) -> Option<Buffer>;
+
+    /// Read `INTRL2_CPU_STAT` for the interrupt loop.
+    fn interrupt_status(&mut self) -> Result<u32, SeamError> {
+        self.read32(regs::INTRL2_CPU_STAT)
+    }
+
+    /// Wait between MDIO busy polls. The host tests use the no-op default.
+    fn delay_us(&mut self, _microseconds: u32) {}
 }
 
 /// The typed bring-up stage.
@@ -111,6 +126,12 @@ pub enum DriverError {
     Frame(FrameError),
     /// The PHY link tracker rejected a sample.
     Link(LinkError),
+    /// The filter table rejected an address list.
+    Filter(FilterError),
+    /// The MDIO command could not be built.
+    Mdio(MdioError),
+    /// The MDIO transaction did not finish within its poll budget.
+    MdioTimeout,
 }
 
 impl From<SeamError> for DriverError {
@@ -134,6 +155,18 @@ impl From<FrameError> for DriverError {
 impl From<LinkError> for DriverError {
     fn from(error: LinkError) -> Self {
         Self::Link(error)
+    }
+}
+
+impl From<FilterError> for DriverError {
+    fn from(error: FilterError) -> Self {
+        Self::Filter(error)
+    }
+}
+
+impl From<MdioError> for DriverError {
+    fn from(error: MdioError) -> Self {
+        Self::Mdio(error)
     }
 }
 

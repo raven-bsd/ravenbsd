@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# Fake required table for the libc-symbol-audit self-test.
+alpha	sym_missing	owner-b	missing fixture
+alpha	sym_present	owner-a	present fixture
+beta	sym_present	owner-c	present fixture

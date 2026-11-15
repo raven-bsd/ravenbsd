@@ -217,6 +217,11 @@ pub fn run() -> i32 {
         };
         if all_up_first {
             raven_rt::println!("svcd: all services up");
+            if let Err(error) = crate::health::mark(&initfs) {
+                raven_rt::eprintln!("svcd: health marker: {error}");
+            } else if initfs.get(crate::health::HEALTH_PATH).is_some() {
+                raven_rt::println!("svcd: health marker written");
+            }
         }
         if exit_when_settled && settled {
             raven_rt::println!("svcd: settled");

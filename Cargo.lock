@@ -217,6 +217,8 @@ dependencies = [
 name = "genet"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
+ "raven-driver",
  "raven-genet",
  "raven-rt",
 ]
@@ -796,6 +798,7 @@ name = "raven-devd"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-fdt-lite",
  "raven-initfs",
  "raven-proto-dev",
  "raven-proto-fs",
@@ -913,6 +916,14 @@ dependencies = [
  "raven-fdt-lite",
  "raven-plat",
  "raven-proto-net",
+]
+
+[[package]]
+name = "raven-genet-stress"
+version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
+ "raven-genet",
 ]
 
 [[package]]
@@ -1990,6 +2001,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-rp1-eth"
+version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
+ "raven-pci",
+ "raven-pi5",
+ "raven-rp1",
+]
+
+[[package]]
+name = "raven-rp1-xhci"
+version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
+ "raven-pci",
+ "raven-pi5",
+ "raven-rp1",
+]
+
+[[package]]
 name = "raven-rsh"
 version = "0.1.0"
 dependencies = [
@@ -2540,6 +2571,15 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-usb-audio"
+version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
+ "raven-proto-audio",
+ "raven-rp1-xhci",
 ]
 
 [[package]]

@@ -22,6 +22,12 @@ fn dispatch(process: &mut LinuxProcess, nr: usize, a: [usize; 6]) -> isize {
     dispatcher.dispatch(process, &call(nr, a))
 }
 
+fn set_path(process: &mut LinuxProcess, path: &[u8]) {
+    process.user_buffer.clear();
+    process.user_buffer.extend_from_slice(path);
+    process.user_buffer.push(0);
+}
+
 #[test]
 fn write_copies_the_prefetched_buffer() {
     let mut process = process();
@@ -176,9 +182,17 @@ fn the_stats_name_every_implemented_handler() {
         [
             "arch_prctl",
             "brk",
+            "close",
             "exit_group",
+            "getdents64",
             "getpid",
+            "lseek",
             "mmap",
+            "open",
+            "openat",
+            "read",
+            "readlink",
+            "readlinkat",
             "rt_sigprocmask",
             "uname",
             "write"
@@ -189,4 +203,111 @@ fn the_stats_name_every_implemented_handler() {
     let stats = dispatcher.stats();
     let write = stats.iter().find(|(name, _, _)| *name == "write");
     assert_eq!(write.map(|(_, calls, _)| *calls), Some(2));
+}
+
+#[test]
+fn openat_and_read_serve_a_proc_file() {
+    let mut process = process();
+    set_path(&mut process, b"/proc/self/status");
+    let fd = dispatch(&mut process, 257, [AT_FDCWD as usize, 0, 0, 0, 0, 0]);
+    assert_eq!(fd, 3);
+    let read = dispatch(&mut process, 0, [3, 0x1000, 4096, 0, 0, 0]);
+    assert!(read > 0);
+    let (address, bytes) = process.pending_write.take().unwrap();
+    assert_eq!(address, 0x1000);
+    assert!(bytes.starts_with(b"Name:\t"));
+    assert_eq!(dispatch(&mut process, 3, [3, 0, 0, 0, 0, 0]), 0);
+    assert!(process.file(3).is_none());
+}
+
+#[test]
+fn open_legacy_and_readlinkat_serve_a_symlink() {
+    let mut process = process();
+    process.set_identity(b"/hello", vec![b"/hello".to_vec()]);
+    set_path(&mut process, b"/proc/self/exe");
+    let read = dispatch(&mut process, 267, [AT_FDCWD as usize, 0, 0x3000, 64, 0, 0]);
+    assert_eq!(read, 6);
+    let (address, bytes) = process.pending_write.take().unwrap();
+    assert_eq!(address, 0x3000);
+    assert_eq!(bytes, b"/hello");
+
+    set_path(&mut process, b"/proc/cpuinfo");
+    let fd = dispatch(&mut process, 2, [0, 0, 0, 0, 0, 0]);
+    assert_eq!(fd, 3);
+    let read = dispatch(&mut process, 0, [3, 0x4000, 64, 0, 0, 0]);
+    assert_eq!(read, 64);
+    assert!(
+        process
+            .pending_write
+            .take()
+            .unwrap()
+            .1
+            .starts_with(b"processor\t")
+    );
+}
+
+#[test]
+fn a_directory_getdents64_lists_its_entries() {
+    let mut process = process();
+    set_path(&mut process, b"/proc/self/fd");
+    let fd = dispatch(
+        &mut process,
+        257,
+        [AT_FDCWD as usize, 0, O_DIRECTORY as usize, 0, 0, 0],
+    );
+    assert_eq!(fd, 3);
+    let read = dispatch(&mut process, 217, [3, 0x5000, 4096, 0, 0, 0]);
+    assert!(read > 0);
+    let (_, bytes) = process.pending_write.take().unwrap();
+    assert!(bytes.windows(2).any(|window| window == b"0\0"));
+    assert!(bytes.windows(2).any(|window| window == b"1\0"));
+    assert!(bytes.windows(2).any(|window| window == b"2\0"));
+    assert_eq!(
+        dispatch(&mut process, 0, [3, 0x5000, 16, 0, 0, 0]),
+        -(Errno::EISDIR.0 as isize)
+    );
+}
+
+#[test]
+fn lseek_moves_the_read_cursor() {
+    let mut process = process();
+    set_path(&mut process, b"/proc/self/exe");
+    process.set_identity(b"/hello", vec![b"/hello".to_vec()]);
+    let _ = dispatch(&mut process, 2, [0, O_RDONLY as usize, 0, 0, 0, 0]);
+    // Opening a symlink is ELOOP; use a regular file instead.
+    set_path(&mut process, b"/proc/cpuinfo");
+    let fd = dispatch(&mut process, 2, [0, 0, 0, 0, 0, 0]);
+    assert_eq!(fd, 3);
+    assert_eq!(
+        dispatch(&mut process, 8, [3, 6, SEEK_SET as usize, 0, 0, 0]),
+        6
+    );
+    let read = dispatch(&mut process, 0, [3, 0x6000, 8, 0, 0, 0]);
+    assert_eq!(read, 8);
+    let (_, bytes) = process.pending_write.take().unwrap();
+    assert_eq!(bytes, b"sor\t: 0\n");
+}
+
+#[test]
+fn open_errors_are_reported_without_state() {
+    let mut process = process();
+    set_path(&mut process, b"/proc/nope");
+    assert_eq!(
+        dispatch(&mut process, 257, [AT_FDCWD as usize, 0, 0, 0, 0, 0]),
+        -(Errno::ENOENT.0 as isize)
+    );
+    set_path(&mut process, b"/proc/self/status");
+    assert_eq!(
+        dispatch(&mut process, 257, [AT_FDCWD as usize, 0, 1, 0, 0, 0]),
+        -(Errno::EACCES.0 as isize)
+    );
+    set_path(&mut process, b"/proc/self/exe");
+    assert_eq!(
+        dispatch(&mut process, 257, [AT_FDCWD as usize, 0, 0, 0, 0, 0]),
+        -(Errno::ELOOP.0 as isize)
+    );
+    assert_eq!(
+        dispatch(&mut process, 3, [3, 0, 0, 0, 0, 0]),
+        -(Errno::EBADF.0 as isize)
+    );
 }

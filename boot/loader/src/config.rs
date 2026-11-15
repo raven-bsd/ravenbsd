@@ -8,6 +8,7 @@
 //! error path. K27 adds the optional A/B keys `slot`, `trial` and `attempts`; a file without them
 //! keeps the legacy single-slot behaviour.
 
+use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
@@ -116,6 +117,8 @@ pub struct Config {
     pub slot: Slot,
     /// Slot being trialled, if any.
     pub trial: Option<Slot>,
+    /// Token that the userland health marker must repeat.
+    pub trial_token: Option<u32>,
     /// Remaining trial boots before rollback.
     pub attempts: u32,
     /// True when `slot`, `trial` or `attempts` appeared in the file.
@@ -135,6 +138,7 @@ impl Config {
     pub fn mark_healthy(&mut self, slot: Slot) {
         self.slot = slot;
         self.trial = None;
+        self.trial_token = None;
         self.attempts = 0;
         self.has_slot_config = true;
     }
@@ -142,6 +146,7 @@ impl Config {
     /// Drop the trial and keep the confirmed slot.
     pub fn rollback(&mut self) {
         self.trial = None;
+        self.trial_token = None;
         self.attempts = 0;
         self.has_slot_config = true;
     }
@@ -160,6 +165,12 @@ impl Config {
         if self.has_slot_config {
             let _ = writeln!(out, "slot = \"{}\"", self.slot.as_str());
             let _ = writeln!(out, "trial = \"{}\"", self.trial.map_or("", Slot::as_str));
+            let _ = writeln!(
+                out,
+                "trial_token = \"{}\"",
+                self.trial_token
+                    .map_or_else(String::new, |token| format!("{token:08x}"))
+            );
             let _ = writeln!(out, "attempts = \"{}\"", self.attempts);
         }
         out
@@ -200,6 +211,8 @@ pub enum ConfigError {
     InvalidSlot(usize),
     /// `attempts` is not an integer in `0..=MAX_ATTEMPTS`.
     InvalidAttempts(usize),
+    /// `trial_token` is not a 32-bit hexadecimal token.
+    InvalidTrialToken(usize),
 }
 
 impl fmt::Display for ConfigError {
@@ -227,6 +240,9 @@ impl fmt::Display for ConfigError {
                 f,
                 "line {line}: attempts must be an integer in 0..={MAX_ATTEMPTS}"
             ),
+            ConfigError::InvalidTrialToken(line) => {
+                write!(f, "line {line}: trial_token must be 1-8 hex digits")
+            }
         }
     }
 }
@@ -291,6 +307,17 @@ pub fn parse_with_warnings(data: &[u8]) -> Result<(Config, Vec<Warning>), Config
                     return Err(ConfigError::InvalidAttempts(line_number));
                 }
                 config.attempts = attempts;
+                config.has_slot_config = true;
+            }
+            "trial_token" => {
+                config.trial_token = if value.is_empty() {
+                    None
+                } else {
+                    Some(
+                        u32::from_str_radix(value, 16)
+                            .map_err(|_| ConfigError::InvalidTrialToken(line_number))?,
+                    )
+                };
                 config.has_slot_config = true;
             }
             _ => warnings.push(Warning {

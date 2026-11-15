@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B30: the Linux personality serves the synthetic procfs/sysfs surface. /init is linuxd and
+# /hello is a static musl probe that reads every file with raw syscalls and prints one `ok` line
+# per file, plus the negative ENOENT case.
+
+name = "linux-proc"
+arch = "x86_64"
+profile = "linux-hello"
+timeout_secs = 180
+pre = ["sh tests/fixtures/linuxd/build.sh"]
+initfs = "build/fixtures/linuxd/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^linux-proc: start$'
+
+[[expect]]
+regex = '^linux-proc: /proc/self/status ok [0-9]+ bytes$'
+
+[[expect]]
+regex = '^linux-proc: /proc/self/maps ok [0-9]+ bytes$'
+
+[[expect]]
+regex = '^linux-proc: /proc/self/cmdline ok [0-9]+ bytes$'
+
+[[expect]]
+regex = '^linux-proc: /proc/self/stat ok [0-9]+ bytes$'
+
+[[expect]]
+regex = '^linux-proc: /proc/cpuinfo ok [0-9]+ bytes$'
+
+[[expect]]
+regex = '^linux-proc: /proc/meminfo ok [0-9]+ bytes$'
+
+[[expect]]
+regex = '^linux-proc: /sys/devices/system/cpu/online ok [0-9]+ bytes$'
+
+[[expect]]
+regex = '^linux-proc: /proc/self/fd ok$'
+
+[[expect]]
+regex = '^linux-proc: /proc/self/exe ok [0-9]+ bytes$'
+
+[[expect]]
+regex = '^linux-proc: enoent ok$'
+
+[[expect]]
+regex = '^linux-proc: done$'
+
+[[expect]]
+regex = '^linuxd: hello exit=0$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|linux-proc: FAIL'

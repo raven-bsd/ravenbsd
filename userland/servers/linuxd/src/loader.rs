@@ -71,6 +71,9 @@ pub const MMAP_BASE: u64 = 0x0000_3000_0000_0000;
 /// Size of the pre-mapped anonymous-`mmap` arena.
 pub const MMAP_SIZE: u64 = 1024 * 1024;
 
+/// Stack reserve below the initial Linux stack image.
+pub const STACK_RESERVE: u64 = 256 * 1024;
+
 /// Why a load failed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LoadError {
@@ -271,6 +274,11 @@ fn map_object<S: Sys>(
 }
 
 /// Map the initial stack and return its initial pointer.
+///
+/// The Linux stack is mapped with a fixed reserve below the initial image instead of only the
+/// bytes of the image: a static program uses ordinary stack frames (a 4 KiB buffer is enough to
+/// fault the one-page B20 mapping) and Linux does not grow a userspace stack through the scheme
+/// server. The image stays at the top; the reserve is zero-filled by the memory object.
 fn map_stack<S: Sys>(
     spec: &ImageSpec,
     sys: &mut S,
@@ -278,8 +286,14 @@ fn map_stack<S: Sys>(
     regions: &mut Vec<Region>,
 ) -> Result<u64, LoadError> {
     let base = spec.stack.base;
-    let page_base = base - (base % PAGE);
-    let end = align_up(base + spec.stack.bytes.len() as u64, PAGE).ok_or(LoadError::TooLarge)?;
+    let image_end = base
+        .checked_add(spec.stack.bytes.len() as u64)
+        .ok_or(LoadError::TooLarge)?;
+    let reserve_start = image_end
+        .checked_sub(STACK_RESERVE)
+        .ok_or(LoadError::TooLarge)?;
+    let page_base = reserve_start.min(base) - (reserve_start.min(base) % PAGE);
+    let end = align_up(image_end, PAGE).ok_or(LoadError::TooLarge)?;
     let length = end.checked_sub(page_base).ok_or(LoadError::TooLarge)?;
     let length = usize::try_from(length).map_err(|_| LoadError::TooLarge)?;
     let object = sys.memobj_create(length).map_err(LoadError::Sys)?;

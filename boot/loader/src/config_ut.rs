@@ -125,9 +125,12 @@ fn malformed_lines_are_rejected() {
 
 #[test]
 fn slot_keys_are_parsed_and_rendered() {
-    let config = parse(b"slot = \"a\"\ntrial = \"b\"\nattempts = \"2\"\n").unwrap();
+    let config =
+        parse(b"slot = \"a\"\ntrial = \"b\"\ntrial_token = \"deadbeef\"\nattempts = \"2\"\n")
+            .unwrap();
     assert_eq!(config.slot, Slot::A);
     assert_eq!(config.trial, Some(Slot::B));
+    assert_eq!(config.trial_token, Some(0xdead_beef));
     assert_eq!(config.attempts, 2);
     assert!(config.has_slot_config);
     assert_eq!(config.boot_slot(), Slot::B);
@@ -135,6 +138,7 @@ fn slot_keys_are_parsed_and_rendered() {
     let rendered = config.render();
     assert!(rendered.contains("slot = \"a\"\n"));
     assert!(rendered.contains("trial = \"b\"\n"));
+    assert!(rendered.contains("trial_token = \"deadbeef\"\n"));
     assert!(rendered.contains("attempts = \"2\"\n"));
     assert_eq!(parse(rendered.as_bytes()).unwrap(), config);
 }
@@ -173,6 +177,10 @@ fn invalid_slot_and_attempts_are_errors() {
     assert_eq!(
         parse(format!("attempts = \"{}\"\n", MAX_ATTEMPTS + 1).as_bytes()).unwrap_err(),
         ConfigError::InvalidAttempts(1)
+    );
+    assert_eq!(
+        parse(b"trial_token = \"not-hex\"\n").unwrap_err(),
+        ConfigError::InvalidTrialToken(1)
     );
 }
 

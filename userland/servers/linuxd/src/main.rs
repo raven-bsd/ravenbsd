@@ -121,6 +121,13 @@ mod program {
 
     fn main(args: raven_rt::Args) -> i32 {
         let path = args.get(1).unwrap_or("/hello");
+        let mut argv = Vec::new();
+        argv.push(path.as_bytes().to_vec());
+        for (index, argument) in args.iter().enumerate() {
+            if index > 0 && argument != path {
+                argv.push(argument.as_bytes().to_vec());
+            }
+        }
         let image = match image_from_initfs(path) {
             Ok(image) => image,
             Err(code) => return code,
@@ -204,7 +211,8 @@ mod program {
         };
 
         let _watchdog = raven_rt::thread::spawn(watchdog, 0, 64 * 1024);
-        serve(sys, loaded, handler, thread)
+        let trace = args.get(2).is_some_and(|argument| argument == "trace");
+        serve(sys, loaded, handler, thread, path, argv, trace)
     }
 
     fn image_from_initfs(path: &str) -> Result<Vec<u8>, i32> {
@@ -244,7 +252,15 @@ mod program {
         bytes
     }
 
-    fn serve(mut sys: KernelSys, loaded: linuxd::Loaded, handler: Handle, thread: Handle) -> i32 {
+    fn serve(
+        mut sys: KernelSys,
+        loaded: linuxd::Loaded,
+        handler: Handle,
+        thread: Handle,
+        path: &str,
+        argv: Vec<Vec<u8>>,
+        trace: bool,
+    ) -> i32 {
         let mut dispatcher = dispatcher();
         let mut process = LinuxProcess::new(
             1,
@@ -255,6 +271,7 @@ mod program {
             loaded.mmap_limit,
         );
         process.regions = loaded.regions.clone();
+        process.set_identity(path.as_bytes(), argv);
         let mut bytes = [0u8; PACKET_SIZE];
         loop {
             let request = match sys::recv(&mut bytes) {
@@ -287,6 +304,7 @@ mod program {
                 call,
                 packet,
                 request,
+                trace,
             );
             if let Some(code) = exit {
                 print_stats(&dispatcher, handler);
@@ -309,6 +327,7 @@ mod program {
         call: raven_proto_linux::LinuxSyscallV1,
         packet: SchemePacket,
         request: Handle,
+        trace: bool,
     ) -> Option<i32> {
         process.user_buffer.clear();
         if let Some(len) = copy_in_len(&call) {
@@ -330,11 +349,13 @@ mod program {
                 Err(error) => action = TrapAction::Reply(-(error.0 as isize)),
             }
         }
-        // The skeleton traces every trap: the line shows which Linux syscall the fixture reached
-        // and what it got back. B21+ can put it behind a quiet flag.
-        match action {
-            TrapAction::Reply(value) => println!("linuxd: trap nr={} -> {value}", call.nr),
-            TrapAction::Exit(code) => println!("linuxd: trap nr={} -> exit {code}", call.nr),
+        // The per-trap trace is opt-in (`linuxd /hello trace`): the B30 fixture emits its own
+        // lines and an interleaved trace would split them. Statistics are always printed at exit.
+        if trace {
+            match action {
+                TrapAction::Reply(value) => println!("linuxd: trap nr={} -> {value}", call.nr),
+                TrapAction::Exit(code) => println!("linuxd: trap nr={} -> exit {code}", call.nr),
+            }
         }
         if !process.output.is_empty() {
             let output = process.take_output();
