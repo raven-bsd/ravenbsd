@@ -5,7 +5,9 @@
 
 use super::*;
 use raven_genet::dtb::DmaMap;
-use raven_genet::phy::PhyMode;
+use raven_genet::phy::{
+    BRGPHY_MII_AUXCTL, BRGPHY_MII_SHADOW_1C, MII_PHYIDR1, MII_PHYIDR2, PhyMode,
+};
 
 const REG_WORDS: usize = 0x5000 / 4;
 
@@ -13,14 +15,27 @@ const REG_WORDS: usize = 0x5000 / 4;
 pub(crate) struct FakeSeam {
     registers: [u32; REG_WORDS],
     fail_reads: bool,
+    mdio: [u16; 32],
+    mdio_busy: bool,
 }
 
 impl FakeSeam {
     pub(crate) fn new() -> Self {
+        let mut mdio = [0u16; 32];
+        mdio[MII_PHYIDR1 as usize] = 0x600d;
+        mdio[MII_PHYIDR2 as usize] = 0x84a0;
+        mdio[BRGPHY_MII_AUXCTL as usize] = 0x8207;
+        mdio[BRGPHY_MII_SHADOW_1C as usize] = 0x8c00;
         Self {
             registers: [0; REG_WORDS],
             fail_reads: false,
+            mdio,
+            mdio_busy: false,
         }
+    }
+
+    pub(crate) fn set_mdio_busy(&mut self, busy: bool) {
+        self.mdio_busy = busy;
     }
 
     pub(crate) fn info() -> GenetInfo {
@@ -64,6 +79,20 @@ impl Seam for FakeSeam {
     fn write32(&mut self, offset: usize, value: u32) -> Result<(), SeamError> {
         if !offset.is_multiple_of(4) {
             return Err(SeamError::Alignment);
+        }
+        if offset == regs::MDIO_CMD {
+            let register = ((value & regs::MDIO_REG_MASK) >> regs::MDIO_REG_SHIFT) as usize;
+            if value & regs::MDIO_WRITE != 0 {
+                if let Some(slot) = self.mdio.get_mut(register) {
+                    *slot = (value & regs::MDIO_DATA_MASK) as u16;
+                }
+                self.registers[offset / 4] = value & !regs::MDIO_START_BUSY;
+            } else if self.mdio_busy {
+                self.registers[offset / 4] = value;
+            } else {
+                self.registers[offset / 4] = self.mdio.get(register).copied().unwrap_or(0) as u32;
+            }
+            return Ok(());
         }
         match self.registers.get_mut(offset / 4) {
             Some(slot) => {

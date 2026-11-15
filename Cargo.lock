@@ -217,6 +217,8 @@ dependencies = [
 name = "genet"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
+ "raven-driver",
  "raven-genet",
  "raven-rt",
 ]
