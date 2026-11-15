@@ -194,11 +194,14 @@ impl SysKernel {
         Self
     }
 
-    /// What the current kernel actually provides: only PG-1 on the two register architectures,
-    /// and even there multi-thread TLS is not scheduled yet, so the conservative answer is none.
+    /// What the current kernel actually provides: PG-1 (`THREAD_SET_TLS`) is
+    /// present on x86-64; AArch64/RISC-V write the user register directly.
+    /// Multi-thread creation remains absent (PG-2).
     #[must_use]
     pub const fn caps_const() -> KernelCaps {
-        KernelCaps::minimal()
+        let mut caps = KernelCaps::minimal();
+        caps.tls = true;
+        caps
     }
 }
 

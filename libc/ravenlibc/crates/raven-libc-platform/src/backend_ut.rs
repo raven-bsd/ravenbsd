@@ -550,6 +550,7 @@ fn platform_pread_is_enosys_and_pipe_is_espipe() {
 #[test]
 fn platform_fchmod_changes_the_open_handle_mode() {
     let fake = FakeSys::new();
+    fake.dir(b"/");
     fake.file(b"/a", b"x");
     let platform = Platform::new(fake);
     let fd = platform.open(b"/a", fcntl::O_RDWR as u32, 0).expect("open");
@@ -557,6 +558,22 @@ fn platform_fchmod_changes_the_open_handle_mode() {
     let stat = platform.fstat(fd).expect("fstat");
     assert_eq!(stat.st_mode & 0o7777, 0o644);
     assert_eq!(platform.fchmod(99, 0o600), Err(Errno::EBADF));
+}
+
+#[test]
+fn platform_fchmod_without_a_remembered_path_is_eopnotsupp() {
+    let fake = FakeSys::new();
+    fake.dir(b"/");
+    fake.file(b"/a", b"x");
+    let platform = Platform::new(fake);
+    let handle = platform
+        .backend()
+        .open(b"file:/a", u32::from(raven_proto_fs::WIRE_OPEN_READ))
+        .expect("backend open");
+    let fd = platform
+        .install(handle, crate::fd::ofd::OfdKind::File, 0, None, false)
+        .expect("install");
+    assert_eq!(platform.fchmod(fd, 0o600), Err(Errno::EOPNOTSUPP));
 }
 
 #[test]

@@ -18,20 +18,88 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
-    use audiod::mixer::{Mixer, PERIOD_FRAMES};
+    use audiod::mixer::{DeviceSink, Mixer, PERIOD_FRAMES};
     use raven_abi::errno::Errno;
-    use raven_proto_audio::{StreamRequest, StreamResponse};
+    use raven_proto_audio::ring::{RingHeader, RingLayout, RingProducer};
+    use raven_proto_audio::{Call, StreamRequest, StreamResponse};
     use raven_proto_fs::{S_IFCHR, Stat};
-    use raven_rt::entry;
     use raven_rt::sync::Mutex;
-    use raven_scheme::{Ctx, Handler, HandlerResult, Opened, Server};
+    use raven_rt::{entry, map_mmio_mut, thread};
+    use raven_scheme::{Client, Ctx, Handler, HandlerResult, Opened, Server};
 
     entry!(main);
 
     /// The only device served in the first gate.
     const DEVICE: &str = "out0";
+    /// The driver ring mapping used by the HDA sink (the driver initialises the header).
+    const DRIVER_RING_BYTES: usize = 64 * 1024;
+    /// One device period at 48 kHz; the pump thread uses this to pace the sink.
+    const DEVICE_PERIOD_NS: u64 = 10_000_000;
 
     static MIXER: Mutex<Option<Mixer>> = Mutex::new(None);
+    static SINK: Mutex<Option<HdaSink>> = Mutex::new(None);
+
+    struct HdaSink {
+        producer: RingProducer<'static>,
+    }
+
+    impl HdaSink {
+        fn open(path: &str) -> Result<Self, Errno> {
+            let client = Client::new();
+            let handle = client.open(path, 3)?;
+            let region = map_mmio_mut(handle, DRIVER_RING_BYTES)?;
+            let header = RingHeader::read_from(region).map_err(|_| Errno::EINVAL)?;
+            let layout =
+                RingLayout::from_header(&header, region.len()).map_err(|_| Errno::EINVAL)?;
+            let format = header.format();
+            if format.rate != 48_000
+                || format.channels != 2
+                || format.sample != raven_proto_audio::SampleFormat::S16Le
+            {
+                return Err(Errno::EOPNOTSUPP);
+            }
+            let producer = RingProducer::new(region, layout).map_err(|_| Errno::EINVAL)?;
+            Ok(Self { producer })
+        }
+    }
+
+    impl DeviceSink for HdaSink {
+        fn write(&mut self, period: &[i16]) -> Result<(), Errno> {
+            let mut bytes = alloc::vec::Vec::with_capacity(period.len().saturating_mul(2));
+            for sample in period {
+                bytes.extend_from_slice(&sample.to_le_bytes());
+            }
+            match self.producer.write(&bytes) {
+                Ok(frames) if frames == period.len() / 2 => Ok(()),
+                _ => Err(Errno::EIO),
+            }
+        }
+
+        fn position_frames(&self) -> u64 {
+            self.producer.position_frames()
+        }
+
+        fn underruns(&self) -> u32 {
+            self.producer.underruns()
+        }
+    }
+
+    fn pump(_argument: usize) {
+        loop {
+            if raven_rt::nanosleep(DEVICE_PERIOD_NS).is_err() {
+                return;
+            }
+            let mut sink = SINK.lock();
+            let Some(device) = sink.as_mut() else {
+                continue;
+            };
+            let result = with_mixer(|mixer| mixer.pump_device(device));
+            if result.is_err() {
+                let _ = sink.take();
+                raven_rt::eprintln!("audiod: hda sink stopped");
+            }
+        }
+    }
 
     fn with_mixer<R>(function: impl FnOnce(&mut Mixer) -> R) -> R {
         let mut guard = MIXER.lock();
@@ -83,6 +151,32 @@ mod program {
                     Ok::<StreamResponse, Errno>(StreamResponse::Ok)
                 })
                 .unwrap_or_else(StreamResponse::Err),
+                StreamRequest::Call(Call::SetBuffer {
+                    handle,
+                    period_frames,
+                    period_count,
+                }) => {
+                    let result = (|| -> Result<(), Errno> {
+                        let format =
+                            with_mixer(|mixer| mixer.stream(file).map(|stream| stream.format))?;
+                        let frame_bytes = usize::from(format.bytes_per_frame());
+                        let data = usize::try_from(period_frames)
+                            .map_err(|_| Errno::EINVAL)?
+                            .saturating_mul(usize::from(period_count))
+                            .saturating_mul(frame_bytes);
+                        let data_offset = (raven_proto_audio::ring::HEADER_LEN
+                            .div_ceil(raven_proto_audio::ring::DATA_ALIGN))
+                            * raven_proto_audio::ring::DATA_ALIGN;
+                        let region = map_mmio_mut(handle, data_offset.saturating_add(data))?;
+                        with_mixer(|mixer| {
+                            mixer.set_buffer(file, region, period_frames, period_count)
+                        })
+                    })();
+                    match result {
+                        Ok(()) => StreamResponse::Ok,
+                        Err(error) => StreamResponse::Err(error),
+                    }
+                }
                 StreamRequest::Call(call) => with_mixer(|mixer| match mixer.call(file, call) {
                     Ok(Some(status)) => Ok(StreamResponse::Status(status)),
                     Ok(None) => Ok(StreamResponse::Ok),
@@ -116,7 +210,7 @@ mod program {
         }
     }
 
-    fn main(_args: raven_rt::Args) -> i32 {
+    fn main(args: raven_rt::Args) -> i32 {
         let mut server = match Server::register("audio") {
             Ok(server) => server,
             Err(error) => {
@@ -125,7 +219,22 @@ mod program {
             }
         };
         let _ = with_mixer(|mixer| mixer.pump());
-        raven_rt::println!("audiod: ready (null sink, {PERIOD_FRAMES} frames/period)");
+        let mut sink_name = "null sink";
+        if let Some(path) = args.env_get("RAVEN_AUDIO_SINK") {
+            match HdaSink::open(path) {
+                Ok(sink) => {
+                    *SINK.lock() = Some(sink);
+                    sink_name = "hda sink";
+                    if let Err(error) = thread::spawn(pump, 0, 64 * 1024) {
+                        raven_rt::eprintln!("audiod: pump thread: {}", error.description());
+                    }
+                }
+                Err(error) => {
+                    raven_rt::eprintln!("audiod: hda sink unavailable: {}", error.description());
+                }
+            }
+        }
+        raven_rt::println!("audiod: ready ({sink_name}, {PERIOD_FRAMES} frames/period)");
         let mut handler = AudioHandler;
         server.run(&mut handler);
     }

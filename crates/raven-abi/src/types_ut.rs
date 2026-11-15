@@ -31,6 +31,9 @@ fn map_flag_packing() {
     let f = map::pack(prot::READ | prot::WRITE, map::FIXED | map::SHARED);
     assert_eq!(f & prot::MASK, 3);
     assert_eq!(f >> map::SHIFT, 3);
+    assert_eq!(map::REPLACE, 4);
+    assert_eq!(map::pack(0, map::FIXED | map::REPLACE), 0x500);
+    assert_eq!(map::REPLACE & map::SHARED, 0);
 }
 
 #[test]
