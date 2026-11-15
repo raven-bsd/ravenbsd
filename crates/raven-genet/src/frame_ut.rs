@@ -154,6 +154,19 @@ fn a_completed_tx_frame_is_reclaimed_and_the_slot_is_freed() {
 }
 
 #[test]
+fn a_malformed_tx_completion_is_reported_and_frees_the_slot() {
+    let mut path = TxPath::new(4).expect("path");
+    path.queue_next(0x8000, 64).expect("queue");
+    let malformed = TxStatus::from_raw(0);
+    assert_eq!(
+        path.reclaim_next(malformed),
+        Err(FrameError::BadStatus(TxError::BadLength(0)))
+    );
+    assert_eq!(path.slot_owner(0), Some(SlotOwner::Free));
+    assert_eq!(path.posted(), Ok(0));
+}
+
+#[test]
 fn a_still_owned_tx_descriptor_is_not_advanced() {
     let mut path = TxPath::new(4).expect("path");
     let post = path.queue_next(0x8000, 64).expect("queue");

@@ -344,6 +344,10 @@ impl TxPath {
         entry.owner = SlotOwner::Free;
         entry.descriptor = descriptor;
         self.indices.advance_consumer(1)?;
+        let length = status.length();
+        if length == 0 || length > BUFFER_LEN {
+            return Err(FrameError::BadStatus(TxError::BadLength(length)));
+        }
         Ok(Some(TxCompletion {
             index: slot as u16,
             descriptor,
