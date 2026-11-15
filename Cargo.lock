@@ -511,6 +511,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pwm-audio"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-audio",
+ "raven-pwm",
+ "raven-rt",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1902,6 +1911,13 @@ dependencies = [
  "raven-output",
  "raven-proto-fs",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-pwm"
+version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
 ]
 
 [[package]]

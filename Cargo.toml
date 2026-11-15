@@ -183,6 +183,7 @@ members = [
     "userland/drivers/virtio-blk",
     "userland/drivers/emmc2",
     "userland/drivers/genet",
+    "userland/drivers/pwm-audio",
     "tools/bench-host",
     "tools/fuzz",
     "tests/fuzz/replay",
