@@ -10,16 +10,13 @@ schema = 1
 family = "compat-crypt"
 description = "bcrypt and the $1$/$5$/$6$ crypt formats over the donor digests"
 exports = [
-  "__bcrypt",
-  "__crypt_md5",
-  "__crypt_sha256",
-  "__crypt_sha512",
-  "bcrypt_gensalt",
+    "__bcrypt", "__crypt_md5", "__crypt_sha256", "__crypt_sha512", "__gensalt_blowfish",
+    "bcrypt_gensalt",
 ]
 opt = ["O2", "O0"]
 defines = []
 include = ["shim:compat", "donor:netbsd/lib/libcrypt"]
-flags = ["-include", "shim:compat/bcrypt_shim.h"]
+force_include = ["shim:compat/bcrypt_shim.h"]
 
 [[source]]
 donor = "netbsd"

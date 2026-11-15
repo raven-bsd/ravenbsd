@@ -204,6 +204,7 @@ fn command_adhoc(args: &[String]) -> Result<u8> {
         opt: vec!["O2".to_string()],
         defines: Vec::new(),
         include: Vec::new(),
+        force_include: Vec::new(),
         aliases: Default::default(),
         flags: Vec::new(),
         source: vec![Source { donor, path: file }],

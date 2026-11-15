@@ -81,6 +81,7 @@ fn compile_args_follow_the_documented_order() {
         &request,
         &recipe.source[0],
         &[("shim:openbsd".to_string(), "/abs/shim".to_string())],
+        &[],
         Path::new("/abs/donor/lib/helper.c"),
         "obj/helper.o",
     );
@@ -238,6 +239,7 @@ fn adhoc_build_derives_exports_from_nm() {
         opt: vec!["O2".to_string()],
         defines: Vec::new(),
         include: Vec::new(),
+        force_include: Vec::new(),
         aliases: Default::default(),
         flags: Vec::new(),
         source: vec![Source {
