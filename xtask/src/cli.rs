@@ -10,7 +10,9 @@ use anyhow::{Result, anyhow, bail};
 
 use crate::build::{self, Arch, Component};
 use crate::process::{CommandSpec, run as run_command};
-use crate::{check, docs, guard, image, initfs, qtest, repo, run as run_image};
+use crate::{
+    check, docs, guard, image, initfs, posix_check, posix_gaps, qtest, repo, run as run_image,
+};
 
 /// Stable `make help` text. The Makefile prints this through `cargo run -q -p xtask -- help`.
 pub(crate) const HELP: &str = "\
@@ -47,6 +49,8 @@ cargo xtask commands:
   run     --arch <a> [--profile <p>] [--no-build] [-- <qemu args>]
   qtest   [--case <name> | --all] [--arch <a>] [--no-build]
   provenance
+  posix-gaps [--check]
+  posix-check [--profile posix] [--arch A] [--json] [--host-only]
   docs
   libc-abi {gen|check|gaps|reconcile|release} [--root DIR]
   libc-lint [CHECK...] [--root DIR] [--json]
@@ -99,6 +103,12 @@ enum Command {
         args: Vec<String>,
     },
     Provenance,
+    PosixGaps {
+        check: bool,
+    },
+    PosixCheck {
+        args: Vec<String>,
+    },
     Docs,
     Libc {
         name: String,
@@ -132,6 +142,19 @@ fn parse_args(args: &[String]) -> Result<Command> {
             reject_extra(rest, "provenance")?;
             Ok(Command::Provenance)
         }
+        "posix-gaps" => {
+            let mut check = false;
+            for arg in rest {
+                match arg.as_str() {
+                    "--check" => check = true,
+                    other => bail!("unknown posix-gaps option `{other}`"),
+                }
+            }
+            Ok(Command::PosixGaps { check })
+        }
+        "posix-check" => Ok(Command::PosixCheck {
+            args: rest.to_vec(),
+        }),
         "docs" => {
             reject_extra(rest, "docs")?;
             Ok(Command::Docs)
@@ -360,6 +383,14 @@ fn execute(command: Command) -> Result<u8> {
             crate::uutils::run(&root, &args)
         }
         Command::Provenance => provenance(),
+        Command::PosixGaps { check } => {
+            let root = root()?;
+            posix_gaps::run(&root, check)
+        }
+        Command::PosixCheck { args } => {
+            let root = root()?;
+            posix_check::run(&root, &args)
+        }
         Command::Docs => {
             let root = root()?;
             docs::run(&root)

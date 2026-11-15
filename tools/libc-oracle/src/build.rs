@@ -84,23 +84,37 @@ fn build_one(
     let oracle_root = request.recipes.parent().unwrap_or_else(|| Path::new("."));
     let shim_root = oracle_root.join("shim");
     let includes = resolve_includes(request, &shim_root)?;
+    let includes = {
+        let mut all = includes;
+        all.extend(resolve_aliases(request, &shim_root, &directory)?);
+        all
+    };
     let mut recorded_commands: Vec<Vec<String>> = Vec::new();
     let mut object_files = Vec::new();
     let mut sources = Vec::new();
 
     for source in &request.recipe.source {
-        let source_path = request.resources.join(&source.donor).join(&source.path);
+        // A `shim` source is a first-party C file (an ABI thunk) beside the donor sources; it
+        // resolves under the recipe shim tree and has no donor pin or gate entry.
+        let source_path = if source.donor == "shim" {
+            std::path::absolute(shim_root.join(&source.path))
+                .with_context(|| "cannot make the shim source absolute")?
+        } else {
+            request.resources.join(&source.donor).join(&source.path)
+        };
         if !source_path.is_file() {
             bail!(
-                "recipe {}: donor file {} is missing",
+                "recipe {}: source file {} is missing",
                 request.recipe.family,
                 source_path.display()
             );
         }
-        if !request.no_pin_check {
-            pin::check(request.resources, &source.donor, &source.path)?;
+        if source.donor != "shim" {
+            if !request.no_pin_check {
+                pin::check(request.resources, &source.donor, &source.path)?;
+            }
+            gate::check_file(&source_path, &source.donor, request.resources)?;
         }
-        gate::check_file(&source_path, &source.donor, request.resources)?;
         let stem = Path::new(&source.path)
             .file_stem()
             .map(|stem| stem.to_string_lossy().into_owned())
@@ -322,6 +336,73 @@ fn resolve_includes(request: &BuildRequest<'_>, shim_root: &Path) -> Result<Vec<
         }
     }
     Ok(resolved)
+}
+
+/// Materialise the recipe's include-root aliases as symlinked directories and return the matching
+/// `-I` entries.
+///
+/// FreeBSD's build creates `machine -> sys/<arch>/include` and `x86 -> sys/x86/include`; a donor
+/// header can therefore write `<machine/_types.h>`. A recipe says
+/// `aliases = { machine = "donor:freebsd/sys/amd64/include" }` and the builder creates that
+/// layout under its own build directory, never touching the read-only checkout.
+fn resolve_aliases(
+    request: &BuildRequest<'_>,
+    shim_root: &Path,
+    directory: &Path,
+) -> Result<Vec<(String, String)>> {
+    if request.recipe.aliases.is_empty() {
+        return Ok(Vec::new());
+    }
+    let root = directory.join("aliases");
+    fs::create_dir_all(&root).with_context(|| format!("cannot create {}", root.display()))?;
+    for (name, target) in &request.recipe.aliases {
+        let target_path = if let Some(rest) = target.strip_prefix("donor:") {
+            let Some((donor, dir)) = rest.split_once('/') else {
+                bail!(
+                    "recipe {}: alias `{name}` target is malformed",
+                    request.recipe.family
+                );
+            };
+            request.resources.join(donor).join(dir)
+        } else if let Some(dir) = target.strip_prefix("shim:") {
+            shim_root.join(dir)
+        } else {
+            bail!(
+                "recipe {}: alias `{name}` target is malformed",
+                request.recipe.family
+            );
+        };
+        if !target_path.is_dir() {
+            bail!(
+                "recipe {}: alias `{name}` target {} is missing",
+                request.recipe.family,
+                target_path.display()
+            );
+        }
+        let target_absolute = std::path::absolute(&target_path)
+            .with_context(|| format!("cannot make {} absolute", target_path.display()))?;
+        let link = root.join(name);
+        if let Ok(metadata) = link.symlink_metadata() {
+            if metadata.file_type().is_symlink() || metadata.is_file() {
+                fs::remove_file(&link)
+                    .with_context(|| format!("cannot replace alias {}", link.display()))?;
+            } else {
+                bail!(
+                    "recipe {}: alias path {} is not a file",
+                    request.recipe.family,
+                    link.display()
+                );
+            }
+        }
+        std::os::unix::fs::symlink(&target_absolute, &link)
+            .with_context(|| format!("cannot create alias {}", link.display()))?;
+    }
+    let root_absolute = std::path::absolute(&root)
+        .with_context(|| format!("cannot make {} absolute", root.display()))?;
+    Ok(vec![(
+        "aliases".to_string(),
+        root_absolute.display().to_string(),
+    )])
 }
 
 fn donors_of(

@@ -2,6 +2,8 @@
 # documentation entry points. One glob-like prefix per line; `#` starts a comment.
 Cargo.lock
 LICENSE
+LICENSE-*
+*/LICENSE-*
 NOTICE
 PROVENANCE.toml
 AI_POLICY.md
