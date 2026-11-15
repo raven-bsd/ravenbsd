@@ -20,7 +20,8 @@ tests.
 * Bounds: `audio:` path 32 bytes, `WRITE` payload 65 536 bytes, rate `8000..=192000`, channels
   `1..=8`, period frames `1..=1048576`, periods `1..=256`, ring region at most 64 MiB.
 * Handles never travel as pointers. `OPEN` attaches the stream handle through the kernel; for
-  `SET_BUFFER` the client first calls `HANDLE_TRANSFER` with the memory object and puts the
+  `SET_BUFFER` the client first installs the memory object in `audiod` with
+  `HANDLE_TRANSFER_FILE` (or `raven_scheme::Client::transfer_to_server`) and puts the
   **destination-valid** handle value in the message.
 * Errno values are `raven-abi` numbers (Linux values, DR-13). The audio protocol's `ENOTSUP` is
   the ABI's `EOPNOTSUPP` (95).
@@ -99,9 +100,10 @@ version  CALL  SET_BUFFER handle  period=1024  count=4
 ```
 
 `SET_BUFFER` attachment: the client creates a memory object of at least
-`align_up(80, 64) + period_frames * period_count * frame_bytes` bytes, calls
-`HANDLE_TRANSFER(audiod_process, object, MAP|READ|WRITE)` and sends the returned
-destination-valid handle in this message. `audiod` maps it, initialises the header, validates the
+`align_up(80, 64) + period_frames * period_count * frame_bytes` bytes, opens the `audio:` stream,
+calls `HANDLE_TRANSFER_FILE(stream, object, MAP|READ|WRITE)` (the client API is
+`raven_scheme::Client::transfer_to_server`) and sends the returned destination-valid handle in
+this message. The server owns the destination handle and maps it from its own table. `audiod` maps it, initialises the header, validates the
 declared size and answers with the granted geometry. Plain `WRITE` is the simple copy path and
 needs no shared memory.
 

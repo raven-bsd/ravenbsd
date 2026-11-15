@@ -35,6 +35,35 @@ pub fn transfer(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(installed.0 as usize)
 }
 
+/// Dispatch `handle_transfer_file(dest_file, handle, rights_mask)` (raw 0x55).
+///
+/// The destination is the process that owns the scheme server behind `dest_file`, so a client can
+/// send a resource to a server without holding a process handle for it. The source must be
+/// transferable, the file must be a scheme file the caller can read, and the installed rights are
+/// the source rights intersected with `rights_mask`.
+pub fn transfer_to_file(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let file_handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let source_handle = Handle(u32::try_from(frame.rsi).map_err(|_| Errno::EBADF)?);
+    let mask = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
+    if mask == 0 {
+        return Err(Errno::EINVAL);
+    }
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let file = crate::ipc::file_from_handle(&caller, file_handle, Rights::READ)?;
+    let destination = Arc::clone(&file.server);
+    let (object, rights, parent) = clone_transferable(&caller, source_handle)?;
+    let (installed, node) = {
+        let mut handles = destination.handles.lock();
+        let installed = handles.insert_derived(object, rights.intersect(Rights(mask)), &parent)?;
+        let node = handles.lineage_node(installed).ok();
+        (installed, node)
+    };
+    if let Some(node) = node {
+        crate::process::handle::register_lineage(node);
+    }
+    Ok(installed.0 as usize)
+}
+
 fn destination(caller: &Arc<Process>, handle: Handle) -> Result<Arc<Process>, Errno> {
     let table = caller.handles.lock();
     match table.get(handle, Rights::WRITE) {

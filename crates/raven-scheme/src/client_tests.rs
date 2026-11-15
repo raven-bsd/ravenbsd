@@ -120,3 +120,14 @@ fn call_typed_encodes_a_k60_request() {
     );
     assert_eq!(&response, b"ok");
 }
+
+#[test]
+fn transfer_to_server_records_the_file_source_and_rights() {
+    let kernel = FakeKernel::new();
+    let client = Client::with_kernel(kernel.clone());
+    let handle = client
+        .transfer_to_server(Handle(1), Handle(2), 0x07)
+        .unwrap();
+    assert_eq!(handle, Handle(1));
+    assert_eq!(kernel.transfers(), vec![(Handle(1), Handle(2), 0x07)]);
+}

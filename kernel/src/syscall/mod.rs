@@ -88,6 +88,9 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == raven_abi::syscall::HANDLE_COPY {
         return handle_xfer::copy(frame);
     }
+    if number == raven_abi::syscall::HANDLE_TRANSFER_FILE {
+        return handle_xfer::transfer_to_file(frame);
+    }
     if number == raven_abi::syscall::THREAD_EXIT_EX {
         thread::exit_ex(frame);
     }
