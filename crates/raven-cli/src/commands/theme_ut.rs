@@ -17,7 +17,7 @@ fn the_meta_names_the_theme_command() {
     assert_eq!(THEME_COMMAND.meta().name, "theme");
     assert_eq!(
         THEME_COMMAND.meta().usage,
-        "raven theme <preview|set|apply> [OPTIONS]"
+        "raven theme <preview|set|apply|export> [OPTIONS]"
     );
 }
 
@@ -41,6 +41,7 @@ fn apply_writes_the_adapters_and_reports_no_backup() {
     let backup = apply_to(&path, &Palette::raven_violet(), Depth::Ansi256, false).expect("apply");
     assert!(backup.is_none());
     let text = fs::read_to_string(&path).expect("adapter file");
+    assert!(text.contains("RAVEN_PALETTE='#b388ff:"));
     assert!(text.contains("LS_COLORS="));
     assert!(text.contains("LESS_TERMCAP_md="));
     assert!(!text.contains('\x1b'));

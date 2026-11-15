@@ -1094,6 +1094,26 @@ pub fn handle_transfer(dest: Handle, source: Handle, rights: Rights) -> Result<H
     })
 }
 
+/// Install a duplicate of `source` in the scheme server behind `file`, returning its handle.
+///
+/// The returned value is valid in the server's table, not the caller's. The file must be a scheme
+/// file the caller can read; the server receives `source` with `rights` (never more).
+pub fn handle_transfer_file(file: Handle, source: Handle, rights: Rights) -> Result<Handle, Errno> {
+    if file == Handle::NONE || source == Handle::NONE || rights == Rights::NONE {
+        return Err(Errno::EINVAL);
+    }
+    // SAFETY: HANDLE_TRANSFER_FILE takes scalar arguments only; the kernel validates the file,
+    // the source's TRANSFER right and intersects the destination rights.
+    handle_from_ret(unsafe {
+        syscall3(
+            raven_abi::syscall::HANDLE_TRANSFER_FILE,
+            file.0 as usize,
+            source.0 as usize,
+            rights.0 as usize,
+        )
+    })
+}
+
 /// Reject the arguments C14 defines as invalid before entering the kernel.
 fn validate_transfer(dest: Handle, source: Handle, rights: Rights) -> Result<(), Errno> {
     if dest == Handle::NONE || source == Handle::NONE || rights == Rights::NONE {

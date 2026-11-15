@@ -60,6 +60,7 @@ pub mod setprogname;
 pub mod spawn_model;
 pub mod spawnp;
 pub mod startup;
+pub mod syscall_backend;
 pub mod times;
 pub mod wait;
 pub mod wait3;

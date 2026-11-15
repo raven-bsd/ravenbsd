@@ -76,10 +76,59 @@ pub enum ProcessState {
     Exited,
 }
 
+/// Process identity and credentials shared by the P2a syscall slice.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProcessIds {
+    /// Parent process id.
+    pub ppid: u64,
+    /// Process group id.
+    pub pgid: u64,
+    /// Session id.
+    pub sid: u64,
+    /// Real user id.
+    pub uid: u32,
+    /// Effective user id.
+    pub euid: u32,
+    /// Real group id.
+    pub gid: u32,
+    /// Effective group id.
+    pub egid: u32,
+}
+
+impl ProcessIds {
+    /// The kernel process identity.
+    pub const fn kernel() -> Self {
+        Self {
+            ppid: 0,
+            pgid: 0,
+            sid: 0,
+            uid: 0,
+            euid: 0,
+            gid: 0,
+            egid: 0,
+        }
+    }
+
+    /// Identity inherited from a parent process.
+    pub const fn inherited(parent: &Self, ppid: u64) -> Self {
+        Self {
+            ppid,
+            pgid: parent.pgid,
+            sid: parent.sid,
+            uid: parent.uid,
+            euid: parent.euid,
+            gid: parent.gid,
+            egid: parent.egid,
+        }
+    }
+}
+
 /// A process.
 pub struct Process {
     /// Process id (PID 1 for the first process).
     pub id: u64,
+    /// Parent, group, session and credentials.
+    pub ids: Mutex<ProcessIds>,
     /// Path used to start the process.
     pub path: String,
     /// User address space (`None` for the kernel process or an exited process).
@@ -188,6 +237,7 @@ pub fn current() -> Option<Arc<Process>> {
 pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
     Ok(Arc::new(Process {
         id: 0,
+        ids: Mutex::new(ProcessIds::kernel()),
         path: String::from("/kernel"),
         address_space: Mutex::new(None),
         handles: Mutex::new(HandleTable::new()),
@@ -213,14 +263,16 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
 /// Create an empty process for `PROC_CREATE`, with the well-known handles installed.
 pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
-    let namespace = if let Some(parent) = current() {
+    let (namespace, ids) = if let Some(parent) = current() {
         let snapshot = parent.namespace.lock().clone();
-        snapshot.child_snapshot(&ipc::registry::names())
+        let ids = ProcessIds::inherited(&parent.ids.lock(), parent.id);
+        (snapshot.child_snapshot(&ipc::registry::names()), ids)
     } else {
-        Namespace::root()
+        (Namespace::root(), ProcessIds::kernel())
     };
     let process = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+        ids: Mutex::new(ids),
         path: String::from("child"),
         address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
         handles: Mutex::new(HandleTable::new()),
@@ -254,8 +306,10 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
 pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> {
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
     let personality = *source.personality.lock();
+    let ids = ProcessIds::inherited(&source.ids.lock(), source.id);
     let child = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+        ids: Mutex::new(ids),
         path: source.path.clone(),
         address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
         handles: Mutex::new(HandleTable::new()),
@@ -357,8 +411,18 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
     load_segments(&mut user_address_space, &elf, data)?;
     let user_stack = build_stack(&mut user_address_space, path, elf.entry(), &elf)?;
 
+    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
     let process = Arc::new(Process {
-        id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
+        id,
+        ids: Mutex::new(ProcessIds {
+            ppid: 0,
+            pgid: id,
+            sid: id,
+            uid: 0,
+            euid: 0,
+            gid: 0,
+            egid: 0,
+        }),
         path: String::from(path),
         address_space: Mutex::new(Some(user_address_space)),
         handles: Mutex::new(HandleTable::new()),

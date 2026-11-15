@@ -16,8 +16,8 @@ use crate::commands::{Command, CommandMeta};
 
 static THEME_META: CommandMeta = CommandMeta {
     name: "theme",
-    summary: "preview, set or apply the Raven terminal theme",
-    usage: "raven theme <preview|set|apply> [OPTIONS]",
+    summary: "preview, set, apply or export the Raven terminal theme",
+    usage: "raven theme <preview|set|apply|export> [OPTIONS]",
     reserved: false,
 };
 
@@ -33,13 +33,14 @@ impl Command for Theme {
 
     fn run(&self, context: &mut Context<'_>, args: &[OsString]) -> Exit {
         let Some(action) = args.first().map(|value| value.to_string_lossy()) else {
-            return context.usage("theme needs preview, set or apply");
+            return context.usage("theme needs preview, set, apply or export");
         };
         match action.as_ref() {
             "preview" => preview(context, &args[1..]),
             "set" => set(context, &args[1..]),
             "apply" => apply(context, &args[1..]),
-            _ => context.usage("theme needs preview, set or apply"),
+            "export" => export(context, &args[1..]),
+            _ => context.usage("theme needs preview, set, apply or export"),
         }
     }
 }
@@ -86,6 +87,30 @@ fn preview(context: &mut Context<'_>, args: &[OsString]) -> Exit {
         text.push('\n');
     }
     context.write_stdout(&text)
+}
+
+fn export(context: &mut Context<'_>, args: &[OsString]) -> Exit {
+    let shell = match args {
+        [] => false,
+        [flag] if flag == "--shell" => true,
+        _ => return context.usage("theme export takes only --shell"),
+    };
+    let palette = match palette() {
+        Ok(palette) => palette,
+        Err(error) => return context.fail("ECONFIG", &error),
+    };
+    let spec = palette.to_env_spec();
+    if context.format == Format::Json {
+        let record = Record::new("theme")
+            .string("name", &palette.name)
+            .string("palette", &spec);
+        return context.emit_record(&record);
+    }
+    if shell {
+        context.write_stdout(&format!("export RAVEN_PALETTE='{spec}'\n"))
+    } else {
+        context.write_stdout(&format!("{spec}\n"))
+    }
 }
 
 fn set(context: &mut Context<'_>, args: &[OsString]) -> Exit {

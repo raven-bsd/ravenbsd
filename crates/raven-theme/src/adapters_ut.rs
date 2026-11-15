@@ -52,8 +52,9 @@ fn the_adapters_never_contain_a_raw_escape() {
 }
 
 #[test]
-fn shell_fragment_has_both_adapters() {
+fn shell_fragment_has_both_adapters_and_the_palette() {
     let value = shell_fragment(&Palette::mono(), Depth::Ansi16);
+    assert!(value.contains("RAVEN_PALETTE="));
     assert!(value.contains("LS_COLORS="));
     assert!(value.contains("LESS_TERMCAP_md="));
 }

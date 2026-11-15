@@ -9,7 +9,7 @@
 
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
-use raven_abi::types::Handle;
+use raven_abi::types::{Handle, Rights};
 
 /// One raw syscall with up to six arguments.
 #[inline(always)]
@@ -160,6 +160,24 @@ pub(crate) fn dup(handle: Handle, rights: u32) -> Result<Handle, Errno> {
         handle.0 as usize,
         rights as usize,
         0,
+        0,
+        0,
+        0,
+    ))?;
+    u32::try_from(value).map(Handle).map_err(|_| Errno::EINVAL)
+}
+
+/// Install a reduced duplicate of `source` in the scheme server that owns `file`.
+pub(crate) fn handle_transfer_file(
+    file: Handle,
+    source: Handle,
+    rights: Rights,
+) -> Result<Handle, Errno> {
+    let value = checked(syscall6(
+        raven_abi::syscall::HANDLE_TRANSFER_FILE,
+        file.0 as usize,
+        source.0 as usize,
+        rights.bits() as usize,
         0,
         0,
         0,

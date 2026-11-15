@@ -55,6 +55,9 @@ pub(crate) struct Recipe {
     /// Extra include directories (`donor:<donor>/<dir>` or `shim:<dir>`).
     #[serde(default)]
     pub(crate) include: Vec<String>,
+    /// Headers force-included (`-include <abs>`), from `shim:<file>` or `donor:<donor>/<file>`.
+    #[serde(default)]
+    pub(crate) force_include: Vec<String>,
     /// Include-root aliases: `<name> = <donor:...|shim:...>` adds a symlinked directory
     /// `<name>` under the recipe build tree and an `-I` that points at it, so a donor header can
     /// use the layout its build system generates (FreeBSD's `machine/` and `x86/` forwarding
@@ -259,6 +262,14 @@ impl Recipe {
         for include in &self.include {
             if !valid_include(include) {
                 bail!("recipe {}: invalid include `{include}`", self.family);
+            }
+        }
+        for entry in &self.force_include {
+            if !valid_include(entry) || !entry.ends_with(".h") {
+                bail!(
+                    "recipe {}: invalid force_include `{entry}` (expect shim:/donor: with a .h file)",
+                    self.family
+                );
             }
         }
         for (name, target) in &self.aliases {

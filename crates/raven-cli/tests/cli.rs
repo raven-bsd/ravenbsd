@@ -45,7 +45,7 @@ const GENERAL_HELP: &str = concat!(
     "  doctor        run ordered diagnostics\n",
     "  svc           list, inspect and control services\n",
     "  config        validate and show the effective TOML configuration\n",
-    "  theme         preview, set or apply the Raven terminal theme\n",
+    "  theme         preview, set, apply or export the Raven terminal theme\n",
     "  net           reserved: network control\n",
     "  log           reserved: log access\n",
     "  pkg           reserved: package access\n",
@@ -420,4 +420,51 @@ fn theme_set_rejects_an_invalid_file_without_writing() {
     assert_eq!(exit, Exit::Failure);
     assert!(stdout.is_empty());
     assert_eq!(json(&stderr)["code"], "ECONFIG");
+}
+
+#[test]
+fn theme_export_prints_the_env_spec() {
+    let (exit, stdout, stderr) = run(&["theme", "export"]);
+    assert_eq!(exit, Exit::Success);
+    assert!(stderr.is_empty());
+    assert_eq!(stdout.lines().count(), 1);
+    assert!(!stdout.contains('\x1b'));
+    let values: Vec<&str> = stdout.trim().split(':').collect();
+    assert_eq!(values.len(), 11);
+    for value in values {
+        assert!(value.starts_with('#'));
+        assert_eq!(value.len(), 7);
+    }
+}
+
+#[test]
+fn theme_export_shell_wraps_the_spec() {
+    let (exit, stdout, stderr) = run(&["theme", "export", "--shell"]);
+    assert_eq!(exit, Exit::Success);
+    assert!(stderr.is_empty());
+    assert!(stdout.starts_with("export RAVEN_PALETTE='#"));
+    assert!(stdout.trim_end().ends_with('\''));
+    assert!(!stdout.contains('\x1b'));
+}
+
+#[test]
+fn theme_export_json_has_the_theme_record() {
+    let (exit, stdout, stderr) = run(&["--json", "theme", "export"]);
+    assert_eq!(exit, Exit::Success);
+    assert!(stderr.is_empty());
+    let value = json(&stdout);
+    assert_eq!(value["schema"], 1);
+    assert_eq!(value["kind"], "theme");
+    assert!(value["name"].is_string());
+    let palette = value["palette"].as_str().expect("palette");
+    assert_eq!(palette.split(':').count(), 11);
+    assert!(!stdout.contains('\x1b'));
+}
+
+#[test]
+fn theme_export_rejects_extra_arguments() {
+    let (exit, stdout, stderr) = run(&["--json", "theme", "export", "wat"]);
+    assert_eq!(exit, Exit::Usage);
+    assert!(stdout.is_empty());
+    assert_eq!(json(&stderr)["code"], "EUSAGE");
 }
