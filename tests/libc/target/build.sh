@@ -84,6 +84,18 @@ if ! command -v "$CC" >/dev/null 2>&1; then
     printf 'skipped: %s not found\n' "$CC"
     exit 77
 fi
+# The pinned Rust sysroot ships ld.lld under lib/rustlib/<host>/bin/gcc-ld; use it when the
+# host PATH has no standalone lld, so the exact clang -fuse-ld=lld vector still runs.
+if ! command -v ld.lld >/dev/null 2>&1; then
+    host=$(rustc -vV 2>/dev/null | sed -n 's/^host: //p' || true)
+    if [ -n "$host" ]; then
+        lld_dir=$(rustc --print sysroot 2>/dev/null)/lib/rustlib/$host/bin/gcc-ld
+        if [ -x "$lld_dir/ld.lld" ]; then
+            PATH="$lld_dir:$PATH"
+            export PATH
+        fi
+    fi
+fi
 if ! command -v ld.lld >/dev/null 2>&1; then
     printf 'skipped: ld.lld not found\n'
     exit 77
@@ -98,7 +110,16 @@ if [ -z "${READELF:-}" ] && ! command -v llvm-readelf >/dev/null 2>&1 &&
     exit 77
 fi
 
-float=${RL_TEST_FLOAT:-soft}
+# H-20 kept every case on the soft-float vector until PG-12 existed. S22 now saves the
+# FP/SIMD state, so libc-time's double-returning difftime path builds with the normal SSE ABI;
+# the other cases keep the conservative soft-float vector.
+float=${RL_TEST_FLOAT:-}
+if [ -z "$float" ]; then
+    case $case_name in
+        time) float=hard ;;
+        *) float=soft ;;
+    esac
+fi
 case $float in
     soft) ;;
     hard)
@@ -112,6 +133,7 @@ esac
 
 out=$root/build/libc-test
 mkdir -p "$out/obj"
+linker_script=$root/tests/libc/target/x86_64.ld
 
 builtins=
 if [ -f "$sysroot/usr/lib/libclang_rt.builtins.a" ]; then
@@ -135,14 +157,14 @@ compile_obj() {
 link_static() {
     if [ -n "$builtins" ]; then
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
-            -nostdlib -nostartfiles -static \
+            -nostdlib -nostartfiles -static -T"$linker_script" \
             -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
             "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$1" \
             -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
             "$sysroot/usr/lib/crtn.o" -o "$2"
     else
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
-            -nostdlib -nostartfiles -static \
+            -nostdlib -nostartfiles -static -T"$linker_script" \
             -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
             "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$1" \
             -L"$sysroot/usr/lib" -lc \

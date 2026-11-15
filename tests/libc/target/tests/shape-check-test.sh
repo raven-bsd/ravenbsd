@@ -32,6 +32,12 @@ Program Headers:
   Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align
   LOAD           0x000000 0x0000000000200000 0x0000000000200000 0x001000 0x001000 R E 0x200000
 EOF
+cat > "$tmp/bad-tail.txt" <<'EOF'
+Elf file type is EXEC
+Program Headers:
+  Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align
+  LOAD           0x000000 0x0000000000200000 0x0000000000200000 0x001234 0x002000 R E 0x1000
+EOF
 cat > "$tmp/fake-readelf" <<'EOF'
 #!/bin/sh
 cat "${RL_SHAPE_FIXTURE:?}"
@@ -65,6 +71,16 @@ if [ "$status" -eq 1 ] && printf '%s\n' "$out" | grep -Fq 'align'; then
     ok
 else
     bad "align fixture: status $status, $out"
+fi
+
+set +e
+out=$(READELF="$tmp/fake-readelf" RL_SHAPE_FIXTURE="$tmp/bad-tail.txt" sh "$shape" "$tmp/elf")
+status=$?
+set -e
+if [ "$status" -eq 1 ] && printf '%s\n' "$out" | grep -Fq 'partial file tail'; then
+    ok
+else
+    bad "tail fixture: status $status, $out"
 fi
 
 set +e

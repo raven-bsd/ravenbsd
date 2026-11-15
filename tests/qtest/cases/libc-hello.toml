@@ -8,7 +8,6 @@ pre = ["sh tests/libc/target/build.sh hello x86_64"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
-skip = "needs PG-1 PG-13 PG-22 PG-23 PG-24 PG-29 PG-50 PG-53"
 
 [[expect]]
 regex = '^libc-hello: start$'
