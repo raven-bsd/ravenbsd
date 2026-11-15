@@ -25,6 +25,29 @@ pub const PROC_SETSID: usize = 0x37;
 pub const PROC_SETCRED: usize = 0x38;
 /// Raw `proc_pid_info(pid, out, count)`.
 pub const PROC_PID_INFO: usize = 0x3A;
+/// Raw `proc_setcred_ex(which, a, b, c, groups, count)`.
+pub const PROC_SETCRED_EX: usize = 0x3B;
+/// Raw `proc_cred_info(out, count)`.
+pub const PROC_CRED_INFO: usize = 0x3C;
+/// Raw `proc_getgroups(out, size)`.
+pub const PROC_GETGROUPS: usize = 0x3D;
+
+/// The six credential words returned by `PROC_CRED_INFO`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CredInfo {
+    /// Real user id.
+    pub uid: u32,
+    /// Effective user id.
+    pub euid: u32,
+    /// Saved user id.
+    pub suid: u32,
+    /// Real group id.
+    pub gid: u32,
+    /// Effective group id.
+    pub egid: u32,
+    /// Saved group id.
+    pub sgid: u32,
+}
 
 /// The eight identity words returned by `PROC_SELF_INFO`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -53,12 +76,16 @@ pub trait Syscall {
     fn self_info(&self) -> Result<SelfInfo, i32>;
     /// Read another live process's identity.
     fn pid_info(&self, pid: i32) -> Result<SelfInfo, i32>;
+    /// Read the caller's saved ids.
+    fn cred_info(&self) -> Result<CredInfo, i32>;
+    /// Read the caller's supplementary groups into `out`; returns the stored count.
+    fn groups(&self, out: &mut [u32]) -> Result<usize, i32>;
+    /// Apply one extended credential request.
+    fn setcred_ex(&self, request: &SetCred) -> Result<(), i32>;
     /// Set a process group.
     fn setpgid(&self, pid: i32, pgid: i32) -> Result<(), i32>;
     /// Create a session and return its id.
     fn setsid(&self) -> Result<i32, i32>;
-    /// Set one credential value.
-    fn setcred(&self, which: u32, value: u32) -> Result<(), i32>;
 }
 
 /// A `ProcBackend` whose identity methods execute the P2a syscall seam.
@@ -111,6 +138,16 @@ impl<S: Syscall> ProcBackend for SyscallBackend<S> {
         self.info().map_or(0, |info| info.egid)
     }
 
+    fn getresuid(&self) -> Result<(u32, u32, u32), i32> {
+        let info = self.sys.cred_info()?;
+        Ok((info.uid, info.euid, info.suid))
+    }
+
+    fn getresgid(&self) -> Result<(u32, u32, u32), i32> {
+        let info = self.sys.cred_info()?;
+        Ok((info.gid, info.egid, info.sgid))
+    }
+
     fn getpgid(&self, pid: i32) -> Result<i32, i32> {
         let info = self.info()?;
         if pid == 0 || small(info.pid) == pid {
@@ -127,8 +164,8 @@ impl<S: Syscall> ProcBackend for SyscallBackend<S> {
         Ok(small(self.sys.pid_info(pid)?.sid))
     }
 
-    fn getgroups(&self, _out: &mut [u32]) -> Result<usize, i32> {
-        Ok(0)
+    fn getgroups(&self, out: &mut [u32]) -> Result<usize, i32> {
+        self.sys.groups(out)
     }
 
     fn spawn(&self, req: &SpawnRequest) -> Result<i32, i32> {
@@ -160,15 +197,8 @@ impl<S: Syscall> ProcBackend for SyscallBackend<S> {
     }
 
     fn setcred(&self, req: &SetCred) -> Result<(), i32> {
-        let (which, value) = match req.kind {
-            1 => (0, req.a),
-            2 => (1, req.a),
-            5 => (2, req.a),
-            6 => (3, req.a),
-            _ => return Err(ENOSYS),
-        };
-        let value = u32::try_from(value).map_err(|_| EINVAL)?;
-        self.sys.setcred(which, value)
+        req.validate()?;
+        self.sys.setcred_ex(req)
     }
 
     fn rlimit(&self, pid: i32, resource: u32, new: Option<(u64, u64)>) -> Result<(u64, u64), i32> {

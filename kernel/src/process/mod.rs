@@ -97,7 +97,18 @@ pub struct ProcessIds {
     pub gid: u32,
     /// Effective group id.
     pub egid: u32,
+    /// Saved user id.
+    pub suid: u32,
+    /// Saved group id.
+    pub sgid: u32,
+    /// Supplementary group list, in kernel storage order.
+    pub groups: [u32; MAX_GROUPS],
+    /// Number of valid entries in `groups`.
+    pub group_count: u32,
 }
+
+/// Maximum supplementary groups stored by this slice.
+pub const MAX_GROUPS: usize = 16;
 
 impl ProcessIds {
     /// The kernel process identity.
@@ -110,6 +121,10 @@ impl ProcessIds {
             euid: 0,
             gid: 0,
             egid: 0,
+            suid: 0,
+            sgid: 0,
+            groups: [0; MAX_GROUPS],
+            group_count: 0,
         }
     }
 
@@ -123,6 +138,10 @@ impl ProcessIds {
             euid: parent.euid,
             gid: parent.gid,
             egid: parent.egid,
+            suid: parent.suid,
+            sgid: parent.sgid,
+            groups: parent.groups,
+            group_count: parent.group_count,
         }
     }
 }
@@ -459,6 +478,10 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
             euid: 0,
             gid: 0,
             egid: 0,
+            suid: 0,
+            sgid: 0,
+            groups: [0; MAX_GROUPS],
+            group_count: 0,
         }),
         path: String::from(path),
         address_space: Mutex::new(Some(user_address_space)),

@@ -1703,6 +1703,14 @@ name = "raven-prng"
 version = "0.1.0"
 
 [[package]]
+name = "raven-proc-credentials"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-proc-identity"
 version = "0.1.0"
 dependencies = [
