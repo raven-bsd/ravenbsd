@@ -743,7 +743,7 @@ pub const SIGWINCH: c_int = 28;
 pub const SIGIO: c_int = 29;
 pub const SIGPWR: c_int = 30;
 pub const SIGSYS: c_int = 31;
-pub const NSIG: c_int = 32;
+pub const NSIG: c_int = 65;
 
 pub const SA_NOCLDWAIT: c_int = 0x0000_0002;
 pub const SA_RESTORER: c_int = 0x0000_0004; // FIXME(redox): remove after relibc removes it
@@ -1515,3 +1515,578 @@ extern "C" {
     // utmp.h
     pub fn login_tty(fd: c_int) -> c_int;
 }
+
+// ---------------------------------------------------------------------------
+// C64h: Linux-compatible surface required by the brush dependency graph.
+//
+// The types and constants follow the Raven ABI headers under
+// `libc/ravenlibc/include`; the Linux-only values that the ABI does not name
+// (DCCP, `SO_ORIGINAL_DST`, the MFD huge-page sizes and RWF flags) are the
+// documented Linux UAPI facts. The dependency crates select their Linux
+// branches for `target_os = "ravenbsd"`, so the names must exist here.
+
+pub type idtype_t = c_uint;
+
+pub type __fsword_t = c_long;
+pub type off64_t = off_t;
+pub type ino64_t = ino_t;
+pub type blkcnt64_t = blkcnt_t;
+pub type rlim64_t = rlim_t;
+pub type fsblkcnt64_t = fsblkcnt_t;
+pub type fsfilcnt64_t = fsfilcnt_t;
+pub type statfs64 = statfs;
+pub type statvfs64 = statvfs;
+pub type termios2 = termios;
+
+s! {
+    pub struct fsid_t {
+        pub __val: [c_int; 2],
+    }
+
+    pub struct statfs {
+        pub f_type: c_long,
+        pub f_bsize: c_long,
+        pub f_blocks: crate::fsblkcnt_t,
+        pub f_bfree: crate::fsblkcnt_t,
+        pub f_bavail: crate::fsblkcnt_t,
+        pub f_files: crate::fsfilcnt_t,
+        pub f_ffree: crate::fsfilcnt_t,
+        pub f_fsid: crate::fsid_t,
+        pub f_namelen: c_long,
+        pub f_frsize: c_long,
+        pub f_flags: c_long,
+        pub f_spare: [c_long; 4],
+    }
+
+    pub struct pollfd {
+        pub fd: c_int,
+        pub events: c_short,
+        pub revents: c_short,
+    }
+
+    pub struct flock {
+        pub l_type: c_short,
+        pub l_whence: c_short,
+        pub l_start: off_t,
+        pub l_len: off_t,
+        pub l_pid: c_int,
+    }
+
+    pub struct sigevent {
+        pub sigev_value: crate::sigval,
+        pub sigev_signo: c_int,
+        pub sigev_notify: c_int,
+        pub sigev_notify_thread_id: c_int,
+        __unused1: Padding<[c_int; 11]>,
+    }
+
+    pub struct signalfd_siginfo {
+        pub ssi_signo: u32,
+        pub ssi_errno: i32,
+        pub ssi_code: i32,
+        pub ssi_pid: u32,
+        pub ssi_uid: u32,
+        pub ssi_fd: i32,
+        pub ssi_tid: u32,
+        pub ssi_band: u32,
+        pub ssi_overrun: u32,
+        pub ssi_trapno: u32,
+        pub ssi_status: i32,
+        pub ssi_int: i32,
+        pub ssi_ptr: u64,
+        pub ssi_utime: u64,
+        pub ssi_stime: u64,
+        pub ssi_addr: u64,
+        pub ssi_addr_lsb: u16,
+        _pad2: Padding<u16>,
+        pub ssi_syscall: i32,
+        pub ssi_call_addr: u64,
+        pub ssi_arch: u32,
+        _pad: Padding<[u8; 28]>,
+    }
+
+    pub struct sockaddr_vm {
+        pub svm_family: crate::sa_family_t,
+        pub svm_reserved1: c_ushort,
+        pub svm_port: c_uint,
+        pub svm_cid: c_uint,
+        pub svm_zero: [u8; 4],
+    }
+
+    pub struct ip_mreqn {
+        pub imr_multiaddr: crate::in_addr,
+        pub imr_address: crate::in_addr,
+        pub imr_ifindex: c_int,
+    }
+
+    pub struct ip_mreq_source {
+        pub imr_multiaddr: crate::in_addr,
+        pub imr_interface: crate::in_addr,
+        pub imr_sourceaddr: crate::in_addr,
+    }
+
+    pub struct sock_filter {
+        pub code: c_ushort,
+        pub jt: c_uchar,
+        pub jf: c_uchar,
+        pub k: c_uint,
+    }
+
+    pub struct sock_fprog {
+        pub len: c_ushort,
+        pub filter: *mut crate::sock_filter,
+    }
+
+    pub struct sysinfo {
+        pub uptime: i64,
+        pub loads: [u64; 3],
+        pub totalram: u64,
+        pub freeram: u64,
+        pub sharedram: u64,
+        pub bufferram: u64,
+        pub totalswap: u64,
+        pub freeswap: u64,
+        pub procs: c_ushort,
+        pub pad: c_ushort,
+        pub totalhigh: u64,
+        pub freehigh: u64,
+        pub mem_unit: c_uint,
+        pub _f: [c_char; 0],
+    }
+}
+
+impl siginfo_t {
+    /// The `SIGCHLD` child pid carried in the siginfo union.
+    ///
+    /// # Safety
+    /// The caller must know that `signo` is `SIGCHLD` (or another child signal).
+    pub unsafe fn si_pid(&self) -> crate::pid_t {
+        let base = self as *const Self as *const u8;
+        unsafe { (base.add(16) as *const c_int).read_unaligned() }
+    }
+
+    /// The real uid carried in the siginfo union.
+    ///
+    /// # Safety
+    /// The caller must know that the signal is `SIGCHLD`.
+    pub unsafe fn si_uid(&self) -> crate::uid_t {
+        let base = self as *const Self as *const u8;
+        unsafe { (base.add(20) as *const c_int).read_unaligned() as crate::uid_t }
+    }
+
+    /// The child status carried in the siginfo union.
+    ///
+    /// # Safety
+    /// The caller must know that the signal is `SIGCHLD`.
+    pub unsafe fn si_status(&self) -> c_int {
+        let base = self as *const Self as *const u8;
+        unsafe { (base.add(24) as *const c_int).read_unaligned() }
+    }
+}
+
+// sys/socket.h and netinet/in.h (Raven ABI).
+pub const SOCK_RDM: c_int = 4;
+pub const SOCK_DCCP: c_int = 6;
+pub const AF_PACKET: c_int = 17;
+pub const AF_VSOCK: c_int = 40;
+pub const IPPROTO_DCCP: c_int = 33;
+pub const IPPROTO_MPTCP: c_int = 262;
+pub const IPPROTO_SCTP: c_int = 132;
+pub const IPPROTO_UDPLITE: c_int = 136;
+pub const SOL_IP: c_int = 0;
+pub const SOL_IPV6: c_int = 41;
+pub const SOL_DCCP: c_int = 269;
+pub const SO_MARK: c_int = 36;
+pub const SO_BINDTODEVICE: c_int = 25;
+pub const SO_BINDTOIFINDEX: c_int = 62;
+pub const SO_BUSY_POLL: c_int = 46;
+pub const SO_INCOMING_CPU: c_int = 49;
+pub const SO_ATTACH_FILTER: c_int = 26;
+pub const SO_DETACH_FILTER: c_int = 27;
+pub const SO_COOKIE: c_int = 57;
+pub const SO_ORIGINAL_DST: c_int = 80;
+pub const IP_TRANSPARENT: c_int = 19;
+pub const IP_FREEBIND: c_int = 15;
+pub const IP_MULTICAST_ALL: c_int = 49;
+pub const IPV6_TRANSPARENT: c_int = 75;
+pub const IPV6_FREEBIND: c_int = 78;
+pub const IPV6_MULTICAST_ALL: c_int = 29;
+pub const IPV6_TCLASS: c_int = 67;
+pub const IP6T_SO_ORIGINAL_DST: c_int = 80;
+pub const TCP_CONGESTION: c_int = 13;
+pub const TCP_CORK: c_int = 3;
+pub const TCP_NOTSENT_LOWAT: c_int = 25;
+pub const TCP_QUICKACK: c_int = 12;
+pub const TCP_THIN_LINEAR_TIMEOUTS: c_int = 16;
+pub const TCP_USER_TIMEOUT: c_int = 18;
+pub const MSG_CONFIRM: c_int = 2048;
+pub const IP_HDRINCL: c_int = 3;
+pub const IPV6_HDRINCL: c_int = 36;
+pub const IPV6_RECVHOPLIMIT: c_int = 51;
+pub const IPV6_RECVTCLASS: c_int = 66;
+pub const IP_ADD_SOURCE_MEMBERSHIP: c_int = 39;
+pub const IP_DROP_SOURCE_MEMBERSHIP: c_int = 40;
+
+pub const DCCP_SOCKOPT_SERVICE: c_int = 2;
+pub const DCCP_SOCKOPT_SERVER_TIMEWAIT: c_int = 6;
+pub const DCCP_SOCKOPT_SEND_CSCOV: c_int = 10;
+pub const DCCP_SOCKOPT_RECV_CSCOV: c_int = 11;
+pub const DCCP_SOCKOPT_QPOLICY_TXQLEN: c_int = 17;
+pub const DCCP_SOCKOPT_AVAILABLE_CCIDS: c_int = 12;
+pub const DCCP_SOCKOPT_CCID: c_int = 13;
+pub const DCCP_SOCKOPT_GET_CUR_MPS: c_int = 5;
+pub const DCCP_SOCKOPT_RX_CCID: c_int = 15;
+pub const DCCP_SOCKOPT_TX_CCID: c_int = 14;
+
+// sys/termios.h and sys/ioctl.h (Raven ABI).
+pub const TCGETS2: c_ulong = 0x802c542a;
+pub const TCSETS2: c_ulong = 0x402c542b;
+pub const TCSETSW2: c_ulong = 0x402c542c;
+pub const TCSETSF2: c_ulong = 0x402c542d;
+pub const FIONCLEX: c_ulong = 0x5450;
+pub const TIOCEXCL: c_ulong = 0x540c;
+pub const TIOCNXCL: c_ulong = 0x540d;
+pub const UIO_MAXIOV: usize = 1024;
+pub const IUCLC: crate::tcflag_t = 0o001_000;
+pub const IMAXBEL: crate::tcflag_t = 0o020_000;
+pub const IUTF8: crate::tcflag_t = 0o040_000;
+pub const NLDLY: crate::tcflag_t = 0o000_400;
+pub const NL0: crate::tcflag_t = 0;
+pub const NL1: crate::tcflag_t = 0o000_400;
+pub const CRDLY: crate::tcflag_t = 0o003_000;
+pub const CR0: crate::tcflag_t = 0;
+pub const CR1: crate::tcflag_t = 0o001_000;
+pub const CR2: crate::tcflag_t = 0o002_000;
+pub const CR3: crate::tcflag_t = 0o003_000;
+pub const TABDLY: crate::tcflag_t = 0o014_000;
+pub const TAB0: crate::tcflag_t = 0;
+pub const TAB1: crate::tcflag_t = 0o004_000;
+pub const TAB2: crate::tcflag_t = 0o010_000;
+pub const TAB3: crate::tcflag_t = 0o014_000;
+pub const XTABS: crate::tcflag_t = 0o014_000;
+pub const BSDLY: crate::tcflag_t = 0o020_000;
+pub const BS0: crate::tcflag_t = 0;
+pub const BS1: crate::tcflag_t = 0o020_000;
+pub const FFDLY: crate::tcflag_t = 0o100_000;
+pub const FF0: crate::tcflag_t = 0;
+pub const FF1: crate::tcflag_t = 0o100_000;
+pub const VTDLY: crate::tcflag_t = 0o040_000;
+pub const VT0: crate::tcflag_t = 0;
+pub const VT1: crate::tcflag_t = 0o040_000;
+pub const CBAUD: crate::tcflag_t = 0o010_017;
+pub const CBAUDEX: crate::tcflag_t = 0o010_000;
+pub const BOTHER: crate::speed_t = 0o010_000;
+pub const IBSHIFT: crate::tcflag_t = 16;
+pub const CIBAUD: crate::tcflag_t = 0o020_036_000_00;
+pub const CMSPAR: crate::tcflag_t = 0o100_000_000_00;
+pub const CRTSCTS: crate::tcflag_t = 0o200_000_000_00;
+pub const XCASE: crate::tcflag_t = 0o000_004;
+
+// sys/statvfs.h, sys/uio.h, sys/mman.h, sys/signalfd.h.
+pub const ST_RDONLY: c_ulong = 1;
+pub const ST_NOSUID: c_ulong = 2;
+pub const ST_NODEV: c_ulong = 4;
+pub const ST_NOEXEC: c_ulong = 8;
+pub const ST_SYNCHRONOUS: c_ulong = 16;
+pub const ST_MANDLOCK: c_ulong = 64;
+pub const ST_NOATIME: c_ulong = 1024;
+pub const ST_NODIRATIME: c_ulong = 2048;
+pub const POSIX_FADV_NORMAL: c_int = 0;
+pub const POSIX_FADV_RANDOM: c_int = 1;
+pub const POSIX_FADV_SEQUENTIAL: c_int = 2;
+pub const POSIX_FADV_WILLNEED: c_int = 3;
+pub const POSIX_FADV_DONTNEED: c_int = 4;
+pub const POSIX_FADV_NOREUSE: c_int = 5;
+pub const UTIME_NOW: c_long = 0x3fff_ffff;
+pub const UTIME_OMIT: c_long = 0x3fff_fffe;
+pub const SFD_CLOEXEC: c_int = 0o200_0000;
+pub const SFD_NONBLOCK: c_int = 0o4_000;
+pub const MFD_CLOEXEC: c_uint = 0x1;
+pub const MFD_ALLOW_SEALING: c_uint = 0x2;
+pub const MFD_HUGETLB: c_uint = 0x4;
+pub const RWF_HIPRI: c_int = 0x0000_0001;
+pub const RWF_DSYNC: c_int = 0x0000_0002;
+pub const RWF_SYNC: c_int = 0x0000_0004;
+pub const RWF_NOWAIT: c_int = 0x0000_0008;
+pub const RWF_APPEND: c_int = 0x0000_0010;
+pub const RWF_NOAPPEND: c_int = 0x0000_0020;
+pub const RWF_ATOMIC: c_int = 0x0000_0040;
+pub const RWF_DONTCACHE: c_int = 0x0000_0080;
+
+// bits/signum.h and sys/wait.h.
+pub const SIGRTMIN: c_int = 35;
+pub const SIGRTMAX: c_int = 64;
+pub const P_ALL: idtype_t = 0;
+pub const P_PID: idtype_t = 1;
+pub const P_PGID: idtype_t = 2;
+pub const P_PIDFD: idtype_t = 3;
+pub const CLD_EXITED: c_int = 1;
+pub const CLD_KILLED: c_int = 2;
+pub const CLD_DUMPED: c_int = 3;
+pub const CLD_TRAPPED: c_int = 4;
+pub const CLD_STOPPED: c_int = 5;
+pub const CLD_CONTINUED: c_int = 6;
+pub const SIGEV_NONE: c_int = 1;
+pub const SIGEV_SIGNAL: c_int = 0;
+pub const SYS_pidfd_open: c_long = 434;
+pub const PIDFD_NONBLOCK: c_int = 0o4_000;
+
+extern "C" {
+    // sys/socket.h
+    pub fn accept4(
+        socket: c_int,
+        address: *mut crate::sockaddr,
+        address_len: *mut crate::socklen_t,
+        flags: c_int,
+    ) -> c_int;
+    pub fn eventfd(count: c_uint, flags: c_int) -> c_int;
+    pub fn sendfile(out_fd: c_int, in_fd: c_int, offset: *mut off_t, count: size_t) -> ssize_t;
+
+    // sys/statfs.h
+    pub fn statfs(path: *const c_char, buf: *mut crate::statfs) -> c_int;
+    pub fn fstatfs(fd: c_int, buf: *mut crate::statfs) -> c_int;
+    pub fn statfs64(path: *const c_char, sz: size_t, buf: *mut crate::statfs64) -> c_int;
+    pub fn fstatfs64(fd: c_int, sz: size_t, buf: *mut crate::statfs64) -> c_int;
+
+    // unistd.h / sys/syscall.h
+    pub fn syscall(num: c_long, ...) -> c_long;
+    pub fn waitid(
+        idtype: idtype_t,
+        id: crate::id_t,
+        infop: *mut crate::siginfo_t,
+        options: c_int,
+    ) -> c_int;
+    pub fn dup3(oldfd: c_int, newfd: c_int, flags: c_int) -> c_int;
+    pub fn utimensat(
+        dirfd: c_int,
+        pathname: *const c_char,
+        times: *const crate::timespec,
+        flags: c_int,
+    ) -> c_int;
+    pub fn posix_fadvise(fd: c_int, offset: off_t, len: off_t, advice: c_int) -> c_int;
+    pub fn posix_fallocate(fd: c_int, offset: off_t, len: off_t) -> c_int;
+    pub fn lseek64(fd: c_int, offset: off64_t, whence: c_int) -> off64_t;
+    pub fn sync();
+    pub fn syncfs(fd: c_int) -> c_int;
+    pub fn fsync(fd: c_int) -> c_int;
+    pub fn fdatasync(fd: c_int) -> c_int;
+    pub fn setfsuid(uid: crate::uid_t) -> c_int;
+    pub fn setfsgid(gid: crate::gid_t) -> c_int;
+    pub fn setgroups(size: size_t, list: *const crate::gid_t) -> c_int;
+    pub fn initgroups(user: *const c_char, group: crate::gid_t) -> c_int;
+    pub fn daemon(nochdir: c_int, noclose: c_int) -> c_int;
+    pub fn fexecve(
+        fd: c_int,
+        argv: *const *const c_char,
+        envp: *const *const c_char,
+    ) -> c_int;
+    pub fn forkpty(
+        amaster: *mut c_int,
+        name: *mut c_char,
+        termp: *const crate::termios,
+        winp: *const crate::winsize,
+    ) -> crate::pid_t;
+    pub fn ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int;
+    pub fn sigsuspend(mask: *const crate::sigset_t) -> c_int;
+    pub fn sysinfo(info: *mut crate::sysinfo) -> c_int;
+    pub fn mkfifoat(dirfd: c_int, pathname: *const c_char, mode: crate::mode_t) -> c_int;
+    pub fn mknodat(
+        dirfd: c_int,
+        pathname: *const c_char,
+        mode: crate::mode_t,
+        dev: crate::dev_t,
+    ) -> c_int;
+    pub fn faccessat(
+        dirfd: c_int,
+        pathname: *const c_char,
+        mode: c_int,
+        flags: c_int,
+    ) -> c_int;
+    pub fn confstr(name: c_int, buf: *mut c_char, len: size_t) -> size_t;
+    pub fn gethostname(name: *mut c_char, len: size_t) -> c_int;
+    pub fn ttyname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int;
+    pub fn tcgetattr(fd: c_int, termios_p: *mut crate::termios) -> c_int;
+    pub fn tcsetattr(
+        fd: c_int,
+        optional_actions: c_int,
+        termios_p: *const crate::termios,
+    ) -> c_int;
+    pub fn tcgetpgrp(fd: c_int) -> crate::pid_t;
+    pub fn tcsetpgrp(fd: c_int, pgrp: crate::pid_t) -> c_int;
+    pub fn killpg(pgrp: crate::pid_t, sig: c_int) -> c_int;
+    pub fn cfmakeraw(termios_p: *mut crate::termios);
+    pub fn truncate(path: *const c_char, length: off_t) -> c_int;
+    pub fn readlink(path: *const c_char, buf: *mut c_char, bufsiz: size_t) -> ssize_t;
+    pub fn chdir(path: *const c_char) -> c_int;
+    pub fn chroot(path: *const c_char) -> c_int;
+    pub fn umask(mask: crate::mode_t) -> crate::mode_t;
+    pub fn ppoll(
+        fds: *mut crate::pollfd,
+        nfds: crate::nfds_t,
+        timeout: *const crate::timespec,
+        sigmask: *const crate::sigset_t,
+    ) -> c_int;
+    pub fn signalfd(fd: c_int, mask: *const crate::sigset_t, flags: c_int) -> c_int;
+}
+
+// bits/sysconf.h values used by nix.
+pub const _SC_2_C_BIND: c_int = 47;
+pub const _SC_2_C_DEV: c_int = 48;
+pub const _SC_2_CHAR_TERM: c_int = 95;
+pub const _SC_2_FORT_DEV: c_int = 49;
+pub const _SC_2_FORT_RUN: c_int = 50;
+pub const _SC_2_LOCALEDEF: c_int = 52;
+pub const _SC_2_SW_DEV: c_int = 51;
+pub const _SC_2_UPE: c_int = 97;
+pub const _SC_2_VERSION: c_int = 46;
+pub const _SC_AIO_LISTIO_MAX: c_int = 23;
+pub const _SC_AIO_MAX: c_int = 24;
+pub const _SC_AIO_PRIO_DELTA_MAX: c_int = 25;
+pub const _SC_ASYNCHRONOUS_IO: c_int = 12;
+pub const _SC_ATEXIT_MAX: c_int = 87;
+pub const _SC_AVPHYS_PAGES: c_int = 86;
+pub const _SC_BC_BASE_MAX: c_int = 36;
+pub const _SC_BC_DIM_MAX: c_int = 37;
+pub const _SC_BC_SCALE_MAX: c_int = 38;
+pub const _SC_BC_STRING_MAX: c_int = 39;
+pub const _SC_COLL_WEIGHTS_MAX: c_int = 40;
+pub const _SC_DELAYTIMER_MAX: c_int = 26;
+pub const _SC_EXPR_NEST_MAX: c_int = 42;
+pub const _SC_FSYNC: c_int = 15;
+pub const _SC_IOV_MAX: c_int = 60;
+pub const _SC_JOB_CONTROL: c_int = 7;
+pub const _SC_LINE_MAX: c_int = 43;
+pub const _SC_MAPPED_FILES: c_int = 16;
+pub const _SC_MEMLOCK: c_int = 17;
+pub const _SC_MEMLOCK_RANGE: c_int = 18;
+pub const _SC_MEMORY_PROTECTION: c_int = 19;
+pub const _SC_MESSAGE_PASSING: c_int = 20;
+pub const _SC_MONOTONIC_CLOCK: c_int = 149;
+pub const _SC_MQ_OPEN_MAX: c_int = 27;
+pub const _SC_MQ_PRIO_MAX: c_int = 28;
+pub const _SC_PHYS_PAGES: c_int = 85;
+pub const _SC_PRIORITIZED_IO: c_int = 13;
+pub const _SC_PRIORITY_SCHEDULING: c_int = 10;
+pub const _SC_RTSIG_MAX: c_int = 31;
+pub const _SC_SAVED_IDS: c_int = 8;
+pub const _SC_SEMAPHORES: c_int = 21;
+pub const _SC_SEM_NSEMS_MAX: c_int = 32;
+pub const _SC_SEM_VALUE_MAX: c_int = 33;
+pub const _SC_SHARED_MEMORY_OBJECTS: c_int = 22;
+pub const _SC_SYNCHRONIZED_IO: c_int = 14;
+pub const _SC_THREADS: c_int = 67;
+pub const _SC_THREAD_ATTR_STACKADDR: c_int = 77;
+pub const _SC_THREAD_ATTR_STACKSIZE: c_int = 78;
+pub const _SC_THREAD_CPUTIME: c_int = 139;
+pub const _SC_THREAD_DESTRUCTOR_ITERATIONS: c_int = 73;
+pub const _SC_THREAD_KEYS_MAX: c_int = 74;
+pub const _SC_THREAD_PRIORITY_SCHEDULING: c_int = 79;
+pub const _SC_THREAD_PRIO_INHERIT: c_int = 80;
+pub const _SC_THREAD_PRIO_PROTECT: c_int = 81;
+pub const _SC_THREAD_PROCESS_SHARED: c_int = 82;
+pub const _SC_THREAD_ROBUST_PRIO_INHERIT: c_int = 247;
+pub const _SC_THREAD_ROBUST_PRIO_PROTECT: c_int = 248;
+pub const _SC_THREAD_SAFE_FUNCTIONS: c_int = 68;
+pub const _SC_THREAD_SPORADIC_SERVER: c_int = 161;
+pub const _SC_THREAD_STACK_MIN: c_int = 75;
+pub const _SC_THREAD_THREADS_MAX: c_int = 76;
+pub const _SC_TIMERS: c_int = 11;
+pub const _SC_TIMER_MAX: c_int = 35;
+pub const _SC_XOPEN_CRYPT: c_int = 92;
+pub const _SC_XOPEN_ENH_I18N: c_int = 93;
+pub const _SC_XOPEN_LEGACY: c_int = 129;
+pub const _SC_XOPEN_REALTIME: c_int = 130;
+pub const _SC_XOPEN_REALTIME_THREADS: c_int = 131;
+pub const _SC_XOPEN_SHM: c_int = 94;
+pub const _SC_XOPEN_STREAMS: c_int = 246;
+pub const _SC_XOPEN_UNIX: c_int = 91;
+pub const _SC_XOPEN_VERSION: c_int = 89;
+pub const _SC_XOPEN_XCU_VERSION: c_int = 90;
+pub const _SC_XOPEN_XPG2: c_int = 98;
+pub const _SC_XOPEN_XPG3: c_int = 99;
+pub const _SC_XOPEN_XPG4: c_int = 100;
+
+// Linux filesystem magic values used by nix `statfs` (UAPI facts).
+pub const ADFS_SUPER_MAGIC: c_long = 0x0000adf5;
+pub const AFFS_SUPER_MAGIC: c_long = 0x0000adff;
+pub const AFS_SUPER_MAGIC: c_long = 0x5346414f;
+pub const AUTOFS_SUPER_MAGIC: c_long = 0x0187;
+pub const BPF_FS_MAGIC: c_long = 0xcafe4a11;
+pub const BTRFS_SUPER_MAGIC: c_long = 0x9123683e;
+pub const CGROUP2_SUPER_MAGIC: c_long = 0x63677270;
+pub const CGROUP_SUPER_MAGIC: c_long = 0x27e0eb;
+pub const CODA_SUPER_MAGIC: c_long = 0x73757245;
+pub const CRAMFS_MAGIC: c_long = 0x28cd3d45;
+pub const DEBUGFS_MAGIC: c_long = 0x64626720;
+pub const DEVPTS_SUPER_MAGIC: c_long = 0x1cd1;
+pub const ECRYPTFS_SUPER_MAGIC: c_long = 0xf15f;
+pub const EFS_SUPER_MAGIC: c_long = 0x00414a53;
+pub const EXT2_SUPER_MAGIC: c_long = 0x0000ef53;
+pub const EXT3_SUPER_MAGIC: c_long = 0x0000ef53;
+pub const EXT4_SUPER_MAGIC: c_long = 0x0000ef53;
+pub const F2FS_SUPER_MAGIC: c_long = 0xf2f52010;
+pub const FUSE_SUPER_MAGIC: c_long = 0x65735546;
+pub const FUTEXFS_SUPER_MAGIC: c_long = 0xbad1dea;
+pub const HOSTFS_SUPER_MAGIC: c_long = 0x00c0ffee;
+pub const HPFS_SUPER_MAGIC: c_long = 0xf995e849;
+pub const HUGETLBFS_MAGIC: c_long = 0x958458f6;
+pub const ISOFS_SUPER_MAGIC: c_long = 0x00009660;
+pub const JFFS2_SUPER_MAGIC: c_long = 0x000072b6;
+pub const MINIX2_SUPER_MAGIC2: c_long = 0x00002478;
+pub const MINIX2_SUPER_MAGIC: c_long = 0x00002468;
+pub const MINIX3_SUPER_MAGIC: c_long = 0x4d5a;
+pub const MINIX_SUPER_MAGIC2: c_long = 0x0000138f;
+pub const MINIX_SUPER_MAGIC: c_long = 0x0000137f;
+pub const MSDOS_SUPER_MAGIC: c_long = 0x00004d44;
+pub const NCP_SUPER_MAGIC: c_long = 0x0000564c;
+pub const NFS_SUPER_MAGIC: c_long = 0x00006969;
+pub const NILFS_SUPER_MAGIC: c_long = 0x3434;
+pub const NSFS_MAGIC: c_long = 0x6e736673;
+pub const OCFS2_SUPER_MAGIC: c_long = 0x7461636f;
+pub const OPENPROM_SUPER_MAGIC: c_long = 0x00009fa1;
+pub const OVERLAYFS_SUPER_MAGIC: c_long = 0x794c7630;
+pub const PROC_SUPER_MAGIC: c_long = 0x00009fa0;
+pub const QNX4_SUPER_MAGIC: c_long = 0x0000002f;
+pub const QNX6_SUPER_MAGIC: c_long = 0x68191122;
+pub const RDTGROUP_SUPER_MAGIC: c_long = 0x7655821;
+pub const REISERFS_SUPER_MAGIC: c_long = 0x52654973;
+pub const SECURITYFS_MAGIC: c_long = 0x73636673;
+pub const SELINUX_MAGIC: c_long = 0xf97cff8c;
+pub const SMACK_MAGIC: c_long = 0x43415d53;
+pub const SMB_SUPER_MAGIC: c_long = 0x0000517b;
+pub const SYSFS_MAGIC: c_long = 0x62656572;
+pub const TMPFS_MAGIC: c_long = 0x01021994;
+pub const TRACEFS_MAGIC: c_long = 0x74726163;
+pub const UDF_SUPER_MAGIC: c_long = 0x15013346;
+pub const USBDEVICE_SUPER_MAGIC: c_long = 0x00009fa2;
+pub const XENFS_SUPER_MAGIC: c_long = 0xabba1974;
+pub const XFS_SUPER_MAGIC: c_long = 0x58465342;
+
+// sys/mman.h huge-page flags (Linux UAPI).
+pub const MFD_HUGE_64KB: c_uint = 0x4000_0000;
+pub const MFD_HUGE_512KB: c_uint = 0x4c00_0000;
+pub const MFD_HUGE_1MB: c_uint = 0x5000_0000;
+pub const MFD_HUGE_2MB: c_uint = 0x5400_0000;
+pub const MFD_HUGE_8MB: c_uint = 0x5c00_0000;
+pub const MFD_HUGE_16MB: c_uint = 0x6000_0000;
+pub const MFD_HUGE_32MB: c_uint = 0x6400_0000;
+pub const MFD_HUGE_256MB: c_uint = 0x7000_0000;
+pub const MFD_HUGE_512MB: c_uint = 0x7400_0000;
+pub const MFD_HUGE_1GB: c_uint = 0x7800_0000;
+pub const MFD_HUGE_2GB: c_uint = 0x7c00_0000;
+pub const MFD_HUGE_16GB: c_uint = 0x8800_0000;
+pub const MFD_HUGE_MASK: c_uint = 63;
+pub const MFD_HUGE_SHIFT: c_uint = 26;
+
+// sys/eventfd.h, errno and sys/sysinfo.h.
+pub const EFD_CLOEXEC: c_int = 0o200_0000;
+pub const EFD_NONBLOCK: c_int = 0o4_000;
+pub const ERFKILL: c_int = 132;
+pub const EHWPOISON: c_int = 133;
+pub const SI_LOAD_SHIFT: c_uint = 16;
+
+// x86_64 syscall numbers used by the brush dependency graph.
+pub const SYS_gettid: c_long = 186;
+pub const SYS_memfd_create: c_long = 319;
+pub const SYS_execveat: c_long = 322;
+pub const SYS_pivot_root: c_long = 155;

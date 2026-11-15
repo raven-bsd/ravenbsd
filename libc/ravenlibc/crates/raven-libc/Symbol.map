@@ -1193,6 +1193,24 @@ RAVEN_1.0 {
 		isatty;
 		mkdir;
 		rename;
+		# --- C64h brush/uutils libc surface ---
+		__getrandom_v03_custom;
+		cfmakeraw;
+		chdir;
+		chroot;
+		confstr;
+		ftruncate;
+		gethostname;
+		killpg;
+		pipe2;
+		readlink;
+		syscall;
+		tcgetattr;
+		tcgetpgrp;
+		tcsetattr;
+		tcsetpgrp;
+		ttyname_r;
+		umask;
 };
 
 RAVENprivate_1.0 {
@@ -1224,4 +1242,5 @@ RAVENprivate_1.0 {
 		__rl_scan_float_impl;
 		__rl_stdio_exit_impl;
 		__rl_tz_load_impl;
+		errno_location;
 };
