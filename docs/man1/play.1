@@ -1,0 +1,39 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 15, 2026
+.Dt PLAY 1
+.Os
+.Sh NAME
+.Nm play
+.Nd play a PCM16 WAV file through the audio: scheme
+.Sh SYNOPSIS
+.Nm
+.Ar file.wav
+.Sh DESCRIPTION
+.Nm
+reads one RIFF PCM16 WAV file (mono or stereo, 8 kHz to 192 kHz), selects the stream format on
+.Dv audio:out0
+and writes the samples through the scheme.
+The null sink consumes the stream; a driver-backed sink is the HDA path (B44).
+.Pp
+The final line reports the frame count, sample rate and channel count.
+.Sh EXIT STATUS
+.Bl -tag -width Ds -compact
+.It 0
+The file was written and drained.
+.It 1
+The file could not be parsed, or the audio server returned an error.
+.It 2
+Usage error.
+.El
+.Sh EXAMPLES
+.Dl $ play /etc/tone440.wav
+.Dl play: ok 24000 frames, 48000 Hz, 2 channels
+.Sh SEE ALSO
+.Xr beep 1 ,
+.Xr mixer 1 ,
+.Xr audiod 8
+.Sh HISTORY
+The
+.Nm
+utility first appeared in RavenBSD 0.1.

@@ -1,0 +1,50 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 15, 2026
+.Dt MIXER 1
+.Os
+.Sh NAME
+.Nm mixer
+.Nd set the volume, mute or query the status of an audio: stream
+.Sh SYNOPSIS
+.Nm
+.Cm volume Ar percent
+.Nm
+.Cm mute
+.Nm
+.Cm status
+.Sh DESCRIPTION
+.Nm
+opens a control stream on
+.Dv audio:out0
+and applies the B40 protocol operations to it.
+.Cm volume
+maps 0 to 100 percent onto the Q15 left/right gain (100 percent is 32768);
+.Cm mute
+sets both channels to zero;
+.Cm status
+prints the stream position, underrun count and state.
+.Pp
+The operation applies to the control stream; a device-wide mixer is the HDA path (B44).
+.Sh EXIT STATUS
+.Bl -tag -width Ds -compact
+.It 0
+The operation completed.
+.It 1
+The audio server returned an error.
+.It 2
+Usage error.
+.El
+.Sh EXAMPLES
+.Dl $ mixer volume 50
+.Dl mixer: volume 50% left=16384 right=16384
+.Dl $ mixer status
+.Dl mixer: status position=0 underruns=0 stopped
+.Sh SEE ALSO
+.Xr play 1 ,
+.Xr beep 1 ,
+.Xr audiod 8
+.Sh HISTORY
+The
+.Nm
+utility first appeared in RavenBSD 0.1.

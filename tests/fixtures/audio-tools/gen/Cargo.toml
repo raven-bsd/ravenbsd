@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "audio-tools-gen"
+version = "0.1.0"
+description = "Host generator for the B45 tone440.wav qtest fixture."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+raven-audio-core = { path = "../../../../crates/raven-audio-core" }
+
+[lints]
+workspace = true
