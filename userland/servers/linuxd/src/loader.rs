@@ -250,7 +250,10 @@ fn map_steps<S: Sys>(
         let vaddr = step.vaddr.checked_add(bias).ok_or(LoadError::TooLarge)?;
         match step.kind {
             StepKind::File { offset } => {
-                map_object(sys, child, object, offset, vaddr, step.len, step.prot)?;
+                let shared = step.prot & prot::WRITE as u8 != 0;
+                map_object(
+                    sys, child, object, offset, vaddr, step.len, step.prot, shared,
+                )?;
                 regions.push(Region {
                     start: vaddr,
                     len: step.len,
@@ -260,7 +263,8 @@ fn map_steps<S: Sys>(
             }
             StepKind::CopyTail { offset, len } => {
                 let tail = stage_tail(image, offset, len, sys)?;
-                map_object(sys, child, tail, 0, vaddr, PAGE, step.prot)?;
+                let shared = step.prot & prot::WRITE as u8 != 0;
+                map_object(sys, child, tail, 0, vaddr, PAGE, step.prot, shared)?;
                 regions.push(Region {
                     start: vaddr,
                     len: PAGE,
@@ -269,20 +273,17 @@ fn map_steps<S: Sys>(
                 });
             }
             StepKind::Zero => {
-                let flags = map::pack(step.prot as usize, map::FIXED);
-                sys.map(
-                    child,
-                    Handle::NONE,
-                    0,
-                    vaddr as usize,
-                    step.len as usize,
-                    flags,
-                )
-                .map_err(LoadError::Sys)?;
+                // Back zero pages with a shared memory object instead of `Handle::NONE`, so the
+                // trap loop can copy user bytes out of and into BSS-like mappings; an anonymous
+                // kernel page has no object the server can map and guest writes would be private.
+                let object = sys
+                    .memobj_create(step.len as usize)
+                    .map_err(LoadError::Sys)?;
+                map_object(sys, child, object, 0, vaddr, step.len, step.prot, true)?;
                 regions.push(Region {
                     start: vaddr,
                     len: step.len,
-                    backing: Handle::NONE,
+                    backing: object,
                     backing_offset: 0,
                 });
             }
@@ -292,6 +293,7 @@ fn map_steps<S: Sys>(
 }
 
 /// Map one page step from `object`, turning an executable mapping into RW + `protect`.
+#[allow(clippy::too_many_arguments)] // sys + handle/range/protection/shared is the whole map call
 fn map_object<S: Sys>(
     sys: &mut S,
     child: Handle,
@@ -300,18 +302,20 @@ fn map_object<S: Sys>(
     vaddr: u64,
     len: u64,
     protection: u8,
+    shared: bool,
 ) -> Result<(), LoadError> {
     let offset = usize::try_from(offset).map_err(|_| LoadError::TooLarge)?;
     let len = usize::try_from(len).map_err(|_| LoadError::TooLarge)?;
     let vaddr = usize::try_from(vaddr).map_err(|_| LoadError::TooLarge)?;
     let executable = protection & prot::EXEC as u8 != 0;
+    let mut map_flags = map::FIXED;
+    if shared {
+        map_flags |= map::SHARED;
+    }
     let flags = if executable {
-        map::pack(
-            (protection as usize & !prot::EXEC) | prot::WRITE,
-            map::FIXED,
-        )
+        map::pack((protection as usize & !prot::EXEC) | prot::WRITE, map_flags)
     } else {
-        map::pack(protection as usize, map::FIXED)
+        map::pack(protection as usize, map_flags)
     };
     sys.map(child, object, offset, vaddr, len, flags)
         .map_err(LoadError::Sys)?;

@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B25: the same staged-root initfs as `linux-root`, now with the metadata batch served. BusyBox
+# `ls` in the Linux cwd (`/compat/linux`) lists the staged top-level directories and exits 0.
+# The old `linux-root` case still asserts the B32a `stat`-failure boundary and needs its own
+# ticket update; this case is the B25 acceptance for the new behaviour.
+
+name = "linux-stat"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh addons/linux-root/build.sh --qtest"]
+initfs = "build/linux-root/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^linux-root: release=3\.24\.4$'
+
+[[expect]]
+regex = '^linux-root: busybox bytes=[0-9]+ loader bytes=[0-9]+$'
+
+[[expect]]
+regex = '^linux-root: attempt path=/compat/linux/bin/busybox argv1=ls$'
+
+[[expect]]
+regex = '^linuxd: entry=0x[0-9a-f]+ phdr=0x[0-9a-f]+ phnum=[0-9]+ brk=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^linuxd: dynamic=1 interp-entry=0x[0-9a-f]+ interp-bias=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^linuxd: mapped [0-9]+ regions, sp=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^bin$'
+
+[[expect]]
+regex = '^etc$'
+
+[[expect]]
+regex = '^lib$'
+
+[[expect]]
+regex = '^sbin$'
+
+[[expect]]
+regex = '^usr$'
+
+[[expect]]
+regex = '^linuxd: syscall lstat calls=[0-9]+ errors=0$'
+
+[[expect]]
+regex = '^linuxd: syscall stat calls=[0-9]+ errors=0$'
+
+[[expect]]
+regex = '^linuxd: hello exit=0$'
+
+[[expect]]
+regex = '^linux-root: linuxd exit=0$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|linux-root: FAIL'

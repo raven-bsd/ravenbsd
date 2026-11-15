@@ -14,8 +14,10 @@
 //!
 //! Every block names its invariant; the kernel validates handles, rights and ranges.
 
+use alloc::vec::Vec;
+
 use linuxd::Region;
-use linuxd::Sys as _;
+use linuxd::{LinuxProcess, Sys as _};
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
 use raven_abi::types::{Handle, Personality, map, prot};
@@ -84,6 +86,65 @@ pub fn copy_in(
         out.copy_from_slice(core::slice::from_raw_parts(source, out.len()));
     }
     sys.unmap(Handle::SELF_PROC, context.address, context.len)
+}
+
+/// Collect a `writev` from the child into `process.output` and return the byte count.
+///
+/// BusyBox's stdio uses `writev` for the `ls` listing; the server owns only a pure dispatcher, so
+/// this one call is assembled in the trap layer from the iovec array and each iovec buffer.
+pub fn writev(
+    sys: &mut KernelSys,
+    regions: &[Region],
+    process: &mut LinuxProcess,
+    fd: i32,
+    iovec: u64,
+    count: usize,
+) -> Result<usize, Errno> {
+    const MAX_IOVECS: usize = 16;
+    const MAX_BYTES: usize = 64 * 1024;
+    if fd != 1 && fd != 2 {
+        return Err(Errno::EBADF);
+    }
+    if count == 0 {
+        return Ok(0);
+    }
+    if count > MAX_IOVECS {
+        return Err(Errno::EINVAL);
+    }
+    let mut array = [0u8; MAX_IOVECS * 16];
+    let len = count.checked_mul(16).ok_or(Errno::EINVAL)?;
+    copy_in(
+        sys,
+        regions,
+        iovec,
+        array.get_mut(..len).ok_or(Errno::EINVAL)?,
+    )?;
+    let mut total = 0usize;
+    for index in 0..count {
+        let base = read_word(&array, index * 16)?;
+        let length = read_word(&array, index * 16 + 8)?;
+        let length = usize::try_from(length).map_err(|_| Errno::E2BIG)?;
+        if length == 0 {
+            continue;
+        }
+        total = total.checked_add(length).ok_or(Errno::E2BIG)?;
+        if total > MAX_BYTES {
+            return Err(Errno::E2BIG);
+        }
+        let mut data = Vec::new();
+        data.try_reserve_exact(length).map_err(|_| Errno::ENOMEM)?;
+        data.resize(length, 0);
+        copy_in(sys, regions, base, &mut data)?;
+        process.output.extend_from_slice(&data);
+    }
+    Ok(total)
+}
+
+fn read_word(bytes: &[u8], offset: usize) -> Result<u64, Errno> {
+    let slot = bytes.get(offset..offset + 8).ok_or(Errno::EINVAL)?;
+    Ok(u64::from_le_bytes(
+        slot.try_into().map_err(|_| Errno::EINVAL)?,
+    ))
 }
 
 /// Copy `bytes` into the child at `address`.

@@ -99,8 +99,8 @@ mod program {
     use alloc::vec::Vec;
 
     use linuxd::{
-        LinuxProcess, TrapAction, copy_in_len, decode, dispatch, dispatcher, encode_reply,
-        interp_path, load, plan_image,
+        LinuxProcess, RootEntry, RootTree, TrapAction, copy_in, decode, dispatch, dispatcher,
+        encode_reply, interp_path, load, plan_image,
     };
     use raven_abi::errno::Errno;
     use raven_abi::types::{Handle, clock};
@@ -239,7 +239,7 @@ mod program {
 
         let _watchdog = raven_rt::thread::spawn(watchdog, 0, 64 * 1024);
         let trace = args.get(2).is_some_and(|argument| argument == "trace");
-        serve(sys, loaded, handler, thread, path, argv, trace)
+        serve(sys, loaded, handler, thread, path, argv, trace, root_tree())
     }
 
     fn image_from_initfs(path: &str) -> Result<Vec<u8>, i32> {
@@ -278,6 +278,26 @@ mod program {
         initfs.get(&rooted).map(|entry| entry.data.to_vec())
     }
 
+    /// Build the metadata view of the staged Linux root from the initfs entries.
+    fn root_tree() -> RootTree {
+        let Ok(mapped) = sys::map_initfs() else {
+            return RootTree::default();
+        };
+        let Ok(initfs) = Initfs::parse(mapped) else {
+            return RootTree::default();
+        };
+        let entries: Vec<RootEntry> = initfs
+            .entries()
+            .filter(|entry| entry.path.starts_with("/compat/linux/"))
+            .map(|entry| RootEntry {
+                path: entry.path.as_bytes().to_vec(),
+                size: entry.data.len() as u64,
+                mode: entry.mode,
+            })
+            .collect();
+        RootTree::new(&entries)
+    }
+
     fn random_bytes() -> [u8; 16] {
         let mut bytes = [0u8; 16];
         if let Ok(now) = sys::clock_get(clock::MONOTONIC) {
@@ -299,6 +319,7 @@ mod program {
         path: &str,
         argv: Vec<Vec<u8>>,
         trace: bool,
+        root: RootTree,
     ) -> i32 {
         let mut dispatcher = dispatcher();
         let mut process = LinuxProcess::new(
@@ -311,6 +332,7 @@ mod program {
         );
         process.regions = loaded.regions.clone();
         process.set_identity(path.as_bytes(), argv);
+        process.set_root(root);
         let mut bytes = [0u8; PACKET_SIZE];
         loop {
             let request = match sys::recv(&mut bytes) {
@@ -371,11 +393,31 @@ mod program {
         request: Handle,
         trace: bool,
     ) -> Option<i32> {
+        if call.nr == 20 {
+            let value = match raw::writev(
+                sys,
+                &loaded.regions,
+                process,
+                call.args[0] as i32,
+                call.args[1],
+                usize::try_from(call.args[2]).unwrap_or(usize::MAX),
+            ) {
+                Ok(value) => value as i64,
+                Err(error) => -(error.0 as i64),
+            };
+            if !process.output.is_empty() {
+                let output = process.take_output();
+                let _ = sys::debug_write(&output);
+            }
+            let packet = reply_packet(packet, value);
+            let _ = sys::send(request, &packet);
+            return None;
+        }
         process.user_buffer.clear();
-        if let Some(len) = copy_in_len(&call) {
+        if let Some((argument, len)) = copy_in(&call) {
             process.user_buffer.resize(len, 0);
-            if let Err(error) =
-                raw::copy_in(sys, &loaded.regions, call.args[1], &mut process.user_buffer)
+            let source = call.args.get(argument).copied().unwrap_or(0);
+            if let Err(error) = raw::copy_in(sys, &loaded.regions, source, &mut process.user_buffer)
             {
                 let reply = reply_packet(packet, -(error.0 as i64));
                 let _ = sys::send(request, &reply);

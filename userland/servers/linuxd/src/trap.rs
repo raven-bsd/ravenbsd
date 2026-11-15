@@ -42,19 +42,21 @@ pub fn decode(request: &[u8]) -> Result<LinuxSyscallV1, TrapError> {
     Ok(call)
 }
 
-/// Number of user bytes the trap loop must copy in before dispatch.
+/// The user argument the trap loop must copy in before dispatch: `(argument index, length)`.
 ///
-/// `write` reads a user buffer (`buf`, `count`); the path-taking calls (`open`, `openat`,
-/// `readlink`, `readlinkat`, `stat`, `newfstatat`) get a bounded path window. The bound protects
-/// the server from a hostile or corrupt Linux process; a longer path is not served.
-pub fn copy_in_len(call: &LinuxSyscallV1) -> Option<usize> {
+/// `write` reads a user buffer (`buf`, `count`); the path-taking calls get a bounded path window at
+/// their path argument (`stat`/`lstat`/`access`/`truncate`/`readlink`/`open` use argument 0, the
+/// `*at` family and `statx` use the path after the dirfd). The bound protects the server from a
+/// hostile or corrupt Linux process; a longer path is not served.
+pub fn copy_in(call: &LinuxSyscallV1) -> Option<(usize, usize)> {
     const PATH_COPY: usize = 128;
     match call.nr {
         1 => {
             let count = usize::try_from(call.args[2]).ok()?;
-            Some(count.min(crate::table::USER_BUFFER_MAX))
+            Some((1, count.min(crate::table::USER_BUFFER_MAX)))
         }
-        2 | 4 | 89 | 257 | 262 | 267 => Some(PATH_COPY),
+        2 | 4 | 6 | 21 | 76 | 89 => Some((0, PATH_COPY)),
+        257 | 260 | 262 | 267 | 268 | 280 | 332 => Some((1, PATH_COPY)),
         _ => None,
     }
 }

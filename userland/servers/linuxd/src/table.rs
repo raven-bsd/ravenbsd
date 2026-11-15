@@ -13,6 +13,8 @@ use alloc::vec::Vec;
 use raven_abi::types::Handle;
 use raven_linux_dispatch::LinuxContext;
 
+use crate::rootfs::RootTree;
+
 /// Largest single user buffer the trap loop copies in.
 pub const USER_BUFFER_MAX: usize = 64 * 1024;
 
@@ -126,6 +128,10 @@ pub struct LinuxProcess {
     pub comm: Vec<u8>,
     /// Linux argv, including `argv[0]` (`/proc/self/cmdline`).
     pub argv: Vec<Vec<u8>>,
+    /// Metadata view of the staged Linux root (`/compat/linux`).
+    root: RootTree,
+    /// Current working directory; relative paths resolve here.
+    cwd: Vec<u8>,
     files: Vec<Option<OpenFile>>,
 }
 
@@ -157,8 +163,27 @@ impl LinuxProcess {
             exe: Vec::new(),
             comm: Vec::new(),
             argv: Vec::new(),
+            root: RootTree::default(),
+            cwd: b"/compat/linux".to_vec(),
             files: Vec::new(),
         }
+    }
+
+    /// Install the staged-root metadata view.
+    pub fn set_root(&mut self, root: RootTree) {
+        self.root = root;
+    }
+
+    /// The staged-root metadata view.
+    #[must_use]
+    pub fn root(&self) -> &RootTree {
+        &self.root
+    }
+
+    /// The current working directory used for relative path resolution.
+    #[must_use]
+    pub fn cwd(&self) -> &[u8] {
+        &self.cwd
     }
 
     /// Set the program identity used by the synthetic procfs files.
