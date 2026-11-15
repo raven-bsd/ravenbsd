@@ -106,6 +106,9 @@ fn run_hardened(seed: u64, ops: usize) {
     let aligns = [1usize, 2, 8, 16, 64, 4096, 8192, 65_536];
     let mut step = 0usize;
     while step < ops {
+        if step != 0 && step.is_multiple_of(100_000) {
+            eprintln!("hardened seed {seed}: {step}/{ops}");
+        }
         let choice = rng.below(100);
         if choice < 35 || live.is_empty() {
             let size = sizes[rng.below(sizes.len())];
@@ -226,6 +229,9 @@ fn run_tiny(seed: u64, ops: usize) {
     ];
     let mut step = 0usize;
     while step < ops {
+        if step != 0 && step.is_multiple_of(100_000) {
+            eprintln!("tiny seed {seed}: {step}/{ops}");
+        }
         let choice = rng.below(100);
         if choice < 40 || live.is_empty() {
             let size = sizes[rng.below(sizes.len())];

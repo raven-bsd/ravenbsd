@@ -42,7 +42,7 @@ check:
 # `cargo test` in `check` and are executed here, at merge/release time.
 check-full:
 	@$(XTASK) check
-	@cargo test -p raven-libc-malloc --test model -- --ignored
+	@cargo test -p raven-libc-malloc --test model -- --ignored --nocapture
 
 guard:
 	@$(XTASK) guard
