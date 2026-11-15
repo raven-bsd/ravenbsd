@@ -19,9 +19,13 @@ read-only `ravenbsd-resources` checkout.
   (`ls cat cp mv rm ln mkdir rmdir touch stat df du echo pwd basename dirname true false sleep date
   head tail wc sort cut tr env id chmod chown`). The rest of the 109 crates stay vendored but are
   not built into the image until a later ticket adds them with tests and a man page.
-* Target status: the host tests pass. The Raven target build is blocked before the link on the
-  external `libc` crate: crates.io `libc 0.2.191` has no `target_os = "ravenbsd"` module. The
-  K19 patched `libc 0.2.185` supplies one for std, but `rustix 1.1.6` (a uutils dependency) needs
-  termios constants (`ECHOKE`, `FLUSHO`, `PENDIN`, `EXTPROC`) and `siginfo_t::si_status` that the
-  K19 module does not define. That is a C64d/libc-ABI gap, not a uutils change; the profile
-  switch and the `base-tools` qtest wait for it. See the K25a report for the exact compiler output.
+* Target status: the host tests pass (97, `--locked`). The uutils workspace is separate, so it
+  carries its own `libc-ravenbsd/` copy of the merged K19 `toolchain/vendor/libc` (the crate
+  version is 0.2.191 to satisfy the uutils lock and `nix ^0.2.186`), and `uucore` depends on the
+  merged `toolchain/raven-getrandom`; the root `.cargo/config.toml` supplies the getrandom custom
+  backend. `cargo xtask build uutils --arch x86_64` now passes the former getrandom/libc 0.2.191
+  failures and stops on the K19 ravenbsd module's remaining ABI gaps: `filetime` (`lutimes`,
+  `UTIME_OMIT`), `rlimit` (`getrlimit`/`setrlimit`), `nix` (37 errors) and `rustix` (107 errors:
+  termios constants, `siginfo_t::si_status`, `waitid`, `POSIX_FADV_*`, `ST_*`). That is the
+  C64d/K26a follow-up list; the profile switch and the `base-tools` qtest wait for it. See the
+  K25a report for the exact compiler output.
