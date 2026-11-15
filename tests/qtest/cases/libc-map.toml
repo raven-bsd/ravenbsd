@@ -2,9 +2,8 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 # S51 PG-13 kernel semantics: PROT_NONE reservations, PROTECT split, partial UNMAP and the
-# atomic FIXED | REPLACE primitive. The PG probe still reports `PG-13: absent` until the
-# reviewer adds `map::REPLACE` to the contract crate; this case tests the kernel behaviour
-# directly so the implementation is not a grep-only claim.
+# atomic FIXED | REPLACE primitive. The reviewer added `map::REPLACE` to the contract crate;
+# this case runs the kernel behaviour directly so the probe's grep is backed by execution.
 
 name = "libc-map"
 arch = "x86_64"

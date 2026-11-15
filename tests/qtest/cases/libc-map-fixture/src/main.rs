@@ -25,10 +25,6 @@ entry!(main);
 const PAGE: usize = 4096;
 const BASE: usize = 0x6000_0000;
 
-/// Proposed `raven-abi::types::map::REPLACE` value (CR-24, PG-13). The ABI crate is
-/// reviewer-owned; the kernel accepts the documented value.
-const MAP_REPLACE: usize = 4;
-
 const MARK: u64 = 0x51ed_0000_0000_0001;
 
 /// Raw `proc_fork(src, flags) -> Handle` number (the ABI crate is reviewer-owned).
@@ -356,7 +352,7 @@ fn reservation(base: usize) -> Result<(), &'static str> {
             base,
             3 * PAGE,
             prot::READ | prot::WRITE,
-            map::FIXED | MAP_REPLACE,
+            map::FIXED | map::REPLACE,
         ) == Err(Errno::EEXIST),
         "replace refuses real mapping",
     )?;
@@ -372,7 +368,7 @@ fn reservation(base: usize) -> Result<(), &'static str> {
             base,
             3 * PAGE,
             prot::READ | prot::WRITE,
-            map::FIXED | MAP_REPLACE,
+            map::FIXED | map::REPLACE,
         ) == Ok(base),
         "replace whole reservation",
     )?;
@@ -384,14 +380,14 @@ fn reservation(base: usize) -> Result<(), &'static str> {
     check(read64(base + 2 * PAGE) == MARK + 2, "replace page 2")?;
 
     // Once replaced it is a normal mapping and cannot be replaced again.
-    match map_anon(base, PAGE, prot::READ, map::FIXED | MAP_REPLACE) {
+    match map_anon(base, PAGE, prot::READ, map::FIXED | map::REPLACE) {
         Err(error) if error == Errno::EEXIST => {}
         Ok(_) => return Err("replace after replace succeeded"),
         Err(_) => return Err("replace after replace wrong error"),
     }
     // REPLACE without FIXED is invalid.
     check(
-        map_anon(0, PAGE, prot::READ, MAP_REPLACE) == Err(Errno::EINVAL),
+        map_anon(0, PAGE, prot::READ, map::REPLACE) == Err(Errno::EINVAL),
         "replace requires fixed",
     )?;
     unmap_raw(base, 3 * PAGE).map_err(|_| "reservation cleanup")?;
@@ -407,7 +403,7 @@ fn reservation(base: usize) -> Result<(), &'static str> {
             sub + PAGE,
             PAGE,
             prot::READ | prot::WRITE,
-            map::FIXED | MAP_REPLACE,
+            map::FIXED | map::REPLACE,
         ) == Ok(sub + PAGE),
         "sub replace middle",
     )?;
@@ -417,7 +413,7 @@ fn reservation(base: usize) -> Result<(), &'static str> {
             sub,
             PAGE,
             prot::READ | prot::WRITE,
-            map::FIXED | MAP_REPLACE,
+            map::FIXED | map::REPLACE,
         ) == Ok(sub),
         "sub replace left",
     )?;
@@ -426,7 +422,7 @@ fn reservation(base: usize) -> Result<(), &'static str> {
             sub + 2 * PAGE,
             PAGE,
             prot::READ | prot::WRITE,
-            map::FIXED | MAP_REPLACE,
+            map::FIXED | map::REPLACE,
         ) == Ok(sub + 2 * PAGE),
         "sub replace right",
     )?;

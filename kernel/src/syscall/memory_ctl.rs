@@ -26,13 +26,6 @@ use crate::usercopy::copy_from_user;
 /// Largest memory object accepted by `MEMOBJ_CREATE` (1 GiB).
 const MAX_MEMOBJ_BYTES: u64 = 1 << 30;
 
-/// Atomic replace flag value proposed for `raven-abi::types::map::REPLACE` (CR-24, PG-13).
-///
-/// The contract crate is reviewer-owned, so the kernel accepts the documented value here and
-/// the ABI delta is recorded in the ticket report. Once `map::REPLACE` exists the two must be
-/// the same value.
-pub const MAP_REPLACE: usize = 4;
-
 enum MappedObject {
     Anonymous,
     Initfs,
@@ -132,7 +125,7 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
     let flags = usize::try_from(frame.r9).map_err(|_| Errno::EINVAL)?;
 
     let allowed = prot::MASK
-        | ((map::FIXED | MAP_REPLACE | map::SHARED | map::NOFORK | map::ZERO_ON_FORK)
+        | ((map::FIXED | map::REPLACE | map::SHARED | map::NOFORK | map::ZERO_ON_FORK)
             << map::SHIFT);
     if flags & !allowed != 0 {
         return Err(Errno::EINVAL);
@@ -146,7 +139,7 @@ pub fn map(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     let map_flags = flags >> map::SHIFT;
     let fixed = map_flags & map::FIXED != 0;
-    let replace = map_flags & MAP_REPLACE != 0;
+    let replace = map_flags & map::REPLACE != 0;
     let shared = map_flags & map::SHARED != 0;
     let nofork = map_flags & map::NOFORK != 0;
     let zero_on_fork = map_flags & map::ZERO_ON_FORK != 0;
