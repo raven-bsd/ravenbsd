@@ -13,8 +13,11 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
+use raven_linux_abi::flags::stat::{
+    S_IFCHR, S_IFDIR, S_IFLNK, S_IFMT, S_IFREG, S_IRUSR, S_IWUSR, S_IXUSR,
+};
 
-use crate::table::{DirEntry, LinuxProcess};
+use crate::table::{DirEntry, FileKind, LinuxProcess, OpenFile};
 
 /// Linux `DT_REG`.
 const DT_REG: u8 = 8;
@@ -22,6 +25,72 @@ const DT_REG: u8 = 8;
 const DT_DIR: u8 = 4;
 /// Linux `DT_LNK`.
 const DT_LNK: u8 = 10;
+
+/// The block size every synthetic descriptor reports.
+pub const BLKSIZE: u64 = 4096;
+/// The size a synthetic directory reports (one filesystem block).
+const DIRECTORY_SIZE: u64 = BLKSIZE;
+/// The deepest symlink chain the resolver follows before `ELOOP`.
+const MAX_SYMLINKS: u8 = 40;
+
+/// Metadata of one synthetic descriptor, in the shape the stat handlers encode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Metadata {
+    /// Linux `st_mode` (type bits plus permissions).
+    pub mode: u32,
+    /// `st_size` in bytes.
+    pub size: u64,
+    /// Deterministic synthetic inode.
+    pub inode: u64,
+    /// `st_nlink`.
+    pub nlink: u64,
+    /// `st_blocks` in 512-byte units.
+    pub blocks: u64,
+}
+
+impl Metadata {
+    /// Build metadata from a mode, size, inode and link count.
+    #[must_use]
+    pub fn new(mode: u32, size: u64, inode: u64, nlink: u64) -> Self {
+        Self {
+            mode,
+            size,
+            inode,
+            nlink,
+            blocks: size.div_ceil(512),
+        }
+    }
+
+    /// True when the mode names a directory.
+    #[must_use]
+    pub fn is_dir(&self) -> bool {
+        self.mode & S_IFMT == S_IFDIR
+    }
+
+    /// Whether the synthetic owner has `mode` (`F_OK`, `R_OK`, `W_OK`, `X_OK`).
+    ///
+    /// The tree is read-only and owned by uid 0; the handler checks the owner bits instead of
+    /// applying the kernel's root override, so `access(..., W_OK)` fails as it does for a
+    /// read-only mount.
+    #[must_use]
+    pub fn allows(&self, mode: i32) -> bool {
+        if mode < 0 || mode & !0o7 != 0 {
+            return false;
+        }
+        let mode = mode as u32;
+        let mut required = 0;
+        if mode & 0o4 != 0 {
+            required |= S_IRUSR;
+        }
+        if mode & 0o2 != 0 {
+            required |= S_IWUSR;
+        }
+        if mode & 0o1 != 0 {
+            required |= S_IXUSR;
+        }
+        self.mode & required == required
+    }
+}
 
 /// One resolved synthetic path.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -43,7 +112,7 @@ pub enum Resource {
 pub fn lookup(process: &LinuxProcess, path: &[u8]) -> Result<Resource, Errno> {
     let path = core::str::from_utf8(path).map_err(|_| Errno::EINVAL)?;
     let path = normalize(path).ok_or(Errno::EINVAL)?;
-    match path {
+    match path.as_str() {
         "/proc" => Ok(Resource::Directory(proc_dir())),
         "/proc/self" => Ok(Resource::Directory(self_dir())),
         "/proc/self/exe" => Ok(Resource::Symlink(process.exe.clone())),
@@ -72,15 +141,125 @@ pub fn lookup(process: &LinuxProcess, path: &[u8]) -> Result<Resource, Errno> {
     }
 }
 
-fn normalize(path: &str) -> Option<&str> {
+/// Resolve `path` and return its metadata.
+///
+/// `follow` selects `stat` (true) or `lstat` (false) symlink semantics. Following a symlink that
+/// leaves the synthetic tree returns [`Errno::ENOENT`], just as a missing real target would.
+///
+/// # Errors
+///
+/// Returns [`Errno::EINVAL`] for a non-absolute/malformed path, [`Errno::ENOENT`] for a missing
+/// path, and [`Errno::ELOOP`] when the symlink chain is deeper than [`MAX_SYMLINKS`].
+pub fn metadata(process: &LinuxProcess, path: &[u8], follow: bool) -> Result<Metadata, Errno> {
+    let path = core::str::from_utf8(path).map_err(|_| Errno::EINVAL)?;
+    let path = normalize(path).ok_or(Errno::EINVAL)?;
+    metadata_path(process, &path, follow, 0)
+}
+
+fn metadata_path(
+    process: &LinuxProcess,
+    path: &str,
+    follow: bool,
+    depth: u8,
+) -> Result<Metadata, Errno> {
+    let resource = lookup(process, path.as_bytes())?;
+    match resource {
+        Resource::Symlink(target) if follow => {
+            if depth >= MAX_SYMLINKS {
+                return Err(Errno::ELOOP);
+            }
+            let next = symlink_target(path, &target)?;
+            metadata_path(process, &next, true, depth.saturating_add(1))
+        }
+        other => Ok(metadata_of(&other, path)),
+    }
+}
+
+/// The metadata of one descriptor, including the three standard descriptors.
+///
+/// # Errors
+///
+/// Returns [`Errno::EBADF`] for a closed or negative descriptor.
+pub fn metadata_fd(process: &LinuxProcess, fd: i32) -> Result<Metadata, Errno> {
+    match fd {
+        0 => Ok(char_device("/dev/null")),
+        1 | 2 => Ok(char_device("tty:console")),
+        _ => process.file(fd).map(metadata_open_file).ok_or(Errno::EBADF),
+    }
+}
+
+fn metadata_of(resource: &Resource, path: &str) -> Metadata {
+    let inode = inode_for(path);
+    match resource {
+        Resource::File(bytes) => Metadata::new(S_IFREG | 0o444, bytes.len() as u64, inode, 1),
+        Resource::Directory(_) => Metadata::new(S_IFDIR | 0o555, DIRECTORY_SIZE, inode, 2),
+        Resource::Symlink(target) => Metadata::new(S_IFLNK | 0o777, target.len() as u64, inode, 1),
+    }
+}
+
+fn metadata_open_file(file: &OpenFile) -> Metadata {
+    let path = core::str::from_utf8(&file.path).unwrap_or("");
+    let inode = inode_for(path);
+    match &file.kind {
+        FileKind::Regular(bytes) => Metadata::new(S_IFREG | 0o444, bytes.len() as u64, inode, 1),
+        FileKind::Directory(_) => Metadata::new(S_IFDIR | 0o555, DIRECTORY_SIZE, inode, 2),
+        FileKind::Symlink(target) => Metadata::new(S_IFLNK | 0o777, target.len() as u64, inode, 1),
+    }
+}
+
+fn char_device(path: &str) -> Metadata {
+    Metadata::new(S_IFCHR | 0o666, 0, inode_for(path), 1)
+}
+
+/// Join a symlink target onto the link's parent directory.
+fn symlink_target(path: &str, target: &[u8]) -> Result<String, Errno> {
+    let target = core::str::from_utf8(target).map_err(|_| Errno::EINVAL)?;
+    if target.is_empty() {
+        return Err(Errno::ENOENT);
+    }
+    let joined = if target.starts_with('/') {
+        target.to_string()
+    } else {
+        let parent = path.rfind('/').map_or("/", |index| &path[..index]);
+        let parent = if parent.is_empty() { "/" } else { parent };
+        format!("{parent}/{target}")
+    };
+    normalize(&joined).ok_or(Errno::EINVAL)
+}
+
+fn normalize(path: &str) -> Option<String> {
     if !path.starts_with('/') {
         return None;
     }
-    if path.len() > 1 {
-        Some(path.trim_end_matches('/'))
-    } else {
-        Some(path)
+    let mut parts: Vec<&str> = Vec::new();
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop();
+            }
+            _ => parts.push(part),
+        }
     }
+    let mut out = String::with_capacity(path.len());
+    for part in parts {
+        out.push('/');
+        out.push_str(part);
+    }
+    if out.is_empty() {
+        out.push('/');
+    }
+    Some(out)
+}
+
+/// Deterministic FNV-1a inode for a normalized synthetic path.
+fn inode_for(path: &str) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for byte in path.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash | 1
 }
 
 fn parse_fd(text: &str) -> Option<i32> {

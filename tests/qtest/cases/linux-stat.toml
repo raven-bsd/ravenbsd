@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B25: the metadata syscall batch. The static musl probe asks linuxd for stat/lstat/fstat/
+# newfstatat/statx/access and the read-only mutators, and checks the x86-64 layouts and synthetic
+# descriptor metadata. The same fixture also runs the linux-root qtest; this case keeps the
+# metadata surface testable without the user-supplied Alpine tarball.
+
+name = "linux-stat"
+arch = "x86_64"
+profile = "linux-hello"
+timeout_secs = 180
+pre = ["sh tests/fixtures/linuxd/build.sh"]
+initfs = "build/fixtures/linuxd/stat-initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^linux-stat: start$'
+
+[[expect]]
+regex = '^linux-stat: stat-status mode=0x8124 nlink=1 size=[0-9]+ blocks=[0-9]+ blksize=4096 ino=1$'
+
+[[expect]]
+regex = '^linux-stat: lstat-exe mode=0xa1ff nlink=1 size=6 blocks=1 blksize=4096 ino=1$'
+
+[[expect]]
+regex = '^linux-stat: fstat-stdout mode=0x21b6 nlink=1 size=0 blocks=0 blksize=4096 ino=1$'
+
+[[expect]]
+regex = '^linux-stat: fstat-file mode=0x8124 nlink=1 size=[0-9]+ blocks=[0-9]+ blksize=4096 ino=1$'
+
+[[expect]]
+regex = '^linux-stat: newfstatat-status mode=0x8124 nlink=1 size=[0-9]+ blocks=[0-9]+ blksize=4096 ino=1$'
+
+[[expect]]
+regex = '^linux-stat: newfstatat-relative mode=0x8124 nlink=1 size=[0-9]+ blocks=[0-9]+ blksize=4096 ino=1$'
+
+[[expect]]
+regex = '^linux-stat: newfstatat-nofollow mode=0xa1ff nlink=1 size=6 blocks=1 blksize=4096 ino=1$'
+
+[[expect]]
+regex = '^linux-stat: newfstatat-empty mode=0x21b6 nlink=1 size=0 blocks=0 blksize=4096 ino=1$'
+
+[[expect]]
+regex = '^linux-stat: statx mask=0x7ff mode=0x8124 size=[0-9]+$'
+
+[[expect]]
+regex = '^linux-stat: access read=0 write=EACCES exec=EACCES dir-exec=0$'
+
+[[expect]]
+regex = '^linux-stat: mutators truncate=EROFS truncate-dir=EISDIR chmod=EROFS chown=EROFS utimes=EROFS$'
+
+[[expect]]
+regex = '^linux-stat: missing=ENOENT$'
+
+[[expect]]
+regex = '^linux-stat: done$'
+
+[[expect]]
+regex = '^linuxd: hello exit=0$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|linux-stat: FAIL'

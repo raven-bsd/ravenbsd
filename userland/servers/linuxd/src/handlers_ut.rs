@@ -3,8 +3,11 @@
 
 //! Handler tests: every B20 syscall, the error paths and the dispatcher counters.
 
+use core::mem::offset_of;
+
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
+use raven_linux_abi::structs::x86_64::{Stat as AbiStat, Statx as AbiStatx};
 use raven_linux_dispatch::SyscallArgs;
 
 use super::*;
@@ -26,6 +29,32 @@ fn set_path(process: &mut LinuxProcess, path: &[u8]) {
     process.user_buffer.clear();
     process.user_buffer.extend_from_slice(path);
     process.user_buffer.push(0);
+}
+
+fn u32_at(bytes: &[u8], offset: usize) -> u32 {
+    let mut word = [0u8; 4];
+    word.copy_from_slice(&bytes[offset..offset + 4]);
+    u32::from_le_bytes(word)
+}
+
+fn u64_at(bytes: &[u8], offset: usize) -> u64 {
+    let mut word = [0u8; 8];
+    word.copy_from_slice(&bytes[offset..offset + 8]);
+    u64::from_le_bytes(word)
+}
+
+fn stat_bytes(process: &mut LinuxProcess, nr: usize, args: [usize; 6], address: u64) -> Vec<u8> {
+    assert_eq!(dispatch(process, nr, args), 0);
+    let (queued, bytes) = process.pending_write.take().expect("a stat copy-out");
+    assert_eq!(queued, address);
+    bytes
+}
+
+fn proc_file_len(process: &LinuxProcess, path: &[u8]) -> u64 {
+    match procfs::lookup(process, path) {
+        Ok(Resource::File(bytes)) => bytes.len() as u64,
+        other => panic!("{path:?}: {other:?}"),
+    }
 }
 
 #[test]
@@ -180,21 +209,31 @@ fn the_stats_name_every_implemented_handler() {
     assert_eq!(
         names,
         [
+            "access",
             "arch_prctl",
             "brk",
             "close",
             "exit_group",
+            "fchmodat",
+            "fchownat",
+            "fstat",
             "getdents64",
             "getpid",
             "lseek",
+            "lstat",
             "mmap",
+            "newfstatat",
             "open",
             "openat",
             "read",
             "readlink",
             "readlinkat",
             "rt_sigprocmask",
+            "stat",
+            "statx",
+            "truncate",
             "uname",
+            "utimensat",
             "write"
         ]
     );
@@ -309,5 +348,299 @@ fn open_errors_are_reported_without_state() {
     assert_eq!(
         dispatch(&mut process, 3, [3, 0, 0, 0, 0, 0]),
         -(Errno::EBADF.0 as isize)
+    );
+}
+
+#[test]
+fn stat_queues_the_linux_layout() {
+    let mut process = process();
+    let size = proc_file_len(&process, b"/proc/self/status");
+    set_path(&mut process, b"/proc/self/status");
+    let bytes = stat_bytes(&mut process, 4, [0, 0x2000, 0, 0, 0, 0], 0x2000);
+    assert_eq!(bytes.len(), stat_layout::STAT_SIZE);
+    assert_eq!(u32_at(&bytes, offset_of!(AbiStat, st_mode)), 0o100444);
+    assert_eq!(u64_at(&bytes, offset_of!(AbiStat, st_nlink)), 1);
+    assert_eq!(u64_at(&bytes, offset_of!(AbiStat, st_size)), size);
+    assert_eq!(
+        u64_at(&bytes, offset_of!(AbiStat, st_blksize)),
+        procfs::BLKSIZE
+    );
+    assert_eq!(
+        u64_at(&bytes, offset_of!(AbiStat, st_blocks)),
+        size.div_ceil(512)
+    );
+    assert!(u64_at(&bytes, offset_of!(AbiStat, st_ino)) != 0);
+    assert_eq!(u32_at(&bytes, offset_of!(AbiStat, st_uid)), 0);
+    assert_eq!(u32_at(&bytes, offset_of!(AbiStat, st_gid)), 0);
+    assert_eq!(u64_at(&bytes, offset_of!(AbiStat, st_mtime)), 0);
+}
+
+#[test]
+fn stat_follows_symlinks_and_accepts_relative_paths() {
+    let mut process = process();
+    process.set_identity(b"/hello", vec![b"/hello".to_vec()]);
+
+    set_path(&mut process, b"/proc/self/exe");
+    let link = stat_bytes(&mut process, 6, [0, 0x2100, 0, 0, 0, 0], 0x2100);
+    assert_eq!(u32_at(&link, offset_of!(AbiStat, st_mode)), 0o120777);
+    assert_eq!(u64_at(&link, offset_of!(AbiStat, st_size)), 6);
+
+    set_path(&mut process, b"/proc/self/exe");
+    assert_eq!(
+        dispatch(&mut process, 4, [0, 0x2200, 0, 0, 0, 0]),
+        -(Errno::ENOENT.0 as isize)
+    );
+    assert!(process.pending_write.is_none());
+
+    set_path(&mut process, b"proc/self/status");
+    let relative = stat_bytes(&mut process, 4, [0, 0x2300, 0, 0, 0, 0], 0x2300);
+    assert_eq!(u32_at(&relative, offset_of!(AbiStat, st_mode)), 0o100444);
+
+    set_path(&mut process, b"/proc/nope");
+    assert_eq!(
+        dispatch(&mut process, 4, [0, 0x2400, 0, 0, 0, 0]),
+        -(Errno::ENOENT.0 as isize)
+    );
+}
+
+#[test]
+fn fstat_serves_standard_and_open_descriptors() {
+    let mut process = process();
+    let stdin = stat_bytes(&mut process, 5, [0, 0x3000, 0, 0, 0, 0], 0x3000);
+    assert_eq!(u32_at(&stdin, offset_of!(AbiStat, st_mode)), 0o020666);
+    assert_eq!(u64_at(&stdin, offset_of!(AbiStat, st_size)), 0);
+    let stdout = stat_bytes(&mut process, 5, [1, 0x3100, 0, 0, 0, 0], 0x3100);
+    assert_eq!(u32_at(&stdout, offset_of!(AbiStat, st_mode)), 0o020666);
+
+    set_path(&mut process, b"/proc/cpuinfo");
+    let fd = dispatch(&mut process, 2, [0, 0, 0, 0, 0, 0]);
+    assert_eq!(fd, 3);
+    let size = proc_file_len(&process, b"/proc/cpuinfo");
+    let opened = stat_bytes(&mut process, 5, [fd as usize, 0x3200, 0, 0, 0, 0], 0x3200);
+    assert_eq!(u32_at(&opened, offset_of!(AbiStat, st_mode)), 0o100444);
+    assert_eq!(u64_at(&opened, offset_of!(AbiStat, st_size)), size);
+
+    assert_eq!(
+        dispatch(&mut process, 5, [99, 0x3300, 0, 0, 0, 0]),
+        -(Errno::EBADF.0 as isize)
+    );
+}
+
+#[test]
+fn newfstatat_handles_dirfds_flags_and_empty_paths() {
+    let mut process = process();
+    set_path(&mut process, b"/proc/self/status");
+    let absolute = stat_bytes(
+        &mut process,
+        262,
+        [AT_FDCWD as usize, 0, 0x4000, 0, 0, 0],
+        0x4000,
+    );
+    assert_eq!(u32_at(&absolute, offset_of!(AbiStat, st_mode)), 0o100444);
+
+    set_path(&mut process, b"/proc/self");
+    let dirfd = dispatch(
+        &mut process,
+        257,
+        [AT_FDCWD as usize, 0, O_DIRECTORY as usize, 0, 0, 0],
+    );
+    assert_eq!(dirfd, 3);
+    set_path(&mut process, b"status");
+    let relative = stat_bytes(
+        &mut process,
+        262,
+        [dirfd as usize, 0, 0x4100, 0, 0, 0],
+        0x4100,
+    );
+    assert_eq!(u32_at(&relative, offset_of!(AbiStat, st_mode)), 0o100444);
+    set_path(&mut process, b".");
+    let child_dir = stat_bytes(
+        &mut process,
+        262,
+        [dirfd as usize, 0, 0x4200, 0, 0, 0],
+        0x4200,
+    );
+    assert_eq!(u32_at(&child_dir, offset_of!(AbiStat, st_mode)), 0o040555);
+
+    process.set_identity(b"/hello", vec![b"/hello".to_vec()]);
+    set_path(&mut process, b"/proc/self/exe");
+    let link = stat_bytes(
+        &mut process,
+        262,
+        [
+            AT_FDCWD as usize,
+            0,
+            0x4300,
+            AT_SYMLINK_NOFOLLOW as usize,
+            0,
+            0,
+        ],
+        0x4300,
+    );
+    assert_eq!(u32_at(&link, offset_of!(AbiStat, st_mode)), 0o120777);
+
+    set_path(&mut process, b"");
+    let empty = stat_bytes(
+        &mut process,
+        262,
+        [1, 0, 0x4400, AT_EMPTY_PATH as usize, 0, 0],
+        0x4400,
+    );
+    assert_eq!(u32_at(&empty, offset_of!(AbiStat, st_mode)), 0o020666);
+
+    set_path(&mut process, b"");
+    assert_eq!(
+        dispatch(&mut process, 262, [AT_FDCWD as usize, 0, 0x4500, 0, 0, 0]),
+        -(Errno::ENOENT.0 as isize)
+    );
+    set_path(&mut process, b"status");
+    assert_eq!(
+        dispatch(&mut process, 262, [42, 0, 0x4600, 0, 0, 0]),
+        -(Errno::EBADF.0 as isize)
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            262,
+            [AT_FDCWD as usize, 0, 0x4700, 0x8000, 0, 0]
+        ),
+        -(Errno::EINVAL.0 as isize)
+    );
+}
+
+#[test]
+fn statx_queues_the_basic_layout() {
+    let mut process = process();
+    let size = proc_file_len(&process, b"/proc/self/status");
+    set_path(&mut process, b"/proc/self/status");
+    let bytes = stat_bytes(
+        &mut process,
+        332,
+        [AT_FDCWD as usize, 0, 0, 0x7ff, 0x5000, 0],
+        0x5000,
+    );
+    assert_eq!(bytes.len(), stat_layout::STATX_SIZE);
+    assert_eq!(
+        u32_at(&bytes, offset_of!(AbiStatx, stx_mask)),
+        stat_layout::STATX_BASIC_STATS
+    );
+    assert_eq!(
+        u32_at(&bytes, offset_of!(AbiStatx, stx_blksize)),
+        procfs::BLKSIZE as u32
+    );
+    assert_eq!(u32_at(&bytes, offset_of!(AbiStatx, stx_nlink)), 1);
+    assert_eq!(u32_at(&bytes, offset_of!(AbiStatx, stx_mode)), 0o100444);
+    assert_eq!(u64_at(&bytes, offset_of!(AbiStatx, stx_size)), size);
+    assert_eq!(
+        u64_at(&bytes, offset_of!(AbiStatx, stx_blocks)),
+        size.div_ceil(512)
+    );
+
+    set_path(&mut process, b"");
+    let empty = stat_bytes(
+        &mut process,
+        332,
+        [0, 0, AT_EMPTY_PATH as usize, 0x7ff, 0x5100, 0],
+        0x5100,
+    );
+    assert_eq!(u32_at(&empty, offset_of!(AbiStatx, stx_mode)), 0o020666);
+
+    set_path(&mut process, b"/proc/self/status");
+    assert_eq!(
+        dispatch(
+            &mut process,
+            332,
+            [AT_FDCWD as usize, 0, 0x8000, 0x7ff, 0x5200, 0]
+        ),
+        -(Errno::EINVAL.0 as isize)
+    );
+}
+
+#[test]
+fn access_uses_the_synthetic_mode_bits() {
+    let mut process = process();
+    set_path(&mut process, b"/proc/self/status");
+    assert_eq!(dispatch(&mut process, 21, [0, 0, 0, 0, 0, 0]), 0);
+    assert_eq!(dispatch(&mut process, 21, [0, 4, 0, 0, 0, 0]), 0);
+    assert_eq!(
+        dispatch(&mut process, 21, [0, 2, 0, 0, 0, 0]),
+        -(Errno::EACCES.0 as isize)
+    );
+    assert_eq!(
+        dispatch(&mut process, 21, [0, 1, 0, 0, 0, 0]),
+        -(Errno::EACCES.0 as isize)
+    );
+    set_path(&mut process, b"/proc/self");
+    assert_eq!(dispatch(&mut process, 21, [0, 1, 0, 0, 0, 0]), 0);
+    assert_eq!(
+        dispatch(&mut process, 21, [0, 2, 0, 0, 0, 0]),
+        -(Errno::EACCES.0 as isize)
+    );
+    set_path(&mut process, b"/proc/nope");
+    assert_eq!(
+        dispatch(&mut process, 21, [0, 0, 0, 0, 0, 0]),
+        -(Errno::ENOENT.0 as isize)
+    );
+    set_path(&mut process, b"/proc/self/status");
+    assert_eq!(
+        dispatch(&mut process, 21, [0, 0o10, 0, 0, 0, 0]),
+        -(Errno::EINVAL.0 as isize)
+    );
+}
+
+#[test]
+fn metadata_mutators_report_a_read_only_tree() {
+    let mut process = process();
+
+    set_path(&mut process, b"/proc/self/status");
+    assert_eq!(
+        dispatch(&mut process, 268, [AT_FDCWD as usize, 0, 0o444, 0, 0, 0]),
+        -(Errno::EROFS.0 as isize)
+    );
+    set_path(&mut process, b"/proc/nope");
+    assert_eq!(
+        dispatch(&mut process, 268, [AT_FDCWD as usize, 0, 0o444, 0, 0, 0]),
+        -(Errno::ENOENT.0 as isize)
+    );
+    set_path(&mut process, b"/proc/self/status");
+    assert_eq!(
+        dispatch(
+            &mut process,
+            268,
+            [AT_FDCWD as usize, 0, 0o444, 0x8000, 0, 0]
+        ),
+        -(Errno::EINVAL.0 as isize)
+    );
+
+    set_path(&mut process, b"/proc/self/status");
+    assert_eq!(
+        dispatch(&mut process, 260, [AT_FDCWD as usize, 0, 0, 0, 0, 0]),
+        -(Errno::EROFS.0 as isize)
+    );
+    set_path(&mut process, b"/proc/self/status");
+    assert_eq!(
+        dispatch(&mut process, 280, [AT_FDCWD as usize, 0, 0, 0, 0, 0]),
+        -(Errno::EROFS.0 as isize)
+    );
+
+    set_path(&mut process, b"/proc/cpuinfo");
+    assert_eq!(
+        dispatch(&mut process, 76, [0, 0, 0, 0, 0, 0]),
+        -(Errno::EROFS.0 as isize)
+    );
+    set_path(&mut process, b"/proc/self");
+    assert_eq!(
+        dispatch(&mut process, 76, [0, 0, 0, 0, 0, 0]),
+        -(Errno::EISDIR.0 as isize)
+    );
+    set_path(&mut process, b"/proc/nope");
+    assert_eq!(
+        dispatch(&mut process, 76, [0, 0, 0, 0, 0, 0]),
+        -(Errno::ENOENT.0 as isize)
+    );
+    set_path(&mut process, b"/proc/cpuinfo");
+    assert_eq!(
+        dispatch(&mut process, 76, [0, usize::MAX, 0, 0, 0, 0]),
+        -(Errno::EINVAL.0 as isize)
     );
 }

@@ -142,3 +142,95 @@ fn unknown_and_relative_paths_are_errors() {
     assert_eq!(lookup(&process(), b"proc/self/status"), Err(Errno::EINVAL));
     assert_eq!(lookup(&process(), b"/proc/self/fd/999"), Err(Errno::ENOENT));
 }
+
+#[test]
+fn dot_segments_are_normalized() {
+    assert!(matches!(
+        lookup(&process(), b"/proc/./self/../self/status"),
+        Ok(Resource::File(_))
+    ));
+    assert!(matches!(
+        lookup(&process(), b"/proc//self//status"),
+        Ok(Resource::File(_))
+    ));
+    assert!(matches!(
+        lookup(&process(), b"/../sys/."),
+        Ok(Resource::Directory(_))
+    ));
+}
+
+#[test]
+fn file_metadata_has_the_synthetic_shape() {
+    let process = process();
+    let meta = metadata(&process, b"/proc/self/status", false).expect("stat");
+    assert_eq!(meta.mode, 0o100444);
+    assert_eq!(meta.nlink, 1);
+    assert_eq!(meta.size, file(&process, "/proc/self/status").len() as u64);
+    assert_eq!(meta.blocks, meta.size.div_ceil(512));
+    assert!(meta.inode != 0);
+}
+
+#[test]
+fn directory_metadata_has_two_links_and_a_block() {
+    let meta = metadata(&process(), b"/proc/self", false).expect("stat");
+    assert!(meta.is_dir());
+    assert_eq!(meta.mode, 0o040555);
+    assert_eq!(meta.nlink, 2);
+    assert_eq!(meta.size, BLKSIZE);
+    assert_eq!(meta.blocks, 8);
+}
+
+#[test]
+fn lstat_reports_the_link_but_stat_follows_it() {
+    let process = process();
+    let link = metadata(&process, b"/proc/self/exe", false).expect("lstat");
+    assert_eq!(link.mode, 0o120777);
+    assert_eq!(link.size, 6);
+    // The synthetic tree does not serve the target (`/hello`), so following it is ENOENT.
+    assert_eq!(
+        metadata(&process, b"/proc/self/exe", true),
+        Err(Errno::ENOENT)
+    );
+}
+
+#[test]
+fn standard_and_open_descriptors_have_metadata() {
+    let mut process = process();
+    let stdin = metadata_fd(&process, 0).expect("fstat 0");
+    assert_eq!(stdin.mode, 0o020666);
+    assert_eq!(stdin.nlink, 1);
+    assert_eq!(stdin.size, 0);
+    let stdout = metadata_fd(&process, 1).expect("fstat 1");
+    assert_eq!(stdout.mode, 0o020666);
+    assert_eq!(metadata_fd(&process, 2).expect("fstat 2").mode, 0o020666);
+    assert_ne!(stdin.inode, stdout.inode);
+
+    let fd = process.open_file(
+        b"/proc/self/status".to_vec(),
+        crate::table::FileKind::Regular(vec![1, 2, 3]),
+    );
+    let opened = metadata_fd(&process, fd).expect("fstat open");
+    assert_eq!(opened.mode, 0o100444);
+    assert_eq!(opened.size, 3);
+    assert_eq!(opened.blocks, 1);
+    assert_eq!(metadata_fd(&process, 99), Err(Errno::EBADF));
+}
+
+#[test]
+fn access_uses_the_synthetic_mode_bits() {
+    let process = process();
+    let file = metadata(&process, b"/proc/self/status", false).expect("stat file");
+    assert!(file.allows(0));
+    assert!(file.allows(0o4));
+    assert!(!file.allows(0o2));
+    assert!(!file.allows(0o1));
+    assert!(!file.allows(0o10));
+
+    let dir = metadata(&process, b"/proc/self", false).expect("stat dir");
+    assert!(dir.allows(0o4));
+    assert!(dir.allows(0o1));
+    assert!(!dir.allows(0o2));
+
+    let link = metadata(&process, b"/proc/self/exe", false).expect("stat link");
+    assert!(link.allows(0o2));
+}

@@ -20,6 +20,7 @@ pub mod handlers;
 pub mod image;
 pub mod loader;
 pub mod procfs;
+pub mod stat;
 pub mod table;
 pub mod trap;
 
@@ -30,4 +31,6 @@ pub use image::{
 pub use loader::{LoadError, Loaded, Sys, load};
 pub use procfs::Resource;
 pub use table::{DirEntry, FileKind, LinuxProcess, OpenFile, Region, USER_BUFFER_MAX};
-pub use trap::{TrapAction, TrapError, copy_in_len, decode, dispatch, encode_reply, lengths};
+pub use trap::{
+    TrapAction, TrapError, copy_in_arg, copy_in_len, decode, dispatch, encode_reply, lengths,
+};

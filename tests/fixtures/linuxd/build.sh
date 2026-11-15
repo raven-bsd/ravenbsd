@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# Build the B30 procfs/sysfs fixture and pack build/fixtures/linuxd/initfs.img:
+# Build the B30 procfs/sysfs and B25 stat fixtures and pack two initfs images:
 #   /init  = the linuxd server (Raven target)
-#   /hello = the static musl probe that reads every synthetic file
+#   /hello = the static musl probe that reads every synthetic file (linux-proc)
+#   /hello = the static musl stat probe (stat-initfs.img, linux-stat)
 #
 # A missing `musl-gcc` fails the qtest instead of skipping it.
 
@@ -21,6 +22,7 @@ if ! command -v musl-gcc >/dev/null 2>&1; then
 fi
 
 musl-gcc -static -O0 -o "$out/hello" tests/fixtures/linuxd/proc.c
+musl-gcc -static -O0 -o "$out/stat" tests/fixtures/linuxd/stat.c
 
 target=x86_64-unknown-none
 target_dir=${CARGO_TARGET_DIR:-target}
@@ -31,3 +33,8 @@ cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "$out/initfs.img" \
     /init="$target_dir/$target/release/linuxd" \
     /hello="$out/hello"
+
+cargo run -q -p raven-initfs --features std --example mkinitfs -- \
+    "$out/stat-initfs.img" \
+    /init="$target_dir/$target/release/linuxd" \
+    /hello="$out/stat"

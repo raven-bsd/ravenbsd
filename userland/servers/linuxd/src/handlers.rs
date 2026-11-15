@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! The syscall handlers of the B20 skeleton.
+//! The syscall handlers of the Linux personality.
 //!
-//! Only the numbers the static `hello` needs are served: `write`, `exit_group`, `brk`, anonymous
-//! `mmap`, `getpid`, `uname`, `rt_sigprocmask` and `arch_prctl`. Every other number reaches the
-//! dispatcher's `-ENOSYS` path and is counted there.
+//! The B20 skeleton serves `write`, `exit_group`, `brk`, anonymous `mmap`, `getpid`, `uname`,
+//! `rt_sigprocmask` and `arch_prctl`; B30 adds the synthetic file calls and B25 adds the metadata
+//! batch (`stat`, `lstat`, `fstat`, `newfstatat`, `statx`, `access`, `fchmodat`, `fchownat`,
+//! `utimensat` and `truncate`). Every other number reaches the dispatcher's `-ENOSYS` path and is
+//! counted there.
 //!
 //! `brk` and anonymous `mmap` are served from two arenas the loader maps once at load time, so a
 //! handler never needs a kernel call and the dispatcher stays a pure function table. The arenas and
@@ -15,9 +17,13 @@ use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 use raven_linux_abi::Arch;
+use raven_linux_abi::flags::at_fd::{
+    AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_STATX_SYNC_TYPE, AT_SYMLINK_NOFOLLOW,
+};
 use raven_linux_dispatch::{Dispatcher, LinuxContext, SyscallArgs};
 
 use crate::procfs::{self, Resource};
+use crate::stat as stat_layout;
 use crate::table::{FileKind, LinuxProcess};
 
 /// `MAP_ANONYMOUS` from the Linux UAPI (the dispatcher's `raven-linux-abi` crate owns the number).
@@ -80,6 +86,16 @@ pub fn dispatcher() -> Dispatcher {
         ("readlink", readlink as _),
         ("readlinkat", readlinkat as _),
         ("getdents64", getdents64 as _),
+        ("stat", stat as _),
+        ("lstat", lstat as _),
+        ("fstat", fstat as _),
+        ("newfstatat", newfstatat as _),
+        ("statx", statx as _),
+        ("access", access as _),
+        ("fchmodat", fchmodat as _),
+        ("fchownat", fchownat as _),
+        ("utimensat", utimensat as _),
+        ("truncate", truncate as _),
     ] {
         // Every name is in the x86-64 table; a failure here is a build-time typo, and the
         // dispatcher reports it as an unimplemented number instead of panicking.
@@ -98,6 +114,12 @@ fn with<R>(ctx: &mut dyn LinuxContext, f: impl FnOnce(&mut LinuxProcess) -> R) -
 
 /// `EINVAL` as the dispatcher's `isize`.
 const EINVAL: i32 = Errno::EINVAL.0 as i32;
+/// `EBADF` for relative paths without an open directory.
+const EBADF: i32 = Errno::EBADF.0 as i32;
+/// `ENOTDIR` for a relative path under a non-directory descriptor.
+const ENOTDIR: i32 = Errno::ENOTDIR.0 as i32;
+/// `ENOENT` for an empty path without `AT_EMPTY_PATH`.
+const ENOENT: i32 = Errno::ENOENT.0 as i32;
 
 fn einval() -> isize {
     -(EINVAL as isize)
@@ -241,6 +263,280 @@ fn path_bytes(process: &LinuxProcess) -> Result<&[u8], i32> {
         return Err(EINVAL);
     }
     buffer.get(..end).ok_or(EINVAL)
+}
+
+fn path_vec(process: &LinuxProcess) -> Result<Vec<u8>, i32> {
+    path_bytes(process).map(|path| path.to_vec())
+}
+
+/// Resolve a possibly-relative path against `dirfd` (or the synthetic root for `AT_FDCWD`).
+fn absolute_path(process: &LinuxProcess, dirfd: i32, path: &[u8]) -> Result<Vec<u8>, i32> {
+    if path.first() == Some(&b'/') {
+        return Ok(path.to_vec());
+    }
+    match dirfd {
+        AT_FDCWD => {
+            let mut out = Vec::with_capacity(path.len().saturating_add(1));
+            out.push(b'/');
+            out.extend_from_slice(path);
+            Ok(out)
+        }
+        0..=2 => Err(EBADF),
+        _ => {
+            let Some(file) = process.file(dirfd) else {
+                return Err(EBADF);
+            };
+            if !matches!(file.kind, FileKind::Directory(_)) {
+                return Err(ENOTDIR);
+            }
+            let mut out = file.path.clone();
+            if !out.ends_with(b"/") {
+                out.push(b'/');
+            }
+            out.extend_from_slice(path);
+            Ok(out)
+        }
+    }
+}
+
+/// The path argument of an `*at` metadata call, with the accepted flag set.
+fn at_path(
+    process: &LinuxProcess,
+    dirfd: i32,
+    flags: u32,
+    allowed: u32,
+    empty_ok: bool,
+) -> Result<Vec<u8>, i32> {
+    if flags & !allowed != 0 {
+        return Err(EINVAL);
+    }
+    if process.user_buffer.first() == Some(&0) {
+        if empty_ok && flags & AT_EMPTY_PATH != 0 {
+            return Ok(Vec::new());
+        }
+        return Err(ENOENT);
+    }
+    let path = path_vec(process)?;
+    absolute_path(process, dirfd, &path)
+}
+
+fn stat_into(process: &mut LinuxProcess, address: u64, path: &[u8], follow: bool) -> isize {
+    match procfs::metadata(process, path, follow) {
+        Ok(metadata) => {
+            process.pending_write = Some((address, stat_layout::encode_stat(&metadata).to_vec()));
+            0
+        }
+        Err(error) => -(error.0 as isize),
+    }
+}
+
+fn statx_into(process: &mut LinuxProcess, address: u64, path: &[u8], follow: bool) -> isize {
+    match procfs::metadata(process, path, follow) {
+        Ok(metadata) => {
+            process.pending_write = Some((address, stat_layout::encode_statx(&metadata).to_vec()));
+            0
+        }
+        Err(error) => -(error.0 as isize),
+    }
+}
+
+fn fstat_into(process: &mut LinuxProcess, fd: i32, address: u64, statx: bool) -> isize {
+    match procfs::metadata_fd(process, fd) {
+        Ok(metadata) => {
+            let bytes = if statx {
+                stat_layout::encode_statx(&metadata).to_vec()
+            } else {
+                stat_layout::encode_stat(&metadata).to_vec()
+            };
+            process.pending_write = Some((address, bytes));
+            0
+        }
+        Err(error) => -(error.0 as isize),
+    }
+}
+
+fn readonly_path(process: &LinuxProcess, path: &[u8], follow: bool) -> isize {
+    match procfs::metadata(process, path, follow) {
+        Ok(_) => -(Errno::EROFS.0 as isize),
+        Err(error) => -(error.0 as isize),
+    }
+}
+
+fn readonly_fd(process: &LinuxProcess, fd: i32) -> isize {
+    match procfs::metadata_fd(process, fd) {
+        Ok(_) => -(Errno::EROFS.0 as isize),
+        Err(error) => -(error.0 as isize),
+    }
+}
+
+/// `stat(path, buf)`: follow symlinks.
+fn stat(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let address = args.ptr(1) as u64;
+    let result = with(ctx, |process| {
+        let path = match path_vec(process) {
+            Ok(path) => path,
+            Err(error) => return -(error as isize),
+        };
+        let path = match absolute_path(process, AT_FDCWD, &path) {
+            Ok(path) => path,
+            Err(error) => return -(error as isize),
+        };
+        stat_into(process, address, &path, true)
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+/// `lstat(path, buf)`: do not follow the final symlink.
+fn lstat(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let address = args.ptr(1) as u64;
+    let result = with(ctx, |process| {
+        let path = match path_vec(process) {
+            Ok(path) => path,
+            Err(error) => return -(error as isize),
+        };
+        let path = match absolute_path(process, AT_FDCWD, &path) {
+            Ok(path) => path,
+            Err(error) => return -(error as isize),
+        };
+        stat_into(process, address, &path, false)
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+fn fstat(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let fd = args.fd(0);
+    let address = args.ptr(1) as u64;
+    with(ctx, |process| fstat_into(process, fd, address, false)).unwrap_or_else(|_| einval())
+}
+
+fn newfstatat(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let dirfd = args.int(0);
+    let address = args.ptr(2) as u64;
+    let flags = args.int(3) as u32;
+    let allowed = AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT | AT_EMPTY_PATH;
+    let result = with(ctx, |process| {
+        let path = match at_path(process, dirfd, flags, allowed, true) {
+            Ok(path) => path,
+            Err(error) => return -(error as isize),
+        };
+        if path.is_empty() {
+            return fstat_into(process, dirfd, address, false);
+        }
+        stat_into(process, address, &path, flags & AT_SYMLINK_NOFOLLOW == 0)
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+fn statx(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let dirfd = args.int(0);
+    let flags = args.int(2) as u32;
+    let address = args.ptr(4) as u64;
+    let allowed = AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT | AT_EMPTY_PATH | AT_STATX_SYNC_TYPE;
+    let result = with(ctx, |process| {
+        let path = match at_path(process, dirfd, flags, allowed, true) {
+            Ok(path) => path,
+            Err(error) => return -(error as isize),
+        };
+        if path.is_empty() {
+            return fstat_into(process, dirfd, address, true);
+        }
+        statx_into(process, address, &path, flags & AT_SYMLINK_NOFOLLOW == 0)
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+fn access(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let mode = args.int(1);
+    let result = with(ctx, |process| {
+        if mode < 0 || mode & !0o7 != 0 {
+            return -(Errno::EINVAL.0 as isize);
+        }
+        let path = match path_vec(process) {
+            Ok(path) => path,
+            Err(error) => return -(error as isize),
+        };
+        let path = match absolute_path(process, AT_FDCWD, &path) {
+            Ok(path) => path,
+            Err(error) => return -(error as isize),
+        };
+        match procfs::metadata(process, &path, true) {
+            Ok(metadata) if metadata.allows(mode) => 0,
+            Ok(_) => -(Errno::EACCES.0 as isize),
+            Err(error) => -(error.0 as isize),
+        }
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+fn fchmodat(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let dirfd = args.int(0);
+    let flags = args.int(3) as u32;
+    let allowed = AT_SYMLINK_NOFOLLOW;
+    let result = with(ctx, |process| {
+        let path = match at_path(process, dirfd, flags, allowed, false) {
+            Ok(path) => path,
+            Err(error) => return -(error as isize),
+        };
+        readonly_path(process, &path, flags & AT_SYMLINK_NOFOLLOW == 0)
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+fn fchownat(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let dirfd = args.int(0);
+    let flags = args.int(4) as u32;
+    let allowed = AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH;
+    let result = with(ctx, |process| {
+        let path = match at_path(process, dirfd, flags, allowed, true) {
+            Ok(path) => path,
+            Err(error) => return -(error as isize),
+        };
+        if path.is_empty() {
+            return readonly_fd(process, dirfd);
+        }
+        readonly_path(process, &path, flags & AT_SYMLINK_NOFOLLOW == 0)
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+fn utimensat(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let dirfd = args.int(0);
+    let flags = args.int(3) as u32;
+    let allowed = AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH;
+    let result = with(ctx, |process| {
+        let path = match at_path(process, dirfd, flags, allowed, true) {
+            Ok(path) => path,
+            Err(error) => return -(error as isize),
+        };
+        if path.is_empty() {
+            return readonly_fd(process, dirfd);
+        }
+        readonly_path(process, &path, flags & AT_SYMLINK_NOFOLLOW == 0)
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+fn truncate(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let length = args.long(1);
+    if length < 0 {
+        return -(Errno::EINVAL.0 as isize);
+    }
+    let result = with(ctx, |process| {
+        let path = match path_vec(process) {
+            Ok(path) => path,
+            Err(error) => return -(error as isize),
+        };
+        let absolute = match absolute_path(process, AT_FDCWD, &path) {
+            Ok(path) => path,
+            Err(error) => return -(error as isize),
+        };
+        match procfs::metadata(process, &absolute, true) {
+            Ok(metadata) if metadata.is_dir() => -(Errno::EISDIR.0 as isize),
+            Ok(_) => -(Errno::EROFS.0 as isize),
+            Err(error) => -(error.0 as isize),
+        }
+    });
+    result.unwrap_or_else(|_| einval())
 }
 
 /// Shared body of `open` and `openat`; `dirfd` is only meaningful for a relative path.

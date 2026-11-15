@@ -45,8 +45,9 @@ pub fn decode(request: &[u8]) -> Result<LinuxSyscallV1, TrapError> {
 /// Number of user bytes the trap loop must copy in before dispatch.
 ///
 /// `write` reads a user buffer (`buf`, `count`); the path-taking calls (`open`, `openat`,
-/// `readlink`, `readlinkat`, `stat`, `newfstatat`) get a bounded path window. The bound protects
-/// the server from a hostile or corrupt Linux process; a longer path is not served.
+/// `readlink`, `readlinkat`, `stat`, `lstat`, `newfstatat`, `statx`, `access`, `truncate`,
+/// `fchmodat`, `fchownat`, `utimensat`) get a bounded path window. The bound protects the server
+/// from a hostile or corrupt Linux process; a longer path is not served.
 pub fn copy_in_len(call: &LinuxSyscallV1) -> Option<usize> {
     const PATH_COPY: usize = 128;
     match call.nr {
@@ -54,8 +55,20 @@ pub fn copy_in_len(call: &LinuxSyscallV1) -> Option<usize> {
             let count = usize::try_from(call.args[2]).ok()?;
             Some(count.min(crate::table::USER_BUFFER_MAX))
         }
-        2 | 4 | 89 | 257 | 262 | 267 => Some(PATH_COPY),
+        2 | 4 | 6 | 21 | 76 | 89 | 257 | 260 | 262 | 267 | 268 | 280 | 332 => Some(PATH_COPY),
         _ => None,
+    }
+}
+
+/// Argument index of the user pointer [`copy_in_len`] describes.
+///
+/// The legacy path calls (`stat`, `lstat`, `access`, `truncate`) take the path first; every other
+/// supported call takes it second. `fstat` has no user pointer and is not in the table.
+#[must_use]
+pub fn copy_in_arg(call: &LinuxSyscallV1) -> usize {
+    match call.nr {
+        4 | 6 | 21 | 76 => 0,
+        _ => 1,
     }
 }
 

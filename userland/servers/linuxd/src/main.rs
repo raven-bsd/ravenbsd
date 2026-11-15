@@ -99,8 +99,8 @@ mod program {
     use alloc::vec::Vec;
 
     use linuxd::{
-        LinuxProcess, TrapAction, copy_in_len, decode, dispatch, dispatcher, encode_reply,
-        interp_path, load, plan_image,
+        LinuxProcess, TrapAction, copy_in_arg, copy_in_len, decode, dispatch, dispatcher,
+        encode_reply, interp_path, load, plan_image,
     };
     use raven_abi::errno::Errno;
     use raven_abi::types::{Handle, clock};
@@ -374,9 +374,13 @@ mod program {
         process.user_buffer.clear();
         if let Some(len) = copy_in_len(&call) {
             process.user_buffer.resize(len, 0);
-            if let Err(error) =
-                raw::copy_in(sys, &loaded.regions, call.args[1], &mut process.user_buffer)
-            {
+            let arg = copy_in_arg(&call);
+            if let Err(error) = raw::copy_in(
+                sys,
+                &loaded.regions,
+                call.args[arg],
+                &mut process.user_buffer,
+            ) {
                 let reply = reply_packet(packet, -(error.0 as i64));
                 let _ = sys::send(request, &reply);
                 return None;

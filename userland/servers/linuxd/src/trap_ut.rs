@@ -70,13 +70,25 @@ fn copy_in_is_bounded_by_the_server_limit() {
 
 #[test]
 fn path_calls_copy_a_bounded_window() {
-    for nr in [2, 4, 89, 257, 262, 267] {
+    for nr in [2, 4, 6, 21, 76, 89, 257, 260, 262, 267, 268, 280, 332] {
         let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, nr, [0; 6]);
         assert_eq!(copy_in_len(&call), Some(128), "nr {nr}");
     }
-    for nr in [0, 3, 8, 217] {
+    for nr in [0, 3, 5, 8, 77, 217] {
         let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, nr, [0; 6]);
         assert_eq!(copy_in_len(&call), None, "nr {nr}");
+    }
+}
+
+#[test]
+fn the_path_pointer_argument_follows_the_syscall_shape() {
+    for nr in [4, 6, 21, 76] {
+        let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, nr, [0; 6]);
+        assert_eq!(copy_in_arg(&call), 0, "nr {nr}");
+    }
+    for nr in [2, 89, 257, 260, 262, 267, 268, 280, 332] {
+        let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, nr, [0; 6]);
+        assert_eq!(copy_in_arg(&call), 1, "nr {nr}");
     }
 }
 
