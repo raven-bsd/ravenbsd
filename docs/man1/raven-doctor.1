@@ -1,0 +1,46 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 14, 2026
+.Dt RAVEN-DOCTOR 1
+.Os RavenBSD
+.Sh NAME
+.Nm raven-doctor
+.Nd run ordered RavenBSD diagnostics
+.Sh SYNOPSIS
+.Nm
+.Op Fl -strict
+.Op Fl -json
+.Sh DESCRIPTION
+.Nm
+runs the ordered checks of
+.Pa architecture/17-modern-userland.md
+section 3.4: required services and readiness, log writability, clock, root mount and free space,
+.Pa /tmp
+writability, network link and route, DNS, crash loops, configuration parse, log retention and
+dropped counters, and an add-on inventory when present.
+Each check is one object of
+.Va kind :
+.Dq check
+with
+.Va id ,
+.Va status
+.Pq Dq ok , Dq warn No or Dq fail ,
+.Va detail
+and an optional
+.Va fix
+text.
+The fix is advice only; the command never runs it.
+.Pp
+The command exits 0 when no check fails.
+Warnings do not fail unless
+.Fl -strict
+is given; a failed check exits 1.
+If the doctor backend is unreachable it reports the error and prints no check objects.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits 2.
+.Sh SEE ALSO
+.Xr raven 1 ,
+.Xr raven-status 1
+.Sh STANDARDS
+RavenBSD modern userland contract, revision 1.

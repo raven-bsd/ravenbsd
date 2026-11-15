@@ -8,6 +8,7 @@ use std::io::Write;
 
 use lexopt::{Arg, Parser};
 use raven_output::{Color, ErrorEnvelope, Exit, Format, Record};
+use raven_theme::Decision;
 
 use crate::commands;
 
@@ -37,6 +38,26 @@ pub struct Context<'a> {
     pub yes: bool,
     stdout: &'a mut dyn Write,
     stderr: &'a mut dyn Write,
+}
+
+impl<'a> Context<'a> {
+    /// Build a context for a command module or a host test.
+    pub fn new(
+        format: Format,
+        color: bool,
+        stdout: &'a mut dyn Write,
+        stderr: &'a mut dyn Write,
+    ) -> Self {
+        Self {
+            format,
+            color,
+            verbose: false,
+            dry_run: false,
+            yes: false,
+            stdout,
+            stderr,
+        }
+    }
 }
 
 impl Context<'_> {
@@ -225,7 +246,13 @@ where
     } else {
         Format::Human
     };
-    let color = globals.color.enabled(io.is_tty, io.no_color);
+    let policy = match globals.color {
+        Color::Auto => Decision::Auto,
+        Color::Always => Decision::Always,
+        Color::Never => Decision::Never,
+    };
+    let term_dumb = std::env::var_os("TERM").is_some_and(|value| value.to_str() == Some("dumb"));
+    let color = policy.enabled(io.is_tty, io.no_color, term_dumb, format == Format::Json);
     let mut context = Context {
         format,
         color,

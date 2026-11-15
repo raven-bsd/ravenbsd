@@ -17,10 +17,40 @@ fn selftest_is_recognised() {
 }
 
 #[test]
+fn json_is_recognised() {
+    assert_eq!(parse_args(["--json"].into_iter()), Ok(Action::ListJson));
+    assert_eq!(
+        parse_args(["--json", "--"].into_iter()),
+        Ok(Action::ListJson)
+    );
+}
+
+#[test]
+fn conflicting_or_repeated_flags_are_rejected() {
+    assert_eq!(
+        parse_args(["--json", "--selftest"].into_iter()),
+        Err(UsageError)
+    );
+    assert_eq!(
+        parse_args(["--selftest", "--json"].into_iter()),
+        Err(UsageError)
+    );
+    assert_eq!(
+        parse_args(["--json", "--json"].into_iter()),
+        Err(UsageError)
+    );
+    assert_eq!(
+        parse_args(["--selftest", "--selftest"].into_iter()),
+        Err(UsageError)
+    );
+}
+
+#[test]
 fn extra_or_unknown_arguments_are_rejected() {
     assert_eq!(parse_args(["x"].into_iter()), Err(UsageError));
     assert_eq!(parse_args(["--", "x"].into_iter()), Err(UsageError));
     assert_eq!(parse_args(["--selftest", "x"].into_iter()), Err(UsageError));
+    assert_eq!(parse_args(["--bogus"].into_iter()), Err(UsageError));
 }
 
 #[test]
@@ -63,4 +93,36 @@ fn whitespace_is_tolerated() {
     let mut out = String::new();
     format_status("  ps   running   7   0  \n", &mut out).unwrap();
     assert_eq!(out, "ps running 0\n");
+}
+
+#[test]
+fn json_record_has_the_process_envelope_and_null_unknowns() {
+    let mut out = String::new();
+    format_json_status("logd running 12 3\n", &mut out).unwrap();
+    assert_eq!(
+        out,
+        "{\"schema\":1,\"kind\":\"process\",\"pid\":null,\"ppid\":null,\"uid\":null,\
+         \"gid\":null,\"state\":\"running\",\"name\":\"logd\",\"command\":null,\
+         \"threads\":null,\"rss_bytes\":null}\n"
+    );
+}
+
+#[test]
+fn json_rejects_malformed_status() {
+    assert_eq!(
+        format_json_status("logd dancing 1 2\n", &mut String::new()),
+        Err(StatusError)
+    );
+    assert_eq!(
+        format_json_status("logd running x 2\n", &mut String::new()),
+        Err(StatusError)
+    );
+}
+
+#[test]
+fn parsed_status_exposes_name_state_and_restarts() {
+    let status = parse_status("vfsd running 5 9\n").unwrap();
+    assert_eq!(status.name, "vfsd");
+    assert_eq!(status.state, "running");
+    assert_eq!(status.restarts, 9);
 }

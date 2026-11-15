@@ -53,27 +53,6 @@ macro_rules! reserved_command {
 }
 
 reserved_command!(
-    STATUS,
-    STATUS_META,
-    "status",
-    "reserved: host health",
-    "raven status [--json]"
-);
-reserved_command!(
-    DOCTOR,
-    DOCTOR_META,
-    "doctor",
-    "reserved: ordered diagnostics",
-    "raven doctor [--strict] [--json]"
-);
-reserved_command!(
-    SVC,
-    SVC_META,
-    "svc",
-    "reserved: service control",
-    "raven svc <list|status|start|stop|restart|enable|disable>"
-);
-reserved_command!(
     NET,
     NET_META,
     "net",
@@ -86,13 +65,6 @@ reserved_command!(
     "log",
     "reserved: log access",
     "raven log <command>"
-);
-reserved_command!(
-    CONFIG,
-    CONFIG_META,
-    "config",
-    "reserved: configuration access",
-    "raven config <check|show|get>"
 );
 reserved_command!(
     PKG,

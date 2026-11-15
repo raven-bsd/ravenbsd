@@ -5,6 +5,22 @@
 # private names (RAVENprivate_1.0) follow the private marker.
 _Exit
 _Fork
+_Unwind_Backtrace
+_Unwind_DeleteException
+_Unwind_FindEnclosingFunction
+_Unwind_ForcedUnwind
+_Unwind_GetCFA
+_Unwind_GetDataRelBase
+_Unwind_GetGR
+_Unwind_GetIP
+_Unwind_GetIPInfo
+_Unwind_GetLanguageSpecificData
+_Unwind_GetRegionStart
+_Unwind_GetTextRelBase
+_Unwind_RaiseException
+_Unwind_Resume
+_Unwind_SetGR
+_Unwind_SetIP
 __cxa_atexit
 __cxa_finalize
 __errno
@@ -189,6 +205,7 @@ expm1f
 fabs
 fabsf
 fclose
+fcntl
 fdim
 fdimf
 fdopen
@@ -253,6 +270,7 @@ fscanf
 fseek
 fstat
 fstat64
+fstatat
 ftell
 fts_children
 fts_close
@@ -732,8 +750,10 @@ readdir
 readdir64
 readdir_r
 readpassphrase
+readv
 realloc
 reallocarray
+realpath
 recv
 recvfrom
 recvmmsg
@@ -1100,6 +1120,7 @@ wmemset
 wordexp
 wordfree
 write
+writev
 y0
 y0f
 y1
@@ -1115,6 +1136,7 @@ __raven_va_error_at_line
 __raven_va_execl
 __raven_va_execle
 __raven_va_execlp
+__raven_va_fcntl
 __raven_va_ioctl
 __raven_va_makecontext
 __raven_va_open

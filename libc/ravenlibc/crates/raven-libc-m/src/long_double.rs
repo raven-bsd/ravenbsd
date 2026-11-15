@@ -148,6 +148,11 @@ impl LongDouble {
         self.class() == FP_ZERO
     }
 
+    /// The value scaled to `[1, 2)` (the mantissa used by the logarithm reduction).
+    pub fn mantissa(self) -> Self {
+        Self::from_parts(false, EXP_BIAS as u32, self.significand_bits())
+    }
+
     /// Whether the value is a normal number.
     pub fn is_normal(self) -> bool {
         self.class() == FP_NORMAL

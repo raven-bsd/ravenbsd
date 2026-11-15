@@ -12,7 +12,9 @@ rust-version.workspace = true
 
 [dependencies]
 lexopt = "0.3"
+raven-config = { path = "../raven-config" }
 raven-output = { path = "../raven-output" }
+raven-theme = { path = "../raven-theme", features = ["config"] }
 
 [dev-dependencies]
 serde_json = "1"

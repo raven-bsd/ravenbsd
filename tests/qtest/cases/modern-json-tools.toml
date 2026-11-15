@@ -1,0 +1,94 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K79: the first-party `ps` keeps its human service view and gains NDJSON `--json` records.
+# The shell profile has the svc: services and ships /bin/ps, so the guest output is parsed
+# directly by the host regex matcher.
+
+name = "modern-json-tools"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 420
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^rsh: ready$'
+
+[[expect]]
+regex = '^consd running [0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^logd running [0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^\{"schema":1,"kind":"process","pid":null,"ppid":null,"uid":null,"gid":null,"state":"[a-z-]+","name":"[a-z0-9-]+","command":null,"threads":null,"rss_bytes":null\}$'
+unordered = true
+
+[[expect]]
+regex = '^usage: ps \[--json\] \| ps --selftest$'
+unordered = true
+
+[[expect]]
+regex = '^process: child exited \(2\)$'
+unordered = true
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|ps: .*bad service status'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "ps\n"
+delay_ms = 100
+
+[[step]]
+wait = '^consd running [0-9]+$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ps --json\n"
+delay_ms = 100
+
+[[step]]
+wait = '^\{"schema":1,"kind":"process",'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ps --json --bogus\n"
+delay_ms = 100
+
+[[step]]
+wait = '^usage: ps \[--json\] \| ps --selftest$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

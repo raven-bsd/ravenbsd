@@ -9425,3 +9425,14 @@ tier = "A"
 copied = "2026-11-14"
 modified = true
 notes = "Pinned brush 0.4.0 workspace vendored under userland/brush; the donor fuzz, xtask, benchmarks, e2e, samples, schemas, scripts, docs and rust-toolchain.toml are omitted; MIT SPDX and copyright headers are applied to the imported source and the workspace member list is trimmed to the retained crates."
+
+[[import]]
+path = "toolchain/vendor/libc"
+upstream = "rust"
+upstream_path = "library/libc-ravenbsd"
+upstream_rev = "8bab26f4f68e0e26f0bb7960be334d5b520ea452"
+license = "MIT"
+tier = "A"
+copied = "2026-11-15"
+modified = true
+notes = "K19 patched libc 0.2.185 (registry release with src/unix/ravenbsd) vendored from build/toolchain-src/library/libc-ravenbsd; MIT headers applied; the root [patch.crates-io] points at it and the lock is pinned to 0.2.185. The exact registry and patch identities are recorded in toolchain/libc-0.2.185-provenance.md."

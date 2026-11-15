@@ -9,6 +9,7 @@ __raven_va_error_at_line
 __raven_va_execl
 __raven_va_execle
 __raven_va_execlp
+__raven_va_fcntl
 __raven_va_ioctl
 __raven_va_makecontext
 __raven_va_open

@@ -6,14 +6,18 @@
 use raven_cli::{Exit, Io};
 
 fn run(args: &[&str]) -> (Exit, String, String) {
+    run_with(args, false, true)
+}
+
+fn run_with(args: &[&str], is_tty: bool, no_color: bool) -> (Exit, String, String) {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let exit = {
         let mut io = Io {
             stdout: &mut stdout,
             stderr: &mut stderr,
-            is_tty: false,
-            no_color: true,
+            is_tty,
+            no_color,
         };
         raven_cli::run(args.iter().copied(), &mut io)
     };
@@ -37,12 +41,13 @@ const GENERAL_HELP: &str = concat!(
     "  version       print version, schema and target information\n",
     "  help          show this help or help for a command\n",
     "  completion    print a shell completion script\n",
-    "  status        reserved: host health\n",
-    "  doctor        reserved: ordered diagnostics\n",
-    "  svc           reserved: service control\n",
+    "  status        show host health, services, load and memory\n",
+    "  doctor        run ordered diagnostics\n",
+    "  svc           list, inspect and control services\n",
+    "  config        validate and show the effective TOML configuration\n",
+    "  theme         preview, set or apply the Raven terminal theme\n",
     "  net           reserved: network control\n",
     "  log           reserved: log access\n",
-    "  config        reserved: configuration access\n",
     "  pkg           reserved: package access\n",
     "  user          reserved: user identities\n",
     "  image         reserved: image management\n",
@@ -58,8 +63,22 @@ const GENERAL_HELP: &str = concat!(
     "  -V, --version      print the version\n",
 );
 
-const RESERVED: &[&str] = &[
-    "status", "doctor", "svc", "net", "log", "config", "pkg", "user", "image",
+const RESERVED: &[&str] = &["net", "log", "pkg", "user", "image"];
+
+const ALL_COMMANDS: &[&str] = &[
+    "version",
+    "help",
+    "completion",
+    "status",
+    "doctor",
+    "svc",
+    "config",
+    "theme",
+    "net",
+    "log",
+    "pkg",
+    "user",
+    "image",
 ];
 
 #[test]
@@ -122,6 +141,22 @@ fn an_unknown_flag_is_usage() {
 }
 
 #[test]
+fn host_status_doctor_and_svc_report_the_missing_backend() {
+    for (args, command) in [
+        (vec!["--json", "status"], "status"),
+        (vec!["--json", "doctor"], "doctor"),
+        (vec!["--json", "svc", "list"], "svc"),
+    ] {
+        let (exit, stdout, stderr) = run(&args);
+        assert_eq!(exit, Exit::Failure, "{command}");
+        assert!(stdout.is_empty(), "{command}");
+        let value = json(&stderr);
+        assert_eq!(value["code"], "EUNAVAILABLE", "{command}");
+        assert_eq!(value["context"]["command"], command, "{command}");
+    }
+}
+
+#[test]
 fn reserved_commands_are_recognized_and_not_faked() {
     for name in RESERVED {
         let (exit, stdout, stderr) = run(&["--json", name]);
@@ -136,7 +171,7 @@ fn reserved_commands_are_recognized_and_not_faked() {
 
 #[test]
 fn reserved_commands_have_a_human_error() {
-    let (exit, stdout, stderr) = run(&["status"]);
+    let (exit, stdout, stderr) = run(&["net"]);
     assert_eq!(exit, Exit::Failure);
     assert!(stdout.is_empty());
     assert!(stderr.contains("not available"));
@@ -144,7 +179,7 @@ fn reserved_commands_have_a_human_error() {
 
 #[test]
 fn reserved_commands_reject_unknown_flags() {
-    let (exit, stdout, stderr) = run(&["--json", "status", "--wat"]);
+    let (exit, stdout, stderr) = run(&["--json", "net", "--wat"]);
     assert_eq!(exit, Exit::Usage);
     assert!(stdout.is_empty());
     assert_eq!(json(&stderr)["code"], "EUSAGE");
@@ -182,7 +217,7 @@ fn help_flag_after_a_command_works() {
 
 #[test]
 fn help_marks_reserved_commands() {
-    let (exit, stdout, _) = run(&["help", "status"]);
+    let (exit, stdout, _) = run(&["help", "net"]);
     assert_eq!(exit, Exit::Success);
     assert!(stdout.contains("reserved"));
     assert!(stdout.contains("EUNAVAILABLE"));
@@ -207,10 +242,7 @@ fn completion_covers_all_three_shells_and_all_commands() {
         assert_eq!(exit, Exit::Success, "{shell}");
         assert!(stderr.is_empty(), "{shell}");
         assert!(stdout.contains(marker), "{shell}");
-        for name in RESERVED
-            .iter()
-            .chain(["version", "help", "completion"].iter())
-        {
+        for name in ALL_COMMANDS {
             assert!(stdout.contains(name), "{shell} misses {name}");
         }
         assert!(!stdout.contains("eval "), "{shell} evaluates shell text");
@@ -271,4 +303,121 @@ fn human_version_names_the_target() {
     let (exit, stdout, _) = run(&["version"]);
     assert_eq!(exit, Exit::Success);
     assert_eq!(stdout, "raven 0.1.0 (x86_64-unknown-ravenbsd)\n");
+}
+
+#[test]
+fn theme_json_preview_has_the_contract_envelope() {
+    let (exit, stdout, stderr) = run(&["theme", "preview", "--json"]);
+    assert_eq!(exit, Exit::Success);
+    assert!(stderr.is_empty());
+    assert_eq!(stdout.lines().count(), 1);
+    assert!(!stdout.contains('\x1b'));
+    let value = json(&stdout);
+    assert_eq!(value["schema"], 1);
+    assert_eq!(value["kind"], "theme");
+    assert!(value["name"].is_string());
+    let roles = value["roles"].as_object().expect("roles object");
+    assert_eq!(roles.len(), 11);
+    for (role, hex) in roles {
+        assert!(role.chars().all(|c| c.is_ascii_lowercase()), "{role}");
+        let hex = hex.as_str().expect("hex string");
+        assert!(hex.starts_with('#'), "{role}");
+        assert_eq!(hex.len(), 7, "{role}");
+    }
+}
+
+#[test]
+fn theme_preview_is_plain_when_piped() {
+    let (exit, stdout, stderr) = run(&["theme", "preview"]);
+    assert_eq!(exit, Exit::Success);
+    assert!(stderr.is_empty());
+    assert!(!stdout.contains('\x1b'));
+    assert_eq!(stdout.lines().count(), 11);
+    let first = stdout.lines().next().unwrap();
+    assert!(first.starts_with("accent  #"), "{first}");
+    assert_eq!(first.len(), "accent  #rrggbb".len(), "{first}");
+}
+
+#[test]
+fn theme_preview_colours_a_terminal() {
+    let (exit, stdout, _) = run_with(&["theme", "preview"], true, false);
+    assert_eq!(exit, Exit::Success);
+    assert!(stdout.contains('\x1b'));
+    assert!(stdout.contains("accent"));
+    assert!(stdout.contains('#'));
+}
+
+#[test]
+fn theme_preview_respects_no_color_on_a_terminal() {
+    let (exit, stdout, _) = run_with(&["theme", "preview"], true, true);
+    assert_eq!(exit, Exit::Success);
+    assert!(!stdout.contains('\x1b'));
+}
+
+#[test]
+fn theme_preview_never_colours_json() {
+    let (exit, stdout, _) = run_with(&["--json", "theme", "preview"], true, false);
+    assert_eq!(exit, Exit::Success);
+    assert!(!stdout.contains('\x1b'));
+}
+
+#[test]
+fn color_always_forces_colour_into_a_pipe() {
+    let (exit, stdout, _) = run_with(&["--color=always", "theme", "preview"], false, true);
+    assert_eq!(exit, Exit::Success);
+    assert!(stdout.contains('\x1b'));
+}
+
+#[test]
+fn color_never_suppresses_a_terminal() {
+    let (exit, stdout, _) = run_with(&["--color=never", "theme", "preview"], true, false);
+    assert_eq!(exit, Exit::Success);
+    assert!(!stdout.contains('\x1b'));
+}
+
+#[test]
+fn theme_apply_dry_run_lists_the_paths() {
+    let (exit, stdout, stderr) = run(&["--dry-run", "theme", "apply"]);
+    assert_eq!(exit, Exit::Success);
+    assert!(stderr.is_empty());
+    assert!(stdout.starts_with("would write "));
+    assert!(stdout.contains("theme.env"));
+    assert!(!stdout.contains('\x1b'));
+}
+
+#[test]
+fn theme_apply_dry_run_json_is_one_theme_record() {
+    let (exit, stdout, stderr) = run(&["--json", "--dry-run", "theme", "apply"]);
+    assert_eq!(exit, Exit::Success);
+    assert!(stderr.is_empty());
+    assert_eq!(stdout.lines().count(), 1);
+    let value = json(&stdout);
+    assert_eq!(value["schema"], 1);
+    assert_eq!(value["kind"], "theme");
+    assert_eq!(value["action"], "apply");
+    assert!(value["dry_run"].as_bool().unwrap());
+    assert!(value["path"].as_str().unwrap().ends_with("theme.env"));
+    assert!(value["backup"].is_null() || value["backup"].is_string());
+}
+
+#[test]
+fn theme_set_without_a_value_is_usage() {
+    let (exit, stdout, stderr) = run(&["--json", "theme", "set"]);
+    assert_eq!(exit, Exit::Usage);
+    assert!(stdout.is_empty());
+    assert_eq!(json(&stderr)["code"], "EUSAGE");
+}
+
+#[test]
+fn theme_set_rejects_an_invalid_file_without_writing() {
+    let path = std::env::temp_dir().join(format!(
+        "raven-cli-invalid-theme-{}.toml",
+        std::process::id()
+    ));
+    std::fs::write(&path, "[colors]\naccent = \"violet\"\n").unwrap();
+    let (exit, stdout, stderr) = run(&["--json", "theme", "set", path.to_str().unwrap()]);
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(exit, Exit::Failure);
+    assert!(stdout.is_empty());
+    assert_eq!(json(&stderr)["code"], "ECONFIG");
 }

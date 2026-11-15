@@ -172,6 +172,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "getrandom"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "300e883d756b2e4ec94e02791f39b04b522276138852cfc41d9fb7e904106099"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "r-efi",
+]
+
+[[package]]
+name = "getrandom-probe"
+version = "0.1.0"
+dependencies = [
+ "getrandom",
+ "libc",
+ "raven-getrandom",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -210,9 +230,7 @@ checksum = "803ec87c9cfb29b9d2633f20cba1f488db3fd53f2158b1024cbefb47ba05d413"
 
 [[package]]
 name = "libc"
-version = "0.2.191"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
+version = "0.2.185"
 
 [[package]]
 name = "libc-census"
@@ -393,6 +411,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "r-efi"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
+
+[[package]]
 name = "raven"
 version = "0.1.0"
 dependencies = [
@@ -564,13 +588,24 @@ name = "raven-cli"
 version = "0.1.0"
 dependencies = [
  "lexopt",
+ "raven-config",
  "raven-output",
+ "raven-theme",
  "serde_json",
 ]
 
 [[package]]
 name = "raven-cmdline"
 version = "0.1.0"
+
+[[package]]
+name = "raven-config"
+version = "0.1.0"
+dependencies = [
+ "raven-svc-manifest",
+ "serde_json",
+ "toml",
+]
 
 [[package]]
 name = "raven-conform"
@@ -742,6 +777,13 @@ name = "raven-fuzz-replay"
 version = "0.1.0"
 dependencies = [
  "raven-fuzz-model",
+]
+
+[[package]]
+name = "raven-getrandom"
+version = "0.1.0"
+dependencies = [
+ "getrandom",
 ]
 
 [[package]]
@@ -1632,6 +1674,7 @@ name = "raven-ps"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-output",
  "raven-proto-fs",
  "raven-rt",
 ]
@@ -2219,6 +2262,14 @@ name = "raven-testsvc"
 version = "0.1.0"
 dependencies = [
  "raven-rt",
+]
+
+[[package]]
+name = "raven-theme"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "toml",
 ]
 
 [[package]]
