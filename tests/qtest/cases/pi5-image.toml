@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# R8: the Pi 5 image profile and FAT manifest kit. The pre step builds a synthetic FAT boot image
+# at the 1 MiB offset and runs scripts/pi5-serial.sh --check; the guest below is the generic
+# aarch64 image with the `pi5` profile under QEMU virt. This is a profile/manifest regression, not
+# a Pi 5 board run and not a claim about the firmware's kernel_2712.img load address.
+
+name = "pi5-image"
+arch = "aarch64"
+profile = "pi5"
+timeout_secs = 180
+pre = ["sh tests/fixtures/pi5-image/build.sh"]
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(aarch64\)'
+
+[[expect]]
+regex = '^init: starting$'
+
+[[expect]]
+regex = '^RavenBSD \S+ 0\.1 RavenBSD 0\.1 \(\S+\) #\d+: .+ aarch64$'
+
+[[expect]]
+regex = '^init: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pi5-manifest: FAIL'
