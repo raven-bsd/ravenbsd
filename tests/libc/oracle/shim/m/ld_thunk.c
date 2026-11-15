@@ -15,6 +15,17 @@ long double fabsl(long double x)
 	return x < 0 ? -x : x;
 }
 long double expm1l(long double);
+long double logl(long double);
+
+void rl_logl(const unsigned char *in, unsigned char *out)
+{
+	long double x;
+	long double y;
+
+	memcpy(&x, in, sizeof(x));
+	y = logl(x);
+	memcpy(out, &y, sizeof(y));
+}
 
 void rl_expl(const unsigned char *in, unsigned char *out)
 {
