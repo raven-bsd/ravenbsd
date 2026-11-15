@@ -40,6 +40,7 @@ errnos! {
     ENOMEM = 12, "out of memory";
     EACCES = 13, "permission denied";
     EFAULT = 14, "bad address";
+    ENOTBLK = 15, "block device required";
     EBUSY = 16, "resource busy";
     EEXIST = 17, "already exists";
     EXDEV = 18, "cross-device link";
@@ -50,6 +51,7 @@ errnos! {
     ENFILE = 23, "too many open files in system";
     EMFILE = 24, "too many open files";
     ENOTTY = 25, "not a terminal";
+    ETXTBSY = 26, "text file busy";
     EFBIG = 27, "file too large";
     ENOSPC = 28, "no space left on device";
     ESPIPE = 29, "illegal seek";
@@ -58,31 +60,66 @@ errnos! {
     EPIPE = 32, "broken pipe";
     EDOM = 33, "numerical argument out of domain";
     ERANGE = 34, "result out of range";
+    EDEADLK = 35, "resource deadlock avoided";
     ENAMETOOLONG = 36, "file name too long";
+    ENOLCK = 37, "no locks available";
     ENOSYS = 38, "function not implemented";
     ENOTEMPTY = 39, "directory not empty";
     ELOOP = 40, "too many levels of symbolic links";
+    ENOMSG = 42, "no message of desired type";
+    EIDRM = 43, "identifier removed";
+    ENOSTR = 60, "not a stream";
+    ENODATA = 61, "no data available";
+    ETIME = 62, "timer expired";
+    ENOSR = 63, "out of streams resources";
+    ENOLINK = 67, "link has been severed";
     EPROTO = 71, "protocol error";
+    EBADMSG = 74, "bad message";
     EOVERFLOW = 75, "value too large for data type";
+    EILSEQ = 84, "illegal byte sequence";
     ENOTSOCK = 88, "not a socket";
+    EDESTADDRREQ = 89, "destination address required";
+    EMSGSIZE = 90, "message too long";
+    EPROTOTYPE = 91, "protocol wrong type for socket";
+    ENOPROTOOPT = 92, "protocol not available";
+    EPROTONOSUPPORT = 93, "protocol not supported";
+    ESOCKTNOSUPPORT = 94, "socket type not supported";
     EOPNOTSUPP = 95, "operation not supported";
+    EPFNOSUPPORT = 96, "protocol family not supported";
     EAFNOSUPPORT = 97, "address family not supported";
     EADDRINUSE = 98, "address in use";
     EADDRNOTAVAIL = 99, "address not available";
+    ENETDOWN = 100, "network is down";
     ENETUNREACH = 101, "network unreachable";
+    ENETRESET = 102, "network dropped connection on reset";
     ECONNABORTED = 103, "connection aborted";
     ECONNRESET = 104, "connection reset";
     ENOBUFS = 105, "no buffer space available";
     EISCONN = 106, "already connected";
     ENOTCONN = 107, "not connected";
+    ESHUTDOWN = 108, "cannot send after transport endpoint shutdown";
+    ETOOMANYREFS = 109, "too many references: cannot splice";
     ETIMEDOUT = 110, "timed out";
     ECONNREFUSED = 111, "connection refused";
+    EHOSTDOWN = 112, "host is down";
     EHOSTUNREACH = 113, "host unreachable";
     EALREADY = 114, "operation already in progress";
     EINPROGRESS = 115, "operation in progress";
+    ESTALE = 116, "stale file handle";
+    EDQUOT = 122, "disk quota exceeded";
+    ECANCELED = 125, "operation canceled";
+    EOWNERDEAD = 130, "owner died";
+    ENOTRECOVERABLE = 131, "state not recoverable";
 }
 
 impl Errno {
+    /// Operation would block (alias of `EAGAIN`).
+    pub const EWOULDBLOCK: Errno = Self::EAGAIN;
+    /// Operation not supported (alias of `EOPNOTSUPP`).
+    pub const ENOTSUP: Errno = Self::EOPNOTSUPP;
+    /// Resource deadlock avoided (alias of `EDEADLK`).
+    pub const EDEADLOCK: Errno = Self::EDEADLK;
+
     /// Encode as a syscall return value (`-errno`).
     #[inline]
     pub const fn to_ret(self) -> isize {
@@ -102,34 +139,5 @@ impl Errno {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn roundtrip() {
-        assert_eq!(Errno::from_ret(Errno::ENOENT.to_ret()), Err(Errno::ENOENT));
-        assert_eq!(Errno::from_ret(0), Ok(0));
-        assert_eq!(Errno::from_ret(42), Ok(42));
-    }
-
-    #[test]
-    fn linux_values() {
-        assert_eq!(Errno::EPERM.0, 1);
-        assert_eq!(Errno::EAGAIN.0, 11);
-        assert_eq!(Errno::ENOSYS.0, 38);
-        assert_eq!(Errno::ETIMEDOUT.0, 110);
-    }
-
-    #[test]
-    fn high_addresses_are_not_errors() {
-        // A mapping returned at 0xFFFF_FFFF_FFFF_F000 is -4096 as isize: success.
-        assert_eq!(Errno::from_ret(-4096), Ok((-4096isize) as usize));
-        assert_eq!(Errno::from_ret(-4095), Err(Errno(4095)));
-    }
-
-    #[test]
-    fn descriptions() {
-        assert_eq!(Errno::ENOENT.description(), "no such file or directory");
-        assert_eq!(Errno(4000).description(), "unknown error");
-    }
-}
+#[path = "errno_ut.rs"]
+mod tests;
