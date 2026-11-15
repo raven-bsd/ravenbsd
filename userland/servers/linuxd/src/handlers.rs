@@ -17,7 +17,8 @@ use raven_abi::errno::Errno;
 use raven_linux_abi::Arch;
 use raven_linux_dispatch::{Dispatcher, LinuxContext, SyscallArgs};
 
-use crate::table::LinuxProcess;
+use crate::procfs::{self, Resource};
+use crate::table::{FileKind, LinuxProcess};
 
 /// `MAP_ANONYMOUS` from the Linux UAPI (the dispatcher's `raven-linux-abi` crate owns the number).
 const MAP_ANONYMOUS: i32 = 0x20;
@@ -34,6 +35,31 @@ const ARCH_SET_FS: i32 = 0x1002;
 /// `ARCH_GET_FS` of x86-64.
 const ARCH_GET_FS: i32 = 0x1003;
 
+/// `AT_FDCWD`.
+const AT_FDCWD: i32 = -100;
+
+/// Linux access-mode mask.
+const O_ACCMODE: i32 = 0x3;
+
+/// `O_RDONLY`.
+const O_RDONLY: i32 = 0;
+
+/// `O_DIRECTORY`.
+const O_DIRECTORY: i32 = 0x1_0000;
+
+/// `O_NONBLOCK` (accepted and ignored for synthetic files).
+const O_NONBLOCK: i32 = 0x800;
+
+/// `O_CLOEXEC`.
+const O_CLOEXEC: i32 = 0x8_0000;
+
+/// `SEEK_SET`.
+const SEEK_SET: i32 = 0;
+/// `SEEK_CUR`.
+const SEEK_CUR: i32 = 1;
+/// `SEEK_END`.
+const SEEK_END: i32 = 2;
+
 /// A dispatcher with the B20 handlers registered.
 pub fn dispatcher() -> Dispatcher {
     let mut dispatcher = Dispatcher::new(Arch::X86_64);
@@ -46,6 +72,14 @@ pub fn dispatcher() -> Dispatcher {
         ("uname", uname as _),
         ("rt_sigprocmask", rt_sigprocmask as _),
         ("arch_prctl", arch_prctl as _),
+        ("open", open as _),
+        ("openat", openat as _),
+        ("read", read as _),
+        ("close", close as _),
+        ("lseek", lseek as _),
+        ("readlink", readlink as _),
+        ("readlinkat", readlinkat as _),
+        ("getdents64", getdents64 as _),
     ] {
         // Every name is in the x86-64 table; a failure here is a build-time typo, and the
         // dispatcher reports it as an unimplemented number instead of panicking.
@@ -197,6 +231,219 @@ fn arch_prctl(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
         _ => -(Errno::EINVAL.0 as isize),
     });
     result.unwrap_or_else(|_| einval())
+}
+
+/// The NUL-terminated path the trap loop copied into `user_buffer`.
+fn path_bytes(process: &LinuxProcess) -> Result<&[u8], i32> {
+    let buffer = process.user_buffer.as_slice();
+    let end = buffer.iter().position(|byte| *byte == 0).ok_or(EINVAL)?;
+    if end == 0 {
+        return Err(EINVAL);
+    }
+    buffer.get(..end).ok_or(EINVAL)
+}
+
+/// Shared body of `open` and `openat`; `dirfd` is only meaningful for a relative path.
+fn open_impl(process: &mut LinuxProcess, dirfd: i32, flags: i32) -> isize {
+    if flags & O_ACCMODE != O_RDONLY {
+        return -(Errno::EACCES.0 as isize);
+    }
+    let allowed = O_DIRECTORY | O_NONBLOCK | O_CLOEXEC;
+    if flags & !allowed != 0 {
+        return -(Errno::EINVAL.0 as isize);
+    }
+    let path = match path_bytes(process) {
+        Ok(path) => path.to_vec(),
+        Err(_) => return -(Errno::EINVAL.0 as isize),
+    };
+    if dirfd != AT_FDCWD && !path.starts_with(b"/") {
+        return -(Errno::EBADF.0 as isize);
+    }
+    match procfs::lookup(process, &path) {
+        Ok(Resource::File(bytes)) => {
+            if flags & O_DIRECTORY != 0 {
+                return -(Errno::ENOTDIR.0 as isize);
+            }
+            process.open_file(path, FileKind::Regular(bytes)) as isize
+        }
+        Ok(Resource::Directory(entries)) => {
+            process.open_file(path, FileKind::Directory(entries)) as isize
+        }
+        Ok(Resource::Symlink(_)) => -(Errno::ELOOP.0 as isize),
+        Err(error) => -(error.0 as isize),
+    }
+}
+
+fn open(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let flags = args.int(1);
+    with(ctx, |process| open_impl(process, AT_FDCWD, flags)).unwrap_or_else(|_| einval())
+}
+
+fn openat(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let dirfd = args.int(0);
+    let flags = args.int(2);
+    with(ctx, |process| open_impl(process, dirfd, flags)).unwrap_or_else(|_| einval())
+}
+
+fn read(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let fd = args.fd(0);
+    let address = args.ptr(1) as u64;
+    let count = args.size(2);
+    let result = with(ctx, |process| {
+        let (data, take) = {
+            let Some(file) = process.file_mut(fd) else {
+                return -(Errno::EBADF.0 as isize);
+            };
+            let bytes = match &file.kind {
+                FileKind::Regular(bytes) => bytes,
+                FileKind::Directory(_) => return -(Errno::EISDIR.0 as isize),
+                FileKind::Symlink(_) => return -(Errno::EINVAL.0 as isize),
+            };
+            let start = usize::try_from(file.offset).unwrap_or(usize::MAX);
+            let take = bytes.len().saturating_sub(start).min(count);
+            let data = bytes
+                .get(start..start.saturating_add(take))
+                .unwrap_or(&[])
+                .to_vec();
+            file.offset = file.offset.saturating_add(take as u64);
+            (data, take)
+        };
+        if take > 0 {
+            process.pending_write = Some((address, data));
+        }
+        take as isize
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+fn close(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let fd = args.fd(0);
+    let result = with(ctx, |process| {
+        if process.close_file(fd) {
+            0
+        } else {
+            -(Errno::EBADF.0 as isize)
+        }
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+fn lseek(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let fd = args.fd(0);
+    let offset = args.ptr(1) as i64;
+    let whence = args.int(2);
+    let result = with(ctx, |process| {
+        let Some(file) = process.file_mut(fd) else {
+            return -(Errno::EBADF.0 as isize);
+        };
+        if matches!(file.kind, FileKind::Directory(_)) {
+            return -(Errno::EISDIR.0 as isize);
+        }
+        let base = match whence {
+            SEEK_SET => 0,
+            SEEK_CUR => file.offset as i64,
+            SEEK_END => file.size() as i64,
+            _ => return -(Errno::EINVAL.0 as isize),
+        };
+        let Some(next) = base.checked_add(offset) else {
+            return -(Errno::EINVAL.0 as isize);
+        };
+        if next < 0 {
+            return -(Errno::EINVAL.0 as isize);
+        }
+        file.offset = next as u64;
+        next as isize
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+fn read_link(process: &mut LinuxProcess, address: u64, size: usize) -> isize {
+    if size == 0 {
+        return -(Errno::EINVAL.0 as isize);
+    }
+    let path = match path_bytes(process) {
+        Ok(path) => path.to_vec(),
+        Err(_) => return -(Errno::EINVAL.0 as isize),
+    };
+    match procfs::lookup(process, &path) {
+        Ok(Resource::Symlink(target)) => {
+            let take = target.len().min(size);
+            let data = target.get(..take).unwrap_or(&[]).to_vec();
+            process.pending_write = Some((address, data));
+            take as isize
+        }
+        Ok(_) => -(Errno::EINVAL.0 as isize),
+        Err(error) => -(error.0 as isize),
+    }
+}
+
+fn readlink(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let address = args.ptr(1) as u64;
+    let size = args.size(2);
+    with(ctx, |process| read_link(process, address, size)).unwrap_or_else(|_| einval())
+}
+
+fn readlinkat(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let address = args.ptr(2) as u64;
+    let size = args.size(3);
+    with(ctx, |process| read_link(process, address, size)).unwrap_or_else(|_| einval())
+}
+
+fn getdents64(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let fd = args.fd(0);
+    let address = args.ptr(1) as u64;
+    let count = args.size(2);
+    let result = with(ctx, |process| {
+        let (data, total) = {
+            let Some(file) = process.file_mut(fd) else {
+                return -(Errno::EBADF.0 as isize);
+            };
+            let entries = match &file.kind {
+                FileKind::Directory(entries) => entries,
+                _ => return -(Errno::ENOTDIR.0 as isize),
+            };
+            let start = usize::try_from(file.offset).unwrap_or(usize::MAX);
+            let Some(slice) = entries.get(start..) else {
+                return 0;
+            };
+            let mut data = Vec::with_capacity(count.min(4096));
+            let mut emitted = 0usize;
+            for (index, entry) in slice.iter().enumerate() {
+                let record_len = align8(19 + entry.name.len() + 1);
+                if data.len().saturating_add(record_len) > count {
+                    break;
+                }
+                let next = start.saturating_add(index).saturating_add(1) as i64;
+                data.extend_from_slice(&entry.ino.to_le_bytes());
+                data.extend_from_slice(&next.to_le_bytes());
+                data.extend_from_slice(&(record_len as u16).to_le_bytes());
+                data.push(entry.kind);
+                data.extend_from_slice(&entry.name);
+                data.push(0);
+                data.resize(
+                    data.len()
+                        .saturating_add(record_len.saturating_sub(19 + entry.name.len() + 1)),
+                    0,
+                );
+                emitted += 1;
+            }
+            if emitted == 0 && !slice.is_empty() {
+                return -(Errno::EINVAL.0 as isize);
+            }
+            file.offset = file.offset.saturating_add(emitted as u64);
+            let total = data.len();
+            (data, total)
+        };
+        if total > 0 {
+            process.pending_write = Some((address, data));
+        }
+        total as isize
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+fn align8(value: usize) -> usize {
+    value.saturating_add(7) & !7
 }
 
 fn round_up(value: u64, align: u64) -> Option<u64> {
