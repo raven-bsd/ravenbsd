@@ -120,6 +120,39 @@ fn compile_args_follow_the_documented_order() {
 }
 
 #[test]
+fn hidden_symbols_are_made_visible_before_linking() {
+    if !require_cc() {
+        return;
+    }
+    let temp = TempDir::new("visibility");
+    let source = temp.path().join("hidden.c");
+    let object = temp.path().join("hidden.o");
+    let library = temp.path().join("libhidden.so");
+    fs::write(&source, "int hidden_fn(void) { return 1; }\n").expect("source");
+    let status = Command::new("cc")
+        .args(["-c", "-fPIC", "-fvisibility=hidden", "-o"])
+        .arg(&object)
+        .arg(&source)
+        .status()
+        .expect("cc");
+    assert!(status.success());
+    let names = std::collections::BTreeSet::from(["hidden_fn".to_string()]);
+    make_symbols_visible(&object, &names).expect("visibility");
+    let status = Command::new("cc")
+        .args(["-shared", "-o"])
+        .arg(&library)
+        .arg(&object)
+        .status()
+        .expect("link");
+    assert!(status.success());
+    let all = nm(&library, &["-D"]);
+    assert!(all.contains(" hidden_fn"), "{all}");
+
+    let missing = std::collections::BTreeSet::from(["not_there".to_string()]);
+    assert!(make_symbols_visible(&object, &missing).is_err());
+}
+
+#[test]
 fn fixture_build_matches_nm_exports_and_keeps_memcpy_external() {
     if !require_cc() {
         return;

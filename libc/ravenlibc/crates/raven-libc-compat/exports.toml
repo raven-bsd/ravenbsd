@@ -540,3 +540,33 @@ name = "_Unwind_SetIP"
 rust = "stdlib::unwind::set_ip"
 header = "unwind.h"
 version = "RAVEN_1.0"
+
+[[export]]
+name = "fchmod"
+rust = "unistd::fchmod"
+header = "sys/stat.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "fsync"
+rust = "unistd::fsync"
+header = "unistd.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "isatty"
+rust = "unistd::isatty"
+header = "unistd.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "mkdir"
+rust = "unistd::mkdir"
+header = "sys/stat.h"
+version = "RAVEN_1.0"
+
+[[export]]
+name = "rename"
+rust = "unistd::rename"
+header = "stdio.h"
+version = "RAVEN_1.0"

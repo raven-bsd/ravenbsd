@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P2b process registry: parent looks up two forked children, moves one into its own group,
+# rejects a group from another session, and checks exited/unknown pids return ESRCH.
+
+name = "proc-registry"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/proc-registry/build.sh"]
+initfs = "build/fixtures/proc-registry/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^proc-registry: ok child-a=[0-9]+ child-b=[0-9]+$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|proc-registry: fail'

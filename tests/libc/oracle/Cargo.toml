@@ -36,6 +36,7 @@ oracle-fmt-freebsd = []
 oracle-fmt-musl = []
 oracle-fmt-musl-scanf = []
 oracle-m-core = []
+oracle-m-ld = []
 oracle-raven-libc-time = []
 oracle-signal-freebsd = []
 oracle-signal-musl = []
@@ -61,6 +62,7 @@ all-oracles = [
     "oracle-fmt-musl",
     "oracle-fmt-musl-scanf",
     "oracle-m-core",
+    "oracle-m-ld",
     "oracle-raven-libc-time",
     "oracle-signal-freebsd",
     "oracle-signal-musl",

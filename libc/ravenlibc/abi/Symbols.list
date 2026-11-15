@@ -280,6 +280,7 @@ fstat
 fstat64
 fstatat
 fstatfs
+fsync
 ftell
 ftruncate
 fts_children
@@ -362,6 +363,8 @@ getpwnam
 getpwnam_r
 getpwuid
 getpwuid_r
+getresgid
+getresuid
 getrlimit
 getrusage
 getservbyname
@@ -873,6 +876,8 @@ setprogname
 setprotoent
 setpwent
 setregid
+setresgid
+setresuid
 setreuid
 setrlimit
 setservent

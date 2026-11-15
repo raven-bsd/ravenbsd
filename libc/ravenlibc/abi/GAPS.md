@@ -3,7 +3,7 @@
 
 # Gaps
 
-- ring 0: 736
+- ring 0: 731
 - ring 1: 1212
 - ring 2: 2575
 
@@ -2432,7 +2432,6 @@
 | fallocate64 | 2 | - | UNOWNED | - |
 | fattach | 1 | - | UNOWNED | - |
 | fchdir | 0 | unistd.h | proc | - |
-| fchmod | 0 | sys/stat.h | platform | - |
 | fchmodat | 0 | - | platform | - |
 | fchown | 0 | unistd.h | proc | - |
 | fchownat | 0 | - | proc | - |
@@ -2594,7 +2593,6 @@
 | fstatvfs | 0 | - | platform | - |
 | fstatvfs64 | 1 | - | UNOWNED | - |
 | fsub | 2 | - | UNOWNED | - |
-| fsync | 0 | unistd.h | proc | - |
 | ftello | 0 | stdio.h | stdio | - |
 | ftello64 | 0 | stdio.h | UNOWNED | - |
 | ftime | 1 | - | UNOWNED | - |
@@ -2878,7 +2876,6 @@
 | is_system_labeled | 2 | - | UNOWNED | - |
 | isaexec | 2 | - | UNOWNED | - |
 | isastream | 1 | - | UNOWNED | - |
-| isatty | 0 | unistd.h | proc | - |
 | iscanonical | 0 | math.h | UNOWNED | - |
 | isdialuptty | 2 | - | UNOWNED | - |
 | isenglish | 2 | - | UNOWNED | - |
@@ -3150,7 +3147,6 @@
 | mergesort_b | 2 | - | UNOWNED | - |
 | mincore | 1 | - | platform | - |
 | minor | 1 | - | abi | - |
-| mkdir | 0 | sys/stat.h | platform | - |
 | mkdirat | 0 | sys/stat.h | platform | - |
 | mkdtemp | 0 | stdlib.h | stdlib | - |
 | mkdtemps | 2 | - | UNOWNED | - |
@@ -3617,7 +3613,6 @@
 | remquo | 0 | - | m | - |
 | remquof | 1 | - | UNOWNED | - |
 | remquol | 1 | - | UNOWNED | - |
-| rename | 0 | stdio.h | stdio | - |
 | renameat | 0 | stdio.h | stdio | - |
 | renameat2 | 1 | - | platform | - |
 | res_mkquery | 1 | - | resolv | - |

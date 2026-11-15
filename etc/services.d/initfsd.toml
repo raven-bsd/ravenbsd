@@ -6,7 +6,7 @@ exec = "/sbin/initfsd"
 needs = ["logd"]
 provides = ["scheme:initfs"]
 readiness = "scheme"
-ready_timeout_ms = 60_000
+ready_timeout_ms = 120_000
 restart = "on-failure"
 
 # Every process created by the kernel already has the initfs MemObject at handle 1 with

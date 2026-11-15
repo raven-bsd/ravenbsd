@@ -96,7 +96,7 @@ C53/C57/C58.
 | `eaccess` | stat+mode bits | PARTIAL | PG-28 | dave | netbsd:lib/libc/sys/access.2 |
 | `euidaccess` | stat+mode bits | PARTIAL | PG-28 | dave | netbsd:lib/libc/sys/access.2 |
 | `chmod` | CALL(OP_CHMOD) | EXISTS | - | dave | userland/rt/src/fs.rs:283 |
-| `fchmod` | CALL(OP_CHMOD*) | TBD | PG-21 | dave | musl:src/stat/fchmodat.c |
+| `fchmod` | CALL(OP_CHMOD) handle | EXISTS | - | dave | musl:src/stat/fchmodat.c |
 | `fchmodat` | CALL(OP_CHMOD) | PARTIAL | PG-21 | dave | musl:src/stat/fchmodat.c |
 | `lchmod` | CALL(OP_CHMOD*) | PARTIAL | PG-21 | dave | musl:src/stat/fchmodat.c |
 | `chown` | CALL(OP_CHOWN*) | TBD | PG-31 | dave | netbsd:lib/libc/sys/chown.2 |

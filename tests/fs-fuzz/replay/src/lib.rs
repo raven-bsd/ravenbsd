@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! Stable replay harness shared by the UFS fuzz targets and the host tests.
+//! Stable replay harness shared by the filesystem fuzz targets and the host tests.
 //!
-//! A fuzz input is the bytes of one on-disk region (superblock, cylinder
-//! group, inode, directory block or indirect block).  Replay overlays it on the
-//! committed B63 `ufs2-b4096` golden image, mounts the result read-only, walks
-//! the parser entry points and requires no panic, no out-of-range read and a
-//! returned value.
+//! UFS targets take one on-disk region (superblock, cylinder group, inode,
+//! directory block or indirect block); replay overlays it on the committed B63
+//! `ufs2-b4096` golden image, mounts the result read-only, walks the parser
+//! entry points and requires no panic, no out-of-range read and a returned
+//! value. The GPT and FAT targets take the complete disk image, so truncation
+//! and any header/table mutation are part of the input.
 
 #![forbid(unsafe_code)]
 
@@ -29,6 +30,8 @@ pub const TARGETS: &[&str] = &[
     "ufs_inode",
     "ufs_directory",
     "ufs_indirect",
+    "gpt",
+    "fat",
 ];
 
 /// One target's base image and mutable region.
@@ -160,6 +163,24 @@ fn inode_offset(geometry: &Geometry, ino: u64) -> Result<usize, String> {
 
 /// Return the base image and the region a target mutates.
 pub fn region(target: &str) -> Result<Region, String> {
+    if target == "gpt" {
+        let base = gpt_core::fixtures::golden_image();
+        let length = base.len();
+        return Ok(Region {
+            base,
+            offset: 0,
+            length,
+        });
+    }
+    if target == "fat" {
+        let base = fat_core::fixtures::fat12_image();
+        let length = base.len();
+        return Ok(Region {
+            base,
+            offset: 0,
+            length,
+        });
+    }
     let base = base_image()?.clone();
     let geometry = geometry(&base)?;
     let (offset, length) = match target {
@@ -217,6 +238,14 @@ pub fn region(target: &str) -> Result<Region, String> {
 
 /// Replay one fuzz input for `target`.
 pub fn replay(target: &str, input: &[u8]) -> Result<(), String> {
+    if target == "gpt" || target == "fat" {
+        let outcome = catch_unwind(AssertUnwindSafe(|| run_whole_image(target, input)));
+        return if outcome.is_ok() {
+            Ok(())
+        } else {
+            Err(format!("{target}: panic"))
+        };
+    }
     let region = region(target)?;
     let mut data = region.base;
     let length = input.len().min(region.length);
@@ -225,9 +254,10 @@ pub fn replay(target: &str, input: &[u8]) -> Result<(), String> {
         .ok_or_else(|| "region slice".to_string())?;
     target_bytes.copy_from_slice(&input[..length]);
 
+    let bytes = data.clone();
     let disk = ReplayDisk::new(data);
     let bad_reads = Rc::clone(&disk.bad_reads);
-    let outcome = catch_unwind(AssertUnwindSafe(|| run(target, disk)));
+    let outcome = catch_unwind(AssertUnwindSafe(|| run(target, disk, &bytes)));
     if outcome.is_err() {
         return Err(format!("{target}: panic"));
     }
@@ -237,7 +267,32 @@ pub fn replay(target: &str, input: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
-fn run(target: &str, disk: ReplayDisk) {
+fn run_whole_image(target: &str, bytes: &[u8]) {
+    match target {
+        "gpt" => {
+            if let Ok(gpt) = gpt_core::Gpt::parse(bytes) {
+                for partition in gpt.partitions() {
+                    let _ = (partition.first_lba, partition.last_lba);
+                }
+            }
+        }
+        "fat" => {
+            if let Ok(volume) = fat_core::FatVolume::parse(bytes) {
+                let _ = volume.root_dir();
+                let _ = volume.lookup(b"HELLO.TXT");
+                let _ = volume.lookup(b"A very long file name.txt");
+                let _ = volume.lookup(b"SUBDIR/INNER.TXT");
+            }
+        }
+        _ => {}
+    }
+}
+
+fn run(target: &str, disk: ReplayDisk, bytes: &[u8]) {
+    if target == "gpt" || target == "fat" {
+        run_whole_image(target, bytes);
+        return;
+    }
     let Ok(mut ufs) = Ufs::mount(disk, MountOptions { read_only: true }) else {
         return;
     };
