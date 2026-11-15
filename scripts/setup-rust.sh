@@ -41,6 +41,13 @@ if [ "$DRY" -eq 0 ]; then
 	(cd "$ROOT" && rustc --version && cargo --version)
 fi
 
+# cargo-nextest is the parallel test runner used by `make check` (one summary, failures only).
+# It is a host tool, not part of the pinned toolchain; install it once when missing.
+if ! have cargo-nextest; then
+	log "installing cargo-nextest (parallel host test runner)"
+	run cargo install cargo-nextest --locked
+fi
+
 # rust-toolchain.toml pins builds INSIDE $ROOT only. The host's DEFAULT toolchain is the host's
 # business: project scripts NEVER install, uninstall or re-default it (only the pinned $channel
 # above is installed, which rustup would do on any in-repo cargo run anyway). Probe cargo outside

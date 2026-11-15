@@ -154,6 +154,7 @@ fn print_summary(summaries: &[Summary]) {
 
 fn build_steps(workspace: &Workspace, fast: bool) -> Result<Vec<Step>> {
     let root = &workspace.root;
+    let nextest = have_nextest();
     let mut steps = vec![
         Step {
             name: "guard".to_string(),
@@ -166,12 +167,37 @@ fn build_steps(workspace: &Workspace, fast: bool) -> Result<Vec<Step>> {
             vec!["fmt".into(), "--all".into(), "--".into(), "--check".into()],
         ),
         command_step("clippy (host)", root, "cargo", host_clippy_args(workspace)),
-        command_step("tests (host)", root, "cargo", vec!["test".into()]),
-        Step {
-            name: "profiles".to_string(),
-            kind: StepKind::Profiles,
-        },
     ];
+    if nextest {
+        steps.push(command_step(
+            "tests (host, parallel)",
+            root,
+            "cargo",
+            vec![
+                "nextest".into(),
+                "run".into(),
+                "--status-level=fail".into(),
+                "--no-fail-fast".into(),
+            ],
+        ));
+        steps.push(command_step(
+            "tests (doc)",
+            root,
+            "cargo",
+            vec!["test".into(), "--doc".into()],
+        ));
+    } else {
+        steps.push(command_step(
+            "tests (host)",
+            root,
+            "cargo",
+            vec!["test".into()],
+        ));
+    }
+    steps.push(Step {
+        name: "profiles".to_string(),
+        kind: StepKind::Profiles,
+    });
     if root.join("crates/raven-provenance/Cargo.toml").is_file() {
         steps.push(command_step(
             "provenance",
@@ -319,6 +345,18 @@ fn command_step(name: &str, root: &std::path::Path, program: &str, args: Vec<Str
         name: name.to_string(),
         kind: StepKind::Command(CommandSpec::new(program, args, root)),
     }
+}
+
+/// Whether the host has `cargo-nextest`, the parallel test runner. It schedules test binaries
+/// across cores and prints only failures; without it the gate falls back to serial `cargo test`.
+fn have_nextest() -> bool {
+    std::process::Command::new("cargo")
+        .args(["nextest", "--version"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
