@@ -13,6 +13,7 @@ PROFILE ?= base
 RELEASE ?= 0
 VERBOSE ?= 0
 SETUP_ARGS ?=
+BASE ?= origin/master
 
 export VERBOSE
 
@@ -23,7 +24,7 @@ XTASK = cargo run -q -p xtask --
 -include .raven-env.mk
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-full guard kernel loader dev release image run test world provenance \
+.PHONY: help setup doctor check check-full check-full-if-needed guard kernel loader dev release image run test world provenance \
 	posix-gaps posix-check toolchain clean distclean
 
 help:
@@ -43,6 +44,19 @@ check:
 check-full:
 	@$(XTASK) check
 	@cargo test -p raven-libc-malloc --test model -- --ignored --nocapture
+
+# Run the expensive full allocator stress only when the diff touches the allocator or its
+# memory/platform seam. Ordinary tickets and ordinary merges do not need it.
+check-full-if-needed:
+	@changed=$$(git diff --name-only $(BASE)...HEAD -- \
+		libc/ravenlibc/crates/raven-libc-malloc \
+		libc/ravenlibc/crates/raven-libc-platform); \
+	if [ -n "$$changed" ]; then \
+		printf '%s\n' "$$changed"; \
+		$(MAKE) check-full; \
+	else \
+		printf '%s\n' "check-full-if-needed: no allocator/memory changes since $(BASE); skipped"; \
+	fi
 
 guard:
 	@$(XTASK) guard
