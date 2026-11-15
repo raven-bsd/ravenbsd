@@ -110,7 +110,16 @@ if [ -z "${READELF:-}" ] && ! command -v llvm-readelf >/dev/null 2>&1 &&
     exit 77
 fi
 
-float=${RL_TEST_FLOAT:-soft}
+# H-20 kept every case on the soft-float vector until PG-12 existed. S22 now saves the
+# FP/SIMD state, so libc-time's double-returning difftime path builds with the normal SSE ABI;
+# the other cases keep the conservative soft-float vector.
+float=${RL_TEST_FLOAT:-}
+if [ -z "$float" ]; then
+    case $case_name in
+        time) float=hard ;;
+        *) float=soft ;;
+    esac
+fi
 case $float in
     soft) ;;
     hard)
