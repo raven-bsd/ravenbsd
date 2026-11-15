@@ -22,7 +22,6 @@ build = "build.rs"
 exclude = [
     "/ci/*",
     "/.github/*",
-    "/.cirrus.yml",
     "/triagebot.toml",
     "cherry-pick-stable.sh",
 ]

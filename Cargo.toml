@@ -357,8 +357,8 @@ strip = "symbols"
 overflow-checks = false
 incremental = false
 
-# K19a/C64g: the registry libc 0.2.186 with the ravenbsd unix target types. The
-# path crate lives outside the workspace (see `exclude`) and is also used by
-# the getrandom backend probe and the brush target build.
+# K19a/C64g: the actual registry libc 0.2.186 with the ABI-checked ravenbsd
+# unix module. The path crate lives outside the workspace (see `exclude`) and
+# is also used by the getrandom backend probe and the brush target build.
 [patch.crates-io]
 libc = { path = "toolchain/vendor/libc" }
