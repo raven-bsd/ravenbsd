@@ -35,6 +35,8 @@ const EXP_MASK: u32 = 0x7fff;
 const EXP_BIAS: i32 = 16383;
 const INT_BIT: u64 = 1 << 63;
 const QNAN: u128 = ((EXP_MASK as u128) << 64) | (INT_BIT as u128) | (1 << 62);
+/// Midpoint of the dense total-order key: `-0` is one below it, `+0` one above.
+const ORDER_BASE: u128 = 1u128 << 78;
 
 const _: () = {
     assert!(core::mem::size_of::<LongDouble>() == 16);
@@ -541,12 +543,20 @@ impl LongDouble {
 /// Monotone key for the total order over the 80 meaningful bits: negatives are complemented, so
 /// `-NaN < -inf < -0 < +0 < +inf < +NaN`. The six padding bytes never enter the key.
 fn order_key(x: LongDouble) -> u128 {
+    // x87 stores the integer bit explicitly, so a raw `bits + 1` steps from the maximum
+    // fraction of one binade into a pseudo-denormal instead of the next value. Drop the
+    // integer bit and key on `(exponent, fraction)`, so every adjacent value is one apart.
     const VALUE_MASK: u128 = (1u128 << 80) - 1;
+    const FRACTION_MASK: u128 = (1u128 << 63) - 1;
     let bits = x.to_bits() & VALUE_MASK;
-    if bits & SIGN_MASK != 0 {
-        !bits & VALUE_MASK
+    let negative = bits & SIGN_MASK != 0;
+    let exponent = (bits >> 64) & EXP_MASK as u128;
+    let fraction = bits & FRACTION_MASK;
+    let magnitude = (exponent << 63) | fraction;
+    if negative {
+        ORDER_BASE - 1 - magnitude
     } else {
-        bits | SIGN_MASK
+        ORDER_BASE + magnitude
     }
 }
 
@@ -871,7 +881,10 @@ mod arithmetic {
         let round_up = match mode {
             Mode::Floor => negative,
             Mode::Ceil => !negative,
-            Mode::Trunc | Mode::Even => false,
+            Mode::Trunc => false,
+            // At `E == -64`, `|x|` is in `[0.5, 1)`: round to even means away from zero
+            // only above the exact half.
+            Mode::Even => exponent == -64 && value.significand > 1u64 << 63,
             Mode::Round => exponent == -64,
         };
         if exponent <= -64 {
@@ -940,16 +953,33 @@ mod arithmetic {
         }
         let key = super::order_key(x);
         let target = super::order_key(towards);
-        if key == target {
+        if key == target || x.partial_cmp(towards) == Some(core::cmp::Ordering::Equal) {
             return towards;
         }
-        let next = if key < target { key + 1 } else { key - 1 };
-        const VALUE_MASK: u128 = (1u128 << 80) - 1;
-        let bits = if next & SIGN_MASK != 0 {
-            next ^ SIGN_MASK
+        // `+-0` are equal but one key apart; the first value on the other side of zero skips
+        // the opposite zero (IEEE `nextafter(+0, -1)` is `-min_subnormal`).
+        let next = if x.is_zero() {
+            if target > super::ORDER_BASE {
+                super::ORDER_BASE + 1
+            } else {
+                super::ORDER_BASE - 2
+            }
+        } else if key < target {
+            key + 1
         } else {
-            !next & VALUE_MASK
+            key - 1
         };
+        const FRACTION_MASK: u128 = (1u128 << 63) - 1;
+        let negative = next < super::ORDER_BASE;
+        let magnitude = if negative {
+            super::ORDER_BASE - 1 - next
+        } else {
+            next - super::ORDER_BASE
+        };
+        let exponent = magnitude >> 63;
+        let fraction = magnitude & FRACTION_MASK;
+        let integer = if exponent == 0 { 0 } else { 1u128 << 63 };
+        let bits = (if negative { SIGN_MASK } else { 0 }) | (exponent << 64) | fraction | integer;
         LongDouble::from_bits(bits)
     }
 }

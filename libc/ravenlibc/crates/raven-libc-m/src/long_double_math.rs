@@ -54,11 +54,15 @@ fn pi() -> LongDouble {
     ld(core::f64::consts::PI)
 }
 
-/// `pi / 2`, split in two parts for the trigonometric reduction.
-fn half_pi() -> (LongDouble, LongDouble) {
+/// `pi / 2`, split in three parts for the trigonometric reduction.
+///
+/// The high part keeps only 40 significant bits, so `k * hi` stays exact for `|k| <= 2^24`;
+/// `mid` and `lo` carry the remaining ~106 bits of the constant.
+fn half_pi() -> (LongDouble, LongDouble, LongDouble) {
     (
-        ld(core::f64::consts::FRAC_PI_2),
-        ld(6.123_233_995_736_766_0e-17),
+        ld(1.570_796_326_794_152_3),
+        ld(7.443_547_480_486_623e-13),
+        ld(-1.253_699_020_693_249_9e-29),
     )
 }
 
@@ -351,9 +355,9 @@ fn cos_series(r: LongDouble) -> LongDouble {
 }
 
 fn reduce_half_pi(x: LongDouble) -> (i64, LongDouble) {
-    let (hi, lo) = half_pi();
+    let (hi, mid, lo) = half_pi();
     let k = x.div(hi).round();
-    let remainder = x.sub(k.mul(hi)).sub(k.mul(lo));
+    let remainder = x.sub(k.mul(hi)).sub(k.mul(mid)).sub(k.mul(lo));
     (k.to_i64().unwrap_or(0), remainder)
 }
 
@@ -481,6 +485,11 @@ pub fn sinhl(x: LongDouble) -> LongDouble {
     if x.is_nan() || x.is_infinite() {
         return x;
     }
+    // `exp(x) - 1/exp(x)` cancels for tiny `x`; `expm1` keeps the low bits.
+    if x.abs().to_f64() < 1.0 {
+        let negative = LongDouble::zero(false).sub(x);
+        return expm1l(x).sub(expm1l(negative)).mul(ld(0.5));
+    }
     let e = expl(x);
     e.sub(LongDouble::one().div(e)).mul(ld(0.5))
 }
@@ -505,6 +514,11 @@ pub fn tanhl(x: LongDouble) -> LongDouble {
     if x.abs().to_f64() > 30.0 {
         return ld(if x.sign_bit() { -1.0 } else { 1.0 });
     }
+    if x.abs().to_f64() < 0.5 {
+        // `exp(2x) - 1` cancels for tiny `x`; `expm1` keeps the low bits.
+        let t = expm1l(x.add(x));
+        return t.div(t.add(ld(2.0)));
+    }
     let e2 = expl(x.add(x));
     e2.sub(LongDouble::one()).div(e2.add(LongDouble::one()))
 }
@@ -515,7 +529,14 @@ pub fn asinhl(x: LongDouble) -> LongDouble {
         return x;
     }
     let magnitude = x.abs();
-    let value = logl(magnitude.add(magnitude.mul(magnitude).add(LongDouble::one()).sqrt()));
+    let square = magnitude.mul(magnitude);
+    let value = if magnitude.to_f64() <= 0.25 {
+        // `log(1 + x + ...)` loses `x` for tiny arguments; `log1p` keeps it.
+        let root = square.add(LongDouble::one()).sqrt();
+        log1pl(magnitude.add(square.div(LongDouble::one().add(root))))
+    } else {
+        logl(magnitude.add(square.add(LongDouble::one()).sqrt()))
+    };
     if x.sign_bit() {
         LongDouble::zero(false).sub(value)
     } else {
@@ -551,6 +572,10 @@ pub fn atanhl(x: LongDouble) -> LongDouble {
         };
     }
     let one = LongDouble::one();
+    if magnitude.to_f64() <= 0.25 {
+        // `log((1 + x) / (1 - x))` cancels for tiny `x`; `log1p` keeps the low bits.
+        return log1pl(ld(2.0).mul(x).div(one.sub(x))).mul(ld(0.5));
+    }
     logl(one.add(x).div(one.sub(x))).mul(ld(0.5))
 }
 
@@ -658,6 +683,13 @@ pub fn lgamma_rl(x: LongDouble) -> (LongDouble, i32) {
     if x.is_infinite() {
         return (x, 1);
     }
+    // The only positive zeros of `lgamma` are at 1 and 2; the Stirling path returns a
+    // cancellation-sized residue there, so pin them to the exact value.
+    if x.total_cmp(LongDouble::one()) == core::cmp::Ordering::Equal
+        || x.total_cmp(ld(2.0)) == core::cmp::Ordering::Equal
+    {
+        return (LongDouble::zero(false), 1);
+    }
     if x.total_cmp(ld(0.5)) == core::cmp::Ordering::Less {
         // Reflection: lgamma(x) = ln(pi / |sin(pi x)|) - lgamma(1 - x).
         let sine = sinl(pi().mul(x));
@@ -721,8 +753,25 @@ pub fn tgammal(x: LongDouble) -> LongDouble {
     if x.is_nan() {
         return x;
     }
-    if x.is_zero() || (x.sign_bit() && is_integral(x)) {
+    if x.is_zero() {
+        return LongDouble::infinity(x.sign_bit());
+    }
+    // `tgamma(+inf) = +inf`; the negative pole is NaN.
+    if x.is_infinite() {
+        return if x.sign_bit() {
+            LongDouble::nan()
+        } else {
+            LongDouble::infinity(false)
+        };
+    }
+    if x.sign_bit() && is_integral(x) {
         return LongDouble::nan();
+    }
+    // `tgamma(1) = tgamma(2) = 1`; the Stirling/reflection path leaves a residue there.
+    if x.total_cmp(LongDouble::one()) == core::cmp::Ordering::Equal
+        || x.total_cmp(ld(2.0)) == core::cmp::Ordering::Equal
+    {
+        return LongDouble::one();
     }
     if x.total_cmp(ld(0.5)) == core::cmp::Ordering::Less {
         // Reflection: Gamma(x) = pi / (sin(pi x) * Gamma(1 - x)).
