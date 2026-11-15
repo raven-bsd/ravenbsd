@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Standalone package: a throw-away qtest fixture, not part of the product workspace.
+[workspace]
+
+[package]
+name = "raven-aarch64-libc"
+version = "0.1.0"
+description = "S56 fixture: aarch64 THREAD_CREATE_EX/TLS, futex and signal parity with S23/S54."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "raven-aarch64-libc"
+path = "src/main.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
