@@ -127,11 +127,40 @@ fn rendering_is_plain_or_colour_as_requested() {
         ".Nm cmd\n",
         ".Nd a page\n",
     );
-    let plain = render_page(source, 80, false, None, None).expect("plain");
+    let palette = Palette::raven_violet();
+    let plain = render_page(source, 80, &palette, false, None, None).expect("plain");
     assert!(!plain.contains('\u{1b}'));
     assert!(plain.contains("cmd - a page"));
-    let colour = render_page(source, 80, true, Some("truecolor"), Some("xterm")).expect("colour");
+    let colour =
+        render_page(source, 80, &palette, true, Some("truecolor"), Some("xterm")).expect("colour");
     assert!(colour.contains("\u{1b}["));
+}
+
+#[test]
+fn a_custom_runtime_palette_reaches_the_renderer() {
+    let palette = Palette::from_env_spec(
+        "#ff0000:#6272a4:#44475a:#50fa7b:#ffb86c:#ff5555:#8be9fd:#f8f8f2:#ffb86c:#50fa7b:#ff79c6",
+    )
+    .expect("spec");
+    let source = concat!(
+        ".Dt CMD 1\n",
+        ".Os RavenBSD\n",
+        ".Sh NAME\n",
+        ".Nm cmd\n",
+        ".Nd a page\n",
+    );
+    let output =
+        render_page(source, 80, &palette, true, Some("truecolor"), Some("xterm")).expect("colour");
+    assert!(output.contains("\u{1b}[38;2;255;0;0m"), "{output}");
+}
+
+#[test]
+fn an_invalid_spec_falls_back_to_the_compiled_palette() {
+    assert_eq!(
+        palette_from_env_spec(Some("not:a:palette")),
+        Palette::current()
+    );
+    assert_eq!(palette_from_env_spec(None), Palette::current());
 }
 
 #[test]

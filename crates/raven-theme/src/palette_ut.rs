@@ -38,6 +38,47 @@ fn raven_violet_matches_the_architecture_table() {
 }
 
 #[test]
+fn the_env_spec_is_the_role_order() {
+    let palette = Palette::raven_violet();
+    assert_eq!(
+        palette.to_env_spec(),
+        "#b388ff:#6272a4:#44475a:#50fa7b:#ffb86c:#ff5555:#8be9fd:#f8f8f2:#ffb86c:#50fa7b:#ff79c6"
+    );
+}
+
+#[test]
+fn the_env_spec_round_trips() {
+    let palette = Palette::raven_violet();
+    assert_eq!(
+        Palette::from_env_spec(&palette.to_env_spec()),
+        Some(palette)
+    );
+    assert_eq!(
+        Palette::from_env_spec(
+            "b388ff:6272a4:44475a:50fa7b:ffb86c:ff5555:8be9fd:f8f8f2:ffb86c:50fa7b:ff79c6"
+        ),
+        Some(Palette::raven_violet())
+    );
+}
+
+#[test]
+fn the_env_spec_rejects_bad_shapes() {
+    let palette = Palette::raven_violet();
+    let mut short = palette.to_env_spec();
+    short.truncate(short.rfind(':').unwrap_or(0));
+    assert_eq!(Palette::from_env_spec(&short), None);
+    assert_eq!(Palette::from_env_spec(""), None);
+    assert_eq!(
+        Palette::from_env_spec(&format!("{}:", palette.to_env_spec())),
+        None
+    );
+    let mut invalid = palette.to_env_spec();
+    let index = invalid.find('#').unwrap_or(0);
+    invalid.replace_range(index + 1..index + 2, "x");
+    assert_eq!(Palette::from_env_spec(&invalid), None);
+}
+
+#[test]
 fn hex_round_trips() {
     let colour = Rgb::new(0xb3, 0x88, 0xff);
     assert_eq!(Rgb::parse_hex(&colour.to_hex()), Some(colour));

@@ -99,6 +99,7 @@ mod program {
             }
         };
         let width = man::width(args.env_get("MANWIDTH"), args.env_get("COLUMNS"));
+        let palette = man::palette_from_env_spec(args.env_get("RAVEN_PALETTE"));
         let term = args.env_get("TERM");
         let term_dumb = term == Some("dumb");
         let is_tty = term.is_some_and(|value| !value.is_empty());
@@ -108,8 +109,14 @@ mod program {
             args.env_get("NO_COLOR").is_some(),
             term_dumb,
         );
-        let output = match man::render_page(source, width, enabled, args.env_get("COLORTERM"), term)
-        {
+        let output = match man::render_page(
+            source,
+            width,
+            &palette,
+            enabled,
+            args.env_get("COLORTERM"),
+            term,
+        ) {
             Ok(output) => output,
             Err(error) => {
                 raven_rt::eprintln!("man: {path}: {error}");
