@@ -1746,8 +1746,6 @@ dependencies = [
 [[package]]
 name = "libc"
 version = "0.2.191"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
 
 [[package]]
 name = "libloading"
@@ -2392,6 +2390,13 @@ name = "rand_core"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
+
+[[package]]
+name = "raven-getrandom"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.4.3",
+]
 
 [[package]]
 name = "rayon"
@@ -4438,6 +4443,7 @@ dependencies = [
  "openssl",
  "os_display",
  "procfs",
+ "raven-getrandom",
  "rustc-hash",
  "rustix",
  "selinux",

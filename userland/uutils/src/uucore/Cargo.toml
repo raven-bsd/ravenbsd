@@ -41,6 +41,9 @@ rustc-hash = { workspace = true }
 unicode-width = { workspace = true }
 unit-prefix = { workspace = true, optional = true }
 uucore_procs = { workspace = true }
+# K25a: the getrandom 0.4 custom backend symbol (`--cfg getrandom_backend="custom"` in the root
+# `.cargo/config.toml`). Every final uutils binary links it through uucore.
+raven-getrandom = { path = "../../../../toolchain/raven-getrandom" }
 z85 = { workspace = true, optional = true }
 
 # Benchmark dependencies (optional)

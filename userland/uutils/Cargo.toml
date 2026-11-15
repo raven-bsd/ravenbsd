@@ -749,3 +749,10 @@ strip = true
 inherits = "release"
 panic = "unwind"
 debug = true
+
+# K25a: the uutils workspace is a separate cargo workspace, so the root
+# `[patch.crates-io]` does not reach it. Use the K19/RavenBSD libc module here
+# with the crate version the uutils lock expects; the module is the merged
+# toolchain copy, not a new clean-room implementation.
+[patch.crates-io]
+libc = { path = "libc-ravenbsd" }
