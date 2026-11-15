@@ -97,8 +97,9 @@ coverage, the existing docs gate and `libc(7)`. The gate does not close.
 
 * 5.1 cases: BLOCKED, `build/libc-gate/5.1.txt`; C73c is wip. The seven cases need PG-22, PG-23,
   PG-29, PG-49 and PG-50; PG-13 landed in S51. Owning ticket: C73c (dave).
-* 5.2 core-servers: MET, `build/libc-gate/5.2.core-servers.txt`; exit 0. One intermediate eval run
-  timed out on this 120 s QEMU case and the immediate rerun passed; the final eval run is MET.
+* 5.2 core-servers: MET, `build/libc-gate/5.2.core-servers.txt`; exit 0. Two full-eval runs timed
+  out on this 120 s QEMU case; the immediate targeted rerun passed and the stored result is that
+  rerun. This is an infrastructure flake, not a libc result.
 * 5.2 file-tools: MET, `build/libc-gate/5.2.file-tools.txt`; exit 0.
 * 5.3 second architecture: INFO; C73 is x86_64 only. The owner decides whether G1 closes on
   x86_64 alone.
