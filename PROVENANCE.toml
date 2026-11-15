@@ -9427,6 +9427,83 @@ modified = true
 notes = "Pinned brush 0.4.0 workspace vendored under userland/brush; the donor fuzz, xtask, benchmarks, e2e, samples, schemas, scripts, docs and rust-toolchain.toml are omitted; MIT SPDX and copyright headers are applied to the imported source and the workspace member list is trimmed to the retained crates."
 
 [[import]]
+path = "userland/brush/vendor/mio"
+upstream = "brush"
+upstream_path = "vendor/mio"
+upstream_rev = "8adb6bc06815c34ccf6503902f6f292e04b1cbba"
+license = "MIT"
+tier = "A"
+copied = "2026-11-15"
+modified = true
+notes = "mio 1.2.4 registry source vendored for the K26c ravenbsd OS-module port; ravenbsd uses the epoll/eventfd Linux arms."
+
+[[import]]
+path = "userland/brush/vendor/nix"
+upstream = "brush"
+upstream_path = "vendor/nix"
+upstream_rev = "8adb6bc06815c34ccf6503902f6f292e04b1cbba"
+license = "MIT"
+tier = "A"
+copied = "2026-11-15"
+modified = true
+notes = "nix 0.31.3 registry source vendored for the K26c ravenbsd OS-module port; ravenbsd joins the linux_android cfg alias and waitid/statfs paths."
+
+[[import]]
+path = "userland/brush/vendor/rlimit"
+upstream = "brush"
+upstream_path = "vendor/rlimit"
+upstream_rev = "8adb6bc06815c34ccf6503902f6f292e04b1cbba"
+license = "MIT"
+tier = "A"
+copied = "2026-11-15"
+modified = true
+notes = "rlimit 0.11.0 registry source vendored for the K26c ravenbsd port; ravenbsd uses getrlimit/setrlimit (no rlimit64 symbols)."
+
+[[import]]
+path = "userland/brush/vendor/rustix"
+upstream = "brush"
+upstream_path = "vendor/rustix"
+upstream_rev = "8adb6bc06815c34ccf6503902f6f292e04b1cbba"
+license = "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
+tier = "A"
+copied = "2026-11-15"
+modified = true
+notes = "rustix 1.1.5 registry source vendored for the K26c ravenbsd port; ravenbsd uses the libc backend with the linux_kernel cfg and a NOSYS fallback for preadv2/pwritev2/fallocate."
+
+[[import]]
+path = "userland/brush/vendor/socket2"
+upstream = "brush"
+upstream_path = "vendor/socket2"
+upstream_rev = "8adb6bc06815c34ccf6503902f6f292e04b1cbba"
+license = "MIT OR Apache-2.0"
+tier = "A"
+copied = "2026-11-15"
+modified = true
+notes = "socket2 0.6.5 registry source vendored for the K26c ravenbsd port; ravenbsd follows the Linux socket branches."
+
+[[import]]
+path = "userland/brush/vendor/tokio"
+upstream = "brush"
+upstream_path = "vendor/tokio"
+upstream_rev = "8adb6bc06815c34ccf6503902f6f292e04b1cbba"
+license = "MIT"
+tier = "A"
+copied = "2026-11-15"
+modified = true
+notes = "tokio 1.54.1 registry source vendored for the K26c ravenbsd port; ravenbsd follows the Linux branches except the Linux-only abstract-socket std extension."
+
+[[import]]
+path = "userland/brush/vendor/uzers"
+upstream = "brush"
+upstream_path = "vendor/uzers"
+upstream_rev = "8adb6bc06815c34ccf6503902f6f292e04b1cbba"
+license = "MIT"
+tier = "A"
+copied = "2026-11-15"
+modified = true
+notes = "uzers 0.12.2 registry source vendored for the K26c ravenbsd port; ravenbsd follows the Linux user/group extras."
+
+[[import]]
 path = "toolchain/vendor/libc"
 upstream = "rust"
 upstream_path = "library/libc-ravenbsd"

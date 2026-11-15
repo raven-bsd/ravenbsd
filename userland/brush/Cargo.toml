@@ -98,6 +98,13 @@ inherits = "release"
 strip = "debuginfo"
 
 # The nested workspace cannot inherit the root `[patch.crates-io]`; point it at
-# the vendored 0.2.186 target libc (C64g).
+# the vendored 0.2.186 target libc (C64g) and the K26c ravenbsd OS-module ports.
 [patch.crates-io]
 libc = { path = "../../toolchain/vendor/libc" }
+mio = { path = "vendor/mio" }
+nix = { path = "vendor/nix" }
+rlimit = { path = "vendor/rlimit" }
+rustix = { path = "vendor/rustix" }
+socket2 = { path = "vendor/socket2" }
+tokio = { path = "vendor/tokio" }
+uzers = { path = "vendor/uzers" }
