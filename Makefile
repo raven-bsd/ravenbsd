@@ -24,7 +24,7 @@ XTASK = cargo run -q -p xtask --
 
 .DEFAULT_GOAL := help
 .PHONY: help setup doctor check guard kernel loader dev release image run test world provenance \
-	toolchain clean distclean
+	posix-gaps toolchain clean distclean
 
 help:
 	@$(XTASK) help
@@ -68,6 +68,9 @@ world:
 
 provenance:
 	@cargo run -q -p raven-provenance -- check --root .
+
+posix-gaps:
+	@$(XTASK) posix-gaps
 
 TOOLCHAIN_STAGE ?= 1
 

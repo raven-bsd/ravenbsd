@@ -87,6 +87,7 @@ members = [
     "tools/ufs-mkfs",
     "tools/integration-inventory",
     "tools/libc-census",
+    "tools/posix-conform",
     "tools/libc-size",
     "tools/libc-oracle",
     "libc/ravenlibc/crates/*",
