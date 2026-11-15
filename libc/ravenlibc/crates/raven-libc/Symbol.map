@@ -856,6 +856,8 @@ RAVEN_1.0 {
 		getpgrp;
 		getpid;
 		getppid;
+		getresgid;
+		getresuid;
 		getsid;
 		getuid;
 		initgroups;
@@ -866,6 +868,8 @@ RAVEN_1.0 {
 		setgroups;
 		setpgid;
 		setregid;
+		setresgid;
+		setresuid;
 		setreuid;
 		setsid;
 		setuid;

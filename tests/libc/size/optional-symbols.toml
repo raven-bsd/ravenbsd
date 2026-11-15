@@ -1,0 +1,207 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Reviewer decision (C69 rework 1): optional personality names stay in the server set.
+# The tiny/server equality rule still applies to the base set; any tiny-only name fails, and a
+# server-only name fails unless it is listed here with a reason.
+schema = 1
+
+[[symbol]]
+name = "getexecname"
+reason = "Solaris personality only; no tiny caller"
+
+[[symbol]]
+name = "getisax"
+reason = "Solaris personality only; no tiny caller"
+
+[[symbol]]
+name = "cond_broadcast"
+reason = "Solaris pthread alias family; server personality only"
+
+[[symbol]]
+name = "cond_destroy"
+reason = "Solaris pthread alias family; server personality only"
+
+[[symbol]]
+name = "cond_init"
+reason = "Solaris pthread alias family; server personality only"
+
+[[symbol]]
+name = "cond_signal"
+reason = "Solaris pthread alias family; server personality only"
+
+[[symbol]]
+name = "cond_timedwait"
+reason = "Solaris pthread alias family; server personality only"
+
+[[symbol]]
+name = "cond_wait"
+reason = "Solaris pthread alias family; server personality only"
+
+[[symbol]]
+name = "mutex_destroy"
+reason = "Solaris pthread alias family; server personality only"
+
+[[symbol]]
+name = "mutex_init"
+reason = "Solaris pthread alias family; server personality only"
+
+[[symbol]]
+name = "mutex_lock"
+reason = "Solaris pthread alias family; server personality only"
+
+[[symbol]]
+name = "mutex_trylock"
+reason = "Solaris pthread alias family; server personality only"
+
+[[symbol]]
+name = "mutex_unlock"
+reason = "Solaris pthread alias family; server personality only"
+
+[[symbol]]
+name = "port_alert"
+reason = "Solaris event-port family; server personality only"
+
+[[symbol]]
+name = "port_associate"
+reason = "Solaris event-port family; server personality only"
+
+[[symbol]]
+name = "port_create"
+reason = "Solaris event-port family; server personality only"
+
+[[symbol]]
+name = "port_dissociate"
+reason = "Solaris event-port family; server personality only"
+
+[[symbol]]
+name = "port_get"
+reason = "Solaris event-port family; server personality only"
+
+[[symbol]]
+name = "port_getn"
+reason = "Solaris event-port family; server personality only"
+
+[[symbol]]
+name = "port_send"
+reason = "Solaris event-port family; server personality only"
+
+[[symbol]]
+name = "rw_rdlock"
+reason = "Solaris rwlock alias family; server personality only"
+
+[[symbol]]
+name = "rw_tryrdlock"
+reason = "Solaris rwlock alias family; server personality only"
+
+[[symbol]]
+name = "rw_trywrlock"
+reason = "Solaris rwlock alias family; server personality only"
+
+[[symbol]]
+name = "rw_unlock"
+reason = "Solaris rwlock alias family; server personality only"
+
+[[symbol]]
+name = "rw_wrlock"
+reason = "Solaris rwlock alias family; server personality only"
+
+[[symbol]]
+name = "rwlock_destroy"
+reason = "Solaris rwlock alias family; server personality only"
+
+[[symbol]]
+name = "rwlock_init"
+reason = "Solaris rwlock alias family; server personality only"
+
+[[symbol]]
+name = "sema_destroy"
+reason = "Solaris semaphore alias family; server personality only"
+
+[[symbol]]
+name = "sema_init"
+reason = "Solaris semaphore alias family; server personality only"
+
+[[symbol]]
+name = "sema_post"
+reason = "Solaris semaphore alias family; server personality only"
+
+[[symbol]]
+name = "sema_trywait"
+reason = "Solaris semaphore alias family; server personality only"
+
+[[symbol]]
+name = "sema_wait"
+reason = "Solaris semaphore alias family; server personality only"
+
+[[symbol]]
+name = "thr_continue"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_create"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_exit"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_getconcurrency"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_getprio"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_getspecific"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_join"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_keycreate"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_kill"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_main"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_min_stack"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_self"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_setconcurrency"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_setprio"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_setspecific"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_sigsetmask"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_suspend"
+reason = "Solaris thread alias family; server personality only"
+
+[[symbol]]
+name = "thr_yield"
+reason = "Solaris thread alias family; server personality only"
