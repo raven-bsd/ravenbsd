@@ -19,6 +19,7 @@ fn request(nr: u64, args: [u64; 6]) -> [u8; SYSCALL_LEN] {
 fn process() -> LinuxProcess {
     LinuxProcess::new(
         7,
+        700,
         raven_abi::types::Handle(9),
         0x4000,
         0x5000,
@@ -35,7 +36,7 @@ fn a_write_request_decodes_and_replies() {
     let bytes = request(1, [1, 0x1000, 6, 0, 0, 0]);
     let call = decode(&bytes).expect("a valid request");
     assert_eq!(call.nr, 1);
-    assert_eq!(copy_in_len(&call), Some(6));
+    assert_eq!(copy_in(&call), Some((1, 6)));
     let action = dispatch(&mut process, &mut dispatcher, &call);
     assert_eq!(action, TrapAction::Reply(6));
     assert_eq!(process.output, b"hello\n");
@@ -63,21 +64,64 @@ fn copy_in_is_bounded_by_the_server_limit() {
         1,
         [1, 0x1000, u64::MAX, 0, 0, 0],
     );
-    assert_eq!(copy_in_len(&call), Some(crate::table::USER_BUFFER_MAX));
+    assert_eq!(copy_in(&call), Some((1, crate::table::USER_BUFFER_MAX)));
     let other = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, 39, [0; 6]);
-    assert_eq!(copy_in_len(&other), None);
+    assert_eq!(copy_in(&other), None);
 }
 
 #[test]
 fn path_calls_copy_a_bounded_window() {
-    for nr in [2, 4, 89, 257, 262, 267] {
+    for nr in [2, 4, 59, 89] {
         let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, nr, [0; 6]);
-        assert_eq!(copy_in_len(&call), Some(128), "nr {nr}");
+        assert_eq!(copy_in(&call), Some((0, 128)), "nr {nr}");
+    }
+    for nr in [257, 262, 267] {
+        let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, nr, [0; 6]);
+        assert_eq!(copy_in(&call), Some((1, 128)), "nr {nr}");
     }
     for nr in [0, 3, 8, 217] {
         let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, nr, [0; 6]);
-        assert_eq!(copy_in_len(&call), None, "nr {nr}");
+        assert_eq!(copy_in(&call), None, "nr {nr}");
     }
+}
+
+#[test]
+fn prctl_set_name_copies_only_its_name_window() {
+    let set_name = LinuxSyscallV1::new(
+        raven_proto_linux::ARCH_X86_64,
+        157,
+        [crate::handlers::PR_SET_NAME as u64, 0x1000, 0, 0, 0, 0],
+    );
+    assert_eq!(copy_in(&set_name), Some((1, 16)));
+    let get_name = LinuxSyscallV1::new(
+        raven_proto_linux::ARCH_X86_64,
+        157,
+        [16, 0x1000, 0, 0, 0, 0],
+    );
+    assert_eq!(copy_in(&get_name), None);
+    let set_pdeathsig =
+        LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, 157, [1, 9, 0, 0, 0, 0]);
+    assert_eq!(copy_in(&set_pdeathsig), None);
+}
+
+#[test]
+fn a_queued_exec_becomes_an_exec_action() {
+    let mut process = process();
+    let mut dispatcher = dispatcher();
+    process.user_buffer.extend_from_slice(b"/exec\0");
+    let bytes = request(59, [0x1000, 0x2000, 0x3000, 0, 0, 0]);
+    let call = decode(&bytes).expect("a valid request");
+    assert_eq!(
+        dispatch(&mut process, &mut dispatcher, &call),
+        TrapAction::Exec
+    );
+    assert_eq!(
+        process
+            .pending_exec
+            .as_ref()
+            .map(|exec| exec.path.as_slice()),
+        Some(b"/exec".as_slice())
+    );
 }
 
 #[test]

@@ -89,11 +89,27 @@ impl OpenFile {
     }
 }
 
+/// A queued `execve`: the path plus the user pointers of the argument arrays.
+///
+/// The handler records the request; the trap loop reads the arrays and the image, because a
+/// handler is a pure function table and cannot call the kernel.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExecRequest {
+    /// Absolute path the program asked for.
+    pub path: Vec<u8>,
+    /// User pointer to the NUL-terminated `argv` array.
+    pub argv: u64,
+    /// User pointer to the NUL-terminated `envp` array.
+    pub envp: u64,
+}
+
 /// One Linux process the server is responsible for.
 #[derive(Debug)]
 pub struct LinuxProcess {
     /// Linux pid shown to the embedded program.
     pub pid: i32,
+    /// Native thread id of the Linux main thread (`THREAD_SELF` value).
+    pub tid: u32,
     /// Exit status once `exit_group` was served.
     pub exit: Option<i32>,
     /// Current program break.
@@ -120,6 +136,24 @@ pub struct LinuxProcess {
     pub fs_base: u64,
     /// A base the `arch_prctl` handler queued for the trap loop to install before it replies.
     pub pending_tls: Option<u64>,
+    /// Linux `clear_child_tid` address; zero means unset.
+    pub clear_tid: u64,
+    /// Linux robust-list head recorded by `set_robust_list`; zero means unset.
+    pub robust_list: u64,
+    /// Length of the robust-list head recorded with the head.
+    pub robust_list_len: usize,
+    /// `PR_SET_NO_NEW_PRIVS` state.
+    pub no_new_privs: bool,
+    /// `PR_SET_PDEATHSIG` signal.
+    pub pdeathsig: u32,
+    /// `PR_SET_DUMPABLE` state (Linux default 1).
+    pub dumpable: bool,
+    /// `PR_SET_THP_DISABLE` state.
+    pub thp_disable: bool,
+    /// `PR_SET_CHILD_SUBREAPER` state.
+    pub subreaper: bool,
+    /// A queued `execve` for the trap loop.
+    pub pending_exec: Option<ExecRequest>,
     /// Absolute path of the loaded program (`/proc/self/exe`).
     pub exe: Vec<u8>,
     /// Program name without the directory (`/proc/self/stat` field 2).
@@ -133,6 +167,7 @@ impl LinuxProcess {
     /// Create the context for a freshly loaded process.
     pub fn new(
         pid: i32,
+        tid: u32,
         thread: Handle,
         brk: u64,
         brk_limit: u64,
@@ -141,6 +176,7 @@ impl LinuxProcess {
     ) -> Self {
         Self {
             pid,
+            tid,
             exit: None,
             brk,
             brk_start: brk,
@@ -154,11 +190,50 @@ impl LinuxProcess {
             thread,
             fs_base: 0,
             pending_tls: None,
+            clear_tid: 0,
+            robust_list: 0,
+            robust_list_len: 0,
+            no_new_privs: false,
+            pdeathsig: 0,
+            dumpable: true,
+            thp_disable: false,
+            subreaper: false,
+            pending_exec: None,
             exe: Vec::new(),
             comm: Vec::new(),
             argv: Vec::new(),
             files: Vec::new(),
         }
+    }
+
+    /// Set the task name (`PR_SET_NAME`), truncated to the Linux 15-byte `comm`.
+    pub fn set_name(&mut self, name: &[u8]) {
+        let end = name
+            .iter()
+            .position(|byte| *byte == 0)
+            .unwrap_or(name.len());
+        let take = end.min(15);
+        self.comm.clear();
+        self.comm.extend_from_slice(name.get(..take).unwrap_or(&[]));
+    }
+
+    /// The 16-byte NUL-padded task name `PR_GET_NAME` returns.
+    #[must_use]
+    pub fn name_bytes(&self) -> [u8; 16] {
+        let mut bytes = [0u8; 16];
+        let take = self.comm.len().min(15);
+        bytes[..take].copy_from_slice(self.comm.get(..take).unwrap_or(&[]));
+        bytes
+    }
+
+    /// Take the synthetic descriptor table so an `execve` image keeps its open files.
+    pub fn take_files(&mut self) -> Vec<Option<OpenFile>> {
+        core::mem::take(&mut self.files)
+    }
+
+    /// Install a descriptor table taken from the process an `execve` replaced.
+    pub fn adopt_files(&mut self, files: Vec<Option<OpenFile>>) {
+        self.files = files;
     }
 
     /// Set the program identity used by the synthetic procfs files.

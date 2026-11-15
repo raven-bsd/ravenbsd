@@ -27,5 +27,5 @@ pub use handlers::dispatcher;
 pub use image::{Config, ImageError, ImageSpec, plan_image};
 pub use loader::{LoadError, Loaded, Sys, load};
 pub use procfs::Resource;
-pub use table::{DirEntry, FileKind, LinuxProcess, OpenFile, Region, USER_BUFFER_MAX};
-pub use trap::{TrapAction, TrapError, copy_in_len, decode, dispatch, encode_reply, lengths};
+pub use table::{DirEntry, ExecRequest, FileKind, LinuxProcess, OpenFile, Region, USER_BUFFER_MAX};
+pub use trap::{TrapAction, TrapError, copy_in, decode, dispatch, encode_reply, lengths};

@@ -8,7 +8,7 @@ use raven_abi::types::Handle;
 use super::*;
 
 fn process() -> LinuxProcess {
-    LinuxProcess::new(7, Handle(9), 0x4000, 0x5000, 0x8000, 0x9000)
+    LinuxProcess::new(7, 700, Handle(9), 0x4000, 0x5000, 0x8000, 0x9000)
 }
 
 #[test]
@@ -78,4 +78,26 @@ fn the_context_downcasts_to_itself() {
         concrete.exit = Some(3);
     }
     assert_eq!(process.exit, Some(3));
+}
+
+#[test]
+fn the_task_name_is_truncated_to_fifteen_bytes() {
+    let mut process = process();
+    process.set_name(b"a-very-long-task-name\0");
+    assert_eq!(process.comm, b"a-very-long-tas");
+    let bytes = process.name_bytes();
+    assert_eq!(&bytes[..15], b"a-very-long-tas");
+    assert_eq!(bytes[15], 0);
+}
+
+#[test]
+fn an_exec_keeps_the_descriptor_table() {
+    let mut original = process();
+    let fd = original.open_file(b"/proc/cpuinfo".to_vec(), FileKind::Regular(vec![1]));
+    assert_eq!(fd, 3);
+    let files = original.take_files();
+    let mut replacement = process();
+    replacement.adopt_files(files);
+    assert!(replacement.file(3).is_some());
+    assert!(original.file(3).is_none());
 }

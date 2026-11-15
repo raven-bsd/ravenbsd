@@ -22,6 +22,8 @@ pub enum TrapAction {
     Reply(isize),
     /// The process asked to exit; reap it with this status.
     Exit(i32),
+    /// The process asked to `execve`; the trap loop replaces the image instead of replying.
+    Exec,
 }
 
 /// A malformed request.
@@ -42,19 +44,22 @@ pub fn decode(request: &[u8]) -> Result<LinuxSyscallV1, TrapError> {
     Ok(call)
 }
 
-/// Number of user bytes the trap loop must copy in before dispatch.
+/// The user argument the trap loop must copy in before dispatch: `(argument index, length)`.
 ///
-/// `write` reads a user buffer (`buf`, `count`); the path-taking calls (`open`, `openat`,
-/// `readlink`, `readlinkat`, `stat`, `newfstatat`) get a bounded path window. The bound protects
+/// `write` reads a user buffer (`buf`, `count`); the path-taking calls get a bounded path window
+/// at their path argument (`open`/`readlink`/`execve` use argument 0, the `*at` family uses the
+/// path after the dirfd), and `prctl(PR_SET_NAME)` gets the 16-byte name window. The bound protects
 /// the server from a hostile or corrupt Linux process; a longer path is not served.
-pub fn copy_in_len(call: &LinuxSyscallV1) -> Option<usize> {
+pub fn copy_in(call: &LinuxSyscallV1) -> Option<(usize, usize)> {
     const PATH_COPY: usize = 128;
     match call.nr {
         1 => {
             let count = usize::try_from(call.args[2]).ok()?;
-            Some(count.min(crate::table::USER_BUFFER_MAX))
+            Some((1, count.min(crate::table::USER_BUFFER_MAX)))
         }
-        2 | 4 | 89 | 257 | 262 | 267 => Some(PATH_COPY),
+        2 | 4 | 59 | 89 => Some((0, PATH_COPY)),
+        257 | 262 | 267 => Some((1, PATH_COPY)),
+        157 if call.args[0] as i32 == crate::handlers::PR_SET_NAME => Some((1, 16)),
         _ => None,
     }
 }
@@ -80,6 +85,9 @@ pub fn dispatch(
         ],
     };
     let value = dispatcher.dispatch(process, &args);
+    if process.pending_exec.is_some() {
+        return TrapAction::Exec;
+    }
     match process.exit {
         Some(code) => TrapAction::Exit(code),
         None => TrapAction::Reply(value),

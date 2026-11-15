@@ -17,10 +17,42 @@
 use linuxd::Region;
 use linuxd::Sys as _;
 use raven_abi::errno::Errno;
-use raven_abi::syscall::Syscall;
+use raven_abi::syscall::{Syscall, THREAD_CREATE_EX, ThreadCreateEx};
 use raven_abi::types::{Handle, Personality, map, prot};
 
 use crate::KernelSys;
+
+/// Create the first thread and capture its kernel tid.
+///
+/// `THREAD_CREATE_EX` writes the new 30-bit tid to the caller's `tid_out` word before the thread
+/// is enqueued, so `gettid` can return the same id the kernel uses for futexes.
+pub fn thread_create_ex(
+    process: Handle,
+    entry: usize,
+    stack_top: usize,
+    tid_out: &mut u32,
+) -> Result<Handle, Errno> {
+    let extended = ThreadCreateEx {
+        tp: 0,
+        tid_out: tid_out as *mut u32 as usize,
+        clear_tid_addr: 0,
+    };
+    // SAFETY: THREAD_CREATE takes scalar arguments; `extended` is a live `ThreadCreateEx` and
+    // `tid_out` is a writable word in this process, which the kernel checks before it copies the
+    // tid. The kernel validates the entry and stack against the target's VMAs.
+    let result = unsafe {
+        raven_rt::sys::syscall6(
+            Syscall::THREAD_CREATE as usize,
+            process.0 as usize,
+            entry,
+            stack_top,
+            0,
+            THREAD_CREATE_EX,
+            &extended as *const ThreadCreateEx as usize,
+        )
+    };
+    Errno::from_ret(result).map(|value| Handle(value as u32))
+}
 
 /// Register `name` and keep the returned scheme-server handle.
 pub fn scheme_register(name: &str) -> Result<Handle, Errno> {

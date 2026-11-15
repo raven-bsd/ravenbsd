@@ -10,7 +10,7 @@ use raven_linux_dispatch::SyscallArgs;
 use super::*;
 
 fn process() -> LinuxProcess {
-    LinuxProcess::new(7, Handle(9), 0x4000, 0x5000, 0x8000, 0x9000)
+    LinuxProcess::new(7, 700, Handle(9), 0x4000, 0x5000, 0x8000, 0x9000)
 }
 
 fn call(nr: usize, a: [usize; 6]) -> SyscallArgs {
@@ -161,13 +161,13 @@ fn an_unknown_number_is_enosys_and_counted() {
     let mut process = process();
     let mut dispatcher = dispatcher();
     assert_eq!(
-        dispatcher.dispatch(&mut process, &call(218, [0; 6])),
+        dispatcher.dispatch(&mut process, &call(110, [0; 6])),
         -(Errno::ENOSYS.0 as isize)
     );
     let hits = dispatcher.unimplemented_hits();
     assert_eq!(hits.len(), 1);
-    assert_eq!(hits[0].0, 218);
-    assert_eq!(hits[0].1, Some("set_tid_address"));
+    assert_eq!(hits[0].0, 110);
+    assert_eq!(hits[0].1, Some("getppid"));
     assert_eq!(hits[0].2, 1);
 }
 
@@ -182,19 +182,26 @@ fn the_stats_name_every_implemented_handler() {
         [
             "arch_prctl",
             "brk",
+            "clone",
             "close",
+            "execve",
             "exit_group",
             "getdents64",
             "getpid",
+            "gettid",
             "lseek",
             "mmap",
             "open",
             "openat",
+            "prctl",
             "read",
             "readlink",
             "readlinkat",
             "rt_sigprocmask",
+            "set_robust_list",
+            "set_tid_address",
             "uname",
+            "wait4",
             "write"
         ]
     );
@@ -310,4 +317,317 @@ fn open_errors_are_reported_without_state() {
         dispatch(&mut process, 3, [3, 0, 0, 0, 0, 0]),
         -(Errno::EBADF.0 as isize)
     );
+}
+
+#[test]
+fn gettid_returns_the_kernel_thread_id() {
+    let mut process = process();
+    assert_eq!(dispatch(&mut process, 186, [0; 6]), 700);
+}
+
+#[test]
+fn set_tid_address_records_the_word_and_returns_the_tid() {
+    let mut process = process();
+    assert_eq!(dispatch(&mut process, 218, [0x2345, 0, 0, 0, 0, 0]), 700);
+    assert_eq!(process.clear_tid, 0x2345);
+    assert_eq!(dispatch(&mut process, 218, [0, 0, 0, 0, 0, 0]), 700);
+    assert_eq!(process.clear_tid, 0);
+}
+
+#[test]
+fn set_robust_list_checks_the_head_size() {
+    let mut process = process();
+    assert_eq!(dispatch(&mut process, 273, [0x2800, 24, 0, 0, 0, 0]), 0);
+    assert_eq!(process.robust_list, 0x2800);
+    assert_eq!(process.robust_list_len, 24);
+    assert_eq!(
+        dispatch(&mut process, 273, [0x2900, 16, 0, 0, 0, 0]),
+        -(Errno::EINVAL.0 as isize)
+    );
+    assert_eq!(process.robust_list, 0x2800);
+}
+
+#[test]
+fn prctl_sets_and_gets_the_task_name() {
+    let mut process = process();
+    process.user_buffer.extend_from_slice(b"clone-fixture\0zz");
+    assert_eq!(
+        dispatch(
+            &mut process,
+            157,
+            [PR_SET_NAME as usize, 0x3000, 0, 0, 0, 0]
+        ),
+        0
+    );
+    assert_eq!(process.comm, b"clone-fixture");
+    assert_eq!(
+        dispatch(
+            &mut process,
+            157,
+            [PR_GET_NAME as usize, 0x3100, 0, 0, 0, 0]
+        ),
+        0
+    );
+    let (address, bytes) = process.pending_write.take().expect("a name copy-out");
+    assert_eq!(address, 0x3100);
+    assert_eq!(bytes.len(), 16);
+    assert_eq!(&bytes[..13], b"clone-fixture");
+    assert_eq!(&bytes[13..], &[0, 0, 0]);
+}
+
+#[test]
+fn prctl_switches_the_process_attributes() {
+    let mut process = process();
+    assert_eq!(
+        dispatch(
+            &mut process,
+            157,
+            [PR_SET_PDEATHSIG as usize, 9, 0, 0, 0, 0]
+        ),
+        0
+    );
+    assert_eq!(process.pdeathsig, 9);
+    assert_eq!(
+        dispatch(
+            &mut process,
+            157,
+            [PR_GET_PDEATHSIG as usize, 0x3200, 0, 0, 0, 0]
+        ),
+        0
+    );
+    assert_eq!(
+        process.pending_write.take().expect("a signal copy-out").1,
+        9u32.to_le_bytes()
+    );
+    assert_eq!(
+        dispatch(&mut process, 157, [PR_GET_DUMPABLE as usize, 0, 0, 0, 0, 0]),
+        1
+    );
+    assert_eq!(
+        dispatch(&mut process, 157, [PR_SET_DUMPABLE as usize, 0, 0, 0, 0, 0]),
+        0
+    );
+    assert_eq!(
+        dispatch(&mut process, 157, [PR_GET_DUMPABLE as usize, 0, 0, 0, 0, 0]),
+        0
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            157,
+            [PR_GET_NO_NEW_PRIVS as usize, 0, 0, 0, 0, 0]
+        ),
+        0
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            157,
+            [PR_SET_NO_NEW_PRIVS as usize, 1, 0, 0, 0, 0]
+        ),
+        0
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            157,
+            [PR_GET_NO_NEW_PRIVS as usize, 0, 0, 0, 0, 0]
+        ),
+        1
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            157,
+            [PR_SET_THP_DISABLE as usize, 1, 0, 0, 0, 0]
+        ),
+        0
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            157,
+            [PR_GET_THP_DISABLE as usize, 0, 0, 0, 0, 0]
+        ),
+        1
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            157,
+            [PR_SET_CHILD_SUBREAPER as usize, 1, 0, 0, 0, 0]
+        ),
+        0
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            157,
+            [PR_GET_CHILD_SUBREAPER as usize, 0x3300, 0, 0, 0, 0]
+        ),
+        0
+    );
+    assert_eq!(
+        process
+            .pending_write
+            .take()
+            .expect("a subreaper copy-out")
+            .1,
+        1u32.to_le_bytes()
+    );
+}
+
+#[test]
+fn prctl_rejects_unknown_options_and_bad_values() {
+    let mut process = process();
+    assert_eq!(
+        dispatch(&mut process, 157, [0x1234, 0, 0, 0, 0, 0]),
+        -(Errno::EINVAL.0 as isize)
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            157,
+            [PR_SET_NO_NEW_PRIVS as usize, 0, 0, 0, 0, 0]
+        ),
+        -(Errno::EINVAL.0 as isize)
+    );
+    assert!(!process.no_new_privs);
+}
+
+#[test]
+fn arch_prctl_rejects_the_gs_operations() {
+    let mut process = process();
+    assert_eq!(
+        dispatch(
+            &mut process,
+            158,
+            [ARCH_SET_GS as usize, 0x7000, 0, 0, 0, 0]
+        ),
+        -(Errno::ENOSYS.0 as isize)
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            158,
+            [ARCH_GET_GS as usize, 0x7000, 0, 0, 0, 0]
+        ),
+        -(Errno::ENOSYS.0 as isize)
+    );
+}
+
+#[test]
+fn clone_validates_flags_and_reports_the_missing_native_frame() {
+    let mut process = process();
+    let thread_flags = clone_flags::CLONE_VM
+        | clone_flags::CLONE_FS
+        | clone_flags::CLONE_FILES
+        | clone_flags::CLONE_SIGHAND
+        | clone_flags::CLONE_THREAD
+        | clone_flags::CLONE_SYSVSEM
+        | clone_flags::CLONE_SETTLS
+        | clone_flags::CLONE_PARENT_SETTID
+        | clone_flags::CLONE_CHILD_CLEARTID;
+    assert_eq!(
+        dispatch(
+            &mut process,
+            56,
+            [thread_flags as usize, 0x7000, 0, 0, 0x7100, 0]
+        ),
+        -(Errno::ENOSYS.0 as isize)
+    );
+    assert_eq!(
+        dispatch(&mut process, 56, [0, 0, 0, 0, 0, 0]),
+        -(Errno::ENOSYS.0 as isize)
+    );
+    // `clone(SIGCHLD, ...)` is the fork-like form: the low byte is a signal, not a flag.
+    assert_eq!(
+        dispatch(&mut process, 56, [17, 0, 0, 0, 0, 0]),
+        -(Errno::ENOSYS.0 as isize)
+    );
+    assert_eq!(
+        dispatch(&mut process, 56, [65, 0, 0, 0, 0, 0]),
+        -(Errno::EINVAL.0 as isize)
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            56,
+            [clone_flags::CLONE_THREAD as usize, 0, 0, 0, 0, 0]
+        ),
+        -(Errno::EINVAL.0 as isize)
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            56,
+            [clone_flags::CLONE_THREAD as usize, 0x7004, 0, 0, 0, 0]
+        ),
+        -(Errno::EINVAL.0 as isize)
+    );
+    assert_eq!(
+        dispatch(&mut process, 56, [0xdead_beef, 0, 0, 0, 0, 0]),
+        -(Errno::EINVAL.0 as isize)
+    );
+}
+
+#[test]
+fn execve_queues_the_path_and_argument_arrays() {
+    let mut process = process();
+    set_path(&mut process, b"/exec");
+    assert_eq!(
+        dispatch(&mut process, 59, [0x1000, 0x2000, 0x3000, 0, 0, 0]),
+        0
+    );
+    let request = process.pending_exec.take().expect("a queued exec");
+    assert_eq!(request.path, b"/exec");
+    assert_eq!(request.argv, 0x2000);
+    assert_eq!(request.envp, 0x3000);
+
+    set_path(&mut process, b"relative");
+    assert_eq!(
+        dispatch(&mut process, 59, [0x1000, 0, 0, 0, 0, 0]),
+        -(Errno::ENOENT.0 as isize)
+    );
+    process.user_buffer.clear();
+    process.user_buffer.push(0);
+    assert_eq!(
+        dispatch(&mut process, 59, [0x1000, 0, 0, 0, 0, 0]),
+        -(Errno::ENOENT.0 as isize)
+    );
+    process.user_buffer.clear();
+    process.user_buffer.resize(128, b'a');
+    assert_eq!(
+        dispatch(&mut process, 59, [0x1000, 0, 0, 0, 0, 0]),
+        -(Errno::ENAMETOOLONG.0 as isize)
+    );
+    assert!(process.pending_exec.is_none());
+}
+
+#[test]
+fn wait4_validates_options_and_reports_no_children() {
+    let mut process = process();
+    assert_eq!(
+        dispatch(&mut process, 61, [usize::MAX, 0, 0, 0, 0, 0]),
+        -(Errno::ECHILD.0 as isize)
+    );
+    assert_eq!(
+        dispatch(&mut process, 61, [usize::MAX, 0, WNOHANG as usize, 0, 0, 0]),
+        -(Errno::ECHILD.0 as isize)
+    );
+    assert_eq!(
+        dispatch(&mut process, 61, [usize::MAX, 0, 2, 0, 0, 0]),
+        -(Errno::EINVAL.0 as isize)
+    );
+}
+
+#[test]
+fn exit_group_queues_the_clear_tid_word() {
+    let mut process = process();
+    process.clear_tid = 0x3400;
+    assert_eq!(dispatch(&mut process, 231, [3, 0, 0, 0, 0, 0]), 0);
+    assert_eq!(process.exit, Some(3));
+    let (address, bytes) = process.pending_write.take().expect("a clear-tid write");
+    assert_eq!(address, 0x3400);
+    assert_eq!(bytes, 0u32.to_le_bytes());
 }
