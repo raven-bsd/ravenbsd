@@ -12,4 +12,5 @@ use core::ffi::c_void;
 #[cfg_attr(feature = "oracle-m-ld", link(name = "oracle_m_ld", kind = "dylib"))]
 unsafe extern "C" {
     pub fn oracle_rl_expl(input: *const c_void, output: *mut c_void);
+    pub fn oracle_rl_expm1l(input: *const c_void, output: *mut c_void);
 }
