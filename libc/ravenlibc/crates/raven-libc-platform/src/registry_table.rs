@@ -70,7 +70,7 @@ pub const FUNCTIONS: &[Entry] = &[
     Entry { name: "eaccess", primitive: "stat+mode bits", status: FunctionStatus::Partial, gap: "PG-28", owner: "dave", donor: "netbsd:lib/libc/sys/access.2", external: false },
     Entry { name: "euidaccess", primitive: "stat+mode bits", status: FunctionStatus::Partial, gap: "PG-28", owner: "dave", donor: "netbsd:lib/libc/sys/access.2", external: false },
     Entry { name: "chmod", primitive: "CALL(OP_CHMOD)", status: FunctionStatus::Exists, gap: "", owner: "dave", donor: "userland/rt/src/fs.rs:283", external: false },
-    Entry { name: "fchmod", primitive: "CALL(OP_CHMOD*)", status: FunctionStatus::Tbd, gap: "PG-21", owner: "dave", donor: "musl:src/stat/fchmodat.c", external: false },
+    Entry { name: "fchmod", primitive: "CALL(OP_CHMOD) handle", status: FunctionStatus::Exists, gap: "", owner: "dave", donor: "musl:src/stat/fchmodat.c", external: false },
     Entry { name: "fchmodat", primitive: "CALL(OP_CHMOD)", status: FunctionStatus::Partial, gap: "PG-21", owner: "dave", donor: "musl:src/stat/fchmodat.c", external: false },
     Entry { name: "lchmod", primitive: "CALL(OP_CHMOD*)", status: FunctionStatus::Partial, gap: "PG-21", owner: "dave", donor: "musl:src/stat/fchmodat.c", external: false },
     Entry { name: "chown", primitive: "CALL(OP_CHOWN*)", status: FunctionStatus::Tbd, gap: "PG-31", owner: "dave", donor: "netbsd:lib/libc/sys/chown.2", external: false },

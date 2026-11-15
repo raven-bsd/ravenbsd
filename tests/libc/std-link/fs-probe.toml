@@ -27,6 +27,9 @@ regex = '^fs-probe: write\+fsync ok$'
 regex = '^fs-probe: metadata\+rename ok$'
 
 [[expect]]
+regex = '^fs-probe: fchmod ok$'
+
+[[expect]]
 regex = '^fs-probe: isatty=(true|false)$'
 
 [[expect]]

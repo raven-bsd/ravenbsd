@@ -8,19 +8,10 @@
 
 use std::fs;
 use std::io::{IsTerminal, Write};
-
-unsafe extern "C" {
-    fn fchmod(fd: i32, mode: u32) -> i32;
-}
+use std::os::unix::fs::PermissionsExt;
 
 fn main() {
     println!("fs-probe: start");
-
-    // `std::fs::File::set_permissions` is the std path that references
-    // `fchmod`; take its address so the symbol is linked without calling the
-    // PG-21 platform stub.
-    let _fchmod: unsafe extern "C" fn(i32, u32) -> i32 = fchmod;
-    let _ = std::hint::black_box(_fchmod);
 
     let root = "/tmp/c64e-fs";
     fs::create_dir(root).expect("create_dir");
@@ -41,6 +32,18 @@ fn main() {
     let metadata = fs::metadata(renamed).expect("metadata after rename");
     assert_eq!(metadata.len(), 5);
     println!("fs-probe: metadata+rename ok");
+
+    let handle = fs::File::open(renamed).expect("open for fchmod");
+    handle
+        .set_permissions(fs::Permissions::from_mode(0o600))
+        .expect("fchmod");
+    let mode = fs::metadata(renamed)
+        .expect("metadata after fchmod")
+        .permissions()
+        .mode()
+        & 0o777;
+    assert_eq!(mode, 0o600);
+    println!("fs-probe: fchmod ok");
 
     println!("fs-probe: isatty={}", std::io::stdout().is_terminal());
     println!("fs-probe: done");

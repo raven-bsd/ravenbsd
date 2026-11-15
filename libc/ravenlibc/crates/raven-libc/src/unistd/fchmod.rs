@@ -8,8 +8,8 @@ use raven_libc_abi::types::mode_t;
 
 /// Change the permission bits of the open file `fd`.
 ///
-/// The platform entry is `ENOSYS` until PG-21 supplies `OP_CHMOD` on an open
-/// handle; the wrapper does not substitute a path-based chmod.
+/// The platform sends `OP_CHMOD` with the handle-relative `"."` path, so the
+/// operation applies to the open file rather than a path remembered by libc.
 ///
 /// # Safety
 /// `fd` is a descriptor owned by the caller; no pointer is dereferenced.
