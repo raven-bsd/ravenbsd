@@ -46,6 +46,7 @@ fn thread_extensions_are_frozen() {
     assert_eq!(THREAD_EXIT_EX, 0x25);
     assert_eq!(ROBUST_LIST_SET, 0x26);
     assert_eq!(HANDLE_COPY, 0x54);
+    assert_eq!(HANDLE_TRANSFER_FILE, 0x55);
     assert_eq!(THREAD_CREATE_EX, 1);
     assert_eq!(core::mem::size_of::<ThreadCreateEx>(), 24);
     let extended = ThreadCreateEx {

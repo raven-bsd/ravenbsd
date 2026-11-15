@@ -226,6 +226,16 @@ pub const ROBUST_LIST_SET: usize = 0x26;
 /// caller and the destination process. Raw constant; not a `Syscall` variant.
 pub const HANDLE_COPY: usize = 0x54;
 
+/// `handle_transfer_file(dest_file, handle, rights_mask) -> Handle`.
+///
+/// Installs a reduced duplicate of `handle` in the scheme server that owns
+/// `dest_file` and returns the destination-valid handle, so a client can send a
+/// shared PCM ring to a server without holding the server's process handle. The
+/// file must be a scheme file the caller can read, the source must be
+/// transferable, and the destination rights are the source rights intersected
+/// with `rights_mask`. Raw constant; not a `Syscall` variant.
+pub const HANDLE_TRANSFER_FILE: usize = 0x55;
+
 /// `thread_exit_ex(code: i32, clear_addr: usize, unmap_addr: usize, unmap_len: usize) -> !`.
 ///
 /// Stores zero to `clear_addr`, unmaps `[unmap_addr, unmap_addr + unmap_len)`,

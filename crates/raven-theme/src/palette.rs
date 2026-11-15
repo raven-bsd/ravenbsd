@@ -282,6 +282,73 @@ impl Palette {
             .map(|role| (role, self.get(role)))
             .collect()
     }
+
+    /// The compact environment spelling: 11 `#rrggbb` values in [`Role::ALL`] order.
+    #[must_use]
+    pub fn to_env_spec(&self) -> String {
+        let mut spec = String::new();
+        for role in Role::ALL {
+            if !spec.is_empty() {
+                spec.push(':');
+            }
+            spec.push_str(&self.get(role).to_hex());
+        }
+        spec
+    }
+
+    /// Parse the compact environment spelling.
+    ///
+    /// Exactly 11 non-empty values are required; each value is six hex digits with an optional
+    /// leading `#`. A wrong count or any invalid value returns `None`.
+    #[must_use]
+    pub fn from_env_spec(spec: &str) -> Option<Self> {
+        let mut parts = spec.split(':');
+        let mut palette = Self::default();
+        for role in Role::ALL {
+            let value = parts.next()?;
+            if value.is_empty() {
+                return None;
+            }
+            palette.set(role, Rgb::parse_hex(value)?);
+        }
+        if parts.next().is_some() {
+            return None;
+        }
+        Some(palette)
+    }
+
+    /// Read `RAVEN_PALETTE` on a std build.
+    ///
+    /// A no_std caller has no process-environment API; it passes the value to
+    /// [`Palette::from_env_spec`] instead. Invalid or absent values return `None` silently.
+    #[must_use]
+    pub fn from_env() -> Option<Self> {
+        #[cfg(feature = "std")]
+        {
+            let spec = std::env::var("RAVEN_PALETTE").ok()?;
+            Self::from_env_spec(&spec)
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            None
+        }
+    }
+
+    /// The runtime palette: `RAVEN_PALETTE` on a std build, else the compiled default.
+    ///
+    /// no_std callers use [`Palette::from_env_spec`] with the value obtained from their argument
+    /// view and fall back to this method's default.
+    #[must_use]
+    pub fn current() -> Self {
+        #[cfg(feature = "std")]
+        {
+            Self::from_env().unwrap_or_default()
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            Self::default()
+        }
+    }
 }
 
 impl Default for Palette {

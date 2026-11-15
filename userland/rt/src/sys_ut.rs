@@ -75,6 +75,22 @@ fn transfer_rejects_none_handles_and_empty_rights() {
 }
 
 #[test]
+fn transfer_file_rejects_none_handles_and_empty_rights() {
+    assert_eq!(
+        handle_transfer_file(Handle::NONE, Handle(1), Rights::READ),
+        Err(Errno::EINVAL)
+    );
+    assert_eq!(
+        handle_transfer_file(Handle(1), Handle::NONE, Rights::READ),
+        Err(Errno::EINVAL)
+    );
+    assert_eq!(
+        handle_transfer_file(Handle(1), Handle(2), Rights::NONE),
+        Err(Errno::EINVAL)
+    );
+}
+
+#[test]
 fn transfer_validation_accepts_real_arguments() {
     assert_eq!(
         validate_transfer(

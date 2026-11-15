@@ -5,9 +5,10 @@
 //!
 //! The core is `no_std` + `alloc` and has no global state; `cargo build --no-default-features`
 //! keeps it that way. The default `config` feature adds the std-only TOML loader for the
-//! `raven` client; base tools keep the compiled palette.
+//! `raven` client; base tools keep the compiled palette. The `std` feature adds the environment
+//! reader used by host tools; no_std callers pass `RAVEN_PALETTE` to `from_env_spec`.
 
-#![cfg_attr(not(feature = "config"), no_std)]
+#![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
 
 extern crate alloc;

@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P2a process identity: /init forks a child, the child checks inherited pid/ppid/pgid/sid and
+# credentials, exercises the bounded setpgid/setsid/setcred rules, and the parent prints one
+# deterministic success line.
+
+name = "proc-identity"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/proc-identity/build.sh"]
+initfs = "build/fixtures/proc-identity/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^proc-identity: ok pid=[0-9]+ ppid=1 pgid=1 sid=1$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|proc-identity: fail'

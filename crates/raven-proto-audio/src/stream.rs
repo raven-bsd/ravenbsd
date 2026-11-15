@@ -125,8 +125,9 @@ pub enum Call {
     },
     /// Attach a shared PCM ring.
     ///
-    /// `handle` is the destination-valid handle produced by `HANDLE_TRANSFER` for the memory
-    /// object; it is never a pointer. `period_frames * period_count` is the ring capacity in
+    /// `handle` is the destination-valid handle produced by `HANDLE_TRANSFER_FILE` (the
+    /// `raven_scheme::Client::transfer_to_server` wrapper) for the memory object; it is never a
+    /// pointer. `period_frames * period_count` is the ring capacity in
     /// frames.
     SetBuffer {
         /// Destination-valid handle of the attached memory object.

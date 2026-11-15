@@ -82,6 +82,18 @@ impl<K: Kernel> Client<K> {
         self.kernel.call(file, request, response)
     }
 
+    /// Install a reduced duplicate of `source` in the scheme server behind `file`.
+    ///
+    /// The returned handle is valid in the server's table, not the caller's.
+    pub fn transfer_to_server(
+        &self,
+        file: Handle,
+        source: Handle,
+        rights: u32,
+    ) -> Result<Handle, Errno> {
+        self.kernel.transfer_to_server(file, source, rights)
+    }
+
     /// Encode and send a [`CallRequest`].
     pub fn call_typed(
         &self,

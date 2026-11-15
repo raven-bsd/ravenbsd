@@ -8,7 +8,7 @@
 //! a running kernel.
 
 use raven_abi::errno::Errno;
-use raven_abi::types::Handle;
+use raven_abi::types::{Handle, Rights};
 use raven_ipc::protocol::{self, Attachment, MAX_ATTACHMENTS, Opcode, PACKET_SIZE, REPLY_HANDLE};
 
 use crate::sys;
@@ -64,6 +64,22 @@ pub trait Kernel: Clone {
     /// Send a typed `CALL` request and receive the response.
     fn call(&self, file: Handle, request: &[u8], response: &mut [u8]) -> Result<usize, Errno> {
         let _ = (file, request, response);
+        Err(Errno::ENOSYS)
+    }
+
+    /// Install a reduced duplicate of `source` in the scheme server behind `file`.
+    ///
+    /// Returns the destination-valid handle the server can use in a later request
+    /// (for example a PCM ring attached with `SET_BUFFER`). The server receives
+    /// `rights` intersected with the source rights; a kernel without the extension
+    /// returns `ENOSYS`.
+    fn transfer_to_server(
+        &self,
+        file: Handle,
+        source: Handle,
+        rights: u32,
+    ) -> Result<Handle, Errno> {
+        let _ = (file, source, rights);
         Err(Errno::ENOSYS)
     }
 
@@ -146,6 +162,15 @@ impl Kernel for RtKernel {
 
     fn call(&self, file: Handle, request: &[u8], response: &mut [u8]) -> Result<usize, Errno> {
         sys::call(file, request, response)
+    }
+
+    fn transfer_to_server(
+        &self,
+        file: Handle,
+        source: Handle,
+        rights: u32,
+    ) -> Result<Handle, Errno> {
+        sys::handle_transfer_file(file, source, Rights(rights))
     }
 
     fn recv(&self, packet: &mut [u8]) -> Result<Handle, Errno> {

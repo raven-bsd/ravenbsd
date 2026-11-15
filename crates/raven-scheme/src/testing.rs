@@ -29,6 +29,7 @@ struct State {
     call_response: Vec<u8>,
     fstat_data: [u8; 64],
     sent_attachments: Vec<(Handle, Vec<u8>, Vec<Attachment>)>,
+    transfers: Vec<(Handle, Handle, u32)>,
     closed: Vec<Handle>,
 }
 
@@ -45,6 +46,7 @@ impl Default for State {
             call_response: Vec::new(),
             fstat_data: [0u8; 64],
             sent_attachments: Vec::new(),
+            transfers: Vec::new(),
             closed: Vec::new(),
         }
     }
@@ -73,6 +75,11 @@ impl FakeKernel {
     /// Queue one encoded server request.
     pub fn push_request(&self, packet: &[u8]) {
         self.state.lock().requests.push_back(packet.to_vec());
+    }
+
+    /// Client-to-server transfers recorded through `transfer_to_server`.
+    pub fn transfers(&self) -> Vec<(Handle, Handle, u32)> {
+        self.state.lock().transfers.clone()
     }
 
     /// Names registered through `SCHEME_REGISTER`.
@@ -174,6 +181,18 @@ impl Kernel for FakeKernel {
         let length = state.call_response.len().min(response.len());
         response[..length].copy_from_slice(&state.call_response[..length]);
         Ok(length)
+    }
+
+    fn transfer_to_server(
+        &self,
+        file: Handle,
+        source: Handle,
+        rights: u32,
+    ) -> Result<Handle, Errno> {
+        let mut state = self.state.lock();
+        state.transfers.push((file, source, rights));
+        state.next_handle = state.next_handle.wrapping_add(1).max(1);
+        Ok(Handle(state.next_handle))
     }
 
     fn recv_timeout(&self, packet: &mut [u8], _timeout_ms: u64) -> Result<Option<Handle>, Errno> {
