@@ -192,5 +192,7 @@ names the source and revision of every numeric fact.
    timeout becomes an infinite loop.
 5. ADMA2 32-bit versus 64-bit and the descriptor-table alignment are UNVERIFIED until the live
    capabilities and the board log confirm them. The table's cache maintenance is S21d's job.
-6. No interrupt, MMIO adapter, DMA engine or `disk:` scheme entry exists yet, so this ticket alone
+6. The transfer layer uses 32-bit block addresses (SDHC/SDXC). A v1 SDSC card reached through the
+   CMD8 fallback would need byte addressing in CMD17/18/24/25; that path is not modelled.
+7. No interrupt, MMIO adapter, DMA engine or `disk:` scheme entry exists yet, so this ticket alone
    cannot boot from the card.
