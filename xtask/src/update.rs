@@ -27,6 +27,10 @@ use crate::profiles::Profile;
 use crate::repo::Workspace;
 
 const FIXTURE_CMDLINE: &str = "console=ttyS0 test-exit=1";
+/// The Pi firmware loads the flat image at this physical address.
+const PI_LOAD: u64 = 0x80000;
+/// The flat kernel image the Pi firmware boots from the FAT root.
+const PI4_KERNEL: &str = "kernel8.img";
 
 /// One root slot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -72,6 +76,7 @@ enum FixtureHealth {
 #[derive(Clone, Debug)]
 struct Options {
     arch: Arch,
+    platform: Platform,
     profile: String,
     image: Option<PathBuf>,
     kernel: Option<PathBuf>,
@@ -87,6 +92,7 @@ impl Default for Options {
     fn default() -> Self {
         Self {
             arch: Arch::X86_64,
+            platform: Platform::Generic,
             profile: String::from("base"),
             image: None,
             kernel: None,
@@ -173,6 +179,10 @@ fn execute(options: &Options) -> Result<()> {
         return build_blank(path);
     }
     if let Some(path) = &options.fixture {
+        ensure!(
+            options.platform == Platform::Generic,
+            "--fixture supports only the generic platform"
+        );
         return build_fixture(options, path);
     }
     let current = std::env::current_dir().context("cannot get the current directory")?;
@@ -187,6 +197,7 @@ fn parse(args: &[String]) -> Result<Option<Options>> {
     }
 
     let mut options = Options::default();
+    let mut profile_set = false;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
@@ -198,12 +209,20 @@ fn parse(args: &[String]) -> Result<Option<Options>> {
                 options.arch =
                     Arch::parse(value).ok_or_else(|| anyhow!("unknown architecture `{value}`"))?;
             }
+            "--platform" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| anyhow!("--platform needs a value"))?;
+                options.platform = Platform::parse(value)?;
+            }
             "--profile" => {
                 index += 1;
                 options.profile = args
                     .get(index)
                     .ok_or_else(|| anyhow!("--profile needs a value"))?
                     .clone();
+                profile_set = true;
             }
             "--image" => {
                 index += 1;
@@ -277,6 +296,13 @@ fn parse(args: &[String]) -> Result<Option<Options>> {
         options.arch != Arch::Riscv64,
         "A/B updates are not supported for riscv64"
     );
+    ensure!(
+        options.platform != Platform::Pi4 || options.arch == Arch::Aarch64,
+        "the pi4 platform requires --arch aarch64"
+    );
+    if !profile_set && options.platform == Platform::Pi4 {
+        options.profile = String::from("pi4");
+    }
     Ok(Some(options))
 }
 
@@ -288,7 +314,8 @@ fn print_help() {
          \n\
          options:\n\
            --arch <x86_64|aarch64>   architecture (default x86_64)\n\
-           --profile <name>          build profile (default base)\n\
+           --platform <generic|pi4>  image layout (default generic)\n\
+           --profile <name>          build profile (default base; pi4 for --platform pi4)\n\
            --image <path>            disk image to update or create\n\
            --kernel <path>           kernel for the inactive slot\n\
            --initfs <path>           initfs for the inactive slot\n\
@@ -324,9 +351,22 @@ fn update_image(root: &Path, options: &Options) -> Result<()> {
                 output: Some(&image_path),
                 ..Overrides::default()
             },
-            Platform::Generic,
+            options.platform,
         )?;
         ensure!(code == 0, "base image build failed with exit code {code}");
+    }
+
+    let mut esp = read_esp(&image_path)?;
+    let layout = detect_layout(&mut esp)?;
+    ensure!(
+        layout == options.platform,
+        "image {} is a {} image; pass --platform {}",
+        image_path.display(),
+        platform_name(layout),
+        platform_name(options.platform)
+    );
+    if layout == Platform::Pi4 {
+        return update_pi4_image(root, options, &image_path, esp);
     }
 
     let workspace = Workspace::load(root)?;
@@ -336,7 +376,6 @@ fn update_image(root: &Path, options: &Options) -> Result<()> {
     let loader = fs::read(&loader_path_on_disk)
         .with_context(|| format!("cannot read {}", loader_path_on_disk.display()))?;
 
-    let mut esp = read_esp(&image_path)?;
     let meta = read_meta(&mut esp, &options.profile, root)?;
     let legacy_kernel = fat_read(&mut esp, "raven/kernel.elf")?
         .ok_or_else(|| anyhow!("image has no raven/kernel.elf"))?;
@@ -406,6 +445,19 @@ fn update_image(root: &Path, options: &Options) -> Result<()> {
     builder.add_file("raven/boot.toml", next_meta.render().as_bytes())?;
     let esp = builder.finish()?;
 
+    let gpt = two_root_gpt()?;
+    image::write_image(&image_path, &gpt, &esp)?;
+    println!("{}", image_path.display());
+    println!(
+        "update: confirmed slot {} trial slot {} attempts {}",
+        next_meta.slot.as_str(),
+        target.as_str(),
+        next_meta.attempts
+    );
+    Ok(())
+}
+
+fn two_root_gpt() -> Result<GptLayout> {
     let root_start = image::ROOT_START_LBA;
     let root_sectors = image::ROOT_SECTORS;
     let second_start = root_start + root_sectors;
@@ -414,7 +466,7 @@ fn update_image(root: &Path, options: &Options) -> Result<()> {
         second_end < image::TOTAL_SECTORS,
         "the image has no room for two root slots"
     );
-    let gpt = GptLayout::new(
+    GptLayout::new(
         image::TOTAL_SECTORS,
         vec![
             Partition::new(
@@ -433,16 +485,226 @@ fn update_image(root: &Path, options: &Options) -> Result<()> {
             ),
             Partition::new(TYPE_LINUX_DATA, 2, second_start, second_end, "ROOT-B"),
         ],
-    )?;
-    image::write_image(&image_path, &gpt, &esp)?;
+    )
+}
+
+fn detect_layout(esp: &mut [u8]) -> Result<Platform> {
+    if fat_read(esp, PI4_KERNEL)?.is_some() {
+        return Ok(Platform::Pi4);
+    }
+    if fat_read(esp, "raven/kernel.elf")?.is_some() {
+        return Ok(Platform::Generic);
+    }
+    bail!("image has neither {PI4_KERNEL} nor raven/kernel.elf")
+}
+
+const fn platform_name(platform: Platform) -> &'static str {
+    match platform {
+        Platform::Generic => "generic",
+        Platform::Pi4 => "pi4",
+    }
+}
+
+/// Install the inactive slot on a Pi 4 image.
+///
+/// The Pi firmware always boots `kernel8.img` from the FAT root, so the planner stages the A/B
+/// metadata (`raven/boot.toml` and `raven/slot-*/kernel8.img`) and makes the root image the trial.
+/// A Pi-side consumer of the metadata is not part of this ticket; board rollback is UNVERIFIED.
+fn update_pi4_image(
+    root: &Path,
+    options: &Options,
+    image_path: &Path,
+    mut esp: Vec<u8>,
+) -> Result<()> {
+    ensure!(
+        options.arch == Arch::Aarch64,
+        "the pi4 platform requires --arch aarch64"
+    );
+    let meta = read_meta(&mut esp, &options.profile, root)?;
+    let legacy =
+        fat_read(&mut esp, PI4_KERNEL)?.ok_or_else(|| anyhow!("Pi 4 image has no {PI4_KERNEL}"))?;
+    let mut slot_a =
+        fat_read(&mut esp, "raven/slot-a/kernel8.img")?.unwrap_or_else(|| legacy.clone());
+    let mut slot_b =
+        fat_read(&mut esp, "raven/slot-b/kernel8.img")?.unwrap_or_else(|| legacy.clone());
+
+    let new_initfs = match &options.initfs {
+        Some(path) => fs::read(path).with_context(|| format!("cannot read {}", path.display()))?,
+        None => build_latest_files(root, options.arch, &options.profile)?.1,
+    };
+
+    let target = target_slot(&meta, options.slot);
+    ensure!(
+        target != meta.slot,
+        "the inactive slot must differ from the confirmed slot"
+    );
+    let (trial, token) = pi4_trial_image(root, options, &new_initfs, target)?;
+    match target {
+        Slot::A => slot_a = trial.clone(),
+        Slot::B => slot_b = trial.clone(),
+    }
+
+    let mut next_meta = meta;
+    next_meta.trial = Some(target);
+    next_meta.trial_token = Some(token);
+    next_meta.attempts = options.attempts;
+    next_meta.has_slot_config = true;
+
+    let esp = stage_pi4_esp(&mut esp, &next_meta, &slot_a, &slot_b, &trial)?;
+    let gpt = two_root_gpt()?;
+    image::write_image(image_path, &gpt, &esp)?;
     println!("{}", image_path.display());
     println!(
-        "update: confirmed slot {} trial slot {} attempts {}",
+        "update: platform pi4 confirmed slot {} trial slot {} attempts {}",
         next_meta.slot.as_str(),
         target.as_str(),
         next_meta.attempts
     );
     Ok(())
+}
+
+/// Copy every file from the Pi boot partition except the planner-owned paths.
+fn copy_fat_tree<T: fatfs::ReadWriteSeek>(
+    dir: &fatfs::Dir<'_, T>,
+    prefix: &str,
+    builder: &mut FatImageBuilder,
+    skip: &dyn Fn(&str) -> bool,
+) -> Result<()> {
+    for entry in dir.iter() {
+        let entry = entry.context("cannot list a Pi 4 boot file")?;
+        let name = entry.file_name();
+        if name == "." || name == ".." {
+            continue;
+        }
+        let path = if prefix.is_empty() {
+            name
+        } else {
+            format!("{prefix}/{name}")
+        };
+        if skip(&path) {
+            continue;
+        }
+        if entry.is_dir() {
+            builder.add_dir(&path)?;
+            copy_fat_tree(&entry.to_dir(), &path, builder, skip)?;
+        } else if entry.is_file() {
+            let mut file = entry.to_file();
+            let mut data = Vec::new();
+            file.read_to_end(&mut data)
+                .with_context(|| format!("cannot read {path}"))?;
+            builder.add_file(&path, &data)?;
+        }
+    }
+    Ok(())
+}
+
+/// Rebuild the Pi boot partition with the preserved firmware files and the new slots.
+fn stage_pi4_esp(
+    esp: &mut [u8],
+    next_meta: &BootMeta,
+    slot_a: &[u8],
+    slot_b: &[u8],
+    trial: &[u8],
+) -> Result<Vec<u8>> {
+    let mut builder = FatImageBuilder::new(usize::try_from(image::ESP_SECTORS * SECTOR_SIZE)?)?
+        .with_epoch(image::source_date_epoch());
+    {
+        let filesystem = FatFileSystem::new(Cursor::new(esp), FsOptions::new())
+            .context("cannot read the Pi 4 boot partition")?;
+        let root_dir = filesystem.root_dir();
+        copy_fat_tree(&root_dir, "", &mut builder, &|path| {
+            path == "raven" || path == PI4_KERNEL
+        })?;
+    }
+    for dir in ["raven", "raven/slot-a", "raven/slot-b"] {
+        builder.add_dir(dir)?;
+    }
+    builder.add_file("raven/boot.toml", next_meta.render().as_bytes())?;
+    builder.add_file("raven/slot-a/kernel8.img", slot_a)?;
+    builder.add_file("raven/slot-b/kernel8.img", slot_b)?;
+    builder.add_file(PI4_KERNEL, trial)?;
+    builder.finish()
+}
+
+/// Build the Pi 4 trial image through the normal Pi image builder and inject the health record.
+///
+/// The builder owns the Pi kernel build (`RAVEN_PI4=1`) and the flat `kernel8.img` layout; the
+/// planner only replaces the trailing initfs with the health-injected one.
+fn pi4_trial_image(
+    root: &Path,
+    options: &Options,
+    initfs: &[u8],
+    target: Slot,
+) -> Result<(Vec<u8>, u32)> {
+    let temp = root.join("build/update");
+    fs::create_dir_all(&temp).with_context(|| format!("cannot create {}", temp.display()))?;
+    let initfs_path = temp.join("pi4-trial-initfs.img");
+    fs::write(&initfs_path, initfs)
+        .with_context(|| format!("cannot write {}", initfs_path.display()))?;
+    let output = temp.join("pi4-trial.img");
+    let kernel = match &options.kernel {
+        Some(path) => {
+            let path = absolute_input(path)?;
+            ensure_pi4_kernel(&fs::read(&path)?)?;
+            Some(path)
+        }
+        None => None,
+    };
+    let code = crate::pi::build(
+        root,
+        Arch::Aarch64,
+        &options.profile,
+        None,
+        Some(&initfs_path),
+        kernel.as_deref(),
+        Some(&output),
+    )?;
+    ensure!(
+        code == 0,
+        "Pi 4 trial image build failed with exit code {code}"
+    );
+    let mut esp = read_esp(&output)?;
+    let flat = fat_read(&mut esp, PI4_KERNEL)?
+        .ok_or_else(|| anyhow!("Pi 4 trial image has no {PI4_KERNEL}"))?;
+    pi4_trial_from_flat(flat, initfs, target)
+}
+
+/// Anchor a CLI path at the current directory, matching the generic planner's reads.
+fn absolute_input(path: &Path) -> Result<PathBuf> {
+    if path.is_absolute() {
+        Ok(path.to_path_buf())
+    } else {
+        Ok(std::env::current_dir()
+            .context("cannot get the current directory")?
+            .join(path))
+    }
+}
+
+/// A Pi 4 kernel ELF enters at the firmware load address, unlike the UEFI aarch64 kernel.
+fn ensure_pi4_kernel(elf: &[u8]) -> Result<()> {
+    ensure!(elf.len() >= 32, "kernel ELF is shorter than the header");
+    ensure!(&elf[..4] == b"\x7fELF", "kernel is not an ELF file");
+    let mut entry = [0u8; 8];
+    entry.copy_from_slice(&elf[24..32]);
+    let entry = u64::from_le_bytes(entry);
+    ensure!(
+        entry == PI_LOAD,
+        "kernel ELF entry {entry:#x} is not the Pi 4 load address {PI_LOAD:#x}; build it with RAVEN_PI4=1"
+    );
+    Ok(())
+}
+
+/// Replace the appended initfs with the health-injected one and derive the trial token.
+fn pi4_trial_from_flat(flat: Vec<u8>, initfs: &[u8], target: Slot) -> Result<(Vec<u8>, u32)> {
+    ensure!(
+        flat.ends_with(initfs),
+        "Pi 4 trial image does not carry the requested initfs"
+    );
+    let split = flat.len() - initfs.len();
+    let token = token_for(&flat[..split], initfs);
+    let mut trial = flat[..split].to_vec();
+    trial.extend_from_slice(&inject_health(initfs, target, token)?);
+    Ok((trial, token))
 }
 
 fn build_blank(output: &Path) -> Result<()> {
