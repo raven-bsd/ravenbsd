@@ -238,6 +238,7 @@ fn adhoc_build_derives_exports_from_nm() {
         opt: vec!["O2".to_string()],
         defines: Vec::new(),
         include: Vec::new(),
+        aliases: Default::default(),
         flags: Vec::new(),
         source: vec![Source {
             donor: "fixture".to_string(),

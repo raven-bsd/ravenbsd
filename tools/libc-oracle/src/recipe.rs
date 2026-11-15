@@ -8,7 +8,7 @@
 //! be relative `.c` files, and compiler flags are limited to a hand-written whitelist.
 //! `defaults.toml` lives next to the `recipes` directory and holds the shared macro definitions.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Component, Path};
 
@@ -55,6 +55,12 @@ pub(crate) struct Recipe {
     /// Extra include directories (`donor:<donor>/<dir>` or `shim:<dir>`).
     #[serde(default)]
     pub(crate) include: Vec<String>,
+    /// Include-root aliases: `<name> = <donor:...|shim:...>` adds a symlinked directory
+    /// `<name>` under the recipe build tree and an `-I` that points at it, so a donor header can
+    /// use the layout its build system generates (FreeBSD's `machine/` and `x86/` forwarding
+    /// trees).
+    #[serde(default)]
+    pub(crate) aliases: BTreeMap<String, String>,
     /// Extra whitelisted compiler flags.
     #[serde(default)]
     pub(crate) flags: Vec<String>,
@@ -255,6 +261,14 @@ impl Recipe {
                 bail!("recipe {}: invalid include `{include}`", self.family);
             }
         }
+        for (name, target) in &self.aliases {
+            if !valid_alias_name(name) {
+                bail!("recipe {}: invalid alias name `{name}`", self.family);
+            }
+            if !valid_include(target) {
+                bail!("recipe {}: invalid alias target `{target}`", self.family);
+            }
+        }
         for flag in &self.flags {
             if !allowed_flag(flag) {
                 bail!("recipe {}: flag `{flag}` is not whitelisted", self.family);
@@ -329,6 +343,15 @@ fn valid_relative_dir(dir: &str) -> bool {
         && Path::new(dir)
             .components()
             .all(|component| matches!(component, Component::Normal(_)))
+}
+
+/// An alias name is one normal path component (it becomes a directory entry).
+fn valid_alias_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.starts_with('.')
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
 fn valid_include(include: &str) -> bool {
