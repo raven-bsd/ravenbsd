@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.files]]
+src = "profiles/hw-sound.d/devd.manifest"
+path = "/etc/services.d/devd.toml"
+
+[[initfs.files]]
+src = "profiles/hw-sound.d/drivers.conf"
+path = "/etc/drivers.toml"
+
+[[initfs.files]]
+src = "profiles/hw-sound.d/audiod.manifest"
+path = "/etc/services.d/audiod.toml"
+
+[[initfs.files]]
+src = "profiles/hw-sound.d/hw-sound-client.manifest"
+path = "/etc/services.d/hw-sound-client.toml"
+
+[[initfs.files]]
+src = "build/fixtures/hw-sound/client"
+path = "/bin/hw-sound-client"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/x86_64/user/hda-driver"
+path = "/sbin/hda-driver"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/fixtures/audio-tools/tone440.wav"
+path = "/etc/tone440.wav"
+mode = 0o644
+generated = true

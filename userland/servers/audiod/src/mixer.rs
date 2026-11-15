@@ -247,12 +247,15 @@ pub trait DeviceSink {
     fn position_frames(&self) -> u64;
     /// Periods the device could not fill.
     fn underruns(&self) -> u32;
+    /// The mixer has no running stream; stop the device clock.
+    fn idle(&mut self) {}
 }
 
 /// The `audio:out0` device state.
 pub struct Mixer {
     streams: BTreeMap<u64, Stream>,
     next_id: u64,
+    auto_pump: bool,
 }
 
 impl Default for Mixer {
@@ -268,7 +271,22 @@ impl Mixer {
         Self {
             streams: BTreeMap::new(),
             next_id: 1,
+            auto_pump: true,
         }
+    }
+
+    /// Enable or disable the null-sink pull-on-write behaviour.
+    ///
+    /// The null sink pulls a period whenever a producer writes; a real device sink (the HDA pump
+    /// thread) is the clock instead, so the write path must leave the samples buffered.
+    pub fn set_auto_pump(&mut self, enabled: bool) {
+        self.auto_pump = enabled;
+    }
+
+    /// Whether writes pull a null-sink period.
+    #[must_use]
+    pub fn auto_pump(&self) -> bool {
+        self.auto_pump
     }
 
     /// Open a stream on the null sink.
@@ -428,7 +446,9 @@ impl Mixer {
                 stream.state = StreamState::Running;
                 if !has_ring {
                     stream.position_frames = 0;
-                    self.pump();
+                    if self.auto_pump {
+                        self.pump();
+                    }
                 }
                 Ok(None)
             }
@@ -441,7 +461,7 @@ impl Mixer {
                 let stream = self.streams.get_mut(&id).ok_or(Errno::EBADF)?;
                 let has_ring = stream.ring.is_some();
                 stream.state = StreamState::Draining;
-                if !has_ring {
+                if !has_ring && self.auto_pump {
                     self.pump();
                 }
                 Ok(None)
@@ -559,5 +579,10 @@ impl Mixer {
             }
         }
         periods
+    }
+
+    /// Pull null-sink periods only when no real device sink owns the clock.
+    pub fn pump_if_null(&mut self) -> u32 {
+        if self.auto_pump { self.pump() } else { 0 }
     }
 }

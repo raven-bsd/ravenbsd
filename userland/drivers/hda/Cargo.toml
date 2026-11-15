@@ -12,5 +12,13 @@ rust-version.workspace = true
 
 [dependencies]
 
+[target.'cfg(target_os = "none")'.dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-driver = { path = "../../../crates/raven-driver" }
+raven-proto-audio = { path = "../../../crates/raven-proto-audio" }
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-rt = { path = "../../rt", features = ["alloc"] }
+raven-scheme = { path = "../../../crates/raven-scheme" }
+
 [lints]
 workspace = true

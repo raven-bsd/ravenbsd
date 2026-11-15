@@ -98,6 +98,8 @@ pub const ICS_ICB: u16 = 1 << 0;
 pub const ICS_IRV: u16 = 1 << 1;
 /// SD control stream run.
 pub const SDCTL_RUN: u32 = 1 << 1;
+/// SD control stream reset.
+pub const SDCTL_SRST: u32 = 1 << 0;
 /// SD control interrupt on completion.
 pub const SDCTL_IOC: u32 = 1 << 2;
 /// SD control stream number shift.
@@ -130,6 +132,95 @@ pub const fn cmd4(codec: u8, node: u8, verb: u16, payload: u16) -> u32 {
 #[must_use]
 pub const fn format_48k(channels: u8) -> u16 {
     BASE_48K | ((BITS_16 & 0x7) << 4) | ((channels.saturating_sub(1) as u16) & 0x0f)
+}
+
+/// QEMU `intel-hda` (ICH6) vendor id.
+pub const QEMU_HDA_VENDOR: u16 = 0x8086;
+/// QEMU `intel-hda` (ICH6) device id.
+pub const QEMU_HDA_DEVICE: u16 = 0x2668;
+/// PCI base class for a multimedia device.
+pub const PCI_CLASS_MULTIMEDIA: u8 = 0x04;
+/// PCI subclass for an audio device (HDA is class 0x0403).
+pub const PCI_SUBCLASS_AUDIO: u8 = 0x03;
+/// Widget type value of an audio output converter.
+pub const WIDGET_AUDIO_OUTPUT: u8 = 0x0;
+/// Widget type value of a pin complex.
+pub const WIDGET_PIN_COMPLEX: u8 = 0x4;
+
+/// Widget type from a `GET_PARAMETER` capabilities word (bits 23:20).
+#[must_use]
+pub const fn widget_type(capabilities: u32) -> u8 {
+    ((capabilities >> 20) & 0x0f) as u8
+}
+
+/// Whether the widget has an output amplifier (capabilities bit 2).
+#[must_use]
+pub const fn widget_has_output_amp(capabilities: u32) -> bool {
+    capabilities & (1 << 2) != 0
+}
+
+/// Whether the widget has an input amplifier (capabilities bit 1).
+#[must_use]
+pub const fn widget_has_input_amp(capabilities: u32) -> bool {
+    capabilities & (1 << 1) != 0
+}
+
+/// Whether a pin's default configuration names an output device.
+///
+/// The default-device field is bits 23:20; values 0..=6 are line out, speaker, headphone,
+/// CD, S/PDIF, digital other out and modem line side.
+#[must_use]
+pub const fn config_is_output(config_default: u32) -> bool {
+    ((config_default >> 20) & 0x0f) <= 6
+}
+
+/// Build a stream-descriptor control word.
+///
+/// `stream_tag` occupies bits 23:20, `ioc` is bit 2 and `run` is bit 1.
+#[must_use]
+pub const fn stream_control(stream_tag: u8, run: bool, ioc: bool) -> u32 {
+    ((stream_tag as u32 & 0x0f) << 20) | ((ioc as u32) << 2) | ((run as u32) << 1)
+}
+
+/// Offset of output stream `index` after the input stream descriptors.
+#[must_use]
+pub const fn stream_descriptor_offset(input_streams: u8, index: u8) -> usize {
+    SD_BASE + (input_streams as usize + index as usize) * SD_STRIDE
+}
+
+/// Frames advanced between two link-position readings, accounting for the cyclic wrap.
+///
+/// `previous` and `current` are byte offsets inside a cyclic buffer of `cbl_bytes`; a zero
+/// `frame_bytes` yields zero.
+#[must_use]
+pub const fn lpib_delta_frames(
+    previous: u32,
+    current: u32,
+    cbl_bytes: u32,
+    frame_bytes: u16,
+) -> u32 {
+    if frame_bytes == 0 {
+        return 0;
+    }
+    let delta = if current >= previous {
+        current - previous
+    } else {
+        cbl_bytes.saturating_sub(previous).saturating_add(current)
+    };
+    delta / frame_bytes as u32
+}
+
+/// The 48 kHz stereo S16LE ring used by the target driver: 480 frames per period, 17 periods.
+///
+/// `region_len()` is exactly 32 KiB (128-byte header plus 32,640 bytes of PCM), so the driver
+/// can use the first half of its 64 KiB DMA buffer and keep CORB/RIRB/BDL in the second half.
+#[must_use]
+pub const fn ring_geometry_48k() -> RingGeometry {
+    RingGeometry {
+        period_frames: 480,
+        period_count: 17,
+        frame_bytes: 4,
+    }
 }
 
 /// One buffer descriptor list entry (16 bytes).

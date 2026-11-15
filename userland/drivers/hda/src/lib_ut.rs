@@ -46,6 +46,64 @@ fn ring_geometry_matches_the_shared_header_rule() {
 }
 
 #[test]
+fn the_target_ring_is_exactly_thirty_two_kib() {
+    let geometry = ring_geometry_48k();
+    assert_eq!(geometry.period_frames, 480);
+    assert_eq!(geometry.period_count, 17);
+    assert_eq!(geometry.frame_bytes, 4);
+    assert_eq!(geometry.region_len(), 32 * 1024);
+    assert_eq!(geometry.cbl_bytes(), 32_640);
+}
+
+#[test]
+fn qemu_intel_hda_ids_and_class_are_fixed() {
+    assert_eq!(QEMU_HDA_VENDOR, 0x8086);
+    assert_eq!(QEMU_HDA_DEVICE, 0x2668);
+    assert_eq!(PCI_CLASS_MULTIMEDIA, 0x04);
+    assert_eq!(PCI_SUBCLASS_AUDIO, 0x03);
+}
+
+#[test]
+fn widget_type_and_amplifier_bits_are_decoded() {
+    assert_eq!(widget_type(0x0000_0000), WIDGET_AUDIO_OUTPUT);
+    assert_eq!(widget_type(0x0040_0000), WIDGET_PIN_COMPLEX);
+    assert!(widget_has_output_amp(0x0000_0004));
+    assert!(!widget_has_output_amp(0x0000_0002));
+    assert!(widget_has_input_amp(0x0000_0002));
+    assert!(!widget_has_input_amp(0x0000_0004));
+}
+
+#[test]
+fn pin_default_configuration_selects_outputs() {
+    assert!(config_is_output(0x0221_401f)); // HP out
+    assert!(config_is_output(0x0011_401f)); // line out
+    assert!(config_is_output(0x0000_0000)); // line out, device 0
+    assert!(!config_is_output(0x0091_401f)); // line in, device 9
+}
+
+#[test]
+fn stream_control_places_tag_ioc_and_run() {
+    assert_eq!(stream_control(1, false, false), 0x0010_0000);
+    assert_eq!(stream_control(1, true, true), 0x0010_0006);
+    assert_eq!(stream_control(0, true, false), 0x0000_0002);
+}
+
+#[test]
+fn output_descriptors_follow_the_input_descriptors() {
+    assert_eq!(stream_descriptor_offset(4, 0), 0x100);
+    assert_eq!(stream_descriptor_offset(4, 1), 0x120);
+    assert_eq!(stream_descriptor_offset(0, 0), SD_BASE);
+}
+
+#[test]
+fn link_position_delta_handles_wrap() {
+    assert_eq!(lpib_delta_frames(0, 1_920, 32_640, 4), 480);
+    assert_eq!(lpib_delta_frames(31_680, 960, 32_640, 4), 480);
+    assert_eq!(lpib_delta_frames(1_920, 1_920, 32_640, 4), 0);
+    assert_eq!(lpib_delta_frames(0, 1_920, 32_640, 0), 0);
+}
+
+#[test]
 fn register_offsets_are_the_ich9_values() {
     assert_eq!(GCTL, 0x08);
     assert_eq!(CORBLBASE, 0x40);

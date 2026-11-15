@@ -1,0 +1,117 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B44a hw-sound: QEMU intel-hda + hda-output, the target HDA driver, audiod on `hda:out0`, and a
+# 440 Hz tone through both the plain WRITE path and the SET_BUFFER shared ring. QEMU captures the
+# codec output with `-audiodev wav`; the oracle checks the dominant frequency, level and gaps.
+
+name = "hw-sound"
+arch = "x86_64"
+profile = "hw-sound"
+timeout_secs = 600
+pre = [
+    "sh tests/fixtures/hw-sound/build.sh",
+    "sh tests/fixtures/audio-tools/build.sh",
+]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-audiodev", "wav,id=snd0,path=build/qtest/hw-sound.wav",
+    "-device", "intel-hda",
+    "-device", "hda-output,audiodev=snd0",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^pcid: devices=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^svcd: pcid up$'
+
+[[expect]]
+regex = '^devd: matched [0-9a-f]{2}:[0-9a-f]{2}\.[0-9] vendor=0x8086 device=0x2668 irq_line=[0-9]+ irq_pin=[0-9]+$'
+
+[[expect]]
+regex = '^devd: driver hda bar=0 size=[0-9]+$'
+
+[[expect]]
+regex = '^devd: driver hda dma bus=0x[0-9a-f]+ len=65536$'
+
+[[expect]]
+regex = '^devd: driver hda irq line=[0-9]+$'
+
+[[expect]]
+regex = '^hda: id=8086:2668 class=0403$'
+
+[[expect]]
+regex = '^hda: dma bus=0x[0-9a-f]+ len=65536 irq=[0-9]+$'
+
+[[expect]]
+regex = '^hda: path pin=[0-9]+ dac=[0-9]+ nodes=[1-8]$'
+
+[[expect]]
+regex = '^hda: codec=0 dac=[0-9]+ pin=[0-9]+ stream=[0-9]+ ring=17x480x4$'
+
+[[expect]]
+regex = '^hda: serving$'
+
+[[expect]]
+regex = '^audiod: ready \(hda sink, 480 frames/period\)$'
+unordered = true
+
+[[expect]]
+regex = '^hw-sound: write ok frames=24000 position=[0-9]+ underruns=0$'
+unordered = true
+
+[[expect]]
+regex = '^hw-sound: ring ok frames=144000 position=[0-9]+ underruns=0$'
+unordered = true
+
+[[expect]]
+regex = '^rsh: ready$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|hw-sound-client: |hda: .*timeout|hda: .*unexpected|underrun at'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "sleep 6\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "play /etc/tone440.wav\n"
+delay_ms = 100
+
+[[step]]
+wait = '^play: ok 24000 frames, 48000 Hz, 2 channels$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
+
+[[oracle]]
+kind = "wav"
+path = "build/qtest/hw-sound.wav"
+min_duration_ms = 1500
+min_rms = 0.01
+tone_hz = 440.0
+tolerance_percent = 2.0
+max_gap_ms = 2500
