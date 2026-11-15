@@ -89,6 +89,7 @@ fn build_one(
         all.extend(resolve_aliases(request, &shim_root, &directory)?);
         all
     };
+    let force_includes = resolve_force_includes(request, &shim_root)?;
     let mut recorded_commands: Vec<Vec<String>> = Vec::new();
     let mut object_files = Vec::new();
     let mut sources = Vec::new();
@@ -120,8 +121,15 @@ fn build_one(
             .map(|stem| stem.to_string_lossy().into_owned())
             .unwrap_or_default();
         let object = format!("obj/{stem}.o");
-        let (actual, recorded) =
-            compile_args(opt, request, source, &includes, &source_path, &object);
+        let (actual, recorded) = compile_args(
+            opt,
+            request,
+            source,
+            &includes,
+            &force_includes,
+            &source_path,
+            &object,
+        );
         run_tool(&tools.cc, &actual, &directory)?;
         recorded_commands.push(prefix(&tools.cc, &recorded));
         object_files.push(object);
@@ -249,6 +257,7 @@ fn compile_args(
     request: &BuildRequest<'_>,
     source: &Source,
     includes: &[(String, String)],
+    force_includes: &[(String, String)],
     source_path: &Path,
     object: &str,
 ) -> (Vec<String>, Vec<String>) {
@@ -287,6 +296,12 @@ fn compile_args(
     for (display, path) in includes {
         actual.push(format!("-I{path}"));
         recorded.push(format!("-I{display}"));
+    }
+    for (display, path) in force_includes {
+        actual.push("-include".to_string());
+        actual.push(path.clone());
+        recorded.push("-include".to_string());
+        recorded.push(display.clone());
     }
     for flag in &request.recipe.flags {
         actual.push(flag.clone());
@@ -345,6 +360,34 @@ fn resolve_includes(request: &BuildRequest<'_>, shim_root: &Path) -> Result<Vec<
 /// header can therefore write `<machine/_types.h>`. A recipe says
 /// `aliases = { machine = "donor:freebsd/sys/amd64/include" }` and the builder creates that
 /// layout under its own build directory, never touching the read-only checkout.
+/// Resolve the recipe's force-included headers to absolute paths (they are emitted as
+/// `-include <path>` before the source).
+fn resolve_force_includes(
+    request: &BuildRequest<'_>,
+    shim_root: &Path,
+) -> Result<Vec<(String, String)>> {
+    let mut resolved = Vec::new();
+    for entry in &request.recipe.force_include {
+        let path = if let Some(rest) = entry.strip_prefix("donor:") {
+            let Some((donor, file)) = rest.split_once('/') else {
+                bail!("force_include `{entry}` is malformed");
+            };
+            request.resources.join(donor).join(file)
+        } else if let Some(file) = entry.strip_prefix("shim:") {
+            shim_root.join(file)
+        } else {
+            bail!("force_include `{entry}` is malformed");
+        };
+        if !path.is_file() {
+            bail!("force_include `{entry}` is missing ({})", path.display());
+        }
+        let path = std::path::absolute(&path)
+            .with_context(|| format!("cannot make {} absolute", path.display()))?;
+        resolved.push((entry.clone(), path.display().to_string()));
+    }
+    Ok(resolved)
+}
+
 fn resolve_aliases(
     request: &BuildRequest<'_>,
     shim_root: &Path,
