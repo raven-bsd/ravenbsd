@@ -4,13 +4,18 @@
 [package]
 name = "raven-rp1"
 version = "0.1.0"
-description = "RP1 enumeration and official-firmware load protocol as data and transitions."
+description = "RP1 enumeration, firmware load and MFD model (GPIO/pinctrl, clocks, power)."
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+raven-fdt-lite = { path = "../raven-fdt-lite" }
+raven-pci = { path = "../raven-pci" }
+
+[dev-dependencies]
+raven-pi5 = { path = "../raven-pi5" }
 
 [lints]
 workspace = true
