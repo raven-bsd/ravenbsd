@@ -119,7 +119,7 @@ pub(crate) fn run(workspace: &Workspace, fast: bool, changed: bool) -> Result<u8
             seconds,
         });
     }
-    print_summary(&summaries);
+    print_summary(&summaries, changed);
     Ok(u8::from(failed))
 }
 
@@ -131,8 +131,9 @@ fn status_for(code: i32) -> Status {
     }
 }
 
-fn print_summary(summaries: &[Summary]) {
-    println!("check summary:");
+fn print_summary(summaries: &[Summary], changed: bool) {
+    let verdict = if changed { "check-fast" } else { "check" };
+    println!("{verdict} summary:");
     for summary in summaries {
         match &summary.status {
             Status::Ok => println!(
@@ -150,9 +151,9 @@ fn print_summary(summaries: &[Summary]) {
         .iter()
         .any(|summary| matches!(summary.status, Status::Failed(_)));
     if failed {
-        println!("check: FAILED");
+        println!("{verdict}: FAILED");
     } else {
-        println!("check: PASSED");
+        println!("{verdict}: PASSED");
     }
 }
 
