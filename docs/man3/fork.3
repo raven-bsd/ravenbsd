@@ -1,0 +1,30 @@
+." SPDX-License-Identifier: BSD-3-Clause
+." Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt FORK 3
+.Os RavenBSD
+.Sh NAME
+.Nm fork
+.Nm vfork
+.Nd create a new process
+.Sh SYNOPSIS
+.In unistd.h
+.Ft pid_t
+.Fn fork void
+.Ft pid_t
+.Fn vfork void
+.Sh DESCRIPTION
+.Fn fork creates a child process. .Fn vfork is the historical shared-address variant; in
+RavenBSD it follows the same process-creation path as .Fn fork.
+.Sh RETURN VALUES
+The parent receives the child pid; the child receives 0. On failure -1 is returned.
+.Sh ERRORS
+Until process cloning is provided, both functions return -1 with .Er ENOSYS.
+.Sh STANDARDS
+POSIX.1-2024; ring 0.
+.Sh CAVEATS
+.Fn fork returns -1 with .Er ENOSYS until the platform provides process cloning. .Fn vfork
+follows the same rule unless C53 documents a narrower fallback. See H-18 and C53.
+.Sh SEE ALSO
+.Xr posix_spawn 3
+.Xr libc 7

@@ -1,0 +1,96 @@
+." SPDX-License-Identifier: BSD-3-Clause
+." Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt LIBC 7
+.Os RavenBSD
+.Sh NAME
+.Nm libc
+.Nd the RavenBSD C library
+.Sh SYNOPSIS
+Static link:
+.Bd -literal -offset indent
+cc program.c -lc
+.Ed
+.Pp
+Dynamic link:
+.Bd -literal -offset indent
+cc program.c -lc
+.Ed
+.Pp
+The static archive is
+.Pa /usr/lib/libc.a ;
+the shared object is
+.Pa /lib/libc.so.1 .
+The stub libraries are
+.Fl lm ,
+.Fl lpthread ,
+.Fl ldl ,
+.Fl lrt ,
+.Fl lutil ,
+.Fl lresolv
+and
+.Fl lcrypt .
+.Sh DESCRIPTION
+ravenlibc is one source tree and one ABI for the RavenBSD shell, the system servers and the
+base utilities. The source is compiled into a static archive and a shared object with the same
+public names.
+.Pp
+The ABI has four rings. Ring 0 is the stable POSIX and C base. Ring 1 adds the BSD and Linux
+interfaces the project needs. Ring 2 is the Raven extension API and the compatibility layer.
+Ring 3 is stubbed or unsupported and may return an honest error.
+.Pp
+The library provides the Linux, BSD and Solaris personalities. The selected personality is a
+runtime property; it does not change the ABI.
+.Pp
+Public symbols carry the RAVEN_1.0 version. Private symbols carry RAVENprivate_1.0 and are not
+part of the stable interface.
+.Pp
+The hardened allocator is the default. A tiny allocator is available for constrained builds;
+it is not part of the default shared library.
+.Sh FILES
+.Bl -tag -width /usr/lib/libc.a -compact
+.It Pa /lib/libc.so.1
+The shared C library.
+.It Pa /libexec/ld-elf.so.1
+The dynamic loader.
+.It Pa /usr/lib/libc.a
+The static archive.
+.It Pa /usr/lib/crt1.o , /usr/lib/Scrt1.o , /usr/lib/rcrt1.o , /usr/lib/crti.o , /usr/lib/crtn.o
+The startup objects.
+.It Pa /usr/include
+The public headers.
+.It Pa /etc/passwd , /etc/group , /etc/hosts , /etc/resolv.conf , /etc/nsswitch.conf , /etc/services , /etc/protocols
+The system databases.
+.It Pa /usr/share/zoneinfo
+The time-zone database.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width RAVEN_FDSAN -compact
+.It Ev TZ
+The time-zone name.
+.It Ev LANG , Ev LC_*
+The locale names. Only C, POSIX, C.UTF-8 and names ending in .UTF-8 or .utf8 select UTF-8; other
+names map to C.UTF-8.
+.It Ev MALLOC_OPTIONS
+Allocator tuning and junk filling.
+.It Ev RAVEN_FDSAN
+The file-descriptor sanitizer mode.
+.It Ev LD_LIBRARY_PATH
+The loader's library search path.
+.It Ev NLSPATH
+The message-catalogue search path.
+.It Ev RES_OPTIONS
+The resolver options.
+.El
+.Sh STANDARDS
+ISO C23 and POSIX.1-2024 base and XSI, with the BSD and Linux extensions documented per page.
+.Sh SEE ALSO
+.Xr setlocale 3 ,
+.Xr printf 3 ,
+.Xr malloc 3 ,
+.Xr open 3 ,
+.Xr pthread_create 3 ,
+.Xr dlopen 3 ,
+.Xr sysconf 3
+.Sh HISTORY
+ravenlibc first shipped in the RavenBSD 0.1 development tree in 2026.

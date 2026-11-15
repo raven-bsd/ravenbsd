@@ -1,0 +1,38 @@
+." SPDX-License-Identifier: BSD-3-Clause
+." Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt OPEN 3
+.Os RavenBSD
+.Sh NAME
+.Nm open
+.Nm openat
+.Nm fcntl
+.Nm ioctl
+.Nd open files and control descriptors
+.Sh SYNOPSIS
+.In fcntl.h
+.Ft int
+.Fn open "const char *path" "int flags" ...
+.Ft int
+.Fn openat "int dirfd" "const char *path" "int flags" ...
+.Ft int
+.Fn fcntl "int fd" "int command" ...
+.Ft int
+.Fn ioctl "int fd" "unsigned long request" ...
+.Sh DESCRIPTION
+.Fn open and .Fn openat create or open a file descriptor. .Fn fcntl changes descriptor flags
+and locks. .Fn ioctl sends a device-specific request.
+.Sh RETURN VALUES
+The open functions return a descriptor or -1. .Fn fcntl and .Fn ioctl return a command-specific
+value or -1.
+.Sh ERRORS
+.Er ENOENT, .Er EACCES, .Er EINVAL and .Er EBADF follow the POSIX rules for the descriptor
+and path.
+.Sh STANDARDS
+POSIX.1-2024; ring 0 and ring 1.
+.Sh CAVEATS
+A path such as name:x is always a file name, never a scheme. The ioctl request set is the one
+ravenlibc implements; see document 11 section 3.4.
+.Sh SEE ALSO
+.Xr open 2
+.Xr libc 7
