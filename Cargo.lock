@@ -152,6 +152,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "emmc2"
+version = "0.1.0"
+dependencies = [
+ "raven-pi4",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1676,6 +1683,13 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "raven-pi4"
+version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
 ]
 
 [[package]]
