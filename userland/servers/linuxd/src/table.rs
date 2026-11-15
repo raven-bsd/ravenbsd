@@ -45,6 +45,50 @@ impl Region {
     }
 }
 
+/// One synthetic directory entry, in `getdents64` order.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DirEntry {
+    /// Entry name without a NUL.
+    pub name: Vec<u8>,
+    /// Linux `d_type` (`DT_REG` 8, `DT_DIR` 4, `DT_LNK` 10).
+    pub kind: u8,
+    /// Inode number shown to the program.
+    pub ino: u64,
+}
+
+/// The content of one open synthetic file.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FileKind {
+    /// A regular file with bytes produced at `open` time.
+    Regular(Vec<u8>),
+    /// A directory with a snapshot of its entries.
+    Directory(Vec<DirEntry>),
+    /// A symlink target returned by `readlink`/`readlinkat`.
+    Symlink(Vec<u8>),
+}
+
+/// One descriptor in a Linux process.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OpenFile {
+    /// Absolute path the program opened.
+    pub path: Vec<u8>,
+    /// Synthetic content.
+    pub kind: FileKind,
+    /// Read/lseek/directory cursor.
+    pub offset: u64,
+}
+
+impl OpenFile {
+    /// Length of a regular file or symlink target (zero for a directory).
+    #[must_use]
+    pub fn size(&self) -> u64 {
+        match &self.kind {
+            FileKind::Regular(bytes) | FileKind::Symlink(bytes) => bytes.len() as u64,
+            FileKind::Directory(_) => 0,
+        }
+    }
+}
+
 /// One Linux process the server is responsible for.
 #[derive(Debug)]
 pub struct LinuxProcess {
@@ -76,6 +120,13 @@ pub struct LinuxProcess {
     pub fs_base: u64,
     /// A base the `arch_prctl` handler queued for the trap loop to install before it replies.
     pub pending_tls: Option<u64>,
+    /// Absolute path of the loaded program (`/proc/self/exe`).
+    pub exe: Vec<u8>,
+    /// Program name without the directory (`/proc/self/stat` field 2).
+    pub comm: Vec<u8>,
+    /// Linux argv, including `argv[0]` (`/proc/self/cmdline`).
+    pub argv: Vec<Vec<u8>>,
+    files: Vec<Option<OpenFile>>,
 }
 
 impl LinuxProcess {
@@ -103,6 +154,84 @@ impl LinuxProcess {
             thread,
             fs_base: 0,
             pending_tls: None,
+            exe: Vec::new(),
+            comm: Vec::new(),
+            argv: Vec::new(),
+            files: Vec::new(),
+        }
+    }
+
+    /// Set the program identity used by the synthetic procfs files.
+    pub fn set_identity(&mut self, exe: &[u8], argv: Vec<Vec<u8>>) {
+        self.exe = exe.to_vec();
+        self.comm = exe
+            .rsplit(|byte| *byte == b'/')
+            .next()
+            .unwrap_or(exe)
+            .to_vec();
+        self.argv = argv;
+    }
+
+    /// All descriptor slots; slot `n` is fd `3 + n` and `None` means closed.
+    #[must_use]
+    pub fn files(&self) -> &[Option<OpenFile>] {
+        &self.files
+    }
+
+    /// Open a synthetic file/directory/symlink and return its descriptor.
+    pub fn open_file(&mut self, path: Vec<u8>, kind: FileKind) -> i32 {
+        let file = OpenFile {
+            path,
+            kind,
+            offset: 0,
+        };
+        if let Some(index) = self.files.iter().position(Option::is_none) {
+            if let Some(slot) = self.files.get_mut(index) {
+                *slot = Some(file);
+            }
+            return 3 + index as i32;
+        }
+        self.files.push(Some(file));
+        3 + self.files.len() as i32 - 1
+    }
+
+    /// One descriptor's file, if it is open.
+    #[must_use]
+    pub fn file(&self, fd: i32) -> Option<&OpenFile> {
+        let index = usize::try_from(fd.checked_sub(3)?).ok()?;
+        self.files.get(index)?.as_ref()
+    }
+
+    /// Mutable access to one descriptor's file.
+    pub fn file_mut(&mut self, fd: i32) -> Option<&mut OpenFile> {
+        let index = usize::try_from(fd.checked_sub(3)?).ok()?;
+        self.files.get_mut(index)?.as_mut()
+    }
+
+    /// Close a synthetic descriptor. Standard descriptors are accepted as a no-op.
+    pub fn close_file(&mut self, fd: i32) -> bool {
+        if (0..=2).contains(&fd) {
+            return true;
+        }
+        let Some(index) = usize::try_from(fd.checked_sub(3).unwrap_or(-1)).ok() else {
+            return false;
+        };
+        match self.files.get_mut(index) {
+            Some(slot @ Some(_)) => {
+                *slot = None;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// The target of `/proc/self/fd/<fd>`.
+    #[must_use]
+    pub fn fd_target(&self, fd: i32) -> Option<&[u8]> {
+        match fd {
+            0 => Some(b"/dev/null"),
+            1 | 2 => Some(b"tty:console"),
+            _ => self.file(fd).map(|file| file.path.as_slice()),
         }
     }
 

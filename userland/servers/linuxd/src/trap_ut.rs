@@ -69,6 +69,18 @@ fn copy_in_is_bounded_by_the_server_limit() {
 }
 
 #[test]
+fn path_calls_copy_a_bounded_window() {
+    for nr in [2, 4, 89, 257, 262, 267] {
+        let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, nr, [0; 6]);
+        assert_eq!(copy_in_len(&call), Some(128), "nr {nr}");
+    }
+    for nr in [0, 3, 8, 217] {
+        let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, nr, [0; 6]);
+        assert_eq!(copy_in_len(&call), None, "nr {nr}");
+    }
+}
+
+#[test]
 fn a_bad_request_is_rejected() {
     assert_eq!(
         decode(&[0u8; 10]),
