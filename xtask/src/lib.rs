@@ -42,6 +42,7 @@ mod libc_size;
 mod libc_stubs;
 mod libc_world;
 mod pi;
+mod posix_check;
 mod posix_gaps;
 mod process;
 mod profiles;
