@@ -234,6 +234,30 @@ impl TransferRing {
         self.inner.used
     }
 
+    /// Total ring capacity, including the Link slot.
+    #[must_use]
+    pub const fn capacity(&self) -> u16 {
+        self.inner.count
+    }
+
+    /// Usable slots (the Link slot is not a transfer slot).
+    #[must_use]
+    pub const fn usable(&self) -> u16 {
+        self.inner.usable()
+    }
+
+    /// Slots that can accept a new TRB.
+    #[must_use]
+    pub const fn free_slots(&self) -> u16 {
+        self.inner.usable().saturating_sub(self.inner.used)
+    }
+
+    /// True when no usable slot is free.
+    #[must_use]
+    pub const fn is_full(&self) -> bool {
+        self.inner.used >= self.inner.usable()
+    }
+
     /// Next transfer slot.
     #[must_use]
     pub const fn enqueue(&self) -> u16 {

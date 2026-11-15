@@ -34,6 +34,9 @@ pub mod ring;
 pub mod slot;
 pub mod trb;
 
+pub mod control;
+
+pub use control::{ControlDirection, ControlTransfer};
 pub use device::{
     DrMode, InterruptRef, MAX_USB_CONTROLLERS, Quirks, UsbController, UsbControllers, UsbError,
 };
