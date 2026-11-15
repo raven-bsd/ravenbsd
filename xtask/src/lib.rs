@@ -50,7 +50,14 @@ mod qtest;
 mod repo;
 mod rootfs;
 mod run;
+mod update;
 
 pub use rootfs::{build_root_disk, build_ufs_root, inject_initfs_file, stage_rootfs_spec};
 
-pub use cli::run_cli;
+/// Dispatch `cargo xtask` arguments, with the K27 `update` planner beside the K05 commands.
+pub fn run_cli(args: Vec<String>) -> std::process::ExitCode {
+    if args.first().map(String::as_str) == Some("update") {
+        return update::run_cli(&args[1..]);
+    }
+    cli::run_cli(args)
+}
