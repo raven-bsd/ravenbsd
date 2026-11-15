@@ -1,7 +1,12 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /* Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors */
 /* RavenBSD std-program link script: the generic user layout plus the TLS image and
-   the constructor arrays that a std binary carries (uutils K25a). */
+   the constructor arrays that a std binary carries (uutils K25a).
+
+   The kernel's spawn(Strict) rejects two PT_LOAD segments that share a page and a
+   file part that does not end on a page boundary. Every file-backed segment below
+   therefore ends with an explicit ALIGN(4096); the dynamic metadata is named so it
+   lands in the segment it belongs to instead of becoming an unaligned orphan. */
 
 ENTRY(_start)
 
@@ -28,11 +33,33 @@ SECTIONS {
         . = ALIGN(4096);
     } :rodata
 
-    .tdata ALIGN(8) : {
+    /* Dynamic read-only metadata; the last section pads the R segment to a page. */
+    .dynsym ALIGN(8) : {
+        *(.dynsym)
+    } :rodata
+    .gnu.hash ALIGN(8) : {
+        *(.gnu.hash)
+    } :rodata
+    .hash ALIGN(8) : {
+        *(.hash)
+    } :rodata
+    .dynstr ALIGN(8) : {
+        *(.dynstr)
+    } :rodata
+    .rela.dyn ALIGN(8) : {
+        *(.rela.dyn)
+        *(.rela.plt)
+        *(.rela.*)
+        . = ALIGN(4096);
+    } :rodata
+
+    /* The TLS image starts on its own page, so the RW LOAD segment never shares the
+       R segment's last page. */
+    .tdata ALIGN(4096) : {
         *(.tdata .tdata.*)
     } :data :tls
 
-    /* The RW LOAD file part must be a page multiple: the end alignment below guarantees it. */
+    /* The RW LOAD file part must be a page multiple. */
     .data ALIGN(4096) : {
         *(.data .data.*)
         *(.data.rel.ro .data.rel.ro.*)
@@ -59,6 +86,12 @@ SECTIONS {
         KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*)))
         KEEP(*(.fini_array))
         PROVIDE_HIDDEN(__fini_array_end = .);
+    } :data
+
+    /* The last file-backed RW section pads the segment to a page. */
+    .dynamic ALIGN(8) : {
+        *(.dynamic)
+        . = ALIGN(4096);
     } :data
 
     /* .bss is NOLOAD: it has no file part; spawn maps its zero tail to the page boundary. */
