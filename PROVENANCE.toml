@@ -9424,4 +9424,4 @@ license = "MIT"
 tier = "A"
 copied = "2026-11-15"
 modified = true
-notes = "K19 patched libc 0.2.185 (registry release with src/unix/ravenbsd) vendored from build/toolchain-src/library/libc-ravenbsd; MIT headers applied; the root [patch.crates-io] points at it and the lock is pinned to 0.2.185. The exact registry and patch identities are recorded in toolchain/libc-0.2.185-provenance.md."
+notes = "libc 0.2.186 registry release with the K19 ravenbsd unix module grafted in (the minimum release nix 0.31 requires); MIT headers applied; the root [patch.crates-io] points at it and the lock is pinned to 0.2.186. The exact registry and patch identities are recorded in toolchain/libc-0.2.186-provenance.md."
