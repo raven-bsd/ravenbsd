@@ -4,12 +4,14 @@
 # libc symbol-audit fixtures
 
 C64j compares the exported `libc.so.1` dynamic symbols with the symbols the seven C73c target
-cases reference. The runner is `scripts/libc-symbol-audit.sh`.
+cases reference. The runner is `scripts/libc-symbol-audit.sh`; C64l adds the build-system command
+`cargo xtask libc-audit`.
 
 | File | Purpose |
 |---|---|
 | `required.tsv` | Per-case required symbols: `case<TAB>symbol<TAB>owner<TAB>note`. Derived from the seven C sources under `libc/ravenlibc/tests/c/` and the C73c section 3 link failures. |
 | `expected.tsv` | Current deterministic matrix (`case<TAB>symbol<TAB>status<TAB>owner<TAB>note`); update it after a fix changes a status. |
+| `gate-row.toml` | The exact C74 `[[check]]` block for the audit (`cargo xtask libc-audit`). Merge it into `tests/libc/gate/rows.toml`; that file is C74's, not C64l's. |
 | `self-test/required.tsv` | Fake required table for the self-test. |
 | `self-test/exports-present.txt` | Fake export set with every fake symbol present. |
 | `self-test/exports-missing.txt` | Fake export set with one fake symbol absent. |
@@ -19,12 +21,15 @@ cases reference. The runner is `scripts/libc-symbol-audit.sh`.
 Run:
 
 ```
+cargo xtask libc-audit            # gate command; rebuilds libc when the export file is absent
+cargo xtask libc-audit --rebuild  # force pack/link, then audit
+cargo xtask libc-audit --self-test # fake tables, no libc or compiler needed
 sh scripts/libc-symbol-audit.sh --self-test
 sh scripts/libc-symbol-audit.sh --rebuild
 ```
 
-The first command is a host-only test of the matcher. The second packs/links the target libc and
-writes `build/libc-symbol-audit/matrix.tsv`; it exits 1 while any required symbol is missing. The
-current snapshot is 66 required, 48 present, 18 missing; see `docs/libc-symbol-audit.md` for the
-groups and owners. No source under `libc/ravenlibc/**` or `tests/libc/target/**` is modified by this
-ticket.
+The host-only self-test checks the matcher. The rebuild path packs/links the target libc and writes
+`build/libc-symbol-audit/matrix.tsv`; it exits 1 while any required symbol is missing. The current
+snapshot is 66 required, 48 present, 18 missing; see `docs/libc-symbol-audit.md` for the groups and
+owners. `cargo test -p xtask` runs the same fake-table paths through `libc_audit_ut.rs`. No source
+under `libc/ravenlibc/**` or `tests/libc/target/**` is modified by this ticket.

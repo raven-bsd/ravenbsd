@@ -3,14 +3,18 @@
 
 # libc symbol audit
 
-Status: C64j host-side inventory. It reads the linked `libc.so.1` and the seven C73c target case
-sources; it does **not** boot QEMU or claim target behaviour. The current snapshot is
-`tests/libc/symbol-audit/expected.tsv`; the matcher is
+Status: C64j host-side inventory, wired to the build system by C64l. It reads the linked
+`libc.so.1` and the seven C73c target case sources; it does **not** boot QEMU or claim target
+behaviour. The current snapshot is `tests/libc/symbol-audit/expected.tsv`; the matcher is
 `scripts/libc-symbol-audit.sh`.
 
 ## Run
 
 ```
+cargo xtask libc-audit             # C74 gate command; rebuilds libc when the export file is absent
+cargo xtask libc-audit --rebuild   # force pack/link, then audit
+cargo xtask libc-audit --self-test # fake tables, no libc/toolchain needed
+
 sh scripts/libc-symbol-audit.sh --rebuild   # pack/link libc, then audit
 sh scripts/libc-symbol-audit.sh             # use build/x86_64/libc.so.1
 sh scripts/libc-symbol-audit.sh --self-test # fake tables, no libc/toolchain needed
@@ -18,6 +22,33 @@ sh scripts/libc-symbol-audit.sh --self-test # fake tables, no libc/toolchain nee
 
 Exit codes: 0 all required symbols exported; 1 one or more missing (the matrix is still written to
 `build/libc-symbol-audit/matrix.tsv`); 2 usage/I/O/missing host tool. The current tree exits 1.
+`cargo xtask libc-audit` forwards the same exit code; `cargo xtask libc-audit --self-test` exits 0
+on the fake tables.
+
+## C74 gate wiring (PROPOSED row)
+
+`tests/libc/symbol-audit/gate-row.toml` holds the exact row for
+`tests/libc/gate/rows.toml`:
+
+```toml
+[[check]]
+id = "1.1.audit"
+row = 1
+title = "target-case symbol audit (C64j)"
+required = true
+kind = "argv"
+argv = ["cargo", "xtask", "libc-audit"]
+evidence = "build/libc-gate/1.1.audit.txt"
+source = "C64j, C64l"
+```
+
+Once merged, `cargo run -q -p libc-gate -- eval` writes
+`build/libc-gate/1.1.audit.txt` and marks the check MET only when
+`cargo xtask libc-audit` exits 0. The current 18 missing symbols make it NOT MET
+until C64i lands. `tests/libc/gate/rows.toml` belongs to C74's Owns, so C64l
+delivers the fragment and the command; the C74 owner merges the block. The
+`libc_audit_ut.rs` host test parses the fragment and asserts its argv is this
+command.
 
 The matrix columns are `case<TAB>symbol<TAB>status<TAB>owner<TAB>note`, sorted by case then symbol.
 `required.tsv` is the per-case inventory derived from the seven C sources under
