@@ -798,6 +798,7 @@ name = "raven-devd"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-fdt-lite",
  "raven-initfs",
  "raven-proto-dev",
  "raven-proto-fs",

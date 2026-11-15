@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The platform driver table installed by the Pi 4 profiles. `devd` matches these entries against
+# the device-tree `compatible` string; `vendor`/`device` are absent because they are PCI keys.
+#
+# K32 covers discovery and matching only. Launching these drivers needs the platform
+# MMIO/DMA/IRQ capability handoff (B47/profile work), so `exec` is recorded here for the
+# follow-up that wires the real drivers.
+
+[[driver]]
+name = "genet"
+compatible = "brcm,bcm2711-genet-v5"
+exec = "/sbin/genet"
+
+[[driver]]
+name = "emmc2"
+compatible = "brcm,bcm2711-emmc2"
+exec = "/sbin/emmc2"
+
+[[driver]]
+name = "pwm1"
+compatible = "brcm,bcm2835-pwm"
+exec = "/sbin/pwm"
+
+[[driver]]
+name = "rng200"
+compatible = "brcm,bcm2711-rng200"
+exec = "/sbin/rng200"
