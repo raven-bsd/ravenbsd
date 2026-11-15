@@ -17,9 +17,9 @@ suitable for the on-target `shell-brush` qtest once the target build and the
 shell-profile wiring are unblocked.
 
 The on-target qtest is present as `tests/brush/shell-brush.toml` but is marked
-`skip`: after C64f the target build reaches the toolchain libc and needs the
-missing target type surface (libc 0.2.186); the
-`nix`/`mio`/`rustix`/`socket2`/`uzers` ravenbsd OS modules follow that. Installing a
+`skip`: C64g supplies the libc 0.2.186 target types; the target build now stops
+in the `mio`/`socket2`/`rustix`/`nix`/`uzers` ravenbsd OS modules and in the
+remaining libc network/terminal API. The exact delta is in the K26a report. Installing a
 `build/brush` artifact in the shared `shell`/`shell-test` profile now would make
 the currently passing `shell-session` qtest depend on a binary that cannot be
 built. A dedicated brush profile also needs a new top-level
