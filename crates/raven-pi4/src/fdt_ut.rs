@@ -6,13 +6,36 @@
 use super::*;
 use raven_fdt_lite::FdtError;
 
-const VALID: &[u8] = include_bytes!("../../../tests/fixtures/pi4-emmc2/pi4-emmc2.dtb");
-const NO_EMMC: &[u8] = include_bytes!("../../../tests/fixtures/pi4-emmc2/pi4-emmc2-no-emmc.dtb");
-const BAD_IRQ: &[u8] = include_bytes!("../../../tests/fixtures/pi4-emmc2/pi4-emmc2-bad-irq.dtb");
+const VALID_HEX: &str = include_str!("../../../tests/fixtures/pi4-emmc2/pi4-emmc2.dtb.hex");
+const NO_EMMC_HEX: &str =
+    include_str!("../../../tests/fixtures/pi4-emmc2/pi4-emmc2-no-emmc.dtb.hex");
+const BAD_IRQ_HEX: &str =
+    include_str!("../../../tests/fixtures/pi4-emmc2/pi4-emmc2-bad-irq.dtb.hex");
+
+/// Decode the checked-in hexadecimal fixture. The first lines are the SPDX header.
+fn decode_hex(text: &str) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    let mut high: Option<u8> = None;
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        for character in line.chars() {
+            let digit = character.to_digit(16).expect("fixture is hexadecimal") as u8;
+            match high.take() {
+                None => high = Some(digit),
+                Some(nibble) => bytes.push((nibble << 4) | digit),
+            }
+        }
+    }
+    assert!(high.is_none(), "fixture has an odd number of hex digits");
+    bytes
+}
 
 #[test]
 fn the_valid_fixture_yields_the_translated_base_spi_and_dma_window() {
-    let node = parse_emmc2(VALID).expect("valid emmc2 tree");
+    let node = parse_emmc2(&decode_hex(VALID_HEX)).expect("valid emmc2 tree");
     assert_eq!(node.base, 0xfe34_0000);
     assert_eq!(node.size, 0x100);
     assert_eq!(node.irq_spi, 126);
@@ -30,7 +53,7 @@ fn the_valid_fixture_yields_the_translated_base_spi_and_dma_window() {
 
 #[test]
 fn dma_bus_addresses_are_limited_to_the_dtb_window() {
-    let node = parse_emmc2(VALID).expect("valid emmc2 tree");
+    let node = parse_emmc2(&decode_hex(VALID_HEX)).expect("valid emmc2 tree");
     assert_eq!(node.bus_address(0), Some(0xc000_0000));
     assert_eq!(node.bus_address(0x1000_0000), Some(0xd000_0000));
     assert_eq!(node.bus_address(0x3fff_f000), Some(0xffff_f000));
@@ -40,13 +63,16 @@ fn dma_bus_addresses_are_limited_to_the_dtb_window() {
 
 #[test]
 fn a_tree_without_the_emmc2_node_is_rejected() {
-    assert_eq!(parse_emmc2(NO_EMMC), Err(Emmc2FdtError::MissingNode));
+    assert_eq!(
+        parse_emmc2(&decode_hex(NO_EMMC_HEX)),
+        Err(Emmc2FdtError::MissingNode)
+    );
 }
 
 #[test]
 fn an_active_low_interrupt_is_rejected() {
     assert_eq!(
-        parse_emmc2(BAD_IRQ),
+        parse_emmc2(&decode_hex(BAD_IRQ_HEX)),
         Err(Emmc2FdtError::BadInterrupt {
             interrupt_type: 0,
             number: 126,

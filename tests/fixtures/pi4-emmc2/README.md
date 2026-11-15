@@ -4,8 +4,8 @@
 # Pi 4 EMMC2 DTB fixtures (J1)
 
 These are **original minimal device trees**, not copies of a donor DTB. They contain only the
-nodes and values the `raven-pi4` EMMC2 lookup needs. The `.dtb` files are generated; edit
-`generate.py`, not the binaries.
+nodes and values the `raven-pi4` EMMC2 lookup needs. The `*.dtb.hex` files are generated; edit
+`generate.py`, not the hexadecimal text.
 
 ## Regeneration
 
@@ -13,8 +13,10 @@ nodes and values the `raven-pi4` EMMC2 lookup needs. The `.dtb` files are genera
 python3 tests/fixtures/pi4-emmc2/generate.py
 ```
 
-The script uses only the Python standard library; `dtc` is not required. It writes both the binary
-`.dtb` (the test input) and the readable `.dts` (documentation).
+The script uses only the Python standard library; `dtc` is not required. It writes the binary DTB
+as hexadecimal text (`*.dtb.hex`, the test input) and a readable `.dts` (documentation). The
+hexadecimal form keeps the fixture in the provenance check's text scan; `fdt_ut.rs` decodes it
+before parsing.
 
 ## Sources of the values
 
@@ -49,8 +51,8 @@ All addresses are CPU-physical after the parent `ranges` translation.
 
 | File | Expected parse |
 |---|---|
-| `pi4-emmc2.dtb` | Valid tree: base, SPI and 1 GiB DMA window. |
-| `pi4-emmc2-no-emmc.dtb` | The EMMC2 node is absent; `Emmc2FdtError::MissingNode`. |
-| `pi4-emmc2-bad-irq.dtb` | The interrupt flags are active-low; `Emmc2FdtError::BadInterrupt`. |
+| `pi4-emmc2.dtb.hex` | Valid tree: base, SPI and 1 GiB DMA window. |
+| `pi4-emmc2-no-emmc.dtb.hex` | The EMMC2 node is absent; `Emmc2FdtError::MissingNode`. |
+| `pi4-emmc2-bad-irq.dtb.hex` | The interrupt flags are active-low; `Emmc2FdtError::BadInterrupt`. |
 
 The invalid fixtures alter only the interrupt flags or omit the node; they do not invent addresses.

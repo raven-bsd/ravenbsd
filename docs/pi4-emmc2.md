@@ -18,7 +18,7 @@ donor files were read for behaviour only and no code, comment or table layout wa
 | 1-bit/4-bit, 400 kHz/25 MHz/50 MHz plans and typed transitions | `crates/raven-pi4/src/timing.rs` | OBSERVED by host tests |
 | EMMC2 device-tree lookup (base, SPI, DMA window) | `crates/raven-pi4/src/fdt.rs` | OBSERVED against the fixture |
 | Driver skeleton and board seam | `userland/drivers/emmc2/src/lib.rs` | OBSERVED by host tests |
-| Minimal DTB fixtures | `tests/fixtures/pi4-emmc2/` | OBSERVED; facts documented in its README |
+| Minimal DTB fixtures (hex text plus `.dts`) | `tests/fixtures/pi4-emmc2/` | OBSERVED; facts documented in its README |
 
 The crate is `no_std`, allocation-free and `#![forbid(unsafe_code)]`. It never touches a register:
 the driver skeleton performs the register sequence through the `Host` trait, and the tests use a

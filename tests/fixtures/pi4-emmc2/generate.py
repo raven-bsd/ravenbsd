@@ -175,8 +175,20 @@ def dts(with_emmc: bool, irq_flags: int) -> str:
 """
 
 
+def hex_fixture(data: bytes) -> str:
+    lines = [
+        "# SPDX-License-Identifier: BSD-3-Clause",
+        "# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors",
+        "# Hexadecimal bytes of the generated DTB; fdt_ut.rs decodes this file.",
+    ]
+    for offset in range(0, len(data), 32):
+        lines.append(data[offset:offset + 32].hex())
+    return "\n".join(lines) + "\n"
+
+
 def write(name: str, with_emmc: bool, irq_flags: int) -> None:
-    (OUT / f"{name}.dtb").write_bytes(encode_tree(tree(with_emmc, irq_flags)))
+    binary = encode_tree(tree(with_emmc, irq_flags))
+    (OUT / f"{name}.dtb.hex").write_text(hex_fixture(binary))
     (OUT / f"{name}.dts").write_text(dts(with_emmc, irq_flags))
 
 
