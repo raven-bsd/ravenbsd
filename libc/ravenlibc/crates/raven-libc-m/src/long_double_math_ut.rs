@@ -268,7 +268,9 @@ fn lgamma_and_tgamma_agree_with_f64_and_the_factorials() {
     assert_eq!(sign, -1);
     // Poles.
     assert_eq!(lgammal(ld(0.0)).to_f64(), f64::INFINITY);
-    assert!(tgammal(ld(0.0)).is_nan());
+    // `tgamma(+-0)` is the signed pole (FreeBSD's `1/x` branch), not NaN.
+    assert_eq!(tgammal(ld(0.0)).to_f64(), f64::INFINITY);
+    assert_eq!(tgammal(ld(-0.0)).to_f64(), f64::NEG_INFINITY);
     assert!(tgammal(ld(-2.0)).is_nan());
     assert!(lgammal(ld(-2.0)).to_f64().is_infinite());
 }
@@ -342,6 +344,24 @@ fn the_bessel_asymptotic_branch_satisfies_the_wronskian_identity() {
         assert!(
             close(identity, expected.to_f64(), 2.0 / (value * value * value)),
             "wronskian {value}"
+        );
+    }
+}
+
+#[test]
+fn hyperbolic_and_inverse_keep_tiny_arguments() {
+    // `exp(x) - 1`, `exp(2x) - 1` and `log(1 + x)` all lose the leading term for tiny `x`.
+    let tiny = 1.0e-19;
+    let x = ld(tiny);
+    for (name, got) in [
+        ("sinhl", sinhl(x).to_f64()),
+        ("tanhl", tanhl(x).to_f64()),
+        ("asinhl", asinhl(x).to_f64()),
+        ("atanhl", atanhl(x).to_f64()),
+    ] {
+        assert!(
+            got > 0.0 && (got - tiny).abs() / tiny < 1.0e-12,
+            "{name}({tiny:e}) = {got:e}"
         );
     }
 }
