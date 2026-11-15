@@ -457,11 +457,20 @@ fn spawn_elf<S: Sys>(
         let _ = sys.handle_close(object);
     }
 
+    #[cfg(feature = "alloc")]
+    let mut stack_buffer = alloc_crate::vec![0u8; STACK_SIZE];
+    #[cfg(not(feature = "alloc"))]
+    let mut stack_buffer = [0u8; 64 * 1024];
+    #[cfg(feature = "alloc")]
+    let stack_size = STACK_SIZE;
+    #[cfg(not(feature = "alloc"))]
+    let stack_size = stack_buffer.len();
+
     let stack_base = STACK_TOP
-        .checked_sub(STACK_SIZE as u64)
+        .checked_sub(stack_size as u64)
         .ok_or(SpawnError::TooLarge)?;
     let stack_base_address = usize::try_from(stack_base).map_err(|_| SpawnError::TooLarge)?;
-    let memobj = match sys.memobj_create(STACK_SIZE) {
+    let memobj = match sys.memobj_create(stack_size) {
         Ok(handle) => handle,
         Err(error) => {
             let _ = sys.handle_close(child);
@@ -469,7 +478,7 @@ fn spawn_elf<S: Sys>(
         }
     };
     let scratch_flags = map::pack(prot::READ | prot::WRITE, map::SHARED);
-    let scratch = match sys.map(Handle::SELF_PROC, memobj, 0, 0, STACK_SIZE, scratch_flags) {
+    let scratch = match sys.map(Handle::SELF_PROC, memobj, 0, 0, stack_size, scratch_flags) {
         Ok(address) => address,
         Err(error) => {
             let _ = sys.handle_close(memobj);
@@ -477,15 +486,6 @@ fn spawn_elf<S: Sys>(
             return Err(SpawnError::Sys(error));
         }
     };
-
-    #[cfg(feature = "alloc")]
-    let mut stack_buffer = alloc_crate::vec![0u8; STACK_SIZE];
-    #[cfg(not(feature = "alloc"))]
-    let mut stack_buffer = [0u8; 64 * 1024];
-    #[cfg(not(feature = "alloc"))]
-    let stack_size = stack_buffer.len();
-    #[cfg(feature = "alloc")]
-    let stack_size = STACK_SIZE;
 
     let (image_offset, sp0) = match build_stack(
         &mut stack_buffer,
