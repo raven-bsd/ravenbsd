@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Pi 4 EMMC2/blockd staging fragment.
+#
+# This installs the service declarations for the SD path: the EMMC2 driver exposes `disk:0` and
+# blockd consumes it. The driver program (`/sbin/emmc2`) and its `[[initfs.programs]]` entry are the
+# integration step, so the fragment stays file-only, both manifests are `enable = false`, and the
+# existing `pi4` profile remains buildable. When the driver service entry lands, add the two
+# program entries here, set `enable = true`, and add the `emmc2` package to the Pi image.
+[[initfs.files]]
+src = "profiles/pi4.d/emmc2.manifest"
+path = "/etc/services.d/emmc2.toml"
+
+[[initfs.files]]
+src = "profiles/pi4.d/blockd.manifest"
+path = "/etc/services.d/blockd.toml"
