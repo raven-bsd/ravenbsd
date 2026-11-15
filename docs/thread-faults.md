@@ -32,7 +32,7 @@ The same fixture creates a second user thread with `THREAD_CREATE_EX`, `tp` set 
 page, and reads `%fs:0x31` after the switch-in. That path already worked; it is now covered as
 well.
 
-`Tests/qtest/cases/kernel-thread-faults.toml` is the acceptance case. The negative control is the
+`tests/qtest/cases/kernel-thread-faults.toml` is the acceptance case. The negative control is the
 temporary `if false` on the immediate-install branch, which brings back the exact `0x31` fault.
 
 ## Fault 2: libc-signals page fault at `0x0`
