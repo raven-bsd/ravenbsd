@@ -845,6 +845,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-dtrace-core"
+version = "0.1.0"
+
+[[package]]
 name = "raven-echo"
 version = "0.1.0"
 dependencies = [

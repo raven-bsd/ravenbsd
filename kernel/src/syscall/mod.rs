@@ -14,6 +14,8 @@ pub mod basic;
 #[cfg(target_arch = "x86_64")]
 pub mod debug_read;
 pub mod driver;
+/// `DTRACE_*` provider control syscalls (S57).
+pub mod dtrace;
 pub mod event;
 pub mod futex;
 pub mod handle_xfer;
@@ -67,6 +69,12 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
         };
     }
     let number = usize::try_from(frame.rax).unwrap_or(usize::MAX);
+    // S57: DTrace control calls are dispatched before the native table and are not traced
+    // themselves; every other native call fires the syscall-entry probe first.
+    if dtrace::is_control(number) {
+        return dtrace::dispatch(number, frame);
+    }
+    dtrace::syscall_probe(frame);
     if number == process_ctl::PROC_FORK {
         return process_ctl::fork(frame);
     }

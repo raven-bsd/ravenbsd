@@ -1,0 +1,35 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 15, 2026
+.Dt DTRACE_READ 2
+.Os RavenBSD
+.Sh NAME
+.Nm dtrace_read
+.Nd drain per-CPU DTrace rings
+.Sh SYNOPSIS
+.Fn dtrace_read out max
+.Sh DESCRIPTION
+.Nm copies up to
+.Fa max
+records from the per-CPU rings to
+.Fa out
+in round-robin CPU order and returns the number copied.
+One call accepts at most 1024 records.
+A record is 64 bytes: a 64-bit sequence number, a 64-bit monotonic timestamp,
+four 64-bit probe arguments, a 32-bit syscall number, a 32-bit thread
+identifier, a 16-bit CPU index and a 16-bit probe identifier.
+.Pp
+Rings are drop-on-full: a producer never overwrites a record the consumer has
+not seen.  The drop count is reported by
+.Xr dtrace_stats 2 .
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EINVAL
+.Fa max
+exceeds 1024 or the byte count overflows.
+.It Er EFAULT
+.Fa out
+is not writable user memory.
+.El
+.Sh STANDARDS
+RavenBSD ABI v1.

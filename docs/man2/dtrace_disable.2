@@ -1,0 +1,22 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 15, 2026
+.Dt DTRACE_DISABLE 2
+.Os RavenBSD
+.Sh NAME
+.Nm dtrace_disable
+.Nd disable a DTrace probe
+.Sh SYNOPSIS
+.Fn dtrace_disable probe
+.Sh DESCRIPTION
+.Nm clears the enabled bit for
+.Fa probe .
+When no probe remains enabled the consumer event is released.
+Records already in the rings stay readable.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EINVAL
+The probe identifier is unknown.
+.El
+.Sh STANDARDS
+RavenBSD ABI v1.
