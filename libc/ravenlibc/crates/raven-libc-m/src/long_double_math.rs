@@ -77,6 +77,15 @@ pub fn expl(x: LongDouble) -> LongDouble {
     if x.is_zero() {
         return LongDouble::one();
     }
+    // The x87 range: exp overflows above ~11356 and underflows below it.
+    let magnitude = x.abs().to_f64();
+    if magnitude > 11356.0 {
+        return if x.sign_bit() {
+            LongDouble::zero(false)
+        } else {
+            LongDouble::infinity(false)
+        };
+    }
     // |x| < 2^-75: 1 + x is the correctly rounded result.
     if x.abs().to_f64() < 3.0e-23 {
         return LongDouble::one().add(x);
