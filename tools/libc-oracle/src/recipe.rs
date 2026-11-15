@@ -290,7 +290,8 @@ impl Recipe {
                     source.path
                 );
             }
-            if let Some(known) = known_donors
+            if source.donor != "shim"
+                && let Some(known) = known_donors
                 && !known.contains(&source.donor)
             {
                 bail!(

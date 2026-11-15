@@ -94,18 +94,27 @@ fn build_one(
     let mut sources = Vec::new();
 
     for source in &request.recipe.source {
-        let source_path = request.resources.join(&source.donor).join(&source.path);
+        // A `shim` source is a first-party C file (an ABI thunk) beside the donor sources; it
+        // resolves under the recipe shim tree and has no donor pin or gate entry.
+        let source_path = if source.donor == "shim" {
+            std::path::absolute(shim_root.join(&source.path))
+                .with_context(|| "cannot make the shim source absolute")?
+        } else {
+            request.resources.join(&source.donor).join(&source.path)
+        };
         if !source_path.is_file() {
             bail!(
-                "recipe {}: donor file {} is missing",
+                "recipe {}: source file {} is missing",
                 request.recipe.family,
                 source_path.display()
             );
         }
-        if !request.no_pin_check {
-            pin::check(request.resources, &source.donor, &source.path)?;
+        if source.donor != "shim" {
+            if !request.no_pin_check {
+                pin::check(request.resources, &source.donor, &source.path)?;
+            }
+            gate::check_file(&source_path, &source.donor, request.resources)?;
         }
-        gate::check_file(&source_path, &source.donor, request.resources)?;
         let stem = Path::new(&source.path)
             .file_stem()
             .map(|stem| stem.to_string_lossy().into_owned())
