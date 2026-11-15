@@ -49,5 +49,17 @@ path = "fuzz_targets/ufs_indirect.rs"
 test = false
 doc = false
 
+[[bin]]
+name = "gpt"
+path = "fuzz_targets/gpt.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fat"
+path = "fuzz_targets/fat.rs"
+test = false
+doc = false
+
 [profile.release]
 debug = 1
