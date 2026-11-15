@@ -6,9 +6,14 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod gate;
 pub mod model;
 pub mod render;
 pub mod seed;
+
+#[cfg(test)]
+#[path = "gate_ut.rs"]
+mod gate_tests;
 
 #[cfg(test)]
 #[path = "model_ut.rs"]
