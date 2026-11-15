@@ -756,3 +756,8 @@ debug = true
 # toolchain copy, not a new clean-room implementation.
 [patch.crates-io]
 libc = { path = "libc-ravenbsd" }
+# K25a: nix and rustix have no `ravenbsd` arm; the two local copies add only the
+# cfg family mapping (Raven's ABI is musl-shaped) and are recorded in PROVENANCE.toml.
+nix = { path = "nix-ravenbsd" }
+rustix = { path = "rustix-ravenbsd" }
+rlimit = { path = "rlimit-ravenbsd" }

@@ -19,13 +19,16 @@ read-only `ravenbsd-resources` checkout.
   (`ls cat cp mv rm ln mkdir rmdir touch stat df du echo pwd basename dirname true false sleep date
   head tail wc sort cut tr env id chmod chown`). The rest of the 109 crates stay vendored but are
   not built into the image until a later ticket adds them with tests and a man page.
-* Target status: the host tests pass (97, `--locked`). The uutils workspace is separate, so it
-  carries its own `libc-ravenbsd/` copy of the merged K19 `toolchain/vendor/libc` (the crate
-  version is 0.2.191 to satisfy the uutils lock and `nix ^0.2.186`), and `uucore` depends on the
-  merged `toolchain/raven-getrandom`; the root `.cargo/config.toml` supplies the getrandom custom
-  backend. `cargo xtask build uutils --arch x86_64` now passes the former getrandom/libc 0.2.191
-  failures and stops on the K19 ravenbsd module's remaining ABI gaps: `filetime` (`lutimes`,
-  `UTIME_OMIT`), `rlimit` (`getrlimit`/`setrlimit`), `nix` (37 errors) and `rustix` (107 errors:
-  termios constants, `siginfo_t::si_status`, `waitid`, `POSIX_FADV_*`, `ST_*`). That is the
-  C64d/K26a follow-up list; the profile switch and the `base-tools` qtest wait for it. See the
-  K25a report for the exact compiler output.
+* Target status: the host tests pass (97, `--locked`) and `cargo xtask build uutils --arch x86_64`
+  links the 30 selected utilities for `x86_64-unknown-ravenbsd` into `build/x86_64/uutils/`. The
+  workspace carries `libc-ravenbsd/` (the merged K19 libc module, crate version 0.2.191) and three
+  cfg-arm compatibility copies, `nix-ravenbsd/`, `rustix-ravenbsd/` and `rlimit-ravenbsd/`; no
+  algorithm changes. `uucore` links the merged `toolchain/raven-getrandom` backend.
+* Link wiring: the Raven std target does not add `-lc`, so `xtask/src/uutils.rs` passes the staged
+  `build/<arch>/libc.a`, `rcrt1.o`, `crti.o`, `crtn.o` and `userland/uutils/<arch>.ld`. The latter
+  is the generic user layout plus `.tdata`/`.tbss` (`PT_TLS`) and the constructor arrays a std
+  binary carries. `-C strip=symbols` keeps the staging tree at 91 MiB for 30 names.
+* Remaining caveat: the installed `ravenbsd` std was built from the K19 libc module, whose fcntl,
+  termios and clock constants predate the Raven ABI tables. Rebuilding the toolchain from the
+  corrected `toolchain/vendor/libc` is a K19/C60 follow-up outside this ticket; the uutils binaries
+  themselves use the corrected module.

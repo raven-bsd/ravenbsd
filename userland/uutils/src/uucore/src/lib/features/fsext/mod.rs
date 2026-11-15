@@ -59,7 +59,8 @@ use std::time::Duration;
     target_os = "linux",
     target_os = "android",
     target_os = "freebsd",
-    target_os = "openbsd"
+    target_os = "openbsd",
+    target_os = "ravenbsd"
 ))]
 pub use libc::statfs as StatFs;
 #[cfg(any(
@@ -79,6 +80,7 @@ pub use libc::statvfs as StatFs;
     target_os = "android",
     target_os = "freebsd",
     target_os = "openbsd",
+    target_os = "ravenbsd",
 ))]
 pub use libc::statfs as statfs_fn;
 #[cfg(any(
@@ -416,6 +418,7 @@ pub fn read_fs_list() -> UResult<Vec<MountInfo>> {
         target_os = "redox",
         target_os = "illumos",
         target_os = "solaris",
+        target_os = "ravenbsd",
         target_os = "wasi"
     ))]
     {
@@ -520,7 +523,7 @@ impl FsMeta for StatFs {
     /// `f_bsize` next to a 4 KiB `f_frsize`, which scales every size derived
     /// from the counts by 256. `f_frsize` is zero on pre-2.6 kernels, so fall
     /// back to `f_bsize` there.
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "ravenbsd"))]
     #[allow(clippy::unnecessary_cast)]
     fn block_size(&self) -> i64 {
         if self.f_frsize == 0 {
@@ -530,7 +533,7 @@ impl FsMeta for StatFs {
         }
     }
 
-    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    #[cfg(not(any(target_os = "linux", target_os = "android", target_os = "ravenbsd")))]
     fn block_size(&self) -> i64 {
         #[cfg(all(
             not(target_env = "musl"),
@@ -699,7 +702,8 @@ impl FsMeta for StatFs {
         target_os = "freebsd",
         target_os = "linux",
         target_os = "android",
-        target_os = "openbsd"
+        target_os = "openbsd",
+        target_os = "ravenbsd"
     ))]
     fn fsid(&self) -> u64 {
         // Use type inference to determine the type of f_fsid
@@ -713,14 +717,15 @@ impl FsMeta for StatFs {
         target_os = "freebsd",
         target_os = "linux",
         target_os = "android",
-        target_os = "openbsd"
+        target_os = "openbsd",
+        target_os = "ravenbsd"
     )))]
     #[allow(clippy::unnecessary_cast)]
     fn fsid(&self) -> u64 {
         self.f_fsid as u64
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "ravenbsd"))]
     fn namelen(&self) -> u64 {
         self.f_namelen as u64
     }
@@ -746,7 +751,8 @@ impl FsMeta for StatFs {
         target_os = "linux",
         target_os = "android",
         target_os = "netbsd",
-        target_os = "openbsd"
+        target_os = "openbsd",
+        target_os = "ravenbsd"
     )))]
     #[allow(clippy::unnecessary_cast)]
     fn namelen(&self) -> u64 {

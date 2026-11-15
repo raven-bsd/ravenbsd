@@ -9424,7 +9424,7 @@ license = "MIT"
 tier = "A"
 copied = "2026-11-15"
 modified = true
-notes = "vendored 0.13.0 workspace (109 utility crates, uucore and tests) for the base file/text tools; one local patch in src/uu/mv/src/mv.rs from upstream cc1a8b2 to repair the pinned commit's build; the tree is in .provenance-ignore because every upstream file carries the MIT notice in its own header form"
+notes = "vendored 0.13.0 workspace (109 utility crates, uucore and tests) for the base file/text tools; one local patch in src/uu/mv/src/mv.rs from upstream cc1a8b2 to repair the pinned commit's build; the subtree also carries the K25a compatibility copies nix 0.31.3 (b5933ca178802b558a667514f717a86b3a1cedcc), rustix 1.1.6 (4a563ad698b2c20ff848515821023d2265a788d0) and rlimit 0.11.0 (839f34767dff1de4197b140c214ea839c1410fbc), each a cfg-arm port only; the tree is in .provenance-ignore because every upstream file carries the MIT notice in its own header form"
 
 [[import]]
 path = "toolchain/vendor/libc"

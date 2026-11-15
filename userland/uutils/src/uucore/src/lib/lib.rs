@@ -24,6 +24,9 @@
     )
 )]
 
+// K25a: link the getrandom 0.4 custom backend even though no uucore item names it.
+extern crate raven_getrandom as _;
+
 // * feature-gated external crates (re-shared as public internal modules)
 #[cfg(feature = "libc")]
 pub extern crate libc;
@@ -131,6 +134,7 @@ pub use crate::features::safe_traversal;
         target_os = "linux",
         target_os = "netbsd",
         target_os = "openbsd",
+        target_os = "ravenbsd",
         target_os = "redox",
         target_os = "solaris"
     )

@@ -124,6 +124,7 @@ pub mod selinux;
         target_os = "linux",
         target_os = "netbsd",
         target_os = "openbsd",
+        target_os = "ravenbsd",
         target_os = "redox",
         target_os = "solaris"
     )

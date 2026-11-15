@@ -181,7 +181,33 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
         if options.release { ", release" } else { "" }
     );
     let head = crate::repo::head_info(root)?;
+    // K25a: the Raven std target does not add `-lc` itself; the static ralibc archive
+    // and the getrandom custom-backend cfg are supplied here, next to the build.
+    let stage = root.join("build").join(&options.arch);
+    let libc = stage.join("libc.a");
+    let crt = stage.join("rcrt1.o");
+    let crti = stage.join("crti.o");
+    let crtn = stage.join("crtn.o");
+    let std_linker = root
+        .join("userland/uutils")
+        .join(format!("{}.ld", options.arch));
+    let linker = if std_linker.is_file() {
+        std_linker
+    } else {
+        root.join("userland/linker")
+            .join(format!("{}.ld", options.arch))
+    };
+    let rustflags = format!(
+        "--cfg getrandom_backend=\"custom\" -C strip=symbols \
+         -C link-arg={} -C link-arg={} -C link-arg={} -C link-arg={} -C link-arg=-T{}",
+        crt.display(),
+        crti.display(),
+        libc.display(),
+        crtn.display(),
+        linker.display()
+    );
     let spec = CommandSpec::new("cargo", command_args(root, &options), root)
+        .env("RUSTFLAGS", rustflags)
         .env("SOURCE_DATE_EPOCH", head.epoch.to_string())
         .env(
             "RAVEN_BUILD_ID",
