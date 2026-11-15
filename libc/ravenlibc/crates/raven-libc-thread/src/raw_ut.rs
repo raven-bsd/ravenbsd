@@ -4,6 +4,13 @@
 use super::*;
 
 #[test]
+fn sys_kernel_reports_the_pg1_tls_capability() {
+    let caps = SysKernel::caps_const();
+    assert!(caps.tls);
+    assert!(!caps.tid);
+}
+
+#[test]
 fn builtin_tls_is_aligned_and_large() {
     assert_eq!(builtin_tls() % 16, 0);
     assert_eq!(

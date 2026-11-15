@@ -142,6 +142,8 @@ pub mod map {
     pub const NOFORK: usize = 8;
     /// The forked child gets zero-filled pages at the same virtual range (PG-14).
     pub const ZERO_ON_FORK: usize = 16;
+    /// Replace an existing anonymous `PROT_NONE` reservation atomically (PG-13, CR-24).
+    pub const REPLACE: usize = 4;
     /// Shift of `map_flags` inside the `MAP` flags argument.
     pub const SHIFT: usize = 8;
 
