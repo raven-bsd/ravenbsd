@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "pi4-devd"
+arch = "aarch64"
+profile = "pi4-devd"
+timeout_secs = 240
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^devd: dtb devices=5$'
+
+[[expect]]
+regex = '^devd: dtb device /soc/pwm@7e20c800 compatible=brcm,bcm2835-pwm reg=0xfe20c800\+0x28 dma=0 irq=none$'
+
+[[expect]]
+regex = '^devd: dtb device /soc/rng@7e104000 compatible=brcm,bcm2711-rng200 reg=0xfe104000\+0x28 dma=0 irq=none$'
+
+[[expect]]
+regex = '^devd: dtb device /scb/ethernet@7d580000 compatible=brcm,bcm2711-genet-v5 reg=0xfd580000\+0x10000 dma=0 irq=spi=157,spi=158$'
+
+[[expect]]
+regex = '^devd: dtb device /emmc2bus/mmc@7e340000 compatible=brcm,bcm2711-emmc2 reg=0xfe340000\+0x100 dma=1 irq=spi=126$'
+
+[[expect]]
+regex = '^devd: dtb device /interrupt-controller@ff841000 compatible=arm,gic-400 reg=0xff841000\+0x1000 dma=0 irq=none$'
+
+[[expect]]
+regex = '^devd: dtb driver genet compatible=brcm,bcm2711-genet-v5 device=/scb/ethernet@7d580000$'
+
+[[expect]]
+regex = '^devd: dtb driver emmc2 compatible=brcm,bcm2711-emmc2 device=/emmc2bus/mmc@7e340000$'
+
+[[expect]]
+regex = '^devd: dtb driver pwm1 compatible=brcm,bcm2835-pwm device=/soc/pwm@7e20c800$'
+
+[[expect]]
+regex = '^devd: dtb driver rng200 compatible=brcm,bcm2711-rng200 device=/soc/rng@7e104000$'
+
+[[expect]]
+regex = '^devd: dtb matched=4$'
+
+[[expect]]
+regex = '^svcd: devd up$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.files]]
+src = "profiles/pi4-devd.d/devd.manifest"
+path = "/etc/services.d/devd.toml"
+
+[[initfs.files]]
+src = "userland/servers/devd/drivers.toml"
+path = "/etc/drivers.toml"
+
+[[initfs.files]]
+src = "tests/fixtures/pi4-devd/pi4-devd.dtb"
+path = "/etc/pi4.dtb"
+
+[[initfs.files]]
+src = "profiles/pi4-devd.d/svcd.conf"
+path = "/etc/svcd.conf"

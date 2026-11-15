@@ -92,6 +92,44 @@ exec = "/sbin/b"
 }
 
 #[test]
+fn driver_table_parses_a_compatible_entry() {
+    let drivers = parse_drivers(
+        r#"
+[[driver]]
+name = "genet"
+compatible = "brcm,bcm2711-genet-v5"
+exec = "/sbin/genet"
+"#,
+    )
+    .unwrap();
+    assert_eq!(drivers.len(), 1);
+    assert_eq!(drivers[0].name, "genet");
+    assert_eq!(
+        drivers[0].compatible.as_deref(),
+        Some("brcm,bcm2711-genet-v5")
+    );
+    assert_eq!(drivers[0].vendor, 0);
+    assert_eq!(drivers[0].device, 0);
+}
+
+#[test]
+fn driver_table_compatible_is_optional() {
+    let drivers = parse_drivers(
+        "[[driver]]\nname = \"dummy\"\nvendor = 0x1234\ndevice = 0x11e8\nexec = \"/sbin/devd\"\n",
+    )
+    .unwrap();
+    assert_eq!(drivers[0].compatible, None);
+}
+
+#[test]
+fn driver_table_rejects_a_bad_compatible_value() {
+    assert!(
+        parse_drivers("[[driver]]\nname = \"genet\"\ncompatible = genet\nexec = \"/sbin/genet\"\n")
+            .is_err()
+    );
+}
+
+#[test]
 fn driver_table_rejects_bad_keys_and_values() {
     assert!(parse_drivers("[[driver]]\nname = \"a\"\nunknown = 1\n").is_err());
     assert!(parse_drivers("[[driver]]\nname = a\n").is_err());

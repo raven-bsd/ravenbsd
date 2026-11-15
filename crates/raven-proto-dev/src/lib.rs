@@ -121,6 +121,9 @@ pub struct DriverSpec {
     pub vendor: u16,
     /// Required PCI device id.
     pub device: u16,
+    /// Optional device-tree compatible string; platform drivers match this instead of the
+    /// vendor/device pair.
+    pub compatible: Option<String>,
     /// Executable path in the initfs.
     pub exec: String,
     /// Arguments passed after the executable path.
@@ -146,6 +149,7 @@ pub fn parse_drivers(text: &str) -> Result<Vec<DriverSpec>, DriverError> {
                 name: String::new(),
                 vendor: 0,
                 device: 0,
+                compatible: None,
                 exec: String::new(),
                 args: Vec::new(),
                 cycles: 1,
@@ -164,6 +168,10 @@ pub fn parse_drivers(text: &str) -> Result<Vec<DriverSpec>, DriverError> {
             "name" => driver.name = parse_string(value).ok_or(DriverError { line: index + 1 })?,
             "vendor" => driver.vendor = parse_u16(value).ok_or(DriverError { line: index + 1 })?,
             "device" => driver.device = parse_u16(value).ok_or(DriverError { line: index + 1 })?,
+            "compatible" => {
+                driver.compatible =
+                    Some(parse_string(value).ok_or(DriverError { line: index + 1 })?)
+            }
             "exec" => driver.exec = parse_string(value).ok_or(DriverError { line: index + 1 })?,
             "args" => driver.args = parse_array(value).ok_or(DriverError { line: index + 1 })?,
             "cycles" => {

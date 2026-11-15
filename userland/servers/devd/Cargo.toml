@@ -12,6 +12,7 @@ rust-version.workspace = true
 
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
+raven-fdt-lite = { path = "../../../crates/raven-fdt-lite" }
 raven-proto-dev = { path = "../../../crates/raven-proto-dev" }
 raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
 
