@@ -4,9 +4,9 @@
 //! Host tests for the K27 update planner.
 
 use super::{
-    BootMeta, Options, Platform, Slot, build_fixture, detect_layout, ensure_pi4_kernel,
-    inject_health, parse, parse_boot_meta, pi4_trial_from_flat, stage_pi4_esp, target_slot,
-    token_for,
+    BootMeta, FixtureHealth, Options, Platform, Slot, build_fixture, detect_layout,
+    ensure_pi4_kernel, inject_health, parse, parse_boot_meta, pi4_trial_from_flat, stage_pi4_esp,
+    target_slot, token_for,
 };
 use crate::fat::FatImageBuilder;
 use crate::gpt::SECTOR_SIZE;
@@ -112,6 +112,58 @@ fn fixture_contains_both_slots_and_a_bad_trial_kernel() {
 
     let _ = fs::remove_file(output);
     let _ = fs::remove_file(kernel);
+}
+
+#[test]
+fn fixture_root_staging_writes_the_health_record() {
+    let directory = std::env::temp_dir().join(format!("xtask-update-root-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&directory);
+    let staging = directory.join("root");
+    fs::create_dir_all(staging.join("etc/services.d")).unwrap();
+    fs::write(
+        staging.join("etc/services.d/probe.toml"),
+        "name = \"probe\"\nexec = \"/sbin/probe\"\n",
+    )
+    .unwrap();
+    let kernel = directory.join("kernel.elf");
+    fs::write(&kernel, b"kernel bytes").unwrap();
+    let output = directory.join("fixture.img");
+    let options = Options {
+        fixture: Some(output.clone()),
+        health: Some(FixtureHealth::Trial),
+        kernel: Some(kernel),
+        root_staging: Some(staging.clone()),
+        root_size: 1024 * 1024,
+        ..Options::default()
+    };
+    build_fixture(&options, &output).unwrap();
+
+    let mut esp = super::read_esp(&output).unwrap();
+    let boot = super::fat_read(&mut esp, "raven/boot.toml")
+        .unwrap()
+        .unwrap();
+    let meta = parse_boot_meta(&boot).unwrap();
+    let token = meta.trial_token.unwrap();
+    assert_eq!(meta.trial, Some(Slot::B));
+    assert_eq!(
+        super::fat_read(&mut esp, "raven/slot-b/kernel.elf")
+            .unwrap()
+            .unwrap(),
+        b"kernel bytes"
+    );
+    let health = fs::read_to_string(staging.join("etc/boot-health")).unwrap();
+    assert!(health.contains("slot = \"b\"\n"));
+    assert!(health.contains(&format!("token = \"{token:08x}\"\n")));
+    assert!(health.contains("lba = \"34\"\n"));
+
+    let bytes = fs::read(&output).unwrap();
+    let marker = &bytes[super::MARKER_LBA as usize * SECTOR_SIZE as usize..][..512];
+    assert_eq!(marker[11], super::HEALTH_STATE_TRIAL);
+    let ufs_start = (image::ESP_START_LBA + image::ESP_SECTORS) * SECTOR_SIZE;
+    let ufs = &bytes[ufs_start as usize..(ufs_start + 1024 * 1024) as usize];
+    assert!(ufs.iter().any(|byte| *byte != 0));
+
+    let _ = fs::remove_dir_all(&directory);
 }
 
 #[test]
