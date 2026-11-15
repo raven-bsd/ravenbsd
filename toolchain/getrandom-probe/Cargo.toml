@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "getrandom-probe"
+version = "0.1.0"
+description = "Target probe for the ravenbsd getrandom and libc backends"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+getrandom = "0.4.3"
+libc = "0.2"
+raven-getrandom = { path = "../raven-getrandom" }
+
+[lints]
+workspace = true
