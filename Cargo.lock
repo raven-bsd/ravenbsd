@@ -353,6 +353,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 
 [[package]]
+name = "man"
+version = "0.1.0"
+dependencies = [
+ "raven-mdoc",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-theme",
+]
+
+[[package]]
 name = "md-5"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1525,6 +1535,13 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-tool-core",
+]
+
+[[package]]
+name = "raven-mdoc"
+version = "0.1.0"
+dependencies = [
+ "raven-theme",
 ]
 
 [[package]]

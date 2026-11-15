@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-mdoc"
+version = "0.1.0"
+description = "A small first-party mdoc renderer for RavenBSD man pages."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+raven-theme = { path = "../raven-theme", default-features = false }
+
+[lints]
+workspace = true

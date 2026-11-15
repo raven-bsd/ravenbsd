@@ -1,0 +1,571 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.programs]]
+package = "man"
+path = "/bin/man"
+
+[[initfs.files]]
+src = "etc/man.conf"
+path = "/etc/man.conf"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/cat.1"
+path = "/usr/share/man/man1/cat.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/cp.1"
+path = "/usr/share/man/man1/cp.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/date.1"
+path = "/usr/share/man/man1/date.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/df.1"
+path = "/usr/share/man/man1/df.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/dmesg.1"
+path = "/usr/share/man/man1/dmesg.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/echo.1"
+path = "/usr/share/man/man1/echo.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/hostname.1"
+path = "/usr/share/man/man1/hostname.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/ifconfig.1"
+path = "/usr/share/man/man1/ifconfig.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/ls.1"
+path = "/usr/share/man/man1/ls.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/man.1"
+path = "/usr/share/man/man1/man.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/mkdir.1"
+path = "/usr/share/man/man1/mkdir.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/mount.1"
+path = "/usr/share/man/man1/mount.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/mv.1"
+path = "/usr/share/man/man1/mv.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/nc.1"
+path = "/usr/share/man/man1/nc.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/netstat.1"
+path = "/usr/share/man/man1/netstat.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/ping.1"
+path = "/usr/share/man/man1/ping.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/ps.1"
+path = "/usr/share/man/man1/ps.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/raven.1"
+path = "/usr/share/man/man1/raven.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/raven-completion.1"
+path = "/usr/share/man/man1/raven-completion.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/raven-config.1"
+path = "/usr/share/man/man1/raven-config.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/raven-doctor.1"
+path = "/usr/share/man/man1/raven-doctor.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/raven-status.1"
+path = "/usr/share/man/man1/raven-status.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/raven-svc.1"
+path = "/usr/share/man/man1/raven-svc.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/raven-theme.1"
+path = "/usr/share/man/man1/raven-theme.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/raven-version.1"
+path = "/usr/share/man/man1/raven-version.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/rm.1"
+path = "/usr/share/man/man1/rm.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/rmdir.1"
+path = "/usr/share/man/man1/rmdir.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/route.1"
+path = "/usr/share/man/man1/route.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/rsh.1"
+path = "/usr/share/man/man1/rsh.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/rustc.1"
+path = "/usr/share/man/man1/rustc.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/sleep.1"
+path = "/usr/share/man/man1/sleep.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/stat.1"
+path = "/usr/share/man/man1/stat.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/svcctl.1"
+path = "/usr/share/man/man1/svcctl.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/touch.1"
+path = "/usr/share/man/man1/touch.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/umount.1"
+path = "/usr/share/man/man1/umount.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man1/uname.1"
+path = "/usr/share/man/man1/uname.1"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/boot_blob.2"
+path = "/usr/share/man/man2/boot_blob.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/call.2"
+path = "/usr/share/man/man2/call.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/clock_get.2"
+path = "/usr/share/man/man2/clock_get.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/close.2"
+path = "/usr/share/man/man2/close.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/debug_read.2"
+path = "/usr/share/man/man2/debug_read.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/debug_write.2"
+path = "/usr/share/man/man2/debug_write.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/dma_alloc.2"
+path = "/usr/share/man/man2/dma_alloc.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/dma_info.2"
+path = "/usr/share/man/man2/dma_info.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/dup.2"
+path = "/usr/share/man/man2/dup.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/event_create.2"
+path = "/usr/share/man/man2/event_create.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/event_signal.2"
+path = "/usr/share/man/man2/event_signal.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/evq_create.2"
+path = "/usr/share/man/man2/evq_create.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/evq_ctl.2"
+path = "/usr/share/man/man2/evq_ctl.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/evq_wait.2"
+path = "/usr/share/man/man2/evq_wait.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/exit.2"
+path = "/usr/share/man/man2/exit.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/fstat.2"
+path = "/usr/share/man/man2/fstat.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/futex.2"
+path = "/usr/share/man/man2/futex.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/handle_close.2"
+path = "/usr/share/man/man2/handle_close.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/handle_dup.2"
+path = "/usr/share/man/man2/handle_dup.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/handle_revoke.2"
+path = "/usr/share/man/man2/handle_revoke.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/handle_transfer.2"
+path = "/usr/share/man/man2/handle_transfer.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/irq_ack.2"
+path = "/usr/share/man/man2/irq_ack.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/irq_create.2"
+path = "/usr/share/man/man2/irq_create.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/irq_wait.2"
+path = "/usr/share/man/man2/irq_wait.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/map.2"
+path = "/usr/share/man/man2/map.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/memobj_create.2"
+path = "/usr/share/man/man2/memobj_create.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/mmio_create.2"
+path = "/usr/share/man/man2/mmio_create.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/nanosleep.2"
+path = "/usr/share/man/man2/nanosleep.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/open.2"
+path = "/usr/share/man/man2/open.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/pager_supply.2"
+path = "/usr/share/man/man2/pager_supply.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/proc_create.2"
+path = "/usr/share/man/man2/proc_create.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/proc_namespace.2"
+path = "/usr/share/man/man2/proc_namespace.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/proc_terminate.2"
+path = "/usr/share/man/man2/proc_terminate.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/proc_wait.2"
+path = "/usr/share/man/man2/proc_wait.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/protect.2"
+path = "/usr/share/man/man2/protect.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/read.2"
+path = "/usr/share/man/man2/read.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/recv.2"
+path = "/usr/share/man/man2/recv.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/scheme_register.2"
+path = "/usr/share/man/man2/scheme_register.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/send.2"
+path = "/usr/share/man/man2/send.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/thread_create.2"
+path = "/usr/share/man/man2/thread_create.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/thread_exit.2"
+path = "/usr/share/man/man2/thread_exit.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/timer_create.2"
+path = "/usr/share/man/man2/timer_create.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/timer_set.2"
+path = "/usr/share/man/man2/timer_set.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/uname.2"
+path = "/usr/share/man/man2/uname.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/unmap.2"
+path = "/usr/share/man/man2/unmap.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/write.2"
+path = "/usr/share/man/man2/write.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man2/yield.2"
+path = "/usr/share/man/man2/yield.2"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/blockd.8"
+path = "/usr/share/man/man8/blockd.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/consd.8"
+path = "/usr/share/man/man8/consd.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/devd.8"
+path = "/usr/share/man/man8/devd.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/dmesg.8"
+path = "/usr/share/man/man8/dmesg.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/fsd-ufs.8"
+path = "/usr/share/man/man8/fsd-ufs.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/ifconfig.8"
+path = "/usr/share/man/man8/ifconfig.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/init.8"
+path = "/usr/share/man/man8/init.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/initfsd.8"
+path = "/usr/share/man/man8/initfsd.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/linuxd.8"
+path = "/usr/share/man/man8/linuxd.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/logd.8"
+path = "/usr/share/man/man8/logd.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/mount.8"
+path = "/usr/share/man/man8/mount.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/nc.8"
+path = "/usr/share/man/man8/nc.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/netd.8"
+path = "/usr/share/man/man8/netd.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/netstat.8"
+path = "/usr/share/man/man8/netstat.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/nulld.8"
+path = "/usr/share/man/man8/nulld.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/pcid.8"
+path = "/usr/share/man/man8/pcid.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/ping.8"
+path = "/usr/share/man/man8/ping.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/platd.8"
+path = "/usr/share/man/man8/platd.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/ramfsd.8"
+path = "/usr/share/man/man8/ramfsd.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/randd.8"
+path = "/usr/share/man/man8/randd.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/resolvd.8"
+path = "/usr/share/man/man8/resolvd.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/route.8"
+path = "/usr/share/man/man8/route.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/svcd.8"
+path = "/usr/share/man/man8/svcd.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/sysd.8"
+path = "/usr/share/man/man8/sysd.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/umount.8"
+path = "/usr/share/man/man8/umount.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/vfsd.8"
+path = "/usr/share/man/man8/vfsd.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/virtio-blk.8"
+path = "/usr/share/man/man8/virtio-blk.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/virtio-net.8"
+path = "/usr/share/man/man8/virtio-net.8"
+mode = 0o644
+
+[[initfs.files]]
+src = "docs/man8/zerod.8"
+path = "/usr/share/man/man8/zerod.8"
+mode = 0o644
