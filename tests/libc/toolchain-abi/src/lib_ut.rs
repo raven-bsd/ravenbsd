@@ -1,0 +1,245 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+//!
+//! Assertions for the toolchain ABI comparison.
+
+use super::*;
+
+const PATCH: &str = include_str!("../../../../toolchain/patches/0002-libc-ravenbsd.patch");
+
+fn assert_clean(findings: Vec<String>, label: &str) {
+    assert!(
+        findings.is_empty(),
+        "{label} mismatches:\n{}",
+        findings.join("\n")
+    );
+}
+
+#[test]
+fn open_flags_match_the_abi() {
+    assert_clean(compare_prefix("O_", ABI_FCNTL, TOOLCHAIN_LIBC), "O_*");
+}
+
+#[test]
+fn at_flags_match_the_abi() {
+    assert_clean(compare_prefix("AT_", ABI_FCNTL, TOOLCHAIN_LIBC), "AT_*");
+}
+
+#[test]
+fn fcntl_commands_match_the_abi() {
+    assert_clean(compare_prefix("F_", ABI_FCNTL, TOOLCHAIN_LIBC), "F_*");
+}
+
+#[test]
+fn fd_cloexec_matches_the_abi() {
+    assert_clean(
+        compare_required(&["FD_CLOEXEC"], ABI_FCNTL, TOOLCHAIN_LIBC),
+        "FD_CLOEXEC",
+    );
+}
+
+#[test]
+fn errno_values_used_by_std_match_the_abi() {
+    const ERRORS: &[&str] = &[
+        "E2BIG",
+        "EACCES",
+        "EAGAIN",
+        "EBADF",
+        "EBUSY",
+        "EEXIST",
+        "EFAULT",
+        "EFBIG",
+        "EINTR",
+        "EINVAL",
+        "EIO",
+        "EISDIR",
+        "ELOOP",
+        "EMFILE",
+        "ENAMETOOLONG",
+        "ENFILE",
+        "ENOENT",
+        "ENOMEM",
+        "ENOSPC",
+        "ENOTDIR",
+        "ENOTEMPTY",
+        "ENOTTY",
+        "ENXIO",
+        "EOPNOTSUPP",
+        "EOVERFLOW",
+        "EPIPE",
+        "EROFS",
+        "ESPIPE",
+        "EXDEV",
+    ];
+    assert_clean(compare_required(ERRORS, ABI_ERRNO, TOOLCHAIN_LIBC), "errno");
+}
+
+#[test]
+fn socket_constants_match_the_abi() {
+    const SOCKET: &[&str] = &[
+        "AF_UNIX",
+        "AF_INET",
+        "AF_INET6",
+        "SOCK_STREAM",
+        "SOCK_DGRAM",
+        "SOCK_RAW",
+        "SOCK_SEQPACKET",
+        "SOL_SOCKET",
+        "SO_REUSEADDR",
+        "SO_ERROR",
+        "SHUT_RD",
+        "SHUT_WR",
+        "SHUT_RDWR",
+    ];
+    let mut findings = compare_required(SOCKET, ABI_SOCKET, TOOLCHAIN_LIBC);
+    findings.extend(compare_required(
+        &[
+            "IPPROTO_IP",
+            "IPPROTO_TCP",
+            "IPPROTO_UDP",
+            "IPPROTO_ICMP",
+            "IPPROTO_IPV6",
+        ],
+        ABI_NETINET,
+        TOOLCHAIN_LIBC,
+    ));
+    assert_clean(findings, "socket");
+}
+
+#[test]
+fn termios_constants_match_the_header() {
+    const TERMIOS: &[&str] = &[
+        "VINTR",
+        "VQUIT",
+        "VERASE",
+        "VKILL",
+        "VEOF",
+        "VTIME",
+        "VMIN",
+        "VSWTC",
+        "VSTART",
+        "VSTOP",
+        "VSUSP",
+        "VEOL",
+        "VREPRINT",
+        "VDISCARD",
+        "VWERASE",
+        "VLNEXT",
+        "VEOL2",
+        "IGNBRK",
+        "BRKINT",
+        "IGNPAR",
+        "PARMRK",
+        "INPCK",
+        "ISTRIP",
+        "INLCR",
+        "IGNCR",
+        "ICRNL",
+        "IXON",
+        "IXANY",
+        "IXOFF",
+        "OPOST",
+        "ONLCR",
+        "OCRNL",
+        "ONOCR",
+        "ONLRET",
+        "CSIZE",
+        "CS5",
+        "CS6",
+        "CS7",
+        "CS8",
+        "CSTOPB",
+        "CREAD",
+        "PARENB",
+        "PARODD",
+        "HUPCL",
+        "CLOCAL",
+        "ISIG",
+        "ICANON",
+        "ECHO",
+        "ECHOE",
+        "ECHOK",
+        "ECHONL",
+        "NOFLSH",
+        "TOSTOP",
+        "IEXTEN",
+        "ECHOCTL",
+        "ECHOPRT",
+        "ECHOKE",
+        "FLUSHO",
+        "PENDIN",
+        "EXTPROC",
+        "TCSANOW",
+        "TCSADRAIN",
+        "TCSAFLUSH",
+        "TCIFLUSH",
+        "TCOFLUSH",
+        "TCIOFLUSH",
+        "TCOOFF",
+        "TCOON",
+        "TCIOFF",
+        "TCION",
+    ];
+    assert_clean(compare_termios(TERMIOS), "termios");
+}
+
+#[test]
+fn scalar_types_match_the_abi() {
+    const TYPES: &[(&str, (u32, bool))] = &[
+        ("mode_t", (32, false)),
+        ("uid_t", (32, false)),
+        ("gid_t", (32, false)),
+        ("nlink_t", (32, false)),
+        ("blksize_t", (32, true)),
+        ("off_t", (64, true)),
+        ("time_t", (64, true)),
+        ("suseconds_t", (64, true)),
+    ];
+    assert_clean(compare_types(TYPES), "types");
+}
+
+#[test]
+fn stat_layout_matches_the_abi() {
+    const FIELDS: &[&str] = &[
+        "u64", "u64", "u32", "u32", "u32", "u32", "u64", "u64", "i64", "i32", "i32", "i64", "i64",
+        "i64", "i64", "i64", "i64", "i64", "[u32; 2]",
+    ];
+    assert_clean(compare_struct("stat", FIELDS), "stat");
+}
+
+#[test]
+fn statvfs_layout_matches_the_abi() {
+    const FIELDS: &[&str] = &[
+        "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u64", "u32",
+        "[i32; 5]",
+    ];
+    assert_clean(compare_struct("statvfs", FIELDS), "statvfs");
+}
+
+#[test]
+fn termios_layout_matches_the_abi() {
+    const FIELDS: &[&str] = &["u32", "u32", "u32", "u32", "u8", "[u8; 32]", "u32", "u32"];
+    assert_clean(compare_struct("termios", FIELDS), "termios");
+}
+
+#[test]
+fn vendored_module_is_the_patched_toolchain_module() {
+    let marker = "+++ b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs\n";
+    let start = PATCH.find(marker).expect("module hunk") + marker.len();
+    let end = PATCH[start..]
+        .find("\ndiff --git ")
+        .map_or(PATCH.len(), |offset| start + offset);
+    let mut module = String::new();
+    for line in PATCH[start..end].lines() {
+        if let Some(rest) = line.strip_prefix('+') {
+            module.push_str(rest);
+            module.push('\n');
+        }
+    }
+    let mut vendor = String::new();
+    for line in TOOLCHAIN_LIBC.lines().skip(3) {
+        vendor.push_str(line);
+        vendor.push('\n');
+    }
+    assert_eq!(module, vendor, "toolchain patch and vendored module differ");
+}
