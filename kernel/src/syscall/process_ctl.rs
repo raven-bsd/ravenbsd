@@ -76,6 +76,113 @@ pub fn fork(frame: &SyscallFrame) -> Result<usize, Errno> {
     Ok(raw.0 as usize)
 }
 
+/// Raw `proc_self_info(out, count) -> 0` number (P2a).
+pub const PROC_SELF_INFO: usize = 0x35;
+/// Raw `proc_setpgid(pid, pgid) -> 0` number.
+pub const PROC_SETPGID: usize = 0x36;
+/// Raw `proc_setsid() -> sid` number.
+pub const PROC_SETSID: usize = 0x37;
+/// Raw `proc_setcred(which, value) -> 0` number.
+pub const PROC_SETCRED: usize = 0x38;
+
+/// `proc_self_info(out: *mut u64, count: usize) -> 0`.
+///
+/// Writes `[pid, ppid, pgid, sid, uid, euid, gid, egid]` as eight little-endian u64 words.
+/// Count must be exactly eight; the destination is checked by `UserSlice`.
+pub fn self_info(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let count = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    if count != 8 {
+        return Err(Errno::EINVAL);
+    }
+    let destination = UserSlice::new(frame.rdi, 64)?;
+    let ids = *caller.ids.lock();
+    let values = [
+        caller.id,
+        ids.ppid,
+        ids.pgid,
+        ids.sid,
+        u64::from(ids.uid),
+        u64::from(ids.euid),
+        u64::from(ids.gid),
+        u64::from(ids.egid),
+    ];
+    let mut bytes = [0u8; 64];
+    for (chunk, value) in bytes.chunks_exact_mut(8).zip(values) {
+        chunk.copy_from_slice(&value.to_le_bytes());
+    }
+    copy_to_user(destination, &bytes)?;
+    Ok(0)
+}
+
+/// `proc_setpgid(pid: i32, pgid: i32) -> 0`.
+///
+/// Only pid 0 and the caller are accepted. A zero pgid means the caller's pid. The slice accepts
+/// the caller's own group or the current group (a no-op); any other group is `EPERM`.
+pub fn setpgid(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let pid = frame.rdi as u32 as i32;
+    if pid != 0 && u64::try_from(pid).ok() != Some(caller.id) {
+        return Err(Errno::EPERM);
+    }
+    let pgid = frame.rsi as u32 as i32;
+    let mut ids = caller.ids.lock();
+    if ids.sid == caller.id {
+        return Err(Errno::EPERM);
+    }
+    let target = if pgid == 0 {
+        caller.id
+    } else {
+        u64::try_from(pgid).map_err(|_| Errno::EPERM)?
+    };
+    if target == caller.id {
+        ids.pgid = caller.id;
+        Ok(0)
+    } else if target == ids.pgid {
+        Ok(0)
+    } else {
+        Err(Errno::EPERM)
+    }
+}
+
+/// `proc_setsid() -> sid`.
+///
+/// A process-group leader cannot create a session. A successful call sets both the process group
+/// and the session to the caller's pid.
+pub fn setsid() -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let mut ids = caller.ids.lock();
+    if ids.pgid == caller.id {
+        return Err(Errno::EPERM);
+    }
+    ids.pgid = caller.id;
+    ids.sid = caller.id;
+    Ok(caller.id as usize)
+}
+
+/// `proc_setcred(which: u32, value: u32) -> 0`.
+///
+/// `which` 0..=3 selects uid/euid/gid/egid. Until a credential model exists the only permitted
+/// change is to the current value; anything else is `EPERM`.
+pub fn setcred(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let which = u32::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
+    let value = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    let ids = caller.ids.lock();
+    let current = match which {
+        0 => ids.uid,
+        1 => ids.euid,
+        2 => ids.gid,
+        3 => ids.egid,
+        _ => return Err(Errno::EINVAL),
+    };
+    if value == current {
+        Ok(0)
+    } else {
+        Err(Errno::EPERM)
+    }
+}
+
 /// `proc_set_personality(proc, personality, handler) -> 0`.
 ///
 /// The child must not have started a thread unless it is the caller itself;
