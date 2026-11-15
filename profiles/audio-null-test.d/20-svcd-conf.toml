@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.files]]
+src = "profiles/audio-null-test.d/svcd.conf"
+path = "/etc/svcd.conf"
+
+[[initfs.files]]
+src = "profiles/audio-null-test.d/rc.conf"
+path = "/etc/rc.conf"

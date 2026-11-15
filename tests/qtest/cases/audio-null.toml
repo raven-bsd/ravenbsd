@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B43 audio-null: audiod registers `audio:`, the one-shot client writes two 10 s streams through
+# the null sink and requires zero underruns. No hardware/DMA path is claimed.
+
+name = "audio-null"
+arch = "x86_64"
+profile = "audio-null-test"
+timeout_secs = 240
+pre = ["sh tests/fixtures/audio/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^audiod: ready \(null sink, 480 frames/period\)$'
+unordered = true
+
+[[expect]]
+regex = '^audio-client: ok position=480000 underruns=0$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|audio-client: underrun|audio-client: no sink'

@@ -1,0 +1,79 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B43 restart evidence: the client passes, audiod is restarted from the shell, and a second
+# client run opens the new server and passes again. The kernel closes the old scheme files; a
+# client that writes during the gap sees EIO and the next open succeeds (the client retries).
+
+name = "audio-restart"
+arch = "x86_64"
+profile = "audio-restart-test"
+timeout_secs = 420
+pre = ["sh tests/fixtures/audio/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^rsh: ready$'
+
+[[expect]]
+regex = '^audiod: ready \(null sink, 480 frames/period\)$'
+unordered = true
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|audio-client: underrun|command not found'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "audio-client\n"
+delay_ms = 100
+
+[[step]]
+wait = '^audio-client: ok position=480000 underruns=0$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "svcctl restart audiod\n"
+delay_ms = 100
+
+[[step]]
+wait = '^audiod: ready \(null sink, 480 frames/period\)$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "audio-client\n"
+delay_ms = 100
+
+[[step]]
+wait = '^audio-client: ok position=480000 underruns=0$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

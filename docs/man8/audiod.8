@@ -1,0 +1,56 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 15, 2026
+.Dt AUDIOD 8
+.Os
+.Sh NAME
+.Nm audiod
+.Nd RavenBSD audio server and mixer
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+registers the
+.Dv audio:
+scheme and mixes client PCM streams into the output device.
+The first gate serves one null sink,
+.Dv audio:out0 ;
+it consumes the mixed frames without a hardware driver.
+.Pp
+A client opens
+.Dv audio:out0
+and writes interleaved PCM16 through the scheme.
+The stream format defaults to 48 kHz stereo; mono and other rates are converted by
+.Xr raven-audio-core 3 .
+The protocol operations
+.Dv SET_FORMAT ,
+.Dv START ,
+.Dv STOP ,
+.Dv DRAIN ,
+.Dv SET_VOLUME
+and
+.Dv GET_STATUS
+are described in
+.Pa crates/raven-proto-audio/README.md .
+.Pp
+The null sink mixes one 480-frame period only when every running stream has a full period, so a
+cooperative pair of clients never underruns.
+.Dv SET_BUFFER
+is refused with
+.Er ENOTSUP
+until the HDA driver path lands.
+.Sh FILES
+.Bl -tag -width /etc/services.d/audiod.toml -compact
+.It Pa /etc/services.d/audiod.toml
+Service manifest.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr play 1 ,
+.Xr beep 1 ,
+.Xr mixer 1
+.Sh HISTORY
+The
+.Nm
+server first appeared in RavenBSD 0.1.
