@@ -45,6 +45,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "audio-tools-gen"
+version = "0.1.0"
+dependencies = [
+ "raven-audio-core",
+]
+
+[[package]]
 name = "audiod"
 version = "0.1.0"
 dependencies = [
@@ -547,6 +554,17 @@ dependencies = [
  "raven-rt",
  "raven-scheme",
  "resolvd",
+]
+
+[[package]]
+name = "raven-beep"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-audio-core",
+ "raven-proto-audio",
+ "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -1474,6 +1492,16 @@ name = "raven-mem"
 version = "0.1.0"
 
 [[package]]
+name = "raven-mixer"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-audio",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-mkdir"
 version = "0.1.0"
 dependencies = [
@@ -1597,6 +1625,17 @@ dependencies = [
  "raven-driver",
  "raven-plat",
  "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-play"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-audio-core",
+ "raven-proto-audio",
  "raven-rt",
  "raven-scheme",
 ]
