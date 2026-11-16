@@ -12,3 +12,6 @@ readiness = "scheme"
 ready_timeout_ms = 60_000
 restart = "never"
 max_restarts = 0
+# devd (P8/P10) spawns /sbin/genet with its platform grants; this entry documents the
+# scheme and must not start a second instance.
+enable = false

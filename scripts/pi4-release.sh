@@ -138,8 +138,12 @@ manifest_check_release() {
         echo "pi4-release: devd.manifest is disabled" >&2
         failed=1
     fi
-    if grep -Eq '^enable = false$' profiles/pi4-release.d/genet.manifest; then
-        echo "pi4-release: genet.manifest is disabled" >&2
+    if ! grep -Fq 'grants = ["platform-root"]' profiles/pi4-release.d/devd.manifest; then
+        echo "pi4-release: devd.manifest lacks the platform-root grant" >&2
+        failed=1
+    fi
+    if ! grep -Eq '^enable = false$' profiles/pi4-release.d/genet.manifest; then
+        echo "pi4-release: genet.manifest must stay disabled; devd launches it" >&2
         failed=1
     fi
     for need in 'scheme:dev' 'scheme:plat'; do

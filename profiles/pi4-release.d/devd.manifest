@@ -7,8 +7,10 @@
 name = "devd"
 exec = "/sbin/devd"
 args = ["devd", "dtb", "launch"]
+grants = ["platform-root"]
 needs = ["logd", "vfsd", "initfsd"]
-provides = ["scheme:dev"]
-readiness = "scheme"
+# devd launches the platform drivers and waits for them; it does not serve a scheme
+# of its own. netd waits for the child genet's `scheme:nic` instead.
+readiness = "none"
 ready_timeout_ms = 60_000
 restart = "on-failure"
