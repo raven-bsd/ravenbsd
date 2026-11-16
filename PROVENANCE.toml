@@ -9524,3 +9524,14 @@ tier = "A"
 copied = "2026-11-15"
 modified = true
 notes = "libc 0.2.186 registry release with the K19 ravenbsd unix module grafted in (the minimum release nix 0.31 requires); MIT headers applied; the root [patch.crates-io] points at it and the lock is pinned to 0.2.186. The exact registry and patch identities are recorded in toolchain/libc-0.2.186-provenance.md."
+
+[[import]]
+path = "addons/tls/openssl"
+upstream = "openssl"
+upstream_path = "."
+upstream_rev = "636dfadc70ce26f2473870570bfd9ec352806b1d"
+license = "Apache-2.0"
+tier = "A"
+copied = "2026-11-16"
+modified = true
+notes = "OpenSSL 3.5.0 source tree for the C add-on (DR-45); crypto, build and API source are unmodified. Upstream apps/demos/doc/fuzz/test private-key fixtures (286 files) are excluded because GitHub push protection rejects them; the build uses no-tests and does not need them. The build is out of tree against the RavenBSD libc clang sysroot; the only compatibility code is addons/tls/compat/tls_compat.c."

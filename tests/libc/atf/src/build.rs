@@ -457,15 +457,24 @@ pub fn classify(stderr: &str) -> String {
 /// Collect every missing header and symbol from compiler stderr.
 pub fn classify_into(stderr: &str, headers: &mut BTreeSet<String>, symbols: &mut BTreeSet<String>) {
     for line in stderr.lines() {
-        if let Some(rest) = line.split("fatal error: ").nth(1)
-            && let Some(header) = rest.split(':').next()
-            && !header.trim().is_empty()
-        {
-            headers.insert(header.trim().to_string());
+        if let Some(rest) = line.split("fatal error: ").nth(1) {
+            let rest = rest.trim();
+            // clang's error limit line is not a header; the real fatal error precedes it.
+            if !rest.starts_with("too many errors") {
+                let quoted = rest
+                    .strip_prefix('\'')
+                    .and_then(|value| value.split('\'').next());
+                let header = quoted.unwrap_or_else(|| rest.split(':').next().unwrap_or(rest));
+                let header = header.trim().trim_matches(['\'', '"', '`']);
+                if !header.is_empty() {
+                    headers.insert(header.to_string());
+                }
+            }
         }
         for marker in [
             "undefined reference to ",
             "implicit declaration of function ",
+            "undefined symbol: ",
         ] {
             if let Some(rest) = line.split(marker).nth(1) {
                 let symbol: String = rest

@@ -13,6 +13,8 @@ pub const REPORT_DESCRIPTOR_TYPE: u8 = 0x22;
 pub const GENERIC_DESKTOP: u16 = 0x01;
 /// Keyboard application usage.
 pub const KEYBOARD_USAGE: u16 = 0x06;
+/// Mouse application usage.
+pub const MOUSE_USAGE: u16 = 0x02;
 /// Maximum parsed report fields.
 pub const MAX_FIELDS: usize = 16;
 /// Global-item push/pop depth.
@@ -76,7 +78,29 @@ impl ReportLayout {
         self.usage_page == GENERIC_DESKTOP
             && self.usage == KEYBOARD_USAGE
             && self.report_id == 0
-            && self.input_bits >= 64
+            && self.input_bits == 64
+    }
+
+    /// The boot mouse report length: three bytes, or four with the wheel byte.
+    ///
+    /// Returns `None` when the layout is not a Generic Desktop mouse without a report ID, or the
+    /// input payload is not the boot mouse's 24 or 32 bits.
+    #[must_use]
+    pub fn boot_mouse_report_len(&self) -> Option<usize> {
+        if self.usage_page != GENERIC_DESKTOP || self.usage != MOUSE_USAGE || self.report_id != 0 {
+            return None;
+        }
+        match self.input_bits {
+            24 => Some(3),
+            32 => Some(4),
+            _ => None,
+        }
+    }
+
+    /// True when this is a three- or four-byte boot mouse layout.
+    #[must_use]
+    pub fn is_boot_mouse(&self) -> bool {
+        self.boot_mouse_report_len().is_some()
     }
 }
 
@@ -248,7 +272,9 @@ pub fn parse_report_descriptor(data: &[u8]) -> Result<ReportLayout, Error> {
                     reset_local(&mut usage, &mut usage_min, &mut usage_max);
                 }
                 0xa => {
-                    if usage != 0 {
+                    // Only the top-level Application collection names the device; an inner
+                    // Physical/Logical collection must not overwrite the application usage.
+                    if usage != 0 && value == 0x01 {
                         layout.usage_page = usage_page;
                         layout.usage = usage;
                     }
@@ -303,4 +329,22 @@ pub(crate) const BOOT_DESCRIPTOR: [u8; 63] = [
     0x75, 0x01, 0x95, 0x08, 0x81, 0x02, 0x95, 0x01, 0x75, 0x08, 0x81, 0x01, 0x95, 0x06, 0x75, 0x08,
     0x15, 0x00, 0x25, 0x65, 0x05, 0x07, 0x19, 0x00, 0x29, 0x65, 0x81, 0x00, 0x05, 0x08, 0x19, 0x01,
     0x29, 0x05, 0x95, 0x05, 0x75, 0x01, 0x91, 0x02, 0x95, 0x01, 0x75, 0x03, 0x91, 0x01, 0xc0,
+];
+
+/// A standard three-byte boot-mouse report descriptor, shared by the host tests.
+#[cfg(test)]
+pub(crate) const BOOT_MOUSE_3_DESCRIPTOR: [u8; 50] = [
+    0x05, 0x01, 0x09, 0x02, 0xa1, 0x01, 0x09, 0x01, 0xa1, 0x00, 0x05, 0x09, 0x19, 0x01, 0x29, 0x03,
+    0x15, 0x00, 0x25, 0x01, 0x95, 0x03, 0x75, 0x01, 0x81, 0x02, 0x95, 0x01, 0x75, 0x05, 0x81, 0x01,
+    0x05, 0x01, 0x09, 0x30, 0x09, 0x31, 0x15, 0x81, 0x25, 0x7f, 0x75, 0x08, 0x95, 0x02, 0x81, 0x06,
+    0xc0, 0xc0,
+];
+
+/// A four-byte (wheel) boot-mouse report descriptor, shared by the host tests.
+#[cfg(test)]
+pub(crate) const BOOT_MOUSE_DESCRIPTOR: [u8; 52] = [
+    0x05, 0x01, 0x09, 0x02, 0xa1, 0x01, 0x09, 0x01, 0xa1, 0x00, 0x05, 0x09, 0x19, 0x01, 0x29, 0x03,
+    0x15, 0x00, 0x25, 0x01, 0x95, 0x03, 0x75, 0x01, 0x81, 0x02, 0x95, 0x01, 0x75, 0x05, 0x81, 0x01,
+    0x05, 0x01, 0x09, 0x30, 0x09, 0x31, 0x09, 0x38, 0x15, 0x81, 0x25, 0x7f, 0x75, 0x08, 0x95, 0x03,
+    0x81, 0x06, 0xc0, 0xc0,
 ];
