@@ -16,6 +16,9 @@
 #[path = "../../crates/raven-ringbuf/src/lib.rs"]
 mod ringbuf;
 
+#[path = "arch/x86_64/i8042.rs"]
+mod i8042;
+
 use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crate::arch::x86_64::{acpi, apic, idt, ioapic, serial};
@@ -48,6 +51,10 @@ static DROP_REPORTED: AtomicU64 = AtomicU64::new(0);
 /// Called once at boot, after the IDT and IOAPIC are initialised and before interrupts are
 /// enabled.  The redirection entry is programmed masked by `ioapic::route` and unmasked here.
 pub fn init() {
+    // S59: the PS/2 keyboard shares this ring. It needs the IDT and IOAPIC, which the caller
+    // installed before this function runs; a failure keeps the serial console working.
+    i8042::init();
+
     let gsi = ioapic::gsi_for_isa(ISA_IRQ);
     let (active_low, level) = acpi::info()
         .override_for_isa(ISA_IRQ)
@@ -96,6 +103,15 @@ pub fn polling() -> bool {
 /// Called by the interrupt handler and by the polling fallback.  Lock-free and allocation-free.
 pub fn push_byte(byte: u8) {
     RX.push(byte);
+}
+
+/// Feed one translated keyboard byte and wake a reader.
+///
+/// Called from the IRQ1 handler; it is the same queue the serial receiver uses, so a console
+/// client cannot tell the two sources apart.
+pub fn feed_key(byte: u8) {
+    push_byte(byte);
+    notify();
 }
 
 /// Drain the UART into the ring, returning true when at least one byte arrived.
