@@ -11,14 +11,14 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 
 | area | total | missing | partial | present | waived |
 |---|---:|---:|---:|---:|---:|
-| filesystem | 20 | 3 | 1 | 16 | 0 |
+| filesystem | 20 | 1 | 1 | 18 | 0 |
 | headers | 86 | 2 | 48 | 36 | 0 |
 | interfaces | 1421 | 627 | 0 | 794 | 0 |
 | process | 17 | 0 | 0 | 10 | 7 |
 | shell | 25 | 13 | 12 | 0 | 0 |
 | tty | 12 | 10 | 2 | 0 | 0 |
 | utilities | 216 | 109 | 7 | 100 | 0 |
-| **all** | **1797** | **764** | **70** | **956** | **7** |
+| **all** | **1797** | **762** | **70** | **958** | **7** |
 
 Traceability rows: 1797; profile rows: 1797.
 
@@ -1805,7 +1805,7 @@ Traceability rows: 1797; profile rows: 1797.
 | `filesystem.permission` | `permission` | present | P5 | `qtest:perm` | PG-23, PG-33 |
 | `filesystem.record-lock` | `record-lock` | missing | P5 | `none` | PG-32 |
 | `filesystem.rename` | `rename` | present | P5 | `qtest:posix-fs` | PG-31 |
-| `filesystem.sparse-file` | `sparse-file` | missing | P5 | `none` | PG-32 |
+| `filesystem.sparse-file` | `sparse-file` | present | P5 | `test:tests/posix/fs/sparse-file/test.sh` | PG-32 |
 | `filesystem.special-file` | `special-file` | present | P5 | `qtest:fsd-ufs-rw` | PG-34, PG-35 |
 | `filesystem.stat-family` | `stat-family` | present | P5 | `qtest:posix-fs` | PG-30 |
 | `filesystem.statvfs` | `statvfs` | present | P5 | `qtest:fsd-ufs-rw` | PG-30 |
@@ -1813,7 +1813,7 @@ Traceability rows: 1797; profile rows: 1797.
 | `filesystem.sync` | `sync` | present | P5 | `qtest:fsd-ufs-rw` | PG-32 |
 | `filesystem.timestamp` | `timestamp` | present | P5 | `qtest:fsd-ufs-rw` | PG-30 |
 | `filesystem.truncate` | `truncate` | present | P5 | `qtest:posix-fs` | PG-32 |
-| `filesystem.umask` | `umask` | missing | P5 | `none` | PG-24 |
+| `filesystem.umask` | `umask` | present | P5 | `test:tests/posix/fs/umask/test.sh` | PG-24 |
 
 ## Process behaviour
 
@@ -1895,8 +1895,6 @@ Traceability rows: 1797; profile rows: 1797.
 |---|---|---|
 | filesystem | `mmap-file` | `kernel/src/memory/uspace.rs` |
 | filesystem | `record-lock` | `none` |
-| filesystem | `sparse-file` | `none` |
-| filesystem | `umask` | `none` |
 | header | `aio.h` | `libc/ravenlibc/include` |
 | header | `complex.h` | `libc/ravenlibc/include` |
 | header | `dirent.h` | `libc/ravenlibc/include` |
@@ -1973,5 +1971,7 @@ Traceability rows: 1797; profile rows: 1797.
 | interface | `asinfNx` | `none` |
 | interface | `asinhfNx` | `none` |
 | interface | `asinhl` | `none` |
+| interface | `asinl` | `none` |
+| interface | `asinpi` | `none` |
 
-841 gap rows are listed in full in the tables above; this short table is a review aid.
+839 gap rows are listed in full in the tables above; this short table is a review aid.

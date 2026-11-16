@@ -22,8 +22,8 @@ mod program {
     use fsd_ufs::block::open_partition;
     use raven_abi::errno::Errno;
     use raven_proto_fs::{
-        Call, CallRequest, CallResponse, O_APPEND, O_CREAT, O_RDWR, O_WRONLY, S_IFCHR, S_IFIFO,
-        S_IFMT, S_IFREG, SetTime, StatVfs,
+        Call, CallRequest, CallResponse, O_APPEND, O_CREAT, O_RDONLY, O_RDWR, O_WRONLY, S_IFCHR,
+        S_IFIFO, S_IFMT, S_IFREG, SetTime, StatVfs,
     };
     use raven_proto_svc::{Op, State, Status};
     use raven_rt::entry;
@@ -57,6 +57,7 @@ mod program {
         create_write_truncate()?;
         namespace()?;
         posix_operations()?;
+        sparse_file()?;
         persistence()?;
         Ok(())
     }
@@ -240,6 +241,40 @@ mod program {
         }
 
         raven_rt::println!("fsd-ufs-rw: probe posix operations ok");
+        Ok(())
+    }
+
+    fn sparse_file() -> Result<(), String> {
+        let path = "file:/ufs/posix/sparse";
+        let file = fs::open(path, O_RDWR | O_CREAT)
+            .map_err(|error| format!("sparse create: {}", error.description()))?;
+        file.close()
+            .map_err(|error| format!("sparse close: {}", error.description()))?;
+        truncate_file(path, 1024 * 1024)?;
+        let stat =
+            fs::stat(path).map_err(|error| format!("sparse stat: {}", error.description()))?;
+        if stat.size != 1024 * 1024 || stat.blocks * 512 >= stat.size / 4 {
+            return Err(format!("sparse size={} blocks={}", stat.size, stat.blocks));
+        }
+        let mut file = fs::open(path, O_RDONLY)
+            .map_err(|error| format!("sparse open: {}", error.description()))?;
+        let mut data = [0xffu8; 4096];
+        let mut position = 0usize;
+        while position < 512 * 1024 + data.len() {
+            let read = file
+                .read(&mut data)
+                .map_err(|error| format!("sparse read: {}", error.description()))?;
+            if read == 0 {
+                return Err("sparse file ended early".to_string());
+            }
+            if data[..read].iter().any(|byte| *byte != 0) {
+                return Err("sparse hole did not read as zeros".to_string());
+            }
+            position += read;
+        }
+        file.close()
+            .map_err(|error| format!("sparse close: {}", error.description()))?;
+        raven_rt::println!("fsd-ufs-rw: probe sparse ok");
         Ok(())
     }
 

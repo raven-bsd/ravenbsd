@@ -6,20 +6,20 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-16T21:51:19Z
+- Date: 2026-11-16T22:26:11Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: target QEMU
 - Tool: `posix-conform 0.1.0`
 - Result: **FAIL (release blocked)**
-- Counts: 837 pass, 926 fail, 10 skip
+- Counts: 879 pass, 919 fail, 10 skip
 
 ## Summary
 
 | area | pass | fail | skip |
 |---|---:|---:|---:|
 | external | 0 | 0 | 3 |
-| filesystem | 16 | 4 | 0 |
+| filesystem | 18 | 2 | 0 |
 | header | 30 | 56 | 0 |
 | interface | 713 | 708 | 0 |
 | link | 1 | 0 | 0 |
@@ -27,8 +27,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | shell | 0 | 25 | 0 |
 | target | 0 | 0 | 7 |
 | tty | 0 | 12 | 0 |
-| utility | 60 | 121 | 0 |
-| **all** | **837** | **926** | **10** |
+| utility | 100 | 116 | 0 |
+| **all** | **879** | **919** | **10** |
 
 ## Rows
 
@@ -48,7 +48,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `filesystem.permission` | filesystem | pass | `qtest:perm` |  |
 | `filesystem.record-lock` | filesystem | fail | `none` | profile status missing; no executable POSIX behaviour test |
 | `filesystem.rename` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.sparse-file` | filesystem | fail | `none` | profile status missing; no executable POSIX behaviour test |
+| `filesystem.sparse-file` | filesystem | pass | `test:tests/posix/fs/sparse-file/test.sh` |  |
 | `filesystem.special-file` | filesystem | pass | `qtest:fsd-ufs-rw` |  |
 | `filesystem.stat-family` | filesystem | pass | `qtest:posix-fs` |  |
 | `filesystem.statvfs` | filesystem | pass | `qtest:fsd-ufs-rw` |  |
@@ -56,7 +56,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `filesystem.sync` | filesystem | pass | `qtest:fsd-ufs-rw` |  |
 | `filesystem.timestamp` | filesystem | pass | `qtest:fsd-ufs-rw` |  |
 | `filesystem.truncate` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.umask` | filesystem | fail | `none` | profile status missing; no executable POSIX behaviour test |
+| `filesystem.umask` | filesystem | pass | `test:tests/posix/fs/umask/test.sh` |  |
 | `header.aio.h` | header | fail | `profile` | profile status partial |
 | `header.arpa-inet.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_1.c` |  |
 | `header.assert.h` | header | pass | `test:tests/posix/check-headers.sh` |  |
@@ -1628,11 +1628,16 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `tty.ttyname` | tty | fail | `libc/ravenlibc/include/unistd.h` | profile status partial; no executable POSIX behaviour test |
 | `util.admin` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.alias` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.ar` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.ar` | utility | pass | `test:tests/posix/utility/archive/ar/test.sh` |  |
+| `util.arch` | utility | pass | `test:tests/posix/utility/misc/arch/test.sh` |  |
 | `util.asa` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.at` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.awk` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.awk` | utility | pass | `test:tests/posix/utility/text2/awk/test.sh` |  |
+| `util.b2sum` | utility | pass | `test:tests/posix/utility/misc/b2sum/test.sh` |  |
+| `util.base32` | utility | pass | `test:tests/posix/utility/misc/base32/test.sh` |  |
+| `util.base64` | utility | pass | `test:tests/posix/utility/misc/base64/test.sh` |  |
 | `util.basename` | utility | pass | `test:tests/posix/utility/text/basename/test.sh` |  |
+| `util.basenc` | utility | pass | `test:tests/posix/utility/misc/basenc/test.sh` |  |
 | `util.batch` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.bc` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.bg` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1664,6 +1669,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.delta` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.df` | utility | pass | `test:tests/posix/utility/file/df/test.sh` |  |
 | `util.diff` | utility | pass | `test:tests/posix/utility/text2/diff/test.sh` |  |
+| `util.dircolors` | utility | pass | `test:tests/posix/utility/misc/dircolors/test.sh` |  |
 | `util.dirname` | utility | pass | `test:tests/posix/utility/text/dirname/test.sh` |  |
 | `util.dot` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.du` | utility | pass | `test:tests/posix/utility/file/du/test.sh` |  |
@@ -1677,11 +1683,13 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.expand` | utility | pass | `test:tests/posix/utility/text/expand/test.sh` |  |
 | `util.export` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.expr` | utility | pass | `test:tests/posix/utility/text/expr/test.sh` |  |
+| `util.factor` | utility | pass | `test:tests/posix/utility/misc/factor/test.sh` |  |
 | `util.false` | utility | pass | `test:tests/posix/utility/misc/false/test.sh` |  |
 | `util.fc` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.fg` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.file` | utility | pass | `test:tests/posix/utility/file/file/test.sh` |  |
 | `util.find` | utility | pass | `test:tests/posix/utility/file/find/test.sh` |  |
+| `util.fmt` | utility | pass | `test:tests/posix/utility/misc/fmt/test.sh` |  |
 | `util.fold` | utility | pass | `test:tests/posix/utility/text/fold/test.sh` |  |
 | `util.fort77` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.gencat` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1689,10 +1697,13 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.getconf` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.getopts` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.grep` | utility | pass | `test:tests/posix/utility/text2/grep/test.sh` |  |
+| `util.groups` | utility | pass | `test:tests/posix/utility/misc/groups/test.sh` |  |
 | `util.hash` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.head` | utility | pass | `test:tests/posix/utility/text/head/test.sh` |  |
+| `util.hostid` | utility | pass | `test:tests/posix/utility/misc/hostid/test.sh` |  |
 | `util.iconv` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.id` | utility | fail | `userland/bin/id` | profile status partial; no POSIX utility test |
+| `util.install` | utility | pass | `test:tests/posix/utility/misc/install/test.sh` |  |
 | `util.ipcrm` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.ipcs` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.jobs` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1712,10 +1723,12 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.mailx` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.make` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.man` | utility | fail | `userland/bin/man` | profile status partial; no POSIX utility test |
+| `util.md5sum` | utility | pass | `test:tests/posix/utility/misc/md5sum/test.sh` |  |
 | `util.mesg` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.mkdir` | utility | pass | `test:tests/posix/utility/file/mkdir/test.sh` |  |
 | `util.mkfifo` | utility | pass | `test:tests/posix/utility/file/mkfifo/test.sh` |  |
 | `util.mknod` | utility | pass | `test:tests/posix/utility/file/mknod/test.sh` |  |
+| `util.mktemp` | utility | pass | `test:tests/posix/utility/misc/mktemp/test.sh` |  |
 | `util.more` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.mv` | utility | pass | `test:tests/posix/utility/file/mv/test.sh` |  |
 | `util.neqn` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1724,15 +1737,20 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.nl` | utility | pass | `test:tests/posix/utility/text/nl/test.sh` |  |
 | `util.nm` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.nohup` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.nproc` | utility | pass | `test:tests/posix/utility/misc/nproc/test.sh` |  |
+| `util.numfmt` | utility | pass | `test:tests/posix/utility/misc/numfmt/test.sh` |  |
 | `util.od` | utility | pass | `test:tests/posix/utility/text/od/test.sh` |  |
 | `util.paste` | utility | pass | `test:tests/posix/utility/text/paste/test.sh` |  |
 | `util.patch` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.pathchk` | utility | pass | `test:tests/posix/utility/file/pathchk/test.sh` |  |
 | `util.pax` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.pinky` | utility | pass | `test:tests/posix/utility/misc/pinky/test.sh` |  |
 | `util.pr` | utility | pass | `test:tests/posix/utility/text/pr/test.sh` |  |
+| `util.printenv` | utility | pass | `test:tests/posix/utility/misc/printenv/test.sh` |  |
 | `util.printf` | utility | pass | `test:tests/posix/utility/text/printf/test.sh` |  |
 | `util.prs` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.ps` | utility | fail | `userland/bin/ps` | profile status partial; no POSIX utility test |
+| `util.ptx` | utility | pass | `test:tests/posix/utility/misc/ptx/test.sh` |  |
 | `util.pwd` | utility | pass | `test:tests/posix/utility/file/pwd/test.sh` |  |
 | `util.qalter` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.qdel` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1756,29 +1774,43 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.rmdir` | utility | pass | `test:tests/posix/utility/file/rmdir/test.sh` |  |
 | `util.sact` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.sccs` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.sed` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.sed` | utility | pass | `test:tests/posix/utility/text2/sed/test.sh` |  |
+| `util.seq` | utility | pass | `test:tests/posix/utility/misc/seq/test.sh` |  |
 | `util.set` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.sh` | utility | fail | `userland/bin/rsh` | profile status partial; no POSIX utility test |
+| `util.sha1sum` | utility | pass | `test:tests/posix/utility/misc/sha1sum/test.sh` |  |
+| `util.sha224sum` | utility | pass | `test:tests/posix/utility/misc/sha224sum/test.sh` |  |
+| `util.sha256sum` | utility | pass | `test:tests/posix/utility/misc/sha256sum/test.sh` |  |
+| `util.sha384sum` | utility | pass | `test:tests/posix/utility/misc/sha384sum/test.sh` |  |
+| `util.sha512sum` | utility | pass | `test:tests/posix/utility/misc/sha512sum/test.sh` |  |
 | `util.shift` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.shred` | utility | pass | `test:tests/posix/utility/misc/shred/test.sh` |  |
+| `util.shuf` | utility | pass | `test:tests/posix/utility/misc/shuf/test.sh` |  |
 | `util.sleep` | utility | pass | `test:tests/posix/utility/misc/sleep/test.sh` |  |
 | `util.sort` | utility | pass | `test:tests/posix/utility/text/sort/test.sh` |  |
 | `util.split` | utility | pass | `test:tests/posix/utility/text/split/test.sh` |  |
 | `util.stat` | utility | pass | `test:tests/posix/utility/file/stat/test.sh` |  |
+| `util.stdbuf` | utility | pass | `test:tests/posix/utility/misc/stdbuf/test.sh` |  |
 | `util.strings` | utility | pass | `test:tests/posix/utility/text2/strings/test.sh` |  |
 | `util.strip` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.stty` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.sum` | utility | pass | `test:tests/posix/utility/misc/sum/test.sh` |  |
+| `util.sync` | utility | pass | `test:tests/posix/utility/misc/sync/test.sh` |  |
 | `util.tabs` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.tac` | utility | pass | `test:tests/posix/utility/misc/tac/test.sh` |  |
 | `util.tail` | utility | pass | `test:tests/posix/utility/text/tail/test.sh` |  |
 | `util.talk` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.tee` | utility | pass | `test:tests/posix/utility/text/tee/test.sh` |  |
 | `util.test` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.time` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.timeout` | utility | pass | `test:tests/posix/utility/misc/timeout/test.sh` |  |
 | `util.times` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.touch` | utility | pass | `test:tests/posix/utility/file/touch/test.sh` |  |
 | `util.tput` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.tr` | utility | pass | `test:tests/posix/utility/text/tr/test.sh` |  |
 | `util.trap` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.true` | utility | pass | `test:tests/posix/utility/misc/true/test.sh` |  |
+| `util.truncate` | utility | pass | `test:tests/posix/utility/misc/truncate/test.sh` |  |
 | `util.tsort` | utility | pass | `test:tests/posix/utility/text/tsort/test.sh` |  |
 | `util.tty` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.type` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1792,9 +1824,11 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.uniq` | utility | pass | `test:tests/posix/utility/text/uniq/test.sh` |  |
 | `util.unlink` | utility | pass | `test:tests/posix/utility/file/unlink/test.sh` |  |
 | `util.unset` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.uptime` | utility | pass | `test:tests/posix/utility/misc/uptime/test.sh` |  |
+| `util.users` | utility | pass | `test:tests/posix/utility/misc/users/test.sh` |  |
 | `util.uucp` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.uudecode` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.uuencode` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.uudecode` | utility | pass | `test:tests/posix/utility/archive/uudecode/test.sh` |  |
+| `util.uuencode` | utility | pass | `test:tests/posix/utility/archive/uuencode/test.sh` |  |
 | `util.uustat` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.uux` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.val` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1806,4 +1840,5 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.write` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.xargs` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.yacc` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.yes` | utility | pass | `test:tests/posix/utility/misc/yes/test.sh` |  |
 | `util.zcat` | utility | fail | `none` | profile status missing; no POSIX utility test |

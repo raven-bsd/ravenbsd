@@ -74,7 +74,7 @@ evidence = "qtest:posix-fs"
 id = "filesystem.sparse-file"
 ticket = "P5"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/fs/sparse-file/test.sh"
 
 [[trace]]
 id = "filesystem.special-file"
@@ -122,7 +122,7 @@ evidence = "qtest:posix-fs"
 id = "filesystem.umask"
 ticket = "P5"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/fs/umask/test.sh"
 
 [[trace]]
 id = "header.aio.h"

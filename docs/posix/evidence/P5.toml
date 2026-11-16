@@ -101,3 +101,15 @@ id = "filesystem.truncate"
 status = "present"
 evidence = "qtest:posix-fs"
 notes = "P5: ftruncate shrink, zero extension and truncate call cursor updates"
+
+[[row]]
+id = "filesystem.sparse-file"
+status = "present"
+evidence = "test:tests/posix/fs/sparse-file/test.sh"
+notes = "P5: UFS extension creates holes; st_blocks stays far below the file size and reads return zeros"
+
+[[row]]
+id = "filesystem.umask"
+status = "present"
+evidence = "test:tests/posix/fs/umask/test.sh"
+notes = "P5: the process-local umask masks mkdir and O_CREAT modes through the libc platform"

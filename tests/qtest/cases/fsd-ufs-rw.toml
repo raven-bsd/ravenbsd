@@ -50,6 +50,9 @@ regex = '^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$'
 regex = '^fsd-ufs-rw: probe posix operations ok$'
 
 [[expect]]
+regex = '^fsd-ufs-rw: probe sparse ok$'
+
+[[expect]]
 regex = '^fsd-ufs-rw: probe unlink/rmdir ok$'
 
 [[expect]]

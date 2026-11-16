@@ -274,6 +274,27 @@ fn utimens_sets_the_requested_timestamps() {
 }
 
 #[test]
+fn sparse_extension_keeps_block_accounting_small() {
+    let mut view = rw_view();
+    let ino = view.create_file("/sparse", 0o644, true).expect("create");
+    view.truncate(ino, 1024 * 1024).expect("truncate");
+    let stat = view.stat(ino).expect("stat");
+    assert_eq!(stat.size, 1024 * 1024);
+    assert!(
+        stat.blocks * 512 < stat.size / 4,
+        "sparse blocks={} size={}",
+        stat.blocks,
+        stat.size
+    );
+    let mut buffer = [0xffu8; 4096];
+    assert_eq!(view.read(ino, 512 * 1024, &mut buffer), Ok(4096));
+    assert!(buffer.iter().all(|byte| *byte == 0));
+    assert_eq!(view.write(ino, 512 * 1024, b"data"), Ok(4));
+    let stat = view.stat(ino).expect("stat after write");
+    assert!(stat.blocks * 512 < stat.size / 4);
+}
+
+#[test]
 fn mkfifo_and_mknod_create_special_inodes() {
     let mut view = rw_view();
     view.mkfifo("/pipe", 0o640).expect("mkfifo");
