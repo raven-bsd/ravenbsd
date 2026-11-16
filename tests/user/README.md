@@ -1,11 +1,20 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# U2 user-tool fixtures
+# User-tool fixtures and U4 matrix
 
-These are the expected account files after the U2 library operations exercised by
-`cargo nextest run -p raven-userdb`. They extend the canonical vectors in
-`tests/fixtures/user-management/`; no file here is a production account database.
+This directory holds the U2 expected account files and the U4 host matrix crate
+(`raven-user-tests`). The matrix drives the seven tool argument layers and `raven-userdb` against
+the canonical fixtures and the 0.1.0 image files:
+
+```
+cargo nextest run -p raven-user-tests
+```
+
+`tests/fixtures/user-management/` remains the canonical input set. No file here is a production
+account database, and no fixture contains a plaintext password.
+
+## U2 expected files
 
 | File | Scenario |
 |---|---|

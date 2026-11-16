@@ -94,6 +94,7 @@ members = [
     "tests/libc/atf",
     "tests/libc/gate",
     "tests/libc/toolchain-abi",
+    "tests/user",
     "tests/ufs-powercut",
     "tools/fs-fuzz",
     "tools/linux-corpus",
