@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.files]]
+src = "etc/raven/raven.toml"
+path = "/etc/raven/raven.toml"
+
+[[initfs.files]]
+src = "etc/raven/profiles/base.toml"
+path = "/etc/raven/profiles/base.toml"
+
+[[initfs.files]]
+src = "etc/raven/profiles/tiny.toml"
+path = "/etc/raven/profiles/tiny.toml"
+
+[[initfs.files]]
+src = "etc/raven/profiles/server.toml"
+path = "/etc/raven/profiles/server.toml"

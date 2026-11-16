@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# RavenBSD brush interactive rc. The service starts brush with
+# `--rcfile /etc/brush/brushrc`; non-interactive `brush -c` does not load it.
+
+if [ -n "${NO_COLOR:-}" ] || [ "${TERM:-}" = "dumb" ]; then
+    PS1='root@raven:\w\$ '
+else
+    # Raven Violet: accent #b388ff (xterm 183), path #f8f8f2 (231).
+    PS1='\[\e[38;5;183m\]root@raven\[\e[0m\]:\[\e[38;5;231m\]\w\[\e[0m\]\[\e[38;5;183m\]\$\[\e[0m\] '
+fi
+
+# A writable, image-local history store; the initfs itself is read-only.
+HISTFILE=/tmp/brush_history
+HISTCONTROL=ignoreboth
+HISTTIMEFORMAT='%F %T '
+HISTSIZE=1000
+
+# brush supplies command and path completion by default; this spec is the
+# contract probe used by the modern-shell qtest.
+complete -W 'help exit' raven-test 2>/dev/null || true

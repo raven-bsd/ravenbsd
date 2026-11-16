@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2024 reuben olinsky
 
-use std::io::{BufRead, IsTerminal, Write};
+use std::io::{BufRead, Write};
+#[cfg(not(target_os = "ravenbsd"))]
+use std::io::IsTerminal;
 
 use crate::{
     InputBackend, ShellError,
@@ -22,10 +24,79 @@ impl InputBackend for MinimalInputBackend {
         shell_ref: &crate::ShellRef<impl brush_core::ShellExtensions>,
         prompt: InteractivePrompt,
     ) -> Result<ReadResult, ShellError> {
-        let stdin = std::io::stdin();
-        let prompt = stdin.is_terminal().then_some(&prompt);
+        // RavenBSD's static binary startup does not initialize std's stdin thread-local
+        // destructors yet; read fd 0 through a borrowed File instead. The console scheme
+        // already returns whole canonical lines, so a BufReader is enough.
+        #[cfg(target_os = "ravenbsd")]
+        {
+            let mut reader = std::io::BufReader::new(ConsoleReader::new());
+            // The console is the serial output; a borrowed fd avoids std's stdout/stderr
+            // thread-local destructor path in the static binary.
+            return Self::read_program_from(
+                shell_ref,
+                Some(&prompt),
+                &mut reader,
+                &mut ConsoleWriter::new(),
+            );
+        }
 
-        Self::read_program_from(shell_ref, prompt, &mut stdin.lock(), &mut std::io::stderr())
+        #[cfg(not(target_os = "ravenbsd"))]
+        {
+            let stdin = std::io::stdin();
+            let prompt = stdin.is_terminal().then_some(&prompt);
+
+            Self::read_program_from(shell_ref, prompt, &mut stdin.lock(), &mut std::io::stderr())
+        }
+    }
+}
+
+/// A borrowed fd-0 reader for RavenBSD's console handle.
+#[cfg(target_os = "ravenbsd")]
+struct ConsoleReader(std::mem::ManuallyDrop<std::fs::File>);
+
+#[cfg(target_os = "ravenbsd")]
+impl ConsoleReader {
+    fn new() -> Self {
+        use std::os::unix::io::FromRawFd;
+
+        // SAFETY: fd 0 is the process's standard input; ManuallyDrop keeps us from closing it.
+        Self(std::mem::ManuallyDrop::new(unsafe {
+            std::fs::File::from_raw_fd(0)
+        }))
+    }
+}
+
+#[cfg(target_os = "ravenbsd")]
+impl std::io::Read for ConsoleReader {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        std::io::Read::read(&mut *self.0, buffer)
+    }
+}
+
+/// A borrowed fd-1 writer for the console prompt.
+#[cfg(target_os = "ravenbsd")]
+struct ConsoleWriter(std::mem::ManuallyDrop<std::fs::File>);
+
+#[cfg(target_os = "ravenbsd")]
+impl ConsoleWriter {
+    fn new() -> Self {
+        use std::os::unix::io::FromRawFd;
+
+        // SAFETY: fd 1 is the process's standard output; ManuallyDrop keeps us from closing it.
+        Self(std::mem::ManuallyDrop::new(unsafe {
+            std::fs::File::from_raw_fd(1)
+        }))
+    }
+}
+
+#[cfg(target_os = "ravenbsd")]
+impl std::io::Write for ConsoleWriter {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        std::io::Write::write(&mut *self.0, buffer)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        std::io::Write::flush(&mut *self.0)
     }
 }
 
