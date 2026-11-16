@@ -5,7 +5,9 @@
 
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
+use raven_linux_abi::flags::clone as clone_flags;
 use raven_linux_dispatch::SyscallArgs;
+use raven_proto_linux::LinuxFrame;
 
 use crate::files::O_CLOEXEC;
 use crate::files::O_RDWR;
@@ -13,7 +15,7 @@ use crate::files::O_RDWR;
 use super::*;
 
 fn process() -> LinuxProcess {
-    LinuxProcess::new(7, Handle(9), 0x4000, 0x5000, 0x8000, 0x9000)
+    LinuxProcess::new(7, 7, Handle(1), Handle(9), 0x4000, 0x5000, 0x8000, 0x9000)
 }
 
 fn call(nr: usize, a: [usize; 6]) -> SyscallArgs {
@@ -160,17 +162,84 @@ fn arch_prctl_get_fs_copies_the_stored_base() {
 }
 
 #[test]
+fn process_identity_handlers_record_the_linux_state() {
+    let mut process = process();
+    assert_eq!(dispatch(&mut process, 186, [0; 6]), 7);
+    assert_eq!(dispatch(&mut process, 218, [0x3000, 0, 0, 0, 0, 0]), 7);
+    assert_eq!(process.clear_tid, 0x3000);
+    assert_eq!(dispatch(&mut process, 273, [0x4000, 24, 0, 0, 0, 0]), 0);
+    assert_eq!(process.robust_list, 0x4000);
+    assert_eq!(process.robust_list_len, 24);
+    assert_eq!(
+        dispatch(&mut process, 273, [0x4000, 16, 0, 0, 0, 0]),
+        -(Errno::EINVAL.0 as isize)
+    );
+    process.user_buffer.extend_from_slice(b"worker\0");
+    assert_eq!(dispatch(&mut process, 157, [15, 0x5000, 0, 0, 0, 0]), 0);
+    assert_eq!(process.comm(), b"worker");
+    assert_eq!(dispatch(&mut process, 157, [16, 0x5000, 0, 0, 0, 0]), 0);
+    let (address, bytes) = process.pending_write.take().expect("the name copy-out");
+    assert_eq!(address, 0x5000);
+    assert_eq!(bytes, b"worker\0\0\0\0\0\0\0\0\0\0");
+}
+
+fn clone_frame() -> LinuxFrame {
+    let mut gprs = [0u64; raven_proto_linux::FRAME_GPRS];
+    gprs[0] = 56;
+    gprs[1] = 0x1234;
+    LinuxFrame {
+        rip: 0x40_1234,
+        rsp: 0x7fff_0000,
+        rflags: 0x202,
+        fs_base: 0x7000,
+        gprs,
+    }
+}
+
+#[test]
+fn clone_queues_the_frame_and_arguments_for_the_trap_loop() {
+    let mut process = process();
+    process.frame = Some(clone_frame());
+    let flags = clone_flags::CLONE_VM | clone_flags::CLONE_THREAD | clone_flags::CLONE_SIGHAND;
+    assert_eq!(
+        dispatch(&mut process, 56, [flags as usize, 0x9000, 0, 0, 0x7000, 0]),
+        0
+    );
+    let request = process.pending_clone.take().expect("a queued clone");
+    assert_eq!(request.flags, flags);
+    assert_eq!(request.child_stack, 0x9000);
+    assert_eq!(request.tls, 0x7000);
+    assert_eq!(request.frame.rip, 0x40_1234);
+    assert_eq!(request.frame.rsp, 0x7fff_0000);
+}
+
+#[test]
+fn clone_without_a_frame_or_with_bad_flags_is_rejected() {
+    let mut process = process();
+    assert_eq!(
+        dispatch(&mut process, 56, [17, 0, 0, 0, 0, 0]),
+        -(Errno::ENOSYS.0 as isize)
+    );
+    process.frame = Some(clone_frame());
+    assert_eq!(
+        dispatch(&mut process, 56, [0xdead_beef, 0, 0, 0, 0, 0]),
+        -(Errno::EINVAL.0 as isize)
+    );
+    assert!(process.pending_clone.is_none());
+}
+
+#[test]
 fn an_unknown_number_is_enosys_and_counted() {
     let mut process = process();
     let mut dispatcher = dispatcher();
     assert_eq!(
-        dispatcher.dispatch(&mut process, &call(218, [0; 6])),
+        dispatcher.dispatch(&mut process, &call(60, [0; 6])),
         -(Errno::ENOSYS.0 as isize)
     );
     let hits = dispatcher.unimplemented_hits();
     assert_eq!(hits.len(), 1);
-    assert_eq!(hits[0].0, 218);
-    assert_eq!(hits[0].1, Some("set_tid_address"));
+    assert_eq!(hits[0].0, 60);
+    assert_eq!(hits[0].1, Some("exit"));
     assert_eq!(hits[0].2, 1);
 }
 
@@ -183,25 +252,40 @@ fn the_stats_name_every_implemented_handler() {
     assert_eq!(
         names,
         [
+            "access",
             "arch_prctl",
             "brk",
+            "clone",
             "close",
             "dup3",
             "exit_group",
+            "fchmodat",
+            "fchownat",
             "fcntl",
+            "fstat",
             "getdents64",
             "getpid",
+            "gettid",
             "lseek",
+            "lstat",
             "mmap",
+            "newfstatat",
             "open",
             "openat",
+            "prctl",
             "pread64",
             "pwrite64",
             "read",
             "readlink",
             "readlinkat",
             "rt_sigprocmask",
+            "set_robust_list",
+            "set_tid_address",
+            "stat",
+            "statx",
+            "truncate",
             "uname",
+            "utimensat",
             "write"
         ]
     );
@@ -463,6 +547,32 @@ fn lseek_moves_the_read_cursor() {
 }
 
 #[test]
+fn relative_paths_resolve_against_the_linux_cwd() {
+    use crate::rootfs::{RootEntry, RootTree};
+
+    let mut process = process();
+    process.set_root(RootTree::new(&[RootEntry {
+        path: b"/compat/linux/bin/busybox".to_vec(),
+        size: 10,
+        mode: 0o755,
+    }]));
+    assert_eq!(
+        resolve_path(&process, AT_FDCWD, b"./bin"),
+        Ok(b"/compat/linux/bin".to_vec())
+    );
+    assert_eq!(
+        resolve_path(&process, AT_FDCWD, b"bin"),
+        Ok(b"/compat/linux/bin".to_vec())
+    );
+    assert_eq!(
+        resolve_path(&process, AT_FDCWD, b"../linux/bin/"),
+        Ok(b"/compat/linux/bin".to_vec())
+    );
+    let meta = crate::meta::path_meta(&process, b"/compat/linux/bin").expect("bin meta");
+    assert!(meta.mode & 0o170000 == 0o040000);
+}
+
+#[test]
 fn open_errors_are_reported_without_state() {
     let mut process = process();
     set_path(&mut process, b"/proc/nope");
@@ -483,5 +593,200 @@ fn open_errors_are_reported_without_state() {
     assert_eq!(
         dispatch(&mut process, 3, [3, 0, 0, 0, 0, 0]),
         -(Errno::EBADF.0 as isize)
+    );
+}
+
+fn staged_process() -> LinuxProcess {
+    use crate::rootfs::{RootEntry, RootTree};
+
+    let mut process = process();
+    process.set_root(RootTree::new(&[
+        RootEntry {
+            path: b"/compat/linux/bin/busybox".to_vec(),
+            size: 804_616,
+            mode: 0o755,
+        },
+        RootEntry {
+            path: b"/compat/linux/etc/alpine-release".to_vec(),
+            size: 6,
+            mode: 0o644,
+        },
+    ]));
+    process
+}
+
+fn word(bytes: &[u8], offset: usize) -> u64 {
+    u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("u64"))
+}
+
+#[test]
+fn stat_fills_the_x86_64_layout_from_the_staged_tree() {
+    let mut process = staged_process();
+    set_path(&mut process, b"/compat/linux/bin/busybox");
+    assert_eq!(dispatch(&mut process, 4, [0x1000, 0x2000, 0, 0, 0, 0]), 0);
+    let (address, bytes) = process.pending_write.take().expect("stat write");
+    assert_eq!(address, 0x2000);
+    assert_eq!(bytes.len(), 144);
+    assert_eq!(word(&bytes, 48), 804_616); // st_size
+    assert_eq!(
+        word(&bytes, 8),
+        process
+            .root()
+            .lookup(b"/compat/linux/bin/busybox")
+            .unwrap()
+            .ino
+    );
+    assert_eq!(&bytes[24..28], &0o100755u32.to_le_bytes());
+}
+
+#[test]
+fn lstat_serves_a_relative_path_through_the_cwd() {
+    let mut process = staged_process();
+    set_path(&mut process, b"./bin/busybox");
+    assert_eq!(dispatch(&mut process, 6, [0x1000, 0x2000, 0, 0, 0, 0]), 0);
+    let (_, bytes) = process.pending_write.take().expect("lstat write");
+    assert_eq!(word(&bytes, 48), 804_616);
+}
+
+#[test]
+fn fstat_reports_open_files_and_standard_descriptors() {
+    let mut process = staged_process();
+    let fd = process.open_file(
+        b"/compat/linux/bin/busybox".to_vec(),
+        FileKind::Regular(vec![0; 10]),
+    );
+    assert_eq!(
+        dispatch(&mut process, 5, [fd as usize, 0x3000, 0, 0, 0, 0]),
+        0
+    );
+    let (_, bytes) = process.pending_write.take().expect("fstat write");
+    assert_eq!(word(&bytes, 48), 10);
+    assert_eq!(&bytes[24..28], &0o100644u32.to_le_bytes());
+
+    assert_eq!(dispatch(&mut process, 5, [1, 0x3000, 0, 0, 0, 0]), 0);
+    let (_, bytes) = process.pending_write.take().expect("stdout fstat");
+    assert_eq!(&bytes[24..28], &0o020600u32.to_le_bytes());
+}
+
+#[test]
+fn newfstatat_serves_paths_and_at_empty_path() {
+    let mut process = staged_process();
+    set_path(&mut process, b"/compat/linux/etc/alpine-release");
+    assert_eq!(
+        dispatch(
+            &mut process,
+            262,
+            [AT_FDCWD as usize, 0x1000, 0x2000, 0, 0, 0]
+        ),
+        0
+    );
+    let (_, bytes) = process.pending_write.take().expect("newfstatat write");
+    assert_eq!(word(&bytes, 48), 6);
+
+    let fd = process.open_file(
+        b"/compat/linux/bin/busybox".to_vec(),
+        FileKind::Regular(vec![0; 10]),
+    );
+    process.user_buffer.clear();
+    process.user_buffer.push(0);
+    assert_eq!(
+        dispatch(
+            &mut process,
+            262,
+            [fd as usize, 0x1000, 0x3000, AT_EMPTY_PATH as usize, 0, 0]
+        ),
+        0
+    );
+    let (_, bytes) = process.pending_write.take().expect("empty path write");
+    assert_eq!(word(&bytes, 48), 10);
+}
+
+#[test]
+fn statx_reports_the_basic_mask() {
+    let mut process = staged_process();
+    set_path(&mut process, b"/compat/linux/bin/busybox");
+    assert_eq!(
+        dispatch(
+            &mut process,
+            332,
+            [AT_FDCWD as usize, 0x1000, 0, 0x7ff, 0x2000, 0]
+        ),
+        0
+    );
+    let (address, bytes) = process.pending_write.take().expect("statx write");
+    assert_eq!(address, 0x2000);
+    assert_eq!(bytes.len(), 256);
+    assert_eq!(&bytes[0..4], &0x7ffu32.to_le_bytes());
+    assert_eq!(word(&bytes, 40), 804_616);
+}
+
+#[test]
+fn access_checks_read_write_and_execute() {
+    let mut process = staged_process();
+    set_path(&mut process, b"/compat/linux/bin/busybox");
+    assert_eq!(
+        dispatch(&mut process, 21, [0x1000, R_OK as usize, 0, 0, 0, 0]),
+        0
+    );
+    set_path(&mut process, b"/compat/linux/etc/alpine-release");
+    assert_eq!(
+        dispatch(&mut process, 21, [0x1000, W_OK as usize, 0, 0, 0, 0]),
+        -(EROFS as isize)
+    );
+    assert_eq!(
+        dispatch(&mut process, 21, [0x1000, X_OK as usize, 0, 0, 0, 0]),
+        -(Errno::EACCES.0 as isize)
+    );
+    assert_eq!(
+        dispatch(&mut process, 21, [0x1000, 8, 0, 0, 0, 0]),
+        -(Errno::EINVAL.0 as isize)
+    );
+}
+
+#[test]
+fn metadata_changes_report_the_read_only_root() {
+    let mut process = staged_process();
+    set_path(&mut process, b"/compat/linux/bin/busybox");
+    assert_eq!(
+        dispatch(
+            &mut process,
+            268,
+            [AT_FDCWD as usize, 0x1000, 0o644, 0, 0, 0]
+        ),
+        -(EROFS as isize)
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            268,
+            [AT_FDCWD as usize, 0x1000, 0o644, 1, 0, 0]
+        ),
+        -(Errno::EINVAL.0 as isize)
+    );
+    assert_eq!(
+        dispatch(&mut process, 260, [AT_FDCWD as usize, 0x1000, 0, 0, 0, 0]),
+        -(EROFS as isize)
+    );
+    assert_eq!(
+        dispatch(&mut process, 280, [AT_FDCWD as usize, 0x1000, 0, 0, 0, 0]),
+        -(EROFS as isize)
+    );
+    assert_eq!(
+        dispatch(&mut process, 76, [0x1000, 10, 0, 0, 0, 0]),
+        -(EROFS as isize)
+    );
+    assert_eq!(
+        dispatch(&mut process, 76, [0x1000, usize::MAX, 0, 0, 0, 0]),
+        -(Errno::EINVAL.0 as isize)
+    );
+
+    set_path(&mut process, b"/compat/linux/nope");
+    assert_eq!(
+        dispatch(
+            &mut process,
+            268,
+            [AT_FDCWD as usize, 0x1000, 0o644, 0, 0, 0]
+        ),
+        -(Errno::ENOENT.0 as isize)
     );
 }

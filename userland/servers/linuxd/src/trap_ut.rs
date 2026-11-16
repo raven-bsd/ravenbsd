@@ -19,6 +19,8 @@ fn request(nr: u64, args: [u64; 6]) -> [u8; SYSCALL_LEN] {
 fn process() -> LinuxProcess {
     LinuxProcess::new(
         7,
+        7,
+        raven_abi::types::Handle(1),
         raven_abi::types::Handle(9),
         0x4000,
         0x5000,
@@ -70,11 +72,11 @@ fn copy_in_is_bounded_by_the_server_limit() {
 
 #[test]
 fn path_calls_copy_a_bounded_window() {
-    for nr in [2, 4, 89] {
+    for nr in [2, 4, 6, 21, 76, 89] {
         let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, nr, [0; 6]);
         assert_eq!(copy_in(&call), Some((0, 128)), "nr {nr}");
     }
-    for nr in [257, 262, 267] {
+    for nr in [257, 260, 262, 267, 268, 280, 332] {
         let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, nr, [0; 6]);
         assert_eq!(copy_in(&call), Some((1, 128)), "nr {nr}");
     }
@@ -88,6 +90,22 @@ fn path_calls_copy_a_bounded_window() {
 fn pwrite_copies_the_same_buffer_window_as_write() {
     let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, 18, [7, 0x2000, 32, 0, 0, 0]);
     assert_eq!(copy_in(&call), Some((1, 32)));
+}
+
+#[test]
+fn prctl_set_name_copies_a_sixteen_byte_window() {
+    let set = LinuxSyscallV1::new(
+        raven_proto_linux::ARCH_X86_64,
+        157,
+        [15, 0x1000, 0, 0, 0, 0],
+    );
+    assert_eq!(copy_in(&set), Some((1, 16)));
+    let get = LinuxSyscallV1::new(
+        raven_proto_linux::ARCH_X86_64,
+        157,
+        [16, 0x1000, 0, 0, 0, 0],
+    );
+    assert_eq!(copy_in(&get), None);
 }
 
 #[test]

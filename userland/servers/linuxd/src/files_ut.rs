@@ -9,7 +9,7 @@ use super::*;
 use crate::table::{FileKind, LinuxProcess};
 
 fn process() -> LinuxProcess {
-    LinuxProcess::new(7, Handle(9), 0x4000, 0x5000, 0x8000, 0x9000)
+    LinuxProcess::new(7, 7, Handle(1), Handle(9), 0x4000, 0x5000, 0x8000, 0x9000)
 }
 
 #[test]
@@ -47,11 +47,11 @@ fn absolute_and_relative_paths_resolve_against_the_cwd() {
     );
     assert_eq!(
         resolve_path(&process, AT_FDCWD, b"tmp/a").unwrap(),
-        b"/tmp/a"
+        b"/compat/linux/tmp/a"
     );
     assert_eq!(
         resolve_path(&process, AT_FDCWD, b"./tmp/../data").unwrap(),
-        b"/data"
+        b"/compat/linux/data"
     );
     assert_eq!(
         resolve_path(&process, AT_FDCWD, b"file:/tmp/a").unwrap(),

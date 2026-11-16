@@ -59,16 +59,27 @@ pub fn lookup(process: &LinuxProcess, path: &[u8]) -> Result<Resource, Errno> {
         "/sys/devices/system" => Ok(Resource::Directory(system_dir())),
         "/sys/devices/system/cpu" => Ok(Resource::Directory(cpu_dir())),
         "/sys/devices/system/cpu/online" => Ok(Resource::File(b"0\n".to_vec())),
-        _ => match path.strip_prefix("/proc/self/fd/") {
-            Some(fd) => {
-                let fd = parse_fd(fd).ok_or(Errno::ENOENT)?;
-                process
-                    .fd_target(fd)
-                    .map(|target| Resource::Symlink(target.to_vec()))
-                    .ok_or(Errno::ENOENT)
+        _ => {
+            if let Some(node) = process.root().lookup(path.as_bytes()) {
+                if node.is_dir() {
+                    return Ok(Resource::Directory(
+                        process.root().entries(path.as_bytes()).unwrap_or_default(),
+                    ));
+                }
+                // The root tree is metadata-only; file contents stay in the initfs.
+                return Err(Errno::EACCES);
             }
-            None => Err(Errno::ENOENT),
-        },
+            match path.strip_prefix("/proc/self/fd/") {
+                Some(fd) => {
+                    let fd = parse_fd(fd).ok_or(Errno::ENOENT)?;
+                    process
+                        .fd_target(fd)
+                        .map(|target| Resource::Symlink(target.to_vec()))
+                        .ok_or(Errno::ENOENT)
+                }
+                None => Err(Errno::ENOENT),
+            }
+        }
     }
 }
 

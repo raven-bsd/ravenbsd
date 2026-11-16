@@ -3,9 +3,10 @@
 
 # B32a: the Alpine minirootfs staged by addons/linux-root/build.sh is packed into the initfs. The
 # fixture verifies the release, BusyBox and the musl loader, then asks linuxd to run the exact
-# `/compat/linux/bin/busybox ls` argument vector. The PIE main and its musl interpreter now load at
-# their biases; BusyBox reaches `ls`, which stops at `stat(2)` (B25). The unimplemented `stat` hit
-# and the BusyBox error line are the recorded boundary.
+# `/compat/linux/bin/busybox ls` argument vector. The PIE main and its musl interpreter load at
+# their biases; after B25 the metadata batch is served, so BusyBox lists the staged top-level
+# directories and exits 0. B25 updates this case from the pre-B25 `stat`-failure boundary to the
+# new successful listing (the case file is outside B25's Owns; see the B25 report).
 
 name = "linux-root"
 arch = "x86_64"
@@ -36,16 +37,31 @@ regex = '^linuxd: dynamic=1 interp-entry=0x[0-9a-f]+ interp-bias=0x[0-9a-f]+$'
 regex = '^linuxd: mapped [0-9]+ regions, sp=0x[0-9a-f]+$'
 
 [[expect]]
-regex = '^ls: \.: Function not implemented$'
+regex = '^bin$'
 
 [[expect]]
-regex = '^linuxd: unimplemented nr=4 name=stat hits=1$'
+regex = '^etc$'
 
 [[expect]]
-regex = '^linuxd: hello exit=1$'
+regex = '^lib$'
 
 [[expect]]
-regex = '^linux-root: linuxd exit=1$'
+regex = '^sbin$'
+
+[[expect]]
+regex = '^usr$'
+
+[[expect]]
+regex = '^linuxd: syscall lstat calls=[0-9]+ errors=0$'
+
+[[expect]]
+regex = '^linuxd: syscall stat calls=[0-9]+ errors=0$'
+
+[[expect]]
+regex = '^linuxd: hello exit=0$'
+
+[[expect]]
+regex = '^linux-root: linuxd exit=0$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
