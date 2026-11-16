@@ -1,0 +1,38 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt UUDECODE 1
+.Os RavenBSD
+.Sh NAME
+.Nm uudecode
+.Nd decode a POSIX uuencode stream
+.Sh SYNOPSIS
+.Nm
+.Op Fl o Ar output
+.Op Ar input
+.Sh DESCRIPTION
+The
+.Nm
+utility reads a POSIX
+.Ql begin Ns / Ns Ql end
+stream from
+.Ar input
+(or standard input when omitted), validates the encoded lines and writes the
+decoded bytes to the name in the header, or to
+.Ar output
+when
+.Fl o
+is supplied.
+The stored mode is applied to the output file.
+.Pp
+Path-like encoded names are rejected when no explicit
+.Fl o
+path is given.
+.Sh EXIT STATUS
+.Ex -std
+Invalid input, an unsafe encoded name or an I/O error exits nonzero.
+.Sh SEE ALSO
+.Xr uuencode 1 ,
+.Xr ar 1
+.Sh STANDARDS
+RavenBSD implements the POSIX uudecode format.

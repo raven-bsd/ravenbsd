@@ -17,10 +17,10 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 | process | 17 | 0 | 0 | 10 | 7 |
 | shell | 25 | 13 | 12 | 0 | 0 |
 | tty | 12 | 10 | 2 | 0 | 0 |
-| utilities | 181 | 114 | 7 | 60 | 0 |
-| **all** | **1762** | **769** | **70** | **916** | **7** |
+| utilities | 216 | 109 | 7 | 100 | 0 |
+| **all** | **1797** | **764** | **70** | **956** | **7** |
 
-Traceability rows: 1762; profile rows: 1762.
+Traceability rows: 1797; profile rows: 1797.
 
 ## Headers
 
@@ -1545,11 +1545,16 @@ Traceability rows: 1762; profile rows: 1762.
 |---|---|---|---|---|---|
 | `util.admin` | `admin` | missing | P4 | `none` | none |
 | `util.alias` | `alias` | missing | P4 | `none` | none |
-| `util.ar` | `ar` | missing | P4 | `none` | none |
+| `util.ar` | `ar` | present | P4 | `test:tests/posix/utility/archive/ar/test.sh` | none |
+| `util.arch` | `arch` | present | P4 | `test:tests/posix/utility/misc/arch/test.sh` | none |
 | `util.asa` | `asa` | missing | P4 | `none` | none |
 | `util.at` | `at` | missing | P4 | `none` | none |
-| `util.awk` | `awk` | missing | P4 | `none` | none |
+| `util.awk` | `awk` | present | P4 | `test:tests/posix/utility/text2/awk/test.sh` | none |
+| `util.b2sum` | `b2sum` | present | P4 | `test:tests/posix/utility/misc/b2sum/test.sh` | none |
+| `util.base32` | `base32` | present | P4 | `test:tests/posix/utility/misc/base32/test.sh` | none |
+| `util.base64` | `base64` | present | P4 | `test:tests/posix/utility/misc/base64/test.sh` | none |
 | `util.basename` | `basename` | present | P4 | `test:tests/posix/utility/text/basename/test.sh` | none |
+| `util.basenc` | `basenc` | present | P4 | `test:tests/posix/utility/misc/basenc/test.sh` | none |
 | `util.batch` | `batch` | missing | P4 | `none` | none |
 | `util.bc` | `bc` | missing | P4 | `none` | none |
 | `util.bg` | `bg` | missing | P4 | `none` | none |
@@ -1581,6 +1586,7 @@ Traceability rows: 1762; profile rows: 1762.
 | `util.delta` | `delta` | missing | P4 | `none` | none |
 | `util.df` | `df` | present | P4 | `test:tests/posix/utility/file/df/test.sh` | none |
 | `util.diff` | `diff` | present | P4 | `test:tests/posix/utility/text2/diff/test.sh` | none |
+| `util.dircolors` | `dircolors` | present | P4 | `test:tests/posix/utility/misc/dircolors/test.sh` | none |
 | `util.dirname` | `dirname` | present | P4 | `test:tests/posix/utility/text/dirname/test.sh` | none |
 | `util.dot` | `dot` | missing | P4 | `none` | none |
 | `util.du` | `du` | present | P4 | `test:tests/posix/utility/file/du/test.sh` | none |
@@ -1594,11 +1600,13 @@ Traceability rows: 1762; profile rows: 1762.
 | `util.expand` | `expand` | present | P4 | `test:tests/posix/utility/text/expand/test.sh` | none |
 | `util.export` | `export` | missing | P4 | `none` | none |
 | `util.expr` | `expr` | present | P4 | `test:tests/posix/utility/text/expr/test.sh` | none |
+| `util.factor` | `factor` | present | P4 | `test:tests/posix/utility/misc/factor/test.sh` | none |
 | `util.false` | `false` | present | P4 | `test:tests/posix/utility/misc/false/test.sh` | none |
 | `util.fc` | `fc` | missing | P4 | `none` | none |
 | `util.fg` | `fg` | missing | P4 | `none` | none |
 | `util.file` | `file` | present | P4 | `test:tests/posix/utility/file/file/test.sh` | none |
 | `util.find` | `find` | present | P4 | `test:tests/posix/utility/file/find/test.sh` | none |
+| `util.fmt` | `fmt` | present | P4 | `test:tests/posix/utility/misc/fmt/test.sh` | none |
 | `util.fold` | `fold` | present | P4 | `test:tests/posix/utility/text/fold/test.sh` | none |
 | `util.fort77` | `fort77` | missing | P4 | `none` | none |
 | `util.gencat` | `gencat` | missing | P4 | `none` | none |
@@ -1606,10 +1614,13 @@ Traceability rows: 1762; profile rows: 1762.
 | `util.getconf` | `getconf` | missing | P4 | `none` | none |
 | `util.getopts` | `getopts` | missing | P4 | `none` | none |
 | `util.grep` | `grep` | present | P4 | `test:tests/posix/utility/text2/grep/test.sh` | none |
+| `util.groups` | `groups` | present | P4 | `test:tests/posix/utility/misc/groups/test.sh` | none |
 | `util.hash` | `hash` | missing | P4 | `none` | none |
 | `util.head` | `head` | present | P4 | `test:tests/posix/utility/text/head/test.sh` | none |
+| `util.hostid` | `hostid` | present | P4 | `test:tests/posix/utility/misc/hostid/test.sh` | none |
 | `util.iconv` | `iconv` | missing | P4 | `none` | none |
 | `util.id` | `id` | partial | P4 | `userland/bin/id` | none |
+| `util.install` | `install` | present | P4 | `test:tests/posix/utility/misc/install/test.sh` | none |
 | `util.ipcrm` | `ipcrm` | missing | P4 | `none` | none |
 | `util.ipcs` | `ipcs` | missing | P4 | `none` | none |
 | `util.jobs` | `jobs` | missing | P4 | `none` | none |
@@ -1629,10 +1640,12 @@ Traceability rows: 1762; profile rows: 1762.
 | `util.mailx` | `mailx` | missing | P4 | `none` | none |
 | `util.make` | `make` | missing | P4 | `none` | none |
 | `util.man` | `man` | partial | P4 | `userland/bin/man` | none |
+| `util.md5sum` | `md5sum` | present | P4 | `test:tests/posix/utility/misc/md5sum/test.sh` | none |
 | `util.mesg` | `mesg` | missing | P4 | `none` | none |
 | `util.mkdir` | `mkdir` | present | P4 | `test:tests/posix/utility/file/mkdir/test.sh` | none |
 | `util.mkfifo` | `mkfifo` | present | P4 | `test:tests/posix/utility/file/mkfifo/test.sh` | none |
 | `util.mknod` | `mknod` | present | P4 | `test:tests/posix/utility/file/mknod/test.sh` | none |
+| `util.mktemp` | `mktemp` | present | P4 | `test:tests/posix/utility/misc/mktemp/test.sh` | none |
 | `util.more` | `more` | missing | P4 | `none` | none |
 | `util.mv` | `mv` | present | P4 | `test:tests/posix/utility/file/mv/test.sh` | none |
 | `util.neqn` | `neqn` | missing | P4 | `none` | none |
@@ -1641,15 +1654,20 @@ Traceability rows: 1762; profile rows: 1762.
 | `util.nl` | `nl` | present | P4 | `test:tests/posix/utility/text/nl/test.sh` | none |
 | `util.nm` | `nm` | missing | P4 | `none` | none |
 | `util.nohup` | `nohup` | missing | P4 | `none` | none |
+| `util.nproc` | `nproc` | present | P4 | `test:tests/posix/utility/misc/nproc/test.sh` | none |
+| `util.numfmt` | `numfmt` | present | P4 | `test:tests/posix/utility/misc/numfmt/test.sh` | none |
 | `util.od` | `od` | present | P4 | `test:tests/posix/utility/text/od/test.sh` | none |
 | `util.paste` | `paste` | present | P4 | `test:tests/posix/utility/text/paste/test.sh` | none |
 | `util.patch` | `patch` | missing | P4 | `none` | none |
 | `util.pathchk` | `pathchk` | present | P4 | `test:tests/posix/utility/file/pathchk/test.sh` | none |
 | `util.pax` | `pax` | missing | P4 | `none` | none |
+| `util.pinky` | `pinky` | present | P4 | `test:tests/posix/utility/misc/pinky/test.sh` | none |
 | `util.pr` | `pr` | present | P4 | `test:tests/posix/utility/text/pr/test.sh` | none |
+| `util.printenv` | `printenv` | present | P4 | `test:tests/posix/utility/misc/printenv/test.sh` | none |
 | `util.printf` | `printf` | present | P4 | `test:tests/posix/utility/text/printf/test.sh` | none |
 | `util.prs` | `prs` | missing | P4 | `none` | none |
 | `util.ps` | `ps` | partial | P4 | `userland/bin/ps` | tests/qtest/cases/modern-json-tools.toml |
+| `util.ptx` | `ptx` | present | P4 | `test:tests/posix/utility/misc/ptx/test.sh` | none |
 | `util.pwd` | `pwd` | present | P4 | `test:tests/posix/utility/file/pwd/test.sh` | none |
 | `util.qalter` | `qalter` | missing | P4 | `none` | none |
 | `util.qdel` | `qdel` | missing | P4 | `none` | none |
@@ -1673,29 +1691,43 @@ Traceability rows: 1762; profile rows: 1762.
 | `util.rmdir` | `rmdir` | present | P4 | `test:tests/posix/utility/file/rmdir/test.sh` | none |
 | `util.sact` | `sact` | missing | P4 | `none` | none |
 | `util.sccs` | `sccs` | missing | P4 | `none` | none |
-| `util.sed` | `sed` | missing | P4 | `none` | none |
+| `util.sed` | `sed` | present | P4 | `test:tests/posix/utility/text2/sed/test.sh` | none |
+| `util.seq` | `seq` | present | P4 | `test:tests/posix/utility/misc/seq/test.sh` | none |
 | `util.set` | `set` | missing | P4 | `none` | none |
 | `util.sh` | `sh` | partial | P4 | `userland/bin/rsh` | none |
+| `util.sha1sum` | `sha1sum` | present | P4 | `test:tests/posix/utility/misc/sha1sum/test.sh` | none |
+| `util.sha224sum` | `sha224sum` | present | P4 | `test:tests/posix/utility/misc/sha224sum/test.sh` | none |
+| `util.sha256sum` | `sha256sum` | present | P4 | `test:tests/posix/utility/misc/sha256sum/test.sh` | none |
+| `util.sha384sum` | `sha384sum` | present | P4 | `test:tests/posix/utility/misc/sha384sum/test.sh` | none |
+| `util.sha512sum` | `sha512sum` | present | P4 | `test:tests/posix/utility/misc/sha512sum/test.sh` | none |
 | `util.shift` | `shift` | missing | P4 | `none` | none |
+| `util.shred` | `shred` | present | P4 | `test:tests/posix/utility/misc/shred/test.sh` | none |
+| `util.shuf` | `shuf` | present | P4 | `test:tests/posix/utility/misc/shuf/test.sh` | none |
 | `util.sleep` | `sleep` | present | P4 | `test:tests/posix/utility/misc/sleep/test.sh` | none |
 | `util.sort` | `sort` | present | P4 | `test:tests/posix/utility/text/sort/test.sh` | none |
 | `util.split` | `split` | present | P4 | `test:tests/posix/utility/text/split/test.sh` | none |
 | `util.stat` | `stat` | present | P4 | `test:tests/posix/utility/file/stat/test.sh` | none |
+| `util.stdbuf` | `stdbuf` | present | P4 | `test:tests/posix/utility/misc/stdbuf/test.sh` | none |
 | `util.strings` | `strings` | present | P4 | `test:tests/posix/utility/text2/strings/test.sh` | none |
 | `util.strip` | `strip` | missing | P4 | `none` | none |
 | `util.stty` | `stty` | missing | P4 | `none` | none |
+| `util.sum` | `sum` | present | P4 | `test:tests/posix/utility/misc/sum/test.sh` | none |
+| `util.sync` | `sync` | present | P4 | `test:tests/posix/utility/misc/sync/test.sh` | none |
 | `util.tabs` | `tabs` | missing | P4 | `none` | none |
+| `util.tac` | `tac` | present | P4 | `test:tests/posix/utility/misc/tac/test.sh` | none |
 | `util.tail` | `tail` | present | P4 | `test:tests/posix/utility/text/tail/test.sh` | none |
 | `util.talk` | `talk` | missing | P4 | `none` | none |
 | `util.tee` | `tee` | present | P4 | `test:tests/posix/utility/text/tee/test.sh` | none |
 | `util.test` | `test` | missing | P4 | `none` | none |
 | `util.time` | `time` | missing | P4 | `none` | none |
+| `util.timeout` | `timeout` | present | P4 | `test:tests/posix/utility/misc/timeout/test.sh` | none |
 | `util.times` | `times` | missing | P4 | `none` | none |
 | `util.touch` | `touch` | present | P4 | `test:tests/posix/utility/file/touch/test.sh` | none |
 | `util.tput` | `tput` | missing | P4 | `none` | none |
 | `util.tr` | `tr` | present | P4 | `test:tests/posix/utility/text/tr/test.sh` | none |
 | `util.trap` | `trap` | missing | P4 | `none` | none |
 | `util.true` | `true` | present | P4 | `test:tests/posix/utility/misc/true/test.sh` | none |
+| `util.truncate` | `truncate` | present | P4 | `test:tests/posix/utility/misc/truncate/test.sh` | none |
 | `util.tsort` | `tsort` | present | P4 | `test:tests/posix/utility/text/tsort/test.sh` | none |
 | `util.tty` | `tty` | missing | P4 | `none` | none |
 | `util.type` | `type` | missing | P4 | `none` | none |
@@ -1709,9 +1741,11 @@ Traceability rows: 1762; profile rows: 1762.
 | `util.uniq` | `uniq` | present | P4 | `test:tests/posix/utility/text/uniq/test.sh` | none |
 | `util.unlink` | `unlink` | present | P4 | `test:tests/posix/utility/file/unlink/test.sh` | none |
 | `util.unset` | `unset` | missing | P4 | `none` | none |
+| `util.uptime` | `uptime` | present | P4 | `test:tests/posix/utility/misc/uptime/test.sh` | none |
+| `util.users` | `users` | present | P4 | `test:tests/posix/utility/misc/users/test.sh` | none |
 | `util.uucp` | `uucp` | missing | P4 | `none` | none |
-| `util.uudecode` | `uudecode` | missing | P4 | `none` | none |
-| `util.uuencode` | `uuencode` | missing | P4 | `none` | none |
+| `util.uudecode` | `uudecode` | present | P4 | `test:tests/posix/utility/archive/uudecode/test.sh` | none |
+| `util.uuencode` | `uuencode` | present | P4 | `test:tests/posix/utility/archive/uuencode/test.sh` | none |
 | `util.uustat` | `uustat` | missing | P4 | `none` | none |
 | `util.uux` | `uux` | missing | P4 | `none` | none |
 | `util.val` | `val` | missing | P4 | `none` | none |
@@ -1723,6 +1757,7 @@ Traceability rows: 1762; profile rows: 1762.
 | `util.write` | `write` | missing | P4 | `none` | none |
 | `util.xargs` | `xargs` | missing | P4 | `none` | none |
 | `util.yacc` | `yacc` | missing | P4 | `none` | none |
+| `util.yes` | `yes` | present | P4 | `test:tests/posix/utility/misc/yes/test.sh` | none |
 | `util.zcat` | `zcat` | missing | P4 | `none` | none |
 
 ## Shell features
@@ -1850,9 +1885,9 @@ Traceability rows: 1762; profile rows: 1762.
 ## Current tree
 
 - frozen exported symbols: 1215
-- `userland/bin` directories: 47
+- `userland/bin` directories: 52
 - headers under `libc/ravenlibc/include`: 228
-- utility directories: adduser, beep, cat, cmp, cp, date, df, diff, dmesg, dtrace, echo, file, find, getty, grep, groupadd, hostname, id, ifconfig, login, ls, man, mixer, mkdir, mount, mv, nc, netstat, passwd, ping, play, ps, raven, rm, rmdir, route, rsh, sleep, stat, strings, su, svcctl, touch, umount, uname, useradd, whoami
+- utility directories: adduser, ar, awk, beep, cat, cmp, cp, date, df, diff, dmesg, dtrace, echo, file, find, getty, grep, groupadd, hostname, id, ifconfig, login, ls, man, mixer, mkdir, mount, mv, nc, netstat, passwd, ping, play, ps, raven, rm, rmdir, route, rsh, sed, sleep, stat, strings, su, svcctl, touch, umount, uname, useradd, uudecode, uuencode, whoami
 
 ## Top gaps
 
@@ -1939,4 +1974,4 @@ Traceability rows: 1762; profile rows: 1762.
 | interface | `asinhfNx` | `none` |
 | interface | `asinhl` | `none` |
 
-846 gap rows are listed in full in the tables above; this short table is a review aid.
+841 gap rows are listed in full in the tables above; this short table is a review aid.

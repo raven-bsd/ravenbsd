@@ -410,6 +410,8 @@ pub enum Object {
     SchemeServer(Arc<SchemeServer>),
     /// A server-side request handle returned by `RECV`.
     SchemeRequest(Arc<PendingRequest>),
+    /// One end of an in-kernel pipe (`PIPE`/`PIPE2`).
+    Pipe(Arc<crate::process::pipe::PipeEnd>),
 }
 
 /// The kernel's handle table type.

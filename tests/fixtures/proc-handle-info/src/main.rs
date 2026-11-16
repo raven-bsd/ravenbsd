@@ -25,6 +25,7 @@ const PROC_WAIT: usize = 0x31;
 const PROC_HANDLE_INFO: usize = 0x3E;
 
 #[inline(always)]
+#[cfg(target_arch = "x86_64")]
 unsafe fn syscall6(
     number: usize,
     a0: usize,
@@ -48,6 +49,35 @@ unsafe fn syscall6(
             in("r9") a5,
             lateout("rcx") _,
             lateout("r11") _,
+            options(nostack),
+        );
+    }
+    result
+}
+
+#[inline(always)]
+#[cfg(target_arch = "aarch64")]
+unsafe fn syscall6(
+    number: usize,
+    a0: usize,
+    a1: usize,
+    a2: usize,
+    a3: usize,
+    a4: usize,
+    a5: usize,
+) -> isize {
+    let result: isize;
+    // SAFETY: scalar syscall arguments; the kernel validates handles and pointers.
+    unsafe {
+        asm!(
+            "svc #0",
+            in("x8") number,
+            inlateout("x0") a0 => result,
+            in("x1") a1,
+            in("x2") a2,
+            in("x3") a3,
+            in("x4") a4,
+            in("x5") a5,
             options(nostack),
         );
     }

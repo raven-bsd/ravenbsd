@@ -1,0 +1,35 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt UUENCODE 1
+.Os RavenBSD
+.Sh NAME
+.Nm uuencode
+.Nd encode a binary file as POSIX uuencode text
+.Sh SYNOPSIS
+.Nm
+.Op Ar input
+.Ar output_name
+.Sh DESCRIPTION
+The
+.Nm
+utility reads
+.Ar input
+(or standard input when omitted) and writes a
+.Ql begin
+line containing the file mode and
+.Ar output_name ,
+45-byte encoded body lines, a backtick terminator and an
+.Ql end
+line.
+.Pp
+The encoded output is written to standard output.
+The encoded file name is stored in the header; it is not an output path.
+.Sh EXIT STATUS
+.Ex -std
+A missing input or usage error exits nonzero.
+.Sh SEE ALSO
+.Xr uudecode 1 ,
+.Xr ar 1
+.Sh STANDARDS
+RavenBSD implements the POSIX uuencode format.
