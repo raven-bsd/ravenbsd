@@ -7,14 +7,14 @@
 //! connection (a uid for this slice), the process group/session and the kernel wait status. The
 //! kernel remains authoritative for identity, address spaces, signal queues and exit timing.
 
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 use raven_proto_proc::{
-    Body, GetPgidRequest, GetSidRequest, HelloRequest, KillRequest, Request, Response,
+    Body, FdMapEntry, GetPgidRequest, GetSidRequest, HelloRequest, KillRequest, Request, Response,
     SetPgidRequest, SpawnRequest, VERSION, WaitRequest,
 };
 
@@ -44,6 +44,28 @@ const STOPPED_STATUS_MASK: i32 = 0x7f;
 const CONTINUED_STATUS: i32 = 0xffff;
 /// POSIX `POSIX_SPAWN_SETPGROUP` from the Linux/musl header values.
 pub const POSIX_SPAWN_SETPGROUP: u32 = 2;
+/// POSIX `POSIX_SPAWN_SETSIGDEF`.
+pub const POSIX_SPAWN_SETSIGDEF: u32 = 4;
+/// POSIX `POSIX_SPAWN_SETSIGMASK`.
+pub const POSIX_SPAWN_SETSIGMASK: u32 = 8;
+/// POSIX `POSIX_SPAWN_SETSID`; the kernel has no setsid-by-handle operation.
+pub const POSIX_SPAWN_SETSID: u32 = 128;
+/// Requirement hint: the caller already resolved the path.
+pub const S_USE_PATH_HINT: u32 = 1 << 16;
+/// Requirement hint: every descriptor not in the fd map starts closed.
+pub const S_CLOEXEC_DEFAULT: u32 = 1 << 17;
+/// Largest accepted child descriptor number.
+pub const MAX_CHILD_FD: i32 = 1024;
+/// Highest signal number the kernel accepts.
+pub const SIG_MAX: u32 = 64;
+/// POSIX SIGSTOP.
+pub const SIGSTOP: u32 = 19;
+
+const SUPPORTED_SPAWN_FLAGS: u32 = POSIX_SPAWN_SETPGROUP
+    | POSIX_SPAWN_SETSIGDEF
+    | POSIX_SPAWN_SETSIGMASK
+    | S_USE_PATH_HINT
+    | S_CLOEXEC_DEFAULT;
 
 /// One live process identity returned by the kernel.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -71,6 +93,32 @@ pub struct WaitEvent {
 pub trait ProcSys {
     /// Spawn an initfs image and return its process handle.
     fn spawn(&mut self, path: &str, argv: &[&str], env: &[&str]) -> Result<Handle, Errno>;
+    /// Spawn with an fd map and initial signal sets.
+    ///
+    /// The default fails closed: an implementation that only supports plain spawn must reject a
+    /// request carrying attributes rather than silently dropping them.
+    #[allow(clippy::too_many_arguments)] // mirrors the wire request fields
+    fn spawn_with_attributes(
+        &mut self,
+        path: &str,
+        argv: &[&str],
+        env: &[&str],
+        fdmap: &[(i32, u32)],
+        sigmask: &[u8; 128],
+        sigdefault: &[u8; 128],
+        ignored: &[u8; 128],
+    ) -> Result<Handle, Errno> {
+        let _ = (path, argv, env, fdmap, sigmask, sigdefault, ignored);
+        Err(Errno::ENOSYS)
+    }
+    /// Check that a transferred handle is usable and carries `TRANSFER`.
+    ///
+    /// The default fails closed; an implementation without the handle-transfer seam must reject
+    /// a non-empty fd map.
+    fn validate_handle(&mut self, handle: Handle) -> Result<(), Errno> {
+        let _ = handle;
+        Err(Errno::ENOSYS)
+    }
     /// Map a process handle to its pid.
     fn pid(&mut self, handle: Handle) -> Result<i32, Errno>;
     /// Read a live process identity.
@@ -106,6 +154,14 @@ pub struct Child {
     pub image: String,
     /// The umask requested by the spawn request; the current kernel has no child umask call.
     pub umask: u32,
+    /// The descriptor map installed in the child.
+    pub fdmap: Vec<(i32, u32)>,
+    /// Initial blocked-signal set.
+    pub sigmask: [u8; 128],
+    /// Signals reset to `SIG_DFL` at spawn.
+    pub sigdefault: [u8; 128],
+    /// Signals ignored by the parent.
+    pub ignored: [u8; 128],
 }
 
 /// The `procd` process table.
@@ -169,39 +225,84 @@ impl<S: ProcSys> Procd<S> {
     }
 
     fn spawn(&mut self, uid: u32, spawn: SpawnRequest) -> Response {
-        if spawn.spawn_flags & !POSIX_SPAWN_SETPGROUP != 0
-            || spawn.sigdefault.iter().any(|byte| *byte != 0)
-            || spawn.sigmask.iter().any(|byte| *byte != 0)
-            || spawn.ignored.iter().any(|byte| *byte != 0)
+        if spawn.spawn_flags & !SUPPORTED_SPAWN_FLAGS != 0
             || spawn.sched_policy != 0
             || spawn.sched_prio != 0
             || spawn.tcpgrp_fd != -1
-            || !spawn.fdmap.is_empty()
         {
+            self.close_fdmap(&spawn.fdmap);
             return Response::error(Errno::ENOSYS);
         }
         if spawn.cwd != b"/" && !spawn.cwd.is_empty() {
+            self.close_fdmap(&spawn.fdmap);
             return Response::error(Errno::ENOSYS);
+        }
+        if let Err(error) = self.validate_spawn(&spawn) {
+            self.close_fdmap(&spawn.fdmap);
+            return Response::error(error);
         }
         let path = match text(&spawn.path) {
             Ok(path) if path.starts_with('/') => path.to_string(),
-            Ok(_) => return Response::error(Errno::EINVAL),
-            Err(error) => return Response::error(error),
+            Ok(_) => {
+                self.close_fdmap(&spawn.fdmap);
+                return Response::error(Errno::EINVAL);
+            }
+            Err(error) => {
+                self.close_fdmap(&spawn.fdmap);
+                return Response::error(error);
+            }
         };
         let argv = match texts(&spawn.argv) {
             Ok(argv) if !argv.is_empty() => argv,
-            Ok(_) => return Response::error(Errno::EINVAL),
-            Err(error) => return Response::error(error),
+            Ok(_) => {
+                self.close_fdmap(&spawn.fdmap);
+                return Response::error(Errno::EINVAL);
+            }
+            Err(error) => {
+                self.close_fdmap(&spawn.fdmap);
+                return Response::error(error);
+            }
         };
         let env = match texts(&spawn.envp) {
             Ok(env) => env,
-            Err(error) => return Response::error(error),
+            Err(error) => {
+                self.close_fdmap(&spawn.fdmap);
+                return Response::error(error);
+            }
         };
 
-        let handle = match self.sys.spawn(&path, &argv, &env) {
-            Ok(handle) => handle,
-            Err(error) => return Response::error(error),
+        let fdmap: Vec<(i32, u32)> = spawn
+            .fdmap
+            .iter()
+            .map(|entry| (entry.fd, entry.handle))
+            .collect();
+        let attributes = !fdmap.is_empty()
+            || spawn.sigmask.iter().any(|byte| *byte != 0)
+            || spawn.sigdefault.iter().any(|byte| *byte != 0)
+            || spawn.ignored.iter().any(|byte| *byte != 0);
+        let spawned = if attributes {
+            self.sys.spawn_with_attributes(
+                &path,
+                &argv,
+                &env,
+                &fdmap,
+                &spawn.sigmask,
+                &spawn.sigdefault,
+                &spawn.ignored,
+            )
+        } else {
+            self.sys.spawn(&path, &argv, &env)
         };
+        let handle = match spawned {
+            Ok(handle) => handle,
+            Err(error) => {
+                self.close_fdmap(&spawn.fdmap);
+                return Response::error(error);
+            }
+        };
+        // The client transferred each source handle into this server for this spawn. Once the
+        // child has its own copies the server-side originals are no longer needed.
+        self.close_fdmap(&spawn.fdmap);
         let pid = match self.sys.pid(handle) {
             Ok(pid) if pid > 0 => pid,
             Ok(_) => {
@@ -249,9 +350,50 @@ impl<S: ProcSys> Procd<S> {
                 sid: info.sid,
                 image: path,
                 umask: spawn.umask,
+                fdmap,
+                sigmask: spawn.sigmask,
+                sigdefault: spawn.sigdefault,
+                ignored: spawn.ignored,
             },
         );
         Response::ok(i64::from(pid))
+    }
+
+    fn validate_spawn(&mut self, spawn: &SpawnRequest) -> Result<(), Errno> {
+        if spawn.spawn_flags & POSIX_SPAWN_SETPGROUP != 0 && spawn.pgroup < 0 {
+            return Err(Errno::EINVAL);
+        }
+        if spawn.spawn_flags & POSIX_SPAWN_SETSIGDEF == 0
+            && spawn.sigdefault.iter().any(|byte| *byte != 0)
+        {
+            return Err(Errno::EINVAL);
+        }
+        validate_signal_set(&spawn.sigmask, true)?;
+        validate_signal_set(&spawn.sigdefault, false)?;
+        validate_signal_set(&spawn.ignored, true)?;
+        if spawn.fdmap.len() > raven_proto_proc::MAX_FDS {
+            return Err(Errno::EINVAL);
+        }
+        let mut descriptors = BTreeSet::new();
+        for entry in &spawn.fdmap {
+            if entry.fd < 0 || entry.fd >= MAX_CHILD_FD || entry.handle == Handle::NONE.0 {
+                return Err(Errno::EINVAL);
+            }
+            if !descriptors.insert(entry.fd) {
+                return Err(Errno::EINVAL);
+            }
+            self.sys.validate_handle(Handle(entry.handle))?;
+        }
+        Ok(())
+    }
+
+    fn close_fdmap(&mut self, map: &[FdMapEntry]) {
+        let mut handles = BTreeSet::new();
+        for entry in map {
+            if handles.insert(entry.handle) {
+                self.sys.close(Handle(entry.handle));
+            }
+        }
     }
 
     fn wait(&mut self, uid: u32, wait: WaitRequest) -> Response {
@@ -476,6 +618,32 @@ fn texts(values: &[Vec<u8>]) -> Result<Vec<&str>, Errno> {
         result.push(text(value)?);
     }
     Ok(result)
+}
+
+/// Validate one 1024-bit `sigset_t` against the kernel's signal range.
+///
+/// Blocked and ignored sets may not name `SIGKILL` or `SIGSTOP`; the default-disposition set has
+/// no such restriction (resetting those two is a no-op).
+fn validate_signal_set(set: &[u8; 128], may_block: bool) -> Result<(), Errno> {
+    for (index, byte) in set.iter().enumerate() {
+        for bit in 0..8u32 {
+            if byte & (1u8 << bit) == 0 {
+                continue;
+            }
+            let signo = u32::try_from(index)
+                .unwrap_or(u32::MAX)
+                .saturating_mul(8)
+                .saturating_add(bit)
+                .saturating_add(1);
+            if signo > SIG_MAX {
+                return Err(Errno::EINVAL);
+            }
+            if may_block && (signo == SIGKILL || signo == SIGSTOP) {
+                return Err(Errno::EINVAL);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn is_terminal(status: i32) -> bool {

@@ -13,6 +13,9 @@
 
 pub use raven_spawn::*;
 
+#[cfg(feature = "alloc")]
+pub use crate::spawn_attrs::*;
+
 /// The pre-P9a runtime error enum, kept until its module is removed with the next
 /// `raven-init` change. New code uses [`SpawnError`].
 #[doc(hidden)]

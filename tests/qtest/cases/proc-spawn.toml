@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P2n procd spawn attributes: an fd map transferred by the client, the close-on-exec default,
+# explicit and self process groups, and the three initial signal sets. Invalid maps and signal
+# sets must fail without creating a child.
+
+name = "proc-spawn"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["PROCD_MODE=attrs sh tests/fixtures/procd/build.sh"]
+initfs = "build/fixtures/procd/initfs-attrs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^procd-test: hello version=1 pid=[0-9]+$'
+
+[[expect]]
+regex = '^procd-test: attrs invalid=6$'
+
+[[expect]]
+regex = '^procd-test: attrs spawn1=[0-9]+$'
+
+[[expect]]
+regex = '^procd-test: attrs spawn2=[0-9]+ pgid=[0-9]+$'
+
+[[expect]]
+regex = '^procd-child: attrs fd=1 cloexec=1 pgid=1 sig=1$'
+unordered = true
+
+[[expect]]
+regex = '^procd-child: attrs fd=1 cloexec=1 pgid=1 sig=1$'
+unordered = true
+
+[[expect]]
+regex = '^procd-child: ok$'
+unordered = true
+
+[[expect]]
+regex = '^procd-child: ok$'
+unordered = true
+
+[[expect]]
+regex = '^procd-test: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|procd-test: fail|procd-child: unknown|procd-child: attrs .*=[0]'
