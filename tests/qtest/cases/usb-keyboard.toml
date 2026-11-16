@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S62: HID reports through the USB HID driver service into the console input queue.
+
+name = "usb-keyboard"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/usb-keyboard/build.sh"]
+initfs = "build/fixtures/usb-keyboard/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^usb-keyboard: boot protocol ok$'
+
+[[expect]]
+regex = '^usb-keyboard: keys=hiB$'
+
+[[expect]]
+regex = '^usb-keyboard: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|usb-keyboard: fail'

@@ -16,7 +16,7 @@
 mod program {
     use raven_rt::entry;
     use raven_rt::println;
-    use raven_usb_hid::{BootKeyboard, Error, SetupPacket, TransferRing};
+    use usb_hid::{BOOT_KEYBOARD_DESCRIPTOR, Error, KeyboardService, SetupPacket, TransferRing};
 
     /// A placeholder until the xHCI adapter lands.
     struct StubRing;
@@ -42,9 +42,10 @@ mod program {
     entry!(main);
 
     fn main(_args: raven_rt::Args) -> i32 {
-        let _device = BootKeyboard::new(StubRing);
-        println!("usb-hid: boot-keyboard core ready");
-        println!("usb-hid: xHCI transfer ring is Phil's follow-up; enumeration UNVERIFIED");
+        let mut service = KeyboardService::new(StubRing);
+        let _ = service.init(&BOOT_KEYBOARD_DESCRIPTOR);
+        println!("usb-hid: boot-keyboard service ready (no transfer ring)");
+        println!("usb-hid: xHCI binding is Phil's follow-up; enumeration UNVERIFIED");
         0
     }
 }
