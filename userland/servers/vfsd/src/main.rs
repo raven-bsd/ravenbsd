@@ -3,11 +3,17 @@
 
 //! `vfsd`: the `file:` namespace server.
 //!
-//! It holds the mount table and forwards `OPEN` by attaching the owning
-//! filesystem server's handle (S25).  Path operations are proxied through
-//! `CALL`; reads and writes go directly to the attached server after `OPEN`.
-//! The `/` root handle is the one exception: its `READ` merges the root
-//! server's entries with the names of mounts directly below `/`.
+//! It holds the mount table and resolves every path to the owning filesystem
+//! server.  An `OPEN` creates a vfsd-owned open file description that keeps the
+//! target server's handle; `READ`, `WRITE`, `SEEK` and `CALL` are forwarded
+//! through it.  The `/` root description additionally merges the root server's
+//! entries with the names of mounts directly below `/`.
+//!
+//! The S25 open-attachment path is deliberately not used.  On aarch64 a handle
+//! attached from `fsd-ufs` returned `EBADF` on its first `READ` after vfsd closed
+//! its source handle, while the same stack passed on x86-64.  Keeping one stable
+//! target handle in vfsd until `CLOSE` gives identical semantics on both
+//! architectures and leaves the attachment protocol to servers that need it.
 
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
@@ -32,9 +38,7 @@ mod program {
     };
     use raven_rt::entry;
     use raven_rt::println;
-    use raven_scheme::{
-        Client, Ctx, Handler, HandlerResult, Kernel, OpenTable, Opened, RtKernel, Server,
-    };
+    use raven_scheme::{Client, Ctx, Handler, HandlerResult, OpenTable, Opened, Server};
     use raven_vfs_core::{DEFAULT_MOUNTS, MountTable, normalized, parse_mounts};
 
     entry!(main);
@@ -43,55 +47,8 @@ mod program {
     const RETRIES: usize = 500;
     const RETRY_NS: u64 = 10_000_000;
     const BUFFER: usize = 4096;
-    /// Budget for root-proxy open-file descriptions.
+    /// Budget for proxy open-file descriptions.
     const MAX_OPEN_FILES: usize = 256;
-
-    /// The real kernel, plus vfsd's ownership rule for Open attachments.
-    ///
-    /// `Opened::Attach` hands the target handle to the client.  The reply send
-    /// installs a client-side duplicate of the same SchemeFile; vfsd's source
-    /// handle must then be closed.  The kernel SchemeFile keeps the server
-    /// reference alive through the client duplicate, so the target server does
-    /// not see a close until the client's last handle goes away.
-    #[derive(Clone, Copy, Debug, Default)]
-    struct VfsKernel {
-        inner: RtKernel,
-    }
-
-    impl Kernel for VfsKernel {
-        fn scheme_register(&self, name: &str) -> Result<(), Errno> {
-            self.inner.scheme_register(name)
-        }
-
-        fn recv(&self, packet: &mut [u8]) -> Result<Handle, Errno> {
-            self.inner.recv(packet)
-        }
-
-        fn recv_timeout(
-            &self,
-            packet: &mut [u8],
-            timeout_ms: u64,
-        ) -> Result<Option<Handle>, Errno> {
-            self.inner.recv_timeout(packet, timeout_ms)
-        }
-
-        fn send(&self, request: Handle, packet: &[u8]) -> Result<(), Errno> {
-            self.inner.send(request, packet)
-        }
-
-        fn send_attach(
-            &self,
-            request: Handle,
-            packet: &[u8],
-            attachments: &[raven_scheme::Attachment],
-        ) -> Result<(), Errno> {
-            let result = self.inner.send_attach(request, packet, attachments);
-            for attachment in attachments {
-                let _ = self.inner.close(Handle(attachment.handle));
-            }
-            result
-        }
-    }
 
     struct Proxy {
         target: Handle,
@@ -326,6 +283,72 @@ mod program {
             .map_err(|_| Errno::EINVAL)
     }
 
+    /// Forward a read through a local buffer.
+    ///
+    /// The client buffer is a kernel capture mapped into `vfsd`, and the kernel
+    /// cannot capture that window again for the target server: `capture::create`
+    /// looks the source up in the VMA tree and returns `EFAULT`.  Stage the data
+    /// through a stack buffer owned by `vfsd` instead.  `offset` selects a
+    /// positional read; `None` advances the target's cursor.
+    fn copy_read(
+        client: &Client,
+        target: Handle,
+        offset: Option<u64>,
+        buffer: &mut [u8],
+    ) -> Result<usize, Errno> {
+        let mut scratch = [0u8; BUFFER];
+        let mut done = 0usize;
+        while done < buffer.len() {
+            let capacity = (buffer.len() - done).min(scratch.len());
+            let read = match offset {
+                Some(base) => {
+                    let position = base.checked_add(done as u64).ok_or(Errno::EOVERFLOW)?;
+                    client.pread(target, position, &mut scratch[..capacity])?
+                }
+                None => client.read(target, 0, &mut scratch[..capacity])?,
+            };
+            if read > capacity {
+                return Err(Errno::EPROTO);
+            }
+            buffer[done..done + read].copy_from_slice(&scratch[..read]);
+            done += read;
+            if read < capacity {
+                break;
+            }
+        }
+        Ok(done)
+    }
+
+    /// Forward a write through a local buffer; see [`copy_read`].
+    fn copy_write(
+        client: &Client,
+        target: Handle,
+        offset: Option<u64>,
+        buffer: &[u8],
+    ) -> Result<usize, Errno> {
+        let mut scratch = [0u8; BUFFER];
+        let mut done = 0usize;
+        while done < buffer.len() {
+            let capacity = (buffer.len() - done).min(scratch.len());
+            scratch[..capacity].copy_from_slice(&buffer[done..done + capacity]);
+            let written = match offset {
+                Some(base) => {
+                    let position = base.checked_add(done as u64).ok_or(Errno::EOVERFLOW)?;
+                    client.pwrite(target, position, &scratch[..capacity])?
+                }
+                None => client.write(target, 0, &scratch[..capacity])?,
+            };
+            if written > capacity {
+                return Err(Errno::EPROTO);
+            }
+            done += written;
+            if written < capacity {
+                break;
+            }
+        }
+        Ok(done)
+    }
+
     /// Forward a small control reply through a local buffer.
     ///
     /// A server capture (`vfsd`'s own response buffer) cannot be captured again
@@ -404,25 +427,21 @@ mod program {
                     return Err(Errno::ENOTDIR.into());
                 }
             }
-            if path == "/" {
-                if self.opens.len() >= MAX_OPEN_FILES {
-                    let _ = client.close(target);
-                    return Err(Errno::EMFILE.into());
-                }
-                let id = self.opens.insert(
-                    Proxy {
-                        target,
-                        path,
-                        root_listing: true,
-                        merged: None,
-                        mount_generation: self.mount_generation,
-                    },
-                    flags,
-                )?;
-                Ok(Opened::File(id))
-            } else {
-                Ok(Opened::Attach(target))
+            if self.opens.len() >= MAX_OPEN_FILES {
+                let _ = client.close(target);
+                return Err(Errno::EMFILE.into());
             }
+            let id = self.opens.insert(
+                Proxy {
+                    target,
+                    root_listing: path == "/",
+                    path,
+                    merged: None,
+                    mount_generation: self.mount_generation,
+                },
+                flags,
+            )?;
+            Ok(Opened::File(id))
         }
 
         fn read(&mut self, file: u64, offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
@@ -436,7 +455,7 @@ mod program {
             if root {
                 Ok(self.read_root(file, buffer)?)
             } else {
-                Ok(Client::new().read(target, 0, buffer)?)
+                Ok(copy_read(&Client::new(), target, None, buffer)?)
             }
         }
 
@@ -445,7 +464,7 @@ mod program {
                 return Err(Errno::EINVAL.into());
             }
             let target = self.opens.get(file).ok_or(Errno::EBADF)?.file.target;
-            Ok(Client::new().write(target, 0, buffer)?)
+            Ok(copy_write(&Client::new(), target, None, buffer)?)
         }
 
         fn pread(&mut self, file: u64, offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
@@ -456,7 +475,7 @@ mod program {
             if root {
                 Ok(self.root_explicit(file, offset, buffer)?)
             } else {
-                Ok(Client::new().pread(target, offset, buffer)?)
+                Ok(copy_read(&Client::new(), target, Some(offset), buffer)?)
             }
         }
 
@@ -468,7 +487,7 @@ mod program {
             if root {
                 return Err(Errno::EISDIR.into());
             }
-            Ok(Client::new().pwrite(target, offset, buffer)?)
+            Ok(copy_write(&Client::new(), target, Some(offset), buffer)?)
         }
 
         fn seek(&mut self, file: u64, offset: i64, whence: u32) -> HandlerResult<u64> {
@@ -659,7 +678,7 @@ mod program {
             println!("vfsd: no root mount");
             return 3;
         }
-        let mut server = match Server::register_with(VfsKernel::default(), "file") {
+        let mut server = match Server::register("file") {
             Ok(server) => server,
             Err(error) => {
                 println!("vfsd: register: {}", error.description());
