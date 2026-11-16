@@ -2910,6 +2910,17 @@ name = "raven-usb-hid"
 version = "0.1.0"
 
 [[package]]
+name = "raven-user-image"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-user-tests"
 version = "0.1.0"
 dependencies = [
