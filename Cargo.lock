@@ -1797,6 +1797,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-pi4-soak"
+version = "0.1.0"
+dependencies = [
+ "pwm-audio",
+ "raven-genet",
+ "raven-proto-audio",
+ "raven-pwm",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-pi5"
 version = "0.1.0"
 dependencies = [
