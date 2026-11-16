@@ -25,11 +25,11 @@ pub struct RtIo;
 
 impl DbIo for RtIo {
     fn read(&mut self, path: &str) -> Result<Vec<u8>, DbError> {
-        fs::read_to_vec(path).map_err(DbError::Io)
+        fs::read_to_vec(&file_path(path)).map_err(DbError::Io)
     }
 
     fn create_exclusive(&mut self, path: &str) -> Result<(), DbError> {
-        match fs::open(path, O_WRONLY | O_CREAT | O_EXCL) {
+        match fs::open(&file_path(path), O_WRONLY | O_CREAT | O_EXCL) {
             Ok(file) => file.close().map_err(DbError::Io),
             Err(Errno::EEXIST) => Err(DbError::Busy),
             Err(error) => Err(DbError::Io(error)),
@@ -112,7 +112,7 @@ pub fn read_line(prompt: &str) -> Result<String, DbError> {
 /// # Errors
 /// An I/O error while creating, writing, changing the mode or flushing.
 pub fn write_file(path: &str, data: &[u8], mode: u32) -> Result<(), DbError> {
-    let mut file = fs::open(path, O_WRONLY | O_CREAT | O_TRUNC).map_err(DbError::Io)?;
+    let mut file = fs::open(&file_path(path), O_WRONLY | O_CREAT | O_TRUNC).map_err(DbError::Io)?;
     // Apply the final mode before writing so a shadow temporary never holds secret bytes with
     // the server's default 0644 creation mode.
     fs::chmod(path, mode).map_err(DbError::Io)?;
@@ -138,7 +138,7 @@ pub fn write_file(path: &str, data: &[u8], mode: u32) -> Result<(), DbError> {
 /// # Errors
 /// An I/O error while creating the directory or copying a skeleton file.
 pub fn create_home(path: &str) -> Result<(), DbError> {
-    match fs::stat(path) {
+    match fs::stat(&file_path(path)) {
         Ok(stat) if stat.mode & S_IFMT == S_IFDIR => return Ok(()),
         Ok(_) => return Err(DbError::Io(Errno::EEXIST)),
         Err(Errno::ENOENT) => {}
@@ -159,7 +159,7 @@ pub fn create_home(path: &str) -> Result<(), DbError> {
 }
 
 fn copy_skel(home: &str) -> Result<(), DbError> {
-    let entries = match fs::read_dir("/etc/skel") {
+    let entries = match fs::read_dir(&file_path("/etc/skel")) {
         Ok(entries) => entries,
         Err(Errno::ENOENT) => return Ok(()),
         Err(error) => return Err(DbError::Io(error)),
@@ -169,11 +169,15 @@ fn copy_skel(home: &str) -> Result<(), DbError> {
             continue;
         }
         let source = format!("/etc/skel/{}", entry.name);
-        let data = fs::read_to_vec(&source).map_err(DbError::Io)?;
+        let data = fs::read_to_vec(&file_path(&source)).map_err(DbError::Io)?;
         let target = format!("{home}/{}", entry.name);
         write_file(&target, &data, 0o644)?;
     }
     Ok(())
+}
+
+fn file_path(path: &str) -> String {
+    format!("file:{path}")
 }
 
 /// Read `N` bytes from a device scheme such as `rand:`.
