@@ -734,6 +734,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-awk"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-regex",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-b12b-probe"
 version = "0.1.0"
 dependencies = [

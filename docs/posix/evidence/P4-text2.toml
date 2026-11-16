@@ -34,3 +34,9 @@ id = "util.sed"
 status = "present"
 evidence = "test:tests/posix/utility/text2/sed/test.sh"
 notes = "P4h: first-party sed subset host behaviour tests"
+
+[[row]]
+id = "util.awk"
+status = "present"
+evidence = "test:tests/posix/utility/text2/awk/test.sh"
+notes = "P4i: bounded first-party awk core host behaviour tests"
