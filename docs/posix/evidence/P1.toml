@@ -128,3 +128,221 @@ id = "interface.free_aligned_sized"
 status = "present"
 evidence = "test:tests/libc/posix/stdlib/check-stdlib.sh"
 notes = "P1 batch B: C23 7.22.3.4 free_aligned_sized; alignment/size hints over the live allocator"
+
+# P1 batch B stdio: the simple stdio exports. Each row is backed by the lower-level stdio-engine
+# test run and the libc.a symbol check in tests/libc/posix/stdio/check-stdio.sh.
+[[row]]
+id = "interface.clearerr_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: C17 <stdio.h> clearerr_unlocked; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.ctermid"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: POSIX.1-2024 ctermid; /dev/tty result and libc.a symbol"
+
+[[row]]
+id = "interface.feof_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: C17 <stdio.h> feof_unlocked; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.ferror_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: C17 <stdio.h> ferror_unlocked; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.fflush_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: C17 <stdio.h> fflush_unlocked; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.fgetc_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: C17 <stdio.h> fgetc_unlocked; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.fgetpos"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: C17 <stdio.h> fgetpos over the FILE position; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.fgetpos64"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: fgetpos64 alias of the 64-bit off_t fgetpos; libc.a symbol"
+
+[[row]]
+id = "interface.fileno_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: POSIX.1-2024 fileno_unlocked; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.flockfile"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: POSIX.1-2024 flockfile no-op on the single stream lock; libc.a symbol"
+
+[[row]]
+id = "interface.fopen64"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: fopen64 alias of fopen (off_t is 64-bit); stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.fputc_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: C17 <stdio.h> fputc_unlocked; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.fputs_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: C17 <stdio.h> fputs_unlocked; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.fread_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: C17 <stdio.h> fread_unlocked; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.freopen64"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: freopen64 alias of freopen; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.fseeko"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: POSIX.1-2024 fseeko; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.fseeko64"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: fseeko64 alias of fseeko; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.fsetpos"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: C17 <stdio.h> fsetpos over the opaque fpos_t; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.fsetpos64"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: fsetpos64 alias of fsetpos; libc.a symbol"
+
+[[row]]
+id = "interface.ftello"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: POSIX.1-2024 ftello; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.ftello64"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: ftello64 alias of ftello; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.ftrylockfile"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: POSIX.1-2024 ftrylockfile always succeeds on the single stream lock; libc.a symbol"
+
+[[row]]
+id = "interface.funlockfile"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: POSIX.1-2024 funlockfile no-op on the single stream lock; libc.a symbol"
+
+[[row]]
+id = "interface.fwrite_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: C17 <stdio.h> fwrite_unlocked; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.getc"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: C17 <stdio.h> getc; fgetc body and libc.a symbol"
+
+[[row]]
+id = "interface.getc_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: POSIX.1-2024 getc_unlocked; fgetc body and libc.a symbol"
+
+[[row]]
+id = "interface.getchar_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: POSIX.1-2024 getchar_unlocked; stdin body and libc.a symbol"
+
+[[row]]
+id = "interface.getdelim"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: POSIX.1-2024 getdelim; lower-level getdelim test and libc.a symbol"
+
+[[row]]
+id = "interface.getw"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: getw one binary int; fread body and libc.a symbol"
+
+[[row]]
+id = "interface.putc"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: C17 <stdio.h> putc; fputc body and libc.a symbol"
+
+[[row]]
+id = "interface.putc_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: POSIX.1-2024 putc_unlocked; fputc body and libc.a symbol"
+
+[[row]]
+id = "interface.putchar_unlocked"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: POSIX.1-2024 putchar_unlocked; stdout body and libc.a symbol"
+
+[[row]]
+id = "interface.putw"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: putw one binary int; fwrite body and libc.a symbol"
+
+[[row]]
+id = "interface.setbuf"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: C17 <stdio.h> setbuf over setvbuf; stdio engine test and libc.a symbol"
+
+[[row]]
+id = "interface.setbuffer"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: BSD setbuffer over setvbuf; libc.a symbol"
+
+[[row]]
+id = "interface.setlinebuf"
+status = "present"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
+notes = "P1 batch B: BSD setlinebuf over setvbuf line mode; libc.a symbol"

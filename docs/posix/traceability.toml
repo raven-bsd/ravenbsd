@@ -1568,7 +1568,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.clearerr_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.clock"
@@ -2018,7 +2018,7 @@ evidence = "none"
 id = "interface.ctermid"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.ctime"
@@ -2582,7 +2582,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.feof_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.feraiseexcept"
@@ -2600,7 +2600,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.ferror_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fesetenv"
@@ -2666,7 +2666,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fflush_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.ffs"
@@ -2696,19 +2696,19 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fgetc_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fgetpos"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fgetpos64"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fgets"
@@ -2744,7 +2744,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fileno_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.finitef"
@@ -2756,7 +2756,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.flockfile"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.floor"
@@ -2948,7 +2948,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fopen64"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fork"
@@ -2984,7 +2984,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fputc_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fputs"
@@ -2996,7 +2996,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fputs_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fputwc"
@@ -3032,7 +3032,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fread_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.free"
@@ -3074,7 +3074,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.freopen64"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.frexp"
@@ -3128,25 +3128,25 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fseeko"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fseeko64"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fsetpos"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fsetpos64"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fstat"
@@ -3188,13 +3188,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.ftello"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.ftello64"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.ftok"
@@ -3218,7 +3218,7 @@ evidence = "none"
 id = "interface.ftrylockfile"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.ftw"
@@ -3236,7 +3236,7 @@ evidence = "none"
 id = "interface.funlockfile"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.futimens"
@@ -3278,7 +3278,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fwrite_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fwscanf"
@@ -3308,13 +3308,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.getc"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.getc_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.getchar"
@@ -3326,7 +3326,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.getchar_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.getcwd"
@@ -3344,7 +3344,7 @@ evidence = "none"
 id = "interface.getdelim"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.getdents"
@@ -3698,7 +3698,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.getw"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.getwc"
@@ -6386,13 +6386,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.putc"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.putc_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.putchar"
@@ -6404,7 +6404,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.putchar_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.putenv"
@@ -6452,7 +6452,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.putw"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.putwc"
@@ -7064,13 +7064,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.setbuf"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.setbuffer"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.setdomainname"
@@ -7148,7 +7148,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.setlinebuf"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.setlocale"
@@ -9170,7 +9170,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "process.credential"
 ticket = "P2"
 test = "none"
-evidence = "none"
+evidence = "qtest:proc-credentials"
 
 [[trace]]
 id = "process.exec"
@@ -9182,7 +9182,7 @@ evidence = "none"
 id = "process.fork"
 ticket = "P2"
 test = "tests/qtest/cases/proc-fork.toml"
-evidence = "kernel/src/syscall/process_ctl.rs"
+evidence = "qtest:proc-fork"
 
 [[trace]]
 id = "process.job-control"
@@ -9200,7 +9200,7 @@ evidence = "none"
 id = "process.posix-spawn"
 ticket = "P2"
 test = "none"
-evidence = "libc/ravenlibc/crates/raven-libc/src/process/posix_spawn.rs"
+evidence = "none"
 
 [[trace]]
 id = "process.priority"
@@ -9212,31 +9212,31 @@ evidence = "none"
 id = "process.process-group"
 ticket = "P2"
 test = "none"
-evidence = "none"
+evidence = "qtest:proc-session"
 
 [[trace]]
 id = "process.process-id"
 ticket = "P2"
 test = "none"
-evidence = "none"
+evidence = "qtest:proc-registry"
 
 [[trace]]
 id = "process.resource"
 ticket = "P2"
 test = "none"
-evidence = "none"
+evidence = "qtest:proc-session"
 
 [[trace]]
 id = "process.session"
 ticket = "P2"
 test = "none"
-evidence = "none"
+evidence = "qtest:proc-session"
 
 [[trace]]
 id = "process.signal"
 ticket = "P2"
 test = "none"
-evidence = "kernel/src/syscall/thread.rs"
+evidence = "qtest:proc-signal"
 
 [[trace]]
 id = "process.system"
@@ -9248,13 +9248,13 @@ evidence = "none"
 id = "process.terminate"
 ticket = "P2"
 test = "none"
-evidence = "kernel/src/syscall/process_ctl.rs"
+evidence = "qtest:proc-session"
 
 [[trace]]
 id = "process.times"
 ticket = "P2"
 test = "none"
-evidence = "none"
+evidence = "qtest:proc-session"
 
 [[trace]]
 id = "process.tty-control"
@@ -9266,7 +9266,7 @@ evidence = "none"
 id = "process.wait"
 ticket = "P2"
 test = "none"
-evidence = "kernel/src/syscall/process_ctl.rs"
+evidence = "qtest:proc-session"
 
 [[trace]]
 id = "shell.arithmetic-expansion"
