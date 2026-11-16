@@ -22,6 +22,7 @@ alloc = []
 raven-abi = { path = "../../crates/raven-abi" }
 raven-elf = { path = "../../crates/raven-elf" }
 raven-initfs = { path = "../../crates/raven-initfs" }
+raven-proto-fs = { path = "../../crates/raven-proto-fs" }
 raven-libc-sys = { path = "../../libc/ravenlibc/crates/raven-libc-sys", default-features = false }
 raven-scheme = { path = "../../crates/raven-scheme" }
 

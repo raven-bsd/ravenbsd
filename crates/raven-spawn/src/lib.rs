@@ -409,14 +409,25 @@ fn image_scheme_path(path: &str) -> alloc_crate::string::String {
     }
 }
 
+/// The S11 wire flags for a read-only image open.
+///
+/// `O_RDONLY` is zero at the C level, but the kernel's `OPEN` wire encoding uses bit 0 for read
+/// access; passing the raw zero flags is rejected.
+#[cfg(any(target_os = "none", test))]
+fn image_open_flags() -> Result<raven_proto_fs::OpenFlags, SpawnError> {
+    raven_proto_fs::OpenFlags::from_linux(raven_proto_fs::O_RDONLY)
+        .map_err(|_| SpawnError::Sys(Errno::EINVAL))
+}
+
 /// Open and read a `file:` path into a bounded image buffer.
 ///
 /// Every call opens its own handle, so concurrent readers do not share a file cursor.
 #[cfg(all(target_os = "none", feature = "alloc"))]
 pub fn read_file_image(path: &str) -> Result<Vec<u8>, SpawnError> {
     let scheme_path = image_scheme_path(path);
+    let flags = image_open_flags()?;
     let client = Client::new();
-    let handle = client.open(&scheme_path, 0).map_err(|error| {
+    let handle = client.open_flags(&scheme_path, flags).map_err(|error| {
         if error == Errno::ENOENT {
             SpawnError::FileNotFound
         } else {

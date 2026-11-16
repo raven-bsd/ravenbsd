@@ -2679,6 +2679,7 @@ dependencies = [
  "raven-elf",
  "raven-initfs",
  "raven-libc-sys",
+ "raven-proto-fs",
  "raven-scheme",
 ]
 
