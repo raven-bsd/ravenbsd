@@ -156,7 +156,8 @@ pub struct Overlay {
 }
 
 impl Overlay {
-    /// Load the optional aggregate file and every `docs/posix/evidence/P1-P5.toml` file.
+    /// Load the optional aggregate file and every `docs/posix/evidence/P1-P5.toml` or
+    /// `P<owner>-<batch>.toml` file.
     ///
     /// Duplicate ids and files outside the P1-P5 owner split are hard errors. A missing overlay
     /// is an empty overlay, so the seed and gate keep working before owners add evidence.
@@ -177,17 +178,24 @@ impl Overlay {
                 if path.extension().and_then(|value| value.to_str()) != Some("toml") {
                     continue;
                 }
-                let owner = path
+                let stem = path
                     .file_stem()
                     .and_then(|value| value.to_str())
-                    .unwrap_or("")
-                    .to_string();
-                if !OWNERS.contains(&owner.as_str()) {
+                    .unwrap_or("");
+                // One file per owner, or one per owner sub-batch (`P4-text.toml`); the
+                // sub-batch is what lets several minions close their own rows in parallel.
+                let owner = if OWNERS.contains(&stem) {
+                    stem.to_string()
+                } else if let Some((prefix, _)) = stem.split_once('-')
+                    && OWNERS.contains(&prefix)
+                {
+                    prefix.to_string()
+                } else {
                     bail!(
-                        "overlay file `{}` must be named P1.toml through P5.toml",
+                        "overlay file `{}` must be named P1.toml through P5.toml or P<owner>-<batch>.toml",
                         path.display()
                     );
-                }
+                };
                 owner_paths.push((path, owner));
             }
             owner_paths.sort_by(|left, right| left.0.cmp(&right.0));

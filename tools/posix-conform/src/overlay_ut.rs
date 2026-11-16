@@ -330,3 +330,16 @@ fn seed_includes_supported_overlay_rows() {
     assert_eq!(meta.notes, "foo export is covered by the header probe");
     cleanup(&path);
 }
+
+#[test]
+fn owner_batch_files_are_accepted() {
+    let path = root("batch");
+    std::fs::write(
+        path.join("docs/posix/evidence/P4-text.toml"),
+        "schema = 1\nstandard = \"posix-2024\"\n\n[[row]]\nid = \"util.sort\"\n\
+         status = \"waived\"\nnotes = \"batch file smoke test\"\n",
+    )
+    .unwrap();
+    assert!(Overlay::load(&path).is_ok());
+    cleanup(&path);
+}
