@@ -249,7 +249,8 @@ manifest_check_release() {
     devd=profiles/pi4-release.d/devd.manifest
     genet=profiles/pi4-release.d/genet.manifest
     netd=profiles/pi4-release.d/netd.manifest
-    drivers=userland/servers/devd/drivers.toml
+    platd=profiles/pi4-release.d/platd.manifest
+    drivers=profiles/pi4-release.d/drivers.conf
 
     if ! grep -Fq 'args = ["devd", "dtb", "launch"]' "$devd"; then
         echo "pi4-release: devd.manifest does not use dtb launch" >&2
@@ -273,6 +274,14 @@ manifest_check_release() {
     fi
     if ! grep -Fq 'grants = ["platform-root"]' "$devd"; then
         echo "pi4-release: devd.manifest lacks the platform-root grant" >&2
+        failed=1
+    fi
+    if ! grep -Fq 'provides = ["scheme:plat", "scheme:dev", "scheme:nic"]' "$devd"; then
+        echo "pi4-release: devd.manifest does not provide plat/dev/nic" >&2
+        failed=1
+    fi
+    if ! grep -Eq '^enable = false$' "$platd"; then
+        echo "pi4-release: platd.manifest must stay disabled; devd launches it" >&2
         failed=1
     fi
     if ! grep -Eq '^enable = false$' "$genet"; then
@@ -309,6 +318,32 @@ manifest_check_release() {
     fi
     if [ "$(grep -c '^name = "genet"' "$drivers")" -ne 1 ]; then
         echo "pi4-release: duplicate genet driver entry" >&2
+        failed=1
+    fi
+    if ! grep -A6 '^name = "platd"' "$drivers" | grep -Fq 'mailbox=3:64'; then
+        echo "pi4-release: drivers.toml platd entry lacks the multi-window plan" >&2
+        failed=1
+    fi
+    platd_args=$(grep -A6 '^name = "platd"' "$drivers" | grep '^args =')
+    for token in 'bar=0' 'bar=1' 'bar=2' 'dma_size=256' 'mailbox=3:64' 'gpio=4:180' 'rng=5:40' 'dma=6:256'; do
+        case "$platd_args" in
+            *"$token"*) ;;
+            *)
+                echo "pi4-release: platd args lack $token" >&2
+                failed=1
+                ;;
+        esac
+    done
+    if [ "$(grep -c '^name = "platd"' "$drivers")" -ne 1 ]; then
+        echo "pi4-release: duplicate platd driver entry" >&2
+        failed=1
+    fi
+    if [ "$(grep -l '^name = "platd"' profiles/pi4-release.d/*.manifest | wc -l | tr -d ' ')" -ne 1 ]; then
+        echo "pi4-release: duplicate platd service launcher" >&2
+        failed=1
+    fi
+    if [ "$(grep -h '^package = "raven-platd"' profiles/pi4-release.d/*.toml | wc -l | tr -d ' ')" -ne 1 ]; then
+        echo "pi4-release: duplicate platd program entry" >&2
         failed=1
     fi
     if [ "$(grep -l '^name = "genet"' profiles/pi4-release.d/*.manifest | wc -l | tr -d ' ')" -ne 1 ]; then
