@@ -239,6 +239,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ed"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-regex",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "emmc2"
 version = "0.1.0"
 dependencies = [
