@@ -99,8 +99,8 @@ mod program {
     use alloc::vec::Vec;
 
     use linuxd::{
-        LinuxProcess, TrapAction, copy_in_len, decode, dispatch, dispatcher, encode_reply,
-        interp_path, load, plan_image,
+        FileKind, FileOp, LinuxProcess, OpenFile, TrapAction, copy_in, decode, dispatch,
+        dispatcher, encode_reply, interp_path, load, plan_image,
     };
     use raven_abi::errno::Errno;
     use raven_abi::types::{Handle, clock};
@@ -372,10 +372,10 @@ mod program {
         trace: bool,
     ) -> Option<i32> {
         process.user_buffer.clear();
-        if let Some(len) = copy_in_len(&call) {
+        if let Some((argument, len)) = copy_in(&call) {
             process.user_buffer.resize(len, 0);
-            if let Err(error) =
-                raw::copy_in(sys, &loaded.regions, call.args[1], &mut process.user_buffer)
+            let source = call.args.get(argument).copied().unwrap_or(0);
+            if let Err(error) = raw::copy_in(sys, &loaded.regions, source, &mut process.user_buffer)
             {
                 let reply = reply_packet(packet, -(error.0 as i64));
                 let _ = sys::send(request, &reply);
@@ -388,6 +388,12 @@ mod program {
         if let Some(base) = process.pending_tls.take() {
             match raw::set_tls(process.thread, base) {
                 Ok(()) => process.fs_base = base,
+                Err(error) => action = TrapAction::Reply(-(error.0 as isize)),
+            }
+        }
+        if let Some(op) = process.pending_file.take() {
+            match run_file_op(sys, process, loaded, op) {
+                Ok(value) => action = TrapAction::Reply(value),
                 Err(error) => action = TrapAction::Reply(-(error.0 as isize)),
             }
         }
@@ -422,6 +428,129 @@ mod program {
                 Some(code)
             }
         }
+    }
+
+    /// Perform one queued file operation and return the Linux syscall result.
+    fn run_file_op(
+        sys: &mut KernelSys,
+        process: &mut LinuxProcess,
+        loaded: &linuxd::Loaded,
+        op: FileOp,
+    ) -> Result<isize, Errno> {
+        match op {
+            FileOp::Open {
+                scheme,
+                path,
+                flags,
+            } => {
+                let text = core::str::from_utf8(&scheme).map_err(|_| Errno::EINVAL)?;
+                let handle = raw::open_file(text, flags)?;
+                Ok(process.open_remote(path, handle, flags) as isize)
+            }
+            FileOp::Read { fd, address, len } => {
+                let handle = process
+                    .file(fd)
+                    .and_then(OpenFile::remote)
+                    .ok_or(Errno::EBADF)?;
+                let mut data = alloc::vec![0u8; len];
+                let read = raw::read_file(handle, &mut data)?;
+                raw::copy_out(sys, &loaded.regions, address, &data[..read])?;
+                Ok(read as isize)
+            }
+            FileOp::Write { fd, data } => {
+                let handle = process
+                    .file(fd)
+                    .and_then(OpenFile::remote)
+                    .ok_or(Errno::EBADF)?;
+                let written = raw::write_file(handle, &data)?;
+                Ok(written as isize)
+            }
+            FileOp::Pread {
+                fd,
+                address,
+                len,
+                offset,
+            } => {
+                let handle = process
+                    .file(fd)
+                    .and_then(OpenFile::remote)
+                    .ok_or(Errno::EBADF)?;
+                let mut data = alloc::vec![0u8; len];
+                let read = raw::pread_file(handle, offset, &mut data)?;
+                raw::copy_out(sys, &loaded.regions, address, &data[..read])?;
+                Ok(read as isize)
+            }
+            FileOp::Pwrite { fd, data, offset } => {
+                let handle = process
+                    .file(fd)
+                    .and_then(OpenFile::remote)
+                    .ok_or(Errno::EBADF)?;
+                let written = raw::pwrite_file(handle, offset, &data)?;
+                Ok(written as isize)
+            }
+            FileOp::Seek { fd, offset, whence } => {
+                let handle = process
+                    .file(fd)
+                    .and_then(OpenFile::remote)
+                    .ok_or(Errno::EBADF)?;
+                let new_offset = raw::seek_file(handle, offset, whence)?;
+                isize::try_from(new_offset).map_err(|_| Errno::EOVERFLOW)
+            }
+            FileOp::Close { fd } => {
+                let remote = process.file(fd).and_then(OpenFile::remote);
+                let result = match remote {
+                    Some(handle) => raw::close_file(handle),
+                    None => Ok(()),
+                };
+                let _ = process.close_file(fd);
+                result.map(|()| 0)
+            }
+            FileOp::Dup3 {
+                oldfd,
+                newfd,
+                cloexec,
+            } => {
+                let file = duplicate_file(process, oldfd, cloexec)?;
+                if let Some(handle) = process.file(newfd).and_then(OpenFile::remote) {
+                    let _ = raw::close_file(handle);
+                }
+                if !process.install_file(newfd, file) {
+                    return Err(Errno::EBADF);
+                }
+                Ok(newfd as isize)
+            }
+            FileOp::FcntlDup { fd, min, cloexec } => {
+                let target = process.lowest_free_fd(min);
+                let file = duplicate_file(process, fd, cloexec)?;
+                if let Some(handle) = process.file(target).and_then(OpenFile::remote) {
+                    let _ = raw::close_file(handle);
+                }
+                if !process.install_file(target, file) {
+                    return Err(Errno::EBADF);
+                }
+                Ok(target as isize)
+            }
+        }
+    }
+
+    /// Clone one descriptor, duplicating a remote scheme handle so the server cursor is shared.
+    fn duplicate_file(process: &LinuxProcess, fd: i32, cloexec: bool) -> Result<OpenFile, Errno> {
+        let old = process.file(fd).ok_or(Errno::EBADF)?.clone();
+        let kind = match old.remote() {
+            Some(handle) => FileKind::Remote(raw::dup_file(handle)?),
+            None => old.kind.clone(),
+        };
+        Ok(OpenFile {
+            path: old.path,
+            kind,
+            offset: old.offset,
+            flags: old.flags,
+            fd_flags: if cloexec {
+                linuxd::files::FD_CLOEXEC
+            } else {
+                0
+            },
+        })
     }
 
     fn print_stats(dispatcher: &Dispatcher, handler: Handle) {

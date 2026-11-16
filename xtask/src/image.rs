@@ -35,10 +35,10 @@ impl Platform {
     }
 }
 
-pub(crate) const IMAGE_BYTES: u64 = 256 * 1024 * 1024;
+pub(crate) const IMAGE_BYTES: u64 = 320 * 1024 * 1024;
 pub(crate) const TOTAL_SECTORS: u64 = IMAGE_BYTES / SECTOR_SIZE;
 pub(crate) const ESP_START_LBA: u64 = 2048;
-pub(crate) const ESP_SECTORS: u64 = 64 * 1024 * 1024 / SECTOR_SIZE;
+pub(crate) const ESP_SECTORS: u64 = 220 * 1024 * 1024 / SECTOR_SIZE;
 pub(crate) const ROOT_START_LBA: u64 = ESP_START_LBA + ESP_SECTORS;
 pub(crate) const ROOT_SECTORS: u64 = 64 * 1024 * 1024 / SECTOR_SIZE;
 pub(crate) const GPT_ENTRY_SECTORS: u64 = 32;

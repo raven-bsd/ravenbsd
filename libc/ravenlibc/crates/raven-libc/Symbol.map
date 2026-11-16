@@ -1209,30 +1209,53 @@ RAVEN_1.0 {
 		readv;
 		realpath;
 		writev;
-		# --- C64e std/fs exports ---
-		fchmod;
-		fsync;
+		# --- K25a std/toolchain exports ---
+		chroot;
+		fchmodat;
+		fchownat;
+		futimens;
+		getaudit;
 		isatty;
+		link;
+		linkat;
+		lutimes;
+		mkfifo;
+		mknod;
+		sync;
+		umask;
+		utimensat;
+		utimes;
+		# --- K25a std/toolchain exports (continued) ---
+		chdir;
+		chmod;
+		clock_settime;
+		fchmod;
+		fstatfs;
+		ftruncate;
+		gethostname;
 		mkdir;
+		pipe2;
+		readlink;
 		rename;
+		renameat;
+		rmdir;
+		statfs;
+		symlink;
+		symlinkat;
+		unlinkat;
 		# --- C64h brush/uutils libc surface ---
 		__getrandom_v03_custom;
 		cfmakeraw;
-		chdir;
-		chroot;
 		confstr;
-		ftruncate;
-		gethostname;
 		killpg;
-		pipe2;
-		readlink;
 		syscall;
 		tcgetattr;
 		tcgetpgrp;
 		tcsetattr;
 		tcsetpgrp;
 		ttyname_r;
-		umask;
+		# --- K96/F3 merge ---
+		fsync;
 };
 
 RAVENprivate_1.0 {
@@ -1264,5 +1287,6 @@ RAVENprivate_1.0 {
 		__rl_scan_float_impl;
 		__rl_stdio_exit_impl;
 		__rl_tz_load_impl;
+		# --- K25a private aliases ---
 		errno_location;
 };

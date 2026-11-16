@@ -35,7 +35,7 @@ fn a_write_request_decodes_and_replies() {
     let bytes = request(1, [1, 0x1000, 6, 0, 0, 0]);
     let call = decode(&bytes).expect("a valid request");
     assert_eq!(call.nr, 1);
-    assert_eq!(copy_in_len(&call), Some(6));
+    assert_eq!(copy_in(&call), Some((1, 6)));
     let action = dispatch(&mut process, &mut dispatcher, &call);
     assert_eq!(action, TrapAction::Reply(6));
     assert_eq!(process.output, b"hello\n");
@@ -63,21 +63,31 @@ fn copy_in_is_bounded_by_the_server_limit() {
         1,
         [1, 0x1000, u64::MAX, 0, 0, 0],
     );
-    assert_eq!(copy_in_len(&call), Some(crate::table::USER_BUFFER_MAX));
+    assert_eq!(copy_in(&call), Some((1, crate::table::USER_BUFFER_MAX)));
     let other = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, 39, [0; 6]);
-    assert_eq!(copy_in_len(&other), None);
+    assert_eq!(copy_in(&other), None);
 }
 
 #[test]
 fn path_calls_copy_a_bounded_window() {
-    for nr in [2, 4, 89, 257, 262, 267] {
+    for nr in [2, 4, 89] {
         let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, nr, [0; 6]);
-        assert_eq!(copy_in_len(&call), Some(128), "nr {nr}");
+        assert_eq!(copy_in(&call), Some((0, 128)), "nr {nr}");
     }
-    for nr in [0, 3, 8, 217] {
+    for nr in [257, 262, 267] {
         let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, nr, [0; 6]);
-        assert_eq!(copy_in_len(&call), None, "nr {nr}");
+        assert_eq!(copy_in(&call), Some((1, 128)), "nr {nr}");
     }
+    for nr in [0, 3, 8, 17, 72, 217, 292] {
+        let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, nr, [0; 6]);
+        assert_eq!(copy_in(&call), None, "nr {nr}");
+    }
+}
+
+#[test]
+fn pwrite_copies_the_same_buffer_window_as_write() {
+    let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, 18, [7, 0x2000, 32, 0, 0, 0]);
+    assert_eq!(copy_in(&call), Some((1, 32)));
 }
 
 #[test]

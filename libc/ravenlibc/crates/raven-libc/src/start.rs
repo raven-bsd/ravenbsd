@@ -22,6 +22,8 @@ use core::ffi::{c_int, c_void};
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use raven_libc_platform::{OfdKind, RealSys, SysBackend};
+
 /// Maximum accepted `argc`; a larger word is a malformed C8 stack.
 const MAX_ARGC: usize = 4096;
 /// Maximum accepted environment entries; a larger array is malformed.
@@ -37,8 +39,6 @@ const AT_PAGESZ: usize = 6;
 const AT_CLKTCK: usize = 17;
 /// `AT_RANDOM`: 16 random bytes.
 const AT_RANDOM: usize = 25;
-/// `AT_SECURE`: the privileged-exec flag (never set on Raven, H-7).
-const AT_SECURE: usize = 23;
 /// `AT_HWCAP`: CPU feature bits (the AArch64/RISC-V IFUNC argument and C67 `getisax`).
 const AT_HWCAP: usize = 16;
 /// `AT_HWCAP2`: the second CPU feature word (C67 `getisax`).
@@ -297,10 +297,9 @@ pub unsafe extern "C" fn __raven_libc_start(
         raven_libc_sys::sys::exit(127)
     }
 
-    // STEP 10: only `AT_SECURE` needs the standard descriptors; Raven never sets it (H-7).
-    if aux_value(&aux, AT_SECURE) != 0 {
-        ensure_standard_fds();
-    }
+    // STEP 10: every child adopts the console for fds 0/1/2 (K06c). A process that already has
+    // a descriptor keeps it; a child without a console falls back to `/dev/null`.
+    ensure_standard_fds();
 
     // STEP 11: stdio, locale, time zone, resolver, nss, the allocator and regex are lazy:
     // nothing runs here (`BP-1`, `R-17`, `R-19`, `R-28`).
@@ -646,20 +645,49 @@ unsafe fn run_array(
     }
 }
 
-/// Ensure descriptors 0, 1 and 2 are open (`AT_SECURE` only; never on Raven).
+/// Ensure descriptors 0, 1 and 2 are open, preferring the console scheme.
 #[cold]
 #[inline(never)]
 fn ensure_standard_fds() {
-    // The fd table is the platform crate's (C55); a closed standard descriptor is replaced by
-    // `/dev/null`, exactly the rule of `donor-map/10` 3.12.2 step 10. This branch is only
-    // reachable when `AT_SECURE` is set, which the Raven spawner never does (H-7).
+    // The fd table is the platform crate's (C55). A spawned child starts with no descriptors;
+    // adopt the shell's `tty:console` handle for stdin, stdout and stderr so child output reaches
+    // the serial console. A process that already has a descriptor keeps it, and a process whose
+    // console is not available yet falls back to `/dev/null` (K06c).
     let platform = crate::ffi::platform::global();
+    let wire = raven_libc_platform::xlat::open_flags(raven_libc_abi::fcntl::O_RDWR as u32)
+        .map(|spec| spec.wire)
+        .unwrap_or(0b11);
     let mut fd = 0i32;
     while fd < 3 {
         if platform
             .fcntl(fd, raven_libc_abi::fcntl::F_GETFD, 0)
-            .is_err()
+            .is_ok()
         {
+            fd = fd.wrapping_add(1);
+            continue;
+        }
+        let installed =
+            match raven_libc_platform::scheme::open_scheme_path(&RealSys, b"tty:console", wire) {
+                Ok(handle) => {
+                    match platform.install_at_fd(
+                        fd as u32,
+                        handle,
+                        OfdKind::Tty,
+                        raven_libc_abi::fcntl::O_RDWR as u32,
+                        None,
+                        false,
+                        0,
+                    ) {
+                        Ok(()) => true,
+                        Err(_) => {
+                            let _ = RealSys.close(handle);
+                            false
+                        }
+                    }
+                }
+                Err(_) => false,
+            };
+        if !installed {
             let _ = platform.open(b"/dev/null", raven_libc_abi::fcntl::O_RDWR as u32, 0);
         }
         fd = fd.wrapping_add(1);

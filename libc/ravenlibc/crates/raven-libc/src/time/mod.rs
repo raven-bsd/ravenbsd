@@ -123,6 +123,7 @@ pub extern "C" fn tzset() {
     });
 }
 
+mod clock_settime;
 mod daylight;
 mod localtime;
 mod nanosleep;

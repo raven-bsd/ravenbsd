@@ -53,6 +53,7 @@ mod repo;
 mod rootfs;
 mod run;
 mod update;
+mod uutils;
 
 pub use rootfs::{build_root_disk, build_ufs_root, inject_initfs_file, stage_rootfs_spec};
 

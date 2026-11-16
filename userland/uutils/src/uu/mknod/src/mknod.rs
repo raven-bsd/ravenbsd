@@ -1,0 +1,307 @@
+// This file is part of the uutils coreutils package.
+//
+// For the full copyright and license information, please view the LICENSE
+// file that was distributed with this source code.
+
+// spell-checker:ignore (ToDO) parsemode makedev sysmacros perror IFBLK IFCHR IFIFO sflag
+
+use clap::{Arg, ArgAction, Command, value_parser};
+use nix::libc::{S_IRGRP, S_IROTH, S_IRUSR, S_IWGRP, S_IWOTH, S_IWUSR, mode_t};
+use nix::sys::stat::{Mode, SFlag, dev_t, mknod as nix_mknod};
+use std::ffi::{OsStr, OsString};
+use std::io::{self, Write as _};
+
+use uucore::display::Quotable;
+use uucore::error::{ExitCode, UResult, USimpleError, UUsageError, set_exit_code};
+use uucore::format_usage;
+use uucore::fs::makedev;
+use uucore::{show_warning, translate};
+
+#[allow(clippy::unnecessary_cast)]
+const MODE_RW_UGO: u32 = (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH) as u32;
+
+mod options {
+    pub const MODE: &str = "mode";
+    pub const TYPE: &str = "type";
+    pub const MAJOR: &str = "major";
+    pub const MINOR: &str = "minor";
+    pub const SECURITY_CONTEXT: &str = "z";
+    pub const CONTEXT: &str = "context";
+}
+
+#[derive(Clone, PartialEq)]
+enum FileType {
+    Block,
+    Character,
+    Fifo,
+}
+
+impl FileType {
+    fn as_sflag(&self) -> SFlag {
+        match self {
+            Self::Block => SFlag::S_IFBLK,
+            Self::Character => SFlag::S_IFCHR,
+            Self::Fifo => SFlag::S_IFIFO,
+        }
+    }
+}
+
+/// Configuration for special inode creation.
+struct Config {
+    /// Permission bits for the inode
+    mode: Mode,
+
+    file_type: FileType,
+
+    /// when false, the exact mode bits will be set
+    use_umask: bool,
+
+    dev: dev_t,
+
+    /// Set security context (SELinux/SMACK).
+    #[cfg(any(
+        all(feature = "selinux", any(target_os = "android", target_os = "linux")),
+        all(feature = "smack", target_os = "linux"),
+    ))]
+    set_security_context: bool,
+
+    /// Specific security context (SELinux/SMACK).
+    context: Option<String>,
+}
+
+fn mknod(file_name: &OsStr, config: Config) -> i32 {
+    #[cfg(all(feature = "selinux", any(target_os = "android", target_os = "linux")))]
+    let selinux_enabled = uucore::selinux::is_selinux_enabled();
+    #[cfg(not(all(feature = "selinux", any(target_os = "android", target_os = "linux"))))]
+    let selinux_enabled = false;
+    #[cfg(all(feature = "smack", target_os = "linux"))]
+    let smack_enabled = uucore::smack::is_smack_enabled();
+    #[cfg(not(all(feature = "smack", target_os = "linux")))]
+    let smack_enabled = false;
+
+    if config.context.is_some() && !selinux_enabled && !smack_enabled {
+        show_warning!("{}", translate!("mknod-warning-context-ignored"));
+    }
+
+    // Label the node at creation, as GNU does; relabelling after leaves a window.
+    #[cfg(all(feature = "selinux", any(target_os = "android", target_os = "linux")))]
+    let _selinux_guard = if config.set_security_context && selinux_enabled {
+        let mode = config.file_type.as_sflag().bits() | config.mode.bits();
+        match uucore::selinux::FsCreateContext::new(
+            std::path::Path::new(file_name),
+            Some(mode),
+            config.context.as_ref(),
+        ) {
+            Ok(guard) => Some(guard),
+            Err(e) => {
+                let _ = writeln!(io::stderr(), "mknod: {e}");
+                return 1;
+            }
+        }
+    } else {
+        None
+    };
+
+    let create_node = || {
+        nix_mknod(
+            file_name,
+            config.file_type.as_sflag(),
+            config.mode,
+            config.dev,
+        )
+        .err()
+    };
+    let mknod_err = if config.use_umask {
+        create_node()
+    } else {
+        uucore::mode::with_umask(0, create_node)
+    };
+    let errno = if mknod_err.is_some() { -1 } else { 0 };
+
+    if let Some(err) = mknod_err {
+        let _ = writeln!(
+            io::stderr(),
+            "{}: {}",
+            uucore::execution_phrase(),
+            io::Error::from(err)
+        );
+    }
+
+    // Apply SMACK context if requested
+    #[cfg(all(feature = "smack", target_os = "linux"))]
+    if config.set_security_context
+        && smack_enabled
+        && let Err(e) =
+            uucore::smack::set_smack_label_and_cleanup(file_name, config.context.as_ref(), |p| {
+                std::fs::remove_file(p)
+            })
+    {
+        let _ = writeln!(io::stderr(), "mknod: {e}");
+        return 1;
+    }
+
+    errno
+}
+
+#[uucore::main]
+pub fn uumain(args: impl uucore::Args) -> UResult<()> {
+    let args: Vec<OsString> = args.collect();
+    // Kept for the caret in mode diagnostics, which needs the mode as typed.
+    let diag_args = uucore::diagnostics::operands(&args);
+    let matches = uucore::clap_localization::handle_clap_result(uu_app(), args)?;
+
+    let file_type = matches.get_one::<FileType>("type").unwrap();
+
+    let mut use_umask = true;
+    let mode_permissions = match matches.get_one::<String>("mode") {
+        None => MODE_RW_UGO,
+        Some(str_mode) => {
+            use_umask = false;
+            let mode =
+                uucore::mode::parse_chmod(MODE_RW_UGO, str_mode, false, uucore::mode::get_umask())
+                    .map_err(|err| {
+                        let message =
+                            translate!("mknod-error-invalid-mode", "error" => err.to_string());
+                        if let Some(args) = &diag_args
+                            && err.render_mode_value(args, str_mode, 0, &message)
+                        {
+                            // The diagnostic is already on stderr; exit quietly.
+                            return ExitCode::new(1);
+                        }
+                        USimpleError::new(1, message)
+                    })?;
+            if mode > 0o777 {
+                return Err(USimpleError::new(
+                    1,
+                    translate!("mknod-error-mode-permission-bits-only"),
+                ));
+            }
+            mode
+        }
+    };
+    let mode = Mode::from_bits_truncate(mode_permissions as mode_t);
+
+    let file_name = matches
+        .get_one::<OsString>("name")
+        .expect("Missing argument 'NAME'");
+
+    // Extract the security context related flags and options
+    #[cfg(any(
+        all(feature = "selinux", any(target_os = "android", target_os = "linux")),
+        all(feature = "smack", target_os = "linux"),
+    ))]
+    let set_security_context = matches.get_flag(options::SECURITY_CONTEXT);
+    let context = matches.get_one::<String>(options::CONTEXT).cloned();
+
+    let dev = match (
+        file_type,
+        matches.get_one::<u32>(options::MAJOR),
+        matches.get_one::<u32>(options::MINOR),
+    ) {
+        (FileType::Fifo, None, None) => 0,
+        (FileType::Fifo, _, _) => {
+            return Err(UUsageError::new(
+                1,
+                translate!("mknod-error-fifo-no-major-minor"),
+            ));
+        }
+        (_, Some(&major), Some(&minor)) => makedev(major as _, minor as _),
+        _ => {
+            return Err(UUsageError::new(
+                1,
+                translate!("mknod-error-special-require-major-minor"),
+            ));
+        }
+    };
+
+    let config = Config {
+        mode,
+        file_type: file_type.clone(),
+        use_umask,
+        dev,
+        #[cfg(any(
+            all(feature = "selinux", any(target_os = "android", target_os = "linux")),
+            all(feature = "smack", target_os = "linux"),
+        ))]
+        set_security_context: set_security_context || context.is_some(),
+        context,
+    };
+
+    let exit_code = mknod(file_name, config);
+    set_exit_code(exit_code);
+    Ok(())
+}
+
+pub fn uu_app() -> Command {
+    Command::new("mknod")
+        .version(uucore::crate_version!())
+        .help_template(uucore::localized_help_template("mknod"))
+        .override_usage(format_usage(&translate!("mknod-usage")))
+        .after_help(translate!("mknod-after-help"))
+        .about(translate!("mknod-about"))
+        .infer_long_args(true)
+        .arg(
+            Arg::new(options::MODE)
+                .short('m')
+                .long("mode")
+                .value_name("MODE")
+                .help(translate!("mknod-help-mode")),
+        )
+        .arg(
+            Arg::new("name")
+                .value_name("NAME")
+                .help(translate!("mknod-help-name"))
+                .required(true)
+                .value_hint(clap::ValueHint::AnyPath)
+                .value_parser(clap::value_parser!(OsString)),
+        )
+        .arg(
+            Arg::new(options::TYPE)
+                .value_name("TYPE")
+                .help(translate!("mknod-help-type"))
+                .required(true)
+                .value_parser(parse_type),
+        )
+        .arg(
+            Arg::new(options::MAJOR)
+                .value_name(options::MAJOR)
+                .help(translate!("mknod-help-major"))
+                .value_parser(value_parser!(u32)),
+        )
+        .arg(
+            Arg::new(options::MINOR)
+                .value_name(options::MINOR)
+                .help(translate!("mknod-help-minor"))
+                .value_parser(value_parser!(u32)),
+        )
+        .arg(
+            Arg::new(options::SECURITY_CONTEXT)
+                .short('Z')
+                .help(translate!("mknod-help-selinux"))
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new(options::CONTEXT)
+                .long(options::CONTEXT)
+                .value_name("CTX")
+                .value_parser(value_parser!(String))
+                .num_args(0..=1)
+                .require_equals(true)
+                .help(translate!("mknod-help-context")),
+        )
+}
+
+fn parse_type(tpe: &str) -> Result<FileType, String> {
+    // Dispatch on the leading character alone, so a spelled-out type works
+    // wherever its initial does: `character` is read like `c` in
+    // `mknod /dev/ttyS0 character 4 64`.
+    tpe.chars()
+        .next()
+        .ok_or_else(|| translate!("mknod-error-missing-device-type"))
+        .and_then(|first_char| match first_char {
+            'b' => Ok(FileType::Block),
+            'c' | 'u' => Ok(FileType::Character),
+            'p' => Ok(FileType::Fifo),
+            _ => Err(translate!("mknod-error-invalid-device-type", "type" => tpe.quote())),
+        })
+}
