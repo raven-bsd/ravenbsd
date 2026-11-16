@@ -4,7 +4,6 @@
 # devd reads /etc/pi4.dtb. The P8 host fixture decodes the synthetic tree; a
 # live firmware DTB path is the board follow-up.
 [[initfs.files]]
-src = "build/fixtures/pi4-release/pi4.dtb"
+src = "tests/fixtures/pi4-release/pi4.dtb"
 path = "/etc/pi4.dtb"
 mode = 0o644
-generated = true

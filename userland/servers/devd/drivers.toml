@@ -13,7 +13,7 @@
 name = "genet"
 compatible = "brcm,bcm2711-genet-v5"
 exec = "/sbin/genet"
-args = ["bar=0", "resources=dma+irq", "serve"]
+args = ["bar=0", "resources=dma+irq", "serve", "slots=platform"]
 
 [[driver]]
 name = "emmc2"
