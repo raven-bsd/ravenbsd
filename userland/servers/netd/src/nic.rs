@@ -32,9 +32,35 @@ pub const GUEST_PREFIX: u8 = 24;
 const OPEN_READ: u32 = 1;
 const OPEN_WRITE: u32 = 2;
 
+/// How the target selects the NIC address source.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NicMode {
+    /// QEMU user-mode: the legacy fixed guest address plus DHCP.
+    QemuUser,
+    /// Platform: DHCP-first; no address is published before a validated lease.
+    DhcpFirst,
+}
+
+impl NicMode {
+    /// Parse the optional service mode token or `NETD_NIC_MODE` environment value.
+    #[must_use]
+    pub fn select(args: &raven_rt::Args) -> Self {
+        let mode = args
+            .iter()
+            .skip(2)
+            .find(|argument| *argument == "dhcp-first" || *argument == "platform")
+            .or_else(|| args.env_get("NETD_NIC_MODE"));
+        if matches!(mode, Some("dhcp-first") | Some("platform")) {
+            Self::DhcpFirst
+        } else {
+            Self::QemuUser
+        }
+    }
+}
+
 /// Attach the `nic:` service as the second core.
-pub fn attach(netd: &mut Netd<Loopback>, now_ms: i64) -> Result<NicConfig, String> {
-    let (device, config) = NicDevice::open()?;
+pub fn attach(netd: &mut Netd<Loopback>, now_ms: i64, mode: NicMode) -> Result<NicConfig, String> {
+    let (device, config) = NicDevice::open(mode)?;
     netd.attach_nic(device, config, now_ms);
     Ok(config)
 }
@@ -67,7 +93,7 @@ impl NicDevice {
 }
 
 impl NicDevice {
-    fn open() -> Result<(Self, NicConfig), String> {
+    fn open(mode: NicMode) -> Result<(Self, NicConfig), String> {
         let client = Client::new();
         let info = read_info(&client)?;
         if !info.link {
@@ -100,13 +126,9 @@ impl NicDevice {
             tx_free.push_back(index);
         }
         write_control(&client, "nic:start")?;
-        let config = NicConfig {
-            mac: info.mac.0,
-            mtu: info.mtu,
-            addr: GUEST_ADDR,
-            prefix: GUEST_PREFIX,
-            gateway: Some(GATEWAY_ADDR),
-            dhcp: true,
+        let config = match mode {
+            NicMode::QemuUser => NicConfig::qemu(info.mac.0, info.mtu),
+            NicMode::DhcpFirst => NicConfig::platform(info.mac.0, info.mtu),
         };
         Ok((
             Self {
