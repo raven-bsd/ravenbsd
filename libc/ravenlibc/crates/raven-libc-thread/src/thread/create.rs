@@ -331,7 +331,9 @@ pub fn create<K: ThreadKernel>(
     sched_point_before_create(kernel);
     let create_args = CreateArgs {
         entry: raw::entry::entry_address(),
-        stack_top: allocation.stack_top,
+        // Start `rsp` at the start-args block, not above it: the trampoline's Rust prologue
+        // pushes below `rsp` and must not overwrite the three words it is about to read.
+        stack_top: args_address,
         arg: args_address,
         tp: pthread_to_tp(tcb),
         clear_tid_addr: tcb + core::mem::offset_of!(Pthread, tid),
