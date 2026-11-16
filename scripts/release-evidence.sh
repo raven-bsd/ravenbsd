@@ -29,6 +29,8 @@ IMAGE=${IMAGE:-$OUT/ravenbsd-$ARCH.img}
 MODE=check
 PI4_LOG=
 PI4_NET_LOG=
+QEMU_LOG=
+ARTIFACT_COMMIT=
 
 usage() {
     cat <<'EOF'
@@ -39,6 +41,9 @@ usage: scripts/release-evidence.sh [--check|--qemu|--pi4-log LOG|--record]
   --pi4-log LOG     check an existing Pi 4 release serial log
   --pi4-net-log LOG check the GENET net evidence log (defaults to the Pi 4 log)
   --record          write evidence.txt from the checked image/transcripts
+  --record-qemu     write evidence-qemu.txt (QEMU artifact only; Pi 4 UNVERIFIED)
+  --qemu-log LOG    transcript to validate/record (default build/release/0.1.0/qemu-release.log)
+  --commit HASH     image build commit for the evidence record (default current HEAD)
   --out DIR         evidence/output directory (default build/release/0.1.0)
   --image PATH      release image (default build/release/0.1.0/ravenbsd-x86_64.img)
 
@@ -63,6 +68,19 @@ while [ "$#" -gt 0 ]; do
             ;;
         --record)
             MODE=record
+            ;;
+        --record-qemu)
+            MODE=record-qemu
+            ;;
+        --qemu-log)
+            [ "$#" -ge 2 ] || { usage >&2; exit 2; }
+            QEMU_LOG=$2
+            shift
+            ;;
+        --commit)
+            [ "$#" -ge 2 ] || { usage >&2; exit 2; }
+            ARTIFACT_COMMIT=$2
+            shift
             ;;
         --out)
             [ "$#" -ge 2 ] || { usage >&2; exit 2; }
@@ -230,6 +248,30 @@ record() {
     log "evidence: $OUT/evidence.txt"
 }
 
+record_qemu() {
+    qemu_inputs
+    release_image
+    qemu=${QEMU_LOG:-$OUT/qemu-release.log}
+    qemu_transcript "$qemu"
+    commit=${ARTIFACT_COMMIT:-$(git rev-parse HEAD)}
+    dirty="clean"
+    [ -n "$(git status --porcelain)" ] && dirty="dirty"
+    {
+        printf 'version=%s\n' "$VERSION"
+        printf 'commit=%s\n' "$commit"
+        printf 'working_tree=%s\n' "$dirty"
+        printf 'image=%s\n' "$IMAGE"
+        printf 'image_sha256=%s\n' "$(sha256_file "$IMAGE")"
+        printf 'provenance_sha256=%s\n' "$(sha256_file PROVENANCE.toml)"
+        printf 'qemu_transcript=%s\n' "$qemu"
+        printf 'qemu_transcript_sha256=%s\n' "$(sha256_file "$qemu")"
+        printf 'qemu_gate=PASS (qtest release-login; check-transcript)\n'
+        printf 'pi4_gate=UNVERIFIED (REL3/REL4b/P8 board log missing)\n'
+        printf 'tag=none (Pi 4 gate and full make check still required)\n'
+    } >"$OUT/evidence-qemu.txt"
+    log "QEMU evidence: $OUT/evidence-qemu.txt"
+}
+
 case "$MODE" in
     check)
         gate_inputs
@@ -256,5 +298,8 @@ case "$MODE" in
         ;;
     record)
         record
+        ;;
+    record-qemu)
+        record_qemu
         ;;
 esac

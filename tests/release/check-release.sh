@@ -21,7 +21,7 @@ if ! output=$(scripts/release-evidence.sh --check 2>&1); then
 fi
 grep -q '^# RavenBSD 0.1.0 release notes$' docs/releases/0.1.0.md
 grep -q 'QEMU transcript' docs/releases/0.1.0.md
-grep -q 'Pi 4 transcript' docs/releases/0.1.0.md
+grep -q 'Pi 4 gate' docs/releases/0.1.0.md
 grep -q 'Default password warning' docs/releases/0.1.0.md
 grep -q 'make check' docs/releases/0.1.0.md
 grep -q 'release-evidence' docs/releases/0.1.0.md
