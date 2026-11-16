@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4d system/process utility evidence. Only rows with executable POSIX behaviour
+# evidence are claimed present; partial or missing tools stay defects in
+# docs/posix/P4-system.md.
+
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.uname"
+status = "present"
+evidence = "qtest:posix-util-system"
+notes = "P4d: QEMU x86_64 case checks uname -s/-n/-r/-v/-m/-a against the kernel uname"
