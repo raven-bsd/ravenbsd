@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2014 The Rust Project Developers
 
+use crate::pid_t;
 use crate::prelude::*;
 
 pub type wchar_t = i32;
@@ -2418,4 +2419,71 @@ extern "C" {
     pub fn removexattr(path: *const c_char, name: *const c_char) -> c_int;
     pub fn lremovexattr(path: *const c_char, name: *const c_char) -> c_int;
     pub fn fremovexattr(fd: c_int, name: *const c_char) -> c_int;
+}
+
+s! {
+    #[repr(C, align(8))]
+    pub struct posix_spawnattr_t {
+        pub __data: [u8; 336],
+    }
+
+    #[repr(C, align(8))]
+    pub struct posix_spawn_file_actions_t {
+        pub __data: [u8; 80],
+    }
+}
+
+pub const POSIX_SPAWN_RESETIDS: c_short = 1;
+pub const POSIX_SPAWN_SETPGROUP: c_short = 2;
+pub const POSIX_SPAWN_SETSIGDEF: c_short = 4;
+pub const POSIX_SPAWN_SETSIGMASK: c_short = 8;
+pub const POSIX_SPAWN_SETSCHEDPARAM: c_short = 16;
+pub const POSIX_SPAWN_SETSCHEDULER: c_short = 32;
+pub const POSIX_SPAWN_SETSID: c_short = 128;
+
+extern "C" {
+    pub fn posix_spawn(
+        pid: *mut pid_t,
+        path: *const c_char,
+        file_actions: *const posix_spawn_file_actions_t,
+        attrp: *const posix_spawnattr_t,
+        argv: *const *const c_char,
+        envp: *const *const c_char,
+    ) -> c_int;
+    pub fn posix_spawnp(
+        pid: *mut pid_t,
+        file: *const c_char,
+        file_actions: *const posix_spawn_file_actions_t,
+        attrp: *const posix_spawnattr_t,
+        argv: *const *const c_char,
+        envp: *const *const c_char,
+    ) -> c_int;
+    pub fn posix_spawn_file_actions_init(
+        file_actions: *mut posix_spawn_file_actions_t,
+    ) -> c_int;
+    pub fn posix_spawn_file_actions_destroy(
+        file_actions: *mut posix_spawn_file_actions_t,
+    ) -> c_int;
+    pub fn posix_spawn_file_actions_adddup2(
+        file_actions: *mut posix_spawn_file_actions_t,
+        fd: c_int,
+        newfd: c_int,
+    ) -> c_int;
+    pub fn posix_spawn_file_actions_addclose(
+        file_actions: *mut posix_spawn_file_actions_t,
+        fd: c_int,
+    ) -> c_int;
+    pub fn posix_spawn_file_actions_addchdir_np(
+        file_actions: *mut posix_spawn_file_actions_t,
+        path: *const c_char,
+    ) -> c_int;
+
+    pub fn posix_spawnattr_init(attr: *mut posix_spawnattr_t) -> c_int;
+    pub fn posix_spawnattr_destroy(attr: *mut posix_spawnattr_t) -> c_int;
+    pub fn posix_spawnattr_setpgroup(attr: *mut posix_spawnattr_t, pgroup: pid_t) -> c_int;
+    pub fn posix_spawnattr_setsigdefault(
+        attr: *mut posix_spawnattr_t,
+        sigdefault: *const sigset_t,
+    ) -> c_int;
+    pub fn posix_spawnattr_setflags(attr: *mut posix_spawnattr_t, flags: c_short) -> c_int;
 }

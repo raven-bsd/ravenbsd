@@ -18,8 +18,8 @@ use core::sync::atomic::{AtomicU64, Ordering};
 
 use crate::backend::{EarlySpawn, WaitResult};
 use crate::consts::{P_PID, WNOHANG};
-#[cfg(target_os = "none")]
-use crate::errors::{E2BIG, ENOENT, ENOEXEC};
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+use crate::errors::{E2BIG, ENOENT};
 use crate::errors::{EAGAIN, ECHILD, EINVAL, ENOSYS, Errno};
 use crate::wait_status::{WaitStatus, encode};
 use crate::wire::SpawnRequest;
@@ -210,7 +210,7 @@ fn strings(items: &[Vec<u8>]) -> Result<Vec<&str>, Errno> {
 }
 
 /// Translate a loader error into a C `errno` value.
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 fn map_spawn_error(error: raven_spawn::SpawnError) -> Errno {
     use raven_spawn::SpawnError;
     match error {
@@ -222,11 +222,11 @@ fn map_spawn_error(error: raven_spawn::SpawnError) -> Errno {
 }
 
 /// The target loader: `raven-spawn` over the real syscalls.
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RtLoader;
 
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 impl Loader for RtLoader {
     fn read_image(&self, path: &str) -> Result<Vec<u8>, Errno> {
         raven_spawn::read_file_image(path).map_err(map_spawn_error)
@@ -249,11 +249,11 @@ impl Loader for RtLoader {
 }
 
 /// The target `PROC_HANDLE_INFO` provider (P9b, raw `0x3E`).
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RtHandleInfo;
 
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 impl HandleInfo for RtHandleInfo {
     fn pid_for_handle(&self, handle: u32) -> Result<i32, Errno> {
         raven_spawn::pid_for_handle(handle).map_err(|error| i32::from(error.0))
@@ -261,7 +261,7 @@ impl HandleInfo for RtHandleInfo {
 }
 
 /// The process-wide native spawner used by the target `ProcBackend`.
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 pub static NATIVE_SPAWNER: NativeSpawner<RtLoader, RtHandleInfo> =
     NativeSpawner::new(RtLoader, RtHandleInfo);
 

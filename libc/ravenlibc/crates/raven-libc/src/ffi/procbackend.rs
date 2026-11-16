@@ -8,33 +8,33 @@
 //! (`native_spawn::NATIVE_SPAWNER`) for `posix_spawn`/`waitpid`; `fork` and `exec` still keep the
 //! local backend's honest `ENOSYS` until `procd` exists.
 
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 use core::ffi::c_int;
 
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 use raven_libc_proc::backend::ProcBackend;
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 use raven_libc_proc::errors::EFAULT;
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 use raven_libc_proc::ids::SetCred;
 use raven_libc_proc::local_backend::LocalBackend;
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 use raven_libc_proc::syscall_backend::{CredInfo, SelfInfo, Syscall, SyscallBackend};
 
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 use raven_libc_proc::syscall_backend::{
     PROC_CRED_INFO, PROC_GETGROUPS, PROC_PID_INFO, PROC_SELF_INFO, PROC_SETCRED_EX, PROC_SETPGID,
     PROC_SETSID,
 };
 
 /// The process backend of the shell.
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 pub(crate) fn backend() -> SyscallBackend<RealSyscall> {
     SyscallBackend::with_spawner(RealSyscall, &raven_libc_proc::native_spawn::NATIVE_SPAWNER)
 }
 
 /// The process backend of the shell before the target syscall seam exists.
-#[cfg(not(target_os = "none"))]
+#[cfg(not(any(target_os = "none", target_os = "ravenbsd")))]
 pub(crate) fn backend() -> LocalBackend<'static> {
     LocalBackend::new(None)
 }
@@ -45,7 +45,7 @@ pub(crate) fn procd_present() -> bool {
 }
 
 /// `getresuid(2)`.
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn getresuid(ruid: *mut u32, euid: *mut u32, suid: *mut u32) -> c_int {
     let result = backend().getresuid();
@@ -66,7 +66,7 @@ pub extern "C" fn getresuid(ruid: *mut u32, euid: *mut u32, suid: *mut u32) -> c
 }
 
 /// `getresgid(2)`.
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn getresgid(rgid: *mut u32, egid: *mut u32, sgid: *mut u32) -> c_int {
     let result = backend().getresgid();
@@ -87,7 +87,7 @@ pub extern "C" fn getresgid(rgid: *mut u32, egid: *mut u32, sgid: *mut u32) -> c
 }
 
 /// `setresuid(2)`.
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn setresuid(ruid: u32, euid: u32, suid: u32) -> c_int {
     let request = SetCred::setresuid(ruid as i32, euid as i32, suid as i32);
@@ -100,7 +100,7 @@ pub extern "C" fn setresuid(ruid: u32, euid: u32, suid: u32) -> c_int {
 }
 
 /// `setresgid(2)`.
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 #[unsafe(no_mangle)]
 pub extern "C" fn setresgid(rgid: u32, egid: u32, sgid: u32) -> c_int {
     let request = SetCred::setresgid(rgid as i32, egid as i32, sgid as i32);
@@ -112,15 +112,15 @@ pub extern "C" fn setresgid(rgid: u32, egid: u32, sgid: u32) -> c_int {
     )
 }
 
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 pub(crate) struct RealSyscall;
 
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 fn errno(error: raven_abi::errno::Errno) -> i32 {
     i32::from(error.0)
 }
 
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 fn decode_info(words: [u64; 8]) -> Result<SelfInfo, i32> {
     Ok(SelfInfo {
         pid: words[0],
@@ -134,7 +134,7 @@ fn decode_info(words: [u64; 8]) -> Result<SelfInfo, i32> {
     })
 }
 
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 fn decode_cred(words: [u64; 6]) -> Result<CredInfo, i32> {
     Ok(CredInfo {
         uid: u32::try_from(words[0]).map_err(|_| i32::from(raven_libc_proc::errors::EOVERFLOW))?,
@@ -146,7 +146,7 @@ fn decode_cred(words: [u64; 6]) -> Result<CredInfo, i32> {
     })
 }
 
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 impl Syscall for RealSyscall {
     fn self_info(&self) -> Result<SelfInfo, i32> {
         let mut words = [0u64; 8];

@@ -228,6 +228,8 @@ rust-version = "1.97"
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
 missing_docs = "warn"
+# The custom target OS is not in rustc's built-in list; declare it once for host clippy.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("ravenbsd"))'] }
 
 [workspace.lints.clippy]
 undocumented_unsafe_blocks = "deny"

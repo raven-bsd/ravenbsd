@@ -31,23 +31,23 @@ extern crate std;
 mod spawn_error;
 mod sys;
 
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 pub use crate::sys::{close_handle, pid_for_handle, wait_process};
 
-#[cfg(all(target_os = "none", feature = "alloc"))]
+#[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
 use alloc_crate::vec::Vec;
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
 use raven_abi::types::Handle;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 use raven_abi::types::{map, prot};
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 use raven_elf::ElfError;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 use raven_elf::{Elf, LoadMode, Machine, MapStep, StepKind};
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 use raven_initfs::Initfs;
-#[cfg(all(target_os = "none", feature = "alloc"))]
+#[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
 use raven_scheme::Client;
 
 /// Options for [`spawn`].
@@ -141,7 +141,7 @@ pub trait Sys {
 }
 
 /// Spawn `/path` from `initfs` using the real syscall implementation.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 pub fn spawn(
     initfs: &Initfs<'_>,
     path: &str,
@@ -157,7 +157,7 @@ pub fn spawn(
 /// the process, map both images, build a [`STACK_SIZE`] stack (at least `ARG_MAX`) through a shared
 /// memory object, start the first thread, and return the process handle. On failure after
 /// `proc_create`, the child handle and the temporary image objects are closed.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 pub fn spawn_with<S: Sys>(
     initfs: &Initfs<'_>,
     path: &str,
@@ -202,7 +202,7 @@ pub fn spawn_with<S: Sys>(
 /// [`read_file_image`]. Segments are copied into a temporary memory object, mapped into the child
 /// and the object is closed before the first thread starts, so the child keeps only its own
 /// mappings.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 pub fn spawn_image_with<S: Sys>(
     image: &[u8],
     path: &str,
@@ -226,12 +226,12 @@ pub fn spawn_image_with<S: Sys>(
             sys,
         );
     };
-    #[cfg(all(target_os = "none", feature = "alloc"))]
+    #[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
     {
         let interpreter = read_file_image(interp_path)?;
         spawn_image_with_interp(image, Some(&interpreter), path, options, sys)
     }
-    #[cfg(not(all(target_os = "none", feature = "alloc")))]
+    #[cfg(not(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc")))]
     {
         let _ = interp_path;
         let _ = main_steps;
@@ -245,7 +245,7 @@ pub fn spawn_image_with<S: Sys>(
 /// File-image callers on a target with `alloc` use [`spawn_image_with`], which reads the
 /// interpreter from the file server. Tests and callers that already have the bytes use this entry
 /// point.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 pub fn spawn_image_with_interp<S: Sys>(
     image: &[u8],
     interpreter: Option<&[u8]>,
@@ -283,7 +283,7 @@ pub fn spawn_image_with_interp<S: Sys>(
 }
 
 /// Spawn `path` from an in-memory image with the real syscall implementation.
-#[cfg(target_os = "none")]
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 pub fn spawn_image(
     image: &[u8],
     path: &str,
@@ -294,7 +294,7 @@ pub fn spawn_image(
 }
 
 /// Spawn an image with the setuid/setgid policy applied to its child process.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 pub fn spawn_image_with_exec<S: Sys>(
     image: &[u8],
     path: &str,
@@ -321,7 +321,7 @@ pub fn spawn_image_with_exec<S: Sys>(
             sys,
         );
     };
-    #[cfg(all(target_os = "none", feature = "alloc"))]
+    #[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
     {
         let interpreter = read_file_image(interp_path)?;
         let (elf, steps, bias) = plan_image(&interpreter, true)?;
@@ -337,7 +337,7 @@ pub fn spawn_image_with_exec<S: Sys>(
             sys,
         )
     }
-    #[cfg(not(all(target_os = "none", feature = "alloc")))]
+    #[cfg(not(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc")))]
     {
         let _ = interp_path;
         let _ = main_steps;
@@ -347,7 +347,7 @@ pub fn spawn_image_with_exec<S: Sys>(
 }
 
 /// Read an open file handle from offset zero without moving its cursor.
-#[cfg(all(target_os = "none", feature = "alloc"))]
+#[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
 pub fn read_file_handle_at(file: Handle) -> Result<Vec<u8>, SpawnError> {
     let client = Client::new();
     let mut data = Vec::new();
@@ -376,7 +376,7 @@ pub fn read_file_handle_at(file: Handle) -> Result<Vec<u8>, SpawnError> {
 /// stable while the image is loaded. `nosuid` is the mount policy the caller obtained from the
 /// mount table. On success the child process has no credential transition until the kernel's
 /// `proc_exec_cred` has checked the execute bit and applied any setuid/setgid bits.
-#[cfg(all(target_os = "none", feature = "alloc"))]
+#[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
 pub fn spawn_file(
     file: Handle,
     path: &str,
@@ -389,7 +389,7 @@ pub fn spawn_file(
 }
 
 /// Read an open `file:` handle into a bounded image buffer.
-#[cfg(all(target_os = "none", feature = "alloc"))]
+#[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
 pub fn read_file_handle(file: Handle) -> Result<Vec<u8>, SpawnError> {
     read_image_handle(&Client::new(), file)
 }
@@ -399,7 +399,7 @@ pub fn read_file_handle(file: Handle) -> Result<Vec<u8>, SpawnError> {
 /// A path that already names a scheme (`file:/bin/ls`, `tty:console`) is used unchanged. A bare
 /// absolute path becomes `file:` followed by the path; a bare relative path is treated as
 /// root-relative because the loader callers (init and libc's spawner) resolve `cwd` first.
-#[cfg(all(target_os = "none", feature = "alloc"))]
+#[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
 fn image_scheme_path(path: &str) -> alloc_crate::string::String {
     use alloc_crate::format;
     match path.find(':') {
@@ -413,7 +413,7 @@ fn image_scheme_path(path: &str) -> alloc_crate::string::String {
 ///
 /// `O_RDONLY` is zero at the C level, but the kernel's `OPEN` wire encoding uses bit 0 for read
 /// access; passing the raw zero flags is rejected.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn image_open_flags() -> Result<raven_proto_fs::OpenFlags, SpawnError> {
     raven_proto_fs::OpenFlags::from_linux(raven_proto_fs::O_RDONLY)
         .map_err(|_| SpawnError::Sys(Errno::EINVAL))
@@ -422,7 +422,7 @@ fn image_open_flags() -> Result<raven_proto_fs::OpenFlags, SpawnError> {
 /// Open and read a `file:` path into a bounded image buffer.
 ///
 /// Every call opens its own handle, so concurrent readers do not share a file cursor.
-#[cfg(all(target_os = "none", feature = "alloc"))]
+#[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
 pub fn read_file_image(path: &str) -> Result<Vec<u8>, SpawnError> {
     let scheme_path = image_scheme_path(path);
     let flags = image_open_flags()?;
@@ -440,7 +440,7 @@ pub fn read_file_image(path: &str) -> Result<Vec<u8>, SpawnError> {
 }
 
 /// Read one open image handle to its end, bounded by [`MAX_FILE_IMAGE`].
-#[cfg(all(target_os = "none", feature = "alloc"))]
+#[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
 fn read_image_handle(client: &Client, handle: Handle) -> Result<Vec<u8>, SpawnError> {
     let mut data = Vec::new();
     let mut buffer = [0u8; 4096];
@@ -461,7 +461,7 @@ fn read_image_handle(client: &Client, handle: Handle) -> Result<Vec<u8>, SpawnEr
 }
 
 /// One executable source.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[derive(Clone, Copy)]
 enum ImageSource<'a> {
     /// A file inside the mapped initfs archive.
@@ -474,7 +474,7 @@ enum ImageSource<'a> {
 }
 
 /// Where mapped pages read their file data from.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[derive(Clone, Copy)]
 enum MapSource {
     /// The initfs memory object, with the archive offset already added per step.
@@ -483,7 +483,7 @@ enum MapSource {
     Object(Handle),
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn prepare_source<S: Sys>(
     source: ImageSource<'_>,
     sys: &mut S,
@@ -519,7 +519,7 @@ fn prepare_source<S: Sys>(
     }
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn map_plan<S: Sys>(
     sys: &mut S,
     child: Handle,
@@ -532,7 +532,7 @@ fn map_plan<S: Sys>(
     Ok(())
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[allow(clippy::too_many_arguments)] // the image pair, entry state and syscall sink
 fn spawn_elf<S: Sys>(
     main_elf: &Elf<'_>,
@@ -724,7 +724,7 @@ fn spawn_elf<S: Sys>(
     }
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn close_objects<S: Sys>(sys: &mut S, first: Option<Handle>, second: Option<Handle>) {
     if let Some(object) = first {
         let _ = sys.handle_close(object);
@@ -734,7 +734,7 @@ fn close_objects<S: Sys>(sys: &mut S, first: Option<Handle>, second: Option<Hand
     }
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn map_step<S: Sys>(
     sys: &mut S,
     child: Handle,
@@ -777,7 +777,7 @@ fn map_step<S: Sys>(
     }
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn source_request(source: MapSource, offset: u64) -> Result<(Handle, u64), SpawnError> {
     match source {
         MapSource::Initfs { data_offset } => {
@@ -791,7 +791,7 @@ fn source_request(source: MapSource, offset: u64) -> Result<(Handle, u64), Spawn
 }
 
 /// Fill one page from a partial file tail, then map it into the child.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn copy_tail<S: Sys>(
     sys: &mut S,
     child: Handle,
@@ -986,105 +986,105 @@ fn handle_from_ret(result: isize) -> Result<Handle, Errno> {
     u32::try_from(value).map(Handle).map_err(|_| Errno::EINVAL)
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const PAGE: u64 = 4096;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const WORD: usize = core::mem::size_of::<usize>();
 /// Minimum child stack: `ARG_MAX` (CR-15) plus the C8 arrays and headroom.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const STACK_SIZE: usize = 256 * 1024;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const ARG_MAX: usize = 128 * 1024;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const _: () = assert!(STACK_SIZE >= ARG_MAX);
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const MAX_AUXV: usize = 20;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_PHDR: usize = 3;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_PHENT: usize = 4;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_PHNUM: usize = 5;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_PAGESZ: usize = 6;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_BASE: usize = 7;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_FLAGS: usize = 8;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_ENTRY: usize = 9;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_UID: usize = 11;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_EUID: usize = 12;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_GID: usize = 13;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_EGID: usize = 14;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_PLATFORM: usize = 15;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_HWCAP: usize = 16;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_CLKTCK: usize = 17;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_SECURE: usize = 23;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_RANDOM: usize = 25;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_HWCAP2: usize = 26;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_EXECFN: usize = 31;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_MINSIGSTKSZ: usize = 51;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const RANDOM_LEN: usize = 16;
 /// Address where an `ET_DYN` main image is based.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const MAIN_PIE_BASE: u64 = 0x0000_1000_0000_0000;
 /// Address where a `PT_INTERP` image is based.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const INTERP_BASE: u64 = 0x0000_2000_0000_0000;
 /// Size of one ELF64 program header.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const PHENT: usize = 56;
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[cfg(target_arch = "x86_64")]
 const MACHINE: Machine = Machine::X86_64;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[cfg(target_arch = "aarch64")]
 const MACHINE: Machine = Machine::Aarch64;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[cfg(target_arch = "riscv64")]
 const MACHINE: Machine = Machine::Riscv64;
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn target_machine() -> Machine {
     MACHINE
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[cfg(target_arch = "x86_64")]
 const USER_MIN: u64 = raven_abi::layout::x86_64::USER_MIN;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[cfg(target_arch = "x86_64")]
 const USER_END: u64 = raven_abi::layout::x86_64::USER_END;
 // ABI v1 publishes the x86-64 layout only; use the same canonical user window on the other
 // architectures until S12-S15/S19 define theirs.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[cfg(not(target_arch = "x86_64"))]
 const USER_MIN: u64 = 0x0000_0000_0000_1000;
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[cfg(not(target_arch = "x86_64"))]
 const USER_END: u64 = 0x0000_7FFF_FFFF_F000;
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 /// The stack top is the top of the user range; the stack occupies [`STACK_SIZE`] and `rsp == sp0`.
 const STACK_TOP: u64 = USER_END;
 
 /// `e_type` from an ELF64 header (`2 = ET_EXEC`, `3 = ET_DYN`).
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn elf_type(data: &[u8]) -> u16 {
     match data.get(16..18) {
         Some(bytes) => u16::from_le_bytes([bytes[0], bytes[1]]),
@@ -1093,7 +1093,7 @@ fn elf_type(data: &[u8]) -> u16 {
 }
 
 /// The `AT_PLATFORM` spelling for the build architecture.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn platform_name() -> &'static str {
     #[cfg(target_arch = "x86_64")]
     {
@@ -1110,7 +1110,7 @@ fn platform_name() -> &'static str {
 }
 
 /// One page-aligned mapping step of a biased image.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[derive(Clone, Copy)]
 struct SegPlan {
     prot: u8,
@@ -1123,7 +1123,7 @@ struct SegPlan {
     file_offset_base: u64,
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 impl SegPlan {
     const EMPTY: Self = Self {
         prot: 0,
@@ -1141,7 +1141,7 @@ impl SegPlan {
     }
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Phase {
     Start,
@@ -1152,7 +1152,7 @@ enum Phase {
 }
 
 /// The page plan of one image with its load bias applied.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 struct BiasedPlan {
     plans: [SegPlan; MAX_SEGMENTS],
     count: usize,
@@ -1162,10 +1162,10 @@ struct BiasedPlan {
     cursor: u64,
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const MAX_SEGMENTS: usize = 16;
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 impl Iterator for BiasedPlan {
     type Item = MapStep;
 
@@ -1242,7 +1242,7 @@ impl Iterator for BiasedPlan {
 /// [`raven_elf::plan_load`] validates the unbiased addresses against the user range, so an
 /// `ET_DYN` image at address zero cannot use it. This is the same split into whole file pages,
 /// one optional `CopyTail` page and zero pages, with the bias applied first.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn plan_biased(
     elf: &Elf<'_>,
     page: u64,
@@ -1316,12 +1316,12 @@ fn plan_biased(
     })
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn page_floor(value: u64) -> u64 {
     value - (value % PAGE)
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn page_ceil(value: u64) -> Option<u64> {
     let remainder = value % PAGE;
     if remainder == 0 {
@@ -1333,7 +1333,7 @@ fn page_ceil(value: u64) -> Option<u64> {
 
 /// Parse and plan one image. `interpreter` selects the `PT_INTERP` rules: the file must be
 /// `ET_DYN` and is based at [`INTERP_BASE`].
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn plan_image<'a>(
     data: &'a [u8],
     interpreter: bool,
@@ -1370,7 +1370,7 @@ fn plan_image<'a>(
 ///
 /// `AT_PLATFORM`, `AT_RANDOM` and `AT_EXECFN` carry zero here; [`build_stack`] replaces them with
 /// the stack addresses it creates.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn build_auxv(
     elf: &Elf<'_>,
     main_bias: u64,
@@ -1421,7 +1421,7 @@ fn build_auxv(
 /// offset of `sp0` and the child virtual address of `sp0`. Strings are placed at the top in
 /// argument/environment order; pointer arrays follow the C8 order. `AT_RANDOM` in `auxv` is
 /// replaced with the address of `random`, which is placed immediately below the strings.
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 #[allow(clippy::too_many_arguments)] // the C8 block is passed explicitly
 fn build_stack(
     buffer: &mut [u8],
@@ -1618,7 +1618,7 @@ fn build_stack(
     Ok((offset, sp0))
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn write_word(buffer: &mut [u8], offset: usize, value: usize) -> Result<(), SpawnError> {
     let end = offset.checked_add(WORD).ok_or(SpawnError::TooLarge)?;
     let Some(slot) = buffer.get_mut(offset..end) else {
@@ -1628,7 +1628,7 @@ fn write_word(buffer: &mut [u8], offset: usize, value: usize) -> Result<(), Spaw
     Ok(())
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn write_string(
     buffer: &mut [u8],
     cursor: &mut usize,
@@ -1651,20 +1651,20 @@ fn write_string(
     usize::try_from(start).map_err(|_| SpawnError::TooLarge)
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 fn align_down(value: u64, align: u64) -> u64 {
     value - value % align
 }
 
-#[cfg(any(target_os = "none", test))]
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 /// Fill 16 bytes for `AT_RANDOM`.
 ///
 /// The value mixes the monotonic clock with a parent address. It is deliberately not
 /// cryptographic yet; the S24/M2 integration only needs distinct bytes per spawned child.
 fn random_bytes(parent_address: usize) -> [u8; RANDOM_LEN] {
-    #[cfg(target_os = "none")]
+    #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
     let now = crate::sys::clock_get(raven_abi::types::clock::MONOTONIC).unwrap_or_default();
-    #[cfg(not(target_os = "none"))]
+    #[cfg(not(any(target_os = "none", target_os = "ravenbsd")))]
     let now = raven_abi::types::Timespec::default();
     let mut state = (now.tv_sec as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
         ^ (now.tv_nsec as u64)
