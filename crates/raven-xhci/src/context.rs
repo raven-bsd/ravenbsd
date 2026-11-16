@@ -79,10 +79,11 @@ pub fn encode_configure_input(
     encode_slot_and_ep0(context_size, port, speed, ep0_bus, max_packet, 3, 0x9, out)?;
     let ep1 = 32 + 3 * context_size;
     put_u32(out, ep1, u32::from(interval) << 16)?;
+    // CErr 3, EP Type 7 (Interrupt IN), max packet size in the upper half.
     put_u32(
         out,
         ep1 + 4,
-        (3 << 1) | (3 << 3) | (u32::from(max_packet) << 16),
+        (3 << 1) | (7 << 3) | (u32::from(max_packet) << 16),
     )?;
     put_u64(out, ep1 + 8, ep1_bus | 1)?;
     put_u32(out, ep1 + 16, 8)?;
