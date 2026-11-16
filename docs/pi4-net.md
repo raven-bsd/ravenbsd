@@ -122,13 +122,11 @@ endpoint, so those writes are ignored on the existing `hw-net` path.
 | `/etc/pi4.dtb` staged | yes |
 | `/etc/drivers.toml` staged | yes |
 
-Observed on this base (`2026-11-16`): devd launch, driver slots, netd dependency, DTB and driver
-staging all pass; **`genet_launchers=2` fails** because
-`profiles/pi4-release.d/20-userspace.toml` installs the enabled `genet.manifest` service as well
-as the devd platform launch. REL3/P12 must remove that service entry (or set `enable = false`) so
-svcd does not start a second `/sbin/genet`; devd owns the launch. The host check exits 1 on this
-defect, while the `pi4-net-model` qtest proves the checker accepts the coherent model and rejects
-a duplicate-launcher model. No profile edit is made by REL4d.
+Observed on this base (`2026-11-16`, after P10/P12): `devd launch`, driver slots, single GENET
+launcher, netd dependency, DTB and driver staging all pass. The earlier duplicate svcd
+`genet.manifest` launcher was removed by the profile follow-up; the host check now prints
+`genet_launchers=1`. The `pi4-net-model` qtest still proves the checker accepts the coherent
+model and rejects a duplicate-launcher model.
 
 ## Failure modes
 
@@ -145,25 +143,39 @@ a duplicate-launcher model. No profile edit is made by REL4d.
 ```
 scripts/pi4-net-evidence.sh <serial.log>
 scripts/pi4-net-evidence.sh --capture <tty> <serial.log> [seconds]
+scripts/pi4-net-evidence.sh --chain <serial.log>
 scripts/pi4-net-evidence.sh --self-test
 ```
 
 `--capture` uses `stty -F` and `timeout cat`, like `scripts/pi4-genet-evidence.sh`. The script
-prints the repository commit and the log SHA-256, checks the three ordered markers, the
-completion marker, the `netd` lease line and a ping summary with at least one reply, then prints
-`PASS` or `FAIL`. It never edits the repository.
+prints the repository commit and the log SHA-256, then requires the final chain:
 
-`--self-test` checks the host-model fixture in `tests/fixtures/pi4-net/` and requires the
-negative fixture to fail. That proves the script's parser; it does **not** prove the board path.
+```
+devd: dtb launch genet ...
+genet: revision=... slots=Platform
+genet: serving nic:
+netd: interface eth0 <lease>/<prefix>
+GENET-NET-LINK speed=<...> duplex=<...>
+GENET-NET-DHCP addr=<lease>/<prefix> gateway=<gw> dns=<...>
+ping: <gw> ...
+GENET-NET-PING target=<gw> tx=<n> rx=<n> rtt_ms=<n>
+GENET-NET-OK
+```
+
+Exactly one devd launch and one `genet: serving nic:` are required. The script rejects the QEMU
+user-mode address (`10.0.2.15/24` / gateway `10.0.2.2`), a missing lease, a ping target or
+summary host that differs from the lease gateway, a link-down marker, an out-of-order marker
+sequence and a duplicate GENET launch. `--chain` runs REL4d's `check-chain.sh` first and exits
+nonzero if either the profile chain or the log fails. `--self-test` runs the positive and all
+negative synthetic fixtures; that proves the parser, not the board path.
 
 ## Board procedure (owner run)
 
-1. **Preconditions.** A `pi4-release` profile must exist and include the GENET driver, `netd`,
-   the DHCP client path and `ping`; `devd` must grant the GENET MMIO/DMA/IRQ handles; the driver
-   must expose the `nic:` frame service that `netd` attaches. The driver and `NicService` are in
-   place and compile for the target, but `devd` platform launch, the profile entry, the netd
-   DHCP-first configuration and the board probe are still missing (see the exact follow-up
-   above). Do not claim a network result until they are in the image.
+1. **Preconditions.** P10 supplies devd's `platform-root` grant, P12 supplies `platd` and the
+   GENET MAC, and REL3 stages the `pi4-release` image. Run
+   `sh tests/fixtures/pi4-net/check-chain.sh`; it must print `genet_launchers=1` and `PASS`.
+   The driver must publish `nic:` and netd must be in DHCP-first mode. Do not claim a network
+   result until this chain and the board log both pass.
 2. **Build and flash.** Build the release image for `--arch aarch64 --platform pi4 --profile
    pi4-release`, write the FAT/root layout exactly as REL3 documents, and attach the UART at
    115200 8N1.
