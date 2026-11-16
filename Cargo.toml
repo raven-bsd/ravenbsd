@@ -170,6 +170,7 @@ members = [
     "userland/bin/awk",
     "userland/bin/ar",
     "userland/bin/compress",
+    "userland/bin/pax",
     "userland/bin/tar",
     "userland/bin/uncompress",
     "userland/bin/uuencode",
