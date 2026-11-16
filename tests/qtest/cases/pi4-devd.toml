@@ -55,7 +55,7 @@ regex = '^devd: dtb launch fake-platform exit=0$'
 regex = '^devd: dtb matched=1$'
 
 [[expect]]
-regex = '^svcd: pcid up$'
+regex = '^svcd: devd up$'
 
 [[expect]]
 regex = '^svcd: settled$'
