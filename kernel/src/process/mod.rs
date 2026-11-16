@@ -8,6 +8,7 @@
 
 pub mod handle;
 pub mod robust;
+pub mod status;
 pub mod thread;
 
 use core::fmt;
@@ -53,6 +54,7 @@ use crate::memory::{frame, paging};
 use crate::sched::wait::WaitQueue;
 
 use self::handle::Object;
+use self::status::{RLIMIT_COUNT, Rlimit, SIGCHLD, default_limits};
 
 /// Page size used by the user loader and stack.
 const PAGE: u64 = 4096;
@@ -109,6 +111,15 @@ pub struct ProcessIds {
 
 /// Maximum supplementary groups stored by this slice.
 pub const MAX_GROUPS: usize = 16;
+
+/// One queued process signal.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PendingSignal {
+    /// Signal number.
+    pub signo: u32,
+    /// Sender pid.
+    pub sender: u64,
+}
 
 impl ProcessIds {
     /// The kernel process identity.
@@ -191,6 +202,32 @@ pub struct Process {
     pub capture_slots: Mutex<CaptureSlots>,
     /// Syscall personality and optional Linux trap handler (S41).
     pub personality: Mutex<PersonalityState>,
+    /// Signals queued for this process.
+    pub pending_signals: Mutex<VecDeque<PendingSignal>>,
+    /// Threads blocked in `PROC_SIGRECV`.
+    pub signal_waiters: WaitQueue,
+    /// Parents blocked in `PROC_WAIT_EX` on this process's children.
+    pub child_waiters: WaitQueue,
+    /// Non-zero stop signal while the process is stopped.
+    pub stop_signal: AtomicU32,
+    /// True when the current stop was already reported to a waiter.
+    pub stop_reported: AtomicBool,
+    /// True when a stopped process continued and that event is not reported yet.
+    pub continued: AtomicBool,
+    /// True after `PROC_WAIT_EX` reaped the exit status.
+    pub reaped: AtomicBool,
+    /// Soft/hard resource limits.
+    pub limits: Mutex<[Rlimit; RLIMIT_COUNT]>,
+    /// Process start time in nanoseconds.
+    pub start_ns: u64,
+    /// Accumulated kernel/syscall time.
+    pub system_ns: AtomicU64,
+    /// Accumulated user time (not sampled yet; zero).
+    pub user_ns: AtomicU64,
+    /// Accumulated reaped-child kernel time.
+    pub child_system_ns: AtomicU64,
+    /// Accumulated reaped-child user time.
+    pub child_user_ns: AtomicU64,
 }
 
 /// Per-process syscall personality and Linux handler handle.
@@ -278,6 +315,18 @@ pub fn lookup_pid(pid: u64) -> Option<Arc<Process>> {
     upgraded
 }
 
+/// Snapshot every currently live process.
+///
+/// The wait/signal scans use this instead of holding the registry lock while
+/// taking process locks. Exited zombies stay in the registry until reaped.
+pub fn processes() -> alloc::vec::Vec<Arc<Process>> {
+    PID_REGISTRY
+        .lock()
+        .values()
+        .filter_map(Weak::upgrade)
+        .collect()
+}
+
 /// True when at least one live process is in `pgid` inside `sid`.
 pub fn group_in_session(pgid: u64, sid: u64) -> bool {
     let registry = PID_REGISTRY.lock();
@@ -311,18 +360,36 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         client_requests: Mutex::new(alloc::vec::Vec::new()),
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
+        pending_signals: Mutex::new(VecDeque::new()),
+        signal_waiters: WaitQueue::new(),
+        child_waiters: WaitQueue::new(),
+        stop_signal: AtomicU32::new(0),
+        stop_reported: AtomicBool::new(false),
+        continued: AtomicBool::new(false),
+        reaped: AtomicBool::new(false),
+        limits: Mutex::new(default_limits()),
+        start_ns: 0,
+        system_ns: AtomicU64::new(0),
+        user_ns: AtomicU64::new(0),
+        child_system_ns: AtomicU64::new(0),
+        child_user_ns: AtomicU64::new(0),
     }))
 }
 
 /// Create an empty process for `PROC_CREATE`, with the well-known handles installed.
 pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
-    let (namespace, ids) = if let Some(parent) = current() {
+    let (namespace, ids, limits) = if let Some(parent) = current() {
         let snapshot = parent.namespace.lock().clone();
         let ids = ProcessIds::inherited(&parent.ids.lock(), parent.id);
-        (snapshot.child_snapshot(&ipc::registry::names()), ids)
+        let limits = *parent.limits.lock();
+        (
+            snapshot.child_snapshot(&ipc::registry::names()),
+            ids,
+            limits,
+        )
     } else {
-        (Namespace::root(), ProcessIds::kernel())
+        (Namespace::root(), ProcessIds::kernel(), default_limits())
     };
     let process = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
@@ -346,6 +413,19 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         client_requests: Mutex::new(alloc::vec::Vec::new()),
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
+        pending_signals: Mutex::new(VecDeque::new()),
+        signal_waiters: WaitQueue::new(),
+        child_waiters: WaitQueue::new(),
+        stop_signal: AtomicU32::new(0),
+        stop_reported: AtomicBool::new(false),
+        continued: AtomicBool::new(false),
+        reaped: AtomicBool::new(false),
+        limits: Mutex::new(limits),
+        start_ns: crate::time::now_ns(),
+        system_ns: AtomicU64::new(0),
+        user_ns: AtomicU64::new(0),
+        child_system_ns: AtomicU64::new(0),
+        child_user_ns: AtomicU64::new(0),
     });
     handle::install_initial(&mut process.handles.lock(), &process, false)?;
     register_pid(&process);
@@ -362,6 +442,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
     let personality = *source.personality.lock();
     let ids = ProcessIds::inherited(&source.ids.lock(), source.id);
+    let limits = *source.limits.lock();
     let child = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
@@ -384,6 +465,19 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         client_requests: Mutex::new(alloc::vec::Vec::new()),
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(personality),
+        pending_signals: Mutex::new(VecDeque::new()),
+        signal_waiters: WaitQueue::new(),
+        child_waiters: WaitQueue::new(),
+        stop_signal: AtomicU32::new(0),
+        stop_reported: AtomicBool::new(false),
+        continued: AtomicBool::new(false),
+        reaped: AtomicBool::new(false),
+        limits: Mutex::new(limits),
+        start_ns: crate::time::now_ns(),
+        system_ns: AtomicU64::new(0),
+        user_ns: AtomicU64::new(0),
+        child_system_ns: AtomicU64::new(0),
+        child_user_ns: AtomicU64::new(0),
     });
 
     {
@@ -444,6 +538,57 @@ impl Process {
     pub fn thread_exited(&self) -> bool {
         self.threads.fetch_sub(1, Ordering::AcqRel) <= 1
     }
+
+    /// Queue a signal and wake a `PROC_SIGRECV` waiter.
+    pub fn queue_signal(&self, signo: u32, sender: u64) {
+        self.pending_signals
+            .lock()
+            .push_back(PendingSignal { signo, sender });
+        self.signal_waiters.wake_all();
+    }
+
+    /// Pop the oldest queued signal.
+    pub fn pop_signal(&self) -> Option<PendingSignal> {
+        self.pending_signals.lock().pop_front()
+    }
+
+    /// True when at least one signal is queued.
+    pub fn has_pending_signal(&self) -> bool {
+        !self.pending_signals.lock().is_empty()
+    }
+}
+
+/// Wake a parent waiting for a child event and optionally queue `SIGCHLD`.
+///
+/// The caller must not hold `process.state`; exit accounting reads the child's
+/// accumulated time and the parent's signal queue.
+pub fn notify_parent(process: &Process, sigchld: bool) {
+    let ppid = process.ids.lock().ppid;
+    let Some(parent) = lookup_pid(ppid) else {
+        return;
+    };
+    if sigchld {
+        parent
+            .child_system_ns
+            .fetch_add(process.system_ns.load(Ordering::Acquire), Ordering::AcqRel);
+        parent
+            .child_user_ns
+            .fetch_add(process.user_ns.load(Ordering::Acquire), Ordering::AcqRel);
+        parent.queue_signal(SIGCHLD, process.id);
+    }
+    parent.child_waiters.wake_all();
+}
+
+/// Mark an exited child reaped and remove its pid from the registry.
+///
+/// Returns `ECHILD` when the exit status was already consumed by another
+/// `PROC_WAIT_EX`; PID 1 and the old handle wait keep their existing behavior.
+pub fn reap_pid(process: &Process) -> Result<(), Errno> {
+    if process.reaped.swap(true, Ordering::AcqRel) {
+        return Err(Errno::ECHILD);
+    }
+    unregister_pid(process.id);
+    Ok(())
 }
 
 /// True when the initfs contains the requested init path.
@@ -502,6 +647,19 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         client_requests: Mutex::new(alloc::vec::Vec::new()),
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
+        pending_signals: Mutex::new(VecDeque::new()),
+        signal_waiters: WaitQueue::new(),
+        child_waiters: WaitQueue::new(),
+        stop_signal: AtomicU32::new(0),
+        stop_reported: AtomicBool::new(false),
+        continued: AtomicBool::new(false),
+        reaped: AtomicBool::new(false),
+        limits: Mutex::new(default_limits()),
+        start_ns: crate::time::now_ns(),
+        system_ns: AtomicU64::new(0),
+        user_ns: AtomicU64::new(0),
+        child_system_ns: AtomicU64::new(0),
+        child_user_ns: AtomicU64::new(0),
     });
     handle::install_initial(&mut process.handles.lock(), &process, true)
         .map_err(ProcessError::Handle)?;
@@ -935,7 +1093,8 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     if process.torn_down.swap(true, Ordering::AcqRel) {
         return;
     }
-    unregister_pid(process.id);
+    // The pid registry keeps a weak zombie entry until `PROC_WAIT_EX` reaps the status; a weak
+    // entry whose process is gone is removed by `lookup_pid`.
     // Fail pending scheme requests and remove the registry entries while the server page tables
     // still exist, so capture mappings can be removed before the address space is released.
     ipc::on_process_exit(process);
@@ -1051,10 +1210,13 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     *state = ProcessState::Exited;
     process.exit_code.store(code, Ordering::Release);
     process.exiting.store(true, Ordering::Release);
+    process.stop_signal.store(0, Ordering::Release);
+    process.continued.store(false, Ordering::Release);
     robust::walk_process(process);
     crate::syscall::futex::remove_process(process.id);
     let _ = process.waiters.wake_all();
     drop(state);
+    notify_parent(process, true);
     crate::event::notify_all();
     teardown(process, code, own_context);
     true

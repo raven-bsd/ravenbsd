@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P2f: a child blocks in PROC_SIGRECV, receives two queued signals, exits, and
+# the parent receives SIGCHLD after PROC_WAIT_EX reaps the status.
+
+name = "proc-signal"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/proc/build.sh"]
+initfs = "build/fixtures/proc/signal.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^proc-signal: rx1=10 rx2=12$'
+
+[[expect]]
+regex = '^proc-signal: wait pid=[0-9]+ status=0$'
+
+[[expect]]
+regex = '^proc-signal: sigchld=17 sender=[0-9]+$'
+
+[[expect]]
+regex = '^proc-signal: eagain=1 invalid=1 unknown=1$'
+
+[[expect]]
+regex = '^proc-signal: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|proc-signal: fail'

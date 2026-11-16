@@ -9,7 +9,16 @@ use super::*;
 use crate::table::{FileKind, LinuxProcess};
 
 fn process() -> LinuxProcess {
-    LinuxProcess::new(7, Handle(9), 0x4000, 0x5000, 0x8000, 0x9000)
+    LinuxProcess::new(
+        7,
+        7,
+        Handle(9),
+        Handle::SELF_PROC,
+        0x4000,
+        0x5000,
+        0x8000,
+        0x9000,
+    )
 }
 
 #[test]

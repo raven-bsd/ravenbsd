@@ -4,6 +4,8 @@
 //! `PROC_CREATE` and `PROC_WAIT`.
 
 use alloc::sync::Arc;
+use alloc::vec;
+use alloc::vec::Vec;
 use core::sync::atomic::Ordering;
 
 use raven_abi::errno::Errno;
@@ -14,6 +16,10 @@ use raven_usercopy::UserSlice;
 
 use crate::ipc::model::{self, NAME_MAX};
 use crate::ipc::router;
+use crate::process::status::{
+    P_ALL, P_PGID, P_PID, RLIM_INFINITY, RLIMIT_COUNT, RLIMIT_NPROC, Rlimit, SIGCONT, SIGKILL,
+    WAIT_OPTIONS, WCONTINUED, WNOHANG, WUNTRACED, WaitEvent, is_stop_signal, signal_valid,
+};
 use crate::process::{self, Process, ProcessState, handle::Object};
 use crate::sched;
 use crate::syscall::SyscallFrame;
@@ -27,6 +33,9 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
         return Err(Errno::EINVAL);
     }
     let caller = process::current().ok_or(Errno::ESRCH)?;
+    if !can_create_child(&caller) {
+        return Err(Errno::EAGAIN);
+    }
     let child = process::new_empty_process()?;
     if flags & CREATE_LINUX != 0 {
         child.personality.lock().personality = Personality::Linux;
@@ -55,6 +64,9 @@ pub fn fork(frame: &SyscallFrame) -> Result<usize, Errno> {
         return Err(Errno::EINVAL);
     }
     let caller = process::current().ok_or(Errno::ESRCH)?;
+    if !can_create_child(&caller) {
+        return Err(Errno::EAGAIN);
+    }
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let source = {
         let handles = caller.handles.lock();
@@ -96,6 +108,24 @@ pub const PROC_GETGROUPS: usize = 0x3D;
 pub const PROC_HANDLE_INFO: usize = 0x3E;
 /// Raw `proc_exec_cred(proc, file, flags) -> 0` number.
 pub const PROC_EXEC_CRED: usize = 0x3F;
+/// Raw `proc_wait_ex(idtype, id, options, out_status) -> pid` number.
+pub const PROC_WAIT_EX: usize = 0x48;
+/// Raw `proc_getpgid(pid) -> pgid` number.
+pub const PROC_GETPGID: usize = 0x49;
+/// Raw `proc_signal(target, signo) -> 0` number.
+pub const PROC_SIGNAL: usize = 0x4A;
+/// Raw `proc_sigrecv(out, flags) -> signo` number.
+pub const PROC_SIGRECV: usize = 0x4B;
+/// Raw `proc_times(out, count) -> 0` number.
+pub const PROC_TIMES: usize = 0x4C;
+/// Raw `proc_getrusage(who, out, count) -> 0` number.
+pub const PROC_GETRUSAGE: usize = 0x4D;
+/// Raw `proc_getrlimit(resource, out) -> 0` number.
+pub const PROC_GETRLIMIT: usize = 0x4E;
+/// Raw `proc_setrlimit(resource, cur, max) -> 0` number.
+pub const PROC_SETRLIMIT: usize = 0x4F;
+/// Exit code used for an uncatchable `SIGKILL` (`128 + 9`).
+const KILL_EXIT_CODE: i32 = 137;
 /// Suppress setuid/setgid bits for this exec.
 pub const EXEC_NOSUID: u64 = 1;
 
@@ -786,4 +816,414 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
             return Err(Errno::EINTR);
         }
     }
+}
+
+/// True when `caller` is under its `RLIMIT_NPROC` live-process limit.
+fn can_create_child(caller: &Arc<Process>) -> bool {
+    let limit = caller
+        .limits
+        .lock()
+        .get(RLIMIT_NPROC)
+        .copied()
+        .unwrap_or(Rlimit::new(RLIM_INFINITY, RLIM_INFINITY))
+        .cur;
+    if limit == RLIM_INFINITY {
+        return true;
+    }
+    let uid = caller.ids.lock().uid;
+    let count = process::processes()
+        .iter()
+        .filter(|process| {
+            process.ids.lock().uid == uid && *process.state.lock() != ProcessState::Exited
+        })
+        .count();
+    (count as u64) < limit
+}
+
+/// Snapshot the children selected by a wait id type.
+fn children_for(caller: &Arc<Process>, idtype: u32, id: i32) -> Result<Vec<Arc<Process>>, Errno> {
+    match idtype {
+        P_PID => {
+            let pid = u64::try_from(id).map_err(|_| Errno::ECHILD)?;
+            let child = process::lookup_pid(pid).ok_or(Errno::ECHILD)?;
+            if child.ids.lock().ppid != caller.id {
+                return Err(Errno::ECHILD);
+            }
+            Ok(vec![child])
+        }
+        P_PGID => {
+            let group = if id == 0 {
+                caller.ids.lock().pgid
+            } else {
+                u64::try_from(id).map_err(|_| Errno::EINVAL)?
+            };
+            Ok(process::processes()
+                .into_iter()
+                .filter(|child| {
+                    let ids = *child.ids.lock();
+                    ids.ppid == caller.id && ids.pgid == group
+                })
+                .collect())
+        }
+        P_ALL => Ok(process::processes()
+            .into_iter()
+            .filter(|child| child.ids.lock().ppid == caller.id)
+            .collect()),
+        _ => Err(Errno::EINVAL),
+    }
+}
+
+/// Non-destructive child-event probe for one child.
+fn peek_event(child: &Process, options: u32) -> Option<WaitEvent> {
+    if *child.state.lock() == ProcessState::Exited && !child.reaped.load(Ordering::Acquire) {
+        return Some(WaitEvent::Exited(child.exit_code.load(Ordering::Acquire)));
+    }
+    if options & WUNTRACED != 0 {
+        let signo = child.stop_signal.load(Ordering::Acquire);
+        if signo != 0 && !child.stop_reported.load(Ordering::Acquire) {
+            return Some(WaitEvent::Stopped(signo));
+        }
+    }
+    if options & WCONTINUED != 0 && child.continued.load(Ordering::Acquire) {
+        return Some(WaitEvent::Continued);
+    }
+    None
+}
+
+/// Consume the flags associated with a selected event.
+fn take_event(child: &Process, event: WaitEvent) {
+    match event {
+        WaitEvent::Exited(_) => {
+            let _ = process::reap_pid(child);
+        }
+        WaitEvent::Stopped(_) => child.stop_reported.store(true, Ordering::Release),
+        WaitEvent::Continued => child.continued.store(false, Ordering::Release),
+    }
+}
+
+/// `proc_wait_ex(idtype, id, options, out_status) -> pid`.
+///
+/// `P_PID`, `P_PGID` and `P_ALL` select children; `WNOHANG` returns 0 when no
+/// event is ready. Exit, stop and continue statuses use the POSIX encoding from
+/// [`crate::process::status`]. A blocking wait sleeps on the caller's child queue
+/// and is woken by exit/stop/continue notifications.
+pub fn wait_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let idtype = u32::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
+    let id = frame.rsi as u32 as i32;
+    let options = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
+    if options & !WAIT_OPTIONS != 0 {
+        return Err(Errno::EINVAL);
+    }
+    let destination = UserSlice::new(frame.r10, 4)?;
+
+    loop {
+        let children = children_for(&caller, idtype, id)?;
+        if children.is_empty() {
+            return Err(Errno::ECHILD);
+        }
+        for child in &children {
+            if let Some(event) = peek_event(child, options) {
+                let status = event.status();
+                take_event(child, event);
+                let pid = usize::try_from(child.id).map_err(|_| Errno::EINVAL)?;
+                copy_to_user(destination, &status.to_le_bytes())?;
+                return Ok(pid);
+            }
+        }
+        if options & WNOHANG != 0 {
+            return Ok(0);
+        }
+
+        let token = sched::begin_block_interruptible()?;
+        if sched::take_kick() {
+            sched::end_block(token);
+            return Err(Errno::EINTR);
+        }
+        let queued = caller.child_waiters.enqueue_if(caller.id, 0, || {
+            let children = children_for(&caller, idtype, id)?;
+            if children.is_empty() {
+                return Ok(false);
+            }
+            Ok(!children
+                .iter()
+                .any(|child| peek_event(child, options).is_some()))
+        });
+        match queued {
+            Ok(true) => {}
+            Ok(false) => {
+                sched::end_block(token);
+                continue;
+            }
+            Err(error) => {
+                sched::end_block(token);
+                return Err(error);
+            }
+        }
+        let status = sched::block_current();
+        let kicked = sched::take_kick();
+        sched::end_block(token);
+        if status == Errno::EINTR.to_ret() || kicked {
+            return Err(Errno::EINTR);
+        }
+    }
+}
+
+/// `proc_getpgid(pid) -> pgid`. Zero means the caller.
+pub fn getpgid(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let pid = frame.rdi as u32 as i32;
+    let target = if pid == 0 {
+        caller
+    } else {
+        let pid = u64::try_from(pid).map_err(|_| Errno::ESRCH)?;
+        process::lookup_pid(pid).ok_or(Errno::ESRCH)?
+    };
+    usize::try_from(target.ids.lock().pgid).map_err(|_| Errno::EINVAL)
+}
+
+/// True when `caller` may signal `target`.
+fn signal_allowed(caller: &Process, target: &Process) -> bool {
+    let caller_ids = *caller.ids.lock();
+    if caller_ids.euid == 0 {
+        return true;
+    }
+    let target_ids = *target.ids.lock();
+    caller_ids.euid == target_ids.uid
+        || caller_ids.uid == target_ids.uid
+        || caller_ids.euid == target_ids.euid
+        || caller_ids.euid == target_ids.suid
+}
+
+fn signal_one(caller: &Arc<Process>, target: &Arc<Process>, signo: u32) -> Result<(), Errno> {
+    if signo == SIGKILL {
+        if Arc::ptr_eq(caller, target) {
+            process::exit_process(KILL_EXIT_CODE);
+        }
+        return process::terminate(target, KILL_EXIT_CODE);
+    }
+    if is_stop_signal(signo) {
+        if target.stop_signal.swap(signo, Ordering::AcqRel) == 0 {
+            target.stop_reported.store(false, Ordering::Release);
+        }
+        process::notify_parent(target, false);
+        return Ok(());
+    }
+    if signo == SIGCONT {
+        if target.stop_signal.swap(0, Ordering::AcqRel) != 0 {
+            target.continued.store(true, Ordering::Release);
+            target.stop_reported.store(false, Ordering::Release);
+        }
+        target.queue_signal(SIGCONT, caller.id);
+        process::notify_parent(target, false);
+        return Ok(());
+    }
+    target.queue_signal(signo, caller.id);
+    Ok(())
+}
+
+/// `proc_signal(target, signo) -> 0`.
+///
+/// Positive `target` is a pid, zero is the caller's process group and a negative
+/// value is `-pgid`. `SIGKILL` terminates, stop signals set the wait-status stop
+/// state, `SIGCONT` clears it and every other signal is queued for
+/// `PROC_SIGRECV`. The permission check uses the caller's effective/real uid and
+/// the target's real/saved uid; effective uid 0 is privileged.
+pub fn signal(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let target = frame.rdi as u32 as i32;
+    let signo = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    if !signal_valid(signo) {
+        return Err(Errno::EINVAL);
+    }
+    let targets: Vec<Arc<Process>> = if target > 0 {
+        let pid = u64::try_from(target).map_err(|_| Errno::ESRCH)?;
+        let target = process::lookup_pid(pid).ok_or(Errno::ESRCH)?;
+        if *target.state.lock() == ProcessState::Exited {
+            return Err(Errno::ESRCH);
+        }
+        vec![target]
+    } else {
+        let group = if target == 0 {
+            caller.ids.lock().pgid
+        } else {
+            u64::from(target.unsigned_abs())
+        };
+        process::processes()
+            .into_iter()
+            .filter(|process| {
+                process.ids.lock().pgid == group && *process.state.lock() != ProcessState::Exited
+            })
+            .collect()
+    };
+    if targets.is_empty() {
+        return Err(Errno::ESRCH);
+    }
+    for target in &targets {
+        if !signal_allowed(&caller, target) {
+            return Err(Errno::EPERM);
+        }
+    }
+    for target in targets {
+        signal_one(&caller, &target, signo)?;
+    }
+    Ok(0)
+}
+
+/// `proc_sigrecv(out, flags) -> signo`.
+///
+/// Writes `[signo, sender_pid, 0]` as three little-endian u64 words. `WNOHANG`
+/// returns `EAGAIN` instead of blocking. The kernel queue does not interpret
+/// signal dispositions; libc/procd own the user pending set.
+pub fn sigrecv(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let destination = UserSlice::new(frame.rdi, 24)?;
+    let flags = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    if flags & !WNOHANG != 0 {
+        return Err(Errno::EINVAL);
+    }
+    loop {
+        if let Some(signal) = caller.pop_signal() {
+            let mut bytes = [0u8; 24];
+            for (chunk, value) in
+                bytes
+                    .chunks_exact_mut(8)
+                    .zip([u64::from(signal.signo), signal.sender, 0])
+            {
+                chunk.copy_from_slice(&value.to_le_bytes());
+            }
+            copy_to_user(destination, &bytes)?;
+            return Ok(signal.signo as usize);
+        }
+        if flags & WNOHANG != 0 {
+            return Err(Errno::EAGAIN);
+        }
+        let token = sched::begin_block_interruptible()?;
+        if sched::take_kick() {
+            sched::end_block(token);
+            return Err(Errno::EINTR);
+        }
+        let queued = caller
+            .signal_waiters
+            .enqueue_if(caller.id, 0, || Ok(!caller.has_pending_signal()));
+        match queued {
+            Ok(true) => {}
+            Ok(false) => {
+                sched::end_block(token);
+                continue;
+            }
+            Err(error) => {
+                sched::end_block(token);
+                return Err(error);
+            }
+        }
+        let status = sched::block_current();
+        let kicked = sched::take_kick();
+        sched::end_block(token);
+        if status == Errno::EINTR.to_ret() || kicked {
+            return Err(Errno::EINTR);
+        }
+    }
+}
+
+/// `proc_times(out, count) -> 0`; count must be four u64 words.
+pub fn times(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let count = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    if count != 4 {
+        return Err(Errno::EINVAL);
+    }
+    let destination = UserSlice::new(frame.rdi, 32)?;
+    let values = [
+        caller.user_ns.load(Ordering::Acquire),
+        caller.system_ns.load(Ordering::Acquire),
+        caller.child_user_ns.load(Ordering::Acquire),
+        caller.child_system_ns.load(Ordering::Acquire),
+    ];
+    let mut bytes = [0u8; 32];
+    for (chunk, value) in bytes.chunks_exact_mut(8).zip(values) {
+        chunk.copy_from_slice(&value.to_le_bytes());
+    }
+    copy_to_user(destination, &bytes)?;
+    Ok(0)
+}
+
+/// `proc_getrusage(who, out, count) -> 0`.
+///
+/// `who == 0` is the caller, `who == -1` the reaped children. Eight u64 words:
+/// user ns, system ns, maxrss, minflt, majflt, nvcsw, nivcsw, reserved.
+pub fn getrusage(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let who = frame.rdi as u32 as i32;
+    let count = usize::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
+    if count != 8 {
+        return Err(Errno::EINVAL);
+    }
+    let (user, system) = match who {
+        0 => (
+            caller.user_ns.load(Ordering::Acquire),
+            caller.system_ns.load(Ordering::Acquire),
+        ),
+        -1 => (
+            caller.child_user_ns.load(Ordering::Acquire),
+            caller.child_system_ns.load(Ordering::Acquire),
+        ),
+        _ => return Err(Errno::EINVAL),
+    };
+    let destination = UserSlice::new(frame.rsi, 64)?;
+    let values = [user, system, 0, 0, 0, 0, 0, caller.start_ns];
+    let mut bytes = [0u8; 64];
+    for (chunk, value) in bytes.chunks_exact_mut(8).zip(values) {
+        chunk.copy_from_slice(&value.to_le_bytes());
+    }
+    copy_to_user(destination, &bytes)?;
+    Ok(0)
+}
+
+/// `proc_getrlimit(resource, out) -> 0`; writes `[cur, max]`.
+pub fn getrlimit(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let resource = usize::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
+    if resource >= RLIMIT_COUNT {
+        return Err(Errno::EINVAL);
+    }
+    let destination = UserSlice::new(frame.rsi, 16)?;
+    let limit = caller
+        .limits
+        .lock()
+        .get(resource)
+        .copied()
+        .ok_or(Errno::EINVAL)?;
+    let mut bytes = [0u8; 16];
+    bytes[..8].copy_from_slice(&limit.cur.to_le_bytes());
+    bytes[8..].copy_from_slice(&limit.max.to_le_bytes());
+    copy_to_user(destination, &bytes)?;
+    Ok(0)
+}
+
+/// `proc_setrlimit(resource, cur, max) -> 0`.
+///
+/// A soft limit above the existing hard limit needs effective uid 0; every pair
+/// must satisfy `cur <= max`.
+pub fn setrlimit(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let resource = usize::try_from(frame.rdi).map_err(|_| Errno::EINVAL)?;
+    if resource >= RLIMIT_COUNT {
+        return Err(Errno::EINVAL);
+    }
+    let limit = Rlimit {
+        cur: frame.rsi,
+        max: frame.rdx,
+    };
+    if !limit.valid() {
+        return Err(Errno::EINVAL);
+    }
+    let privileged = caller.ids.lock().euid == 0;
+    let mut limits = caller.limits.lock();
+    let slot = limits.get_mut(resource).ok_or(Errno::EINVAL)?;
+    if limit.cur > slot.max && !privileged {
+        return Err(Errno::EPERM);
+    }
+    *slot = limit;
+    Ok(0)
 }

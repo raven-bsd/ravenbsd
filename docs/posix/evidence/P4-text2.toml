@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4e text2 evidence: first-party grep, cmp, diff and strings.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.grep"
+status = "present"
+evidence = "test:tests/posix/utility/text2/grep/test.sh"
+notes = "P4e: first-party grep host behaviour tests"
+
+[[row]]
+id = "util.cmp"
+status = "present"
+evidence = "test:tests/posix/utility/text2/cmp/test.sh"
+notes = "P4e: first-party cmp host behaviour tests"
+
+[[row]]
+id = "util.diff"
+status = "present"
+evidence = "test:tests/posix/utility/text2/diff/test.sh"
+notes = "P4e: first-party diff host behaviour tests"
+
+[[row]]
+id = "util.strings"
+status = "present"
+evidence = "test:tests/posix/utility/text2/strings/test.sh"
+notes = "P4e: first-party strings host behaviour tests"

@@ -15,6 +15,7 @@ use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 use raven_linux_abi::Arch;
+use raven_linux_abi::flags::clone as clone_flags;
 use raven_linux_dispatch::{Dispatcher, LinuxContext, SyscallArgs};
 
 use crate::files::{
@@ -23,7 +24,7 @@ use crate::files::{
     SEEK_CUR, SEEK_END, SEEK_SET, bounded_len,
 };
 use crate::procfs::{self, Resource};
-use crate::table::{FileKind, LinuxProcess};
+use crate::table::{CloneRequest, FileKind, LinuxProcess};
 
 /// `MAP_ANONYMOUS` from the Linux UAPI (the dispatcher's `raven-linux-abi` crate owns the number).
 const MAP_ANONYMOUS: i32 = 0x20;
@@ -42,6 +43,14 @@ const ARCH_GET_FS: i32 = 0x1003;
 
 /// The Linux root is read-only for the synthetic surface.
 const EROFS: i32 = Errno::EROFS.0 as i32;
+
+/// `PR_SET_NAME`.
+const PR_SET_NAME: i32 = 15;
+/// `PR_GET_NAME`.
+const PR_GET_NAME: i32 = 16;
+
+/// `sizeof(struct robust_list_head)` on 64-bit Linux.
+const ROBUST_LIST_HEAD_SIZE: usize = 24;
 
 /// A dispatcher with the B20 handlers registered.
 pub fn dispatcher() -> Dispatcher {
@@ -67,6 +76,11 @@ pub fn dispatcher() -> Dispatcher {
         ("pwrite64", pwrite64 as _),
         ("fcntl", fcntl as _),
         ("dup3", dup3 as _),
+        ("gettid", gettid as _),
+        ("set_tid_address", set_tid_address as _),
+        ("set_robust_list", set_robust_list as _),
+        ("prctl", prctl as _),
+        ("clone", clone as _),
     ] {
         // Every name is in the x86-64 table; a failure here is a build-time typo, and the
         // dispatcher reports it as an unimplemented number instead of panicking.
@@ -93,10 +107,111 @@ fn einval() -> isize {
 fn exit_group(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
     let code = args.int(0);
     let result = with(ctx, |process| {
+        // The main thread was created before the program called `set_tid_address`, so the kernel's
+        // clear-on-exit word is unset. Queue the zero store and let the trap loop perform it before
+        // the process is terminated.
+        if process.clear_tid != 0 {
+            process.pending_write = Some((process.clear_tid, 0u32.to_le_bytes().to_vec()));
+        }
         process.exit = Some(code);
         0
     });
     result.unwrap_or_else(|_| einval())
+}
+
+/// `gettid` returns the native thread id captured when linuxd created the Linux thread.
+fn gettid(ctx: &mut dyn LinuxContext, _args: &SyscallArgs) -> isize {
+    with(ctx, |process| process.tid as isize).unwrap_or_else(|_| einval())
+}
+
+/// `set_tid_address(ptr)` records the clear-child-tid word and returns the caller's tid.
+fn set_tid_address(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let address = args.ptr(0) as u64;
+    with(ctx, |process| {
+        process.clear_tid = address;
+        process.tid as isize
+    })
+    .unwrap_or_else(|_| einval())
+}
+
+/// `set_robust_list(head, len)` records the robust-list head; only the 24-byte UAPI head is valid.
+fn set_robust_list(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let head = args.ptr(0) as u64;
+    let length = args.size(1);
+    with(ctx, |process| {
+        if length != ROBUST_LIST_HEAD_SIZE {
+            return -(Errno::EINVAL.0 as isize);
+        }
+        process.robust_list = head;
+        process.robust_list_len = length;
+        0
+    })
+    .unwrap_or_else(|_| einval())
+}
+
+/// The name attributes a static Linux program sets at startup.
+///
+/// Only `PR_SET_NAME`/`PR_GET_NAME` are served in B21b; the other B21 attributes are not needed by
+/// `clone` and remain `EINVAL` until the process/thread batch lands.
+fn prctl(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let option = args.int(0);
+    let result = with(ctx, |process| match option {
+        PR_SET_NAME => {
+            let name = process.user_buffer.clone();
+            process.set_name(&name);
+            0
+        }
+        PR_GET_NAME => {
+            process.pending_write = Some((args.ptr(1) as u64, process.name_bytes().to_vec()));
+            0
+        }
+        _ => -(Errno::EINVAL.0 as isize),
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+/// `clone` validates the Linux arguments and queues the request for the trap loop.
+///
+/// The handler cannot create a native thread or process, so it records the B21a frame and the six
+/// arguments in [`CloneRequest`]; `main.rs` performs the mapping and creation, then replaces the
+/// placeholder reply with the child pid/tid or the kernel's errno. A missing frame means the trap
+/// did not come from the B21a x86-64 path, so the honest answer is `-ENOSYS`.
+fn clone(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let result = with(ctx, |process| {
+        let Some(frame) = process.frame else {
+            return -(Errno::ENOSYS.0 as isize);
+        };
+        let request = CloneRequest {
+            flags: args.ptr(0) as u64,
+            child_stack: args.ptr(1) as u64,
+            ptid: args.ptr(2) as u64,
+            ctid: args.ptr(3) as u64,
+            tls: args.ptr(4) as u64,
+            frame,
+        };
+        match crate::clone::classify(&request) {
+            Ok(_) => {}
+            Err(error) => return -(error.0 as isize),
+        }
+        if request.flags & clone_flags::CLONE_PARENT_SETTID != 0
+            && !writable_word(process, request.ptid)
+        {
+            return -(Errno::EFAULT.0 as isize);
+        }
+        if request.flags & clone_flags::CLONE_CHILD_SETTID != 0
+            && !writable_word(process, request.ctid)
+        {
+            return -(Errno::EFAULT.0 as isize);
+        }
+        process.pending_clone = Some(request);
+        0
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+/// Whether a four-byte pointer is zero or lies inside a known writable region.
+fn writable_word(process: &LinuxProcess, address: u64) -> bool {
+    address == 0 || process.region_for(address, 4).is_some()
 }
 
 fn brk(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
