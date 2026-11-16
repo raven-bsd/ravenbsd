@@ -1,0 +1,31 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt UNCOMPRESS 1
+.Os RavenBSD
+.Sh NAME
+.Nm uncompress
+.Nd expand .Z LZW files
+.Sh SYNOPSIS
+.Nm
+.Op Fl c
+.Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility decodes historical `.Z` LZW streams. A missing
+.Ql .Z
+suffix is added when reading; the output name has the suffix removed. The input file is removed
+after a successful write unless
+.Fl c
+is supplied, in which case the decoded bytes go to standard output and the input is kept.
+.Pp
+The target image requires a file operand; standard input is not available.
+.Sh EXIT STATUS
+.Ex -std
+A corrupt stream or I/O error exits with status 1; a usage error exits with status 2.
+.Sh SEE ALSO
+.Xr compress 1 ,
+.Xr zcat 1
+.Sh STANDARDS
+RavenBSD implements the historical block-mode `.Z` LZW format.

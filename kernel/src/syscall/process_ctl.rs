@@ -17,8 +17,8 @@ use raven_usercopy::UserSlice;
 use crate::ipc::model::{self, NAME_MAX};
 use crate::ipc::router;
 use crate::process::status::{
-    P_ALL, P_PGID, P_PID, RLIM_INFINITY, RLIMIT_COUNT, RLIMIT_NPROC, Rlimit, SIGCONT, SIGKILL,
-    WAIT_OPTIONS, WCONTINUED, WNOHANG, WUNTRACED, WaitEvent, is_stop_signal, signal_valid,
+    P_ALL, P_PGID, P_PID, RLIM_INFINITY, RLIMIT_COUNT, RLIMIT_NPROC, Rlimit, SIGKILL, WAIT_OPTIONS,
+    WCONTINUED, WNOHANG, WUNTRACED, WaitEvent, signal_valid,
 };
 use crate::process::{self, Process, ProcessState, handle::Object};
 use crate::sched;
@@ -247,6 +247,8 @@ pub fn setsid() -> Result<usize, Errno> {
     }
     ids.pgid = caller.id;
     ids.sid = caller.id;
+    drop(ids);
+    crate::process::tty::clear_session(&caller);
     Ok(caller.id as usize)
 }
 
@@ -1002,24 +1004,7 @@ fn signal_one(caller: &Arc<Process>, target: &Arc<Process>, signo: u32) -> Resul
         }
         return process::terminate(target, KILL_EXIT_CODE);
     }
-    if is_stop_signal(signo) {
-        if target.stop_signal.swap(signo, Ordering::AcqRel) == 0 {
-            target.stop_reported.store(false, Ordering::Release);
-        }
-        process::notify_parent(target, false);
-        return Ok(());
-    }
-    if signo == SIGCONT {
-        if target.stop_signal.swap(0, Ordering::AcqRel) != 0 {
-            target.continued.store(true, Ordering::Release);
-            target.stop_reported.store(false, Ordering::Release);
-        }
-        target.queue_signal(SIGCONT, caller.id);
-        process::notify_parent(target, false);
-        return Ok(());
-    }
-    target.queue_signal(signo, caller.id);
-    Ok(())
+    process::deliver_signal(target, signo, caller.id)
 }
 
 /// `proc_signal(target, signo) -> 0`.

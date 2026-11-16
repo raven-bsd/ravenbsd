@@ -99,8 +99,8 @@ notes = "P2f: PROC_TIMES/PROC_GETRUSAGE; user time and extra counters are zero u
 
 [[row]]
 id = "process.tty-control"
-status = "waived"
-evidence = "none"
+status = "present"
+evidence = "qtest:tty-control"
 notes = "P3: ttyd controlling terminal, tcsetpgrp and SESSIONINFO belong to P3"
 
 [[row]]
