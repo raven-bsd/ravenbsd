@@ -1,0 +1,88 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt BC 1
+.Os RavenBSD
+.Sh NAME
+.Nm bc
+.Nd arbitrary-precision decimal calculator (bounded POSIX core)
+.Sh SYNOPSIS
+.Nm
+.Op Fl l
+.Op Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility reads arithmetic programs from the file operands, or from standard input when no file
+operand is present, and writes expression values and
+.Ic print
+output to standard output.
+.Pp
+Numbers are arbitrary-precision signed decimals.
+The special variable
+.Va scale
+sets the number of fractional digits used by division and other scale-sensitive operations.
+The operators
+.Ic + , - , * , / , % , ^
+and the relational and logical operators are supported, together with unary
+.Ic - 
+and
+.Ic ! .
+The functions
+.Ic sqrt ,
+.Ic length
+and
+.Ic scale
+are built in.
+.Pp
+The language includes scalar variables, integer-indexed arrays, comments, quoted strings,
+.Ic if/else ,
+.Ic while ,
+C-style
+.Ic for ,
+.Ic break ,
+.Ic continue ,
+.Ic return ,
+.Ic auto
+locals and user-defined functions.
+A bare expression writes its value; an assignment is silent.
+.Ic print
+writes its comma-separated arguments without adding a newline.
+.Pp
+The following option is supported:
+.Bl -tag -width Fl
+.It Fl l
+Set
+.Va scale
+to 20 and enable the bounded math library:
+.Ic e , l , s , c
+and
+.Ic a .
+.El
+.Pp
+The
+.Va ibase
+and
+.Va obase
+variables are fixed at decimal; assigning another base is an error.
+The
+.Ic dc
+language, GNU extensions, array parameters,
+.Ic auto
+arrays, the Bessel function
+.Ic j
+and non-decimal input/output bases are not implemented.
+On the target image standard input is read from the console terminal; there is no general process
+pipeline handle.
+.Sh EXIT STATUS
+.Ex -std
+Status 2 indicates invalid usage; status 1 indicates a parse, runtime, unsupported or I/O error.
+.Sh SEE ALSO
+.Xr patch 1 ,
+.Xr rsh 1
+.Sh STANDARDS
+The bounded core follows the POSIX.1-2024
+.Nm
+language for the implemented statements, operators, functions and the
+.Fl l
+option.
