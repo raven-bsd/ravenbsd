@@ -1,8 +1,0 @@
-# SPDX-License-Identifier: BSD-3-Clause
-# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-
-# Pin the resident shell services so `exit_when_exits = rsh` can end the scripted session.
-
-[[initfs.files]]
-src = "profiles/modern-shell-test.d/rc.conf"
-path = "/etc/rc.conf"

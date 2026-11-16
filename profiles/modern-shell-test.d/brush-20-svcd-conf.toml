@@ -1,8 +1,0 @@
-# SPDX-License-Identifier: BSD-3-Clause
-# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-
-# End svcd when rsh exits so the scripted qtest can assert `init exited (0)`.
-
-[[initfs.files]]
-src = "etc/svcd.conf"
-path = "/etc/svcd.conf"
