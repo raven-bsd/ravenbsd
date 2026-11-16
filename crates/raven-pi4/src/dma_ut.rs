@@ -264,6 +264,38 @@ fn a_64_bit_table_encodes_twelve_byte_descriptors() {
 }
 
 #[test]
+fn the_dma_matrix_covers_sdma_and_both_adma2_widths() {
+    let sdma = plan_sdma(PI4_WINDOW, 0x1000, 0x1000).expect("sdma");
+    assert_eq!(sdma.bus_address, 0xc000_1000);
+    assert_eq!(sdma.length, 0x1000);
+
+    for width in [DescriptorWidth::Bits32, DescriptorWidth::Bits64] {
+        let table = Adma2Table::from_buffer(PI4_WINDOW, 0x1000, 0x1000, width).expect("table");
+        assert_eq!(table.width(), width);
+        assert_eq!(table.len(), 1);
+        assert_eq!(table.data_bytes(), 0x1000);
+        assert_eq!(table.descriptors()[0].address, 0xc000_1000);
+        assert!(table.descriptors()[0].end);
+        assert_eq!(table.encoded_len(), 2 * width.encoded_len());
+    }
+
+    let high_window = DmaWindow {
+        bus_base: 0x1_0000_0000,
+        cpu_base: 0,
+        size: 0x4_0000_0000,
+    };
+    let high = Adma2Table::from_buffer(high_window, 0x1_0000_1000, 0x1000, DescriptorWidth::Bits64)
+        .expect("64-bit table above four GiB");
+    assert_eq!(high.descriptors()[0].address, 0x2_0000_1000);
+    assert_eq!(
+        Adma2Table::from_buffer(high_window, 0x1_0000_1000, 0x1000, DescriptorWidth::Bits32),
+        Err(DmaError::BounceRequired {
+            reason: BounceReason::BusAddressTooHigh
+        })
+    );
+}
+
+#[test]
 fn a_crossing_or_outside_buffer_needs_a_bounce() {
     assert_eq!(
         Adma2Table::from_buffer(PI4_WINDOW, 0x3fff_f000, 0x2000, DescriptorWidth::Bits32),

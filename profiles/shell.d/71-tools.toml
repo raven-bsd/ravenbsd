@@ -2,16 +2,16 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 [[initfs.programs]]
-package = "raven-hostname"
-path = "/bin/hostname"
-
-[[initfs.programs]]
 package = "raven-sleep"
 path = "/bin/sleep"
 
 [[initfs.programs]]
 package = "raven-date"
 path = "/bin/date"
+
+[[initfs.programs]]
+package = "raven-hostname"
+path = "/bin/hostname"
 
 [[initfs.programs]]
 package = "raven-dmesg"

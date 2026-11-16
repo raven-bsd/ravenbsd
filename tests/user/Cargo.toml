@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-user-tests"
+version = "0.1.0"
+description = "RavenBSD U4 host user-management matrix over the U2 tools and fixtures."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dev-dependencies]
+adduser = { path = "../../userland/bin/adduser" }
+groupadd = { path = "../../userland/bin/groupadd" }
+id = { path = "../../userland/bin/id" }
+passwd = { path = "../../userland/bin/passwd" }
+raven-auth = { path = "../../crates/raven-auth" }
+raven-userdb = { path = "../../crates/raven-userdb" }
+su = { path = "../../userland/bin/su" }
+useradd = { path = "../../userland/bin/useradd" }
+whoami = { path = "../../userland/bin/whoami" }
+
+[lints]
+workspace = true

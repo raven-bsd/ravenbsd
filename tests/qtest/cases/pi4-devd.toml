@@ -1,11 +1,16 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
+# P8: devd decodes the fixture DTB, matches the fake platform driver by compatible string,
+# creates the MMIO/DMA/IRQ handles, transfers them and waits for the driver. The fake driver
+# verifies its handles without touching device memory.
+
 name = "pi4-devd"
 arch = "aarch64"
-profile = "pi4-devd"
-timeout_secs = 240
+profile = "base"
+timeout_secs = 300
 pre = ["sh tests/fixtures/pi4-devd/build.sh"]
+initfs = "build/fixtures/pi4-devd/initfs.img"
 boot_cmdline = "console=ttyAMA0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
@@ -29,19 +34,25 @@ regex = '^devd: dtb device /emmc2bus/mmc@7e340000 compatible=brcm,bcm2711-emmc2 
 regex = '^devd: dtb device /interrupt-controller@ff841000 compatible=arm,gic-400 reg=0xff841000\+0x1000 dma=0 irq=none$'
 
 [[expect]]
-regex = '^devd: dtb driver genet compatible=brcm,bcm2711-genet-v5 device=/scb/ethernet@7d580000$'
+regex = '^devd: dtb driver fake-platform compatible=brcm,bcm2711-genet-v5 device=/scb/ethernet@7d580000$'
 
 [[expect]]
-regex = '^devd: dtb driver emmc2 compatible=brcm,bcm2711-emmc2 device=/emmc2bus/mmc@7e340000$'
+regex = '^devd: dtb launch fake-platform bar=0 size=0x10000 dma=1048576 irq=189$'
 
 [[expect]]
-regex = '^devd: dtb driver pwm1 compatible=brcm,bcm2835-pwm device=/soc/pwm@7e20c800$'
+regex = '^fake-platform: bar=0 size=65536 dma=1048576 irq=189$'
 
 [[expect]]
-regex = '^devd: dtb driver rng200 compatible=brcm,bcm2711-rng200 device=/soc/rng@7e104000$'
+regex = '^fake-platform: dma bus=0x[0-9a-f]+ len=1048576$'
 
 [[expect]]
-regex = '^devd: dtb matched=4$'
+regex = '^fake-platform: handles ok$'
+
+[[expect]]
+regex = '^devd: dtb launch fake-platform exit=0$'
+
+[[expect]]
+regex = '^devd: dtb matched=1$'
 
 [[expect]]
 regex = '^svcd: devd up$'

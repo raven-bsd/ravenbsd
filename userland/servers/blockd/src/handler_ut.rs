@@ -11,6 +11,7 @@ use raven_abi::types::Handle;
 use raven_proto_block::{
     INFO_LEN, REQUEST_HEADER_LEN, Request, decode_partition_list, decode_reply,
 };
+use raven_proto_fs::Credentials;
 use raven_scheme::HandlerError;
 
 use crate::device::RamDisk;
@@ -23,6 +24,7 @@ fn ctx() -> Ctx {
         token: 1,
         buffer_len: 0,
         response_len: 0,
+        credentials: Credentials::ROOT,
     }
 }
 

@@ -1,0 +1,5 @@
+root:x:0:0:root:/root:/bin/brush
+alice:x:1000:1000:Alice Example:/home/alice:/bin/brush
+bob:x:1001:1001:Bob Example:/home/bob:/bin/brush
+nobody:x:65534:65534:nobody:/nonexistent:/nonexistent
+carol:x:1002:1002:Carol Example:/home/carol:/bin/brush

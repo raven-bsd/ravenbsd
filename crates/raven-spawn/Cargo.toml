@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-spawn"
+version = "0.1.0"
+description = "RavenBSD shared no_std ELF loader and process spawn planning"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+default = []
+alloc = []
+
+[dependencies]
+raven-abi = { path = "../../crates/raven-abi" }
+raven-elf = { path = "../../crates/raven-elf" }
+raven-initfs = { path = "../../crates/raven-initfs" }
+raven-proto-fs = { path = "../../crates/raven-proto-fs" }
+raven-scheme = { path = "../../crates/raven-scheme" }
+
+[dev-dependencies]
+raven-initfs = { path = "../../crates/raven-initfs", features = ["std"] }

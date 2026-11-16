@@ -1,0 +1,168 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# U3e: adversarial credential-transition cases for setuid su/passwd.
+# The fixture starts initfsd/ramfsd/vfsd/consd, copies the account files into a writable ramfs
+# /etc, and drives root and uid-1000 attempts. Wrong and locked passwords, an unknown account and
+# a passwd old-password mismatch must leave both the caller and the account database unchanged.
+
+name = "user-secure"
+arch = "x86_64"
+# Blocked by the product defect recorded in docs/user-security.md: raven-rt's fs::open passes
+# plain /etc paths to the kernel without the `file:` scheme, so userdb's RtIo reads fail EINVAL
+# before su/passwd can reach the console prompt. Enable this case when that fix lands.
+skip = "blocked by raven-rt fs plain-path EINVAL (docs/user-security.md)"
+profile = "base"
+timeout_secs = 300
+pre = ["sh tests/user/secure/build.sh"]
+initfs = "build/fixtures/user-secure/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^secure: services ok$'
+
+[[expect]]
+regex = '^secure: case missing-shell$'
+
+[[expect]]
+regex = '^secure-shell: ran$'
+
+[[expect]]
+regex = '^secure-shell: uid=1002 euid=1002 suid=1002 gid=1002 egid=1002 sgid=1002$'
+
+[[expect]]
+regex = '^secure: missing-shell=ok$'
+
+[[expect]]
+regex = '^secure: case ids-groups$'
+
+[[expect]]
+regex = '^probe: uid=1000 euid=1000 suid=1000 gid=1000 egid=1000 sgid=1000$'
+
+[[expect]]
+regex = '^probe: groups=100$'
+
+[[expect]]
+regex = '^secure: ids-groups=ok$'
+
+[[expect]]
+regex = '^secure: case environment$'
+
+[[expect]]
+regex = '^probe: env PATH=/bin:/usr/bin:/sbin:/usr/sbin$'
+
+[[expect]]
+regex = '^probe: env HOME=/home/alice$'
+
+[[expect]]
+regex = '^probe: env SHELL=/bin/brush$'
+
+[[expect]]
+regex = '^probe: env USER=alice$'
+
+[[expect]]
+regex = '^probe: env LOGNAME=alice$'
+
+[[expect]]
+regex = '^probe: env PWD=/$'
+
+[[expect]]
+regex = '^probe: env TERM=vt220$'
+
+[[expect]]
+regex = '^probe: env LD_PRELOAD=<unset>$'
+
+[[expect]]
+regex = '^secure: environment=ok$'
+
+[[expect]]
+regex = '^secure: case wrong-password$'
+
+[[step]]
+wait = '^Password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "wrong-secret\n"
+delay_ms = 100
+
+[[expect]]
+regex = '^su: incorrect password$'
+
+[[expect]]
+regex = '^secure-runner: mode=su exit=1$'
+
+[[expect]]
+regex = '^secure-runner: caller uid=1000 euid=1000 suid=1000 gid=1000 egid=1000 sgid=1000 groups=0$'
+
+[[expect]]
+regex = '^secure: wrong-password=denied$'
+
+[[expect]]
+regex = '^secure: case locked$'
+
+[[step]]
+wait = '^Password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[expect]]
+regex = '^su: incorrect password$'
+
+[[expect]]
+regex = '^secure-runner: mode=su exit=1$'
+
+[[expect]]
+regex = '^secure-runner: caller uid=1000 euid=1000 suid=1000 gid=1000 egid=1000 sgid=1000 groups=0$'
+
+[[expect]]
+regex = '^secure: locked=denied$'
+
+[[expect]]
+regex = '^secure: case unknown$'
+
+[[expect]]
+regex = '^su: ghost: no such user$'
+
+[[expect]]
+regex = '^secure-runner: mode=su exit=1$'
+
+[[expect]]
+regex = '^secure: unknown=denied$'
+
+[[expect]]
+regex = '^secure: case passwd-old$'
+
+[[step]]
+wait = '^Current password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "wrong-old\n"
+delay_ms = 100
+
+[[expect]]
+regex = '^passwd: incorrect password$'
+
+[[expect]]
+regex = '^secure-runner: mode=passwd exit=1$'
+
+[[expect]]
+regex = '^secure-runner: caller uid=1000 euid=1000 suid=1000 gid=1000 egid=1000 sgid=1000 groups=0$'
+
+[[expect]]
+regex = '^secure: passwd-old=unchanged$'
+
+[[expect]]
+regex = '^secure: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|secure: fail|wrong-secret|old-secret|LD_PRELOAD=/evil'

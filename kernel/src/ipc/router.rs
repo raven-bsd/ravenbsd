@@ -379,6 +379,35 @@ pub fn fstat(
     Ok(())
 }
 
+/// Stat a scheme file into a kernel buffer without a client capture.
+///
+/// This is the internal exec path. The server returns its 64-byte record inline; the client
+/// response buffer is zero-length and `reply_result` permits the inline record for `Fstat`.
+pub fn fstat_kernel(caller: &Arc<Process>, file: &Arc<SchemeFile>) -> Result<[u8; 64], Errno> {
+    ensure_server(&file.server)?;
+    let mut packet = SchemePacket::request(Opcode::Fstat, next_request_id(), file.server_id());
+    packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
+    packet.response_len = 0;
+    let request = PendingRequest::new(
+        Arc::clone(caller),
+        Arc::clone(&file.server),
+        Some(Arc::clone(file)),
+        Opcode::Fstat,
+        packet,
+        RequestBuffers::default(),
+    );
+    let (status, _) = submit(&request).and_then(|_| wait(caller, &request))?;
+    if status != 0 {
+        return Err(status_errno(status));
+    }
+    let response = *request.response.lock();
+    let bytes = response.data_bytes();
+    let source = bytes.get(..64).ok_or(Errno::EPROTO)?;
+    let mut stat = [0u8; 64];
+    stat.copy_from_slice(source);
+    Ok(stat)
+}
+
 /// Typed call with an optional response buffer.
 pub fn call(
     caller: &Arc<Process>,

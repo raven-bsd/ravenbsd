@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# U3a: caller-credential filesystem permission matrix. The fixture starts as root, creates the
+# files, drops to uid/gid 1000 via PROC_SETCRED_EX, and checks file:/vfsd and ramfs: access.
+
+name = "perm"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/perm/build.sh"]
+initfs = "build/fixtures/perm/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^perm: services ok$'
+
+[[expect]]
+regex = '^perm: root read=ok exec=denied write=ok$'
+
+[[expect]]
+regex = '^perm: uid1000 0600=denied 0644=ok$'
+
+[[expect]]
+regex = '^perm: uid1000 dirs 0755=ok 0700=denied$'
+
+[[expect]]
+regex = '^perm: uid1000 create=denied$'
+
+[[expect]]
+regex = '^perm: uid1000 exec 0644=denied$'
+
+[[expect]]
+regex = '^perm: uid1000 sticky=denied$'
+
+[[expect]]
+regex = '^perm: ramfs 0600=denied 0644=ok dir700=denied$'
+
+[[expect]]
+regex = '^perm: symlink=denied$'
+
+[[expect]]
+regex = '^perm: dotdot=denied$'
+
+[[expect]]
+regex = '^perm: deleted-cwd=enoent$'
+
+[[expect]]
+regex = '^perm: xonly-write=denied$'
+
+[[expect]]
+regex = '^perm: group-list=ok$'
+
+[[expect]]
+regex = '^perm: handles duplicate=ok stale=badf$'
+
+[[expect]]
+regex = '^perm: setuid-dir=bad-elf$'
+
+[[expect]]
+regex = '^perm: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|perm: fail'

@@ -1,0 +1,9 @@
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+HOME=/root
+TERM=${TERM:-vt100}
+USER=root
+LOGNAME=root
+SHELL=/bin/rsh
+PS1='\u@\h:\w# '
+export PATH HOME TERM USER LOGNAME SHELL PS1
+umask 022

@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The 0.1.0 QEMU release profile: the shell image plus getty/login, brush, the base tools and
+# the server network stack. The parent shell profile stages /bin/brush and the uutils slice; this
+# profile only layers the release-specific services and files. QEMU/x86_64 is the supported target
+# for this ticket; REL3 owns the Pi 4 variant.
+name = "release"
+extends = "shell"
+
+[initfs]
+release = true
+
+[boot]
+cmdline = "console=ttyS0 loglevel=info"
+log_level = "info"

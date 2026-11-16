@@ -406,11 +406,13 @@ cases:
       printf '~%q\n' 'a b'
 
   - name: "printf %q shell-sensitive characters"
+    min_oracle_version: "5.2" # %Q is bash 5.2+
     stdin: |
       printf '%q\n' '~' 'x:~' 'x=~' '#' 'x#y'
       printf '%Q\n' '~' 'x:~' 'x=~' '#' 'x#y'
 
   - name: "printf %Q"
+    min_oracle_version: "5.2" # %Q is bash 5.2+
     stdin: |
       printf '%Q\n' 'foo bar'
 

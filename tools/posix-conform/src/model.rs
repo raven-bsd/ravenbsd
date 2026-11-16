@@ -255,6 +255,32 @@ impl Profile {
         rows
     }
 
+    /// Find one row's shared fields by id.
+    pub fn meta_mut(&mut self, id: &str) -> Option<&mut Meta> {
+        if let Some(row) = self.header.iter_mut().find(|row| row.meta.id == id) {
+            return Some(&mut row.meta);
+        }
+        if let Some(row) = self.interface.iter_mut().find(|row| row.meta.id == id) {
+            return Some(&mut row.meta);
+        }
+        if let Some(row) = self.utility.iter_mut().find(|row| row.meta.id == id) {
+            return Some(&mut row.meta);
+        }
+        if let Some(row) = self.shell_feature.iter_mut().find(|row| row.meta.id == id) {
+            return Some(&mut row.meta);
+        }
+        if let Some(row) = self.filesystem.iter_mut().find(|row| row.meta.id == id) {
+            return Some(&mut row.meta);
+        }
+        if let Some(row) = self.process.iter_mut().find(|row| row.meta.id == id) {
+            return Some(&mut row.meta);
+        }
+        if let Some(row) = self.tty.iter_mut().find(|row| row.meta.id == id) {
+            return Some(&mut row.meta);
+        }
+        None
+    }
+
     /// All ids, rejecting duplicates.
     pub fn unique_ids(&self) -> Result<BTreeSet<String>> {
         let mut ids = BTreeSet::new();

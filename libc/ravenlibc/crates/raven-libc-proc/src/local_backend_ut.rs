@@ -4,7 +4,6 @@
 //! Host tests for the early-boot backend.
 
 use super::*;
-use crate::backend::FdMapEntry;
 use crate::consts::RLIMIT_NOFILE;
 
 struct Spawner {
@@ -22,15 +21,9 @@ impl Spawner {
 }
 
 impl EarlySpawn for Spawner {
-    fn spawn_initfs(
-        &self,
-        path: &[u8],
-        _argv: &[Vec<u8>],
-        _envp: &[Vec<u8>],
-        _fds: &[FdMapEntry],
-    ) -> Result<i32, Errno> {
+    fn spawn(&self, request: &crate::wire::SpawnRequest) -> Result<i32, Errno> {
         self.calls.set(self.calls.get() + 1);
-        *self.path.borrow_mut() = path.to_vec();
+        *self.path.borrow_mut() = request.path.clone();
         Ok(55)
     }
 }

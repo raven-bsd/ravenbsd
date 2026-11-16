@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Pi 4 platform server. devd launches platd from the release drivers.toml with
+# the mailbox/GPIO/RNG/DMA plan; this svcd service entry stays disabled so there
+# is exactly one platd launcher. P8b must add the multi-window transfer before
+# the entry is usable on hardware.
+name = "platd"
+exec = "/sbin/platd"
+restart = "never"
+max_restarts = 0
+enable = false

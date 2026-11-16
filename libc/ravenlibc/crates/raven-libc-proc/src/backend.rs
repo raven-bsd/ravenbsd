@@ -24,16 +24,17 @@ pub struct WaitResult {
     pub rusage: [u8; 144],
 }
 
-/// The early-boot spawn seam implemented by the shell.
+/// The native spawn seam used before `procd` exists.
+///
+/// P9a implements it with the shared `raven-spawn` loader and the pid -> handle table; host tests
+/// implement it with a fake.
 pub trait EarlySpawn {
-    /// Spawn one initfs program.
-    fn spawn_initfs(
-        &self,
-        path: &[u8],
-        argv: &[Vec<u8>],
-        envp: &[Vec<u8>],
-        fds: &[FdMapEntry],
-    ) -> Result<i32, Errno>;
+    /// Spawn one `file:` image and return the child pid.
+    fn spawn(&self, request: &SpawnRequest) -> Result<i32, Errno>;
+    /// Wait for one recorded child.
+    fn wait(&self, _idtype: u32, _id: i64, _options: u32) -> Result<WaitResult, Errno> {
+        Err(crate::errors::ECHILD)
+    }
 }
 
 /// The process operations the models need.

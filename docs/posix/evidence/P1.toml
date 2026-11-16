@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P1 owner evidence: headers and interfaces.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "header.assert.h"
+status = "present"
+evidence = "test:tests/posix/check-headers.sh"
+notes = "P1: assert.h and the assert macro compile under the POSIX feature macros"

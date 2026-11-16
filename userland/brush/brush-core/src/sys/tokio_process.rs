@@ -26,26 +26,63 @@ pub(crate) fn spawn(command: LaunchRequest) -> std::io::Result<ChildProcess> {
     // See `CreateOptions::kill_external_commands_on_drop` (false for ordinary shells).
     let kill_on_drop = command.kill_on_drop;
 
-    let mut command = tokio::process::Command::from(compose_std_command(command)?);
-    command.kill_on_drop(kill_on_drop);
-    let child = command.spawn()?;
-
-    #[expect(clippy::cast_possible_wrap)]
-    let pid = child.id().map(|id| id as ProcessId);
-    if pid.is_none() {
-        tracing::warn!("could not retrieve pid for child process");
+    // RavenBSD has no AF_UNIX socketpair yet, so `tokio::process` cannot initialize its
+    // signal/reaper driver (PG-30). Use a std child and wait on the blocking pool instead; the
+    // runtime still has its time and IO drivers.
+    #[cfg(target_os = "ravenbsd")]
+    {
+        let mut child = compose_std_command(command)?.spawn()?;
+        let pid = Some(child.id() as ProcessId);
+        let pgid = match process_group {
+            ProcessGroup::Inherit => None,
+            ProcessGroup::Join(pgid) => Some(pgid),
+            ProcessGroup::New { .. } | ProcessGroup::NewSession => pid,
+        };
+        let _ = kill_on_drop;
+        let exited = async move {
+            loop {
+                match child.try_wait() {
+                    Ok(Some(status)) => {
+                        let output = std::process::Output {
+                            status,
+                            stdout: Vec::new(),
+                            stderr: Vec::new(),
+                        };
+                        return Ok(ExecutionResult::from(output));
+                    }
+                    Ok(None) => {
+                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
+        };
+        return Ok(ChildProcess::from_future(exited).native_child(pid, pgid));
     }
 
-    let pgid = match process_group {
-        ProcessGroup::Inherit => None,
-        ProcessGroup::Join(pgid) => Some(pgid),
-        ProcessGroup::New { .. } | ProcessGroup::NewSession => pid,
-    };
+    #[cfg(not(target_os = "ravenbsd"))]
+    {
+        let mut command = tokio::process::Command::from(compose_std_command(command)?);
+        command.kill_on_drop(kill_on_drop);
+        let child = command.spawn()?;
 
-    let exited = child
-        .wait_with_output()
-        .map(|output| output.map(ExecutionResult::from));
-    Ok(ChildProcess::from_future(exited).native_child(pid, pgid))
+        #[expect(clippy::cast_possible_wrap)]
+        let pid = child.id().map(|id| id as ProcessId);
+        if pid.is_none() {
+            tracing::warn!("could not retrieve pid for child process");
+        }
+
+        let pgid = match process_group {
+            ProcessGroup::Inherit => None,
+            ProcessGroup::Join(pgid) => Some(pgid),
+            ProcessGroup::New { .. } | ProcessGroup::NewSession => pid,
+        };
+
+        let exited = child
+            .wait_with_output()
+            .map(|output| output.map(ExecutionResult::from));
+        Ok(ChildProcess::from_future(exited).native_child(pid, pgid))
+    }
 }
 
 /// Replaces the current process with a new one. Returns only if that fails, with
@@ -84,6 +121,9 @@ fn compose_std_command(command: LaunchRequest) -> std::io::Result<std::process::
     cmd.inject_fds(open_files.iter_fds().map(|(fd, file)| (fd, file.clone())))
         .map_err(std::io::Error::other)?;
 
+    // Process groups need a `pre_exec` hook, which forces std's fork path; RavenBSD only has
+    // the native posix_spawn backend in 0.1.x, so a foreground command inherits the group.
+    #[cfg(not(target_os = "ravenbsd"))]
     match command.process_group {
         ProcessGroup::Inherit => {}
         ProcessGroup::Join(pgid) => {
@@ -98,6 +138,8 @@ fn compose_std_command(command: LaunchRequest) -> std::io::Result<std::process::
         // setsid() makes a new process group too.
         ProcessGroup::NewSession => cmd.lead_session(),
     }
+    #[cfg(target_os = "ravenbsd")]
+    let _ = command.process_group;
 
     Ok(cmd)
 }

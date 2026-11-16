@@ -29,7 +29,7 @@ a fixed 16-entry `Field` table with the bit offset, size, count and usage range;
 and output bit counts are exported.
 
 A layout is a boot keyboard when the application usage is Generic Desktop/Keyboard (`0x01`,
-`0x06`), there is no report ID and the input payload is at least 64 bits. The host tests use a
+`0x06`), there is no report ID and the input payload is exactly 64 bits. The host tests use a
 standard 63-byte boot keyboard descriptor written from the USB HID specification: three input
 fields (8 modifier bits, 8 reserved bits, 6 key bytes) and two LED output fields (5 bits plus 3
 padding bits).

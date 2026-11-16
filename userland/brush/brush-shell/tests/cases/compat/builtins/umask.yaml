@@ -48,6 +48,7 @@ cases:
       umask -p -S
 
   - name: "umask takes a symbolic mode"
+    min_oracle_version: "5.2" # bash 5.1 rejects multi-who symbolic modes
     stdin: |
       umask 022
       umask u=rwx,g=rx,o=; umask
@@ -66,6 +67,7 @@ cases:
       umask 027; umask o=gr-r; umask
 
   - name: "umask symbolic X is conditional on original execute bits"
+    min_oracle_version: "5.2" # bash 5.1 rejects multi-who symbolic modes
     stdin: |
       umask 077; umask g+X; umask
       umask 077; umask a-X; umask

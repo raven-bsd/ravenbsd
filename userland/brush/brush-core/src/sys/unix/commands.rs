@@ -61,6 +61,13 @@ impl CommandFdInjectionExt for std::process::Command {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        // `fd_mappings` installs a pre_exec hook even for an empty list, which forces the
+        // fork path. RavenBSD's spawn is not fork-based yet; an ordinary command with only
+        // stdio must keep the plain posix_spawn path.
+        if fd_mappings.is_empty() {
+            return Ok(());
+        }
+
         self.fd_mappings(fd_mappings)
             .map_err(|_e| error::ErrorKind::ChildCreationFailure)?;
 
@@ -77,6 +84,13 @@ pub trait CommandFgControlExt {
 }
 
 impl CommandFgControlExt for std::process::Command {
+    #[cfg(target_os = "ravenbsd")]
+    fn take_foreground(&mut self) {
+        // Job control is out of scope for 0.1.x: a `pre_exec` hook forces std's fork path,
+        // and ravenlibc has no fork (posix_spawn is the supported native spawn).
+    }
+
+    #[cfg(not(target_os = "ravenbsd"))]
     fn take_foreground(&mut self) {
         // SAFETY:
         // This arranges for a provided function to run in the context of
@@ -87,6 +101,12 @@ impl CommandFgControlExt for std::process::Command {
         }
     }
 
+    #[cfg(target_os = "ravenbsd")]
+    fn lead_session(&mut self) {
+        // See `take_foreground`: no fork on RavenBSD.
+    }
+
+    #[cfg(not(target_os = "ravenbsd"))]
     fn lead_session(&mut self) {
         // SAFETY:
         // This arranges for a provided function to run in the context of

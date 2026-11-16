@@ -2255,7 +2255,11 @@ SOMETHING
             ),
             (
                 "echo \"[$(cat <<EOF | tr '[:lower:]' '[:upper:]')]\"\nbody\nEOF\n",
-                &["echo", "\"[$(cat <<EOF | tr '[:lower:]' '[:upper:]'\nbody\nEOF\n)]\"", "\n"],
+                &[
+                    "echo",
+                    "\"[$(cat <<EOF | tr '[:lower:]' '[:upper:]'\nbody\nEOF\n)]\"",
+                    "\n",
+                ],
             ),
             (
                 "echo \"[$(cat <<A; cat <<-B)]\"\na\nA\n\tb\n\tB\n",

@@ -413,7 +413,6 @@ cases:
       (. /nonexistent-file || echo "ran ||"; echo "survived . ||")
 
   - name: "Prefix assignment to a readonly variable (POSIX mode, non-interactive)"
-    known_failure: true # in POSIX mode, bash doesn't run the command; brush does
     ignore_stderr: true
     stdin: |
       set -o posix

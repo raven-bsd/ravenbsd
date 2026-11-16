@@ -120,9 +120,14 @@ impl ReedlineInputBackend {
             };
         }
 
-        let mut shell = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(shell_ref.lock())
-        });
+        // The backend is constructed before the shell is shared with the interactive loop, so
+        // the lock is free. `block_in_place` needs a multi-threaded runtime and the RavenBSD
+        // target uses the current-thread runtime, so take the guard without blocking.
+        let mut shell = shell_ref.try_lock().map_err(|_| {
+            ShellError::IoError(std::io::Error::other(
+                "the shell is busy while the reedline backend starts",
+            ))
+        })?;
 
         shell.set_key_bindings(Some(updatable_bindings));
         drop(shell);

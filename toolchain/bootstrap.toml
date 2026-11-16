@@ -7,7 +7,7 @@
 change-id = "ignore"
 
 [build]
-target = ["x86_64-unknown-linux-gnu", "x86_64-unknown-ravenbsd"]
+target = ["x86_64-unknown-linux-gnu", "x86_64-unknown-ravenbsd", "aarch64-unknown-ravenbsd"]
 extended = true
 # `make toolchain` installs stage 1. Cargo is part of that stage; rustfmt and
 # clippy are stage-2 tools and are deliberately not required for the K19 gate.

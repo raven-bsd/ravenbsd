@@ -4,10 +4,12 @@
 //! `platd` startup: select the fake or hardware backend and serve `plat:`.
 
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 use raven_plat::{FakePlatform, Platform};
+use raven_platd::resources;
 use raven_rt::entry;
 use raven_rt::println;
 use raven_scheme::Server;
@@ -16,11 +18,6 @@ use crate::handler::PlatHandler;
 use crate::hardware::PiPlatform;
 
 entry!(main);
-
-const MAILBOX_LEN: usize = 0x40;
-const GPIO_LEN: usize = 0xb4;
-const RNG_LEN: usize = 0x28;
-const DMA_LEN: usize = 0x100;
 
 fn main(args: raven_rt::Args) -> i32 {
     let fake = args
@@ -56,25 +53,16 @@ fn main(args: raven_rt::Args) -> i32 {
 }
 
 fn hardware_backend(args: &raven_rt::Args) -> Result<PiPlatform, Errno> {
-    let (mailbox, _) = window(args, "mailbox").ok_or(Errno::EINVAL)?;
-    let (gpio, _) = window(args, "gpio").ok_or(Errno::EINVAL)?;
-    let (rng, _) = window(args, "rng").ok_or(Errno::EINVAL)?;
-    let (dma, dma_len) = window(args, "dma").ok_or(Errno::EINVAL)?;
-    let mailbox = map_mmio(mailbox, MAILBOX_LEN)?;
-    let gpio = map_mmio(gpio, GPIO_LEN)?;
-    let rng = map_mmio(rng, RNG_LEN)?;
-    let buffer = map_dma(dma, dma_len.max(DMA_LEN))?;
+    let args: Vec<&str> = args.iter().collect();
+    let resources = resources::parse(&args).map_err(|error| {
+        println!("platd: resource plan: {error}");
+        Errno::EINVAL
+    })?;
+    let mailbox = map_mmio(resources.mailbox.handle, resources.mailbox.len)?;
+    let gpio = map_mmio(resources.gpio.handle, resources.gpio.len)?;
+    let rng = map_mmio(resources.rng.handle, resources.rng.len)?;
+    let buffer = map_dma(resources.dma.handle, resources.dma.len)?;
     PiPlatform::new(mailbox, buffer, gpio, rng)
-}
-
-fn window(args: &raven_rt::Args, key: &str) -> Option<(u32, usize)> {
-    args.iter().find_map(|argument| {
-        let value = argument.strip_prefix(key)?.strip_prefix('=')?;
-        let (handle, length) = value.split_once(':')?;
-        let handle = handle.parse().ok()?;
-        let length = length.parse().ok()?;
-        Some((handle, length))
-    })
 }
 
 fn map_mmio(handle: u32, length: usize) -> Result<raven_driver::MmioRegion, Errno> {

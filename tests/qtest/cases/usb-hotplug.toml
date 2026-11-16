@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S68: HID input hotplug/removal, stuck-key release and re-enumeration.
+# The fixture runs the driver services over a fake USB core with a controllable presence bit;
+# no QEMU USB device is needed.
+
+name = "usb-hotplug"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/usb-hotplug/build.sh"]
+initfs = "build/fixtures/usb-hotplug/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^usb-hotplug: keyboard attach ok$'
+
+[[expect]]
+regex = '^usb-hotplug: stuck releases=2$'
+
+[[expect]]
+regex = '^usb-hotplug: repeat stopped$'
+
+[[expect]]
+regex = '^usb-hotplug: keyboard reconnect=b$'
+
+[[expect]]
+regex = '^usb-hotplug: mouse release ok$'
+
+[[expect]]
+regex = '^usb-hotplug: mouse reconnect=right$'
+
+[[expect]]
+regex = '^usb-hotplug: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|usb-hotplug: fail'

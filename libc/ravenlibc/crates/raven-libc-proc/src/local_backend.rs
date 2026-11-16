@@ -72,10 +72,10 @@ impl ProcBackend for LocalBackend<'_> {
     }
 
     fn spawn(&self, req: &SpawnRequest) -> Result<i32, Errno> {
-        let Some(early) = self.early else {
+        let Some(spawner) = self.early else {
             return Err(ENOSYS);
         };
-        early.spawn_initfs(&req.path, &req.argv, &req.envp, &req.fdmap)
+        spawner.spawn(req)
     }
 
     fn fork(&self, _req: &ForkRequest) -> Result<i32, Errno> {
@@ -86,8 +86,11 @@ impl ProcBackend for LocalBackend<'_> {
         ENOSYS
     }
 
-    fn wait(&self, _idtype: u32, _id: i64, _options: u32) -> Result<WaitResult, Errno> {
-        Err(ECHILD)
+    fn wait(&self, idtype: u32, id: i64, options: u32) -> Result<WaitResult, Errno> {
+        let Some(spawner) = self.early else {
+            return Err(ECHILD);
+        };
+        spawner.wait(idtype, id, options)
     }
 
     fn kill(&self, _pid: i64, _sig: u32, _queue_value: Option<u64>) -> Result<(), Errno> {

@@ -1,0 +1,112 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# REL2b: the QEMU release gate. Boots the `release` profile, logs in as root with the
+# development password, asserts the brush root prompt, lists /bin and pings the QEMU
+# user-network gateway. The kernel/loader lines remain in the captured transcript.
+
+name = "release-login"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 420
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^cat$'
+
+[[expect]]
+regex = '^ls$'
+
+[[expect]]
+regex = '^uname$'
+
+[[expect]]
+regex = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "ls /bin\n"
+delay_ms = 100
+
+[[step]]
+wait = '^cat$'
+timeout_secs = 30
+
+[[step]]
+wait = '^ls$'
+timeout_secs = 30
+
+[[step]]
+wait = '^uname$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ping 10.0.2.2\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
+timeout_secs = 60
+
+[[step]]
+wait = '^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet loss$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|login: .*incorrect|login: .*failed|ping: .*timeout'
