@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Expected loader transcript for a two-segment ET_EXEC image:
+#   text: vaddr 0x00400000, len 0x1000, prot READ|EXEC, file offset 0x0000
+#   data: vaddr 0x00401000, len 0x1000, prot READ|WRITE, file offset 0x1000
+#   bss:  vaddr 0x00402000, len 0x1000, prot READ|WRITE, zero fill
+#   image.len() = 0x2000, page_len = 0x2000
+#   STACK_SIZE = 0x40000, STACK_TOP = USER_END
+#
+# Symbolic handles:
+#   SELF_PROC = 0, INITFS = 1, NONE = 0 (anonymous mapping)
+#   img       = MEMOBJ_CREATE(image)
+#   stack     = MEMOBJ_CREATE(STACK_SIZE)
+#   child     = PROC_CREATE(0)
+#   thread    = THREAD_CREATE(child, entry, sp0, sp0, 0)
+#
+# The order and the arguments are the contract. A value shown as <...> is opaque.
+#
+# 1. Read the image from file:<path>; at most MAX_FILE_IMAGE (8 MiB) bytes.
+# 2. Plan the image (raven-elf); ET_EXEC bias 0, no PT_INTERP.
+
+MEMOBJ_CREATE(0x2000, 0) -> img
+MAP(SELF_PROC, img, 0, 0, 0x2000, READ|WRITE|SHARED) -> <scratch>
+WRITE_PARENT_MEM(<scratch>, <image bytes>)
+UNMAP(SELF_PROC, <scratch>, 0x2000)
+
+PROC_CREATE(0) -> child
+
+MAP(child, img, 0x0000, 0x00400000, 0x1000, READ|WRITE)
+PROTECT(child, 0x00400000, 0x1000, READ|EXEC)
+MAP(child, img, 0x1000, 0x00401000, 0x1000, READ|WRITE)
+MAP(child, NONE, 0, 0x00402000, 0x1000, READ|WRITE)
+HANDLE_CLOSE(img)
+
+MEMOBJ_CREATE(0x40000, 0) -> stack
+MAP(SELF_PROC, stack, 0, 0, 0x40000, READ|WRITE|SHARED) -> <stack_scratch>
+WRITE_PARENT_MEM(<stack_scratch>, <C8 stack: argv, envp, auxv>)
+UNMAP(SELF_PROC, <stack_scratch>, 0x40000)
+MAP(child, stack, 0, STACK_TOP-0x40000, 0x40000, READ|WRITE|FIXED|SHARED)
+HANDLE_CLOSE(stack)
+
+THREAD_CREATE(child, entry, sp0, sp0, 0) -> thread
+HANDLE_CLOSE(thread)
+
+# libc EarlySpawn wrapper (not the shared loader):
+PROC_HANDLE_INFO(child, <8-word out>, 8) -> [pid, ppid, pgid, sid, uid, euid, gid, egid]
+# P9 addition: record pid -> child for waitpid. This must work for a live handle even
+# if the child already exited (the pid is still needed to report it).
+PROC_WAIT(child, <code out>) -> 0
+# libc: status = (code & 0xff) << 8; return the recorded pid; remove the table entry.
+HANDLE_CLOSE(child)
+
+# Negative assertions:
+# - no HANDLE_TRANSFER
+# - no HANDLE_DUP / HANDLE_COPY
+# - no PROC_SETPGID / PROC_SETSID
+# - no fork / exec / pipe2
+# - no AT_RAVEN_FDMAP in the console-only stack
+#
+# Separate unit cases keep coverage for copy_tail (a partial file tail), ET_DYN bias,
+# PT_INTERP, TooLarge and the failure cleanup paths.

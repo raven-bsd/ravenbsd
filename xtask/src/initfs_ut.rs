@@ -1,0 +1,254 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+//! Initfs packing and uutils staging-detection tests.
+
+use super::*;
+use crate::profiles::{Boot, File, Initfs as InitfsSpec, Profile};
+use raven_initfs::Initfs;
+
+fn profile(files: &[(&str, &str)]) -> Profile {
+    Profile {
+        name: "test".to_string(),
+        initfs: InitfsSpec {
+            programs: Vec::new(),
+            files: files
+                .iter()
+                .map(|(src, path)| File {
+                    src: (*src).to_string(),
+                    path: (*path).to_string(),
+                    mode: 0o755,
+                    generated: true,
+                })
+                .collect(),
+        },
+        boot: Boot {
+            cmdline: "console=ttyS0".to_string(),
+            log_level: "info".to_string(),
+        },
+    }
+}
+
+#[test]
+fn packed_image_round_trips_through_the_reader() {
+    let mut builder = InitfsBuilder::new();
+    builder.add_file("/init", b"init-binary", 0o755).unwrap();
+    builder
+        .add_file("/bin/uname", b"uname-binary", 0o755)
+        .unwrap();
+    let image = builder.build();
+    let parsed = Initfs::parse(&image).unwrap();
+    assert_eq!(parsed.len(), 2);
+    let init = parsed.get("/init").unwrap();
+    assert_eq!(init.data, b"init-binary");
+    assert_eq!(init.mode, 0o755);
+    let uname = parsed.get("/bin/uname").unwrap();
+    assert_eq!(uname.data, b"uname-binary");
+}
+
+#[test]
+fn release_user_programs_requires_an_explicit_one() {
+    assert!(release_user_programs_from_env(Some("1")));
+    assert!(!release_user_programs_from_env(None));
+    assert!(!release_user_programs_from_env(Some("true")));
+    assert!(!release_user_programs_from_env(Some("0")));
+}
+
+#[test]
+fn extra_file_keeps_its_mode_and_contents() {
+    let mut builder = InitfsBuilder::new();
+    builder.add_file("/etc/example", b"value\n", 0o640).unwrap();
+    let image = builder.build();
+    let parsed = Initfs::parse(&image).unwrap();
+    let file = parsed.get("/etc/example").unwrap();
+    assert_eq!(file.data, b"value\n");
+    assert_eq!(file.mode, 0o640);
+}
+
+#[test]
+fn only_the_matching_arch_uutils_tree_is_detected() {
+    assert_eq!(
+        uutils_source_name(Arch::X86_64, "build/x86_64/uutils/ls"),
+        Some("ls")
+    );
+    assert_eq!(
+        uutils_source_name(Arch::Aarch64, "build/aarch64/uutils/cat"),
+        Some("cat")
+    );
+    assert_eq!(
+        uutils_source_name(Arch::X86_64, "build/aarch64/uutils/ls"),
+        None
+    );
+    assert_eq!(
+        uutils_source_name(Arch::X86_64, "build/x86_64/uutils/"),
+        None
+    );
+    assert_eq!(
+        uutils_source_name(Arch::X86_64, "build/x86_64/uutils/sub/ls"),
+        None
+    );
+    assert_eq!(uutils_source_name(Arch::X86_64, "services/ls.toml"), None);
+}
+
+#[test]
+fn a_partial_uutils_tree_reports_only_the_missing_names() {
+    let profile = profile(&[
+        ("build/x86_64/uutils/ls", "/bin/ls"),
+        ("build/x86_64/uutils/cat", "/bin/cat"),
+        ("etc/example", "/etc/example"),
+    ]);
+    let exists = |source: &str| source.ends_with("/ls");
+    assert_eq!(uutils_missing(&profile, Arch::X86_64, exists), ["cat"]);
+}
+
+#[test]
+fn a_complete_uutils_tree_needs_no_build() {
+    let profile = profile(&[("build/x86_64/uutils/ls", "/bin/ls")]);
+    assert!(uutils_missing(&profile, Arch::X86_64, |_| true).is_empty());
+}
+
+#[test]
+fn an_empty_uutils_tree_reports_every_required_name_once() {
+    let profile = profile(&[
+        ("build/x86_64/uutils/ls", "/bin/ls"),
+        ("build/x86_64/uutils/cat", "/bin/cat"),
+        ("build/x86_64/uutils/ls", "/bin/ls-again"),
+    ]);
+    assert_eq!(
+        uutils_missing(&profile, Arch::X86_64, |_| false),
+        ["ls", "cat"]
+    );
+}
+
+#[test]
+fn non_uutils_profile_files_do_not_trigger_the_slice_build() {
+    let profile = profile(&[("etc/example", "/etc/example")]);
+    assert!(uutils_missing(&profile, Arch::X86_64, |_| false).is_empty());
+}
+
+#[test]
+fn libc_outputs_are_arch_specific_and_ordered() {
+    assert_eq!(
+        libc_missing(Arch::X86_64, |_| false),
+        [
+            "build/x86_64/libc.a",
+            "build/x86_64/crt1.o",
+            "build/x86_64/crti.o",
+            "build/x86_64/crtn.o"
+        ]
+    );
+    assert_eq!(
+        libc_missing(Arch::Aarch64, |_| false),
+        [
+            "build/aarch64/libc.a",
+            "build/aarch64/crt1.o",
+            "build/aarch64/crti.o",
+            "build/aarch64/crtn.o"
+        ]
+    );
+    assert!(libc_missing(Arch::X86_64, |_| true).is_empty());
+}
+
+#[test]
+fn a_partial_libc_pack_reports_only_the_missing_output() {
+    let missing = libc_missing(Arch::X86_64, |path| !path.ends_with("crt1.o"));
+    assert_eq!(missing, ["build/x86_64/crt1.o"]);
+}
+
+#[test]
+fn legacy_and_arch_brush_sources_select_the_arch_path() {
+    assert!(is_brush_source("build/brush", Arch::X86_64));
+    assert!(is_brush_source("build/x86_64/brush", Arch::X86_64));
+    assert!(!is_brush_source("build/aarch64/brush", Arch::X86_64));
+    assert!(!is_brush_source("build/x86_64/brush", Arch::Aarch64));
+    assert!(!is_brush_source("build/x86_64/uutils/ls", Arch::X86_64));
+    assert!(!is_brush_source("etc/profile", Arch::X86_64));
+}
+
+#[test]
+fn brush_is_requested_only_when_the_profile_stages_it() {
+    let legacy = profile(&[("build/brush", "/bin/brush")]);
+    assert!(brush_requested(&legacy, Arch::X86_64));
+    let arch = profile(&[("build/x86_64/brush", "/bin/brush")]);
+    assert!(brush_requested(&arch, Arch::X86_64));
+    assert!(!brush_requested(&arch, Arch::Aarch64));
+    let none = profile(&[("etc/profile", "/etc/profile")]);
+    assert!(!brush_requested(&none, Arch::X86_64));
+}
+
+#[test]
+fn brush_missing_checks_the_arch_path_not_the_legacy_source() {
+    let legacy = profile(&[("build/brush", "/bin/brush")]);
+    assert!(brush_missing(&legacy, Arch::X86_64, |_| false));
+    assert!(!brush_missing(&legacy, Arch::X86_64, |path| {
+        path == "build/x86_64/brush"
+    }));
+    assert!(brush_missing(&legacy, Arch::X86_64, |path| {
+        // A stale mutable `build/brush` must not satisfy the prerequisite.
+        path == "build/brush"
+    }));
+}
+
+#[test]
+fn source_path_maps_only_the_legacy_brush_source() {
+    let root = std::path::Path::new("/repo");
+    assert_eq!(
+        source_path(root, Arch::X86_64, "build/brush"),
+        std::path::PathBuf::from("/repo/build/x86_64/brush")
+    );
+    assert_eq!(
+        source_path(root, Arch::Aarch64, "build/brush"),
+        std::path::PathBuf::from("/repo/build/aarch64/brush")
+    );
+    assert_eq!(
+        source_path(root, Arch::X86_64, "build/x86_64/brush"),
+        std::path::PathBuf::from("/repo/build/x86_64/brush")
+    );
+    assert_eq!(
+        source_path(root, Arch::X86_64, "tests/brush/bash-compat.sh"),
+        std::path::PathBuf::from("/repo/tests/brush/bash-compat.sh")
+    );
+}
+
+#[test]
+fn uutils_requested_detects_staged_sources_only() {
+    let staged = profile(&[("build/x86_64/uutils/ls", "/bin/ls")]);
+    assert!(uutils_requested(&staged, Arch::X86_64));
+    assert!(!uutils_requested(&staged, Arch::Aarch64));
+    let other = profile(&[("etc/profile", "/etc/profile")]);
+    assert!(!uutils_requested(&other, Arch::X86_64));
+}
+
+#[test]
+fn prerequisite_plan_lists_every_missing_step_once() {
+    let staged = profile(&[
+        ("build/brush", "/bin/brush"),
+        ("build/x86_64/uutils/ls", "/bin/ls"),
+        ("build/x86_64/uutils/cat", "/bin/cat"),
+        ("build/x86_64/uutils/ls", "/bin/ls-again"),
+        ("etc/profile", "/etc/profile"),
+    ]);
+    let plan = prerequisite_plan(&staged, Arch::X86_64, |_| false);
+    assert_eq!(
+        plan.libc,
+        [
+            "build/x86_64/libc.a",
+            "build/x86_64/crt1.o",
+            "build/x86_64/crti.o",
+            "build/x86_64/crtn.o"
+        ]
+    );
+    assert!(plan.brush);
+    assert_eq!(plan.uutils, ["ls", "cat"]);
+
+    let complete = prerequisite_plan(&staged, Arch::X86_64, |_| true);
+    assert!(complete.libc.is_empty());
+    assert!(!complete.brush);
+    assert!(complete.uutils.is_empty());
+
+    let no_prerequisites = profile(&[("etc/profile", "/etc/profile")]);
+    let plan = prerequisite_plan(&no_prerequisites, Arch::X86_64, |_| false);
+    assert!(plan.libc.is_empty());
+    assert!(!plan.brush);
+    assert!(plan.uutils.is_empty());
+}

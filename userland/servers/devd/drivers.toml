@@ -4,14 +4,16 @@
 # The platform driver table installed by the Pi 4 profiles. `devd` matches these entries against
 # the device-tree `compatible` string; `vendor`/`device` are absent because they are PCI keys.
 #
-# K32 covers discovery and matching only. Launching these drivers needs the platform
-# MMIO/DMA/IRQ capability handoff (B47/profile work), so `exec` is recorded here for the
-# follow-up that wires the real drivers.
+# `args` declares the platform grants: `bar=N` selects the `reg` window and `resources=dma+irq`
+# asks for the DMA buffer and the device's first GIC interrupt. `devd dtb launch` generates the
+# `bar`/`bar_size`/`dma`/`irq` tokens and transfers the handles in that order. REL3 stages the
+# driver programs and their service entries; the genet entry is the launch-ready one.
 
 [[driver]]
 name = "genet"
 compatible = "brcm,bcm2711-genet-v5"
 exec = "/sbin/genet"
+args = ["bar=0", "resources=dma+irq", "serve"]
 
 [[driver]]
 name = "emmc2"

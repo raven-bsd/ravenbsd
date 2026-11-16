@@ -57,6 +57,20 @@ impl<S: Seam> FrameBackend<S> {
 
     /// Create the frame path with an explicit link debounce.
     pub fn with_debounce(controller: Controller<S>, debounce: u8) -> Result<Self, DriverError> {
+        Self::with_counts(controller, regs::DESC_COUNT, regs::DESC_COUNT, debounce)
+    }
+
+    /// Create the frame path with independent RX/TX slot counts.
+    ///
+    /// The B39 `nic:` service maps eight RX buffers and three TX buffers from the shared pool,
+    /// so the driver uses those counts while the hardware descriptor array remains the Pi 4
+    /// default.
+    pub fn with_counts(
+        controller: Controller<S>,
+        rx_count: u16,
+        tx_count: u16,
+        debounce: u8,
+    ) -> Result<Self, DriverError> {
         if controller.stage() != Stage::Ready {
             return Err(DriverError::WrongStage {
                 expected: Stage::Ready,
@@ -65,7 +79,7 @@ impl<S: Seam> FrameBackend<S> {
         }
         Ok(Self {
             controller,
-            path: FramePath::new(regs::DESC_COUNT)?,
+            path: FramePath::with_counts(rx_count, tx_count)?,
             link: LinkTracker::new(debounce),
             recovery: ErrorRecovery::default(),
         })
@@ -75,6 +89,22 @@ impl<S: Seam> FrameBackend<S> {
     #[must_use]
     pub const fn controller(&self) -> &Controller<S> {
         &self.controller
+    }
+
+    /// Mutable access to the bring-up controller (target bring-up and host tests).
+    pub fn controller_mut(&mut self) -> &mut Controller<S> {
+        &mut self.controller
+    }
+
+    /// The platform seam.
+    #[must_use]
+    pub const fn seam(&self) -> &S {
+        &self.controller.seam
+    }
+
+    /// Mutable access to the platform seam.
+    pub fn seam_mut(&mut self) -> &mut S {
+        &mut self.controller.seam
     }
 
     /// The frame ownership path.
@@ -125,9 +155,200 @@ impl<S: Seam> FrameBackend<S> {
         Ok(self.path.tx.queue_next(buffer.bus_addr, length)?)
     }
 
+    /// Queue a TX frame at an explicit device-visible address.
+    ///
+    /// The B39 `nic:` pool already holds the frame, so the driver points the GENET descriptor at
+    /// that buffer instead of copying it into a seam slot.
+    pub fn queue_tx_address(&mut self, address: u64, length: usize) -> Result<TxPost, DriverError> {
+        Ok(self.path.tx.queue_next(address, length)?)
+    }
+
     /// Reclaim the next TX descriptor with the status read from the device.
     pub fn reclaim_tx(&mut self, status: TxStatus) -> Result<Option<TxCompletion>, DriverError> {
         Ok(self.path.tx.reclaim_next(status)?)
+    }
+
+    /// Write one RX descriptor to the hardware descriptor array.
+    pub fn write_rx_descriptor(&mut self, post: RxPost) -> Result<(), DriverError> {
+        let registers = post.descriptor.registers();
+        let status = regs::rx_desc_status(post.index).ok_or(DriverError::BadInfo)?;
+        self.controller.seam.write32(status, registers[0])?;
+        self.controller.seam.write32(status + 0x04, registers[1])?;
+        self.controller.seam.write32(status + 0x08, registers[2])?;
+        Ok(())
+    }
+
+    /// Write one TX descriptor to the hardware descriptor array.
+    pub fn write_tx_descriptor(&mut self, post: TxPost) -> Result<(), DriverError> {
+        let registers = post.descriptor.registers();
+        let status = regs::tx_desc_status(post.index).ok_or(DriverError::BadInfo)?;
+        self.controller.seam.write32(status, registers[0])?;
+        self.controller.seam.write32(status + 0x04, registers[1])?;
+        self.controller.seam.write32(status + 0x08, registers[2])?;
+        Ok(())
+    }
+
+    /// Publish the RX producer/consumer counters to the hardware queue registers.
+    pub fn publish_rx_indices(&mut self) -> Result<(), DriverError> {
+        let indices = self.path.rx.indices();
+        let queue = regs::DEFAULT_QUEUE;
+        let producer = regs::rx_dma_prod_index(queue).ok_or(DriverError::BadInfo)?;
+        let consumer = regs::rx_dma_cons_index(queue).ok_or(DriverError::BadInfo)?;
+        self.controller
+            .seam
+            .write32(producer, u32::from(indices.hardware_producer()))?;
+        self.controller
+            .seam
+            .write32(consumer, u32::from(indices.hardware_consumer()))?;
+        Ok(())
+    }
+
+    /// Publish the TX producer/consumer counters to the hardware queue registers.
+    pub fn publish_tx_indices(&mut self) -> Result<(), DriverError> {
+        let indices = self.path.tx.indices();
+        let queue = regs::DEFAULT_QUEUE;
+        let producer = regs::tx_dma_prod_index(queue).ok_or(DriverError::BadInfo)?;
+        let consumer = regs::tx_dma_cons_index(queue).ok_or(DriverError::BadInfo)?;
+        self.controller
+            .seam
+            .write32(producer, u32::from(indices.hardware_producer()))?;
+        self.controller
+            .seam
+            .write32(consumer, u32::from(indices.hardware_consumer()))?;
+        Ok(())
+    }
+
+    /// Read the next consumer RX status word from the hardware descriptor array.
+    pub fn rx_consumer_status(&mut self) -> Result<RxStatus, DriverError> {
+        let slot = self.path.rx.indices().consumer_slot() as u16;
+        let offset = regs::rx_desc_status(slot).ok_or(DriverError::BadInfo)?;
+        Ok(RxStatus::from_raw(self.controller.seam.read32(offset)?))
+    }
+
+    /// Read the next consumer TX status word from the hardware descriptor array.
+    pub fn tx_consumer_status(&mut self) -> Result<TxStatus, DriverError> {
+        let slot = self.path.tx.indices().consumer_slot() as u16;
+        let offset = regs::tx_desc_status(slot).ok_or(DriverError::BadInfo)?;
+        Ok(TxStatus::from_raw(self.controller.seam.read32(offset)?))
+    }
+
+    /// Read `INTRL2_CPU_STAT`.
+    pub fn interrupt_status(&mut self) -> Result<u32, DriverError> {
+        Ok(self.controller.seam.interrupt_status()?)
+    }
+
+    /// Acknowledge interrupt bits through `INTRL2_CPU_CLEAR`.
+    pub fn ack_interrupt(&mut self, bits: u32) -> Result<(), DriverError> {
+        self.controller.seam.write32(regs::INTRL2_CPU_CLEAR, bits)?;
+        Ok(())
+    }
+
+    /// Read the PHY `BMSR` and Broadcom `AUXSTS` registers.
+    pub fn sample_link(&mut self) -> Result<(u16, u16), DriverError> {
+        let phy = self.controller.info().phy_address;
+        let bmsr = crate::board::read_mdio(&mut self.controller.seam, phy, phy::MII_BMSR)?;
+        let auxsts =
+            crate::board::read_mdio(&mut self.controller.seam, phy, phy::BRGPHY_MII_AUXSTS)?;
+        Ok((bmsr, auxsts))
+    }
+
+    /// Sample the PHY and apply a debounced link transition.
+    pub fn poll_link(&mut self) -> Result<Option<LinkEvent>, DriverError> {
+        let (bmsr, auxsts) = self.sample_link()?;
+        self.observe_link(bmsr, auxsts)
+    }
+
+    /// Program the Pi 4 RX/TX ring registers and enable the DMA engines.
+    ///
+    /// The descriptor array is the hardware-internal 256-entry array; the B39 service uses the
+    /// first eight RX and three TX entries. The exact ring configuration is UNVERIFIED on a
+    /// board; the host tests check the documented register writes.
+    pub fn program_rings(&mut self) -> Result<(), DriverError> {
+        let setup = Controller::<S>::ring_setup();
+        let queue = regs::DEFAULT_QUEUE;
+        let reg = |offset: Option<usize>| offset.ok_or(DriverError::BadInfo);
+
+        self.controller
+            .seam
+            .write32(reg(regs::rx_dma_ring_buf_size(queue))?, setup.buf_size)?;
+        self.controller
+            .seam
+            .write32(reg(regs::rx_dma_start_addr_lo(queue))?, 0)?;
+        self.controller
+            .seam
+            .write32(reg(regs::rx_dma_start_addr_hi(queue))?, 0)?;
+        self.controller
+            .seam
+            .write32(reg(regs::rx_dma_end_addr_lo(queue))?, setup.end_address)?;
+        self.controller
+            .seam
+            .write32(reg(regs::rx_dma_end_addr_hi(queue))?, 0)?;
+        self.controller
+            .seam
+            .write32(reg(regs::rx_dma_prod_index(queue))?, 0)?;
+        self.controller
+            .seam
+            .write32(reg(regs::rx_dma_cons_index(queue))?, 0)?;
+        self.controller
+            .seam
+            .write32(reg(regs::rx_dma_xon_xoff_thres(queue))?, setup.xon_xoff)?;
+        self.controller.seam.write32(
+            reg(regs::rx_dma_mbuf_done_thres(queue))?,
+            setup.rx_threshold,
+        )?;
+        self.controller.seam.write32(
+            reg(regs::rx_dma_ring_timeout(queue))?,
+            setup.rx_timeout_ticks,
+        )?;
+        self.controller.seam.write32(regs::RX_DMA_RING_CFG, 0)?;
+        self.controller.seam.write32(
+            regs::RX_DMA_CTRL,
+            regs::RX_DMA_CTRL_EN | regs::rx_dma_ctrl_rbuf_en(queue),
+        )?;
+
+        self.controller
+            .seam
+            .write32(reg(regs::tx_dma_ring_buf_size(queue))?, setup.buf_size)?;
+        self.controller
+            .seam
+            .write32(reg(regs::tx_dma_start_addr_lo(queue))?, 0)?;
+        self.controller
+            .seam
+            .write32(reg(regs::tx_dma_start_addr_hi(queue))?, 0)?;
+        self.controller
+            .seam
+            .write32(reg(regs::tx_dma_end_addr_lo(queue))?, setup.end_address)?;
+        self.controller
+            .seam
+            .write32(reg(regs::tx_dma_end_addr_hi(queue))?, 0)?;
+        self.controller
+            .seam
+            .write32(reg(regs::tx_dma_prod_index(queue))?, 0)?;
+        self.controller
+            .seam
+            .write32(reg(regs::tx_dma_cons_index(queue))?, 0)?;
+        self.controller.seam.write32(
+            reg(regs::tx_dma_mbuf_done_thres(queue))?,
+            setup.tx_threshold,
+        )?;
+        self.controller.seam.write32(regs::TX_DMA_RING_CFG, 0)?;
+        self.controller.seam.write32(
+            regs::TX_DMA_CTRL,
+            regs::TX_DMA_CTRL_EN | regs::tx_dma_ctrl_rbuf_en(queue),
+        )?;
+
+        self.controller
+            .seam
+            .write32(regs::RBUF_CTRL, regs::RBUF_ALIGN_2B)?;
+        self.controller
+            .seam
+            .write32(regs::UMAC_MAX_FRAME_LEN, 1518)?;
+        let command = self.controller.seam.read32(regs::UMAC_CMD)?;
+        self.controller.seam.write32(
+            regs::UMAC_CMD,
+            command | regs::UMAC_CMD_RXEN | regs::UMAC_CMD_TXEN,
+        )?;
+        Ok(())
     }
 
     /// Read and service one interrupt-status pass.

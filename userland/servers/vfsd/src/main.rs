@@ -32,13 +32,13 @@ mod program {
     use raven_abi::errno::Errno;
     use raven_abi::types::Handle;
     use raven_proto_fs::{
-        Call, CallRequest, CallResponse, DIRENT_ALIGN, DIRENT_HEADER_LEN, DT_DIR, DirEntry,
-        DirEntryHeader, DirEntryIter, MAX_PATH, OpenFlags, S_IFDIR, S_IFMT, Stat,
-        WIRE_OPEN_DIRECTORY, normalize_request,
+        ACCESS_EXEC, ACCESS_READ, ACCESS_WRITE, Call, CallRequest, CallResponse, Credentials,
+        DIRENT_ALIGN, DIRENT_HEADER_LEN, DT_DIR, DirEntry, DirEntryHeader, DirEntryIter, MAX_PATH,
+        OpenFlags, S_IFDIR, S_IFMT, Stat, WIRE_OPEN_DIRECTORY, normalize_request,
     };
     use raven_rt::entry;
     use raven_rt::println;
-    use raven_scheme::{Client, Ctx, Handler, HandlerResult, OpenTable, Opened, Server};
+    use raven_scheme::{CallReply, Client, Ctx, Handler, HandlerResult, OpenTable, Opened, Server};
     use raven_vfs_core::{DEFAULT_MOUNTS, MountTable, normalized, parse_mounts};
 
     entry!(main);
@@ -100,6 +100,85 @@ mod program {
             let normalized =
                 normalize_request(&absolute, &mut buffer).map_err(|error| error.errno())?;
             Ok((normalized.path.to_string(), normalized.requires_dir))
+        }
+
+        fn target_stat(&self, scheme: &str, suffix: &str) -> Result<Stat, Errno> {
+            let client = Client::new();
+            let path = format!("{scheme}{suffix}");
+            let handle = client.open(&path, READ)?;
+            let stat = client.fstat(handle);
+            let _ = client.close(handle);
+            stat
+        }
+
+        fn check_traverse(
+            &self,
+            scheme: &str,
+            suffix: &str,
+            creds: &Credentials,
+        ) -> Result<(), Errno> {
+            let mut prefix = String::new();
+            for component in suffix.split('/').filter(|component| !component.is_empty()) {
+                if !prefix.is_empty() {
+                    prefix.push('/');
+                }
+                prefix.push_str(component);
+                let stat = self.target_stat(scheme, &prefix)?;
+                if stat.mode & S_IFMT == S_IFDIR
+                    && !creds.permitted(
+                        (stat.mode & 0o7777) as u16,
+                        stat.uid,
+                        stat.gid,
+                        ACCESS_EXEC,
+                    )
+                {
+                    return Err(Errno::EACCES);
+                }
+            }
+            Ok(())
+        }
+
+        fn check_parent(
+            &self,
+            scheme: &str,
+            suffix: &str,
+            creds: &Credentials,
+        ) -> Result<(), Errno> {
+            let parent = parent_suffix(suffix);
+            self.check_traverse(scheme, parent, creds)?;
+            let stat = self.target_stat(scheme, parent)?;
+            if stat.mode & S_IFMT != S_IFDIR {
+                return Err(Errno::ENOTDIR);
+            }
+            if !creds.permitted(
+                (stat.mode & 0o7777) as u16,
+                stat.uid,
+                stat.gid,
+                ACCESS_WRITE | ACCESS_EXEC,
+            ) {
+                return Err(Errno::EACCES);
+            }
+            Ok(())
+        }
+
+        fn check_open(
+            &self,
+            scheme: &str,
+            suffix: &str,
+            creds: &Credentials,
+            flags: OpenFlags,
+        ) -> Result<(), Errno> {
+            if flags.create() {
+                self.check_parent(scheme, suffix, creds)?;
+                match self.target_stat(scheme, suffix) {
+                    Ok(stat) => return check_stat_access(creds, stat, flags),
+                    Err(Errno::ENOENT) => return Ok(()),
+                    Err(error) => return Err(error),
+                }
+            }
+            self.check_traverse(scheme, suffix, creds)?;
+            let stat = self.target_stat(scheme, suffix)?;
+            check_stat_access(creds, stat, flags)
         }
 
         fn build_root_listing(&self, target: Handle) -> Result<Vec<u8>, Errno> {
@@ -220,6 +299,7 @@ mod program {
             call: Call<'_>,
             base: &str,
             response: &mut [u8],
+            creds: &Credentials,
         ) -> Result<usize, Errno> {
             let raw = single_path(&call).ok_or(Errno::EINVAL)?;
             let path = self.absolute(base, &bytes_to_string(raw)?)?;
@@ -230,6 +310,30 @@ mod program {
                 .ok_or(Errno::ENOENT)?
                 .scheme
                 .clone();
+            match call {
+                Call::Mkdir { .. } | Call::Symlink { .. } => {
+                    self.check_parent(&scheme, suffix, creds)?;
+                }
+                Call::Unlink { .. } | Call::Rmdir { .. } => {
+                    self.check_parent(&scheme, suffix, creds)?;
+                    let target = self.target_stat(&scheme, suffix)?;
+                    let parent = self.target_stat(&scheme, parent_suffix(suffix))?;
+                    if !creds.sticky_delete_allowed((parent.mode & 0o7777) as u16, target.uid) {
+                        return Err(Errno::EPERM);
+                    }
+                }
+                Call::Readlink { .. } => {
+                    self.check_traverse(&scheme, parent_suffix(suffix), creds)?;
+                }
+                Call::Chmod { .. } => {
+                    self.check_traverse(&scheme, parent_suffix(suffix), creds)?;
+                    let target = self.target_stat(&scheme, suffix)?;
+                    if !creds.is_root() && creds.euid != target.uid {
+                        return Err(Errno::EPERM);
+                    }
+                }
+                _ => {}
+            }
             let client = Client::new();
             let root = client.open(&scheme, READ)?;
             let request = CallRequest::new(rebuild_single(&call, suffix.as_bytes())?);
@@ -243,6 +347,7 @@ mod program {
             from: &str,
             to: &str,
             response: &mut [u8],
+            creds: &Credentials,
         ) -> Result<usize, Errno> {
             self.table.rename(from, to)?;
             let (mount_id, suffix) = self.table.resolve(from)?;
@@ -253,6 +358,22 @@ mod program {
                 .ok_or(Errno::ENOENT)?
                 .scheme
                 .clone();
+            if self.table.resolve(from)?.0 != self.table.resolve(to)?.0 {
+                return Err(Errno::EXDEV);
+            }
+            self.check_parent(&scheme, suffix, creds)?;
+            self.check_parent(&scheme, to_suffix, creds)?;
+            let source = self.target_stat(&scheme, suffix)?;
+            let source_parent = self.target_stat(&scheme, parent_suffix(suffix))?;
+            if !creds.sticky_delete_allowed((source_parent.mode & 0o7777) as u16, source.uid) {
+                return Err(Errno::EPERM);
+            }
+            if let Ok(dest) = self.target_stat(&scheme, to_suffix) {
+                let dest_parent = self.target_stat(&scheme, parent_suffix(to_suffix))?;
+                if !creds.sticky_delete_allowed((dest_parent.mode & 0o7777) as u16, dest.uid) {
+                    return Err(Errno::EPERM);
+                }
+            }
             let client = Client::new();
             let root = client.open(&scheme, READ)?;
             let request = CallRequest::new(Call::Rename {
@@ -262,6 +383,32 @@ mod program {
             let result = proxy_call(&client, root, &request, response);
             let _ = client.close(root);
             result
+        }
+    }
+
+    fn parent_suffix(suffix: &str) -> &str {
+        let trimmed = suffix.trim_end_matches('/');
+        match trimmed.rsplit_once('/') {
+            Some((parent, _)) => parent,
+            None => "",
+        }
+    }
+
+    fn check_stat_access(creds: &Credentials, stat: Stat, flags: OpenFlags) -> Result<(), Errno> {
+        let mut want = 0;
+        if flags.readable() {
+            want |= ACCESS_READ;
+        }
+        if flags.writable() || flags.truncate() {
+            want |= ACCESS_WRITE;
+        }
+        if stat.mode & S_IFMT == S_IFDIR && flags.readable() {
+            want |= ACCESS_EXEC;
+        }
+        if creds.permitted((stat.mode & 0o7777) as u16, stat.uid, stat.gid, want) {
+            Ok(())
+        } else {
+            Err(Errno::EACCES)
         }
     }
 
@@ -398,7 +545,7 @@ mod program {
             path: &str,
             flags: OpenFlags,
             _mode: u32,
-            _ctx: &Ctx,
+            ctx: &Ctx,
         ) -> HandlerResult<Opened> {
             let (path, requires_dir) = self.normalize_request_path(path)?;
             let directory = requires_dir || flags.directory();
@@ -412,6 +559,7 @@ mod program {
                 .scheme
                 .clone();
             let target_path = format!("{scheme}{suffix}");
+            self.check_open(&scheme, suffix, &ctx.credentials, target_flags)?;
             let client = Client::new();
             let target = client.open_flags(&target_path, target_flags)?;
             if directory || path == "/" {
@@ -547,6 +695,29 @@ mod program {
         }
 
         fn call(&mut self, file: u64, request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {
+            self.call_checked(file, request, response, &Credentials::ROOT)
+        }
+
+        fn call_with(
+            &mut self,
+            file: u64,
+            request: &[u8],
+            response: &mut [u8],
+            ctx: &Ctx,
+        ) -> HandlerResult<CallReply> {
+            let written = self.call_checked(file, request, response, &ctx.credentials)?;
+            Ok(CallReply::new(written))
+        }
+    }
+
+    impl VfsHandler {
+        fn call_checked(
+            &mut self,
+            file: u64,
+            request: &[u8],
+            response: &mut [u8],
+            creds: &Credentials,
+        ) -> HandlerResult<usize> {
             let (target, base) = {
                 let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
                 (entry.file.target, entry.file.path.clone())
@@ -554,6 +725,9 @@ mod program {
             let decoded = CallRequest::decode(request).map_err(|_| Errno::EPROTO)?;
             match decoded.call {
                 Call::Mount { path, scheme } => {
+                    if !creds.is_root() {
+                        return Err(Errno::EPERM.into());
+                    }
                     let path = bytes_to_string(path)?;
                     let path = normalized(&path)?;
                     let scheme = bytes_to_string(scheme)?;
@@ -562,6 +736,9 @@ mod program {
                     status(response, Ok(()))
                 }
                 Call::Umount { path } => {
+                    if !creds.is_root() {
+                        return Err(Errno::EPERM.into());
+                    }
                     let path = bytes_to_string(path)?;
                     let path = normalized(&path)?;
                     self.table.umount(&path, 0)?;
@@ -601,19 +778,49 @@ mod program {
                     Ok(result?)
                 }
                 Call::Truncate { .. } => {
+                    let stat = Client::new().fstat(target)?;
+                    if !creds.permitted(
+                        (stat.mode & 0o7777) as u16,
+                        stat.uid,
+                        stat.gid,
+                        ACCESS_WRITE,
+                    ) {
+                        return Err(Errno::EACCES.into());
+                    }
                     Ok(proxy_call(&Client::new(), target, &decoded, response)?)
                 }
                 Call::Rename { from, to } => {
                     let from = self.absolute(&base, &bytes_to_string(from)?)?;
                     let to = self.absolute(&base, &bytes_to_string(to)?)?;
-                    Ok(self.forward_rename(&from, &to, response)?)
+                    Ok(self.forward_rename(&from, &to, response, creds)?)
+                }
+                Call::Access { mode, path } => {
+                    let path = self.absolute(&base, &bytes_to_string(path)?)?;
+                    let (mount_id, suffix) = self.table.resolve(&path)?;
+                    let scheme = self
+                        .table
+                        .get(mount_id)
+                        .ok_or(Errno::ENOENT)?
+                        .scheme
+                        .clone();
+                    self.check_traverse(&scheme, suffix, creds)?;
+                    let stat = self.target_stat(&scheme, suffix)?;
+                    let allowed = creds.permitted(
+                        (stat.mode & 0o7777) as u16,
+                        stat.uid,
+                        stat.gid,
+                        mode as u16,
+                    );
+                    status(response, if allowed { Ok(()) } else { Err(Errno::EACCES) })
                 }
                 Call::Mkdir { .. }
                 | Call::Unlink { .. }
                 | Call::Rmdir { .. }
                 | Call::Symlink { .. }
                 | Call::Readlink { .. }
-                | Call::Chmod { .. } => Ok(self.forward_one(decoded.call, &base, response)?),
+                | Call::Chmod { .. } => {
+                    Ok(self.forward_one(decoded.call, &base, response, creds)?)
+                }
             }
         }
     }

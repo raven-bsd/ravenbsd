@@ -33,6 +33,13 @@ fn build_brush_maps_every_target() {
 }
 
 #[test]
+fn brush_stages_the_arch_path_only() {
+    assert_eq!(staged_for(Arch::X86_64), "build/x86_64/brush");
+    assert_eq!(staged_for(Arch::Aarch64), "build/aarch64/brush");
+    assert_eq!(staged_for(Arch::Riscv64), "build/riscv64/brush");
+}
+
+#[test]
 fn build_brush_rejects_an_unknown_flag() {
     let error = parse_build(&args(&["--arch", "x86_64", "--wat"])).unwrap_err();
     assert!(error.to_string().contains("--wat"));

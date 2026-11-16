@@ -10,7 +10,8 @@
 ENTRY(_start)
 
 PHDRS {
-    text PT_LOAD FLAGS(5);
+    phdr PT_PHDR PHDRS;
+    text PT_LOAD FILEHDR PHDRS FLAGS(5);
     rodata PT_LOAD FLAGS(4);
     data PT_LOAD FLAGS(6);
     bss PT_LOAD FLAGS(6);
@@ -18,7 +19,12 @@ PHDRS {
 }
 
 SECTIONS {
-    . = 0x00400000;
+    /*
+     * Keep the ELF/program headers inside the first LOAD. `__raven_init_main_thread` reads
+     * AT_PHDR/AT_PHNUM to find the executable's PT_TLS; a layout that starts the first LOAD at
+     * file offset 0x1000 leaves the headers unmapped and the kernel writes AT_PHDR=0.
+     */
+    . = 0x00400000 + SIZEOF_HEADERS;
 
     .text ALIGN(4096) : {
         *(.text .text.*)

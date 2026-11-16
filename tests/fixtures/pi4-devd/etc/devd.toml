@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P8 qtest: devd launches the fake platform driver with its MMIO/DMA/IRQ grants. It runs under
+# the `pcid` service name because init's root-device grant is reserved for `pcid`; the production
+# Pi 4 profile still needs the REL3 broker/root policy.
+name = "pcid"
+exec = "/sbin/devd"
+args = ["devd", "dtb", "launch"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
+grants = ["root"]

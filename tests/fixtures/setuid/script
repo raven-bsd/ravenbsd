@@ -1,0 +1,5 @@
+#!/bin/sh
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# A non-ELF image with a setuid bit; the loader must reject it before any credential change.
+echo "setuid-script"

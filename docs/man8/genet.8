@@ -1,0 +1,61 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt GENET 8
+.Os RavenBSD
+.Sh NAME
+.Nm genet
+.Nd RavenBSD Raspberry Pi 4 GENET frame service
+.Sh SYNOPSIS
+.Nm
+.Op Ar bar=handle:length dma=handle:length irq=handle irq_pin=number
+.Sh DESCRIPTION
+.Nm
+brings up the BCM2711 GENET v5 controller through the
+.Xr raven-driver 3
+MMIO/DMA/IRQ grants and registers the
+.Dq nic:
+frame service consumed by
+.Xr netd 8 .
+It reads the station address from
+.Dq plat:mac ,
+programs the UMAC/RGMII state and serves the B39 frame ring, the
+.Dq nic:info ,
+.Dq nic:mac ,
+.Dq nic:link ,
+.Dq nic:ring ,
+.Dq nic:start ,
+.Dq nic:stop ,
+.Dq nic:release
+and
+.Dq nic:quit
+entries.
+.Pp
+The
+.Dq nic:release
+path accepts the DHCP and ping observations used by
+.Xr pi4-net-evidence 1
+and prints the
+.Dq GENET-NET-*
+transcript only after the ordered link, DHCP and gateway-ping observations.
+.Pp
+The devd platform launch that supplies the BAR/DMA/IRQ handles is not wired on the Pi 4
+(P8). The release profile stages
+.Nm
+with its service manifest disabled; no link, DHCP or ping result is claimed until the board
+transcript exists.
+.Sh FILES
+.Bl -tag -width /etc/services.d/genet.toml -compact
+.It Pa /etc/services.d/genet.toml
+Service manifest (staged disabled in the Pi 4 release profile).
+.It Pa profiles/pi4-release.d/genet.manifest
+Release profile manifest.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr devd 8 ,
+.Xr netd 8 ,
+.Xr platd 8
+.Sh STANDARDS
+RavenBSD.
