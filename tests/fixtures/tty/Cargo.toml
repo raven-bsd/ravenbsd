@@ -13,6 +13,10 @@ rust-version.workspace = true
 [package.metadata.raven]
 target = "none"
 
+[lib]
+name = "raven_tty_fixture"
+path = "src/lib.rs"
+
 [[bin]]
 name = "raven-tty-init"
 path = "src/init.rs"
@@ -20,6 +24,14 @@ path = "src/init.rs"
 [[bin]]
 name = "raven-tty-child"
 path = "src/child.rs"
+
+[[bin]]
+name = "raven-tty-ctl-child"
+path = "src/ctl_child.rs"
+
+[[bin]]
+name = "raven-tty-hup-child"
+path = "src/hup_child.rs"
 
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }

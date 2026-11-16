@@ -93,6 +93,7 @@ fn read(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
         );
     }
     let file = ipc::file_from_handle(caller, handle, Rights::READ)?;
+    crate::process::tty::check_access(caller, &file, false)?;
     router::read(caller, &file, frame.rsi, frame.rdx)
 }
 
@@ -110,6 +111,7 @@ fn write(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
         );
     }
     let file = ipc::file_from_handle(caller, handle, Rights::WRITE)?;
+    crate::process::tty::check_access(caller, &file, true)?;
     router::write(caller, &file, frame.rsi, frame.rdx)
 }
 
@@ -118,6 +120,7 @@ pub fn pread(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let file = ipc::file_from_handle(&caller, handle, Rights::READ)?;
+    crate::process::tty::check_access(&caller, &file, false)?;
     router::pread(&caller, &file, frame.rsi, frame.rdx, frame.r10)
 }
 
@@ -126,6 +129,7 @@ pub fn pwrite(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let file = ipc::file_from_handle(&caller, handle, Rights::WRITE)?;
+    crate::process::tty::check_access(&caller, &file, true)?;
     router::pwrite(&caller, &file, frame.rsi, frame.rdx, frame.r10)
 }
 
