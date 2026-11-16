@@ -62,6 +62,7 @@ pub(crate) mod sort_support;
 pub(crate) mod srand;
 pub(crate) mod srand48;
 pub(crate) mod srandom;
+pub(crate) mod strtof;
 pub(crate) mod strtol;
 pub(crate) mod strtonum;
 pub(crate) mod strtoul;

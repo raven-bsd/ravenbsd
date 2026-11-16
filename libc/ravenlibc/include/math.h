@@ -33,6 +33,8 @@ __BEGIN_DECLS
 
 #define __NEED_float_t
 #define __NEED_double_t
+#define __NEED_intmax_t
+#define __NEED_uintmax_t
 #include <bits/alltypes.h>
 
 /*
@@ -58,6 +60,13 @@ __BEGIN_DECLS
 #define FP_ZERO      2
 #define FP_SUBNORMAL 3
 #define FP_NORMAL    4
+
+/* C23 integer-rounding selections for fromfp/fromfpx. */
+#define FP_INT_UPWARD           0
+#define FP_INT_DOWNWARD         1
+#define FP_INT_TOWARDZERO       2
+#define FP_INT_TONEARESTFROMZERO 3
+#define FP_INT_TONEAREST        4
 
 #ifdef __FP_FAST_FMA
 #define FP_FAST_FMA 1
@@ -394,6 +403,32 @@ double      pow10(double);
 float       pow10f(float);
 long double pow10l(long double);
 #endif
+
+/* C23 additions (RavenBSD P1b). */
+double      acospi(double);
+double      asinpi(double);
+double      atanpi(double);
+double      atan2pi(double, double);
+double      cospi(double);
+double      sinpi(double);
+double      tanpi(double);
+double      exp10m1(double);
+double      exp2m1(double);
+double      log10p1(double);
+double      log2p1(double);
+double      pown(double, int);
+double      rootn(double, int);
+double      powr(double, double);
+double      compoundn(double, long);
+double      fmaxmag(double, double);
+double      fminmag(double, double);
+double      fmaximum_mag_num(double, double);
+double      fminimum_mag_num(double, double);
+long        llogb(double);
+intmax_t    fromfp(double, int, unsigned int);
+intmax_t    fromfpx(double, int, unsigned int);
+uintmax_t   ufromfp(double, int, unsigned int);
+uintmax_t   ufromfpx(double, int, unsigned int);
 
 __END_DECLS
 

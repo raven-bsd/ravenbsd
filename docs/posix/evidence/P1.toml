@@ -346,3 +346,768 @@ id = "interface.setlinebuf"
 status = "present"
 evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 notes = "P1 batch B: BSD setlinebuf over setvbuf line mode; libc.a symbol"
+
+# P1 batch B math: the C23/POSIX math exports. Each row is backed by the raven-libc-m unit suite,
+# the C long-double ABI smoke test and the libc.a symbol check in check-math.sh.
+
+[[row]]
+id = "interface.acoshl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: acoshl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.acosl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: acosl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.acospi"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: acospi; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.asinhl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: asinhl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.asinl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: asinl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.asinpi"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: asinpi; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.atan2l"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: atan2l; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.atan2pi"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: atan2pi; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.atanhl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: atanhl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.atanl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: atanl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.atanpi"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: atanpi; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.cbrtl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: cbrtl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.ceill"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: ceill; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.compoundn"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: compoundn; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.copysignl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: copysignl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.coshl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: coshl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.cosl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: cosl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.cospi"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: cospi; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.erfcl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: erfcl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.erfl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: erfl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.exp10l"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: exp10l; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.exp10m1"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: exp10m1; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.exp2l"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: exp2l; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.exp2m1"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: exp2m1; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.expl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: expl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.expm1l"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: expm1l; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.fabsl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: fabsl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.fdiml"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: fdiml; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.floorl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: floorl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.fmal"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: fmal; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.fmaximum_mag_num"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: fmaximum_mag_num; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.fmaxl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: fmaxl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.fmaxmag"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: fmaxmag; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.fminimum_mag_num"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: fminimum_mag_num; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.fminl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: fminl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.fminmag"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: fminmag; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.fmodl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: fmodl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.fpclassify"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: fpclassify; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.frexpl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: frexpl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.fromfp"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: fromfp; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.fromfpx"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: fromfpx; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.gammal"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: gammal; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.hypotl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: hypotl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.ilogbl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: ilogbl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.iscanonical"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: iscanonical; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.iseqsig"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: iseqsig; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.isfinite"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: isfinite; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.isgreater"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: isgreater; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.isgreaterequal"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: isgreaterequal; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.isless"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: isless; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.islessequal"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: islessequal; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.islessgreater"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: islessgreater; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.isnan"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: isnan; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.isnormal"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: isnormal; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.issubnormal"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: issubnormal; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.isunordered"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: isunordered; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.iszero"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: iszero; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.ldexpl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: ldexpl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.lgammal"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: lgammal; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.lgammal_r"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: lgammal_r; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.llogb"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: llogb; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.llrint"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: llrint; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.llrintf"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: llrintf; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.llrintl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: llrintl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.llround"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: llround; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.llroundf"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: llroundf; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.llroundl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: llroundl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.log10l"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: log10l; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.log10p1"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: log10p1; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.log1pl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: log1pl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.log2l"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: log2l; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.log2p1"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: log2p1; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.logb"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: logb; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.logbf"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: logbf; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.logbl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: logbl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.logl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: logl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.lrint"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: lrint; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.lrintf"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: lrintf; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.lrintl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: lrintl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.lround"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: lround; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.lroundf"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: lroundf; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.lroundl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: lroundl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.modfl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: modfl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.nan"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: nan; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.nanf"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: nanf; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.nanl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: nanl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.nearbyint"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: nearbyint; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.nearbyintf"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: nearbyintf; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.nearbyintl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: nearbyintl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.nextafter"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: nextafter; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.nextafterf"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: nextafterf; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.nextafterl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: nextafterl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.nexttoward"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: nexttoward; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.nexttowardf"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: nexttowardf; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.nexttowardl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: nexttowardl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.pow10l"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: pow10l; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.powl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: powl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.pown"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: pown; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.powr"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: powr; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.remainder"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: remainder; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.remainderf"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: remainderf; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.remainderl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: remainderl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.remquo"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: remquo; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.remquof"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: remquof; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.remquol"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: remquol; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.rintl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: rintl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.rootn"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: rootn; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.roundl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: roundl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.scalbln"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: scalbln; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.scalblnf"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: scalblnf; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.scalblnl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: scalblnl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.scalbnl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: scalbnl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.signbit"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: signbit; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.sincosl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: sincosl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.sinhl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: sinhl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.sinl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: sinl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.sqrtl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: sqrtl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.strfromd"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: strfromd; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.strfromf"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: strfromf; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.strtof"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: strtof; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.tanhl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: tanhl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.tanl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: tanl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.tanpi"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: tanpi; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.tgammal"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: tgammal; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.truncl"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: truncl; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.ufromfp"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: ufromfp; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+[[row]]
+id = "interface.ufromfpx"
+status = "present"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+notes = "P1 batch B: ufromfpx; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
