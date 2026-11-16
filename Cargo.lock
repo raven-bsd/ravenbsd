@@ -2001,6 +2001,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-pi4-net-model"
+version = "0.1.0"
+dependencies = [
+ "raven-initfs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-pi4-soak"
 version = "0.1.0"
 dependencies = [
