@@ -7,7 +7,7 @@ exec = "/sbin/blockd"
 needs = ["scheme:disk"]
 provides = ["scheme:block"]
 readiness = "scheme"
-ready_timeout_ms = 60_000
+ready_timeout_ms = 300_000
 restart = "never"
 max_restarts = 0
 

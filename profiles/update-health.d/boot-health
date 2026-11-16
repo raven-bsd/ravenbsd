@@ -1,9 +1,0 @@
-# SPDX-License-Identifier: BSD-3-Clause
-# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-#
-# Static K27a qtest health record. The update planner generates the same file with the real
-# trial token for production images.
-
-slot = "a"
-token = "00000001"
-lba = "34"

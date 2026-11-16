@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-pi4-soak"
+version = "0.1.0"
+description = "Host/qtest soak for the Pi 4 GENET frame model and the PWM audio ring."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[lib]
+name = "pi4_soak"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raven-pi4-soak"
+path = "src/main.rs"
+
+[dependencies]
+pwm-audio = { path = "../../../userland/drivers/pwm-audio" }
+raven-genet = { path = "../../../crates/raven-genet" }
+raven-proto-audio = { path = "../../../crates/raven-proto-audio" }
+raven-pwm = { path = "../../../crates/raven-pwm" }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["panic-handler"] }
+
+[lints]
+workspace = true

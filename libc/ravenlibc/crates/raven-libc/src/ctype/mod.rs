@@ -26,6 +26,7 @@ pub(crate) mod iswspace;
 pub(crate) mod iswupper;
 pub(crate) mod iswxdigit;
 pub(crate) mod isxdigit;
+pub(crate) mod mb_cur_max;
 pub(crate) mod toascii;
 pub(crate) mod tolower;
 pub(crate) mod toupper;

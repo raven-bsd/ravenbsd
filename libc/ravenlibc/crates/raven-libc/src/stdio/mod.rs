@@ -8,12 +8,17 @@
 //! stdio state (R-19), not objects of this crate.
 
 pub(crate) mod file;
+pub(crate) mod stderr;
+pub(crate) mod stdin;
+pub(crate) mod stdout;
 pub(crate) mod streams;
 pub(crate) mod trampolines;
 pub(crate) mod trampolines_scanf;
 pub(crate) mod va;
 pub(crate) mod vfprintf;
+pub(crate) mod vfwprintf;
 pub(crate) mod vprintf;
 pub(crate) mod vsnprintf;
 pub(crate) mod vsprintf;
 pub(crate) mod vsscanf;
+pub(crate) mod wide;

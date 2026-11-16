@@ -313,6 +313,9 @@ pub unsafe extern "C" fn __raven_libc_start(
 #[unsafe(no_mangle)]
 pub extern "C" fn __raven_libc_init() {
     crate::hooks::install_all();
+    // The C `stdin`/`stdout`/`stderr` data symbols must be valid before the program's
+    // constructors run; attaching the static buffers does not allocate or open a file.
+    crate::stdio::streams::init();
 }
 
 /// Steps 12-15: constructors, `errno`, `main`, `exit`.

@@ -486,6 +486,43 @@ fn readiness_exit_marks_up_when_clean() {
 }
 
 #[test]
+fn health_ready_waits_for_required_exit_services() {
+    let mut required = service("required");
+    required.readiness = Readiness::Exit;
+    let mut optional = service("optional");
+    optional.readiness = Readiness::Exit;
+    optional.required = false;
+    let mut supervisor = supervisor(vec![required, optional]);
+    assert!(!supervisor.health_ready());
+
+    let required_generation = supervisor.start(0, 0).unwrap();
+    let optional_generation = supervisor.start(1, 0).unwrap();
+    assert!(!supervisor.health_ready());
+    supervisor.exited(1, optional_generation, 0, 10);
+    assert!(!supervisor.health_ready());
+    supervisor.exited(0, required_generation, 0, 10);
+    assert!(supervisor.health_ready());
+}
+
+#[test]
+fn health_ready_ignores_optional_failures_and_rejects_required_failures() {
+    let mut optional = service("optional");
+    optional.required = false;
+    let required = service("required");
+    let mut mixed = supervisor(vec![required, optional]);
+    let required_generation = mixed.start(0, 0).unwrap();
+    mixed.spawned(0, required_generation, Handle(7), 0);
+    let optional_generation = mixed.start(1, 0).unwrap();
+    mixed.spawn_failed(1, optional_generation, "optional failure".to_string());
+    assert!(mixed.health_ready());
+
+    let mut failing = supervisor(vec![service("required")]);
+    let generation = failing.start(0, 0).unwrap();
+    failing.spawn_failed(0, generation, "required failure".to_string());
+    assert!(!failing.health_ready());
+}
+
+#[test]
 fn names_are_in_manifest_order() {
     let supervisor = supervisor(vec![service("b"), service("a")]);
     assert_eq!(supervisor.names().collect::<Vec<_>>(), ["b", "a"]);

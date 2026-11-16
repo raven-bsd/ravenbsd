@@ -854,8 +854,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-dtrace"
+version = "0.1.0"
+dependencies = [
+ "raven-dtrace-user",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-dtrace-core"
 version = "0.1.0"
+
+[[package]]
+name = "raven-dtrace-user"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
 
 [[package]]
 name = "raven-echo"
@@ -1224,6 +1240,7 @@ dependencies = [
  "raven-libc-pledge",
  "raven-libc-proc",
  "raven-libc-pwd",
+ "raven-libc-rand",
  "raven-libc-regex",
  "raven-libc-resolv",
  "raven-libc-signal",
@@ -1798,6 +1815,17 @@ dependencies = [
  "raven-proto-block",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "raven-pi4-soak"
+version = "0.1.0"
+dependencies = [
+ "pwm-audio",
+ "raven-genet",
+ "raven-proto-audio",
+ "raven-pwm",
+ "raven-rt",
 ]
 
 [[package]]
@@ -2620,6 +2648,13 @@ name = "raven-uname"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-update-health-probe"
+version = "0.1.0"
+dependencies = [
  "raven-rt",
 ]
 

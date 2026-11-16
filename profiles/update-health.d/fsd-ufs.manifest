@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# UFS root from partition 2 of the update-health fixture disk: partition 1 is the ESP that
+# carries boot.toml and the A/B slot payloads.
+name = "fsd-ufs"
+exec = "/sbin/fsd-ufs"
+needs = ["scheme:block"]
+provides = ["scheme:ufs"]
+readiness = "scheme"
+ready_timeout_ms = 300_000
+restart = "never"
+max_restarts = 0
+
+[env]
+FSD_UFS_DEVICE = "block:0"
+FSD_UFS_PARTITION = "2"
+FSD_UFS_SCHEME = "ufs"
+FSD_UFS_READ_ONLY = "0"

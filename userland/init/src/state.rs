@@ -514,6 +514,18 @@ impl Supervisor {
         })
     }
 
+    /// True when every required enabled service has reached its declared readiness.
+    ///
+    /// `readiness = "exit"` services are ready after a clean exit, so this uses `ever_ready`
+    /// rather than the live `Running` state. Optional and disabled services never block the
+    /// health marker.
+    pub fn health_ready(&self) -> bool {
+        self.services
+            .iter()
+            .zip(self.runtime.iter())
+            .all(|(service, runtime)| !service.enable || !service.required || runtime.ever_ready)
+    }
+
     /// True when every `restart != never` or required enabled service is running.
     pub fn all_up(&self) -> bool {
         self.services
