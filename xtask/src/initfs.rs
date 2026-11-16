@@ -179,7 +179,57 @@ pub(crate) fn ensure_prerequisites(root: &Path, arch: Arch, profile: &Profile) -
     if !plan.uutils.is_empty() {
         ensure_uutils(root, arch, profile)?;
     }
+    ensure_fixtures(root, profile)?;
     Ok(())
+}
+
+/// Build the fixture files a profile stages from `build/fixtures/<name>/`.
+///
+/// The Pi 4 DTB is decoded by `tests/fixtures/pi4-release/build.sh`; a clean checkout has no
+/// `build/` tree. Run each fixture's build script once when a staged file is missing, then let
+/// the normal copy path verify the result.
+fn ensure_fixtures(root: &Path, profile: &Profile) -> Result<()> {
+    let missing = missing_fixtures(profile, |source| root.join(source).is_file());
+    for name in missing {
+        let script = root.join("tests/fixtures").join(&name).join("build.sh");
+        if !script.is_file() {
+            bail!(
+                "profile stages build/fixtures/{name}/ but {} is missing",
+                script.display()
+            );
+        }
+        println!("==> fixtures: building {name} ({})", script.display());
+        let status = std::process::Command::new("sh")
+            .arg(&script)
+            .current_dir(root)
+            .status()
+            .with_context(|| format!("cannot run {}", script.display()))?;
+        if !status.success() {
+            bail!("fixture build {} failed ({status})", script.display());
+        }
+    }
+    Ok(())
+}
+
+/// Fixture directory names whose staged files are missing, in profile order.
+fn missing_fixtures<F>(profile: &Profile, exists: F) -> Vec<String>
+where
+    F: Fn(&str) -> bool,
+{
+    let mut missing = Vec::new();
+    for file in &profile.initfs.files {
+        let Some(rest) = file.src.strip_prefix("build/fixtures/") else {
+            continue;
+        };
+        let Some(name) = rest.split('/').next() else {
+            continue;
+        };
+        if name.is_empty() || exists(&file.src) || missing.iter().any(|entry| entry == name) {
+            continue;
+        }
+        missing.push(name.to_string());
+    }
+    missing
 }
 
 /// Run the libc pack when the arch archive or a crt object is missing.
