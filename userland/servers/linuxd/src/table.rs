@@ -13,6 +13,8 @@ use alloc::vec::Vec;
 use raven_abi::types::Handle;
 use raven_linux_dispatch::LinuxContext;
 
+use crate::files::FileOp;
+
 /// Largest single user buffer the trap loop copies in.
 pub const USER_BUFFER_MAX: usize = 64 * 1024;
 
@@ -56,7 +58,7 @@ pub struct DirEntry {
     pub ino: u64,
 }
 
-/// The content of one open synthetic file.
+/// The content of one open synthetic or remote file.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FileKind {
     /// A regular file with bytes produced at `open` time.
@@ -65,6 +67,8 @@ pub enum FileKind {
     Directory(Vec<DirEntry>),
     /// A symlink target returned by `readlink`/`readlinkat`.
     Symlink(Vec<u8>),
+    /// A live `file:`/`ufs:` handle served by the VFS stack.
+    Remote(Handle),
 }
 
 /// One descriptor in a Linux process.
@@ -72,19 +76,32 @@ pub enum FileKind {
 pub struct OpenFile {
     /// Absolute path the program opened.
     pub path: Vec<u8>,
-    /// Synthetic content.
+    /// Synthetic content or a remote scheme handle.
     pub kind: FileKind,
-    /// Read/lseek/directory cursor.
+    /// Read/lseek/directory cursor for synthetic files; the scheme server owns the remote cursor.
     pub offset: u64,
+    /// Linux `open` flags (`O_RDONLY`, `O_APPEND`, ...).
+    pub flags: i32,
+    /// Linux descriptor flags (`FD_CLOEXEC`).
+    pub fd_flags: i32,
 }
 
 impl OpenFile {
-    /// Length of a regular file or symlink target (zero for a directory).
+    /// Length of a regular file or symlink target (zero for a directory or remote file).
     #[must_use]
     pub fn size(&self) -> u64 {
         match &self.kind {
             FileKind::Regular(bytes) | FileKind::Symlink(bytes) => bytes.len() as u64,
-            FileKind::Directory(_) => 0,
+            FileKind::Directory(_) | FileKind::Remote(_) => 0,
+        }
+    }
+
+    /// The scheme handle for a remote descriptor.
+    #[must_use]
+    pub fn remote(&self) -> Option<Handle> {
+        match self.kind {
+            FileKind::Remote(handle) => Some(handle),
+            _ => None,
         }
     }
 }
@@ -114,6 +131,8 @@ pub struct LinuxProcess {
     pub user_buffer: Vec<u8>,
     /// Bytes a handler wants the trap loop to copy into the process, with their address.
     pub pending_write: Option<(u64, Vec<u8>)>,
+    /// A file operation the trap loop must perform (handlers are pure function tables).
+    pub pending_file: Option<FileOp>,
     /// Thread handle of the Linux thread (`THREAD_CREATE`), used by `THREAD_SET_TLS`.
     pub thread: Handle,
     /// Current user TLS base, as `arch_prctl` `ARCH_GET_FS` reports it.
@@ -126,6 +145,10 @@ pub struct LinuxProcess {
     pub comm: Vec<u8>,
     /// Linux argv, including `argv[0]` (`/proc/self/cmdline`).
     pub argv: Vec<Vec<u8>>,
+    /// Standard descriptors; `dup3` may replace them.
+    stdio: [Option<OpenFile>; 3],
+    /// Current working directory for relative `openat` paths.
+    cwd: Vec<u8>,
     files: Vec<Option<OpenFile>>,
 }
 
@@ -151,12 +174,15 @@ impl LinuxProcess {
             output: Vec::new(),
             user_buffer: Vec::new(),
             pending_write: None,
+            pending_file: None,
             thread,
             fs_base: 0,
             pending_tls: None,
             exe: Vec::new(),
             comm: Vec::new(),
             argv: Vec::new(),
+            stdio: [None, None, None],
+            cwd: b"/".to_vec(),
             files: Vec::new(),
         }
     }
@@ -178,12 +204,30 @@ impl LinuxProcess {
         &self.files
     }
 
-    /// Open a synthetic file/directory/symlink and return its descriptor.
+    /// The current working directory used for relative paths.
+    #[must_use]
+    pub fn cwd(&self) -> &[u8] {
+        &self.cwd
+    }
+
+    /// Open a read-only synthetic file/directory/symlink and return its descriptor.
     pub fn open_file(&mut self, path: Vec<u8>, kind: FileKind) -> i32 {
+        self.open_with_flags(path, kind, crate::files::O_RDONLY)
+    }
+
+    /// Open a synthetic file/directory/symlink with Linux `open` flags.
+    pub fn open_with_flags(&mut self, path: Vec<u8>, kind: FileKind, flags: i32) -> i32 {
+        let fd_flags = if flags & crate::files::O_CLOEXEC != 0 {
+            crate::files::FD_CLOEXEC
+        } else {
+            0
+        };
         let file = OpenFile {
             path,
             kind,
             offset: 0,
+            flags: flags & !crate::files::O_CLOEXEC,
+            fd_flags,
         };
         if let Some(index) = self.files.iter().position(Option::is_none) {
             if let Some(slot) = self.files.get_mut(index) {
@@ -195,22 +239,78 @@ impl LinuxProcess {
         3 + self.files.len() as i32 - 1
     }
 
+    /// Open a remote `file:`/`ufs:` handle and return its descriptor.
+    pub fn open_remote(&mut self, path: Vec<u8>, handle: Handle, flags: i32) -> i32 {
+        self.open_with_flags(path, FileKind::Remote(handle), flags)
+    }
+
+    /// Install `file` at an exact descriptor, replacing any previous file there.
+    ///
+    /// Returns false for a negative descriptor. Standard descriptors are stored in the
+    /// three-slot table; higher descriptors extend the dynamic table.
+    pub fn install_file(&mut self, fd: i32, file: OpenFile) -> bool {
+        let Ok(index) = usize::try_from(fd) else {
+            return false;
+        };
+        if index < 3 {
+            self.stdio[index] = Some(file);
+            return true;
+        }
+        let slot = index - 3;
+        if self.files.len() <= slot {
+            self.files.resize(slot + 1, None);
+        }
+        if let Some(entry) = self.files.get_mut(slot) {
+            *entry = Some(file);
+            return true;
+        }
+        false
+    }
+
+    /// Lowest free descriptor at or above `min`, or the next dynamic slot.
+    #[must_use]
+    pub fn lowest_free_fd(&self, min: i32) -> i32 {
+        let start = min.max(0);
+        let mut fd = start;
+        while fd < 3 {
+            if self.stdio[fd as usize].is_none() {
+                return fd;
+            }
+            fd += 1;
+        }
+        let mut index = (start.max(3) - 3) as usize;
+        while index < self.files.len() {
+            if self.files[index].is_none() {
+                return 3 + index as i32;
+            }
+            index += 1;
+        }
+        3 + self.files.len() as i32
+    }
+
     /// One descriptor's file, if it is open.
     #[must_use]
     pub fn file(&self, fd: i32) -> Option<&OpenFile> {
+        if (0..3).contains(&fd) {
+            return self.stdio[fd as usize].as_ref();
+        }
         let index = usize::try_from(fd.checked_sub(3)?).ok()?;
         self.files.get(index)?.as_ref()
     }
 
     /// Mutable access to one descriptor's file.
     pub fn file_mut(&mut self, fd: i32) -> Option<&mut OpenFile> {
+        if (0..3).contains(&fd) {
+            return self.stdio[fd as usize].as_mut();
+        }
         let index = usize::try_from(fd.checked_sub(3)?).ok()?;
         self.files.get_mut(index)?.as_mut()
     }
 
-    /// Close a synthetic descriptor. Standard descriptors are accepted as a no-op.
+    /// Close a descriptor. Standard descriptors without a replacement are a no-op.
     pub fn close_file(&mut self, fd: i32) -> bool {
-        if (0..=2).contains(&fd) {
+        if (0..3).contains(&fd) {
+            self.stdio[fd as usize] = None;
             return true;
         }
         let Some(index) = usize::try_from(fd.checked_sub(3).unwrap_or(-1)).ok() else {
@@ -228,10 +328,13 @@ impl LinuxProcess {
     /// The target of `/proc/self/fd/<fd>`.
     #[must_use]
     pub fn fd_target(&self, fd: i32) -> Option<&[u8]> {
+        if let Some(file) = self.file(fd) {
+            return Some(file.path.as_slice());
+        }
         match fd {
             0 => Some(b"/dev/null"),
             1 | 2 => Some(b"tty:console"),
-            _ => self.file(fd).map(|file| file.path.as_slice()),
+            _ => None,
         }
     }
 
