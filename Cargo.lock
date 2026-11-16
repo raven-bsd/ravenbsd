@@ -1897,6 +1897,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-m4"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-mdoc"
 version = "0.1.0"
 dependencies = [

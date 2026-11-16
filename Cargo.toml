@@ -165,6 +165,7 @@ members = [
     "userland/bin/strings",
     "userland/bin/sed",
     "userland/bin/awk",
+    "userland/bin/m4",
     "userland/bin/useradd",
     "userland/bin/adduser",
     "userland/bin/passwd",
