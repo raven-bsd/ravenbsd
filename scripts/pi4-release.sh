@@ -324,6 +324,16 @@ manifest_check_release() {
         echo "pi4-release: drivers.toml platd entry lacks the multi-window plan" >&2
         failed=1
     fi
+    platd_args=$(grep -A6 '^name = "platd"' "$drivers" | grep '^args =')
+    for token in 'bar=0' 'bar=1' 'bar=2' 'dma_size=256' 'mailbox=3:64' 'gpio=4:180' 'rng=5:40' 'dma=6:256'; do
+        case "$platd_args" in
+            *"$token"*) ;;
+            *)
+                echo "pi4-release: platd args lack $token" >&2
+                failed=1
+                ;;
+        esac
+    done
     if [ "$(grep -c '^name = "platd"' "$drivers")" -ne 1 ]; then
         echo "pi4-release: duplicate platd driver entry" >&2
         failed=1

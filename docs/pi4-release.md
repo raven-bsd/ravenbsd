@@ -78,22 +78,23 @@ image SHA-256 header. The checker requires the boot/kernel banner, login prompt,
 
 ## 4. Platform and network dependencies
 
-P8 `devd dtb launch` is enabled with the `platform-root` grant (P10 merged). The release image
-stages the P8 GENET entry (`bar=0`, `resources=dma+irq`, `serve`, `slots=platform`) and the P12
-platd multi-window entry (`mailbox=3:64 gpio=4:180 rng=5:40 dma=6:256`). Both are launched by
-`devd`; their svcd service entries stay disabled, so there is exactly one launcher. netd waits for
-`scheme:nic` and uses DHCP-first addressing (REL4b).
+P8 `devd dtb launch` is enabled with the `platform-root` grant (P10 merged). P8b's multi-window
+launcher is merged, so the release `drivers.conf` now carries the P12 platd entry with three MMIO
+windows and one DMA buffer:
 
-The current P8 launcher transfers one BAR, one DMA and one optional IRQ; it cannot create or
-transfer platd's three MMIO windows plus DMA. **P8b** (multi-window launcher) and **P12** (platd
-resource plan) are therefore required before the production platd entry is usable. The handle
-numbers above are illustrative until P8b defines the transfer order. The P8b/P12 launcher path is
-the exact remaining platform dependency; REL3c stages the profile/table and validates the plan,
-but makes no board claim.
+```
+bar=0 bar=1 bar=2 resources=dma dma_size=256
+mailbox=3:64 gpio=4:180 rng=5:40 dma=6:256
+```
 
-Without a serial log, the release gate cannot claim link, DHCP, gateway ping or the GENET
-`nic:` service. The P8 host fixture DTB is staged as `/etc/pi4.dtb`; the live firmware DTB path is
-still a board follow-up.
+`devd` creates windows 3/4/5 in declaration order and DMA slot 6. The platd and genet svcd service
+entries stay disabled so `devd` is the only launcher. netd waits for `scheme:nic` and uses
+DHCP-first addressing (REL4b).
+
+The host fixture DTB is the P8b platd tree with the three-window node; it is staged as
+`/etc/pi4.dtb`. The live firmware DTB, the real window mapping, the GENET link/DHCP lease and the
+gateway ping remain UNVERIFIED without the owner's serial log. A missing board transcript is not a
+pass, and the platd/genet service entries are not duplicated by svcd.
 
 ## 5. Board checklist (UNVERIFIED)
 
