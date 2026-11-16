@@ -51,14 +51,21 @@ snapshot of the platform fds.
 
 Two items remain outside this slice:
 
-* `std::process::Command::status` still faults after a successful spawn with `RBX=0` at
-  `mov %r13d,0x4(%rbx)` (the `Ok(ExitStatus)` sret). The minimal `libc-spawn-std` fixture
-  reproduces it; QEMU reports `IP=0x423975`, `CR2=0x4`. The std/toolchain patch is K91.
-* `/bin/ls` output needs child fd inheritance: publish the `AT_RAVEN_FDMAP`/`AT_RAVEN_FDMAP_N`
-  block and call `restore_fdmap` from the start path. That wiring is in
-  `raven-libc-platform`/`start.rs`, outside P9c's Owns.
+* P9c found the `Command::status` sret corruption was a `sigset_t` ABI mismatch: the target
+  libc declared an 8-byte `sigset_t` while `sigemptyset`/`sigaddset` and the runtime use 128
+  bytes, so std's `MaybeUninit<libc::sigset_t>` on `Command::spawn`'s stack was overrun and
+  saved `RBX` was zeroed. `0003-posix-spawn-ravenbsd.patch` now declares the 128-byte
+  `s! { struct sigset_t { __val: [c_ulong; 16] } }`; `libc-spawn-std` passes.
+* `brush-spawn` now reaches the external command but panics in the tokio I/O driver:
+  `vendor/tokio/src/runtime/io/driver.rs:279`, `Handle::unpark`, `failed to wake I/O driver:
+  Os { code: 9, kind: Uncategorized, message: "Bad file descriptor" }`. That is brush/tokio,
+  outside P9c's Owns.
+* `/bin/ls` output also needs child fd inheritance: publish the
+  `AT_RAVEN_FDMAP`/`AT_RAVEN_FDMAP_N` block and call `restore_fdmap` from the start path. That
+  wiring is in `raven-libc-platform`/`start.rs`, outside P9c's Owns.
 
-Minimal next step: merge K91, then wire the fdmap block/restore and rerun `brush-spawn`.
+Minimal next step: fix the tokio I/O-driver waker (brush/vendor), then wire the fdmap
+block/restore and rerun `brush-spawn`.
 
 ## Limits in this slice
 

@@ -32,7 +32,7 @@ mod spawn_error;
 mod sys;
 
 #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
-pub use crate::sys::{close_handle, pid_for_handle, wait_process};
+pub use crate::sys::{close_handle, pid_for_handle, wait_ex, wait_process};
 
 #[cfg(all(any(target_os = "none", target_os = "ravenbsd"), feature = "alloc"))]
 use alloc_crate::vec::Vec;

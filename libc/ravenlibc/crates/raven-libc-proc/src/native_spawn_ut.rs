@@ -4,8 +4,8 @@
 //! Host tests for the P9a native spawner.
 
 use super::*;
-use crate::consts::{P_ALL, WNOHANG};
-use crate::errors::EBADF;
+use crate::consts::{P_ALL, P_PID, WNOHANG};
+use crate::errors::{EBADF, ECHILD};
 
 use core::cell::{Cell, RefCell};
 
@@ -17,6 +17,7 @@ struct FakeLoader {
     handle: u32,
     code: i32,
     close_calls: Cell<usize>,
+    waited: Cell<bool>,
 }
 
 impl FakeLoader {
@@ -29,6 +30,7 @@ impl FakeLoader {
             handle,
             code,
             close_calls: Cell::new(0),
+            waited: Cell::new(false),
         }
     }
 }
@@ -43,11 +45,21 @@ impl Loader for FakeLoader {
         assert_eq!(image, self.image.borrow().as_slice());
         *self.load_path.borrow_mut() = path.into();
         *self.argv.borrow_mut() = argv.iter().map(|value| (*value).into()).collect();
+        self.waited.set(false);
         Ok(self.handle)
     }
 
-    fn wait(&self, _handle: u32) -> Result<i32, Errno> {
-        Ok(self.code)
+    fn wait_ex(&self, _idtype: u32, id: i32, options: u32) -> Result<(i32, i32), Errno> {
+        if id != 42 && id != 0 {
+            return Err(ECHILD);
+        }
+        if options & WNOHANG != 0 {
+            return Ok((0, 0));
+        }
+        if self.waited.replace(true) {
+            return Err(ECHILD);
+        }
+        Ok((42, self.code << 8))
     }
 
     fn close(&self, _handle: u32) -> Result<(), Errno> {
@@ -209,16 +221,22 @@ fn wait_for_an_unknown_child_is_echild() {
 }
 
 #[test]
-fn wait_rejects_wait_any_and_wnohang() {
+fn wnohang_does_not_reap_and_wait_any_uses_the_kernel_seam() {
     let loader = FakeLoader::new(7, 0);
     let spawner = NativeSpawner::new(
         loader,
         FakeInfo {
-            pid: 1,
+            pid: 42,
             fail: false,
         },
     );
-    assert_eq!(spawner.wait(P_ALL, 0, 0), Err(ENOSYS));
-    assert_eq!(spawner.wait(P_PID, 1, WNOHANG), Err(ENOSYS));
-    assert_eq!(spawner.wait(P_PID, 1, 0x80), Err(EINVAL));
+    spawner
+        .spawn(&request(b"/bin/ls", b"/", &[]))
+        .expect("spawn");
+    let miss = spawner.wait(P_PID, 42, WNOHANG).expect("wnohang");
+    assert_eq!(miss.pid, 0);
+    assert_eq!(spawner.loader.close_calls.get(), 0);
+    let ready = spawner.wait(P_ALL, 0, 0).expect("wait any");
+    assert_eq!(ready.pid, 42);
+    assert_eq!(spawner.loader.close_calls.get(), 1);
 }
