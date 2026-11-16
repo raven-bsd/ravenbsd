@@ -6,7 +6,7 @@
 # link/DHCP/ping result stays UNVERIFIED until the owner log.
 name = "genet"
 exec = "/sbin/genet"
-needs = ["logd", "scheme:dev", "scheme:plat"]
+needs = ["logd", "scheme:plat"]
 provides = ["scheme:nic"]
 readiness = "scheme"
 ready_timeout_ms = 60_000
