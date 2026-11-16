@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B21b: linuxd implements clone from the B21a trap frame. The static musl probe checks the
+# process/thread batch, then creates a CLONE_VM|CLONE_THREAD child and a fork-like child. Both
+# resume at the parent's return RIP with rax=0 and signal the parent through the shared page;
+# the fork child is reaped when the parent exits.
+
+name = "linux-clone"
+arch = "x86_64"
+profile = "linux-hello"
+timeout_secs = 180
+pre = ["sh tests/fixtures/linuxd/build-clone.sh"]
+initfs = "build/fixtures/linuxd-clone/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^linux-clone: start$'
+
+[[expect]]
+regex = '^linux-clone: gettid tid=[0-9]+$'
+
+[[expect]]
+regex = '^linux-clone: set_tid_address=[0-9]+ same=1$'
+
+[[expect]]
+regex = '^linux-clone: set_robust_list ok=1$'
+
+[[expect]]
+regex = '^linux-clone: prctl name=clone-fixture ok=1$'
+
+[[expect]]
+regex = '^linux-clone: arch_prctl fs=[0-9]+ ok=1$'
+
+[[expect]]
+regex = '^linux-clone: clone bad-flags errno=22$'
+
+[[expect]]
+regex = '^linux-clone: clone thread pid=[0-9]+ child=0$'
+
+[[expect]]
+regex = '^linux-clone: clone thread flag ok$'
+
+[[expect]]
+regex = '^linux-clone: clone fork pid=[0-9]+ child=0$'
+
+[[expect]]
+regex = '^linux-clone: clone fork flag ok$'
+
+[[expect]]
+regex = '^linux-clone: done$'
+
+[[expect]]
+regex = '^linuxd: hello exit=0$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|linux-clone: FAIL'

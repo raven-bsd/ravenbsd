@@ -8,10 +8,14 @@ name = "usb-keyboard"
 arch = "x86_64"
 profile = "base"
 timeout_secs = 240
-pre = ["sh tests/fixtures/usb-keyboard/build.sh"]
+pre = ["sh tests/fixtures/usb-keyboard/build.sh", "rm -f build/qtest/usb-keyboard.qmp"]
 initfs = "build/fixtures/usb-keyboard/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
-qemu_extra = ["-device", "qemu-xhci", "-device", "usb-kbd"]
+qemu_extra = [
+    "-device", "qemu-xhci",
+    "-device", "usb-kbd",
+    "-qmp", "unix:build/qtest/usb-keyboard.qmp,server=on,wait=off",
+]
 expect_exit = "success"
 
 [[expect]]
@@ -50,11 +54,21 @@ regex = '^xhci: device vendor=0x[0-9a-f]+ product=0x[0-9a-f]+ class=[0-9]+ confi
 [[expect]]
 regex = '^xhci: hid interface=[0-9]+ report=[0-9]+ ep=0x81$'
 
+# S63: send the chord only after the boot protocol is selected and EP1 is primed; the
+# driver then waits for the interrupt-IN transfer and drains the HID console.
+[[step]]
+wait = '^usb-keyboard: boot protocol ok$'
+send = '@qmp:build/qtest/usb-keyboard.qmp:h,i,shift,b,ret'
+delay_ms = 0
+
 [[expect]]
 regex = '^usb-keyboard: boot protocol ok$'
 
 [[expect]]
-regex = '^usb-keyboard: enumerated keys=[0-9]+$'
+regex = '^usb-keyboard: enumerated keys=4$'
+
+[[expect]]
+regex = '^usb-keyboard: console hex=\[68, 69, 42, 0a\]$'
 
 [[expect]]
 regex = '^usb-keyboard: ok$'
@@ -69,4 +83,4 @@ regex = '^svcd: settled$'
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|xhci: .*failed|usb-keyboard: fail'
+regex = '(?i)panic|EXCEPTION|xhci: .*failed|usb-keyboard: fail|usb-keyboard: enumerated keys=0'

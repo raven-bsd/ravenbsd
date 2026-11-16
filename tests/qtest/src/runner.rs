@@ -3,15 +3,17 @@
 
 //! Process execution with serial capture, scripted dialogue, ANSI stripping and a hard timeout.
 
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
+use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::OnceLock;
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use regex::Regex;
+use serde_json::{Value, json};
 
 use crate::dialogue::Dialogue;
 
@@ -42,6 +44,119 @@ pub(crate) struct RunOutput {
     pub timed_out: bool,
     /// Set when the scripted dialogue did not finish.
     pub step_failure: Option<StepFailure>,
+}
+
+/// A `send` payload beginning with `@qmp:<socket>:<key,...>` is a QMP key chord, not serial text.
+///
+/// The case supplies the QMP socket through `qemu_extra`:
+/// `-qmp unix:build/qtest/<case>.qmp,server=on,wait=off`. This keeps QEMU's serial stdio
+/// untouched and gives the harness a side channel for `send-key`.
+/// Extract the QMP socket path from the QEMU argument vector.
+fn qmp_path(args: &[String]) -> Option<PathBuf> {
+    for pair in args.windows(2) {
+        if pair[0] != "-qmp" {
+            continue;
+        }
+        let path = pair[1].strip_prefix("unix:")?;
+        let path = path.split(',').next()?;
+        if !path.is_empty() {
+            return Some(PathBuf::from(path));
+        }
+    }
+    None
+}
+
+fn qmp_action(payload: &[u8]) -> Option<(PathBuf, Vec<String>)> {
+    let text = core::str::from_utf8(payload).ok()?;
+    let rest = text.strip_prefix("@qmp:")?;
+    let (path, keys) = rest.split_once(':')?;
+    if path.is_empty() || keys.is_empty() {
+        return None;
+    }
+    let keys: Vec<String> = keys
+        .split(',')
+        .filter(|key| !key.is_empty())
+        .map(str::to_string)
+        .collect();
+    if keys.is_empty() {
+        return None;
+    }
+    Some((PathBuf::from(path), keys))
+}
+
+/// A small QMP client for the `send-key` action.
+struct QmpClient {
+    stream: std::os::unix::net::UnixStream,
+    reader: BufReader<std::os::unix::net::UnixStream>,
+}
+
+impl QmpClient {
+    fn connect(path: &PathBuf) -> Result<Self> {
+        let mut last = None;
+        for _ in 0..300 {
+            match std::os::unix::net::UnixStream::connect(path) {
+                Ok(stream) => {
+                    stream.set_read_timeout(Some(Duration::from_secs(2)))?;
+                    let mut client = Self {
+                        reader: BufReader::new(stream.try_clone()?),
+                        stream,
+                    };
+                    client.handshake()?;
+                    return Ok(client);
+                }
+                Err(error) => {
+                    last = Some(error);
+                    thread::sleep(Duration::from_millis(10));
+                }
+            }
+        }
+        Err(anyhow::anyhow!(
+            "QMP socket did not appear: {}",
+            last.map(|error| error.to_string())
+                .unwrap_or_else(|| "unknown error".to_string())
+        ))
+    }
+
+    fn handshake(&mut self) -> Result<()> {
+        let mut greeting = String::new();
+        self.reader.read_line(&mut greeting)?;
+        if greeting.trim().is_empty() {
+            bail!("QMP greeting is empty");
+        }
+        self.command(json!({"execute": "qmp_capabilities"}))
+    }
+
+    fn send_key(&mut self, keys: &[String]) -> Result<()> {
+        let keys: Vec<Value> = keys
+            .iter()
+            .map(|key| json!({"type": "qcode", "data": key}))
+            .collect();
+        self.command(json!({
+            "execute": "send-key",
+            "arguments": {"keys": keys, "hold-time": 500}
+        }))
+    }
+
+    fn command(&mut self, command: Value) -> Result<()> {
+        let mut line = serde_json::to_vec(&command)?;
+        line.push(b'\n');
+        self.stream.write_all(&line)?;
+        self.stream.flush()?;
+        loop {
+            let mut response = String::new();
+            let read = self.reader.read_line(&mut response)?;
+            if read == 0 {
+                bail!("QMP connection closed");
+            }
+            let response: Value = serde_json::from_str(response.trim())?;
+            if let Some(error) = response.get("error") {
+                bail!("QMP error: {error}");
+            }
+            if response.get("return").is_some() {
+                return Ok(());
+            }
+        }
+    }
 }
 
 /// Run `spec`, streaming stdout line by line and killing the process group on timeout.
@@ -80,6 +195,13 @@ fn run_inner(spec: &RunSpec, mut dialogue: Option<&mut Dialogue>) -> Result<RunO
         .take()
         .context("child process has no captured stdout")?;
     let mut stdin = child.stdin.take();
+    let mut qmp = match qmp_path(&spec.args) {
+        Some(path) => Some(
+            QmpClient::connect(&path)
+                .with_context(|| format!("connecting to QMP socket {}", path.display()))?,
+        ),
+        None => None,
+    };
     let (sender, receiver) = mpsc::channel();
     let reader = thread::spawn(move || {
         let mut stdout = stdout;
@@ -129,8 +251,38 @@ fn run_inner(spec: &RunSpec, mut dialogue: Option<&mut Dialogue>) -> Result<RunO
                 kill_tree(&mut child);
                 break;
             }
+            let pending = active
+                .pending_step()
+                .map(|(index, pattern, _)| (index, pattern.to_string()));
             if let Some(payload) = active.poll_send(now) {
-                write_stdin(&mut stdin, &payload);
+                let mut action_error = None;
+                if let Some((path, keys)) = qmp_action(&payload) {
+                    if qmp.is_none() {
+                        match QmpClient::connect(&path) {
+                            Ok(client) => qmp = Some(client),
+                            Err(error) => action_error = Some(format!("QMP connect: {error:#}")),
+                        }
+                    }
+                    if action_error.is_none()
+                        && let Some(client) = qmp.as_mut()
+                        && let Err(error) = client.send_key(&keys)
+                    {
+                        action_error = Some(format!("QMP send-key: {error:#}"));
+                    }
+                } else {
+                    write_stdin(&mut stdin, &payload);
+                }
+                if let Some(reason) = action_error {
+                    let (index, pattern) = pending.unwrap_or_else(|| (0, "qmp".to_string()));
+                    step_failure = Some(StepFailure {
+                        index,
+                        pattern,
+                        reason,
+                        lines: tail(&lines, 20),
+                    });
+                    kill_tree(&mut child);
+                    break;
+                }
             }
         }
         let remaining = spec.timeout.saturating_sub(started.elapsed());
@@ -258,204 +410,5 @@ fn kill_tree(child: &mut Child) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::case::Case;
-    use std::time::Instant;
-
-    fn spec(script: &str, timeout: Duration) -> RunSpec {
-        RunSpec {
-            program: "sh".to_string(),
-            args: vec!["-c".to_string(), script.to_string()],
-            timeout,
-        }
-    }
-
-    fn dialogue(step_tables: &str, timeout: u64) -> Dialogue {
-        let text = format!(
-            "name = \"d\"\narch = \"x86_64\"\nprofile = \"base\"\ntimeout_secs = {timeout}\n\
-             expect_exit = \"success\"\n{step_tables}"
-        );
-        let case = Case::parse(&text).expect("case");
-        Dialogue::from_case(&case).expect("dialogue")
-    }
-
-    #[test]
-    fn strips_crlf_and_ansi_escapes() {
-        let output = run(&spec(
-            "printf 'hello\\r\\n\\033[31mred\\033[0m\\n'",
-            Duration::from_secs(5),
-        ))
-        .unwrap();
-        assert_eq!(output.lines, vec!["hello", "red"]);
-        assert_eq!(output.status, Some(0));
-        assert!(output.step_failure.is_none());
-    }
-
-    #[test]
-    fn flushes_a_partial_last_line() {
-        let output = run(&spec("printf 'tail'", Duration::from_secs(5))).unwrap();
-        assert_eq!(output.lines, vec!["tail"]);
-    }
-
-    #[test]
-    fn binary_garbage_does_not_panic() {
-        let output = run(&spec("printf '\\377\\376\\n'", Duration::from_secs(5))).unwrap();
-        assert_eq!(output.lines.len(), 1);
-        assert!(output.lines[0].contains('\u{fffd}'));
-    }
-
-    #[test]
-    fn very_long_line_does_not_hang() {
-        let output = run(&spec(
-            "head -c 1048576 /dev/zero | tr '\\0' x; printf '\\n'",
-            Duration::from_secs(10),
-        ))
-        .unwrap();
-        assert_eq!(output.lines.len(), 1);
-        assert_eq!(output.lines[0].len(), 1_048_576);
-    }
-
-    #[test]
-    fn exit_status_is_captured() {
-        let output = run(&spec("exit 33", Duration::from_secs(5))).unwrap();
-        assert_eq!(output.status, Some(33));
-        assert!(!output.timed_out);
-    }
-
-    #[test]
-    fn timeout_kills_a_sleeping_process() {
-        let started = Instant::now();
-        let output = run(&spec("sleep 5", Duration::from_millis(500))).unwrap();
-        assert!(output.timed_out);
-        assert!(started.elapsed() < Duration::from_secs(3));
-        assert_eq!(output.status, None);
-    }
-
-    #[test]
-    fn dialogue_writes_to_the_guest_stdin() {
-        let mut dialogue = dialogue(
-            "[[step]]\nwait = \"^ready$\"\nsend = \"hello\\n\"\ndelay_ms = 0\n",
-            5,
-        );
-        let output = run_dialogue(
-            &spec(
-                "printf 'ready\\n'; read line; printf 'got: %s\\n' \"$line\"; exit 33",
-                Duration::from_secs(5),
-            ),
-            &mut dialogue,
-        )
-        .unwrap();
-        assert!(output.step_failure.is_none(), "{:?}", output.step_failure);
-        assert_eq!(output.status, Some(33));
-        assert!(
-            output.lines.contains(&"got: hello".to_string()),
-            "{:?}",
-            output.lines
-        );
-        assert!(dialogue.is_complete());
-    }
-
-    #[test]
-    fn dialogue_matches_a_partial_prompt() {
-        let mut dialogue = dialogue(
-            "[[step]]\nwait = \"^raven# $\"\nsend = \"uname\\n\"\ndelay_ms = 0\n",
-            5,
-        );
-        let output = run_dialogue(
-            &spec(
-                "printf 'raven# '; read line; printf 'got: %s\\n' \"$line\"; exit 33",
-                Duration::from_secs(5),
-            ),
-            &mut dialogue,
-        )
-        .unwrap();
-        assert!(output.step_failure.is_none(), "{:?}", output.step_failure);
-        assert!(
-            output.lines.iter().any(|line| line.contains("got: uname")),
-            "{:?}",
-            output.lines
-        );
-    }
-
-    #[test]
-    fn a_step_timeout_reports_the_index_pattern_and_lines() {
-        let mut dialogue = dialogue("[[step]]\nwait = \"^never$\"\ntimeout_secs = 1\n", 10);
-        let started = Instant::now();
-        let script =
-            "i=0; while [ $i -lt 30 ]; do printf 'line %s\\n' $i; i=$((i+1)); done; sleep 5";
-        let output = run_dialogue(&spec(script, Duration::from_secs(10)), &mut dialogue).unwrap();
-        let failure = output.step_failure.expect("step failure");
-        assert_eq!(failure.index, 0);
-        assert_eq!(failure.pattern, "^never$");
-        assert_eq!(failure.lines.len(), 20);
-        assert!(failure.lines[19].contains("line 29"), "{:?}", failure.lines);
-        assert!(started.elapsed() < Duration::from_secs(4));
-    }
-
-    #[test]
-    fn a_process_exit_before_a_step_is_a_failure() {
-        let mut dialogue = dialogue("[[step]]\nwait = \"^missing$\"\n", 5);
-        let output = run_dialogue(
-            &spec("printf 'other\\n'; exit 33", Duration::from_secs(5)),
-            &mut dialogue,
-        )
-        .unwrap();
-        let failure = output.step_failure.expect("step failure");
-        assert_eq!(failure.index, 0);
-        assert_eq!(failure.pattern, "^missing$");
-        assert!(failure.reason.contains("exited"), "{}", failure.reason);
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn timeout_kills_the_whole_process_group() {
-        let temp = crate::testutil::TempDir::new("runner-group");
-        let pid_file = temp.path().join("child.pid");
-        let script = format!("sleep 30 & echo $! > {}; wait", pid_file.display());
-        let output = run(&spec(&script, Duration::from_millis(500))).unwrap();
-        assert!(output.timed_out);
-
-        let bytes = std::fs::read(&pid_file).expect("pid file written before the timeout");
-        let pid: u32 = String::from_utf8_lossy(&bytes).trim().parse().unwrap();
-        let mut alive = true;
-        for _ in 0..20 {
-            let status = Command::new("kill")
-                .arg("-0")
-                .arg(pid.to_string())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status()
-                .unwrap();
-            if !status.success() {
-                alive = false;
-                break;
-            }
-            thread::sleep(Duration::from_millis(25));
-        }
-        assert!(
-            !alive,
-            "child process {pid} survived the process-group kill"
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn timeout_leaves_no_process_matching_the_runner() {
-        let marker = format!("raven-qtest-orphan-{}", std::process::id());
-        let script = format!("# {marker}\nsleep 30 & wait");
-        let output = run(&spec(&script, Duration::from_millis(500))).unwrap();
-        assert!(output.timed_out);
-        thread::sleep(Duration::from_millis(100));
-        let pgrep = Command::new("pgrep")
-            .arg("-f")
-            .arg(&marker)
-            .output()
-            .expect("pgrep runs");
-        assert!(
-            !pgrep.status.success(),
-            "process survived the timeout: {}",
-            String::from_utf8_lossy(&pgrep.stdout)
-        );
-    }
-}
+#[path = "runner_ut.rs"]
+mod tests;

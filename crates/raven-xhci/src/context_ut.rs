@@ -48,7 +48,7 @@ fn configure_endpoint_encodes_ep1_and_keeps_ep0() {
     assert_eq!(u64_at(&bytes, 32 + 64 + 8), 0x8001);
     let ep1 = 32 + 3 * 64;
     assert_eq!(u32_at(&bytes, ep1), 10 << 16);
-    assert_eq!(u32_at(&bytes, ep1 + 4), (3 << 1) | (3 << 3) | (8 << 16));
+    assert_eq!(u32_at(&bytes, ep1 + 4), (3 << 1) | (7 << 3) | (8 << 16));
     assert_eq!(u64_at(&bytes, ep1 + 8), 0x9001);
     assert_eq!(u32_at(&bytes, ep1 + 16), 8);
 }
