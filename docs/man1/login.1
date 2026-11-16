@@ -1,0 +1,61 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt LOGIN 1
+.Os RavenBSD
+.Sh NAME
+.Nm login
+.Nd verify the root password and print the login message
+.Sh SYNOPSIS
+.Nm
+.Ar user
+.Sh DESCRIPTION
+.Nm
+is started by
+.Xr getty 1
+after the login name has been read.
+It prompts for a password on
+.Pa tty:console
+with terminal echo disabled, reads
+.Pa /etc/shadow
+and verifies the nine-field
+.Dv root
+record through
+.Xr raven-auth 3 .
+Only the
+.Dv root
+account is accepted.
+.Pp
+On success
+.Nm
+prints
+.Pa /etc/motd
+and exits with status 0.
+.Xr getty 1
+then starts the session shell named by the root entry in
+.Pa /etc/passwd .
+On failure
+.Nm
+prints
+.Dq Li "Login incorrect"
+and exits with status 1.
+.Pp
+There is no setuid bit, no plaintext password file and no shell expansion in the account files.
+The password hash is SHA-512-crypt
+.Pq Dq Li "$6$"
+from the vetted
+.Xr sha-crypt 3
+Rust crate; the hash is generated at build time from the release password.
+.Sh FILES
+.Bl -tag -width "/etc/shadow" -compact
+.It Pa /etc/passwd
+root account, home and session shell
+.It Pa /etc/shadow
+root password hash
+.It Pa /etc/motd
+message printed after a successful login
+.El
+.Sh SEE ALSO
+.Xr getty 1 ,
+.Xr rsh 1 ,
+.Xr consd 8

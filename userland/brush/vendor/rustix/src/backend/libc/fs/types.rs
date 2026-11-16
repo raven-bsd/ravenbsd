@@ -981,7 +981,14 @@ pub enum FlockOperation {
 ///
 /// [`statat`]: crate::fs::statat
 /// [`fstat`]: crate::fs::fstat
-#[cfg(not(any(linux_like, target_os = "hurd", target_os = "netbsd")))]
+// `linux_kernel` is true for ravenbsd while `linux_like` is not; without it this arm and the
+// `stat64` arm below both define `Stat`. ravenbsd uses the Linux `stat64` layout.
+#[cfg(not(any(
+    linux_like,
+    linux_kernel,
+    target_os = "hurd",
+    target_os = "netbsd"
+)))]
 pub type Stat = c::stat;
 
 /// `struct stat` for use with [`statat`] and [`fstat`].

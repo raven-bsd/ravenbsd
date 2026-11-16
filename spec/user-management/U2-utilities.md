@@ -3,6 +3,10 @@
 
 # U2 - user utilities and NSS
 
+SPDX-License-Identifier: BSD-3-Clause
+Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+
 Lane: kevin      Wave: 12      Milestone: M-0.2.0
 Depends: U1, REL1b, REL1, U3 (for setuid su/passwd)      Blocks: U4
 Estimated size: L   Type: userland

@@ -882,7 +882,7 @@ pub const LOCK_NB: c_int = 4;
 pub const LOCK_UN: c_int = 8;
 
 // sys/epoll.h
-pub const EPOLL_CLOEXEC: c_int = 0x0100_0000;
+pub const EPOLL_CLOEXEC: c_int = crate::O_CLOEXEC;
 pub const EPOLL_CTL_ADD: c_int = 1;
 pub const EPOLL_CTL_DEL: c_int = 2;
 pub const EPOLL_CTL_MOD: c_int = 3;

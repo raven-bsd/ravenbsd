@@ -51,6 +51,11 @@ tokio = { version = "1.52.3", features = ["io-util", "macros", "rt", "sync"] }
 
 [target.'cfg(any(unix, windows))'.dependencies]
 hostname = "0.4.2"
+
+# `process` and `signal` pull in tokio's Unix signal driver, which needs an AF_UNIX socketpair
+# that RavenBSD does not implement yet (PG-30). The Raven branch uses the std child + blocking
+# pool instead, so those two features stay off there.
+[target.'cfg(all(any(unix, windows), not(target_os = "ravenbsd")))'.dependencies]
 tokio = { version = "1.52.3", features = [
     "io-util",
     "macros",
@@ -60,6 +65,16 @@ tokio = { version = "1.52.3", features = [
     "rt-multi-thread",
     "signal",
     "sync",
+] }
+
+[target.'cfg(target_os = "ravenbsd")'.dependencies]
+tokio = { version = "1.52.3", features = [
+    "io-util",
+    "macros",
+    "net",
+    "rt",
+    "sync",
+    "time",
 ] }
 
 [target.'cfg(windows)'.dependencies]

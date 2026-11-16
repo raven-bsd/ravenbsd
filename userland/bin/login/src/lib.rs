@@ -1,0 +1,282 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+//! RavenBSD `login` policy: the root account, its shadow record and the session profile.
+//!
+//! The binary is a thin target wrapper; this library owns the parsers and the authentication
+//! handoff so they can be tested on the host. Password hashing and verification are never
+//! reimplemented here: [`verify_root_password`] calls REL1b's `raven_auth` crate.
+
+#![cfg_attr(not(test), no_std)]
+#![forbid(unsafe_code)]
+#![deny(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
+)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::arithmetic_side_effects
+    )
+)]
+
+extern crate alloc;
+
+use alloc::string::String;
+
+/// Default search path when `/etc/profile` has no `PATH`.
+pub const DEFAULT_PATH: &str = "/bin:/sbin";
+/// Default home when `/etc/profile` has no `HOME`.
+pub const DEFAULT_HOME: &str = "/";
+/// Default terminal type when `/etc/profile` has no `TERM`.
+pub const DEFAULT_TERM: &str = "vt100";
+/// Default login name; the release image has the root account only.
+pub const ROOT_USER: &str = "root";
+/// Default session shell when `/etc/passwd` and `/etc/profile` are silent.
+pub const DEFAULT_SHELL: &str = "/bin/rsh";
+/// Longest accepted account/profile field.
+pub const MAX_FIELD: usize = 256;
+/// Longest accepted login name.
+pub const MAX_USER: usize = 32;
+
+/// One `/etc/passwd` entry needed by the session.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PasswdEntry {
+    /// Account name.
+    pub name: String,
+    /// Home directory.
+    pub home: String,
+    /// Login shell.
+    pub shell: String,
+}
+
+/// The session environment parsed from `/etc/profile`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Profile {
+    /// `PATH` value.
+    pub path: String,
+    /// `HOME` value.
+    pub home: String,
+    /// `TERM` value.
+    pub term: String,
+    /// `USER` value.
+    pub user: String,
+    /// `SHELL` value from the profile (the passwd shell still wins for the exec path).
+    pub shell: String,
+}
+
+impl Default for Profile {
+    fn default() -> Self {
+        Self {
+            path: String::from(DEFAULT_PATH),
+            home: String::from(DEFAULT_HOME),
+            term: String::from(DEFAULT_TERM),
+            user: String::from(ROOT_USER),
+            shell: String::from(DEFAULT_SHELL),
+        }
+    }
+}
+
+/// Find the `root` entry in `/etc/passwd`.
+#[must_use]
+pub fn parse_root_passwd(text: &str) -> Option<PasswdEntry> {
+    text.lines().find_map(|line| {
+        let entry = parse_passwd_line(line)?;
+        (entry.name == ROOT_USER).then_some(entry)
+    })
+}
+
+fn parse_passwd_line(line: &str) -> Option<PasswdEntry> {
+    let mut fields = line.split(':');
+    let name = fields.next()?;
+    let _password = fields.next()?;
+    let _uid = fields.next()?;
+    let _gid = fields.next()?;
+    let _gecos = fields.next()?;
+    let home = fields.next()?;
+    let shell = fields.next()?;
+    if fields.next().is_some() {
+        return None;
+    }
+    if name.is_empty()
+        || home.is_empty()
+        || shell.is_empty()
+        || home.len() > MAX_FIELD
+        || shell.len() > MAX_FIELD
+    {
+        return None;
+    }
+    Some(PasswdEntry {
+        name: String::from(name),
+        home: String::from(home),
+        shell: String::from(shell),
+    })
+}
+
+/// Parse `/etc/profile` as a flat `KEY=VALUE` file.
+///
+/// Only `PATH`, `HOME`, `TERM`, `USER` and `SHELL` are consumed; comments, blank lines, unknown
+/// keys and values longer than [`MAX_FIELD`] are ignored. There is no shell expansion.
+#[must_use]
+pub fn parse_profile(text: &str) -> Profile {
+    let mut profile = Profile::default();
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let key = key.trim();
+        let value = value.trim();
+        if value.len() > MAX_FIELD {
+            continue;
+        }
+        match key {
+            "PATH" => profile.path = String::from(value),
+            "HOME" => profile.home = String::from(value),
+            "TERM" => profile.term = String::from(value),
+            "USER" => profile.user = String::from(value),
+            "SHELL" => profile.shell = String::from(value),
+            _ => {}
+        }
+    }
+    profile
+}
+
+/// Find the nine-field `root` shadow line.
+#[must_use]
+pub fn root_shadow_line(text: &str) -> Option<&str> {
+    text.lines().find(|line| {
+        let mut fields = line.split(':');
+        fields.next() == Some(ROOT_USER) && fields.count() == 8
+    })
+}
+
+/// Verify a password against the shadow text using REL1b's constant-time verifier.
+#[must_use]
+pub fn verify_root_password(shadow_text: &str, password: &str) -> bool {
+    root_shadow_line(shadow_text).is_some_and(|line| raven_auth::verify_root_shadow(line, password))
+}
+
+/// Normalise a login name: trim ASCII whitespace, accept 1..=32 account characters.
+#[must_use]
+pub fn normalize_username(text: &str) -> Option<&str> {
+    let name = text.trim_matches(|character: char| character.is_ascii_whitespace());
+    if name.is_empty()
+        || name.len() > MAX_USER
+        || !name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+    {
+        return None;
+    }
+    Some(name)
+}
+
+/// The release image has one account.
+#[must_use]
+pub fn is_root_user(name: &str) -> bool {
+    name == ROOT_USER
+}
+
+#[cfg(target_os = "none")]
+pub mod tty {
+    //! The `tty:console` session helpers shared by `login` and `getty`.
+
+    use alloc::string::String;
+    use alloc::vec::Vec;
+
+    use raven_abi::errno::Errno;
+    use raven_abi::types::Handle;
+    use raven_proto_fs::O_RDWR;
+    use raven_proto_tty::{CALL_LEN, Mode, Request, Settings, encode_request};
+    use raven_rt::fs;
+    use raven_scheme::Client;
+
+    /// Longest line accepted from the console.
+    pub const MAX_LINE: usize = 256;
+
+    /// One open `tty:console` handle.
+    pub struct Console {
+        handle: Handle,
+    }
+
+    impl Console {
+        /// Open the serial console for reading and writing.
+        pub fn open() -> Result<Self, Errno> {
+            let flags = fs::s11_flags(O_RDWR)?;
+            let handle = Client::new().open("tty:console", flags)?;
+            Ok(Self { handle })
+        }
+
+        /// Write all bytes to the console.
+        pub fn write(&self, bytes: &[u8]) -> Result<(), Errno> {
+            let client = Client::new();
+            let mut written = 0usize;
+            while written < bytes.len() {
+                let chunk = bytes.get(written..).ok_or(Errno::EIO)?;
+                let count = client.write(self.handle, 0, chunk)?;
+                if count == 0 {
+                    return Err(Errno::EIO);
+                }
+                written = written.checked_add(count).ok_or(Errno::EIO)?;
+            }
+            Ok(())
+        }
+
+        /// Read one canonical line without its terminator.
+        pub fn read_line(&self) -> Result<String, Errno> {
+            let client = Client::new();
+            let mut line: Vec<u8> = Vec::new();
+            let mut buffer = [0u8; 64];
+            loop {
+                let count = client.read(self.handle, 0, &mut buffer)?;
+                if count == 0 {
+                    return Err(Errno::EIO);
+                }
+                let chunk = buffer.get(..count).ok_or(Errno::EIO)?;
+                for &byte in chunk {
+                    if byte == b'\n' {
+                        return Ok(String::from_utf8_lossy(&line).into_owned());
+                    }
+                    if line.len() < MAX_LINE {
+                        line.push(byte);
+                    }
+                }
+            }
+        }
+
+        /// Switch the console echo bit; failures keep the previous setting.
+        pub fn set_echo(&self, echo: bool) {
+            let request = Request::SetMode {
+                settings: Settings {
+                    mode: Mode::Canonical,
+                    echo,
+                },
+            };
+            let mut encoded = [0u8; CALL_LEN];
+            encode_request(request, &mut encoded);
+            let mut response = [0u8; CALL_LEN];
+            let _ = Client::new().call(self.handle, &encoded, &mut response);
+        }
+    }
+
+    impl Drop for Console {
+        fn drop(&mut self) {
+            let _ = Client::new().close(self.handle);
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "lib_ut.rs"]
+mod tests;

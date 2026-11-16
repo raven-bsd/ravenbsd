@@ -29,4 +29,8 @@ pub mod mdio;
 pub mod phy;
 pub mod recovery;
 pub mod regs;
+pub mod release;
 pub mod ring;
+
+/// The shared B39 frame-ring contract used by the `nic:` service.
+pub use raven_proto_net::ring as b39;
