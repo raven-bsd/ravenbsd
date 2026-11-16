@@ -282,6 +282,7 @@ cases:
       declare -p zz_m
 
   - name: "unset with a star or at subscript leaves an associative array alone"
+    min_oracle_version: "5.2" # bash 5.1 removes the whole array
     stdin: |
       declare -A zz_m=([k]=v)
       unset 'zz_m[*]'

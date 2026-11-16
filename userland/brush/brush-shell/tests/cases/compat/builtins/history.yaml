@@ -683,6 +683,7 @@ cases:
       echo "history -s -x: $?"
 
   - name: "history -d takes an attached negative offset"
+    min_oracle_version: "5.2" # bash 5.1 rejects the negative offset
     args: ["-o", "history"]
     env:
       HISTFILE: "history-file.txt"

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The nested brush workspace builds host tests with the stock toolchain, which does not know
+# the custom `ravenbsd` target. Declare the value once for the whole workspace instead of
+# adding `-A warnings` to the command line or crate-level allows to every vendored dependency
+# (socket2, mio, uzers and the patched libc). The target toolchain knows the target natively.
+
+[build]
+rustflags = [
+    "--check-cfg=cfg(target_os,values(\"ravenbsd\"))",
+]

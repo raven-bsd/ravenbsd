@@ -33,3 +33,25 @@ cargo xtask qtest --case shell-brush --arch x86_64
 
 `/bin/brush` is built by `cargo xtask build brush --arch x86_64`; that requires
 `cargo xtask libc-pack --arch x86_64` first, like the other target userland.
+
+## Host suite (K26f)
+
+brush is a nested Cargo workspace. Run its Rust suite from `userland/brush`, not the repository
+root:
+
+```sh
+cd userland/brush
+cargo nextest run -p brush-shell
+```
+
+The K26f base result is **3707 passed, 109 skipped, 0 failed**. The host oracle is GNU bash
+5.1.16; compat cases that assert bash 5.2+ behaviour are gated with
+`min_oracle_version: "5.2"` and run on a 5.2/5.3 oracle. Known failures remain in the suite as
+`known_failure` cases; `Signals::Ctrl+C ends a loop running a program` is skipped on Linux
+because the pty harness compares only the process exit status there. The two interactive
+`--init-file`/`--rcfile` cases use a quiet `HOME` with `.hushlogin` so the host's system bashrc
+does not add its sudo hint to the oracle output.
+
+The nested workspace's `.cargo/config.toml` declares the `ravenbsd` target value for
+`--check-cfg`, which removes the vendored `unexpected_cfgs` warnings without `-A warnings`.
+See `docs/brush-tests.md` for the warning and target-smoke details.
