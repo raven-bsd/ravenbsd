@@ -484,6 +484,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 
 [[package]]
+name = "login"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-auth",
+ "raven-proto-fs",
+ "raven-proto-tty",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "man"
 version = "0.1.0"
 dependencies = [
@@ -1075,6 +1087,16 @@ name = "raven-getrandom"
 version = "0.1.0"
 dependencies = [
  "getrandom",
+]
+
+[[package]]
+name = "raven-getty"
+version = "0.1.0"
+dependencies = [
+ "login",
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
 ]
 
 [[package]]

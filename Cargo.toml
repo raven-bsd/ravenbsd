@@ -123,6 +123,8 @@ members = [
     "userland/bin/route",
     "userland/bin/netstat",
     "userland/bin/hostname",
+    "userland/bin/login",
+    "userland/bin/getty",
     "userland/bin/sleep",
     "userland/bin/play",
     "userland/bin/beep",
