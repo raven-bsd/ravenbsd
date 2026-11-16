@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The P8 fake platform driver: devd matches the fixture GENET node and launches this binary with
+# the selected MMIO/DMA/IRQ handles and tokens.
+
+[[driver]]
+name = "fake-platform"
+compatible = "brcm,bcm2711-genet-v5"
+exec = "/sbin/fake-platform"
+args = ["bar=0", "resources=dma+irq"]
+cycles = 1
