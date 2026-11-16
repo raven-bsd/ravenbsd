@@ -8,10 +8,14 @@
 //! [`TrapFrame`] and calls [`exception_dispatch`] with the slot index. The handler never returns:
 //! it prints the dump and exits the test with failure.
 //!
+//! Lower-EL entries also capture the user `TPIDR_EL0` into the current thread, and the restore
+//! path reinstalls it before `eret`; see [`save_user_tls`] and [`aarch64_restore_user_tls`].
+//!
 //! The table structure follows the MIT-licensed `raspberrypi-os-tutorials` exception entry
 //! (`11_exceptions_part1_groundwork/src/_arch/aarch64/exception.s`); the frame, slot dispatch and
 //! recovery path are RavenBSD's.
 
+use core::arch::asm;
 use core::mem::size_of;
 
 use raven_abi::errno::Errno;
@@ -130,6 +134,7 @@ __exception_restore:
     cbz x2, 1f
     ldr x9, [sp, #248]
     msr sp_el0, x9
+    bl aarch64_restore_user_tls
 1:
     ldr x9, [sp, #256]
     msr elr_el1, x9
@@ -184,6 +189,56 @@ const EC_WATCHPOINT: u8 = 0x34;
 /// Exception class: BRK instruction.
 const EC_BRK: u8 = 0x3c;
 
+/// Save the interrupted user TLS base into the current thread.
+///
+/// `TPIDR_EL0` is user-writable, and aarch64 libc installs its thread pointer with `msr
+/// tpidr_el0` rather than `THREAD_SET_TLS`. Capturing the register on every lower-EL exception
+/// keeps the kernel's per-thread copy current, so a later context switch does not resurrect a
+/// stale base. The saved value is also what `THREAD_SET_TLS` updates before the return path
+/// installs it.
+fn save_user_tls() {
+    let Some(thread) = crate::sched::current_thread() else {
+        return;
+    };
+    if !thread.user {
+        return;
+    }
+    let base: u64;
+    // SAFETY: TPIDR_EL0 is the user TLS base and is readable at EL1.
+    unsafe {
+        asm!(
+            "mrs {}, tpidr_el0",
+            out(reg) base,
+            options(nomem, nostack, preserves_flags),
+        );
+    }
+    thread.set_tls_base(base);
+}
+
+/// Install the current thread's TLS base in `TPIDR_EL0` before returning to EL0.
+///
+/// Called from `__exception_restore` for lower-EL frames after `exception_dispatch` and any
+/// context switch. `THREAD_SET_TLS` therefore takes effect for the caller on the syscall return
+/// (S23 parity), and a direct user `msr tpidr_el0` survives the kernel round trip.
+#[unsafe(no_mangle)]
+pub extern "C" fn aarch64_restore_user_tls() {
+    let Some(thread) = crate::sched::current_thread() else {
+        return;
+    };
+    if !thread.user {
+        return;
+    }
+    let base = thread.tls_base();
+    // SAFETY: EL1 may write TPIDR_EL0; the value is the current user thread's saved base.
+    unsafe {
+        asm!(
+            "msr tpidr_el0, {}",
+            in(reg) base,
+            options(nomem, nostack, preserves_flags),
+        );
+    }
+}
+
 /// Rust side of every vector slot.
 ///
 /// IRQ slots dispatch through [`crate::arch::irq`] and return to the vector's restore path. The
@@ -192,6 +247,11 @@ const EC_BRK: u8 = 0x3c;
 /// unhandled slot prints the trap frame and exits the test with failure.
 #[unsafe(no_mangle)]
 pub extern "C" fn exception_dispatch(slot: u64, frame: *mut TrapFrame) {
+    // Lower-EL slots enter with the user's `TPIDR_EL0` live; capture it before any handler can
+    // switch threads or use the registered signal context area.
+    if slot >= 8 {
+        save_user_tls();
+    }
     // IRQ slots: 1 (current-EL SP0), 5 (current-EL SPx), 9 (lower EL AArch64), 13 (lower EL
     // AArch32). The CPU masks IRQ on exception entry, so the handler never nests. Slots 9/13
     // interrupted EL0, which is what enables return-to-user preemption (x86-64's

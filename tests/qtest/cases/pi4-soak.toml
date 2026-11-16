@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# O6 pi4-soak: the GENET frame model and the PWM audio ring run together for 1024 iterations in
+# the guest. The fixture is host-model code only; it does not touch Pi 4 MMIO or DMA.
+
+name = "pi4-soak"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/pi4-soak/build.sh"]
+initfs = "build/fixtures/pi4-soak/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^pi4-soak: start iterations=1024$'
+
+[[expect]]
+regex = '^pi4-soak: genet rx=1024 tx=910 owned=147 rx_errors=128 tx_errors=114 link_events=1024 irq=32$'
+
+[[expect]]
+regex = '^pi4-soak: recovery resets=3 faults=1$'
+
+[[expect]]
+regex = '^pi4-soak: audio periods=960 frames=983040 underruns=64 writes=1032 bytes=8421504$'
+
+[[expect]]
+regex = '^pi4-soak: pass$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pi4-soak: failed'

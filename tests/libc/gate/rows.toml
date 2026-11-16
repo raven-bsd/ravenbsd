@@ -37,6 +37,16 @@ evidence = "build/libc-gate/1.1.pack.txt"
 source = "C60, 3.B.9 C1"
 
 [[check]]
+id = "1.1.audit"
+row = 1
+title = "target-case symbol audit (C64j)"
+required = true
+kind = "argv"
+argv = ["cargo", "xtask", "libc-audit"]
+evidence = "build/libc-gate/1.1.audit.txt"
+source = "C64j, C64l"
+
+[[check]]
 id = "1.2"
 row = 1
 title = "donor suites G1 (C2-C6)"

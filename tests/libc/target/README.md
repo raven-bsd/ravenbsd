@@ -7,8 +7,8 @@ Host-side drivers for the C73 on-target libc cases.
 
 * `cases.tsv` is the single table: `case<TAB>hard PGs<TAB>soft PGs<TAB>binaries<TAB>link`.
   `build.sh` and `pg-probe.sh` read it; `tests/cases-consistency.sh` compares it with the
-  seven `tests/qtest/cases/libc-*.toml` files (the `skip` text must list exactly the HARD
-  column).
+  seven `tests/qtest/cases/libc-*.toml` files: a blocked case's `skip` text lists exactly the
+  HARD column, and an enabled case has no `skip` and the probe says `RUNNABLE`.
 * `pg-probe.sh [<case>|all]` runs the mechanical probes of C73 4.2. It is read-only and always
   exits 0. `present` is a `grep` match in the product tree, `absent` is no match, `unknown`
   means a human must read the merged ticket named in `tickets/INDEX.md`. A case prints

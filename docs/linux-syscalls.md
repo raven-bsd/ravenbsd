@@ -1,10 +1,18 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# linuxd syscall batches: metadata (B25)
+# linuxd syscall batches: metadata (B25) and clone (B21b)
 
-Status: B25, 2026-11-15. Evidence tags: **OBSERVED** (run on the target or read in the source),
-**PROPOSED** (not implemented), **UNVERIFIED** (not exercised).
+Status: B25 and B21b, 2026-11-16. Evidence tags: **OBSERVED** (run on the target or read in the
+source), **PROPOSED** (not implemented), **UNVERIFIED** (not exercised).
+
+This document covers two linuxd batches:
+
+* the metadata surface for the staged Alpine root (B25), which lets BusyBox `ls` list the tree;
+* `clone` from the B21a trap frame (B21b), including the child trampoline and the shared signal
+  page used by the clone fixture.
+
+# Part I: metadata (B25)
 
 ## 1. Scope
 
@@ -45,10 +53,10 @@ directories return `getdents64` entries.
 against an open directory descriptor; `.`/`..` are normalized without leaving `/`. This is what
 makes the fixture's `busybox ls` (no path argument) list the staged top-level entries.
 
-The loader now maps writable image pages and zero pages as **shared memory objects** (file data
-pages with `PROT_WRITE`, and every `StepKind::Zero` page). Writable `BSS`/data buffers are then
-visible to the server's copy-in/copy-out, and `stat`/`lstat` on BusyBox's path buffers works.
-Read-only text remains a private mapping.
+The loader maps writable image pages and zero pages as **shared memory objects** (file data pages
+with `PROT_WRITE`, and every `StepKind::Zero` page). Writable `BSS`/data buffers are then visible
+to the server's copy-in/copy-out, and `stat`/`lstat` on BusyBox's path buffers works. Read-only
+text remains a private mapping.
 
 ## 3. `struct stat` and `struct statx`
 
@@ -107,14 +115,118 @@ linux-root: linuxd exit=0
 init exited (0)
 ```
 
-`cargo xtask qtest --case linux-stat --arch x86_64` passes. The older `linux-root` case was the
-B32a loader-boundary test and still asserts `ls: .: Function not implemented` plus
-`unimplemented nr=4`; after B25 that boundary is gone. The case file is not in B25's Owns
-(`tests/qtest/cases/linux-root*` belongs to B32a), so it needs a small follow-up update to the new
-listing/status expectations; `linux-stat` is the B25 gate.
+`cargo xtask qtest --case linux-stat --arch x86_64` passes. B25 also updates
+`tests/qtest/cases/linux-root.toml` from the B32a `stat`-failure boundary to the same successful
+listing and exit 0, because B25's contract explicitly says to run `linux-root` and requires
+`busybox ls` to list the staged tree. That case file is outside B25's Owns-globs; the exception is
+recorded in the B25 report.
 
 ## 6. Provenance
 
 First-party BSD-3-Clause code. The syscall numbers, `S_IF*` bits and `struct stat`/`statx` layouts
 come from `raven-linux-abi` (generated from `linux-raw-sys`, Apache-2.0 OR MIT). No donor code was
 copied. The Alpine tarball remains user-supplied and uncommitted.
+
+# Part II: clone (B21b)
+
+## 7. Scope
+
+B21b implements `clone` in `linuxd` from the B21a trap frame. The supporting process/thread calls
+needed by the static fixture are served too: `gettid`, `set_tid_address`, `set_robust_list`,
+`prctl` (`PR_SET_NAME`/`PR_GET_NAME`) and the existing `arch_prctl`.
+
+`clone` covers two shapes:
+
+| shape | flags | native mechanism | child return |
+|---|---|---|---|
+| thread | `CLONE_VM\|CLONE_THREAD\|CLONE_SIGHAND` | `THREAD_CREATE_EX` in the same process | `rax = 0`, new rsp |
+| fork-like | signal byte only (e.g. `SIGCHLD`) | `PROC_FORK` + `THREAD_CREATE_EX` | `rax = 0`, COW stack |
+
+`CLONE_SETTLS`, `CLONE_PARENT_SETTID`, `CLONE_CHILD_SETTID` and `CLONE_CHILD_CLEARTID` are
+honoured. Unknown flags, `CLONE_THREAD` without `CLONE_VM`/`CLONE_SIGHAND`, sharing flags without
+`CLONE_VM`, a zero/misaligned thread stack, and a fork-like `CLONE_CHILD_SETTID` are `EINVAL`; a
+valid `clone` trap without a B21a frame is `ENOSYS`.
+
+## 8. Child frame and trampoline
+
+The kernel delivers the saved user frame in the scheme packet's path field (B21a). linuxd copies it,
+sets `gprs[RAX] = 0` and chooses `rsp`:
+
+* thread: the caller's `child_stack` (already 16-byte aligned);
+* fork-like: the captured parent `rsp` (the COW copy contains the same stack), unless the caller
+  supplied an explicit stack.
+
+linuxd then builds one executable page containing a RIP-relative trampoline and the frame table.
+The code loads all 15 general registers and `rsp` from the page, then jumps through a
+`jmp qword ptr [rip+disp32]` to the captured RIP. It never touches the stack, so the eight bytes
+below the child's `rsp` (the SysV red zone) survive; the `ret` in the fixture's raw-clone stub sees
+exactly the parent's stack.
+
+The child TLS base is installed at thread creation (`THREAD_CREATE_EX.tp`); the child does not need
+an `arch_prctl` trap.
+
+## 9. Addresses and the signal page
+
+`linuxd` maps one shared, zero-filled page at `0x0000_4800_0000_0000` before the Linux thread
+starts. A clone child cannot be attributed to a process by the trap packet (the packet carries no
+sender identity), so the fixture children signal the parent through this page and spin instead of
+making a syscall. A fork-like child inherits the shared mapping through `PROC_FORK`; a thread child
+shares it directly.
+
+Each clone maps a fresh trampoline page at `0x0000_4800_0000_1000 + n * 4096`, after creating the
+memory object and populating it through a shared write mapping in linuxd. The target mapping is
+created read/write and changed to read/execute with `PROTECT`, because generic memory objects carry
+no `EXEC` right in ABI v1.
+
+## 10. Ownership and cleanup
+
+`LinuxProcess` records every native task in `clones` with its Linux pid/tid and native thread id.
+When the parent exits (`exit_group`), linuxd terminates and reaps every fork-like child process,
+closes the thread handles, and then terminates the Linux process. A thread child needs no separate
+termination: terminating the process kills all of its threads.
+
+`CLONE_CHILD_CLEARTID` is passed to the kernel as the new thread's clear-on-exit word. The main
+thread's `set_tid_address` word is cleared by the trap loop at `exit_group`, because the thread was
+created before the program called `set_tid_address` and the kernel has no later setter.
+
+## 11. Clone evidence
+
+**OBSERVED** from `build/qtest/linux-clone.log`:
+
+```
+linux-clone: gettid tid=6
+linux-clone: set_tid_address=6 same=1
+linux-clone: set_robust_list ok=1
+linux-clone: prctl name=clone-fixture ok=1
+linux-clone: arch_prctl fs=4280664 ok=1
+linux-clone: clone bad-flags errno=22
+linux-clone: clone thread pid=2 child=0
+linux-clone: clone thread flag ok
+linux-clone: clone fork pid=3 child=0
+linux-clone: clone fork flag ok
+linux-clone: done
+linuxd: hello exit=0
+init exited (0)
+```
+
+The thread child and the fork child both resumed at the parent's return RIP with `rax = 0` and
+wrote the shared page. The fork child was terminated and reaped when the parent exited.
+
+## 12. Clone limits
+
+* **Trap attribution**: the scheme packet identifies the handler, not the sending process. A clone
+  child that made a syscall would be served as its parent. B21b's children signal through the
+  shared page and do not trap; per-task attribution is the B21 follow-up.
+* `clone` with `CLONE_VM` but without `CLONE_THREAD` (a shared-VM process), namespaces, `CLONE_VFORK`,
+  `CLONE_PIDFD` and the other unsupported bits are `EINVAL`, not silently accepted.
+* `wait4` is not part of B21b; a fork-like child is reaped by linuxd at parent exit.
+* The task-name attributes beyond `PR_SET_NAME`/`PR_GET_NAME` are `EINVAL`; B21 owns the full
+  process/thread batch.
+* aarch64 keeps the compact trap without a frame; `clone` there is `ENOSYS` until S56 adds frame
+  parity.
+
+## 13. Provenance for clone
+
+First-party BSD-3-Clause code. No donor code was copied. The flag values and `ThreadCreateEx`
+layout come from `raven-linux-abi` and `raven-abi`; the frame and trampoline are this project's
+protocol and user-space code.

@@ -1,0 +1,33 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 15, 2026
+.Dt DTRACE_PROBE_LIST 2
+.Os RavenBSD
+.Sh NAME
+.Nm dtrace_probe_list
+.Nd list the registered DTrace probes
+.Sh SYNOPSIS
+.Fn dtrace_probe_list out max
+.Sh DESCRIPTION
+.Nm writes up to
+.Fa max
+probe records to
+.Fa out
+and returns the total number of registered probes.
+A record is 52 bytes: a 32-bit identifier, a 16-byte NUL-padded provider name
+and a 32-byte NUL-padded probe name.
+A
+.Fa max
+of zero returns the count without touching
+.Fa out .
+.Pp
+The current provider set is static; the initial probe is
+.Li syscall::entry .
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EFAULT
+.Fa out
+is not writable user memory.
+.El
+.Sh STANDARDS
+RavenBSD ABI v1.

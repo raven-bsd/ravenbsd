@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S58: userland DTrace consumer, ring wrap and the USDT marker.
+
+name = "dtrace-user"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/dtrace-user/build.sh"]
+initfs = "build/fixtures/dtrace-user/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^dtrace-user: probe id=1 provider=syscall$'
+
+[[expect]]
+regex = '^cpu=[0-9]+ probe=1 tid=[0-9]+ syscall=36 ts=[0-9]+ args=0x[0-9a-f]+,0x[0-9a-f]+,0x[0-9a-f]+,0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^dtrace-user: wrap produced=4096 retained=4096 dropped=[0-9]+$'
+
+[[expect]]
+regex = '^dtrace-user: usdt provider=raven name=usdt-test opcode=0x90$'
+
+[[expect]]
+regex = '^dtrace-user: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|dtrace-user: fail'

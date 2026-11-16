@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# Host test: every cases.tsv row has a case file whose skip text lists exactly the row's HARD
-# PGs, and every libc-*.toml case file has a row. This is the C73 4.6.2 consistency check.
+# Host test: every cases.tsv row has a case file; a blocked case's skip text lists exactly the
+# row's HARD PGs, and an enabled case has no skip and the live PG probe says RUNNABLE. Extra
+# `libc-*` cases (fixtures, startup) are outside this seven-case table and are ignored here.
+# This is the C73 4.6.2 consistency check.
 
 set -eu
 
@@ -31,15 +33,32 @@ while IFS='	' read -r name hard soft binaries link; do
     ok
     skip=$(sed -n 's/^skip = "needs \(.*\)"$/\1/p' "$file")
     if [ -z "$skip" ]; then
-        bad "$name has no skip reason"
-        continue
-    fi
-    printf '%s\n' "$skip" | tr ' ' '\n' | sed 's/^PG-//' | sed '/^$/d' | sort -n > "$tmp/skip"
-    printf '%s\n' "$hard" | tr ' ' '\n' | sed '/^$/d' | sort -n > "$tmp/hard"
-    if cmp -s "$tmp/skip" "$tmp/hard"; then
-        ok
+        probe_line=$(sh "$root/tests/libc/target/pg-probe.sh" "$name" | tail -n 1)
+        case $probe_line in
+            *': RUNNABLE')
+                ok
+                ;;
+            *)
+                bad "$name has no skip but the probe says: $probe_line"
+                ;;
+        esac
     else
-        bad "$name skip does not match the HARD column"
+        printf '%s\n' "$skip" | tr ' ' '\n' | sed 's/^PG-//' | sed '/^$/d' | sort -n > "$tmp/skip"
+        printf '%s\n' "$hard" | tr ' ' '\n' | sed '/^$/d' | sort -n > "$tmp/hard"
+        if cmp -s "$tmp/skip" "$tmp/hard"; then
+            ok
+        else
+            bad "$name skip does not match the HARD column"
+        fi
+        probe_line=$(sh "$root/tests/libc/target/pg-probe.sh" "$name" | tail -n 1)
+        case $probe_line in
+            *': RUNNABLE')
+                bad "$name still has a skip but the probe says RUNNABLE"
+                ;;
+            *)
+                ok
+                ;;
+        esac
     fi
     if grep -qx "name = \"libc-$name\"" "$file"; then
         ok
@@ -57,18 +76,6 @@ while IFS='	' read -r name hard soft binaries link; do
         bad "$name has no expectations"
     fi
 done < "$tsv"
-
-for file in "$cases"/libc-*.toml; do
-    [ -f "$file" ] || continue
-    base=${file##*/}
-    name=${base#libc-}
-    name=${name%.toml}
-    if awk -F '	' -v want="$name" '$0 !~ /^#/ && $1 == want { found = 1 } END { exit found ? 0 : 1 }' "$tsv"; then
-        ok
-    else
-        bad "case file $base has no cases.tsv row"
-    fi
-done
 
 printf 'cases-consistency: %s passed, %s failed\n' "$passed" "$failed"
 if [ "$failed" -ne 0 ]; then

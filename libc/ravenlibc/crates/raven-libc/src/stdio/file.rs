@@ -4,10 +4,11 @@
 //! The `FILE` half of `<stdio.h>`: open/close, block and line I/O, seek, buffering and memory
 //! streams. Every body forwards to a C56 crate function and maps `Fail` to the C return/errno.
 
+use alloc::vec::Vec;
 use core::ffi::{c_char, c_int, c_long, c_void};
 
 use raven_libc_abi::errno::Errno;
-use raven_libc_stdio::{EOF, Fail, File, R};
+use raven_libc_stdio::{EOF, Fail, File, LineBuf, R};
 
 use crate::ffi::errno;
 use crate::stdio::streams::streams;
@@ -333,6 +334,109 @@ pub(crate) unsafe extern "C" fn fgets_impl(
     }
 }
 
+/// `fgetln`: the next line in the FILE's own buffer.
+///
+/// # Safety
+/// `stream` is a FILE and `length` is NULL or writable for one `size_t`.
+pub(crate) unsafe extern "C" fn fgetln_impl(
+    stream: *mut c_void,
+    length: *mut usize,
+) -> *mut c_char {
+    let Some(target) = file(stream) else {
+        return crate::ffi::ret::null(Errno(9));
+    };
+    match raven_libc_stdio::fgetln(target) {
+        Ok(_) => {
+            let line = target.getln_buffer();
+            if !length.is_null() {
+                // SAFETY: the caller's out-pointer is writable.
+                unsafe { *length = line.len() };
+            }
+            line.as_ptr() as *mut c_char
+        }
+        Err(error) => fail_ptr(error),
+    }
+}
+
+/// `getline`: grow the caller's buffer and return the line length.
+///
+/// # Safety
+/// `lineptr` and `capacity` are writable, `*lineptr` is NULL or a live malloc block, and
+/// `stream` is a FILE.
+pub(crate) unsafe extern "C" fn getline_impl(
+    lineptr: *mut *mut c_char,
+    capacity: *mut usize,
+    stream: *mut c_void,
+) -> isize {
+    let Some(target) = file(stream) else {
+        return crate::ffi::ret::ssize(Err(Errno(9)));
+    };
+    if lineptr.is_null() || capacity.is_null() {
+        return crate::ffi::ret::ssize(Err(Errno(22)));
+    }
+    // SAFETY: the caller's `char **` and `size_t *` are writable and hold the C buffer pair.
+    let (old, old_capacity) = unsafe { (*lineptr, *capacity) };
+    let mut data = Vec::new();
+    let mut line = LineBuf::new(&mut data, old_capacity);
+    match raven_libc_stdio::getline(target, &mut line) {
+        Ok(_) => {
+            let bytes = line.bytes();
+            let needed = line.capacity().max(bytes.len());
+            let block = if old.is_null() {
+                // SAFETY: the allocator returns `needed` writable bytes or null.
+                unsafe { crate::malloc::abi_alloc(needed) }
+            } else {
+                crate::malloc::heap::api().realloc(old as usize, needed) as *mut u8
+            };
+            if block.is_null() {
+                crate::ffi::errno::set(Errno(12));
+                return -1;
+            }
+            // SAFETY: `block` has `needed >= bytes.len()` writable bytes and the caller's
+            // out-pointers are writable.
+            unsafe {
+                core::ptr::copy_nonoverlapping(bytes.as_ptr(), block, bytes.len());
+                *lineptr = block.cast::<c_char>();
+                *capacity = needed;
+            }
+            isize::try_from(bytes.len().saturating_sub(1)).unwrap_or(-1)
+        }
+        Err(Fail::Eof) => -1,
+        Err(Fail::Errno(error)) => {
+            errno::set(error);
+            -1
+        }
+    }
+}
+
+/// `remove`.
+///
+/// # Safety
+/// `path` is NUL terminated.
+pub(crate) unsafe extern "C" fn remove_impl(path: *const c_char) -> c_int {
+    if path.is_null() {
+        return crate::ffi::ret::int(Err(Errno(22)));
+    }
+    // SAFETY: the C string contract.
+    let path = unsafe { crate::ffi::cstr::slice(path) };
+    match raven_libc_stdio::remove(streams().state(), path) {
+        Ok(()) => 0,
+        Err(error) => fail_int(error),
+    }
+}
+
+/// `rewind`.
+///
+/// # Safety
+/// `stream` is a FILE.
+pub(crate) unsafe extern "C" fn rewind_impl(stream: *mut c_void) {
+    let Some(target) = file(stream) else {
+        errno::set(Errno(9));
+        return;
+    };
+    raven_libc_stdio::rewind(target);
+}
+
 /// `fputs`.
 ///
 /// # Safety
@@ -480,4 +584,6 @@ mod fopen;
 mod fputc;
 mod ftell;
 mod getchar;
+mod line;
+mod misc;
 mod perror;

@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2024 reuben olinsky
+
+use std::path::Path;
+
+use brush_core::builtins;
+
+/// Evaluate the provided script in the current shell environment.
+#[derive(winnow_args::Args)]
+#[arg(disable_help_short, disable_version_flag, disable_help_subcommand)]
+pub(crate) struct DotCommand {
+    /// Path to the script to evaluate.
+    #[arg(positional, double_dash = "automatic")]
+    script_path: String,
+
+    /// Any arguments to be passed as positional parameters to the script.
+    #[arg(positional, allow_negative_numbers)]
+    script_args: Vec<String>,
+}
+
+brush_winnow_args_adapter::impl_parse_args!(DotCommand);
+
+impl<SE: brush_core::ShellExtensions> builtins::Builtin<SE> for DotCommand {
+    type Error = brush_core::Error;
+
+    async fn execute(
+        self,
+        context: brush_core::ExecutionContext<'_, SE>,
+    ) -> Result<brush_core::ExecutionResult, Self::Error> {
+        // TODO(dot): Handle trap inheritance.
+        context
+            .shell
+            .source_script(
+                Path::new(&self.script_path),
+                self.script_args.iter(),
+                &context.params,
+            )
+            .await
+    }
+}

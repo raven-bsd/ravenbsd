@@ -10,7 +10,16 @@ use crate::rootfs::{RootEntry, RootTree};
 use crate::table::LinuxProcess;
 
 fn process() -> LinuxProcess {
-    let mut process = LinuxProcess::new(1, Handle(1), 0x40_0000, 0x50_0000, 0x60_0000, 0x70_0000);
+    let mut process = LinuxProcess::new(
+        1,
+        1,
+        Handle(1),
+        Handle(2),
+        0x40_0000,
+        0x50_0000,
+        0x60_0000,
+        0x70_0000,
+    );
     process.set_identity(b"/compat/linux/bin/busybox", vec![b"busybox".to_vec()]);
     process.set_root(RootTree::new(&[RootEntry {
         path: b"/compat/linux/bin/busybox".to_vec(),

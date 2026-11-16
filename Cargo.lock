@@ -515,6 +515,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pwm-audio"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-audio",
+ "raven-pwm",
+ "raven-rt",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -838,6 +847,26 @@ dependencies = [
 
 [[package]]
 name = "raven-driver"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-dtrace"
+version = "0.1.0"
+dependencies = [
+ "raven-dtrace-user",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-dtrace-core"
+version = "0.1.0"
+
+[[package]]
+name = "raven-dtrace-user"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
@@ -1211,6 +1240,7 @@ dependencies = [
  "raven-libc-pledge",
  "raven-libc-proc",
  "raven-libc-pwd",
+ "raven-libc-rand",
  "raven-libc-regex",
  "raven-libc-resolv",
  "raven-libc-signal",
@@ -1788,6 +1818,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-pi4-soak"
+version = "0.1.0"
+dependencies = [
+ "pwm-audio",
+ "raven-genet",
+ "raven-proto-audio",
+ "raven-pwm",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-pi5"
 version = "0.1.0"
 dependencies = [
@@ -1928,6 +1969,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-pwm"
+version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
+]
+
+[[package]]
 name = "raven-qtest"
 version = "0.1.0"
 dependencies = [
@@ -2030,6 +2078,13 @@ dependencies = [
  "raven-fdt-lite",
  "raven-pci",
  "raven-pi5",
+ "raven-rp1",
+]
+
+[[package]]
+name = "raven-rp1-fw"
+version = "0.1.0"
+dependencies = [
  "raven-rp1",
 ]
 
@@ -2593,6 +2648,13 @@ name = "raven-uname"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-update-health-probe"
+version = "0.1.0"
+dependencies = [
  "raven-rt",
 ]
 

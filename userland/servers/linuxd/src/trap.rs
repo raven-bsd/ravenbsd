@@ -50,12 +50,15 @@ pub fn decode(request: &[u8]) -> Result<LinuxSyscallV1, TrapError> {
 /// hostile or corrupt Linux process; a longer path is not served.
 pub fn copy_in(call: &LinuxSyscallV1) -> Option<(usize, usize)> {
     const PATH_COPY: usize = 128;
+    const NAME_COPY: usize = 16;
     match call.nr {
         1 => {
             let count = usize::try_from(call.args[2]).ok()?;
             Some((1, count.min(crate::table::USER_BUFFER_MAX)))
         }
         2 | 4 | 6 | 21 | 76 | 89 => Some((0, PATH_COPY)),
+        // prctl(PR_SET_NAME, name): only the 16-byte task-name window is read.
+        157 if call.args[0] == 15 => Some((1, NAME_COPY)),
         257 | 260 | 262 | 267 | 268 | 280 | 332 => Some((1, PATH_COPY)),
         _ => None,
     }

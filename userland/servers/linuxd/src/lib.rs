@@ -16,6 +16,7 @@
 
 extern crate alloc;
 
+pub mod clone;
 pub mod handlers;
 pub mod image;
 pub mod loader;
@@ -25,6 +26,7 @@ pub mod rootfs;
 pub mod table;
 pub mod trap;
 
+pub use clone::{CloneKind, child_frame, classify, trampoline_page};
 pub use handlers::dispatcher;
 pub use image::{
     Config, INTERP_BASE, ImageError, ImageSpec, LINUX_ROOT, MAIN_PIE_BASE, interp_path, plan_image,
@@ -33,5 +35,8 @@ pub use loader::{LoadError, Loaded, Sys, load};
 pub use meta::Meta;
 pub use procfs::Resource;
 pub use rootfs::{RootEntry, RootTree};
-pub use table::{DirEntry, FileKind, LinuxProcess, OpenFile, Region, USER_BUFFER_MAX};
+pub use table::{
+    CloneChild, CloneRequest, DirEntry, FLAG_ADDR, FileKind, LinuxProcess, OpenFile, Region,
+    TRAMPOLINE_BASE, USER_BUFFER_MAX,
+};
 pub use trap::{TrapAction, TrapError, copy_in, decode, dispatch, encode_reply, lengths};

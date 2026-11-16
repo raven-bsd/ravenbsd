@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# The Raspberry Pi 5 host-side profile skeleton. B54 does not build a bootable image; B59 owns
-# the image/evidence kit. The UART name is UNVERIFIED until a board log exists.
+# The Raspberry Pi 5 image profile. It inherits the base initfs and selects the proposed Pi UART
+# command line. R8's manifest/evidence kit targets the FAT `kernel_2712.img` layout; the board
+# UART name and the firmware kernel selection remain UNVERIFIED until a Pi 5 log exists.
 name = "pi5"
 extends = "base"
 

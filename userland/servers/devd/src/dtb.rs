@@ -206,10 +206,10 @@ fn walk(
 }
 
 fn is_enabled(node: &Node<'_>) -> bool {
-    match node.property_str("status") {
-        Some("disabled" | "fail" | "fail-sss") => false,
-        _ => true,
-    }
+    !matches!(
+        node.property_str("status"),
+        Some("disabled" | "fail" | "fail-sss")
+    )
 }
 
 fn decode_device(fdt: &Fdt<'_>, node: Node<'_>, depth: usize) -> Result<DeviceSpec, DtbError> {

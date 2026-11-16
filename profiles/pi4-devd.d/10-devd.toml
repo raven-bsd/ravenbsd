@@ -12,6 +12,7 @@ path = "/etc/drivers.toml"
 [[initfs.files]]
 src = "build/fixtures/pi4-devd/pi4-devd.dtb"
 path = "/etc/pi4.dtb"
+generated = true
 
 [[initfs.files]]
 src = "profiles/pi4-devd.d/svcd.conf"

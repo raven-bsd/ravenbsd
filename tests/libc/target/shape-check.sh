@@ -55,10 +55,10 @@ awk '$1 == "LOAD" {
         for (i = 7; i < NF; i++) {
             flags = flags $i
         }
-        print $2, $3, flags, $NF
+        print $2, $3, $5, flags, $NF
     }' "$tmp" > "$loads_file"
 
-while read -r offset virt flags align; do
+while read -r offset virt size flags align; do
     case $flags in
         *W*E* | *E*W*)
             printf 'shape: FAIL writable and executable PT_LOAD at %s\n' "$virt"
@@ -71,8 +71,14 @@ while read -r offset virt flags align; do
     fi
     off_value=$((offset))
     virt_value=$((virt))
+    size_value=$((size))
     if [ $((off_value % 4096)) -ne $((virt_value % 4096)) ]; then
         printf 'shape: FAIL offset/vaddr mismatch at %s\n' "$virt"
+        exit 1
+    fi
+    if [ "$size_value" -ne 0 ] && [ $(((off_value + size_value) % 4096)) -ne 0 ]; then
+        printf 'shape: FAIL partial file tail at %s (offset %s + size %s)\n' \
+            "$virt" "$offset" "$size"
         exit 1
     fi
 done < "$loads_file"

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# One-shot UFS-root service: readiness is the clean exit, so the health marker waits for a real
+# root service result rather than for "all services up".
+name = "health-probe"
+exec = "/sbin/health-probe"
+args = ["health-probe"]
+needs = ["scheme:file"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

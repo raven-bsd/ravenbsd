@@ -99,15 +99,17 @@ mod program {
     use alloc::vec::Vec;
 
     use linuxd::{
-        LinuxProcess, RootEntry, RootTree, TrapAction, copy_in, decode, dispatch, dispatcher,
-        encode_reply, interp_path, load, plan_image,
+        CloneChild, CloneKind, FLAG_ADDR, LinuxProcess, Region, RootEntry, RootTree, Sys as _,
+        TrapAction, child_frame, classify, copy_in, decode, dispatch, dispatcher, encode_reply,
+        interp_path, load, plan_image, trampoline_page,
     };
     use raven_abi::errno::Errno;
-    use raven_abi::types::{Handle, clock};
+    use raven_abi::types::{Handle, clock, map, prot};
     use raven_initfs::Initfs;
     use raven_ipc::protocol::{self, Opcode, PACKET_SIZE, SchemePacket};
+    use raven_linux_abi::flags::clone as clone_flags;
     use raven_linux_dispatch::Dispatcher;
-    use raven_proto_linux::REPLY_LEN;
+    use raven_proto_linux::{LinuxFrame, REPLY_LEN};
     use raven_rt::entry;
     use raven_rt::println;
     use raven_rt::spawn::RtSys;
@@ -116,6 +118,9 @@ mod program {
     use crate::{KernelSys, raw};
 
     entry!(main);
+
+    /// Page size used by every clone mapping.
+    const PAGE: usize = 4096;
 
     /// A Linux process that stops before its first syscall is a failure, not a hang.
     const WATCHDOG_SECS: u64 = 20;
@@ -194,7 +199,7 @@ mod program {
         }
 
         let mut sys = KernelSys;
-        let loaded = match load(&spec, &image, interpreter.as_deref(), &mut sys) {
+        let mut loaded = match load(&spec, &image, interpreter.as_deref(), &mut sys) {
             Ok(loaded) => loaded,
             Err(error) => {
                 println!("linuxd: load failed: {error:?}");
@@ -206,6 +211,22 @@ mod program {
             loaded.regions.len(),
             loaded.sp
         );
+
+        // The clone cooperation page must exist before the Linux thread starts: a fork child has
+        // no process identity in the trap packet and signals its parent through this shared page.
+        let flag_object = match setup_flag_page(&mut sys, loaded.proc) {
+            Ok(object) => object,
+            Err(error) => {
+                println!("linuxd: clone flag page failed: {}", error.description());
+                return 7;
+            }
+        };
+        loaded.regions.push(Region {
+            start: FLAG_ADDR,
+            len: PAGE as u64,
+            backing: flag_object,
+            backing_offset: 0,
+        });
 
         let handler = match raw::scheme_register("linux") {
             Ok(handle) => handle,
@@ -229,17 +250,41 @@ mod program {
             Ok(stack) => stack,
             Err(_) => return 6,
         };
-        let thread = match sys::thread_create(loaded.proc, entry, stack, 0) {
-            Ok(thread) => thread,
-            Err(error) => {
-                println!("linuxd: thread create failed: {}", error.description());
-                return 6;
-            }
-        };
+        let mut native_tid = 0u32;
+        let thread =
+            match raw::thread_create_ex(loaded.proc, entry, stack, 0, 0, &mut native_tid, 0) {
+                Ok(thread) => thread,
+                Err(error) => {
+                    println!("linuxd: thread create failed: {}", error.description());
+                    return 6;
+                }
+            };
 
         let _watchdog = raven_rt::thread::spawn(watchdog, 0, 64 * 1024);
         let trace = args.get(2).is_some_and(|argument| argument == "trace");
-        serve(sys, loaded, handler, thread, path, argv, trace, root_tree())
+        serve(
+            sys,
+            loaded,
+            handler,
+            thread,
+            native_tid,
+            path,
+            argv,
+            trace,
+            root_tree(),
+        )
+    }
+
+    /// Map the shared clone cooperation page into `proc` at [`linuxd::FLAG_ADDR`].
+    fn setup_flag_page(sys: &mut KernelSys, proc: Handle) -> Result<Handle, Errno> {
+        let object = sys.memobj_create(PAGE)?;
+        let flags = map::pack(prot::READ | prot::WRITE, map::FIXED | map::SHARED);
+        let address = usize::try_from(FLAG_ADDR).map_err(|_| Errno::EINVAL)?;
+        if let Err(error) = sys.map(proc, object, 0, address, PAGE, flags) {
+            let _ = sys.handle_close(object);
+            return Err(error);
+        }
+        Ok(object)
     }
 
     fn image_from_initfs(path: &str) -> Result<Vec<u8>, i32> {
@@ -311,11 +356,13 @@ mod program {
         bytes
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn serve(
         mut sys: KernelSys,
         loaded: linuxd::Loaded,
         handler: Handle,
         thread: Handle,
+        native_tid: u32,
         path: &str,
         argv: Vec<Vec<u8>>,
         trace: bool,
@@ -324,6 +371,8 @@ mod program {
         let mut dispatcher = dispatcher();
         let mut process = LinuxProcess::new(
             1,
+            native_tid,
+            loaded.proc,
             thread,
             loaded.brk,
             loaded.brk_limit,
@@ -368,6 +417,7 @@ mod program {
                 trace,
             );
             if let Some(code) = exit {
+                cleanup_clones(&mut sys, &mut process);
                 print_stats(&dispatcher, handler);
                 let _ = sys::proc_terminate(loaded.proc, code);
                 let mut rt = RtSys;
@@ -414,6 +464,9 @@ mod program {
             return None;
         }
         process.user_buffer.clear();
+        // B21a carries the saved user frame in the packet path. A malformed or absent frame leaves
+        // `None`; only `clone` needs it, and it answers `-ENOSYS` without one.
+        process.frame = LinuxFrame::decode(&packet.path).ok();
         if let Some((argument, len)) = copy_in(&call) {
             process.user_buffer.resize(len, 0);
             let source = call.args.get(argument).copied().unwrap_or(0);
@@ -431,6 +484,17 @@ mod program {
             match raw::set_tls(process.thread, base) {
                 Ok(()) => process.fs_base = base,
                 Err(error) => action = TrapAction::Reply(-(error.0 as isize)),
+            }
+        }
+        // `clone` is the one handler that needs kernel work: the trap loop maps the trampoline,
+        // creates the native task and replaces the handler's placeholder with the child pid/tid.
+        if let Some(request) = process.pending_clone.take() {
+            match run_clone(sys, process, request) {
+                Ok(value) => action = TrapAction::Reply(value),
+                Err(error) => {
+                    println!("linuxd: clone failed: {}", error.description());
+                    action = TrapAction::Reply(-(error.0 as isize));
+                }
             }
         }
         // The per-trap trace is opt-in (`linuxd /hello trace`): the B30 fixture emits its own
@@ -462,6 +526,181 @@ mod program {
                 let packet = reply_packet(packet, 0);
                 let _ = sys::send(request, &packet);
                 Some(code)
+            }
+        }
+    }
+
+    /// Perform one validated `clone`: map the trampoline, create the native task, write the tid
+    /// outputs and return the child pid/tid for the parent's reply.
+    fn run_clone(
+        sys: &mut KernelSys,
+        process: &mut LinuxProcess,
+        request: linuxd::CloneRequest,
+    ) -> Result<isize, Errno> {
+        let kind = classify(&request)?;
+        let frame = child_frame(&request, kind)?;
+        let page = trampoline_page(&frame);
+        let address = map_trampoline(sys, process, &page)?;
+        let tp = if request.flags & clone_flags::CLONE_SETTLS != 0 {
+            request.tls
+        } else {
+            request.frame.fs_base
+        };
+        let clear_tid = if request.flags & clone_flags::CLONE_CHILD_CLEARTID != 0 {
+            request.ctid
+        } else {
+            0
+        };
+        match kind {
+            CloneKind::Thread => {
+                let mut native_tid = 0u32;
+                let thread = raw::thread_create_ex(
+                    process.proc,
+                    address as usize,
+                    request.child_stack as usize,
+                    0,
+                    tp,
+                    &mut native_tid,
+                    clear_tid,
+                )?;
+                let task = process.next_task_id();
+                process.clones.push(CloneChild {
+                    task,
+                    native_tid,
+                    process: None,
+                    thread: Some(thread),
+                });
+                if request.flags & clone_flags::CLONE_PARENT_SETTID != 0 {
+                    write_word(sys, process, request.ptid, task)?;
+                }
+                if request.flags & clone_flags::CLONE_CHILD_SETTID != 0 {
+                    write_word(sys, process, request.ctid, task)?;
+                }
+                Ok(task as isize)
+            }
+            CloneKind::Fork => {
+                let child = raw::proc_fork(process.proc)?;
+                // `THREAD_CREATE` requires a 16-byte-aligned initial stack. The trampoline
+                // immediately replaces RSP with the exact frame value, so only this admission
+                // check sees the rounded address.
+                let stack = if request.child_stack != 0 {
+                    request.child_stack
+                } else {
+                    request.frame.rsp & !0xf
+                };
+                let mut native_tid = 0u32;
+                let thread = match raw::thread_create_ex(
+                    child,
+                    address as usize,
+                    stack as usize,
+                    0,
+                    tp,
+                    &mut native_tid,
+                    clear_tid,
+                ) {
+                    Ok(thread) => thread,
+                    Err(error) => {
+                        let _ = sys::proc_terminate(child, 0);
+                        let mut rt = RtSys;
+                        let mut status = 0;
+                        let _ = rt.proc_wait(child, &mut status);
+                        let _ = sys.handle_close(child);
+                        return Err(error);
+                    }
+                };
+                let _ = sys.handle_close(thread);
+                let task = process.next_task_id();
+                process.clones.push(CloneChild {
+                    task,
+                    native_tid,
+                    process: Some(child),
+                    thread: None,
+                });
+                if request.flags & clone_flags::CLONE_PARENT_SETTID != 0 {
+                    write_word(sys, process, request.ptid, task)?;
+                }
+                Ok(task as isize)
+            }
+        }
+    }
+
+    /// Map one executable trampoline page into the Linux process at a fresh fixed address.
+    ///
+    /// The page content is written through a shared mapping in linuxd's own address space; the
+    /// process mapping is read/execute only, as the kernel rejects a writable+executable mapping.
+    fn map_trampoline(
+        sys: &mut KernelSys,
+        process: &mut LinuxProcess,
+        page: &[u8; PAGE],
+    ) -> Result<u64, Errno> {
+        for _ in 0..64 {
+            let address = process.next_trampoline();
+            let object = sys.memobj_create(PAGE)?;
+            let scratch_flags = map::pack(prot::READ | prot::WRITE, map::SHARED);
+            let scratch = match sys.map(Handle::SELF_PROC, object, 0, 0, PAGE, scratch_flags) {
+                Ok(scratch) => scratch,
+                Err(error) => {
+                    let _ = sys.handle_close(object);
+                    return Err(error);
+                }
+            };
+            // SAFETY: `scratch` is a PAGE-byte read/write mapping of `object` in this process and
+            // `page` is exactly PAGE bytes; the ranges do not overlap.
+            unsafe {
+                core::ptr::copy_nonoverlapping(page.as_ptr(), scratch as *mut u8, PAGE);
+            }
+            let _ = sys.unmap(Handle::SELF_PROC, scratch, PAGE);
+            // Generic memory objects carry no EXEC right in ABI v1, so map read/write and change
+            // the target VMA to read/execute; the loader uses the same pattern for ELF text.
+            let target_flags = map::pack(prot::READ | prot::WRITE, map::FIXED | map::SHARED);
+            let fixed = usize::try_from(address).map_err(|_| Errno::EINVAL)?;
+            match sys.map(process.proc, object, 0, fixed, PAGE, target_flags) {
+                Ok(_) => {}
+                Err(Errno::EEXIST) => {
+                    let _ = sys.handle_close(object);
+                    continue;
+                }
+                Err(error) => {
+                    let _ = sys.handle_close(object);
+                    return Err(error);
+                }
+            }
+            let _ = sys.handle_close(object);
+            let protection = (prot::READ | prot::EXEC) as u8;
+            if let Err(error) = sys.protect(process.proc, fixed, PAGE, protection) {
+                let _ = sys.unmap(process.proc, fixed, PAGE);
+                return Err(error);
+            }
+            return Ok(address);
+        }
+        Err(Errno::ENOMEM)
+    }
+
+    /// Store a four-byte Linux task id in the parent's address space.
+    fn write_word(
+        sys: &mut KernelSys,
+        process: &LinuxProcess,
+        address: u64,
+        value: u32,
+    ) -> Result<(), Errno> {
+        if address == 0 {
+            return Ok(());
+        }
+        raw::copy_out(sys, &process.regions, address, &value.to_le_bytes())
+    }
+
+    /// Reap every task `clone` created before the parent goes away.
+    fn cleanup_clones(sys: &mut KernelSys, process: &mut LinuxProcess) {
+        for child in process.clones.drain(..) {
+            if let Some(handle) = child.process {
+                let _ = sys::proc_terminate(handle, 0);
+                let mut rt = RtSys;
+                let mut status = 0;
+                let _ = rt.proc_wait(handle, &mut status);
+                let _ = sys.handle_close(handle);
+            }
+            if let Some(handle) = child.thread {
+                let _ = sys.handle_close(handle);
             }
         }
     }

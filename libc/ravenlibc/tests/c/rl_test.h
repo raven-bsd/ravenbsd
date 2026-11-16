@@ -86,6 +86,19 @@ static inline void rl_open_console(void)
 #endif
 }
 
+/* C38's raven_open_scheme is still unbound in the shell, and a service child starts with an
+ * empty fd table. Fall back to the kernel debug console (the same serial line svcd uses) so the
+ * checks can report their result instead of dying silently. */
+static inline long rl_debug_write(const char *text, unsigned long length)
+{
+    long result;
+    __asm__ volatile("syscall"
+                     : "=a"(result)
+                     : "a"(3L), "D"(text), "S"(length)
+                     : "rcx", "r11", "memory");
+    return result;
+}
+
 static inline void rl_emit(const char *text, unsigned long length)
 {
     unsigned long done = 0;
@@ -104,10 +117,13 @@ static inline void rl_emit(const char *text, unsigned long length)
             if (written < 0 && errno == EBADF && attempt == 0) {
                 rl_open_console();
                 if (!rl_console_ready) {
-                    (void)write(2, text, length);
+                    (void)rl_debug_write(text + done, length - done);
                     return;
                 }
                 break;
+            }
+            if (!rl_console_ready) {
+                (void)rl_debug_write(text + done, length - done);
             }
             return;
         }

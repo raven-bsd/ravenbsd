@@ -1,0 +1,21 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 15, 2026
+.Dt DTRACE_CLEAR 2
+.Os RavenBSD
+.Sh NAME
+.Nm dtrace_clear
+.Nd reset DTrace rings and counters
+.Sh SYNOPSIS
+.Fn dtrace_clear void
+.Sh DESCRIPTION
+.Nm drains every per-CPU ring, resets the sequence counter and the drop
+counters, and releases the consumer event.  The caller must disable every
+probe first.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EBUSY
+At least one probe is still enabled.
+.El
+.Sh STANDARDS
+RavenBSD ABI v1.

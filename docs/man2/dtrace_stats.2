@@ -1,0 +1,31 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 15, 2026
+.Dt DTRACE_STATS 2
+.Os RavenBSD
+.Sh NAME
+.Nm dtrace_stats
+.Nd report per-CPU DTrace ring statistics
+.Sh SYNOPSIS
+.Fn dtrace_stats out max
+.Sh DESCRIPTION
+.Nm writes up to
+.Fa max
+per-CPU entries to
+.Fa out
+and returns the number of online CPUs represented by the rings, capped at the
+number of ring slots.
+An entry is 32 bytes: produced, consumed, dropped and capacity, each a 64-bit
+unsigned integer.
+A
+.Fa max
+of zero returns the CPU count without touching
+.Fa out .
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EFAULT
+.Fa out
+is not writable user memory.
+.El
+.Sh STANDARDS
+RavenBSD ABI v1.

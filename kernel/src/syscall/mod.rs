@@ -14,6 +14,8 @@ pub mod basic;
 #[cfg(target_arch = "x86_64")]
 pub mod debug_read;
 pub mod driver;
+/// `DTRACE_*` provider control syscalls (S57).
+pub mod dtrace;
 pub mod event;
 pub mod futex;
 pub mod handle_xfer;
@@ -67,6 +69,12 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
         };
     }
     let number = usize::try_from(frame.rax).unwrap_or(usize::MAX);
+    // S57: DTrace control calls are dispatched before the native table and are not traced
+    // themselves; every other native call fires the syscall-entry probe first.
+    if dtrace::is_control(number) {
+        return dtrace::dispatch(number, frame);
+    }
+    dtrace::syscall_probe(frame);
     if number == process_ctl::PROC_FORK {
         return process_ctl::fork(frame);
     }
@@ -199,6 +207,20 @@ fn result_value(result: Result<usize, Errno>) -> u64 {
 #[cfg(target_arch = "x86_64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn syscall_dispatch(frame: &mut crate::arch::x86_64::trapframe::TrapFrame) {
+    // B21a: the Linux trap carries the full user frame; a handler may resume the thread at a
+    // different RIP/RSP. The compact `dispatch` path remains for native calls.
+    #[cfg(target_arch = "x86_64")]
+    if let Some(caller) = process::current()
+        && caller.personality.lock().personality == Personality::Linux
+    {
+        match linux::trap_x86_64(&caller, frame) {
+            Ok(value) => frame.rax = value as u64,
+            Err(error) => process::exit_process(error.to_ret() as i32),
+        }
+        crate::arch::x86_64::syscall::deliver_signal(frame);
+        crate::sched::syscall_return();
+        return;
+    }
     let registers = SyscallFrame {
         rax: frame.rax,
         rdi: frame.rdi,

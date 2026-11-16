@@ -68,7 +68,9 @@ impl Slot {
 enum FixtureHealth {
     /// Marker confirms the trial slot.
     Good,
-    /// Marker is stale and cannot confirm.
+    /// Marker is stale but the trial slot is valid; the loader boots it and waits.
+    Trial,
+    /// Marker is stale and the trial slot is invalid; the loader rolls back.
     Bad,
 }
 
@@ -81,11 +83,15 @@ struct Options {
     image: Option<PathBuf>,
     kernel: Option<PathBuf>,
     initfs: Option<PathBuf>,
+    base_kernel: Option<PathBuf>,
+    base_initfs: Option<PathBuf>,
     slot: Option<Slot>,
     attempts: u32,
     fixture: Option<PathBuf>,
     health: Option<FixtureHealth>,
     blank: Option<PathBuf>,
+    root_staging: Option<PathBuf>,
+    root_size: u64,
 }
 
 impl Default for Options {
@@ -97,11 +103,15 @@ impl Default for Options {
             image: None,
             kernel: None,
             initfs: None,
+            base_kernel: None,
+            base_initfs: None,
             slot: None,
             attempts: 2,
             fixture: None,
             health: None,
             blank: None,
+            root_staging: None,
+            root_size: 8 * 1024 * 1024,
         }
     }
 }
@@ -175,6 +185,9 @@ pub(crate) fn run_cli(args: &[String]) -> ExitCode {
 }
 
 fn execute(options: &Options) -> Result<()> {
+    if options.root_staging.is_some() && options.fixture.is_none() {
+        bail!("--root-staging requires --fixture");
+    }
     if let Some(path) = &options.blank {
         return build_blank(path);
     }
@@ -245,6 +258,20 @@ fn parse(args: &[String]) -> Result<Option<Options>> {
                         .ok_or_else(|| anyhow!("--initfs needs a value"))?,
                 ));
             }
+            "--base-kernel" => {
+                index += 1;
+                options.base_kernel = Some(PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| anyhow!("--base-kernel needs a value"))?,
+                ));
+            }
+            "--base-initfs" => {
+                index += 1;
+                options.base_initfs = Some(PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| anyhow!("--base-initfs needs a value"))?,
+                ));
+            }
             "--slot" => {
                 index += 1;
                 let value = args
@@ -277,8 +304,9 @@ fn parse(args: &[String]) -> Result<Option<Options>> {
                     .ok_or_else(|| anyhow!("--health needs a value"))?;
                 options.health = Some(match value.as_str() {
                     "good" => FixtureHealth::Good,
+                    "trial" => FixtureHealth::Trial,
                     "bad" => FixtureHealth::Bad,
-                    other => bail!("--health must be good or bad, found `{other}`"),
+                    other => bail!("--health must be good, trial or bad, found `{other}`"),
                 });
             }
             "--blank" => {
@@ -287,6 +315,26 @@ fn parse(args: &[String]) -> Result<Option<Options>> {
                     args.get(index)
                         .ok_or_else(|| anyhow!("--blank needs a value"))?,
                 ));
+            }
+            "--root-staging" => {
+                index += 1;
+                options.root_staging = Some(PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| anyhow!("--root-staging needs a value"))?,
+                ));
+            }
+            "--root-size" => {
+                index += 1;
+                let value = args
+                    .get(index)
+                    .ok_or_else(|| anyhow!("--root-size needs a value"))?;
+                options.root_size = value
+                    .parse()
+                    .map_err(|_| anyhow!("--root-size must be an integer"))?;
+                ensure!(
+                    options.root_size >= 1024 * 1024 && options.root_size.is_multiple_of(4096),
+                    "--root-size must be a 4 KiB multiple of at least 1 MiB"
+                );
             }
             other => bail!("unknown update option `{other}`"),
         }
@@ -319,10 +367,14 @@ fn print_help() {
            --image <path>            disk image to update or create\n\
            --kernel <path>           kernel for the inactive slot\n\
            --initfs <path>           initfs for the inactive slot\n\
+           --base-kernel <path>      confirmed-slot kernel (fixture; default --kernel)\n\
+           --base-initfs <path>      confirmed-slot initfs (fixture; default --initfs)\n\
            --slot <a|b>              inactive slot (default: the other slot)\n\
            --attempts <n>            trial boot budget (default 2)\n\
            --fixture <path>          build the QEMU rollback slot volume\n\
-           --health <good|bad>       fixture health marker state\n\
+           --health <good|trial|bad> fixture health marker state\n\
+           --root-staging <dir>      fixture UFS root staging tree\n\
+           --root-size <bytes>       fixture UFS root size (default 8 MiB)\n\
            --blank <path>            build a blank GPT disk for the init fixture\n\
            --help                    show this help\n\
          \n\
@@ -729,19 +781,28 @@ fn build_blank(output: &Path) -> Result<()> {
 }
 
 fn build_fixture(options: &Options, output: &Path) -> Result<()> {
-    let kernel = options
+    let kernel_path = options
         .kernel
         .as_ref()
         .ok_or_else(|| anyhow!("--fixture needs --kernel"))?;
-    let kernel = fs::read(kernel).with_context(|| format!("cannot read {}", kernel.display()))?;
-    let initfs = match &options.initfs {
+    let trial_kernel =
+        fs::read(kernel_path).with_context(|| format!("cannot read {}", kernel_path.display()))?;
+    let trial_initfs = match &options.initfs {
         Some(path) => fs::read(path).with_context(|| format!("cannot read {}", path.display()))?,
         None => b"fixture initfs".to_vec(),
     };
-    let token = token_for(&kernel, &initfs);
+    let base_kernel = match &options.base_kernel {
+        Some(path) => fs::read(path).with_context(|| format!("cannot read {}", path.display()))?,
+        None => trial_kernel.clone(),
+    };
+    let base_initfs = match &options.base_initfs {
+        Some(path) => fs::read(path).with_context(|| format!("cannot read {}", path.display()))?,
+        None => trial_initfs.clone(),
+    };
+    let token = token_for(&trial_kernel, &trial_initfs);
     let health = options.health.unwrap_or(FixtureHealth::Bad);
-    let trial_kernel: &[u8] = match health {
-        FixtureHealth::Good => &kernel,
+    let installed_kernel: &[u8] = match health {
+        FixtureHealth::Good | FixtureHealth::Trial => &trial_kernel,
         FixtureHealth::Bad => b"not an ELF64 image\n",
     };
     let meta = BootMeta {
@@ -759,32 +820,97 @@ fn build_fixture(options: &Options, output: &Path) -> Result<()> {
         builder.add_dir(dir)?;
     }
     builder.add_file("raven/boot.toml", meta.render().as_bytes())?;
-    builder.add_file("raven/slot-a/kernel.elf", &kernel)?;
-    builder.add_file("raven/slot-a/initfs.img", &initfs)?;
-    builder.add_file("raven/slot-b/kernel.elf", trial_kernel)?;
-    builder.add_file("raven/slot-b/initfs.img", &initfs)?;
+    builder.add_file("raven/slot-a/kernel.elf", &base_kernel)?;
+    builder.add_file("raven/slot-a/initfs.img", &base_initfs)?;
+    builder.add_file("raven/slot-b/kernel.elf", installed_kernel)?;
+    builder.add_file("raven/slot-b/initfs.img", &trial_initfs)?;
     let esp = builder.finish()?;
-    let gpt = GptLayout::new(
-        image::TOTAL_SECTORS,
-        vec![Partition::new(
-            TYPE_ESP,
-            0,
-            image::ESP_START_LBA,
-            image::ESP_START_LBA + image::ESP_SECTORS - 1,
-            "ESP",
-        )],
-    )?;
+
+    let (gpt, root_image) = if let Some(staging) = &options.root_staging {
+        let staging = absolute_input(staging)?;
+        ensure!(
+            staging.is_dir(),
+            "root staging tree {} is not a directory",
+            staging.display()
+        );
+        write_root_health(&staging, token)?;
+        let ufs_path = output.with_extension("root.ufs");
+        crate::rootfs::build_ufs_root(&staging, options.root_size, &ufs_path)?;
+        let ufs =
+            fs::read(&ufs_path).with_context(|| format!("cannot read {}", ufs_path.display()))?;
+        ensure!(
+            ufs.len() as u64 == options.root_size,
+            "fixture UFS root has the wrong size"
+        );
+        let _ = fs::remove_file(&ufs_path);
+        let ufs_sectors = options.root_size / SECTOR_SIZE;
+        let ufs_start = image::ESP_START_LBA + image::ESP_SECTORS;
+        let ufs_end = ufs_start + ufs_sectors - 1;
+        ensure!(
+            ufs_end + 33 < image::TOTAL_SECTORS,
+            "fixture UFS root does not fit the image"
+        );
+        let gpt = GptLayout::new(
+            image::TOTAL_SECTORS,
+            vec![
+                Partition::new(
+                    TYPE_ESP,
+                    0,
+                    image::ESP_START_LBA,
+                    image::ESP_START_LBA + image::ESP_SECTORS - 1,
+                    "ESP",
+                ),
+                Partition::new(TYPE_LINUX_DATA, 1, ufs_start, ufs_end, "ufs-root"),
+            ],
+        )?;
+        (gpt, Some((ufs, ufs_start)))
+    } else {
+        let gpt = GptLayout::new(
+            image::TOTAL_SECTORS,
+            vec![Partition::new(
+                TYPE_ESP,
+                0,
+                image::ESP_START_LBA,
+                image::ESP_START_LBA + image::ESP_SECTORS - 1,
+                "ESP",
+            )],
+        )?;
+        (gpt, None)
+    };
     if let Some(parent) = output.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("cannot create {}", parent.display()))?;
     }
     image::write_image(output, &gpt, &esp)?;
+    if let Some((ufs, ufs_start)) = root_image {
+        write_file_at(output, ufs_start * SECTOR_SIZE, &ufs)?;
+    }
     let (marker_token, state) = match health {
         FixtureHealth::Good => (token, HEALTH_STATE_HEALTHY),
-        FixtureHealth::Bad => (token, HEALTH_STATE_TRIAL),
+        FixtureHealth::Trial | FixtureHealth::Bad => (token, HEALTH_STATE_TRIAL),
     };
     write_marker(output, Slot::B, marker_token, state)?;
     println!("{}", output.display());
+    Ok(())
+}
+
+/// Add the health record to a fixture UFS root staging tree.
+fn write_root_health(staging: &Path, token: u32) -> Result<()> {
+    let etc = staging.join("etc");
+    fs::create_dir_all(&etc).with_context(|| format!("cannot create {}", etc.display()))?;
+    let record = format!("slot = \"b\"\ntoken = \"{token:08x}\"\nlba = \"{MARKER_LBA}\"\n");
+    let path = etc.join("boot-health");
+    fs::write(&path, record).with_context(|| format!("cannot write {}", path.display()))
+}
+
+fn write_file_at(path: &Path, offset: u64, bytes: &[u8]) -> Result<()> {
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .open(path)
+        .with_context(|| format!("cannot open {}", path.display()))?;
+    file.seek(SeekFrom::Start(offset))?;
+    file.write_all(bytes)?;
+    file.flush()?;
     Ok(())
 }
 

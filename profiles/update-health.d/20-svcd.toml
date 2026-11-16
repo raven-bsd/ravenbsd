@@ -4,8 +4,3 @@
 [[initfs.files]]
 src = "profiles/update-health.d/svcd.conf"
 path = "/etc/svcd.conf"
-
-[[initfs.files]]
-src = "profiles/update-health.d/boot-health"
-path = "/etc/boot-health"
-mode = 0o444

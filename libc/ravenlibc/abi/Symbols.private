@@ -28,3 +28,4 @@ __rl_malloc_impl_impl
 __rl_scan_float_impl
 __rl_stdio_exit_impl
 __rl_tz_load_impl
+errno_location
