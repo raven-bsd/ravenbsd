@@ -28,3 +28,9 @@ id = "util.strings"
 status = "present"
 evidence = "test:tests/posix/utility/text2/strings/test.sh"
 notes = "P4e: first-party strings host behaviour tests"
+
+[[row]]
+id = "util.sed"
+status = "present"
+evidence = "test:tests/posix/utility/text2/sed/test.sh"
+notes = "P4h: first-party sed subset host behaviour tests"
