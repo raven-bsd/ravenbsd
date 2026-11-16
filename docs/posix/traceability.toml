@@ -194,7 +194,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.float.h"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.fmtmsg.h"
@@ -242,7 +242,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.iso646.h"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.langinfo.h"
@@ -260,7 +260,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.libintl.h"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.limits.h"
@@ -392,25 +392,25 @@ evidence = "libc/ravenlibc/include"
 id = "header.stdarg.h"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.stdatomic.h"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.stdbool.h"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.stddef.h"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.stdint.h"
@@ -572,7 +572,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.tgmath.h"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.threads.h"

@@ -2957,6 +2957,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-usb-core-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-usb-core",
+]
+
+[[package]]
 name = "raven-usb-hid"
 version = "0.1.0"
 

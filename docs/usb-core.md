@@ -92,6 +92,27 @@ port/device behaviour remain R4 UNVERIFIED items.
 
 `make check-fast` is the ticket gate.
 
+### Guest qtest
+
+`cargo xtask qtest --case usb-core --arch x86_64` boots `tests/fixtures/usb-core/probe` with the
+same synthetic descriptor set. The probe parses the device/configuration/interface/endpoint chain,
+assigns and releases address 1, checks the `GET_DESCRIPTOR` setup bytes, reaches `Configured` and
+drives the hub port through attach, power, reset, enable and detach. It prints:
+
+```
+usb-core: descriptors vendor=0x1d04 product=0x0001 configs=1
+usb-core: config value=1 interfaces=1 endpoints=1
+usb-core: endpoint address=0x81 dci=3
+usb-core: address assigned=1 pool=1
+usb-core: setup request=0x06 length=18
+usb-core: hub port=0 state=enabled
+usb-core: hub detach ok
+usb-core: pass
+```
+
+This is a guest model of the core, not a real xHCI/USB device run; the board claims stay
+UNVERIFIED.
+
 ## 6. S60 seam and board steps
 
 S60 HID can consume `Configuration`, `Interface`, `EndpointDescriptor`, `ControlTransport` and the
