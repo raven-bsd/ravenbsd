@@ -90,6 +90,13 @@ for `NOFILE`, `AS`, `CORE` and the rest belongs to the consumers/follow-ups.
 `cur > max` is `EINVAL`; raising the soft limit above the hard limit without
 effective uid 0 is `EPERM`.
 
+## Kernel stack
+
+P2i raised the shared kernel stack from five to seven mapped pages (28 KiB plus the guard).
+P2g measured `PROC_FORK`/`PROC_SIGNAL` at 24,816 bytes including the 288-byte aarch64 trap frame;
+six pages would still be short, while seven restore about 3.9 KiB of headroom. The same constant
+is used by x86_64, where the current cases were shallower but the latent depth is the same.
+
 ## Tests
 
 ```sh
