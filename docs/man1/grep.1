@@ -1,0 +1,57 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt GREP 1
+.Os RavenBSD
+.Sh NAME
+.Nm grep
+.Nd select lines matching a pattern
+.Sh SYNOPSIS
+.Nm
+.Op Fl i
+.Op Fl v
+.Op Fl n
+.Op Fl l
+.Op Fl q
+.Op Fl c
+.Op Fl E
+.Op Fl F
+.Ar pattern
+.Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility selects lines in each
+.Ar file
+that match
+.Ar pattern.
+The target image currently requires at least one file; the host byte-stream core also covers
+standard input.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl c
+Print the count of selected lines.
+.It Fl E
+Use extended regular expressions.
+.It Fl F
+Use fixed strings instead of regular expressions.
+.It Fl i
+Ignore case.
+.It Fl l
+Print only the names of matching files.
+.It Fl n
+Prefix each selected line with its line number.
+.It Fl q
+Quiet; exit 0 on the first match.
+.It Fl v
+Select non-matching lines.
+.El
+.Sh EXIT STATUS
+.Ex -std
+0 for a match, 1 for no match, 2 for usage, an invalid pattern or an I/O error.
+.Sh SEE ALSO
+.Xr cmp 1 ,
+.Xr diff 1
+.Sh STANDARDS
+RavenBSD.

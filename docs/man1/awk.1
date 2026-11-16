@@ -1,0 +1,63 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt AWK 1
+.Os RavenBSD
+.Sh NAME
+.Nm awk
+.Nd pattern-directed scanning and processing (bounded POSIX core)
+.Sh SYNOPSIS
+.Nm
+.Op Fl F Ar fs
+.Op Fl v Ar name=value
+.Op Fl f Ar program-file
+.Ar program
+.Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility applies pattern-action rules to records read from the input files.
+The supported core includes:
+.Bl -bullet
+.It
+records and fields
+.Pq Va $0 .. $NF ,
+.Fl F
+and
+.Va FS ;
+.It
+.Va BEGIN
+and
+.Va END
+rules;
+.It
+arithmetic, comparison, logical and regex-match operators, string concatenation and variables;
+.It
+associative arrays and
+.Ic for ( Ns Ar k Ic in Ar a Ns Ic ) ;
+.It
+.Ic if/else , while
+and C-style
+.Ic for ;
+.It
+.Ic print , printf , length , substr , index , split , sub , gsub , match ,
+.Ic sprintf
+and
+.Ic int ;
+.It
+.Va NR , NF , FS , OFS
+and
+.Va ORS .
+.El
+.Pp
+User-defined functions, `getline`, pipes, `close`, `system`, output redirection, full regex
+escapes and unlisted built-ins are not implemented and are usage errors.
+The target image currently requires file operands; standard input is a follow-up.
+.Sh EXIT STATUS
+.Ex -std
+0 on success, 2 for an invalid/unsupported program or an I/O error.
+.Sh SEE ALSO
+.Xr grep 1 ,
+.Xr sed 1
+.Sh STANDARDS
+RavenBSD.

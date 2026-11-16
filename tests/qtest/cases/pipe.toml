@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P2j pipe primitive: data, 64 KiB ring, O_NONBLOCK/EAGAIN, EOF, EPIPE/SIGPIPE, wrong-direction
+# handles, unknown flags and wrap-around. Single-process fixture on x86_64.
+
+name = "pipe"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/pipe/build.sh"]
+initfs = "build/fixtures/pipe/pipe.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^pipe: basic=1 nonblock=1$'
+
+[[expect]]
+regex = '^pipe: eof=1 epipe=1 sigpipe=1$'
+
+[[expect]]
+regex = '^pipe: wrap=1 badfd=1 flags=1$'
+
+[[expect]]
+regex = '^pipe: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pipe: FAIL'

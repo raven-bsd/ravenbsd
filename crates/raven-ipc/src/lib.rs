@@ -14,5 +14,10 @@ extern crate alloc;
 
 #[path = "../../../kernel/src/ipc/model.rs"]
 pub mod model;
+pub mod pipe_ring;
 #[path = "../../../kernel/src/ipc/protocol.rs"]
 pub mod protocol;
+
+#[cfg(test)]
+#[path = "pipe_ring_ut.rs"]
+mod pipe_ring_ut;
