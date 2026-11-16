@@ -65,7 +65,27 @@ A board probe can therefore read the `netd` lease and `ping` result and feed the
 when all three stages are complete the driver prints the `GENET-NET-*` transcript. The parser and
 feed path are host-tested; the probe binary and its profile entry are the board follow-up below.
 
-## Board follow-up (exact, outside REL4a Owns)
+## netd addressing modes
+
+`netd` selects the address source from the service arguments or `NETD_NIC_MODE`; the QEMU path is
+the default:
+
+| Mode | Selection | Address before lease | `eth0` publication |
+|---|---|---|---|
+| QEMU user | default `netd nic` | `10.0.2.15/24`, gateway `10.0.2.2` | immediately (B70/`hw-net` contract) |
+| Platform DHCP-first | `netd nic dhcp-first` or `NETD_NIC_MODE=dhcp-first` | none | only after a validated DHCP lease |
+
+In DHCP-first mode `netd` starts the DHCP client with no IPv4 configuration, validates the lease
+(unicast address/gateway/DNS, prefix `1..=32`), and only then publishes `eth0` in `net:iface` and
+the console. A malformed lease leaves `eth0` unpublished. The Pi 4 release profile must pass the
+`dhcp-first` token (or set the environment value); the profile is outside REL4b's Owns.
+
+When `netd` has a live lease, it writes the matching `dhcp <addr>/<prefix> <gateway> <dns|none>`
+line to `nic:release`; when an ICMP echo reply arrives from the lease gateway, it writes the
+`ping <gateway> tx=1 rx=1 rtt_ms=<n>` line. The QEMU `virtio-net` driver has no `nic:release`
+endpoint, so those writes are ignored on the existing `hw-net` path.
+
+## Board follow-up (exact)
 
 1. **Platform launch.** `userland/servers/devd/src/main.rs`, `run_dtb()` only prints the DT
    matches; it does not grant MMIO/DMA/IRQ or spawn a platform driver. The GENET driver cannot
@@ -74,11 +94,10 @@ feed path are host-tested; the probe binary and its profile entry are the board 
 2. **Profile.** `profiles/pi4-release.toml` (REL3) includes `netd`, `resolvd` and `ping` but no
    `genet` program or service manifest. Add the program and a service entry that waits for
    `logd`, `platd` (`plat:mac`) and the driver's `nic:` readiness. This is outside REL4a Owns.
-3. **netd QEMU constants.** `userland/servers/netd/src/nic.rs`, `NicDevice::open()` constructs
-   `NicConfig` with `GUEST_ADDR = 10.0.2.15`, `GATEWAY_ADDR = 10.0.2.2` and
-   `GUEST_PREFIX = 24` (QEMU user-mode). The Pi 4 path must not claim those addresses before the
-   DHCP lease; it needs a neutral DHCP-first configuration (or a profile-supplied address) and a
-   check that the lease actually arrived. REL4a does not edit `netd`.
+3. **netd mode.** `userland/servers/netd/src/nic.rs` now keeps the QEMU constants only in
+   `NicMode::QemuUser`; `NicMode::DhcpFirst` uses `NicConfig::platform` and waits for the lease.
+   The remaining profile step is to pass `dhcp-first` (or set `NETD_NIC_MODE`) in the Pi 4 netd
+   service; the QEMU default is unchanged.
 4. **Ring values.** `FrameBackend::program_rings()` writes the documented Pi 4 ring setup
    (`RING_BUF_SIZE`, start/end, producer/consumer, DMA control, UMAC RX/TX enable). The exact
    register values and the descriptor producer/consumer index programming remain UNVERIFIED
@@ -137,7 +156,11 @@ negative fixture to fail. That proves the script's parser; it does **not** prove
 ```
 cargo nextest run -p raven-genet
 cargo nextest run -p genet
+cargo nextest run -p netd
+cargo nextest run -p raven-netcore
 cargo check -p genet --target aarch64-unknown-none-softfloat
+cargo check -p netd --target x86_64-unknown-none
+cargo xtask qtest --case hw-net --arch x86_64
 sh -n scripts/pi4-net-evidence.sh
 scripts/pi4-net-evidence.sh --self-test
 ```
@@ -147,6 +170,11 @@ counts and the exact marker transcript. The `genet` tests drive the same gate th
 `FrameBackend::observe_link`, proving that the debounced link transition reaches `UMAC_CMD` before
 the DHCP and ping observations are accepted. They also cover the B39 ring mapping, RX publishing,
 TX queue/reclaim, malformed descriptors, the `nic:release` parser and the target compile.
+
+The `netd` tests cover the address-mode matrix: DHCP-first publishes no address before a lease,
+rejects malformed leases and publishes a valid lease; the QEMU mode keeps the fixed user-mode
+address; and only a NIC gateway reply produces a release ping marker. The existing `hw-net` QEMU
+case remains the end-to-end proof of the QEMU default path.
 
 There is no `pi4-net` QEMU case: QEMU has no GENET v5 model, and adding a fake PCI device would not
 exercise the Pi 4 platform path. The frame service runs in the host tests and the target code is
@@ -159,6 +187,7 @@ These must come from the owner's serial log, not from the host model or this doc
 * the live GENET MMIO/DMA/IRQ resources, the `devd` match and the platform launch;
 * the resolved link speed and duplex;
 * the DHCP server, lease address, prefix, gateway and DNS;
+* the Pi 4 profile's `dhcp-first` selection and the lease it receives;
 * the gateway ping sequence, reply count and RTT;
 * the `FrameBackend::program_rings` values and the hardware producer/consumer indices;
 * whether the release image includes the GENET `nic:` service and `netd` attaches it;
