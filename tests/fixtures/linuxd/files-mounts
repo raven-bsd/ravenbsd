@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# B23 fixture mounts only the two servers its controller starts.
+
+/ initfs:
+/tmp ramfs:
