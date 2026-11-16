@@ -155,7 +155,8 @@ if total > len(data) or total < 40:
 print(len(data), f"{zlib.crc32(data) & 0xffffffff:08x}")
 PY
     read -r dtb_size dtb_crc < "$work/fdt.txt"
-    cargo run -q -p raven-initfs --features std --example lsinitfs -- "$initfs" > "$work/initfs.list"
+    CARGO_TARGET_DIR="$root/build/cargo/pi4-release-check" \
+        cargo run -q -p raven-initfs --features std --example lsinitfs -- "$initfs" > "$work/initfs.list"
     entry=$(awk '$1 == "/etc/pi4.dtb" { print $2, $4 }' "$work/initfs.list")
     [ -n "$entry" ] || {
         echo "pi4-release: /etc/pi4.dtb is not in the initfs" >&2
@@ -180,7 +181,8 @@ repro_check() {
             echo "pi4-release: fixture build failed for $side" >&2
             return 1
         }
-        if ! cargo xtask image --arch aarch64 --platform pi4 --profile pi4-release \
+        if ! CARGO_TARGET_DIR="$root/build/cargo/pi4-release-repro" \
+            cargo xtask image --arch aarch64 --platform pi4 --profile pi4-release \
             --output "$out/$side.img" > "$out/build-$side.log" 2>&1; then
             echo "pi4-release: image build failed for $side" >&2
             tail -20 "$out/build-$side.log" >&2
