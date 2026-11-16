@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Server certificate extensions shared by the trusted and untrusted T3 test
+# certificates. The SAN is the QEMU user-mode gateway address the client uses.
+
+[ server_ext ]
+basicConstraints = critical,CA:FALSE
+keyUsage = critical,digitalSignature,keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = IP:10.0.2.2
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer

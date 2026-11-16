@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Lookup expectations for the canonical fixture. Tab-separated:
+# kind name uid gid home shell
+pw root 0 0 /root /bin/brush
+pw alice 1000 1000 /home/alice /bin/brush
+pw bob 1001 1001 /home/bob /bin/brush
+pw nobody 65534 65534 /nonexistent /nonexistent
+gr wheel 0 - - -
+gr users 100 - - -
+gr alice 1000 - - -
+gr bob 1001 - - -
+gr nobody 65534 - - -
