@@ -558,6 +558,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aab41826031698d6ffcd9cff78ef56ef998e39dc7e5067cdfebe373842d4723b"
 
 [[package]]
+name = "pi4-xhci"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-driver",
+ "raven-pi4-xhci",
+ "raven-rt",
+ "raven-usb-core",
+ "raven-usb-hid",
+ "raven-xhci",
+ "usb-hid",
+]
+
+[[package]]
 name = "posix-conform"
 version = "0.1.0"
 dependencies = [
