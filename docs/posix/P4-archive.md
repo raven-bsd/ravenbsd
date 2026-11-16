@@ -1,10 +1,10 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# P4j - POSIX archive tools
+# P4j/P4l - POSIX archive tools
 
-First-party Rust implementations of `ar`, `uuencode` and `uudecode`, plus host behaviour tests
-and executable evidence rows.
+First-party Rust implementations of `ar`, `uuencode`, `uudecode` and ustar `tar`, plus host
+behaviour tests and executable evidence rows.
 
 ## Method
 
@@ -16,6 +16,10 @@ and executable evidence rows.
 * `uuencode` writes the POSIX `begin <mode> <name>` / body / backtick / `end` format with 45-byte
   lines. `uudecode` validates the header, length characters, groups and mode, and rejects unsafe
   encoded file names.
+* `tar` implements ustar create/list/extract for regular files, directories and symbolic links,
+  with modes, zero uid/gid for a non-root process, mtime, nested paths and the 100-byte name plus
+  155-byte prefix fields. Paths that do not fit are rejected, never truncated; PAX/long-name and
+  compression are explicit errors.
 * The target binaries use `raven_rt::fs`; the host tests and the `test:` evidence exercise the
   same pure code. Standard input is not available in the Raven image, so the target wrappers
   require a file operand and print an explicit usage error otherwise.
@@ -27,14 +31,19 @@ and executable evidence rows.
 | `ar` | `r`/`t`/`x`/`s`; short and long names; modes; ELF symbol table; malformed headers | 6 lib + 1 host |
 | `uuencode` | begin/end wrapper; 45-byte chunks; empty/short/partial input; mode/name | 6 lib + 2 host |
 | `uudecode` | header/mode/name validation; safe names; malformed end/length | 3 lib + 1 host |
+| `tar` | ustar `-c`/`-t`/`-x`; regular/dir/symlink; modes/mtime/nested names; checksum and safe extraction | 5 lib + 1 host |
 
-All three `util.*` rows are registered in `docs/posix/evidence/P4-archive.toml`.
+The three P4j `util.*` rows and the P4l `util.tar` row are registered in
+`docs/posix/evidence/P4-archive.toml`. `tar` was added to the seed `UTILITIES` list and
+`profile.toml`/`traceability.toml` were regenerated; the gate executes the tar case and reports
+the row as present.
 
 ## Known defects / limits
 
 | Defect | Tool | Detail |
 |---|---|---|
 | `P4j-D1` | `ar` | `d`, `m`, `p`, `q` and `-u` are not implemented; unknown operations are a usage error, never silent wrong output |
+| - | `tar` | long-name/PAX, compression (`-z`/`-j`/`-J`) and non-regular/directory/symlink types are explicit errors |
 | - | `ar` | the symbol table covers ELF32/ELF64 little-endian only; other object formats contribute no symbols |
 | - | `uuencode`/`uudecode` | target standard input is unavailable in this image; file operands are required |
 | - | `ar` | extraction is a simple current-directory write; no overwrite/owner policy beyond mode restoration |
@@ -43,10 +52,10 @@ All three `util.*` rows are registered in `docs/posix/evidence/P4-archive.toml`.
 
 ```
 sh tests/posix/utility/run-archive.sh
-cargo nextest run -p ar -p uuencode -p uudecode
+cargo nextest run -p ar -p tar -p uuencode -p uudecode
 cargo xtask posix-check --profile posix --arch x86_64
 make check-fast
 ```
 
-The archive runner reports `3 pass, 0 fail`; the gate executes each `test:` script and registers
-the three rows. No board claim.
+The archive runner reports `4 pass, 0 fail`; the gate executes each registered `test:` script and
+reports `util.tar` as present. No board claim.

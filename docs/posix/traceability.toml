@@ -10535,6 +10535,12 @@ test = "none"
 evidence = "none"
 
 [[trace]]
+id = "util.tar"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/archive/tar/test.sh"
+
+[[trace]]
 id = "util.tee"
 ticket = "P4"
 test = "none"

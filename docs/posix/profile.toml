@@ -25139,6 +25139,21 @@ locale = "POSIX locale categories and LC_ALL"
 test = "none"
 
 [[utility]]
+id = "util.tar"
+standard = "posix-2024"
+status = "present"
+evidence = "test:tests/posix/utility/archive/tar/test.sh"
+owner = "P4"
+waiver = ""
+notes = "P4l: POSIX ustar create/list/extract, modes, symlinks and nested-path host tests"
+pg = []
+name = "tar"
+options = "standard option set"
+exit_status = "0 success; >0 failure; 2 usage"
+locale = "POSIX locale categories and LC_ALL"
+test = "none"
+
+[[utility]]
 id = "util.tee"
 standard = "posix-2024"
 status = "present"
