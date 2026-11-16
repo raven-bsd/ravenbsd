@@ -12,15 +12,15 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 | area | total | missing | partial | present | waived |
 |---|---:|---:|---:|---:|---:|
 | filesystem | 20 | 5 | 15 | 0 | 0 |
-| headers | 86 | 2 | 46 | 38 | 0 |
+| headers | 86 | 2 | 48 | 36 | 0 |
 | interfaces | 1421 | 627 | 0 | 794 | 0 |
 | process | 17 | 11 | 5 | 1 | 0 |
 | shell | 25 | 13 | 12 | 0 | 0 |
 | tty | 12 | 10 | 2 | 0 | 0 |
-| utilities | 177 | 136 | 17 | 24 | 0 |
-| **all** | **1758** | **804** | **97** | **857** | **0** |
+| utilities | 181 | 122 | 8 | 51 | 0 |
+| **all** | **1762** | **790** | **90** | **882** | **0** |
 
-Traceability rows: 1758; profile rows: 1758.
+Traceability rows: 1762; profile rows: 1762.
 
 ## Headers
 
@@ -37,7 +37,7 @@ Traceability rows: 1758; profile rows: 1758.
 | `header.errno.h` | `errno.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.fcntl.h` | `fcntl.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.fenv.h` | `fenv.h` | partial | P1 | `libc/ravenlibc/include` |  |
-| `header.float.h` | `float.h` | present | P1 | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
+| `header.float.h` | `float.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.fmtmsg.h` | `fmtmsg.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.fnmatch.h` | `fnmatch.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.ftw.h` | `ftw.h` | partial | P1 | `libc/ravenlibc/include` |  |
@@ -45,10 +45,10 @@ Traceability rows: 1758; profile rows: 1758.
 | `header.grp.h` | `grp.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.iconv.h` | `iconv.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.inttypes.h` | `inttypes.h` | partial | P1 | `libc/ravenlibc/include` |  |
-| `header.iso646.h` | `iso646.h` | present | P1 | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
+| `header.iso646.h` | `iso646.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.langinfo.h` | `langinfo.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.libgen.h` | `libgen.h` | partial | P1 | `libc/ravenlibc/include` |  |
-| `header.libintl.h` | `libintl.h` | present | P1 | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
+| `header.libintl.h` | `libintl.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.limits.h` | `limits.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.locale.h` | `locale.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.math.h` | `math.h` | partial | P1 | `libc/ravenlibc/include` |  |
@@ -70,10 +70,10 @@ Traceability rows: 1758; profile rows: 1758.
 | `header.setjmp.h` | `setjmp.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.signal.h` | `signal.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.spawn.h` | `spawn.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.stdarg.h` | `stdarg.h` | present | P1 | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
-| `header.stdatomic.h` | `stdatomic.h` | present | P1 | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
-| `header.stdbool.h` | `stdbool.h` | present | P1 | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
-| `header.stddef.h` | `stddef.h` | present | P1 | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
+| `header.stdarg.h` | `stdarg.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.stdatomic.h` | `stdatomic.h` | present | P1 | `libc/ravenlibc/include` |  |
+| `header.stdbool.h` | `stdbool.h` | present | P1 | `libc/ravenlibc/include` |  |
+| `header.stddef.h` | `stddef.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.stdint.h` | `stdint.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.stdio.h` | `stdio.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.stdlib.h` | `stdlib.h` | partial | P1 | `libc/ravenlibc/include` |  |
@@ -100,7 +100,7 @@ Traceability rows: 1758; profile rows: 1758.
 | `header.syslog.h` | `syslog.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.tar.h` | `tar.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.termios.h` | `termios.h` | partial | P1 | `libc/ravenlibc/include` |  |
-| `header.tgmath.h` | `tgmath.h` | present | P1 | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
+| `header.tgmath.h` | `tgmath.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.threads.h` | `threads.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.time.h` | `time.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.trace.h` | `trace.h` | missing | P1 | `none` |  |
@@ -1557,33 +1557,33 @@ Traceability rows: 1758; profile rows: 1758.
 | `util.c17` | `c17` | missing | P4 | `none` | none |
 | `util.c99` | `c99` | missing | P4 | `none` | none |
 | `util.cal` | `cal` | missing | P4 | `none` | none |
-| `util.cat` | `cat` | partial | P4 | `userland/bin/cat` | none |
+| `util.cat` | `cat` | present | P4 | `test:tests/posix/utility/file/cat/test.sh` | none |
 | `util.cd` | `cd` | missing | P4 | `none` | none |
 | `util.cflow` | `cflow` | missing | P4 | `none` | none |
-| `util.chgrp` | `chgrp` | missing | P4 | `none` | none |
-| `util.chmod` | `chmod` | missing | P4 | `none` | none |
-| `util.chown` | `chown` | missing | P4 | `none` | none |
-| `util.cksum` | `cksum` | missing | P4 | `none` | none |
+| `util.chgrp` | `chgrp` | present | P4 | `test:tests/posix/utility/file/chgrp/test.sh` | none |
+| `util.chmod` | `chmod` | present | P4 | `test:tests/posix/utility/file/chmod/test.sh` | none |
+| `util.chown` | `chown` | present | P4 | `test:tests/posix/utility/file/chown/test.sh` | none |
+| `util.cksum` | `cksum` | present | P4 | `test:tests/posix/utility/file/cksum/test.sh` | none |
 | `util.cmp` | `cmp` | missing | P4 | `none` | none |
 | `util.cod` | `cod` | missing | P4 | `none` | none |
 | `util.comm` | `comm` | present | P4 | `test:tests/posix/utility/text/comm/test.sh` | none |
 | `util.command` | `command` | missing | P4 | `none` | none |
 | `util.compress` | `compress` | missing | P4 | `none` | none |
 | `util.continue` | `continue` | missing | P4 | `none` | none |
-| `util.cp` | `cp` | partial | P4 | `userland/bin/cp` | none |
+| `util.cp` | `cp` | present | P4 | `test:tests/posix/utility/file/cp/test.sh` | none |
 | `util.crontab` | `crontab` | missing | P4 | `none` | none |
 | `util.csplit` | `csplit` | present | P4 | `test:tests/posix/utility/text/csplit/test.sh` | none |
 | `util.ctags` | `ctags` | missing | P4 | `none` | none |
 | `util.cut` | `cut` | present | P4 | `test:tests/posix/utility/text/cut/test.sh` | none |
 | `util.cxref` | `cxref` | missing | P4 | `none` | none |
 | `util.date` | `date` | partial | P4 | `userland/bin/date` | none |
-| `util.dd` | `dd` | missing | P4 | `none` | none |
+| `util.dd` | `dd` | present | P4 | `test:tests/posix/utility/file/dd/test.sh` | none |
 | `util.delta` | `delta` | missing | P4 | `none` | none |
-| `util.df` | `df` | partial | P4 | `userland/bin/df` | none |
+| `util.df` | `df` | present | P4 | `test:tests/posix/utility/file/df/test.sh` | none |
 | `util.diff` | `diff` | missing | P4 | `none` | none |
 | `util.dirname` | `dirname` | present | P4 | `test:tests/posix/utility/text/dirname/test.sh` | none |
 | `util.dot` | `dot` | missing | P4 | `none` | none |
-| `util.du` | `du` | missing | P4 | `none` | none |
+| `util.du` | `du` | present | P4 | `test:tests/posix/utility/file/du/test.sh` | none |
 | `util.echo` | `echo` | partial | P4 | `userland/bin/echo` | none |
 | `util.ed` | `ed` | missing | P4 | `none` | none |
 | `util.env` | `env` | missing | P4 | `none` | none |
@@ -1597,8 +1597,8 @@ Traceability rows: 1758; profile rows: 1758.
 | `util.false` | `false` | missing | P4 | `none` | none |
 | `util.fc` | `fc` | missing | P4 | `none` | none |
 | `util.fg` | `fg` | missing | P4 | `none` | none |
-| `util.file` | `file` | missing | P4 | `none` | none |
-| `util.find` | `find` | missing | P4 | `none` | none |
+| `util.file` | `file` | present | P4 | `test:tests/posix/utility/file/file/test.sh` | none |
+| `util.find` | `find` | present | P4 | `test:tests/posix/utility/file/find/test.sh` | none |
 | `util.fold` | `fold` | present | P4 | `test:tests/posix/utility/text/fold/test.sh` | none |
 | `util.fort77` | `fort77` | missing | P4 | `none` | none |
 | `util.gencat` | `gencat` | missing | P4 | `none` | none |
@@ -1616,24 +1616,25 @@ Traceability rows: 1758; profile rows: 1758.
 | `util.join` | `join` | present | P4 | `test:tests/posix/utility/text/join/test.sh` | none |
 | `util.kill` | `kill` | missing | P4 | `none` | none |
 | `util.lex` | `lex` | missing | P4 | `none` | none |
-| `util.link` | `link` | missing | P4 | `none` | none |
-| `util.ln` | `ln` | missing | P4 | `none` | none |
+| `util.link` | `link` | present | P4 | `test:tests/posix/utility/file/link/test.sh` | none |
+| `util.ln` | `ln` | present | P4 | `test:tests/posix/utility/file/ln/test.sh` | none |
 | `util.locale` | `locale` | missing | P4 | `none` | none |
 | `util.localedef` | `localedef` | missing | P4 | `none` | none |
 | `util.logger` | `logger` | missing | P4 | `none` | none |
 | `util.logname` | `logname` | missing | P4 | `none` | none |
 | `util.lp` | `lp` | missing | P4 | `none` | none |
-| `util.ls` | `ls` | partial | P4 | `userland/bin/ls` | none |
+| `util.ls` | `ls` | present | P4 | `test:tests/posix/utility/file/ls/test.sh` | none |
 | `util.m4` | `m4` | missing | P4 | `none` | none |
 | `util.mail` | `mail` | missing | P4 | `none` | none |
 | `util.mailx` | `mailx` | missing | P4 | `none` | none |
 | `util.make` | `make` | missing | P4 | `none` | none |
 | `util.man` | `man` | partial | P4 | `userland/bin/man` | none |
 | `util.mesg` | `mesg` | missing | P4 | `none` | none |
-| `util.mkdir` | `mkdir` | partial | P4 | `userland/bin/mkdir` | none |
-| `util.mkfifo` | `mkfifo` | missing | P4 | `none` | none |
+| `util.mkdir` | `mkdir` | present | P4 | `test:tests/posix/utility/file/mkdir/test.sh` | none |
+| `util.mkfifo` | `mkfifo` | present | P4 | `test:tests/posix/utility/file/mkfifo/test.sh` | none |
+| `util.mknod` | `mknod` | present | P4 | `test:tests/posix/utility/file/mknod/test.sh` | none |
 | `util.more` | `more` | missing | P4 | `none` | none |
-| `util.mv` | `mv` | partial | P4 | `userland/bin/mv` | none |
+| `util.mv` | `mv` | present | P4 | `test:tests/posix/utility/file/mv/test.sh` | none |
 | `util.neqn` | `neqn` | missing | P4 | `none` | none |
 | `util.newgrp` | `newgrp` | missing | P4 | `none` | none |
 | `util.nice` | `nice` | missing | P4 | `none` | none |
@@ -1643,13 +1644,13 @@ Traceability rows: 1758; profile rows: 1758.
 | `util.od` | `od` | present | P4 | `test:tests/posix/utility/text/od/test.sh` | none |
 | `util.paste` | `paste` | present | P4 | `test:tests/posix/utility/text/paste/test.sh` | none |
 | `util.patch` | `patch` | missing | P4 | `none` | none |
-| `util.pathchk` | `pathchk` | missing | P4 | `none` | none |
+| `util.pathchk` | `pathchk` | present | P4 | `test:tests/posix/utility/file/pathchk/test.sh` | none |
 | `util.pax` | `pax` | missing | P4 | `none` | none |
 | `util.pr` | `pr` | present | P4 | `test:tests/posix/utility/text/pr/test.sh` | none |
 | `util.printf` | `printf` | present | P4 | `test:tests/posix/utility/text/printf/test.sh` | none |
 | `util.prs` | `prs` | missing | P4 | `none` | none |
 | `util.ps` | `ps` | partial | P4 | `userland/bin/ps` | tests/qtest/cases/modern-json-tools.toml |
-| `util.pwd` | `pwd` | missing | P4 | `none` | none |
+| `util.pwd` | `pwd` | present | P4 | `test:tests/posix/utility/file/pwd/test.sh` | none |
 | `util.qalter` | `qalter` | missing | P4 | `none` | none |
 | `util.qdel` | `qdel` | missing | P4 | `none` | none |
 | `util.qhold` | `qhold` | missing | P4 | `none` | none |
@@ -1662,12 +1663,14 @@ Traceability rows: 1758; profile rows: 1758.
 | `util.qstat` | `qstat` | missing | P4 | `none` | none |
 | `util.qsub` | `qsub` | missing | P4 | `none` | none |
 | `util.read` | `read` | missing | P4 | `none` | none |
+| `util.readlink` | `readlink` | present | P4 | `test:tests/posix/utility/file/readlink/test.sh` | none |
 | `util.readonly` | `readonly` | missing | P4 | `none` | none |
+| `util.realpath` | `realpath` | present | P4 | `test:tests/posix/utility/file/realpath/test.sh` | none |
 | `util.renice` | `renice` | missing | P4 | `none` | none |
 | `util.return` | `return` | missing | P4 | `none` | none |
-| `util.rm` | `rm` | partial | P4 | `userland/bin/rm` | none |
+| `util.rm` | `rm` | present | P4 | `test:tests/posix/utility/file/rm/test.sh` | none |
 | `util.rmdel` | `rmdel` | missing | P4 | `none` | none |
-| `util.rmdir` | `rmdir` | partial | P4 | `userland/bin/rmdir` | none |
+| `util.rmdir` | `rmdir` | present | P4 | `test:tests/posix/utility/file/rmdir/test.sh` | none |
 | `util.sact` | `sact` | missing | P4 | `none` | none |
 | `util.sccs` | `sccs` | missing | P4 | `none` | none |
 | `util.sed` | `sed` | missing | P4 | `none` | none |
@@ -1677,6 +1680,7 @@ Traceability rows: 1758; profile rows: 1758.
 | `util.sleep` | `sleep` | partial | P4 | `userland/bin/sleep` | none |
 | `util.sort` | `sort` | present | P4 | `test:tests/posix/utility/text/sort/test.sh` | none |
 | `util.split` | `split` | present | P4 | `test:tests/posix/utility/text/split/test.sh` | none |
+| `util.stat` | `stat` | present | P4 | `test:tests/posix/utility/file/stat/test.sh` | none |
 | `util.strings` | `strings` | missing | P4 | `none` | none |
 | `util.strip` | `strip` | missing | P4 | `none` | none |
 | `util.stty` | `stty` | missing | P4 | `none` | none |
@@ -1687,7 +1691,7 @@ Traceability rows: 1758; profile rows: 1758.
 | `util.test` | `test` | missing | P4 | `none` | none |
 | `util.time` | `time` | missing | P4 | `none` | none |
 | `util.times` | `times` | missing | P4 | `none` | none |
-| `util.touch` | `touch` | partial | P4 | `userland/bin/touch` | none |
+| `util.touch` | `touch` | present | P4 | `test:tests/posix/utility/file/touch/test.sh` | none |
 | `util.tput` | `tput` | missing | P4 | `none` | none |
 | `util.tr` | `tr` | present | P4 | `test:tests/posix/utility/text/tr/test.sh` | none |
 | `util.trap` | `trap` | missing | P4 | `none` | none |
@@ -1703,7 +1707,7 @@ Traceability rows: 1758; profile rows: 1758.
 | `util.unexpand` | `unexpand` | present | P4 | `test:tests/posix/utility/text/unexpand/test.sh` | none |
 | `util.unget` | `unget` | missing | P4 | `none` | none |
 | `util.uniq` | `uniq` | present | P4 | `test:tests/posix/utility/text/uniq/test.sh` | none |
-| `util.unlink` | `unlink` | missing | P4 | `none` | none |
+| `util.unlink` | `unlink` | present | P4 | `test:tests/posix/utility/file/unlink/test.sh` | none |
 | `util.unset` | `unset` | missing | P4 | `none` | none |
 | `util.uucp` | `uucp` | missing | P4 | `none` | none |
 | `util.uudecode` | `uudecode` | missing | P4 | `none` | none |
@@ -1846,9 +1850,9 @@ Traceability rows: 1758; profile rows: 1758.
 ## Current tree
 
 - frozen exported symbols: 1215
-- `userland/bin` directories: 41
+- `userland/bin` directories: 43
 - headers under `libc/ravenlibc/include`: 228
-- utility directories: adduser, beep, cat, cp, date, df, dmesg, dtrace, echo, getty, groupadd, hostname, id, ifconfig, login, ls, man, mixer, mkdir, mount, mv, nc, netstat, passwd, ping, play, ps, raven, rm, rmdir, route, rsh, sleep, stat, su, svcctl, touch, umount, uname, useradd, whoami
+- utility directories: adduser, beep, cat, cp, date, df, dmesg, dtrace, echo, file, find, getty, groupadd, hostname, id, ifconfig, login, ls, man, mixer, mkdir, mount, mv, nc, netstat, passwd, ping, play, ps, raven, rm, rmdir, route, rsh, sleep, stat, su, svcctl, touch, umount, uname, useradd, whoami
 
 ## Top gaps
 
@@ -1896,6 +1900,8 @@ Traceability rows: 1758; profile rows: 1758.
 | header | `regex.h` | `libc/ravenlibc/include` |
 | header | `search.h` | `libc/ravenlibc/include` |
 | header | `signal.h` | `libc/ravenlibc/include` |
+| header | `stdarg.h` | `libc/ravenlibc/include` |
+| header | `stddef.h` | `libc/ravenlibc/include` |
 | header | `stdio.h` | `libc/ravenlibc/include` |
 | header | `stdlib.h` | `libc/ravenlibc/include` |
 | header | `string.h` | `libc/ravenlibc/include` |
@@ -1932,7 +1938,5 @@ Traceability rows: 1758; profile rows: 1758.
 | interface | `aio_cancel` | `none` |
 | interface | `aio_cancel64` | `none` |
 | interface | `aio_error` | `none` |
-| interface | `aio_error64` | `none` |
-| interface | `aio_fsync` | `none` |
 
-901 gap rows are listed in full in the tables above; this short table is a review aid.
+880 gap rows are listed in full in the tables above; this short table is a review aid.

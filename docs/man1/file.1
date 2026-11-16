@@ -1,0 +1,39 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt FILE 1
+.Os RavenBSD
+.Sh NAME
+.Nm file
+.Nd classify files by content and type
+.Sh SYNOPSIS
+.Nm
+.Op Fl b
+.Op Fl i
+.Ar path ...
+.Sh DESCRIPTION
+The
+.Nm
+utility classifies each
+.Ar path
+as text, binary data, an ELF image, a directory, a symbolic link, a FIFO or a device/socket.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl b
+Omit the path prefix from each output line.
+.It Fl i
+Print MIME types instead of descriptive text.
+.El
+.Pp
+The optional
+.Fl m
+magic-file option is not implemented; an unknown option is a usage error.
+.Sh EXIT STATUS
+.Ex -std
+A path that cannot be inspected exits with status 1; a usage error exits with status 2.
+.Sh SEE ALSO
+.Xr find 1 ,
+.Xr ls 1
+.Sh STANDARDS
+RavenBSD.

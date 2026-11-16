@@ -194,7 +194,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.float.h"
 ticket = "P1"
 test = "none"
-evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
+evidence = "libc/ravenlibc/include"
 
 [[trace]]
 id = "header.fmtmsg.h"
@@ -242,7 +242,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.iso646.h"
 ticket = "P1"
 test = "none"
-evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
+evidence = "libc/ravenlibc/include"
 
 [[trace]]
 id = "header.langinfo.h"
@@ -260,7 +260,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.libintl.h"
 ticket = "P1"
 test = "none"
-evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
+evidence = "libc/ravenlibc/include"
 
 [[trace]]
 id = "header.limits.h"
@@ -392,25 +392,25 @@ evidence = "libc/ravenlibc/include"
 id = "header.stdarg.h"
 ticket = "P1"
 test = "none"
-evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
+evidence = "libc/ravenlibc/include"
 
 [[trace]]
 id = "header.stdatomic.h"
 ticket = "P1"
 test = "none"
-evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
+evidence = "libc/ravenlibc/include"
 
 [[trace]]
 id = "header.stdbool.h"
 ticket = "P1"
 test = "none"
-evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
+evidence = "libc/ravenlibc/include"
 
 [[trace]]
 id = "header.stddef.h"
 ticket = "P1"
 test = "none"
-evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
+evidence = "libc/ravenlibc/include"
 
 [[trace]]
 id = "header.stdint.h"
@@ -572,7 +572,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.tgmath.h"
 ticket = "P1"
 test = "none"
-evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
+evidence = "libc/ravenlibc/include"
 
 [[trace]]
 id = "header.threads.h"
@@ -9578,7 +9578,7 @@ evidence = "none"
 id = "util.cat"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/cat"
+evidence = "test:tests/posix/utility/file/cat/test.sh"
 
 [[trace]]
 id = "util.cd"
@@ -9596,25 +9596,25 @@ evidence = "none"
 id = "util.chgrp"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/file/chgrp/test.sh"
 
 [[trace]]
 id = "util.chmod"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/file/chmod/test.sh"
 
 [[trace]]
 id = "util.chown"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/file/chown/test.sh"
 
 [[trace]]
 id = "util.cksum"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/file/cksum/test.sh"
 
 [[trace]]
 id = "util.cmp"
@@ -9656,7 +9656,7 @@ evidence = "none"
 id = "util.cp"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/cp"
+evidence = "test:tests/posix/utility/file/cp/test.sh"
 
 [[trace]]
 id = "util.crontab"
@@ -9698,7 +9698,7 @@ evidence = "userland/bin/date"
 id = "util.dd"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/file/dd/test.sh"
 
 [[trace]]
 id = "util.delta"
@@ -9710,7 +9710,7 @@ evidence = "none"
 id = "util.df"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/df"
+evidence = "test:tests/posix/utility/file/df/test.sh"
 
 [[trace]]
 id = "util.diff"
@@ -9734,7 +9734,7 @@ evidence = "none"
 id = "util.du"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/file/du/test.sh"
 
 [[trace]]
 id = "util.echo"
@@ -9818,13 +9818,13 @@ evidence = "none"
 id = "util.file"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/file/file/test.sh"
 
 [[trace]]
 id = "util.find"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/file/find/test.sh"
 
 [[trace]]
 id = "util.fold"
@@ -9932,13 +9932,13 @@ evidence = "none"
 id = "util.link"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/file/link/test.sh"
 
 [[trace]]
 id = "util.ln"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/file/ln/test.sh"
 
 [[trace]]
 id = "util.locale"
@@ -9974,7 +9974,7 @@ evidence = "none"
 id = "util.ls"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/ls"
+evidence = "test:tests/posix/utility/file/ls/test.sh"
 
 [[trace]]
 id = "util.m4"
@@ -10016,13 +10016,19 @@ evidence = "none"
 id = "util.mkdir"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/mkdir"
+evidence = "test:tests/posix/utility/file/mkdir/test.sh"
 
 [[trace]]
 id = "util.mkfifo"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/file/mkfifo/test.sh"
+
+[[trace]]
+id = "util.mknod"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/file/mknod/test.sh"
 
 [[trace]]
 id = "util.more"
@@ -10034,7 +10040,7 @@ evidence = "none"
 id = "util.mv"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/mv"
+evidence = "test:tests/posix/utility/file/mv/test.sh"
 
 [[trace]]
 id = "util.neqn"
@@ -10094,7 +10100,7 @@ evidence = "none"
 id = "util.pathchk"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/file/pathchk/test.sh"
 
 [[trace]]
 id = "util.pax"
@@ -10130,7 +10136,7 @@ evidence = "userland/bin/ps"
 id = "util.pwd"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/file/pwd/test.sh"
 
 [[trace]]
 id = "util.qalter"
@@ -10205,10 +10211,22 @@ test = "none"
 evidence = "none"
 
 [[trace]]
+id = "util.readlink"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/file/readlink/test.sh"
+
+[[trace]]
 id = "util.readonly"
 ticket = "P4"
 test = "none"
 evidence = "none"
+
+[[trace]]
+id = "util.realpath"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/file/realpath/test.sh"
 
 [[trace]]
 id = "util.renice"
@@ -10226,7 +10244,7 @@ evidence = "none"
 id = "util.rm"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/rm"
+evidence = "test:tests/posix/utility/file/rm/test.sh"
 
 [[trace]]
 id = "util.rmdel"
@@ -10238,7 +10256,7 @@ evidence = "none"
 id = "util.rmdir"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/rmdir"
+evidence = "test:tests/posix/utility/file/rmdir/test.sh"
 
 [[trace]]
 id = "util.sact"
@@ -10293,6 +10311,12 @@ id = "util.split"
 ticket = "P4"
 test = "none"
 evidence = "test:tests/posix/utility/text/split/test.sh"
+
+[[trace]]
+id = "util.stat"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/file/stat/test.sh"
 
 [[trace]]
 id = "util.strings"
@@ -10358,7 +10382,7 @@ evidence = "none"
 id = "util.touch"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/touch"
+evidence = "test:tests/posix/utility/file/touch/test.sh"
 
 [[trace]]
 id = "util.tput"
@@ -10454,7 +10478,7 @@ evidence = "test:tests/posix/utility/text/uniq/test.sh"
 id = "util.unlink"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/file/unlink/test.sh"
 
 [[trace]]
 id = "util.unset"
