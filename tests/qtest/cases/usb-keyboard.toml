@@ -1,29 +1,72 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# S62: HID reports through the USB HID driver service into the console input queue.
+# S67: guest xHCI enumeration of QEMU's `usb-kbd`, then the S62 HID boot-protocol service.
+# QEMU exposes a real USB keyboard through `qemu-xhci`; key injection is S63.
 
 name = "usb-keyboard"
 arch = "x86_64"
 profile = "base"
-timeout_secs = 120
+timeout_secs = 240
 pre = ["sh tests/fixtures/usb-keyboard/build.sh"]
 initfs = "build/fixtures/usb-keyboard/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
-qemu_extra = []
+qemu_extra = ["-device", "qemu-xhci", "-device", "usb-kbd"]
 expect_exit = "success"
+
+[[expect]]
+regex = '^pcid: devices=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^svcd: pcid up$'
+
+[[expect]]
+regex = '^devd: matched [0-9a-f]{2}:[0-9a-f]{2}\.[0-9] vendor=0x1b36 device=0x000d irq_line=[0-9]+ irq_pin=[0-9]+$'
+
+[[expect]]
+regex = '^devd: driver xhci bar=0 size=[0-9]+$'
+
+[[expect]]
+regex = '^devd: driver xhci dma bus=0x[0-9a-f]+ len=65536$'
+
+[[expect]]
+regex = '^devd: driver xhci irq line=[0-9]+$'
+
+[[expect]]
+regex = '^xhci: bar=0 size=[0-9]+ dma=65536 bus=0x[0-9a-f]+ vendor=0x1b36 device=0x000d$'
+
+[[expect]]
+regex = '^xhci: version=0x[0-9a-f]+ slots=[0-9]+ ports=[0-9]+ csz=[01]$'
+
+[[expect]]
+regex = '^xhci: port=[0-9]+ speed=[0-9]+$'
+
+[[expect]]
+regex = '^xhci: slot=[0-9]+ addressed$'
+
+[[expect]]
+regex = '^xhci: device vendor=0x[0-9a-f]+ product=0x[0-9a-f]+ class=[0-9]+ configs=[0-9]+ interfaces=[0-9]+$'
+
+[[expect]]
+regex = '^xhci: hid interface=[0-9]+ report=[0-9]+ ep=0x81$'
 
 [[expect]]
 regex = '^usb-keyboard: boot protocol ok$'
 
 [[expect]]
-regex = '^usb-keyboard: keys=hiB$'
+regex = '^usb-keyboard: enumerated keys=[0-9]+$'
 
 [[expect]]
 regex = '^usb-keyboard: ok$'
 
 [[expect]]
+regex = '^devd: driver xhci cycle 1 exit=0$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|usb-keyboard: fail'
+regex = '(?i)panic|EXCEPTION|xhci: .*failed|usb-keyboard: fail'
