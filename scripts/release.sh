@@ -13,6 +13,16 @@
 # The script never creates a git tag. REL5 is blocked until REL2b (QEMU login), REL3 (Pi 4
 # image/serial gate), REL4 (Pi 4 GENET ping), REL8 clean-clone verification and the full
 # `make check` pass; the owner creates the tag after reviewing this output.
+#
+# REL5 QEMU candidate (x86_64/release), built from origin/master f44ebb9b:
+#   commit=f44ebb9becdb87f3f8b985c8a4db685041835039
+#   image=build/x86_64/ravenbsd-x86_64.img
+#   image_sha256=aa462d3eff806b33f12cf94ca353940343b1181e70fc83f572b7a6c87be12a63
+#   provenance_sha256=c02fa6827bc50d48c9f6ef67bcdd8a516085906796f6b5677493dbe9abcbb3f2
+#   transcript=build/release/0.1.0/qemu-release.log
+#   transcript_sha256=a57031194564818c2a0480f3d2302128a454ad94fc7f10c6289254822ac249a4
+#   qemu_gate=release-login: pass
+# The Pi 4 serial/GENET transcript remains UNVERIFIED; no tag is created.
 
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)

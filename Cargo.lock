@@ -46,6 +46,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
+name = "ar"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "audio-client"
 version = "0.1.0"
 dependencies = [
@@ -731,6 +740,15 @@ name = "raven-auth"
 version = "0.1.0"
 dependencies = [
  "sha-crypt",
+]
+
+[[package]]
+name = "raven-awk"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-regex",
+ "raven-rt",
+ "raven-tool-core",
 ]
 
 [[package]]
@@ -1888,6 +1906,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-m4"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-mdoc"
 version = "0.1.0"
 dependencies = [
@@ -2100,6 +2126,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-pipe-tests"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-plat"
 version = "0.1.0"
 dependencies = [
@@ -2125,6 +2159,17 @@ dependencies = [
  "raven-abi",
  "raven-audio-core",
  "raven-proto-audio",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-posix-fs"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
 ]
@@ -2162,6 +2207,7 @@ name = "raven-proc-primitives"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-initfs",
  "raven-rt",
 ]
 
@@ -2171,6 +2217,30 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-procd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-proto-proc",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-procd-fixture"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-proto-proc",
+ "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -2207,6 +2277,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-proto-proc"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
+
+[[package]]
 name = "raven-proto-svc"
 version = "0.1.0"
 
@@ -2236,6 +2313,18 @@ dependencies = [
  "raven-output",
  "raven-proto-fs",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-ptyd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-proto-tty",
+ "raven-rt",
+ "raven-scheme",
+ "raven-tty-core",
 ]
 
 [[package]]
@@ -2730,6 +2819,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-sed"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-regex",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-setuid"
 version = "0.1.0"
 dependencies = [
@@ -2949,6 +3047,28 @@ dependencies = [
 [[package]]
 name = "raven-tty-core"
 version = "0.1.0"
+
+[[package]]
+name = "raven-tty-fixture"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-proto-proc",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-ttyd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
 
 [[package]]
 name = "raven-umount"
@@ -3283,6 +3403,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tar"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "toml"
 version = "1.2.1+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3434,6 +3563,24 @@ version = "0.1.0"
 dependencies = [
  "raven-rt",
  "raven-userdb",
+]
+
+[[package]]
+name = "uudecode"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+ "uuencode",
+]
+
+[[package]]
+name = "uuencode"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-tool-core",
 ]
 
 [[package]]

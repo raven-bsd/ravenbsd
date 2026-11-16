@@ -1,0 +1,213 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+//! The `pty:` master/slave server.
+//!
+//! `OPEN pty:master` and `OPEN pty:slave` select the two ends of one pair. Standard tty CALLs
+//! (`SET_MODE`, `GET_MODE`, `FLUSH`) use `raven-proto-tty`; the server-local calls `SET_FG`,
+//! `GET_FG` and `HANGUP` use the same 12-byte version/op/arg shape. Ctrl-C is delivered as SIGINT
+//! to the foreground process group through `PROC_SIGNAL`.
+
+#![cfg_attr(target_os = "none", no_std)]
+#![cfg_attr(target_os = "none", no_main)]
+#![allow(unsafe_code)] // The raw signal syscall below has a SAFETY comment.
+
+#[cfg(target_os = "none")]
+extern crate alloc;
+
+#[cfg(target_os = "none")]
+mod program {
+    use alloc::collections::BTreeMap;
+
+    use raven_abi::errno::Errno;
+    use raven_proto_fs::{S_IFCHR, Stat};
+    use raven_proto_tty::{self, Request, Response, decode_request, encode_response};
+    use raven_ptyd::{Pty, SignalSink};
+    use raven_rt::entry;
+    use raven_scheme::{Ctx, Handler, HandlerResult, Opened, Server};
+
+    entry!(main);
+
+    const PROC_SIGNAL: usize = 0x4A;
+    const OP_SET_FG: u16 = 0x10;
+    const OP_GET_FG: u16 = 0x11;
+    const OP_HANGUP: u16 = 0x12;
+
+    struct TargetSignal;
+
+    impl SignalSink for TargetSignal {
+        fn signal(&mut self, pgrp: i32, signo: u32) -> Result<(), Errno> {
+            // SAFETY: SIGNAL takes two scalar values; the kernel validates the negative group,
+            // the signal number and the caller's uid permission.
+            let raw = unsafe {
+                raven_rt::sys::syscall2(PROC_SIGNAL, pgrp as isize as usize, signo as usize)
+            };
+            Errno::from_ret(raw).map(|_| ())
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    enum Role {
+        Master,
+        Slave,
+    }
+
+    struct HandlerImpl {
+        pty: Pty<TargetSignal>,
+        files: BTreeMap<u64, Role>,
+        next: u64,
+    }
+
+    impl HandlerImpl {
+        fn new() -> Self {
+            Self {
+                pty: Pty::new(TargetSignal),
+                files: BTreeMap::new(),
+                next: 1,
+            }
+        }
+
+        fn role(&self, file: u64) -> Result<Role, Errno> {
+            self.files.get(&file).copied().ok_or(Errno::EBADF)
+        }
+    }
+
+    impl Handler for HandlerImpl {
+        fn open(
+            &mut self,
+            path: &str,
+            flags: u32,
+            _mode: u32,
+            _ctx: &Ctx,
+        ) -> HandlerResult<Opened> {
+            let path = path.strip_prefix('/').unwrap_or(path);
+            let role = match path {
+                "master" => Role::Master,
+                "slave" => Role::Slave,
+                _ => return Err(Errno::ENOENT.into()),
+            };
+            let readable = flags & 1 != 0;
+            let writable = flags & 2 != 0;
+            if !readable && !writable {
+                return Err(Errno::EACCES.into());
+            }
+            let id = self.next;
+            self.next = self.next.wrapping_add(1);
+            self.files.insert(id, role);
+            Ok(Opened::File(id))
+        }
+
+        fn read(&mut self, file: u64, _offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
+            let role = self.role(file)?;
+            let count = match role {
+                Role::Master => self.pty.read_master(buffer),
+                Role::Slave => self.pty.read_slave(buffer),
+            }
+            .map_err(raven_scheme::HandlerError::Errno)?;
+            Ok(count)
+        }
+
+        fn write(&mut self, file: u64, _offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
+            let role = self.role(file)?;
+            match role {
+                Role::Master => self.pty.write_master(buffer),
+                Role::Slave => self.pty.write_slave(buffer),
+            }
+            Ok(buffer.len())
+        }
+
+        fn call(&mut self, file: u64, request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {
+            let _ = self.role(file)?;
+            if request.len() < raven_proto_tty::CALL_LEN
+                || response.len() < raven_proto_tty::CALL_LEN
+            {
+                return Err(Errno::EINVAL.into());
+            }
+            let version = u16::from_le_bytes([request[0], request[1]]);
+            if version != raven_proto_tty::VERSION {
+                return Err(Errno::EINVAL.into());
+            }
+            let op = u16::from_le_bytes([request[2], request[3]]);
+            let arg0 = u32::from_le_bytes([request[4], request[5], request[6], request[7]]);
+            let arg1 = u32::from_le_bytes([request[8], request[9], request[10], request[11]]);
+            match op {
+                raven_proto_tty::OP_SET_MODE
+                | raven_proto_tty::OP_GET_MODE
+                | raven_proto_tty::OP_FLUSH => {
+                    let request = decode_request(&request[..raven_proto_tty::CALL_LEN])
+                        .map_err(|_| Errno::EINVAL)?;
+                    let reply = match request {
+                        Request::SetMode { settings } => {
+                            self.pty.set_settings(settings);
+                            Response::Mode(self.pty.settings())
+                        }
+                        Request::GetMode => Response::Mode(self.pty.settings()),
+                        Request::Flush => Response::Flushed {
+                            bytes: self.pty.flush(),
+                        },
+                    };
+                    let mut body = [0u8; raven_proto_tty::CALL_LEN];
+                    encode_response(reply, &mut body);
+                    response[..body.len()].copy_from_slice(&body);
+                    Ok(body.len())
+                }
+                OP_SET_FG => {
+                    self.pty.set_fg(arg0 as i32);
+                    write_custom(response, OP_SET_FG, self.pty.fg() as u32, 0)
+                }
+                OP_GET_FG => write_custom(response, OP_GET_FG, self.pty.fg() as u32, 0),
+                OP_HANGUP => {
+                    self.pty.hangup();
+                    write_custom(response, OP_HANGUP, 0, 0)
+                }
+                _ => {
+                    let _ = arg1;
+                    Err(Errno::ENOSYS.into())
+                }
+            }
+        }
+
+        fn fstat(&mut self, _file: u64) -> HandlerResult<Stat> {
+            Ok(Stat {
+                mode: S_IFCHR | 0o666,
+                nlink: 1,
+                ..Stat::default()
+            })
+        }
+
+        fn close(&mut self, file: u64) -> HandlerResult<()> {
+            if self.files.remove(&file).is_some() {
+                Ok(())
+            } else {
+                Err(Errno::EBADF.into())
+            }
+        }
+    }
+
+    fn write_custom(out: &mut [u8], op: u16, arg0: u32, arg1: u32) -> HandlerResult<usize> {
+        out[..2].copy_from_slice(&raven_proto_tty::VERSION.to_le_bytes());
+        out[2..4].copy_from_slice(&op.to_le_bytes());
+        out[4..8].copy_from_slice(&arg0.to_le_bytes());
+        out[8..12].copy_from_slice(&arg1.to_le_bytes());
+        Ok(raven_proto_tty::CALL_LEN)
+    }
+
+    fn main(_args: raven_rt::Args) -> i32 {
+        let mut server = match Server::register("pty") {
+            Ok(server) => server,
+            Err(error) => {
+                raven_rt::eprintln!("ptyd: {}", error.description());
+                return 1;
+            }
+        };
+        let mut handler = HandlerImpl::new();
+        loop {
+            if let Some(packet) = server.poll(None) {
+                let _ = server.dispatch(packet, &mut handler);
+            }
+        }
+    }
+}
+
+#[cfg(not(target_os = "none"))]
+fn main() {}

@@ -1,7 +1,80 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# P3 owner evidence: add [[row]] entries here. A present row needs executable evidence; a waived
-# row needs a written waiver in notes.
+# P3 tty rows: executable pty Qtests where the behaviour is present, explicit owner waivers
+# where the kernel/libtool seam is still missing.
+
 schema = 1
 standard = "posix-2024"
+
+[[row]]
+id = "tty.canonical"
+status = "present"
+evidence = "qtest:pty-session"
+notes = "P3: canonical line buffering and line editing through the pty discipline"
+
+[[row]]
+id = "tty.control-character"
+status = "present"
+evidence = "qtest:tty-job-control"
+notes = "P3: Ctrl-C discards the line and signals the foreground process group"
+
+[[row]]
+id = "tty.controlling-terminal"
+status = "waived"
+evidence = "none"
+notes = "P3: ttyd records the foreground group/session and ptyd signals it, but the kernel has no TIOCSCTTY/acquisition call; P3 documents the logical-only state"
+
+[[row]]
+id = "tty.echo"
+status = "present"
+evidence = "qtest:pty-session"
+notes = "P3: echo on/off is exercised on the pty master"
+
+[[row]]
+id = "tty.flow-control"
+status = "waived"
+evidence = "none"
+notes = "P3: IXON/IXOFF and output pause are not implemented; the current discipline has no flow-control state"
+
+[[row]]
+id = "tty.job-control-glue"
+status = "present"
+evidence = "qtest:tty-job-control"
+notes = "P3: foreground pgrp handoff, SIGINT delivery and hangup through ptyd/ttyd"
+
+[[row]]
+id = "tty.line-discipline"
+status = "present"
+evidence = "qtest:pty-session"
+notes = "P3: raven-tty-core discipline over both pty queues"
+
+[[row]]
+id = "tty.pty"
+status = "present"
+evidence = "qtest:pty-session"
+notes = "P3: ptyd master/slave pair with independent reads and writes"
+
+[[row]]
+id = "tty.raw"
+status = "present"
+evidence = "qtest:pty-session"
+notes = "P3: raw/no-echo mode passes bytes without editing"
+
+[[row]]
+id = "tty.stty"
+status = "waived"
+evidence = "none"
+notes = "P3: no stty utility; the termios/pty CALL surface is present but the command-line front-end is a later utility ticket"
+
+[[row]]
+id = "tty.termios"
+status = "waived"
+evidence = "none"
+notes = "P3: the existing ravenlibc platform wrapper has host tests over GET_MODE/SET_MODE/FLUSH, but no target libc termios case covers the speed/flag fields; pty-session exercises the protocol only. Kept waived rather than claiming a false pass"
+
+[[row]]
+id = "tty.ttyname"
+status = "waived"
+evidence = "none"
+notes = "P3: isatty/ttyname wrappers exist but there is no target pty identity case; P3 keeps the row honest instead of claiming the libc path"
