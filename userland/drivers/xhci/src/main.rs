@@ -34,9 +34,7 @@ mod program {
         AddressPool, ControlError, ControlTransport, Enumerator, SetupPacket, UsbError,
     };
     use raven_usb_hid::parse_hid_descriptor;
-    use raven_xhci::{
-        ControlDirection, Controller, EP1_DCI, MIN_DMA_LEN, Seam, TrbType, XhciError,
-    };
+    use raven_xhci::{ControlDirection, Controller, MIN_DMA_LEN, Seam, XhciError};
     use usb_hid::{Error as HidError, KeyboardService, SetupPacket as HidSetup, TransferRing};
 
     entry!(main);
@@ -186,8 +184,17 @@ mod program {
         let mut service = KeyboardService::new(transport);
         service.init(&report).map_err(hid_text)?;
         println!("usb-keyboard: boot protocol ok");
-        let queued = service.poll().map_err(hid_text)?;
+        let mut queued = 0usize;
+        for _ in 0..8 {
+            queued = queued.saturating_add(service.poll().map_err(hid_text)?);
+            if service.console_len() >= 4 {
+                break;
+            }
+        }
+        let mut console = [0u8; 8];
+        let count = service.read_console(&mut console);
         println!("usb-keyboard: enumerated keys={queued}");
+        println!("usb-keyboard: console hex={:02x?}", &console[..count]);
         println!("usb-keyboard: ok");
         Ok(())
     }
@@ -351,18 +358,13 @@ mod program {
         }
 
         fn next_report(&mut self) -> Option<[u8; 8]> {
-            loop {
-                let event = self.controller.poll_event().ok().flatten()?;
-                if event.kind() != TrbType::TransferEvent || event.endpoint() != EP1_DCI {
-                    continue;
-                }
-                if event.completion_code() != 1 && event.completion_code() != 13 {
-                    return None;
-                }
-                let mut report = [0u8; 8];
-                self.controller.read_interrupt(&mut report).ok()?;
-                return Some(report);
+            let event = self.controller.wait_interrupt().ok()?;
+            if event.completion_code() != 1 && event.completion_code() != 13 {
+                return None;
             }
+            let mut report = [0u8; 8];
+            self.controller.read_interrupt(&mut report).ok()?;
+            Some(report)
         }
     }
 

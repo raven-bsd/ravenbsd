@@ -24,6 +24,7 @@ pub mod ipc;
 /// Linux-personality trap routing to the per-process userspace handler (S41).
 pub mod linux;
 pub mod memory_ctl;
+pub mod pipe;
 pub mod process_ctl;
 pub mod thread;
 
@@ -99,6 +100,12 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     if number == ipc::SEEK {
         return ipc::seek(frame);
+    }
+    if number == pipe::PIPE {
+        return pipe::pipe(frame);
+    }
+    if number == pipe::PIPE2 {
+        return pipe::pipe2(frame);
     }
     if number == process_ctl::PROC_SELF_INFO {
         return process_ctl::self_info(frame);

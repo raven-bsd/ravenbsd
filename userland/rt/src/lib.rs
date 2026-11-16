@@ -22,6 +22,7 @@ pub mod event;
 #[cfg(feature = "alloc")]
 pub mod fs;
 pub mod initfs;
+pub mod pipe;
 pub mod print;
 pub mod proc;
 pub mod spawn;

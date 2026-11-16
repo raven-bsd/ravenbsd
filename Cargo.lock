@@ -734,6 +734,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-awk"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-regex",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-b12b-probe"
 version = "0.1.0"
 dependencies = [
@@ -910,6 +919,14 @@ name = "raven-cmdline"
 version = "0.1.0"
 
 [[package]]
+name = "raven-cmp"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-config"
 version = "0.1.0"
 dependencies = [
@@ -996,6 +1013,14 @@ name = "raven-df"
 version = "0.1.0"
 dependencies = [
  "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
+name = "raven-diff"
+version = "0.1.0"
+dependencies = [
  "raven-rt",
  "raven-tool-core",
 ]
@@ -1165,6 +1190,15 @@ dependencies = [
  "raven-abi",
  "raven-initfs",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-grep"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-regex",
+ "raven-rt",
+ "raven-tool-core",
 ]
 
 [[package]]
@@ -2075,6 +2109,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-pipe-tests"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-plat"
 version = "0.1.0"
 dependencies = [
@@ -2705,6 +2747,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-sed"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-regex",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-setuid"
 version = "0.1.0"
 dependencies = [
@@ -2743,6 +2794,14 @@ name = "raven-stat"
 version = "0.1.0"
 dependencies = [
  "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
+name = "raven-strings"
+version = "0.1.0"
+dependencies = [
  "raven-rt",
  "raven-tool-core",
 ]
