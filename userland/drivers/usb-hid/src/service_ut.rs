@@ -111,3 +111,26 @@ fn a_non_keyboard_descriptor_is_rejected() {
     assert_eq!(service.ring().controls.get(), 2);
     assert_eq!(service.ring().submits.get(), 0);
 }
+
+#[test]
+fn uk_layout_and_repeat_reach_the_queue() {
+    use crate::repeat::RepeatSettings;
+
+    let fake = Fake::default();
+    fake.reports.borrow_mut()[0] = [0x02, 0, 0x20, 0, 0, 0, 0, 0]; // UK Shift+3 -> £
+    fake.count.set(1);
+    let mut service = KeyboardService::with_layout(fake, Layout::Uk);
+    assert_eq!(service.init(&BOOT_KEYBOARD_DESCRIPTOR), Ok(()));
+    service.set_repeat(RepeatSettings {
+        delay_ns: 100,
+        period_ns: 50,
+    });
+    assert_eq!(service.poll_at(1_000), Ok(1));
+    let mut out = [0u8; 8];
+    assert_eq!(service.read_console(&mut out), 1);
+    assert_eq!(out[0], 0xa3);
+    assert_eq!(service.tick(1_099), 0);
+    assert_eq!(service.tick(1_100), 1);
+    assert_eq!(service.read_console(&mut out), 1);
+    assert_eq!(out[0], 0xa3);
+}

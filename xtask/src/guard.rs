@@ -65,6 +65,12 @@ pub(crate) fn scan_repo(root: &Path) -> Result<Vec<Violation>> {
     let allowlist = read_allowlist(root)?;
     let mut violations = Vec::new();
     for rel_path in repository_files(root)? {
+        // The uutils tree is a separate, pinned donor workspace (MIT); its own test and coverage
+        // scripts use nightly tooling, which is not part of the shipped scaffold. The root
+        // workspace excludes it, so the stable-Rust rule does not apply to that tree.
+        if rel_path.starts_with("userland/uutils/") {
+            continue;
+        }
         if allowlist.contains(&rel_path) {
             continue;
         }

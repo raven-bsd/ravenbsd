@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# T2 one-shot target client. `scheme:net` is provided by netd, so the socket
+# path is ready before this service starts; `readiness = "exit"` lets svcd
+# report it up after the clean exit and the test svcd.conf then exits init
+# with this service's status.
+name = "tls-client"
+exec = "/sbin/tls-client"
+args = []
+needs = ["scheme:net"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

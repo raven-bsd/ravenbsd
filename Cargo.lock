@@ -1829,6 +1829,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-pi4-xhci"
+version = "0.1.0"
+
+[[package]]
 name = "raven-pi5"
 version = "0.1.0"
 dependencies = [
@@ -2609,6 +2613,20 @@ name = "raven-timemath"
 version = "0.1.0"
 
 [[package]]
+name = "raven-tls"
+version = "0.1.0"
+
+[[package]]
+name = "raven-tls-client"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
+ "raven-scheme",
+ "raven-tls",
+]
+
+[[package]]
 name = "raven-tool-core"
 version = "0.1.0"
 dependencies = [
@@ -2668,6 +2686,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-usb-core"
+version = "0.1.0"
+dependencies = [
+ "raven-rp1-xhci",
+]
+
+[[package]]
 name = "raven-usb-hid"
 version = "0.1.0"
 
@@ -2719,6 +2744,13 @@ dependencies = [
 [[package]]
 name = "raven-vma"
 version = "0.1.0"
+
+[[package]]
+name = "raven-xhci"
+version = "0.1.0"
+dependencies = [
+ "raven-rp1-xhci",
+]
 
 [[package]]
 name = "raven-zerod"
@@ -3054,6 +3086,19 @@ name = "winnow"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3b93199df0ab874cdf0c6a94f0a0dc3423fe41f1cafb62b8bd7b1deb277aef"
+
+[[package]]
+name = "xhci"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-driver",
+ "raven-rt",
+ "raven-usb-core",
+ "raven-usb-hid",
+ "raven-xhci",
+ "usb-hid",
+]
 
 [[package]]
 name = "xtask"

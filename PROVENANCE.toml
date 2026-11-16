@@ -9416,6 +9416,17 @@ modified = true
 notes = "minimal _rtld_start entry stubs; the full register convention is the on-target half"
 
 [[import]]
+path = "userland/uutils"
+upstream = "uutils-coreutils"
+upstream_path = "."
+upstream_rev = "cf030b82ef519ab60ccacf763f7f086dd612d9c3"
+license = "MIT"
+tier = "A"
+copied = "2026-11-15"
+modified = true
+notes = "vendored 0.13.0 workspace (109 utility crates, uucore and tests) for the base file/text tools; one local patch in src/uu/mv/src/mv.rs from upstream cc1a8b2 to repair the pinned commit's build; the subtree also carries the K25a compatibility copies nix 0.31.3 (b5933ca178802b558a667514f717a86b3a1cedcc), rustix 1.1.6 (4a563ad698b2c20ff848515821023d2265a788d0) and rlimit 0.11.0 (839f34767dff1de4197b140c214ea839c1410fbc), each a cfg-arm port only; the tree is in .provenance-ignore because every upstream file carries the MIT notice in its own header form"
+
+[[import]]
 path = "userland/brush"
 upstream = "brush"
 upstream_path = "."
@@ -9513,3 +9524,14 @@ tier = "A"
 copied = "2026-11-15"
 modified = true
 notes = "libc 0.2.186 registry release with the K19 ravenbsd unix module grafted in (the minimum release nix 0.31 requires); MIT headers applied; the root [patch.crates-io] points at it and the lock is pinned to 0.2.186. The exact registry and patch identities are recorded in toolchain/libc-0.2.186-provenance.md."
+
+[[import]]
+path = "addons/tls/openssl"
+upstream = "openssl"
+upstream_path = "."
+upstream_rev = "636dfadc70ce26f2473870570bfd9ec352806b1d"
+license = "Apache-2.0"
+tier = "A"
+copied = "2026-11-16"
+modified = true
+notes = "OpenSSL 3.5.0 source tree for the C add-on (DR-45); crypto, build and API source are unmodified. Upstream apps/demos/doc/fuzz/test private-key fixtures (286 files) are excluded because GitHub push protection rejects them; the build uses no-tests and does not need them. The build is out of tree against the RavenBSD libc clang sysroot; the only compatibility code is addons/tls/compat/tls_compat.c."

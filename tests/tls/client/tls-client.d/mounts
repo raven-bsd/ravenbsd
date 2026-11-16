@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The server profile mounts only the initfs root and a writable /etc. OpenSSL's
+# DEVRANDOM seeding path opens /dev/urandom, so this test overlay maps it to
+# the rand: scheme. The product image should grow the same mount (or use the
+# PG-52 getrandom path) when the entropy story is settled.
+
+/ initfs:
+/etc ramfs:
+/dev/urandom rand:
