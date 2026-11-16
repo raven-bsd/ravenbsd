@@ -212,7 +212,7 @@ argv = ["cargo", "xtask", "qtest", "--case", "libc-hello", "--arch", "x86_64"]
 child_argv = ["cargo", "xtask", "qtest", "--case", "{case}", "--arch", "x86_64"]
 expand = "qtest"
 cases = ["libc-hello", "libc-stdio", "libc-time", "libc-threads", "libc-signals", "libc-dynamic", "libc-spawn"]
-note = "C74a: signals passes; hello auxv/string, stdio fault 0x3, time build, threads AT_PHDR, dynamic shape, spawn LocalBackend"
+note = "C74a: signals passes; hello auxv/string, stdio fault 0x3, time build, threads list-link corruption after cond, dynamic shape, spawn LocalBackend"
 evidence = "build/libc-gate/5.1.txt"
 source = "C73, 16 3.B.9 C12"
 
