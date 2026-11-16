@@ -11,6 +11,32 @@ fn sys_kernel_reports_the_pg1_tls_capability() {
 }
 
 #[test]
+fn the_thread_create_call_carries_the_extended_payload() {
+    let args = CreateArgs {
+        entry: 0x1111,
+        stack_top: 0x2222,
+        arg: 0x3333,
+        tp: 0x4444,
+        clear_tid_addr: 0x5555,
+    };
+    let call = create_call(&args);
+    assert_eq!(call.nr, 0x20);
+    assert_eq!(call.proc_handle, 0);
+    assert_eq!(call.entry, 0x1111);
+    assert_eq!(call.stack_top, 0x2222);
+    assert_eq!(call.arg, 0x3333);
+    assert_eq!(call.flags, 1);
+    assert_eq!(call.extended.tp, 0x4444);
+    assert_eq!(call.extended.tid_out, 0);
+    assert_eq!(call.extended.clear_tid_addr, 0x5555);
+    assert_eq!(core::mem::size_of::<ThreadCreateEx>(), 24);
+    assert_eq!(core::mem::align_of::<ThreadCreateEx>(), 8);
+    assert_eq!(core::mem::offset_of!(ThreadCreateEx, tp), 0);
+    assert_eq!(core::mem::offset_of!(ThreadCreateEx, tid_out), 8);
+    assert_eq!(core::mem::offset_of!(ThreadCreateEx, clear_tid_addr), 16);
+}
+
+#[test]
 fn builtin_tls_is_aligned_and_large() {
     assert_eq!(builtin_tls() % 16, 0);
     assert_eq!(

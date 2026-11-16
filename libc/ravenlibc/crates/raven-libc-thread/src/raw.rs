@@ -182,6 +182,69 @@ pub fn tlsdesc_dynamic(descriptor: &mut [usize; 2]) -> usize {
     unsafe { tlsdesc::dynamic_entry(descriptor.as_mut_ptr()) }
 }
 
+/// `THREAD_CREATE` syscall number (`crates/raven-abi/src/syscall.rs`).
+const THREAD_CREATE: usize = 0x20;
+/// The `THREAD_CREATE_EX` payload flag.
+const THREAD_CREATE_EX: usize = 1;
+/// `Handle::SELF_PROC`.
+const SELF_PROC: usize = 0;
+
+/// The extended `THREAD_CREATE` payload; mirrors `raven_abi::syscall::ThreadCreateEx`, which is
+/// a contract-crate type this crate does not depend on.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ThreadCreateEx {
+    /// New thread's user TLS base.
+    pub tp: usize,
+    /// Optional destination for the kernel tid; zero skips the write.
+    pub tid_out: usize,
+    /// New thread's clear-on-exit word; zero disables it.
+    pub clear_tid_addr: usize,
+}
+
+const _: () = assert!(core::mem::size_of::<ThreadCreateEx>() == 24);
+const _: () = assert!(core::mem::align_of::<ThreadCreateEx>() == 8);
+const _: () = assert!(core::mem::offset_of!(ThreadCreateEx, tp) == 0);
+const _: () = assert!(core::mem::offset_of!(ThreadCreateEx, tid_out) == 8);
+const _: () = assert!(core::mem::offset_of!(ThreadCreateEx, clear_tid_addr) == 16);
+
+/// One `THREAD_CREATE` argument set, kept separate from the syscall so the host test can check it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct CreateCall {
+    /// Syscall number.
+    pub nr: usize,
+    /// Target process handle (`SELF_PROC`).
+    pub proc_handle: usize,
+    /// Entry stub.
+    pub entry: usize,
+    /// New stack top.
+    pub stack_top: usize,
+    /// Start arguments.
+    pub arg: usize,
+    /// `THREAD_CREATE_EX`.
+    pub flags: usize,
+    /// The extended payload.
+    pub extended: ThreadCreateEx,
+}
+
+/// Build the production `THREAD_CREATE` argument set.
+#[must_use]
+pub(crate) fn create_call(args: &CreateArgs) -> CreateCall {
+    CreateCall {
+        nr: THREAD_CREATE,
+        proc_handle: SELF_PROC,
+        entry: args.entry,
+        stack_top: args.stack_top,
+        arg: args.arg,
+        flags: THREAD_CREATE_EX,
+        extended: ThreadCreateEx {
+            tp: args.tp,
+            tid_out: 0,
+            clear_tid_addr: args.clear_tid_addr,
+        },
+    }
+}
+
 /// The production `ThreadKernel`: every method that has no Raven primitive returns `ENOSYS` or
 /// the documented fallback; no kernel flag is invented.
 #[derive(Clone, Copy, Debug, Default)]
@@ -194,9 +257,9 @@ impl SysKernel {
         Self
     }
 
-    /// What the current kernel actually provides: PG-1 (`THREAD_SET_TLS`) is
-    /// present on x86-64; AArch64/RISC-V write the user register directly.
-    /// Multi-thread creation remains absent (PG-2).
+    /// What the current kernel actually provides: PG-1 (`THREAD_SET_TLS`) and the
+    /// PG-2 `THREAD_CREATE_EX` payload are present. Real tids (`THREAD_SELF`) and
+    /// `THREAD_EXIT_EX` remain optional and are not advertised.
     #[must_use]
     pub const fn caps_const() -> KernelCaps {
         let mut caps = KernelCaps::minimal();
@@ -228,10 +291,26 @@ impl ThreadKernel for SysKernel {
         Err(ENOSYS)
     }
 
-    fn create(&self, _args: &CreateArgs) -> Result<u32, Errno> {
-        // PG-2 (thread create, clear-on-exit) and a `Handle::SELF_PROC` accessor in C54 are both
-        // absent. Refuse rather than start a thread that shares the creator's TLS block.
-        Err(ENOSYS)
+    fn create(&self, args: &CreateArgs) -> Result<u32, Errno> {
+        let call = create_call(args);
+        let mut extended = call.extended;
+        // SAFETY: `extended` is a live, fully initialised payload for the duration of the call;
+        // the kernel copies it from user space. The entry, stack and TLS addresses were built by
+        // `pthread_create` in the caller's address space, and `SELF_PROC` is the kernel's
+        // self-process handle.
+        let raw = unsafe {
+            raven_libc_sys::arch::syscall6(
+                call.nr,
+                call.proc_handle,
+                call.entry,
+                call.stack_top,
+                call.arg,
+                call.flags,
+                &mut extended as *mut ThreadCreateEx as usize,
+            )
+        };
+        let value = raven_libc_sys::errno::ret(raw).map_err(|error| Errno(error.0))?;
+        u32::try_from(value).map_err(|_| EINVAL)
     }
 
     fn exit(&self, code: i32) -> ! {
