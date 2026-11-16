@@ -7,6 +7,10 @@ Status: the qtest harness now has a QMP side channel and the `usb-keyboard` case
 chord. The S67 xHCI driver still polls once and exits, so the current transcript reports
 `usb-keyboard: enumerated keys=0`; the exact driver follow-up is recorded below. No Pi board claim.
 
+Rev 39 merged `origin/master` `95e72780` (S61/S67/S68); the QMP harness and this limit are
+unchanged. `cargo test -p raven-qtest` passes 173 tests, and the host gate is green, but the
+end-to-end case is BLOCKED on the driver's single report poll and its missing console/TTY drain.
+
 ## QMP side channel
 
 QEMU keeps using `-serial stdio` for the guest console. The case adds a QMP socket through
@@ -56,3 +60,15 @@ make check-fast
 
 The qtest currently fails only the `keys=4` expectation; the QMP step itself completes and the
 QEMU trace shows the key event. The host gate is independent of the qtest key assertion.
+
+Current guest transcript:
+
+```
+xhci: hid interface=0 report=63 ep=0x81
+usb-keyboard: boot protocol ok
+usb-keyboard: enumerated keys=0
+usb-keyboard: ok
+...
+--- unmatched expectations ---
+^usb-keyboard: enumerated keys=4$
+```
