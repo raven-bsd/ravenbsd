@@ -54,10 +54,10 @@ regex = '^xhci: device vendor=0x[0-9a-f]+ product=0x[0-9a-f]+ class=[0-9]+ confi
 [[expect]]
 regex = '^xhci: hid interface=[0-9]+ report=[0-9]+ ep=0x81$'
 
-# S63: hold h+i+shift+b+Enter long enough for the driver to prime EP1. The QMP side channel
-# keeps QEMU's serial stdio for the guest console.
+# S63: send the chord only after the boot protocol is selected and EP1 is primed; the
+# driver then waits for the interrupt-IN transfer and drains the HID console.
 [[step]]
-wait = '^xhci: hid interface='
+wait = '^usb-keyboard: boot protocol ok$'
 send = '@qmp:build/qtest/usb-keyboard.qmp:h,i,shift,b,ret'
 delay_ms = 0
 
@@ -66,6 +66,9 @@ regex = '^usb-keyboard: boot protocol ok$'
 
 [[expect]]
 regex = '^usb-keyboard: enumerated keys=4$'
+
+[[expect]]
+regex = '^usb-keyboard: console hex=\[68, 69, 42, 0a\]$'
 
 [[expect]]
 regex = '^usb-keyboard: ok$'
@@ -80,4 +83,4 @@ regex = '^svcd: settled$'
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|xhci: .*failed|usb-keyboard: fail'
+regex = '(?i)panic|EXCEPTION|xhci: .*failed|usb-keyboard: fail|usb-keyboard: enumerated keys=0'

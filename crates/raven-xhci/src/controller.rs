@@ -490,6 +490,20 @@ impl<S: Seam> Controller<S> {
         self.seam.dma_read_bytes(INTERRUPT_BUFFER_OFFSET, out)
     }
 
+    /// Wait for the next EP1 interrupt-IN transfer event.
+    ///
+    /// This is the bounded wait the HID adapter uses after an interrupt-IN transfer
+    /// has been primed. It acknowledges the controller interrupt and advances the
+    /// event-ring dequeue pointer, exactly like the control-transfer wait path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`XhciError::Timeout`] when no EP1 transfer event arrives within the
+    /// bounded wait, or the DMA error from the event ring.
+    pub fn wait_interrupt(&mut self) -> Result<Trb, XhciError> {
+        self.wait_transfer(EP1_DCI)
+    }
+
     /// Wait for a transfer event for `endpoint`.
     fn wait_transfer(&mut self, endpoint: u8) -> Result<Trb, XhciError> {
         for _ in 0..2000 {

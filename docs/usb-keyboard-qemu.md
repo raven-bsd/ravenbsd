@@ -3,13 +3,11 @@
 
 # QEMU USB keyboard end-to-end (S63)
 
-Status: the qtest harness now has a QMP side channel and the `usb-keyboard` case injects a key
-chord. The S67 xHCI driver still polls once and exits, so the current transcript reports
-`usb-keyboard: enumerated keys=0`; the exact driver follow-up is recorded below. No Pi board claim.
-
-Rev 39 merged `origin/master` `95e72780` (S61/S67/S68); the QMP harness and this limit are
-unchanged. `cargo test -p raven-qtest` passes 173 tests, and the host gate is green, but the
-end-to-end case is BLOCKED on the driver's single report poll and its missing console/TTY drain.
+Status: **PASS** on QEMU's `qemu-xhci` + `usb-kbd`. The guest enumerates the keyboard through
+the S61 USB core, selects the HID boot protocol, receives the QMP key chord `h i shift+b Enter`,
+and the xHCI driver drains the S62 console queue. The guest transcript reports four keys and the
+`hiB\n` bytes (`[68, 69, 42, 0a]`). No Pi board claim; the DWC3/real-hardware path stays
+UNVERIFIED.
 
 ## QMP side channel
 
@@ -25,50 +23,63 @@ runner and sent as one QMP `send-key` command instead of being written to serial
 
 ```
 [[step]]
-wait = '^xhci: hid interface='
+wait = '^usb-keyboard: boot protocol ok$'
 send = '@qmp:build/qtest/usb-keyboard.qmp:h,i,shift,b,ret'
 delay_ms = 0
 ```
 
 The runner connects to QMP immediately after QEMU starts, performs the `qmp_capabilities`
-handshake and sends the chord with a 500 ms hold. QEMU's trace (`input_event_key_qcode`) confirms
-the key event reaches the input subsystem. The QMP socket path must be removed before a
-run (`pre` does `rm -f`), because QEMU's `server=on` refuses a stale socket.
+handshake and sends the chord with a 500 ms hold. The socket is removed before a run (`pre` does
+`rm -f`), because QEMU's `server=on` refuses a stale socket.
 
-## Current limit
+The chord arrives as one HID report per key transition (`h`, then `h i`, then shift, then
+`h i b`, then Enter). The driver's bounded drain loop consumes up to eight reports.
 
-The S67 driver (`userland/drivers/xhci/src/main.rs`, `run`) does:
+## Driver fix
+
+The first end-to-end attempt stalled EP1. QEMU's trace showed:
 
 ```
-let queued = service.poll().map_err(hid_text)?;
-println!("usb-keyboard: enumerated keys={queued}");
+usb_packet_state_change ... ep 1 ... state undef -> setup
+usb_xhci_xfer_error ... ret -3
+usb_xhci_queue_event ... CC_STALL_ERROR
+usb_xhci_ep_state ... running -> halted
 ```
 
-`KeyboardService::poll` performs one `next_report`; if the QMP key arrives after that call, or the
-driver exits before the interrupt-IN completion, the queue stays empty. The observed transcript is
-`keys=0`. The driver must be changed (outside S63's Owns) to poll for a bounded interval, drain
-`service.read_console` and print the received bytes (`hiB\n`). Once that lands, the case can keep
-its `keys=4` expectation and the report can include the key transcript.
+The input context encoded EP1 with EP Type **3** (Interrupt OUT) even though DCI 3 is EP1 IN.
+`crates/raven-xhci/src/context.rs` now encodes EP Type **7** (Interrupt IN) and the context test
+asserts the new value.
+
+The driver (`userland/drivers/xhci/src/main.rs`) now:
+
+1. calls `Controller::wait_interrupt()` after the boot protocol primes EP1, acknowledging the
+   controller interrupt and advancing the event-ring dequeue pointer;
+2. polls the keyboard service until four console bytes are queued (bounded to eight reports);
+3. drains `KeyboardService::read_console` and prints the bytes as a hex console/TTY transcript.
+
+The S62 `ConsoleInput` queue remains the seam; no HID or USB-core source was changed.
+
+## Guest transcript
+
+```
+xhci: hid interface=0 report=63 ep=0x81
+usb-keyboard: boot protocol ok
+usb-keyboard: enumerated keys=4
+usb-keyboard: console hex=[68, 69, 42, 0a]
+usb-keyboard: ok
+devd: driver xhci cycle 1 exit=0
+svcd: settled
+init exited (0)
+```
 
 ## Commands
 
 ```
 cargo test -p raven-qtest
+cargo nextest run -p raven-xhci
 cargo xtask qtest --case usb-keyboard --arch x86_64
 make check-fast
 ```
 
-The qtest currently fails only the `keys=4` expectation; the QMP step itself completes and the
-QEMU trace shows the key event. The host gate is independent of the qtest key assertion.
-
-Current guest transcript:
-
-```
-xhci: hid interface=0 report=63 ep=0x81
-usb-keyboard: boot protocol ok
-usb-keyboard: enumerated keys=0
-usb-keyboard: ok
-...
---- unmatched expectations ---
-^usb-keyboard: enumerated keys=4$
-```
+The case forbids `panic`, `EXCEPTION`, `usb-keyboard: fail` and
+`usb-keyboard: enumerated keys=0`, so the zero-key regression cannot pass silently.
