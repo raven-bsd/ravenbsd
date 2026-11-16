@@ -1,0 +1,64 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt ED 1
+.Os RavenBSD
+.Sh NAME
+.Nm ed
+.Nd line-oriented text editor
+.Sh SYNOPSIS
+.Nm
+.Op Fl s
+.Op Ar file
+.Sh DESCRIPTION
+The
+.Nm
+utility edits a line buffer with the POSIX command subset.
+Addresses are one-based lines, with
+.Ql \&.
+(current),
+.Ql $
+(last),
+.Ql 'x
+(mark),
+.Ql /re/
+(forward search),
+.Ql ?re?
+(backward search) and comma ranges.
+.Bl -tag -width Ds
+.It Ic a , Ic i , Ic c
+Append, insert or change lines until a lone
+.Ql \&. .
+.It Ic d , Ic p , Ic n , Ic l
+Delete, print, number or escaped-print lines.
+.It Ic s
+Substitute with the POSIX basic regular expression syntax; flags
+.Ql g ,
+a numeric occurrence and
+.Ql p
+are supported.
+.It Ic g , Ic v
+Global and inverse-global matching commands.
+.It Ic m , Ic t , Ic j
+Move, copy or join ranges.
+.It Ic k
+Set a mark.
+.It Ic r , Ic w , Ic e , Ic f
+Read, write, edit or name a file.
+.It Ic u , Ic q , Ic =
+Undo, quit or print a line number.
+.El
+.Pp
+Shell escapes
+.Pq Ic !
+are explicitly unsupported and return a diagnostic. The target image has no
+standard-input stream, so the current wrapper expects commands on the serial
+console; host tests execute the same command model directly.
+.Sh EXIT STATUS
+.Ex -std
+An invalid command/address exits with status 1; a usage error exits with status 2.
+.Sh SEE ALSO
+.Xr sed 1 ,
+.Xr ex 1
+.Sh STANDARDS
+RavenBSD implements the documented POSIX ed subset.

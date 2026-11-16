@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4t ed evidence: first-party POSIX line-editor subset.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.ed"
+status = "present"
+evidence = "test:tests/posix/utility/ed/ed/test.sh"
+notes = "P4t: address/range edits, substitutions, global commands, file I/O, undo and quit host tests"
