@@ -138,6 +138,26 @@ model and rejects a duplicate-launcher model.
 | link marker missing | PHY/cable/autonegotiation failure | `GENET-REV`/`GENET-PHY`/`GENET-RGMII` and `GENET-NET-LINK` |
 | ping marker missing | no lease gateway reply, wrong gateway, or ping not run | `GENET-NET-DHCP`, `ping` summary, `GENET-NET-PING` |
 
+## Model soak
+
+`tests/fixtures/pi4-net/model` runs 128 deterministic cycles over the host-tested
+`NicService`/`FrameBackend` with seeds `1..=128`. The cycle selector injects:
+
+| Case | Trigger | Expected |
+|---|---|---|
+| plain success | remaining seeds | four `GENET-NET-*` markers, RX armed, TX empty |
+| link flap | `seed % 17 == 0` | recover and complete |
+| DHCP timeout | `seed % 19 == 0` | no lease, no `GENET-NET-OK` |
+| lease renewal | `seed % 13 == 0` | new lease and completion |
+| B39 ring wrap | `seed % 31 == 0` | wrap RX/TX and complete |
+| TX drop | `seed % 23 == 0` | rejected descriptor, no `GENET-NET-OK` |
+| malformed RX | `seed % 29 == 0` | error counted, then complete |
+
+The `pi4-net-model` qtest prints `pi4-net-soak: cycles=128 ok=... failed=...`,
+`faults ...`, `markers=ok leaks=0` and `pass`. A failed cycle never produces a transcript or
+`GENET-NET-OK`; a successful cycle leaves the RX ring at 8 posted descriptors and the TX ring
+empty. This is a host model, not a board claim.
+
 ## Evidence script
 
 ```

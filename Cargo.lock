@@ -2007,6 +2007,8 @@ dependencies = [
 name = "raven-pi4-net-model"
 version = "0.1.0"
 dependencies = [
+ "genet",
+ "raven-genet",
  "raven-initfs",
  "raven-rt",
 ]

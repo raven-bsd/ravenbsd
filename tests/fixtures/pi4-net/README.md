@@ -19,6 +19,14 @@ script. Neither file is Pi 4 board evidence:
 The script must accept only the positive file; every negative file must fail. `--chain` also
 runs `check-chain.sh` before validating the log.
 
+## Model soak
+
+The `pi4-net-model` guest also runs 128 deterministic cycles (seeds `1..=128`) over the host-tested
+`NicService`/`FrameBackend`: link flap, DHCP timeout/retry, lease renewal, B39 ring wrap, one TX
+drop and a malformed RX descriptor. A successful cycle must produce the four `GENET-NET-*`
+markers and leave the RX ring armed with no TX slot outstanding; a failed cycle must have no
+transcript. The qtest prints the cycle/fault counts and `markers=ok leaks=0`.
+
 Run the pair without QEMU or a board:
 
 ```
