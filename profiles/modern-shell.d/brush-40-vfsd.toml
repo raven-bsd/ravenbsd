@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[[initfs.programs]]
+package = "raven-vfsd"
+path = "/sbin/vfsd"
+
+[[initfs.files]]
+src = "etc/services.d/vfsd.toml"
+path = "/etc/services.d/vfsd.toml"
+
+[[initfs.files]]
+src = "etc/mounts"
+path = "/etc/mounts"
