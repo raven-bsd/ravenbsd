@@ -618,7 +618,37 @@ pub fn getdents<B: SysBackend, L: Lock>(
     fd: i32,
     buf: &mut [u8],
 ) -> Result<usize, Errno> {
-    platform.read(fd, buf)
+    // The file servers return the packed K60 entry format. `readdir` expects the Linux
+    // `struct dirent` records (20-byte header, NUL-terminated name, 8-byte reclen), so decode the
+    // server page and re-encode it into the caller's buffer. One server page is at most 4 KiB.
+    let mut raw = [0u8; 4096];
+    let length = platform.read(fd, &mut raw)?;
+    let mut written = 0usize;
+    for item in raven_proto_fs::DirEntryIter::new(&raw[..length]) {
+        let entry = item.map_err(|_| Errno::EPROTO)?;
+        let name = entry.name;
+        let record_len = (19usize
+            .saturating_add(name.len())
+            .saturating_add(1)
+            .saturating_add(7))
+            & !7;
+        let Some(end) = written.checked_add(record_len) else {
+            return Err(Errno::EIO);
+        };
+        if end > buf.len() {
+            break;
+        }
+        let record = &mut buf[written..end];
+        record.fill(0);
+        record[0..8].copy_from_slice(&entry.header.ino.to_le_bytes());
+        // The K60 stream has no seek cookie; sequential `readdir` does not need one.
+        record[8..16].copy_from_slice(&0i64.to_le_bytes());
+        record[16..18].copy_from_slice(&(record_len as u16).to_le_bytes());
+        record[18] = entry.header.kind;
+        record[19..19 + name.len()].copy_from_slice(name);
+        written = end;
+    }
+    Ok(written)
 }
 
 /// `getdirentries` (BSD spelling of `getdents`).

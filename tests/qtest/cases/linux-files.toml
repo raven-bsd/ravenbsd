@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B23: linuxd serves the file syscall batch through the file: namespace. The fixture starts
+# initfsd, ramfsd and vfsd, then runs a static musl probe through linuxd. The probe reads
+# `/data.txt` from the initfs and creates, rewrites, seeks, preads/pwrites, fcntls and dup3s
+# `/tmp/b23.txt` on the ramfs.
+
+name = "linux-files"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/linuxd/build-files.sh"]
+initfs = "build/fixtures/linuxd-files/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^vfsd: mounted / on initfs:$'
+
+[[expect]]
+regex = '^vfsd: mounted /tmp on ramfs:$'
+
+[[expect]]
+regex = '^linux-files: file namespace ready$'
+
+[[expect]]
+regex = '^linux-files: start$'
+
+[[expect]]
+regex = '^linux-files: read initfs ok bytes=[0-9]+$'
+
+[[expect]]
+regex = '^linux-files: write/read ok$'
+
+[[expect]]
+regex = '^linux-files: pread/pwrite ok$'
+
+[[expect]]
+regex = '^linux-files: fcntl ok$'
+
+[[expect]]
+regex = '^linux-files: dup3 ok$'
+
+[[expect]]
+regex = '^linux-files: reopen ok$'
+
+[[expect]]
+regex = '^linux-files: done$'
+
+[[expect]]
+regex = '^linuxd: hello exit=0$'
+
+[[expect]]
+regex = '^linux-files: linuxd exit=0$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|linux-files: FAIL'

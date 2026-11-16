@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "xhci"
+version = "0.1.0"
+description = "QEMU/Pi guest xHCI driver: BAR/DMA/IRQ, enumeration and USB HID keyboard binding."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "xhci"
+path = "src/main.rs"
+
+[dependencies]
+raven-usb-core = { path = "../../../crates/raven-usb-core" }
+raven-usb-hid = { path = "../../../crates/raven-usb-hid" }
+raven-xhci = { path = "../../../crates/raven-xhci" }
+usb-hid = { path = "../usb-hid" }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-driver = { path = "../../../crates/raven-driver" }
+raven-rt = { path = "../../rt", features = ["alloc"] }
+
+[lints]
+workspace = true

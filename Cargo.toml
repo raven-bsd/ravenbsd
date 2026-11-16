@@ -7,7 +7,7 @@
 resolver = "3"
 # `make toolchain` extracts the pinned Rust source under build/; its bootstrap
 # package must not be pulled into this workspace.
-exclude = ["build", "userland/brush", "toolchain/vendor/libc"]
+exclude = ["build", "userland/brush", "toolchain/vendor/libc", "userland/uutils"]
 # A ticket that creates a new top-level crate appends ONE line to `members` (and nothing else here).
 # Planned members: "kernel", "boot/loader", "userland/rt", "userland/init", "userland/bin/<tool>",
 # "userland/servers/<server>", "userland/drivers/<driver>", "userland/linux-shim", "libc/ravenlibc/crates/*",
@@ -57,6 +57,7 @@ members = [
     "tests/fixtures/usercopy-cow",
     "tests/fixtures/testkernel",
     "tests/fixtures/update/probe",
+    "tests/tls/client",
     "tests/fixtures/k14-block/mkdisk",
     "tests/fixtures/k33-rootfs",
     "tests/fixtures/b12-netd",
@@ -189,6 +190,7 @@ members = [
     "userland/drivers/emmc2",
     "userland/drivers/genet",
     "userland/drivers/usb-hid",
+    "userland/drivers/xhci",
     "userland/drivers/pwm-audio",
     "tools/bench-host",
     "tools/fuzz",

@@ -1,0 +1,46 @@
+[package]
+name = "uu_install"
+description = "install ~ (uutils) copy files from SOURCE to DESTINATION (with specified attributes)"
+repository = "https://github.com/uutils/coreutils/tree/main/src/uu/install"
+version.workspace = true
+license.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+readme.workspace = true
+
+[lib]
+path = "src/install.rs"
+
+[target.'cfg(unix)'.dependencies]
+clap = { workspace = true }
+fluent = { workspace = true }
+rustix = { workspace = true, features = ["process"] }
+thiserror = { workspace = true }
+uucore = { workspace = true, default-features = true, features = [
+  "backup-control",
+  "buf-copy",
+  "entries",
+  "fs",
+  "mode",
+  "perms",
+  "process",
+] }
+
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
+rustix = { workspace = true, features = ["fs"] }
+selinux = { workspace = true, optional = true }
+
+[features]
+diagnostics = ["uucore/diagnostics"]
+selinux = ["dep:selinux", "uucore/selinux"]
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "install"
+path = "src/main.rs"
+required-features = ["uucore/default"]
