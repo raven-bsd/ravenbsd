@@ -28,7 +28,7 @@ Traceability rows: 1758; profile rows: 1758.
 |---|---|---|---|---|---|
 | `header.aio.h` | `aio.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.arpa-inet.h` | `arpa/inet.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.assert.h` | `assert.h` | present | P1 | `tests/posix/check-headers.sh` |  |
+| `header.assert.h` | `assert.h` | present | P1 | `test:tests/posix/check-headers.sh` |  |
 | `header.complex.h` | `complex.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.cpio.h` | `cpio.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.ctype.h` | `ctype.h` | present | P1 | `libc/ravenlibc/include` |  |

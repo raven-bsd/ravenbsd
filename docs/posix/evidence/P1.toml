@@ -8,5 +8,5 @@ standard = "posix-2024"
 [[row]]
 id = "header.assert.h"
 status = "present"
-evidence = "tests/posix/check-headers.sh"
+evidence = "test:tests/posix/check-headers.sh"
 notes = "P1: assert.h and the assert macro compile under the POSIX feature macros"

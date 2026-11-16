@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P2f: process groups and sessions, a group stop/continue reported by
+# PROC_WAIT_EX, P_PGID/P_ALL exit waits, times/getrusage, rlimits and the
+# RLIMIT_NPROC enforcement path.
+
+name = "proc-session"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/proc/build.sh"]
+initfs = "build/fixtures/proc/session.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^proc-session: pgid=1 child-a=[0-9]+ child-b=[0-9]+$'
+
+[[expect]]
+regex = '^proc-session: setpgid=1 getpgid=1 sid-b=1$'
+
+[[expect]]
+regex = '^proc-session: stop=4991 cont=65535$'
+
+[[expect]]
+regex = '^proc-session: kill-a=35072 kill-b=35072$'
+
+[[expect]]
+regex = '^proc-session: times=1 rusage=1 rlimit=1 invalid=1 nproc=1 echild=1$'
+
+[[expect]]
+regex = '^proc-session: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|proc-session: fail'

@@ -25,11 +25,19 @@ fn row(
     owner: &str,
     evidence: &str,
     extra: &str,
+    waiver: &str,
 ) {
     let evidence = if evidence.is_empty() {
         "none"
     } else {
         evidence
+    };
+    let extra = if waiver.trim().is_empty() {
+        extra.to_string()
+    } else if extra.is_empty() {
+        format!("waiver: {waiver}")
+    } else {
+        format!("{extra}; waiver: {waiver}")
     };
     let _ = writeln!(
         output,
@@ -126,6 +134,7 @@ pub fn render_gaps(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<
                     } else {
                         "PG linked"
                     },
+                    &entry.meta.waiver,
                 );
             }
         },
@@ -145,6 +154,7 @@ pub fn render_gaps(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<
                     &entry.meta.owner,
                     &entry.meta.evidence,
                     &entry.header,
+                    &entry.meta.waiver,
                 );
             }
         },
@@ -164,6 +174,7 @@ pub fn render_gaps(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<
                     &entry.meta.owner,
                     &entry.meta.evidence,
                     &entry.test,
+                    &entry.meta.waiver,
                 );
             }
         },
@@ -183,6 +194,7 @@ pub fn render_gaps(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<
                     &entry.meta.owner,
                     &entry.meta.evidence,
                     &entry.description,
+                    &entry.meta.waiver,
                 );
             }
         },
@@ -202,6 +214,7 @@ pub fn render_gaps(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<
                     &entry.meta.owner,
                     &entry.meta.evidence,
                     &entry.meta.pg.join(", "),
+                    &entry.meta.waiver,
                 );
             }
         },
@@ -221,6 +234,7 @@ pub fn render_gaps(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<
                     &entry.meta.owner,
                     &entry.meta.evidence,
                     &entry.meta.pg.join(", "),
+                    &entry.meta.waiver,
                 );
             }
         },
@@ -240,6 +254,7 @@ pub fn render_gaps(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<
                     &entry.meta.owner,
                     &entry.meta.evidence,
                     &entry.meta.pg.join(", "),
+                    &entry.meta.waiver,
                 );
             }
         },
