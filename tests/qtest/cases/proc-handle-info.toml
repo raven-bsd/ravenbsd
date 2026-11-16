@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P9b: PROC_HANDLE_INFO and wait-status encoding. The fixture creates a child, maps its handle
+# to a pid, terminates it with code 42, waits, checks the POSIX 42<<8 encoding, keeps the pid
+# readable after exit, closes the handle and checks stale/non-process rejection.
+
+name = "proc-handle-info"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/proc-handle-info/build.sh"]
+initfs = "build/fixtures/proc-handle-info/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^proc-handle-info: pid=[0-9]+ info=ok$'
+
+[[expect]]
+regex = '^proc-handle-info: wait=42 status=10752$'
+
+[[expect]]
+regex = '^proc-handle-info: exited info=ok$'
+
+[[expect]]
+regex = '^proc-handle-info: stale=badf$'
+
+[[expect]]
+regex = '^proc-handle-info: nonprocess=badf$'
+
+[[expect]]
+regex = '^proc-handle-info: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|proc-handle-info: fail'

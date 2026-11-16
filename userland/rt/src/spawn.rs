@@ -902,7 +902,7 @@ impl Sys for RtSys {
         let flags = usize::from(nosuid);
         // SAFETY: `PROC_EXEC_CRED` takes a target process handle, an open scheme-file handle and
         // a scalar flags word; the kernel validates both handles, rights and the file's Stat.
-        let result = unsafe { crate::sys::syscall3(0x3E, proc.0 as usize, file.0 as usize, flags) };
+        let result = unsafe { crate::sys::syscall3(0x3F, proc.0 as usize, file.0 as usize, flags) };
         Errno::from_ret(result).map(|_| ())
     }
 
