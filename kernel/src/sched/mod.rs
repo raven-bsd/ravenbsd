@@ -247,7 +247,7 @@ fn enqueue_on(cpu: usize, thread: Arc<Thread>) -> bool {
     };
     if state
         .runqueue
-        .push_back(thread.priority, Arc::clone(&thread))
+        .push_back(thread.effective_priority(), Arc::clone(&thread))
         .is_err()
     {
         return false;
@@ -311,7 +311,16 @@ pub fn new_user_thread(
         .map(|address_space| address_space.root().0)
         .ok_or(Errno::EINVAL)?;
     let name = format!("{}-thread", process.id);
-    Thread::new_user(name, Arc::clone(process), entry, stack_top, arg, cr3)
+    let priority = crate::process::priority::nice_to_priority(process.nice());
+    Thread::new_user(
+        name,
+        Arc::clone(process),
+        entry,
+        stack_top,
+        arg,
+        cr3,
+        priority,
+    )
 }
 
 /// Start the scheduler with `thread` as the first runnable user thread.
@@ -374,7 +383,7 @@ fn schedule_locked() {
             current.set_state(ThreadState::Ready);
             let _ = state
                 .runqueue
-                .push_back(current.priority, Arc::clone(&current));
+                .push_back(current.effective_priority(), Arc::clone(&current));
         }
         state.need_resched = false;
         // A terminal process must never run user code again: drop every runnable thread that
@@ -795,7 +804,7 @@ pub fn wake(thread: Arc<Thread>, token: Option<u64>, status: isize) -> bool {
             thread.pending_wake.store(false, Ordering::SeqCst);
             if state
                 .runqueue
-                .push_back(thread.priority, Arc::clone(&thread))
+                .push_back(thread.effective_priority(), Arc::clone(&thread))
                 .is_err()
             {
                 thread.set_state(ThreadState::Dead);
@@ -845,7 +854,7 @@ fn try_steal(cpu: usize) -> bool {
                     Some(thread) => {
                         let _ = state
                             .runqueue
-                            .push_back(thread.priority, Arc::clone(&thread));
+                            .push_back(thread.effective_priority(), Arc::clone(&thread));
                         None
                     }
                     None => None,
@@ -864,7 +873,7 @@ fn try_steal(cpu: usize) -> bool {
                 .store(u32::try_from(cpu).unwrap_or(u32::MAX), Ordering::Release);
             if state
                 .runqueue
-                .push_back(thread.priority, Arc::clone(&thread))
+                .push_back(thread.effective_priority(), Arc::clone(&thread))
                 .is_err()
             {
                 thread.set_state(ThreadState::Dead);
