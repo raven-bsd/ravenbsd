@@ -100,6 +100,9 @@ pub(crate) fn rustflags_for(
             }
             flags.extend(["-C".to_string(), "relocation-model=static".to_string()]);
             flags.extend(["-C".to_string(), "force-frame-pointers=yes".to_string()]);
+            // sha2 0.11.1 currently hits an LLVM codegen bug on x86_64-unknown-none; the
+            // portable backend produces the same digests and lets raven-auth/users link.
+            flags.extend(["--cfg".to_string(), "sha2_backend=\"soft\"".to_string()]);
             if let Some(linker) = user_linker {
                 flags.push("-C".to_string());
                 flags.push(format!("link-arg=-T{}", linker.display()));

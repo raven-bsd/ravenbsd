@@ -266,14 +266,28 @@ mod program {
         let mut argv: Vec<&str> = Vec::with_capacity(tokens.len() + 1);
         argv.push(driver.name.as_str());
         argv.extend(tokens.iter().map(String::as_str));
-        raven_rt::println!(
-            "devd: dtb launch {} bar={} size={:#x} dma={} irq={}",
-            driver.name,
-            plan.bar,
-            plan.reg.size,
-            dma_size,
-            irq_line
-        );
+        if let (Some(bar), Some(reg)) = (plan.bars.first(), plan.regs.first()) {
+            if plan.bars.len() == 1 {
+                raven_rt::println!(
+                    "devd: dtb launch {} bar={} size={:#x} dma={} irq={}",
+                    driver.name,
+                    bar,
+                    reg.size,
+                    dma_size,
+                    irq_line
+                );
+            } else {
+                raven_rt::println!(
+                    "devd: dtb launch {} bars={} bar={} size={:#x} dma={} irq={}",
+                    driver.name,
+                    plan.bars.len(),
+                    bar,
+                    reg.size,
+                    dma_size,
+                    irq_line
+                );
+            }
+        }
         let mut sys = GrantSys { handles };
         let child = match spawn_with(
             initfs,

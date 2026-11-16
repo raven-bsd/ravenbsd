@@ -76,6 +76,7 @@ members = [
     "tests/fixtures/pi4-soak",
     "tests/fixtures/pi4-net/model",
     "tests/fixtures/pi4-devd/driver",
+    "tests/fixtures/pi4-platd",
     "profiles/iommu-fixture",
     "tests/qtest/cases/linux-trap-fixture",
     "tests/qtest/cases/linux-root-fixture",
@@ -100,6 +101,7 @@ members = [
     "tests/libc/gate",
     "tests/libc/toolchain-abi",
     "tests/user",
+    "tests/user/image",
     "tests/ufs-powercut",
     "tools/fs-fuzz",
     "tools/linux-corpus",
@@ -226,6 +228,8 @@ rust-version = "1.97"
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
 missing_docs = "warn"
+# The custom target OS is not in rustc's built-in list; declare it once for host clippy.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("ravenbsd"))'] }
 
 [workspace.lints.clippy]
 undocumented_unsafe_blocks = "deny"

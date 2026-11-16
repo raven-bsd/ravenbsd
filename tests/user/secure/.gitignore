@@ -1,0 +1,2 @@
+# The standalone U3e test workspace keeps its own build directory.
+/target/

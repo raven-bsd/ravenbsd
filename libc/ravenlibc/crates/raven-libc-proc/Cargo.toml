@@ -20,3 +20,4 @@ std = []
 
 [dependencies]
 raven-libc-abi = { path = "../raven-libc-abi" }
+raven-spawn = { path = "../../../../crates/raven-spawn", features = ["alloc"] }

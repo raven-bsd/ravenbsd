@@ -1670,6 +1670,7 @@ name = "raven-libc-proc"
 version = "0.1.0"
 dependencies = [
  "raven-libc-abi",
+ "raven-spawn",
 ]
 
 [[package]]
@@ -2007,8 +2008,20 @@ dependencies = [
 name = "raven-pi4-net-model"
 version = "0.1.0"
 dependencies = [
+ "genet",
+ "raven-genet",
  "raven-initfs",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-pi4-platd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-plat",
+ "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -2325,6 +2338,7 @@ dependencies = [
  "raven-initfs",
  "raven-proto-fs",
  "raven-scheme",
+ "raven-spawn",
 ]
 
 [[package]]
@@ -2688,6 +2702,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-spawn"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-elf",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-stat"
 version = "0.1.0"
 dependencies = [
@@ -2908,6 +2933,17 @@ dependencies = [
 [[package]]
 name = "raven-usb-hid"
 version = "0.1.0"
+
+[[package]]
+name = "raven-user-image"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
 
 [[package]]
 name = "raven-user-tests"

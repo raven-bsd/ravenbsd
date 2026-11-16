@@ -16,7 +16,7 @@
 # --record writes build/release/<version>/evidence.txt with the commit, the QEMU and Pi 4 image
 # hashes, the provenance hash and the transcript/log hashes. A missing gate artifact is a hard
 # error: the script never emits a fake hash, transcript or tag. Board claims stay UNVERIFIED until
-# the owner supplies a log for the REL3/P8/P10/P12/REL4d gate.
+# the owner supplies a log for the P8/P8b/P10/P12/REL3c gate.
 
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
@@ -289,8 +289,8 @@ record_qemu() {
         printf 'pi4_image=%s\n' "$PI4_IMAGE"
         printf 'pi4_image_sha256=%s\n' "$(sha256_file "$PI4_IMAGE")"
         printf 'pi4_host_check=PASS\n'
-        printf 'pi4_gate=UNVERIFIED (REL3/P8/P10/P12/REL4d board log missing)\n'
-        printf 'tag=none (Pi 4 board gate and full make check still required)\n'
+        printf 'pi4_gate=UNVERIFIED (P8/P8b/P10/P12/REL3c board log missing)\n'
+        printf 'tag=none (Pi 4 board chain and full make check still required)\n'
     } >"$OUT/evidence-qemu.txt"
     log "QEMU evidence: $OUT/evidence-qemu.txt"
 }
