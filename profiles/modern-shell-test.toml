@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K26b rework: the non-interactive test for the brush rc and prompt theme. It extends the
+# rescue `shell` profile (rsh owns the console) and installs only the brush configuration, so
+# the release image and the default login shell stay unchanged.
+
+name = "modern-shell-test"
+
+extends = "shell"
+
+[boot]
+cmdline = "console=ttyS0 loglevel=info"
+log_level = "info"

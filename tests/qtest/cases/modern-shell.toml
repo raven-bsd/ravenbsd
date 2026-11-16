@@ -1,14 +1,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K26b: brush is the interactive login shell in the modern-shell profile. The case asserts
-# the Raven Violet prompt, cwd/root marker, history/completion config and the NO_COLOR branch.
+# K26b rework: non-interactive rc and theme test. rsh owns the console in the
+# `modern-shell-test` profile; `/bin/brush -c` exercises the shell builtins and sources the
+# opt-in `/etc/brush/brushrc` to check the Raven Violet prompt, history and completion.
+# The interactive login assertion is `modern-shell-login.toml`, blocked on P9a.
 
 name = "modern-shell"
 arch = "x86_64"
-profile = "modern-shell"
-timeout_secs = 900
-skip = "interactive brush console input is blocked: minimal backend panics in static TLS, basic backend does not consume tty:console input, reedline needs multi-threaded tokio (thread_create is ENOSYS)"
+profile = "modern-shell-test"
+timeout_secs = 600
 pre = ["cargo xtask build brush --arch x86_64"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
@@ -18,89 +19,65 @@ expect_exit = "success"
 regex = '^svcd: all services up$'
 
 [[expect]]
-regex = '^\x1B\[38;5;183mroot'
+regex = '^rsh: ready$'
 
 [[expect]]
-regex = '^prompt-ok$'
+regex = '^echo:ok$'
 
 [[expect]]
-regex = '^/tmp/brush_history$'
+regex = '^printf:ok$'
 
 [[expect]]
-regex = '^ignoreboth$'
+regex = '^test:ok$'
 
 [[expect]]
-regex = '^%F %T'
+regex = '^cond:ok$'
+
+[[expect]]
+regex = '^arith:5$'
+
+[[expect]]
+regex = '^theme:ok$'
+
+[[expect]]
+regex = '^prompt:ok$'
+
+[[expect]]
+regex = '^hist:/tmp/brush_history:ignoreboth:%F %T$'
 
 [[expect]]
 regex = "^complete -W 'help exit' raven-test$"
 
 [[expect]]
-regex = '^root@raven:/# $'
+regex = '^nocolor:ok$'
 
 [[expect]]
-regex = '^no-color-ok$'
+regex = '^nocolor:prompt$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION'
+regex = '(?i)panic|EXCEPTION|Function not implemented|error:'
 
 [[step]]
-wait = '^.*root@raven:/# $'
-timeout_secs = 600
+wait = '^raven# $'
+timeout_secs = 300
 
 [[step]]
-send = "echo prompt-ok\n"
-delay_ms = 2000
-
-[[step]]
-wait = '^prompt-ok$'
-timeout_secs = 30
-
-[[step]]
-wait = '^.*root@raven:/# $'
-timeout_secs = 30
-
-[[step]]
-send = "echo $HISTFILE\n"
+send = "/bin/brush -c 'echo echo:ok; printf \"printf:%s\\n\" ok; test 1 -eq 1 && echo test:ok; [[ a == a ]] && echo cond:ok; echo arith:$((2+3))'\n"
 delay_ms = 100
 
 [[step]]
-wait = '^/tmp/brush_history$'
+wait = '^arith:5$'
 timeout_secs = 30
 
 [[step]]
-wait = '^.*root@raven:/# $'
+wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "echo $HISTCONTROL\n"
-delay_ms = 100
-
-[[step]]
-wait = '^ignoreboth$'
-timeout_secs = 30
-
-[[step]]
-wait = '^.*root@raven:/# $'
-timeout_secs = 30
-
-[[step]]
-send = "echo $HISTTIMEFORMAT\n"
-delay_ms = 100
-
-[[step]]
-wait = '^%F %T'
-timeout_secs = 30
-
-[[step]]
-wait = '^.*root@raven:/# $'
-timeout_secs = 30
-
-[[step]]
-send = "complete -p raven-test\n"
+send = "/bin/brush -c '. /etc/brush/brushrc; case \"$PS1\" in *\"38;5;183\"*) echo theme:ok;; *) echo theme:missing;; esac; case \"$PS1\" in *root@raven*) echo prompt:ok;; esac; echo hist:$HISTFILE:$HISTCONTROL:$HISTTIMEFORMAT; complete -p raven-test'\n"
 delay_ms = 100
 
 [[step]]
@@ -108,27 +85,23 @@ wait = "^complete -W 'help exit' raven-test$"
 timeout_secs = 30
 
 [[step]]
-wait = '^.*root@raven:/# $'
+wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "NO_COLOR=1 source /etc/brush/brushrc\n"
+send = "/bin/brush -c 'NO_COLOR=1; export NO_COLOR; . /etc/brush/brushrc; case \"$PS1\" in *\"38;5;\"*) echo nocolor:bad;; *) echo nocolor:ok;; esac; case \"$PS1\" in *root@raven*) echo nocolor:prompt;; esac'\n"
 delay_ms = 100
 
 [[step]]
-wait = '^root@raven:/# $'
+wait = '^nocolor:ok$'
 timeout_secs = 30
 
 [[step]]
-send = "echo no-color-ok\n"
-delay_ms = 100
-
-[[step]]
-wait = '^no-color-ok$'
+wait = '^nocolor:prompt$'
 timeout_secs = 30
 
 [[step]]
-wait = '^root@raven:/# $'
+wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]

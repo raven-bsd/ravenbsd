@@ -18,5 +18,6 @@ HISTTIMEFORMAT='%F %T '
 HISTSIZE=1000
 
 # brush supplies command and path completion by default; this spec is the
-# contract probe used by the modern-shell qtest.
-complete -W 'help exit' raven-test 2>/dev/null || true
+# contract probe used by the modern-shell qtest. Do not redirect to /dev/null:
+# the initfs has no /dev directory, only the mounted /dev/null scheme path.
+complete -W 'help exit' raven-test || true
