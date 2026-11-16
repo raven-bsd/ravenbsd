@@ -63,6 +63,11 @@ pub const OP_UTIMENS: u16 = 20;
 pub const OP_STATVFS: u16 = 21;
 /// `LSTAT(path)`; returns the fixed [`Stat`](crate::Stat) record without following a final symlink.
 pub const OP_LSTAT: u16 = 22;
+/// `MMAP` on the open file; the reply attaches a pager-backed `MemObject`.
+pub const OP_MMAP: u16 = 23;
+
+/// `MMAP` flag: the mapping is shared with the file.
+pub const MMAP_SHARED: u32 = 1 << 0;
 
 /// Encoded size of a [`StatFs`] payload in bytes.
 pub const STATFS_LEN: usize = 36;
@@ -251,6 +256,15 @@ pub enum Call<'a> {
         /// Path relative to the directory handle.
         path: &'a [u8],
     },
+    /// Map a range of the open file through a pager-backed memory object.
+    Mmap {
+        /// File offset; page-aligned.
+        offset: u64,
+        /// Mapping length in bytes; page-aligned.
+        len: u64,
+        /// Whether the mapping is shared with the file.
+        shared: bool,
+    },
 }
 
 impl Call<'_> {
@@ -279,6 +293,7 @@ impl Call<'_> {
             Self::Utimens { .. } => OP_UTIMENS,
             Self::Statvfs => OP_STATVFS,
             Self::Lstat { .. } => OP_LSTAT,
+            Self::Mmap { .. } => OP_MMAP,
         }
     }
 
@@ -288,6 +303,7 @@ impl Call<'_> {
             Self::Mkdir { mode, .. } | Self::Chmod { mode, .. } => (*mode, 0),
             Self::Access { mode, .. } => (*mode, 0),
             Self::Truncate { size } => (*size as u32, (*size >> 32) as u32),
+            Self::Mmap { offset, .. } => (*offset as u32, (*offset >> 32) as u32),
             Self::Chown { uid, gid, .. }
             | Self::Lchown { uid, gid, .. }
             | Self::Fchown { uid, gid } => (*uid, *gid),
@@ -341,7 +357,8 @@ impl Call<'_> {
             | Self::Sync
             | Self::Statfs
             | Self::Fchown { .. }
-            | Self::Statvfs => (None, None),
+            | Self::Statvfs
+            | Self::Mmap { .. } => (None, None),
         }
     }
 }
@@ -376,6 +393,10 @@ impl<'a> CallRequest<'a> {
         writer.put_u32(flags)?;
         writer.put_u32(arg0)?;
         writer.put_u32(arg1)?;
+        if let Call::Mmap { len, shared, .. } = &self.call {
+            writer.put_u64(*len)?;
+            writer.put_u32(if *shared { MMAP_SHARED } else { 0 })?;
+        }
         let (first, second) = self.call.paths();
         if let Some(path) = first {
             write_path(&mut writer, path)?;
@@ -397,6 +418,11 @@ impl<'a> CallRequest<'a> {
         let flags = reader.get_u32()?;
         let arg0 = reader.get_u32()?;
         let arg1 = reader.get_u32()?;
+        let (mmap_len, mmap_flags) = if op == OP_MMAP {
+            (reader.get_u64()?, reader.get_u32()?)
+        } else {
+            (0, 0)
+        };
         let path_count = path_count(op).ok_or(ProtoError::UnknownOp(op))?;
         let first = if path_count >= 1 {
             Some(read_path(&mut reader)?)
@@ -514,6 +540,16 @@ impl<'a> CallRequest<'a> {
             OP_LSTAT => Call::Lstat {
                 path: first.ok_or(ProtoError::Truncated)?,
             },
+            OP_MMAP => {
+                if mmap_flags & !MMAP_SHARED != 0 {
+                    return Err(ProtoError::Malformed);
+                }
+                Call::Mmap {
+                    offset: u64::from(arg0) | (u64::from(arg1) << 32),
+                    len: mmap_len,
+                    shared: mmap_flags & MMAP_SHARED != 0,
+                }
+            }
             _ => return Err(ProtoError::UnknownOp(op)),
         };
         Ok(Self { flags, call })
@@ -810,7 +846,7 @@ const fn path_count(op: u16) -> Option<usize> {
         OP_MKDIR | OP_UNLINK | OP_RMDIR | OP_READLINK | OP_CHMOD | OP_UMOUNT | OP_ACCESS
         | OP_CHOWN | OP_LCHOWN | OP_MKFIFO | OP_MKNOD | OP_UTIMENS | OP_LSTAT => Some(1),
         OP_RENAME | OP_SYMLINK | OP_MOUNT | OP_LINK => Some(2),
-        OP_TRUNCATE | OP_SYNC | OP_STATFS | OP_FCHOWN | OP_STATVFS => Some(0),
+        OP_TRUNCATE | OP_SYNC | OP_STATFS | OP_FCHOWN | OP_STATVFS | OP_MMAP => Some(0),
         _ => None,
     }
 }
