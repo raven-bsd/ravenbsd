@@ -34,21 +34,28 @@ preferred because they do not conflict. Every row is:
 [[row]]
 id = "header.assert.h"
 status = "present"          # present or waived
-evidence = "tests/posix/check-headers.sh"
+evidence = "test:tests/posix/check-headers.sh"
 notes = "P1: assert.h compiles under the POSIX feature macros"
 ```
 
-* `present` requires executable evidence: a test name or command, not `none` or an empty string.
-* `waived` requires the written owner waiver in `notes`; `evidence` may be `none`.
+Structured evidence is mandatory for `present`:
+
+* `qtest:<case>` resolves to `tests/qtest/cases/<case>.toml`; the gate runs
+  `cargo xtask qtest --case <case> --arch <arch>` with a 900-second outer timeout. A missing case,
+  a failed boot or a skipped case rejects the claim.
+* `test:<repo-relative-path>` must exist; the gate runs it through the runner declared in its
+  shebang (for example `#!/bin/sh`) or directly when it is an executable binary, with a
+  300-second timeout. A non-zero exit, missing file or timeout rejects the claim.
+* `waived` requires the written owner waiver in `notes`; `evidence` may be `none`. The gate keeps
+  the waiver visible in the row reason, and `GAPS.md` appends the waiver text.
 * The row id must already exist in the derived profile, and the owner file must match the row's
   owner. Duplicate ids across files are rejected.
 
-The seed applies the overlay after its own derivation, so supported rows land in `profile.toml`,
-`traceability.toml` and `GAPS.md`. Unsupported rows are ignored by the seed (with a warning) and
-reported as failures by `posix-check`; they never silently become a pass. The gate also applies
-the overlay at runtime, so a stale generated profile cannot hide an owner claim. The gate counts
-must not regress: a supported overlay row replaces its derived failure with a pass, while a claim
-without evidence stays a failure.
+The seed applies structurally valid rows after its own derivation, so they land in `profile.toml`,
+`traceability.toml` and `GAPS.md`; the gate re-applies them and executes the evidence. Missing or
+failing evidence stays a failure, and the gate never turns a claim into a pass without running it.
+The gate counts must not regress: a supported row whose evidence passes replaces its derived
+failure, while a fake path, a missing qtest or a failing test stays a failure.
 
-Current sample: `P1.toml` closes `header.assert.h` with `tests/posix/check-headers.sh`
-(`sh tests/posix/check-headers.sh`).
+Current sample: `P1.toml` closes `header.assert.h` with
+`test:tests/posix/check-headers.sh` (`sh tests/posix/check-headers.sh`).

@@ -1418,7 +1418,7 @@ pub fn seed_profile(root: &Path) -> Result<Profile> {
 pub fn seed(root: &Path) -> Result<()> {
     let mut profile = seed_profile(root)?;
     let overlay = crate::overlay::Overlay::load(root)?;
-    let outcome = overlay.apply(&mut profile);
+    let outcome = overlay.apply(root, &mut profile);
     for claim in &outcome.unsupported {
         eprintln!(
             "posix-conform: overlay row `{}` ignored: {}",

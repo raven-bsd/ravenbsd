@@ -3,7 +3,11 @@
 
 //! Host tests for the published gate report.
 
+use std::path::Path;
+
 use crate::gate::{GateReport, Verdict, render};
+use crate::model::{BehaviorRow, Meta, PlatformStatus, Profile, STANDARD, Status, TraceFile};
+use crate::render::render_gaps;
 
 fn report() -> GateReport {
     GateReport {
@@ -59,4 +63,44 @@ fn every_verdict_is_spelled_in_lowercase() {
     assert_eq!(Verdict::Pass.as_str(), "pass");
     assert_eq!(Verdict::Fail.as_str(), "fail");
     assert_eq!(Verdict::Skip.as_str(), "skip");
+}
+
+#[test]
+fn gaps_keep_a_waiver_visible() {
+    let profile = Profile {
+        schema: 1,
+        standard: STANDARD.to_string(),
+        platform: PlatformStatus::new(),
+        header: Vec::new(),
+        interface: Vec::new(),
+        utility: Vec::new(),
+        shell_feature: Vec::new(),
+        filesystem: Vec::new(),
+        process: vec![BehaviorRow {
+            meta: Meta {
+                id: "process.fork".to_string(),
+                standard: STANDARD.to_string(),
+                status: Status::Waived,
+                evidence: "none".to_string(),
+                owner: "P5".to_string(),
+                waiver: "OWNER WAIVER: P5 omits fork for the first gate".to_string(),
+                notes: String::new(),
+                pg: Vec::new(),
+            },
+            name: "fork".to_string(),
+            description: "fork".to_string(),
+        }],
+        tty: Vec::new(),
+    };
+    let trace = TraceFile {
+        schema: 1,
+        standard: STANDARD.to_string(),
+        trace: Vec::new(),
+    };
+    let text = render_gaps(Path::new("."), &profile, &trace).unwrap();
+    assert!(text.contains("waived"), "{text}");
+    assert!(
+        text.contains("waiver: OWNER WAIVER: P5 omits fork for the first gate"),
+        "{text}"
+    );
 }
