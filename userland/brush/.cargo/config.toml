@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: MIT
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # The nested brush workspace builds host tests with the stock toolchain, which does not know
