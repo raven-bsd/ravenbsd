@@ -162,6 +162,7 @@ members = [
     "userland/bin/diff",
     "userland/bin/grep",
     "userland/bin/strings",
+    "userland/bin/sed",
     "userland/bin/useradd",
     "userland/bin/adduser",
     "userland/bin/passwd",

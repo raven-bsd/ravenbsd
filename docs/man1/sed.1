@@ -1,0 +1,66 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt SED 1
+.Os RavenBSD
+.Sh NAME
+.Nm sed
+.Nd stream editor (POSIX basic subset)
+.Sh SYNOPSIS
+.Nm
+.Op Fl n
+.Op Fl e Ar script
+.Op Fl f Ar script-file
+.Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility applies a POSIX basic regular expression script to each input file.
+Supported addresses are line numbers,
+.Sq $ ,
+.Pa /regex/ ,
+and ranges of those addresses, with optional
+.Sq \&!
+negation.
+.Pp
+The supported commands are:
+.Bl -tag -width Ds
+.It Ic s Ns Ar /re/repl/flags
+Substitute; flags are
+.Sq g ,
+.Sq p
+and a decimal occurrence number. Replacement supports
+.Sq & ,
+.Sq \e1
+through
+.Sq \e9 .
+.It Ic y Ns Ar /source/target/
+Translate characters; the two sets must have equal length.
+.It Ic p , d , q , =
+Print, delete, quit and print the line number.
+.It Ic a , i , c
+Append, insert or change text.
+.El
+.Pp
+The
+.Fl n
+option suppresses automatic printing.
+.Fl e
+adds a script expression and
+.Fl f
+reads one from a file.
+.Pp
+Extended regular expressions (`-E`), the hold space and the
+.Ic n Ns , Ns Ic N Ns , Ns Ic D Ns , Ns Ic P Ns , Ns Ic G Ns , Ns Ic H Ns ,
+.Ic h Ns , Ns Ic x Ns , Ns Ic b Ns , Ns Ic t
+and
+.Ic \&:
+commands are not implemented.
+The target image currently requires file operands; standard input is a follow-up.
+.Sh EXIT STATUS
+.Ex -std
+0 on success, 2 for an invalid script or an I/O error.
+.Sh SEE ALSO
+.Xr grep 1
+.Sh STANDARDS
+RavenBSD.

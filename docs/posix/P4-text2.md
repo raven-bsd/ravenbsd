@@ -1,23 +1,23 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# POSIX text tools: grep, cmp, diff, strings (P4e)
+# POSIX text tools: grep, cmp, diff, strings, sed (P4e/P4h)
 
-Status: **DONE for the four implemented tools.** Host behaviour tests pass for `grep`, `cmp`,
-`diff` and `strings`; the evidence overlay registers all four rows. `awk` and `sed` remain
-follow-up defects and are not touched here.
+Status: **DONE for the five implemented tools.** Host behaviour tests pass for `grep`, `cmp`,
+`diff`, `strings` and the bounded `sed` subset; the evidence overlay registers all five rows.
+`awk` remains a follow-up defect.
 
 ## Method
 
 Each tool is a first-party Rust crate under `userland/bin/` (`raven-grep`, `raven-cmp`,
-`raven-diff`, `raven-strings`), `no_std` on the target and `#![forbid(unsafe_code)]`. The host
-tests exercise the same pure logic under `LC_ALL=C` through `cargo nextest`; the target binaries
-need the Raven kernel and are not claimed as board evidence.
+`raven-diff`, `raven-strings`, `raven-sed`), `no_std` on the target and
+`#![forbid(unsafe_code)]`. The host tests exercise the same pure logic under `LC_ALL=C` through
+`cargo nextest`; the target binaries need the Raven kernel and are not claimed as board evidence.
 
 ```sh
 sh tests/posix/utility/run-text2.sh
 sh tests/posix/utility/run-text2.sh --list
-sh tests/posix/utility/run-text2.sh grep cmp diff strings
+sh tests/posix/utility/run-text2.sh grep cmp diff strings sed
 ```
 
 ## Tool matrix
@@ -28,9 +28,10 @@ sh tests/posix/utility/run-text2.sh grep cmp diff strings
 | `cmp` | `-l -s`, byte comparison, EOF, exit 0/1/2 | 5 | `tests/posix/utility/text2/cmp/test.sh` |
 | `diff` | normal and `-u` unified output, add/change/delete, exit 0/1/2 | 5 | `tests/posix/utility/text2/diff/test.sh` |
 | `strings` | `-a -n`, printable ASCII runs, multiple files | 5 | `tests/posix/utility/text2/strings/test.sh` |
+| `sed` | BRE `s///` (`g`/`p`/numeric), line/`$`/`/re/`/ranges, `-n`, `-e`, `-f`, `p d q = y a i c` | 8 | `tests/posix/utility/text2/sed/test.sh` |
 
-`grep` uses the existing `raven-libc-regex` engine (the libc regex exposed to userspace); no new
-external dependency was added.
+`grep` and `sed` use the existing `raven-libc-regex` engine (the libc regex exposed to userspace);
+no new external dependency was added.
 
 ## Limitations
 
@@ -40,10 +41,13 @@ external dependency was added.
 * `grep` supports the requested flags but not the full POSIX `-e`/`-f` option set.
 * `diff` renders one unified hunk with full context rather than minimal hunks; normal and unified
   exit statuses are correct.
-* `awk` and `sed` are still missing; they are P4c follow-up defects, not P4e rows.
+* `sed` supports the bounded subset in the matrix; `-E`, `n/N/D/P/G/H/h/x/b/t/:`, multiline
+  pattern/hold spaces and the full `-e`/`-f` command grammar remain unsupported and are explicit
+  defects.
+* `awk` is still missing; it is a P4c follow-up defect, not a P4e/P4h row.
 
 ## Evidence overlay
 
-`docs/posix/evidence/P4-text2.toml` contains the four structured `test:` rows. The P0b loader
+`docs/posix/evidence/P4-text2.toml` contains the five structured `test:` rows. The P0b loader
 accepts the `P4-text2` batch file; `posix-check` executes each script and reports the rows as
 present. No row is present without a passing case.

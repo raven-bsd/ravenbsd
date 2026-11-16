@@ -2730,6 +2730,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-sed"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-regex",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-setuid"
 version = "0.1.0"
 dependencies = [
