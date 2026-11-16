@@ -391,7 +391,16 @@ pub fn derive(
             .rows
             .get(name)
             .or_else(|| data.get(name).and_then(|data| census.rows.get(&data.name)));
+        let arches = arches.get(name.as_str()).map_or("all", String::as_str);
         let Some(row) = row else {
+            // Public exports that the donor census does not list are still part of the
+            // `Symbols.list` contract; record them with default metadata instead of dropping
+            // them from the frozen map and leaving the mkmap `.txt` name set wider.
+            if let Some(data) = data.get(name) {
+                records.push(format!("{name} D {} {arches} 3 -", data.size));
+            } else {
+                records.push(format!("{name} F - {arches} 3 -"));
+            }
             continue;
         };
         if !matches!(row.kind.as_str(), "func" | "data") {
@@ -405,7 +414,6 @@ pub fn derive(
         } else {
             ("F", "-".to_string())
         };
-        let arches = arches.get(name.as_str()).map_or("all", String::as_str);
         records.push(format!(
             "{name} {kind} {size} {arches} {} {}",
             row.ring.min(3),

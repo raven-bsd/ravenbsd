@@ -1,7 +1,7 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1149
+# records: 1187
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
 _Unwind_Backtrace F - all 2 -
@@ -20,11 +20,13 @@ _Unwind_RaiseException F - all 1 -
 _Unwind_Resume F - all 1 -
 _Unwind_SetGR F - all 1 -
 _Unwind_SetIP F - all 1 -
+__ctype_get_mb_cur_max F - all 2 -
 __cxa_atexit F - all 1 -
 __cxa_finalize F - all 1 -
 __errno F - all 1 -
 __errno_location F - all 2 -
 __error F - all 1 -
+__getrandom_v03_custom F - all 3 -
 __gnu_basename F - all 2 -
 __h_errno_location F - all 2 -
 __progname F - all 2 -
@@ -50,6 +52,7 @@ acoshf F - all 1 -
 addmntent F - x86_64 2 mntent.h
 aligned_alloc F - all 1 stdlib.h
 alphasort F - all 1 dirent.h
+arc4random_buf F - all 1 stdlib.h
 asin F - all 1 -
 asinf F - all 1 -
 asinh F - all 1 -
@@ -95,12 +98,14 @@ cgetset F - x86_64 2 -
 cgetstr F - x86_64 2 -
 cgetustr F - x86_64 2 -
 chdir F - all 0 unistd.h
+chmod F - all 0 sys/stat.h
 chroot F - all 1 -
 clearenv F - all 1 stdlib.h
 clearerr F - all 0 stdio.h
 clock F - all 0 time.h
 clock_getres F - all 0 time.h
 clock_gettime F - all 0 time.h
+clock_settime F - all 0 time.h
 close F - all 0 unistd.h
 close_range F - all 1 unistd.h
 closedir F - all 0 dirent.h
@@ -208,6 +213,8 @@ expm1f F - all 1 -
 fabs F - all 1 -
 fabsf F - all 1 -
 fchmod F - all 0 sys/stat.h
+fchmodat F - all 0 -
+fchownat F - all 0 -
 fclose F - all 0 stdio.h
 fcntl F - all 0 fcntl.h
 fdim F - all 1 -
@@ -222,8 +229,10 @@ ffs F - all 1 -
 ffsl F - all 1 -
 ffsll F - all 1 -
 fgetc F - all 0 stdio.h
+fgetln F - all 1 -
 fgets F - all 0 stdio.h
 fgetspent F - all 1 -
+fgetwc F - all 0 wchar.h
 fileno F - all 0 stdio.h
 finite F - all 1 -
 finitef F - all 1 -
@@ -275,6 +284,7 @@ fseek F - all 0 stdio.h
 fstat F - all 0 sys/stat.h
 fstat64 F - all 0 sys/stat.h
 fstatat F - all 0 sys/stat.h
+fstatfs F - all 1 -
 fsync F - all 0 unistd.h
 ftell F - all 0 stdio.h
 ftruncate F - all 0 unistd.h
@@ -285,6 +295,8 @@ fts_openat F - all 2 -
 fts_read F - all 1 -
 fts_set F - all 1 -
 ftw F - all 1 ftw.h
+futimens F - all 0 sys/stat.h
+fwprintf F - all 0 wchar.h
 fwrite F - all 0 stdio.h
 gai_strerror F - all 1 -
 gamma F - all 1 -
@@ -294,6 +306,7 @@ get_nprocs F - all 1 sys/sysinfo.h
 get_nprocs_conf F - all 1 sys/sysinfo.h
 get_phys_pages F - all 2 sys/sysinfo.h
 getaddrinfo F - all 1 -
+getaudit F - all 3 -
 getauxval F - all 2 sys/auxv.h
 getbsize F - x86_64 2 -
 getchar F - all 0 stdio.h
@@ -323,6 +336,7 @@ gethostbyname_r F - all 1 netdb.h
 gethostent F - all 1 netdb.h
 gethostname F - all 0 unistd.h
 getisax F - all 2 -
+getline F - all 0 stdio.h
 getlogin F - all 0 unistd.h
 getlogin_r F - all 1 -
 getmntent F - x86_64 1 mntent.h
@@ -386,6 +400,7 @@ glob F - all 0 glob.h
 globfree F - all 0 glob.h
 gmtime F - all 0 time.h
 gmtime_r F - all 1 time.h
+grantpt F - x86_64 0 stdlib.h
 group_from_gid F - all 2 -
 h_errno F - all 1 -
 hasmntopt F - x86_64 1 mntent.h
@@ -487,6 +502,8 @@ lgamma F - all 1 -
 lgamma_r F - all 1 -
 lgammaf F - all 1 -
 lgammaf_r F - all 1 -
+link F - all 0 unistd.h
+linkat F - all 0 unistd.h
 listen F - all 1 sys/socket.h
 llabs F - all 1 -
 lldiv F - all 0 stdlib.h
@@ -509,6 +526,7 @@ lseek F - all 0 unistd.h
 lseek64 F - all 0 unistd.h
 lstat F - all 1 sys/stat.h
 lstat64 F - all 0 sys/stat.h
+lutimes F - all 1 sys/time.h
 makecontext F - all 1 ucontext.h
 malloc F - all 0 malloc.h
 malloc_usable_size F - all 1 -
@@ -531,6 +549,8 @@ memset_explicit F - all 0 string.h
 memset_s F - all 1 -
 mergesort F - all 2 -
 mkdir F - all 0 sys/stat.h
+mkfifo F - all 0 sys/stat.h
+mknod F - all 0 sys/stat.h
 mktime F - all 0 time.h
 mmap F - all 0 sys/mman.h
 mmap64 F - all 1 sys/mman.h
@@ -595,6 +615,7 @@ port_getn F - all 2 -
 port_send F - all 2 -
 posix_getdents F - all 2 -
 posix_memalign F - all 0 stdlib.h
+posix_openpt F - x86_64 0 stdlib.h
 posix_spawn F - all 1 -
 posix_spawn_file_actions_addchdir_np F - all 1 -
 posix_spawn_file_actions_addclose F - all 1 -
@@ -744,6 +765,7 @@ pthread_testcancel F - all 1 -
 pthread_timedjoin_np F - all 1 pthread.h
 pthread_tryjoin_np F - all 1 pthread.h
 pthread_yield F - all 1 -
+ptsname_r F - x86_64 0 stdlib.h
 putchar F - all 0 stdio.h
 putenv F - all 1 stdlib.h
 puts F - all 0 stdio.h
@@ -776,13 +798,17 @@ regcomp F - all 0 regex.h
 regerror F - all 0 regex.h
 regexec F - all 0 regex.h
 regfree F - all 0 regex.h
+remove F - all 0 stdio.h
 remque F - all 1 -
 rename F - all 0 stdio.h
+renameat F - all 0 stdio.h
 res_init F - all 1 -
+rewind F - all 0 stdio.h
 rewinddir F - all 0 dirent.h
 rindex F - all 1 string.h
 rint F - all 1 -
 rintf F - all 1 -
+rmdir F - all 0 unistd.h
 round F - all 1 -
 roundeven F - all 2 -
 roundf F - all 1 -
@@ -934,6 +960,10 @@ srandom F - all 1 stdlib.h
 sscanf F - all 0 stdio.h
 stat F - all 0 sys/stat.h
 stat64 F - all 0 sys/stat.h
+statfs F - all 1 -
+stderr D 8 all 0 stdio.h
+stdin D 8 all 0 stdio.h
+stdout D 8 all 0 stdio.h
 stpcpy F - all 1 string.h
 stpncpy F - all 1 string.h
 str2sig F - all 1 -
@@ -995,6 +1025,9 @@ suboptarg F - all 3 -
 svis F - x86_64 2 -
 swab F - all 1 -
 swapcontext F - all 1 ucontext.h
+symlink F - all 0 unistd.h
+symlinkat F - all 0 -
+sync F - all 0 unistd.h
 syscall F - all 1 unistd.h
 sysconf F - all 0 unistd.h
 sysctl F - all 2 -
@@ -1079,12 +1112,16 @@ umask F - all 0 sys/stat.h
 uname F - all 0 sys/utsname.h
 ungetc F - all 0 stdio.h
 unlink F - all 0 unistd.h
+unlinkat F - all 0 unistd.h
+unlockpt F - x86_64 0 stdlib.h
 unsetenv F - all 1 stdlib.h
 unveil F - all 2 -
 unvis F - x86_64 2 -
 updwtmpx F - x86_64 1 -
 uselocale F - all 1 -
 user_from_uid F - all 2 -
+utimensat F - all 0 sys/stat.h
+utimes F - all 0 sys/time.h
 uuid_compare F - x86_64 1 -
 uuid_create F - x86_64 2 -
 uuid_create_nil F - x86_64 2 -
@@ -1101,6 +1138,7 @@ versionsort F - all 1 dirent.h
 vfork F - all 1 unistd.h
 vfprintf F - all 0 stdio.h
 vfscanf F - all 0 stdio.h
+vfwprintf F - all 0 wchar.h
 vis F - x86_64 2 -
 vprintf F - all 0 stdio.h
 vscanf F - all 0 stdio.h

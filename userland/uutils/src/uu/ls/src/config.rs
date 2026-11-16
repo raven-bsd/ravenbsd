@@ -455,6 +455,13 @@ fn is_color_compatible_term() -> bool {
 ///
 /// A boolean representing whether or not to use color.
 fn extract_color(options: &clap::ArgMatches) -> bool {
+    // NO_COLOR suppresses the automatic/default colour, but an explicit --color=always
+    // keeps the user's override.
+    if options.value_source(options::COLOR) != Some(clap::parser::ValueSource::CommandLine)
+        && std::env::var_os("NO_COLOR").is_some()
+    {
+        return false;
+    }
     if !is_color_compatible_term() {
         return false;
     }
@@ -919,7 +926,22 @@ impl Config {
         }
 
         let color = if needs_color {
-            Some(LsColors::from_env().unwrap_or_default())
+            // One theme source on the target: when the environment has no LS_COLORS, parse
+            // the Raven Violet palette. Host builds keep the donor default so the upstream
+            // byte-compatibility tests remain meaningful.
+            #[cfg(target_os = "ravenbsd")]
+            {
+                let fallback = uucore::raven::default_ls_colors();
+                let value = std::env::var("LS_COLORS")
+                    .ok()
+                    .filter(|value| !value.is_empty())
+                    .unwrap_or(fallback);
+                Some(LsColors::from_string(&value))
+            }
+            #[cfg(not(target_os = "ravenbsd"))]
+            {
+                Some(LsColors::from_env().unwrap_or_default())
+            }
         } else {
             None
         };

@@ -24,7 +24,7 @@ pub(crate) fn run(root: &Path, arch: Arch, profile: &str) -> Result<u8> {
 /// Build the initfs and return its path.
 pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathBuf> {
     let profile = Profile::load(root, profile_name)?;
-    ensure_uutils(root, arch, &profile)?;
+    ensure_prerequisites(root, arch, &profile)?;
     let workspace = Workspace::load(root)?;
     let packages: Vec<String> = profile
         .initfs
@@ -58,10 +58,13 @@ pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathB
         builder.add_file(&program.path, &data, 0o755)?;
     }
     for file in &profile.initfs.files {
-        let data = fs::read(root.join(&file.src)).with_context(|| {
+        let source = source_path(root, arch, &file.src);
+        let data = fs::read(&source).with_context(|| {
             format!(
-                "cannot read profile file {} for initfs path {}",
-                file.src, file.path
+                "cannot read profile file {} for initfs path {} (resolved {})",
+                file.src,
+                file.path,
+                source.display()
             )
         })?;
         builder.add_file(&file.path, &data, file.mode)?;
@@ -82,6 +85,152 @@ pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathB
 /// regression matrix can exercise the release user binary in the same image path.
 fn release_user_programs_from_env(value: Option<&str>) -> bool {
     matches!(value, Some("1"))
+}
+
+/// One prerequisite plan for a resolved profile.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct PrerequisitePlan {
+    /// Missing libc archive/crt files, as repo-relative paths.
+    pub(crate) libc: Vec<String>,
+    /// Whether brush is staged and its arch-correct binary is missing.
+    pub(crate) brush: bool,
+    /// Missing uutils staging names.
+    pub(crate) uutils: Vec<String>,
+}
+
+/// The libc outputs every userland C/std build needs.
+const LIBC_OUTPUTS: [&str; 4] = ["libc.a", "crt1.o", "crti.o", "crtn.o"];
+
+fn libc_outputs(arch: Arch) -> Vec<String> {
+    LIBC_OUTPUTS
+        .iter()
+        .map(|name| format!("build/{}/{}", arch.as_str(), name))
+        .collect()
+}
+
+fn libc_missing(arch: Arch, exists: impl Fn(&str) -> bool) -> Vec<String> {
+    libc_outputs(arch)
+        .into_iter()
+        .filter(|path| !exists(path))
+        .collect()
+}
+
+fn brush_path(arch: Arch) -> String {
+    crate::brush::staged_for(arch)
+}
+
+fn is_brush_source(source: &str, arch: Arch) -> bool {
+    source == "build/brush" || source == brush_path(arch)
+}
+
+fn brush_requested(profile: &Profile, arch: Arch) -> bool {
+    profile
+        .initfs
+        .files
+        .iter()
+        .any(|file| is_brush_source(&file.src, arch))
+}
+
+fn brush_missing(profile: &Profile, arch: Arch, exists: impl Fn(&str) -> bool) -> bool {
+    brush_requested(profile, arch) && !exists(&brush_path(arch))
+}
+
+fn uutils_requested(profile: &Profile, arch: Arch) -> bool {
+    profile
+        .initfs
+        .files
+        .iter()
+        .any(|file| uutils_source_name(arch, &file.src).is_some())
+}
+
+/// Decide which clean-tree prerequisites the profile needs.
+///
+/// The libc pack is only a prerequisite when the profile stages a libc consumer (brush or
+/// uutils); a base image with neither does not pay for it.
+pub(crate) fn prerequisite_plan(
+    profile: &Profile,
+    arch: Arch,
+    exists: impl Fn(&str) -> bool,
+) -> PrerequisitePlan {
+    let needs_libc = brush_requested(profile, arch) || uutils_requested(profile, arch);
+    PrerequisitePlan {
+        libc: if needs_libc {
+            libc_missing(arch, &exists)
+        } else {
+            Vec::new()
+        },
+        brush: brush_missing(profile, arch, &exists),
+        uutils: uutils_missing(profile, arch, &exists),
+    }
+}
+
+/// Ensure the libc pack, brush and uutils prerequisites exist before packing an initfs.
+///
+/// Each step runs at most once per call and only when its outputs are missing. libc is checked
+/// first because brush and uutils link against its archive and crt objects.
+pub(crate) fn ensure_prerequisites(root: &Path, arch: Arch, profile: &Profile) -> Result<()> {
+    let plan = prerequisite_plan(profile, arch, |source| root.join(source).is_file());
+    if !plan.libc.is_empty() {
+        ensure_libc(root, arch)?;
+    }
+    if plan.brush {
+        ensure_brush(root, arch, profile)?;
+    }
+    if !plan.uutils.is_empty() {
+        ensure_uutils(root, arch, profile)?;
+    }
+    Ok(())
+}
+
+/// Run the libc pack when the arch archive or a crt object is missing.
+pub(crate) fn ensure_libc(root: &Path, arch: Arch) -> Result<()> {
+    let missing = libc_missing(arch, |source| root.join(source).is_file());
+    if missing.is_empty() {
+        return Ok(());
+    }
+    println!(
+        "==> libc {}: packing missing prerequisites ({})",
+        arch.as_str(),
+        missing.join(", ")
+    );
+    let code = crate::libc_pack::run(root, &["--arch".to_string(), arch.as_str().to_string()])?;
+    if code != 0 {
+        bail!("libc-pack failed with exit code {code}");
+    }
+    let missing = libc_missing(arch, |source| root.join(source).is_file());
+    if !missing.is_empty() {
+        bail!("libc-pack did not produce: {}", missing.join(", "));
+    }
+    Ok(())
+}
+
+/// Build brush for the resolved arch when a profile stages it and the staged binary is missing.
+pub(crate) fn ensure_brush(root: &Path, arch: Arch, profile: &Profile) -> Result<()> {
+    if !brush_missing(profile, arch, |source| root.join(source).is_file()) {
+        return Ok(());
+    }
+    let path = brush_path(arch);
+    println!(
+        "==> brush {}: building missing staging binary ({path})",
+        arch.as_str()
+    );
+    let code = crate::brush::build_for_arch(root, arch)?;
+    if code != 0 {
+        bail!("brush build failed with exit code {code}");
+    }
+    if brush_missing(profile, arch, |source| root.join(source).is_file()) {
+        bail!("brush build did not produce {path}");
+    }
+    Ok(())
+}
+
+/// Resolve a profile source; the legacy mutable `build/brush` maps to the arch-correct path.
+pub(crate) fn source_path(root: &Path, arch: Arch, source: &str) -> PathBuf {
+    if source == "build/brush" {
+        root.join(brush_path(arch))
+    } else {
+        root.join(source)
+    }
 }
 
 /// Build the uutils slice once when the resolved profile stages a missing uutils binary.

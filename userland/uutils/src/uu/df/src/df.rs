@@ -540,162 +540,234 @@ pub fn uumain(args: impl uucore::Args) -> UResult<()> {
         .get_many::<OsString>(OPT_PATHS)
         .map(|paths| paths.map(Path::new).collect());
 
+    if uucore::raven::json(&matches) {
+        return df_json(paths.as_deref(), &opt);
+    }
+
     df(paths.as_deref(), &opt)
 }
 
+/// One NDJSON record per mounted filesystem.
+fn df_json(paths: Option<&[&Path]>, opt: &Options) -> UResult<()> {
+    use uucore::error::set_exit_code;
+    use uucore::raven::Record;
+
+    let filesystems = match filesystems(paths, opt) {
+        Ok(filesystems) => filesystems,
+        Err(error) => {
+            uucore::raven::json_error("df", "EIO", &error.to_string());
+            set_exit_code(1);
+            return Ok(());
+        }
+    };
+    if filesystems.is_empty() {
+        uucore::raven::json_error("df", "ENODATA", "no file systems processed");
+        set_exit_code(1);
+        return Ok(());
+    }
+
+    let mut records = Vec::new();
+    for filesystem in filesystems {
+        let usage = &filesystem.usage;
+        let total = usage.blocks.saturating_mul(usage.blocksize);
+        let used = usage
+            .blocks
+            .saturating_sub(usage.bfree)
+            .saturating_mul(usage.blocksize);
+        let available = usage.bavail.saturating_mul(usage.blocksize);
+        let percent = if total == 0 {
+            0.0
+        } else {
+            used as f64 * 100.0 / total as f64
+        };
+        records.push(
+            Record::new("filesystem")
+                .string("filesystem", &filesystem.mount_info.dev_name)
+                .string("type", &filesystem.mount_info.fs_type)
+                .string(
+                    "mount_point",
+                    &filesystem.mount_info.mount_dir.to_string_lossy(),
+                )
+                .u64("total_bytes", total)
+                .u64("used_bytes", used)
+                .u64("available_bytes", available)
+                .f64("use_percent", percent),
+        );
+    }
+    uucore::raven::write_records(&records)
+        .map_err(|error| USimpleError::new(1, error.to_string()))?;
+    Ok(())
+}
+
 pub fn uu_app() -> Command {
-    Command::new("df")
-        .version(uucore::crate_version!())
-        .help_template(uucore::localized_help_template(uucore::util_name()))
-        .about(translate!("df-about"))
-        .override_usage(format_usage(&translate!("df-usage")))
-        .after_help(translate!("df-after-help"))
-        .infer_long_args(true)
-        .disable_help_flag(true)
-        .arg(
-            Arg::new(OPT_HELP)
-                .long(OPT_HELP)
-                .help(translate!("df-help-print-help"))
-                .action(ArgAction::Help),
-        )
-        .arg(
-            Arg::new(OPT_ALL)
-                .short('a')
-                .long("all")
-                .overrides_with(OPT_ALL)
-                .help(translate!("df-help-all"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(OPT_BLOCKSIZE)
-                .short('B')
-                .long(OPT_BLOCKSIZE_LONG)
-                .value_name("SIZE")
-                .overrides_with_all([OPT_KILO, OPT_MEGA, OPT_BLOCKSIZE])
-                .help(translate!("df-help-block-size")),
-        )
-        .arg(
-            Arg::new(OPT_TOTAL)
-                .long("total")
-                .overrides_with(OPT_TOTAL)
-                .help(translate!("df-help-total"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(OPT_HUMAN_READABLE_BINARY)
-                .short('h')
-                .long("human-readable")
-                .overrides_with_all([OPT_HUMAN_READABLE_DECIMAL, OPT_HUMAN_READABLE_BINARY])
-                .help(translate!("df-help-human-readable"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(OPT_HUMAN_READABLE_DECIMAL)
-                .short('H')
-                .long("si")
-                .overrides_with_all([OPT_HUMAN_READABLE_BINARY, OPT_HUMAN_READABLE_DECIMAL])
-                .help(translate!("df-help-si"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(OPT_INODES)
-                .short('i')
-                .long("inodes")
-                .overrides_with(OPT_INODES)
-                .help(translate!("df-help-inodes"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(OPT_KILO)
-                .short('k')
-                .help(translate!("df-help-kilo"))
-                .overrides_with_all([OPT_BLOCKSIZE, OPT_KILO, OPT_MEGA])
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(OPT_MEGA)
-                .short('m')
-                .help(translate!("df-help-mega"))
-                .overrides_with_all([OPT_BLOCKSIZE, OPT_KILO, OPT_MEGA])
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(OPT_LOCAL)
-                .short('l')
-                .long("local")
-                .overrides_with(OPT_LOCAL)
-                .help(translate!("df-help-local"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(OPT_NO_SYNC)
-                .long("no-sync")
-                .overrides_with_all([OPT_SYNC, OPT_NO_SYNC])
-                .help(translate!("df-help-no-sync"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(OPT_OUTPUT)
-                .long("output")
-                .value_name("FIELD_LIST")
-                .action(ArgAction::Append)
-                .num_args(0..)
-                .require_equals(true)
-                .use_value_delimiter(true)
-                .value_parser(OUTPUT_FIELD_LIST)
-                .default_missing_values(OUTPUT_FIELD_LIST)
-                .default_values(["source", "size", "used", "avail", "pcent", "target"])
-                .conflicts_with_all([OPT_INODES, OPT_PORTABILITY, OPT_PRINT_TYPE])
-                .help(translate!("df-help-output")),
-        )
-        .arg(
-            Arg::new(OPT_PORTABILITY)
-                .short('P')
-                .long("portability")
-                .overrides_with(OPT_PORTABILITY)
-                .help(translate!("df-help-portability"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(OPT_SYNC)
-                .long("sync")
-                .overrides_with_all([OPT_NO_SYNC, OPT_SYNC])
-                .help(translate!("df-help-sync"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(OPT_TYPE)
-                .short('t')
-                .long("type")
-                .value_parser(ValueParser::os_string())
-                .value_name("TYPE")
-                .action(ArgAction::Append)
-                .help(translate!("df-help-type")),
-        )
-        .arg(
-            Arg::new(OPT_PRINT_TYPE)
-                .short('T')
-                .long("print-type")
-                .overrides_with(OPT_PRINT_TYPE)
-                .help(translate!("df-help-print-type"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(OPT_EXCLUDE_TYPE)
-                .short('x')
-                .long("exclude-type")
-                .action(ArgAction::Append)
-                .value_parser(ValueParser::os_string())
-                .value_name("TYPE")
-                .use_value_delimiter(true)
-                .help(translate!("df-help-exclude-type")),
-        )
-        .arg(
-            Arg::new(OPT_PATHS)
-                .action(ArgAction::Append)
-                .value_parser(ValueParser::os_string())
-                .value_hint(clap::ValueHint::AnyPath),
-        )
+    uucore::raven::style(
+        Command::new("df")
+            .version(uucore::crate_version!())
+            .help_template(uucore::localized_help_template(uucore::util_name()))
+            .about(translate!("df-about"))
+            .override_usage(format_usage(&translate!("df-usage")))
+            .after_help(translate!("df-after-help"))
+            .infer_long_args(true)
+            .disable_help_flag(true)
+            .arg(
+                Arg::new(OPT_HELP)
+                    .long(OPT_HELP)
+                    .help(translate!("df-help-print-help"))
+                    .action(ArgAction::Help),
+            )
+            .arg(
+                Arg::new(OPT_ALL)
+                    .short('a')
+                    .long("all")
+                    .overrides_with(OPT_ALL)
+                    .help(translate!("df-help-all"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(OPT_BLOCKSIZE)
+                    .short('B')
+                    .long(OPT_BLOCKSIZE_LONG)
+                    .value_name("SIZE")
+                    .overrides_with_all([OPT_KILO, OPT_MEGA, OPT_BLOCKSIZE])
+                    .help(translate!("df-help-block-size")),
+            )
+            .arg(
+                Arg::new(OPT_TOTAL)
+                    .long("total")
+                    .overrides_with(OPT_TOTAL)
+                    .help(translate!("df-help-total"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(OPT_HUMAN_READABLE_BINARY)
+                    .short('h')
+                    .long("human-readable")
+                    .overrides_with_all([OPT_HUMAN_READABLE_DECIMAL, OPT_HUMAN_READABLE_BINARY])
+                    .help(translate!("df-help-human-readable"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(OPT_HUMAN_READABLE_DECIMAL)
+                    .short('H')
+                    .long("si")
+                    .overrides_with_all([OPT_HUMAN_READABLE_BINARY, OPT_HUMAN_READABLE_DECIMAL])
+                    .help(translate!("df-help-si"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(OPT_INODES)
+                    .short('i')
+                    .long("inodes")
+                    .overrides_with(OPT_INODES)
+                    .help(translate!("df-help-inodes"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(OPT_KILO)
+                    .short('k')
+                    .help(translate!("df-help-kilo"))
+                    .overrides_with_all([OPT_BLOCKSIZE, OPT_KILO, OPT_MEGA])
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(OPT_MEGA)
+                    .short('m')
+                    .help(translate!("df-help-mega"))
+                    .overrides_with_all([OPT_BLOCKSIZE, OPT_KILO, OPT_MEGA])
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(OPT_LOCAL)
+                    .short('l')
+                    .long("local")
+                    .overrides_with(OPT_LOCAL)
+                    .help(translate!("df-help-local"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(OPT_NO_SYNC)
+                    .long("no-sync")
+                    .overrides_with_all([OPT_SYNC, OPT_NO_SYNC])
+                    .help(translate!("df-help-no-sync"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(OPT_OUTPUT)
+                    .long("output")
+                    .value_name("FIELD_LIST")
+                    .action(ArgAction::Append)
+                    .num_args(0..)
+                    .require_equals(true)
+                    .use_value_delimiter(true)
+                    .value_parser(OUTPUT_FIELD_LIST)
+                    .default_missing_values(OUTPUT_FIELD_LIST)
+                    .default_values(["source", "size", "used", "avail", "pcent", "target"])
+                    .conflicts_with_all([OPT_INODES, OPT_PORTABILITY, OPT_PRINT_TYPE])
+                    .help(translate!("df-help-output")),
+            )
+            .arg(
+                Arg::new(OPT_PORTABILITY)
+                    .short('P')
+                    .long("portability")
+                    .overrides_with(OPT_PORTABILITY)
+                    .help(translate!("df-help-portability"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(OPT_SYNC)
+                    .long("sync")
+                    .overrides_with_all([OPT_NO_SYNC, OPT_SYNC])
+                    .help(translate!("df-help-sync"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(OPT_TYPE)
+                    .short('t')
+                    .long("type")
+                    .value_parser(ValueParser::os_string())
+                    .value_name("TYPE")
+                    .action(ArgAction::Append)
+                    .help(translate!("df-help-type")),
+            )
+            .arg(
+                Arg::new(OPT_PRINT_TYPE)
+                    .short('T')
+                    .long("print-type")
+                    .overrides_with(OPT_PRINT_TYPE)
+                    .help(translate!("df-help-print-type"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(OPT_EXCLUDE_TYPE)
+                    .short('x')
+                    .long("exclude-type")
+                    .action(ArgAction::Append)
+                    .value_parser(ValueParser::os_string())
+                    .value_name("TYPE")
+                    .use_value_delimiter(true)
+                    .help(translate!("df-help-exclude-type")),
+            )
+            .arg(
+                Arg::new(OPT_PATHS)
+                    .action(ArgAction::Append)
+                    .value_parser(ValueParser::os_string())
+                    .value_hint(clap::ValueHint::AnyPath),
+            )
+            .arg(
+                Arg::new(uucore::raven::JSON)
+                    .long("json")
+                    .help("Write one NDJSON record per filesystem")
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(uucore::raven::COLOR)
+                    .long("color")
+                    .value_name("WHEN")
+                    .value_parser(["auto", "always", "never"])
+                    .default_value("auto")
+                    .help("Colour the human output"),
+            ),
+    )
 }
 
 #[cfg(test)]

@@ -11,7 +11,7 @@ package = "raven-getty"
 path = "/bin/getty"
 
 [[initfs.programs]]
-package = "raven-login"
+package = "login"
 path = "/bin/login"
 
 [[initfs.files]]

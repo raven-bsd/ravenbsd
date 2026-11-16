@@ -73,9 +73,17 @@ mod program {
         let shell = read_shell().unwrap_or_else(|| profile.shell.clone());
         let env_strings = profile_env(&profile, &shell);
         let env: Vec<&str> = env_strings.iter().map(String::as_str).collect();
-        let shell_args: [&str; 0] = [];
+        // The console scheme has no POSIX tty, so brush cannot detect an interactive stdin;
+        // the login shell is interactive by construction.
+        let shell_args: &[&str] = if shell.rsplit('/').next() == Some("brush") {
+            // argv[0] is the shell name; `-i` forces the interactive backend and `-l` loads
+            // /etc/profile on the console.
+            &["brush", "-i", "-l"]
+        } else {
+            &[]
+        };
         let shell_options = SpawnOptions {
-            args: &shell_args,
+            args: shell_args,
             env: &env,
         };
         spawn_wait(&initfs, &shell, &shell_options)
