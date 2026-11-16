@@ -56,6 +56,7 @@ members = [
     "tests/fixtures/s39-parity",
     "tests/fixtures/usercopy-cow",
     "tests/fixtures/testkernel",
+    "tests/fixtures/update/probe",
     "tests/fixtures/k14-block/mkdisk",
     "tests/fixtures/k33-rootfs",
     "tests/fixtures/b12-netd",

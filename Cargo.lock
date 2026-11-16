@@ -2625,6 +2625,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-update-health-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-usb-audio"
 version = "0.1.0"
 dependencies = [

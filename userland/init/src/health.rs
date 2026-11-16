@@ -1,21 +1,20 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! K27a boot-health marker written by `init` after the service set is up.
+//! Boot-health marker written by `init` after the required services are ready.
 //!
-//! The update planner adds `/etc/boot-health` to the trial initfs. It names the slot, the trial
-//! token and the reserved marker LBA. `init` writes one sector through the `block:` scheme; the
-//! loader reads that sector on the next boot and confirms the trial only when the token matches.
+//! The health record lives on the UFS root (`/etc/boot-health`) and names the slot, the trial
+//! token and the reserved marker LBA. `init` reads it after mounting the root and writes one
+//! sector through the `block:` scheme; the loader reads that sector on the next boot and confirms
+//! the trial only when the slot, token and healthy state match. An initfs record is still accepted
+//! for legacy images that have no UFS root.
 
 #[cfg(target_os = "none")]
 use alloc::format;
 #[cfg(target_os = "none")]
 use alloc::string::String;
 
-#[cfg(target_os = "none")]
-use raven_initfs::Initfs;
-
-/// Path of the health record in the trial initfs.
+/// Path of the health record in the UFS root (and the legacy initfs).
 pub const HEALTH_PATH: &str = "/etc/boot-health";
 /// Marker magic shared with the loader.
 pub const MAGIC: [u8; 8] = *b"RAVENHLT";
@@ -116,15 +115,9 @@ pub fn encode_write(
     request
 }
 
-/// Write the healthy marker when the trial initfs carries `/etc/boot-health`.
+/// Write the healthy marker for a parsed health record.
 #[cfg(target_os = "none")]
-pub fn mark(initfs: &Initfs<'_>) -> Result<(), String> {
-    let Some(entry) = initfs.get(HEALTH_PATH) else {
-        return Ok(());
-    };
-    let text =
-        core::str::from_utf8(entry.data).map_err(|_| String::from("boot-health is not UTF-8"))?;
-    let health = parse(text).ok_or_else(|| String::from("boot-health is malformed"))?;
+pub fn mark(health: Health) -> Result<(), String> {
     let sector = encode_marker(health.slot, health.token, STATE_HEALTHY);
     let request = encode_write(health.lba, &sector);
     let client = raven_scheme::Client::new();

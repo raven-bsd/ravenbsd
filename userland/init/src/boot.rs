@@ -22,6 +22,7 @@ use raven_svc_manifest::{
 };
 
 use crate::config::{self, Config};
+use crate::health::Health;
 use crate::state::{MergeError, Notice, StartRequest, Supervisor};
 
 /// The mapped initfs, set once at boot.
@@ -41,6 +42,10 @@ pub(crate) struct Core {
     pub(crate) pending_starts: Vec<StartRequest>,
     pub(crate) pending_terminations: Vec<Handle>,
     pub(crate) all_up_printed: bool,
+    /// The health record read from the UFS root, when the image carries one.
+    pub(crate) health: Option<Health>,
+    /// True once the marker write has been attempted for this boot.
+    pub(crate) health_written: bool,
     /// True when the service was declared by the root filesystem and should run from `/root`.
     pub(crate) root_exec: Vec<bool>,
 }
@@ -142,6 +147,8 @@ pub fn run() -> i32 {
         pending_starts: Vec::new(),
         pending_terminations: Vec::new(),
         all_up_printed: false,
+        health: None,
+        health_written: false,
         root_exec,
     }));
     if CORE.lock().is_some() {
@@ -167,6 +174,7 @@ pub fn run() -> i32 {
         }
     }
 
+    core.lock().health = read_initfs_health(&initfs);
     if root_capable {
         let selected = bootstrap_selection(core.lock().supervisor.services());
         {
@@ -180,7 +188,9 @@ pub fn run() -> i32 {
             return code;
         }
         match activate_root(&core) {
-            Ok(()) => {}
+            Ok(()) => {
+                core.lock().health = read_root_health();
+            }
             Err(reason) => {
                 raven_rt::println!("svcd: root: {reason}; starting the initfs plan");
             }
@@ -200,16 +210,22 @@ pub fn run() -> i32 {
         if let Some(code) = core.lock().exit_code {
             return code;
         }
-        let (all_up_first, settled, settled_code, exit_when_settled) = {
+        let (all_up_first, health_due, settled, settled_code, exit_when_settled) = {
             let mut guard = core.lock();
             let all_up = guard.supervisor.all_up();
             let first = all_up && !guard.all_up_printed;
             if first {
                 guard.all_up_printed = true;
             }
+            let health_due =
+                !guard.health_written && guard.health.is_some() && guard.supervisor.health_ready();
+            if health_due {
+                guard.health_written = true;
+            }
             let settled = guard.supervisor.settled();
             (
                 first,
+                health_due,
                 settled,
                 guard.supervisor.settled_exit_code(),
                 guard.config.exit_when_settled,
@@ -217,10 +233,14 @@ pub fn run() -> i32 {
         };
         if all_up_first {
             raven_rt::println!("svcd: all services up");
-            if let Err(error) = crate::health::mark(&initfs) {
-                raven_rt::eprintln!("svcd: health marker: {error}");
-            } else if initfs.get(crate::health::HEALTH_PATH).is_some() {
-                raven_rt::println!("svcd: health marker written");
+        }
+        if health_due {
+            raven_rt::println!("svcd: required services ready");
+            if let Some(health) = core.lock().health {
+                match crate::health::mark(health) {
+                    Ok(()) => raven_rt::println!("svcd: health marker written"),
+                    Err(error) => raven_rt::eprintln!("svcd: health marker: {error}"),
+                }
             }
         }
         if exit_when_settled && settled {
@@ -439,6 +459,40 @@ fn read_root_overrides() -> Result<Option<Overrides>, String> {
         }
         Err(raven_abi::errno::Errno::ENOENT) => Ok(None),
         Err(error) => Err(alloc::format!("/root/etc/rc.conf: {}", error.description())),
+    }
+}
+
+/// The health record on the UFS root, read after the root mount.
+const ROOT_HEALTH_PATH: &str = "file:/root/etc/boot-health";
+
+fn read_root_health() -> Option<Health> {
+    match raven_rt::fs::read_to_vec(ROOT_HEALTH_PATH) {
+        Ok(bytes) => parse_health_bytes("/root/etc/boot-health", &bytes),
+        Err(Errno::ENOENT) => None,
+        Err(error) => {
+            raven_rt::println!("svcd: /root/etc/boot-health: {}", error.description());
+            None
+        }
+    }
+}
+
+/// Legacy images carry the same record in the initfs.
+fn read_initfs_health(initfs: &Initfs<'_>) -> Option<Health> {
+    let entry = initfs.get(crate::health::HEALTH_PATH)?;
+    parse_health_bytes(crate::health::HEALTH_PATH, entry.data)
+}
+
+fn parse_health_bytes(path: &str, bytes: &[u8]) -> Option<Health> {
+    let Ok(text) = core::str::from_utf8(bytes) else {
+        raven_rt::println!("svcd: {path}: not UTF-8");
+        return None;
+    };
+    match crate::health::parse(text) {
+        Some(health) => Some(health),
+        None => {
+            raven_rt::println!("svcd: {path}: malformed health record");
+            None
+        }
     }
 }
 

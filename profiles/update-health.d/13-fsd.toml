@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# fsd-ufs mounts partition 2 of the virtio-blk disk (partition 1 is the ESP with the A/B slots);
+# vfsd attaches `ufs:` so init can mount the root at /root.
+
+[[initfs.files]]
+src = "profiles/update-health.d/fsd-ufs.manifest"
+path = "/etc/services.d/fsd-ufs.toml"
+
+[[initfs.files]]
+src = "profiles/update-health.d/vfsd.manifest"
+path = "/etc/services.d/vfsd.toml"
