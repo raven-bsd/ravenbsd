@@ -207,6 +207,20 @@ fn result_value(result: Result<usize, Errno>) -> u64 {
 #[cfg(target_arch = "x86_64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn syscall_dispatch(frame: &mut crate::arch::x86_64::trapframe::TrapFrame) {
+    // B21a: the Linux trap carries the full user frame; a handler may resume the thread at a
+    // different RIP/RSP. The compact `dispatch` path remains for native calls.
+    #[cfg(target_arch = "x86_64")]
+    if let Some(caller) = process::current()
+        && caller.personality.lock().personality == Personality::Linux
+    {
+        match linux::trap_x86_64(&caller, frame) {
+            Ok(value) => frame.rax = value as u64,
+            Err(error) => process::exit_process(error.to_ret() as i32),
+        }
+        crate::arch::x86_64::syscall::deliver_signal(frame);
+        crate::sched::syscall_return();
+        return;
+    }
     let registers = SyscallFrame {
         rax: frame.rax,
         rdi: frame.rdi,
