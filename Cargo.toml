@@ -178,6 +178,7 @@ members = [
     "userland/bin/m4",
     "userland/bin/patch",
     "userland/bin/xargs",
+    "userland/bin/bc",
     "userland/bin/useradd",
     "userland/bin/adduser",
     "userland/bin/passwd",

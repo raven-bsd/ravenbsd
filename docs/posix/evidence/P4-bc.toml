@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4s bc evidence: bounded first-party arbitrary-precision calculator.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.bc"
+status = "present"
+evidence = "test:tests/posix/utility/bc/test.sh"
+notes = "P4s: bounded first-party bc host behaviour tests"
