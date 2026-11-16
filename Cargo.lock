@@ -1978,6 +1978,7 @@ dependencies = [
  "raven-initfs",
  "raven-proto-fs",
  "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]

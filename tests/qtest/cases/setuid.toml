@@ -19,6 +19,9 @@ expect_exit = "success"
 regex = '^setuid: 0644=denied$'
 
 [[expect]]
+regex = '^setuid: setuid-0644=denied$'
+
+[[expect]]
 regex = '^setuid-child: mode=0755 uid=1000 euid=1000 gid=1000 egid=1000$'
 
 [[expect]]
@@ -32,6 +35,9 @@ regex = '^setuid: script=bad-elf$'
 
 [[expect]]
 regex = '^setuid-child: mode=nosuid uid=1000 euid=1000 gid=1000 egid=1000$'
+
+[[expect]]
+regex = '^setuid: exited-handle=ok$'
 
 [[expect]]
 regex = '^setuid: ok$'

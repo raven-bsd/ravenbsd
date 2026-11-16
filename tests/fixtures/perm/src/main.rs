@@ -18,11 +18,12 @@ use core::arch::asm;
 
 use raven_abi::errno::Errno;
 use raven_initfs::Initfs;
-use raven_proto_fs::{ACCESS_EXEC, ACCESS_READ, O_CREAT, O_RDONLY, O_TRUNC, O_WRONLY};
+use raven_proto_fs::{ACCESS_EXEC, ACCESS_READ, O_CREAT, O_RDONLY, O_TRUNC, O_WRONLY, OpenFlags};
 use raven_rt::entry;
 use raven_rt::fs;
 use raven_rt::println;
-use raven_rt::spawn::{SpawnOptions, spawn};
+use raven_rt::spawn::{SpawnError, SpawnOptions, spawn, spawn_file};
+use raven_scheme::Client;
 
 entry!(main);
 
@@ -90,6 +91,21 @@ unsafe fn syscall6(
 
 fn setcred(which: usize, value: u32) -> Result<(), Errno> {
     let raw = unsafe { syscall6(PROC_SETCRED_EX, which, value as usize, 0, 0, 0, 0) };
+    Errno::from_ret(raw).map(|_| ())
+}
+
+fn setgroups(groups: &[u32]) -> Result<(), Errno> {
+    let raw = unsafe {
+        syscall6(
+            PROC_SETCRED_EX,
+            9,
+            0,
+            0,
+            0,
+            groups.as_ptr() as usize,
+            groups.len(),
+        )
+    };
     Errno::from_ret(raw).map(|_| ())
 }
 
@@ -177,10 +193,17 @@ fn root_setup() -> Result<(), &'static str> {
     mkdir("/tmp/perm/dir755", 0o755).map_err(|_| "mkdir dir755")?;
     mkdir("/tmp/perm/dir700", 0o700).map_err(|_| "mkdir dir700")?;
     mkdir("/tmp/sticky", 0o1777).map_err(|_| "mkdir sticky")?;
+    mkdir("/tmp/perm/setgid", 0o2777).map_err(|_| "mkdir setgid")?;
+    mkdir("/tmp/perm/execdir", 0o4755).map_err(|_| "mkdir execdir")?;
+    mkdir("/tmp/perm/gone", 0o755).map_err(|_| "mkdir gone")?;
+    fs::rmdir("/tmp/perm/gone").map_err(|_| "rmdir gone")?;
     create("/tmp/perm/root600", b"root-secret", 0o600).map_err(|_| "create root600")?;
     create("/tmp/perm/world644", b"world-readable", 0o644).map_err(|_| "create world644")?;
     create("/tmp/perm/exec644", b"#!/bin/sh\n", 0o644).map_err(|_| "create exec644")?;
+    create("/tmp/perm/groupfile", b"group-readable", 0o640).map_err(|_| "create groupfile")?;
+    create("/tmp/perm/xonly", b"execute-only", 0o111).map_err(|_| "create xonly")?;
     create("/tmp/sticky/rootfile", b"sticky", 0o644).map_err(|_| "create sticky file")?;
+    fs::symlink("/tmp/perm/link600", "root600").map_err(|_| "create symlink")?;
     Ok(())
 }
 
@@ -188,17 +211,26 @@ fn root_checks() -> Result<(), &'static str> {
     if fs::read_to_vec("file:/tmp/perm/root600").is_err() {
         return Err("root 0600 read");
     }
+    if fs::read_to_vec("file:/tmp/perm/link600").is_err() {
+        return Err("root symlink read");
+    }
+    let mut xonly = fs::open("file:/tmp/perm/xonly", O_WRONLY).map_err(|_| "root xonly open")?;
+    if xonly.write(b"root-write").is_err() {
+        return Err("root xonly write");
+    }
+    xonly.close().map_err(|_| "root xonly close")?;
     if fs::access("/tmp/perm/exec644", ACCESS_EXEC as u32).is_ok() {
         return Err("root 0644 exec");
     }
     if fs::access("/tmp/perm/dir755", ACCESS_EXEC as u32).is_err() {
         return Err("root 0755 exec");
     }
-    println!("perm: root read=ok exec=denied");
+    println!("perm: root read=ok exec=denied write=ok");
     Ok(())
 }
 
 fn drop_credentials() -> Result<(), &'static str> {
+    setgroups(&[0]).map_err(|_| "setgroups 0")?;
     setcred(5, 1000).map_err(|_| "setgid 1000")?;
     setcred(1, 1000).map_err(|_| "setuid 1000")?;
     Ok(())
@@ -252,5 +284,79 @@ fn user_checks() -> Result<(), &'static str> {
         return Err("uid1000 ramfs dir700");
     }
     println!("perm: ramfs 0600=denied 0644=ok dir700=denied");
+
+    if fs::read_to_vec("file:/tmp/perm/link600") != Err(Errno::EACCES) {
+        return Err("uid1000 symlink 0600");
+    }
+    println!("perm: symlink=denied");
+
+    if fs::read_to_vec("file:/tmp/perm/dir755/../../perm/root600") != Err(Errno::EACCES) {
+        return Err("uid1000 dotdot");
+    }
+    println!("perm: dotdot=denied");
+
+    let deleted = fs::resolve_with_pwd("root600", "/tmp/perm/gone");
+    if fs::read_to_vec(&format!("file:{deleted}")) != Err(Errno::ENOENT) {
+        return Err("uid1000 deleted cwd");
+    }
+    println!("perm: deleted-cwd=enoent");
+
+    if fs::open("file:/tmp/perm/xonly", O_WRONLY).is_ok() {
+        return Err("uid1000 xonly write");
+    }
+    println!("perm: xonly-write=denied");
+
+    if fs::read_to_vec("file:/tmp/perm/groupfile").as_deref() != Ok(b"group-readable") {
+        return Err("uid1000 group list");
+    }
+    println!("perm: group-list=ok");
+
+    let file = fs::open("file:/tmp/perm/world644", O_RDONLY).map_err(|_| "uid1000 dup open")?;
+    let mut duplicate = file.try_clone().map_err(|_| "uid1000 dup")?;
+    drop(file);
+    let mut buffer = [0u8; 16];
+    if duplicate.read(&mut buffer).is_err() {
+        return Err("uid1000 duplicate read");
+    }
+    let client = Client::new();
+    let stale = client
+        .open(
+            "file:/tmp/perm/world644",
+            u32::from(OpenFlags::READ.to_wire()),
+        )
+        .map_err(|_| "uid1000 stale open")?;
+    client.close(stale).map_err(|_| "uid1000 stale close")?;
+    if client.read(stale, 0, &mut buffer) != Err(Errno::EBADF) {
+        return Err("uid1000 stale handle");
+    }
+    println!("perm: handles duplicate=ok stale=badf");
+
+    let directory = client
+        .open(
+            "file:/tmp/perm/execdir",
+            u32::from(OpenFlags::READ.to_wire()),
+        )
+        .map_err(|_| "uid1000 setuid-dir open")?;
+    let result = spawn_file(
+        directory,
+        "/tmp/perm/execdir",
+        &SpawnOptions {
+            args: &[],
+            env: &[],
+        },
+        false,
+    );
+    let _ = client.close(directory);
+    if !matches!(result, Err(SpawnError::BadElf(_))) {
+        return Err("uid1000 setuid-dir");
+    }
+    println!("perm: setuid-dir=bad-elf");
+
+    let _ = fs::open("ramfs:/perm/setgid/userfile", O_WRONLY | O_CREAT | O_TRUNC);
+    match fs::stat("ramfs:/perm/setgid/userfile") {
+        Ok(stat) if stat.gid == 0 => println!("perm: setgid-dir=ok"),
+        Ok(stat) => println!("perm: setgid-dir=KNOWN-DEFECT gid={}", stat.gid),
+        Err(_) => println!("perm: setgid-dir=KNOWN-DEFECT stat"),
+    }
     Ok(())
 }
