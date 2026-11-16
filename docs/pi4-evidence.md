@@ -62,7 +62,7 @@ changes the console to the Pi PL011 and stages the EMMC2/blockd declarations:
 | Profile | Extends | Initfs role | Storage staging |
 |---|---|---|---|
 | `pi4-base` | `base` | legacy init, `uname`, `echo` | `emmc2`/`blockd` manifests, disabled |
-| `pi4-shell` | `shell` | shell services and console | `emmc2`/`blockd` manifests, disabled |
+| `pi4-shell` | `base` + shell entries | shell services and first-party tools, no uutils/man | `emmc2`/`blockd` manifests, disabled |
 | `pi4-server` | `server` | network/server stack in the initfs | `emmc2`/`blockd` manifests, disabled |
 
 Build one variant with:
@@ -80,11 +80,16 @@ records the generated hashes in `build/fixtures/pi4-image/variants.tsv`. The che
 determinism-based, not a fixed hash: the kernel build id contains the repository head, so a
 recorded hash is only meaningful for the same worktree state.
 
-The image GPT has two partitions: `ESP` (partition 1, 64 MiB) and `ROOT` (partition 2, LBA
-133120..264191, 64 MiB). J8 does not populate `ROOT`; it is reserved for the J5 UFS-root path. J5
-must select GPT partition 2 (`FSD_UFS_PARTITION=2`) or the image layout must move `ROOT` first
-before the root stack is enabled. The fixture fails if `ROOT` is missing or is not partition 2, so
-that integration boundary cannot drift silently.
+The image GPT has two partitions: `ESP` (partition 1) and `ROOT` (partition 2, 64 MiB; in the
+current 320 MiB image the ROOT span is LBA 452608..583679). J8 does not populate `ROOT`; it is
+reserved for the J5 UFS-root path. J5 must select GPT partition 2 (`FSD_UFS_PARTITION=2`) or the
+image layout must move `ROOT` first before the root stack is enabled. The fixture fails if `ROOT`
+is missing or is not partition 2, so that integration boundary cannot drift silently.
+
+The `pi4-shell` variant does not inherit `shell` directly: `profiles/shell.d/72-uutils.toml`
+stages the x86_64 uutils slice, which cannot run in the aarch64 Pi image. The Pi variant keeps
+the shell services and first-party tools, minus uutils and man, until K25a provides the aarch64
+slice.
 
 ## 3. Capture
 

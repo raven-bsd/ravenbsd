@@ -1,10 +1,50 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# Pi 4 shell image variant: the generic shell initfs with the Pi 4 UART and the
-# staged EMMC2/blockd service declarations.
+# Pi 4 shell image variant: the shell services and tools with the Pi 4 UART.
+#
+# It extends `base` instead of `shell` because `profiles/shell.d/72-uutils.toml`
+# stages the x86_64 uutils slice; those binaries cannot run in an aarch64 Pi
+# image. The aarch64 uutils slice is a K25a follow-up. This variant keeps every
+# shell service and first-party tool, minus uutils and man.
 name = "pi4-shell"
-extends = "shell"
+extends = "base"
+
+[initfs]
+programs = [
+    { package = "raven-svcctl", path = "/bin/svcctl" },
+    { package = "raven-logd", path = "/sbin/logd" },
+    { package = "raven-sysd", path = "/sbin/sysd" },
+    { package = "raven-randd", path = "/sbin/randd" },
+    { package = "raven-zerod", path = "/sbin/zerod" },
+    { package = "raven-nulld", path = "/sbin/nulld" },
+    { package = "raven-initfsd", path = "/sbin/initfsd" },
+    { package = "raven-ramfsd", path = "/sbin/ramfsd" },
+    { package = "raven-vfsd", path = "/sbin/vfsd" },
+    { package = "raven-consd", path = "/sbin/consd" },
+    { package = "raven-rsh", path = "/bin/rsh" },
+    { package = "raven-sleep", path = "/bin/sleep" },
+    { package = "raven-date", path = "/bin/date" },
+    { package = "raven-hostname", path = "/bin/hostname" },
+    { package = "raven-dmesg", path = "/sbin/dmesg" },
+    { package = "raven-mount", path = "/sbin/mount" },
+    { package = "raven-umount", path = "/sbin/umount" },
+    { package = "raven-ps", path = "/bin/ps" },
+]
+
+files = [
+    { src = "etc/services.d/logd.toml", path = "/etc/services.d/logd.toml" },
+    { src = "etc/services.d/sysd.toml", path = "/etc/services.d/sysd.toml" },
+    { src = "etc/services.d/randd.toml", path = "/etc/services.d/randd.toml" },
+    { src = "etc/services.d/zerod.toml", path = "/etc/services.d/zerod.toml" },
+    { src = "etc/services.d/nulld.toml", path = "/etc/services.d/nulld.toml" },
+    { src = "etc/services.d/initfsd.toml", path = "/etc/services.d/initfsd.toml" },
+    { src = "etc/services.d/ramfsd.toml", path = "/etc/services.d/ramfsd.toml" },
+    { src = "etc/services.d/vfsd.toml", path = "/etc/services.d/vfsd.toml" },
+    { src = "etc/services.d/consd.toml", path = "/etc/services.d/consd.toml" },
+    { src = "etc/services.d/rsh.toml", path = "/etc/services.d/rsh.toml" },
+    { src = "etc/mounts", path = "/etc/mounts" },
+]
 
 [boot]
 cmdline = "console=ttyAMA0 loglevel=info"
