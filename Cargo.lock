@@ -2209,6 +2209,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-procd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-proto-proc",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-procd-fixture"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-proto-proc",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-proto-audio"
 version = "0.1.0"
 dependencies = [
@@ -2236,6 +2260,13 @@ version = "0.1.0"
 
 [[package]]
 name = "raven-proto-net"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
+
+[[package]]
+name = "raven-proto-proc"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
@@ -2271,6 +2302,18 @@ dependencies = [
  "raven-output",
  "raven-proto-fs",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-ptyd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-proto-tty",
+ "raven-rt",
+ "raven-scheme",
+ "raven-tty-core",
 ]
 
 [[package]]
@@ -2993,6 +3036,28 @@ dependencies = [
 [[package]]
 name = "raven-tty-core"
 version = "0.1.0"
+
+[[package]]
+name = "raven-tty-fixture"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-proto-proc",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-ttyd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
 
 [[package]]
 name = "raven-umount"
