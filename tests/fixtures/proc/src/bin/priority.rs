@@ -28,6 +28,7 @@ use common::*;
 entry!(main);
 
 fn proc_create() -> Result<Handle, Errno> {
+    // SAFETY: PROC_CREATE takes only the flags argument (zero); the kernel validates it.
     checked(unsafe { syscall6(Syscall::PROC_CREATE as usize, 0, 0, 0, 0, 0, 0) })
         .map(|value| Handle(value as u32))
 }
