@@ -19,9 +19,22 @@ use crate::process::{CommandSpec, run as run_command};
 const PACKAGE: &str = "brush-shell";
 /// The binary name produced by the package.
 const BINARY: &str = "brush";
-/// Stable staging path used by the shell profile until brush becomes a normal
-/// workspace user package. The x86-64 bring-up image is the only consumer.
-const STAGED: &str = "build/brush";
+
+/// The arch-correct staging path for the brush binary.
+pub(crate) fn staged_for(arch: Arch) -> String {
+    format!("build/{}/brush", arch.as_str())
+}
+
+/// Build release brush for one architecture; used by the image/initfs prerequisite path.
+pub(crate) fn build_for_arch(root: &Path, arch: Arch) -> Result<u8> {
+    build(
+        root,
+        BuildOptions {
+            arch,
+            release: true,
+        },
+    )
+}
 
 /// The RavenBSD target triple for an architecture.
 pub(crate) fn target_for(arch: Arch) -> &'static str {
@@ -178,9 +191,7 @@ fn build(root: &Path, options: BuildOptions) -> Result<u8> {
             artifact.display()
         );
     }
-    let arch_staged = root.join("build").join(options.arch.as_str()).join(BINARY);
-    let staged = root.join(STAGED);
-    copy(&artifact, &arch_staged)?;
+    let staged = root.join(staged_for(options.arch));
     copy(&artifact, &staged)?;
     println!("{}", staged.display());
     Ok(0)
