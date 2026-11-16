@@ -14,15 +14,16 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
+    use alloc::format;
     use alloc::vec;
 
     use raven_abi::errno::Errno;
-    use raven_abi::types::Handle;
+    use raven_abi::types::{Handle, Rights};
     use raven_initfs::Initfs;
     use raven_proto_fs::OpenFlags;
     use raven_proto_proc::{
-        Body, HelloRequest, KillRequest, Op, Request, Response, SetPgidRequest, SpawnRequest,
-        VERSION, WaitRequest, decode_response, encode_request,
+        Body, FdMapEntry, HelloRequest, KillRequest, Op, Request, Response, SetPgidRequest,
+        SpawnRequest, VERSION, WaitRequest, decode_response, encode_request,
     };
     use raven_rt::entry;
     use raven_rt::fs;
@@ -30,6 +31,16 @@ mod program {
     use raven_scheme::Client;
 
     entry!(main);
+
+    const SPAWN_SETPGROUP: u32 = 2;
+    const SPAWN_SETSIGDEF: u32 = 4;
+    const SPAWN_SETSIGMASK: u32 = 8;
+    const SPAWN_CLOEXEC_DEFAULT: u32 = 1 << 17;
+    const PROC_SELF_INFO: usize = 0x35;
+    const SIGKILL: u32 = 9;
+    const SIGUSR1: u32 = 10;
+    const SIGUSR2: u32 = 12;
+    const SIGTERM: u32 = 15;
 
     fn main(_args: raven_rt::Args) -> i32 {
         match run() {
@@ -58,6 +69,7 @@ mod program {
         match mode {
             "exec" => exec_cases(&client, handle, &mut seq)?,
             "signal" => signal_cases(&client, handle, &mut seq)?,
+            "attrs" => attrs_cases(&client, handle, &mut seq)?,
             _ => return Err("mode"),
         }
         let _ = client.close(handle);
@@ -203,6 +215,204 @@ mod program {
         Ok(())
     }
 
+    fn attrs_cases(client: &Client, handle: Handle, seq: &mut u64) -> Result<(), &'static str> {
+        let (read, write) = raven_rt::pipe::pipe().map_err(|_| "pipe")?;
+        raven_rt::sys::write(write, b"ok\n").map_err(|_| "pipe write")?;
+        let mut invalid = 0u32;
+
+        let source = transfer(client, handle, read)?;
+        let mut request = base_spawn();
+        request.fdmap = vec![
+            FdMapEntry {
+                fd: 7,
+                handle: source,
+            },
+            FdMapEntry {
+                fd: 7,
+                handle: source,
+            },
+        ];
+        expect_error(client, handle, seq, &Request::Spawn(request), Errno::EINVAL)?;
+        invalid = invalid.saturating_add(1);
+
+        let source = transfer(client, handle, read)?;
+        let mut request = base_spawn();
+        request.fdmap = vec![FdMapEntry {
+            fd: -1,
+            handle: source,
+        }];
+        expect_error(client, handle, seq, &Request::Spawn(request), Errno::EINVAL)?;
+        invalid = invalid.saturating_add(1);
+
+        let source = transfer(client, handle, read)?;
+        let mut request = base_spawn();
+        request.fdmap = vec![FdMapEntry {
+            fd: 1024,
+            handle: source,
+        }];
+        expect_error(client, handle, seq, &Request::Spawn(request), Errno::EINVAL)?;
+        invalid = invalid.saturating_add(1);
+
+        let mut request = base_spawn();
+        request.fdmap = vec![FdMapEntry {
+            fd: 7,
+            handle: 0x00ff_ffff,
+        }];
+        expect_error(client, handle, seq, &Request::Spawn(request), Errno::EBADF)?;
+        invalid = invalid.saturating_add(1);
+
+        let mut request = base_spawn();
+        request.spawn_flags = SPAWN_SETSIGMASK;
+        set_signal(&mut request.sigmask, SIGKILL);
+        expect_error(client, handle, seq, &Request::Spawn(request), Errno::EINVAL)?;
+        invalid = invalid.saturating_add(1);
+
+        let mut request = base_spawn();
+        set_signal(&mut request.sigdefault, SIGTERM);
+        expect_error(client, handle, seq, &Request::Spawn(request), Errno::EINVAL)?;
+        invalid = invalid.saturating_add(1);
+
+        let nohang = call_raw(
+            client,
+            handle,
+            seq,
+            &Request::Wait(WaitRequest {
+                idtype: 0,
+                id: 0,
+                options: 1,
+            }),
+        )?;
+        let no_child =
+            nohang.status == -(Errno::ECHILD.0 as i32) || (nohang.status == 0 && nohang.value == 0);
+        if !no_child {
+            return Err("invalid spawn created a child");
+        }
+        raven_rt::println!("procd-test: attrs invalid={invalid}");
+
+        let source = transfer(client, handle, read)?;
+        let mut request = base_spawn();
+        request.spawn_flags =
+            SPAWN_SETPGROUP | SPAWN_SETSIGMASK | SPAWN_SETSIGDEF | SPAWN_CLOEXEC_DEFAULT;
+        request.pgroup = 0;
+        request.fdmap = vec![FdMapEntry {
+            fd: 7,
+            handle: source,
+        }];
+        set_signal(&mut request.sigmask, SIGUSR1);
+        set_signal(&mut request.sigdefault, SIGTERM);
+        set_signal(&mut request.ignored, SIGUSR2);
+        request.argv = vec![
+            b"procd-child".to_vec(),
+            b"attrs".to_vec(),
+            b"-1".to_vec(),
+            b"1".to_vec(),
+        ];
+        let pid = spawn_request(client, handle, seq, request)?;
+        raven_rt::println!("procd-test: attrs spawn1={pid}");
+        let status = wait_child(client, handle, seq, pid)?;
+        if exited(status) != Some(0) {
+            return Err("attrs spawn1 exit");
+        }
+
+        let pgid = self_pgid()?;
+        raven_rt::sys::write(write, b"ok\n").map_err(|_| "pipe write 2")?;
+        let source = transfer(client, handle, read)?;
+        let mut request = base_spawn();
+        request.spawn_flags = SPAWN_SETPGROUP;
+        request.pgroup = pgid;
+        request.fdmap = vec![FdMapEntry {
+            fd: 7,
+            handle: source,
+        }];
+        request.argv = vec![
+            b"procd-child".to_vec(),
+            b"attrs".to_vec(),
+            format!("{pgid}").into_bytes(),
+            b"0".to_vec(),
+        ];
+        let pid = spawn_request(client, handle, seq, request)?;
+        let status = wait_child(client, handle, seq, pid)?;
+        if exited(status) != Some(0) {
+            return Err("attrs spawn2 exit");
+        }
+        raven_rt::println!("procd-test: attrs spawn2={pid} pgid={pgid}");
+
+        let _ = client.close(read);
+        let _ = client.close(write);
+        Ok(())
+    }
+
+    fn base_spawn() -> SpawnRequest {
+        SpawnRequest {
+            spawn_flags: 0,
+            pgroup: 0,
+            sigdefault: [0u8; 128],
+            sigmask: [0u8; 128],
+            ignored: [0u8; 128],
+            sched_policy: 0,
+            sched_prio: 0,
+            umask: 0o022,
+            tcpgrp_fd: -1,
+            path: b"/bin/procd-child".to_vec(),
+            cwd: b"/".to_vec(),
+            argv: vec![b"procd-child".to_vec(), b"attrs".to_vec()],
+            envp: vec![],
+            fdmap: vec![],
+        }
+    }
+
+    fn transfer(client: &Client, proc_handle: Handle, source: Handle) -> Result<u32, &'static str> {
+        client
+            .transfer_to_server(proc_handle, source, Rights::ALL.0)
+            .map(|handle| handle.0)
+            .map_err(|_| "transfer")
+    }
+
+    fn expect_error(
+        client: &Client,
+        handle: Handle,
+        seq: &mut u64,
+        request: &Request,
+        expected: Errno,
+    ) -> Result<(), &'static str> {
+        let response = call_raw(client, handle, seq, request)?;
+        if response.status != -(expected.0 as i32) {
+            return Err("unexpected spawn error");
+        }
+        Ok(())
+    }
+
+    fn spawn_request(
+        client: &Client,
+        handle: Handle,
+        seq: &mut u64,
+        request: SpawnRequest,
+    ) -> Result<i32, &'static str> {
+        let response = call_raw(client, handle, seq, &Request::Spawn(request))?;
+        if response.status < 0 {
+            raven_rt::println!("procd-test: spawn-status={}", response.status);
+            return Err("spawn status");
+        }
+        i32::try_from(response.value).map_err(|_| "spawn pid")
+    }
+
+    fn set_signal(set: &mut [u8; 128], signo: u32) {
+        let bit = usize::try_from(signo.saturating_sub(1)).unwrap_or(0);
+        if let Some(byte) = set.get_mut(bit / 8) {
+            *byte |= 1 << (bit % 8);
+        }
+    }
+
+    fn self_pgid() -> Result<i32, &'static str> {
+        let mut words = [0u64; 8];
+        // SAFETY: PROC_SELF_INFO writes eight u64 words to the live array owned by the caller.
+        let raw = unsafe {
+            raven_rt::sys::syscall2(PROC_SELF_INFO, words.as_mut_ptr() as usize, words.len())
+        };
+        Errno::from_ret(raw).map_err(|_| "self info")?;
+        i32::try_from(words[2]).map_err(|_| "pgid")
+    }
+
     fn spawn_child(
         client: &Client,
         handle: Handle,
@@ -236,7 +446,7 @@ mod program {
         seq: &mut u64,
         pid: i32,
     ) -> Result<i32, &'static str> {
-        let response = call(
+        let response = call_raw(
             client,
             handle,
             seq,
@@ -246,6 +456,10 @@ mod program {
                 options: 0,
             }),
         )?;
+        if response.status < 0 {
+            raven_rt::println!("procd-test: wait-status={}", response.status);
+            return Err("wait status");
+        }
         match response.body {
             Body::Wait { status, .. } => Ok(status),
             _ => Err("wait body"),

@@ -20,7 +20,7 @@ mod program {
     use alloc::collections::BTreeSet;
 
     use raven_abi::errno::Errno;
-    use raven_abi::types::Handle;
+    use raven_abi::types::{Handle, Rights};
     use raven_initfs::Initfs;
     use raven_procd::{ProcInfo, ProcSys, Procd, WaitEvent};
     use raven_proto_fs::OpenFlags;
@@ -47,6 +47,39 @@ mod program {
     impl ProcSys for TargetSys {
         fn spawn(&mut self, path: &str, argv: &[&str], env: &[&str]) -> Result<Handle, Errno> {
             spawn(&self.initfs, path, &SpawnOptions { args: argv, env }).map_err(spawn_error)
+        }
+
+        fn spawn_with_attributes(
+            &mut self,
+            path: &str,
+            argv: &[&str],
+            env: &[&str],
+            fdmap: &[(i32, u32)],
+            sigmask: &[u8; 128],
+            sigdefault: &[u8; 128],
+            ignored: &[u8; 128],
+        ) -> Result<Handle, Errno> {
+            let attributes = raven_rt::spawn::SpawnAttributes {
+                fdmap,
+                sigmask,
+                sigdefault,
+                ignored,
+            };
+            raven_rt::spawn::spawn_with_attributes(
+                &self.initfs,
+                path,
+                &SpawnOptions { args: argv, env },
+                &attributes,
+            )
+            .map_err(spawn_error)
+        }
+
+        fn validate_handle(&mut self, handle: Handle) -> Result<(), Errno> {
+            // A transfer into the server itself proves the descriptor is live and carries the
+            // TRANSFER right without creating the child yet. Close the probe copy immediately.
+            let probe = raven_rt::sys::handle_transfer(Handle::SELF_PROC, handle, Rights::ALL)?;
+            let _ = raven_rt::sys::handle_close(probe);
+            Ok(())
         }
 
         fn pid(&mut self, handle: Handle) -> Result<i32, Errno> {

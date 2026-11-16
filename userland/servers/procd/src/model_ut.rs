@@ -6,13 +6,13 @@
 #![allow(clippy::indexing_slicing)] // fixed test vectors
 #![allow(clippy::arithmetic_side_effects)] // test construction
 
-use alloc::collections::{BTreeMap, VecDeque};
+use alloc::collections::{BTreeMap, BTreeSet, VecDeque};
 use alloc::vec;
 
 use super::*;
 use raven_proto_proc::{
-    Body, GetPgidRequest, GetSidRequest, HelloRequest, KillRequest, Op, Request, Response,
-    SetPgidRequest, SpawnRequest, WaitRequest,
+    Body, FdMapEntry, GetPgidRequest, GetSidRequest, HelloRequest, KillRequest, Op, Request,
+    Response, SetPgidRequest, SpawnRequest, WaitRequest,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -20,6 +20,10 @@ struct SpawnCall {
     path: String,
     argv: Vec<String>,
     env: Vec<String>,
+    fdmap: Vec<(i32, u32)>,
+    sigmask: [u8; 128],
+    sigdefault: [u8; 128],
+    ignored: [u8; 128],
 }
 
 struct FakeSys {
@@ -31,6 +35,7 @@ struct FakeSys {
     signals: Vec<(i32, u32)>,
     setpgids: Vec<(i32, i32)>,
     closed: Vec<Handle>,
+    reject_handles: BTreeSet<u32>,
     next_pid: i32,
     next_handle: u32,
     server_pid: i32,
@@ -57,19 +62,32 @@ impl FakeSys {
             signals: Vec::new(),
             setpgids: Vec::new(),
             closed: Vec::new(),
+            reject_handles: BTreeSet::new(),
             next_pid: 100,
             next_handle: 10,
             server_pid: 3,
         }
     }
-}
 
-impl ProcSys for FakeSys {
-    fn spawn(&mut self, path: &str, argv: &[&str], env: &[&str]) -> Result<Handle, Errno> {
+    #[allow(clippy::too_many_arguments)] // mirrors the ProcSys attribute method
+    fn record(
+        &mut self,
+        path: &str,
+        argv: &[&str],
+        env: &[&str],
+        fdmap: &[(i32, u32)],
+        sigmask: &[u8; 128],
+        sigdefault: &[u8; 128],
+        ignored: &[u8; 128],
+    ) -> Handle {
         self.spawns.push(SpawnCall {
             path: path.to_string(),
             argv: argv.iter().map(|value| value.to_string()).collect(),
             env: env.iter().map(|value| value.to_string()).collect(),
+            fdmap: fdmap.to_vec(),
+            sigmask: *sigmask,
+            sigdefault: *sigdefault,
+            ignored: *ignored,
         });
         let pid = self.next_pid;
         self.next_pid += 1;
@@ -85,7 +103,34 @@ impl ProcSys for FakeSys {
                 sid: self.server_pid,
             },
         );
-        Ok(handle)
+        handle
+    }
+}
+
+impl ProcSys for FakeSys {
+    fn spawn(&mut self, path: &str, argv: &[&str], env: &[&str]) -> Result<Handle, Errno> {
+        Ok(self.record(path, argv, env, &[], &zeroes(), &zeroes(), &zeroes()))
+    }
+
+    fn spawn_with_attributes(
+        &mut self,
+        path: &str,
+        argv: &[&str],
+        env: &[&str],
+        fdmap: &[(i32, u32)],
+        sigmask: &[u8; 128],
+        sigdefault: &[u8; 128],
+        ignored: &[u8; 128],
+    ) -> Result<Handle, Errno> {
+        Ok(self.record(path, argv, env, fdmap, sigmask, sigdefault, ignored))
+    }
+
+    fn validate_handle(&mut self, handle: Handle) -> Result<(), Errno> {
+        if handle == Handle::NONE || self.reject_handles.contains(&handle.0) {
+            Err(Errno::EBADF)
+        } else {
+            Ok(())
+        }
     }
 
     fn pid(&mut self, handle: Handle) -> Result<i32, Errno> {
@@ -214,6 +259,10 @@ fn spawn_records_argv_env_and_wait_reports_the_exit_status() {
             path: "/bin/procd-child".to_string(),
             argv: vec!["procd-child".to_string(), "exec".to_string()],
             env: vec!["TEST=value".to_string()],
+            fdmap: vec![],
+            sigmask: zeroes(),
+            sigdefault: zeroes(),
+            ignored: zeroes(),
         }]
     );
     assert_eq!(procd.children().get(&pid).expect("child").owner, 1000);
@@ -469,4 +518,142 @@ fn setpgid_spawn_flag_sets_the_child_group() {
     let pid = i32::try_from(response.value).expect("pid");
     assert_eq!(procd.sys().setpgids, vec![(pid, pid)]);
     assert_eq!(procd.children().get(&pid).expect("child").pgid, pid);
+}
+
+fn signal_bit(set: &mut [u8; 128], signo: u32) {
+    let bit = usize::try_from(signo.saturating_sub(1)).expect("signal");
+    set[bit / 8] |= 1 << (bit % 8);
+}
+
+fn fd(fd: i32, handle: u32) -> FdMapEntry {
+    FdMapEntry { fd, handle }
+}
+
+#[test]
+fn fdmap_and_signal_attributes_reach_the_loader_and_sources_close() {
+    let mut sys = FakeSys::new();
+    sys.reject_handles.insert(0xdead);
+    let mut procd = Procd::new(sys, 3);
+    let mut request = spawn_request();
+    request.spawn_flags =
+        POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF | S_CLOEXEC_DEFAULT;
+    request.pgroup = 0;
+    request.fdmap = vec![fd(7, 0x40), fd(0, 0x41)];
+    signal_bit(&mut request.sigmask, 10);
+    signal_bit(&mut request.sigdefault, 15);
+    signal_bit(&mut request.ignored, 12);
+    let response = procd.dispatch(1000, Request::Spawn(request));
+    assert_eq!(response.status, 0);
+    let pid = i32::try_from(response.value).expect("pid");
+
+    let call = procd.sys().spawns.first().expect("spawn");
+    assert_eq!(call.fdmap, vec![(7, 0x40), (0, 0x41)]);
+    assert_eq!(call.sigmask[1] & 0b10, 0b10);
+    assert_eq!(call.sigdefault[1] & 0b0100_0000, 0b0100_0000);
+    assert_eq!(call.ignored[1] & 0b1000, 0b1000);
+    assert_eq!(procd.sys().closed, vec![Handle(0x40), Handle(0x41)]);
+
+    let child = procd.children().get(&pid).expect("child");
+    assert_eq!(child.fdmap, vec![(7, 0x40), (0, 0x41)]);
+    assert_eq!(child.sigmask, call.sigmask);
+    assert_eq!(child.sigdefault, call.sigdefault);
+    assert_eq!(child.ignored, call.ignored);
+}
+
+#[test]
+fn malformed_fd_maps_are_rejected_before_spawning() {
+    let cases: Vec<(Vec<FdMapEntry>, i32)> = vec![
+        (vec![fd(7, 0x40), fd(7, 0x41)], Errno::EINVAL.0 as i32),
+        (vec![fd(-1, 0x40)], Errno::EINVAL.0 as i32),
+        (vec![fd(MAX_CHILD_FD, 0x40)], Errno::EINVAL.0 as i32),
+        (vec![fd(7, Handle::NONE.0)], Errno::EINVAL.0 as i32),
+        (vec![fd(7, 0xdead)], Errno::EBADF.0 as i32),
+    ];
+    for (map, expected) in cases {
+        let mut sys = FakeSys::new();
+        sys.reject_handles.insert(0xdead);
+        let mut procd = Procd::new(sys, 3);
+        let mut request = spawn_request();
+        request.fdmap = map;
+        let response = procd.dispatch(1000, Request::Spawn(request));
+        assert_eq!(response.status, -expected);
+        assert!(procd.sys().spawns.is_empty());
+        assert!(!procd.sys().closed.is_empty());
+    }
+}
+
+#[test]
+fn too_many_fd_map_entries_are_rejected() {
+    let mut procd = Procd::new(FakeSys::new(), 3);
+    let mut request = spawn_request();
+    request.fdmap = (0..=raven_proto_proc::MAX_FDS)
+        .map(|index| fd(i32::try_from(index).expect("fd"), 0x1000))
+        .collect();
+    let response = procd.dispatch(1000, Request::Spawn(request));
+    assert_eq!(response.status, -(Errno::EINVAL.0 as i32));
+    assert!(procd.sys().spawns.is_empty());
+}
+
+#[test]
+fn invalid_signal_sets_are_rejected_before_spawning() {
+    let cases = [
+        {
+            let mut request = spawn_request();
+            request.spawn_flags = POSIX_SPAWN_SETSIGMASK;
+            signal_bit(&mut request.sigmask, SIGKILL);
+            request
+        },
+        {
+            let mut request = spawn_request();
+            signal_bit(&mut request.ignored, SIGSTOP);
+            request
+        },
+        {
+            let mut request = spawn_request();
+            request.spawn_flags = POSIX_SPAWN_SETSIGMASK;
+            request.sigmask[8] = 1;
+            request
+        },
+        {
+            let mut request = spawn_request();
+            signal_bit(&mut request.sigdefault, 15);
+            request
+        },
+    ];
+    for request in cases {
+        let mut procd = Procd::new(FakeSys::new(), 3);
+        let response = procd.dispatch(1000, Request::Spawn(request));
+        assert_eq!(response.status, -(Errno::EINVAL.0 as i32));
+        assert!(procd.sys().spawns.is_empty());
+    }
+}
+
+#[test]
+fn unsupported_spawn_flags_still_return_enosys() {
+    let mutations: [fn(&mut SpawnRequest); 3] = [
+        |request| request.spawn_flags = POSIX_SPAWN_SETSID,
+        |request| request.sched_policy = 1,
+        |request| request.tcpgrp_fd = 0,
+    ];
+    for mutate in mutations {
+        let mut procd = Procd::new(FakeSys::new(), 3);
+        let mut request = spawn_request();
+        mutate(&mut request);
+        request.fdmap = vec![fd(7, 0x40)];
+        let response = procd.dispatch(1000, Request::Spawn(request));
+        assert_eq!(response.status, -(Errno::ENOSYS.0 as i32));
+        assert!(procd.sys().spawns.is_empty());
+        assert_eq!(procd.sys().closed, vec![Handle(0x40)]);
+    }
+}
+
+#[test]
+fn negative_pgroup_is_rejected_before_spawning() {
+    let mut procd = Procd::new(FakeSys::new(), 3);
+    let mut request = spawn_request();
+    request.spawn_flags = POSIX_SPAWN_SETPGROUP;
+    request.pgroup = -5;
+    let response = procd.dispatch(1000, Request::Spawn(request));
+    assert_eq!(response.status, -(Errno::EINVAL.0 as i32));
+    assert!(procd.sys().spawns.is_empty());
 }
