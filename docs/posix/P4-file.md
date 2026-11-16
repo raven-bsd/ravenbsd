@@ -3,9 +3,10 @@
 
 # POSIX file utility conformance (P4b)
 
-Status: **PARTIAL — 25 host behaviour suites pass, 2 tools are defects, and the evidence overlay
-cannot be loaded because the P0b loader rejects owner subfiles (`P4-file-D1`).** No utility binary
-was edited and no row is claimed without a test.
+Status: **PARTIAL — 25 host behaviour suites pass; 21 rows are registered in the P0b overlay,
+4 tools have no profile row, and `file`/`find` are defects.** The P4b2 ticket implements
+`file`/`find`; the four unregistered tools need a profile/seed follow-up (`P4-file-D1`). No utility
+binary was edited and no row is claimed without a test.
 
 ## Method
 
@@ -42,39 +43,40 @@ sh tests/posix/utility/run-file.sh cat cp ls
 | `ls` | 7 | pass | `tests/posix/utility/file/ls/test.sh` |
 | `mkdir` | 5 | pass | `tests/posix/utility/file/mkdir/test.sh` |
 | `mkfifo` | 3 | pass | `tests/posix/utility/file/mkfifo/test.sh` |
-| `mknod` | 3 | pass | `tests/posix/utility/file/mknod/test.sh` |
+| `mknod` | 3 | pass / no profile row | `tests/posix/utility/file/mknod/test.sh` |
 | `mv` | 5 | pass | `tests/posix/utility/file/mv/test.sh` |
 | `pathchk` | 3 | pass | `tests/posix/utility/file/pathchk/test.sh` |
 | `pwd` | 3 | pass | `tests/posix/utility/file/pwd/test.sh` |
-| `readlink` | 3 | pass | `tests/posix/utility/file/readlink/test.sh` |
-| `realpath` | 3 | pass | `tests/posix/utility/file/realpath/test.sh` |
+| `readlink` | 3 | pass / no profile row | `tests/posix/utility/file/readlink/test.sh` |
+| `realpath` | 3 | pass / no profile row | `tests/posix/utility/file/realpath/test.sh` |
 | `rm` | 4 | pass | `tests/posix/utility/file/rm/test.sh` |
 | `rmdir` | 5 | pass | `tests/posix/utility/file/rmdir/test.sh` |
-| `stat` | 3 | pass | `tests/posix/utility/file/stat/test.sh` |
+| `stat` | 3 | pass / no profile row | `tests/posix/utility/file/stat/test.sh` |
 | `touch` | 5 | pass | `tests/posix/utility/file/touch/test.sh` |
 | `unlink` | 3 | pass | `tests/posix/utility/file/unlink/test.sh` |
 
-Total: 25 present tools, 99 assertions, 0 failing present tool.
+Total: 25 tested tools, 99 assertions, 0 failing present tool. The P0b overlay registers 21 of
+them; `mknod`, `readlink`, `realpath` and `stat` have no profile row, so their tests cannot be
+registered without a profile/seed change.
 
 ## Defects
 
 | Defect | Row/tool | Impact |
 |---|---|---|
-| `P4-file-D1` | P0b overlay loader | rejects `docs/posix/evidence/P4-file.toml` by filename; the 25 evidence rows cannot be loaded |
-| `P4-file-D2` | `util.file` (`file`) | no `file` utility implementation; stays missing/partial |
-| `P4-file-D3` | `util.find` (`find`) | no `find` utility implementation; stays missing/partial |
+| `P4-file-D1` | `util.mknod`, `util.readlink`, `util.realpath`, `util.stat` | no profile rows exist; their 4 passing tests cannot be registered from P4b Owns |
+| `P4-file-D2` | `util.file` (`file`) | no `file` utility implementation; P4b2 implements it |
+| `P4-file-D3` | `util.find` (`find`) | no `find` utility implementation; P4b2 implements it |
 
-The two missing tools are not waived. They need implementation or a dedicated defect ticket; the
-file family is therefore partial, not present.
+`file` and `find` are handed to P4b2, which owns their implementations and tests. The four
+profile-less tools need a seed/profile follow-up; they are not waived and not counted as present
+in the gate.
 
-## Evidence overlay (prepared, blocked)
+## Evidence overlay
 
-The ready rows use the P0b structured `test:` form. They are not committed because the current
-P0b loader accepts only exact `P1.toml`…`P5.toml` stems and exits 2 on `P4-file.toml`:
-
-```
-posix-conform: overlay file `./docs/posix/evidence/P4-file.toml` must be named P1.toml through P5.toml
-```
+`docs/posix/evidence/P4-file.toml` is committed with 21 structured `test:` rows for the profile
+rows that exist. The P0b loader accepts the owner batch file and the gate executes each row. The
+four tools without profile rows are deliberately absent from the overlay so they cannot create
+unsupported-claim failures.
 
 ```toml
 schema = 1
@@ -85,14 +87,10 @@ id = "util.cat"
 status = "present"
 evidence = "test:tests/posix/utility/file/cat/test.sh"
 notes = "P4b: file-family behaviour test"
-
-# ... one row per tool for chgrp, chmod, chown, cp, cksum, dd, df, du, link, ln, ls,
-# mkdir, mkfifo, mknod, mv, pathchk, pwd, readlink, realpath, rm, rmdir, stat, touch, unlink,
-# each with evidence = "test:tests/posix/utility/file/<tool>/test.sh".
 ```
 
-Once the loader accepts owner subfiles, the rows can be dropped in without changing the test
-runner or any utility source.
+The gate run reports those 21 as pass; the file family still has the `file`/`find` defects until
+P4b2 lands.
 
 ## Qtest scope
 
