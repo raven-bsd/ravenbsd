@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "tar"
+version = "0.1.0"
+description = "RavenBSD tar: POSIX ustar create, list and extract."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "tar"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tar"
+path = "src/main.rs"
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-rt = { path = "../../rt" }
+raven-tool-core = { path = "../../../crates/raven-tool-core" }
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+
+[lints]
+workspace = true
