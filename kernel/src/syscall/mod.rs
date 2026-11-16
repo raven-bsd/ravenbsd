@@ -104,6 +104,9 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == ipc::SEEK {
         return ipc::seek(frame);
     }
+    if number == raven_abi::syscall::MSYNC {
+        return memory_ctl::msync(frame);
+    }
     if number == exec::PROC_EXEC {
         return exec::exec(frame);
     }

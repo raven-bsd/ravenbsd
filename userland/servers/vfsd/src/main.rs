@@ -30,7 +30,8 @@ mod program {
     use alloc::vec::Vec;
 
     use raven_abi::errno::Errno;
-    use raven_abi::types::Handle;
+    use raven_abi::types::{Handle, Rights, prot};
+    use raven_pager::{PAGE_IN, PAGE_OUT, PagerPacket};
     use raven_proto_fs::{
         ACCESS_EXEC, ACCESS_READ, ACCESS_WRITE, Call, CallRequest, CallResponse, Credentials,
         DIRENT_ALIGN, DIRENT_HEADER_LEN, DT_DIR, DirEntry, DirEntryHeader, DirEntryIter, MAX_PATH,
@@ -47,8 +48,16 @@ mod program {
     const RETRIES: usize = 500;
     const RETRY_NS: u64 = 10_000_000;
     const BUFFER: usize = 4096;
+    const PAGE: usize = 4096;
     /// Budget for proxy open-file descriptions.
     const MAX_OPEN_FILES: usize = 256;
+
+    #[derive(Clone, Copy)]
+    struct PagerRegion {
+        target: Handle,
+        offset: u64,
+        shared: bool,
+    }
 
     struct Proxy {
         target: Handle,
@@ -61,6 +70,7 @@ mod program {
     struct VfsHandler {
         table: MountTable,
         opens: OpenTable<Proxy>,
+        pagers: BTreeMap<u32, PagerRegion>,
         mount_generation: u32,
     }
 
@@ -69,6 +79,7 @@ mod program {
             Self {
                 table,
                 opens: OpenTable::new(),
+                pagers: BTreeMap::new(),
                 mount_generation: 1,
             }
         }
@@ -129,6 +140,102 @@ mod program {
                 | Ok(CallResponse::StatFs { status, .. })
                 | Ok(CallResponse::StatVfs { status, .. }) => Err(errno_from_status(status)),
                 Err(_) => Err(Errno::EPROTO),
+            }
+        }
+
+        fn mmap_call(
+            &mut self,
+            file: u64,
+            offset: u64,
+            len: u64,
+            shared: bool,
+        ) -> HandlerResult<CallReply> {
+            let (target, root) = {
+                let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
+                (entry.file.target, entry.file.root_listing)
+            };
+            if root {
+                return Err(Errno::EISDIR.into());
+            }
+            if len == 0 || !offset.is_multiple_of(PAGE as u64) || !len.is_multiple_of(PAGE as u64) {
+                return Err(Errno::EINVAL.into());
+            }
+            let stat = Client::new().fstat(target)?;
+            if offset >= stat.size {
+                return Err(Errno::EINVAL.into());
+            }
+            let object = raven_rt::sys::memobj_create_pager(
+                usize::try_from(len).map_err(|_| Errno::ENOMEM)?,
+            )?;
+            self.pagers.insert(
+                object.0,
+                PagerRegion {
+                    target,
+                    offset,
+                    shared,
+                },
+            );
+            let mut reply = CallReply::new(0);
+            reply.attach(
+                object,
+                Rights::READ.union(Rights::WRITE).union(Rights::MAP).bits(),
+            )?;
+            Ok(reply)
+        }
+
+        fn pager_call(&mut self, packet: PagerPacket) -> HandlerResult<CallReply> {
+            let Some(region) = self.pagers.get(&packet.object).copied() else {
+                return Err(Errno::EIO.into());
+            };
+            if packet.len != PAGE as u64 {
+                return Err(Errno::EINVAL.into());
+            }
+            let page_offset = usize::try_from(packet.offset).map_err(|_| Errno::EINVAL)?;
+            let file_offset = region
+                .offset
+                .checked_add(packet.offset)
+                .ok_or(Errno::EINVAL)?;
+            let stat = Client::new().fstat(region.target)?;
+            match packet.kind {
+                PAGE_IN => {
+                    if file_offset >= stat.size {
+                        return Err(Errno::EIO.into());
+                    }
+                    let want = usize::try_from((stat.size - file_offset).min(PAGE as u64))
+                        .map_err(|_| Errno::EINVAL)?;
+                    let mut page = [0u8; PAGE];
+                    let read =
+                        Client::new().pread(region.target, file_offset, &mut page[..want])?;
+                    if read < want {
+                        return Err(Errno::EIO.into());
+                    }
+                    raven_rt::sys::pager_supply(Handle(packet.object), page_offset, &page[..want])?;
+                    Ok(CallReply::new(0))
+                }
+                PAGE_OUT => {
+                    let address = raven_rt::sys::map_object(
+                        Handle(packet.object),
+                        page_offset,
+                        PAGE,
+                        prot::READ as usize,
+                        true,
+                    )?;
+                    let mut page = [0u8; PAGE];
+                    raven_rt::sys::copy_from_mapping(address, &mut page);
+                    let _ = raven_rt::sys::unmap(Handle::SELF_PROC, address, PAGE);
+                    if file_offset < stat.size {
+                        let want = usize::try_from((stat.size - file_offset).min(PAGE as u64))
+                            .map_err(|_| Errno::EINVAL)?;
+                        let written =
+                            Client::new().pwrite(region.target, file_offset, &page[..want])?;
+                        if written < want {
+                            return Err(Errno::EIO.into());
+                        }
+                    }
+                    let _ = region.shared;
+                    Ok(CallReply::new(0))
+                }
+                _ => Err(Errno::EINVAL.into()),
             }
         }
 
@@ -807,6 +914,18 @@ mod program {
             response: &mut [u8],
             ctx: &Ctx,
         ) -> HandlerResult<CallReply> {
+            if let Ok(packet) = PagerPacket::decode(request) {
+                return self.pager_call(packet);
+            }
+            let decoded = CallRequest::decode(request).map_err(|_| Errno::EPROTO)?;
+            if let Call::Mmap {
+                offset,
+                len,
+                shared,
+            } = decoded.call
+            {
+                return self.mmap_call(file, offset, len, shared);
+            }
             let written = self.call_checked(file, request, response, &ctx.credentials)?;
             Ok(CallReply::new(written))
         }
@@ -937,6 +1056,7 @@ mod program {
                 | Call::Lstat { .. } => {
                     Ok(self.forward_one(decoded.call, &base, response, creds)?)
                 }
+                Call::Mmap { .. } => status(response, Err(Errno::EINVAL)),
             }
         }
     }

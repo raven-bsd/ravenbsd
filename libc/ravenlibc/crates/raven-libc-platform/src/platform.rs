@@ -1358,6 +1358,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             Call::Utimens { .. } => raven_proto_fs::OP_UTIMENS,
             Call::Statvfs => raven_proto_fs::OP_STATVFS,
             Call::Lstat { .. } => raven_proto_fs::OP_LSTAT,
+            Call::Mmap { .. } => raven_proto_fs::OP_MMAP,
         };
         let call_response =
             CallResponse::decode(op, &response[..count]).map_err(|error| error.errno())?;

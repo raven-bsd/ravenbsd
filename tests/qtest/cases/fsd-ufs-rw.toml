@@ -53,6 +53,9 @@ regex = '^fsd-ufs-rw: probe posix operations ok$'
 regex = '^fsd-ufs-rw: probe sparse ok$'
 
 [[expect]]
+regex = '^fsd-ufs-rw: probe mmap ok$'
+
+[[expect]]
 regex = '^fsd-ufs-rw: probe unlink/rmdir ok$'
 
 [[expect]]

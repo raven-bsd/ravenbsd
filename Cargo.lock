@@ -3205,6 +3205,7 @@ name = "raven-vfsd"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-pager",
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
