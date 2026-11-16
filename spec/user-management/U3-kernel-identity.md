@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # U3 - kernel identity, permissions and setuid
 
 Lane: stuart      Wave: 12      Milestone: M-0.2.0
