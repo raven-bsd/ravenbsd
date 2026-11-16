@@ -75,6 +75,7 @@ members = [
     "tests/fixtures/b70-net/overlay",
     "tests/fixtures/pi4-soak",
     "tests/fixtures/pi4-devd/driver",
+    "tests/fixtures/pi4-platd",
     "profiles/iommu-fixture",
     "tests/qtest/cases/linux-trap-fixture",
     "tests/qtest/cases/linux-root-fixture",

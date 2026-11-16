@@ -2001,6 +2001,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-pi4-platd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-plat",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-pi4-soak"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P12: devd launches platd from the P8 driver table and a client exercises the
+# plat: scheme through the deterministic backend. The fixture is a launch/scheme
+# test; the hardware capability plan is host-tested, not a board result.
+
+name = "pi4-platd"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 300
+pre = ["sh tests/fixtures/pi4-platd/build.sh"]
+initfs = "build/fixtures/pi4-platd/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^devd: dtb devices=5$'
+
+[[expect]]
+regex = '^devd: dtb driver platd compatible=brcm,bcm2711-genet-v5 device=/scb/ethernet@7d580000$'
+
+[[expect]]
+regex = '^devd: dtb launch platd bar=0 size=0x10000 dma=0 irq=0$'
+
+[[expect]]
+regex = '^platd: ready backend=fake$'
+
+[[expect]]
+regex = '^svcd: pcid up$'
+
+[[expect]]
+regex = '^pi4-platd: model=0x00002711$'
+
+[[expect]]
+regex = '^pi4-platd: revision=0x00c03114$'
+
+[[expect]]
+regex = '^pi4-platd: serial=0x0000000012345678$'
+
+[[expect]]
+regex = '^pi4-platd: mac=02:00:00:00:00:01$'
+
+[[expect]]
+regex = '^pi4-platd: clock12=50000000$'
+
+[[expect]]
+regex = '^pi4-platd: power0=1$'
+
+[[expect]]
+regex = '^platd: claim pin=17$'
+
+[[expect]]
+regex = '^pi4-platd: gpio claim ok$'
+
+[[expect]]
+regex = '^platd: conflict pin=17$'
+
+[[expect]]
+regex = '^pi4-platd: gpio conflict ok$'
+
+[[expect]]
+regex = '^pi4-platd: gpio config ok$'
+
+[[expect]]
+regex = '^platd: release pin=17$'
+
+[[expect]]
+regex = '^pi4-platd: rng=[0-9a-f]{16}$'
+
+[[expect]]
+regex = '^pi4-platd: done$'
+
+[[expect]]
+regex = '^svcd: plat-client up$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
