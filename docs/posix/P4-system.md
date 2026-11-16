@@ -175,3 +175,7 @@ The five missing man pages are outside Owns; see “Docs gate”.
   not met.
 * The `cargo xtask build uutils` target build still fails in vendored rustix; the fixture uses
   the existing K25a uutils `id` slice and does not edit the uutils tree.
+* `env`, `nice` and `nohup` copy a bounded set of well-known environment variables (`PATH`,
+  `HOME`, `USER`, `LOGNAME`, `SHELL`, `PWD`, `TERM`) because `raven_rt::Args` exposes only
+  `env_get`, not an environment iterator. Arbitrary exported variables are not inherited by
+  the exec'd command; that needs a safe runtime enumeration API outside P4o Owns.
