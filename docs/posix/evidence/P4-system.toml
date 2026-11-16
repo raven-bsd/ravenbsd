@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# P4d system/process utility evidence. Only rows with executable POSIX behaviour
-# evidence are claimed present; partial or missing tools stay defects in
-# docs/posix/P4-system.md.
+# P4d/P4o system/process utility evidence. Only rows with executable POSIX
+# behaviour evidence are claimed present; partial or missing tools stay defects
+# in docs/posix/P4-system.md.
 
 schema = 1
 standard = "posix-2024"
@@ -31,3 +31,27 @@ id = "util.stty"
 status = "present"
 evidence = "test:tests/posix/utility/system/stty/test.sh"
 notes = "P4d: host behaviour of the vendored uutils stty on a pty; target termios primitives come from P3"
+
+[[row]]
+id = "util.env"
+status = "present"
+evidence = "qtest:posix-util-system"
+notes = "P4o: first-party env; -i, assignments, execve command and exit status"
+
+[[row]]
+id = "util.getconf"
+status = "present"
+evidence = "qtest:posix-util-system"
+notes = "P4o: first-party getconf; ARG_MAX, PAGESIZE, _POSIX_VERSION and -a"
+
+[[row]]
+id = "util.kill"
+status = "present"
+evidence = "qtest:posix-util-system"
+notes = "P4o: first-party kill; -l names/numbers, pid and group targets, signal 0 and errors"
+
+[[row]]
+id = "util.nice"
+status = "present"
+evidence = "qtest:posix-util-system"
+notes = "P4o: first-party nice; query, set/clamp and execute a command"

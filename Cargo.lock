@@ -1090,6 +1090,14 @@ name = "raven-elf"
 version = "0.1.0"
 
 [[package]]
+name = "raven-env"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-esr"
 version = "0.1.0"
 
@@ -1181,6 +1189,14 @@ version = "0.1.0"
 dependencies = [
  "raven-fdt-lite",
  "raven-genet",
+]
+
+[[package]]
+name = "raven-getconf"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
 ]
 
 [[package]]
@@ -1450,6 +1466,14 @@ dependencies = [
  "raven-usercopy",
  "raven-vma",
  "spin",
+]
+
+[[package]]
+name = "raven-kill"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
 ]
 
 [[package]]
@@ -2002,6 +2026,25 @@ dependencies = [
  "raven-proto-net",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "raven-nice"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-env",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-nohup"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-env",
+ "raven-proto-fs",
+ "raven-rt",
 ]
 
 [[package]]
