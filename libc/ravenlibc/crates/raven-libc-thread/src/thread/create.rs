@@ -308,6 +308,7 @@ pub fn create<K: ThreadKernel>(
     pthread.startarg = arg;
     pthread.result = 0;
     pthread.robust_head = raw::robust_head_addr(pthread);
+    pthread.join_word.store(1, Ordering::Release);
     raw::set_tsd_base(pthread, allocation.tsd_base);
     raw::zero_bytes(allocation.tsd_base, tsd_size);
     pthread.handle = 0;
@@ -331,10 +332,14 @@ pub fn create<K: ThreadKernel>(
     sched_point_before_create(kernel);
     let create_args = CreateArgs {
         entry: raw::entry::entry_address(),
-        stack_top: allocation.stack_top,
+        // Start `rsp` at the start-args block, not above it: the trampoline's Rust prologue
+        // pushes below `rsp` and must not overwrite the three words it is about to read.
+        stack_top: args_address,
         arg: args_address,
         tp: pthread_to_tp(tcb),
-        clear_tid_addr: tcb + core::mem::offset_of!(Pthread, tid),
+        // The kernel clears this word after the thread's last user instruction. `join_word` is
+        // not touched by the exit path, so it is the A-thr-3 death confirmation the reaper needs.
+        clear_tid_addr: tcb + core::mem::offset_of!(Pthread, join_word),
     };
     let result = kernel.create(&create_args);
     match result {

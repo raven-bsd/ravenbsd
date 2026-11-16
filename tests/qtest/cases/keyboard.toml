@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S59: PS/2 keyboard through the i8042 controller, IRQ1 and the shared console queue.
+
+name = "keyboard"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = [
+    "sh tests/fixtures/keyboard/build.sh",
+    "sh tests/fixtures/keyboard/start-keys.sh",
+]
+initfs = "build/fixtures/keyboard/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = ["-qmp", "unix:build/fixtures/keyboard/qmp.sock,server=on,wait=off"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^keyboard: ready$'
+
+[[expect]]
+regex = '^keyboard: got h$'
+
+[[expect]]
+regex = '^keyboard: got i$'
+
+[[expect]]
+regex = '^keyboard: got enter$'
+
+[[expect]]
+regex = '^keyboard: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|keyboard: fail'
