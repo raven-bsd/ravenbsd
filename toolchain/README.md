@@ -143,3 +143,12 @@ stamps the patched source and installed prefix, and registers the result with
 crate. The target std rlibs are installed, but the runtime (ralibc and the userland ABI) is still
 K20-K22 work; the K19 gate only proves the compiler and metadata emission. ralibc implementation
 work for std is separate (K20-K22).
+
+## Shared toolchain link (do not relink from a minion clone)
+
+`make toolchain` installs into the clone's `build/toolchain` and then relinks the global
+`rustup` toolchain `ravenbsd` to that path. Doing this from a minion clone changes the sysroot
+path in every cached rmeta and makes unrelated builds fail with E0460 (`found possibly newer
+version of crate std`). The lead owns the link; minions use `rustc +ravenbsd` as already linked
+and do not run `make toolchain`. A toolchain patch is reviewed and installed by the lead only.
+

@@ -19,7 +19,7 @@ use core::sync::atomic::{AtomicU64, Ordering};
 use crate::backend::{EarlySpawn, WaitResult};
 use crate::consts::{P_PID, WNOHANG};
 #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
-use crate::errors::{E2BIG, ENOENT};
+use crate::errors::{E2BIG, ENOENT, ENOEXEC};
 use crate::errors::{EAGAIN, ECHILD, EINVAL, ENOSYS, Errno};
 use crate::wait_status::{WaitStatus, encode};
 use crate::wire::SpawnRequest;
