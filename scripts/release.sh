@@ -10,8 +10,8 @@
 #   scripts/release.sh --build       build the release image and manifest (requires --check)
 #   scripts/release.sh --verify      verify the files recorded in SHA256SUMS
 #
-# The script never creates a git tag. REL5c is blocked until REL2b (QEMU login), the Pi 4 board
-# gate (REL3/P8/P10/P12/REL4d), REL8 clean-clone verification and the full `make check` pass; the
+# The script never creates a git tag. REL5d is blocked until REL2b (QEMU login), the Pi 4 board
+# chain (P8/P8b/P10/P12/REL3c), REL8 clean-clone verification and the full `make check` pass; the
 # owner creates the tag after reviewing this output.
 
 set -eu
@@ -107,10 +107,9 @@ build_image() {
 	repro_env
 	SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct)}
 	export SOURCE_DATE_EPOCH
-	# The release image must carry release user programs. A debug build of the sha2 crate
-	# currently trips an LLVM split-result error on x86_64-unknown-none; the release build is the
-	# supported release-image path.
-	export RAVEN_USER_RELEASE=1
+	# REL7b: the resolved profile decides the user-program build mode through [initfs] release,
+	# so profiles/release.toml builds release user programs without RAVEN_USER_RELEASE. Do not
+	# force the environment override here; a non-release profile keeps its debug users.
 	short=$(git rev-parse --short HEAD)
 	dirty=""
 	[ -n "$(git status --porcelain)" ] && dirty="-dirty"
@@ -159,12 +158,12 @@ case "$MODE" in
 	candidate)
 		log "candidate profile: $CANDIDATE_PROFILE (not the release profile)"
 		build_image "$CANDIDATE_PROFILE" "$OUT/candidate-$ARCH/ravenbsd-$ARCH.img" candidate
-		warn "candidate is not the 0.1.0 release artifact; the Pi 4 board gate and full make check are still required"
+		warn "candidate is not the 0.1.0 release artifact; the Pi 4 board chain (P8/P8b/P10/P12/REL3c) and full make check are still required"
 		;;
 	build)
 		check_inputs
 		build_image "$PROFILE" "$OUT/ravenbsd-$ARCH.img" release
-		log "release not tagged: Pi 4 board gate (REL3/P8/P10/P12/REL4d) and full make check are the gate"
+		log "release not tagged: Pi 4 board chain (P8/P8b/P10/P12/REL3c) and full make check are the gate"
 		;;
 	verify)
 		[ -f "$OUT/SHA256SUMS" ] || die "no SHA256SUMS in $OUT"
