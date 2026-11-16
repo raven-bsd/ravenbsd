@@ -101,6 +101,7 @@ members = [
     "tests/libc/gate",
     "tests/libc/toolchain-abi",
     "tests/user",
+    "tests/user/image",
     "tests/ufs-powercut",
     "tools/fs-fuzz",
     "tools/linux-corpus",
