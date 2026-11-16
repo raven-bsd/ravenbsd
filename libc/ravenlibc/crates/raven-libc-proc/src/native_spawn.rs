@@ -14,22 +14,30 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use spin::Mutex;
+use core::sync::atomic::{AtomicU64, Ordering};
 
 use crate::backend::{EarlySpawn, WaitResult};
 use crate::consts::{P_PID, WNOHANG};
 #[cfg(target_os = "none")]
 use crate::errors::{E2BIG, ENOENT, ENOEXEC};
-use crate::errors::{ECHILD, EINVAL, ENOSYS, Errno};
+use crate::errors::{EAGAIN, ECHILD, EINVAL, ENOSYS, Errno};
 use crate::wait_status::{WaitStatus, encode};
 use crate::wire::SpawnRequest;
 
-/// One recorded child: its pid and the process handle that `PROC_WAIT` needs.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Child {
-    pid: i32,
-    handle: u32,
-}
+/// Maximum number of children tracked at once.
+pub const MAX_CHILDREN: usize = 128;
+
+/// One free table slot.
+const EMPTY: u64 = 0;
+/// A slot that a spawner has claimed but not published yet.
+const RESERVED: u64 = u64::MAX;
+
+/// The pid -> handle table slot.
+///
+/// One `u64` holds `pid << 32 | handle`; zero is free and `u64::MAX` is a reservation. The table
+/// is a fixed array of atomics so a `NativeSpawner` can live in a `static` without a lock or a
+/// heap allocation.
+type Slot = AtomicU64;
 
 /// Read an image and start its first thread.
 ///
@@ -55,7 +63,7 @@ pub trait HandleInfo {
 pub struct NativeSpawner<L, H> {
     loader: L,
     info: H,
-    children: Mutex<Vec<Child>>,
+    children: [Slot; MAX_CHILDREN],
 }
 
 impl<L, H> NativeSpawner<L, H> {
@@ -65,8 +73,46 @@ impl<L, H> NativeSpawner<L, H> {
         Self {
             loader,
             info,
-            children: Mutex::new(Vec::new()),
+            children: [const { AtomicU64::new(EMPTY) }; MAX_CHILDREN],
         }
+    }
+
+    /// Claim one free table slot before starting a child.
+    fn reserve(&self) -> Result<&Slot, Errno> {
+        for slot in &self.children {
+            if slot
+                .compare_exchange(EMPTY, RESERVED, Ordering::AcqRel, Ordering::Relaxed)
+                .is_ok()
+            {
+                return Ok(slot);
+            }
+        }
+        Err(EAGAIN)
+    }
+
+    /// Publish a started child into its reserved slot.
+    fn publish(slot: &Slot, pid: i32, handle: u32) {
+        let pid = pid as u32;
+        let value = (u64::from(pid) << 32) | u64::from(handle);
+        slot.store(value, Ordering::Release);
+    }
+
+    /// Claim the slot for `pid` and return its handle.
+    fn take(&self, pid: i32) -> Option<u32> {
+        let pid = pid as u32;
+        for slot in &self.children {
+            let value = slot.load(Ordering::Acquire);
+            if value == EMPTY || value == RESERVED || value >> 32 != u64::from(pid) {
+                continue;
+            }
+            if slot
+                .compare_exchange(value, EMPTY, Ordering::AcqRel, Ordering::Relaxed)
+                .is_ok()
+            {
+                return Some(value as u32);
+            }
+        }
+        None
     }
 }
 
@@ -76,17 +122,29 @@ impl<L: Loader, H: HandleInfo> EarlySpawn for NativeSpawner<L, H> {
         let resolved = resolve_image_path(path, &request.cwd)?;
         let argv = strings(&request.argv)?;
         let envp = strings(&request.envp)?;
-        let image = self.loader.read_image(&resolved)?;
-        let handle = self.loader.load(&image, &resolved, &argv, &envp)?;
-        let pid = match self.info.pid_for_handle(handle) {
-            Ok(pid) => pid,
-            Err(error) => {
-                let _ = self.loader.close(handle);
-                return Err(error);
+        let slot = self.reserve()?;
+        let result = (|| {
+            let image = self.loader.read_image(&resolved)?;
+            let handle = self.loader.load(&image, &resolved, &argv, &envp)?;
+            let pid = match self.info.pid_for_handle(handle) {
+                Ok(pid) => pid,
+                Err(error) => {
+                    let _ = self.loader.close(handle);
+                    return Err(error);
+                }
+            };
+            Ok((pid, handle))
+        })();
+        match result {
+            Ok((pid, handle)) => {
+                Self::publish(slot, pid, handle);
+                Ok(pid)
             }
-        };
-        self.children.lock().push(Child { pid, handle });
-        Ok(pid)
+            Err(error) => {
+                slot.store(EMPTY, Ordering::Release);
+                Err(error)
+            }
+        }
     }
 
     fn wait(&self, idtype: u32, id: i64, options: u32) -> Result<WaitResult, Errno> {
@@ -102,22 +160,20 @@ impl<L: Loader, H: HandleInfo> EarlySpawn for NativeSpawner<L, H> {
             return Err(EINVAL);
         }
         let pid = i32::try_from(id).map_err(|_| EINVAL)?;
-        let child = {
-            let mut children = self.children.lock();
-            let index = children
-                .iter()
-                .position(|child| child.pid == pid)
-                .ok_or(ECHILD)?;
-            children.remove(index)
+        let Some(handle) = self.take(pid) else {
+            return Err(ECHILD);
         };
-        let code = match self.loader.wait(child.handle) {
+        let code = match self.loader.wait(handle) {
             Ok(code) => code,
             Err(error) => {
-                self.children.lock().push(child);
+                // Restore the entry so a retry can wait again.
+                if let Ok(slot) = self.reserve() {
+                    Self::publish(slot, pid, handle);
+                }
                 return Err(error);
             }
         };
-        let _ = self.loader.close(child.handle);
+        let _ = self.loader.close(handle);
         Ok(WaitResult {
             pid,
             status: encode(WaitStatus::Exited(code as u8)),

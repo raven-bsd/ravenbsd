@@ -178,6 +178,24 @@ fn wait_encodes_the_exit_status_and_closes_the_handle() {
 }
 
 #[test]
+fn wait_releases_the_table_slot() {
+    let loader = FakeLoader::new(7, 0);
+    let spawner = NativeSpawner::new(
+        loader,
+        FakeInfo {
+            pid: 42,
+            fail: false,
+        },
+    );
+    for _ in 0..MAX_CHILDREN * 2 {
+        spawner
+            .spawn(&request(b"/bin/ls", b"/", &[]))
+            .expect("spawn");
+        spawner.wait(P_PID, 42, 0).expect("wait");
+    }
+}
+
+#[test]
 fn wait_for_an_unknown_child_is_echild() {
     let loader = FakeLoader::new(7, 0);
     let spawner = NativeSpawner::new(

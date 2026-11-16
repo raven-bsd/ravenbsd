@@ -21,4 +21,3 @@ std = []
 [dependencies]
 raven-libc-abi = { path = "../raven-libc-abi" }
 raven-spawn = { path = "../../../../crates/raven-spawn", features = ["alloc"] }
-spin = { version = "0.9", default-features = false, features = ["spin_mutex"] }

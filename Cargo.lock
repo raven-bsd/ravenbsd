@@ -1671,7 +1671,6 @@ version = "0.1.0"
 dependencies = [
  "raven-libc-abi",
  "raven-spawn",
- "spin",
 ]
 
 [[package]]
