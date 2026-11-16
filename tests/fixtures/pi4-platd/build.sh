@@ -26,7 +26,7 @@ python3 - "$out" <<'PY'
 import sys
 from pathlib import Path
 
-source = Path("tests/fixtures/pi4-devd/pi4-devd.dtb.hex")
+source = Path("tests/fixtures/pi4-platd/pi4-platd.dtb.hex")
 text = "".join(line for line in source.read_text().splitlines() if not line.startswith("#"))
 Path(sys.argv[1], "pi4-platd.dtb").write_bytes(bytes.fromhex(text))
 PY

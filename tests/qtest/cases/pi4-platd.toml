@@ -16,13 +16,16 @@ qemu_extra = []
 expect_exit = "success"
 
 [[expect]]
-regex = '^devd: dtb devices=5$'
+regex = '^devd: dtb devices=1$'
 
 [[expect]]
-regex = '^devd: dtb driver platd compatible=brcm,bcm2711-genet-v5 device=/scb/ethernet@7d580000$'
+regex = '^devd: dtb device /platd@fd580000 compatible=raven,pi4-platform reg=0xfd580000\+0x1000 dma=0 irq=none$'
 
 [[expect]]
-regex = '^devd: dtb launch platd bar=0 size=0x10000 dma=0 irq=0$'
+regex = '^devd: dtb driver platd compatible=raven,pi4-platform device=/platd@fd580000$'
+
+[[expect]]
+regex = '^devd: dtb launch platd bars=3 bar=0 size=0x1000 dma=4096 irq=0$'
 
 [[expect]]
 regex = '^platd: ready backend=fake$'

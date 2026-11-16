@@ -82,32 +82,39 @@ spawned children are terminated and reaped before `devd` reports the error.
 
 ## Resource selection and grants
 
-The manifest `args` use the PCI selectors:
+The manifest `args` use the platform selectors:
 
-* `bar=N` selects the device's `reg` window (default `0`).
+* `bar=N` selects one of the device's `reg` windows. Repeated `bar=` tokens select multiple
+  windows in declaration order; `mmio=N,N,...` is the equivalent list form for callers that can
+  carry a comma inside one argument (the small `[[driver]]` table splits `args` on commas, so a
+  manifest uses repeated `bar=`).
 * `resources=dma+irq` asks for a DMA buffer and the device's first GIC interrupt. `resources=none`
   clears both; bare `dma` and `irq` tokens are also accepted.
 * `dma_size=N` sets the DMA length (default 1 MiB; rounded up to the 4096-byte platform page).
 * Every other token is forwarded to the driver before the generated tokens.
 
 `platform::plan` is pure and validates the whole request before `devd` creates any handle. A
-missing `reg` index, a missing interrupt, a zero DMA length or an unknown selector returns an
-error and no grants. `platform::PlatformPlan::grants` then fixes the transfer order:
+missing `reg` index, a duplicate window, a missing interrupt, a zero DMA length or an unknown
+selector returns an error and no grants. `platform::PlatformPlan::grants` then fixes the transfer
+order:
 
-| Slot | Grant | Created with |
+| Position | Grant | Created with |
 |---|---|---|
-| 3 | selected `reg` window, page-rounded | `mmio_create(root, base, len, 0)` |
-| 4 | requested DMA buffer, page-rounded | `dma_alloc(root, len, 4096, 32, 0)` |
-| 5 | first GIC interrupt | `irq_create(root, IRQ_LEGACY, intid, None)` |
+| first M slots | each selected `reg` window, in declaration order | `mmio_create(root, base, len, 0)` |
+| after the windows | requested DMA buffer, page-rounded | `dma_alloc(root, len, 4096, 32, 0)` |
+| after DMA | first GIC interrupt, when requested | `irq_create(root, IRQ_LEGACY, intid, None)` |
 
-Only the requested entries are present, so a driver that asks for no DMA has its interrupt at
-slot 4. A fresh child has handles 0 (self), 1 (initfs) and 2 (namespace). The PCI path also
-transfers a configuration page, so its slot numbers differ; the argv token shape is the same.
+A fresh child has handles 0 (self), 1 (initfs) and 2 (namespace), so the first window lands at
+slot 3. A three-window driver with DMA receives slots 3/4/5 and 6. The PCI path also transfers a
+configuration page, so its slot numbers differ.
 
-The generated tokens are `bar=<n>`, `bar_size=<bytes>`, and `dma=<actual-len>` / `irq=<intid>` when
-requested. `dma` comes from `dma_info` so a rounded allocation is reported accurately. Handles are
-closed on every creation or spawn failure; on a successful spawn they have moved to the child, so
-`devd` does not close the stale source values.
+The generated tokens are `bar=<first-index>`, `bar_size=<first-size>`, and `dma=<actual-len>` /
+`irq=<intid>` when requested. Additional windows are identified by their handle order; a driver
+that wants named handles declares their slot numbers in its manifest `rest` tokens (the platd
+fixture uses `mailbox=3:64`, `gpio=4:180`, `rng=5:40`, `dma=6:256`). `dma` comes from `dma_info`
+so a rounded allocation is reported accurately. Handles are closed on every creation or spawn
+failure; on a successful spawn they have moved to the child, so `devd` does not close the stale
+source values.
 
 ## Readiness contract
 
