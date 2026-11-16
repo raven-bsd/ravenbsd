@@ -252,3 +252,19 @@ fn prerequisite_plan_lists_every_missing_step_once() {
     assert!(!plan.brush);
     assert!(plan.uutils.is_empty());
 }
+
+#[test]
+fn missing_fixtures_lists_each_directory_once() {
+    let profile = profile(&[
+        ("build/fixtures/pi4-release/one.dtb", "/one"),
+        ("build/fixtures/pi4-release/other/two.dtb", "/two"),
+    ]);
+    let missing = missing_fixtures(&profile, |_| false);
+    assert_eq!(missing, ["pi4-release"]);
+}
+
+#[test]
+fn missing_fixtures_skips_existing_sources() {
+    let profile = profile(&[("build/fixtures/pi4-release/one.dtb", "/one")]);
+    assert!(missing_fixtures(&profile, |_| true).is_empty());
+}

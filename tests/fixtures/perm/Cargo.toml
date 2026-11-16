@@ -22,6 +22,7 @@ raven-abi = { path = "../../../crates/raven-abi" }
 raven-initfs = { path = "../../../crates/raven-initfs" }
 raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
 raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-scheme = { path = "../../../crates/raven-scheme" }
 
 [lints]
 workspace = true

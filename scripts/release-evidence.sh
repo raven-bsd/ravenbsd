@@ -13,9 +13,10 @@
 # --check validates the gate inputs and any recorded transcript/log; --qemu runs
 # scripts/qemu-release.sh and checks its release-login transcript; --pi4-log checks an existing
 # Pi 4 serial log with scripts/pi4-release.sh (and the GENET net evidence when available);
-# --record writes build/release/<version>/evidence.txt with the commit, image/provenance hashes
-# and the transcript/log hashes. A missing gate artifact is a hard error: the script never emits a
-# fake hash, transcript or tag. Board claims stay UNVERIFIED until the owner supplies a log.
+# --record writes build/release/<version>/evidence.txt with the commit, the QEMU and Pi 4 image
+# hashes, the provenance hash and the transcript/log hashes. A missing gate artifact is a hard
+# error: the script never emits a fake hash, transcript or tag. Board claims stay UNVERIFIED until
+# the owner supplies a log.
 
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
@@ -25,7 +26,8 @@ cd "$ROOT"
 VERSION=${VERSION:-0.1.0}
 ARCH=${ARCH:-x86_64}
 OUT=${OUT:-$ROOT/build/release/$VERSION}
-IMAGE=${IMAGE:-$OUT/ravenbsd-$ARCH.img}
+IMAGE=${IMAGE:-$ROOT/build/$ARCH/ravenbsd-$ARCH.img}
+PI4_IMAGE=${PI4_IMAGE:-$ROOT/build/aarch64/ravenbsd-pi4.img}
 MODE=check
 PI4_LOG=
 PI4_NET_LOG=
@@ -44,8 +46,10 @@ usage: scripts/release-evidence.sh [--check|--qemu|--pi4-log LOG|--record]
   --record-qemu     write evidence-qemu.txt (QEMU artifact only; Pi 4 UNVERIFIED)
   --qemu-log LOG    transcript to validate/record (default build/release/0.1.0/qemu-release.log)
   --commit HASH     image build commit for the evidence record (default current HEAD)
+  --pi4-image PATH  Pi 4 release image (default build/aarch64/ravenbsd-pi4.img)
   --out DIR         evidence/output directory (default build/release/0.1.0)
-  --image PATH      release image (default build/release/0.1.0/ravenbsd-x86_64.img)
+  --image PATH      release image (default build/x86_64/ravenbsd-x86_64.img, the
+                    `make image ARCH=x86_64 PROFILE=release` output)
 
 Environment: VERSION, ARCH, OUT, IMAGE.
 EOF
@@ -82,10 +86,14 @@ while [ "$#" -gt 0 ]; do
             ARTIFACT_COMMIT=$2
             shift
             ;;
+        --pi4-image)
+            [ "$#" -ge 2 ] || { usage >&2; exit 2; }
+            PI4_IMAGE=$2
+            shift
+            ;;
         --out)
             [ "$#" -ge 2 ] || { usage >&2; exit 2; }
             OUT=$2
-            IMAGE=$OUT/ravenbsd-$ARCH.img
             shift
             ;;
         --image)
@@ -216,9 +224,18 @@ release_image() {
     }
 }
 
+pi4_image_check() {
+    [ -s "$PI4_IMAGE" ] || {
+        printf 'release-evidence: blocked: missing Pi 4 release image %s\n' "$PI4_IMAGE" >&2
+        return 1
+    }
+    sh scripts/pi4-release.sh --check -i "$PI4_IMAGE"
+}
+
 record() {
     gate_inputs
     release_image
+    pi4_image_check
     qemu=${QEMU_LOG:-$OUT/qemu-release.log}
     pi4=${PI4_LOG:-$OUT/pi4-serial.log}
     net=${PI4_NET_LOG:-$pi4}
@@ -251,6 +268,7 @@ record() {
 record_qemu() {
     qemu_inputs
     release_image
+    pi4_image_check
     qemu=${QEMU_LOG:-$OUT/qemu-release.log}
     qemu_transcript "$qemu"
     commit=${ARTIFACT_COMMIT:-$(git rev-parse HEAD)}
@@ -266,6 +284,9 @@ record_qemu() {
         printf 'qemu_transcript=%s\n' "$qemu"
         printf 'qemu_transcript_sha256=%s\n' "$(sha256_file "$qemu")"
         printf 'qemu_gate=PASS (qtest release-login; check-transcript)\n'
+        printf 'pi4_image=%s\n' "$PI4_IMAGE"
+        printf 'pi4_image_sha256=%s\n' "$(sha256_file "$PI4_IMAGE")"
+        printf 'pi4_host_check=PASS\n'
         printf 'pi4_gate=UNVERIFIED (REL3/REL4b/P8 board log missing)\n'
         printf 'tag=none (Pi 4 gate and full make check still required)\n'
     } >"$OUT/evidence-qemu.txt"
@@ -279,6 +300,7 @@ case "$MODE" in
         pi4=${PI4_LOG:-$OUT/pi4-serial.log}
         net=${PI4_NET_LOG:-$pi4}
         release_image
+        pi4_image_check
         qemu_transcript "$qemu"
         pi4_evidence "$pi4"
         log "release evidence: all gates present"

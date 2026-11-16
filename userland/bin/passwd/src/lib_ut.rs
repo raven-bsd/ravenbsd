@@ -76,6 +76,24 @@ fn empty_and_line_broken_passwords_are_rejected() {
 }
 
 #[test]
+fn non_root_callers_authenticate_and_stay_on_their_account() {
+    assert!(!requires_old_password(0));
+    assert!(requires_old_password(1000));
+    assert!(target_allowed(0, 1000));
+    assert!(target_allowed(1000, 1000));
+    assert!(!target_allowed(1000, 1001));
+}
+
+#[test]
+fn old_password_uses_raven_auth_and_refuses_locked_hashes() {
+    let hash = raven_auth::hash_password("old-password", b"passwd-test").expect("hash");
+    assert!(verify_old_password(&hash, "old-password"));
+    assert!(!verify_old_password(&hash, "wrong-password"));
+    assert!(!verify_old_password("!", "old-password"));
+    assert!(!verify_old_password("", "old-password"));
+}
+
+#[test]
 fn days_are_whole_and_non_negative() {
     assert_eq!(days_since_epoch(0), 0);
     assert_eq!(days_since_epoch(86_399), 0);

@@ -87,13 +87,16 @@ endpoint, so those writes are ignored on the existing `hw-net` path.
 
 ## Board follow-up (exact)
 
-1. **Platform launch.** `userland/servers/devd/src/main.rs`, `run_dtb()` only prints the DT
-   matches; it does not grant MMIO/DMA/IRQ or spawn a platform driver. The GENET driver cannot
-   start until that path launches `/sbin/genet` with the same `bar`/`dma`/`irq` tokens the PCI
-   path uses.
+1. **Platform launch.** P8 now implements `devd dtb launch` and transfers BAR slot 3, DMA slot 4
+   and IRQ slot 5. The GENET driver accepts that order only when the manifest selects it
+   (`platform` or the explicit `bar_handle=`/`dma_handle=`/`irq_handle=` tokens); the default is
+   the PCI/QEMU order (BAR 3, config 4, DMA 5, IRQ 6). Add the platform selector to the GENET
+   manifest in the installed `/etc/drivers.toml` (`["bar=0", "resources=dma+irq", "platform",
+   "serve"]`). This is outside REL4c Owns.
 2. **Profile.** `profiles/pi4-release.toml` (REL3) includes `netd`, `resolvd` and `ping` but no
-   `genet` program or service manifest. Add the program and a service entry that waits for
-   `logd`, `platd` (`plat:mac`) and the driver's `nic:` readiness. This is outside REL4a Owns.
+   `genet` program or service manifest. Add the program, the platform manifest selector above
+   and a service entry that waits for `logd`, `platd` (`plat:mac`) and the driver's `nic:`
+   readiness. This is outside REL4c Owns.
 3. **netd mode.** `userland/servers/netd/src/nic.rs` now keeps the QEMU constants only in
    `NicMode::QemuUser`; `NicMode::DhcpFirst` uses `NicConfig::platform` and waits for the lease.
    The remaining profile step is to pass `dhcp-first` (or set `NETD_NIC_MODE`) in the Pi 4 netd
@@ -105,6 +108,37 @@ endpoint, so those writes are ignored on the existing `hw-net` path.
 5. **Live device tree.** `userland/drivers/genet/src/main.rs`, `pi4_info()` uses the documented
    Pi 4 base `0xfd58_0000`, MDIO `0xe14`, PHY 1 and `rgmii-rxid`; the board must confirm the live
    DT values and the `plat:mac` result.
+
+## Launch/readiness chain
+
+`tests/fixtures/pi4-net/check-chain.sh` reads the resolved `pi4-release` profile. Its matrix is:
+
+| Assertion | Expected |
+|---|---|
+| `devd.manifest` args | `dtb launch` |
+| GENET driver args | `slots=platform` |
+| GENET launchers | exactly one, owned by `devd` |
+| `netd.manifest` needs | `scheme:nic` |
+| `/etc/pi4.dtb` staged | yes |
+| `/etc/drivers.toml` staged | yes |
+
+Observed on this base (`2026-11-16`): devd launch, driver slots, netd dependency, DTB and driver
+staging all pass; **`genet_launchers=2` fails** because
+`profiles/pi4-release.d/20-userspace.toml` installs the enabled `genet.manifest` service as well
+as the devd platform launch. REL3/P12 must remove that service entry (or set `enable = false`) so
+svcd does not start a second `/sbin/genet`; devd owns the launch. The host check exits 1 on this
+defect, while the `pi4-net-model` qtest proves the checker accepts the coherent model and rejects
+a duplicate-launcher model. No profile edit is made by REL4d.
+
+## Failure modes
+
+| Symptom | Likely cause | Check |
+|---|---|---|
+| no `nic:` / netd stuck | devd launch missing, duplicate/late GENET, or driver exited before scheme registration | `svcd` status, `devd: dtb launch genet ...`, `/etc/drivers.toml` |
+| no `eth0` / no DHCP marker | link down, no lease, or netd started in the wrong mode | `GENET-NET-LINK`, `netd: interface eth0 ...`, `GENET-NET-DHCP` |
+| driver exits before `nic:` | `plat:mac` missing or invalid, MMIO/DMA/IRQ grant rejected | `genet: ...` serial line and `platd` status |
+| link marker missing | PHY/cable/autonegotiation failure | `GENET-REV`/`GENET-PHY`/`GENET-RGMII` and `GENET-NET-LINK` |
+| ping marker missing | no lease gateway reply, wrong gateway, or ping not run | `GENET-NET-DHCP`, `ping` summary, `GENET-NET-PING` |
 
 ## Evidence script
 

@@ -59,8 +59,12 @@ pub(crate) fn get_effective_gid() -> Result<u32, error::Error> {
 }
 
 pub(crate) fn get_current_username() -> Result<String, error::Error> {
-    let username = uzers::get_current_username().ok_or_else(|| error::ErrorKind::NoCurrentUser)?;
-    Ok(username.to_string_lossy().to_string())
+    // RavenBSD's initfs has no /etc/passwd yet; fall back to the numeric uid (0 is root)
+    // instead of failing every prompt/history path that resolves the current user.
+    let username = uzers::get_current_username()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_else(|| uzers::get_current_uid().to_string());
+    Ok(username)
 }
 
 pub(crate) fn get_user_group_ids() -> Result<Vec<u32>, error::Error> {

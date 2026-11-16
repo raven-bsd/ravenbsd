@@ -1,0 +1,98 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K26b rework: the interactive login assertion for the opt-in `modern-shell` profile. It is
+# recorded here but not executed: the static brush binary reaches the prompt, yet its console
+# input path and the multi-threaded reedline runtime depend on P9a and the interactive backend
+# work. The passing non-interactive case is `modern-shell.toml`.
+
+name = "modern-shell-login"
+arch = "x86_64"
+profile = "modern-shell"
+timeout_secs = 900
+skip = "blocked on P9a native spawn: interactive brush console input still needs the static-binary TLS/input fix, tty:console line delivery and a multi-threaded tokio runtime (thread_create is ENOSYS)"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^\x1B\[38;5;183mroot'
+
+[[expect]]
+regex = '^prompt-ok$'
+
+[[expect]]
+regex = '^/tmp/brush_history$'
+
+[[expect]]
+regex = '^ignoreboth$'
+
+[[expect]]
+regex = '^%F %T'
+
+[[expect]]
+regex = "^complete -W 'help exit' raven-test$"
+
+[[expect]]
+regex = '^root@raven:/# $'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'
+
+[[step]]
+wait = '^.*root@raven:/# $'
+timeout_secs = 600
+
+[[step]]
+send = "echo prompt-ok\n"
+delay_ms = 2000
+
+[[step]]
+wait = '^prompt-ok$'
+timeout_secs = 30
+
+[[step]]
+send = "echo $HISTFILE\n"
+delay_ms = 100
+
+[[step]]
+wait = '^/tmp/brush_history$'
+timeout_secs = 30
+
+[[step]]
+send = "echo $HISTCONTROL\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ignoreboth$'
+timeout_secs = 30
+
+[[step]]
+send = "echo $HISTTIMEFORMAT\n"
+delay_ms = 100
+
+[[step]]
+wait = '^%F %T'
+timeout_secs = 30
+
+[[step]]
+send = "complete -p raven-test\n"
+delay_ms = 100
+
+[[step]]
+wait = "^complete -W 'help exit' raven-test$"
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

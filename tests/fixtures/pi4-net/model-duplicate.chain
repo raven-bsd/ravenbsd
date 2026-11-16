@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Negative model: devd launches GENET and svcd also has an enabled genet
+# service. The checker must reject this chain.
+devd_args=dtb,launch
+genet_driver=slots=platform
+genet_launchers=2
+netd_needs=scheme:nic
+dtb_staged=yes
+drivers_staged=yes

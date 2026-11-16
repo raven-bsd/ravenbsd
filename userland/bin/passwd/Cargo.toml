@@ -12,11 +12,12 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+raven-auth = { path = "../../../crates/raven-auth" }
 raven-userdb = { path = "../../../crates/raven-userdb" }
 
 [target.'cfg(target_os = "none")'.dependencies]
+login = { path = "../login" }
 raven-abi = { path = "../../../crates/raven-abi" }
-raven-auth = { path = "../../../crates/raven-auth" }
 raven-rt = { path = "../../rt" }
 
 [lints]

@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# REL4d: model the Pi 4 release launch/readiness chain in a guest. The two
+# chain files are host fixtures, not board transcripts. The checker must accept
+# the coherent chain and reject the duplicate-launcher chain.
+
+name = "pi4-net-model"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/pi4-net/build.sh"]
+initfs = "build/fixtures/pi4-net/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^pi4-net-model: start$'
+
+[[expect]]
+regex = '^pi4-net-model: chain pass$'
+
+[[expect]]
+regex = '^pi4-net-model: duplicate rejected$'
+
+[[expect]]
+regex = '^pi4-net-model: pass$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pi4-net-model: (coherent chain rejected|duplicate launcher accepted)'

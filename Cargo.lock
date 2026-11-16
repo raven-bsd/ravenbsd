@@ -381,6 +381,7 @@ dependencies = [
 name = "id"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
  "raven-rt",
  "raven-userdb",
 ]
@@ -596,6 +597,7 @@ dependencies = [
 name = "passwd"
 version = "0.1.0"
 dependencies = [
+ "login",
  "raven-abi",
  "raven-auth",
  "raven-rt",
@@ -1978,6 +1980,7 @@ dependencies = [
  "raven-initfs",
  "raven-proto-fs",
  "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -2000,6 +2003,14 @@ dependencies = [
  "raven-proto-block",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "raven-pi4-net-model"
+version = "0.1.0"
+dependencies = [
+ "raven-initfs",
+ "raven-rt",
 ]
 
 [[package]]
@@ -2070,6 +2081,14 @@ version = "0.1.0"
 
 [[package]]
 name = "raven-proc-credentials"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-proc-handle-info"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
@@ -3149,6 +3168,9 @@ checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
 name = "su"
 version = "0.1.0"
 dependencies = [
+ "login",
+ "raven-abi",
+ "raven-auth",
  "raven-initfs",
  "raven-rt",
  "raven-userdb",
