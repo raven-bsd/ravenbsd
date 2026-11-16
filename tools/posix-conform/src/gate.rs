@@ -17,6 +17,7 @@ use anyhow::{Context, Result, bail};
 use serde::Serialize;
 
 use crate::model::{InterfaceRow, Profile, Status, TraceFile};
+use crate::overlay::{Overlay, OverlayOutcome};
 
 /// One probe verdict.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -681,6 +682,50 @@ fn gate_rows(
     Ok(rows)
 }
 
+/// Apply the owner overlay to the published rows.
+///
+/// A supported `present`/`waived` claim replaces the derived verdict with a pass. An unsupported
+/// claim is reported as a failure and leaves the derived profile status untouched.
+fn apply_overlay(rows: &mut Vec<ResultRow>, profile: &Profile, outcome: &OverlayOutcome) {
+    let areas: BTreeMap<&str, &str> = profile
+        .metas()
+        .into_iter()
+        .map(|(area, meta)| (meta.id.as_str(), area))
+        .collect();
+    for applied in &outcome.applied {
+        let area = areas.get(applied.id.as_str()).copied().unwrap_or("overlay");
+        if let Some(row) = rows.iter_mut().find(|row| row.id == applied.id) {
+            row.result = Verdict::Pass;
+            row.command.clone_from(&applied.command);
+            row.reason.clear();
+        } else {
+            rows.push(ResultRow {
+                id: applied.id.clone(),
+                area: area.to_string(),
+                result: Verdict::Pass,
+                command: applied.command.clone(),
+                reason: String::new(),
+            });
+        }
+    }
+    for claim in &outcome.unsupported {
+        let area = areas.get(claim.id.as_str()).copied().unwrap_or("overlay");
+        if let Some(row) = rows.iter_mut().find(|row| row.id == claim.id) {
+            row.result = Verdict::Fail;
+            row.command = "docs/posix/evidence".to_string();
+            row.reason.clone_from(&claim.reason);
+        } else {
+            rows.push(ResultRow {
+                id: claim.id.clone(),
+                area: area.to_string(),
+                result: Verdict::Fail,
+                command: "docs/posix/evidence".to_string(),
+                reason: claim.reason.clone(),
+            });
+        }
+    }
+}
+
 /// Run the gate and return the report plus target rows.
 pub fn run(
     root: &Path,
@@ -694,7 +739,11 @@ pub fn run(
     if !matches!(options.arch.as_str(), "x86_64" | "aarch64" | "riscv64") {
         bail!("unknown arch `{}`", options.arch);
     }
-    let mut rows = gate_rows(root, &options.arch, profile, trace, options.host_only)?;
+    let overlay = Overlay::load(root)?;
+    let mut merged = profile.clone();
+    let outcome = overlay.apply(&mut merged);
+    let mut rows = gate_rows(root, &options.arch, &merged, trace, options.host_only)?;
+    apply_overlay(&mut rows, &merged, &outcome);
     rows.sort_by(|left, right| {
         (left.area.as_str(), left.id.as_str()).cmp(&(right.area.as_str(), right.id.as_str()))
     });
