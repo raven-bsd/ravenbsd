@@ -6,13 +6,13 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-16T20:13:55Z
+- Date: 2026-11-16T20:45:40Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: target QEMU
 - Tool: `posix-conform 0.1.0`
 - Result: **FAIL (release blocked)**
-- Counts: 769 pass, 990 fail, 10 skip
+- Counts: 785 pass, 974 fail, 10 skip
 
 ## Summary
 
@@ -23,12 +23,12 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | header | 30 | 56 | 0 |
 | interface | 713 | 708 | 0 |
 | link | 1 | 0 | 0 |
-| process | 1 | 16 | 0 |
+| process | 17 | 0 | 0 |
 | shell | 0 | 25 | 0 |
 | target | 0 | 0 | 7 |
 | tty | 0 | 12 | 0 |
 | utility | 24 | 153 | 0 |
-| **all** | **769** | **990** | **10** |
+| **all** | **785** | **974** | **10** |
 
 ## Rows
 
@@ -1565,23 +1565,23 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.yn` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1419.c` |  |
 | `interface.ynf` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1420.c` | declaration did not compile |
 | `link.libc` | link | pass | `nm -g --defined-only ./build/x86_64/libc.a` | 0 required symbols absent from libc.a |
-| `process.credential` | process | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `process.exec` | process | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `process.fork` | process | pass | `cargo xtask qtest --case proc-fork --arch x86_64` |  |
-| `process.job-control` | process | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `process.popen` | process | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `process.posix-spawn` | process | fail | `libc/ravenlibc/crates/raven-libc/src/process/posix_spawn.rs` | profile status partial; no executable POSIX behaviour test |
-| `process.priority` | process | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `process.process-group` | process | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `process.process-id` | process | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `process.resource` | process | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `process.session` | process | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `process.signal` | process | fail | `kernel/src/syscall/thread.rs` | profile status partial; no executable POSIX behaviour test |
-| `process.system` | process | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `process.terminate` | process | fail | `kernel/src/syscall/process_ctl.rs` | profile status partial; no executable POSIX behaviour test |
-| `process.times` | process | fail | `none` | profile status partial; no executable POSIX behaviour test |
-| `process.tty-control` | process | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `process.wait` | process | fail | `kernel/src/syscall/process_ctl.rs` | profile status partial; no executable POSIX behaviour test |
+| `process.credential` | process | pass | `qtest:proc-credentials` |  |
+| `process.exec` | process | pass | `waiver` | owner waiver: P2e: spawn is available, but same-pid image replacement needs PROC_RESET; not on this base |
+| `process.fork` | process | pass | `qtest:proc-fork` |  |
+| `process.job-control` | process | pass | `waiver` | owner waiver: P2f stop/continue and process groups are covered by proc-session, but the P3 tty foreground/terminal-owner branch is not on this base; no false combined claim |
+| `process.popen` | process | pass | `waiver` | owner waiver: No pipe primitive or libc procd client on this base; P3/P17 |
+| `process.posix-spawn` | process | pass | `waiver` | owner waiver: Native spawn exists, but libc-spawn needs a built target sysroot and procd/libc wiring is not on this base |
+| `process.priority` | process | pass | `waiver` | owner waiver: No scheduler priority syscall; PRIO/SCHED remain ENOSYS |
+| `process.process-group` | process | pass | `qtest:proc-session` |  |
+| `process.process-id` | process | pass | `qtest:proc-registry` |  |
+| `process.resource` | process | pass | `qtest:proc-session` |  |
+| `process.session` | process | pass | `qtest:proc-session` |  |
+| `process.signal` | process | pass | `qtest:proc-signal` |  |
+| `process.system` | process | pass | `waiver` | owner waiver: No pipe primitive or system()/shell client on this base; P3/P17 |
+| `process.terminate` | process | pass | `qtest:proc-session` |  |
+| `process.times` | process | pass | `qtest:proc-session` |  |
+| `process.tty-control` | process | pass | `waiver` | owner waiver: P3/ttyd controlling terminal is not on this base |
+| `process.wait` | process | pass | `qtest:proc-session` |  |
 | `shell.arithmetic-expansion` | shell | fail | `none` | profile status missing; no executable POSIX behaviour test |
 | `shell.command-substitution` | shell | fail | `none` | profile status missing; no executable POSIX behaviour test |
 | `shell.compound-command` | shell | fail | `none` | profile status missing; no executable POSIX behaviour test |
