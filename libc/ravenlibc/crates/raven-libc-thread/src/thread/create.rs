@@ -279,10 +279,10 @@ pub fn create<K: ThreadKernel>(
     let parent = crate::thread::current_pthread(kernel);
     let parent_sigmask = parent.sigmask.load(Ordering::Acquire);
     let parent_canary = parent.canary;
-    let args_address = allocation
-        .stack_top
-        .wrapping_sub(core::mem::size_of::<StartArgs>())
-        & !15;
+    // Carve the hand-over block at the bottom of the new stack, not below its top: the Rust
+    // entry prologue grows down from `stack_top` and would overwrite a top-carved block before
+    // `thread_start` reads it.
+    let args_address = allocation.stack_limit.wrapping_add(16) & !15;
     let pthread = raw::tcb_mut(tcb);
     pthread.self_ptr = tcb;
     pthread.tid.store(tid, Ordering::Release);
