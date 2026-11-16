@@ -38,7 +38,7 @@ pub use crate::sys::{close_handle, pid_for_handle, wait_ex, wait_process};
 use alloc_crate::vec::Vec;
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
-use raven_abi::types::Handle;
+use raven_abi::types::{Handle, Rights};
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 use raven_abi::types::{map, prot};
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
@@ -104,6 +104,11 @@ pub trait Sys {
         protection: u8,
     ) -> Result<(), Errno> {
         let _ = (proc, addr, len, protection);
+        Err(Errno::ENOSYS)
+    }
+    /// Transfer `source` into `dest` with the source's rights, returning the child handle.
+    fn handle_transfer(&mut self, dest: Handle, source: Handle) -> Result<Handle, Errno> {
+        let _ = (dest, source);
         Err(Errno::ENOSYS)
     }
     /// Create the first thread of a process.
@@ -191,6 +196,7 @@ pub fn spawn_with<S: Sys>(
         interp,
         path,
         options,
+        &[],
         None,
         sys,
     )
@@ -222,6 +228,7 @@ pub fn spawn_image_with<S: Sys>(
             None,
             path,
             options,
+            &[],
             None,
             sys,
         );
@@ -238,6 +245,41 @@ pub fn spawn_image_with<S: Sys>(
         let _ = main_bias;
         Err(SpawnError::NotFound)
     }
+}
+
+/// Spawn an in-memory image and inherit `fdmap` descriptors into the child.
+///
+/// Each `(child_fd, parent_handle)` is transferred with `HANDLE_TRANSFER`; the child handles are
+/// packed into the `RFDM` block published as `AT_RAVEN_FDMAP`/`AT_RAVEN_FDMAP_N`. Only static
+/// ET_EXEC images are supported on this path; an interpreter is a separate dynamic-loading
+/// feature.
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+pub fn spawn_image_with_fdmap<S: Sys>(
+    image: &[u8],
+    path: &str,
+    options: &SpawnOptions<'_>,
+    fdmap: &[(i32, u32)],
+    sys: &mut S,
+) -> Result<Handle, SpawnError> {
+    if image.len() > MAX_FILE_IMAGE {
+        return Err(SpawnError::TooLarge);
+    }
+    let (main, main_steps, main_bias) = plan_image(image, false)?;
+    if main.interp().is_some() {
+        return Err(SpawnError::NotFound);
+    }
+    spawn_elf(
+        &main,
+        main_steps,
+        ImageSource::Bytes(image),
+        main_bias,
+        None,
+        path,
+        options,
+        fdmap,
+        None,
+        sys,
+    )
 }
 
 /// Spawn an in-memory image with an explicit interpreter image.
@@ -277,6 +319,7 @@ pub fn spawn_image_with_interp<S: Sys>(
         interp,
         path,
         options,
+        &[],
         None,
         sys,
     )
@@ -317,6 +360,7 @@ pub fn spawn_image_with_exec<S: Sys>(
             None,
             path,
             options,
+            &[],
             exec,
             sys,
         );
@@ -333,6 +377,7 @@ pub fn spawn_image_with_exec<S: Sys>(
             Some((elf, steps, ImageSource::Bytes(&interpreter), bias)),
             path,
             options,
+            &[],
             exec,
             sys,
         )
@@ -542,6 +587,7 @@ fn spawn_elf<S: Sys>(
     interp: Option<(Elf<'_>, BiasedPlan, ImageSource<'_>, u64)>,
     path: &str,
     options: &SpawnOptions<'_>,
+    fdmap: &[(i32, u32)],
     exec: Option<(Handle, bool)>,
     sys: &mut S,
 ) -> Result<Handle, SpawnError> {
@@ -572,9 +618,6 @@ fn spawn_elf<S: Sys>(
             .and_then(|value| usize::try_from(value).ok())
             .ok_or(SpawnError::TooLarge)?,
     };
-    let (auxv, auxv_len) = build_auxv(main_elf, main_bias, interp_bias);
-    let random = random_bytes(&auxv as *const _ as usize);
-
     let child = match sys.proc_create() {
         Ok(child) => child,
         Err(error) => {
@@ -613,6 +656,82 @@ fn spawn_elf<S: Sys>(
         .checked_sub(STACK_SIZE as u64)
         .ok_or(SpawnError::TooLarge)?;
     let stack_base_address = usize::try_from(stack_base).map_err(|_| SpawnError::TooLarge)?;
+
+    let fdmap_info = if fdmap.is_empty() {
+        None
+    } else {
+        let mut entries = alloc_crate::vec::Vec::with_capacity(fdmap.len());
+        for (fd, source) in fdmap {
+            match sys.handle_transfer(child, Handle(*source)) {
+                Ok(handle) => entries.push((*fd, handle.0)),
+                Err(error) => {
+                    let _ = sys.handle_close(child);
+                    return Err(SpawnError::Sys(error));
+                }
+            }
+        }
+        let block = match encode_fdmap(&entries) {
+            Ok(block) => block,
+            Err(error) => {
+                let _ = sys.handle_close(child);
+                return Err(error);
+            }
+        };
+        let page_len = match block
+            .len()
+            .checked_add(PAGE as usize - 1)
+            .map(|len| len / PAGE as usize * PAGE as usize)
+        {
+            Some(page_len) if page_len != 0 => page_len,
+            _ => {
+                let _ = sys.handle_close(child);
+                return Err(SpawnError::TooLarge);
+            }
+        };
+        let address = match stack_base.checked_sub(page_len as u64) {
+            Some(address) => address,
+            None => {
+                let _ = sys.handle_close(child);
+                return Err(SpawnError::TooLarge);
+            }
+        };
+        let object = match sys.memobj_create(page_len) {
+            Ok(object) => object,
+            Err(error) => {
+                let _ = sys.handle_close(child);
+                return Err(SpawnError::Sys(error));
+            }
+        };
+        let scratch_flags = map::pack(prot::READ | prot::WRITE, map::SHARED);
+        let scratch = match sys.map(Handle::SELF_PROC, object, 0, 0, page_len, scratch_flags) {
+            Ok(scratch) => scratch,
+            Err(error) => {
+                let _ = sys.handle_close(object);
+                let _ = sys.handle_close(child);
+                return Err(SpawnError::Sys(error));
+            }
+        };
+        sys.write_parent_mem(scratch, &block);
+        if let Err(error) = sys.unmap(Handle::SELF_PROC, scratch, page_len) {
+            let _ = sys.handle_close(object);
+            let _ = sys.handle_close(child);
+            return Err(SpawnError::Sys(error));
+        }
+        let child_flags = map::pack(prot::READ, map::SHARED | map::FIXED);
+        if let Err(error) = sys.map(child, object, 0, address as usize, page_len, child_flags) {
+            let _ = sys.handle_close(object);
+            let _ = sys.handle_close(child);
+            return Err(SpawnError::Sys(error));
+        }
+        if let Err(error) = sys.handle_close(object) {
+            let _ = sys.handle_close(child);
+            return Err(SpawnError::Sys(error));
+        }
+        Some((address as usize, entries.len()))
+    };
+    let (auxv, auxv_len) = build_auxv(main_elf, main_bias, interp_bias, fdmap_info);
+    let random = random_bytes(&auxv as *const _ as usize);
+
     let memobj = match sys.memobj_create(STACK_SIZE) {
         Ok(handle) => handle,
         Err(error) => {
@@ -926,6 +1045,20 @@ impl Sys for RtSys {
         Errno::from_ret(result).map(|_| ())
     }
 
+    fn handle_transfer(&mut self, dest: Handle, source: Handle) -> Result<Handle, Errno> {
+        // SAFETY: HANDLE_TRANSFER takes scalar handles and a rights mask; the kernel validates the
+        // destination's WRITE right and the source's TRANSFER right.
+        let result = unsafe {
+            crate::sys::syscall3(
+                Syscall::HANDLE_TRANSFER as usize,
+                dest.0 as usize,
+                source.0 as usize,
+                Rights::ALL.0 as usize,
+            )
+        };
+        handle_from_ret(result)
+    }
+
     fn thread_create(
         &mut self,
         proc: Handle,
@@ -998,7 +1131,16 @@ const ARG_MAX: usize = 128 * 1024;
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const _: () = assert!(STACK_SIZE >= ARG_MAX);
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
-const MAX_AUXV: usize = 20;
+const MAX_AUXV: usize = 32;
+/// Raven fd-inheritance block address.
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+const AT_RAVEN_FDMAP: usize = 0x7003;
+/// Raven fd-inheritance entry count.
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+const AT_RAVEN_FDMAP_N: usize = 0x7004;
+/// Raven ABI revision.
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+const AT_RAVEN_ABI: usize = 0x7006;
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
 const AT_PHDR: usize = 3;
 #[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
@@ -1366,6 +1508,29 @@ fn plan_image<'a>(
     Ok((elf, steps, bias))
 }
 
+/// Encode the `RFDM` block consumed by `raven_libc_platform::fd::inherit::FdMap::decode`.
+///
+/// Entries carry no path or status; the child's `restore_fdmap` creates unknown-kind OFDs with
+/// read/write status and the transferred handles. The loader only publishes this block for
+/// inherited stdio and ordinary file descriptors.
+#[cfg(any(any(target_os = "none", target_os = "ravenbsd"), test))]
+fn encode_fdmap(entries: &[(i32, u32)]) -> Result<alloc_crate::vec::Vec<u8>, SpawnError> {
+    let count = u16::try_from(entries.len()).map_err(|_| SpawnError::TooLarge)?;
+    let mut out = alloc_crate::vec::Vec::with_capacity(8usize.saturating_add(18 * entries.len()));
+    out.extend_from_slice(b"RFDM");
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&count.to_le_bytes());
+    for (fd, handle) in entries {
+        out.extend_from_slice(&fd.to_le_bytes());
+        out.extend_from_slice(&handle.to_le_bytes());
+        out.push(255); // OfdKind::Unknown
+        out.push(0); // FD_CLOEXEC already filtered by apply_actions
+        out.extend_from_slice(&2u32.to_le_bytes()); // O_RDWR
+        out.extend_from_slice(&u32::MAX.to_le_bytes()); // NO_PATH
+    }
+    Ok(out)
+}
+
 /// Build the PG-50 auxiliary vector for the main image and an optional interpreter.
 ///
 /// `AT_PLATFORM`, `AT_RANDOM` and `AT_EXECFN` carry zero here; [`build_stack`] replaces them with
@@ -1375,6 +1540,7 @@ fn build_auxv(
     elf: &Elf<'_>,
     main_bias: u64,
     interp_bias: u64,
+    fdmap: Option<(usize, usize)>,
 ) -> ([(usize, usize); MAX_AUXV], usize) {
     let mut auxv = [(0usize, 0usize); MAX_AUXV];
     let mut len = 0usize;
@@ -1411,6 +1577,11 @@ fn build_auxv(
     push(AT_HWCAP2, 0);
     push(AT_EXECFN, 0);
     push(AT_MINSIGSTKSZ, 8192);
+    if let Some((address, count)) = fdmap {
+        push(AT_RAVEN_FDMAP, address);
+        push(AT_RAVEN_FDMAP_N, count);
+        push(AT_RAVEN_ABI, raven_abi::ABI_VERSION as usize);
+    }
     (auxv, len)
 }
 

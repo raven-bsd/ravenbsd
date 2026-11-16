@@ -41,7 +41,14 @@ impl Loader for FakeLoader {
         Ok(self.image.borrow().clone())
     }
 
-    fn load(&self, image: &[u8], path: &str, argv: &[&str], _env: &[&str]) -> Result<u32, Errno> {
+    fn load(
+        &self,
+        image: &[u8],
+        path: &str,
+        argv: &[&str],
+        _env: &[&str],
+        _fdmap: &[(i32, u32)],
+    ) -> Result<u32, Errno> {
         assert_eq!(image, self.image.borrow().as_slice());
         *self.load_path.borrow_mut() = path.into();
         *self.argv.borrow_mut() = argv.iter().map(|value| (*value).into()).collect();

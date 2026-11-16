@@ -60,20 +60,23 @@ Two items remain outside this slice:
   `vendor/tokio/src/runtime/io/driver.rs:279`, `Handle::unpark`, `failed to wake I/O driver:
   Os { code: 9, kind: Uncategorized, message: "Bad file descriptor" }`. That is brush/tokio,
   outside P9c's Owns.
-* `/bin/ls` output also needs child fd inheritance: publish the
-  `AT_RAVEN_FDMAP`/`AT_RAVEN_FDMAP_N` block and call `restore_fdmap` from the start path. That
-  wiring is in `raven-libc-platform`/`start.rs`, outside P9c's Owns.
+* `posix_spawn` now transfers each inherited parent handle with `HANDLE_TRANSFER`, encodes the
+  `RFDM` block (fd/handle, unknown kind, read/write status), maps it below the child stack and
+  publishes `AT_RAVEN_FDMAP`/`AT_RAVEN_FDMAP_N`. The libc start path decodes it and calls
+  `Platform::restore_fdmap` before `ensure_standard_fds`; `libc-spawn*` pass with inherited
+  descriptors.
 
-Minimal next step: fix the tokio I/O-driver waker (brush/vendor), then wire the fdmap
-block/restore and rerun `brush-spawn`.
+Minimal next step: fix the tokio I/O-driver waker (brush/vendor) and rerun `brush-spawn`;
+the fdmap block/restore is wired and `libc-spawn*` pass.
 
 ## Limits in this slice
 
 - Only UTF-8 paths, arguments and environment strings are accepted; other bytes return `EINVAL`.
-- `waitpid` supports `P_PID` with blocking options. `wait(2)` (`P_ALL`) and `WNOHANG` return
-  `ENOSYS` until the kernel has a wait-any/non-blocking primitive.
-- The spawn request's `fdmap` and spawn attributes are not applied yet; the C73 `libc-child`
-  fixture opens the console itself. File-action and job-control tickets own those.
+- `waitpid` uses `PROC_WAIT_EX`: `P_PID`, `P_ALL`, `P_PGID` and `WNOHANG` work; stop/continue
+  events follow the kernel encoding.
+- The spawn request's `fdmap` is applied for static ET_EXEC images. Spawn attributes and an
+  interpreter plus fdmap combination are not implemented yet; the C73 `libc-child` fixture opens
+  the console itself, and job-control tickets own the rest.
 - Relative image paths are resolved against `SpawnRequest.cwd`; scheme paths pass unchanged, and
   bare absolute paths become `file:/...`.
 

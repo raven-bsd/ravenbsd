@@ -44,7 +44,14 @@ pub trait Loader {
     /// Read one executable image into a bounded buffer.
     fn read_image(&self, path: &str) -> Result<Vec<u8>, Errno>;
     /// Load `image` and start the first thread; return the child process handle.
-    fn load(&self, image: &[u8], path: &str, argv: &[&str], env: &[&str]) -> Result<u32, Errno>;
+    fn load(
+        &self,
+        image: &[u8],
+        path: &str,
+        argv: &[&str],
+        env: &[&str],
+        fdmap: &[(i32, u32)],
+    ) -> Result<u32, Errno>;
     /// Wait for a child; a `WNOHANG` miss returns pid 0.
     fn wait_ex(&self, idtype: u32, id: i32, options: u32) -> Result<(i32, i32), Errno>;
     /// Close one process handle.
@@ -123,7 +130,12 @@ impl<L: Loader, H: HandleInfo> EarlySpawn for NativeSpawner<L, H> {
         let slot = self.reserve()?;
         let result = (|| {
             let image = self.loader.read_image(&resolved)?;
-            let handle = self.loader.load(&image, &resolved, &argv, &envp)?;
+            let fds: Vec<(i32, u32)> = request
+                .fdmap
+                .iter()
+                .map(|entry| (entry.fd, entry.handle))
+                .collect();
+            let handle = self.loader.load(&image, &resolved, &argv, &envp, &fds)?;
             let pid = match self.info.pid_for_handle(handle) {
                 Ok(pid) => pid,
                 Err(error) => {
@@ -211,9 +223,16 @@ impl Loader for RtLoader {
         raven_spawn::read_file_image(path).map_err(map_spawn_error)
     }
 
-    fn load(&self, image: &[u8], path: &str, argv: &[&str], env: &[&str]) -> Result<u32, Errno> {
+    fn load(
+        &self,
+        image: &[u8],
+        path: &str,
+        argv: &[&str],
+        env: &[&str],
+        fdmap: &[(i32, u32)],
+    ) -> Result<u32, Errno> {
         let options = raven_spawn::SpawnOptions { args: argv, env };
-        raven_spawn::spawn_image_with(image, path, &options, &mut raven_spawn::RtSys)
+        raven_spawn::spawn_image_with_fdmap(image, path, &options, fdmap, &mut raven_spawn::RtSys)
             .map(|handle| handle.0)
             .map_err(map_spawn_error)
     }
