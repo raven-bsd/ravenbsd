@@ -288,10 +288,19 @@ fn extract_format(options: &clap::ArgMatches, mode: ProgramMode) -> (Format, Opt
             ProgramMode::Dir => (Format::Columns, None),
             ProgramMode::Vdir => (Format::Long, None),
             ProgramMode::Ls => {
-                if stdout().is_terminal() {
-                    (Format::Columns, None)
-                } else {
+                #[cfg(target_os = "ravenbsd")]
+                {
+                    // The serial console is a terminal but the Raven shell session expects the
+                    // POSIX one-name-per-line listing.
                     (Format::OneLine, None)
+                }
+                #[cfg(not(target_os = "ravenbsd"))]
+                {
+                    if stdout().is_terminal() {
+                        (Format::Columns, None)
+                    } else {
+                        (Format::OneLine, None)
+                    }
                 }
             }
         }
@@ -575,7 +584,14 @@ fn extract_indicator_style(options: &clap::ArgMatches) -> Option<IndicatorStyle>
     } else if options.get_flag(options::indicator_style::FILE_TYPE) {
         Some(IndicatorStyle::FileType)
     } else {
-        None
+        #[cfg(target_os = "ravenbsd")]
+        {
+            Some(IndicatorStyle::Slash)
+        }
+        #[cfg(not(target_os = "ravenbsd"))]
+        {
+            None
+        }
     }
 }
 

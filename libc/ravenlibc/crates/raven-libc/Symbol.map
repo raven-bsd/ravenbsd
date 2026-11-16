@@ -1240,8 +1240,6 @@ RAVEN_1.0 {
 		# --- C64h brush/uutils libc surface ---
 		__getrandom_v03_custom;
 		cfmakeraw;
-		chdir;
-		chroot;
 		confstr;
 		killpg;
 		syscall;
@@ -1250,7 +1248,6 @@ RAVEN_1.0 {
 		tcsetattr;
 		tcsetpgrp;
 		ttyname_r;
-		umask;
 		# --- K96/F3 merge ---
 		fsync;
 };

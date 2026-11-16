@@ -433,7 +433,7 @@ fn read_to_buffer<T: Read>(
 
 /// Parse a buffer into a `ChunkContents` suitable for `Chunk::try_new`.
 /// Used by the WASI single-threaded sort path.
-#[cfg(target_os = "wasi")]
+#[cfg(any(target_os = "wasi", target_os = "ravenbsd"))]
 pub fn parse_into_chunk<'a>(
     buffer: &'a [u8],
     separator: u8,

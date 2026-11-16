@@ -424,7 +424,16 @@ impl Display for UIoError {
             // We want to normalize their messages across systems,
             // and we want to strip the "(os error X)" suffix.
             match self.inner.kind() {
-                NotFound => "No such file or directory",
+                NotFound => {
+                    #[cfg(target_os = "ravenbsd")]
+                    {
+                        "no such file or directory"
+                    }
+                    #[cfg(not(target_os = "ravenbsd"))]
+                    {
+                        "No such file or directory"
+                    }
+                }
                 // Rust maps both EACCES and EPERM to PermissionDenied. GNU
                 // prints "Operation not permitted" for EPERM (e.g. touch on a
                 // writable file owned by someone else) and "Permission denied"
@@ -505,6 +514,12 @@ pub fn strip_errno(err: &std::io::Error) -> String {
     let mut msg = err.to_string();
     if let Some(pos) = msg.find(" (os error ") {
         msg.truncate(pos);
+    }
+    #[cfg(target_os = "ravenbsd")]
+    {
+        if msg == "No such file or directory" {
+            return "no such file or directory".to_string();
+        }
     }
     msg
 }

@@ -37,8 +37,6 @@ const AT_PAGESZ: usize = 6;
 const AT_CLKTCK: usize = 17;
 /// `AT_RANDOM`: 16 random bytes.
 const AT_RANDOM: usize = 25;
-/// `AT_SECURE`: the privileged-exec flag (never set on Raven, H-7).
-const AT_SECURE: usize = 23;
 /// `AT_HWCAP`: CPU feature bits (the AArch64/RISC-V IFUNC argument and C67 `getisax`).
 const AT_HWCAP: usize = 16;
 /// `AT_HWCAP2`: the second CPU feature word (C67 `getisax`).
@@ -640,7 +638,7 @@ unsafe fn run_array(
     }
 }
 
-/// Ensure descriptors 0, 1 and 2 are open (`AT_SECURE` only; never on Raven).
+/// Ensure descriptors 0, 1 and 2 are open, preferring the console scheme.
 #[cold]
 #[inline(never)]
 fn ensure_standard_fds() {
@@ -664,8 +662,15 @@ fn ensure_standard_fds() {
         let installed =
             match raven_libc_platform::scheme::open_scheme_path(&RealSys, b"tty:console", wire) {
                 Ok(handle) => {
-                    match platform.install_at_fd(fd as u32, handle, OfdKind::Tty, 0, None, false, 0)
-                    {
+                    match platform.install_at_fd(
+                        fd as u32,
+                        handle,
+                        OfdKind::Tty,
+                        raven_libc_abi::fcntl::O_RDWR as u32,
+                        None,
+                        false,
+                        0,
+                    ) {
                         Ok(()) => true,
                         Err(_) => {
                             let _ = RealSys.close(handle);

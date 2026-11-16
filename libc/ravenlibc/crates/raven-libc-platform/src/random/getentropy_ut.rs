@@ -65,12 +65,17 @@ fn seed_is_32_bytes_and_clock_mixed() {
 }
 
 #[test]
-fn getrandom_is_enosys_until_pg_52() {
+fn getrandom_uses_the_weak_rand_source_until_pg_52() {
     let fake = FakeSys::new();
     fake.rand(&[0u8; 32]);
     let platform = Platform::new(fake);
     let mut buffer = [0u8; 8];
-    assert_eq!(getrandom(&platform, &mut buffer, 0), Err(Errno::ENOSYS));
+    assert_eq!(getrandom(&platform, &mut buffer, 0), Ok(8));
+    assert_eq!(buffer, [0u8; 8]);
+    assert_eq!(
+        getrandom(&platform, &mut buffer, 0x8000),
+        Err(Errno::EINVAL)
+    );
 }
 
 #[test]

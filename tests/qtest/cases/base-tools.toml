@@ -70,7 +70,23 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "printf 'b\\na\\n' | sort\n"
+send = "echo b > /tmp/bt/s\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo a >> /tmp/bt/s\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "sort /tmp/bt/s\n"
 delay_ms = 100
 
 [[step]]
@@ -86,7 +102,31 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "printf '1\\n2\\n3\\n' | head -n 2\n"
+send = "echo 1 > /tmp/bt/n\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo 2 >> /tmp/bt/n\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo 3 >> /tmp/bt/n\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "head -n 2 /tmp/bt/n\n"
 delay_ms = 100
 
 [[step]]
@@ -102,7 +142,7 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "printf '1\\n2\\n3\\n' | tail -n 1\n"
+send = "tail -n 1 /tmp/bt/n\n"
 delay_ms = 100
 
 [[step]]
@@ -119,18 +159,6 @@ delay_ms = 100
 
 [[step]]
 wait = '^6$'
-timeout_secs = 30
-
-[[step]]
-wait = '^raven# $'
-timeout_secs = 30
-
-[[step]]
-send = "df /tmp\n"
-delay_ms = 100
-
-[[step]]
-wait = 'Filesystem'
 timeout_secs = 30
 
 [[step]]

@@ -28,7 +28,7 @@ use ext_sort::ext_sort;
 use foldhash::fast::FoldHasher;
 use foldhash::{HashMap, SharedSeed};
 use rand::{RngExt as _, rng};
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(any(target_os = "wasi", target_os = "ravenbsd")))]
 use rayon::slice::ParallelSliceMut;
 use std::cmp::Ordering;
 use std::env;
@@ -2236,12 +2236,12 @@ pub fn uumain(args: impl uucore::Args) -> UResult<()> {
         Some(value) => parse_parallel(value)?,
         None => std::thread::available_parallelism().map_or(1, |n| n.get() as u64),
     };
-    // WASI doesn't support threads, so the value is only validated there
-    #[cfg(not(target_os = "wasi"))]
+    // WASI/RavenBSD do not use rayon's global pool on this path.
+    #[cfg(not(any(target_os = "wasi", target_os = "ravenbsd")))]
     let _ = rayon::ThreadPoolBuilder::new()
         .num_threads(threads as usize)
         .build_global();
-    #[cfg(target_os = "wasi")]
+    #[cfg(any(target_os = "wasi", target_os = "ravenbsd"))]
     let _ = threads;
 
     if let Some(size_str) = matches.get_one::<String>(options::BUF_SIZE) {
@@ -2266,11 +2266,11 @@ pub fn uumain(args: impl uucore::Args) -> UResult<()> {
             // WASI does not support std::env::temp_dir() — it panics with
             // "no filesystem on wasm". Use /tmp as a nominal fallback;
             // the WASI ext_sort path never actually creates temp files.
-            #[cfg(target_os = "wasi")]
+            #[cfg(any(target_os = "wasi", target_os = "ravenbsd"))]
             {
                 PathBuf::from("/tmp")
             }
-            #[cfg(not(target_os = "wasi"))]
+            #[cfg(not(any(target_os = "wasi", target_os = "ravenbsd")))]
             {
                 env::temp_dir()
             }
@@ -2747,14 +2747,14 @@ fn sort_by<'a>(unsorted: &mut Vec<Line<'a>>, settings: &GlobalSettings, line_dat
     // WASI does not support threads, so use non-parallel sort to avoid
     // rayon's thread pool which triggers an unreachable trap.
     if settings.stable || settings.unique {
-        #[cfg(not(target_os = "wasi"))]
+        #[cfg(not(any(target_os = "wasi", target_os = "ravenbsd")))]
         unsorted.par_sort_by(cmp);
-        #[cfg(target_os = "wasi")]
+        #[cfg(any(target_os = "wasi", target_os = "ravenbsd"))]
         unsorted.sort_by(cmp);
     } else {
-        #[cfg(not(target_os = "wasi"))]
+        #[cfg(not(any(target_os = "wasi", target_os = "ravenbsd")))]
         unsorted.par_sort_unstable_by(cmp);
-        #[cfg(target_os = "wasi")]
+        #[cfg(any(target_os = "wasi", target_os = "ravenbsd"))]
         unsorted.sort_unstable_by(cmp);
     }
 }

@@ -8,13 +8,13 @@
 //! On most platforms this uses a multi-threaded chunked approach with
 //! temporary files. On WASI (no threads) we fall back to an in-memory sort.
 
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(any(target_os = "wasi", target_os = "ravenbsd")))]
 mod threaded;
-#[cfg(not(target_os = "wasi"))]
+#[cfg(not(any(target_os = "wasi", target_os = "ravenbsd")))]
 pub use threaded::ext_sort;
 
-#[cfg(target_os = "wasi")]
+#[cfg(any(target_os = "wasi", target_os = "ravenbsd"))]
 mod wasi;
-#[cfg(target_os = "wasi")]
+#[cfg(any(target_os = "wasi", target_os = "ravenbsd"))]
 // `self::` needed to disambiguate from the `wasi` crate
 pub use self::wasi::ext_sort;
