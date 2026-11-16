@@ -2023,6 +2023,16 @@ name = "raven-pager"
 version = "0.1.0"
 
 [[package]]
+name = "raven-patch"
+version = "0.1.0"
+dependencies = [
+ "raven-diff",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-pci"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4m patch evidence: bounded first-party unified-diff applier.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.patch"
+status = "present"
+evidence = "test:tests/posix/utility/patch/test.sh"
+notes = "P4m: bounded first-party patch host behaviour tests"

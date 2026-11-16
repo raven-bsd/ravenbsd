@@ -173,6 +173,7 @@ members = [
     "userland/bin/uuencode",
     "userland/bin/uudecode",
     "userland/bin/m4",
+    "userland/bin/patch",
     "userland/bin/useradd",
     "userland/bin/adduser",
     "userland/bin/passwd",
