@@ -291,6 +291,16 @@ impl ThreadKernel for SysKernel {
         Err(ENOSYS)
     }
 
+    fn thread_is_dead(&self, tcb_address: usize) -> bool {
+        // The kernel clears `Pthread.join_word` when the thread exits; the libc exit path never
+        // writes it, so a zero word is the kernel's confirmation that the user stack can be
+        // reclaimed (A-thr-3).
+        tcb(tcb_address)
+            .join_word
+            .load(core::sync::atomic::Ordering::Acquire)
+            == 0
+    }
+
     fn create(&self, args: &CreateArgs) -> Result<u32, Errno> {
         let call = create_call(args);
         let mut extended = call.extended;
