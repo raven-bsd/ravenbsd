@@ -36,7 +36,7 @@ stub.
 | `proc-handle-info` | **PASS** | pid/info, wait status, post-exit info, stale and non-process EBADF all printed |
 | `proc-signal` | FAIL | kernel data abort at stack guard before the fixture prints |
 | `proc-fork` | FAIL | kernel data abort at stack guard after the invalid-combo probes |
-| `proc-exec` | absent | no case file on this base; P2e (Stuart) follow-up |
+| `proc-exec` | BLOCKED | skipped: P2e procd + `raven-proto-proc` SPAWN/WAIT not on `origin/master`; no kernel `PROC_EXEC` syscall |
 
 The aarch64 kernel check and the x86_64 proc cases remain green. `proc-session` and
 `proc-handle-info` are the positive aarch64 parity results: the shared wait/session/times/rlimit
@@ -118,8 +118,11 @@ aarch64 `TrapFrame`/signal context is not the cause: `proc-session` and `proc-ha
 exercise the common syscall/trap path successfully; the failure is only on the deeper fork
 fixtures.
 
-`proc-exec` has no case file on this base; it is a P2e (Stuart) follow-up. `procd` was not
-edited.
+`proc-exec` is blocked, not absent: `tests/qtest/cases/proc-exec.toml` records the exact
+dependency. `origin/master` has no `procd` server or `raven-proto-proc` crate, and the kernel has
+no `PROC_EXEC` syscall (only `PROC_EXEC_CRED`, which transfers credentials). The P2e branch
+(`origin/stuart/P2e` `15d47e18`) carries the passing case on top of procd `SPAWN`/`WAIT`; that
+server must be merged before this row can run. `procd` was not edited.
 
 ## 4. Provenance
 
