@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The client starts after devd reports the plat: readiness gate and exits with
+# its check result.
+name = "plat-client"
+exec = "/bin/plat-client"
+needs = ["scheme:plat"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
