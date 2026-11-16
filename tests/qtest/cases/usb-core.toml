@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S61: the USB core in the Raven guest. The probe parses the synthetic USB 2.0
+# descriptor set, assigns/releases addresses, runs GET_DESCRIPTOR/SET_ADDRESS
+# through a fake control transport, reaches Configured and drives the hub port
+# state machine. No xHCI hardware or real device is involved.
+
+name = "usb-core"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/usb-core/build.sh"]
+initfs = "build/fixtures/usb-core/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^usb-core: start$'
+
+[[expect]]
+regex = '^usb-core: descriptors vendor=0x1d04 product=0x0001 configs=1$'
+
+[[expect]]
+regex = '^usb-core: config value=1 interfaces=1 endpoints=1$'
+
+[[expect]]
+regex = '^usb-core: endpoint address=0x81 dci=3$'
+
+[[expect]]
+regex = '^usb-core: address assigned=1 pool=1$'
+
+[[expect]]
+regex = '^usb-core: setup request=0x06 length=18$'
+
+[[expect]]
+regex = '^usb-core: hub port=0 state=enabled$'
+
+[[expect]]
+regex = '^usb-core: hub detach ok$'
+
+[[expect]]
+regex = '^usb-core: pass$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|usb-core: fail'

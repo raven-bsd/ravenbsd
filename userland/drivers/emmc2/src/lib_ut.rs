@@ -6,7 +6,7 @@
 use super::*;
 use raven_pi4::registers::{
     CLOCK_INTERNAL_STABLE, ERROR_CMD_TIMEOUT, NORMAL_CMD_COMPLETE, POWER_BUS, POWER_VOLTAGE_3V3,
-    SOFTWARE_RESET_ALL,
+    PRESENT_CARD_INSERTED, SOFTWARE_RESET_ALL,
 };
 
 const DMA: DmaWindow = DmaWindow {
@@ -36,6 +36,7 @@ struct FakeHost {
     app_not_set: bool,
     reset_stuck: bool,
     clock_stuck: bool,
+    present_state: u32,
     writes: [Option<u32>; 0x100],
 }
 
@@ -60,8 +61,19 @@ impl FakeHost {
             app_not_set: false,
             reset_stuck: false,
             clock_stuck: false,
+            present_state: PRESENT_CARD_INSERTED,
             writes: [None; 0x100],
         }
+    }
+
+    /// Simulate a host/controller power cycle while the card stays in the slot.
+    fn power_cycle(&mut self) {
+        let clock = self.clock;
+        let caps = self.caps;
+        let present_state = self.present_state;
+        *self = Self::new(clock);
+        self.caps = caps;
+        self.present_state = present_state;
     }
 
     fn last_write(&self, register: Register) -> Option<u32> {
@@ -123,6 +135,7 @@ impl Host for FakeHost {
             Register::HostControllerVersion => 2,
             Register::Capabilities => self.caps,
             Register::SoftwareReset => u32::from(self.reset_stuck),
+            Register::PresentState => self.present_state,
             Register::ClockControl => {
                 if self.clock_stuck {
                     u32::from(self.clock_control)
@@ -130,7 +143,6 @@ impl Host for FakeHost {
                     u32::from(self.clock_control | CLOCK_INTERNAL_STABLE)
                 }
             }
-            Register::PresentState => 0,
             Register::NormalInterruptStatus => u32::from(self.normal),
             Register::ErrorInterruptStatus => u32::from(self.error),
             Register::Response0 => self.response[0],
@@ -373,4 +385,53 @@ fn a_clock_that_never_stabilises_is_a_timeout() {
     let mut host = FakeHost::new(Some(50_000_000));
     host.clock_stuck = true;
     assert_eq!(bring_up(&mut host), Err(DriverError::ClockStableTimeout));
+}
+
+#[test]
+fn card_insertion_is_reported_from_the_present_state() {
+    let mut host = FakeHost::new(Some(50_000_000));
+    assert!(card_inserted(&mut host));
+    host.present_state = 0;
+    assert!(!card_inserted(&mut host));
+    host.present_state = PRESENT_CARD_INSERTED;
+    assert!(card_inserted(&mut host));
+}
+
+#[test]
+fn a_removed_card_is_refused_before_initialisation() {
+    let mut host = FakeHost::new(Some(50_000_000));
+    host.present_state = 0;
+    assert_eq!(init_card_checked(&mut host), Err(DriverError::NoCard));
+    assert_eq!(host.command_count, 0);
+}
+
+#[test]
+fn a_removed_then_reinserted_card_initialises_again() {
+    let mut host = FakeHost::new(Some(50_000_000));
+    let first = init_card_checked(&mut host).expect("first init");
+    host.present_state = 0;
+    assert_eq!(init_card_checked(&mut host), Err(DriverError::NoCard));
+    host.present_state = PRESENT_CARD_INSERTED;
+    let second = init_card_checked(&mut host).expect("reinserted card");
+    assert_eq!(second.card, first.card);
+    assert_eq!(second.timing, first.timing);
+}
+
+#[test]
+fn a_power_cycle_reinitialises_the_card() {
+    let mut host = FakeHost::new(Some(50_000_000));
+    let first = init_card_checked(&mut host).expect("first init");
+    let commands = host.command_count;
+    host.power_cycle();
+    assert_eq!(host.command_count, 0);
+    assert!(host.last_write(Register::SoftwareReset).is_none());
+    let second = init_card_checked(&mut host).expect("second init");
+    assert_eq!(second.card, first.card);
+    assert_eq!(second.plan, first.plan);
+    assert_eq!(second.timing, first.timing);
+    assert_eq!(host.command_count, commands);
+    assert_eq!(
+        host.last_write(Register::PowerControl),
+        Some(u32::from(POWER_BUS | POWER_VOLTAGE_3V3))
+    );
 }

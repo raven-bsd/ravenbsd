@@ -1,16 +1,16 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# Pi 4 platform launch (P8): match the DTB, grant BAR/DMA/IRQ handles and
-# spawn the matched platform drivers. The child `nic:`/`dev:` schemes are the
-# readiness gate; the init root grant for devd is P10 (Kevin).
+# Pi 4 platform launch (P8/P12): match the DTB, grant the platform driver
+# handles and spawn the matched drivers. platd and genet are launched here, not
+# by svcd. The P8b multi-window launcher is still required for platd's four
+# handles; no board result is claimed before it lands.
 name = "devd"
 exec = "/sbin/devd"
 args = ["devd", "dtb", "launch"]
-grants = ["platform-root"]
 needs = ["logd", "vfsd", "initfsd"]
-# devd launches the platform drivers and waits for them; it does not serve a scheme
-# of its own. netd waits for the child genet's `scheme:nic` instead.
-readiness = "none"
+provides = ["scheme:plat", "scheme:dev", "scheme:nic"]
+readiness = "scheme"
 ready_timeout_ms = 60_000
 restart = "on-failure"
+grants = ["platform-root"]

@@ -183,6 +183,8 @@ pub const ERROR_STATUS_MASK: u16 = 0x13ff;
 pub const PRESENT_CMD_INHIBIT: u32 = 1 << 0;
 /// Present state: the data line is inhibited.
 pub const PRESENT_DAT_INHIBIT: u32 = 1 << 1;
+/// Present state: a card is inserted in the slot (`Card Inserted`, bit 16).
+pub const PRESENT_CARD_INSERTED: u32 = 1 << 16;
 /// Present state: the read buffer can be drained.
 pub const PRESENT_BUFFER_READ_ENABLE: u32 = 1 << 11;
 /// Present state: the write buffer can be filled.
@@ -397,6 +399,14 @@ impl PresentState {
     /// The data line is inhibited.
     pub const fn dat_inhibit(self) -> bool {
         self.0 & PRESENT_DAT_INHIBIT != 0
+    }
+
+    /// The slot reports a card (`Card Inserted`, bit 16).
+    ///
+    /// The EMMC2 card-detect implementation is UNVERIFIED on silicon; the real launcher must
+    /// confirm whether this bit is live before using it as an insertion gate.
+    pub const fn card_inserted(self) -> bool {
+        self.0 & PRESENT_CARD_INSERTED != 0
     }
 
     /// The read buffer can be drained.
