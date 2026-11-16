@@ -7,6 +7,7 @@
 //! single thread owns the kernel stack used by syscall and trap entry.
 
 pub mod handle;
+pub mod pipe;
 pub mod robust;
 pub mod status;
 pub mod thread;

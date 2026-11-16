@@ -2100,6 +2100,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-pipe-tests"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-plat"
 version = "0.1.0"
 dependencies = [
