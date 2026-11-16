@@ -37,10 +37,13 @@ RAVEN_1.0 {
 		strchr;
 		strchrnul;
 		strcmp;
+		strcoll;
+		strcoll_l;
 		strcpy;
 		strcspn;
 		strdup;
 		strerror;
+		strerror_l;
 		strerror_r;
 		strlcat;
 		strlcpy;
@@ -62,6 +65,8 @@ RAVEN_1.0 {
 		strstr;
 		strtok;
 		strtok_r;
+		strxfrm;
+		strxfrm_l;
 		strverscmp;
 		stpcpy;
 		stpncpy;
@@ -142,6 +147,7 @@ RAVEN_1.0 {
 		abort;
 		abs;
 		arc4random_buf;
+		atof;
 		atoi;
 		atol;
 		atoll;
@@ -153,16 +159,21 @@ RAVEN_1.0 {
 		ldiv;
 		llabs;
 		lldiv;
+		mbstowcs;
+		strtod;
 		strtoimax;
 		strtol;
 		strtoll;
 		strtoul;
 		strtoull;
 		strtoumax;
+		wcstombs;
 		# --- malloc ---
 		aligned_alloc;
 		calloc;
 		free;
+		free_aligned_sized;
+		free_sized;
 		freezero;
 		malloc;
 		malloc_usable_size;

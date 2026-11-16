@@ -1,7 +1,7 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1187
+# records: 1198
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
 _Unwind_Backtrace F - all 2 -
@@ -64,6 +64,7 @@ atanf F - all 1 -
 atanh F - all 1 -
 atanhf F - all 1 -
 atexit F - all 0 stdlib.h
+atof F - all 0 stdlib.h
 atoi F - all 0 stdlib.h
 atol F - all 0 stdlib.h
 atoll F - all 0 stdlib.h
@@ -273,6 +274,8 @@ fputc F - all 0 stdio.h
 fputs F - all 0 stdio.h
 fread F - all 0 stdio.h
 free F - all 0 malloc.h
+free_aligned_sized F - all 0 stdlib.h
+free_sized F - all 0 stdlib.h
 freeaddrinfo F - all 1 -
 freelocale F - all 1 -
 freezero F - all 1 -
@@ -534,6 +537,7 @@ mblen F - all 0 stdlib.h
 mbrlen F - all 0 wchar.h
 mbrtowc F - all 0 wchar.h
 mbsinit F - all 0 wchar.h
+mbstowcs F - all 0 stdlib.h
 mbtowc F - all 0 stdlib.h
 memalign F - all 1 malloc.h
 memccpy F - all 1 string.h
@@ -974,10 +978,13 @@ strcat F - all 0 string.h
 strchr F - all 0 string.h
 strchrnul F - all 1 string.h
 strcmp F - all 0 string.h
+strcoll F - all 0 string.h
+strcoll_l F - all 1 -
 strcpy F - all 0 string.h
 strcspn F - all 0 string.h
 strdup F - all 1 string.h
 strerror F - all 0 string.h
+strerror_l F - all 0 string.h
 strerror_r F - all 0 string.h
 strftime F - all 0 time.h
 strlcat F - all 0 string.h
@@ -1007,6 +1014,7 @@ strspn F - all 0 string.h
 strstr F - all 0 string.h
 strsvis F - x86_64 2 -
 strsvisx F - x86_64 2 -
+strtod F - all 0 stdlib.h
 strtoimax F - all 0 inttypes.h
 strtok F - all 0 string.h
 strtok_r F - all 0 string.h
@@ -1021,6 +1029,8 @@ strunvisx F - x86_64 2 -
 strverscmp F - all 1 string.h
 strvis F - x86_64 2 -
 strvisx F - x86_64 2 -
+strxfrm F - all 0 string.h
+strxfrm_l F - all 1 -
 suboptarg F - all 3 -
 svis F - x86_64 2 -
 swab F - all 1 -
@@ -1168,6 +1178,7 @@ wcspbrk F - all 0 wchar.h
 wcsrchr F - all 0 wchar.h
 wcsspn F - all 0 wchar.h
 wcsstr F - all 0 wchar.h
+wcstombs F - all 0 stdlib.h
 wcswidth F - all 1 -
 wctob F - all 0 wchar.h
 wctomb F - all 0 stdlib.h

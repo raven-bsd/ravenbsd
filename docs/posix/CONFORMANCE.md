@@ -6,13 +6,13 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-16T20:13:55Z
+- Date: 2026-11-16T20:58:04Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: target QEMU
 - Tool: `posix-conform 0.1.0`
 - Result: **FAIL (release blocked)**
-- Counts: 769 pass, 990 fail, 10 skip
+- Counts: 815 pass, 948 fail, 10 skip
 
 ## Summary
 
@@ -20,15 +20,15 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 |---|---:|---:|---:|
 | external | 0 | 0 | 3 |
 | filesystem | 0 | 20 | 0 |
-| header | 30 | 56 | 0 |
-| interface | 713 | 708 | 0 |
+| header | 38 | 48 | 0 |
+| interface | 724 | 697 | 0 |
 | link | 1 | 0 | 0 |
 | process | 1 | 16 | 0 |
 | shell | 0 | 25 | 0 |
 | target | 0 | 0 | 7 |
 | tty | 0 | 12 | 0 |
-| utility | 24 | 153 | 0 |
-| **all** | **769** | **990** | **10** |
+| utility | 51 | 130 | 0 |
+| **all** | **815** | **948** | **10** |
 
 ## Rows
 
@@ -68,7 +68,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `header.errno.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_8.c` |  |
 | `header.fcntl.h` | header | fail | `profile` | profile status partial |
 | `header.fenv.h` | header | fail | `profile` | profile status partial |
-| `header.float.h` | header | fail | `docs/posix/evidence` | evidence must be `qtest:<case>` or `test:<repo-relative-path>` |
+| `header.float.h` | header | pass | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.fmtmsg.h` | header | fail | `profile` | profile status partial |
 | `header.fnmatch.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_13.c` |  |
 | `header.ftw.h` | header | fail | `profile` | profile status partial |
@@ -76,10 +76,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `header.grp.h` | header | fail | `profile` | profile status partial |
 | `header.iconv.h` | header | fail | `profile` | profile status partial |
 | `header.inttypes.h` | header | fail | `profile` | profile status partial |
-| `header.iso646.h` | header | fail | `docs/posix/evidence` | evidence must be `qtest:<case>` or `test:<repo-relative-path>` |
+| `header.iso646.h` | header | pass | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.langinfo.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_20.c` |  |
 | `header.libgen.h` | header | fail | `profile` | profile status partial |
-| `header.libintl.h` | header | fail | `docs/posix/evidence` | evidence must be `qtest:<case>` or `test:<repo-relative-path>` |
+| `header.libintl.h` | header | pass | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.limits.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_23.c` |  |
 | `header.locale.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_24.c` |  |
 | `header.math.h` | header | fail | `profile` | profile status partial |
@@ -101,10 +101,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `header.setjmp.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_41.c` |  |
 | `header.signal.h` | header | fail | `profile` | profile status partial |
 | `header.spawn.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_43.c` |  |
-| `header.stdarg.h` | header | fail | `docs/posix/evidence` | evidence must be `qtest:<case>` or `test:<repo-relative-path>` |
-| `header.stdatomic.h` | header | fail | `docs/posix/evidence` | evidence must be `qtest:<case>` or `test:<repo-relative-path>` |
-| `header.stdbool.h` | header | fail | `docs/posix/evidence` | evidence must be `qtest:<case>` or `test:<repo-relative-path>` |
-| `header.stddef.h` | header | fail | `docs/posix/evidence` | evidence must be `qtest:<case>` or `test:<repo-relative-path>` |
+| `header.stdarg.h` | header | pass | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
+| `header.stdatomic.h` | header | pass | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
+| `header.stdbool.h` | header | pass | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
+| `header.stddef.h` | header | pass | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.stdint.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_48.c` |  |
 | `header.stdio.h` | header | fail | `profile` | profile status partial |
 | `header.stdlib.h` | header | fail | `profile` | profile status partial |
@@ -131,7 +131,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `header.syslog.h` | header | fail | `profile` | profile status partial |
 | `header.tar.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_72.c` |  |
 | `header.termios.h` | header | fail | `profile` | profile status partial |
-| `header.tgmath.h` | header | fail | `docs/posix/evidence` | evidence must be `qtest:<case>` or `test:<repo-relative-path>` |
+| `header.tgmath.h` | header | pass | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.threads.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_75.c` |  |
 | `header.time.h` | header | fail | `profile` | profile status partial |
 | `header.trace.h` | header | fail | `profile` | profile status missing |
@@ -208,7 +208,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.atanl` | interface | fail | `profile` | profile status missing |
 | `interface.atanpi` | interface | fail | `profile` | profile status missing |
 | `interface.atexit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_64.c` |  |
-| `interface.atof` | interface | fail | `profile` | profile status missing |
+| `interface.atof` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib.sh` |  |
 | `interface.atoi` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_66.c` |  |
 | `interface.atol` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_67.c` |  |
 | `interface.atoll` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_68.c` |  |
@@ -543,8 +543,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.fread` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_397.c` |  |
 | `interface.fread_unlocked` | interface | fail | `profile` | profile status missing |
 | `interface.free` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_399.c` |  |
-| `interface.free_aligned_sized` | interface | fail | `profile` | profile status missing |
-| `interface.free_sized` | interface | fail | `profile` | profile status missing |
+| `interface.free_aligned_sized` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib.sh` |  |
+| `interface.free_sized` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib.sh` |  |
 | `interface.freeaddrinfo` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_402.c` |  |
 | `interface.freelocale` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_403.c` |  |
 | `interface.freopen` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_404.c` |  |
@@ -855,7 +855,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.mbsinit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_709.c` |  |
 | `interface.mbsnrtowcs` | interface | fail | `profile` | profile status missing |
 | `interface.mbsrtowcs` | interface | fail | `profile` | profile status missing |
-| `interface.mbstowcs` | interface | fail | `profile` | profile status missing |
+| `interface.mbstowcs` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib.sh` |  |
 | `interface.mbtowc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_713.c` |  |
 | `interface.memchr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_714.c` |  |
 | `interface.memcmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_715.c` |  |
@@ -1323,12 +1323,12 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.strcat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1177.c` |  |
 | `interface.strchr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1178.c` |  |
 | `interface.strcmp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1179.c` |  |
-| `interface.strcoll` | interface | fail | `profile` | profile status missing |
-| `interface.strcoll_l` | interface | fail | `profile` | profile status missing |
+| `interface.strcoll` | interface | pass | `test:tests/libc/posix/string/check-string.sh` |  |
+| `interface.strcoll_l` | interface | pass | `test:tests/libc/posix/string/check-string.sh` |  |
 | `interface.strcpy` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1182.c` |  |
 | `interface.strcspn` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1183.c` |  |
 | `interface.strerror` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1184.c` |  |
-| `interface.strerror_l` | interface | fail | `profile` | profile status missing |
+| `interface.strerror_l` | interface | pass | `test:tests/libc/posix/string/check-string.sh` |  |
 | `interface.strerror_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1186.c` |  |
 | `interface.strfmon` | interface | fail | `profile` | profile status missing |
 | `interface.strfmon_l` | interface | fail | `profile` | profile status missing |
@@ -1350,7 +1350,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.strrchr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1204.c` |  |
 | `interface.strspn` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1205.c` |  |
 | `interface.strstr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1206.c` |  |
-| `interface.strtod` | interface | fail | `profile` | profile status missing |
+| `interface.strtod` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib.sh` |  |
 | `interface.strtof` | interface | fail | `profile` | profile status missing |
 | `interface.strtoimax` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1209.c` |  |
 | `interface.strtok` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1210.c` |  |
@@ -1362,8 +1362,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.strtoul` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1216.c` |  |
 | `interface.strtoull` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1217.c` |  |
 | `interface.strtoumax` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1218.c` |  |
-| `interface.strxfrm` | interface | fail | `profile` | profile status missing |
-| `interface.strxfrm_l` | interface | fail | `profile` | profile status missing |
+| `interface.strxfrm` | interface | pass | `test:tests/libc/posix/string/check-string.sh` |  |
+| `interface.strxfrm_l` | interface | pass | `test:tests/libc/posix/string/check-string.sh` |  |
 | `interface.swab` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1221.c` |  |
 | `interface.swprintf` | interface | fail | `profile` | profile status missing |
 | `interface.swscanf` | interface | fail | `profile` | profile status missing |
@@ -1533,7 +1533,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.wcstol` | interface | fail | `profile` | profile status missing |
 | `interface.wcstold` | interface | fail | `profile` | profile status missing |
 | `interface.wcstoll` | interface | fail | `profile` | profile status missing |
-| `interface.wcstombs` | interface | fail | `profile` | profile status missing |
+| `interface.wcstombs` | interface | pass | `test:tests/libc/posix/stdlib/check-stdlib.sh` |  |
 | `interface.wcstoul` | interface | fail | `profile` | profile status missing |
 | `interface.wcstoull` | interface | fail | `profile` | profile status missing |
 | `interface.wcstoumax` | interface | fail | `profile` | profile status missing |
@@ -1640,33 +1640,33 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.c17` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.c99` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.cal` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.cat` | utility | fail | `userland/bin/cat` | profile status partial; no POSIX utility test |
+| `util.cat` | utility | pass | `test:tests/posix/utility/file/cat/test.sh` |  |
 | `util.cd` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.cflow` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.chgrp` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.chmod` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.chown` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.cksum` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.chgrp` | utility | pass | `test:tests/posix/utility/file/chgrp/test.sh` |  |
+| `util.chmod` | utility | pass | `test:tests/posix/utility/file/chmod/test.sh` |  |
+| `util.chown` | utility | pass | `test:tests/posix/utility/file/chown/test.sh` |  |
+| `util.cksum` | utility | pass | `test:tests/posix/utility/file/cksum/test.sh` |  |
 | `util.cmp` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.cod` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.comm` | utility | pass | `test:tests/posix/utility/text/comm/test.sh` |  |
 | `util.command` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.compress` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.continue` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.cp` | utility | fail | `userland/bin/cp` | profile status partial; no POSIX utility test |
+| `util.cp` | utility | pass | `test:tests/posix/utility/file/cp/test.sh` |  |
 | `util.crontab` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.csplit` | utility | pass | `test:tests/posix/utility/text/csplit/test.sh` |  |
 | `util.ctags` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.cut` | utility | pass | `test:tests/posix/utility/text/cut/test.sh` |  |
 | `util.cxref` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.date` | utility | fail | `userland/bin/date` | profile status partial; no POSIX utility test |
-| `util.dd` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.dd` | utility | pass | `test:tests/posix/utility/file/dd/test.sh` |  |
 | `util.delta` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.df` | utility | fail | `userland/bin/df` | profile status partial; no POSIX utility test |
+| `util.df` | utility | pass | `test:tests/posix/utility/file/df/test.sh` |  |
 | `util.diff` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.dirname` | utility | pass | `test:tests/posix/utility/text/dirname/test.sh` |  |
 | `util.dot` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.du` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.du` | utility | pass | `test:tests/posix/utility/file/du/test.sh` |  |
 | `util.echo` | utility | fail | `userland/bin/echo` | profile status partial; no POSIX utility test |
 | `util.ed` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.env` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1680,8 +1680,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.false` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.fc` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.fg` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.file` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.find` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.file` | utility | pass | `test:tests/posix/utility/file/file/test.sh` |  |
+| `util.find` | utility | pass | `test:tests/posix/utility/file/find/test.sh` |  |
 | `util.fold` | utility | pass | `test:tests/posix/utility/text/fold/test.sh` |  |
 | `util.fort77` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.gencat` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1699,24 +1699,25 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.join` | utility | pass | `test:tests/posix/utility/text/join/test.sh` |  |
 | `util.kill` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.lex` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.link` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.ln` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.link` | utility | pass | `test:tests/posix/utility/file/link/test.sh` |  |
+| `util.ln` | utility | pass | `test:tests/posix/utility/file/ln/test.sh` |  |
 | `util.locale` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.localedef` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.logger` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.logname` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.lp` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.ls` | utility | fail | `userland/bin/ls` | profile status partial; no POSIX utility test |
+| `util.ls` | utility | pass | `test:tests/posix/utility/file/ls/test.sh` |  |
 | `util.m4` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.mail` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.mailx` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.make` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.man` | utility | fail | `userland/bin/man` | profile status partial; no POSIX utility test |
 | `util.mesg` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.mkdir` | utility | fail | `userland/bin/mkdir` | profile status partial; no POSIX utility test |
-| `util.mkfifo` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.mkdir` | utility | pass | `test:tests/posix/utility/file/mkdir/test.sh` |  |
+| `util.mkfifo` | utility | pass | `test:tests/posix/utility/file/mkfifo/test.sh` |  |
+| `util.mknod` | utility | pass | `test:tests/posix/utility/file/mknod/test.sh` |  |
 | `util.more` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.mv` | utility | fail | `userland/bin/mv` | profile status partial; no POSIX utility test |
+| `util.mv` | utility | pass | `test:tests/posix/utility/file/mv/test.sh` |  |
 | `util.neqn` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.newgrp` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.nice` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1726,13 +1727,13 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.od` | utility | pass | `test:tests/posix/utility/text/od/test.sh` |  |
 | `util.paste` | utility | pass | `test:tests/posix/utility/text/paste/test.sh` |  |
 | `util.patch` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.pathchk` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.pathchk` | utility | pass | `test:tests/posix/utility/file/pathchk/test.sh` |  |
 | `util.pax` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.pr` | utility | pass | `test:tests/posix/utility/text/pr/test.sh` |  |
 | `util.printf` | utility | pass | `test:tests/posix/utility/text/printf/test.sh` |  |
 | `util.prs` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.ps` | utility | fail | `userland/bin/ps` | profile status partial; no POSIX utility test |
-| `util.pwd` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.pwd` | utility | pass | `test:tests/posix/utility/file/pwd/test.sh` |  |
 | `util.qalter` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.qdel` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.qhold` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1745,12 +1746,14 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.qstat` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.qsub` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.read` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.readlink` | utility | pass | `test:tests/posix/utility/file/readlink/test.sh` |  |
 | `util.readonly` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.realpath` | utility | pass | `test:tests/posix/utility/file/realpath/test.sh` |  |
 | `util.renice` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.return` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.rm` | utility | fail | `userland/bin/rm` | profile status partial; no POSIX utility test |
+| `util.rm` | utility | pass | `test:tests/posix/utility/file/rm/test.sh` |  |
 | `util.rmdel` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.rmdir` | utility | fail | `userland/bin/rmdir` | profile status partial; no POSIX utility test |
+| `util.rmdir` | utility | pass | `test:tests/posix/utility/file/rmdir/test.sh` |  |
 | `util.sact` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.sccs` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.sed` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1760,6 +1763,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.sleep` | utility | fail | `userland/bin/sleep` | profile status partial; no POSIX utility test |
 | `util.sort` | utility | pass | `test:tests/posix/utility/text/sort/test.sh` |  |
 | `util.split` | utility | pass | `test:tests/posix/utility/text/split/test.sh` |  |
+| `util.stat` | utility | pass | `test:tests/posix/utility/file/stat/test.sh` |  |
 | `util.strings` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.strip` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.stty` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1770,7 +1774,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.test` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.time` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.times` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.touch` | utility | fail | `userland/bin/touch` | profile status partial; no POSIX utility test |
+| `util.touch` | utility | pass | `test:tests/posix/utility/file/touch/test.sh` |  |
 | `util.tput` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.tr` | utility | pass | `test:tests/posix/utility/text/tr/test.sh` |  |
 | `util.trap` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1786,7 +1790,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.unexpand` | utility | pass | `test:tests/posix/utility/text/unexpand/test.sh` |  |
 | `util.unget` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.uniq` | utility | pass | `test:tests/posix/utility/text/uniq/test.sh` |  |
-| `util.unlink` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.unlink` | utility | pass | `test:tests/posix/utility/file/unlink/test.sh` |  |
 | `util.unset` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.uucp` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.uudecode` | utility | fail | `none` | profile status missing; no POSIX utility test |

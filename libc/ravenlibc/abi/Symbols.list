@@ -65,6 +65,7 @@ atanf
 atanh
 atanhf
 atexit
+atof
 atoi
 atol
 atoll
@@ -274,6 +275,8 @@ fputc
 fputs
 fread
 free
+free_aligned_sized
+free_sized
 freeaddrinfo
 freelocale
 freezero
@@ -535,6 +538,7 @@ mblen
 mbrlen
 mbrtowc
 mbsinit
+mbstowcs
 mbtowc
 memalign
 memccpy
@@ -975,10 +979,13 @@ strcat
 strchr
 strchrnul
 strcmp
+strcoll
+strcoll_l
 strcpy
 strcspn
 strdup
 strerror
+strerror_l
 strerror_r
 strftime
 strlcat
@@ -1008,6 +1015,7 @@ strspn
 strstr
 strsvis
 strsvisx
+strtod
 strtoimax
 strtok
 strtok_r
@@ -1022,6 +1030,8 @@ strunvisx
 strverscmp
 strvis
 strvisx
+strxfrm
+strxfrm_l
 suboptarg
 svis
 swab
@@ -1169,6 +1179,7 @@ wcspbrk
 wcsrchr
 wcsspn
 wcsstr
+wcstombs
 wcswidth
 wctob
 wctomb

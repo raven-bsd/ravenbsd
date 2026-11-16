@@ -194,7 +194,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.float.h"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/include"
+evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.fmtmsg.h"
@@ -242,7 +242,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.iso646.h"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/include"
+evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.langinfo.h"
@@ -260,7 +260,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.libintl.h"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/include"
+evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.limits.h"
@@ -392,25 +392,25 @@ evidence = "libc/ravenlibc/include"
 id = "header.stdarg.h"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/include"
+evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.stdatomic.h"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/include"
+evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.stdbool.h"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/include"
+evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.stddef.h"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/include"
+evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.stdint.h"
@@ -572,7 +572,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.tgmath.h"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/include"
+evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.threads.h"
@@ -1034,7 +1034,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.atof"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib.sh"
 
 [[trace]]
 id = "interface.atoi"
@@ -3044,13 +3044,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.free_aligned_sized"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib.sh"
 
 [[trace]]
 id = "interface.free_sized"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib.sh"
 
 [[trace]]
 id = "interface.freeaddrinfo"
@@ -4916,7 +4916,7 @@ evidence = "none"
 id = "interface.mbstowcs"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib.sh"
 
 [[trace]]
 id = "interface.mbtowc"
@@ -7724,13 +7724,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.strcoll"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/string/check-string.sh"
 
 [[trace]]
 id = "interface.strcoll_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/string/check-string.sh"
 
 [[trace]]
 id = "interface.strcpy"
@@ -7754,7 +7754,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.strerror_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/string/check-string.sh"
 
 [[trace]]
 id = "interface.strerror_r"
@@ -7886,7 +7886,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.strtod"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib.sh"
 
 [[trace]]
 id = "interface.strtof"
@@ -7958,13 +7958,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.strxfrm"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/string/check-string.sh"
 
 [[trace]]
 id = "interface.strxfrm_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/string/check-string.sh"
 
 [[trace]]
 id = "interface.swab"
@@ -8984,7 +8984,7 @@ evidence = "none"
 id = "interface.wcstombs"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib.sh"
 
 [[trace]]
 id = "interface.wcstoul"

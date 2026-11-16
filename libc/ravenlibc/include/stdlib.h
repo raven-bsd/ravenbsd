@@ -88,6 +88,8 @@ void *malloc (size_t);
 void *calloc (size_t, size_t);
 void *realloc (void *, size_t);
 void free (void *);
+void free_sized (void *, size_t);
+void free_aligned_sized (void *, size_t, size_t);
 void *aligned_alloc (size_t, size_t);
 
 _Noreturn void abort (void);

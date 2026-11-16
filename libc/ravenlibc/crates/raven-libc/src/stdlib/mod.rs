@@ -10,6 +10,7 @@ pub(crate) mod exit;
 
 pub(crate) mod a64l;
 pub(crate) mod abs;
+pub(crate) mod atof;
 pub(crate) mod atoi;
 pub(crate) mod bsearch;
 pub(crate) mod clearenv;
@@ -18,6 +19,7 @@ pub(crate) mod drand48;
 pub(crate) mod env_support;
 pub(crate) mod environ;
 pub(crate) mod erand48;
+pub(crate) mod free_sized;
 pub(crate) mod getenv;
 pub(crate) mod getenv_r;
 pub(crate) mod getopt;
@@ -34,6 +36,7 @@ pub(crate) mod lcong48;
 pub(crate) mod lfind;
 pub(crate) mod lrand48;
 pub(crate) mod lsearch;
+pub(crate) mod mbstowcs;
 pub(crate) mod mergesort;
 pub(crate) mod mrand48;
 pub(crate) mod nrand48;
@@ -70,6 +73,7 @@ pub(crate) mod tfind;
 pub(crate) mod tsearch;
 pub(crate) mod twalk;
 pub(crate) mod unsetenv;
+pub(crate) mod wcstombs;
 
 #[allow(non_snake_case)] // the C symbol is `_Exit`
 pub(crate) mod _Exit;
