@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4n compress evidence: first-party .Z LZW tools.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.compress"
+status = "present"
+evidence = "test:tests/posix/utility/compress/compress/test.sh"
+notes = "P4n: .Z LZW header, round-trip, empty/binary input, widths and corrupt-stream tests"
+
+[[row]]
+id = "util.uncompress"
+status = "present"
+evidence = "test:tests/posix/utility/compress/uncompress/test.sh"
+notes = "P4n: .Z decode argument and suffix tests"
+
+[[row]]
+id = "util.zcat"
+status = "present"
+evidence = "test:tests/posix/utility/compress/zcat/test.sh"
+notes = "P4n: zcat argument and source-name tests"
