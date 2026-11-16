@@ -10,6 +10,7 @@
 
 use crate::Error;
 use crate::descriptor::{ReportLayout, parse_report_descriptor};
+use crate::keymap::Layout;
 use crate::report::{BOOT_REPORT_LEN, BootReport, KeyEvents, Keyboard};
 use crate::setup::SetupPacket;
 
@@ -45,6 +46,15 @@ impl<R: TransferRing> BootKeyboard<R> {
         Self {
             ring,
             keyboard: Keyboard::new(),
+            primed: false,
+        }
+    }
+
+    /// Wrap a transport with a selected keymap layout.
+    pub const fn with_layout(ring: R, layout: Layout) -> Self {
+        Self {
+            ring,
+            keyboard: Keyboard::with_layout(layout),
             primed: false,
         }
     }
@@ -103,6 +113,16 @@ impl<R: TransferRing> BootKeyboard<R> {
     #[must_use]
     pub const fn keyboard(&self) -> &Keyboard {
         &self.keyboard
+    }
+
+    /// Mutable keyboard state, for layout selection.
+    pub fn keyboard_mut(&mut self) -> &mut Keyboard {
+        &mut self.keyboard
+    }
+
+    /// Select the keymap layout.
+    pub fn set_layout(&mut self, layout: Layout) {
+        self.keyboard.set_layout(layout);
     }
 
     /// The transport, for the xHCI binding.

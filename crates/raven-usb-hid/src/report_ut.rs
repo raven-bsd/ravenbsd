@@ -113,3 +113,46 @@ fn modifier_release_is_an_event() {
         }
     );
 }
+
+#[test]
+fn the_layout_selects_the_uk_iso_keys() {
+    let mut keyboard = Keyboard::with_layout(Layout::Uk);
+    assert_eq!(keyboard.layout(), Layout::Uk);
+    let events = keyboard.update(&report(0x02, keys(&[0x20])));
+    assert_eq!(events.events[1].ascii, Some(0xa3));
+    keyboard.set_layout(Layout::Us);
+    let _ = keyboard.update(&report(0, keys(&[])));
+    let events = keyboard.update(&report(0x02, keys(&[0x20])));
+    assert_eq!(events.events[1].ascii, Some(b'#'));
+}
+
+#[test]
+fn num_lock_toggles_before_the_keypad_mapping() {
+    let mut keyboard = Keyboard::new();
+    let _ = keyboard.update(&report(0, keys(&[0x53])));
+    assert!(keyboard.num_lock());
+    let _ = keyboard.update(&report(0, keys(&[])));
+    let events = keyboard.update(&report(0, keys(&[0x59])));
+    assert_eq!(events.events[0].ascii, Some(b'1'));
+    let _ = keyboard.update(&report(0, keys(&[])));
+    let _ = keyboard.update(&report(0, keys(&[0x53])));
+    assert!(!keyboard.num_lock());
+    let _ = keyboard.update(&report(0, keys(&[])));
+    let events = keyboard.update(&report(0, keys(&[0x59])));
+    assert_eq!(events.events[0].ascii, None);
+}
+
+#[test]
+fn alt_and_altgr_are_tracked_and_suppress_ascii() {
+    let mut keyboard = Keyboard::new();
+    let events = keyboard.update(&report(0x40, keys(&[0x04])));
+    assert!(keyboard.altgr());
+    assert_eq!(events.events[1].ascii, None);
+    let _ = keyboard.update(&report(0, keys(&[])));
+    assert!(!keyboard.altgr());
+    let events = keyboard.update(&report(0x04, keys(&[0x04])));
+    assert!(keyboard.alt());
+    assert_eq!(events.events[1].ascii, None);
+    assert!(!keyboard.shift());
+    assert!(!keyboard.control());
+}

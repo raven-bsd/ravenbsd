@@ -11,12 +11,14 @@
 #![no_std]
 
 pub mod console;
+pub mod repeat;
 pub mod service;
 
 pub use console::ConsoleInput;
+pub use repeat::{Repeat, RepeatSettings};
 pub use service::KeyboardService;
 
-pub use raven_usb_hid::{Error, SetupPacket, TransferRing};
+pub use raven_usb_hid::{Error, Layout, SetupPacket, TransferRing};
 
 /// The standard 63-byte boot-keyboard report descriptor.
 ///

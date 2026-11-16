@@ -21,7 +21,11 @@ pub use descriptor::{
     Field, HidDescriptor, MAX_FIELDS, ReportLayout, parse_hid_descriptor, parse_report_descriptor,
 };
 pub use device::{BootKeyboard, REPORT_ENDPOINT, TransferRing};
-pub use keymap::key_to_ascii;
+pub use keymap::{
+    CAPS_LOCK, LEFT_ALT, LEFT_CTRL, LEFT_GUI, LEFT_SHIFT, Layout, MODIFIER_FIRST, MODIFIER_LAST,
+    NUM_LOCK, RIGHT_ALT, RIGHT_CTRL, RIGHT_GUI, RIGHT_SHIFT, alt, altgr, control, gui, is_modifier,
+    key_to_ascii, key_to_ascii_layout, shift,
+};
 pub use report::{BOOT_REPORT_LEN, BootReport, KeyEvent, KeyEvents, Keyboard, MAX_EVENTS};
 pub use setup::SetupPacket;
 
