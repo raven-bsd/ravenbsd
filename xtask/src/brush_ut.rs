@@ -14,10 +14,15 @@ fn build_brush_requires_an_arch() {
 }
 
 #[test]
-fn build_brush_parses_the_arch_and_release() {
-    let options = parse_build(&args(&["--arch", "x86_64", "--release"])).unwrap();
+fn build_brush_defaults_to_release() {
+    let options = parse_build(&args(&["--arch", "x86_64"])).unwrap();
     assert_eq!(options.arch, Arch::X86_64);
     assert!(options.release);
+    assert!(
+        !parse_build(&args(&["--arch", "x86_64", "--debug"]))
+            .unwrap()
+            .release
+    );
 }
 
 #[test]

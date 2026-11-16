@@ -43,6 +43,8 @@ unused_macro_rules = "deny"
 # For now we allow unknown lints so we can opt into warnings that don't exist on the
 # oldest toolchain we need to support.
 unknown_lints = { level = "allow", priority = -100 }
+# The host toolchain does not know the custom `ravenbsd` target; the target build does.
+unexpected_cfgs = { level = "allow", priority = -100 }
 
 [workspace.lints.rustdoc]
 all = { level = "deny", priority = -1 }
