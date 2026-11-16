@@ -88,8 +88,8 @@ pub extern "C" fn difftime(t1: c_longlong, t0: c_longlong) -> c_double {
 ///
 /// The hosted C caller passes and receives `double` in the SysV SSE registers
 /// since S22 enabled the hard-float time case, while the libc target itself is
-/// the soft-float profile. The assembly entry does the integer subtraction and
-/// the one conversion directly, returning the value in `xmm0`.
+/// the soft-float profile. The assembly entry converts both operands and
+/// subtracts them in `xmm0`, so the signed difference cannot wrap.
 #[cfg(target_arch = "x86_64")]
 core::arch::global_asm!(
     r#"
@@ -97,9 +97,9 @@ core::arch::global_asm!(
     .global difftime
     .type difftime, @function
 difftime:
-    mov rax, rdi
-    sub rax, rsi
-    cvtsi2sd xmm0, rax
+    cvtsi2sd xmm0, rdi
+    cvtsi2sd xmm1, rsi
+    subsd xmm0, xmm1
     ret
     .size difftime, . - difftime
 "#
