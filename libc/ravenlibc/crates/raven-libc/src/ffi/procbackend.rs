@@ -4,8 +4,8 @@
 //! The shell's one process backend (C64 4.9 / P2a).
 //!
 //! On the target the identity syscalls are real: `PROC_SELF_INFO`, `PROC_SETPGID`, `PROC_SETSID`
-//! and `PROC_SETCRED` are called through `raven-libc-sys`. Host tests and the pre-syscall
-//! bootstrap keep `LocalBackend`. Nothing is created at start and `fork`/`exec`/`spawn` keep the
+//! and `PROC_SETCRED` are called through `raven-libc-sys`. P9a adds the native `file:` spawner
+//! (`native_spawn::NATIVE_SPAWNER`) for `posix_spawn`/`waitpid`; `fork` and `exec` still keep the
 //! local backend's honest `ENOSYS` until `procd` exists.
 
 #[cfg(target_os = "none")]
@@ -30,7 +30,7 @@ use raven_libc_proc::syscall_backend::{
 /// The process backend of the shell.
 #[cfg(target_os = "none")]
 pub(crate) fn backend() -> SyscallBackend<RealSyscall> {
-    SyscallBackend::new(RealSyscall)
+    SyscallBackend::with_spawner(RealSyscall, &raven_libc_proc::native_spawn::NATIVE_SPAWNER)
 }
 
 /// The process backend of the shell before the target syscall seam exists.
