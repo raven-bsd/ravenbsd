@@ -30,6 +30,7 @@ fn ctx() -> Ctx {
         token: 1,
         buffer_len: 0,
         response_len: 0,
+        credentials: Credentials::ROOT,
     }
 }
 

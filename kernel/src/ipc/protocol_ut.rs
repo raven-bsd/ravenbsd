@@ -20,8 +20,35 @@ fn sample() -> SchemePacket {
 
 #[test]
 fn packet_size_and_offsets_are_stable() {
-    assert_eq!(PACKET_SIZE, 440);
+    assert_eq!(PACKET_SIZE, 520);
     assert_eq!(size_of::<Opcode>(), 2);
+}
+
+#[test]
+fn caller_credentials_roundtrip() {
+    let mut packet = SchemePacket::request(Opcode::Open, 1, 2);
+    packet.uid = 1000;
+    packet.euid = 1000;
+    packet.gid = 1000;
+    packet.egid = 1001;
+    packet.group_count = 2;
+    packet.groups[0] = 4;
+    packet.groups[1] = 1001;
+    let decoded = decode(&to_vec(&packet).unwrap()).unwrap();
+    assert_eq!(decoded.uid, 1000);
+    assert_eq!(decoded.euid, 1000);
+    assert_eq!(decoded.gid, 1000);
+    assert_eq!(decoded.egid, 1001);
+    assert_eq!(decoded.group_count, 2);
+    assert_eq!(&decoded.groups[..2], &[4, 1001]);
+    assert_eq!(decoded.validate(false), Ok(()));
+}
+
+#[test]
+fn group_count_is_bounded() {
+    let mut packet = SchemePacket::request(Opcode::Read, 1, 1);
+    packet.group_count = MAX_GROUPS as u32 + 1;
+    assert_eq!(packet.validate(false), Err(PacketError::BadLength));
 }
 
 #[test]

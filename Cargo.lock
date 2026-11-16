@@ -1961,6 +1961,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-perm"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-pf"
 version = "0.1.0"
 

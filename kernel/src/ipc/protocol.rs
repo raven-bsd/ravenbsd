@@ -20,11 +20,13 @@ use core::mem::{offset_of, size_of};
 use raven_abi::types::Rights;
 
 /// Current packet version.
-pub const VERSION: u32 = 1;
+pub const VERSION: u32 = 2;
 /// Maximum path suffix carried by an `Open` packet.
 pub const MAX_PATH: usize = 256;
 /// Maximum inline data carried by a packet.
 pub const MAX_DATA: usize = 64;
+/// Maximum supplementary groups carried by a packet.
+pub const MAX_GROUPS: usize = 16;
 /// Maximum payload captured for one request or response.
 pub const MAX_TRANSFER: u64 = 4 * 1024 * 1024;
 /// Maximum handles attached to one reply.
@@ -140,6 +142,18 @@ pub struct SchemePacket {
     pub attach_count: u32,
     /// Reply attachments, encoded after inline data.
     pub attach: [Attachment; MAX_ATTACHMENTS],
+    /// Caller real user id (version 2).
+    pub uid: u32,
+    /// Caller effective user id (version 2).
+    pub euid: u32,
+    /// Caller real group id (version 2).
+    pub gid: u32,
+    /// Caller effective group id (version 2).
+    pub egid: u32,
+    /// Number of valid entries in [`SchemePacket::groups`] (version 2).
+    pub group_count: u32,
+    /// Caller supplementary groups (version 2).
+    pub groups: [u32; MAX_GROUPS],
 }
 
 impl Default for SchemePacket {
@@ -162,6 +176,12 @@ impl Default for SchemePacket {
             data: [0; MAX_DATA],
             attach_count: 0,
             attach: [Attachment::default(); MAX_ATTACHMENTS],
+            uid: 0,
+            euid: 0,
+            gid: 0,
+            egid: 0,
+            group_count: 0,
+            groups: [0; MAX_GROUPS],
         }
     }
 }
@@ -170,7 +190,7 @@ impl Default for SchemePacket {
 pub const PACKET_SIZE: usize = size_of::<SchemePacket>();
 
 const _: () = {
-    assert!(PACKET_SIZE == 440);
+    assert!(PACKET_SIZE == 520);
     assert!(offset_of!(SchemePacket, version) == 0);
     assert!(offset_of!(SchemePacket, opcode) == 4);
     assert!(offset_of!(SchemePacket, flags) == 6);
@@ -188,6 +208,12 @@ const _: () = {
     assert!(offset_of!(SchemePacket, data) == 336);
     assert!(offset_of!(SchemePacket, attach_count) == 400);
     assert!(offset_of!(SchemePacket, attach) == 404);
+    assert!(offset_of!(SchemePacket, uid) == 436);
+    assert!(offset_of!(SchemePacket, euid) == 440);
+    assert!(offset_of!(SchemePacket, gid) == 444);
+    assert!(offset_of!(SchemePacket, egid) == 448);
+    assert!(offset_of!(SchemePacket, group_count) == 452);
+    assert!(offset_of!(SchemePacket, groups) == 456);
 };
 
 /// Why a reply's reported result length is not acceptable.
@@ -305,6 +331,22 @@ pub fn encode(packet: &SchemePacket, out: &mut [u8]) -> Result<(), PacketError> 
         put_u32(out, offset.saturating_add(4), attachment.rights_mask);
         index = index.saturating_add(1);
     }
+    put_u32(out, offset_of!(SchemePacket, uid), packet.uid);
+    put_u32(out, offset_of!(SchemePacket, euid), packet.euid);
+    put_u32(out, offset_of!(SchemePacket, gid), packet.gid);
+    put_u32(out, offset_of!(SchemePacket, egid), packet.egid);
+    put_u32(
+        out,
+        offset_of!(SchemePacket, group_count),
+        packet.group_count,
+    );
+    let mut index = 0usize;
+    while index < MAX_GROUPS {
+        let offset = offset_of!(SchemePacket, groups).saturating_add(index.saturating_mul(4));
+        let group = packet.groups.get(index).copied().unwrap_or(0);
+        put_u32(out, offset, group);
+        index = index.saturating_add(1);
+    }
     Ok(())
 }
 
@@ -335,6 +377,14 @@ pub fn decode(input: &[u8]) -> Result<SchemePacket, PacketError> {
         slot.rights_mask = get_u32(input, offset.saturating_add(4))?;
         index = index.saturating_add(1);
     }
+    let mut groups = [0u32; MAX_GROUPS];
+    let mut index = 0usize;
+    while index < MAX_GROUPS {
+        let offset = offset_of!(SchemePacket, groups).saturating_add(index.saturating_mul(4));
+        let slot = groups.get_mut(index).ok_or(PacketError::TooShort)?;
+        *slot = get_u32(input, offset)?;
+        index = index.saturating_add(1);
+    }
     Ok(SchemePacket {
         version: get_u32(input, offset_of!(SchemePacket, version))?,
         opcode: get_u16(input, offset_of!(SchemePacket, opcode))?,
@@ -353,6 +403,12 @@ pub fn decode(input: &[u8]) -> Result<SchemePacket, PacketError> {
         data,
         attach_count,
         attach,
+        uid: get_u32(input, offset_of!(SchemePacket, uid))?,
+        euid: get_u32(input, offset_of!(SchemePacket, euid))?,
+        gid: get_u32(input, offset_of!(SchemePacket, gid))?,
+        egid: get_u32(input, offset_of!(SchemePacket, egid))?,
+        group_count: get_u32(input, offset_of!(SchemePacket, group_count))?,
+        groups,
     })
 }
 
@@ -387,6 +443,9 @@ impl SchemePacket {
             return Err(PacketError::BadLength);
         }
         if self.attach_count as usize > MAX_ATTACHMENTS {
+            return Err(PacketError::BadLength);
+        }
+        if self.group_count as usize > MAX_GROUPS {
             return Err(PacketError::BadLength);
         }
         if response && !(0..=4095).contains(&self.status) {
