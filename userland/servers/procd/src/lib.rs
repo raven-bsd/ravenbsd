@@ -16,6 +16,6 @@ extern crate alloc;
 pub mod model;
 
 pub use model::{
-    Child, P_ALL, P_PID, ProcInfo, ProcSys, Procd, SIGINT, SIGKILL, SIGTERM, WNOHANG, WaitStatus,
-    encode_wait_status,
+    Child, KERNEL_P_ALL, KERNEL_WCONTINUED, P_ALL, P_PGID, P_PID, ProcInfo, ProcSys, Procd,
+    SIGKILL, SIGTERM, WCONTINUED, WNOHANG, WUNTRACED, WaitEvent,
 };

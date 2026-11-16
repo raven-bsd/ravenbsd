@@ -20,10 +20,9 @@ mod program {
     use alloc::collections::BTreeSet;
 
     use raven_abi::errno::Errno;
-    use raven_abi::syscall::Syscall;
     use raven_abi::types::Handle;
     use raven_initfs::Initfs;
-    use raven_procd::{ProcInfo, ProcSys, Procd};
+    use raven_procd::{ProcInfo, ProcSys, Procd, WaitEvent};
     use raven_proto_fs::OpenFlags;
     use raven_proto_proc::{decode_request, encode_response};
     use raven_rt::entry;
@@ -36,6 +35,9 @@ mod program {
     const PROC_PID_INFO: usize = 0x3A;
     const PROC_SETPGID: usize = 0x36;
     const PROC_HANDLE_INFO: usize = 0x3E;
+    const PROC_WAIT_EX: usize = 0x48;
+    const PROC_GETPGID: usize = 0x49;
+    const PROC_SIGNAL: usize = 0x4A;
 
     struct TargetSys {
         initfs: Initfs<'static>,
@@ -78,22 +80,40 @@ mod program {
             })
         }
 
-        fn wait(&mut self, handle: Handle) -> Result<i32, Errno> {
-            let mut code = 0i32;
-            // SAFETY: PROC_WAIT takes a process handle and a writable i32 pointer owned by the
-            // caller; the kernel validates the handle and the destination range.
+        fn wait_ex(&mut self, idtype: u32, id: i32, options: u32) -> Result<WaitEvent, Errno> {
+            let mut status = 0i32;
+            // SAFETY: WAIT_EX takes three scalar selectors and a writable i32 status pointer
+            // owned by the caller; the kernel validates the idtype, the target and the range.
             let raw = unsafe {
-                raven_rt::sys::syscall2(
-                    Syscall::PROC_WAIT as usize,
-                    handle.0 as usize,
-                    &mut code as *mut i32 as usize,
+                raven_rt::sys::syscall4(
+                    PROC_WAIT_EX,
+                    idtype as usize,
+                    id as isize as usize,
+                    options as usize,
+                    &mut status as *mut i32 as usize,
                 )
             };
-            Errno::from_ret(raw).map(|_| code)
+            let pid = Errno::from_ret(raw)?;
+            Ok(WaitEvent {
+                pid: i32::try_from(pid).map_err(|_| Errno::EOVERFLOW)?,
+                status,
+            })
         }
 
-        fn terminate(&mut self, handle: Handle, code: i32) -> Result<(), Errno> {
-            raven_rt::sys::proc_terminate(handle, code)
+        fn signal(&mut self, target: i32, signo: u32) -> Result<(), Errno> {
+            // SAFETY: SIGNAL takes two scalar values; the kernel validates the target, signal
+            // number, uid permission and group membership.
+            let raw = unsafe {
+                raven_rt::sys::syscall2(PROC_SIGNAL, target as isize as usize, signo as usize)
+            };
+            Errno::from_ret(raw).map(|_| ())
+        }
+
+        fn getpgid(&mut self, pid: i32) -> Result<i32, Errno> {
+            // SAFETY: GETPGID takes one scalar pid; the kernel validates it and returns the
+            // stored group id.
+            let raw = unsafe { raven_rt::sys::syscall1(PROC_GETPGID, pid as isize as usize) };
+            Errno::from_ret(raw).and_then(|pgid| i32::try_from(pgid).map_err(|_| Errno::EOVERFLOW))
         }
 
         fn setpgid(&mut self, pid: i32, pgid: i32) -> Result<(), Errno> {

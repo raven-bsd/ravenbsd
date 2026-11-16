@@ -27,8 +27,8 @@ struct FakeSys {
     infos: BTreeMap<i32, ProcInfo>,
     handles: BTreeMap<u32, i32>,
     fail_info: BTreeMap<i32, usize>,
-    waits: VecDeque<Result<i32, Errno>>,
-    terminations: Vec<(Handle, i32)>,
+    wait_events: VecDeque<Result<WaitEvent, Errno>>,
+    signals: Vec<(i32, u32)>,
     setpgids: Vec<(i32, i32)>,
     closed: Vec<Handle>,
     next_pid: i32,
@@ -53,26 +53,14 @@ impl FakeSys {
             infos,
             handles: BTreeMap::new(),
             fail_info: BTreeMap::new(),
-            waits: VecDeque::new(),
-            terminations: Vec::new(),
+            wait_events: VecDeque::new(),
+            signals: Vec::new(),
             setpgids: Vec::new(),
             closed: Vec::new(),
             next_pid: 100,
             next_handle: 10,
             server_pid: 3,
         }
-    }
-
-    fn add_child(&mut self, pid: i32, ppid: i32, pgid: i32, sid: i32) {
-        self.infos.insert(
-            pid,
-            ProcInfo {
-                pid,
-                ppid,
-                pgid,
-                sid,
-            },
-        );
     }
 }
 
@@ -88,7 +76,15 @@ impl ProcSys for FakeSys {
         let handle = Handle(self.next_handle);
         self.next_handle += 1;
         self.handles.insert(handle.0, pid);
-        self.add_child(pid, self.server_pid, self.server_pid, self.server_pid);
+        self.infos.insert(
+            pid,
+            ProcInfo {
+                pid,
+                ppid: self.server_pid,
+                pgid: self.server_pid,
+                sid: self.server_pid,
+            },
+        );
         Ok(handle)
     }
 
@@ -107,13 +103,17 @@ impl ProcSys for FakeSys {
         self.infos.get(&pid).copied().ok_or(Errno::ESRCH)
     }
 
-    fn wait(&mut self, _handle: Handle) -> Result<i32, Errno> {
-        self.waits.pop_front().unwrap_or(Err(Errno::ECHILD))
+    fn wait_ex(&mut self, _idtype: u32, _id: i32, _options: u32) -> Result<WaitEvent, Errno> {
+        self.wait_events.pop_front().unwrap_or(Err(Errno::ECHILD))
     }
 
-    fn terminate(&mut self, handle: Handle, code: i32) -> Result<(), Errno> {
-        self.terminations.push((handle, code));
+    fn signal(&mut self, target: i32, signo: u32) -> Result<(), Errno> {
+        self.signals.push((target, signo));
         Ok(())
+    }
+
+    fn getpgid(&mut self, pid: i32) -> Result<i32, Errno> {
+        self.info(pid).map(|info| info.pgid)
     }
 
     fn setpgid(&mut self, pid: i32, pgid: i32) -> Result<(), Errno> {
@@ -197,7 +197,10 @@ fn hello_reports_the_server_version_and_pid() {
 #[test]
 fn spawn_records_argv_env_and_wait_reports_the_exit_status() {
     let mut sys = FakeSys::new();
-    sys.waits.push_back(Ok(7));
+    sys.wait_events.push_back(Ok(WaitEvent {
+        pid: 100,
+        status: 7 << 8,
+    }));
     let mut procd = Procd::new(sys, 3);
     let pid = spawn(&mut procd, 1000);
     assert_eq!(pid, 100);
@@ -233,9 +236,66 @@ fn spawn_records_argv_env_and_wait_reports_the_exit_status() {
 }
 
 #[test]
-fn kill_maps_supported_signals_to_terminate_and_wait_reports_signaled() {
+fn wait_nohang_and_stop_continue_keep_the_child_alive() {
     let mut sys = FakeSys::new();
-    sys.waits.push_back(Ok(143));
+    sys.wait_events
+        .push_back(Ok(WaitEvent { pid: 0, status: 0 }));
+    let stop_status = ((SIGTERM & 0x7f) << 8) | 0x7f;
+    sys.wait_events.push_back(Ok(WaitEvent {
+        pid: 100,
+        status: stop_status as i32,
+    }));
+    sys.wait_events.push_back(Ok(WaitEvent {
+        pid: 100,
+        status: 0xffff,
+    }));
+    sys.wait_events.push_back(Ok(WaitEvent {
+        pid: 100,
+        status: 0,
+    }));
+    let mut procd = Procd::new(sys, 3);
+    let pid = spawn(&mut procd, 1000);
+    let nohang = wait(&mut procd, 1000, pid, WNOHANG);
+    assert_eq!(nohang.value, 0);
+    let stopped = wait(&mut procd, 1000, pid, WUNTRACED);
+    assert_eq!(
+        stopped.body,
+        Body::Wait {
+            status: stop_status as i32,
+            siginfo: [0u8; 128],
+            rusage: [0u8; 144],
+        }
+    );
+    assert!(procd.children().contains_key(&pid));
+    let continued = wait(&mut procd, 1000, pid, WCONTINUED);
+    assert_eq!(
+        continued.body,
+        Body::Wait {
+            status: 0xffff,
+            siginfo: [0u8; 128],
+            rusage: [0u8; 144],
+        }
+    );
+    assert!(procd.children().contains_key(&pid));
+    let exited = wait(&mut procd, 1000, pid, 0);
+    assert_eq!(
+        exited.body,
+        Body::Wait {
+            status: 0,
+            siginfo: [0u8; 128],
+            rusage: [0u8; 144],
+        }
+    );
+    assert!(!procd.children().contains_key(&pid));
+}
+
+#[test]
+fn kill_uses_the_kernel_signal_path_and_wait_reports_the_exit_code() {
+    let mut sys = FakeSys::new();
+    sys.wait_events.push_back(Ok(WaitEvent {
+        pid: 100,
+        status: 143 << 8,
+    }));
     let mut procd = Procd::new(sys, 3);
     let pid = spawn(&mut procd, 1000);
     let response = procd.dispatch(
@@ -248,21 +308,16 @@ fn kill_maps_supported_signals_to_terminate_and_wait_reports_signaled() {
         }),
     );
     assert_eq!(response.status, 0);
-    assert_eq!(
-        procd.children().get(&pid).expect("child").status,
-        Some(WaitStatus::signaled(SIGTERM))
-    );
-
+    assert_eq!(procd.sys().signals, vec![(pid, SIGTERM)]);
     let response = wait(&mut procd, 1000, pid, 0);
     assert_eq!(
         response.body,
         Body::Wait {
-            status: SIGTERM as i32,
+            status: 143 << 8,
             siginfo: [0u8; 128],
             rusage: [0u8; 144],
         }
     );
-    let _ = procd;
 }
 
 #[test]
@@ -283,12 +338,26 @@ fn group_and_identity_operations_use_the_kernel_values() {
             .value,
         3
     );
+    let response = procd.dispatch(
+        1000,
+        Request::Kill(KillRequest {
+            pid: -i64::from(pid),
+            sig: SIGTERM,
+            flags: 0,
+            value: None,
+        }),
+    );
+    assert_eq!(response.status, 0);
+    assert_eq!(procd.sys().signals, vec![(-pid, SIGTERM)]);
 }
 
 #[test]
 fn owner_checks_reject_another_unprivileged_client() {
     let mut sys = FakeSys::new();
-    sys.waits.push_back(Ok(0));
+    sys.wait_events.push_back(Ok(WaitEvent {
+        pid: 100,
+        status: 0,
+    }));
     let mut procd = Procd::new(sys, 3);
     let pid = spawn(&mut procd, 1000);
     assert_eq!(
@@ -301,40 +370,50 @@ fn owner_checks_reject_another_unprivileged_client() {
 #[test]
 fn unsupported_rows_are_honest_enosys() {
     let mut procd = Procd::new(FakeSys::new(), 3);
-    assert_eq!(
-        procd.dispatch(1000, Request::Other(Op::Fork)).status,
-        -(Errno::ENOSYS.0 as i32)
-    );
-    assert_eq!(
-        procd.dispatch(1000, Request::Other(Op::Exec)).status,
-        -(Errno::ENOSYS.0 as i32)
-    );
-    assert_eq!(
-        procd.dispatch(1000, Request::Other(Op::SetSid)).status,
-        -(Errno::ENOSYS.0 as i32)
-    );
-    assert_eq!(
-        procd.dispatch(1000, Request::Other(Op::SetCred)).status,
-        -(Errno::ENOSYS.0 as i32)
-    );
+    for op in [
+        Op::Fork,
+        Op::Exec,
+        Op::SetSid,
+        Op::SetCred,
+        Op::Rlimit,
+        Op::Rusage,
+        Op::Prio,
+        Op::Sched,
+        Op::SessionInfo,
+    ] {
+        assert_eq!(
+            procd.dispatch(1000, Request::Other(op)).status,
+            -(Errno::ENOSYS.0 as i32),
+            "{op:?}"
+        );
+    }
     let pid = spawn(&mut procd, 1000);
-    assert_eq!(
-        wait(&mut procd, 1000, pid, WNOHANG).status,
-        -(Errno::ENOSYS.0 as i32)
-    );
     assert_eq!(
         procd
             .dispatch(
                 1000,
                 Request::Kill(KillRequest {
                     pid: i64::from(pid),
-                    sig: 19,
-                    flags: 0,
+                    sig: SIGTERM,
+                    flags: 1,
                     value: None,
                 }),
             )
             .status,
         -(Errno::ENOSYS.0 as i32)
+    );
+    assert_eq!(
+        procd
+            .dispatch(
+                1000,
+                Request::Wait(WaitRequest {
+                    idtype: 99,
+                    id: 0,
+                    options: 0,
+                }),
+            )
+            .status,
+        -(Errno::EINVAL.0 as i32)
     );
 }
 

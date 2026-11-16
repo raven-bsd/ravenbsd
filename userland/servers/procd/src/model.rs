@@ -3,9 +3,9 @@
 
 //! The process-table model and protocol dispatch.
 //!
-//! `procd` is the parent of every child it creates. The model keeps the process handle for wait
-//! and terminate, the owner connection (a uid for the first server slice) and the status it has
-//! already reported. The kernel still owns identity, address spaces and exit timing.
+//! `procd` is the parent of every child it creates. The model keeps the process handle, the owner
+//! connection (a uid for this slice), the process group/session and the kernel wait status. The
+//! kernel remains authoritative for identity, address spaces, signal queues and exit timing.
 
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
@@ -18,18 +18,30 @@ use raven_proto_proc::{
     SetPgidRequest, SpawnRequest, VERSION, WaitRequest,
 };
 
-/// `idtype_t` value for all children.
+/// `idtype_t` value for all children (libc/Linux numbering on the wire).
 pub const P_ALL: u32 = 0;
 /// `idtype_t` value for one pid.
 pub const P_PID: u32 = 1;
+/// `idtype_t` value for one process group.
+pub const P_PGID: u32 = 2;
+/// P2f's kernel `P_ALL` value; the wire value is translated to this.
+pub const KERNEL_P_ALL: u32 = 3;
 /// `WNOHANG` option bit.
 pub const WNOHANG: u32 = 1;
-/// POSIX SIGINT.
-pub const SIGINT: u32 = 2;
+/// `WUNTRACED` option bit.
+pub const WUNTRACED: u32 = 2;
+/// `WCONTINUED` wire (libc/Linux) option bit.
+pub const WCONTINUED: u32 = 8;
+/// P2f's kernel `WCONTINUED` option bit.
+pub const KERNEL_WCONTINUED: u32 = 4;
 /// POSIX SIGKILL.
 pub const SIGKILL: u32 = 9;
 /// POSIX SIGTERM.
 pub const SIGTERM: u32 = 15;
+/// Low-byte marker of a stopped wait status.
+const STOPPED_STATUS_MASK: i32 = 0x7f;
+/// The continued wait status.
+const CONTINUED_STATUS: i32 = 0xffff;
 /// POSIX `POSIX_SPAWN_SETPGROUP` from the Linux/musl header values.
 pub const POSIX_SPAWN_SETPGROUP: u32 = 2;
 
@@ -46,6 +58,15 @@ pub struct ProcInfo {
     pub sid: i32,
 }
 
+/// One result from `PROC_WAIT_EX`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WaitEvent {
+    /// Reaped/observed pid, or zero for `WNOHANG` with nothing ready.
+    pub pid: i32,
+    /// Raw POSIX wait status.
+    pub status: i32,
+}
+
 /// The kernel operations the model needs. Host tests use a recording fake.
 pub trait ProcSys {
     /// Spawn an initfs image and return its process handle.
@@ -54,10 +75,12 @@ pub trait ProcSys {
     fn pid(&mut self, handle: Handle) -> Result<i32, Errno>;
     /// Read a live process identity.
     fn info(&mut self, pid: i32) -> Result<ProcInfo, Errno>;
-    /// Block until the child exits and return its raw exit code.
-    fn wait(&mut self, handle: Handle) -> Result<i32, Errno>;
-    /// Terminate the child and store `code` as its exit code.
-    fn terminate(&mut self, handle: Handle, code: i32) -> Result<(), Errno>;
+    /// Wait for a child with the P2f idtype/options/status contract.
+    fn wait_ex(&mut self, idtype: u32, id: i32, options: u32) -> Result<WaitEvent, Errno>;
+    /// Send a signal to a pid or a negative process group.
+    fn signal(&mut self, target: i32, signo: u32) -> Result<(), Errno>;
+    /// Read a process group.
+    fn getpgid(&mut self, pid: i32) -> Result<i32, Errno>;
     /// Set a direct child's process group.
     fn setpgid(&mut self, pid: i32, pgid: i32) -> Result<(), Errno>;
     /// Close a process handle.
@@ -66,47 +89,12 @@ pub trait ProcSys {
     fn self_pid(&mut self) -> Result<i32, Errno>;
 }
 
-/// The status a `wait` reports.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct WaitStatus {
-    /// Raw exit code when the child exited.
-    pub code: i32,
-    /// Signal number when `procd` terminated the child.
-    pub signal: Option<u32>,
-}
-
-impl WaitStatus {
-    /// A normal exit.
-    #[must_use]
-    pub const fn exited(code: i32) -> Self {
-        Self { code, signal: None }
-    }
-
-    /// A signal-style termination.
-    #[must_use]
-    pub const fn signaled(signal: u32) -> Self {
-        Self {
-            code: 128 + signal as i32,
-            signal: Some(signal),
-        }
-    }
-}
-
-/// Encode a [`WaitStatus`] as the POSIX wait-status word.
-#[must_use]
-pub fn encode_wait_status(status: WaitStatus) -> i32 {
-    match status.signal {
-        Some(signal) => (signal & 0x7f) as i32,
-        None => (status.code & 0xff) << 8,
-    }
-}
-
 /// One child owned by this server.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Child {
     /// Process id.
     pub pid: i32,
-    /// Process handle retained for wait and terminate.
+    /// Process handle retained for cleanup and close.
     pub handle: Handle,
     /// Owner connection uid.
     pub owner: u32,
@@ -114,8 +102,6 @@ pub struct Child {
     pub pgid: i32,
     /// Session id.
     pub sid: i32,
-    /// The status already reported by a wait, if any.
-    pub status: Option<WaitStatus>,
     /// The image path, for diagnostics.
     pub image: String,
     /// The umask requested by the spawn request; the current kernel has no child umask call.
@@ -168,15 +154,11 @@ impl<S: ProcSys> Procd<S> {
             Request::SetPgid(setpgid) => self.set_pgid(uid, setpgid),
             Request::GetPgid(getpgid) => self.get_pgid(getpgid),
             Request::GetSid(getsid) => self.get_sid(getsid),
-            Request::Other(op) => {
-                let _ = op;
-                Response::error(Errno::ENOSYS)
-            }
+            Request::Other(_) => Response::error(Errno::ENOSYS),
         }
     }
 
-    fn hello(&self, hello: HelloRequest) -> Response {
-        let _ = hello;
+    fn hello(&self, _hello: HelloRequest) -> Response {
         Response::body(
             0,
             Body::Hello {
@@ -223,11 +205,11 @@ impl<S: ProcSys> Procd<S> {
         let pid = match self.sys.pid(handle) {
             Ok(pid) if pid > 0 => pid,
             Ok(_) => {
-                self.cleanup(handle);
+                self.sys.close(handle);
                 return Response::error(Errno::EINVAL);
             }
             Err(error) => {
-                self.cleanup(handle);
+                self.sys.close(handle);
                 return Response::error(error);
             }
         };
@@ -235,11 +217,11 @@ impl<S: ProcSys> Procd<S> {
         if spawn.spawn_flags & POSIX_SPAWN_SETPGROUP != 0 {
             let target = if spawn.pgroup == 0 { pid } else { spawn.pgroup };
             if target < 0 {
-                self.cleanup(handle);
+                self.cleanup(pid, handle);
                 return Response::error(Errno::EINVAL);
             }
             if let Err(error) = self.sys.setpgid(pid, target) {
-                self.cleanup(handle);
+                self.cleanup(pid, handle);
                 return Response::error(error);
             }
             pgid = Some(target);
@@ -252,7 +234,7 @@ impl<S: ProcSys> Procd<S> {
             Err(_) => match self.sys.info(self.pid) {
                 Ok(info) => info,
                 Err(error) => {
-                    self.cleanup(handle);
+                    self.cleanup(pid, handle);
                     return Response::error(error);
                 }
             },
@@ -265,7 +247,6 @@ impl<S: ProcSys> Procd<S> {
                 owner: uid,
                 pgid: pgid.unwrap_or(info.pgid),
                 sid: info.sid,
-                status: None,
                 image: path,
                 umask: spawn.umask,
             },
@@ -274,16 +255,49 @@ impl<S: ProcSys> Procd<S> {
     }
 
     fn wait(&mut self, uid: u32, wait: WaitRequest) -> Response {
-        if wait.idtype != P_PID || wait.id <= 0 {
-            return Response::error(Errno::ENOSYS);
-        }
-        if wait.options & WNOHANG != 0 {
-            return Response::error(Errno::ENOSYS);
-        }
-        if wait.options != 0 {
+        let idtype = match wait.idtype {
+            P_ALL | KERNEL_P_ALL => P_ALL,
+            P_PID => P_PID,
+            P_PGID => P_PGID,
+            _ => return Response::error(Errno::EINVAL),
+        };
+        if wait.options & !(WNOHANG | WUNTRACED | WCONTINUED) != 0 {
             return Response::error(Errno::EINVAL);
         }
-        let pid = i32::try_from(wait.id).unwrap_or(-1);
+        let id = i32::try_from(wait.id).unwrap_or(-1);
+        if idtype != P_ALL && id <= 0 {
+            return Response::error(Errno::ENOSYS);
+        }
+        if let Err(error) = self.check_wait_owner(uid, idtype, id) {
+            return Response::error(error);
+        }
+        let kernel_type = if idtype == P_ALL {
+            KERNEL_P_ALL
+        } else {
+            idtype
+        };
+        let kernel_id = if idtype == P_ALL { 0 } else { id };
+        let options = (wait.options & (WNOHANG | WUNTRACED))
+            | if wait.options & WCONTINUED != 0 {
+                KERNEL_WCONTINUED
+            } else {
+                0
+            };
+        let event = match self.sys.wait_ex(kernel_type, kernel_id, options) {
+            Ok(event) => event,
+            Err(error) => return Response::error(error),
+        };
+        if event.pid == 0 {
+            return Response::body(
+                0,
+                Body::Wait {
+                    status: 0,
+                    siginfo: [0u8; 128],
+                    rusage: [0u8; 144],
+                },
+            );
+        }
+        let pid = event.pid;
         let Some(child) = self.children.get(&pid) else {
             return Response::error(Errno::ECHILD);
         };
@@ -291,22 +305,14 @@ impl<S: ProcSys> Procd<S> {
             return Response::error(Errno::EPERM);
         }
         let handle = child.handle;
-        let status = match self.sys.wait(handle) {
-            Ok(code) => {
-                if let Some(child) = self.children.get(&pid) {
-                    child.status.unwrap_or_else(|| WaitStatus::exited(code))
-                } else {
-                    WaitStatus::exited(code)
-                }
-            }
-            Err(error) => return Response::error(error),
-        };
-        self.children.remove(&pid);
-        self.sys.close(handle);
+        if is_terminal(event.status) {
+            self.children.remove(&pid);
+            self.sys.close(handle);
+        }
         Response::body(
             i64::from(pid),
             Body::Wait {
-                status: encode_wait_status(status),
+                status: event.status,
                 siginfo: [0u8; 128],
                 rusage: [0u8; 144],
             },
@@ -321,17 +327,18 @@ impl<S: ProcSys> Procd<S> {
             return Response::error(Errno::ENOSYS);
         }
         if kill.sig == 0 {
-            let exists = (kill.pid > 0 && self.child_owned(uid, kill.pid as i32))
-                || (kill.pid < 0 && self.group_owned(uid, -kill.pid as i32));
-            return if exists {
-                Response::ok(0)
-            } else {
-                Response::error(Errno::ESRCH)
+            if kill.pid > 0 {
+                return match self.child_owned(uid, kill.pid as i32) {
+                    true => Response::ok(0),
+                    false => Response::error(Errno::ESRCH),
+                };
+            }
+            let group = -kill.pid as i32;
+            return match self.group_owned(uid, group) {
+                true => Response::ok(0),
+                false => Response::error(Errno::ESRCH),
             };
         }
-        let Some(signal) = terminate_signal(kill.sig) else {
-            return Response::error(Errno::ENOSYS);
-        };
         if kill.pid > 0 {
             let pid = i32::try_from(kill.pid).unwrap_or(-1);
             let Some(child) = self.children.get(&pid) else {
@@ -340,38 +347,19 @@ impl<S: ProcSys> Procd<S> {
             if child.owner != uid && uid != 0 {
                 return Response::error(Errno::EPERM);
             }
-            let handle = child.handle;
-            if let Err(error) = self.sys.terminate(handle, 128 + signal as i32) {
-                return Response::error(error);
-            }
-            if let Some(child) = self.children.get_mut(&pid) {
-                child.status = Some(WaitStatus::signaled(signal));
-            }
-            return Response::ok(0);
+            return match self.sys.signal(pid, kill.sig) {
+                Ok(()) => Response::ok(0),
+                Err(error) => Response::error(error),
+            };
         }
-
         let group = -kill.pid as i32;
-        let pids: Vec<i32> = self
-            .children
-            .iter()
-            .filter(|(_, child)| child.pgid == group && (child.owner == uid || uid == 0))
-            .map(|(pid, _)| *pid)
-            .collect();
-        if pids.is_empty() {
+        if !self.group_owned(uid, group) {
             return Response::error(Errno::ESRCH);
         }
-        for pid in pids {
-            if let Some(child) = self.children.get(&pid) {
-                let handle = child.handle;
-                if let Err(error) = self.sys.terminate(handle, 128 + signal as i32) {
-                    return Response::error(error);
-                }
-                if let Some(child) = self.children.get_mut(&pid) {
-                    child.status = Some(WaitStatus::signaled(signal));
-                }
-            }
+        match self.sys.signal(-group, kill.sig) {
+            Ok(()) => Response::ok(0),
+            Err(error) => Response::error(error),
         }
-        Response::ok(0)
     }
 
     fn set_pgid(&mut self, uid: u32, setpgid: SetPgidRequest) -> Response {
@@ -402,8 +390,8 @@ impl<S: ProcSys> Procd<S> {
         if getpgid.pid <= 0 {
             return Response::error(Errno::ENOSYS);
         }
-        match self.sys.info(getpgid.pid) {
-            Ok(info) => Response::ok(i64::from(info.pgid)),
+        match self.sys.getpgid(getpgid.pid) {
+            Ok(pgid) => Response::ok(i64::from(pgid)),
             Err(error) => Response::error(error),
         }
     }
@@ -418,6 +406,39 @@ impl<S: ProcSys> Procd<S> {
         }
     }
 
+    fn check_wait_owner(&self, uid: u32, idtype: u32, id: i32) -> Result<(), Errno> {
+        if uid == 0 {
+            return Ok(());
+        }
+        match idtype {
+            P_PID => match self.children.get(&id) {
+                Some(child) if child.owner == uid => Ok(()),
+                Some(_) => Err(Errno::EPERM),
+                None => Err(Errno::ECHILD),
+            },
+            P_PGID => {
+                let mut found = false;
+                for child in self.children.values().filter(|child| child.pgid == id) {
+                    found = true;
+                    if child.owner != uid {
+                        return Err(Errno::EPERM);
+                    }
+                }
+                if found { Ok(()) } else { Err(Errno::ECHILD) }
+            }
+            _ => {
+                if self.children.is_empty() {
+                    return Err(Errno::ECHILD);
+                }
+                if self.children.values().all(|child| child.owner == uid) {
+                    Ok(())
+                } else {
+                    Err(Errno::EPERM)
+                }
+            }
+        }
+    }
+
     fn child_owned(&self, uid: u32, pid: i32) -> bool {
         self.children
             .get(&pid)
@@ -425,14 +446,19 @@ impl<S: ProcSys> Procd<S> {
     }
 
     fn group_owned(&self, uid: u32, pgid: i32) -> bool {
-        self.children
-            .values()
-            .any(|child| child.pgid == pgid && (child.owner == uid || uid == 0))
+        let mut found = false;
+        for child in self.children.values().filter(|child| child.pgid == pgid) {
+            found = true;
+            if child.owner != uid && uid != 0 {
+                return false;
+            }
+        }
+        found
     }
 
-    fn cleanup(&mut self, handle: Handle) {
-        let _ = self.sys.terminate(handle, 125);
-        let _ = self.sys.wait(handle);
+    fn cleanup(&mut self, pid: i32, handle: Handle) {
+        let _ = self.sys.signal(pid, SIGKILL);
+        let _ = self.sys.wait_ex(P_PID, pid, 0);
         self.sys.close(handle);
     }
 }
@@ -452,11 +478,8 @@ fn texts(values: &[Vec<u8>]) -> Result<Vec<&str>, Errno> {
     Ok(result)
 }
 
-fn terminate_signal(signal: u32) -> Option<u32> {
-    match signal {
-        SIGINT | SIGKILL | SIGTERM => Some(signal),
-        _ => None,
-    }
+fn is_terminal(status: i32) -> bool {
+    status != CONTINUED_STATUS && (status & STOPPED_STATUS_MASK) != STOPPED_STATUS_MASK
 }
 
 #[cfg(test)]

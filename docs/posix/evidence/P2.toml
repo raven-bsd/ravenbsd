@@ -1,7 +1,110 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# P2 owner evidence: add [[row]] entries here. A present row needs executable evidence; a waived
-# row needs a written waiver in notes.
+# P2 process rows backed by the kernel and procd work. A `present` row names executable QEMU
+# evidence; a `waived` row names the missing primitive and its owner.
+
 schema = 1
 standard = "posix-2024"
+
+[[row]]
+id = "process.credential"
+status = "present"
+evidence = "qtest:proc-credentials"
+notes = "P2c: real/effective/saved uid-gid and supplementary groups; fork inherits"
+
+[[row]]
+id = "process.exec"
+status = "waived"
+evidence = "none"
+notes = "P2e: spawn of a new image is implemented, but same-pid image replacement needs PROC_RESET (not in P2f); see docs/procd.md"
+
+[[row]]
+id = "process.fork"
+status = "present"
+evidence = "qtest:proc-fork"
+notes = "P2b/P2f: COW fork, private/N OFORK pages and repeated fork/exit cycles"
+
+[[row]]
+id = "process.job-control"
+status = "waived"
+evidence = "none"
+notes = "P3: P2f reports stop/continue wait events but does not suspend threads; controlling-terminal and foreground-group glue belong to P3"
+
+[[row]]
+id = "process.popen"
+status = "waived"
+evidence = "none"
+notes = "P3/P17: no pipe primitive and no libc procd client; procd SPAWN/WAIT are available but not wired to popen"
+
+[[row]]
+id = "process.posix-spawn"
+status = "waived"
+evidence = "none"
+notes = "P17: native libc spawn exists, but libc-spawn needs a built target sysroot; procd's SPAWN protocol is not wired into libc in P2e"
+
+[[row]]
+id = "process.priority"
+status = "waived"
+evidence = "none"
+notes = "P2f/P3: no scheduler priority syscall; PRIO/SCHED remain ENOSYS"
+
+[[row]]
+id = "process.process-group"
+status = "present"
+evidence = "qtest:proc-session"
+notes = "P2f: SETPGID/GETPGID, group signalling and session membership"
+
+[[row]]
+id = "process.process-id"
+status = "present"
+evidence = "qtest:proc-registry"
+notes = "P2b: monotonic pid registry, PROC_PID_INFO and PROC_HANDLE_INFO"
+
+[[row]]
+id = "process.resource"
+status = "present"
+evidence = "qtest:proc-session"
+notes = "P2f: 16 inherited limits; RLIMIT_NPROC enforced, other limits stored/returned"
+
+[[row]]
+id = "process.session"
+status = "present"
+evidence = "qtest:proc-session"
+notes = "P2f: SETSID/GETSID and session membership; child thread suspension is P3"
+
+[[row]]
+id = "process.signal"
+status = "present"
+evidence = "qtest:proc-signal"
+notes = "P2f: process queue, SIGCHLD, SIGKILL/stop/continue; libc pending-set injection is a follow-up"
+
+[[row]]
+id = "process.system"
+status = "waived"
+evidence = "none"
+notes = "P3/P17: needs a pipe-capable shell client; no procd/libc system() path in P2e"
+
+[[row]]
+id = "process.terminate"
+status = "present"
+evidence = "qtest:proc-session"
+notes = "P2f: SIGKILL terminates with the 137 exit status; SIGTERM/SIGINT queue through PROC_SIGNAL"
+
+[[row]]
+id = "process.times"
+status = "present"
+evidence = "qtest:proc-session"
+notes = "P2f: PROC_TIMES/PROC_GETRUSAGE; user time and extra counters are zero until accounting"
+
+[[row]]
+id = "process.tty-control"
+status = "waived"
+evidence = "none"
+notes = "P3: ttyd controlling terminal, tcsetpgrp and SESSIONINFO belong to P3"
+
+[[row]]
+id = "process.wait"
+status = "present"
+evidence = "qtest:proc-session"
+notes = "P2f: P_PID/P_PGID/P_ALL, WNOHANG/WUNTRACED/WCONTINUED and status encoding"

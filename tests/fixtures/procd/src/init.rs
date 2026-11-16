@@ -185,10 +185,10 @@ mod program {
         }
         raven_rt::println!("procd-test: kill signal=15");
         let status = wait_child(client, handle, seq, pid)?;
-        if signaled(status) != Some(15) {
+        if exited(status) != Some(143) {
             return Err("signal wait");
         }
-        raven_rt::println!("procd-test: wait signal=15");
+        raven_rt::println!("procd-test: wait exit=143");
         let unknown = wait_raw(client, handle, seq, 999_999)?;
         if unknown.status != -(Errno::ECHILD.0 as i32) {
             return Err("unknown wait status");
@@ -323,11 +323,6 @@ mod program {
         } else {
             None
         }
-    }
-
-    fn signaled(status: i32) -> Option<i32> {
-        let signal = status & 0x7f;
-        if signal == 0 { None } else { Some(signal) }
     }
 }
 

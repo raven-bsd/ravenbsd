@@ -36,7 +36,7 @@ regex = '^procd-test: getpgid=[0-9]+$'
 regex = '^procd-test: kill signal=15$'
 
 [[expect]]
-regex = '^procd-test: wait signal=15$'
+regex = '^procd-test: wait exit=143$'
 
 [[expect]]
 regex = '^procd-test: unknown=echild$'
