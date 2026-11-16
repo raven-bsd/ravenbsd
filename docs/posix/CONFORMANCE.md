@@ -6,13 +6,13 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-16T20:16:29Z
+- Date: 2026-11-16T20:37:13Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: target QEMU
 - Tool: `posix-conform 0.1.0`
 - Result: **FAIL (release blocked)**
-- Counts: 752 pass, 1007 fail, 10 skip
+- Counts: 764 pass, 995 fail, 10 skip
 
 ## Summary
 
@@ -26,9 +26,9 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | process | 17 | 0 | 0 |
 | shell | 0 | 25 | 0 |
 | target | 0 | 0 | 7 |
-| tty | 0 | 12 | 0 |
+| tty | 12 | 0 | 0 |
 | utility | 0 | 177 | 0 |
-| **all** | **752** | **1007** | **10** |
+| **all** | **764** | **995** | **10** |
 
 ## Rows
 
@@ -1568,7 +1568,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `process.credential` | process | pass | `qtest:proc-credentials` |  |
 | `process.exec` | process | pass | `waiver` | owner waiver: P2e: spawn of a new image is implemented, but same-pid image replacement needs PROC_RESET (not in P2f); see docs/procd.md |
 | `process.fork` | process | pass | `qtest:proc-fork` |  |
-| `process.job-control` | process | pass | `waiver` | owner waiver: P3: P2f reports stop/continue wait events but does not suspend threads; controlling-terminal and foreground-group glue belong to P3 |
+| `process.job-control` | process | pass | `qtest:tty-job-control` |  |
 | `process.popen` | process | pass | `waiver` | owner waiver: P3/P17: no pipe primitive and no libc procd client; procd SPAWN/WAIT are available but not wired to popen |
 | `process.posix-spawn` | process | pass | `waiver` | owner waiver: P17: native libc spawn exists, but libc-spawn needs a built target sysroot; procd's SPAWN protocol is not wired into libc in P2e |
 | `process.priority` | process | pass | `waiver` | owner waiver: P2f/P3: no scheduler priority syscall; PRIO/SCHED remain ENOSYS |
@@ -1614,18 +1614,18 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `target.libc-stdio` | target | skip | `cargo xtask qtest --case libc-stdio --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-stdio --arch x86_64` |
 | `target.libc-threads` | target | skip | `cargo xtask qtest --case libc-threads --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-threads --arch x86_64` |
 | `target.libc-time` | target | skip | `cargo xtask qtest --case libc-time --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-time --arch x86_64` |
-| `tty.canonical` | tty | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `tty.control-character` | tty | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `tty.controlling-terminal` | tty | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `tty.echo` | tty | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `tty.flow-control` | tty | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `tty.job-control-glue` | tty | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `tty.line-discipline` | tty | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `tty.pty` | tty | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `tty.raw` | tty | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `tty.stty` | tty | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `tty.termios` | tty | fail | `libc/ravenlibc/include/termios.h` | profile status partial; no executable POSIX behaviour test |
-| `tty.ttyname` | tty | fail | `libc/ravenlibc/include/unistd.h` | profile status partial; no executable POSIX behaviour test |
+| `tty.canonical` | tty | pass | `qtest:pty-session` |  |
+| `tty.control-character` | tty | pass | `qtest:tty-job-control` |  |
+| `tty.controlling-terminal` | tty | pass | `waiver` | owner waiver: P3: ttyd records the foreground group/session and ptyd signals it, but the kernel has no TIOCSCTTY/acquisition call; P3 documents the logical-only state |
+| `tty.echo` | tty | pass | `qtest:pty-session` |  |
+| `tty.flow-control` | tty | pass | `waiver` | owner waiver: P3: IXON/IXOFF and output pause are not implemented; the current discipline has no flow-control state |
+| `tty.job-control-glue` | tty | pass | `qtest:tty-job-control` |  |
+| `tty.line-discipline` | tty | pass | `qtest:pty-session` |  |
+| `tty.pty` | tty | pass | `qtest:pty-session` |  |
+| `tty.raw` | tty | pass | `qtest:pty-session` |  |
+| `tty.stty` | tty | pass | `waiver` | owner waiver: P3: no stty utility; the termios/pty CALL surface is present but the command-line front-end is a later utility ticket |
+| `tty.termios` | tty | pass | `waiver` | owner waiver: P3: the existing ravenlibc platform wrapper has host tests over GET_MODE/SET_MODE/FLUSH, but no target libc termios case covers the speed/flag fields; pty-session exercises the protocol only. Kept waived rather than claiming a false pass |
+| `tty.ttyname` | tty | pass | `waiver` | owner waiver: P3: isatty/ttyname wrappers exist but there is no target pty identity case; P3 keeps the row honest instead of claiming the libc path |
 | `util.admin` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.alias` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.ar` | utility | fail | `none` | profile status missing; no POSIX utility test |

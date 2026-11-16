@@ -1,0 +1,380 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+//! P3 pty and terminal job-control fixture client.
+
+#![cfg_attr(target_os = "none", no_std)]
+#![cfg_attr(target_os = "none", no_main)]
+
+#[cfg(target_os = "none")]
+extern crate alloc;
+
+#[cfg(target_os = "none")]
+mod program {
+    use alloc::vec;
+    use alloc::vec::Vec;
+
+    use raven_abi::errno::Errno;
+    use raven_abi::types::Handle;
+    use raven_initfs::Initfs;
+    use raven_proto_fs::OpenFlags;
+    use raven_proto_proc::{
+        Body, Request, Response, SetPgidRequest, SpawnRequest, WaitRequest, decode_response,
+        encode_request,
+    };
+    use raven_rt::entry;
+    use raven_rt::fs;
+    use raven_rt::spawn::{SpawnOptions, spawn};
+    use raven_scheme::Client;
+
+    entry!(main);
+
+    const VERSION: u16 = 1;
+    const CALL_LEN: usize = 12;
+    const OP_SET_MODE: u16 = 1;
+    const OP_FLUSH: u16 = 3;
+    const OP_PTY_SET_FG: u16 = 0x10;
+    const OP_PTY_GET_FG: u16 = 0x11;
+    const OP_PTY_HANGUP: u16 = 0x12;
+    const OP_TTYD_SET_FG: u16 = 0x20;
+    const OP_TTYD_GET_FG: u16 = 0x21;
+    const OP_TTYD_HANGUP: u16 = 0x22;
+    const OP_TTYD_STATE: u16 = 0x23;
+    const HUNG_BIT: u32 = 0x8000_0000;
+
+    fn main(_args: raven_rt::Args) -> i32 {
+        match run() {
+            Ok(()) => {
+                raven_rt::println!("tty: ok");
+                0
+            }
+            Err(step) => {
+                raven_rt::println!("tty: fail {step}");
+                1
+            }
+        }
+    }
+
+    fn run() -> Result<(), &'static str> {
+        start_service("/sbin/initfsd", "initfs:")?;
+        start_service("/sbin/procd", "proc:")?;
+        start_service("/sbin/ptyd", "pty:master")?;
+        start_service("/sbin/ttyd", "ttyd:session")?;
+        let mode = fs::read_to_vec("initfs:/etc/tty-mode").map_err(|_| "mode")?;
+        let mode = core::str::from_utf8(&mode).map_err(|_| "mode utf8")?.trim();
+        match mode {
+            "pty" => pty_cases(),
+            "job" => job_cases(),
+            _ => Err("mode"),
+        }
+    }
+
+    fn start_service(path: &str, probe: &str) -> Result<(), &'static str> {
+        let image = raven_rt::map_initfs().map_err(|_| "initfs map")?;
+        let initfs = Initfs::parse(image).map_err(|_| "initfs parse")?;
+        spawn(
+            &initfs,
+            path,
+            &SpawnOptions {
+                args: &[],
+                env: &[],
+            },
+        )
+        .map_err(|_| "spawn service")?;
+        wait_scheme(probe)
+    }
+
+    fn wait_scheme(path: &str) -> Result<(), &'static str> {
+        let client = Client::new();
+        let mut attempt = 0usize;
+        while attempt < 3000 {
+            if let Ok(handle) = client.open(path, u32::from(OpenFlags::READ.to_wire())) {
+                let _ = client.close(handle);
+                return Ok(());
+            }
+            let _ = raven_rt::nanosleep(10_000_000);
+            attempt = attempt.saturating_add(1);
+        }
+        Err("scheme timeout")
+    }
+
+    fn pty_cases() -> Result<(), &'static str> {
+        let client = Client::new();
+        let master = client
+            .open("pty:master", u32::from(OpenFlags::READ_WRITE.to_wire()))
+            .map_err(|_| "open master")?;
+        let slave = client
+            .open("pty:slave", u32::from(OpenFlags::READ_WRITE.to_wire()))
+            .map_err(|_| "open slave")?;
+
+        set_mode(&client, master, 0, 1)?;
+        write_all(&client, master, b"hello\n")?;
+        let slave_data = read_retry(&client, slave)?;
+        if slave_data != b"hello\n" {
+            return Err("canonical slave");
+        }
+        raven_rt::println!("tty: canonical=hello");
+        let echo = read_retry(&client, master)?;
+        if !echo.starts_with(b"hello") {
+            return Err("canonical echo");
+        }
+        raven_rt::println!("tty: echo=hello");
+
+        set_mode(&client, master, 1, 0)?;
+        write_all(&client, master, b"raw")?;
+        if read_retry(&client, slave)? != b"raw" {
+            return Err("raw slave");
+        }
+        raven_rt::println!("tty: raw=raw");
+
+        set_mode(&client, master, 0, 0)?;
+        write_all(&client, master, b"quiet\n")?;
+        if read_retry(&client, slave)? != b"quiet\n" {
+            return Err("echo-off slave");
+        }
+        if !read_now(&client, master)?.is_empty() {
+            return Err("echo-off leaked");
+        }
+        raven_rt::println!("tty: echo-off=ok");
+
+        write_all(&client, master, b"junk")?;
+        let (op, flushed, _) = tty_call(&client, master, OP_FLUSH, 0, 0)?;
+        if op != OP_FLUSH || flushed < 4 {
+            return Err("flush");
+        }
+        raven_rt::println!("tty: flush=ok");
+
+        let _ = client.close(master);
+        let _ = client.close(slave);
+        raven_rt::println!("tty: pty-session=ok");
+        Ok(())
+    }
+
+    fn job_cases() -> Result<(), &'static str> {
+        let client = Client::new();
+        let proc_handle = client
+            .open("proc:", u32::from(OpenFlags::READ_WRITE.to_wire()))
+            .map_err(|_| "open proc")?;
+        let mut seq = 1u64;
+        let pid = spawn_child(&client, proc_handle, &mut seq)?;
+        raven_rt::println!("tty: child={pid}");
+        set_pgid(&client, proc_handle, &mut seq, pid)?;
+
+        let master = client
+            .open("pty:master", u32::from(OpenFlags::READ_WRITE.to_wire()))
+            .map_err(|_| "open master")?;
+        let slave = client
+            .open("pty:slave", u32::from(OpenFlags::READ_WRITE.to_wire()))
+            .map_err(|_| "open slave")?;
+        let session = client
+            .open("ttyd:session", u32::from(OpenFlags::READ_WRITE.to_wire()))
+            .map_err(|_| "open ttyd")?;
+        let (_, _, _) = tty_call(&client, master, OP_PTY_SET_FG, pid as u32, 0)?;
+        let (_, _, _) = tty_call(&client, session, OP_TTYD_SET_FG, pid as u32, 0)?;
+
+        let _ = raven_rt::nanosleep(150_000_000);
+        write_all(&client, master, b"\x03")?;
+        let status = wait_child(&client, proc_handle, &mut seq, pid)?;
+        if exited(status) != Some(130) {
+            return Err("job wait");
+        }
+        raven_rt::println!("tty: job wait=130");
+
+        let (_, pty_fg, _) = tty_call(&client, master, OP_PTY_GET_FG, 0, 0)?;
+        let (_, ttyd_fg, _) = tty_call(&client, session, OP_TTYD_GET_FG, 0, 0)?;
+        if pty_fg != pid as u32 || ttyd_fg != pid as u32 {
+            return Err("foreground");
+        }
+        raven_rt::println!("tty: pty-fg={pty_fg}");
+        raven_rt::println!("tty: ttyd-fg={ttyd_fg}");
+
+        let (_, _, _) = tty_call(&client, master, OP_PTY_HANGUP, 0, 0)?;
+        if !read_retry(&client, slave)?.is_empty() {
+            return Err("hangup data");
+        }
+        raven_rt::println!("tty: hangup=eof");
+        let (_, _, _) = tty_call(&client, session, OP_TTYD_HANGUP, 0, 0)?;
+        let (_, _, state) = tty_call(&client, session, OP_TTYD_STATE, 0, 0)?;
+        if state & HUNG_BIT == 0 {
+            return Err("ttyd hung");
+        }
+        raven_rt::println!("tty: ttyd-hung=ok");
+
+        let _ = client.close(master);
+        let _ = client.close(slave);
+        let _ = client.close(session);
+        let _ = client.close(proc_handle);
+        raven_rt::println!("tty: tty-job-control=ok");
+        Ok(())
+    }
+
+    fn set_mode(client: &Client, file: Handle, mode: u32, echo: u32) -> Result<(), &'static str> {
+        let (op, arg0, arg1) = tty_call(client, file, OP_SET_MODE, mode, echo)?;
+        if op != 2 || arg0 != mode || arg1 != echo {
+            return Err("set mode");
+        }
+        Ok(())
+    }
+
+    fn tty_call(
+        client: &Client,
+        file: Handle,
+        op: u16,
+        arg0: u32,
+        arg1: u32,
+    ) -> Result<(u16, u32, u32), &'static str> {
+        let mut request = [0u8; CALL_LEN];
+        request[..2].copy_from_slice(&VERSION.to_le_bytes());
+        request[2..4].copy_from_slice(&op.to_le_bytes());
+        request[4..8].copy_from_slice(&arg0.to_le_bytes());
+        request[8..12].copy_from_slice(&arg1.to_le_bytes());
+        let mut response = [0u8; CALL_LEN];
+        let length = client
+            .call(file, &request, &mut response)
+            .map_err(|_| "tty call")?;
+        if length < CALL_LEN {
+            return Err("tty call length");
+        }
+        let reply_op = u16::from_le_bytes([response[2], response[3]]);
+        let reply0 = u32::from_le_bytes([response[4], response[5], response[6], response[7]]);
+        let reply1 = u32::from_le_bytes([response[8], response[9], response[10], response[11]]);
+        Ok((reply_op, reply0, reply1))
+    }
+
+    fn write_all(client: &Client, file: Handle, data: &[u8]) -> Result<(), &'static str> {
+        let mut offset = 0usize;
+        while offset < data.len() {
+            let written = client
+                .write(file, 0, data.get(offset..).ok_or("write range")?)
+                .map_err(|_| "write")?;
+            if written == 0 {
+                return Err("short write");
+            }
+            offset = offset.saturating_add(written);
+        }
+        Ok(())
+    }
+
+    fn read_retry(client: &Client, file: Handle) -> Result<Vec<u8>, &'static str> {
+        let mut buffer = [0u8; 128];
+        let mut attempt = 0usize;
+        while attempt < 200 {
+            match client.read(file, 0, &mut buffer) {
+                Ok(0) => return Ok(Vec::new()),
+                Ok(count) => return Ok(buffer.get(..count).unwrap_or(&[]).to_vec()),
+                Err(Errno::EAGAIN) => {
+                    let _ = raven_rt::nanosleep(10_000_000);
+                    attempt = attempt.saturating_add(1);
+                }
+                Err(_) => return Err("read"),
+            }
+        }
+        Err("read timeout")
+    }
+
+    fn read_now(client: &Client, file: Handle) -> Result<Vec<u8>, &'static str> {
+        let mut buffer = [0u8; 128];
+        match client.read(file, 0, &mut buffer) {
+            Ok(0) | Err(Errno::EAGAIN) => Ok(Vec::new()),
+            Ok(count) => Ok(buffer.get(..count).unwrap_or(&[]).to_vec()),
+            Err(_) => Err("read now"),
+        }
+    }
+
+    fn spawn_child(
+        client: &Client,
+        proc_handle: Handle,
+        seq: &mut u64,
+    ) -> Result<i32, &'static str> {
+        let request = SpawnRequest {
+            spawn_flags: 0,
+            pgroup: 0,
+            sigdefault: [0u8; 128],
+            sigmask: [0u8; 128],
+            ignored: [0u8; 128],
+            sched_policy: 0,
+            sched_prio: 0,
+            umask: 0o022,
+            tcpgrp_fd: -1,
+            path: b"/bin/tty-child".to_vec(),
+            cwd: b"/".to_vec(),
+            argv: vec![b"tty-child".to_vec(), b"sleep".to_vec()],
+            envp: vec![],
+            fdmap: vec![],
+        };
+        let response = procd_call(client, proc_handle, seq, &Request::Spawn(request))?;
+        i32::try_from(response.value).map_err(|_| "spawn pid")
+    }
+
+    fn set_pgid(
+        client: &Client,
+        proc_handle: Handle,
+        seq: &mut u64,
+        pid: i32,
+    ) -> Result<(), &'static str> {
+        let response = procd_call(
+            client,
+            proc_handle,
+            seq,
+            &Request::SetPgid(SetPgidRequest { pid, pgid: 0 }),
+        )?;
+        if response.status < 0 {
+            return Err("setpgid");
+        }
+        Ok(())
+    }
+
+    fn wait_child(
+        client: &Client,
+        proc_handle: Handle,
+        seq: &mut u64,
+        pid: i32,
+    ) -> Result<i32, &'static str> {
+        let response = procd_call(
+            client,
+            proc_handle,
+            seq,
+            &Request::Wait(WaitRequest {
+                idtype: 1,
+                id: i64::from(pid),
+                options: 0,
+            }),
+        )?;
+        match response.body {
+            Body::Wait { status, .. } => Ok(status),
+            _ => Err("wait body"),
+        }
+    }
+
+    fn procd_call(
+        client: &Client,
+        proc_handle: Handle,
+        seq: &mut u64,
+        request: &Request,
+    ) -> Result<Response, &'static str> {
+        let mut encoded = [0u8; 4096];
+        let length = encode_request(request, *seq, &mut encoded).map_err(|_| "encode")?;
+        *seq = seq.saturating_add(1);
+        let mut response = [0u8; 1024];
+        let length = client
+            .call(proc_handle, &encoded[..length], &mut response)
+            .map_err(|_| "procd call")?;
+        let response =
+            decode_response(request.op(), &response[..length]).map_err(|_| "procd decode")?;
+        if response.status < 0 {
+            return Err("procd status");
+        }
+        Ok(response)
+    }
+
+    fn exited(status: i32) -> Option<i32> {
+        if status & 0x7f == 0 {
+            Some((status >> 8) & 0xff)
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(not(target_os = "none"))]
+fn main() {}

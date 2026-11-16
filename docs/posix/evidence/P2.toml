@@ -27,9 +27,9 @@ notes = "P2b/P2f: COW fork, private/N OFORK pages and repeated fork/exit cycles"
 
 [[row]]
 id = "process.job-control"
-status = "waived"
-evidence = "none"
-notes = "P3: P2f reports stop/continue wait events but does not suspend threads; controlling-terminal and foreground-group glue belong to P3"
+status = "present"
+evidence = "qtest:tty-job-control"
+notes = "P2e/P3: foreground process-group handoff plus Ctrl-C/SIGINT; P2f stop/continue statuses are present, but scheduler suspension remains a follow-up"
 
 [[row]]
 id = "process.popen"

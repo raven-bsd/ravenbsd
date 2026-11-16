@@ -2227,6 +2227,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-ptyd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-proto-tty",
+ "raven-rt",
+ "raven-scheme",
+ "raven-tty-core",
+]
+
+[[package]]
 name = "raven-pwm"
 version = "0.1.0"
 dependencies = [
@@ -2929,6 +2941,28 @@ dependencies = [
 [[package]]
 name = "raven-tty-core"
 version = "0.1.0"
+
+[[package]]
+name = "raven-tty-fixture"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-proto-proc",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-ttyd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
 
 [[package]]
 name = "raven-umount"
