@@ -76,7 +76,7 @@ impl ReportLayout {
         self.usage_page == GENERIC_DESKTOP
             && self.usage == KEYBOARD_USAGE
             && self.report_id == 0
-            && self.input_bits >= 64
+            && self.input_bits == 64
     }
 }
 
