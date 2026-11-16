@@ -206,6 +206,10 @@ pub(crate) fn run_with_overrides(
 }
 
 /// Build the initfs for a rootfs profile from release user programs.
+///
+/// The normal image path delegates to `initfs::build`, which resolves the profile's
+/// `[initfs] release` switch and the `RAVEN_USER_RELEASE` override. A rootfs profile is a
+/// production image, so this path keeps the unconditional release build.
 fn build_release_initfs(
     root: &Path,
     arch: Arch,

@@ -8,6 +8,9 @@
 name = "release"
 extends = "shell"
 
+[initfs]
+release = true
+
 [boot]
 cmdline = "console=ttyS0 loglevel=info"
 log_level = "info"

@@ -5,7 +5,9 @@
 
 Status: REL7 implementation. `cargo xtask image` and `cargo xtask qtest` now detect and build the
 libc, brush and uutils prerequisites for the resolved profile and architecture. A release image no
-longer depends on undocumented manual build steps.
+longer depends on undocumented manual build steps. REL7b adds the profile-level release switch, so
+`make image PROFILE=release` also builds its user programs with the release profile without an
+environment variable.
 
 ## Prerequisite detection
 
@@ -33,6 +35,20 @@ The decision logic is host-tested in `xtask/src/initfs_ut.rs` (missing/partial/c
 brush source mapping, uutils names, the combined plan). The build commands themselves are not run
 inside the host tests.
 
+## Release user programs (REL7b)
+
+`profiles/release.toml` sets `[initfs] release = true`. The `release` field defaults to false and
+merges additively across `extends` and `profiles/<name>.d/*.toml`: once a parent or fragment
+enables it, the resolved profile keeps it. The profile parse and merge cases are host-tested in
+`xtask/src/profiles_ut.rs`.
+
+`xtask/src/initfs.rs` builds the resolved profile's user programs with the release profile when the
+field is set. `make image PROFILE=release` is therefore self-contained. `RAVEN_USER_RELEASE`
+remains an override: `=1` forces release and `=0` forces debug; any other value (or no value)
+leaves the profile's decision. The build-mode decision is host-tested in
+`xtask/src/initfs_ut.rs`. Rootfs profiles (`rootfs/<name>.toml`) keep their unconditional release
+build in `xtask/src/image.rs`.
+
 ## Arch-correct staging
 
 `cargo xtask build brush --arch <arch>` stages only `build/<arch>/brush`; it no longer writes a
@@ -50,6 +66,7 @@ From a clean `build/` (or after removing only the selected prerequisites):
 ```sh
 cargo xtask qtest --case shell-session --arch x86_64
 cargo xtask image --arch x86_64 --profile shell-test
+make image ARCH=x86_64 PROFILE=release
 ```
 
 The qtest/image path prints the prerequisite actions it takes, for example:
@@ -85,6 +102,11 @@ and runs `cargo xtask qtest --case shell-session --arch x86_64`; the image path 
 three and the qtest must pass. The aarch64 commands above prove the Pi 4 prerequisites. The ticket
 report carries the exact commands, exit codes and transcript. **OBSERVED** in
 `tickets/kevin/reports/REL7.md`.
+
+REL7b's acceptance removes `build/x86_64/user`, runs
+`cargo xtask image --arch x86_64 --profile release` without `RAVEN_USER_RELEASE` and runs the
+`release-login` qtest. The image must come from release user programs and the qtest must pass.
+**OBSERVED** in `tickets/kevin/reports/REL7b.md`.
 
 ## Notes and limits
 
