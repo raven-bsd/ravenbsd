@@ -2668,6 +2668,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-usb-core"
+version = "0.1.0"
+dependencies = [
+ "raven-rp1-xhci",
+]
+
+[[package]]
 name = "raven-usb-hid"
 version = "0.1.0"
 
