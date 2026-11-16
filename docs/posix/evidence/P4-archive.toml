@@ -22,3 +22,9 @@ id = "util.uudecode"
 status = "present"
 evidence = "test:tests/posix/utility/archive/uudecode/test.sh"
 notes = "P4j: POSIX begin/end decoder, mode, safe-name and malformed-input host tests"
+
+[[row]]
+id = "util.tar"
+status = "present"
+evidence = "test:tests/posix/utility/archive/tar/test.sh"
+notes = "P4l: POSIX ustar create/list/extract, modes, symlinks and nested-path host tests"

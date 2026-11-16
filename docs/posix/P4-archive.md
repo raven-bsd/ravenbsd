@@ -33,17 +33,16 @@ behaviour tests and executable evidence rows.
 | `uudecode` | header/mode/name validation; safe names; malformed end/length | 3 lib + 1 host |
 | `tar` | ustar `-c`/`-t`/`-x`; regular/dir/symlink; modes/mtime/nested names; checksum and safe extraction | 5 lib + 1 host |
 
-The three P4j `util.*` rows are registered in `docs/posix/evidence/P4-archive.toml`.
-`util.tar` cannot be registered: `docs/posix/profile.toml` has no `util.tar` row, and the
-profile/seed paths are outside P4l Owns. The implementation and tests are complete; the profile
-row is defect `P4l-D1`.
+The three P4j `util.*` rows and the P4l `util.tar` row are registered in
+`docs/posix/evidence/P4-archive.toml`. `tar` was added to the seed `UTILITIES` list and
+`profile.toml`/`traceability.toml` were regenerated; the gate executes the tar case and reports
+the row as present.
 
 ## Known defects / limits
 
 | Defect | Tool | Detail |
 |---|---|---|
 | `P4j-D1` | `ar` | `d`, `m`, `p`, `q` and `-u` are not implemented; unknown operations are a usage error, never silent wrong output |
-| `P4l-D1` | `tar` | no `util.tar` row exists in the profile and P4l does not own the profile/seed; the tool is implemented and tested but the row cannot be registered from this ticket |
 | - | `tar` | long-name/PAX, compression (`-z`/`-j`/`-J`) and non-regular/directory/symlink types are explicit errors |
 | - | `ar` | the symbol table covers ELF32/ELF64 little-endian only; other object formats contribute no symbols |
 | - | `uuencode`/`uudecode` | target standard input is unavailable in this image; file operands are required |
@@ -58,5 +57,5 @@ cargo xtask posix-check --profile posix --arch x86_64
 make check-fast
 ```
 
-The archive runner reports `4 pass, 0 fail`; the gate executes each registered `test:` script.
-No board claim.
+The archive runner reports `4 pass, 0 fail`; the gate executes each registered `test:` script and
+reports `util.tar` as present. No board claim.

@@ -9506,7 +9506,7 @@ evidence = "none"
 id = "util.ar"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/archive/ar/test.sh"
 
 [[trace]]
 id = "util.arch"
@@ -9530,7 +9530,7 @@ evidence = "none"
 id = "util.awk"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/text2/awk/test.sh"
 
 [[trace]]
 id = "util.b2sum"
@@ -10382,7 +10382,7 @@ evidence = "none"
 id = "util.sed"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/text2/sed/test.sh"
 
 [[trace]]
 id = "util.seq"
@@ -10533,6 +10533,12 @@ id = "util.talk"
 ticket = "P4"
 test = "none"
 evidence = "none"
+
+[[trace]]
+id = "util.tar"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/archive/tar/test.sh"
 
 [[trace]]
 id = "util.tee"
@@ -10700,13 +10706,13 @@ evidence = "none"
 id = "util.uudecode"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/archive/uudecode/test.sh"
 
 [[trace]]
 id = "util.uuencode"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/archive/uuencode/test.sh"
 
 [[trace]]
 id = "util.uustat"
