@@ -5,23 +5,32 @@
 
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
-#![forbid(unsafe_code)]
+// The runtime has no safe process-info wrappers yet; the two raw read-only calls below have
+// SAFETY comments and caller-owned fixed-size buffers.
+#![allow(unsafe_code)]
 
 extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
     use alloc::format;
+    use alloc::string::ToString;
+    use alloc::vec::Vec;
     use core::fmt;
 
+    use raven_abi::errno::Errno;
     use raven_output::{ErrorEnvelope, JsonWriter};
     use raven_proto_fs::O_RDONLY;
-    use raven_ps::{Action, format_json_status, format_status, parse_args};
+    use raven_ps::{
+        Action, ProcessRow, format_json_status, format_posix_header, format_posix_row,
+        format_status, parse_args,
+    };
     use raven_rt::entry;
 
     entry!(main);
 
     const TOOL: &str = "ps";
+    const PROC_PID_INFO: usize = 0x3A;
 
     struct Console;
 
@@ -56,6 +65,53 @@ mod program {
         let mut formatted = alloc::string::String::new();
         format_status(&text, &mut formatted).map_err(|_| raven_abi::errno::Errno::EPROTO)?;
         Ok(formatted)
+    }
+
+    fn pid_info(pid: i32) -> Result<[u64; 8], Errno> {
+        let mut words = [0u64; 8];
+        // SAFETY: PROC_PID_INFO takes a scalar pid and a live eight-word array owned by the
+        // caller; the kernel validates the pid and writes exactly eight u64 values.
+        let raw = unsafe {
+            raven_rt::sys::syscall3(
+                PROC_PID_INFO,
+                pid as isize as usize,
+                words.as_mut_ptr() as usize,
+                words.len(),
+            )
+        };
+        Errno::from_ret(raw)?;
+        Ok(words)
+    }
+
+    fn posix_table() -> i32 {
+        let mut rows = Vec::new();
+        for pid in 1..=4096 {
+            let Ok(words) = pid_info(pid) else {
+                continue;
+            };
+            let command = if pid == 1 {
+                "init".to_string()
+            } else {
+                "?".to_string()
+            };
+            rows.push(ProcessRow {
+                pid: i32::try_from(words[0]).unwrap_or(pid),
+                ppid: i32::try_from(words[1]).unwrap_or(0),
+                uid: u32::try_from(words[4]).unwrap_or(0),
+                gid: u32::try_from(words[6]).unwrap_or(0),
+                cmd: command,
+            });
+        }
+        let mut console = Console;
+        if format_posix_header(&mut console).is_err() {
+            return 1;
+        }
+        for row in &rows {
+            if format_posix_row(row, &mut console).is_err() {
+                return 1;
+            }
+        }
+        0
     }
 
     fn json_error(code: &str, message: &str, name: Option<&str>) {
@@ -137,6 +193,7 @@ mod program {
         match parse_args(args.iter().skip(1)) {
             Ok(Action::List) => list(false),
             Ok(Action::ListJson) => list(true),
+            Ok(Action::Posix) => posix_table(),
             Ok(Action::Selftest) => selftest(),
             Err(error) => {
                 raven_rt::eprintln!("{error}");

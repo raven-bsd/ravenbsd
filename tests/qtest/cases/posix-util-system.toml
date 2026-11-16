@@ -187,6 +187,22 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
+send = "ps -e\n"
+delay_ms = 100
+
+[[step]]
+wait = '^PID PPID UID GID CMD$'
+timeout_secs = 30
+
+[[step]]
+wait = '^1 [0-9]+ 0 0 init$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
 send = "ps --json\n"
 delay_ms = 100
 
@@ -295,6 +311,58 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
+send = "getconf ARG_MAX\n"
+delay_ms = 100
+
+[[step]]
+wait = '^131072$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "getconf PAGESIZE\n"
+delay_ms = 100
+
+[[step]]
+wait = '^4096$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "getconf _POSIX_VERSION\n"
+delay_ms = 100
+
+[[step]]
+wait = '^202405$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "getconf NOPE; echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^getconf: NOPE: unrecognized variable$'
+timeout_secs = 30
+
+[[step]]
+wait = '^status=1$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
 send = "hostname\n"
 delay_ms = 100
 
@@ -367,6 +435,18 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
+send = "/bin/env -i FOO=bar /bin/whoami\n"
+delay_ms = 100
+
+[[step]]
+wait = '^root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
 send = "export P4D=ok\n"
 delay_ms = 100
 
@@ -408,6 +488,158 @@ timeout_secs = 30
 
 [[step]]
 wait = '^status=2$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "kill -l\n"
+delay_ms = 100
+
+[[step]]
+wait = '^HUP .*TERM.*SYS$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "kill -l 15\n"
+delay_ms = 100
+
+[[step]]
+wait = '^TERM$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "kill -l TERM\n"
+delay_ms = 100
+
+[[step]]
+wait = '^15$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "kill -0 1; echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^status=0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "kill -s TERM 9999; echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^kill: 9999: no such process$'
+timeout_secs = 30
+
+[[step]]
+wait = '^status=1$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "nice\n"
+delay_ms = 100
+
+[[step]]
+wait = '^0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "nice -n 5 /bin/nice\n"
+delay_ms = 100
+
+[[step]]
+wait = '^5$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "nice -n 20 /bin/nice\n"
+delay_ms = 100
+
+[[step]]
+wait = '^19$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "nice -n -5 /bin/nice\n"
+delay_ms = 100
+
+[[step]]
+wait = '^-5$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "nice -n 5 /bin/getconf ARG_MAX\n"
+delay_ms = 100
+
+[[step]]
+wait = '^131072$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "nohup /bin/whoami\n"
+delay_ms = 100
+
+[[step]]
+wait = '^root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "nohup /bin/getconf NOPE; echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^getconf: NOPE: unrecognized variable$'
+timeout_secs = 30
+
+[[step]]
+wait = '^status=1$'
 timeout_secs = 30
 
 [[step]]

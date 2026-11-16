@@ -1,0 +1,45 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt KILL 1
+.Os RavenBSD
+.Sh NAME
+.Nm kill
+.Nd send a signal to a process or process group
+.Sh SYNOPSIS
+.Nm
+.Fl l
+.Op Ar name | number
+.Nm
+.Op Fl s Ar signal | Fl signal
+.Ar pid ...
+.Sh DESCRIPTION
+.Nm
+sends a signal to each
+.Ar pid .
+A positive target names a process; a negative target names a process group;
+zero names the caller's process group.
+.Pp
+Signal names are accepted with or without a
+.Ql SIG
+prefix.
+The number 0 performs an existence check without sending a signal.
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl l
+List signal names, or print the name/number of one signal.
+.It Fl s Ar signal
+Select the signal by name or number.
+.It Fl Ar signal
+Select the signal by name or number.
+.El
+.Sh EXIT STATUS
+.Ex -std
+An unknown signal, missing target or failed target exits 1; a usage error
+exits 2.
+.Sh SEE ALSO
+.Xr nice 1 ,
+.Xr signal 3
+.Sh STANDARDS
+IEEE Std 1003.1-2024
+.Pq POSIX.1-2024 .

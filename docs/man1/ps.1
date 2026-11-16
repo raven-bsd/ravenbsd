@@ -5,9 +5,11 @@
 .Os RavenBSD
 .Sh NAME
 .Nm ps
-.Nd list services from the svc: scheme
+.Nd list services or process-table fields
 .Sh SYNOPSIS
 .Nm
+.Nm
+.Fl e
 .Nm
 .Fl -json
 .Nm
@@ -32,12 +34,33 @@ The state is one of
 or
 .Ql gave-up .
 .Pp
+.Fl e
+scans the kernel pid registry and prints one row per live process:
+.Bd -literal -offset indent
+PID PPID UID GID CMD
+.Ed
+.Pp
+The kernel's
+.Ql PROC_PID_INFO
+exposes pid, ppid, uid and gid but no command path, and
+.Nm procd
+has no process-list operation.
+The
+.Ql CMD
+field is therefore
+.Ql ?
+for every process except pid 1, which is
+.Ql init ;
+a real command source is a follow-up.
+.Pp
 .Fl -selftest
 reads every status record, checks that the directory is non-empty and every
 line parses, and prints
 .Dq ps: selftest ok .
 .Sh OPTIONS
 .Bl -tag -width Ds
+.It Fl e
+Print the bounded process-table fields instead of the service view.
 .It Fl -json
 Print one NDJSON object per service instead of the aligned human lines.
 The object has the fixed envelope
@@ -82,6 +105,13 @@ $ ps --json
 .Xr svcctl 1 ,
 .Xr init 8
 .Sh STANDARDS
-The output is a RavenBSD service view, not the process table of a POSIX
-.Nm
-utility.
+The service view is RavenBSD-specific.
+The
+.Fl e
+fields are the POSIX subset available from
+.Ql PROC_PID_INFO ;
+the
+.Ql CMD
+field remains
+.Ql ?
+until a pid-to-command source exists.
