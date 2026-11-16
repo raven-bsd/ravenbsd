@@ -12,7 +12,6 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
-    use raven_abi::errno::Errno;
     use raven_proto_fs::{S_IFCHR, Stat};
     use raven_rt::entry;
     use raven_scheme::{Ctx, Handler, HandlerResult, Opened, Server};
@@ -29,9 +28,9 @@ mod program {
             _mode: u32,
             _ctx: &Ctx,
         ) -> HandlerResult<Opened> {
-            if flags & 4 != 0 {
-                return Err(Errno::EINVAL.into());
-            }
+            // A null device is both readable and writable; brush opens /dev/null O_RDWR
+            // for interactive redirection. The write handler below discards the data.
+            let _ = flags;
             Ok(Opened::File(0))
         }
 

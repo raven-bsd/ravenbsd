@@ -33,13 +33,11 @@ pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathB
         .map(|program| program.package.clone())
         .collect();
     if !packages.is_empty() {
-        let code = build::run(
-            &workspace,
-            Component::User,
-            arch,
-            release_user_programs_from_env(std::env::var("RAVEN_USER_RELEASE").ok().as_deref()),
-            &packages,
-        )?;
+        let release = release_user_programs(
+            profile.initfs.release,
+            std::env::var("RAVEN_USER_RELEASE").ok().as_deref(),
+        );
+        let code = build::run(&workspace, Component::User, arch, release, &packages)?;
         if code != 0 {
             bail!("user program build failed with exit code {code}");
         }
@@ -79,12 +77,18 @@ pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathB
     Ok(output)
 }
 
-/// Select release user programs for a manually requested image build.
+/// Resolve the user-program profile from the profile's `[initfs] release` switch and
+/// `RAVEN_USER_RELEASE`.
 ///
-/// This is deliberately opt-in: normal images retain their debug user programs, while the K63
-/// regression matrix can exercise the release user binary in the same image path.
-fn release_user_programs_from_env(value: Option<&str>) -> bool {
-    matches!(value, Some("1"))
+/// `RAVEN_USER_RELEASE=1` forces the release profile and `=0` forces debug; any other value (or
+/// absence) leaves the profile's decision. This keeps the environment override used by
+/// `release-gate` and the K63 matrix while `make image PROFILE=release` is self-contained.
+fn release_user_programs(profile_release: bool, value: Option<&str>) -> bool {
+    match value {
+        Some("1") => true,
+        Some("0") => false,
+        _ => profile_release,
+    }
 }
 
 /// One prerequisite plan for a resolved profile.

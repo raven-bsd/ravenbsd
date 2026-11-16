@@ -21,6 +21,7 @@ fn profile(files: &[(&str, &str)]) -> Profile {
                     generated: true,
                 })
                 .collect(),
+            release: false,
         },
         boot: Boot {
             cmdline: "console=ttyS0".to_string(),
@@ -47,11 +48,18 @@ fn packed_image_round_trips_through_the_reader() {
 }
 
 #[test]
-fn release_user_programs_requires_an_explicit_one() {
-    assert!(release_user_programs_from_env(Some("1")));
-    assert!(!release_user_programs_from_env(None));
-    assert!(!release_user_programs_from_env(Some("true")));
-    assert!(!release_user_programs_from_env(Some("0")));
+fn release_user_programs_follow_the_profile_without_an_override() {
+    assert!(release_user_programs(true, None));
+    assert!(!release_user_programs(false, None));
+}
+
+#[test]
+fn release_user_programs_env_overrides_the_profile() {
+    assert!(release_user_programs(false, Some("1")));
+    assert!(!release_user_programs(true, Some("0")));
+    // Unrecognised values do not silently override the profile.
+    assert!(release_user_programs(true, Some("true")));
+    assert!(!release_user_programs(false, Some("true")));
 }
 
 #[test]
