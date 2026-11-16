@@ -14,14 +14,15 @@ use crate::keymap::Layout;
 use crate::report::{BOOT_REPORT_LEN, BootReport, KeyEvents, Keyboard};
 use crate::setup::SetupPacket;
 
-/// Interrupt-IN endpoint used by the boot keyboard model.
+/// Interrupt-IN endpoint used by the boot keyboard and mouse models.
 pub const REPORT_ENDPOINT: u8 = 1;
 
 /// The transport seam the model drives.
 ///
 /// `interrupt_in` queues one interrupt-IN transfer for `length` bytes. `next_report` returns the
-/// next completed eight-byte report, or `None` when no transfer has completed. The xHCI adapter
-/// owns the transfer buffer and copies the event payload into the fixed report.
+/// next completed report in the fixed eight-byte buffer: a boot keyboard uses all eight bytes, a
+/// boot mouse uses the first three or four. The xHCI adapter owns the transfer buffer and copies
+/// the event payload into the fixed report.
 pub trait TransferRing {
     /// Submit a host-to-device control transfer.
     fn control_out(&mut self, setup: SetupPacket, data: &[u8]) -> Result<(), Error>;
