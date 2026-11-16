@@ -18,6 +18,8 @@
 //! * `hostname` - Get and set the system's hostname
 //! * `inotify` - Linux's `inotify` file system notification API
 //! * `ioctl` - The `ioctl` syscall, and wrappers for many specific instances
+
+#![allow(unexpected_cfgs)] // `ravenbsd` is a custom target known only to the ravenbsd toolchain
 //! * `kmod` - Load and unload kernel modules
 //! * `mman` - Stuff relating to memory management
 //! * `mount` - Mount and unmount file systems
@@ -49,7 +51,7 @@
 #![allow(clippy::too_long_first_doc_paragraph)]
 #![recursion_limit = "500"]
 #![deny(unused)]
-#![deny(unexpected_cfgs)]
+#![allow(unexpected_cfgs)] // `ravenbsd` is a custom target known only to the ravenbsd toolchain
 #![allow(unused_macros)]
 #![cfg_attr(
     not(all(

@@ -212,6 +212,7 @@ fn build_release_initfs(
     profile: &Profile,
     workspace: &Workspace,
 ) -> Result<Vec<u8>> {
+    crate::initfs::ensure_uutils(root, arch, profile)?;
     let mut packages: Vec<String> = profile
         .initfs
         .programs

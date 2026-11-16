@@ -38,6 +38,11 @@ bootstrap configuration and the build wrapper for `make toolchain` (ticket K19).
   from a source tarball)` and contains `cargo`, rustc, host std and the
   `x86_64-unknown-ravenbsd` std rlibs. A reinstall from the cached build tree takes 0:10; a second
   `make toolchain` with a matching stamp skips the build entirely.
+* 2026-11-16: the bootstrap target list includes `aarch64-unknown-ravenbsd` and the stage-1
+  install now ships `lib/rustlib/aarch64-unknown-ravenbsd` std (`manifest-rust-std-aarch64-
+  unknown-ravenbsd`). The compiler-rt C sources are compiled with the host's
+  `aarch64-linux-gnu-gcc`; `build.sh` exports `CC_aarch64_unknown_ravenbsd` when that compiler
+  is present. Install `gcc-aarch64-linux-gnu` before `make toolchain` on a fresh host.
 * Rust's own `src/stage0` pins `1.96.0` as the bootstrap compiler for the 1.97.1 source. That
   download is part of the pinned release, not a substituted version; no nightly is used. The
   `build.sh` check requires the repository's pinned `rustc 1.97.1` to invoke the script.

@@ -303,7 +303,7 @@ impl Statfs {
         apple_targets,
     )))]
     pub fn filesystem_type(&self) -> FsType {
-        FsType(self.0.f_type)
+        FsType(self.0.f_type as fs_type_t)
     }
 
     /// Magic code defining system type
@@ -358,7 +358,7 @@ impl Statfs {
         target_os = "ravenbsd"
     ))]
     pub fn optimal_transfer_size(&self) -> libc::__fsword_t {
-        self.0.f_bsize
+        self.0.f_bsize as libc::__fsword_t
     }
 
     /// Optimal transfer block size
@@ -431,7 +431,7 @@ impl Statfs {
         target_os = "ravenbsd"
     ))]
     pub fn block_size(&self) -> libc::__fsword_t {
-        self.0.f_bsize
+        self.0.f_bsize as libc::__fsword_t
     }
 
     /// Size of a block

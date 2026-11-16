@@ -1,0 +1,46 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt GROUPADD 1
+.Os RavenBSD
+.Sh NAME
+.Nm groupadd
+.Nd create a group
+.Sh SYNOPSIS
+.Nm
+.Op Fl g Ar gid
+.Op Fl r
+.Ar name
+.Sh DESCRIPTION
+.Nm
+adds an empty group record to
+.Pa /etc/group .
+Without
+.Fl g
+the next regular gid at or above 1000 is allocated monotonically.
+The
+.Fl r
+option selects a system gid from 1 through 999.
+Duplicate names and gids are rejected.
+.Pp
+Member editing is not part of the 0.2.0 command; use
+.Xr useradd 1
+.Fl G
+or the
+.Nm raven-userdb
+library.
+.Sh FILES
+.Bl -tag -width /etc/group -compact
+.It Pa /etc/group
+group records, mode 0644
+.It Pa /etc/.pwd.lock
+exclusive update lock
+.El
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr useradd 1 ,
+.Xr id 1
+.Sh STANDARDS
+RavenBSD.

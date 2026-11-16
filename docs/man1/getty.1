@@ -1,0 +1,56 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt GETTY 1
+.Os RavenBSD
+.Sh NAME
+.Nm getty
+.Nd console login prompt and session launcher
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+is the one-shot console login service.
+It opens
+.Pa tty:console
+through
+.Xr consd 8 ,
+prints the banner and
+.Dq Li "login: " ,
+reads the login name and starts
+.Xr login 1
+with that name.
+.Nm
+waits for
+.Xr login 1
+and starts the session shell only when it exits 0.
+The shell path is the root shell from
+.Pa /etc/passwd ;
+the environment comes from
+.Pa /etc/profile
+.Pq Ev PATH , HOME , TERM , USER , SHELL
+plus
+.Ev PWD Ns = Ns Pa / .
+.Pp
+The kernel has no
+.Xr exec 2
+and a spawned child does not inherit the service's initfs grant, so
+.Nm
+owns the grant and performs both spawns.
+.Nm
+exits with the session shell's status; the test service is configured with
+.Dq Li "exit_when_exits = getty" .
+.Sh FILES
+.Bl -tag -width "/etc/profile" -compact
+.It Pa /etc/passwd
+session shell
+.It Pa /etc/profile
+session environment
+.It Pa /etc/motd
+printed by
+.Xr login 1
+.El
+.Sh SEE ALSO
+.Xr login 1 ,
+.Xr rsh 1 ,
+.Xr consd 8
