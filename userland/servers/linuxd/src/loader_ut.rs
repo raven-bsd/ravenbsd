@@ -162,6 +162,7 @@ fn the_child_gets_every_segment_and_the_arenas() {
     let image = image();
     let spec = plan_image(
         &image,
+        None,
         &config(),
         &[b"hello".as_slice()],
         &[],
@@ -170,7 +171,7 @@ fn the_child_gets_every_segment_and_the_arenas() {
     )
     .expect("plan");
     let mut mock = Mock::new();
-    let loaded = load(&spec, &image, &mut mock).expect("load");
+    let loaded = load(&spec, &image, None, &mut mock).expect("load");
     assert_eq!(loaded.proc, Handle(7));
     assert_eq!(loaded.entry, 0x40_0080);
     assert_eq!(loaded.brk, 0x40_2000);
@@ -191,7 +192,15 @@ fn the_child_gets_every_segment_and_the_arenas() {
             .iter()
             .any(|(addr, _, prot)| *addr == 0x40_0000 && *prot == 5)
     );
-    assert_eq!(child_maps[2].address as u64, loaded.sp - (loaded.sp % PAGE));
+    assert_eq!(
+        child_maps[2].address as u64,
+        loaded
+            .regions
+            .iter()
+            .find(|region| region.start <= loaded.sp && loaded.sp < region.start + region.len)
+            .expect("the stack region")
+            .start
+    );
     assert_eq!(
         child_maps[2].flags & (map::FIXED << map::SHIFT),
         map::FIXED << map::SHIFT
@@ -199,7 +208,7 @@ fn the_child_gets_every_segment_and_the_arenas() {
     assert!(
         mock.maps
             .iter()
-            .any(|call| call.proc == 7 && call.address as u64 == BRK_BASE)
+            .any(|call| call.proc == 7 && call.address as u64 == 0x40_2000)
     );
     assert!(
         mock.maps
@@ -213,6 +222,7 @@ fn the_regions_record_what_the_trap_loop_may_copy_out_of() {
     let image = image();
     let spec = plan_image(
         &image,
+        None,
         &config(),
         &[b"hello".as_slice()],
         &[],
@@ -221,7 +231,7 @@ fn the_regions_record_what_the_trap_loop_may_copy_out_of() {
     )
     .expect("plan");
     let mut mock = Mock::new();
-    let loaded = load(&spec, &image, &mut mock).expect("load");
+    let loaded = load(&spec, &image, None, &mut mock).expect("load");
     assert_eq!(loaded.regions.len(), 5);
     assert!(
         loaded
@@ -233,7 +243,7 @@ fn the_regions_record_what_the_trap_loop_may_copy_out_of() {
         loaded
             .regions
             .iter()
-            .any(|region| region.start == BRK_BASE && region.len == BRK_SIZE)
+            .any(|region| region.start == 0x40_2000 && region.len == BRK_SIZE)
     );
     assert!(
         loaded
@@ -254,6 +264,7 @@ fn the_stack_and_image_are_written_through_the_scratch_mapping() {
     let image = image();
     let spec = plan_image(
         &image,
+        None,
         &config(),
         &[b"hello".as_slice()],
         &[],
@@ -262,7 +273,7 @@ fn the_stack_and_image_are_written_through_the_scratch_mapping() {
     )
     .expect("plan");
     let mut mock = Mock::new();
-    let _ = load(&spec, &image, &mut mock).expect("load");
+    let _ = load(&spec, &image, None, &mut mock).expect("load");
     // image bytes, data tail, stack bytes
     assert_eq!(mock.writes.len(), 3);
     assert_eq!(mock.writes[0].1, image.len());
@@ -271,6 +282,6 @@ fn the_stack_and_image_are_written_through_the_scratch_mapping() {
     assert!(
         mock.creations
             .iter()
-            .any(|len| *len == spec.stack.bytes.len().div_ceil(PAGE as usize) * PAGE as usize)
+            .any(|len| *len >= usize::try_from(STACK_RESERVE).expect("reserve fits"))
     );
 }

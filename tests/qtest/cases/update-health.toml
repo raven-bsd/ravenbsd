@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K27c good-marker case: the fixture disk carries an ESP with the A/B slots and a UFS root
+# partition. The marker on the UFS root disk is healthy and matches boot.toml, so the loader
+# confirms slot B and boots the real kernel; init mounts the UFS root, waits for the required
+# root service readiness and writes the marker.
+
+name = "update-health"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 900
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-drive", "if=none,id=d0,format=raw,file=build/qtest/update-health-good.img",
+    "-device", "virtio-blk-pci,drive=d0,disable-legacy=on",
+]
+pre = ["sh tests/fixtures/update/prepare.sh"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: update: health marker matches slot b; confirmed$'
+
+[[expect]]
+regex = '^svcd: root mounted at /root$'
+
+[[expect]]
+regex = '^svcd: root services=1 added=1$'
+
+[[expect]]
+regex = '^update-health: probe ready$'
+
+[[expect]]
+regex = '^svcd: health-probe up$'
+
+[[expect]]
+regex = '^svcd: required services ready$'
+
+[[expect]]
+regex = '^svcd: health marker written$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|health marker:'

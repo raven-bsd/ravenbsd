@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024 reuben olinsky
+
+name: "shopt login_shell"
+cases:
+  - name: "login_shell is on for login shells"
+    args:
+      - "--login"
+      - "-c"
+      - "shopt -q login_shell"
+
+  - name: "login_shell is off for non-login shells"
+    args:
+      - "-c"
+      - "shopt -q login_shell"
+
+  - name: "login_shell is on for -l"
+    args:
+      - "-l"
+      - "-c"
+      - "shopt -q login_shell"

@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-dtrace-user"
+version = "0.1.0"
+description = "DTrace consumer model, record formatting and USDT marker helpers for RavenBSD."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+
+[dependencies]
+raven-abi = { path = "../raven-abi" }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-rt = { path = "../../userland/rt" }
+
+[lints.rust]
+missing_docs = "warn"
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"

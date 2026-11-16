@@ -104,6 +104,8 @@ pub(crate) mod process;
 pub(crate) mod pthread;
 #[cfg(target_os = "none")]
 pub(crate) mod pwd;
+#[cfg(target_os = "none")]
+pub(crate) mod rand;
 #[cfg(any(target_os = "none", test))]
 #[path = "stdlib/realpath.rs"]
 pub(crate) mod realpath;

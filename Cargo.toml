@@ -7,7 +7,7 @@
 resolver = "3"
 # `make toolchain` extracts the pinned Rust source under build/; its bootstrap
 # package must not be pulled into this workspace.
-exclude = ["build", "toolchain/vendor/libc", "userland/uutils"]
+exclude = ["build", "userland/brush", "toolchain/vendor/libc", "userland/uutils"]
 # A ticket that creates a new top-level crate appends ONE line to `members` (and nothing else here).
 # Planned members: "kernel", "boot/loader", "userland/rt", "userland/init", "userland/bin/<tool>",
 # "userland/servers/<server>", "userland/drivers/<driver>", "userland/linux-shim", "libc/ravenlibc/crates/*",
@@ -56,10 +56,12 @@ members = [
     "tests/fixtures/s39-parity",
     "tests/fixtures/usercopy-cow",
     "tests/fixtures/testkernel",
+    "tests/fixtures/update/probe",
     "tests/fixtures/k14-block/mkdisk",
     "tests/fixtures/k33-rootfs",
     "tests/fixtures/b12-netd",
     "tests/fixtures/k14-block/controller",
+    "tests/fixtures/pi4-emmc2/probe",
     "tests/fixtures/k54-ufs/mkimage",
     "tests/fixtures/k54-ufs/probe",
     "tests/fixtures/k55-ufs/probe",
@@ -67,8 +69,10 @@ members = [
     "tests/fixtures/b15-resolv/probe",
     "tests/fixtures/b70-net/probe",
     "tests/fixtures/b70-net/overlay",
+    "tests/fixtures/pi4-soak",
     "profiles/iommu-fixture",
     "tests/qtest/cases/linux-trap-fixture",
+    "tests/qtest/cases/linux-root-fixture",
     "tests/qtest/cases/tls-base-fixture",
     "tests/qtest/cases/kick-eintr-fixture",
     "tests/qtest/cases/signal-entry-fixture",
@@ -81,11 +85,13 @@ members = [
     "tests/qtest/cases/thread-tid-fixture",
     "xtask",
     "tests/qtest",
+    "tests/genet",
     "tests/ufs-oracle",
     "tests/libc/oracle",
     "tests/libc/va",
     "tests/libc/headers",
     "tests/libc/atf",
+    "tests/libc/gate",
     "tests/libc/toolchain-abi",
     "tests/ufs-powercut",
     "tools/fs-fuzz",
@@ -107,6 +113,7 @@ members = [
     "userland/init",
     "userland/init/testsvc",
     "userland/bin/uname",
+    "userland/bin/dtrace",
     "userland/bin/rsh",
     "userland/bin/echo",
     "userland/bin/ifconfig",
@@ -181,13 +188,15 @@ members = [
     "userland/drivers/virtio-blk",
     "userland/drivers/emmc2",
     "userland/drivers/genet",
+    "userland/drivers/usb-hid",
+    "userland/drivers/pwm-audio",
     "tools/bench-host",
     "tools/fuzz",
     "tests/fuzz/replay",
     "libc/ravenlibc/crt",
     "libc/ravenlibc/ld",
 ]
-default-members = ["crates/*", "libc/ravenlibc/crates/*"]
+default-members = ["crates/*", "libc/ravenlibc/crates/*", "tests/genet"]
 
 [workspace.package]
 edition = "2024"

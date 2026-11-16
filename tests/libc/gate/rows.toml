@@ -1,0 +1,291 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The six-row libc gate. Thresholds are copied from
+# architecture/raven-libc/donor-map/16-size-testing-oracles.md 3.B.9 (G1 column) and are
+# PROPOSED (O-B8). Do not lower one to make a row pass.
+
+[thresholds]
+netbsd = 90
+freebsd = 90
+openbsd = 90
+picolibc = 90
+mlibc = 85
+exclusions = 250
+soak_seconds = 3600
+world_built = 100
+world_weighted = 197.5
+
+[[check]]
+id = "1.1"
+row = 1
+title = "symbol coverage (C1)"
+required = true
+kind = "argv"
+argv = ["cargo", "run", "-q", "-p", "libc-census", "--", "missing", "--implemented", "libc/ravenlibc/abi/Symbols.list", "--fail-p0"]
+evidence = "build/libc-gate/1.1.txt"
+source = "C33, C60, 3.B.9 C1"
+
+[[check]]
+id = "1.1.pack"
+row = 1
+title = "packed symbol list (C1)"
+required = true
+kind = "argv"
+argv = ["cargo", "xtask", "libc-pack", "--arch", "x86_64", "--check"]
+evidence = "build/libc-gate/1.1.pack.txt"
+source = "C60, 3.B.9 C1"
+
+[[check]]
+id = "1.1.audit"
+row = 1
+title = "target-case symbol audit (C64j)"
+required = true
+kind = "argv"
+argv = ["cargo", "xtask", "libc-audit"]
+evidence = "build/libc-gate/1.1.audit.txt"
+source = "C64j, C64l"
+
+[[check]]
+id = "1.2"
+row = 1
+title = "donor suites G1 (C2-C6)"
+required = true
+kind = "argv"
+argv = ["cargo", "run", "-q", "-p", "raven-atf-run", "--", "gate", "--g1"]
+blocked_on = { ticket = "C71a" }
+note = "PG-22 PG-23 PG-29 PG-49 PG-50; C71a is blocked"
+evidence = "build/libc-gate/1.2.txt"
+source = "C71 4.9, 16 3.B.9 C2-C6"
+
+[[check]]
+id = "1.3"
+row = 1
+title = "LTP and pjdfstest (C7, C8)"
+required = false
+kind = "info"
+note = "owner-run LTP/pjdfstest results not supplied; INFO per C71/3.B.1.4"
+evidence = "build/libc-gate/1.3.txt"
+source = "C71, 3.B.1.4"
+
+[[check]]
+id = "1.4"
+row = 1
+title = "differential tests (C9)"
+required = true
+kind = "argv"
+argv = ["cargo", "xtask", "libc-oracle", "list"]
+child_argv = ["cargo", "xtask", "libc-oracle", "diff", "{family}"]
+expand = "oracle"
+blocked_on = { exit = [77] }
+evidence = "build/libc-gate/1.4.txt"
+source = "C35, 16 3.B.9 C9"
+
+[[check]]
+id = "1.5"
+row = 1
+title = "host unit tests"
+required = true
+kind = "argv"
+argv = ["cargo", "test", "-p", "raven-libc-abi"]
+child_argv = ["cargo", "test", "-p", "{crate}"]
+expand = "crates"
+evidence = "build/libc-gate/1.5.txt"
+source = "C34 data, xtask/crates.toml"
+
+[[check]]
+id = "1.6"
+row = 1
+title = "Miri (C11)"
+required = true
+kind = "argv"
+preflight = ["cargo", "+nightly", "miri", "--version"]
+argv = ["cargo", "+nightly", "miri", "test", "-p", "raven-libc-str", "-p", "raven-libc-fmt", "-p", "raven-libc-dtoa", "-p", "raven-libc-regex", "-p", "raven-libc-glob"]
+blocked_on = { exit = [77] }
+evidence = "build/libc-gate/1.6.txt"
+source = "16 3.B.2.1"
+
+[[check]]
+id = "1.7"
+row = 1
+title = "lints (C16)"
+required = true
+kind = "argv"
+argv = ["cargo", "xtask", "libc-lint", "all"]
+evidence = "build/libc-gate/1.7.txt"
+source = "C34"
+
+[[check]]
+id = "2.1"
+row = 2
+title = "world check"
+required = true
+kind = "argv"
+argv = ["cargo", "run", "-q", "-p", "libc-world", "--", "check"]
+blocked_on = { missing_files = ["tools/libc-world/Cargo.toml", "tools/libc-world/results/x86_64/world.json"] }
+note = "C72 outputs are not in origin/master and H-11 tarballs are absent"
+evidence = "build/libc-gate/2.1.txt"
+source = "C72"
+
+[[check]]
+id = "2.2"
+row = 2
+title = "world build gate (C13)"
+required = true
+kind = "argv"
+argv = ["cargo", "run", "-q", "-p", "libc-world", "--", "gate", "--phase", "1", "--min-built", "100", "--results", "tools/libc-world/results/x86_64"]
+blocked_on = { missing_files = ["tools/libc-world/Cargo.toml", "tools/libc-world/results/x86_64/world.json"] }
+note = "C72 outputs are not in origin/master and H-11 tarballs are absent"
+evidence = "build/libc-gate/2.2.txt"
+source = "C72 4.8, 16 3.B.9 C13"
+
+[[check]]
+id = "3.1"
+row = 3
+title = "size budgets (C14)"
+required = true
+kind = "argv"
+argv = ["cargo", "xtask", "libc-size", "--check"]
+evidence = "build/libc-gate/3.1.txt"
+source = "C69, 16 3.B.9 C14"
+
+[[check]]
+id = "3.2"
+row = 3
+title = "boot path (C15)"
+required = false
+kind = "info"
+note = "PG-60 absent; 0-1 syscalls and <=250 instructions are not evaluable"
+evidence = "build/libc-gate/3.2.txt"
+source = "3.A.9"
+
+[[check]]
+id = "4.1"
+row = 4
+title = "fuzz replay"
+required = true
+kind = "argv"
+argv = ["cargo", "test", "-p", "raven-libc-fuzz-replay"]
+evidence = "build/libc-gate/4.1.txt"
+source = "C70"
+
+[[check]]
+id = "4.2"
+row = 4
+title = "fuzz soak (C10)"
+required = true
+kind = "read"
+read = "soak"
+file = "tests/libc/fuzz/SOAK.md"
+min_seconds = 3600
+evidence = "build/libc-gate/4.2.txt"
+source = "C70 4.7, 16 3.B.9 C10"
+
+[[check]]
+id = "4.3"
+row = 4
+title = "hardened malloc default"
+required = true
+kind = "read"
+read = "hardened-malloc"
+file = "libc/ravenlibc/crates/raven-libc/Cargo.toml"
+evidence = "build/libc-gate/4.3.txt"
+source = "C49, C60, 17 10.1"
+
+[[check]]
+id = "4.4"
+row = 4
+title = "ENTROPY_WEAK status (H-5)"
+required = false
+kind = "info"
+read = "entropy-weak"
+evidence = "build/libc-gate/4.4.txt"
+source = "C50, C73, PG-52"
+
+[[check]]
+id = "5.1"
+row = 5
+title = "on-target libc cases (C12)"
+required = true
+kind = "argv"
+argv = ["cargo", "xtask", "qtest", "--case", "libc-hello", "--arch", "x86_64"]
+child_argv = ["cargo", "xtask", "qtest", "--case", "{case}", "--arch", "x86_64"]
+expand = "qtest"
+cases = ["libc-hello", "libc-stdio", "libc-time", "libc-threads", "libc-signals", "libc-dynamic", "libc-spawn"]
+blocked_on = { ticket = "C73c" }
+note = "PG-22 PG-23 PG-29 PG-49 PG-50; PG-13 merged in S51"
+evidence = "build/libc-gate/5.1.txt"
+source = "C73, 16 3.B.9 C12"
+
+[[check]]
+id = "5.2.core-servers"
+row = 5
+title = "core-servers regression"
+required = true
+kind = "argv"
+argv = ["cargo", "xtask", "qtest", "--case", "core-servers", "--arch", "x86_64"]
+evidence = "build/libc-gate/5.2.core-servers.txt"
+source = "LEAD-TICKET-CHECKLIST 8"
+
+[[check]]
+id = "5.2.file-tools"
+row = 5
+title = "file-tools regression"
+required = true
+kind = "argv"
+argv = ["cargo", "xtask", "qtest", "--case", "file-tools", "--arch", "x86_64"]
+evidence = "build/libc-gate/5.2.file-tools.txt"
+source = "LEAD-TICKET-CHECKLIST 8"
+
+[[check]]
+id = "5.3"
+row = 5
+title = "second architecture"
+required = false
+kind = "info"
+note = "aarch64: not delivered (C73 open item); owner decides whether G1 closes on x86_64 alone"
+evidence = "build/libc-gate/5.3.txt"
+source = "C73 12, 16 3.B.9 C12"
+
+[[check]]
+id = "6.1"
+row = 6
+title = "page coverage"
+required = true
+kind = "argv"
+argv = ["cargo", "run", "-q", "-p", "libc-gate", "--", "man-check"]
+evidence = "build/libc-gate/6.1.txt"
+source = "4.6"
+
+[[check]]
+id = "6.2"
+row = 6
+title = "render lint"
+required = true
+kind = "read"
+read = "mandoc"
+preflight = ["which", "mandoc"]
+cases = ["docs/man3/setlocale.3", "docs/man3/printf.3", "docs/man3/iconv.3", "docs/man3/assert.3", "docs/man3/fork.3", "docs/man3/posix_spawn.3", "docs/man3/issetugid.3", "docs/man3/arc4random.3", "docs/man3/malloc.3", "docs/man3/clock.3", "docs/man3/mmap.3", "docs/man3/open.3", "docs/man3/pledge.3", "docs/man3/pthread_create.3", "docs/man3/dlopen.3", "docs/man3/sysconf.3", "docs/man7/libc.7"]
+evidence = "build/libc-gate/6.2.txt"
+source = "K28 style, 4.6"
+
+[[check]]
+id = "6.3"
+row = 6
+title = "existing docs gate"
+required = true
+kind = "argv"
+argv = ["cargo", "xtask", "docs"]
+evidence = "build/libc-gate/6.3.txt"
+source = "K28"
+
+[[check]]
+id = "6.4"
+row = 6
+title = "libc(7)"
+required = true
+kind = "read"
+read = "files"
+file = "docs/man7/libc.7"
+evidence = "build/libc-gate/6.4.txt"
+source = "4.7"

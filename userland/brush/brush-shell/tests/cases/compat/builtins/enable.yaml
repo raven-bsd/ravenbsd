@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2024 reuben olinsky
+
+name: "Builtins: enable"
+cases:
+  - name: "List special builtins"
+    stdin: enable -s
+
+  - name: "List default-disabled builtins"
+    stdin: enable -n
+
+  - name: "List all builtins"
+    stdin: |
+      # List builtins but ignore any brush specific ones.
+      enable | grep -v brush
+
+  - name: "Disable builtins"
+    ignore_stderr: true
+    stdin: |
+      type printf
+
+      # Disable the builtin
+      PATH=
+      enable -n printf
+
+      # Check
+      type printf
+      print "Gone\n"
+
+      # Re-enable
+      enable printf
+
+      # Re-check
+      type printf
+      printf "Back\n"
+
+  - name: "enable -p lists only enabled builtins"
+    stdin: |
+      enable -n echo
+      enable -p | grep -c echo
+      enable -n -p | grep echo
+
+  - name: "enable lists only enabled builtins, -a lists all of them"
+    stdin: |
+      enable -n echo
+      enable | grep -w echo; echo "default: $?"
+      enable -s | grep -w -e echo -e set
+      enable -a | grep -w -e echo -e printf
+      enable -n -a | grep -w -e echo -e printf
+      enable -n | grep -w -e echo -e printf
+
+  - name: "enable takes --"
+    stdin: |
+      enable -n -- echo; echo "a=$?"
+      type -t echo
+      enable -- echo; echo "b=$?"
+      type -t echo

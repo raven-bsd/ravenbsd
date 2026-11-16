@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Required Pi 5 FAT boot files for the R8 evidence kit. Fields: path, minimum bytes, check.
+# `scripts/pi5-serial.sh --check` reads this file with `mtype`; the checks are `config` (the
+# proposed Pi 5 config.txt contract lines), `kernel` (non-zero `kernel_2712.img`), `fdt` (the
+# big-endian 0xd00dfeed magic) and `none`.
+#
+# The Pi 5 EEPROM bootloader's exact required file set, the kernel_2712.img selection and the
+# kernel load address remain UNVERIFIED; see docs/pi5-evidence.md.
+config.txt 1 config
+kernel_2712.img 65536 kernel
+bcm2712-rpi-5-b.dtb 1024 fdt
+start4.elf 1048576 none
+fixup4.dat 1024 none
+LICENCE.broadcom 1 none

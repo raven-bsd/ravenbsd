@@ -21,6 +21,8 @@ use spin::Mutex;
 use raven_abi::errno::Errno;
 use raven_rmm::VirtAddr;
 
+#[cfg(target_arch = "x86_64")]
+use crate::arch::x86_64::fpu::FpuArea;
 use crate::memory::paging;
 use crate::process::Process;
 
@@ -134,6 +136,12 @@ pub struct Thread {
     /// Top of the mapped kernel stack.
     pub kernel_stack_top: u64,
     saved_rsp: core::cell::UnsafeCell<u64>,
+    /// Architectural FP/SIMD save area (x86-64).
+    #[cfg(target_arch = "x86_64")]
+    pub fpu: core::cell::UnsafeCell<FpuArea>,
+    /// True while the user FP state is parked in `fpu` (thread is inside a syscall).
+    #[cfg(target_arch = "x86_64")]
+    pub fpu_saved: AtomicBool,
     /// True for a ring-3 thread.
     pub user: bool,
     /// User entry point (zero for kernel threads).
@@ -243,6 +251,23 @@ impl Thread {
         self.saved_rsp.get()
     }
 
+    /// Raw pointer to the thread's FP/SIMD save area.
+    ///
+    /// `FpuArea` is `repr(C)` with the byte array as its first field, so the area address is the
+    /// struct address. Callers must own the thread's FP/SIMD state (scheduler critical section).
+    #[cfg(target_arch = "x86_64")]
+    #[inline]
+    pub fn fpu_area_ptr(&self) -> *mut u8 {
+        self.fpu.get() as *mut u8
+    }
+
+    /// Raw const pointer to the thread's FP/SIMD save area.
+    #[cfg(target_arch = "x86_64")]
+    #[inline]
+    pub fn fpu_area_const_ptr(&self) -> *const u8 {
+        self.fpu.get() as *const u8
+    }
+
     fn new(
         name: String,
         process: Arc<Process>,
@@ -267,6 +292,10 @@ impl Thread {
             kernel_stack_base: base,
             kernel_stack_top: top,
             saved_rsp: core::cell::UnsafeCell::new(0),
+            #[cfg(target_arch = "x86_64")]
+            fpu: core::cell::UnsafeCell::new(FpuArea::new()),
+            #[cfg(target_arch = "x86_64")]
+            fpu_saved: AtomicBool::new(false),
             user,
             user_entry: 0,
             user_stack: 0,
@@ -365,6 +394,10 @@ impl Thread {
             kernel_stack_base: 0,
             kernel_stack_top: current_rsp & !0xf,
             saved_rsp: core::cell::UnsafeCell::new(0),
+            #[cfg(target_arch = "x86_64")]
+            fpu: core::cell::UnsafeCell::new(FpuArea::new()),
+            #[cfg(target_arch = "x86_64")]
+            fpu_saved: AtomicBool::new(false),
             user: false,
             user_entry: 0,
             user_stack: 0,
@@ -413,6 +446,10 @@ impl Thread {
             kernel_stack_base: base,
             kernel_stack_top: top,
             saved_rsp: core::cell::UnsafeCell::new(0),
+            #[cfg(target_arch = "x86_64")]
+            fpu: core::cell::UnsafeCell::new(FpuArea::new()),
+            #[cfg(target_arch = "x86_64")]
+            fpu_saved: AtomicBool::new(false),
             user: false,
             user_entry: 0,
             user_stack: 0,

@@ -116,6 +116,11 @@ fn current_table() -> &'static NameTable {
     })
 }
 
+/// `MB_CUR_MAX` of the active `LC_CTYPE` locale.
+pub(crate) fn mb_cur_max() -> usize {
+    current_locale().mb_cur_max(current_table())
+}
+
 /// `setlocale`.
 ///
 /// # Safety

@@ -5,7 +5,9 @@
 //!
 //! The production mode registers the `dev:` scheme after scanning. The `test` argument runs the
 //! matched driver a fixed number of cycles and exits, which the qtest uses to prove clean
-//! MMIO-handle teardown and restart.
+//! MMIO-handle teardown and restart. The `dtb` argument decodes the platform bus from
+//! `/etc/pi4.dtb` and reports the `compatible` matches; it is the aarch64/Pi 4 path and does not
+//! touch the PCI scheme.
 
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
@@ -23,6 +25,7 @@ mod program {
 
     use raven_abi::errno::Errno;
     use raven_abi::types::{Handle, Rights};
+    use raven_devd::dtb;
     use raven_initfs::Initfs;
     use raven_proto_dev::{DEVICE_INFO_LEN, DeviceInfo, DriverSpec, parse_drivers};
     use raven_proto_fs::{S_IFREG, Stat};
@@ -35,6 +38,7 @@ mod program {
     const READ: u32 = 1;
     const OPEN_OPCODE: u16 = 1;
     const OPEN_READ: u32 = 1;
+    const DTB_PATH: &str = "/etc/pi4.dtb";
 
     fn main(args: raven_rt::Args) -> i32 {
         let executable = args.get(0).unwrap_or("devd");
@@ -42,7 +46,7 @@ mod program {
         if executable == "dummy" || mode == "dummy" {
             return dummy_driver();
         }
-        match run(mode == "test") {
+        match run(mode) {
             Ok(()) => 0,
             Err(message) => {
                 raven_rt::eprintln!("devd: {message}");
@@ -51,7 +55,11 @@ mod program {
         }
     }
 
-    fn run(test: bool) -> Result<(), String> {
+    fn run(mode: &str) -> Result<(), String> {
+        if mode == "dtb" {
+            return run_dtb();
+        }
+        let test = mode == "test";
         let image = raven_rt::map_initfs().map_err(|error| error.description().to_string())?;
         let initfs = Initfs::parse(image).map_err(|error| alloc::format!("{error:?}"))?;
         let client = Client::new();
@@ -107,6 +115,48 @@ mod program {
         }
         raven_rt::println!("devd: driver {} cycles={}", driver.name, cycles);
         if test { Ok(()) } else { serve() }
+    }
+
+    /// Decode the platform device tree and report the compatible-string matches.
+    ///
+    /// This is the aarch64/Pi 4 discovery path. It deliberately stops at matching: launching a
+    /// platform driver needs MMIO/DMA/IRQ capabilities from the supervisor (B47/profile work),
+    /// which is not part of K32.
+    fn run_dtb() -> Result<(), String> {
+        let image = raven_rt::map_initfs().map_err(|error| error.description().to_string())?;
+        let initfs = Initfs::parse(image).map_err(|error| alloc::format!("{error:?}"))?;
+        let drivers = load_drivers(&initfs)?;
+        let Some(entry) = initfs.get(DTB_PATH) else {
+            return Err(alloc::format!("{DTB_PATH} is missing from the initfs"));
+        };
+        let devices =
+            dtb::parse(entry.data).map_err(|error| alloc::format!("{DTB_PATH}: {error}"))?;
+        raven_rt::println!("devd: dtb devices={}", devices.len());
+        for device in &devices {
+            let reg = device.first_reg().map_or_else(
+                || "none".to_string(),
+                |reg| alloc::format!("{:#x}+{:#x}", reg.base, reg.size),
+            );
+            raven_rt::println!(
+                "devd: dtb device {} compatible={} reg={} dma={} irq={}",
+                device.path,
+                device.compatible().unwrap_or("none"),
+                reg,
+                device.dma.len(),
+                device.irq_label()
+            );
+        }
+        let matched = dtb::match_drivers(&devices, &drivers);
+        for (device, driver) in &matched {
+            raven_rt::println!(
+                "devd: dtb driver {} compatible={} device={}",
+                driver.name,
+                driver.compatible.as_deref().unwrap_or("none"),
+                device.path
+            );
+        }
+        raven_rt::println!("devd: dtb matched={}", matched.len());
+        Ok(())
     }
 
     /// The launch-time arguments `devd` consumes from the driver's own list.
@@ -385,10 +435,11 @@ mod program {
         drivers: &'a [DriverSpec],
     ) -> Option<(DeviceInfo, &'a DriverSpec)> {
         for device in devices {
-            if let Some(driver) = drivers
-                .iter()
-                .find(|driver| driver.vendor == device.vendor && driver.device == device.device)
-            {
+            if let Some(driver) = drivers.iter().find(|driver| {
+                driver.compatible.is_none()
+                    && driver.vendor == device.vendor
+                    && driver.device == device.device
+            }) {
                 return Some((*device, driver));
             }
         }

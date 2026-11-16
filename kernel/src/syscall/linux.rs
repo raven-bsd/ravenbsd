@@ -18,8 +18,14 @@ use raven_abi::types::{Handle, Rights};
 use raven_proto_linux::ARCH_AARCH64;
 #[cfg(target_arch = "x86_64")]
 use raven_proto_linux::ARCH_X86_64;
-use raven_proto_linux::{LinuxReplyV1, LinuxSyscallV1, REPLY_LEN};
+#[cfg(target_arch = "x86_64")]
+use raven_proto_linux::FRAME_LEN;
+use raven_proto_linux::{FRAME_MAGIC, LinuxFrame, LinuxReplyV1, LinuxSyscallV1, REPLY_LEN};
+#[cfg(target_arch = "x86_64")]
+use raven_usercopy::is_user_address;
 
+#[cfg(target_arch = "x86_64")]
+use crate::arch::x86_64::trapframe::TrapFrame;
 use crate::ipc::protocol::{Opcode, SchemePacket};
 use crate::ipc::{PendingRequest, RequestBuffers, next_request_id};
 use crate::process::{Process, handle::Object};
@@ -33,6 +39,13 @@ const MAX_HANDLER_REQUESTS: usize = 1024;
 const ARCH: u8 = ARCH_X86_64;
 #[cfg(target_arch = "aarch64")]
 const ARCH: u8 = ARCH_AARCH64;
+
+/// User-visible RFLAGS bits a resumed frame may set; IOPL, NT and VM never come from the server.
+#[cfg(target_arch = "x86_64")]
+const USER_RFLAGS_MASK: u64 = 0x0000_0000_0024_0fd7;
+/// RFLAGS bits forced on return (bit 1 and IF).
+#[cfg(target_arch = "x86_64")]
+const USER_RFLAGS_SET: u64 = 0x202;
 
 /// Install a handler into `target` for `PROC_SET_PERSONALITY`.
 ///
@@ -71,6 +84,66 @@ pub fn install_handler(
 
 /// Deliver one raw syscall frame to the process handler and return its `i64`.
 pub fn trap(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<isize, Errno> {
+    let request = LinuxSyscallV1::new(
+        ARCH,
+        frame.rax,
+        [
+            frame.rdi, frame.rsi, frame.rdx, frame.r10, frame.r8, frame.r9,
+        ],
+    );
+    Ok(deliver(caller, request, None)?.0)
+}
+
+/// x86-64 trap entry: capture the full user frame and deliver it beside the version-1 request.
+///
+/// The frame travels in the scheme packet's `path` field because the packet's inline `data` is
+/// 64 bytes and the version-1 request already uses 58. A handler that knows the frame may reply
+/// with the same envelope to resume the thread at a chosen RIP/RSP; the 9-byte reply value stays
+/// in `data`. An older handler ignores the path and the thread returns normally.
+#[cfg(target_arch = "x86_64")]
+pub fn trap_x86_64(caller: &Arc<Process>, frame: &mut TrapFrame) -> Result<isize, Errno> {
+    let request = LinuxSyscallV1::new(
+        ARCH,
+        frame.rax,
+        [
+            frame.rdi, frame.rsi, frame.rdx, frame.r10, frame.r8, frame.r9,
+        ],
+    );
+    let tls_base = sched::current_thread()
+        .map(|thread| thread.tls_base())
+        .unwrap_or(0);
+    let captured = LinuxFrame {
+        rip: frame.rip,
+        rsp: frame.rsp,
+        rflags: frame.rflags,
+        fs_base: tls_base,
+        gprs: [
+            frame.rax, frame.rbx, frame.rcx, frame.rdx, frame.rsi, frame.rdi, frame.rbp, frame.r8,
+            frame.r9, frame.r10, frame.r11, frame.r12, frame.r13, frame.r14, frame.r15,
+        ],
+    };
+    let mut frame_bytes = [0u8; FRAME_LEN];
+    captured
+        .encode(&mut frame_bytes)
+        .map_err(|_| Errno::EPROTO)?;
+    let (value, reply_frame) = deliver(caller, request, Some(&frame_bytes))?;
+    if let Some(reply_frame) = reply_frame
+        && reply_frame != captured
+    {
+        // A handler that echoes the request frame (older servers copy the packet and leave the
+        // path untouched) must not override state the syscall already changed, notably the TLS
+        // base an `arch_prctl` handler installed before its reply.
+        apply_frame(frame, &reply_frame)?;
+    }
+    Ok(value)
+}
+
+/// Build the packet, wait for the handler and decode the reply plus an optional reply frame.
+fn deliver(
+    caller: &Arc<Process>,
+    request: LinuxSyscallV1,
+    frame_bytes: Option<&[u8]>,
+) -> Result<(isize, Option<LinuxFrame>), Errno> {
     let state = *caller.personality.lock();
     let handler = state.handler.ok_or(Errno::EIO)?;
     let server = handler_server(caller, handler)?;
@@ -79,13 +152,6 @@ pub fn trap(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<isize, Errno>
         return Err(Errno::EIO);
     }
 
-    let request = LinuxSyscallV1::new(
-        ARCH,
-        frame.rax,
-        [
-            frame.rdi, frame.rsi, frame.rdx, frame.r10, frame.r8, frame.r9,
-        ],
-    );
     let mut request_bytes = [0u8; 64];
     let request_len = request
         .encode(&mut request_bytes)
@@ -94,6 +160,15 @@ pub fn trap(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<isize, Errno>
     let data = packet.data.get_mut(..request_len).ok_or(Errno::EPROTO)?;
     data.copy_from_slice(request_bytes.get(..request_len).ok_or(Errno::EPROTO)?);
     packet.data_len = u32::try_from(request_len).map_err(|_| Errno::EPROTO)?;
+    if let Some(frame_bytes) = frame_bytes {
+        // `set_path` is the Open path setter and rewrites `data_len`; the frame is an extra field
+        // beside the 58-byte request, so write the path bytes directly.
+        let path = packet
+            .path
+            .get_mut(..frame_bytes.len())
+            .ok_or(Errno::EPROTO)?;
+        path.copy_from_slice(frame_bytes);
+    }
     // The reply value travels in the response inline data. `Call` reports its
     // result length from `buffer_len`; asking for 8 bytes keeps the router's
     // reply-bound check satisfied without a captured response buffer.
@@ -118,17 +193,60 @@ pub fn trap(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<isize, Errno>
         if response.opcode == 0 {
             return Err(Errno::EIO);
         }
-        return Ok(isize::try_from(response.status)
-            .unwrap_or(0)
-            .saturating_neg());
+        return Ok((
+            isize::try_from(response.status)
+                .unwrap_or(0)
+                .saturating_neg(),
+            None,
+        ));
     }
     let reply = match LinuxReplyV1::decode(response.data_bytes()) {
         Ok(reply) => reply,
         Err(_) => {
-            return Ok(isize::from(Errno::EPROTO.0 as i16).saturating_neg());
+            return Ok((isize::from(Errno::EPROTO.0 as i16).saturating_neg(), None));
         }
     };
-    Ok(reply.value as isize)
+    let reply_frame = if response.path.get(..4) == Some(FRAME_MAGIC.as_slice()) {
+        Some(LinuxFrame::decode(&response.path).map_err(|_| Errno::EPROTO)?)
+    } else {
+        None
+    };
+    Ok((reply.value as isize, reply_frame))
+}
+
+/// Apply a handler-provided frame to the blocked syscall's saved user context.
+#[cfg(target_arch = "x86_64")]
+fn apply_frame(target: &mut TrapFrame, frame: &LinuxFrame) -> Result<(), Errno> {
+    if frame.rip == 0
+        || frame.rsp == 0
+        || !is_user_address(frame.rip)
+        || !is_user_address(frame.rsp)
+    {
+        return Err(Errno::EFAULT);
+    }
+    target.rip = frame.rip;
+    target.rsp = frame.rsp;
+    target.rflags = (frame.rflags & USER_RFLAGS_MASK) | USER_RFLAGS_SET;
+    target.rax = frame.gprs[0];
+    target.rbx = frame.gprs[1];
+    target.rcx = frame.gprs[2];
+    target.rdx = frame.gprs[3];
+    target.rsi = frame.gprs[4];
+    target.rdi = frame.gprs[5];
+    target.rbp = frame.gprs[6];
+    target.r8 = frame.gprs[7];
+    target.r9 = frame.gprs[8];
+    target.r10 = frame.gprs[9];
+    target.r11 = frame.gprs[10];
+    target.r12 = frame.gprs[11];
+    target.r13 = frame.gprs[12];
+    target.r14 = frame.gprs[13];
+    target.r15 = frame.gprs[14];
+    if let Some(thread) = sched::current_thread() {
+        thread.set_tls_base(frame.fs_base);
+    }
+    crate::sched::context::install_tls_base(frame.fs_base);
+    Ok(())
 }
 
 fn handler_server(caller: &Arc<Process>, handler: Handle) -> Result<Arc<Process>, Errno> {

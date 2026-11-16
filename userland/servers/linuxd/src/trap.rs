@@ -44,14 +44,19 @@ pub fn decode(request: &[u8]) -> Result<LinuxSyscallV1, TrapError> {
 
 /// Number of user bytes the trap loop must copy in before dispatch.
 ///
-/// Only `write` reads a user buffer in the skeleton (`buf`, `count`). The bound protects the server
-/// from a hostile or corrupt Linux process.
+/// `write` reads a user buffer (`buf`, `count`); the path-taking calls (`open`, `openat`,
+/// `readlink`, `readlinkat`, `stat`, `newfstatat`) get a bounded path window. The bound protects
+/// the server from a hostile or corrupt Linux process; a longer path is not served.
 pub fn copy_in_len(call: &LinuxSyscallV1) -> Option<usize> {
-    if call.nr != 1 {
-        return None;
+    const PATH_COPY: usize = 128;
+    match call.nr {
+        1 => {
+            let count = usize::try_from(call.args[2]).ok()?;
+            Some(count.min(crate::table::USER_BUFFER_MAX))
+        }
+        2 | 4 | 89 | 257 | 262 | 267 => Some(PATH_COPY),
+        _ => None,
     }
-    let count = usize::try_from(call.args[2]).ok()?;
-    Some(count.min(crate::table::USER_BUFFER_MAX))
 }
 
 /// Dispatch one decoded call and decide the server's next step.

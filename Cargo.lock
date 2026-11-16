@@ -155,7 +155,13 @@ dependencies = [
 name = "emmc2"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
+ "raven-driver",
  "raven-pi4",
+ "raven-proto-block",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -215,6 +221,8 @@ dependencies = [
 name = "genet"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
+ "raven-driver",
  "raven-genet",
  "raven-rt",
 ]
@@ -313,6 +321,16 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "regex",
+ "serde",
+ "serde_json",
+ "toml",
+]
+
+[[package]]
+name = "libc-gate"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
  "serde",
  "serde_json",
  "toml",
@@ -497,6 +515,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pwm-audio"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-audio",
+ "raven-pwm",
+ "raven-rt",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -611,6 +638,14 @@ dependencies = [
  "raven-rt",
  "raven-scheme",
  "resolvd",
+]
+
+[[package]]
+name = "raven-b32-linux-root"
+version = "0.1.0"
+dependencies = [
+ "raven-initfs",
+ "raven-rt",
 ]
 
 [[package]]
@@ -784,6 +819,7 @@ name = "raven-devd"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-fdt-lite",
  "raven-initfs",
  "raven-proto-dev",
  "raven-proto-fs",
@@ -811,6 +847,26 @@ dependencies = [
 
 [[package]]
 name = "raven-driver"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-dtrace"
+version = "0.1.0"
+dependencies = [
+ "raven-dtrace-user",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-dtrace-core"
+version = "0.1.0"
+
+[[package]]
+name = "raven-dtrace-user"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
@@ -901,6 +957,14 @@ dependencies = [
  "raven-fdt-lite",
  "raven-plat",
  "raven-proto-net",
+]
+
+[[package]]
+name = "raven-genet-stress"
+version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
+ "raven-genet",
 ]
 
 [[package]]
@@ -1176,6 +1240,7 @@ dependencies = [
  "raven-libc-pledge",
  "raven-libc-proc",
  "raven-libc-pwd",
+ "raven-libc-rand",
  "raven-libc-regex",
  "raven-libc-resolv",
  "raven-libc-signal",
@@ -1731,10 +1796,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-pf"
+version = "0.1.0"
+
+[[package]]
 name = "raven-pi4"
 version = "0.1.0"
 dependencies = [
  "raven-fdt-lite",
+]
+
+[[package]]
+name = "raven-pi4-emmc2-probe"
+version = "0.1.0"
+dependencies = [
+ "emmc2",
+ "raven-abi",
+ "raven-proto-block",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-pi4-soak"
+version = "0.1.0"
+dependencies = [
+ "pwm-audio",
+ "raven-genet",
+ "raven-proto-audio",
+ "raven-pwm",
+ "raven-rt",
 ]
 
 [[package]]
@@ -1878,6 +1969,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-pwm"
+version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
+]
+
+[[package]]
 name = "raven-qtest"
 version = "0.1.0"
 dependencies = [
@@ -1967,6 +2065,38 @@ dependencies = [
 [[package]]
 name = "raven-rp1"
 version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
+ "raven-pci",
+ "raven-pi5",
+]
+
+[[package]]
+name = "raven-rp1-eth"
+version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
+ "raven-pci",
+ "raven-pi5",
+ "raven-rp1",
+]
+
+[[package]]
+name = "raven-rp1-fw"
+version = "0.1.0"
+dependencies = [
+ "raven-rp1",
+]
+
+[[package]]
+name = "raven-rp1-xhci"
+version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
+ "raven-pci",
+ "raven-pi5",
+ "raven-rp1",
+]
 
 [[package]]
 name = "raven-rsh"
@@ -2522,6 +2652,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-update-health-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-usb-audio"
+version = "0.1.0"
+dependencies = [
+ "raven-fdt-lite",
+ "raven-proto-audio",
+ "raven-rp1-xhci",
+]
+
+[[package]]
+name = "raven-usb-hid"
+version = "0.1.0"
+
+[[package]]
 name = "raven-usercopy"
 version = "0.1.0"
 dependencies = [
@@ -2860,6 +3010,14 @@ name = "unicode-ident"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
+
+[[package]]
+name = "usb-hid"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-usb-hid",
+]
 
 [[package]]
 name = "version_check"

@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S54: kernel-side reproducers for the primitives libc-threads/libc-signals build on.
+
+name = "libc-kernel"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/libc-kernel/build.sh"]
+initfs = "build/fixtures/libc-kernel/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^libc-kernel: thread create ex ok$'
+
+[[expect]]
+regex = '^libc-kernel: futex wait/wake ok$'
+
+[[expect]]
+regex = '^libc-kernel: futex eagain ok$'
+
+[[expect]]
+regex = '^libc-kernel: signal delivery ok$'
+
+[[expect]]
+regex = '^libc-kernel: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|libc-kernel: fail|killed by page fault'

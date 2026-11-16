@@ -17,6 +17,7 @@ pub mod config;
 pub mod fs;
 #[cfg(target_os = "uefi")]
 pub mod handoff;
+pub mod health;
 #[cfg(target_os = "uefi")]
 pub mod image;
 pub mod layout;

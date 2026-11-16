@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# B17 packet fixture for tests/fixtures/b17-pf/stateful.conf.
+# direction interface proto source sport destination dport length tcp-flags expected
+# tcp-flags: S=SYN A=ACK F=FIN R=RST; "-" for non-TCP.
+in  eth0 tcp 10.0.0.5   40000 192.0.2.10 80 60 S  pass
+out eth0 tcp 192.0.2.10 80    10.0.0.5   40000 60 SA pass
+in  eth0 tcp 10.0.0.6   40001 192.0.2.10 22 60 S  block
+in  eth0 udp 10.0.0.7   5353  192.0.2.10 53 40 -  block
+in  eth0 tcp 10.0.0.5   40000 192.0.2.10 80 60 A  pass

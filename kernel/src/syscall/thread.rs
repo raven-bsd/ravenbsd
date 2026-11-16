@@ -267,8 +267,9 @@ pub fn kick(frame: &SyscallFrame) -> Result<usize, Errno> {
 /// `thread_set_tls(thread, tp) -> 0`.
 ///
 /// `Handle::NONE` targets the calling thread. A non-zero base must be a
-/// canonical user address; zero clears it. The value is per-thread and is
-/// installed by the next context switch to that thread.
+/// canonical user address; zero clears it. The value is per-thread, and for the
+/// calling thread it is written to `IA32_FS_BASE` before the syscall returns;
+/// another target receives it on its next switch-in.
 pub fn set_tls(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
@@ -294,6 +295,12 @@ pub fn set_tls(frame: &SyscallFrame) -> Result<usize, Errno> {
         return Err(Errno::EFAULT);
     }
     thread.set_tls_base(tp);
+    // The caller reads `%fs:` as soon as the syscall returns; install the base now instead of
+    // waiting for the next context switch. A different target thread gets it on switch-in.
+    #[cfg(target_arch = "x86_64")]
+    if sched::current_thread().is_some_and(|current| Arc::ptr_eq(&current, &thread)) {
+        crate::sched::context::install_tls_base(tp);
+    }
     Ok(0)
 }
 

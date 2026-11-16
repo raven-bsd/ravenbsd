@@ -4,16 +4,18 @@
 [package]
 name = "genet"
 version = "0.1.0"
-description = "GENET v5 userspace driver skeleton for the Raspberry Pi 4: MMIO/DMA seam and typed bring-up."
+description = "GENET v5 userspace driver: platform MMIO/DMA seam, board bring-up record, frame/IRQ path and typed bring-up."
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+raven-driver = { path = "../../../crates/raven-driver" }
 raven-genet = { path = "../../../crates/raven-genet" }
 
 [target.'cfg(target_os = "none")'.dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
 raven-rt = { path = "../../rt", features = ["alloc"] }
 
 [lints]

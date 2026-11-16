@@ -1,0 +1,44 @@
+." SPDX-License-Identifier: BSD-3-Clause
+." Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 12, 2026
+.Dt MALLOC 3
+.Os RavenBSD
+.Sh NAME
+.Nm malloc
+.Nm free
+.Nm calloc
+.Nm realloc
+.Nm posix_memalign
+.Nm aligned_alloc
+.Nd allocate and free memory
+.Sh SYNOPSIS
+.In stdlib.h
+.Ft void *
+.Fn malloc "size_t size"
+.Ft void
+.Fn free "void *pointer"
+.Ft void *
+.Fn calloc "size_t count" "size_t size"
+.Ft void *
+.Fn realloc "void *pointer" "size_t size"
+.Ft int
+.Fn posix_memalign "void **pointer" "size_t alignment" "size_t size"
+.Ft void *
+.Fn aligned_alloc "size_t alignment" "size_t size"
+.Sh DESCRIPTION
+The allocator manages the process heap. The hardened backend is the default; a tiny backend
+is available for constrained builds.
+.Sh RETURN VALUES
+The allocating functions return a pointer or a null pointer. .Fn free returns no value.
+.Fn posix_memalign returns 0 or an errno value.
+.Sh ERRORS
+.Er ENOMEM is returned when the request cannot be satisfied. .Er EINVAL is returned for an
+invalid alignment.
+.Sh STANDARDS
+ISO C23 and POSIX.1-2024; ring 0.
+.Sh CAVEATS
+The hardened allocator is the default and supports MALLOC_OPTIONS and junk filling. The tiny
+allocator is not part of the default libc.so.1. See C49 and document 08.
+.Sh SEE ALSO
+.Xr malloc 3
+.Xr libc 7

@@ -22,11 +22,13 @@ _Unwind_RaiseException
 _Unwind_Resume
 _Unwind_SetGR
 _Unwind_SetIP
+__ctype_get_mb_cur_max
 __cxa_atexit
 __cxa_finalize
 __errno
 __errno_location
 __error
+__getrandom_v03_custom
 __gnu_basename
 __h_errno_location
 __progname
@@ -52,6 +54,7 @@ acoshf
 addmntent
 aligned_alloc
 alphasort
+arc4random_buf
 asin
 asinf
 asinh
@@ -85,6 +88,7 @@ cbrt
 cbrtf
 ceil
 ceilf
+cfmakeraw
 cgetcap
 cgetclose
 cgetent
@@ -120,6 +124,7 @@ cond_init
 cond_signal
 cond_timedwait
 cond_wait
+confstr
 connect
 copy_file_range
 copysign
@@ -226,8 +231,10 @@ ffs
 ffsl
 ffsll
 fgetc
+fgetln
 fgets
 fgetspent
+fgetwc
 fileno
 finite
 finitef
@@ -291,6 +298,7 @@ fts_read
 fts_set
 ftw
 futimens
+fwprintf
 fwrite
 gai_strerror
 gamma
@@ -330,6 +338,7 @@ gethostbyname_r
 gethostent
 gethostname
 getisax
+getline
 getlogin
 getlogin_r
 getmntent
@@ -393,6 +402,7 @@ glob
 globfree
 gmtime
 gmtime_r
+grantpt
 group_from_gid
 h_errno
 hasmntopt
@@ -479,6 +489,7 @@ jnf
 jrand48
 kevent
 kill
+killpg
 kqueue
 kqueue1
 l64a
@@ -606,6 +617,7 @@ port_getn
 port_send
 posix_getdents
 posix_memalign
+posix_openpt
 posix_spawn
 posix_spawn_file_actions_addchdir_np
 posix_spawn_file_actions_addclose
@@ -755,6 +767,7 @@ pthread_testcancel
 pthread_timedjoin_np
 pthread_tryjoin_np
 pthread_yield
+ptsname_r
 putchar
 putenv
 puts
@@ -787,10 +800,12 @@ regcomp
 regerror
 regexec
 regfree
+remove
 remque
 rename
 renameat
 res_init
+rewind
 rewinddir
 rindex
 rint
@@ -948,6 +963,9 @@ sscanf
 stat
 stat64
 statfs
+stderr
+stdin
+stdout
 stpcpy
 stpncpy
 str2sig
@@ -1012,6 +1030,7 @@ swapcontext
 symlink
 symlinkat
 sync
+syscall
 sysconf
 sysctl
 sysctlbyname
@@ -1023,6 +1042,10 @@ tan
 tanf
 tanh
 tanhf
+tcgetattr
+tcgetpgrp
+tcsetattr
+tcsetpgrp
 tdelete
 tdestroy
 telldir
@@ -1083,6 +1106,7 @@ tss_create
 tss_delete
 tss_get
 tss_set
+ttyname_r
 twalk
 uid_from_user
 ulckpwdf
@@ -1091,6 +1115,7 @@ uname
 ungetc
 unlink
 unlinkat
+unlockpt
 unsetenv
 unveil
 unvis
@@ -1115,6 +1140,7 @@ versionsort
 vfork
 vfprintf
 vfscanf
+vfwprintf
 vis
 vprintf
 vscanf

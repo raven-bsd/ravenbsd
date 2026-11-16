@@ -86,12 +86,16 @@ probe() {
             fi
             ;;
         23)
-            count=$(grep -c 'file_from_handle(caller, handle, Rights::NONE)' \
-                "$root/kernel/src/syscall/ipc.rs" || true)
-            if [ "$count" -ge 2 ]; then
-                present
+            if [ ! -f "$root/kernel/src/syscall/ipc.rs" ]; then
+                unknown
             else
-                absent
+                count=$(grep -c 'file_from_handle(caller, handle, Rights::NONE)' \
+                    "$root/kernel/src/syscall/ipc.rs" 2>/dev/null || true)
+                if [ "${count:-0}" -ge 2 ]; then
+                    present
+                else
+                    absent
+                fi
             fi
             ;;
         24)
