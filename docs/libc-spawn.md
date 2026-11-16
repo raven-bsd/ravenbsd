@@ -41,6 +41,25 @@ supplies the kernel syscall, and the on-target `libc-spawn` case passes on maste
 `PROC_WAIT` returns the kernel's raw exit code; `native_spawn` encodes it with
 `wait_status::encode(WaitStatus::Exited(code))`, so `WIFEXITED`/`WEXITSTATUS` work.
 
+## P9c follow-up
+
+The Bytes loader is not the fault in the brush repro. A C caller with non-NULL
+`posix_spawnattr_t`/`posix_spawn_file_actions_t` and `posix_spawnp` starts the child and waits
+correctly (`libc-spawn-attr`). The spawner's file-action model previously saw an empty parent
+table, so std-style `adddup2` actions returned `EBADF`; `posix_spawn`/`posix_spawnp` now pass a
+snapshot of the platform fds.
+
+Two items remain outside this slice:
+
+* `std::process::Command::status` still faults after a successful spawn with `RBX=0` at
+  `mov %r13d,0x4(%rbx)` (the `Ok(ExitStatus)` sret). The minimal `libc-spawn-std` fixture
+  reproduces it; QEMU reports `IP=0x423975`, `CR2=0x4`. The std/toolchain patch is K91.
+* `/bin/ls` output needs child fd inheritance: publish the `AT_RAVEN_FDMAP`/`AT_RAVEN_FDMAP_N`
+  block and call `restore_fdmap` from the start path. That wiring is in
+  `raven-libc-platform`/`start.rs`, outside P9c's Owns.
+
+Minimal next step: merge K91, then wire the fdmap block/restore and rerun `brush-spawn`.
+
 ## Limits in this slice
 
 - Only UTF-8 paths, arguments and environment strings are accepted; other bytes return `EINVAL`.
