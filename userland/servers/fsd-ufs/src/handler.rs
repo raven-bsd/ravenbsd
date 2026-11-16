@@ -10,7 +10,8 @@
 use alloc::string::{String, ToString};
 use raven_abi::errno::Errno;
 use raven_proto_fs::{
-    Call, CallRequest, CallResponse, MAX_PATH, OpenFlags, S_IFDIR, S_IFMT, Stat, StatFs,
+    ACCESS_EXEC, ACCESS_READ, ACCESS_WRITE, Call, CallRequest, CallResponse, Credentials, MAX_PATH,
+    OpenFlags, S_IFDIR, S_IFMT, Stat, StatFs,
 };
 use raven_scheme::{Ctx, Handler, HandlerResult, OpenTable, Opened};
 
@@ -119,6 +120,7 @@ pub trait FileSystem {
 struct OpenState {
     ino: u32,
     dir_cookie: u64,
+    credentials: Credentials,
 }
 
 /// A stateful read-only filesystem handler.
@@ -152,6 +154,29 @@ impl<F: FileSystem> FsHandler<F> {
             .map_err(|_| Errno::EPROTO.into())
     }
 
+    fn check_traverse(&mut self, path: &str, creds: &Credentials) -> Result<(), Errno> {
+        let absolute = path.starts_with('/');
+        let mut prefix = String::new();
+        for component in path.split('/').filter(|component| !component.is_empty()) {
+            if prefix.is_empty() {
+                if absolute {
+                    prefix.push('/');
+                }
+            } else {
+                prefix.push('/');
+            }
+            prefix.push_str(component);
+            let ino = self.fs.resolve(&prefix)?;
+            let stat = self.fs.stat(ino)?;
+            if stat.mode & S_IFMT == S_IFDIR
+                && !creds.permitted((stat.mode & 0o7777) as u16, stat.uid, stat.gid, ACCESS_EXEC)
+            {
+                return Err(Errno::EACCES);
+            }
+        }
+        Ok(())
+    }
+
     fn result(&self, response: &mut [u8], result: Result<(), Errno>) -> HandlerResult<usize> {
         match result {
             Ok(()) => self.status(response, 0),
@@ -170,7 +195,7 @@ impl<F: FileSystem> Handler for FsHandler<F> {
         path: &str,
         flags: OpenFlags,
         _mode: u32,
-        _ctx: &Ctx,
+        ctx: &Ctx,
     ) -> HandlerResult<Opened> {
         let Some((file_id, expected)) = self.pending.take() else {
             return Err(Errno::EINVAL.into());
@@ -190,6 +215,7 @@ impl<F: FileSystem> Handler for FsHandler<F> {
                 .map_err(|_| Errno::EINVAL)?;
             self.fs.create_file(path, mode, flags.exclusive())?
         } else {
+            self.check_traverse(path, &ctx.credentials)?;
             self.fs.resolve(path)?
         };
         if flags.truncate() {
@@ -199,9 +225,32 @@ impl<F: FileSystem> Handler for FsHandler<F> {
         if flags.directory() && stat.mode & S_IFMT != S_IFDIR {
             return Err(Errno::ENOTDIR.into());
         }
+        let mut want = 0;
+        if flags.readable() {
+            want |= ACCESS_READ;
+        }
+        if flags.writable() || flags.truncate() {
+            want |= ACCESS_WRITE;
+        }
+        if stat.mode & S_IFMT == S_IFDIR && flags.readable() {
+            want |= ACCESS_EXEC;
+        }
+        if !ctx
+            .credentials
+            .permitted((stat.mode & 0o7777) as u16, stat.uid, stat.gid, want)
+        {
+            return Err(Errno::EACCES.into());
+        }
         let cursor = if flags.append() { stat.size } else { 0 };
-        self.opens
-            .insert_with_id(file_id, OpenState { ino, dir_cookie: 0 }, flags)?;
+        self.opens.insert_with_id(
+            file_id,
+            OpenState {
+                ino,
+                dir_cookie: 0,
+                credentials: ctx.credentials,
+            },
+            flags,
+        )?;
         if let Some(open) = self.opens.get_mut(file_id) {
             open.set_cursor(cursor);
         }
@@ -278,13 +327,14 @@ impl<F: FileSystem> Handler for FsHandler<F> {
     }
 
     fn call(&mut self, file: u64, request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {
-        if self.opens.get(file).is_none() {
-            return Err(Errno::EBADF.into());
-        }
+        let credentials = self.opens.get(file).ok_or(Errno::EBADF)?.file.credentials;
         let decoded = CallRequest::decode(request).map_err(|_| Errno::EPROTO)?;
         match decoded.call {
             Call::Readlink { path } => {
                 let path = bytes_to_string(path)?;
+                if let Err(error) = self.check_traverse(path, &credentials) {
+                    return self.status(response, -i32::from(error.0));
+                }
                 let ino = match self.fs.resolve_nofollow(path) {
                     Ok(ino) => ino,
                     Err(error) => return self.status(response, -i32::from(error.0)),
@@ -366,6 +416,34 @@ impl<F: FileSystem> Handler for FsHandler<F> {
             }
             Call::Mount { .. } | Call::Umount { .. } => {
                 self.status(response, -i32::from(Errno::EINVAL.0))
+            }
+            Call::Access { mode, path } => {
+                let path = bytes_to_string(path)?;
+                if let Err(error) = self.check_traverse(path, &credentials) {
+                    return self.status(response, -i32::from(error.0));
+                }
+                let ino = match self.fs.resolve(path) {
+                    Ok(ino) => ino,
+                    Err(error) => return self.status(response, -i32::from(error.0)),
+                };
+                let stat = match self.fs.stat(ino) {
+                    Ok(stat) => stat,
+                    Err(error) => return self.status(response, -i32::from(error.0)),
+                };
+                let allowed = credentials.permitted(
+                    (stat.mode & 0o7777) as u16,
+                    stat.uid,
+                    stat.gid,
+                    mode as u16,
+                );
+                self.status(
+                    response,
+                    if allowed {
+                        0
+                    } else {
+                        -i32::from(Errno::EACCES.0)
+                    },
+                )
             }
         }
     }

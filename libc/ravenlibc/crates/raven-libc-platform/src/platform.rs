@@ -1348,6 +1348,7 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             Call::Mount { .. } => raven_proto_fs::OP_MOUNT,
             Call::Umount { .. } => raven_proto_fs::OP_UMOUNT,
             Call::Statfs => raven_proto_fs::OP_STATFS,
+            Call::Access { .. } => raven_proto_fs::OP_ACCESS,
         };
         let call_response =
             CallResponse::decode(op, &response[..count]).map_err(|error| error.errno())?;

@@ -7,8 +7,8 @@ use alloc::vec::Vec;
 
 use raven_abi::types::Handle;
 use raven_proto_fs::{
-    Call, CallRequest, CallResponse, DT_REG, DirEntry, DirEntryHeader, MAX_PATH, S_IFDIR, S_IFLNK,
-    S_IFMT, S_IFREG, Stat, StatFs,
+    Call, CallRequest, CallResponse, Credentials, DT_REG, DirEntry, DirEntryHeader, MAX_PATH,
+    S_IFDIR, S_IFLNK, S_IFMT, S_IFREG, Stat, StatFs,
 };
 use raven_scheme::HandlerError;
 
@@ -152,6 +152,7 @@ fn ctx() -> Ctx {
         token: 1,
         buffer_len: 0,
         response_len: 0,
+        credentials: Credentials::ROOT,
     }
 }
 
