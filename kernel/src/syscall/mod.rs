@@ -27,11 +27,24 @@ pub mod memory_ctl;
 pub mod process_ctl;
 pub mod thread;
 
+use core::sync::atomic::Ordering;
+
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
 use raven_abi::types::Personality;
 
 use crate::process;
+
+/// Dispatch one syscall frame, accounting kernel time to the caller.
+fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let start = crate::time::now_ns();
+    let result = dispatch_inner(frame);
+    if let Some(caller) = process::current() {
+        let elapsed = crate::time::now_ns().saturating_sub(start);
+        caller.system_ns.fetch_add(elapsed, Ordering::AcqRel);
+    }
+    result
+}
 
 /// Register view shared by every syscall handler.
 ///
@@ -56,7 +69,7 @@ pub struct SyscallFrame {
 }
 
 /// Dispatch one syscall frame and return its raw result.
-fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
+fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     // S41: a Linux-personality process never enters the native table. Route the
     // raw number to the process handler before interpreting any native meaning;
     // in particular Linux `write` (1) must not reach native `EXIT`.
@@ -116,6 +129,30 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     if number == process_ctl::PROC_GETGROUPS {
         return process_ctl::getgroups(frame);
+    }
+    if number == process_ctl::PROC_WAIT_EX {
+        return process_ctl::wait_ex(frame);
+    }
+    if number == process_ctl::PROC_GETPGID {
+        return process_ctl::getpgid(frame);
+    }
+    if number == process_ctl::PROC_SIGNAL {
+        return process_ctl::signal(frame);
+    }
+    if number == process_ctl::PROC_SIGRECV {
+        return process_ctl::sigrecv(frame);
+    }
+    if number == process_ctl::PROC_TIMES {
+        return process_ctl::times(frame);
+    }
+    if number == process_ctl::PROC_GETRUSAGE {
+        return process_ctl::getrusage(frame);
+    }
+    if number == process_ctl::PROC_GETRLIMIT {
+        return process_ctl::getrlimit(frame);
+    }
+    if number == process_ctl::PROC_SETRLIMIT {
+        return process_ctl::setrlimit(frame);
     }
     if number == raven_abi::syscall::PROC_SET_PERSONALITY {
         return process_ctl::set_personality(frame);
