@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-b23-linux-files"
+version = "0.1.0"
+description = "B23 fixture: start file: and ramfs: servers, then run linuxd on the file probe."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+
+# Standalone so the fixture needs no root-workspace members line; the path dependencies keep
+# their own workspace roots for inheritance.
+[workspace]
+
+[[bin]]
+name = "raven-b23-linux-files"
+path = "src/main.rs"
+
+[dependencies]
+raven-abi = { path = "../../../../crates/raven-abi" }
+raven-initfs = { path = "../../../../crates/raven-initfs" }
+raven-rt = { path = "../../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }

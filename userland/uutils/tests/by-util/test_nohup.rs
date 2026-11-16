@@ -1,0 +1,413 @@
+// This file is part of the uutils coreutils package.
+//
+// For the full copyright and license information, please view the LICENSE
+// file that was distributed with this source code.
+
+// spell-checker:ignore winsize Openpty openpty xpixel ypixel ptyprocess
+
+#[cfg(unix)]
+use std::thread::sleep;
+use uutests::new_ucmd;
+#[cfg(unix)]
+use uutests::{util::TestScenario, util_name};
+
+// General observation: nohup.out will not be created in tests run by cargo test
+// because stdin/stdout is not attached to a TTY.
+// All that can be tested is the side-effects.
+
+#[test]
+fn test_nohup_exit_codes() {
+    // No args: 125 default, 127 with POSIXLY_CORRECT
+    new_ucmd!().fails_with_code(125);
+    new_ucmd!().env("POSIXLY_CORRECT", "1").fails_with_code(127);
+
+    // Invalid arg: 125 default, 127 with POSIXLY_CORRECT
+    new_ucmd!().arg("--invalid").fails_with_code(125);
+    new_ucmd!()
+        .env("POSIXLY_CORRECT", "1")
+        .arg("--invalid")
+        .fails_with_code(127);
+}
+
+#[test]
+#[cfg(any(
+    target_vendor = "apple",
+    target_os = "linux",
+    target_os = "android",
+    target_os = "freebsd",
+    target_os = "openbsd"
+))]
+fn test_nohup_multiple_args_and_flags() {
+    use uutests::at_and_ucmd;
+
+    let (at, mut ucmd) = at_and_ucmd!();
+
+    ucmd.args(&["touch", "-t", "1006161200", "file1", "file2"])
+        .succeeds();
+    sleep(std::time::Duration::from_millis(10));
+
+    assert!(at.file_exists("file1"));
+    assert!(at.file_exists("file2"));
+}
+
+#[test]
+#[cfg(any(
+    target_vendor = "apple",
+    target_os = "linux",
+    target_os = "android",
+    target_os = "freebsd",
+    target_os = "openbsd"
+))]
+fn test_nohup_with_pseudo_terminal_emulation_on_stdin_stdout_stderr_get_replaced() {
+    let ts = TestScenario::new(util_name!());
+    let result = ts
+        .ucmd()
+        .terminal_simulation(true)
+        .args(&["sh", "is_a_tty.sh"])
+        .succeeds();
+
+    assert_eq!(
+        String::from_utf8_lossy(result.stderr()).trim(),
+        "nohup: ignoring input and appending output to 'nohup.out'"
+    );
+
+    sleep(std::time::Duration::from_millis(10));
+
+    // this proves that nohup was exchanging the stdio file descriptors
+    assert_eq!(
+        std::fs::read_to_string(ts.fixtures.plus_as_string("nohup.out")).unwrap(),
+        "stdin is not a tty\nstdout is not a tty\nstderr is not a tty\n"
+    );
+}
+
+// Note: Testing stdin preservation is complex because nohup's behavior depends on
+// whether stdin is a TTY. When stdin is a TTY, nohup redirects it to /dev/null.
+// When stdin is not a TTY (e.g., a pipe), nohup preserves it.
+// This behavior is already tested indirectly through other tests.
+
+// When stdin is a terminal, the replacement must be unreadable so that a
+// command which mistakenly reads from it gets an error instead of a silent
+// EOF (GNU opens /dev/null write-only). Since nohup execs the command, the
+// exit status is the command's own.
+#[test]
+#[cfg(unix)]
+fn test_nohup_replaced_stdin_is_not_readable() {
+    let ts = TestScenario::new(util_name!());
+    let at = &ts.fixtures;
+
+    ts.ucmd()
+        .terminal_simulation(true)
+        .arg("tee")
+        .fails_with_code(1)
+        .stderr_contains("nohup: ignoring input and appending output to 'nohup.out'");
+
+    sleep(std::time::Duration::from_millis(10));
+
+    // cat's error message goes to stderr, which nohup redirected into nohup.out
+    let content = at.read("nohup.out");
+    assert!(
+        content.contains("Bad file descriptor"),
+        "expected a read error from cat in nohup.out, got: {content:?}"
+    );
+}
+
+// Test that nohup creates nohup.out in current directory
+#[test]
+#[cfg(any(
+    target_vendor = "apple",
+    target_os = "linux",
+    target_os = "android",
+    target_os = "freebsd",
+    target_os = "openbsd"
+))]
+fn test_nohup_creates_output_in_cwd() {
+    let ts = TestScenario::new(util_name!());
+    let at = &ts.fixtures;
+
+    ts.ucmd()
+        .terminal_simulation(true)
+        .args(&["echo", "test output"])
+        .succeeds()
+        .stderr_contains("nohup: ignoring input and appending output to 'nohup.out'");
+
+    sleep(std::time::Duration::from_millis(10));
+
+    // Check that nohup.out was created in cwd
+    assert!(at.file_exists("nohup.out"));
+    let content = std::fs::read_to_string(at.plus_as_string("nohup.out")).unwrap();
+    assert!(content.contains("test output"));
+}
+
+// Test that nohup appends to existing nohup.out
+#[test]
+#[cfg(any(
+    target_vendor = "apple",
+    target_os = "linux",
+    target_os = "android",
+    target_os = "freebsd",
+    target_os = "openbsd"
+))]
+fn test_nohup_appends_to_existing_file() {
+    let ts = TestScenario::new(util_name!());
+    let at = &ts.fixtures;
+
+    // Create existing nohup.out with content
+    at.write("nohup.out", "existing content\n");
+
+    ts.ucmd()
+        .terminal_simulation(true)
+        .args(&["echo", "new output"])
+        .succeeds();
+
+    sleep(std::time::Duration::from_millis(10));
+
+    // Check that new output was appended
+    let content = std::fs::read_to_string(at.plus_as_string("nohup.out")).unwrap();
+    assert!(content.contains("existing content"));
+    assert!(content.contains("new output"));
+}
+
+// Test that nohup falls back to $HOME/nohup.out when cwd is not writable
+// Skipped on macOS as the permissions test is unreliable
+#[test]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "android",
+    target_os = "freebsd",
+    target_os = "openbsd"
+))]
+fn test_nohup_fallback_to_home() {
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+
+    // Skip test when running as root (permissions bypassed via CAP_DAC_OVERRIDE)
+    // This is common in Docker/Podman containers but won't happen in CI
+    if rustix::process::geteuid().is_root() {
+        println!("Skipping test when running as root (file permissions bypassed)");
+        return;
+    }
+
+    let ts = TestScenario::new(util_name!());
+    let at = &ts.fixtures;
+
+    // Create a temporary HOME directory
+    at.mkdir("home");
+    let home_dir = at.plus_as_string("home");
+
+    // Create a read-only directory as working directory
+    at.mkdir("readonly_dir");
+    let readonly_path = at.plus("readonly_dir");
+
+    // Make readonly_dir actually read-only
+    let mut perms = fs::metadata(&readonly_path).unwrap().permissions();
+    perms.set_mode(0o555); // Changed from 0o444 to 0o555 (r-xr-xr-x)
+    fs::set_permissions(&readonly_path, perms).unwrap();
+
+    // Run nohup with the readonly directory as cwd and custom HOME
+    let result = ts
+        .ucmd()
+        .env("HOME", &home_dir)
+        .current_dir(&readonly_path)
+        .terminal_simulation(true)
+        .args(&["echo", "fallback test"])
+        .run(); // Use run() instead of succeeds() since it might fail
+
+    // Restore permissions for cleanup before any assertions
+    let mut perms = fs::metadata(&readonly_path).unwrap().permissions();
+    perms.set_mode(0o755);
+    fs::set_permissions(&readonly_path, perms).unwrap();
+
+    // Should mention HOME/nohup.out in stderr if it fell back
+    let stderr_str = String::from_utf8_lossy(result.stderr());
+    let home_nohup = format!("{home_dir}/nohup.out");
+
+    // Check either stderr mentions the HOME path or the file was created in HOME
+    sleep(std::time::Duration::from_millis(50));
+    assert!(
+        stderr_str.contains(&home_nohup) || std::path::Path::new(&home_nohup).exists(),
+        "nohup should fall back to HOME when cwd is not writable. stderr: {stderr_str}"
+    );
+}
+
+// Test that nohup exits with 127 when command is not found
+// or 126 when command exists but is not executable
+#[test]
+fn test_nohup_command_not_found() {
+    let command = "this-command-definitely-does-not-exist-anywhere";
+    let result = new_ucmd!().arg(command).fails();
+
+    result.stderr_contains(format!("failed to run command '{command}'"));
+
+    // Accept either 126 (cannot execute) or 127 (command not found)
+    let code = result.try_exit_status().and_then(|s| s.code());
+    assert!(
+        code == Some(126) || code == Some(127),
+        "Expected exit code 126 or 127, got: {code:?}"
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn test_nohup_command_with_non_utf8_args() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    new_ucmd!()
+        .arg("echo")
+        .arg(OsStr::from_bytes(b"a\xffb"))
+        .succeeds()
+        .stdout_only_bytes(b"a\xffb\n");
+}
+
+#[test]
+#[cfg(unix)]
+fn test_nohup_non_utf8_command_not_found() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    new_ucmd!()
+        .arg(OsStr::from_bytes(b"no-such-command-\xff"))
+        .fails_with_code(127)
+        .no_stdout()
+        .stderr_contains("failed to run command")
+        .stderr_contains("no-such-command-\\xFF");
+}
+
+#[test]
+#[cfg(all(unix, not(target_vendor = "apple")))]
+fn test_nohup_non_utf8_command_path() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    // The path of the command is not valid UTF-8 and must reach exec unchanged.
+    let ts = TestScenario::new(util_name!());
+    let dir = ts.fixtures.plus(OsStr::from_bytes(b"dir-\xff"));
+    std::fs::create_dir(&dir).unwrap();
+    let cmd = dir.join("coreutils");
+    std::os::unix::fs::symlink(&ts.bin_path, &cmd).unwrap();
+    ts.ucmd()
+        .arg(&cmd)
+        .args(&["nohup", "--version"])
+        .succeeds()
+        .stdout_only(format!("nohup {}\n", uucore::crate_version!()));
+}
+
+// Test stderr is redirected to stdout
+#[test]
+#[cfg(any(
+    target_vendor = "apple",
+    target_os = "linux",
+    target_os = "android",
+    target_os = "freebsd",
+    target_os = "openbsd"
+))]
+fn test_nohup_stderr_to_stdout() {
+    let ts = TestScenario::new(util_name!());
+    let at = &ts.fixtures;
+
+    // Create a script that outputs to both stdout and stderr
+    at.write(
+        "both_streams.sh",
+        "#!/bin/sh\necho 'stdout message'\necho 'stderr message' >&2",
+    );
+    at.set_mode("both_streams.sh", 0o755);
+
+    ts.ucmd()
+        .terminal_simulation(true)
+        .args(&["sh", "both_streams.sh"])
+        .succeeds();
+
+    sleep(std::time::Duration::from_millis(10));
+
+    // Both stdout and stderr should be in nohup.out
+    let content = std::fs::read_to_string(at.plus_as_string("nohup.out")).unwrap();
+    assert!(content.contains("stdout message"));
+    assert!(content.contains("stderr message"));
+}
+
+// The command's own exit status passes through nohup untouched, since the
+// command replaces nohup's process image via exec.
+#[test]
+#[cfg(any(
+    target_vendor = "apple",
+    target_os = "linux",
+    target_os = "android",
+    target_os = "freebsd",
+    target_os = "openbsd"
+))]
+fn test_nohup_propagates_command_exit_code() {
+    new_ucmd!().args(&["true"]).succeeds();
+    new_ucmd!().args(&["sh", "-c", "exit 3"]).fails_with_code(3);
+}
+
+// A freshly created nohup.out must be readable only by its owner (0600),
+// so other users on a shared host cannot read the detached job's logs.
+#[test]
+#[cfg(unix)]
+fn test_nohup_new_output_file_is_owner_only() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let ts = TestScenario::new(util_name!());
+    let at = &ts.fixtures;
+
+    ts.ucmd()
+        .terminal_simulation(true)
+        .args(&["echo", "secret output"])
+        .succeeds();
+
+    sleep(std::time::Duration::from_millis(10));
+
+    let mode = at.metadata("nohup.out").permissions().mode() & 0o777;
+    assert_eq!(
+        mode, 0o600,
+        "new nohup.out should have mode 0600, got {mode:o}"
+    );
+}
+
+// If nohup.out already exists its permissions are left alone, and new
+// output is still appended to it.
+#[test]
+#[cfg(unix)]
+fn test_nohup_existing_output_file_keeps_permissions() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let ts = TestScenario::new(util_name!());
+    let at = &ts.fixtures;
+
+    at.write("nohup.out", "old content\n");
+    at.set_mode("nohup.out", 0o644);
+
+    ts.ucmd()
+        .terminal_simulation(true)
+        .args(&["echo", "new content"])
+        .succeeds();
+
+    sleep(std::time::Duration::from_millis(10));
+
+    let mode = std::fs::metadata(at.plus("nohup.out"))
+        .unwrap()
+        .permissions()
+        .mode()
+        & 0o777;
+    assert_eq!(
+        mode, 0o644,
+        "existing nohup.out should keep mode 0644, got {mode:o}"
+    );
+    let content = std::fs::read_to_string(at.plus_as_string("nohup.out")).unwrap();
+    assert!(content.contains("old content"));
+    assert!(content.contains("new content"));
+}
+
+#[test]
+fn test_nohup_help_and_version() {
+    use regex::Regex;
+
+    new_ucmd!()
+        .arg("--help")
+        .succeeds()
+        .stdout_contains("nohup COMMAND");
+    new_ucmd!()
+        .arg("--version")
+        .succeeds()
+        .stdout_matches(&Regex::new(r"^nohup \(uutils coreutils\) (\d+\.\d+\.\d+)\n$").unwrap());
+}

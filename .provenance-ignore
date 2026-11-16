@@ -14,10 +14,15 @@ tests/tcpip/fuzz/corpus/
 tests/fs-fuzz/corpus/
 tests/libc-oracle/vendor/
 
+# T1: OpenSSL is vendored unmodified with its upstream headers and notices. The
+# PROVENANCE.toml import pins the OpenSSL 3.5.0 revision and the Apache-2.0 licence.
+addons/tls/openssl/
+
 tests/libc/fuzz/corpus/
 # B54: binary Pi 5 DTB fixtures; tests/fixtures/pi5/generate.py regenerates them from the
 # documented trees, and the readable .dts/README stay under the SPDX check.
 tests/fixtures/pi5/*.dtb
+userland/uutils/
 
 # C64h: the vendored brush crates keep their upstream headers, and the first-party delta doc sits
 # under the MIT import. The K26c import records the upstream sources and licences.

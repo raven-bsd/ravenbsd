@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# T1 target smoke: the upstream OpenSSL 3.5 CLI runs from a minimal initfs and prints its version.
+# The add-on build produces the initfs; the base kernel and loader are the normal qtest image.
+
+name = "openssl-version"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 300
+initfs = "build/tls/x86_64/openssl-version-initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+pre = ["sh addons/tls/build.sh --qtest"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^OpenSSL 3\.5\.0 '
+
+[[expect]]
+regex = '^svcd: openssl-version up$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|openssl-version failed'

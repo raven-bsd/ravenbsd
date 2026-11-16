@@ -1,0 +1,495 @@
+// This file is part of the uutils coreutils package.
+//
+// For the full copyright and license information, please view the LICENSE
+// file that was distributed with this source code.
+
+// spell-checker:ignore (ToDO) taaaa tbbbb tcccc
+
+use rstest::rstest;
+use uucore::display::Quotable;
+use uutests::{at_and_ucmd, new_ucmd};
+
+#[test]
+fn test_invalid_arg() {
+    new_ucmd!().arg("--definitely-invalid").fails_with_code(1);
+}
+
+#[test]
+fn test_bare_dash_reads_stdin_in_file_list() {
+    let (at, mut ucmd) = at_and_ucmd!();
+    at.write("file", "file\n");
+
+    ucmd.args(&["-", "file"])
+        .pipe_in("stdin\n")
+        .succeeds()
+        .stdout_is("stdin\nfile\n");
+}
+
+#[test]
+fn test_with_tab() {
+    new_ucmd!()
+        .arg("with-tab.txt")
+        .succeeds()
+        .stdout_contains("        ")
+        .stdout_does_not_contain("\t");
+}
+
+#[test]
+fn test_with_trailing_tab() {
+    new_ucmd!()
+        .arg("with-trailing-tab.txt")
+        .succeeds()
+        .stdout_contains("with tabs=>  ")
+        .stdout_does_not_contain("\t");
+}
+
+#[test]
+fn test_with_trailing_tab_i() {
+    new_ucmd!()
+        .arg("with-trailing-tab.txt")
+        .arg("-i")
+        .succeeds()
+        .stdout_contains("        // with tabs=>\t");
+}
+
+#[test]
+fn test_with_tab_size() {
+    new_ucmd!()
+        .arg("with-tab.txt")
+        .arg("--tabs=10")
+        .succeeds()
+        .stdout_contains("          ");
+}
+
+#[test]
+fn test_with_space() {
+    new_ucmd!()
+        .arg("with-spaces.txt")
+        .succeeds()
+        .stdout_contains("    return");
+}
+
+#[test]
+fn test_with_multiple_files() {
+    new_ucmd!()
+        .arg("with-spaces.txt")
+        .arg("with-tab.txt")
+        .succeeds()
+        .stdout_contains("    return")
+        .stdout_contains("        ");
+}
+
+#[test]
+fn test_tabs() {
+    for list in ["3 6 9", "3,6,9", "3\t6\t9", ", \t3,\t6 9,"] {
+        new_ucmd!()
+            .arg("--tabs")
+            .arg(list)
+            .pipe_in("a\tb\tc\td\te")
+            .succeeds()
+            .stdout_is("a  b  c  d e");
+    }
+}
+
+#[rstest]
+#[case::multiple_tabs_args(&["--tabs=3", "--tabs=6", "--tabs=9"], "a\tb\tc\td\te", "a  b  c  d e")]
+#[case::tabs_empty_string(&["--tabs", ""], "a\tb\tc", "a       b       c")]
+#[case::tabs_comma_only(&["--tabs", ","], "a\tb\tc", "a       b       c")]
+#[case::tabs_space_only(&["--tabs", " "], "a\tb\tc", "a       b       c")]
+#[case::tabs_slash(&["--tabs", "/"], "a\tb\tc", "a       b       c")]
+#[case::tabs_plus(&["--tabs", "+"], "a\tb\tc", "a       b       c")]
+#[case::tabs_comma_separated_no_numbers(&["--tabs=+,/,+,/"], "\ta\tb\tc", "        a       b       c")]
+fn test_expand_stdin(#[case] args: &[&str], #[case] input: &str, #[case] expected: &str) {
+    new_ucmd!()
+        .args(args)
+        .pipe_in(input)
+        .succeeds()
+        .stdout_only(expected);
+}
+
+#[test]
+fn test_tabs_trailing_slash() {
+    new_ucmd!()
+        .arg("--tabs=1,/5")
+        .pipe_in("\ta\tb\tc")
+        .succeeds()
+        //          0         1
+        //          01234567890
+        .stdout_is(" a   b    c");
+}
+
+#[test]
+fn test_tabs_trailing_slash_long_columns() {
+    new_ucmd!()
+        .arg("--tabs=1,/3")
+        .pipe_in("\taaaa\tbbbb\tcccc")
+        .succeeds()
+        //          0         1
+        //          01234567890123456
+        .stdout_is(" aaaa bbbb  cccc");
+}
+
+#[test]
+fn test_tabs_trailing_plus() {
+    new_ucmd!()
+        .arg("--tabs=1,+5")
+        .pipe_in("\ta\tb\tc")
+        .succeeds()
+        //          0         1
+        //          012345678901
+        .stdout_is(" a    b    c");
+}
+
+#[test]
+fn test_tabs_trailing_plus_long_columns() {
+    new_ucmd!()
+        .arg("--tabs=1,+3")
+        .pipe_in("\taaaa\tbbbb\tcccc")
+        .succeeds()
+        //          0         1
+        //          012345678901234567
+        .stdout_is(" aaaa  bbbb  cccc");
+}
+
+#[test]
+fn test_tabs_must_be_ascending() {
+    new_ucmd!()
+        .arg("--tabs=1,1")
+        .fails()
+        .stderr_contains("tab sizes must be ascending");
+}
+
+#[test]
+fn test_tabs_trailing_size_not_larger_than_last_stop() {
+    // The number after `/` or `+` is a tab size, not a tab stop, so it
+    // does not have to be larger than the previous tab stop.
+    new_ucmd!()
+        .arg("--tabs=2,/2")
+        .pipe_in("a\tb\tc")
+        .succeeds()
+        //          012345
+        .stdout_is("a b c");
+    new_ucmd!()
+        .arg("--tabs=4,+2")
+        .pipe_in("\ta\tb")
+        .succeeds()
+        //          01234567
+        .stdout_is("    a b");
+}
+
+#[test]
+fn test_tabs_cannot_be_zero() {
+    new_ucmd!()
+        .arg("--tabs=0")
+        .fails()
+        .stderr_contains("tab size cannot be 0");
+}
+
+#[test]
+fn test_tabs_keep_last_trailing_specifier() {
+    // If there are multiple trailing specifiers, use only the last one
+    // before the number.
+    new_ucmd!()
+        .arg("--tabs=1,+/+/5")
+        .pipe_in("\ta\tb\tc")
+        .succeeds()
+        //          0         1
+        //          01234567890
+        .stdout_is(" a   b    c");
+}
+
+#[test]
+fn test_tabs_with_specifier_not_at_start() {
+    fn run_cmd(arg: &str, expected_prefix: &str, expected_suffix: &str) {
+        let expected_msg = format!(
+            "{} specifier not at start of number: {}",
+            expected_prefix.quote(),
+            expected_suffix.quote()
+        );
+        new_ucmd!().arg(arg).fails().stderr_contains(expected_msg);
+    }
+    run_cmd("--tabs=1/", "/", "/");
+    run_cmd("--tabs=1/2", "/", "/2");
+    run_cmd("--tabs=1+", "+", "+");
+    run_cmd("--tabs=1+2", "+", "+2");
+}
+
+#[test]
+fn test_tabs_with_specifier_only_allowed_with_last_value() {
+    fn run_cmd(arg: &str, specifier: &str) {
+        let expected_msg = format!(
+            "{} specifier only allowed with the last value",
+            specifier.quote()
+        );
+        new_ucmd!().arg(arg).fails().stderr_contains(expected_msg);
+    }
+    run_cmd("--tabs=/1,2,3", "/");
+    run_cmd("--tabs=1,/2,3", "/");
+    new_ucmd!().arg("--tabs=1,2,/3").succeeds();
+
+    run_cmd("--tabs=+1,2,3", "+");
+    run_cmd("--tabs=1,+2,3", "+");
+    new_ucmd!().arg("--tabs=1,2,+3").succeeds();
+}
+
+#[test]
+fn test_tabs_with_invalid_chars() {
+    new_ucmd!()
+        .arg("--tabs=x")
+        .fails()
+        .stderr_contains("tab size contains invalid character(s): 'x'");
+    new_ucmd!()
+        .arg("--tabs=1x2")
+        .fails()
+        .stderr_contains("tab size contains invalid character(s): 'x2'");
+}
+
+#[test]
+fn test_tabs_with_too_large_size() {
+    let arg = format!("--tabs={}", u128::MAX);
+    let expected_error = format!("tab stop is too large '{}'", u128::MAX);
+
+    new_ucmd!().arg(arg).fails().stderr_contains(expected_error);
+}
+
+#[cfg(all(target_os = "linux", target_pointer_width = "64"))]
+#[uutests::wasi_ignore(AddressSpaceLimitUnsuitable)]
+#[test]
+fn test_large_tab_stop_without_tabs_does_not_allocate() {
+    use rlimit::Resource;
+
+    const AS_LIMIT: u64 = 200 * 1024 * 1024;
+
+    new_ucmd!()
+        .limit(Resource::AS, AS_LIMIT, AS_LIMIT)
+        .arg("--tabs=267672676527678256")
+        .pipe_in("hello\n")
+        .succeeds()
+        .stdout_is("hello\n");
+}
+
+#[test]
+fn test_tabs_shortcut() {
+    new_ucmd!()
+        .args(&["-2", "-5", "-7"])
+        .pipe_in("\ta\tb\tc")
+        .succeeds()
+        //          01234567890
+        .stdout_is("  a  b c");
+}
+
+#[test]
+fn test_comma_separated_tabs_shortcut() {
+    new_ucmd!()
+        .args(&["-2,5", "-7"])
+        .pipe_in("\ta\tb\tc")
+        .succeeds()
+        //          01234567890
+        .stdout_is("  a  b c");
+}
+
+#[test]
+fn test_tabs_and_tabs_shortcut_mixed() {
+    new_ucmd!()
+        .args(&["-2", "--tabs=5", "-7"])
+        .pipe_in("\ta\tb\tc")
+        .succeeds()
+        //          01234567890
+        .stdout_is("  a  b c");
+}
+
+#[test]
+fn test_ignore_initial_plus() {
+    new_ucmd!()
+        .args(&["--tabs=+3"])
+        .pipe_in("\ta\tb\tc")
+        .succeeds()
+        //          01234567890
+        .stdout_is("   a  b  c");
+}
+
+#[test]
+fn test_ignore_initial_pluses() {
+    new_ucmd!()
+        .args(&["--tabs=++3"])
+        .pipe_in("\ta\tb\tc")
+        .succeeds()
+        //          01234567890
+        .stdout_is("   a  b  c");
+}
+
+#[test]
+fn test_ignore_initial_slash() {
+    new_ucmd!()
+        .args(&["--tabs=/3"])
+        .pipe_in("\ta\tb\tc")
+        .succeeds()
+        //          01234567890
+        .stdout_is("   a  b  c");
+}
+
+#[test]
+fn test_ignore_initial_slashes() {
+    new_ucmd!()
+        .args(&["--tabs=//3"])
+        .pipe_in("\ta\tb\tc")
+        .succeeds()
+        //          01234567890
+        .stdout_is("   a  b  c");
+}
+
+#[test]
+fn test_ignore_initial_plus_slash_combination() {
+    new_ucmd!()
+        .args(&["--tabs=+/3"])
+        .pipe_in("\ta\tb\tc")
+        .succeeds()
+        //          01234567890
+        .stdout_is("   a  b  c");
+}
+
+#[test]
+fn test_comma_with_plus_1() {
+    new_ucmd!()
+        .args(&["--tabs=3,+6"])
+        .pipe_in("\t111\t222\t333")
+        .succeeds()
+        //          01234567890
+        .stdout_is("   111   222   333");
+}
+
+#[test]
+fn test_comma_with_plus_2() {
+    new_ucmd!()
+        .args(&["--tabs=1,+5"])
+        .pipe_in("\ta\tb\tc")
+        .succeeds()
+        //          01234567890
+        .stdout_is(" a    b    c");
+}
+
+#[test]
+fn test_comma_with_plus_3() {
+    new_ucmd!()
+        .args(&["--tabs=2,+5"])
+        .pipe_in("a\tb\tc")
+        .succeeds()
+        //          01234567890
+        .stdout_is("a b    c");
+}
+
+#[test]
+fn test_comma_with_plus_4() {
+    new_ucmd!()
+        .args(&["--tabs=1,3,+5"])
+        .pipe_in("a\tb\tc")
+        .succeeds()
+        //          01234567890
+        .stdout_is("a  b    c");
+}
+
+#[test]
+fn test_args_override() {
+    new_ucmd!()
+        .args(&["-i", "-i", "with-trailing-tab.txt"])
+        .succeeds()
+        .stdout_is(
+            "// !note: file contains significant whitespace
+// * indentation uses <TAB> characters
+int main() {
+        // * next line has both a leading & trailing tab
+        // with tabs=>\t
+        return 0;
+}
+",
+        );
+}
+
+#[test]
+fn test_expand_directory() {
+    new_ucmd!()
+        .args(&["."])
+        .fails()
+        .stderr_contains("expand: .: Is a directory");
+}
+
+#[test]
+fn test_nonexisting_file() {
+    new_ucmd!()
+        .args(&["nonexistent", "with-spaces.txt"])
+        .fails()
+        .stderr_contains("expand: nonexistent: No such file or directory")
+        .stdout_contains_line("// !note: file contains significant whitespace");
+}
+
+#[uutests::wasi_ignore(HostPathsNotVisible)]
+#[test]
+#[cfg(all(target_os = "linux", not(target_env = "musl")))]
+fn test_read_error() {
+    new_ucmd!()
+        .arg("/proc/self/mem")
+        .fails()
+        .stderr_contains("expand: /proc/self/mem: Input/output error");
+}
+
+#[uutests::wasi_ignore(NonUtf8ArgsUnsupported)]
+#[test]
+#[cfg(target_os = "linux")]
+fn test_expand_non_utf8_paths() {
+    use std::os::unix::ffi::OsStringExt;
+    use uutests::at_and_ucmd;
+
+    let (at, mut ucmd) = at_and_ucmd!();
+
+    let filename = std::ffi::OsString::from_vec(vec![0xFF, 0xFE]);
+    std::fs::write(at.plus(&filename), b"hello\tworld\ntest\tline\n").unwrap();
+
+    ucmd.arg(&filename)
+        .succeeds()
+        .stdout_is("hello   world\ntest    line\n");
+}
+
+#[test]
+fn test_wide_multibyte_char_width() {
+    // A tab following a wide character must expand to the next tab stop based
+    // on the character's display width, not its byte length. Regression for a
+    // bug where the UTF-8 sequence length was derived from the leading byte's
+    // codepoint value, so 3- and 4-byte characters were mis-measured.
+    // U+4E2D (中, 3 bytes, width 2): col 0->2, tab pads 6 spaces to column 8.
+    new_ucmd!()
+        .pipe_in("\u{4E2D}\t|".as_bytes())
+        .succeeds()
+        .stdout_is("\u{4E2D}      |");
+    // U+1F600 (😀, 4 bytes, width 2) behaves the same.
+    new_ucmd!()
+        .pipe_in("\u{1F600}\t|".as_bytes())
+        .succeeds()
+        .stdout_is("\u{1F600}      |");
+}
+
+#[test]
+fn test_nul_has_zero_width() {
+    new_ucmd!()
+        .pipe_in("\0\t|\n")
+        .succeeds()
+        .stdout_is("\0        |\n");
+    new_ucmd!()
+        .pipe_in("ab\0\0cd\tx\n")
+        .succeeds()
+        .stdout_is("ab\0\0cd    x\n");
+    new_ucmd!()
+        .arg("--no-utf8")
+        .pipe_in("\0\t|\n")
+        .succeeds()
+        .stdout_is("\0        |\n");
+}
+
+#[test]
+fn test_buffered_reads_new_line_no_tabs_in_first_chunk() {
+    // test includes tabs after 1 full chunk of no tabs with new line
+    // checks that the tabstop calculation is done to correct column
+    new_ucmd!()
+        .args(&["new_line_in_chunk.txt"])
+        .succeeds()
+        .stdout_is_fixture("new_line_in_chunk_expected.txt");
+}

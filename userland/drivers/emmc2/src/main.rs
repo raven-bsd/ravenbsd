@@ -24,6 +24,7 @@ mod program {
     use alloc::format;
     use alloc::string::{String, ToString};
     use alloc::vec;
+    use alloc::vec::Vec;
 
     use emmc2::block::{BlockDevice, BlockError, BlockPlan, BlockService, MemoryDisk};
     use emmc2::pattern::{self, Hasher, SECTOR_SIZE};
@@ -43,7 +44,9 @@ mod program {
     use raven_proto_block::{BlockInfo, Op, Request, encode_reply};
     use raven_proto_fs::OpenFlags;
     use raven_rt::entry;
-    use raven_scheme::{Ctx, Handler, HandlerError, HandlerResult, OpenTable, Opened, Server};
+    use raven_scheme::{
+        Client, Ctx, Handler, HandlerError, HandlerResult, OpenTable, Opened, Server,
+    };
 
     entry!(main);
 
@@ -73,6 +76,7 @@ mod program {
         dma_size: usize,
         clock_hz: Option<u32>,
         window: DmaWindow,
+        disk: Option<String>,
     }
 
     impl Default for Options {
@@ -90,6 +94,7 @@ mod program {
                     cpu_base: 0,
                     size: 0x4000_0000,
                 },
+                disk: None,
             }
         }
     }
@@ -133,11 +138,17 @@ mod program {
                 options.window.cpu_base = parse_u64(value)?;
             } else if let Some(value) = argument.strip_prefix("window_size=") {
                 options.window.size = parse_u64(value)?;
+            } else if let Some(value) = argument.strip_prefix("disk=") {
+                options.disk = Some(value.to_string());
             } else {
                 return Err(format!("unknown argument `{argument}`"));
             }
         }
-        if test { run_test() } else { run_real(options) }
+        if test {
+            run_test(&options)
+        } else {
+            run_real(options)
+        }
     }
 
     fn parse_handle(value: &str) -> Result<Handle, String> {
@@ -164,32 +175,90 @@ mod program {
     }
 
     /// Host-backed qtest mode: a memory disk with a deterministic pattern and marker.
-    fn run_test() -> Result<(), String> {
-        let mut data = vec![0u8; TEST_SECTORS * SECTOR_SIZE];
-        let pattern_start = PATTERN_FIRST * SECTOR_SIZE;
-        let pattern_end = (PATTERN_FIRST + PATTERN_SECTORS) * SECTOR_SIZE;
-        let pattern_slice = data
-            .get_mut(pattern_start..pattern_end)
-            .ok_or_else(|| "pattern range".to_string())?;
-        pattern::fill_pattern(PATTERN_FIRST as u64, PATTERN_FILL, pattern_slice);
-        let mut hasher = Hasher::new();
-        hasher.update(pattern_slice);
-        let checksum = hasher.finish();
-        let marker = pattern::marker_encode(checksum);
-        let marker_start = MARKER_LBA * SECTOR_SIZE;
-        let marker_end = marker_start + SECTOR_SIZE;
-        data.get_mut(marker_start..marker_end)
-            .ok_or_else(|| "marker range".to_string())?
-            .copy_from_slice(&marker);
-
-        raven_rt::println!("emmc2: backend=memory sectors={TEST_SECTORS}");
-        raven_rt::println!("emmc2: pattern sectors={PATTERN_SECTORS} checksum={checksum:#018x}");
-        raven_rt::println!("emmc2: marker ok");
+    /// Host-backed mode: a deterministic pattern disk or an image loaded from `initfs:`.
+    fn run_test(options: &Options) -> Result<(), String> {
+        let mut data = match &options.disk {
+            Some(path) => {
+                let image = load_image(path)?;
+                raven_rt::println!(
+                    "emmc2: backend=memory image={path} sectors={}",
+                    image.len() / SECTOR_SIZE
+                );
+                image
+            }
+            None => {
+                let mut data = vec![0u8; TEST_SECTORS * SECTOR_SIZE];
+                let pattern_start = PATTERN_FIRST * SECTOR_SIZE;
+                let pattern_end = (PATTERN_FIRST + PATTERN_SECTORS) * SECTOR_SIZE;
+                let pattern_slice = data
+                    .get_mut(pattern_start..pattern_end)
+                    .ok_or_else(|| "pattern range".to_string())?;
+                pattern::fill_pattern(PATTERN_FIRST as u64, PATTERN_FILL, pattern_slice);
+                let mut hasher = Hasher::new();
+                hasher.update(pattern_slice);
+                let checksum = hasher.finish();
+                let marker = pattern::marker_encode(checksum);
+                let marker_start = MARKER_LBA * SECTOR_SIZE;
+                let marker_end = marker_start + SECTOR_SIZE;
+                data.get_mut(marker_start..marker_end)
+                    .ok_or_else(|| "marker range".to_string())?
+                    .copy_from_slice(&marker);
+                raven_rt::println!("emmc2: backend=memory sectors={TEST_SECTORS}");
+                raven_rt::println!(
+                    "emmc2: pattern sectors={PATTERN_SECTORS} checksum={checksum:#018x}"
+                );
+                raven_rt::println!("emmc2: marker ok");
+                data
+            }
+        };
 
         let disk = MemoryDisk::new(&mut data, false).map_err(describe)?;
         let service = BlockService::new(disk).map_err(describe_block)?;
         let mut handler = DiskHandler::new(service, true);
         serve(&mut handler)
+    }
+
+    /// Load a whole test image through the `file:`/`initfs:` client.
+    fn load_image(path: &str) -> Result<Vec<u8>, String> {
+        const MAX_IMAGE_BYTES: usize = 64 * 1024 * 1024;
+        let client = Client::new();
+        let handle = client
+            .open(path, 1)
+            .map_err(|error| format!("open {path}: {}", error.description()))?;
+        let mut data = Vec::new();
+        let mut chunk = [0u8; 4096];
+        loop {
+            let read = match client.read(handle, 0, &mut chunk) {
+                Ok(read) => read,
+                Err(error) => {
+                    let _ = client.close(handle);
+                    return Err(format!("read {path}: {}", error.description()));
+                }
+            };
+            if read == 0 {
+                break;
+            }
+            let next = data
+                .len()
+                .checked_add(read)
+                .ok_or_else(|| "image length overflow".to_string())?;
+            if next > MAX_IMAGE_BYTES {
+                let _ = client.close(handle);
+                return Err(format!("image {path} exceeds {MAX_IMAGE_BYTES} bytes"));
+            }
+            data.extend_from_slice(
+                chunk
+                    .get(..read)
+                    .ok_or_else(|| "short image chunk".to_string())?,
+            );
+        }
+        let _ = client.close(handle);
+        if data.is_empty() || !data.len().is_multiple_of(SECTOR_SIZE) {
+            return Err(format!(
+                "image {path} is not a nonempty whole number of 512-byte sectors"
+            ));
+        }
+        Ok(data)
     }
 
     /// Real path: map the device windows, initialise the card and serve SDMA transfers.

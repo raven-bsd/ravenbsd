@@ -66,6 +66,51 @@ fn a_non_keyboard_layout_is_not_accepted() {
 }
 
 #[test]
+fn the_boot_mouse_descriptors_are_recognised() {
+    let three = parse_report_descriptor(&BOOT_MOUSE_3_DESCRIPTOR).expect("layout");
+    assert_eq!(three.usage_page, GENERIC_DESKTOP);
+    assert_eq!(three.usage, MOUSE_USAGE);
+    assert_eq!(three.input_bits, 24);
+    assert!(three.is_boot_mouse());
+    assert_eq!(three.boot_mouse_report_len(), Some(3));
+    assert!(!three.is_boot_keyboard());
+
+    let four = parse_report_descriptor(&BOOT_MOUSE_DESCRIPTOR).expect("layout");
+    assert_eq!(four.input_bits, 32);
+    assert!(four.is_boot_mouse());
+    assert_eq!(four.boot_mouse_report_len(), Some(4));
+}
+
+#[test]
+fn a_keyboard_is_not_a_boot_mouse() {
+    let layout = parse_report_descriptor(&BOOT_DESCRIPTOR).expect("layout");
+    assert!(!layout.is_boot_mouse());
+    assert_eq!(layout.boot_mouse_report_len(), None);
+}
+
+#[test]
+fn a_mouse_report_id_disqualifies_the_boot_layout() {
+    let descriptor = [
+        0x05u8, 0x01, 0x09, 0x02, 0xa1, 0x01, 0x85, 0x01, 0x05, 0x09, 0x19, 0x01, 0x29, 0x03, 0x95,
+        0x03, 0x75, 0x01, 0x81, 0x02, 0x95, 0x01, 0x75, 0x05, 0x81, 0x01, 0x05, 0x01, 0x09, 0x30,
+        0x09, 0x31, 0x95, 0x02, 0x75, 0x08, 0x81, 0x06, 0xc0,
+    ];
+    let layout = parse_report_descriptor(&descriptor).expect("layout");
+    assert_eq!(layout.report_id, 1);
+    assert!(!layout.is_boot_mouse());
+}
+
+#[test]
+fn a_wider_mouse_input_report_is_not_a_boot_mouse() {
+    let descriptor = [
+        0x05u8, 0x01, 0x09, 0x02, 0xa1, 0x01, 0x76, 0xff, 0xff, 0x96, 0xff, 0xff, 0x81, 0x02, 0xc0,
+    ];
+    let layout = parse_report_descriptor(&descriptor).expect("layout");
+    assert!(layout.input_bits > 32);
+    assert!(!layout.is_boot_mouse());
+}
+
+#[test]
 fn a_wider_input_report_is_not_a_boot_keyboard() {
     // S64 fuzz finding: a keyboard usage with a 65535-bit input payload was accepted as the
     // fixed eight-byte boot layout. The boot protocol report is exactly 64 bits.

@@ -110,12 +110,24 @@ pub fn seed<B: SysBackend, L: Lock>(platform: &Platform<B, L>) -> Result<[u8; 32
 /// seeded kernel source. The interim path reads `rand:` like `getentropy` but does not claim to
 /// be cryptographic.
 pub fn getrandom<B: SysBackend, L: Lock>(
-    _platform: &Platform<B, L>,
-    _buf: &mut [u8],
-    _flags: u32,
+    platform: &Platform<B, L>,
+    buf: &mut [u8],
+    flags: u32,
 ) -> Result<usize, Errno> {
-    // A weak userspace source must not be advertised as `getrandom` (A-sys-14).
-    Err(Errno::ENOSYS)
+    // The kernel CSPRNG (PG-52/G-7) is not available. Rust std's HashMap seed calls this
+    // primitive; use the documented weak `rand:` source in 256-byte chunks rather than making
+    // every std collection panic. ENTROPY_WEAK stays set until PG-52 lands (A-sys-14).
+    if flags & !0x7 != 0 {
+        return Err(Errno::EINVAL);
+    }
+    let mut done = 0usize;
+    while done < buf.len() {
+        let end = done.saturating_add(GETENTROPY_MAX).min(buf.len());
+        let chunk = buf.get_mut(done..end).ok_or(Errno::EIO)?;
+        getentropy(platform, chunk)?;
+        done = end;
+    }
+    Ok(buf.len())
 }
 
 /// The bytes read from a `rand:` handle; kept for tests that need a deterministic source.
