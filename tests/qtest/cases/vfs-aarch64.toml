@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K54a: the K54 read-only UFS stack mounted through vfsd on aarch64. It uses the
+# same `fsd-ufs-test` profile as the K54 case but builds the probe for the arch
+# selected by the runner (`RAVEN_QT_ARCH`), which the K54 fixture does not.
+# Before the vfsd proxy fix the probe mounts `file:/ufs` and then fails its first
+# `file:` read with EBADF.
+
+name = "vfs-aarch64"
+arch = "aarch64"
+profile = "fsd-ufs-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/vfs/build.sh"]
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: blockd up$'
+unordered = true
+
+[[expect]]
+regex = '^blockd: gpt ok partitions=1$'
+unordered = true
+
+[[expect]]
+regex = '^blockd: part 1 ufs-root 34\.\.32801$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: fsd-ufs up$'
+unordered = true
+
+[[expect]]
+regex = '^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$'
+unordered = true
+
+[[expect]]
+regex = '^svcd: vfsd up$'
+unordered = true
+
+[[expect]]
+regex = '^fsd-ufs: probe errors ok$'
+
+[[expect]]
+regex = '^fsd-ufs: probe mount ok$'
+
+[[expect]]
+regex = '^fsd-ufs: probe ten\.txt=0123456789$'
+
+[[expect]]
+regex = '^fsd-ufs: probe one\.txt=one$'
+
+[[expect]]
+regex = '^fsd-ufs: probe listing=dir1,fastlink,slowlink,ten\.txt$'
+
+[[expect]]
+regex = '^fsd-ufs: probe readlink=fast-target$'
+
+[[expect]]
+regex = '^fsd-ufs: probe stat=empty,size=0$'
+
+[[expect]]
+regex = '^fsd-ufs: probe vfs-errors ok$'
+
+[[expect]]
+regex = '^fsd-ufs: probe umount ok$'
+
+[[expect]]
+regex = '^fsd-ufs: probe ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

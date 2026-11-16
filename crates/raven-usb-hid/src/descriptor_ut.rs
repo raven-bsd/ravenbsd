@@ -66,6 +66,18 @@ fn a_non_keyboard_layout_is_not_accepted() {
 }
 
 #[test]
+fn a_wider_input_report_is_not_a_boot_keyboard() {
+    // S64 fuzz finding: a keyboard usage with a 65535-bit input payload was accepted as the
+    // fixed eight-byte boot layout. The boot protocol report is exactly 64 bits.
+    let descriptor = [
+        0x05u8, 0x01, 0x09, 0x06, 0xa1, 0x01, 0x76, 0xff, 0xff, 0x96, 0xff, 0xff, 0x81, 0x02, 0xc0,
+    ];
+    let layout = parse_report_descriptor(&descriptor).expect("layout");
+    assert!(layout.input_bits > 64);
+    assert!(!layout.is_boot_keyboard());
+}
+
+#[test]
 fn a_report_id_disqualifies_the_boot_layout() {
     let descriptor = [
         0x05, 0x01, 0x09, 0x06, 0xa1, 0x01, 0x85, 0x01, 0x05, 0x07, 0x19, 0xe0, 0x29, 0xe7, 0x75,
