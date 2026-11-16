@@ -1829,6 +1829,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-pi4-xhci"
+version = "0.1.0"
+
+[[package]]
 name = "raven-pi5"
 version = "0.1.0"
 dependencies = [
