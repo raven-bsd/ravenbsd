@@ -53,9 +53,11 @@ check-full:
 # Run the expensive full allocator stress only when the allocator crate or its model test
 # changes. The platform seam is faked in this host test, so platform changes belong to qtest.
 # 0.1.0 release gate: full nextest/provenance check plus the QEMU login qtest.
+# The release profile's user programs are built with the release profile; the debug
+# profile trips a known sha2/LLVM debug-info failure and is never a release artifact.
 release-gate:
 	@$(XTASK) check
-	@$(XTASK) qtest --case release-login --arch x86_64
+	@RAVEN_USER_RELEASE=1 $(XTASK) qtest --case release-login --arch x86_64
 
 check-full-if-needed:
 	@changed=$$(git diff --name-only $(BASE)...HEAD -- \
