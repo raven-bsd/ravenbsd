@@ -2862,6 +2862,21 @@ name = "raven-usb-hid"
 version = "0.1.0"
 
 [[package]]
+name = "raven-user-tests"
+version = "0.1.0"
+dependencies = [
+ "adduser",
+ "groupadd",
+ "id",
+ "passwd",
+ "raven-auth",
+ "raven-userdb",
+ "su",
+ "useradd",
+ "whoami",
+]
+
+[[package]]
 name = "raven-usercopy"
 version = "0.1.0"
 dependencies = [
