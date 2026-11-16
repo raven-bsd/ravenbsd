@@ -3,12 +3,13 @@
 
 # P4a POSIX shell semantics (P4-shell)
 
-Status: P4a implementation/spike. The host `brush --posix` conformance transcript matches GNU
+Status: P4a implementation. The host `brush --posix` conformance transcript matches GNU
 bash 5.1.16 `--posix` for every marker in `tests/fixtures/posix-shell/posix-shell.sh` except
 `$$`. The target `posix-shell` qtest passes the supported grammar, expansion, redirection,
-function, loop, set-option, trap-EXIT, builtin and `getopts` groups. The `posix-check` row
-overlay is P0b's `docs/posix/evidence/P4.toml`; P0b is not merged at this base, so the gate still
-reports the rows as fail. **PROPOSED** statuses below are for that overlay.
+function, loop, set-option, trap-EXIT, builtin and `getopts` groups. The P0b overlay is merged;
+`docs/posix/evidence/P4-shell.toml` registers the 18 passing rows against
+`qtest:posix-shell` and the 7 genuinely missing behaviours as written waivers. The gate executes
+the qtest for each present row.
 
 ## Evidence
 
@@ -19,7 +20,7 @@ userland/brush/target/debug/brush --posix tests/fixtures/posix-shell/posix-shell
 # Target: the four supported groups on the opt-in rsh+brush image.
 cargo xtask qtest --case posix-shell --arch x86_64
 
-# Gate (blocked until the P0b overlay lands):
+# Gate (executes docs/posix/evidence/P4-shell.toml):
 cargo xtask posix-check --profile posix --arch x86_64
 ```
 
@@ -28,7 +29,7 @@ covers the shell engine's host unit tests. No donor shell source was read or cop
 
 ## Row matrix
 
-| `shell.*` row | Proposed | Evidence or waiver |
+| `shell.*` row | Status | Evidence or waiver |
 |---|---|---|
 | `arithmetic-expansion` | present | qtest `arith:5`; host fixture `arith2` |
 | `command-substitution` | present | qtest `sub:inner` |
@@ -63,9 +64,8 @@ covers the shell engine's host unit tests. No donor shell source was read or cop
    class affects script/source mode stdout. This is outside the test-only part of P4a and needs
    a target file-open/stdio follow-up before `redirection`/`here-document` can be present.
 2. **P0b overlay.** The gate reads `docs/posix/profile.toml` + `docs/posix/traceability.toml`;
-   P0b's per-owner `docs/posix/evidence/P4.toml` is not merged, so every shell row still fails
-   as "profile status partial/missing; no executable POSIX behaviour test". The matrix above is
-   the proposed overlay content.
+   P0b's owner overlay loader accepts `docs/posix/evidence/P4-shell.toml`, so the gate executes
+   `qtest:posix-shell` for the 18 present rows and keeps the 7 waivers visible in the report.
 3. **Platform waivers.** PG-35 (pipeline), PG-56 (job control/async lists), PG-7 (signal traps)
    and P9c (interactive login) are the explicit reasons. They stay in `GAPS.md`; this ticket
    does not claim them.
