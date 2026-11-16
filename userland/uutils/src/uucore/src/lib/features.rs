@@ -57,6 +57,7 @@ pub mod parser;
 pub mod quoting_style;
 #[cfg(feature = "ranges")]
 pub mod ranges;
+pub mod raven;
 #[cfg(feature = "ringbuffer")]
 pub mod ringbuffer;
 #[cfg(feature = "sum")]
