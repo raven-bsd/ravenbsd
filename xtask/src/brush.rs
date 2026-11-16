@@ -116,8 +116,8 @@ fn build(root: &Path, options: BuildOptions) -> Result<u8> {
     // A std binary is PIE by default. The Raven spawn loader wants a fixed-address ET_EXEC with
     // page-aligned segments, so use the same static link script and code model as uutils.
     let linker = root
-        .join("userland/brush")
-        .join(format!("{}.ld", options.arch.as_str()));
+        .join("xtask")
+        .join(format!("brush-{}.ld", options.arch.as_str()));
     if options.arch == Arch::X86_64 && !linker.is_file() {
         bail!("missing brush linker script: {}", linker.display());
     }

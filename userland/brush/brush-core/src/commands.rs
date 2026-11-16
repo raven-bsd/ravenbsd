@@ -839,6 +839,51 @@ pub(crate) async fn invoke_shell_function(
     Ok(result.into())
 }
 
+/// Run a command substitution and capture its output.
+///
+/// RavenBSD has no `pipe2(2)` yet (PG-35). Command substitution is an in-process builtin for
+/// the target shell, so capture stdout in an anonymous temporary file and read it after the
+/// command completes; no pipe, no async reader and no extra thread are needed.
+#[cfg(target_os = "ravenbsd")]
+pub(crate) async fn invoke_command_in_subshell_and_get_output(
+    shell: &mut Shell<impl extensions::ShellExtensions>,
+    params: &ExecutionParameters,
+    s: String,
+) -> Result<String, error::Error> {
+    use std::io::Read;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    // `tempfile::tempfile()` uses O_TMPFILE, which the Raven open path does not support.
+    // A named file under /tmp uses the ordinary create/open calls that already work.
+    static SUBST_COUNTER: AtomicU64 = AtomicU64::new(0);
+    let sequence = SUBST_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let path = std::env::temp_dir().join(format!("brush-subst-{}-{sequence}", std::process::id()));
+
+    // Instantiate a subshell to run the command in.
+    let mut subshell = shell.clone();
+
+    if !shell.options().command_subst_inherits_errexit {
+        subshell.options_mut().exit_on_nonzero_command_exit = false;
+    }
+
+    let mut params = params.clone();
+    params.process_group_policy = ProcessGroupPolicy::SameProcessGroup;
+
+    let file = std::fs::File::create(&path)?;
+    let mut reader = std::fs::File::open(&path)?;
+    params.set_fd(OpenFiles::STDOUT_FD, file.into());
+
+    let cmd_result = run_substitution_command(subshell, params, s).await?;
+    shell.set_last_exit_status(cmd_result.exit_code.into());
+
+    let mut output_str = String::new();
+    reader.read_to_string(&mut output_str)?;
+    let _ = std::fs::remove_file(&path);
+
+    Ok(output_str)
+}
+
+#[cfg(not(target_os = "ravenbsd"))]
 pub(crate) async fn invoke_command_in_subshell_and_get_output(
     shell: &mut Shell<impl extensions::ShellExtensions>,
     params: &ExecutionParameters,

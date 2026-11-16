@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /* Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors */
 /* RavenBSD std-program link script: the generic user layout plus the TLS image and
-   the constructor arrays that a std binary carries (brush K26a; the same layout as
-   the K25a uutils script).
+   the constructor arrays that a std binary carries (K26a brush; the same layout as
+   the K25a uutils script). This build-time data file lives under xtask/ because the
+   brush workspace is an MIT import.
 
    The kernel's spawn(Strict) rejects two PT_LOAD segments that share a page and a
    file part that does not end on a page boundary. Every file-backed segment below
