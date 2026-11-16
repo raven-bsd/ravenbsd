@@ -26,7 +26,7 @@ The negative assertions matter as much as the calls:
 
 * no `HANDLE_TRANSFER` in the console-only path;
 * no `PROC_SETPGID`, `PROC_SETSID` or `fork`/`exec`;
-* `PROC_HANDLE_INFO` is called exactly once per spawn;
+* the libc wrapper calls `PROC_HANDLE_INFO` exactly once per spawn (the shared loader does not);
 * the returned thread handle is closed (the current loader ignores it, which leaks one handle
   per spawn).
 

@@ -26,8 +26,6 @@ WRITE_PARENT_MEM(<scratch>, <image bytes>)
 UNMAP(SELF_PROC, <scratch>, 0x2000)
 
 PROC_CREATE(0) -> child
-PROC_HANDLE_INFO(child, <8-word out>, 8) -> [pid, ppid, pgid, sid, uid, euid, gid, egid]
-# P9 addition: the pid is recorded as pid -> child for waitpid.
 
 MAP(child, img, 0x0000, 0x00400000, 0x1000, READ|WRITE)
 PROTECT(child, 0x00400000, 0x1000, READ|EXEC)
@@ -45,7 +43,9 @@ HANDLE_CLOSE(stack)
 THREAD_CREATE(child, entry, sp0, sp0, 0) -> thread
 HANDLE_CLOSE(thread)
 
-# Wait path (libc, not the loader):
+# libc EarlySpawn wrapper (not the shared loader):
+PROC_HANDLE_INFO(child, <8-word out>, 8) -> [pid, ppid, pgid, sid, uid, euid, gid, egid]
+# P9 addition: record pid -> child for waitpid.
 PROC_WAIT(child, <code out>) -> 0
 # libc: status = (code & 0xff) << 8; return the recorded pid; remove the table entry.
 HANDLE_CLOSE(child)

@@ -184,35 +184,37 @@ lengths are page-aligned; `MAP` addresses are inside `USER_MIN..USER_END`.
    `0x1|0x2|(0x2<<8)`) -> parent scratch. Copy the image bytes; `UNMAP(SELF_PROC, scratch,
    page_len)` (`0x41`).
 5. `PROC_CREATE(0)` (`0x30`) -> child handle (`Rights::ALL`, native personality).
-6. `PROC_HANDLE_INFO(child, out, 8)` (`0x3E`, **new**) -> `[pid, ppid, pgid, sid, uid, euid,
-   gid, egid]`; the parent records `pid -> child` for `waitpid`. On failure, close the child;
-   `PROC_WAIT` reaps an unstarted process immediately.
-7. For each planned segment: `MAP(child, image_obj, file_offset, vaddr, len, prot)`.
+6. For each planned segment: `MAP(child, image_obj, file_offset, vaddr, len, prot)`.
    For a segment with `EXEC`, map it `READ|WRITE` first, then
    `PROTECT(child, vaddr, len, READ|EXEC)` (`0x42`) before any thread exists. The kernel rejects
    `WRITE|EXEC` together and a generic memory object has no `EXEC` right, so this two-step is
    mandatory.
-8. `StepKind::Zero` (bss): `MAP(child, Handle::NONE, 0, vaddr, len, prot)` (`0x40` with a zero
+7. `StepKind::Zero` (bss): `MAP(child, Handle::NONE, 0, vaddr, len, prot)` (`0x40` with a zero
    object handle; anonymous zero fill).
-9. Partial file tail: create a one-page object, map it in the parent, map the source page in the
+8. Partial file tail: create a one-page object, map it in the parent, map the source page in the
    parent, copy the tail, map the page into the child at `vaddr`, `PROTECT` to the segment
    protection, close the temporary object. This is the `copy_tail` path in the loader.
 
 ### Stack and first thread
 
-10. `MEMOBJ_CREATE(STACK_SIZE, 0)` (`0x43`), `STACK_SIZE = 256 KiB` (at least `ARG_MAX`).
-11. `MAP(SELF_PROC, stack_obj, 0, 0, STACK_SIZE, READ|WRITE|SHARED)`, write the C8 stack
+9. `MEMOBJ_CREATE(STACK_SIZE, 0)` (`0x43`), `STACK_SIZE = 256 KiB` (at least `ARG_MAX`).
+10. `MAP(SELF_PROC, stack_obj, 0, 0, STACK_SIZE, READ|WRITE|SHARED)`, write the C8 stack
     (`argv`, `envp`, auxv, `AT_RANDOM`, `AT_PLATFORM`), `UNMAP(SELF_PROC, scratch, STACK_SIZE)`.
-12. `MAP(child, stack_obj, 0, STACK_TOP - STACK_SIZE, STACK_SIZE,
+11. `MAP(child, stack_obj, 0, STACK_TOP - STACK_SIZE, STACK_SIZE,
     READ|WRITE|FIXED|SHARED)` (`STACK_TOP = USER_END`), then `HANDLE_CLOSE(stack_obj)`.
-13. `THREAD_CREATE(child, entry, sp0, sp0, 0)` (`0x20`). Flags are zero: the main thread's TLS
+12. `THREAD_CREATE(child, entry, sp0, sp0, 0)` (`0x20`). Flags are zero: the main thread's TLS
     is installed by libc start from `AT_PHDR` / `AT_PHNUM` / `PT_TLS`; `THREAD_CREATE_EX` is for
     `pthread_create`, not for the first thread.
-14. Close the temporary image object(s) and the thread handle (if returned). The parent keeps the
+13. Close the temporary image object(s) and the thread handle (if returned). The parent keeps the
     child process handle for `PROC_WAIT` and closes it after the reap.
 
-### Wait
+### libc wrapper: pid and wait
 
+14. `PROC_HANDLE_INFO(child, out, 8)` (`0x3E`, **new**) -> `[pid, ppid, pgid, sid, uid, euid,
+    gid, egid]`; the wrapper records `pid -> child` for `waitpid`. This call lives in the libc
+    `EarlySpawn` wrapper after `spawn_image_with` returns, not in the shared loader, so the
+    loader's `(Handle)` return type and its other callers do not change. On failure,
+    `PROC_TERMINATE(child, code)` (`0x32`, permitted by `Rights::ALL`), `PROC_WAIT`, then close.
 15. `PROC_WAIT(child, &code)` (`0x31`) blocks until exit and writes the raw exit code. The libc
     backend encodes it as POSIX wait status `(code & 0xff) << 8`, returns the recorded pid, and
     removes the table entry, so a second `waitpid` returns `ECHILD`.
@@ -226,7 +228,7 @@ lengths are page-aligned; `MAP` addresses are inside `USER_MIN..USER_END`.
 |---|---|---|
 | `path` / `argv` / `envp` | `SpawnRequest.path` / `argv` / `envp`; stack image | required |
 | `posix_spawnp` PATH search | existing `search_path`, `/bin/sh` fallback soft | required |
-| `pid` out | `PROC_HANDLE_INFO` after `PROC_CREATE`; table insert | required (new syscall) |
+| `pid` out | `PROC_HANDLE_INFO` on the returned child handle; table insert | required (new syscall) |
 | `waitpid` | table lookup, `PROC_WAIT`, status encode, `ECHILD` after reap | required |
 | `POSIX_SPAWN_SETSIGMASK` / `SETSIGDEF` | accepted by the attr object; no child mask syscall yet | no-op, documented |
 | `POSIX_SPAWN_SETPGROUP` | `PROC_SETPGID(pid, pgroup)` (`0x36`) before `THREAD_CREATE` | optional; needs the pid |
@@ -275,9 +277,9 @@ the extracted loader must produce so the host mock cannot silently drift:
 
 * `tests/spawn/README.md` — what the fixture is for, and which ticket activates it.
 * `tests/spawn/expected-sequence.txt` — the ordered `Sys` calls and exact arguments for the
-  two-segment image case: `MEMOBJ_CREATE`, parent `MAP`/`UNMAP`, `PROC_CREATE`,
-  `PROC_HANDLE_INFO`, child `MAP` per segment, `PROTECT` for text, stack `MEMOBJ_CREATE`/
-  `MAP`/`UNMAP`/`MAP(child)`, `HANDLE_CLOSE`, `THREAD_CREATE`, `PROC_WAIT`, `HANDLE_CLOSE`.
+  two-segment image case: `MEMOBJ_CREATE`, parent `MAP`/`UNMAP`, `PROC_CREATE`, child `MAP` per
+  segment, `PROTECT` for text, stack `MEMOBJ_CREATE`/`MAP`/`UNMAP`/`MAP(child)`, `HANDLE_CLOSE`,
+  `THREAD_CREATE`, then the libc wrapper's `PROC_HANDLE_INFO`, `PROC_WAIT`, `HANDLE_CLOSE`.
   It must also assert the negative: no `HANDLE_TRANSFER`, no `PROC_SETPGID`, no `fork`/`exec`.
 * `tests/spawn/cases/brush-ls.toml` and `tests/spawn/cases/brush-ping.toml` — the target qtest
   sketches below; the follow-up moves them to `tests/qtest/cases/`.
