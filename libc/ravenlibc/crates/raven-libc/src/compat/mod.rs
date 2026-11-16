@@ -65,6 +65,13 @@ pub(crate) unsafe fn set_errno(value: c_int) {
     }
 }
 
+/// Return the C failure value with `ENOSYS` set, for the unimplemented pty entry points.
+pub(crate) fn unsupported() -> c_int {
+    // SAFETY: `__errno_location` returns this thread's valid errno cell.
+    unsafe { set_errno(ENOSYS) };
+    -1
+}
+
 /// The length of a NUL-terminated C string, bounded by `max`.
 pub(crate) unsafe fn c_len(pointer: *const c_char, max: usize) -> usize {
     let mut length = 0usize;
@@ -158,6 +165,7 @@ pub mod getusershell;
 pub mod getutxent;
 pub mod getutxid;
 pub mod getutxline;
+pub mod grantpt;
 pub mod hasmntopt;
 pub mod humanize_number;
 pub mod login_tty;
@@ -165,7 +173,8 @@ pub mod mntent_state;
 pub mod nvis;
 pub mod openpty;
 pub mod pidfile;
-pub mod pty;
+pub mod posix_openpt;
+pub mod ptsname_r;
 pub mod pty_state;
 pub mod pututxline;
 pub mod readpassphrase;
@@ -194,6 +203,7 @@ pub mod strvis;
 pub mod strvisx;
 pub mod svis;
 pub mod ttyent_state;
+pub mod unlockpt;
 pub mod unvis;
 pub mod updwtmpx;
 pub mod usershell_state;
@@ -253,7 +263,10 @@ unsafe extern "C" {
     pub(crate) fn raise(signum: c_int) -> c_int;
 }
 
-pub(crate) use pty::{grantpt, posix_openpt, ptsname_r, unlockpt};
+pub(crate) use grantpt::grantpt;
+pub(crate) use posix_openpt::posix_openpt;
+pub(crate) use ptsname_r::ptsname_r;
+pub(crate) use unlockpt::unlockpt;
 
 /// `TCSAFLUSH`.
 pub(crate) const TCSAFLUSH: c_int = 2;
