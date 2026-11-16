@@ -82,7 +82,7 @@ $ cargo nextest run -p raven-proto-proc
 7 tests, 7 passed, exit 0
 
 $ cargo nextest run -p raven-procd
-7 tests, 7 passed, exit 0
+9 tests, 9 passed, exit 0
 
 $ cargo xtask qtest --case proc-exec --arch x86_64
 proc-exec: pass, exit 0
