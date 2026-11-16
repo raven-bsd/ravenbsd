@@ -1,0 +1,36 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt STRINGS 1
+.Os RavenBSD
+.Sh NAME
+.Nm strings
+.Nd extract printable runs from files
+.Sh SYNOPSIS
+.Nm
+.Op Fl a
+.Op Fl n Ar number
+.Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility prints runs of printable ASCII bytes at least
+.Ar number
+characters long (default 4).
+The target image currently requires at least one file; the host byte-stream core also covers
+standard input.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl a
+Scan every file (the default; accepted for compatibility).
+.It Fl n Ar number
+Set the minimum run length.
+.El
+.Sh EXIT STATUS
+.Ex -std
+0 on success, 2 for usage or an I/O error.
+.Sh SEE ALSO
+.Xr grep 1
+.Sh STANDARDS
+RavenBSD.

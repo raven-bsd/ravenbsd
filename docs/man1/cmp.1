@@ -1,0 +1,31 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt CMP 1
+.Os RavenBSD
+.Sh NAME
+.Nm cmp
+.Nd compare two files byte by byte
+.Sh SYNOPSIS
+.Nm
+.Op Fl l | Fl s
+.Ar file1 file2
+.Sh DESCRIPTION
+The
+.Nm
+utility compares two files.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl l
+Print every differing byte as an offset and two octal values.
+.It Fl s
+Suppress output and report only the exit status.
+.El
+.Sh EXIT STATUS
+.Ex -std
+0 when the files are identical, 1 when they differ, 2 for usage or an I/O error.
+.Sh SEE ALSO
+.Xr diff 1
+.Sh STANDARDS
+RavenBSD.

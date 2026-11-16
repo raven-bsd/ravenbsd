@@ -910,6 +910,14 @@ name = "raven-cmdline"
 version = "0.1.0"
 
 [[package]]
+name = "raven-cmp"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-config"
 version = "0.1.0"
 dependencies = [
@@ -996,6 +1004,14 @@ name = "raven-df"
 version = "0.1.0"
 dependencies = [
  "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
+name = "raven-diff"
+version = "0.1.0"
+dependencies = [
  "raven-rt",
  "raven-tool-core",
 ]
@@ -1165,6 +1181,15 @@ dependencies = [
  "raven-abi",
  "raven-initfs",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-grep"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-regex",
+ "raven-rt",
+ "raven-tool-core",
 ]
 
 [[package]]
@@ -2743,6 +2768,14 @@ name = "raven-stat"
 version = "0.1.0"
 dependencies = [
  "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
+name = "raven-strings"
+version = "0.1.0"
+dependencies = [
  "raven-rt",
  "raven-tool-core",
 ]
