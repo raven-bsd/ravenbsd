@@ -73,16 +73,37 @@ impl DbIo for RtIo {
 /// # Errors
 /// An I/O error, invalid UTF-8, or an empty read.
 pub fn read_line(prompt: &str) -> Result<String, DbError> {
+    const MAX_LINE: usize = 1024;
     let mut file = fs::open("tty:console", O_RDWR).map_err(DbError::Io)?;
     file.write(prompt.as_bytes()).map_err(DbError::Io)?;
     let mut buffer = [0u8; 256];
-    let read = file.read(&mut buffer).map_err(DbError::Io)?;
+    let mut line = Vec::new();
+    let mut oversized = false;
+    loop {
+        let read = file.read(&mut buffer).map_err(DbError::Io)?;
+        if read == 0 {
+            break;
+        }
+        let chunk = buffer.get(..read).unwrap_or(&[]);
+        if !oversized {
+            if line.len().saturating_add(read) > MAX_LINE {
+                oversized = true;
+            } else {
+                line.extend_from_slice(chunk);
+            }
+        }
+        if chunk.contains(&b'\n') {
+            break;
+        }
+    }
     let _ = file.close();
-    if read == 0 {
+    if oversized {
+        return Err(DbError::Io(Errno::E2BIG));
+    }
+    if line.is_empty() {
         return Err(DbError::Io(Errno::EIO));
     }
-    let text = core::str::from_utf8(buffer.get(..read).unwrap_or(&[]))
-        .map_err(|_| DbError::Io(Errno::EILSEQ))?;
+    let text = core::str::from_utf8(&line).map_err(|_| DbError::Io(Errno::EILSEQ))?;
     Ok(text.trim_end_matches(['\r', '\n']).to_string())
 }
 
