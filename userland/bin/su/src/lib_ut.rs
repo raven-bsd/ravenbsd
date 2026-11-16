@@ -78,6 +78,41 @@ fn an_empty_shell_uses_the_default() {
 }
 
 #[test]
+fn only_a_non_root_caller_needs_a_password() {
+    assert!(!needs_password(0));
+    assert!(needs_password(1000));
+}
+
+#[test]
+fn target_password_uses_raven_auth() {
+    let hash = raven_auth::hash_password("correct", b"su-test").expect("hash");
+    let entry = ShadowEntry {
+        name: "alice".to_string(),
+        hash,
+        last_change: 0,
+        min: 0,
+        max: 99999,
+        warn: 7,
+        inactive: 0,
+        expire: 0,
+        reserved: 0,
+    };
+    assert!(verify_target_password(&entry, "correct"));
+    assert!(!verify_target_password(&entry, "wrong"));
+    let mut locked = entry;
+    locked.lock();
+    assert!(!verify_target_password(&locked, "correct"));
+}
+
+#[test]
+fn supplementary_groups_drop_the_primary() {
+    assert_eq!(
+        supplementary_groups(&[1000, 100, 0, 100], 1000),
+        vec![100, 0]
+    );
+}
+
+#[test]
 fn commands_are_passed_with_c() {
     let options = parse_args(["-c", "echo hello", "root"]).expect("parse");
     assert_eq!(shell_arguments(&options), vec!["-c", "echo hello"]);

@@ -381,6 +381,7 @@ dependencies = [
 name = "id"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
  "raven-rt",
  "raven-userdb",
 ]
@@ -596,6 +597,7 @@ dependencies = [
 name = "passwd"
 version = "0.1.0"
 dependencies = [
+ "login",
  "raven-abi",
  "raven-auth",
  "raven-rt",
@@ -3143,6 +3145,9 @@ checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
 name = "su"
 version = "0.1.0"
 dependencies = [
+ "login",
+ "raven-abi",
+ "raven-auth",
  "raven-initfs",
  "raven-rt",
  "raven-userdb",

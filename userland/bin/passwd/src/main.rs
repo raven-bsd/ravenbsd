@@ -3,9 +3,11 @@
 
 //! The RavenBSD `passwd` utility.
 //!
-//! U2 ships the root path only. A non-root caller needs a setuid binary and the kernel credential
-//! switch from U3; the tool does not fake either. The password never goes through argv, the
-//! environment or a temporary file.
+//! The binary is installed setuid root. Root may change any account without an old password. A
+//! non-root caller may change only its own account after proving the old hash; the effective root
+//! id from the setuid install is used only for the database transaction. The password never goes
+//! through argv, the environment or a temporary file, and the console echo bit is restored before
+//! the tool exits.
 
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
@@ -16,11 +18,14 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
-    use alloc::string::ToString;
+    use alloc::format;
+    use alloc::string::{String, ToString};
 
+    use login::tty::Console;
     use raven_abi::types::clock;
     use raven_rt::entry;
-    use raven_userdb::rt::{RtIo, random_bytes, read_line};
+    use raven_rt::proc;
+    use raven_userdb::rt::{RtIo, random_bytes};
     use raven_userdb::store::{Paths, Transaction};
 
     entry!(main);
@@ -33,97 +38,99 @@ mod program {
                 return 2;
             }
         };
-        // The kernel is root-only in 0.2.0. U3 supplies the real effective uid and the setuid
-        // execution path; until then every caller is root and the root-only path is correct.
-        let caller_uid = 0u32;
-        let mut transaction = match Transaction::begin(RtIo, Paths::system()) {
-            Ok(transaction) => transaction,
-            Err(error) => {
-                raven_rt::eprintln!("passwd: {error}");
-                return 1;
+        match run(&options) {
+            Ok(()) => 0,
+            Err(message) => {
+                raven_rt::eprintln!("passwd: {message}");
+                1
             }
-        };
+        }
+    }
+
+    fn run(options: &passwd::Options<'_>) -> Result<(), String> {
+        let credentials = proc::credentials().map_err(|error| error.description().to_string())?;
+        if credentials.euid != 0 {
+            return Err("must be installed setuid root".to_string());
+        }
+        let mut transaction =
+            Transaction::begin(RtIo, Paths::system()).map_err(|error| error.to_string())?;
         let name = match options.user {
             Some(name) => name.to_string(),
-            None => match transaction.database().user_by_uid(caller_uid) {
+            None => match transaction.database().user_by_uid(credentials.uid) {
                 Some(user) => user.name.clone(),
-                None => {
-                    raven_rt::eprintln!("passwd: no account for uid {caller_uid}");
-                    return 1;
-                }
+                None => return Err(format!("no account for uid {}", credentials.uid)),
             },
         };
-        let target = match transaction.database().user(&name) {
-            Some(user) => user.clone(),
-            None => {
-                raven_rt::eprintln!("passwd: {}: no such user", name);
-                return 1;
-            }
-        };
+        let target = transaction
+            .database()
+            .user(&name)
+            .cloned()
+            .ok_or_else(|| format!("{name}: no such user"))?;
+        if !passwd::target_allowed(credentials.uid, target.uid) {
+            return Err(format!("{name}: permission denied"));
+        }
         match options.action {
             passwd::Action::Lock => {
-                if let Err(error) = transaction.database_mut().lock_password(&name) {
-                    raven_rt::eprintln!("passwd: {name}: {error}");
-                    return 1;
+                if credentials.uid != 0 {
+                    return Err("only root may lock a password".to_string());
                 }
+                transaction
+                    .database_mut()
+                    .lock_password(&name)
+                    .map_err(|error| format!("{name}: {error}"))?;
             }
             passwd::Action::Unlock => {
-                if let Err(error) = transaction.database_mut().unlock_password(&name) {
-                    raven_rt::eprintln!("passwd: {name}: {error}");
-                    return 1;
+                if credentials.uid != 0 {
+                    return Err("only root may unlock a password".to_string());
                 }
+                transaction
+                    .database_mut()
+                    .unlock_password(&name)
+                    .map_err(|error| format!("{name}: {error}"))?;
             }
             passwd::Action::Change => {
-                let password = match read_line("New password: ") {
-                    Ok(password) => password,
-                    Err(error) => {
-                        raven_rt::eprintln!("passwd: {error}");
-                        return 1;
+                let console = Console::open().map_err(|error| error.description().to_string())?;
+                if passwd::requires_old_password(credentials.uid) {
+                    let shadow = transaction
+                        .database()
+                        .shadow_by_name(&name)
+                        .ok_or_else(|| format!("{name}: no shadow record"))?;
+                    let old = prompt(&console, "Current password: ")?;
+                    if !passwd::verify_old_password(&shadow.hash, &old) {
+                        return Err("incorrect password".to_string());
                     }
-                };
-                let confirmation = match read_line("Retype new password: ") {
-                    Ok(password) => password,
-                    Err(error) => {
-                        raven_rt::eprintln!("passwd: {error}");
-                        return 1;
-                    }
-                };
+                }
+                let password = prompt(&console, "New password: ")?;
+                let confirmation = prompt(&console, "Retype new password: ")?;
                 if password != confirmation {
-                    raven_rt::eprintln!("passwd: passwords do not match");
-                    return 1;
+                    return Err("passwords do not match".to_string());
                 }
-                if let Err(error) = passwd::validate_password(&password, caller_uid, target.uid) {
-                    raven_rt::eprintln!("passwd: {}", error.message());
-                    return 1;
-                }
-                let salt = match random_bytes::<16>("rand:") {
-                    Ok(salt) => salt,
-                    Err(error) => {
-                        raven_rt::eprintln!("passwd: rand: {error}");
-                        return 1;
-                    }
-                };
-                let hash = match raven_auth::hash_password(&password, &salt) {
-                    Ok(hash) => hash,
-                    Err(error) => {
-                        raven_rt::eprintln!("passwd: {error}");
-                        return 1;
-                    }
-                };
+                passwd::validate_password(&password, credentials.uid, target.uid)
+                    .map_err(|error| error.message().to_string())?;
+                let salt = random_bytes::<16>("rand:").map_err(|error| format!("rand: {error}"))?;
+                let hash = raven_auth::hash_password(&password, &salt)
+                    .map_err(|error| error.to_string())?;
                 let today = raven_rt::clock_get(clock::REALTIME)
                     .map(|time| passwd::days_since_epoch(time.tv_sec))
                     .unwrap_or(0);
-                if let Err(error) = transaction.database_mut().set_password(&name, &hash, today) {
-                    raven_rt::eprintln!("passwd: {name}: {error}");
-                    return 1;
-                }
+                transaction
+                    .database_mut()
+                    .set_password(&name, &hash, today)
+                    .map_err(|error| format!("{name}: {error}"))?;
             }
         }
-        if let Err(error) = transaction.commit() {
-            raven_rt::eprintln!("passwd: {error}");
-            return 1;
-        }
-        0
+        transaction.commit().map_err(|error| error.to_string())
+    }
+
+    fn prompt(console: &Console, prompt: &str) -> Result<String, String> {
+        console
+            .write(prompt.as_bytes())
+            .map_err(|error| error.description().to_string())?;
+        console.set_echo(false);
+        let result = console.read_line();
+        console.set_echo(true);
+        let _ = console.write(b"\n");
+        result.map_err(|error| error.description().to_string())
     }
 }
 

@@ -115,6 +115,29 @@ pub fn days_since_epoch(seconds: i64) -> i64 {
     seconds.div_euclid(86_400).max(0)
 }
 
+/// A non-root real uid must prove the old password before changing its own.
+#[must_use]
+pub const fn requires_old_password(real_uid: u32) -> bool {
+    real_uid != 0
+}
+
+/// Root may target any account; a non-root caller may only target its own uid.
+#[must_use]
+pub const fn target_allowed(real_uid: u32, target_uid: u32) -> bool {
+    real_uid == 0 || real_uid == target_uid
+}
+
+/// Verify an old password against the target hash with `raven-auth`.
+///
+/// A missing, empty or locked hash never authenticates.
+#[must_use]
+pub fn verify_old_password(hash: &str, password: &str) -> bool {
+    if hash.is_empty() || hash.starts_with('!') || hash.starts_with('*') {
+        return false;
+    }
+    raven_auth::verify_password(password, hash)
+}
+
 /// Parse `passwd [-l|-u] [name]`.
 ///
 /// # Errors
