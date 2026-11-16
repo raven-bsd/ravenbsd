@@ -18,6 +18,8 @@ name = "raven-pi4-net-model"
 path = "src/main.rs"
 
 [dependencies]
+genet = { path = "../../../../userland/drivers/genet" }
+raven-genet = { path = "../../../../crates/raven-genet" }
 raven-initfs = { path = "../../../../crates/raven-initfs" }
 
 [target.'cfg(target_os = "none")'.dependencies]
