@@ -3,11 +3,10 @@
 
 # aarch64 process/signal qtest parity (P2g)
 
-Status: **PASS on the four available cases.** `proc-handle-info`, `proc-session`, `proc-signal`
-and `proc-fork` pass on aarch64 after P2i raised the shared kernel stack to seven pages
-(`KERNEL_STACK_PAGES = 7`, 28 KiB) in `kernel/src/sched/thread.rs`. The x86_64 controls pass the
-same four cases. `proc-exec` is not on `origin/master`: it is the P2k same-pid `execve` work and
-is reported as a P2k dependency, not skipped or faked. No board claim.
+Status: **PASS on all five cases.** `proc-handle-info`, `proc-session`, `proc-signal`, `proc-fork`
+and `proc-exec` pass on aarch64. P2i raised the shared kernel stack to seven pages
+(`KERNEL_STACK_PAGES = 7`, 28 KiB) in `kernel/src/sched/thread.rs`, and P2k's same-pid `execve`
+now provides the fifth case. The x86_64 controls pass the same five cases. No board claim.
 
 ## 1. Build
 
@@ -33,9 +32,9 @@ handle-info fixture has an aarch64 `svc #0` syscall stub beside the x86-64 `sysc
 | `proc-session` | **PASS** | groups, stop/continue, P_PGID/P_ALL waits, times/rusage, rlimits |
 | `proc-signal` | **PASS** | two queued signals, wait status, SIGCHLD sender, EAGAIN/invalid/unknown |
 | `proc-fork` | **PASS** | COW data, NOFORK, ZERO_ON_FORK, object handle, four-cycle fork loop |
-| `proc-exec` | P2k dependency | P2k same-pid `execve` is not on `origin/master`; no case or fixture exists yet |
+| `proc-exec` | **PASS** | bad image/kernel request keep the old image; exec keeps argv, identity and non-CLOEXEC handles |
 
-The x86_64 controls pass the same four cases. The shared syscall numbers and the common
+The x86_64 controls pass the same five cases. The shared syscall numbers and the common
 wait/session/times/rlimit path are unchanged.
 
 ### aarch64 serials
@@ -88,6 +87,18 @@ proc-fork: done
 init exited (0)
 ```
 
+`proc-exec`:
+
+```
+proc-exec: bad-image=1 bad-kernel=1
+proc-exec: exec-start
+proc-exec: child argv=1
+proc-exec: child identity=1
+proc-exec: child handles=1
+proc-exec: child ok
+init exited (0)
+```
+
 ## 3. P2i kernel stack
 
 P2i merged the shared stack increase: `KERNEL_STACK_PAGES = 7` (28 KiB) plus one guard page in
@@ -96,12 +107,13 @@ faulted in the aarch64 exception vector; with seven pages the `proc-signal` and 
 transcripts above complete normally. The previous 20 KiB analysis is retained in the P2g report
 for history.
 
-## 4. P2k dependency
+## 4. proc-exec (P2k)
 
-`proc-exec` is owned by P2k (same-pid `execve`, `kernel/src/process/**`, `kernel/src/syscall/**`,
-`tests/qtest/cases/proc-exec*`, `tests/fixtures/proc/**`). It is not on `origin/master` as of this
-P2g round, so the case is not present and is not skipped here; the four available aarch64 cases
-are run and this row is reported as the exact P2k dependency. `procd` was not edited.
+P2k's same-pid `execve` is merged. `tests/qtest/cases/proc-exec.toml` and the fixture are present
+on `origin/master`; the case runs on aarch64 and x86_64. It covers a bad ELF and an oversized
+kernel request leaving the old image running, then a real exec that keeps pid/pgid/sid,
+credentials and non-CLOEXEC handles while closing a CLOEXEC pipe. The aarch64 transcript is
+above.
 
 ## 5. Provenance
 

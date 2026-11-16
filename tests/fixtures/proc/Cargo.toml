@@ -27,8 +27,24 @@ name = "proc-session-init"
 path = "src/bin/session.rs"
 test = false
 
+[[bin]]
+name = "proc-exec-init"
+path = "src/bin/exec.rs"
+test = false
+
+[[bin]]
+name = "proc-exec-child"
+path = "src/bin/exec_child.rs"
+test = false
+
+[[bin]]
+name = "proc-priority-init"
+path = "src/bin/priority.rs"
+test = false
+
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
+raven-initfs = { path = "../../../crates/raven-initfs" }
 raven-rt = { path = "../../../userland/rt", features = ["alloc", "panic-handler"] }
 
 [lints]

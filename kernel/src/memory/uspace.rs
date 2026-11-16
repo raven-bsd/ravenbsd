@@ -1527,6 +1527,33 @@ fn map_errno(error: MapError) -> Errno {
     }
 }
 
+/// Activate a user page-table root on the current CPU.
+///
+/// # Safety
+///
+/// `root` must be the live root of an `AddressSpace` owned by the caller, and this code and its
+/// kernel stack must be mapped in the shared kernel half of both the old and the new root. The
+/// caller must not touch the old user mappings after the switch.
+pub unsafe fn activate_user_root(root: u64, asid: u16) {
+    #[cfg(target_arch = "x86_64")]
+    {
+        let _ = asid;
+        // SAFETY: the caller guarantees `root` is a live page-table root; reloading CR3 also
+        // flushes non-global TLB entries for the old user mappings.
+        unsafe {
+            core::arch::asm!(
+                "mov cr3, {}",
+                in(reg) root,
+                options(nostack, preserves_flags),
+            );
+        }
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        crate::arch::mmu::switch_ttbr0(root, asid);
+    }
+}
+
 /// Switch to the kernel address space (x86-64: the kernel CR3).
 #[cfg(target_arch = "x86_64")]
 fn activate_kernel_space() {

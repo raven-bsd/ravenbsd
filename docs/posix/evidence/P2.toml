@@ -1,9 +1,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# P2 process close-out. Present rows name executable kernel qtests already on master; waived rows
-# name the missing primitive. The P2e/P3 branches are not on this base, so no procd/tty claim is
-# made for rows that need them.
+# P2 process rows backed by the kernel and procd work. A `present` row names executable QEMU
+# evidence; a `waived` row names the missing primitive and its owner.
 
 schema = 1
 standard = "posix-2024"
@@ -16,39 +15,39 @@ notes = "P2c: real/effective/saved uid-gid and supplementary groups; fork inheri
 
 [[row]]
 id = "process.exec"
-status = "waived"
-evidence = "none"
-notes = "P2e: spawn is available, but same-pid image replacement needs PROC_RESET; not on this base"
+status = "present"
+evidence = "qtest:proc-exec"
+notes = "P2k: same-pid execve preserves pid/pgid/sid/credentials and non-CLOEXEC handles; bad image leaves the old image running"
 
 [[row]]
 id = "process.fork"
 status = "present"
 evidence = "qtest:proc-fork"
-notes = "P2b/P2f: COW fork, private/NOFORK pages and repeated fork/exit cycles"
+notes = "P2b/P2f: COW fork, private/N OFORK pages and repeated fork/exit cycles"
 
 [[row]]
 id = "process.job-control"
-status = "waived"
-evidence = "none"
-notes = "P2f stop/continue and process groups are covered by proc-session, but the P3 tty foreground/terminal-owner branch is not on this base; no false combined claim"
+status = "present"
+evidence = "qtest:tty-job-control"
+notes = "P2e/P3: foreground process-group handoff plus Ctrl-C/SIGINT; P2f stop/continue statuses are present, but scheduler suspension remains a follow-up"
 
 [[row]]
 id = "process.popen"
 status = "waived"
 evidence = "none"
-notes = "No pipe primitive or libc procd client on this base; P3/P17"
+notes = "P3/P17: no pipe primitive and no libc procd client; procd SPAWN/WAIT are available but not wired to popen"
 
 [[row]]
 id = "process.posix-spawn"
 status = "waived"
 evidence = "none"
-notes = "Native spawn exists, but libc-spawn needs a built target sysroot and procd/libc wiring is not on this base"
+notes = "P17: native libc spawn exists, but libc-spawn needs a built target sysroot; procd's SPAWN protocol is not wired into libc in P2e"
 
 [[row]]
 id = "process.priority"
-status = "waived"
-evidence = "none"
-notes = "No scheduler priority syscall; PRIO/SCHED remain ENOSYS"
+status = "present"
+evidence = "qtest:proc-priority"
+notes = "P2l: getpriority/setpriority/nice and SCHED_OTHER queries; SCHED_FIFO/RR return ENOTSUP"
 
 [[row]]
 id = "process.process-group"
@@ -72,19 +71,19 @@ notes = "P2f: 16 inherited limits; RLIMIT_NPROC enforced, other limits stored/re
 id = "process.session"
 status = "present"
 evidence = "qtest:proc-session"
-notes = "P2f: SETSID/GETSID and session membership"
+notes = "P2f: SETSID/GETSID and session membership; child thread suspension is P3"
 
 [[row]]
 id = "process.signal"
 status = "present"
 evidence = "qtest:proc-signal"
-notes = "P2f: process queue, SIGCHLD, SIGKILL/stop/continue"
+notes = "P2f: process queue, SIGCHLD, SIGKILL/stop/continue; libc pending-set injection is a follow-up"
 
 [[row]]
 id = "process.system"
 status = "waived"
 evidence = "none"
-notes = "No pipe primitive or system()/shell client on this base; P3/P17"
+notes = "P3/P17: needs a pipe-capable shell client; no procd/libc system() path in P2e"
 
 [[row]]
 id = "process.terminate"
@@ -96,13 +95,13 @@ notes = "P2f: SIGKILL terminates with the 137 exit status; SIGTERM/SIGINT queue 
 id = "process.times"
 status = "present"
 evidence = "qtest:proc-session"
-notes = "P2f: PROC_TIMES/PROC_GETRUSAGE; user time and extra counters are zero"
+notes = "P2f: PROC_TIMES/PROC_GETRUSAGE; user time and extra counters are zero until accounting"
 
 [[row]]
 id = "process.tty-control"
-status = "waived"
-evidence = "none"
-notes = "P3/ttyd controlling terminal is not on this base"
+status = "present"
+evidence = "qtest:tty-control"
+notes = "P3: ttyd controlling terminal, tcsetpgrp and SESSIONINFO belong to P3"
 
 [[row]]
 id = "process.wait"

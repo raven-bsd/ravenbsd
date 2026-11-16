@@ -24,6 +24,8 @@ use crate::sched;
 use crate::sched::wait::WaitQueue;
 use crate::usercopy::{copy_from_user, copy_to_user};
 
+// The ring's wrap arithmetic is bounded by the fixed capacity and cannot overflow.
+#[allow(clippy::arithmetic_side_effects)]
 #[path = "../../../crates/raven-ipc/src/pipe_ring.rs"]
 mod ring;
 

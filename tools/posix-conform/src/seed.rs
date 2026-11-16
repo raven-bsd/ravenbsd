@@ -283,6 +283,7 @@ const UTILITIES: &[&str] = &[
     "tac",
     "tail",
     "talk",
+    "tar",
     "tee",
     "test",
     "time",

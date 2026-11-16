@@ -17,6 +17,7 @@ pub mod driver;
 /// `DTRACE_*` provider control syscalls (S57).
 pub mod dtrace;
 pub mod event;
+pub mod exec;
 pub mod futex;
 pub mod handle_xfer;
 /// Scheme IPC (`0x60..0x69`) is shared by x86-64 and aarch64.
@@ -25,8 +26,10 @@ pub mod ipc;
 pub mod linux;
 pub mod memory_ctl;
 pub mod pipe;
+pub mod priority;
 pub mod process_ctl;
 pub mod thread;
+pub mod tty;
 
 use core::sync::atomic::Ordering;
 
@@ -101,11 +104,44 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == ipc::SEEK {
         return ipc::seek(frame);
     }
+    if number == exec::PROC_EXEC {
+        return exec::exec(frame);
+    }
     if number == pipe::PIPE {
         return pipe::pipe(frame);
     }
     if number == pipe::PIPE2 {
         return pipe::pipe2(frame);
+    }
+    if number == priority::GETPRIORITY {
+        return priority::getpriority(frame);
+    }
+    if number == priority::SETPRIORITY {
+        return priority::setpriority(frame);
+    }
+    if number == priority::NICE {
+        return priority::nice(frame);
+    }
+    if number == priority::SCHED_GET_PRIORITY_MAX {
+        return priority::sched_get_priority_max(frame);
+    }
+    if number == priority::SCHED_GET_PRIORITY_MIN {
+        return priority::sched_get_priority_min(frame);
+    }
+    if number == priority::SCHED_SETSCHEDULER {
+        return priority::sched_setscheduler(frame);
+    }
+    if number == priority::SCHED_GETSCHEDULER {
+        return priority::sched_getscheduler(frame);
+    }
+    if number == tty::PROC_CTTY_SET {
+        return tty::set_ctty(frame);
+    }
+    if number == tty::PROC_CTTY_GET {
+        return tty::get_pgrp(frame);
+    }
+    if number == tty::PROC_CTTY_SET_FG {
+        return tty::set_pgrp(frame);
     }
     if number == process_ctl::PROC_SELF_INFO {
         return process_ctl::self_info(frame);
@@ -249,6 +285,49 @@ fn result_value(result: Result<usize, Errno>) -> u64 {
     }
 }
 
+/// Install a successful exec's entry and stack on the saved user frame.
+///
+/// The old image is already gone; every general register is cleared so no old-pointer value
+/// leaks into the new program. `_start` takes the C8 stack from `rsp`/`sp`, not from a GPR.
+#[cfg(target_arch = "x86_64")]
+fn apply_exec_context(
+    frame: &mut crate::arch::x86_64::trapframe::TrapFrame,
+    context: crate::process::exec::ExecContext,
+) {
+    frame.rip = context.entry;
+    frame.rsp = context.stack;
+    frame.rflags = 0x202;
+    frame.rax = 0;
+    frame.rbx = 0;
+    frame.rcx = 0;
+    frame.rdx = 0;
+    frame.rsi = 0;
+    frame.rdi = 0;
+    frame.rbp = 0;
+    frame.r8 = 0;
+    frame.r9 = 0;
+    frame.r10 = 0;
+    frame.r11 = 0;
+    frame.r12 = 0;
+    frame.r13 = 0;
+    frame.r14 = 0;
+    frame.r15 = 0;
+}
+
+/// Install a successful exec's entry and stack on the saved user frame.
+#[cfg(target_arch = "aarch64")]
+fn apply_exec_context(
+    frame: &mut crate::arch::aarch64::vectors::TrapFrame,
+    context: crate::process::exec::ExecContext,
+) {
+    frame.x = [0; 31];
+    frame.sp = context.stack;
+    frame.elr = context.entry;
+    frame.spsr = 0;
+    frame.esr = 0;
+    frame.far = 0;
+}
+
 /// Rust side of the x86-64 `syscall` entry stub.
 ///
 /// The assembly stub saves a TrapFrame-compatible register image, passes its address here, and
@@ -287,7 +366,11 @@ pub extern "C" fn syscall_dispatch(frame: &mut crate::arch::x86_64::trapframe::T
         }
     } else {
         frame.rax = result_value(dispatch(&registers));
-        crate::arch::x86_64::syscall::deliver_signal(frame);
+        if let Some(context) = process::exec::take_pending() {
+            apply_exec_context(frame, context);
+        } else {
+            crate::arch::x86_64::syscall::deliver_signal(frame);
+        }
     }
     crate::sched::syscall_return();
 }
@@ -323,7 +406,11 @@ pub fn svc_dispatch(frame: &mut crate::arch::aarch64::vectors::TrapFrame) {
         if let Some(slot) = frame.x.get_mut(0) {
             *slot = value;
         }
-        crate::arch::aarch64::vectors::deliver_signal(frame);
+        if let Some(context) = process::exec::take_pending() {
+            apply_exec_context(frame, context);
+        } else {
+            crate::arch::aarch64::vectors::deliver_signal(frame);
+        }
     }
     crate::sched::syscall_return();
 }

@@ -13,9 +13,10 @@ use alloc::string::{String, ToString};
 use raven_abi::errno::Errno;
 use raven_proto_fs::{
     ACCESS_EXEC, ACCESS_READ, ACCESS_WRITE, Call, CallRequest, CallResponse, Credentials,
-    OpenFlags, S_IFDIR, S_IFLNK, S_IFMT, Stat, StatFs,
+    OpenFlags, S_IFBLK, S_IFCHR, S_IFDIR, S_IFIFO, S_IFLNK, S_IFMT, S_IFSOCK, SetTime, Stat,
+    StatFs, StatVfs,
 };
-use raven_ramfs_core::{ROOT_INO, Ramfs};
+use raven_ramfs_core::{ROOT_INO, Ramfs, SpecialKind};
 use raven_scheme::{CallReply, Ctx, Handler, HandlerResult, OpenTable, Opened};
 
 /// Aggregate open-file-description budget.
@@ -568,6 +569,14 @@ impl RamfsHandler {
                 .encode(response)
                 .map_err(|_| Errno::EPROTO.into())
             }
+            Call::Lstat { path } => {
+                let path = text(path)?;
+                let ino = self.fs.lookup_no_follow_at_checked(dir_ino, path, creds)?;
+                let stat = self.fs.stat(ino)?;
+                CallResponse::Stat { status: 0, stat }
+                    .encode(response)
+                    .map_err(|_| Errno::EPROTO.into())
+            }
             Call::Chmod { mode, path } => {
                 let path = text(path)?;
                 let ino = self.fs.lookup_at_checked(dir_ino, path, creds)?;
@@ -584,6 +593,156 @@ impl RamfsHandler {
                         now,
                     ),
                 )
+            }
+            Call::Link { path, target } => {
+                let path = text(path)?;
+                let target = text(target)?;
+                let (parent, _, parent_stat) =
+                    self.fs.parent_and_name_checked(dir_ino, path, creds)?;
+                if !creds.permitted(
+                    (parent_stat.mode & 0o7777) as u16,
+                    parent_stat.uid,
+                    parent_stat.gid,
+                    ACCESS_WRITE | ACCESS_EXEC,
+                ) {
+                    return Self::status(response, Err(Errno::EACCES));
+                }
+                if let Err(error) = self.fs.lookup_no_follow_at_checked(dir_ino, target, creds) {
+                    return Self::status(response, Err(error));
+                }
+                let result = self.fs.link_at(dir_ino, path, target, now);
+                if result.is_ok() {
+                    self.bump_dir(parent);
+                }
+                Self::status(response, result)
+            }
+            Call::Chown { uid, gid, path } | Call::Lchown { uid, gid, path } => {
+                let path = text(path)?;
+                let follow = matches!(decoded.call, Call::Chown { .. });
+                let ino = if follow {
+                    self.fs.lookup_at_checked(dir_ino, path, creds)?
+                } else {
+                    self.fs.lookup_no_follow_at_checked(dir_ino, path, creds)?
+                };
+                let stat = self.fs.stat(ino)?;
+                if let Err(error) = check_chown(creds, &stat, uid, gid) {
+                    return Self::status(response, Err(error));
+                }
+                Self::status(
+                    response,
+                    self.fs.chown_at(dir_ino, path, uid, gid, follow, now),
+                )
+            }
+            Call::Fchown { uid, gid } => {
+                let ino = self.opens.get(file).ok_or(Errno::EBADF)?.file.ino;
+                let stat = self.fs.stat(ino)?;
+                if let Err(error) = check_chown(creds, &stat, uid, gid) {
+                    return Self::status(response, Err(error));
+                }
+                Self::status(response, self.fs.chown_ino(ino, uid, gid, now))
+            }
+            Call::Mkfifo { mode, path } => {
+                let path = text(path)?;
+                let (parent, _, parent_stat) =
+                    self.fs.parent_and_name_checked(dir_ino, path, creds)?;
+                if !creds.permitted(
+                    (parent_stat.mode & 0o7777) as u16,
+                    parent_stat.uid,
+                    parent_stat.gid,
+                    ACCESS_WRITE | ACCESS_EXEC,
+                ) {
+                    return Self::status(response, Err(Errno::EACCES));
+                }
+                let result = self
+                    .fs
+                    .mkfifo_at_owned(
+                        dir_ino,
+                        path,
+                        u16::try_from(mode).map_err(|_| Errno::EINVAL)?,
+                        creds.euid,
+                        creds.egid,
+                        now,
+                    )
+                    .map(|_| ());
+                if result.is_ok() {
+                    self.bump_dir(parent);
+                }
+                Self::status(response, result)
+            }
+            Call::Mknod { mode, dev, path } => {
+                let path = text(path)?;
+                let _ = dev;
+                let (parent, _, parent_stat) =
+                    self.fs.parent_and_name_checked(dir_ino, path, creds)?;
+                if !creds.permitted(
+                    (parent_stat.mode & 0o7777) as u16,
+                    parent_stat.uid,
+                    parent_stat.gid,
+                    ACCESS_WRITE | ACCESS_EXEC,
+                ) {
+                    return Self::status(response, Err(Errno::EACCES));
+                }
+                let kind = match mode & S_IFMT {
+                    S_IFIFO => SpecialKind::Fifo,
+                    S_IFCHR => SpecialKind::CharDevice,
+                    S_IFBLK => SpecialKind::BlockDevice,
+                    S_IFSOCK => SpecialKind::Socket,
+                    _ => return Self::status(response, Err(Errno::EINVAL)),
+                };
+                let result = self
+                    .fs
+                    .mknod_at_owned(
+                        dir_ino,
+                        path,
+                        kind,
+                        u16::try_from(mode).map_err(|_| Errno::EINVAL)?,
+                        creds.euid,
+                        creds.egid,
+                        now,
+                    )
+                    .map(|_| ());
+                if result.is_ok() {
+                    self.bump_dir(parent);
+                }
+                Self::status(response, result)
+            }
+            Call::Utimens {
+                path,
+                atime,
+                mtime,
+                follow,
+            } => {
+                let path = text(path)?;
+                let ino = if follow {
+                    self.fs.lookup_at_checked(dir_ino, path, creds)?
+                } else {
+                    self.fs.lookup_no_follow_at_checked(dir_ino, path, creds)?
+                };
+                let stat = self.fs.stat(ino)?;
+                let explicit = matches!(atime, SetTime::Set(_)) || matches!(mtime, SetTime::Set(_));
+                if let Err(error) = check_utimens(creds, &stat, explicit) {
+                    return Self::status(response, Err(error));
+                }
+                let atime = match atime {
+                    SetTime::Set(seconds) => Some(seconds),
+                    SetTime::Now => Some(now),
+                    SetTime::Omit => None,
+                };
+                let mtime = match mtime {
+                    SetTime::Set(seconds) => Some(seconds),
+                    SetTime::Now => Some(now),
+                    SetTime::Omit => None,
+                };
+                Self::status(
+                    response,
+                    self.fs.utimens_at(dir_ino, path, atime, mtime, follow, now),
+                )
+            }
+            Call::Statvfs => {
+                let statvfs: StatVfs = self.fs.statfs().into();
+                CallResponse::StatVfs { status: 0, statvfs }
+                    .encode(response)
+                    .map_err(|_| Errno::EPROTO.into())
             }
             Call::Sync => Self::status(response, Ok(())),
             Call::Access { mode, path } => {
@@ -607,6 +766,44 @@ impl RamfsHandler {
 
 fn text(bytes: &[u8]) -> Result<&str, Errno> {
     core::str::from_utf8(bytes).map_err(|_| Errno::EINVAL)
+}
+
+/// POSIX ownership rules: root may change anything; an owner may keep the uid and select a group
+/// they belong to.
+fn check_chown(creds: &Credentials, stat: &Stat, uid: u32, gid: u32) -> Result<(), Errno> {
+    if creds.is_root() {
+        return Ok(());
+    }
+    if creds.euid != stat.uid {
+        return Err(Errno::EPERM);
+    }
+    if uid != u32::MAX && uid != stat.uid {
+        return Err(Errno::EPERM);
+    }
+    if gid != u32::MAX && gid != stat.gid && !creds.in_group(gid) {
+        return Err(Errno::EPERM);
+    }
+    Ok(())
+}
+
+/// Arbitrary timestamps need ownership; `UTIME_NOW`/`UTIME_OMIT` also accept write permission.
+fn check_utimens(creds: &Credentials, stat: &Stat, explicit: bool) -> Result<(), Errno> {
+    if creds.is_root() || creds.euid == stat.uid {
+        return Ok(());
+    }
+    if explicit {
+        return Err(Errno::EPERM);
+    }
+    if creds.permitted(
+        (stat.mode & 0o7777) as u16,
+        stat.uid,
+        stat.gid,
+        ACCESS_WRITE,
+    ) {
+        Ok(())
+    } else {
+        Err(Errno::EACCES)
+    }
 }
 
 fn seek_target(base: u64, offset: i64) -> Option<u64> {

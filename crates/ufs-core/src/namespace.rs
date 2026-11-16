@@ -281,6 +281,51 @@ impl<D: BlockIo> Ufs<D> {
         Ok(())
     }
 
+    /// Create a FIFO, device or socket node and enter it in `dir`.
+    ///
+    /// `mode` carries the on-disk file type in `0o170000`; regular files and directories are
+    /// rejected because they have their own creation paths. `rdev` is stored in the first direct
+    /// pointer for character and block devices, matching the on-disk UFS layout.
+    pub fn mknod(
+        &mut self,
+        dir: Ino,
+        name: &[u8],
+        mode: u16,
+        rdev: u64,
+        uid: u32,
+        gid: u32,
+    ) -> Result<Ino, UfsError> {
+        self.ensure_writable()?;
+        dirwrite::validate_new_name(name)?;
+        let kind = crate::dinode::file_type_from_mode(mode)?;
+        if !matches!(
+            kind,
+            FileType::Fifo | FileType::CharDevice | FileType::BlockDevice | FileType::Socket
+        ) {
+            return Err(UfsError::Invalid);
+        }
+        let mut dp = self.directory_inode(dir)?;
+        if self.lookup_entry(dir, name)?.is_some() {
+            return Err(UfsError::Exists);
+        }
+        let ino = self.alloc_inode(dir, mode)?;
+        let mut inode = self.load_inode(ino)?;
+        inode.nlink = 1;
+        inode.uid = uid;
+        inode.gid = gid;
+        if matches!(kind, FileType::CharDevice | FileType::BlockDevice) {
+            inode.rdev = rdev;
+            inode.db[0] = rdev;
+        }
+        self.new_inode_times(&mut inode);
+        self.store_inode(ino, &inode)?;
+        if let Err(error) = self.dir_insert(dir, &mut dp, name, ino, dtype(kind)) {
+            let _ = self.free_inode(ino, inode.mode);
+            return Err(error);
+        }
+        Ok(ino)
+    }
+
     /// Create a symbolic link and enter it in `dir`.
     pub fn symlink(
         &mut self,

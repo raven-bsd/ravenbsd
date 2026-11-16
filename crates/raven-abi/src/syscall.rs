@@ -181,6 +181,14 @@ syscalls! {
     IRQ_ACK = 0x76;
 }
 
+/// `msync(proc: Handle, addr: usize, len: usize, flags: usize) -> 0`.
+///
+/// Writes dirty pages of a shared file-backed mapping back through the pager without unmapping
+/// the range. `flags` uses the POSIX `MS_ASYNC`/`MS_SYNC`/`MS_INVALIDATE` bits; `MS_SYNC` waits
+/// for the PageOut. A raw constant, not a [`Syscall`] variant, so existing exhaustive matches
+/// downstream stay intact.
+pub const MSYNC: usize = 0x44;
+
 /// `proc_set_personality(proc: Handle, personality: u32, handler: Handle) -> 0`.
 ///
 /// This is a native-only control syscall in the `0x30` process-control range,

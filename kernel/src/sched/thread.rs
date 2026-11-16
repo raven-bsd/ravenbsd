@@ -207,6 +207,18 @@ impl Thread {
         ThreadState::from_raw(self.state.load(Ordering::SeqCst))
     }
 
+    /// Run-queue priority for this thread.
+    ///
+    /// User threads derive it from the owning process's POSIX nice value, so `setpriority`
+    /// reaches every later enqueue/wake. Kernel and idle threads keep their static priority.
+    pub fn effective_priority(&self) -> u8 {
+        if self.user && !self.idle {
+            crate::process::priority::nice_to_priority(self.process.nice())
+        } else {
+            self.priority
+        }
+    }
+
     /// Change state.
     #[inline]
     pub fn set_state(&self, state: ThreadState) {
@@ -333,15 +345,9 @@ impl Thread {
         stack_top: u64,
         arg: u64,
         cr3: u64,
+        priority: u8,
     ) -> Result<Arc<Thread>, Errno> {
-        let thread = Self::new(
-            name,
-            Arc::clone(&process),
-            PRIORITY_DEFAULT,
-            true,
-            cr3,
-            false,
-        )?;
+        let thread = Self::new(name, Arc::clone(&process), priority, true, cr3, false)?;
         // SAFETY: the thread is not shared yet, so mutable access through the raw pointer is
         // exclusive. All fields are plain data published before the first schedule.
         unsafe {

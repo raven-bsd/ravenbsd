@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P3: pty master/slave pairs, canonical/raw modes, echo, line buffering, flush and hangup.
+
+name = "pty-session"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["TTY_MODE=pty sh tests/fixtures/tty/build.sh"]
+initfs = "build/fixtures/tty/initfs-pty.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^tty: canonical=hello$'
+
+[[expect]]
+regex = '^tty: echo=hello$'
+
+[[expect]]
+regex = '^tty: raw=raw$'
+
+[[expect]]
+regex = '^tty: echo-off=ok$'
+
+[[expect]]
+regex = '^tty: flush=ok$'
+
+[[expect]]
+regex = '^tty: pty-session=ok$'
+
+[[expect]]
+regex = '^tty: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|tty: fail'

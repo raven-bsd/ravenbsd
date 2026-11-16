@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P2m controlling terminal: TIOCSCTTY, tcgetpgrp/tcsetpgrp, background SIGTTIN/SIGTTOU, orphaned
+# EIO and session-leader hangup with SIGHUP.
+
+name = "tty-control"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["TTY_MODE=control sh tests/fixtures/tty/build.sh"]
+initfs = "build/fixtures/tty/initfs-control.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^tty-control: ctty=1 fg=1$'
+
+[[expect]]
+regex = '^tty-control: ttyd=1 orphan=1$'
+
+[[expect]]
+regex = '^tty-control: sig=1$'
+
+[[expect]]
+regex = '^tty-control: hangup=1$'
+
+[[expect]]
+regex = '^tty-control: ok$'
+
+[[expect]]
+regex = '^tty-ctl: ready$'
+unordered = true
+
+[[expect]]
+regex = '^tty-ctl: ttin$'
+unordered = true
+
+[[expect]]
+regex = '^tty-ctl: fg-read$'
+unordered = true
+
+[[expect]]
+regex = '^tty-ctl: ttou$'
+unordered = true
+
+[[expect]]
+regex = '^tty-ctl: fg-write$'
+unordered = true
+
+[[expect]]
+regex = '^tty-hup: leader$'
+unordered = true
+
+[[expect]]
+regex = '^tty-hup: got$'
+unordered = true
+
+[[expect]]
+regex = '^tty-hup: eio$'
+unordered = true
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|tty-control: fail|tty-ctl: .*fail|tty-hup: .*fail'

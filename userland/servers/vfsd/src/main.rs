@@ -111,6 +111,27 @@ mod program {
             stat
         }
 
+        fn target_lstat(&self, scheme: &str, suffix: &str) -> Result<Stat, Errno> {
+            let client = Client::new();
+            let root = client.open(scheme, READ)?;
+            let request = CallRequest::new(Call::Lstat {
+                path: suffix.as_bytes(),
+            });
+            let mut response = [0u8; 128];
+            let result = client.call_typed(root, &request, &mut response);
+            let _ = client.close(root);
+            let length = result?;
+            match CallResponse::decode(request.op(), &response[..length]) {
+                Ok(CallResponse::Stat { status: 0, stat }) => Ok(stat),
+                Ok(CallResponse::Stat { status, .. })
+                | Ok(CallResponse::Status(status))
+                | Ok(CallResponse::Readlink { status, .. })
+                | Ok(CallResponse::StatFs { status, .. })
+                | Ok(CallResponse::StatVfs { status, .. }) => Err(errno_from_status(status)),
+                Err(_) => Err(Errno::EPROTO),
+            }
+        }
+
         fn check_traverse(
             &self,
             scheme: &str,
@@ -311,12 +332,15 @@ mod program {
                 .scheme
                 .clone();
             match call {
-                Call::Mkdir { .. } | Call::Symlink { .. } => {
+                Call::Mkdir { .. }
+                | Call::Symlink { .. }
+                | Call::Mkfifo { .. }
+                | Call::Mknod { .. } => {
                     self.check_parent(&scheme, suffix, creds)?;
                 }
                 Call::Unlink { .. } | Call::Rmdir { .. } => {
                     self.check_parent(&scheme, suffix, creds)?;
-                    let target = self.target_stat(&scheme, suffix)?;
+                    let target = self.target_lstat(&scheme, suffix)?;
                     let parent = self.target_stat(&scheme, parent_suffix(suffix))?;
                     if !creds.sticky_delete_allowed((parent.mode & 0o7777) as u16, target.uid) {
                         return Err(Errno::EPERM);
@@ -332,11 +356,47 @@ mod program {
                         return Err(Errno::EPERM);
                     }
                 }
+                Call::Chown { .. } | Call::Lchown { .. } | Call::Utimens { .. } => {
+                    self.check_traverse(&scheme, parent_suffix(suffix), creds)?;
+                }
                 _ => {}
             }
             let client = Client::new();
             let root = client.open(&scheme, READ)?;
             let request = CallRequest::new(rebuild_single(&call, suffix.as_bytes())?);
+            let result = proxy_call(&client, root, &request, response);
+            let _ = client.close(root);
+            result
+        }
+
+        fn forward_link(
+            &self,
+            path: &str,
+            target: &str,
+            response: &mut [u8],
+            creds: &Credentials,
+        ) -> Result<usize, Errno> {
+            if !self.table.same_mount(path, target)? {
+                return Err(Errno::EXDEV);
+            }
+            let (mount_id, suffix) = self.table.resolve(path)?;
+            let (_, target_suffix) = self.table.resolve(target)?;
+            if suffix.is_empty() || target_suffix.is_empty() {
+                return Err(Errno::EINVAL);
+            }
+            let scheme = self
+                .table
+                .get(mount_id)
+                .ok_or(Errno::ENOENT)?
+                .scheme
+                .clone();
+            self.check_parent(&scheme, suffix, creds)?;
+            let client = Client::new();
+            let root = client.open(&scheme, READ)?;
+            let request = CallRequest::new(Call::Link {
+                path: suffix.as_bytes(),
+                target: target_suffix.as_bytes(),
+            });
             let result = proxy_call(&client, root, &request, response);
             let _ = client.close(root);
             result
@@ -363,12 +423,12 @@ mod program {
             }
             self.check_parent(&scheme, suffix, creds)?;
             self.check_parent(&scheme, to_suffix, creds)?;
-            let source = self.target_stat(&scheme, suffix)?;
+            let source = self.target_lstat(&scheme, suffix)?;
             let source_parent = self.target_stat(&scheme, parent_suffix(suffix))?;
             if !creds.sticky_delete_allowed((source_parent.mode & 0o7777) as u16, source.uid) {
                 return Err(Errno::EPERM);
             }
-            if let Ok(dest) = self.target_stat(&scheme, to_suffix) {
+            if let Ok(dest) = self.target_lstat(&scheme, to_suffix) {
                 let dest_parent = self.target_stat(&scheme, parent_suffix(to_suffix))?;
                 if !creds.sticky_delete_allowed((dest_parent.mode & 0o7777) as u16, dest.uid) {
                     return Err(Errno::EPERM);
@@ -419,6 +479,12 @@ mod program {
             | Call::Rmdir { path }
             | Call::Readlink { path }
             | Call::Chmod { path, .. }
+            | Call::Chown { path, .. }
+            | Call::Lchown { path, .. }
+            | Call::Mkfifo { path, .. }
+            | Call::Mknod { path, .. }
+            | Call::Utimens { path, .. }
+            | Call::Lstat { path }
             | Call::Symlink { path, .. } => Some(*path),
             _ => None,
         }
@@ -524,9 +590,45 @@ mod program {
             Call::Rmdir { .. } => Call::Rmdir { path },
             Call::Readlink { .. } => Call::Readlink { path },
             Call::Chmod { mode, .. } => Call::Chmod { mode: *mode, path },
+            Call::Chown { uid, gid, .. } => Call::Chown {
+                uid: *uid,
+                gid: *gid,
+                path,
+            },
+            Call::Lchown { uid, gid, .. } => Call::Lchown {
+                uid: *uid,
+                gid: *gid,
+                path,
+            },
+            Call::Mkfifo { mode, .. } => Call::Mkfifo { mode: *mode, path },
+            Call::Mknod { mode, dev, .. } => Call::Mknod {
+                mode: *mode,
+                dev: *dev,
+                path,
+            },
+            Call::Utimens {
+                atime,
+                mtime,
+                follow,
+                ..
+            } => Call::Utimens {
+                path,
+                atime: *atime,
+                mtime: *mtime,
+                follow: *follow,
+            },
+            Call::Lstat { .. } => Call::Lstat { path },
             Call::Symlink { target, .. } => Call::Symlink { path, target },
             _ => return Err(Errno::EINVAL),
         })
+    }
+
+    fn errno_from_status(status: i32) -> Errno {
+        if (-4095..0).contains(&status) {
+            Errno(u16::try_from(-status).unwrap_or(Errno::EIO.0))
+        } else {
+            Errno::EIO
+        }
     }
 
     fn status(response: &mut [u8], result: Result<(), Errno>) -> HandlerResult<usize> {
@@ -777,17 +879,25 @@ mod program {
                     let _ = client.close(root);
                     Ok(result?)
                 }
-                Call::Truncate { .. } => {
+                Call::Truncate { .. } | Call::Fchown { .. } => {
                     let stat = Client::new().fstat(target)?;
-                    if !creds.permitted(
-                        (stat.mode & 0o7777) as u16,
-                        stat.uid,
-                        stat.gid,
-                        ACCESS_WRITE,
-                    ) {
+                    if matches!(decoded.call, Call::Truncate { .. })
+                        && !creds.permitted(
+                            (stat.mode & 0o7777) as u16,
+                            stat.uid,
+                            stat.gid,
+                            ACCESS_WRITE,
+                        )
+                    {
                         return Err(Errno::EACCES.into());
                     }
                     Ok(proxy_call(&Client::new(), target, &decoded, response)?)
+                }
+                Call::Statvfs => Ok(proxy_call(&Client::new(), target, &decoded, response)?),
+                Call::Link { path, target } => {
+                    let path = self.absolute(&base, &bytes_to_string(path)?)?;
+                    let target = self.absolute(&base, &bytes_to_string(target)?)?;
+                    Ok(self.forward_link(&path, &target, response, creds)?)
                 }
                 Call::Rename { from, to } => {
                     let from = self.absolute(&base, &bytes_to_string(from)?)?;
@@ -818,7 +928,13 @@ mod program {
                 | Call::Rmdir { .. }
                 | Call::Symlink { .. }
                 | Call::Readlink { .. }
-                | Call::Chmod { .. } => {
+                | Call::Chmod { .. }
+                | Call::Chown { .. }
+                | Call::Lchown { .. }
+                | Call::Mkfifo { .. }
+                | Call::Mknod { .. }
+                | Call::Utimens { .. }
+                | Call::Lstat { .. } => {
                     Ok(self.forward_one(decoded.call, &base, response, creds)?)
                 }
             }

@@ -356,3 +356,13 @@ fn mount_defaults_twice_is_eexist() {
     table.mount_defaults().expect("defaults");
     assert_eq!(table.mount_defaults(), Err(Errno::EEXIST));
 }
+
+#[test]
+fn same_mount_uses_the_longest_prefix() {
+    let mut table = table();
+    table.mount("/tmp", "ramfs:").expect("tmp");
+    assert!(table.same_mount("/tmp/a", "/tmp/b").expect("tmp pair"));
+    assert!(!table.same_mount("/tmp/a", "/etc").expect("root pair"));
+    assert!(table.same_mount("/etc", "/etc/mounts").expect("root pair"));
+    assert_eq!(table.same_mount("relative", "/"), Err(Errno::EINVAL));
+}
