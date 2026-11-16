@@ -9,11 +9,14 @@ use raven_genet::filter::FilterError;
 use raven_genet::frame::{FrameError, ReclaimBudget, SlotOwner};
 use raven_genet::link::LinkEvent;
 use raven_genet::mac::MacAddress;
-use raven_genet::phy::{AUXSTS_RES_1000FD, BMSR_ACOMP, BMSR_LINK, Duplex, LinkError, Speed};
+use raven_genet::phy::{
+    AUXSTS_RES_1000FD, BMSR_ACOMP, BMSR_LINK, BRGPHY_MII_AUXSTS, Duplex, LinkError, MII_BMSR, Speed,
+};
 use raven_genet::recovery::{ErrorRecovery, RecoveryAction};
 use raven_genet::regs;
 use raven_genet::ring::{
-    RX_STATUS_BUFLEN_SHIFT, RX_STATUS_EOP, RX_STATUS_SOP, RxStatus, TX_STATUS_OWN, TxStatus,
+    RX_STATUS_BUFLEN_SHIFT, RX_STATUS_EOP, RX_STATUS_OWN, RX_STATUS_SOP, RxStatus, TX_STATUS_OWN,
+    TxStatus,
 };
 
 fn backend() -> FrameBackend<FakeSeam> {
@@ -381,5 +384,130 @@ fn the_frame_path_has_the_full_descriptor_count() {
     assert_eq!(
         backend.path().tx.free_slots(),
         Ok(regs::DESC_COUNT as usize)
+    );
+}
+
+#[test]
+fn independent_rx_and_tx_counts_are_accepted() {
+    let backend =
+        FrameBackend::with_counts(ready_controller(), 8, 3, 2).expect("independent counts");
+    assert_eq!(backend.path().rx.count(), 8);
+    assert_eq!(backend.path().tx.count(), 3);
+    assert_eq!(backend.path().rx.free_slots(), Ok(8));
+    assert_eq!(backend.path().tx.free_slots(), Ok(3));
+}
+
+#[test]
+fn descriptors_are_written_to_the_hardware_array() {
+    let mut backend = backend();
+    let rx = backend.post_rx_next().expect("rx post");
+    backend.write_rx_descriptor(rx).expect("rx write");
+    assert_eq!(
+        backend
+            .controller()
+            .seam
+            .register(regs::rx_desc_status(0).expect("status")),
+        RX_STATUS_OWN
+    );
+    assert_eq!(
+        backend
+            .controller()
+            .seam
+            .register(regs::rx_desc_address_lo(0).expect("address")),
+        0x1000
+    );
+
+    let tx = backend.queue_tx_address(0x9000, 64).expect("tx post");
+    backend.write_tx_descriptor(tx).expect("tx write");
+    let status = backend
+        .controller()
+        .seam
+        .register(regs::tx_desc_status(0).expect("status"));
+    assert_ne!(status & TX_STATUS_OWN, 0);
+    assert_eq!(
+        backend
+            .controller()
+            .seam
+            .register(regs::tx_desc_address_lo(0).expect("address")),
+        0x9000
+    );
+}
+
+#[test]
+fn consumer_status_reads_the_front_descriptor() {
+    let mut backend = backend();
+    let post = backend.post_rx_next().expect("post");
+    backend.write_rx_descriptor(post).expect("write");
+    assert!(backend.rx_consumer_status().expect("rx status").own());
+    let tx = backend.queue_tx_address(0x9000, 64).expect("tx post");
+    backend.write_tx_descriptor(tx).expect("tx write");
+    assert!(backend.tx_consumer_status().expect("tx status").own());
+}
+
+#[test]
+fn program_rings_writes_the_documented_pi4_setup() {
+    let mut backend = backend();
+    backend.program_rings().expect("rings");
+    let setup = Controller::<FakeSeam>::ring_setup();
+    let queue = regs::DEFAULT_QUEUE;
+    assert_eq!(
+        backend
+            .controller()
+            .seam
+            .register(regs::rx_dma_ring_buf_size(queue).expect("rx size")),
+        setup.buf_size
+    );
+    assert_eq!(
+        backend
+            .controller()
+            .seam
+            .register(regs::rx_dma_end_addr_lo(queue).expect("rx end")),
+        setup.end_address
+    );
+    assert_eq!(
+        backend.controller().seam.register(regs::RX_DMA_CTRL),
+        regs::RX_DMA_CTRL_EN | regs::rx_dma_ctrl_rbuf_en(queue)
+    );
+    assert_eq!(
+        backend
+            .controller()
+            .seam
+            .register(regs::tx_dma_ring_buf_size(queue).expect("tx size")),
+        setup.buf_size
+    );
+    assert_eq!(
+        backend.controller().seam.register(regs::TX_DMA_CTRL),
+        regs::TX_DMA_CTRL_EN | regs::tx_dma_ctrl_rbuf_en(queue)
+    );
+    assert_eq!(
+        backend.controller().seam.register(regs::RBUF_CTRL),
+        regs::RBUF_ALIGN_2B
+    );
+    let command = backend.controller().seam.register(regs::UMAC_CMD);
+    assert_eq!(
+        command & (regs::UMAC_CMD_RXEN | regs::UMAC_CMD_TXEN),
+        regs::UMAC_CMD_RXEN | regs::UMAC_CMD_TXEN
+    );
+}
+
+#[test]
+fn sample_link_reads_bmsr_and_auxsts() {
+    let mut controller = ready_controller();
+    controller.seam.set_mdio(MII_BMSR, BMSR_LINK | BMSR_ACOMP);
+    controller
+        .seam
+        .set_mdio(BRGPHY_MII_AUXSTS, AUXSTS_RES_1000FD);
+    let mut backend = FrameBackend::new(controller).expect("backend");
+    assert_eq!(
+        backend.sample_link(),
+        Ok((BMSR_LINK | BMSR_ACOMP, AUXSTS_RES_1000FD))
+    );
+    assert_eq!(backend.poll_link(), Ok(None));
+    assert_eq!(
+        backend.poll_link(),
+        Ok(Some(LinkEvent::Up {
+            speed: Speed::Thousand,
+            duplex: Duplex::Full,
+        }))
     );
 }

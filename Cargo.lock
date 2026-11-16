@@ -293,7 +293,9 @@ dependencies = [
  "raven-abi",
  "raven-driver",
  "raven-genet",
+ "raven-proto-fs",
  "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
