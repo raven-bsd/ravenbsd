@@ -1,0 +1,51 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt FIND 1
+.Os RavenBSD
+.Sh NAME
+.Nm find
+.Nd traverse a directory tree and select entries
+.Sh SYNOPSIS
+.Nm
+.Op Ar path ...
+.Op Fl name Ar pattern
+.Op Fl type Ar f|d|l
+.Op Fl perm Ar mode
+.Op Fl print
+.Sh DESCRIPTION
+The
+.Nm
+utility traverses each
+.Ar path
+(default
+.Pa . )
+and prints entries that match the predicates.
+Symbolic links are not followed, so a link loop cannot recurse.
+.Pp
+The predicates are:
+.Bl -tag -width Ds
+.It Fl name Ar pattern
+Match the final path component against a shell pattern with
+.Ql *
+and
+.Ql ? .
+.It Fl type Ar f|d|l
+Match a regular file, directory or symbolic link.
+.It Fl perm Ar mode
+Match the exact octal permission bits.
+.It Fl print
+Print matching paths; this is the default action.
+.El
+.Pp
+The optional
+.Fl exec
+action is not implemented; an unknown option is a usage error.
+.Sh EXIT STATUS
+.Ex -std
+A missing start path or traversal error exits with status 1; a usage error exits with status 2.
+.Sh SEE ALSO
+.Xr file 1 ,
+.Xr ls 1
+.Sh STANDARDS
+RavenBSD.
