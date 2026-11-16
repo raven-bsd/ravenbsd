@@ -910,6 +910,14 @@ name = "raven-cmdline"
 version = "0.1.0"
 
 [[package]]
+name = "raven-cmp"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-config"
 version = "0.1.0"
 dependencies = [
@@ -1001,6 +1009,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-diff"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-dmesg"
 version = "0.1.0"
 dependencies = [
@@ -1066,6 +1082,24 @@ version = "0.1.0"
 [[package]]
 name = "raven-fdt-lite"
 version = "0.1.0"
+
+[[package]]
+name = "raven-file"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
+name = "raven-find"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
 
 [[package]]
 name = "raven-frames"
@@ -1147,6 +1181,15 @@ dependencies = [
  "raven-abi",
  "raven-initfs",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-grep"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-regex",
+ "raven-rt",
+ "raven-tool-core",
 ]
 
 [[package]]
@@ -2115,6 +2158,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-proc-primitives"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-proc-registry"
 version = "0.1.0"
 dependencies = [
@@ -2722,6 +2773,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-strings"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-svc-manifest"
 version = "0.1.0"
 
@@ -2928,6 +2987,14 @@ name = "raven-usb-core"
 version = "0.1.0"
 dependencies = [
  "raven-rp1-xhci",
+]
+
+[[package]]
+name = "raven-usb-core-probe"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-usb-core",
 ]
 
 [[package]]

@@ -1,0 +1,111 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P2 process close-out. Present rows name executable kernel qtests already on master; waived rows
+# name the missing primitive. The P2e/P3 branches are not on this base, so no procd/tty claim is
+# made for rows that need them.
+
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "process.credential"
+status = "present"
+evidence = "qtest:proc-credentials"
+notes = "P2c: real/effective/saved uid-gid and supplementary groups; fork inherits"
+
+[[row]]
+id = "process.exec"
+status = "waived"
+evidence = "none"
+notes = "P2e: spawn is available, but same-pid image replacement needs PROC_RESET; not on this base"
+
+[[row]]
+id = "process.fork"
+status = "present"
+evidence = "qtest:proc-fork"
+notes = "P2b/P2f: COW fork, private/NOFORK pages and repeated fork/exit cycles"
+
+[[row]]
+id = "process.job-control"
+status = "waived"
+evidence = "none"
+notes = "P2f stop/continue and process groups are covered by proc-session, but the P3 tty foreground/terminal-owner branch is not on this base; no false combined claim"
+
+[[row]]
+id = "process.popen"
+status = "waived"
+evidence = "none"
+notes = "No pipe primitive or libc procd client on this base; P3/P17"
+
+[[row]]
+id = "process.posix-spawn"
+status = "waived"
+evidence = "none"
+notes = "Native spawn exists, but libc-spawn needs a built target sysroot and procd/libc wiring is not on this base"
+
+[[row]]
+id = "process.priority"
+status = "waived"
+evidence = "none"
+notes = "No scheduler priority syscall; PRIO/SCHED remain ENOSYS"
+
+[[row]]
+id = "process.process-group"
+status = "present"
+evidence = "qtest:proc-session"
+notes = "P2f: SETPGID/GETPGID, group signalling and session membership"
+
+[[row]]
+id = "process.process-id"
+status = "present"
+evidence = "qtest:proc-registry"
+notes = "P2b: monotonic pid registry, PROC_PID_INFO and PROC_HANDLE_INFO"
+
+[[row]]
+id = "process.resource"
+status = "present"
+evidence = "qtest:proc-session"
+notes = "P2f: 16 inherited limits; RLIMIT_NPROC enforced, other limits stored/returned"
+
+[[row]]
+id = "process.session"
+status = "present"
+evidence = "qtest:proc-session"
+notes = "P2f: SETSID/GETSID and session membership"
+
+[[row]]
+id = "process.signal"
+status = "present"
+evidence = "qtest:proc-signal"
+notes = "P2f: process queue, SIGCHLD, SIGKILL/stop/continue"
+
+[[row]]
+id = "process.system"
+status = "waived"
+evidence = "none"
+notes = "No pipe primitive or system()/shell client on this base; P3/P17"
+
+[[row]]
+id = "process.terminate"
+status = "present"
+evidence = "qtest:proc-session"
+notes = "P2f: SIGKILL terminates with the 137 exit status; SIGTERM/SIGINT queue through PROC_SIGNAL"
+
+[[row]]
+id = "process.times"
+status = "present"
+evidence = "qtest:proc-session"
+notes = "P2f: PROC_TIMES/PROC_GETRUSAGE; user time and extra counters are zero"
+
+[[row]]
+id = "process.tty-control"
+status = "waived"
+evidence = "none"
+notes = "P3/ttyd controlling terminal is not on this base"
+
+[[row]]
+id = "process.wait"
+status = "present"
+evidence = "qtest:proc-session"
+notes = "P2f: P_PID/P_PGID/P_ALL, WNOHANG/WUNTRACED/WCONTINUED and status encoding"

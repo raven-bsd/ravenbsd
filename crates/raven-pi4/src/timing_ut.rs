@@ -167,6 +167,35 @@ fn bus_width_arguments_match_the_sd_specification() {
 }
 
 #[test]
+fn the_speed_width_matrix_covers_one_and_four_bit_at_25_and_50_mhz() {
+    for width in [BusWidth::Bit1, BusWidth::Bit4] {
+        for speed in [SpeedMode::Default, SpeedMode::HighSpeed] {
+            let mut timing = Timing::new(50_000_000, SpecVersion::V3).expect("timing");
+            timing.switch_to_default().expect("default speed");
+            timing.set_bus_width(width).expect("bus width");
+            if speed == SpeedMode::HighSpeed {
+                timing.switch_to_high_speed().expect("high speed");
+            }
+            let plan = timing.clock_plan().expect("clock plan");
+            assert_eq!(plan.target_hz, speed.frequency_hz());
+            assert!(plan.actual_hz <= plan.target_hz);
+
+            let quirked = timing.host_control(Quirks::PI4_EMMC2, DmaMode::Pio);
+            assert_eq!(quirked & HOST_CONTROL_4BIT != 0, width == BusWidth::Bit4);
+            assert_eq!(quirked & HOST_CONTROL_HIGH_SPEED, 0);
+
+            let mut generic = Quirks::PI4_EMMC2;
+            generic.no_high_speed_bit = false;
+            let standard = timing.host_control(generic, DmaMode::Pio);
+            assert_eq!(
+                standard & HOST_CONTROL_HIGH_SPEED != 0,
+                speed == SpeedMode::HighSpeed
+            );
+        }
+    }
+}
+
+#[test]
 fn speed_steps_are_ordered_and_match_the_pi4_contract() {
     assert_eq!(PI4_SPEED_STEPS.len(), 3);
     assert_eq!(PI4_SPEED_STEPS[0].mode, SpeedMode::Identification);

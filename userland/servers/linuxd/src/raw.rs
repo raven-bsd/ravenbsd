@@ -17,7 +17,7 @@
 use linuxd::Region;
 use linuxd::Sys as _;
 use raven_abi::errno::Errno;
-use raven_abi::syscall::Syscall;
+use raven_abi::syscall::{Syscall, THREAD_CREATE_EX, ThreadCreateEx};
 use raven_abi::types::{Handle, Personality, Rights, map, prot};
 
 use crate::KernelSys;
@@ -28,6 +28,8 @@ const PREAD: usize = 0x6b;
 const PWRITE: usize = 0x6c;
 /// Raw `SEEK` (PG-22): `(handle, offset, whence) -> new offset`.
 const SEEK: usize = 0x6d;
+/// `PROC_FORK` (S50b) is a raw constant in the kernel, not part of `raven_abi::syscall`.
+const PROC_FORK: usize = 0x39;
 
 /// Register `name` and keep the returned scheme-server handle.
 pub fn scheme_register(name: &str) -> Result<Handle, Errno> {
@@ -158,6 +160,48 @@ pub fn seek_file(handle: Handle, offset: i64, whence: i32) -> Result<u64, Errno>
         )
     };
     Errno::from_ret(result).map(|value| value as u64)
+}
+/// Create a COW child of `source` (`PROC_FORK`); the child has no thread until one is created.
+pub fn proc_fork(source: Handle) -> Result<Handle, Errno> {
+    // SAFETY: PROC_FORK takes the source process handle and a zero flag word. `source` is the
+    // process linuxd loaded, which carries ADMIN; the kernel duplicates its address space and
+    // handles and returns the child with all rights.
+    let result = unsafe { raven_rt::sys::syscall2(PROC_FORK, source.0 as usize, 0) };
+    Errno::from_ret(result).map(|value| Handle(value as u32))
+}
+
+/// Create a user thread with the extended payload: TLS base, a local tid output and a
+/// clear-on-exit word in the target process.
+#[allow(clippy::too_many_arguments)]
+pub fn thread_create_ex(
+    process: Handle,
+    entry: usize,
+    stack_top: usize,
+    arg: usize,
+    tp: u64,
+    tid_out: &mut u32,
+    clear_tid: u64,
+) -> Result<Handle, Errno> {
+    let extended = ThreadCreateEx {
+        tp: usize::try_from(tp).map_err(|_| Errno::EINVAL)?,
+        tid_out: tid_out as *mut u32 as usize,
+        clear_tid_addr: usize::try_from(clear_tid).map_err(|_| Errno::EINVAL)?,
+    };
+    // SAFETY: THREAD_CREATE takes five scalar words plus a pointer to the live `ThreadCreateEx`
+    // below. The kernel validates the target handle, entry/stack VMAs, the TLS address, the local
+    // tid output and the target clear-tid word, then copies the payload before returning.
+    let result = unsafe {
+        raven_rt::sys::syscall6(
+            Syscall::THREAD_CREATE as usize,
+            process.0 as usize,
+            entry,
+            stack_top,
+            arg,
+            THREAD_CREATE_EX,
+            &extended as *const ThreadCreateEx as usize,
+        )
+    };
+    Errno::from_ret(result).map(|value| Handle(value as u32))
 }
 
 /// Copy `out.len()` child bytes at `address` into `out`.

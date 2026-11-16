@@ -185,7 +185,7 @@ src = "profiles/pi4-release.d/genet.manifest"
 path = "/etc/services.d/genet.toml"
 
 [[initfs.files]]
-src = "userland/servers/devd/drivers.toml"
+src = "profiles/pi4-release.d/drivers.conf"
 path = "/etc/drivers.toml"
 
 [[initfs.files]]

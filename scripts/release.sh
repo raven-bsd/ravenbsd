@@ -10,9 +10,9 @@
 #   scripts/release.sh --build       build the release image and manifest (requires --check)
 #   scripts/release.sh --verify      verify the files recorded in SHA256SUMS
 #
-# The script never creates a git tag. REL5d is blocked until REL2b (QEMU login), the Pi 4 board
-# chain (P8/P8b/P10/P12/REL3c), REL8 clean-clone verification and the full `make check` pass; the
-# owner creates the tag after reviewing this output.
+# The script never creates a git tag. REL5 is blocked until REL2b (QEMU login), REL3 (Pi 4
+# image/serial gate), REL4 (Pi 4 GENET ping), REL8 clean-clone verification and the full
+# `make check` pass; the owner creates the tag after reviewing this output.
 
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
@@ -158,12 +158,12 @@ case "$MODE" in
 	candidate)
 		log "candidate profile: $CANDIDATE_PROFILE (not the release profile)"
 		build_image "$CANDIDATE_PROFILE" "$OUT/candidate-$ARCH/ravenbsd-$ARCH.img" candidate
-		warn "candidate is not the 0.1.0 release artifact; the Pi 4 board chain (P8/P8b/P10/P12/REL3c) and full make check are still required"
+		warn "candidate is not the 0.1.0 release artifact; the Pi 4 board gate (REL3/REL4) and full make check are still required"
 		;;
 	build)
 		check_inputs
 		build_image "$PROFILE" "$OUT/ravenbsd-$ARCH.img" release
-		log "release not tagged: Pi 4 board chain (P8/P8b/P10/P12/REL3c) and full make check are the gate"
+		log "release not tagged: Pi 4 board gate (REL3/REL4) and full make check are the gate"
 		;;
 	verify)
 		[ -f "$OUT/SHA256SUMS" ] || die "no SHA256SUMS in $OUT"

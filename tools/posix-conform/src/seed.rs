@@ -198,6 +198,7 @@ const UTILITIES: &[&str] = &[
     "mesg",
     "mkdir",
     "mkfifo",
+    "mknod",
     "more",
     "mv",
     "neqn",
@@ -228,7 +229,9 @@ const UTILITIES: &[&str] = &[
     "qstat",
     "qsub",
     "read",
+    "readlink",
     "readonly",
+    "realpath",
     "renice",
     "return",
     "rm",
@@ -243,6 +246,7 @@ const UTILITIES: &[&str] = &[
     "sleep",
     "sort",
     "split",
+    "stat",
     "strings",
     "strip",
     "stty",
@@ -1412,8 +1416,19 @@ pub fn seed_profile(root: &Path) -> Result<Profile> {
 }
 
 /// Write the seed profile, traceability file and generated gap matrix.
+///
+/// The owner overlays under `docs/posix/evidence/` are merged after the derivation. Unsupported
+/// claims are ignored here; the gate reports them as failures.
 pub fn seed(root: &Path) -> Result<()> {
-    let profile = seed_profile(root)?;
+    let mut profile = seed_profile(root)?;
+    let overlay = crate::overlay::Overlay::load(root)?;
+    let outcome = overlay.apply(root, &mut profile);
+    for claim in &outcome.unsupported {
+        eprintln!(
+            "posix-conform: overlay row `{}` ignored: {}",
+            claim.id, claim.reason
+        );
+    }
     let trace = trace_from_profile(&profile);
     let dir = root.join("docs/posix");
     std::fs::create_dir_all(&dir).with_context(|| format!("cannot create {}", dir.display()))?;
