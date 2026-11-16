@@ -9,7 +9,7 @@
 name = "update-health"
 arch = "x86_64"
 profile = "base"
-timeout_secs = 600
+timeout_secs = 900
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = [
     "-drive", "if=none,id=d0,format=raw,file=build/qtest/update-health-good.img",

@@ -8,6 +8,6 @@ exec = "/sbin/vfsd"
 needs = ["logd", "initfsd", "ramfsd", "nulld", "zerod", "randd", "scheme:ufs"]
 provides = ["scheme:file"]
 readiness = "scheme"
-ready_timeout_ms = 60_000
+ready_timeout_ms = 300_000
 restart = "never"
 max_restarts = 0

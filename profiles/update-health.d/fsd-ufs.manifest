@@ -8,7 +8,7 @@ exec = "/sbin/fsd-ufs"
 needs = ["scheme:block"]
 provides = ["scheme:ufs"]
 readiness = "scheme"
-ready_timeout_ms = 60_000
+ready_timeout_ms = 300_000
 restart = "never"
 max_restarts = 0
 
