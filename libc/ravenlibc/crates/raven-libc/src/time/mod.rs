@@ -73,6 +73,7 @@ fn utc() -> raven_libc_time::TzState {
     raven_libc_time::TzState::utc()
 }
 
+mod clock_settime;
 mod localtime;
 mod nanosleep;
 mod strftime;

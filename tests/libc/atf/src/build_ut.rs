@@ -80,6 +80,25 @@ fn classify_a_missing_header() {
 }
 
 #[test]
+fn classify_a_quoted_missing_header() {
+    let text = "hello.c:1:10: fatal error: 'sys/atomic.h' file not found\n";
+    assert_eq!(classify(text), "missing-header:sys/atomic.h");
+}
+
+#[test]
+fn classify_the_lld_undefined_symbol() {
+    let text = "rust-lld: error: undefined symbol: warnx\n";
+    assert_eq!(classify(text), "missing-symbol:warnx");
+}
+
+#[test]
+fn the_clang_error_limit_is_not_a_header() {
+    let text =
+        "hello.c:1:10: fatal error: too many errors emitted, stopping now [-ferror-limit=]\n";
+    assert!(classify(text).starts_with("build-other:"));
+}
+
+#[test]
 fn classify_every_missing_symbol() {
     let text = "a.c:(.text+0x1): undefined reference to `foo'\nb.c:(.text+0x2): undefined reference to `bar'\n";
     let mut headers = BTreeSet::new();

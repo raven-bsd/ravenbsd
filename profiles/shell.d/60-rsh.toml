@@ -6,5 +6,16 @@ package = "raven-rsh"
 path = "/bin/rsh"
 
 [[initfs.files]]
+src = "build/brush"
+path = "/bin/brush"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "tests/brush/bash-compat.sh"
+path = "/etc/brush-compat.sh"
+mode = 0o755
+
+[[initfs.files]]
 src = "etc/services.d/rsh.toml"
 path = "/etc/services.d/rsh.toml"

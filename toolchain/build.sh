@@ -177,6 +177,21 @@ else
 	printf '%s\n' "$fingerprint" > "$src_stamp"
 fi
 
+# The aarch64 std build also compiles compiler-rt C sources. Bootstrap passes the
+# target's `CC` to the cc crate, so point it at the host cross compiler when one
+# is installed (see toolchain/README.md, "Cross compiler").
+if [ -z "${CC_aarch64_unknown_ravenbsd:-}" ]; then
+	for cc in aarch64-linux-gnu-gcc aarch64-unknown-linux-gnu-gcc; do
+		if command -v "$cc" >/dev/null 2>&1; then
+			export CC_aarch64_unknown_ravenbsd=$cc
+			if command -v aarch64-linux-gnu-ar >/dev/null 2>&1; then
+				export AR_aarch64_unknown_ravenbsd=aarch64-linux-gnu-ar
+			fi
+			break
+		fi
+	done
+fi
+
 # A prefix from an older stage or a failed install must not be mixed with the
 # new component set; the build tree stays incremental.
 rm -rf "$PREFIX"

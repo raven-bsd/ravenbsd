@@ -297,6 +297,7 @@ fn same_inputs_produce_the_same_image() {
 const CHILD: Handle = Handle(0x10);
 const MEMOBJ: Handle = Handle(0x20);
 const THREAD: Handle = Handle(0x30);
+const FILE: Handle = Handle(0x40);
 const SCRATCH: usize = 0x7000_0000;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -328,6 +329,11 @@ enum Call {
         stack_top: usize,
         arg: usize,
     },
+    ExecCred {
+        proc: u32,
+        file: u32,
+        nosuid: bool,
+    },
     HandleClose(u32),
     WriteParentMem {
         addr: usize,
@@ -349,6 +355,7 @@ struct Mock {
     fail_unmap: bool,
     fail_close: Option<u32>,
     fail_thread: bool,
+    fail_exec: bool,
     maps: usize,
     image: RefCell<Vec<u8>>,
 }
@@ -460,6 +467,19 @@ impl Sys for Mock {
             Err(Errno::EIO)
         } else {
             Ok(THREAD)
+        }
+    }
+
+    fn exec_cred(&mut self, proc: Handle, file: Handle, nosuid: bool) -> Result<(), Errno> {
+        self.push(Call::ExecCred {
+            proc: proc.0,
+            file: file.0,
+            nosuid,
+        });
+        if self.fail_exec {
+            Err(Errno::EIO)
+        } else {
+            Ok(())
         }
     }
 
@@ -1011,4 +1031,66 @@ fn image_spawn_rejects_an_oversized_image() {
     let error = spawn_image_with(&image, "/child", &options(&[], &[]), &mut mock).unwrap_err();
     assert_eq!(error, SpawnError::TooLarge);
     assert!(mock.calls().is_empty());
+}
+
+#[test]
+fn exec_spawn_applies_credentials_before_the_first_thread() {
+    let elf = child_elf(false, false);
+    let mut mock = Mock::default();
+    let child = spawn_image_with_exec(
+        &elf,
+        "/child",
+        &options(&["/child"], &[]),
+        FILE,
+        false,
+        &mut mock,
+    )
+    .unwrap();
+    assert_eq!(child, CHILD);
+    let calls = mock.calls();
+    let exec = calls
+        .iter()
+        .position(|call| matches!(call, Call::ExecCred { .. }))
+        .expect("exec credentials");
+    assert_eq!(
+        calls[exec],
+        Call::ExecCred {
+            proc: CHILD.0,
+            file: FILE.0,
+            nosuid: false,
+        }
+    );
+    assert!(matches!(
+        calls.get(exec + 1),
+        Some(Call::ThreadCreate { .. })
+    ));
+}
+
+#[test]
+fn exec_spawn_failure_closes_the_child_before_a_thread_starts() {
+    let elf = child_elf(false, false);
+    let mut mock = Mock {
+        fail_exec: true,
+        ..Mock::default()
+    };
+    let error = spawn_image_with_exec(
+        &elf,
+        "/child",
+        &options(&["/child"], &[]),
+        FILE,
+        true,
+        &mut mock,
+    )
+    .unwrap_err();
+    assert_eq!(error, SpawnError::Sys(Errno::EIO));
+    let calls = mock.calls();
+    assert!(matches!(
+        calls.last(),
+        Some(Call::HandleClose(handle)) if *handle == CHILD.0
+    ));
+    assert!(
+        !calls
+            .iter()
+            .any(|call| matches!(call, Call::ThreadCreate { .. }))
+    );
 }

@@ -3,11 +3,17 @@
 
 //! `vfsd`: the `file:` namespace server.
 //!
-//! It holds the mount table and forwards `OPEN` by attaching the owning
-//! filesystem server's handle (S25).  Path operations are proxied through
-//! `CALL`; reads and writes go directly to the attached server after `OPEN`.
-//! The `/` root handle is the one exception: its `READ` merges the root
-//! server's entries with the names of mounts directly below `/`.
+//! It holds the mount table and resolves every path to the owning filesystem
+//! server.  An `OPEN` creates a vfsd-owned open file description that keeps the
+//! target server's handle; `READ`, `WRITE`, `SEEK` and `CALL` are forwarded
+//! through it.  The `/` root description additionally merges the root server's
+//! entries with the names of mounts directly below `/`.
+//!
+//! The S25 open-attachment path is deliberately not used.  On aarch64 a handle
+//! attached from `fsd-ufs` returned `EBADF` on its first `READ` after vfsd closed
+//! its source handle, while the same stack passed on x86-64.  Keeping one stable
+//! target handle in vfsd until `CLOSE` gives identical semantics on both
+//! architectures and leaves the attachment protocol to servers that need it.
 
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
@@ -26,15 +32,13 @@ mod program {
     use raven_abi::errno::Errno;
     use raven_abi::types::Handle;
     use raven_proto_fs::{
-        Call, CallRequest, CallResponse, DIRENT_ALIGN, DIRENT_HEADER_LEN, DT_DIR, DirEntry,
-        DirEntryHeader, DirEntryIter, MAX_PATH, OpenFlags, S_IFDIR, S_IFMT, Stat,
-        WIRE_OPEN_DIRECTORY, normalize_request,
+        ACCESS_EXEC, ACCESS_READ, ACCESS_WRITE, Call, CallRequest, CallResponse, Credentials,
+        DIRENT_ALIGN, DIRENT_HEADER_LEN, DT_DIR, DirEntry, DirEntryHeader, DirEntryIter, MAX_PATH,
+        OpenFlags, S_IFDIR, S_IFMT, Stat, WIRE_OPEN_DIRECTORY, normalize_request,
     };
     use raven_rt::entry;
     use raven_rt::println;
-    use raven_scheme::{
-        Client, Ctx, Handler, HandlerResult, Kernel, OpenTable, Opened, RtKernel, Server,
-    };
+    use raven_scheme::{CallReply, Client, Ctx, Handler, HandlerResult, OpenTable, Opened, Server};
     use raven_vfs_core::{DEFAULT_MOUNTS, MountTable, normalized, parse_mounts};
 
     entry!(main);
@@ -43,55 +47,8 @@ mod program {
     const RETRIES: usize = 500;
     const RETRY_NS: u64 = 10_000_000;
     const BUFFER: usize = 4096;
-    /// Budget for root-proxy open-file descriptions.
+    /// Budget for proxy open-file descriptions.
     const MAX_OPEN_FILES: usize = 256;
-
-    /// The real kernel, plus vfsd's ownership rule for Open attachments.
-    ///
-    /// `Opened::Attach` hands the target handle to the client.  The reply send
-    /// installs a client-side duplicate of the same SchemeFile; vfsd's source
-    /// handle must then be closed.  The kernel SchemeFile keeps the server
-    /// reference alive through the client duplicate, so the target server does
-    /// not see a close until the client's last handle goes away.
-    #[derive(Clone, Copy, Debug, Default)]
-    struct VfsKernel {
-        inner: RtKernel,
-    }
-
-    impl Kernel for VfsKernel {
-        fn scheme_register(&self, name: &str) -> Result<(), Errno> {
-            self.inner.scheme_register(name)
-        }
-
-        fn recv(&self, packet: &mut [u8]) -> Result<Handle, Errno> {
-            self.inner.recv(packet)
-        }
-
-        fn recv_timeout(
-            &self,
-            packet: &mut [u8],
-            timeout_ms: u64,
-        ) -> Result<Option<Handle>, Errno> {
-            self.inner.recv_timeout(packet, timeout_ms)
-        }
-
-        fn send(&self, request: Handle, packet: &[u8]) -> Result<(), Errno> {
-            self.inner.send(request, packet)
-        }
-
-        fn send_attach(
-            &self,
-            request: Handle,
-            packet: &[u8],
-            attachments: &[raven_scheme::Attachment],
-        ) -> Result<(), Errno> {
-            let result = self.inner.send_attach(request, packet, attachments);
-            for attachment in attachments {
-                let _ = self.inner.close(Handle(attachment.handle));
-            }
-            result
-        }
-    }
 
     struct Proxy {
         target: Handle,
@@ -143,6 +100,85 @@ mod program {
             let normalized =
                 normalize_request(&absolute, &mut buffer).map_err(|error| error.errno())?;
             Ok((normalized.path.to_string(), normalized.requires_dir))
+        }
+
+        fn target_stat(&self, scheme: &str, suffix: &str) -> Result<Stat, Errno> {
+            let client = Client::new();
+            let path = format!("{scheme}{suffix}");
+            let handle = client.open(&path, READ)?;
+            let stat = client.fstat(handle);
+            let _ = client.close(handle);
+            stat
+        }
+
+        fn check_traverse(
+            &self,
+            scheme: &str,
+            suffix: &str,
+            creds: &Credentials,
+        ) -> Result<(), Errno> {
+            let mut prefix = String::new();
+            for component in suffix.split('/').filter(|component| !component.is_empty()) {
+                if !prefix.is_empty() {
+                    prefix.push('/');
+                }
+                prefix.push_str(component);
+                let stat = self.target_stat(scheme, &prefix)?;
+                if stat.mode & S_IFMT == S_IFDIR
+                    && !creds.permitted(
+                        (stat.mode & 0o7777) as u16,
+                        stat.uid,
+                        stat.gid,
+                        ACCESS_EXEC,
+                    )
+                {
+                    return Err(Errno::EACCES);
+                }
+            }
+            Ok(())
+        }
+
+        fn check_parent(
+            &self,
+            scheme: &str,
+            suffix: &str,
+            creds: &Credentials,
+        ) -> Result<(), Errno> {
+            let parent = parent_suffix(suffix);
+            self.check_traverse(scheme, parent, creds)?;
+            let stat = self.target_stat(scheme, parent)?;
+            if stat.mode & S_IFMT != S_IFDIR {
+                return Err(Errno::ENOTDIR);
+            }
+            if !creds.permitted(
+                (stat.mode & 0o7777) as u16,
+                stat.uid,
+                stat.gid,
+                ACCESS_WRITE | ACCESS_EXEC,
+            ) {
+                return Err(Errno::EACCES);
+            }
+            Ok(())
+        }
+
+        fn check_open(
+            &self,
+            scheme: &str,
+            suffix: &str,
+            creds: &Credentials,
+            flags: OpenFlags,
+        ) -> Result<(), Errno> {
+            if flags.create() {
+                self.check_parent(scheme, suffix, creds)?;
+                match self.target_stat(scheme, suffix) {
+                    Ok(stat) => return check_stat_access(creds, stat, flags),
+                    Err(Errno::ENOENT) => return Ok(()),
+                    Err(error) => return Err(error),
+                }
+            }
+            self.check_traverse(scheme, suffix, creds)?;
+            let stat = self.target_stat(scheme, suffix)?;
+            check_stat_access(creds, stat, flags)
         }
 
         fn build_root_listing(&self, target: Handle) -> Result<Vec<u8>, Errno> {
@@ -263,6 +299,7 @@ mod program {
             call: Call<'_>,
             base: &str,
             response: &mut [u8],
+            creds: &Credentials,
         ) -> Result<usize, Errno> {
             let raw = single_path(&call).ok_or(Errno::EINVAL)?;
             let path = self.absolute(base, &bytes_to_string(raw)?)?;
@@ -273,6 +310,30 @@ mod program {
                 .ok_or(Errno::ENOENT)?
                 .scheme
                 .clone();
+            match call {
+                Call::Mkdir { .. } | Call::Symlink { .. } => {
+                    self.check_parent(&scheme, suffix, creds)?;
+                }
+                Call::Unlink { .. } | Call::Rmdir { .. } => {
+                    self.check_parent(&scheme, suffix, creds)?;
+                    let target = self.target_stat(&scheme, suffix)?;
+                    let parent = self.target_stat(&scheme, parent_suffix(suffix))?;
+                    if !creds.sticky_delete_allowed((parent.mode & 0o7777) as u16, target.uid) {
+                        return Err(Errno::EPERM);
+                    }
+                }
+                Call::Readlink { .. } => {
+                    self.check_traverse(&scheme, parent_suffix(suffix), creds)?;
+                }
+                Call::Chmod { .. } => {
+                    self.check_traverse(&scheme, parent_suffix(suffix), creds)?;
+                    let target = self.target_stat(&scheme, suffix)?;
+                    if !creds.is_root() && creds.euid != target.uid {
+                        return Err(Errno::EPERM);
+                    }
+                }
+                _ => {}
+            }
             let client = Client::new();
             let root = client.open(&scheme, READ)?;
             let request = CallRequest::new(rebuild_single(&call, suffix.as_bytes())?);
@@ -286,6 +347,7 @@ mod program {
             from: &str,
             to: &str,
             response: &mut [u8],
+            creds: &Credentials,
         ) -> Result<usize, Errno> {
             self.table.rename(from, to)?;
             let (mount_id, suffix) = self.table.resolve(from)?;
@@ -296,6 +358,22 @@ mod program {
                 .ok_or(Errno::ENOENT)?
                 .scheme
                 .clone();
+            if self.table.resolve(from)?.0 != self.table.resolve(to)?.0 {
+                return Err(Errno::EXDEV);
+            }
+            self.check_parent(&scheme, suffix, creds)?;
+            self.check_parent(&scheme, to_suffix, creds)?;
+            let source = self.target_stat(&scheme, suffix)?;
+            let source_parent = self.target_stat(&scheme, parent_suffix(suffix))?;
+            if !creds.sticky_delete_allowed((source_parent.mode & 0o7777) as u16, source.uid) {
+                return Err(Errno::EPERM);
+            }
+            if let Ok(dest) = self.target_stat(&scheme, to_suffix) {
+                let dest_parent = self.target_stat(&scheme, parent_suffix(to_suffix))?;
+                if !creds.sticky_delete_allowed((dest_parent.mode & 0o7777) as u16, dest.uid) {
+                    return Err(Errno::EPERM);
+                }
+            }
             let client = Client::new();
             let root = client.open(&scheme, READ)?;
             let request = CallRequest::new(Call::Rename {
@@ -305,6 +383,32 @@ mod program {
             let result = proxy_call(&client, root, &request, response);
             let _ = client.close(root);
             result
+        }
+    }
+
+    fn parent_suffix(suffix: &str) -> &str {
+        let trimmed = suffix.trim_end_matches('/');
+        match trimmed.rsplit_once('/') {
+            Some((parent, _)) => parent,
+            None => "",
+        }
+    }
+
+    fn check_stat_access(creds: &Credentials, stat: Stat, flags: OpenFlags) -> Result<(), Errno> {
+        let mut want = 0;
+        if flags.readable() {
+            want |= ACCESS_READ;
+        }
+        if flags.writable() || flags.truncate() {
+            want |= ACCESS_WRITE;
+        }
+        if stat.mode & S_IFMT == S_IFDIR && flags.readable() {
+            want |= ACCESS_EXEC;
+        }
+        if creds.permitted((stat.mode & 0o7777) as u16, stat.uid, stat.gid, want) {
+            Ok(())
+        } else {
+            Err(Errno::EACCES)
         }
     }
 
@@ -324,6 +428,72 @@ mod program {
         core::str::from_utf8(bytes)
             .map(str::to_string)
             .map_err(|_| Errno::EINVAL)
+    }
+
+    /// Forward a read through a local buffer.
+    ///
+    /// The client buffer is a kernel capture mapped into `vfsd`, and the kernel
+    /// cannot capture that window again for the target server: `capture::create`
+    /// looks the source up in the VMA tree and returns `EFAULT`.  Stage the data
+    /// through a stack buffer owned by `vfsd` instead.  `offset` selects a
+    /// positional read; `None` advances the target's cursor.
+    fn copy_read(
+        client: &Client,
+        target: Handle,
+        offset: Option<u64>,
+        buffer: &mut [u8],
+    ) -> Result<usize, Errno> {
+        let mut scratch = [0u8; BUFFER];
+        let mut done = 0usize;
+        while done < buffer.len() {
+            let capacity = (buffer.len() - done).min(scratch.len());
+            let read = match offset {
+                Some(base) => {
+                    let position = base.checked_add(done as u64).ok_or(Errno::EOVERFLOW)?;
+                    client.pread(target, position, &mut scratch[..capacity])?
+                }
+                None => client.read(target, 0, &mut scratch[..capacity])?,
+            };
+            if read > capacity {
+                return Err(Errno::EPROTO);
+            }
+            buffer[done..done + read].copy_from_slice(&scratch[..read]);
+            done += read;
+            if read < capacity {
+                break;
+            }
+        }
+        Ok(done)
+    }
+
+    /// Forward a write through a local buffer; see [`copy_read`].
+    fn copy_write(
+        client: &Client,
+        target: Handle,
+        offset: Option<u64>,
+        buffer: &[u8],
+    ) -> Result<usize, Errno> {
+        let mut scratch = [0u8; BUFFER];
+        let mut done = 0usize;
+        while done < buffer.len() {
+            let capacity = (buffer.len() - done).min(scratch.len());
+            scratch[..capacity].copy_from_slice(&buffer[done..done + capacity]);
+            let written = match offset {
+                Some(base) => {
+                    let position = base.checked_add(done as u64).ok_or(Errno::EOVERFLOW)?;
+                    client.pwrite(target, position, &scratch[..capacity])?
+                }
+                None => client.write(target, 0, &scratch[..capacity])?,
+            };
+            if written > capacity {
+                return Err(Errno::EPROTO);
+            }
+            done += written;
+            if written < capacity {
+                break;
+            }
+        }
+        Ok(done)
     }
 
     /// Forward a small control reply through a local buffer.
@@ -375,7 +545,7 @@ mod program {
             path: &str,
             flags: OpenFlags,
             _mode: u32,
-            _ctx: &Ctx,
+            ctx: &Ctx,
         ) -> HandlerResult<Opened> {
             let (path, requires_dir) = self.normalize_request_path(path)?;
             let directory = requires_dir || flags.directory();
@@ -389,6 +559,7 @@ mod program {
                 .scheme
                 .clone();
             let target_path = format!("{scheme}{suffix}");
+            self.check_open(&scheme, suffix, &ctx.credentials, target_flags)?;
             let client = Client::new();
             let target = client.open_flags(&target_path, target_flags)?;
             if directory || path == "/" {
@@ -404,25 +575,21 @@ mod program {
                     return Err(Errno::ENOTDIR.into());
                 }
             }
-            if path == "/" {
-                if self.opens.len() >= MAX_OPEN_FILES {
-                    let _ = client.close(target);
-                    return Err(Errno::EMFILE.into());
-                }
-                let id = self.opens.insert(
-                    Proxy {
-                        target,
-                        path,
-                        root_listing: true,
-                        merged: None,
-                        mount_generation: self.mount_generation,
-                    },
-                    flags,
-                )?;
-                Ok(Opened::File(id))
-            } else {
-                Ok(Opened::Attach(target))
+            if self.opens.len() >= MAX_OPEN_FILES {
+                let _ = client.close(target);
+                return Err(Errno::EMFILE.into());
             }
+            let id = self.opens.insert(
+                Proxy {
+                    target,
+                    root_listing: path == "/",
+                    path,
+                    merged: None,
+                    mount_generation: self.mount_generation,
+                },
+                flags,
+            )?;
+            Ok(Opened::File(id))
         }
 
         fn read(&mut self, file: u64, offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
@@ -436,7 +603,7 @@ mod program {
             if root {
                 Ok(self.read_root(file, buffer)?)
             } else {
-                Ok(Client::new().read(target, 0, buffer)?)
+                Ok(copy_read(&Client::new(), target, None, buffer)?)
             }
         }
 
@@ -445,7 +612,7 @@ mod program {
                 return Err(Errno::EINVAL.into());
             }
             let target = self.opens.get(file).ok_or(Errno::EBADF)?.file.target;
-            Ok(Client::new().write(target, 0, buffer)?)
+            Ok(copy_write(&Client::new(), target, None, buffer)?)
         }
 
         fn pread(&mut self, file: u64, offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
@@ -456,7 +623,7 @@ mod program {
             if root {
                 Ok(self.root_explicit(file, offset, buffer)?)
             } else {
-                Ok(Client::new().pread(target, offset, buffer)?)
+                Ok(copy_read(&Client::new(), target, Some(offset), buffer)?)
             }
         }
 
@@ -468,7 +635,7 @@ mod program {
             if root {
                 return Err(Errno::EISDIR.into());
             }
-            Ok(Client::new().pwrite(target, offset, buffer)?)
+            Ok(copy_write(&Client::new(), target, Some(offset), buffer)?)
         }
 
         fn seek(&mut self, file: u64, offset: i64, whence: u32) -> HandlerResult<u64> {
@@ -528,6 +695,29 @@ mod program {
         }
 
         fn call(&mut self, file: u64, request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {
+            self.call_checked(file, request, response, &Credentials::ROOT)
+        }
+
+        fn call_with(
+            &mut self,
+            file: u64,
+            request: &[u8],
+            response: &mut [u8],
+            ctx: &Ctx,
+        ) -> HandlerResult<CallReply> {
+            let written = self.call_checked(file, request, response, &ctx.credentials)?;
+            Ok(CallReply::new(written))
+        }
+    }
+
+    impl VfsHandler {
+        fn call_checked(
+            &mut self,
+            file: u64,
+            request: &[u8],
+            response: &mut [u8],
+            creds: &Credentials,
+        ) -> HandlerResult<usize> {
             let (target, base) = {
                 let entry = self.opens.get(file).ok_or(Errno::EBADF)?;
                 (entry.file.target, entry.file.path.clone())
@@ -535,6 +725,9 @@ mod program {
             let decoded = CallRequest::decode(request).map_err(|_| Errno::EPROTO)?;
             match decoded.call {
                 Call::Mount { path, scheme } => {
+                    if !creds.is_root() {
+                        return Err(Errno::EPERM.into());
+                    }
                     let path = bytes_to_string(path)?;
                     let path = normalized(&path)?;
                     let scheme = bytes_to_string(scheme)?;
@@ -543,6 +736,9 @@ mod program {
                     status(response, Ok(()))
                 }
                 Call::Umount { path } => {
+                    if !creds.is_root() {
+                        return Err(Errno::EPERM.into());
+                    }
                     let path = bytes_to_string(path)?;
                     let path = normalized(&path)?;
                     self.table.umount(&path, 0)?;
@@ -582,19 +778,49 @@ mod program {
                     Ok(result?)
                 }
                 Call::Truncate { .. } => {
+                    let stat = Client::new().fstat(target)?;
+                    if !creds.permitted(
+                        (stat.mode & 0o7777) as u16,
+                        stat.uid,
+                        stat.gid,
+                        ACCESS_WRITE,
+                    ) {
+                        return Err(Errno::EACCES.into());
+                    }
                     Ok(proxy_call(&Client::new(), target, &decoded, response)?)
                 }
                 Call::Rename { from, to } => {
                     let from = self.absolute(&base, &bytes_to_string(from)?)?;
                     let to = self.absolute(&base, &bytes_to_string(to)?)?;
-                    Ok(self.forward_rename(&from, &to, response)?)
+                    Ok(self.forward_rename(&from, &to, response, creds)?)
+                }
+                Call::Access { mode, path } => {
+                    let path = self.absolute(&base, &bytes_to_string(path)?)?;
+                    let (mount_id, suffix) = self.table.resolve(&path)?;
+                    let scheme = self
+                        .table
+                        .get(mount_id)
+                        .ok_or(Errno::ENOENT)?
+                        .scheme
+                        .clone();
+                    self.check_traverse(&scheme, suffix, creds)?;
+                    let stat = self.target_stat(&scheme, suffix)?;
+                    let allowed = creds.permitted(
+                        (stat.mode & 0o7777) as u16,
+                        stat.uid,
+                        stat.gid,
+                        mode as u16,
+                    );
+                    status(response, if allowed { Ok(()) } else { Err(Errno::EACCES) })
                 }
                 Call::Mkdir { .. }
                 | Call::Unlink { .. }
                 | Call::Rmdir { .. }
                 | Call::Symlink { .. }
                 | Call::Readlink { .. }
-                | Call::Chmod { .. } => Ok(self.forward_one(decoded.call, &base, response)?),
+                | Call::Chmod { .. } => {
+                    Ok(self.forward_one(decoded.call, &base, response, creds)?)
+                }
             }
         }
     }
@@ -659,7 +885,7 @@ mod program {
             println!("vfsd: no root mount");
             return 3;
         }
-        let mut server = match Server::register_with(VfsKernel::default(), "file") {
+        let mut server = match Server::register("file") {
             Ok(server) => server,
             Err(error) => {
                 println!("vfsd: register: {}", error.description());

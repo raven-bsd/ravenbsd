@@ -18,9 +18,16 @@ use linuxd::Region;
 use linuxd::Sys as _;
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
-use raven_abi::types::{Handle, Personality, map, prot};
+use raven_abi::types::{Handle, Personality, Rights, map, prot};
 
 use crate::KernelSys;
+
+/// Raw `PREAD` (PG-22): `(handle, buffer, len, offset) -> bytes`.
+const PREAD: usize = 0x6b;
+/// Raw `PWRITE` (PG-22): `(handle, buffer, len, offset) -> bytes`.
+const PWRITE: usize = 0x6c;
+/// Raw `SEEK` (PG-22): `(handle, offset, whence) -> new offset`.
+const SEEK: usize = 0x6d;
 
 /// Register `name` and keep the returned scheme-server handle.
 pub fn scheme_register(name: &str) -> Result<Handle, Errno> {
@@ -66,6 +73,91 @@ pub fn set_tls(thread: Handle, base: u64) -> Result<(), Errno> {
         )
     };
     Errno::from_ret(result).map(|_| ())
+}
+
+/// Open a `file:`/`ufs:` scheme path with Linux `open` flags.
+///
+/// `raven_rt::fs::s11_flags` maps the Linux flag word to the S11 wire flags the scheme servers
+/// expect; the kernel performs the server `OPEN` and returns the scheme-file handle.
+pub fn open_file(path: &str, flags: i32) -> Result<Handle, Errno> {
+    // The S11 open flags cover access, create/truncate/append, directory and no-follow. The
+    // descriptor/status bits are handled by linuxd's own descriptor table.
+    let flags = flags
+        & !(linuxd::files::O_CLOEXEC
+            | linuxd::files::O_NONBLOCK
+            | linuxd::files::O_LARGEFILE
+            | linuxd::files::O_NOCTTY);
+    let wire = raven_rt::fs::s11_flags(flags as u32)?;
+    raven_rt::sys::open(path, wire)
+}
+
+/// Read from a scheme file at its cursor.
+pub fn read_file(handle: Handle, buffer: &mut [u8]) -> Result<usize, Errno> {
+    raven_rt::sys::read(handle, buffer)
+}
+
+/// Write to a scheme file at its cursor.
+pub fn write_file(handle: Handle, buffer: &[u8]) -> Result<usize, Errno> {
+    raven_rt::sys::write(handle, buffer)
+}
+
+/// Close a scheme file.
+pub fn close_file(handle: Handle) -> Result<(), Errno> {
+    raven_rt::sys::close(handle)
+}
+
+/// Duplicate a scheme file with all rights; the kernel intersects them with the original.
+pub fn dup_file(handle: Handle) -> Result<Handle, Errno> {
+    raven_rt::sys::dup(handle, Rights::ALL.bits())
+}
+
+/// Positional read; the scheme cursor does not move.
+pub fn pread_file(handle: Handle, offset: u64, buffer: &mut [u8]) -> Result<usize, Errno> {
+    // SAFETY: PREAD takes the scheme handle, a writable buffer of `buffer.len()` bytes and the
+    // scalar offset. The kernel validates the handle rights and copies at most `len` bytes into
+    // the buffer.
+    let result = unsafe {
+        raven_rt::sys::syscall4(
+            PREAD,
+            handle.0 as usize,
+            buffer.as_mut_ptr() as usize,
+            buffer.len(),
+            offset as usize,
+        )
+    };
+    Errno::from_ret(result)
+}
+
+/// Positional write; the scheme cursor does not move.
+pub fn pwrite_file(handle: Handle, offset: u64, buffer: &[u8]) -> Result<usize, Errno> {
+    // SAFETY: PWRITE takes the scheme handle, a readable buffer of `buffer.len()` bytes and the
+    // scalar offset; the kernel validates the handle rights and copies at most `len` bytes from
+    // the buffer.
+    let result = unsafe {
+        raven_rt::sys::syscall4(
+            PWRITE,
+            handle.0 as usize,
+            buffer.as_ptr() as usize,
+            buffer.len(),
+            offset as usize,
+        )
+    };
+    Errno::from_ret(result)
+}
+
+/// Move a scheme file's cursor and return the new offset.
+pub fn seek_file(handle: Handle, offset: i64, whence: i32) -> Result<u64, Errno> {
+    // SAFETY: SEEK takes the scheme handle and two scalar words; the kernel validates the handle
+    // and the whence value.
+    let result = unsafe {
+        raven_rt::sys::syscall3(
+            SEEK,
+            handle.0 as usize,
+            offset as usize,
+            usize::try_from(whence).map_err(|_| Errno::EINVAL)?,
+        )
+    };
+    Errno::from_ret(result).map(|value| value as u64)
 }
 
 /// Copy `out.len()` child bytes at `address` into `out`.

@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# One getty on the console. It needs the tty scheme from consd and the
+# initfs/ramfs/vfs services for the account files and /bin/login.
+
+name = "getty"
+exec = "/bin/getty"
+needs = ["consd", "vfsd", "ramfsd", "initfsd"]
+restart = "on-failure"
+grants = ["initfs"]

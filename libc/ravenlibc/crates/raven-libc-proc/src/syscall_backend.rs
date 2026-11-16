@@ -9,7 +9,7 @@
 
 use alloc::vec::Vec;
 
-use crate::backend::{ProcBackend, WaitResult};
+use crate::backend::{EarlySpawn, ProcBackend, WaitResult};
 use crate::ids::SetCred;
 use crate::local_backend::LocalBackend;
 use crate::wire::{ExecRequest, ForkRequest, SpawnRequest};
@@ -100,6 +100,15 @@ impl<S: Syscall> SyscallBackend<S> {
         Self {
             sys,
             local: LocalBackend::new(None),
+        }
+    }
+
+    /// Wrap a syscall implementation with the P9a native spawner.
+    #[must_use]
+    pub const fn with_spawner(sys: S, spawner: &'static dyn EarlySpawn) -> Self {
+        Self {
+            sys,
+            local: LocalBackend::new(Some(spawner)),
         }
     }
 

@@ -3,7 +3,7 @@
 
 //! USB HID boot-protocol keyboard reports.
 
-use crate::keymap::{CAPS_LOCK, MODIFIER_FIRST, key_to_ascii};
+use crate::keymap::{CAPS_LOCK, Layout, MODIFIER_FIRST, NUM_LOCK, key_to_ascii_layout};
 
 /// Boot-protocol keyboard report length.
 pub const BOOT_REPORT_LEN: usize = 8;
@@ -84,23 +84,50 @@ impl KeyEvents {
     }
 }
 
-/// Keyboard state: previous report, caps lock and modifier state.
+/// Keyboard state: previous report, modifiers, locks and layout.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Keyboard {
     modifiers: u8,
     keys: [u8; 6],
     caps: bool,
+    num_lock: bool,
+    layout: Layout,
 }
 
 impl Keyboard {
-    /// A fresh keyboard with no keys held.
+    /// A fresh US keyboard with no keys held.
     #[must_use]
     pub const fn new() -> Self {
         Self {
             modifiers: 0,
             keys: [0; 6],
             caps: false,
+            num_lock: false,
+            layout: Layout::Us,
         }
+    }
+
+    /// A fresh keyboard with the selected layout.
+    #[must_use]
+    pub const fn with_layout(layout: Layout) -> Self {
+        Self {
+            modifiers: 0,
+            keys: [0; 6],
+            caps: false,
+            num_lock: false,
+            layout,
+        }
+    }
+
+    /// The active layout.
+    #[must_use]
+    pub const fn layout(&self) -> Layout {
+        self.layout
+    }
+
+    /// Select the layout for subsequent reports.
+    pub fn set_layout(&mut self, layout: Layout) {
+        self.layout = layout;
     }
 
     /// The current modifier bitmap.
@@ -115,10 +142,47 @@ impl Keyboard {
         self.caps
     }
 
+    /// True when Num Lock is active.
+    #[must_use]
+    pub const fn num_lock(&self) -> bool {
+        self.num_lock
+    }
+
+    /// True while either Shift bit is held.
+    #[must_use]
+    pub const fn shift(&self) -> bool {
+        crate::keymap::shift(self.modifiers)
+    }
+
+    /// True while either Control bit is held.
+    #[must_use]
+    pub const fn control(&self) -> bool {
+        crate::keymap::control(self.modifiers)
+    }
+
+    /// True while Left Alt is held.
+    #[must_use]
+    pub const fn alt(&self) -> bool {
+        crate::keymap::alt(self.modifiers)
+    }
+
+    /// True while Right Alt (AltGr) is held.
+    #[must_use]
+    pub const fn altgr(&self) -> bool {
+        crate::keymap::altgr(self.modifiers)
+    }
+
+    /// True while either GUI bit is held.
+    #[must_use]
+    pub const fn gui(&self) -> bool {
+        crate::keymap::gui(self.modifiers)
+    }
+
     /// Decode one report and return the key transitions.
     ///
-    /// An ErrorRollOver report is ignored without changing the held-key state. A Caps Lock press
-    /// toggles the state before the ASCII of every other key in the same report is computed.
+    /// An ErrorRollOver report is ignored without changing the held-key state. Caps Lock and Num
+    /// Lock toggle on their press before the ASCII of every other key in the same report is
+    /// computed.
     pub fn update(&mut self, report: &BootReport) -> KeyEvents {
         let mut events = KeyEvents::default();
         if report.is_rollover() {
@@ -126,6 +190,9 @@ impl Keyboard {
         }
         if report.keys.contains(&CAPS_LOCK) && !self.keys.contains(&CAPS_LOCK) {
             self.caps = !self.caps;
+        }
+        if report.keys.contains(&NUM_LOCK) && !self.keys.contains(&NUM_LOCK) {
+            self.num_lock = !self.num_lock;
         }
         let changed = self.modifiers ^ report.modifiers;
         let mut bit = 0u8;
@@ -140,15 +207,13 @@ impl Keyboard {
             bit = bit.saturating_add(1);
         }
         self.modifiers = report.modifiers;
-        let shift = report.shift();
-        let control = report.modifiers & 0x11 != 0;
 
         for key in self.keys {
             if key != 0 && !report.keys.contains(&key) {
                 events.push(KeyEvent {
                     usage: key,
                     pressed: false,
-                    ascii: translate(key, shift, self.caps, control),
+                    ascii: translate(key, self.modifiers, self.caps, self.num_lock, self.layout),
                 });
             }
         }
@@ -157,7 +222,7 @@ impl Keyboard {
                 events.push(KeyEvent {
                     usage: key,
                     pressed: true,
-                    ascii: translate(key, shift, self.caps, control),
+                    ascii: translate(key, self.modifiers, self.caps, self.num_lock, self.layout),
                 });
             }
         }
@@ -166,18 +231,9 @@ impl Keyboard {
     }
 }
 
-/// ASCII for one usage, with the control-letter mapping.
-fn translate(usage: u8, shift: bool, caps: bool, control: bool) -> Option<u8> {
-    let ascii = key_to_ascii(usage, shift, caps)?;
-    if control && ascii.is_ascii_alphabetic() {
-        return Some(
-            ascii
-                .to_ascii_lowercase()
-                .wrapping_sub(b'a')
-                .wrapping_add(1),
-        );
-    }
-    Some(ascii)
+/// ASCII for one usage under the current layout, modifiers and locks.
+fn translate(usage: u8, modifiers: u8, caps: bool, num_lock: bool, layout: Layout) -> Option<u8> {
+    key_to_ascii_layout(usage, layout, modifiers, caps, num_lock)
 }
 
 #[cfg(test)]

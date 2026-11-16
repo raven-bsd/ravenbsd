@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "pi4-xhci"
+version = "0.1.0"
+description = "Pi 4 xHCI userspace driver: BAR/DMA/IRQ, rings and S61/S62 keyboard integration."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "pi4-xhci"
+path = "src/main.rs"
+
+[dependencies]
+raven-pi4-xhci = { path = "../../../crates/raven-pi4-xhci" }
+raven-usb-core = { path = "../../../crates/raven-usb-core" }
+raven-usb-hid = { path = "../../../crates/raven-usb-hid" }
+raven-xhci = { path = "../../../crates/raven-xhci" }
+usb-hid = { path = "../usb-hid" }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-driver = { path = "../../../crates/raven-driver" }
+raven-rt = { path = "../../rt", features = ["alloc"] }
+
+[lints]
+workspace = true

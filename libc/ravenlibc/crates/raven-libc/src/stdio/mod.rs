@@ -21,4 +21,5 @@ pub(crate) mod vprintf;
 pub(crate) mod vsnprintf;
 pub(crate) mod vsprintf;
 pub(crate) mod vsscanf;
+#[path = "fgetwc.rs"]
 pub(crate) mod wide;

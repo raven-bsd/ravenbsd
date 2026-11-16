@@ -23,6 +23,7 @@ pub mod event;
 pub mod fs;
 pub mod initfs;
 pub mod print;
+pub mod proc;
 pub mod spawn;
 mod spawn_error;
 pub mod sync;

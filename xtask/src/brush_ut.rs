@@ -14,10 +14,15 @@ fn build_brush_requires_an_arch() {
 }
 
 #[test]
-fn build_brush_parses_the_arch_and_release() {
-    let options = parse_build(&args(&["--arch", "x86_64", "--release"])).unwrap();
+fn build_brush_defaults_to_release() {
+    let options = parse_build(&args(&["--arch", "x86_64"])).unwrap();
     assert_eq!(options.arch, Arch::X86_64);
     assert!(options.release);
+    assert!(
+        !parse_build(&args(&["--arch", "x86_64", "--debug"]))
+            .unwrap()
+            .release
+    );
 }
 
 #[test]
@@ -25,6 +30,13 @@ fn build_brush_maps_every_target() {
     assert_eq!(target_for(Arch::X86_64), "x86_64-unknown-ravenbsd");
     assert_eq!(target_for(Arch::Aarch64), "aarch64-unknown-ravenbsd");
     assert_eq!(target_for(Arch::Riscv64), "riscv64gc-unknown-ravenbsd");
+}
+
+#[test]
+fn brush_stages_the_arch_path_only() {
+    assert_eq!(staged_for(Arch::X86_64), "build/x86_64/brush");
+    assert_eq!(staged_for(Arch::Aarch64), "build/aarch64/brush");
+    assert_eq!(staged_for(Arch::Riscv64), "build/riscv64/brush");
 }
 
 #[test]

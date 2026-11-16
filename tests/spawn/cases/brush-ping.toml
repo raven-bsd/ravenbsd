@@ -1,0 +1,73 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P9 planning sketch, not an active qtest case. P13 moves this to tests/qtest/cases/.
+# It proves a second, non-libc binary and the net:icmp scheme from a spawned child.
+
+name = "spawn-ping"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 600
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
+
+[[expect]]
+regex = '^ping: 1 packets transmitted, 1 received, 0% packet loss$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|ping: .*timeout|Function not implemented'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "/bin/brush -c '/sbin/ping -c 1 10.0.2.2'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^ping: 10\.0\.2\.2 seq=1 rtt=[0-9]+ms$'
+timeout_secs = 60
+
+[[step]]
+wait = '^ping: 1 packets transmitted, 1 received, 0% packet loss$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

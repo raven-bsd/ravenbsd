@@ -41,6 +41,8 @@ pub const OP_MOUNT: u16 = 10;
 pub const OP_UMOUNT: u16 = 11;
 /// `STATFS`; no paths.
 pub const OP_STATFS: u16 = 12;
+/// `ACCESS(mode)` followed by one path.
+pub const OP_ACCESS: u16 = 13;
 
 /// Encoded size of a [`StatFs`] payload in bytes.
 pub const STATFS_LEN: usize = 36;
@@ -112,6 +114,13 @@ pub enum Call<'a> {
     },
     /// Read filesystem statistics.
     Statfs,
+    /// Check access bits (`R`/`W`/`X`) at `path` for the caller.
+    Access {
+        /// Requested access bits: 4 read, 2 write, 1 execute.
+        mode: u32,
+        /// Path relative to the directory handle.
+        path: &'a [u8],
+    },
 }
 
 impl Call<'_> {
@@ -130,6 +139,7 @@ impl Call<'_> {
             Self::Mount { .. } => OP_MOUNT,
             Self::Umount { .. } => OP_UMOUNT,
             Self::Statfs => OP_STATFS,
+            Self::Access { .. } => OP_ACCESS,
         }
     }
 
@@ -137,6 +147,7 @@ impl Call<'_> {
     const fn args(&self) -> (u32, u32) {
         match self {
             Self::Mkdir { mode, .. } | Self::Chmod { mode, .. } => (*mode, 0),
+            Self::Access { mode, .. } => (*mode, 0),
             Self::Truncate { size } => (*size as u32, (*size >> 32) as u32),
             _ => (0, 0),
         }
@@ -151,6 +162,7 @@ impl Call<'_> {
             | Self::Readlink { path }
             | Self::Chmod { path, .. }
             | Self::Umount { path } => (Some(path), None),
+            Self::Access { path, .. } => (Some(path), None),
             Self::Rename { from, to } => (Some(from), Some(to)),
             Self::Symlink { path, target } => (Some(path), Some(target)),
             Self::Mount { path, scheme } => (Some(path), Some(scheme)),
@@ -261,6 +273,10 @@ impl<'a> CallRequest<'a> {
                 path: first.ok_or(ProtoError::Truncated)?,
             },
             OP_STATFS => Call::Statfs,
+            OP_ACCESS => Call::Access {
+                mode: arg0,
+                path: first.ok_or(ProtoError::Truncated)?,
+            },
             _ => return Err(ProtoError::UnknownOp(op)),
         };
         Ok(Self { flags, call })
@@ -405,7 +421,7 @@ impl<'a> CallResponse<'a> {
                 })
             }
             OP_MKDIR | OP_UNLINK | OP_RMDIR | OP_RENAME | OP_TRUNCATE | OP_SYMLINK | OP_CHMOD
-            | OP_SYNC | OP_MOUNT | OP_UMOUNT => {
+            | OP_SYNC | OP_MOUNT | OP_UMOUNT | OP_ACCESS => {
                 if !reader.is_empty() {
                     return Err(ProtoError::TrailingBytes);
                 }
@@ -418,7 +434,7 @@ impl<'a> CallResponse<'a> {
 
 const fn path_count(op: u16) -> Option<usize> {
     match op {
-        OP_MKDIR | OP_UNLINK | OP_RMDIR | OP_READLINK | OP_CHMOD | OP_UMOUNT => Some(1),
+        OP_MKDIR | OP_UNLINK | OP_RMDIR | OP_READLINK | OP_CHMOD | OP_UMOUNT | OP_ACCESS => Some(1),
         OP_RENAME | OP_SYMLINK | OP_MOUNT => Some(2),
         OP_TRUNCATE | OP_SYNC | OP_STATFS => Some(0),
         _ => None,
@@ -653,6 +669,10 @@ mod tests {
             },
             Call::Umount { path: b"/tmp" },
             Call::Statfs,
+            Call::Access {
+                mode: 1,
+                path: b"f",
+            },
         ];
         for call in calls {
             let request = CallRequest {
@@ -906,10 +926,11 @@ mod tests {
             OP_MOUNT,
             OP_UMOUNT,
             OP_STATFS,
+            OP_ACCESS,
         ] {
             assert!(path_count(op).is_some());
         }
         assert_eq!(path_count(0), None);
-        assert_eq!(path_count(13), None);
+        assert_eq!(path_count(14), None);
     }
 }

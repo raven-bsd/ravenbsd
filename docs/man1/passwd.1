@@ -1,0 +1,52 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt PASSWD 1
+.Os RavenBSD
+.Sh NAME
+.Nm passwd
+.Nd change, lock or unlock a password
+.Sh SYNOPSIS
+.Nm
+.Op Fl l | Fl u
+.Op Ar name
+.Sh DESCRIPTION
+.Nm
+replaces the
+.Pa /etc/shadow
+hash for
+.Ar name ,
+or for the caller when no operand is given.
+The new password is prompted twice, hashed with SHA-512-crypt
+.Pq Li $6$ ,
+and stored with the current last-change day.
+.Pp
+The
+.Fl l
+option prefixes the hash with
+.Ql ! ;
+.Fl u
+removes one such marker.
+A locked record never authenticates.
+.Pp
+Root may change every account. Other users may change only their own password after
+verifying the old one; that path needs the setuid binary and kernel credentials from U3 and is
+not shipped in 0.2.0.
+.Pp
+The console server echoes input in this release. Echo suppression needs the terminal-mode
+work in U3.
+.Sh FILES
+.Bl -tag -width /etc/shadow -compact
+.It Pa /etc/shadow
+password records, mode 0600
+.It Pa /etc/.pwd.lock
+exclusive update lock
+.El
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr useradd 1 ,
+.Xr su 1
+.Sh STANDARDS
+RavenBSD.

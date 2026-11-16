@@ -7,6 +7,9 @@ use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 use raven_linux_dispatch::SyscallArgs;
 
+use crate::files::O_CLOEXEC;
+use crate::files::O_RDWR;
+
 use super::*;
 
 fn process() -> LinuxProcess {
@@ -183,13 +186,17 @@ fn the_stats_name_every_implemented_handler() {
             "arch_prctl",
             "brk",
             "close",
+            "dup3",
             "exit_group",
+            "fcntl",
             "getdents64",
             "getpid",
             "lseek",
             "mmap",
             "open",
             "openat",
+            "pread64",
+            "pwrite64",
             "read",
             "readlink",
             "readlinkat",
@@ -247,6 +254,173 @@ fn open_legacy_and_readlinkat_serve_a_symlink() {
 }
 
 #[test]
+fn openat_queues_a_remote_file_with_a_file_scheme() {
+    let mut process = process();
+    set_path(&mut process, b"/tmp/b23.txt");
+    let flags = O_RDWR | crate::files::O_CREAT;
+    assert_eq!(
+        dispatch(
+            &mut process,
+            257,
+            [AT_FDCWD as usize, 0, flags as usize, 0, 0, 0]
+        ),
+        0
+    );
+    assert_eq!(
+        process.pending_file.take(),
+        Some(FileOp::Open {
+            scheme: b"file:/tmp/b23.txt".to_vec(),
+            path: b"/tmp/b23.txt".to_vec(),
+            flags,
+        })
+    );
+}
+
+#[test]
+fn remote_descriptors_queue_read_write_seek_and_close() {
+    let mut process = process();
+    let fd = process.open_remote(b"/tmp/b23.txt".to_vec(), Handle(5), O_RDWR);
+    assert_eq!(fd, 3);
+    process.user_buffer.extend_from_slice(b"abc");
+    assert_eq!(
+        dispatch(&mut process, 1, [fd as usize, 0x1000, 3, 0, 0, 0]),
+        3
+    );
+    assert_eq!(
+        process.pending_file.take(),
+        Some(FileOp::Write {
+            fd,
+            data: b"abc".to_vec(),
+        })
+    );
+    assert_eq!(
+        dispatch(&mut process, 0, [fd as usize, 0x2000, 16, 0, 0, 0]),
+        16
+    );
+    assert_eq!(
+        process.pending_file.take(),
+        Some(FileOp::Read {
+            fd,
+            address: 0x2000,
+            len: 16,
+        })
+    );
+    assert_eq!(
+        dispatch(&mut process, 17, [fd as usize, 0x3000, 8, 4, 0, 0]),
+        8
+    );
+    assert_eq!(
+        process.pending_file.take(),
+        Some(FileOp::Pread {
+            fd,
+            address: 0x3000,
+            len: 8,
+            offset: 4,
+        })
+    );
+    process.user_buffer.clear();
+    process.user_buffer.extend_from_slice(b"xy");
+    assert_eq!(
+        dispatch(&mut process, 18, [fd as usize, 0x4000, 2, 9, 0, 0]),
+        2
+    );
+    assert_eq!(
+        process.pending_file.take(),
+        Some(FileOp::Pwrite {
+            fd,
+            data: b"xy".to_vec(),
+            offset: 9,
+        })
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            8,
+            [fd as usize, 6, SEEK_SET as usize, 0, 0, 0]
+        ),
+        0
+    );
+    assert_eq!(
+        process.pending_file.take(),
+        Some(FileOp::Seek {
+            fd,
+            offset: 6,
+            whence: SEEK_SET,
+        })
+    );
+    assert_eq!(dispatch(&mut process, 3, [fd as usize, 0, 0, 0, 0, 0]), 0);
+    assert_eq!(process.pending_file.take(), Some(FileOp::Close { fd }));
+}
+
+#[test]
+fn fcntl_and_dup3_queue_descriptor_operations() {
+    let mut process = process();
+    let fd = process.open_remote(b"/tmp/b23.txt".to_vec(), Handle(5), O_RDWR);
+    assert_eq!(
+        dispatch(
+            &mut process,
+            72,
+            [fd as usize, F_GETFL as usize, 0, 0, 0, 0]
+        ),
+        O_RDWR as isize
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            72,
+            [fd as usize, F_SETFD as usize, 1, 0, 0, 0]
+        ),
+        0
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            72,
+            [fd as usize, F_GETFD as usize, 0, 0, 0, 0]
+        ),
+        FD_CLOEXEC as isize
+    );
+    assert_eq!(
+        dispatch(
+            &mut process,
+            72,
+            [fd as usize, F_DUPFD as usize, 10, 0, 0, 0]
+        ),
+        0
+    );
+    assert_eq!(
+        process.pending_file.take(),
+        Some(FileOp::FcntlDup {
+            fd,
+            min: 10,
+            cloexec: false,
+        })
+    );
+    assert_eq!(dispatch(&mut process, 292, [fd as usize, 9, 0, 0, 0, 0]), 0);
+    assert_eq!(
+        process.pending_file.take(),
+        Some(FileOp::Dup3 {
+            oldfd: fd,
+            newfd: 9,
+            cloexec: false,
+        })
+    );
+    assert_eq!(
+        dispatch(&mut process, 292, [fd as usize, fd as usize, 0, 0, 0, 0]),
+        -(Errno::EINVAL.0 as isize)
+    );
+}
+
+#[test]
+fn open_remote_records_cloexec_as_a_descriptor_flag() {
+    let mut process = process();
+    let fd = process.open_remote(b"/tmp/b23.txt".to_vec(), Handle(5), O_RDWR | O_CLOEXEC);
+    let file = process.file(fd).expect("the remote descriptor");
+    assert_eq!(file.fd_flags, FD_CLOEXEC);
+    assert_eq!(file.flags, O_RDWR);
+}
+
+#[test]
 fn a_directory_getdents64_lists_its_entries() {
     let mut process = process();
     set_path(&mut process, b"/proc/self/fd");
@@ -299,7 +473,7 @@ fn open_errors_are_reported_without_state() {
     set_path(&mut process, b"/proc/self/status");
     assert_eq!(
         dispatch(&mut process, 257, [AT_FDCWD as usize, 0, 1, 0, 0, 0]),
-        -(Errno::EACCES.0 as isize)
+        -(Errno::EROFS.0 as isize)
     );
     set_path(&mut process, b"/proc/self/exe");
     assert_eq!(

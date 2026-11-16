@@ -1,0 +1,52 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt ADDUSER 1
+.Os RavenBSD
+.Sh NAME
+.Nm adduser
+.Nd add a user interactively
+.Sh SYNOPSIS
+.Nm
+.Op Ar name
+.Sh DESCRIPTION
+.Nm
+prompts for the same fields as
+.Xr useradd 1 :
+the login name, full name, home directory, shell, primary group and password.
+It uses the same locked
+.Pa /etc/passwd ,
+.Pa /etc/group
+and
+.Pa /etc/shadow
+transaction; there is no second file format.
+.Pp
+The default home is
+.Pa /home/<name> ,
+the default shell is
+.Pa /bin/brush ,
+and the default primary group is the same-name group.
+The home directory is created with mode 0700 and the regular files from
+.Pa /etc/skel
+are copied into it.
+.Pp
+The 0.2.0 tools are root-only. The console server echoes input; echo suppression is part of
+the terminal-mode work in U3.
+.Sh FILES
+.Bl -tag -width /etc/shadow -compact
+.It Pa /etc/passwd
+account records
+.It Pa /etc/group
+group records
+.It Pa /etc/shadow
+password records
+.It Pa /etc/skel
+home-directory defaults
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr useradd 1 ,
+.Xr passwd 1
+.Sh STANDARDS
+RavenBSD.

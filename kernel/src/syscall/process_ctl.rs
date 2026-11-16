@@ -92,6 +92,17 @@ pub const PROC_SETCRED_EX: usize = 0x3B;
 pub const PROC_CRED_INFO: usize = 0x3C;
 /// Raw `proc_getgroups(out, size) -> count` number.
 pub const PROC_GETGROUPS: usize = 0x3D;
+/// Raw `proc_handle_info(handle) -> pid` number.
+pub const PROC_HANDLE_INFO: usize = 0x3E;
+/// Raw `proc_exec_cred(proc, file, flags) -> 0` number.
+pub const PROC_EXEC_CRED: usize = 0x3F;
+/// Suppress setuid/setgid bits for this exec.
+pub const EXEC_NOSUID: u64 = 1;
+
+const S_IFMT: u32 = 0o170000;
+const S_IFREG: u32 = 0o100000;
+const S_ISUID: u32 = 0o4000;
+const S_ISGID: u32 = 0o2000;
 
 /// Write the eight identity words for `target` to user memory.
 fn write_info(target: &Process, out: u64, count: usize) -> Result<usize, Errno> {
@@ -489,6 +500,114 @@ pub fn setcred_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
         _ => return Err(Errno::EINVAL),
     }
     Ok(0)
+}
+
+/// `proc_handle_info(handle) -> pid`.
+///
+/// The handle must already be in the caller's table and name a process; the syscall does not
+/// confer rights or search ambient tables. A non-process or stale handle is `EBADF`. The result
+/// is the kernel-assigned pid, including for a child that has already exited.
+pub fn handle_info(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let target = {
+        let handles = caller.handles.lock();
+        match handles.get(handle, Rights::READ) {
+            Ok(Object::Process(target)) => Arc::clone(target),
+            Ok(_) => return Err(Errno::EBADF),
+            Err(Errno::EACCES) => return Err(Errno::EPERM),
+            Err(error) => return Err(error),
+        }
+    };
+    usize::try_from(target.id).map_err(|_| Errno::EINVAL)
+}
+
+/// `proc_exec_cred(proc, file, flags) -> 0`.
+///
+/// The caller has already parsed the executable image. This syscall takes the open scheme-file
+/// handle, obtains its `Stat` through the kernel's inline-FSTAT path, checks the caller's execute
+/// permission, then applies a regular file's setuid/setgid bits to the target child's effective
+/// and saved ids. `flags & EXEC_NOSUID` suppresses both bits. The target must be an empty child
+/// (no threads) with a process handle the caller may administer; applying credentials to the
+/// caller itself is refused.
+pub fn exec_cred(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let file_handle = Handle(u32::try_from(frame.rsi).map_err(|_| Errno::EBADF)?);
+    let flags = frame.rdx;
+    if flags & !EXEC_NOSUID != 0 {
+        return Err(Errno::EINVAL);
+    }
+    if handle == Handle::SELF_PROC {
+        return Err(Errno::EPERM);
+    }
+    let target = {
+        let handles = caller.handles.lock();
+        match handles.get(handle, Rights::ADMIN) {
+            Ok(Object::Process(target)) => Arc::clone(target),
+            Ok(_) => return Err(Errno::EBADF),
+            Err(Errno::EACCES) => return Err(Errno::EPERM),
+            Err(error) => return Err(error),
+        }
+    };
+    if Arc::ptr_eq(&target, &caller) {
+        return Err(Errno::EPERM);
+    }
+    if target.threads.load(Ordering::Acquire) != 0 {
+        return Err(Errno::EINVAL);
+    }
+    if *target.state.lock() == ProcessState::Exited {
+        return Err(Errno::ESRCH);
+    }
+
+    let file = crate::ipc::file_from_handle(&caller, file_handle, Rights::READ)?;
+    let bytes = router::fstat_kernel(&caller, &file)?;
+    let mode = u32::from_le_bytes([bytes[48], bytes[49], bytes[50], bytes[51]]);
+    let uid = u32::from_le_bytes([bytes[56], bytes[57], bytes[58], bytes[59]]);
+    let gid = u32::from_le_bytes([bytes[60], bytes[61], bytes[62], bytes[63]]);
+    if mode & S_IFMT != S_IFREG {
+        return Err(Errno::EACCES);
+    }
+
+    let caller_ids = caller.ids.lock();
+    if !executable(&caller_ids, mode, uid, gid) {
+        return Err(Errno::EACCES);
+    }
+    drop(caller_ids);
+
+    if flags & EXEC_NOSUID != 0 {
+        return Ok(0);
+    }
+    let mut ids = target.ids.lock();
+    if mode & S_ISUID != 0 {
+        ids.euid = uid;
+        ids.suid = uid;
+    }
+    if mode & S_ISGID != 0 {
+        ids.egid = gid;
+        ids.sgid = gid;
+    }
+    Ok(0)
+}
+
+fn executable(ids: &process::ProcessIds, mode: u32, uid: u32, gid: u32) -> bool {
+    if ids.euid == 0 {
+        return mode & 0o111 != 0;
+    }
+    let bits = if ids.euid == uid {
+        (mode >> 6) & 0o7
+    } else if ids.egid == gid
+        || ids
+            .groups
+            .iter()
+            .take(ids.group_count as usize)
+            .any(|group| *group == gid)
+    {
+        (mode >> 3) & 0o7
+    } else {
+        mode & 0o7
+    };
+    bits & 0o1 != 0
 }
 
 /// `proc_set_personality(proc, personality, handler) -> 0`.

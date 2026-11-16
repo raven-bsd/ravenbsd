@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The P8b fixture maps the multi-window platd node to devd. The three MMIO
+# windows are created in declaration order and transferred as slots 3/4/5;
+# the DMA buffer is slot 6. `fake` selects platd's deterministic backend.
+# The small `[[driver]]` parser splits `args` on commas, so window selection
+# uses repeated `bar=` tokens (the plan also accepts `mmio=` directly).
+
+[[driver]]
+name = "platd"
+compatible = "raven,pi4-platform"
+exec = "/sbin/platd"
+args = ["bar=0", "bar=1", "bar=2", "resources=dma", "dma_size=256", "fake", "mailbox=3:64", "gpio=4:180", "rng=5:40", "dma=6:256"]
+cycles = 1

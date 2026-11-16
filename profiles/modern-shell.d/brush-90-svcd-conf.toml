@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The modern-shell image ends when brush exits.
+
+[[initfs.files]]
+src = "etc/brush/svcd.conf"
+path = "/etc/svcd.conf"
