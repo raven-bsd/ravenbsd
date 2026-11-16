@@ -295,7 +295,10 @@ impl ThreadKernel for SysKernel {
         // The kernel clears `Pthread.join_word` when the thread exits; the libc exit path never
         // writes it, so a zero word is the kernel's confirmation that the user stack can be
         // reclaimed (A-thr-3).
-        tcb(tcb_address).join_word.load(core::sync::atomic::Ordering::Acquire) == 0
+        tcb(tcb_address)
+            .join_word
+            .load(core::sync::atomic::Ordering::Acquire)
+            == 0
     }
 
     fn create(&self, args: &CreateArgs) -> Result<u32, Errno> {
