@@ -10,6 +10,7 @@
 #[cfg(target_os = "none")]
 mod program {
     use raven_rt::entry;
+    use raven_rt::proc;
     use raven_userdb::rt::RtIo;
     use raven_userdb::store::{Paths, load_lookup};
 
@@ -28,8 +29,13 @@ mod program {
                 return 1;
             }
         };
-        // The kernel is root-only in 0.2.0; U3 supplies the effective uid.
-        let uid = 0u32;
+        let uid = match proc::credentials() {
+            Ok(credentials) => credentials.euid,
+            Err(error) => {
+                raven_rt::eprintln!("whoami: {}", error.description());
+                return 1;
+            }
+        };
         raven_rt::println!("{}", whoami::name_for_uid(&database, uid));
         if whoami::known_uid(&database, uid) {
             0

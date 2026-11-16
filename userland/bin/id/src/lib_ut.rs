@@ -129,6 +129,23 @@ fn an_operand_resolves_by_name_and_number() {
 }
 
 #[test]
+fn process_credential_puts_the_primary_group_first() {
+    let ids = ProcessIds {
+        uid: 1000,
+        euid: 0,
+        gid: 1001,
+        egid: 0,
+        groups: alloc::vec![100, 1001, 0],
+    };
+    let credential = process_credential(&ids);
+    assert_eq!(credential.uid, 1000);
+    assert_eq!(credential.euid, 0);
+    assert_eq!(credential.gid, 1001);
+    assert_eq!(credential.egid, 0);
+    assert_eq!(credential.groups, alloc::vec![1001, 100, 0]);
+}
+
+#[test]
 fn the_current_identity_uses_the_root_record() {
     let database = database();
     let credential = credential_for(&database, None).expect("root");
