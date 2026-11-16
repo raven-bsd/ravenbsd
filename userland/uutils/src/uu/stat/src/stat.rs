@@ -7,7 +7,7 @@
 
 use std::ops::Range;
 use uucore::diagnostics::OptionValue;
-use uucore::error::{UError, UResult, USimpleError};
+use uucore::error::{UError, UResult, USimpleError, set_exit_code};
 use uucore::i18n::get_ctype_encoding;
 use uucore::quoting_style::{QuotingStyle, escape_name, quoting_style_from_env};
 use uucore::translate;
@@ -1497,6 +1497,10 @@ pub fn uumain(args: impl uucore::Args) -> UResult<()> {
         1,
     )?;
 
+    if uucore::raven::json(&matches) {
+        return stat_json(&matches);
+    }
+
     let stater = Stater::new(&matches, diag_args.as_deref())?;
     let exit_status = stater.exec()?;
     if exit_status == 0 {
@@ -1507,58 +1511,136 @@ pub fn uumain(args: impl uucore::Args) -> UResult<()> {
 }
 
 pub fn uu_app() -> Command {
-    Command::new("stat")
-        .version(uucore::crate_version!())
-        .help_template(uucore::localized_help_template("stat"))
-        .about(translate!("stat-about"))
-        .after_help(translate!("stat-after-help"))
-        .override_usage(format_usage(&translate!("stat-usage")))
-        .infer_long_args(true)
-        .arg(
-            Arg::new(options::DEREFERENCE)
-                .short('L')
-                .long(options::DEREFERENCE)
-                .help(translate!("stat-help-dereference"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::FILE_SYSTEM)
-                .short('f')
-                .long(options::FILE_SYSTEM)
-                .help(translate!("stat-help-file-system"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::TERSE)
-                .short('t')
-                .long(options::TERSE)
-                .help(translate!("stat-help-terse"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::FORMAT)
-                .short('c')
-                .long(options::FORMAT)
-                .help(translate!("stat-help-format"))
-                .value_name("FORMAT")
-                .allow_hyphen_values(true)
-                .overrides_with(options::PRINTF),
-        )
-        .arg(
-            Arg::new(options::PRINTF)
-                .long(options::PRINTF)
-                .value_name("FORMAT")
-                .allow_hyphen_values(true)
-                .overrides_with(options::FORMAT)
-                .help(translate!("stat-help-printf")),
-        )
-        .arg(
-            Arg::new(options::FILES)
-                .action(ArgAction::Append)
-                .value_parser(ValueParser::os_string())
-                .required(true)
-                .value_hint(clap::ValueHint::FilePath),
-        )
+    uucore::raven::style(
+        Command::new("stat")
+            .version(uucore::crate_version!())
+            .help_template(uucore::localized_help_template("stat"))
+            .about(translate!("stat-about"))
+            .after_help(translate!("stat-after-help"))
+            .override_usage(format_usage(&translate!("stat-usage")))
+            .infer_long_args(true)
+            .arg(
+                Arg::new(options::DEREFERENCE)
+                    .short('L')
+                    .long(options::DEREFERENCE)
+                    .help(translate!("stat-help-dereference"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::FILE_SYSTEM)
+                    .short('f')
+                    .long(options::FILE_SYSTEM)
+                    .help(translate!("stat-help-file-system"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::TERSE)
+                    .short('t')
+                    .long(options::TERSE)
+                    .help(translate!("stat-help-terse"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::FORMAT)
+                    .short('c')
+                    .long(options::FORMAT)
+                    .help(translate!("stat-help-format"))
+                    .value_name("FORMAT")
+                    .allow_hyphen_values(true)
+                    .overrides_with(options::PRINTF),
+            )
+            .arg(
+                Arg::new(options::PRINTF)
+                    .long(options::PRINTF)
+                    .value_name("FORMAT")
+                    .allow_hyphen_values(true)
+                    .overrides_with(options::FORMAT)
+                    .help(translate!("stat-help-printf")),
+            )
+            .arg(
+                Arg::new(options::FILES)
+                    .action(ArgAction::Append)
+                    .value_parser(ValueParser::os_string())
+                    .required(true)
+                    .value_hint(clap::ValueHint::FilePath),
+            )
+            .arg(
+                Arg::new(uucore::raven::JSON)
+                    .long("json")
+                    .help("Write one NDJSON record per file")
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(uucore::raven::COLOR)
+                    .long("color")
+                    .value_name("WHEN")
+                    .value_parser(["auto", "always", "never"])
+                    .default_value("auto")
+                    .help("Colour the human output"),
+            ),
+    )
+}
+
+/// One NDJSON record per stat operand.
+fn stat_json(matches: &ArgMatches) -> UResult<()> {
+    use uucore::raven::Record;
+
+    let dereference = matches.get_flag(options::DEREFERENCE);
+    let mut records = Vec::new();
+    let mut failed = false;
+    for file in matches
+        .get_many::<OsString>(options::FILES)
+        .into_iter()
+        .flatten()
+    {
+        let path = Path::new(file);
+        let metadata = if dereference {
+            fs::metadata(path)
+        } else {
+            fs::symlink_metadata(path)
+        };
+        match metadata {
+            Ok(metadata) => {
+                let kind = if metadata.is_dir() {
+                    "directory"
+                } else if metadata.file_type().is_symlink() {
+                    "symlink"
+                } else if metadata.is_file() {
+                    "file"
+                } else {
+                    "other"
+                };
+                records.push(
+                    Record::new("file")
+                        .string("path", &path.to_string_lossy())
+                        .string("type", kind)
+                        .u64("size", metadata.size())
+                        .u64("mode", u64::from(metadata.mode()))
+                        .u64("uid", u64::from(metadata.uid()))
+                        .u64("gid", u64::from(metadata.gid()))
+                        .u64("inode", metadata.ino())
+                        .u64("links", metadata.nlink())
+                        .i64("atime", metadata.atime())
+                        .i64("mtime", metadata.mtime())
+                        .i64("ctime", metadata.ctime()),
+                );
+            }
+            Err(error) => {
+                failed = true;
+                uucore::raven::json_error(
+                    "stat",
+                    "ENOENT",
+                    &format!("{}: {error}", path.display()),
+                );
+            }
+        }
+    }
+    uucore::raven::write_records(&records)
+        .map_err(|error| USimpleError::new(1, error.to_string()))?;
+    if failed {
+        set_exit_code(1);
+    }
+    Ok(())
 }
 
 const PRETTY_DATETIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S.%N %z";

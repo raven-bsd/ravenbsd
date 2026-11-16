@@ -86,6 +86,7 @@ pub use crate::features::parser;
 pub use crate::features::quoting_style;
 #[cfg(feature = "ranges")]
 pub use crate::features::ranges;
+pub use crate::features::raven;
 #[cfg(feature = "ringbuffer")]
 pub use crate::features::ringbuffer;
 #[cfg(feature = "sum")]
