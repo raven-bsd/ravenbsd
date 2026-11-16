@@ -675,7 +675,11 @@ fn success_call_sequence() {
 #[test]
 fn an_image_open_requests_the_read_wire_bit() {
     let flags = image_open_flags().expect("image open flags");
-    assert_eq!(flags.to_wire(), 1, "raw O_RDONLY=0 is not a valid wire flag");
+    assert_eq!(
+        flags.to_wire(),
+        1,
+        "raw O_RDONLY=0 is not a valid wire flag"
+    );
 }
 
 #[test]

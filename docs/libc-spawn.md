@@ -1,5 +1,8 @@
 # libc native spawn (P9a)
 
+SPDX-License-Identifier: BSD-3-Clause
+Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
 Status: backend implemented; target acceptance is blocked on P9b (`PROC_HANDLE_INFO`).
 
 ## Contract
