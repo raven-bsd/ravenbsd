@@ -10,8 +10,8 @@ util.ps	ps	ps	P4d-D2
 util.uname	uname	uname -a
 util.env	env	env	P4d-D3
 util.getconf	getconf	getconf ARG_MAX	P4d-D4
-util.tty	tty	tty	P4d-D5
-util.stty	stty	stty -a	P4d-D6
+util.tty	tty	tty
+util.stty	stty	stty -a
 util.kill	kill	kill -l	P4d-D7
 util.nice	nice	nice true	P4d-D8
 util.nohup	nohup	nohup true	P4d-D9

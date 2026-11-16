@@ -19,3 +19,15 @@ id = "util.uname"
 status = "present"
 evidence = "qtest:posix-util-system"
 notes = "P4d: QEMU x86_64 case checks uname -s/-n/-r/-v/-m/-a against the kernel uname"
+
+[[row]]
+id = "util.tty"
+status = "present"
+evidence = "test:tests/posix/utility/system/tty/test.sh"
+notes = "P4d: host behaviour of the vendored uutils tty on a pty; target pty/tty primitives come from P3"
+
+[[row]]
+id = "util.stty"
+status = "present"
+evidence = "test:tests/posix/utility/system/stty/test.sh"
+notes = "P4d: host behaviour of the vendored uutils stty on a pty; target termios primitives come from P3"

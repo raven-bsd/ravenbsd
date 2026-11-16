@@ -37,6 +37,14 @@ while IFS="$(printf '\t')" read -r row tool command defect; do
     if [ -n "$defect" ]; then
         status=DEFECT
         detail=$defect
+    elif [ -f "tests/posix/utility/system/$tool/test.sh" ]; then
+        if sh "tests/posix/utility/system/$tool/test.sh" </dev/null >"$out/$tool-test.log" 2>&1; then
+            status=PASS
+            detail="host test"
+        else
+            status=FAIL
+            detail="host test failed (log $out/$tool-test.log)"
+        fi
     elif [ "$qtest_status" = PASS ]; then
         status=PASS
         detail=qtest
