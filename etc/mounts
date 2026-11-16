@@ -9,3 +9,4 @@
 /dev/null null:
 /dev/zero zero:
 /dev/random rand:
+/dev/urandom rand:

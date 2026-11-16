@@ -7,7 +7,6 @@ name = "shell"
 programs = [
     { package = "raven-init", path = "/init" },
     { package = "raven-uname", path = "/bin/uname" },
-    { package = "raven-echo", path = "/bin/echo" },
 ]
 
 [boot]

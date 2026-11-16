@@ -100,12 +100,14 @@ cgetset
 cgetstr
 cgetustr
 chdir
+chmod
 chroot
 clearenv
 clearerr
 clock
 clock_getres
 clock_gettime
+clock_settime
 close
 close_range
 closedir
@@ -213,6 +215,8 @@ expm1f
 fabs
 fabsf
 fchmod
+fchmodat
+fchownat
 fclose
 fcntl
 fdim
@@ -282,6 +286,7 @@ fseek
 fstat
 fstat64
 fstatat
+fstatfs
 fsync
 ftell
 ftruncate
@@ -292,6 +297,7 @@ fts_openat
 fts_read
 fts_set
 ftw
+futimens
 fwprintf
 fwrite
 gai_strerror
@@ -302,6 +308,7 @@ get_nprocs
 get_nprocs_conf
 get_phys_pages
 getaddrinfo
+getaudit
 getauxval
 getbsize
 getchar
@@ -497,6 +504,8 @@ lgamma
 lgamma_r
 lgammaf
 lgammaf_r
+link
+linkat
 listen
 llabs
 lldiv
@@ -519,6 +528,7 @@ lseek
 lseek64
 lstat
 lstat64
+lutimes
 makecontext
 malloc
 malloc_usable_size
@@ -541,6 +551,8 @@ memset_explicit
 memset_s
 mergesort
 mkdir
+mkfifo
+mknod
 mktime
 mmap
 mmap64
@@ -791,12 +803,14 @@ regfree
 remove
 remque
 rename
+renameat
 res_init
 rewind
 rewinddir
 rindex
 rint
 rintf
+rmdir
 round
 roundeven
 roundf
@@ -948,6 +962,7 @@ srandom
 sscanf
 stat
 stat64
+statfs
 stderr
 stdin
 stdout
@@ -1012,6 +1027,9 @@ suboptarg
 svis
 swab
 swapcontext
+symlink
+symlinkat
+sync
 syscall
 sysconf
 sysctl
@@ -1096,6 +1114,7 @@ umask
 uname
 ungetc
 unlink
+unlinkat
 unlockpt
 unsetenv
 unveil
@@ -1103,6 +1122,8 @@ unvis
 updwtmpx
 uselocale
 user_from_uid
+utimensat
+utimes
 uuid_compare
 uuid_create
 uuid_create_nil

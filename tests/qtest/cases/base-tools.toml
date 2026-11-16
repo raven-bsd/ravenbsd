@@ -1,0 +1,202 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Draft only: copy to tests/qtest/cases/base-tools.toml after the Raven target build of
+# userland/uutils is unblocked and the profile installs build/x86_64/uutils/* at /bin/*.
+
+name = "base-tools"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 600
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|command not found'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 600
+
+[[step]]
+send = "mkdir /tmp/bt\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo hello > /tmp/bt/a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "cp /tmp/bt/a /tmp/bt/b\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mv /tmp/bt/b /tmp/bt/c\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "cat /tmp/bt/c\n"
+delay_ms = 100
+
+[[step]]
+wait = '^hello$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo b > /tmp/bt/s\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo a >> /tmp/bt/s\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "sort /tmp/bt/s\n"
+delay_ms = 100
+
+[[step]]
+wait = '^a$'
+timeout_secs = 30
+
+[[step]]
+wait = '^b$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo 1 > /tmp/bt/n\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo 2 >> /tmp/bt/n\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo 3 >> /tmp/bt/n\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "head -n 2 /tmp/bt/n\n"
+delay_ms = 100
+
+[[step]]
+wait = '^1$'
+timeout_secs = 30
+
+[[step]]
+wait = '^2$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "tail -n 1 /tmp/bt/n\n"
+delay_ms = 100
+
+[[step]]
+wait = '^3$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "stat -c %s /tmp/bt/c\n"
+delay_ms = 100
+
+[[step]]
+wait = '^6$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "rm /tmp/bt/c\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "false\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo $?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^1$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60
