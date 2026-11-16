@@ -1,0 +1,52 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt ID 1
+.Os RavenBSD
+.Sh NAME
+.Nm id
+.Nd print account and group identities
+.Sh SYNOPSIS
+.Nm
+.Op Fl u | Fl g | Fl G
+.Op Fl n
+.Op Ar user
+.Sh DESCRIPTION
+.Nm
+reads
+.Pa /etc/passwd
+and
+.Pa /etc/group
+and prints the selected identity for
+.Ar user ,
+or for the caller when no operand is given.
+The full form is
+.Dl uid=N(name) gid=N(name) groups=N(name),...
+.Pp
+The
+.Fl u
+option selects the effective uid,
+.Fl g
+the effective gid, and
+.Fl G
+all groups.
+.Fl n
+prints names instead of numbers and requires one of the selectors.
+.Pp
+The kernel is root-only in 0.2.0, so the caller identity is root. U3 supplies the real
+effective uid.
+.Sh FILES
+.Bl -tag -width /etc/passwd -compact
+.It Pa /etc/passwd
+account records
+.It Pa /etc/group
+group records
+.El
+.Sh EXIT STATUS
+.Ex -std
+An unknown account exits with status 1; a usage error exits with status 2.
+.Sh SEE ALSO
+.Xr whoami 1 ,
+.Xr groupadd 1
+.Sh STANDARDS
+RavenBSD.
