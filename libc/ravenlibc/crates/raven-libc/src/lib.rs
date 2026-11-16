@@ -105,6 +105,7 @@ pub(crate) mod pthread;
 #[cfg(target_os = "none")]
 pub(crate) mod pwd;
 #[cfg(target_os = "none")]
+#[path = "arc4random_buf.rs"]
 pub(crate) mod rand;
 #[cfg(any(target_os = "none", test))]
 #[path = "stdlib/realpath.rs"]

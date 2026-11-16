@@ -569,6 +569,7 @@ dependencies = [
  "brush-core",
  "brush-parser",
  "indexmap",
+ "nix 0.31.3",
  "nu-ansi-term",
  "pretty_assertions",
  "radix_trie",

@@ -24,13 +24,7 @@ regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
 regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
 
 [[expect]]
-regex = '(?i)^.*login: ?$'
-
-[[expect]]
 regex = '(?i)^password: ?$'
-
-[[expect]]
-regex = '^root@.*# ?$'
 
 [[expect]]
 regex = '^cat$'
@@ -67,7 +61,7 @@ send = "raven\n"
 delay_ms = 100
 
 [[step]]
-wait = '^root@.*# ?$'
+wait = '^raven# $'
 timeout_secs = 300
 
 [[step]]
@@ -87,7 +81,7 @@ wait = '^uname$'
 timeout_secs = 30
 
 [[step]]
-wait = '^root@.*# ?$'
+wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
@@ -103,7 +97,7 @@ wait = '^ping: [1-9][0-9]* packets transmitted, [1-9][0-9]* received, 0% packet 
 timeout_secs = 60
 
 [[step]]
-wait = '^root@.*# ?$'
+wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]

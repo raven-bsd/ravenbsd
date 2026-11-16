@@ -115,6 +115,9 @@ struct State {
 #[allow(clippy::cognitive_complexity)]
 pub fn uumain(args: impl uucore::Args) -> UResult<()> {
     let matches = uucore::clap_localization::handle_clap_result(uu_app(), args)?;
+    if uucore::raven::json(&matches) {
+        return id_json();
+    }
     let mut lock = io::stdout().lock();
 
     let users: Vec<String> = matches
@@ -353,114 +356,158 @@ pub fn uumain(args: impl uucore::Args) -> UResult<()> {
 }
 
 pub fn uu_app() -> Command {
-    Command::new("id")
-        .version(uucore::crate_version!())
-        .help_template(uucore::localized_help_template("id"))
-        .about(translate!("id-about"))
-        .override_usage(format_usage(&translate!("id-usage")))
-        .infer_long_args(true)
-        .args_override_self(true)
-        .after_help(translate!("id-after-help"))
-        .arg(
-            Arg::new(options::OPT_IGNORE)
-                .short('a')
-                .long(options::OPT_IGNORE)
-                .help(translate!("id-help-ignore"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::OPT_AUDIT)
-                .short('A')
-                .conflicts_with_all([
-                    options::OPT_GROUP,
-                    options::OPT_EFFECTIVE_USER,
-                    options::OPT_HUMAN_READABLE,
-                    options::OPT_PASSWORD,
-                    options::OPT_GROUPS,
-                    options::OPT_ZERO,
-                ])
-                .help(translate!("id-help-audit"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::OPT_EFFECTIVE_USER)
-                .short('u')
-                .long(options::OPT_EFFECTIVE_USER)
-                .conflicts_with(options::OPT_GROUP)
-                .help(translate!("id-help-user"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::OPT_GROUP)
-                .short('g')
-                .long(options::OPT_GROUP)
-                .conflicts_with(options::OPT_EFFECTIVE_USER)
-                .help(translate!("id-help-group"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::OPT_GROUPS)
-                .short('G')
-                .long(options::OPT_GROUPS)
-                .conflicts_with_all([
-                    options::OPT_GROUP,
-                    options::OPT_EFFECTIVE_USER,
-                    options::OPT_CONTEXT,
-                    options::OPT_HUMAN_READABLE,
-                    options::OPT_PASSWORD,
-                    options::OPT_AUDIT,
-                ])
-                .help(translate!("id-help-groups"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::OPT_HUMAN_READABLE)
-                .short('p')
-                .help(translate!("id-help-human-readable"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::OPT_NAME)
-                .short('n')
-                .long(options::OPT_NAME)
-                .help(translate!("id-help-name"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::OPT_PASSWORD)
-                .short('P')
-                .help(translate!("id-help-password"))
-                .conflicts_with(options::OPT_HUMAN_READABLE)
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::OPT_REAL_ID)
-                .short('r')
-                .long(options::OPT_REAL_ID)
-                .help(translate!("id-help-real"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::OPT_ZERO)
-                .short('z')
-                .long(options::OPT_ZERO)
-                .help(translate!("id-help-zero"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::OPT_CONTEXT)
-                .short('Z')
-                .long(options::OPT_CONTEXT)
-                .conflicts_with_all([options::OPT_GROUP, options::OPT_EFFECTIVE_USER])
-                .help(get_context_help_text())
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::ARG_USERS)
-                .action(ArgAction::Append)
-                .value_name(options::ARG_USERS)
-                .value_hint(clap::ValueHint::Username),
-        )
+    uucore::raven::style(
+        Command::new("id")
+            .version(uucore::crate_version!())
+            .help_template(uucore::localized_help_template("id"))
+            .about(translate!("id-about"))
+            .override_usage(format_usage(&translate!("id-usage")))
+            .infer_long_args(true)
+            .args_override_self(true)
+            .after_help(translate!("id-after-help"))
+            .arg(
+                Arg::new(options::OPT_IGNORE)
+                    .short('a')
+                    .long(options::OPT_IGNORE)
+                    .help(translate!("id-help-ignore"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::OPT_AUDIT)
+                    .short('A')
+                    .conflicts_with_all([
+                        options::OPT_GROUP,
+                        options::OPT_EFFECTIVE_USER,
+                        options::OPT_HUMAN_READABLE,
+                        options::OPT_PASSWORD,
+                        options::OPT_GROUPS,
+                        options::OPT_ZERO,
+                    ])
+                    .help(translate!("id-help-audit"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::OPT_EFFECTIVE_USER)
+                    .short('u')
+                    .long(options::OPT_EFFECTIVE_USER)
+                    .conflicts_with(options::OPT_GROUP)
+                    .help(translate!("id-help-user"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::OPT_GROUP)
+                    .short('g')
+                    .long(options::OPT_GROUP)
+                    .conflicts_with(options::OPT_EFFECTIVE_USER)
+                    .help(translate!("id-help-group"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::OPT_GROUPS)
+                    .short('G')
+                    .long(options::OPT_GROUPS)
+                    .conflicts_with_all([
+                        options::OPT_GROUP,
+                        options::OPT_EFFECTIVE_USER,
+                        options::OPT_CONTEXT,
+                        options::OPT_HUMAN_READABLE,
+                        options::OPT_PASSWORD,
+                        options::OPT_AUDIT,
+                    ])
+                    .help(translate!("id-help-groups"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::OPT_HUMAN_READABLE)
+                    .short('p')
+                    .help(translate!("id-help-human-readable"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::OPT_NAME)
+                    .short('n')
+                    .long(options::OPT_NAME)
+                    .help(translate!("id-help-name"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::OPT_PASSWORD)
+                    .short('P')
+                    .help(translate!("id-help-password"))
+                    .conflicts_with(options::OPT_HUMAN_READABLE)
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::OPT_REAL_ID)
+                    .short('r')
+                    .long(options::OPT_REAL_ID)
+                    .help(translate!("id-help-real"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::OPT_ZERO)
+                    .short('z')
+                    .long(options::OPT_ZERO)
+                    .help(translate!("id-help-zero"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::OPT_CONTEXT)
+                    .short('Z')
+                    .long(options::OPT_CONTEXT)
+                    .conflicts_with_all([options::OPT_GROUP, options::OPT_EFFECTIVE_USER])
+                    .help(get_context_help_text())
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::ARG_USERS)
+                    .action(ArgAction::Append)
+                    .value_name(options::ARG_USERS)
+                    .value_hint(clap::ValueHint::Username),
+            )
+            .arg(
+                Arg::new(uucore::raven::JSON)
+                    .long("json")
+                    .help("Write one NDJSON identity record")
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(uucore::raven::COLOR)
+                    .long("color")
+                    .value_name("WHEN")
+                    .value_parser(["auto", "always", "never"])
+                    .default_value("auto")
+                    .help("Colour the human output"),
+            ),
+    )
+}
+
+/// The NDJSON form of the current identity.
+fn id_json() -> UResult<()> {
+    use uucore::raven::{Record, Value};
+
+    let uid = getuid().as_raw();
+    let gid = getgid().as_raw();
+    let euid = geteuid().as_raw();
+    let egid = getegid().as_raw();
+    let user = entries::uid2usr(uid).unwrap_or_else(|_| uid.to_string());
+    let group = entries::gid2grp(gid).unwrap_or_else(|_| gid.to_string());
+    let groups = entries::get_groups_gnu(None)?
+        .iter()
+        .map(|&group| Value::Unsigned(u64::from(group)))
+        .collect();
+
+    let record = Record::new("user")
+        .u64("uid", u64::from(uid))
+        .u64("gid", u64::from(gid))
+        .u64("euid", u64::from(euid))
+        .u64("egid", u64::from(egid))
+        .string("user", &user)
+        .string("group", &group)
+        .array("groups", groups);
+    uucore::raven::write_records(&[record])
+        .map_err(|error| USimpleError::new(1, error.to_string()))?;
+    Ok(())
 }
 
 fn pretty(possible_pw: Option<Passwd>) -> io::Result<()> {
