@@ -61,6 +61,13 @@ impl CommandFdInjectionExt for std::process::Command {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        // `fd_mappings` installs a pre_exec hook even for an empty list, which forces the
+        // fork path. RavenBSD's spawn is not fork-based yet; an ordinary command with only
+        // stdio must keep the plain posix_spawn path.
+        if fd_mappings.is_empty() {
+            return Ok(());
+        }
+
         self.fd_mappings(fd_mappings)
             .map_err(|_e| error::ErrorKind::ChildCreationFailure)?;
 

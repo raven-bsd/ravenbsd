@@ -1755,6 +1755,18 @@ fn futimens_old(fd: BorrowedFd<'_>, times: &Timestamps) -> io::Result<()> {
     target_os = "redox",
     target_os = "vita",
 )))]
+#[cfg(target_os = "ravenbsd")]
+pub(crate) fn fallocate(
+    fd: BorrowedFd<'_>,
+    mode: FallocateFlags,
+    offset: u64,
+    len: u64,
+) -> io::Result<()> {
+    let _ = (fd, mode, offset, len);
+    Err(io::Errno::NOSYS)
+}
+
+#[cfg(not(target_os = "ravenbsd"))]
 pub(crate) fn fallocate(
     fd: BorrowedFd<'_>,
     mode: FallocateFlags,
@@ -1769,14 +1781,7 @@ pub(crate) fn fallocate(
     let offset = offset.try_into().map_err(|_| io::Errno::OVERFLOW)?;
     let len = len.try_into().map_err(|_| io::Errno::OVERFLOW)?;
 
-    // RavenBSD has no fallocate/posix_fallocate in ravenlibc yet.
-    #[cfg(target_os = "ravenbsd")]
-    {
-        let _ = (fd, mode, offset, len);
-        Err(io::Errno::NOSYS)
-    }
-
-    #[cfg(all(not(target_os = "ravenbsd"), any(linux_kernel, target_os = "fuchsia")))]
+    #[cfg(any(linux_kernel, target_os = "fuchsia"))]
     unsafe {
         ret(c::fallocate(
             borrowed_fd(fd),
@@ -1786,10 +1791,7 @@ pub(crate) fn fallocate(
         ))
     }
 
-    #[cfg(all(
-        not(target_os = "ravenbsd"),
-        not(any(linux_kernel, target_os = "fuchsia"))
-    ))]
+    #[cfg(not(any(linux_kernel, target_os = "fuchsia")))]
     {
         assert!(mode.is_empty());
         let err = unsafe { c::posix_fallocate(borrowed_fd(fd), offset, len) };

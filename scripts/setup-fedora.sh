@@ -10,6 +10,7 @@ DRY=${DRY:-0}
 # Same groups as setup-ubuntu.sh; Fedora names:
 #   edk2-ovmf = x86-64 UEFI firmware, edk2-aarch64 = AAVMF, gdisk provides sgdisk.
 PKGS="gcc gcc-c++ make pkgconf-pkg-config clang cmake ninja-build python3 git curl ca-certificates xz \
+gcc-aarch64-linux-gnu \
 openssl-devel \
 qemu-system-x86-core qemu-system-aarch64-core edk2-ovmf edk2-aarch64 \
 gdisk mtools dosfstools \

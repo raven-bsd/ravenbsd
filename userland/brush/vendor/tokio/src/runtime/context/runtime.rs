@@ -7,13 +7,17 @@ use std::fmt;
 
 #[derive(Debug, Clone, Copy)]
 #[must_use]
+#[repr(u8)]
 pub(crate) enum EnterRuntime {
+    /// Not in a runtime context **or** a blocking region.
+    ///
+    /// Kept first so the zero value of a zero-initialized thread-local is the non-entered
+    /// state; RavenBSD static binaries do not populate .tdata for the main thread yet.
+    NotEntered,
+
     /// Currently in a runtime context.
     #[cfg_attr(not(feature = "rt"), allow(dead_code))]
     Entered { allow_block_in_place: bool },
-
-    /// Not in a runtime context **or** a blocking region.
-    NotEntered,
 }
 
 /// Guard tracking that a caller has entered a runtime context.

@@ -12,6 +12,7 @@ use raven_initfs::InitfsBuilder;
 use crate::build::{self, Arch, Component};
 use crate::profiles::Profile;
 use crate::repo::Workspace;
+use crate::uutils;
 
 /// Build `build/<arch>/initfs.img` from the profile's programs.
 pub(crate) fn run(root: &Path, arch: Arch, profile: &str) -> Result<u8> {
@@ -23,6 +24,7 @@ pub(crate) fn run(root: &Path, arch: Arch, profile: &str) -> Result<u8> {
 /// Build the initfs and return its path.
 pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathBuf> {
     let profile = Profile::load(root, profile_name)?;
+    ensure_uutils(root, arch, &profile)?;
     let workspace = Workspace::load(root)?;
     let packages: Vec<String> = profile
         .initfs
@@ -82,44 +84,64 @@ fn release_user_programs_from_env(value: Option<&str>) -> bool {
     matches!(value, Some("1"))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use raven_initfs::Initfs;
-
-    #[test]
-    fn packed_image_round_trips_through_the_reader() {
-        let mut builder = InitfsBuilder::new();
-        builder.add_file("/init", b"init-binary", 0o755).unwrap();
-        builder
-            .add_file("/bin/uname", b"uname-binary", 0o755)
-            .unwrap();
-        let image = builder.build();
-        let parsed = Initfs::parse(&image).unwrap();
-        assert_eq!(parsed.len(), 2);
-        let init = parsed.get("/init").unwrap();
-        assert_eq!(init.data, b"init-binary");
-        assert_eq!(init.mode, 0o755);
-        let uname = parsed.get("/bin/uname").unwrap();
-        assert_eq!(uname.data, b"uname-binary");
+/// Build the uutils slice once when the resolved profile stages a missing uutils binary.
+///
+/// The profile's `generated = true` entries are not validated by `Profile::load`, so
+/// `make image`/`cargo xtask image` can reach the file copy with a clean `build/<arch>/uutils`.
+/// The slice build is the same one `cargo xtask build uutils` runs; it is skipped when every
+/// referenced staging file already exists so normal image builds stay fast.
+pub(crate) fn ensure_uutils(root: &Path, arch: Arch, profile: &Profile) -> Result<()> {
+    let exists = |source: &str| root.join(source).is_file();
+    let missing = uutils_missing(profile, arch, exists);
+    if missing.is_empty() {
+        return Ok(());
     }
-
-    #[test]
-    fn release_user_programs_requires_an_explicit_one() {
-        assert!(release_user_programs_from_env(Some("1")));
-        assert!(!release_user_programs_from_env(None));
-        assert!(!release_user_programs_from_env(Some("true")));
-        assert!(!release_user_programs_from_env(Some("0")));
+    println!(
+        "==> uutils {}: building missing staging slice ({})",
+        arch.as_str(),
+        missing.join(", ")
+    );
+    let code = uutils::run(root, &["--arch".to_string(), arch.as_str().to_string()])?;
+    if code != 0 {
+        bail!("uutils staging build failed with exit code {code}");
     }
+    let exists = |source: &str| root.join(source).is_file();
+    let missing = uutils_missing(profile, arch, exists);
+    if !missing.is_empty() {
+        bail!(
+            "uutils build did not produce the staged files: {}",
+            missing.join(", ")
+        );
+    }
+    Ok(())
+}
 
-    #[test]
-    fn extra_file_keeps_its_mode_and_contents() {
-        let mut builder = InitfsBuilder::new();
-        builder.add_file("/etc/example", b"value\n", 0o640).unwrap();
-        let image = builder.build();
-        let parsed = Initfs::parse(&image).unwrap();
-        let file = parsed.get("/etc/example").unwrap();
-        assert_eq!(file.data, b"value\n");
-        assert_eq!(file.mode, 0o640);
+/// The uutils name in a profile source such as `build/x86_64/uutils/ls`.
+fn uutils_source_name(arch: Arch, source: &str) -> Option<&str> {
+    let prefix = format!("build/{}/uutils/", arch.as_str());
+    let name = source.strip_prefix(&prefix)?;
+    if name.is_empty() || name.contains('/') {
+        None
+    } else {
+        Some(name)
     }
 }
+
+/// Names whose staged file is missing, deduplicated in profile order.
+fn uutils_missing(profile: &Profile, arch: Arch, exists: impl Fn(&str) -> bool) -> Vec<String> {
+    let mut missing = Vec::new();
+    for file in &profile.initfs.files {
+        let Some(name) = uutils_source_name(arch, &file.src) else {
+            continue;
+        };
+        if exists(&file.src) || missing.iter().any(|seen| seen == name) {
+            continue;
+        }
+        missing.push(name.to_string());
+    }
+    missing
+}
+
+#[cfg(test)]
+#[path = "initfs_ut.rs"]
+mod tests;

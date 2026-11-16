@@ -9,7 +9,7 @@ use raven_genet::phy::{
     BRGPHY_MII_AUXCTL, BRGPHY_MII_SHADOW_1C, MII_PHYIDR1, MII_PHYIDR2, PhyMode,
 };
 
-const REG_WORDS: usize = 0x5000 / 4;
+const REG_WORDS: usize = 0x8000 / 4;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct FakeSeam {
@@ -36,6 +36,10 @@ impl FakeSeam {
 
     pub(crate) fn set_mdio_busy(&mut self, busy: bool) {
         self.mdio_busy = busy;
+    }
+
+    pub(crate) fn set_mdio(&mut self, register: u8, value: u16) {
+        self.mdio[register as usize] = value;
     }
 
     pub(crate) fn info() -> GenetInfo {

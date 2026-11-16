@@ -1,0 +1,8 @@
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+HOME=/root
+TERM=${TERM:-vt100}
+USER=root
+LOGNAME=root
+SHELL=/bin/brush
+export PATH HOME TERM USER LOGNAME SHELL
+umask 022

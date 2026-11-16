@@ -210,14 +210,20 @@ pub fn run() {
     //
     // Run.
     //
-    #[cfg(any(unix, windows))]
+    #[cfg(all(any(unix, windows), not(target_os = "ravenbsd")))]
     let mut builder = tokio::runtime::Builder::new_multi_thread();
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(any(not(any(unix, windows)), target_os = "ravenbsd"))]
     let mut builder = tokio::runtime::Builder::new_current_thread();
 
-    let Ok(runtime) = builder.enable_all().build() else {
-        tracing::error!("error: failed to create Tokio runtime");
-        std::process::exit(1);
+    builder.enable_all();
+
+    let runtime = match builder.build() {
+        Ok(runtime) => runtime,
+        Err(error) => {
+            tracing::error!("error: failed to create Tokio runtime: {error}");
+            eprintln!("brush: failed to create the async runtime: {error}");
+            std::process::exit(1);
+        }
     };
 
     let result = runtime.block_on(run_async(&args, parsed_args));
@@ -239,6 +245,9 @@ fn install_panic_handlers() {
     // Set up panic handler. On release builds, it will capture panic details to a
     // temporary .toml file and report a human-readable message to the screen.
     //
+    // RavenBSD has no issue-submission path from the image, so keep the default Rust panic
+    // report on the serial console instead of writing a human-panic TOML to /tmp.
+    #[cfg(not(target_os = "ravenbsd"))]
     human_panic::setup_panic!(
         human_panic::Metadata::new(productinfo::PRODUCT_NAME, productinfo::PRODUCT_VERSION)
             .homepage(env!("CARGO_PKG_HOMEPAGE"))

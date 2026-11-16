@@ -14,6 +14,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "adduser"
+version = "0.1.0"
+dependencies = [
+ "passwd",
+ "raven-abi",
+ "raven-auth",
+ "raven-rt",
+ "raven-userdb",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -282,7 +293,9 @@ dependencies = [
  "raven-abi",
  "raven-driver",
  "raven-genet",
+ "raven-proto-fs",
  "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]
@@ -308,6 +321,14 @@ dependencies = [
 [[package]]
 name = "gpt-core"
 version = "0.1.0"
+
+[[package]]
+name = "groupadd"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-userdb",
+]
 
 [[package]]
 name = "hashbrown"
@@ -354,6 +375,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27f864f10dfb56725ce5ce5472bc52252c8f93a4ab86327122cebf62c5f59a17"
 dependencies = [
  "typenum",
+]
+
+[[package]]
+name = "id"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-userdb",
 ]
 
 [[package]]
@@ -484,6 +513,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 
 [[package]]
+name = "login"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-auth",
+ "raven-proto-fs",
+ "raven-proto-tty",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "man"
 version = "0.1.0"
 dependencies = [
@@ -549,6 +590,16 @@ dependencies = [
  "raven-proto-net",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "passwd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-auth",
+ "raven-rt",
+ "raven-userdb",
 ]
 
 [[package]]
@@ -1075,6 +1126,17 @@ name = "raven-getrandom"
 version = "0.1.0"
 dependencies = [
  "getrandom",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-getty"
+version = "0.1.0"
+dependencies = [
+ "login",
+ "raven-abi",
+ "raven-initfs",
+ "raven-rt",
 ]
 
 [[package]]
@@ -2816,6 +2878,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-userdb"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-auth",
+ "raven-proto-fs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-vfs-core"
 version = "0.1.0"
 dependencies = [
@@ -3016,6 +3088,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
 
 [[package]]
+name = "su"
+version = "0.1.0"
+dependencies = [
+ "raven-initfs",
+ "raven-rt",
+ "raven-userdb",
+]
+
+[[package]]
 name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3179,6 +3260,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "useradd"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-userdb",
+]
+
+[[package]]
 name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3206,6 +3295,14 @@ dependencies = [
  "raven-proto-net",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "whoami"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-userdb",
 ]
 
 [[package]]
