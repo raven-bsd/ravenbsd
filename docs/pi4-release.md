@@ -17,8 +17,9 @@ add:
 * the aarch64 brush and uutils `ls` slice;
 * `/etc/passwd`, `group`, `shadow`, `profile`, `motd`, `/bin/getty` and `/bin/login`;
 * netd in DHCP-first mode (`netd nic dhcp-first`, `needs = scheme:nic`);
-* pcid, devd (`dtb launch`, enabled), GENET (`scheme:nic`, enabled) and platd (disabled until
-  the platform-handle launch); `/etc/drivers.toml` is the P8 table with the GENET/EMMC2 entries;
+* pcid, devd (`dtb launch`, enabled, `platform-root`), the disabled platd/genet service entries,
+  and the release `drivers.conf` with the GENET `slots=platform` entry plus the P12 platd
+  multi-window plan (`mailbox=3:64 gpio=4:180 rng=5:40 dma=6:256`);
 * `/etc/pi4.dtb` from the P8 host fixture (`tests/fixtures/pi4-release/build.sh`); the live
   firmware DTB remains a board follow-up.
 
@@ -39,10 +40,12 @@ It runs `scripts/pi4-serial.sh --check` (firmware/DTB/FAT), verifies the `kernel
 checks the release initfs paths: `/sbin/{vfsd,netd,platd,genet,pcid,devd}`,
 `/bin/{rsh,login,getty,brush,ls,ping}`, the account files, `/etc/drivers.toml` and `/etc/pi4.dtb`.
 The DTB check compares the FDT magic/totalsize/CRC-32 of the staged blob with the validated
-fixture. The manifest linter fails if devd/genet/netd are disabled, devd is not `dtb launch`, the
-expected `scheme:dev`/`scheme:plat`/`scheme:nic` needs or provides are missing, the drivers table
-lacks the `genet`/`slots=platform` entry, or a duplicate genet launcher is present. It never opens
-a serial port and never claims a board result.
+fixture. The manifest linter fails if devd/netd are disabled, devd is not `dtb launch`, the
+devd `platform-root` grant or `scheme:plat`/`scheme:dev`/`scheme:nic` provides are missing, the
+genet/platd svcd entries are enabled (duplicate launchers), netd is not DHCP-first behind
+`scheme:nic`, the drivers table lacks the GENET `slots=platform` or P12 platd multi-window entry,
+or a duplicate genet/platd launcher is present. It never opens a serial port and never claims a
+board result.
 
 ## 2.1 Reproducibility
 
@@ -75,22 +78,23 @@ image SHA-256 header. The checker requires the boot/kernel banner, login prompt,
 
 ## 4. Platform and network dependencies
 
-P8 `devd dtb launch` is enabled and grants the platform BAR/DMA/IRQ handles to the matched
-drivers. The release image stages the P8 GENET entry (`bar=0`, `resources=dma+irq`, `serve`) and
-enables the GENET service; netd waits for `scheme:nic` and uses DHCP-first addressing (REL4b).
-`platd` remains disabled because its mailbox/GPIO/RNG/DMA handles are not in the P8 driver table.
+P8 `devd dtb launch` is enabled with the `platform-root` grant (P10 merged). P8b's multi-window
+launcher is merged, so the release `drivers.conf` now carries the P12 platd entry with three MMIO
+windows and one DMA buffer:
 
-Two known dependencies remain outside REL3:
+```
+bar=0 bar=1 bar=2 resources=dma dma_size=256
+mailbox=3:64 gpio=4:180 rng=5:40 dma=6:256
+```
 
-* **P10 (Kevin)**: the init root-device grant is reserved for `pcid`; devd cannot create the
-  platform grants until that policy is split. The image stages the services but the board launch
-  is not claimed.
-* **REL4c (Phil)**: GENET slot alignment and the live ring/handle layout remain board-tested
-  follow-ups.
+`devd` creates windows 3/4/5 in declaration order and DMA slot 6. The platd and genet svcd service
+entries stay disabled so `devd` is the only launcher. netd waits for `scheme:nic` and uses
+DHCP-first addressing (REL4b).
 
-Without a serial log, the release gate cannot claim link, DHCP, gateway ping or the GENET
-`nic:` service. The P8 host fixture DTB is staged as `/etc/pi4.dtb`; the live firmware DTB path is
-still a board follow-up.
+The host fixture DTB is the P8b platd tree with the three-window node; it is staged as
+`/etc/pi4.dtb`. The live firmware DTB, the real window mapping, the GENET link/DHCP lease and the
+gateway ping remain UNVERIFIED without the owner's serial log. A missing board transcript is not a
+pass, and the platd/genet service entries are not duplicated by svcd.
 
 ## 5. Board checklist (UNVERIFIED)
 
