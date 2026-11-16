@@ -1,0 +1,168 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4b file-family evidence. The P0b loader accepts this owner batch file and executes test: rows.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.cat"
+status = "present"
+evidence = "test:tests/posix/utility/file/cat/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.chgrp"
+status = "present"
+evidence = "test:tests/posix/utility/file/chgrp/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.chmod"
+status = "present"
+evidence = "test:tests/posix/utility/file/chmod/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.chown"
+status = "present"
+evidence = "test:tests/posix/utility/file/chown/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.cp"
+status = "present"
+evidence = "test:tests/posix/utility/file/cp/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.cksum"
+status = "present"
+evidence = "test:tests/posix/utility/file/cksum/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.dd"
+status = "present"
+evidence = "test:tests/posix/utility/file/dd/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.df"
+status = "present"
+evidence = "test:tests/posix/utility/file/df/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.du"
+status = "present"
+evidence = "test:tests/posix/utility/file/du/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.link"
+status = "present"
+evidence = "test:tests/posix/utility/file/link/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.ln"
+status = "present"
+evidence = "test:tests/posix/utility/file/ln/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.ls"
+status = "present"
+evidence = "test:tests/posix/utility/file/ls/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.mkdir"
+status = "present"
+evidence = "test:tests/posix/utility/file/mkdir/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.mkfifo"
+status = "present"
+evidence = "test:tests/posix/utility/file/mkfifo/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.mknod"
+status = "present"
+evidence = "test:tests/posix/utility/file/mknod/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.mv"
+status = "present"
+evidence = "test:tests/posix/utility/file/mv/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.pathchk"
+status = "present"
+evidence = "test:tests/posix/utility/file/pathchk/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.pwd"
+status = "present"
+evidence = "test:tests/posix/utility/file/pwd/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.readlink"
+status = "present"
+evidence = "test:tests/posix/utility/file/readlink/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.realpath"
+status = "present"
+evidence = "test:tests/posix/utility/file/realpath/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.rm"
+status = "present"
+evidence = "test:tests/posix/utility/file/rm/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.rmdir"
+status = "present"
+evidence = "test:tests/posix/utility/file/rmdir/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.stat"
+status = "present"
+evidence = "test:tests/posix/utility/file/stat/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.touch"
+status = "present"
+evidence = "test:tests/posix/utility/file/touch/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.unlink"
+status = "present"
+evidence = "test:tests/posix/utility/file/unlink/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.file"
+status = "present"
+evidence = "test:tests/posix/utility/file/file/test.sh"
+notes = "P4b2: first-party file utility behaviour tests"
+
+[[row]]
+id = "util.find"
+status = "present"
+evidence = "test:tests/posix/utility/file/find/test.sh"
+notes = "P4b2: first-party find utility behaviour tests"
