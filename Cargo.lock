@@ -1670,6 +1670,7 @@ name = "raven-libc-proc"
 version = "0.1.0"
 dependencies = [
  "raven-libc-abi",
+ "raven-spawn",
 ]
 
 [[package]]
@@ -2335,6 +2336,7 @@ dependencies = [
  "raven-initfs",
  "raven-proto-fs",
  "raven-scheme",
+ "raven-spawn",
 ]
 
 [[package]]
@@ -2695,6 +2697,17 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-rt",
+]
+
+[[package]]
+name = "raven-spawn"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-elf",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-scheme",
 ]
 
 [[package]]
