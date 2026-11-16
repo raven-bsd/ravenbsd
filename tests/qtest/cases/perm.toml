@@ -17,7 +17,7 @@ expect_exit = "success"
 regex = '^perm: services ok$'
 
 [[expect]]
-regex = '^perm: root read=ok exec=denied$'
+regex = '^perm: root read=ok exec=denied write=ok$'
 
 [[expect]]
 regex = '^perm: uid1000 0600=denied 0644=ok$'
@@ -36,6 +36,27 @@ regex = '^perm: uid1000 sticky=denied$'
 
 [[expect]]
 regex = '^perm: ramfs 0600=denied 0644=ok dir700=denied$'
+
+[[expect]]
+regex = '^perm: symlink=denied$'
+
+[[expect]]
+regex = '^perm: dotdot=denied$'
+
+[[expect]]
+regex = '^perm: deleted-cwd=enoent$'
+
+[[expect]]
+regex = '^perm: xonly-write=denied$'
+
+[[expect]]
+regex = '^perm: group-list=ok$'
+
+[[expect]]
+regex = '^perm: handles duplicate=ok stale=badf$'
+
+[[expect]]
+regex = '^perm: setuid-dir=bad-elf$'
 
 [[expect]]
 regex = '^perm: ok$'

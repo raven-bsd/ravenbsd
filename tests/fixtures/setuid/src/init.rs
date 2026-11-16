@@ -15,17 +15,19 @@ extern crate alloc;
 use alloc::format;
 
 use raven_abi::errno::Errno;
+use raven_abi::syscall::Syscall;
 use raven_initfs::Initfs;
 use raven_proto_fs::OpenFlags;
 use raven_rt::entry;
 use raven_rt::println;
 use raven_rt::spawn::{SpawnError, SpawnOptions, spawn, spawn_file};
 use raven_scheme::Client;
-use raven_setuid::{setcred, wait};
+use raven_setuid::{setcred, syscall6, wait};
 
 entry!(main);
 
 const INITFSD: &str = "/sbin/initfsd";
+const PROC_HANDLE_INFO: usize = 0x3E;
 
 fn main(_args: raven_rt::Args) -> i32 {
     if let Err(step) = run() {
@@ -47,6 +49,14 @@ fn run() -> Result<(), &'static str> {
         }
         Err(_) => return Err("0644 error"),
     }
+    match spawn_once("/bin/child-4644", "4644", false) {
+        Err(SpawnError::Sys(Errno::EACCES)) => println!("setuid: setuid-0644=denied"),
+        Ok(child) => {
+            let _ = wait(child);
+            return Err("4644 executed");
+        }
+        Err(_) => return Err("4644 error"),
+    }
 
     setcred(5, 1000).map_err(|_| "setgid 1000")?;
     setcred(1, 1000).map_err(|_| "setuid 1000")?;
@@ -61,6 +71,7 @@ fn run() -> Result<(), &'static str> {
     }
 
     run_child("/bin/child-4755", "nosuid", true)?;
+    exited_handle()?;
     Ok(())
 }
 
@@ -97,6 +108,42 @@ fn run_child(path: &str, label: &str, nosuid: bool) -> Result<(), &'static str> 
         Ok(0) => Ok(()),
         _ => Err("child wait"),
     }
+}
+
+fn exited_handle() -> Result<(), &'static str> {
+    println!("setuid: run handle");
+    let child = spawn_once("/bin/child", "handle", false).map_err(|_| "handle spawn")?;
+    if wait(child) != Ok(0) {
+        return Err("handle wait");
+    }
+    let pid =
+        Errno::from_ret(unsafe { syscall6(PROC_HANDLE_INFO, child.0 as usize, 0, 0, 0, 0, 0) })
+            .map_err(|_| "handle info")?;
+    if pid <= 1 {
+        return Err("handle pid");
+    }
+    if Errno::from_ret(unsafe {
+        syscall6(
+            Syscall::HANDLE_CLOSE as usize,
+            child.0 as usize,
+            0,
+            0,
+            0,
+            0,
+            0,
+        )
+    })
+    .is_err()
+    {
+        return Err("handle close");
+    }
+    if Errno::from_ret(unsafe { syscall6(PROC_HANDLE_INFO, child.0 as usize, 0, 0, 0, 0, 0) })
+        != Err(Errno::EBADF)
+    {
+        return Err("handle stale");
+    }
+    println!("setuid: exited-handle=ok");
+    Ok(())
 }
 
 fn spawn_once(
