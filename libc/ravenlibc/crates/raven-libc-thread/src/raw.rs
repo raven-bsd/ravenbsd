@@ -37,7 +37,7 @@ use core::sync::atomic::{AtomicI32, AtomicU32};
 use raven_libc_tls::Pthread;
 
 use crate::kernel::{CreateArgs, KernelCaps, ThreadKernel};
-use crate::limits::{EINVAL, ENOMEM, ENOSYS, Errno, NS_PER_SEC};
+use crate::limits::{EINVAL, ENOMEM, ENOSYS, EOVERFLOW, Errno, NS_PER_SEC};
 
 pub mod entry;
 pub mod futex;
@@ -187,6 +187,91 @@ pub fn tlsdesc_dynamic(descriptor: &mut [usize; 2]) -> usize {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SysKernel;
 
+/// `THREAD_CREATE` syscall number (`raven_abi::syscall::Syscall::THREAD_CREATE`).
+const THREAD_CREATE: usize = 0x20;
+/// `THREAD_CREATE` flag selecting the [`ThreadCreateEx`] payload.
+const THREAD_CREATE_EX: usize = 1;
+/// Raw `Handle::SELF_PROC`.
+const SELF_PROC: usize = 0;
+
+/// The extended `THREAD_CREATE` payload, matching `raven_abi::syscall::ThreadCreateEx`.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct ThreadCreateEx {
+    /// User TLS base installed for the new thread.
+    tp: usize,
+    /// Optional caller tid output (unused: the library owns the TCB tid).
+    tid_out: usize,
+    /// New thread's clear-on-exit word.
+    clear_tid_addr: usize,
+}
+
+const _: () = {
+    assert!(core::mem::size_of::<ThreadCreateEx>() == 24);
+    assert!(core::mem::align_of::<ThreadCreateEx>() == 8);
+    assert!(core::mem::offset_of!(ThreadCreateEx, tp) == 0);
+    assert!(core::mem::offset_of!(ThreadCreateEx, tid_out) == 8);
+    assert!(core::mem::offset_of!(ThreadCreateEx, clear_tid_addr) == 16);
+};
+
+/// One fully built extended `THREAD_CREATE` call.
+///
+/// Kept separate from the syscall instruction so the host test can inspect every wire value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct CreateCall {
+    /// Syscall number.
+    number: usize,
+    /// Target process handle (`SELF_PROC`).
+    process: usize,
+    /// Thread entry stub.
+    entry: usize,
+    /// Top of the new user stack.
+    stack_top: usize,
+    /// Entry argument (`StartArgs` address).
+    arg: usize,
+    /// `THREAD_CREATE_EX`.
+    flags: usize,
+    /// Extended payload passed in the sixth argument.
+    extended: ThreadCreateEx,
+}
+
+/// Build the extended create call from the library arguments.
+fn create_call(args: &CreateArgs) -> CreateCall {
+    CreateCall {
+        number: THREAD_CREATE,
+        process: SELF_PROC,
+        entry: args.entry,
+        stack_top: args.stack_top,
+        arg: args.arg,
+        flags: THREAD_CREATE_EX,
+        extended: ThreadCreateEx {
+            tp: args.tp,
+            tid_out: 0,
+            clear_tid_addr: args.clear_tid_addr,
+        },
+    }
+}
+
+/// Invoke the extended create call and decode the returned thread handle.
+fn invoke_create(call: &CreateCall) -> Result<u32, Errno> {
+    // SAFETY: the scalar arguments name user addresses in the calling process; `call.extended`
+    // is a live, correctly aligned payload read by the kernel for the duration of the call.
+    let raw = unsafe {
+        raven_libc_sys::arch::syscall6(
+            call.number,
+            call.process,
+            call.entry,
+            call.stack_top,
+            call.arg,
+            call.flags,
+            &call.extended as *const ThreadCreateEx as usize,
+        )
+    };
+    raven_libc_sys::errno::ret(raw)
+        .map_err(|error| Errno(error.0))
+        .and_then(|value| u32::try_from(value).map_err(|_| EOVERFLOW))
+}
+
 impl SysKernel {
     /// The production kernel.
     #[must_use]
@@ -196,7 +281,8 @@ impl SysKernel {
 
     /// What the current kernel actually provides: PG-1 (`THREAD_SET_TLS`) is
     /// present on x86-64; AArch64/RISC-V write the user register directly.
-    /// Multi-thread creation remains absent (PG-2).
+    /// The extended `THREAD_CREATE_EX` create path is present; `THREAD_SELF`
+    /// kernel tids are still absent.
     #[must_use]
     pub const fn caps_const() -> KernelCaps {
         let mut caps = KernelCaps::minimal();
@@ -228,10 +314,8 @@ impl ThreadKernel for SysKernel {
         Err(ENOSYS)
     }
 
-    fn create(&self, _args: &CreateArgs) -> Result<u32, Errno> {
-        // PG-2 (thread create, clear-on-exit) and a `Handle::SELF_PROC` accessor in C54 are both
-        // absent. Refuse rather than start a thread that shares the creator's TLS block.
-        Err(ENOSYS)
+    fn create(&self, args: &CreateArgs) -> Result<u32, Errno> {
+        invoke_create(&create_call(args))
     }
 
     fn exit(&self, code: i32) -> ! {
