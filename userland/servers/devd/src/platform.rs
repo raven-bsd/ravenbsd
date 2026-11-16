@@ -3,14 +3,15 @@
 
 //! Platform resource selection for `devd`.
 //!
-//! A platform driver manifest declares the same selectors as a PCI driver: `bar=<n>` selects a
-//! `reg` window and `resources=dma+irq` asks for a DMA buffer and the device's first GIC
-//! interrupt. The selection is pure; the caller creates exactly the handles in the returned plan
-//! and transfers them to the child. Nothing outside the selected window, buffer or interrupt is
-//! created.
+//! A platform driver manifest declares the same selectors as a PCI driver: `bar=<n>` (or
+//! `mmio=<n>,<n>,...`) selects `reg` windows and `resources=dma+irq` asks for a DMA buffer and the
+//! device's first GIC interrupt. The selection is pure; the caller creates exactly the handles in
+//! the returned plan and transfers them to the child. Nothing outside the selected windows, buffer
+//! or interrupt is created.
 
 use alloc::format;
 use alloc::string::String;
+use alloc::vec;
 use alloc::vec::Vec;
 
 use crate::dtb::{DeviceSpec, GicInterrupt, RegWindow};
@@ -24,8 +25,8 @@ pub const PLATFORM_PAGE_SIZE: usize = 4096;
 /// The selectors parsed from a driver manifest entry.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LaunchArgs {
-    /// Selected `reg` index.
-    pub bar: usize,
+    /// Selected `reg` indices, in declaration order.
+    pub bars: Vec<usize>,
     /// Request a DMA buffer.
     pub dma: bool,
     /// Request the first GIC interrupt.
@@ -39,10 +40,10 @@ pub struct LaunchArgs {
 /// The resources one platform launch will create.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PlatformPlan {
-    /// Selected `reg` index, passed as `bar=<n>`.
-    pub bar: usize,
-    /// Selected MMIO window from the device tree.
-    pub reg: RegWindow,
+    /// Selected `reg` indices, in declaration order.
+    pub bars: Vec<usize>,
+    /// Selected MMIO windows from the device tree, parallel to `bars`.
+    pub regs: Vec<RegWindow>,
     /// Requested DMA buffer length.
     pub dma: Option<usize>,
     /// Requested GIC interrupt.
@@ -77,12 +78,18 @@ pub enum Grant {
 
 impl PlatformPlan {
     /// The child argv tokens after the executable name.
+    ///
+    /// The first window keeps the existing `bar`/`bar_size` tokens. Additional windows are
+    /// identified by the handle order (bars, then DMA, then IRQ); a driver that needs named
+    /// handles declares their slot numbers in its manifest `rest` tokens.
     #[must_use]
     pub fn tokens(&self) -> Vec<String> {
-        let mut tokens = Vec::with_capacity(self.rest.len() + 4);
+        let mut tokens = Vec::with_capacity(self.rest.len() + self.bars.len() + 3);
         tokens.extend(self.rest.iter().cloned());
-        tokens.push(format!("bar={}", self.bar));
-        tokens.push(format!("bar_size={}", self.reg.size));
+        if let Some((index, reg)) = self.bars.first().zip(self.regs.first()) {
+            tokens.push(format!("bar={index}"));
+            tokens.push(format!("bar_size={}", reg.size));
+        }
         if let Some(len) = self.dma {
             tokens.push(format!("dma={len}"));
         }
@@ -94,18 +101,20 @@ impl PlatformPlan {
 
     /// The capabilities to create and transfer, in child handle order.
     ///
-    /// The BAR is always first, then the DMA buffer when requested, then the interrupt. A fresh
-    /// child has handles 0 (self), 1 (initfs) and 2 (namespace), so these land at slots 3, 4 and
-    /// 5. The PCI path also transfers a configuration page, so its slot numbers differ even
-    /// though the argv tokens have the same shape.
+    /// Every selected MMIO window comes first in declaration order, then the DMA buffer when
+    /// requested, then the interrupt. A fresh child has handles 0 (self), 1 (initfs) and 2
+    /// (namespace), so a three-window driver with DMA receives slots 3, 4, 5 and 6. The PCI path
+    /// also transfers a configuration page, so its slot numbers differ.
     #[must_use]
     pub fn grants(&self) -> Vec<Grant> {
-        let mut grants = Vec::with_capacity(3);
-        grants.push(Grant::Bar {
-            index: self.bar,
-            base: self.reg.base,
-            size: self.reg.size,
-        });
+        let mut grants = Vec::with_capacity(self.bars.len() + 2);
+        for (index, reg) in self.bars.iter().zip(self.regs.iter()) {
+            grants.push(Grant::Bar {
+                index: *index,
+                base: reg.base,
+                size: reg.size,
+            });
+        }
         if let Some(len) = self.dma {
             grants.push(Grant::Dma { len });
         }
@@ -123,6 +132,8 @@ pub enum PlatformError {
     BadArgument,
     /// The selected `reg` index is outside the device's windows.
     BarOutOfRange(usize),
+    /// The same `reg` index was selected more than once.
+    DuplicateWindow(usize),
     /// `resources=irq` was requested but the device has no GIC interrupt.
     MissingInterrupt,
     /// The requested DMA length is zero or cannot be represented.
@@ -134,6 +145,7 @@ impl core::fmt::Display for PlatformError {
         match self {
             Self::BadArgument => formatter.write_str("invalid platform driver argument"),
             Self::BarOutOfRange(index) => write!(formatter, "platform bar{index} does not exist"),
+            Self::DuplicateWindow(index) => write!(formatter, "platform bar{index} selected twice"),
             Self::MissingInterrupt => {
                 formatter.write_str("platform driver asked for an IRQ but the node has none")
             }
@@ -144,11 +156,12 @@ impl core::fmt::Display for PlatformError {
 
 /// Parse the platform driver selectors.
 ///
-/// `bar=N` defaults to 0. `resources=dma+irq` is the PCI shape; `dma`/`irq` bare tokens are also
+/// `bar=N` and `mmio=N,N,...` select `reg` windows in declaration order; with no selector the
+/// first window is used. `resources=dma+irq` is the PCI shape; `dma`/`irq` bare tokens are also
 /// accepted, and `dma_size=N` sets the buffer length. Every other token is forwarded to the child.
 pub fn parse_args(args: &[String]) -> Result<LaunchArgs, PlatformError> {
     let mut parsed = LaunchArgs {
-        bar: 0,
+        bars: Vec::new(),
         dma: false,
         irq: false,
         dma_len: PLATFORM_DMA_LEN,
@@ -156,7 +169,23 @@ pub fn parse_args(args: &[String]) -> Result<LaunchArgs, PlatformError> {
     };
     for argument in args {
         if let Some(value) = argument.strip_prefix("bar=") {
-            parsed.bar = value.parse().map_err(|_| PlatformError::BadArgument)?;
+            parsed
+                .bars
+                .push(value.parse().map_err(|_| PlatformError::BadArgument)?);
+            continue;
+        }
+        if let Some(value) = argument.strip_prefix("mmio=") {
+            if value.is_empty() {
+                return Err(PlatformError::BadArgument);
+            }
+            for part in value.split(',') {
+                if part.is_empty() {
+                    return Err(PlatformError::BadArgument);
+                }
+                parsed
+                    .bars
+                    .push(part.parse().map_err(|_| PlatformError::BadArgument)?);
+            }
             continue;
         }
         if let Some(value) = argument.strip_prefix("dma_size=") {
@@ -198,11 +227,23 @@ pub fn parse_args(args: &[String]) -> Result<LaunchArgs, PlatformError> {
 /// caller must not create any handle after this fails.
 pub fn plan(device: &DeviceSpec, args: &[String]) -> Result<PlatformPlan, PlatformError> {
     let parsed = parse_args(args)?;
-    let reg = device
-        .regs
-        .get(parsed.bar)
-        .copied()
-        .ok_or(PlatformError::BarOutOfRange(parsed.bar))?;
+    let bars = if parsed.bars.is_empty() {
+        vec![0]
+    } else {
+        parsed.bars
+    };
+    let mut regs = Vec::with_capacity(bars.len());
+    for (position, bar) in bars.iter().enumerate() {
+        if bars[..position].contains(bar) {
+            return Err(PlatformError::DuplicateWindow(*bar));
+        }
+        let reg = device
+            .regs
+            .get(*bar)
+            .copied()
+            .ok_or(PlatformError::BarOutOfRange(*bar))?;
+        regs.push(reg);
+    }
     let irq = if parsed.irq {
         Some(
             *device
@@ -229,8 +270,8 @@ pub fn plan(device: &DeviceSpec, args: &[String]) -> Result<PlatformPlan, Platfo
         None
     };
     Ok(PlatformPlan {
-        bar: parsed.bar,
-        reg,
+        bars,
+        regs,
         dma,
         irq,
         rest: parsed.rest,
