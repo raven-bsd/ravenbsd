@@ -117,7 +117,7 @@ initfs_paths() {
             missing=1
         fi
     done
-    for path in /etc/passwd /etc/group /etc/shadow /etc/profile /etc/motd /etc/drivers.toml; do
+    for path in /etc/passwd /etc/group /etc/shadow /etc/profile /etc/motd /etc/drivers.toml /etc/pi4.dtb; do
         if grep -Fq -- "$path" "$work/initfs.strings"; then
             echo "pi4-release: initfs path $path ok"
         else
@@ -126,6 +126,37 @@ initfs_paths() {
         fi
     done
     [ "$missing" -eq 0 ]
+}
+
+manifest_check_release() {
+    failed=0
+    if ! grep -Fq 'args = ["devd", "dtb", "launch"]' profiles/pi4-release.d/devd.manifest; then
+        echo "pi4-release: devd.manifest does not use dtb launch" >&2
+        failed=1
+    fi
+    if grep -Eq '^enable = false$' profiles/pi4-release.d/devd.manifest; then
+        echo "pi4-release: devd.manifest is disabled" >&2
+        failed=1
+    fi
+    if grep -Eq '^enable = false$' profiles/pi4-release.d/genet.manifest; then
+        echo "pi4-release: genet.manifest is disabled" >&2
+        failed=1
+    fi
+    for need in 'scheme:dev' 'scheme:plat'; do
+        if ! grep -Fq -- "$need" profiles/pi4-release.d/genet.manifest; then
+            echo "pi4-release: genet.manifest lacks $need" >&2
+            failed=1
+        fi
+    done
+    if ! grep -Fq 'provides = ["scheme:nic"]' profiles/pi4-release.d/genet.manifest; then
+        echo "pi4-release: genet.manifest does not provide scheme:nic" >&2
+        failed=1
+    fi
+    if ! grep -Fq 'name = "genet"' userland/servers/devd/drivers.toml; then
+        echo "pi4-release: drivers.toml has no genet entry" >&2
+        failed=1
+    fi
+    [ "$failed" -eq 0 ]
 }
 
 image_check() {
@@ -145,7 +176,8 @@ image_check() {
         return 1
     }
     echo "pi4-release: kernel8.img $size bytes, banner marker ok"
-    initfs_paths
+    initfs_paths || return 1
+    manifest_check_release || return 1
     echo "pi4-release: image check PASS (board gates remain UNVERIFIED)"
 }
 

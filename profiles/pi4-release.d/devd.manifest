@@ -1,15 +1,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# Pi 4 device manager. The DTB match path exists, but the platform launch that
-# grants MMIO/DMA/IRQ handles and spawns /sbin/genet is P8; staging the service
-# disabled avoids claiming a driver launch that is not wired yet.
+# Pi 4 platform launch (P8): match the DTB, grant BAR/DMA/IRQ handles and
+# spawn the matched platform drivers. The child `nic:`/`dev:` schemes are the
+# readiness gate; the init root grant for devd is P10 (Kevin).
 name = "devd"
 exec = "/sbin/devd"
-args = ["devd"]
-needs = ["scheme:pci"]
+args = ["devd", "dtb", "launch"]
+needs = ["logd", "vfsd", "initfsd"]
 provides = ["scheme:dev"]
 readiness = "scheme"
 ready_timeout_ms = 60_000
 restart = "on-failure"
-enable = false

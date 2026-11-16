@@ -161,7 +161,7 @@ src = "etc/services.d/rsh.toml"
 path = "/etc/services.d/rsh.toml"
 
 [[initfs.files]]
-src = "etc/services.d/netd.toml"
+src = "profiles/pi4-release.d/netd.manifest"
 path = "/etc/services.d/netd.toml"
 
 [[initfs.files]]

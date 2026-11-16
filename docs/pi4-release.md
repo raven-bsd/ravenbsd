@@ -16,10 +16,11 @@ add:
 * shell services and first-party tools;
 * the aarch64 brush and uutils `ls` slice;
 * `/etc/passwd`, `group`, `shadow`, `profile`, `motd`, `/bin/getty` and `/bin/login`;
-* netd/resolvd/ping/route/netstat;
-* pcid, devd, platd and the GENET program/service, with the platform launch staged disabled
-  (P8);
-* `/etc/drivers.toml` from `userland/servers/devd/drivers.toml`.
+* netd in DHCP-first mode (`netd nic dhcp-first`, `needs = scheme:nic`);
+* pcid, devd (`dtb launch`, enabled), GENET (`scheme:nic`, enabled) and platd (disabled until
+  the platform-handle launch); `/etc/drivers.toml` is the P8 table with the GENET/EMMC2 entries;
+* `/etc/pi4.dtb` from the P8 host fixture (`tests/fixtures/pi4-release/build.sh`); the live
+  firmware DTB remains a board follow-up.
 
 Build:
 
@@ -36,8 +37,10 @@ scripts/pi4-release.sh --check
 
 It runs `scripts/pi4-serial.sh --check` (firmware/DTB/FAT), verifies the `kernel8.img` banner and
 checks the release initfs paths: `/sbin/{vfsd,netd,platd,genet,pcid,devd}`,
-`/bin/{rsh,login,getty,brush,ls,ping}` and the account/driver files. It never opens a serial port
-and never claims a board result.
+`/bin/{rsh,login,getty,brush,ls,ping}`, the account files, `/etc/drivers.toml` and `/etc/pi4.dtb`.
+It also fails if the devd/genet manifests are disabled, the devd args are not `dtb launch`, the
+GENET manifest lacks `scheme:dev`/`scheme:plat`/`scheme:nic`, or `drivers.toml` has no GENET
+entry. It never opens a serial port and never claims a board result.
 
 ## 3. Flash and capture
 
@@ -58,13 +61,24 @@ image SHA-256 header. The checker requires the boot/kernel banner, login prompt,
 (0)`. It fails on panic/EXCEPTION, failed login or ping timeout. Markers live in
 `tests/fixtures/pi4-release/gate-markers.txt`; no fixture substitutes for a board log.
 
-## 4. Platform and network gap (P8)
+## 4. Platform and network dependencies
 
-`platd`, `devd` and `genet` are staged with `enable = false`: the devd DTB path currently only
-reports matches and does not grant MMIO/DMA/IRQ or spawn the platform driver. Until P8 launches
-them, `plat:mac`, `nic:` and the GENET link are unavailable; the release gate cannot claim
-link/DHCP/ping. The driver/service manifests are in `profiles/pi4-release.d/` with honest
-`needs`/`readiness` and no board claim.
+P8 `devd dtb launch` is enabled and grants the platform BAR/DMA/IRQ handles to the matched
+drivers. The release image stages the P8 GENET entry (`bar=0`, `resources=dma+irq`, `serve`) and
+enables the GENET service; netd waits for `scheme:nic` and uses DHCP-first addressing (REL4b).
+`platd` remains disabled because its mailbox/GPIO/RNG/DMA handles are not in the P8 driver table.
+
+Two known dependencies remain outside REL3:
+
+* **P10 (Kevin)**: the init root-device grant is reserved for `pcid`; devd cannot create the
+  platform grants until that policy is split. The image stages the services but the board launch
+  is not claimed.
+* **REL4c (Phil)**: GENET slot alignment and the live ring/handle layout remain board-tested
+  follow-ups.
+
+Without a serial log, the release gate cannot claim link, DHCP, gateway ping or the GENET
+`nic:` service. The P8 host fixture DTB is staged as `/etc/pi4.dtb`; the live firmware DTB path is
+still a board follow-up.
 
 ## 5. Board checklist (UNVERIFIED)
 
