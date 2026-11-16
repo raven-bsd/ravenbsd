@@ -17,6 +17,7 @@ cd "$root"
 image=build/aarch64/ravenbsd-pi4.img
 device=/dev/ttyUSB0
 have_device=0
+flash_device=
 log=
 check_only=0
 do_check=1
@@ -29,18 +30,20 @@ usage:
   scripts/pi4-release.sh --check [-i IMAGE]
   scripts/pi4-release.sh --log LOG
   scripts/pi4-release.sh --device TTY [--log LOG] [-i IMAGE]
+  scripts/pi4-release.sh --flash DEVICE [--device TTY] [--log LOG]
 
   -i, --image PATH   release image (default: build/aarch64/ravenbsd-pi4.img)
   -d, --device TTY   UART adapter for capture (default: /dev/ttyUSB0)
+  -f, --flash DEV    write the image to an SD-card block device first (owner only)
   -l, --log PATH     existing log to check, or capture destination
   -c, --check        host-side image/manifest/initfs check only
       --no-check     skip the host-side check before capture
   -h, --help         show this help
 
-The release gates are kernel banner, login, brush, `ls /bin` and `ping <gateway>`.
-The current image carries the shell services and network tools; login/brush/ls
-remain PENDING until REL1 and the aarch64 shell slices land. A board result is
-claimed only from a captured log.
+Capture uses 115200 8N1 and console=ttyAMA0, matching scripts/pi4-serial.sh.
+The release gates are kernel banner, login root/raven, `raven#`, `ls /bin`,
+`ping <gateway>` and a clean exit. A board result is claimed only from a
+captured log; `--check` never opens the serial port.
 EOF
 }
 
@@ -55,6 +58,11 @@ while [ "$#" -gt 0 ]; do
             [ "$#" -ge 2 ] || { usage >&2; exit 2; }
             device=$2
             have_device=1
+            shift 2
+            ;;
+        -f|--flash)
+            [ "$#" -ge 2 ] || { usage >&2; exit 2; }
+            flash_device=$2
             shift 2
             ;;
         -l|--log)
@@ -100,7 +108,8 @@ initfs_paths() {
     }
     strings "$initfs" > "$work/initfs.strings"
     missing=0
-    for path in /sbin/vfsd /sbin/netd /sbin/platd /bin/rsh /bin/ping; do
+    for path in /sbin/vfsd /sbin/netd /sbin/platd /sbin/genet /sbin/pcid /sbin/devd \
+        /bin/rsh /bin/login /bin/getty /bin/brush /bin/ls /bin/ping; do
         if grep -Fq -- "$path" "$work/initfs.strings"; then
             echo "pi4-release: initfs path $path ok"
         else
@@ -108,11 +117,12 @@ initfs_paths() {
             missing=1
         fi
     done
-    for path in /bin/login /bin/brush /bin/ls; do
+    for path in /etc/passwd /etc/group /etc/shadow /etc/profile /etc/motd /etc/drivers.toml; do
         if grep -Fq -- "$path" "$work/initfs.strings"; then
             echo "pi4-release: initfs path $path ok"
         else
-            echo "pi4-release: initfs path $path PENDING (REL1/K25a)"
+            echo "pi4-release: initfs path $path MISSING" >&2
+            missing=1
         fi
     done
     [ "$missing" -eq 0 ]
@@ -161,6 +171,10 @@ evaluate_log() {
             failed=1
         fi
     done < "$markers"
+    if grep -Eiq 'panic|EXCEPTION|login: .*incorrect|login: .*failed|ping: .*timeout' "$log"; then
+        echo "pi4-release: forbidden failure marker in the transcript"
+        failed=1
+    fi
     if [ "$failed" -ne 0 ]; then
         echo "pi4-release: serial gate FAIL"
         return 1
@@ -173,6 +187,20 @@ if [ "$check_only" -eq 1 ]; then
     exit $?
 fi
 
+if [ -n "$flash_device" ]; then
+    image_check || exit 1
+    [ -b "$flash_device" ] || {
+        echo "pi4-release: --flash target is not a block device: $flash_device" >&2
+        exit 1
+    }
+    command -v dd >/dev/null 2>&1 || {
+        echo "pi4-release: dd is required for --flash" >&2
+        exit 1
+    }
+    echo "pi4-release: writing $image to $flash_device"
+    dd if="$image" of="$flash_device" bs=4M conv=fsync
+fi
+
 if [ "$have_device" -eq 1 ] && [ -z "$log" ]; then
     log=build/pi4-release/serial.log
 fi
@@ -181,7 +209,7 @@ if [ -n "$log" ] && [ "$have_device" -eq 1 ]; then
     if [ "$do_check" -eq 1 ]; then
         image_check || exit 1
     fi
-    sh scripts/pi4-serial.sh -d "$device" -i "$image" -l "$log"
+    sh scripts/pi4-serial.sh -d "$device" -b 115200 -i "$image" -l "$log"
 fi
 
 if [ -n "$log" ]; then

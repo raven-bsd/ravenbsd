@@ -2,11 +2,14 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
 # Required Pi 4 release serial-log markers. Fields: gate, fixed string.
-# A real board transcript must contain every line. The host-side image check
-# reports login/brush/ls/ping as PENDING until REL1 and the aarch64 tool slices
-# land; it never claims a board result.
+# A real board transcript must contain every line. No fixture substitutes for
+# the owner's capture.
 kernel RavenBSD kernel 0.1 (aarch64)
 login login:
-brush brush
-ls rsh
-ping bytes from
+password assword:
+prompt raven#
+ls-command ls /bin
+ls-rsh rsh
+ls-brush brush
+ping-reply bytes from
+clean init exited (0)
