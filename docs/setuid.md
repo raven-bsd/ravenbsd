@@ -18,7 +18,7 @@ open file: handle -> fstat (kernel inline FSTAT) -> read/parse ELF -> proc_creat
 image from offset zero, parses it with `raven-elf` (so a script/non-ELF image never reaches the
 credential step), and calls the new raw syscall `proc_exec_cred` before the first thread exists.
 
-`proc_exec_cred` (raw number `0x3E`, not in the frozen ABI crate) takes the target process handle,
+`proc_exec_cred` (raw number `0x3F`, not in the frozen ABI crate) takes the target process handle,
 the open file handle and flags. The kernel obtains the file's 64-byte `Stat` through an inline
 FSTAT reply (no user buffer to forge), checks the caller's execute permission, and only then writes
 the child's effective/saved ids. `EXEC_NOSUID` (`flags & 1`) suppresses the setuid/setgid bits.

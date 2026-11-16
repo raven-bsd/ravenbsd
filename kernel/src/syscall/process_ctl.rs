@@ -92,8 +92,10 @@ pub const PROC_SETCRED_EX: usize = 0x3B;
 pub const PROC_CRED_INFO: usize = 0x3C;
 /// Raw `proc_getgroups(out, size) -> count` number.
 pub const PROC_GETGROUPS: usize = 0x3D;
-/// Raw `proc_exec_cred(proc, stat, flags) -> 0` number.
-pub const PROC_EXEC_CRED: usize = 0x3E;
+/// Raw `proc_handle_info(handle) -> pid` number.
+pub const PROC_HANDLE_INFO: usize = 0x3E;
+/// Raw `proc_exec_cred(proc, file, flags) -> 0` number.
+pub const PROC_EXEC_CRED: usize = 0x3F;
 /// Suppress setuid/setgid bits for this exec.
 pub const EXEC_NOSUID: u64 = 1;
 
@@ -498,6 +500,26 @@ pub fn setcred_ex(frame: &SyscallFrame) -> Result<usize, Errno> {
         _ => return Err(Errno::EINVAL),
     }
     Ok(0)
+}
+
+/// `proc_handle_info(handle) -> pid`.
+///
+/// The handle must already be in the caller's table and name a process; the syscall does not
+/// confer rights or search ambient tables. A non-process or stale handle is `EBADF`. The result
+/// is the kernel-assigned pid, including for a child that has already exited.
+pub fn handle_info(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let target = {
+        let handles = caller.handles.lock();
+        match handles.get(handle, Rights::READ) {
+            Ok(Object::Process(target)) => Arc::clone(target),
+            Ok(_) => return Err(Errno::EBADF),
+            Err(Errno::EACCES) => return Err(Errno::EPERM),
+            Err(error) => return Err(error),
+        }
+    };
+    usize::try_from(target.id).map_err(|_| Errno::EINVAL)
 }
 
 /// `proc_exec_cred(proc, file, flags) -> 0`.
