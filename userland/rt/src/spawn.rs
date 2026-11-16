@@ -91,6 +91,15 @@ pub trait Sys {
         stack_top: usize,
         arg: usize,
     ) -> Result<Handle, Errno>;
+    /// Apply the setuid/setgid policy to an empty child process before its first thread starts.
+    ///
+    /// `file` is the open scheme-file handle for the image. The target implementation is
+    /// [`RtSys`]; test doubles may record or override it. The default fails closed so a caller
+    /// never silently skips the credential transition.
+    fn exec_cred(&mut self, proc: Handle, file: Handle, nosuid: bool) -> Result<(), Errno> {
+        let _ = (proc, file, nosuid);
+        Err(Errno::ENOSYS)
+    }
     /// Close a handle.
     fn handle_close(&mut self, handle: Handle) -> Result<(), Errno>;
     /// Copy bytes into a mapping owned by the parent.
@@ -159,6 +168,7 @@ pub fn spawn_with<S: Sys>(
         interp,
         path,
         options,
+        None,
         sys,
     )
 }
@@ -189,6 +199,7 @@ pub fn spawn_image_with<S: Sys>(
             None,
             path,
             options,
+            None,
             sys,
         );
     };
@@ -243,6 +254,7 @@ pub fn spawn_image_with_interp<S: Sys>(
         interp,
         path,
         options,
+        None,
         sys,
     )
 }
@@ -256,6 +268,101 @@ pub fn spawn_image(
 ) -> Result<Handle, SpawnError> {
     let mut sys = RtSys;
     spawn_image_with(image, path, options, &mut sys)
+}
+
+/// Spawn an image with the setuid/setgid policy applied to its child process.
+#[cfg(any(target_os = "none", test))]
+pub fn spawn_image_with_exec<S: Sys>(
+    image: &[u8],
+    path: &str,
+    options: &SpawnOptions<'_>,
+    file: Handle,
+    nosuid: bool,
+    sys: &mut S,
+) -> Result<Handle, SpawnError> {
+    if image.len() > MAX_FILE_IMAGE {
+        return Err(SpawnError::TooLarge);
+    }
+    let (main, main_steps, main_bias) = plan_image(image, false)?;
+    let exec = Some((file, nosuid));
+    let Some(interp_path) = main.interp() else {
+        return spawn_elf(
+            &main,
+            main_steps,
+            ImageSource::Bytes(image),
+            main_bias,
+            None,
+            path,
+            options,
+            exec,
+            sys,
+        );
+    };
+    #[cfg(all(target_os = "none", feature = "alloc"))]
+    {
+        let interpreter = read_file_image(interp_path)?;
+        let (elf, steps, bias) = plan_image(&interpreter, true)?;
+        spawn_elf(
+            &main,
+            main_steps,
+            ImageSource::Bytes(image),
+            main_bias,
+            Some((elf, steps, ImageSource::Bytes(&interpreter), bias)),
+            path,
+            options,
+            exec,
+            sys,
+        )
+    }
+    #[cfg(not(all(target_os = "none", feature = "alloc")))]
+    {
+        let _ = interp_path;
+        let _ = main_steps;
+        let _ = main_bias;
+        Err(SpawnError::NotFound)
+    }
+}
+
+/// Read an open file handle from offset zero without moving its cursor.
+#[cfg(all(target_os = "none", feature = "alloc"))]
+pub fn read_file_handle_at(file: Handle) -> Result<Vec<u8>, SpawnError> {
+    let client = Client::new();
+    let mut data = Vec::new();
+    let mut buffer = [0u8; 4096];
+    let mut offset = 0u64;
+    loop {
+        let read = client
+            .pread(file, offset, &mut buffer)
+            .map_err(SpawnError::Sys)?;
+        if read == 0 {
+            return Ok(data);
+        }
+        let next = data.len().checked_add(read).ok_or(SpawnError::TooLarge)?;
+        if next > MAX_FILE_IMAGE {
+            return Err(SpawnError::TooLarge);
+        }
+        let chunk = buffer.get(..read).ok_or(SpawnError::TooLarge)?;
+        data.extend_from_slice(chunk);
+        offset = offset.saturating_add(read as u64);
+    }
+}
+
+/// Spawn an ELF from an open scheme-file handle.
+///
+/// The handle is stat'ed and read from offset zero; its open-file description keeps the inode
+/// stable while the image is loaded. `nosuid` is the mount policy the caller obtained from the
+/// mount table. On success the child process has no credential transition until the kernel's
+/// `proc_exec_cred` has checked the execute bit and applied any setuid/setgid bits.
+#[cfg(all(target_os = "none", feature = "alloc"))]
+pub fn spawn_file(
+    file: Handle,
+    path: &str,
+    options: &SpawnOptions<'_>,
+    nosuid: bool,
+) -> Result<Handle, SpawnError> {
+    let image = read_file_handle(file)?;
+    let mut sys = RtSys;
+    spawn_image_with_exec(&image, path, options, file, nosuid, &mut sys)
 }
 
 /// Read an open `file:` handle into a bounded image buffer.
@@ -391,6 +498,7 @@ fn spawn_elf<S: Sys>(
     interp: Option<(Elf<'_>, BiasedPlan, ImageSource<'_>, u64)>,
     path: &str,
     options: &SpawnOptions<'_>,
+    exec: Option<(Handle, bool)>,
     sys: &mut S,
 ) -> Result<Handle, SpawnError> {
     let (main_map, main_object) = prepare_source(main_source, sys)?;
@@ -552,6 +660,12 @@ fn spawn_elf<S: Sys>(
             return Err(SpawnError::TooLarge);
         }
     };
+    if let Some((file, nosuid)) = exec
+        && let Err(error) = sys.exec_cred(child, file, nosuid)
+    {
+        let _ = sys.handle_close(child);
+        return Err(SpawnError::Sys(error));
+    }
     match sys.thread_create(child, entry_address, sp0, sp0) {
         Ok(_thread) => Ok(child),
         Err(error) => {
@@ -782,6 +896,14 @@ impl Sys for RtSys {
             )
         };
         handle_from_ret(result)
+    }
+
+    fn exec_cred(&mut self, proc: Handle, file: Handle, nosuid: bool) -> Result<(), Errno> {
+        let flags = usize::from(nosuid);
+        // SAFETY: `PROC_EXEC_CRED` takes a target process handle, an open scheme-file handle and
+        // a scalar flags word; the kernel validates both handles, rights and the file's Stat.
+        let result = unsafe { crate::sys::syscall3(0x3E, proc.0 as usize, file.0 as usize, flags) };
+        Errno::from_ret(result).map(|_| ())
     }
 
     fn handle_close(&mut self, handle: Handle) -> Result<(), Errno> {

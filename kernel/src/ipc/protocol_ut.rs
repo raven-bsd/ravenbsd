@@ -110,6 +110,18 @@ fn large_read_response_uses_buffer_len() {
 }
 
 #[test]
+fn fstat_inline_record_without_a_capture_is_bounded() {
+    let mut packet = SchemePacket::request(Opcode::Fstat, 1, 1);
+    packet.data_len = 64;
+    assert_eq!(reply_result(Opcode::Fstat, 0, 0, &packet), Ok(0));
+    packet.data_len = 65;
+    assert_eq!(
+        reply_result(Opcode::Fstat, 0, 0, &packet),
+        Err(ReplyBoundError::ExceedsCapacity)
+    );
+}
+
+#[test]
 fn status_range_is_checked_for_responses() {
     let mut packet = SchemePacket::request(Opcode::Call, 1, 1);
     packet.status = 5;

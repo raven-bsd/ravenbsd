@@ -258,7 +258,18 @@ pub fn reply_result(
             }
             request_response_len
         }
-        Opcode::Fstat => request_response_len,
+        Opcode::Fstat => {
+            // An FSTAT without a client response buffer is the kernel's internal stat path: the
+            // 64-byte record travels in the packet's inline data. Clients that provide a capture
+            // keep the historical `data_len <= response_len` bound.
+            if request_response_len == 0 {
+                if u64::from(packet.data_len) > 64 {
+                    return Err(ReplyBoundError::ExceedsCapacity);
+                }
+                return Ok(0);
+            }
+            request_response_len
+        }
         Opcode::Open | Opcode::Close | Opcode::Dup | Opcode::Seek => return Ok(result),
     };
     if result > allowed {
