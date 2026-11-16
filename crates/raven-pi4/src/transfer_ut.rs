@@ -268,6 +268,37 @@ fn command_failures_are_mapped() {
 }
 
 #[test]
+fn the_error_matrix_maps_crc_and_timeout_sources() {
+    let cases = [
+        (ERROR_CMD_TIMEOUT, TransferErrorKind::CommandTimeout),
+        (ERROR_CMD_CRC, TransferErrorKind::CommandCrc),
+        (ERROR_CMD_END_BIT, TransferErrorKind::CommandEndBit),
+        (ERROR_CMD_INDEX, TransferErrorKind::CommandIndex),
+        (ERROR_DATA_TIMEOUT, TransferErrorKind::DataTimeout),
+        (ERROR_DATA_CRC, TransferErrorKind::DataCrc),
+        (ERROR_ADMA, TransferErrorKind::Adma),
+        (ERROR_DMA, TransferErrorKind::Dma),
+        (ERROR_AUTO_CMD12, TransferErrorKind::AutoCmd12),
+    ];
+    for (raw, expected) in cases {
+        assert_eq!(
+            TransferErrorKind::from_error_interrupt(ErrorInterrupt::from_raw(raw)),
+            expected
+        );
+    }
+
+    let failures = [
+        (CommandFailure::Timeout, TransferErrorKind::CommandTimeout),
+        (CommandFailure::Crc, TransferErrorKind::CommandCrc),
+        (CommandFailure::DataTimeout, TransferErrorKind::DataTimeout),
+        (CommandFailure::DataCrc, TransferErrorKind::DataCrc),
+    ];
+    for (failure, expected) in failures {
+        assert_eq!(TransferErrorKind::from_command_failure(failure), expected);
+    }
+}
+
+#[test]
 fn a_polled_error_stops_the_transfer_and_is_sticky() {
     let mut transfer = make_transfer(DataDirection::Write, 2);
     let _ = transfer.start().expect("start");

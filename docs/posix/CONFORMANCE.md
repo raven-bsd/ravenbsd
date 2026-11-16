@@ -6,7 +6,7 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-16T19:38:42Z
+- Date: 2026-11-16T19:55:14Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: target QEMU
@@ -59,7 +59,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `filesystem.umask` | filesystem | fail | `none` | profile status missing; no executable POSIX behaviour test |
 | `header.aio.h` | header | fail | `profile` | profile status partial |
 | `header.arpa-inet.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_1.c` |  |
-| `header.assert.h` | header | pass | `tests/posix/check-headers.sh` |  |
+| `header.assert.h` | header | pass | `test:tests/posix/check-headers.sh` |  |
 | `header.complex.h` | header | fail | `profile` | profile status partial |
 | `header.cpio.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_4.c` |  |
 | `header.ctype.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_5.c` |  |
