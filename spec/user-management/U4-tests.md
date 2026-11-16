@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # U4 - user-management test matrix
 
 Lane: bob      Wave: 12      Milestone: M-0.2.0
