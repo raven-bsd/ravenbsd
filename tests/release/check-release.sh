@@ -10,12 +10,21 @@ ROOT=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
 cd "$ROOT"
 
 sh -n scripts/release.sh
+sh -n scripts/release-evidence.sh
 scripts/release.sh --help >/dev/null
+scripts/release-evidence.sh --help >/dev/null
+if ! output=$(scripts/release-evidence.sh --check 2>&1); then
+    printf '%s\n' "$output" | grep -q '^release-evidence: blocked: missing' || {
+        printf 'release checks: unexpected evidence failure\n%s\n' "$output" >&2
+        exit 1
+    }
+fi
 grep -q '^# RavenBSD 0.1.0 release notes$' docs/releases/0.1.0.md
 grep -q 'QEMU transcript' docs/releases/0.1.0.md
 grep -q 'Pi 4 transcript' docs/releases/0.1.0.md
 grep -q 'Default password warning' docs/releases/0.1.0.md
 grep -q 'make check' docs/releases/0.1.0.md
+grep -q 'release-evidence' docs/releases/0.1.0.md
 grep -Eq '^Status: \*\*BLOCKED' docs/releases/0.1.0.md
 [ -f PROVENANCE.toml ]
 
