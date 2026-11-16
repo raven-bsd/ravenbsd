@@ -154,6 +154,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 
 [[package]]
+name = "compress"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "cpufeatures"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -618,6 +627,15 @@ name = "password-hash"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aab41826031698d6ffcd9cff78ef56ef998e39dc7e5067cdfebe373842d4723b"
+
+[[package]]
+name = "pax"
+version = "0.1.0"
+dependencies = [
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
 
 [[package]]
 name = "pi4-devd-fake-driver"
@@ -2066,6 +2084,16 @@ name = "raven-pager"
 version = "0.1.0"
 
 [[package]]
+name = "raven-patch"
+version = "0.1.0"
+dependencies = [
+ "raven-diff",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-pci"
 version = "0.1.0"
 dependencies = [
@@ -3229,6 +3257,7 @@ name = "raven-vfsd"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-pager",
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
@@ -3248,6 +3277,15 @@ dependencies = [
 [[package]]
 name = "raven-vma"
 version = "0.1.0"
+
+[[package]]
+name = "raven-xargs"
+version = "0.1.0"
+dependencies = [
+ "raven-initfs",
+ "raven-rt",
+ "raven-tool-core",
+]
 
 [[package]]
 name = "raven-xhci"
@@ -3587,6 +3625,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c8352f8c05e47892e7eaf13b34abd76a7f4aeaf817b716e88789381927f199c"
 
 [[package]]
+name = "uncompress"
+version = "0.1.0"
+dependencies = [
+ "compress",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "unicode-ident"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3693,6 +3741,16 @@ dependencies = [
  "serde",
  "toml",
  "ufs-mkfs",
+]
+
+[[package]]
+name = "zcat"
+version = "0.1.0"
+dependencies = [
+ "compress",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
 ]
 
 [[package]]

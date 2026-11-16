@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! `mmap` glue over `MAP`, `UNMAP`, `PROTECT` and `MEMOBJ_CREATE`.
+//! `mmap` glue over `MAP`, `UNMAP`, `PROTECT`, `MEMOBJ_CREATE` and the file `OP_MMAP`.
 //!
 //! Anonymous private mappings pass `Handle::NONE`; anonymous shared mappings create a memory
-//! object first; file mappings need `OP_MMAP` (PG-36) and return `ENODEV` until then. `MAP_FIXED`
-//! uses `map::REPLACE` when PG-13 exists; today it unmaps the target range and maps again, which
-//! is not atomic (documented deviation). `mlock*` is an accepted no-op: pages are never pinned.
+//! object first; a file mapping asks the owning VFS server for a pager-backed `MemObject` and
+//! maps the attached handle. `MAP_FIXED` uses `map::REPLACE` when PG-13 exists; today it unmaps
+//! the target range and maps again, which is not atomic (documented deviation). `mlock*` is an
+//! accepted no-op: pages are never pinned.
 
 use raven_abi::errno::Errno;
 use raven_abi::types::{Handle, map, prot};
 /// Page size from `raven-abi` (4096 on all three architectures).
 pub const PAGE_SIZE: usize = raven_abi::PAGE_SIZE;
 use raven_libc_abi::mman;
+use raven_proto_fs::{Call, CallRequest};
 
 use crate::backend::{PendingCall, SysBackend};
 use crate::lock::Lock;
@@ -61,16 +63,13 @@ pub fn mmap<B: SysBackend, L: Lock>(
         return Err(Errno::EINVAL);
     }
     let anonymous = flags & mman::MAP_ANONYMOUS != 0;
-    if !anonymous && fd >= 0 {
-        // PG-36: OP_MMAP returns an attached pager-backed MemObject.
-        return Err(Errno::ENODEV);
+    if !anonymous && fd < 0 {
+        return Err(Errno::EBADF);
     }
     let prot_bits = protection as u32;
-    let map_bits = if flags & mman::MAP_SHARED != 0 {
-        map::SHARED as u32
-    } else {
-        0
-    };
+    let shared = flags & mman::MAP_SHARED != 0;
+    let map_bits = if shared { map::SHARED as u32 } else { 0 };
+    let len = len.checked_add(PAGE_SIZE - 1).ok_or(Errno::ENOMEM)? & !(PAGE_SIZE - 1);
     if flags & mman::MAP_FIXED != 0 && addr != 0 {
         // PG-13 adds map::REPLACE; until then unmap-then-map is observable and non-atomic.
         let _ = platform.backend().unmap(addr, len);
@@ -80,15 +79,43 @@ pub fn mmap<B: SysBackend, L: Lock>(
     } else {
         0
     };
-    if anonymous && flags & mman::MAP_SHARED != 0 {
-        let object = platform.backend().memobj_create(len, 0)?;
+    if anonymous {
+        if shared {
+            let object = platform.backend().memobj_create(len, 0)?;
+            return platform
+                .backend()
+                .map(object, 0, addr, len, prot_bits, map_bits | fixed);
+        }
         return platform
             .backend()
-            .map(object, 0, addr, len, prot_bits, map_bits | fixed);
+            .map(Handle::NONE, 0, addr, len, prot_bits, map_bits | fixed);
     }
+
+    let reference = platform.get(fd)?;
+    let request = CallRequest::new(Call::Mmap {
+        offset: offset as u64,
+        len: len as u64,
+        shared,
+    });
+    let mut encoded = [0u8; 64];
+    let encoded_len = request
+        .encode(&mut encoded)
+        .map_err(|error| error.errno())?;
+    let mut response = [0u8; 16];
+    let count = platform.backend().call(
+        reference.handle(),
+        encoded.get(..encoded_len).ok_or(Errno::EPROTO)?,
+        &mut response,
+    )?;
+    if count < 8 {
+        return Err(Errno::EPROTO);
+    }
+    let object = Handle(u32::from_le_bytes(
+        response[..4].try_into().map_err(|_| Errno::EPROTO)?,
+    ));
     platform
         .backend()
-        .map(Handle::NONE, 0, addr, len, prot_bits, map_bits | fixed)
+        .map(object, 0, addr, len, prot_bits, map_bits | fixed)
 }
 
 /// `munmap`.
@@ -122,19 +149,22 @@ pub fn mprotect<B: SysBackend, L: Lock>(
     platform.backend().protect(addr, len, protection as u32)
 }
 
-/// `msync`: `ENOSYS` until PG-22 adds `OP_MSYNC`.
+/// `msync`.
 pub fn msync<B: SysBackend, L: Lock>(
     platform: &Platform<B, L>,
     addr: usize,
     len: usize,
-    _flags: i32,
+    flags: i32,
 ) -> Result<(), Errno> {
-    if len == 0 {
+    if len == 0 || !addr.is_multiple_of(PAGE_SIZE) {
         return Err(Errno::EINVAL);
     }
-    let _ = addr;
-    let _ = platform;
-    Err(Errno::ENOSYS)
+    let allowed = mman::MS_ASYNC | mman::MS_INVALIDATE | mman::MS_SYNC;
+    if flags & !allowed != 0 || flags & (mman::MS_ASYNC | mman::MS_SYNC) == 0 {
+        return Err(Errno::EINVAL);
+    }
+    let len = len.checked_add(PAGE_SIZE - 1).ok_or(Errno::ENOMEM)? & !(PAGE_SIZE - 1);
+    platform.backend().msync(addr, len, flags as u32)
 }
 
 /// `madvise`: documented advice is a success; `DONTNEED`/`FREE` need PG-15.

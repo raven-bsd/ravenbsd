@@ -58,6 +58,9 @@ regex = '^posix-fs: special-file ok$'
 regex = '^posix-fs: statvfs ok$'
 
 [[expect]]
+regex = '^posix-fs: mmap-file ok$'
+
+[[expect]]
 regex = '^posix-fs: ok$'
 
 [[expect]]

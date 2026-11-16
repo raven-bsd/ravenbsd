@@ -29,6 +29,7 @@ pub mod pipe;
 pub mod priority;
 pub mod process_ctl;
 pub mod thread;
+pub mod tty;
 
 use core::sync::atomic::Ordering;
 
@@ -103,6 +104,9 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == ipc::SEEK {
         return ipc::seek(frame);
     }
+    if number == raven_abi::syscall::MSYNC {
+        return memory_ctl::msync(frame);
+    }
     if number == exec::PROC_EXEC {
         return exec::exec(frame);
     }
@@ -132,6 +136,15 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     if number == priority::SCHED_GETSCHEDULER {
         return priority::sched_getscheduler(frame);
+    }
+    if number == tty::PROC_CTTY_SET {
+        return tty::set_ctty(frame);
+    }
+    if number == tty::PROC_CTTY_GET {
+        return tty::get_pgrp(frame);
+    }
+    if number == tty::PROC_CTTY_SET_FG {
+        return tty::set_pgrp(frame);
     }
     if number == process_ctl::PROC_SELF_INFO {
         return process_ctl::self_info(frame);

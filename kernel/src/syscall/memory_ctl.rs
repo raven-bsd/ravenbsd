@@ -25,6 +25,12 @@ use crate::usercopy::copy_from_user;
 
 /// Largest memory object accepted by `MEMOBJ_CREATE` (1 GiB).
 const MAX_MEMOBJ_BYTES: u64 = 1 << 30;
+/// POSIX `MS_ASYNC`.
+const MS_ASYNC: usize = 1;
+/// POSIX `MS_INVALIDATE`.
+const MS_INVALIDATE: usize = 2;
+/// POSIX `MS_SYNC`.
+const MS_SYNC: usize = 4;
 
 enum MappedObject {
     Anonymous,
@@ -264,6 +270,36 @@ pub fn unmap(frame: &SyscallFrame) -> Result<usize, Errno> {
     if let Some((object, start, end)) = shared_range {
         crate::syscall::futex::remove_shared_range(target.id, object, start, end);
     }
+    // C18: the address-space lock is released before the pager IPC wait.
+    #[cfg(target_arch = "x86_64")]
+    for (object, page) in dirty {
+        crate::memory::pager::page_out(&caller, &object, page)?;
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    let _ = dirty;
+    Ok(0)
+}
+
+/// `msync(proc, addr, len, flags) -> 0`.
+///
+/// Only shared pager-backed mappings have dirty pages to write back. `MS_ASYNC` is implemented
+/// synchronously (the writeback is started and completed before returning); `MS_INVALIDATE` has
+/// no additional effect because private copies are never cached across page-outs.
+pub fn msync(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let target = lookup_process(&caller, Handle(frame.rdi as u32), Rights::MAP)?;
+    let addr = frame.rsi;
+    let len = frame.rdx;
+    let flags = usize::try_from(frame.r10).map_err(|_| Errno::EINVAL)?;
+    if flags & !(MS_ASYNC | MS_INVALIDATE | MS_SYNC) != 0 || flags & (MS_ASYNC | MS_SYNC) == 0 {
+        return Err(Errno::EINVAL);
+    }
+    validate_range(addr, len)?;
+    let dirty = {
+        let guard = target.address_space.lock();
+        let address_space = guard.as_ref().ok_or(Errno::ESRCH)?;
+        address_space.collect_pager_dirty(addr, len)
+    };
     // C18: the address-space lock is released before the pager IPC wait.
     #[cfg(target_arch = "x86_64")]
     for (object, page) in dirty {

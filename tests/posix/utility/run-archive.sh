@@ -8,7 +8,7 @@ set -eu
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 root=$(CDPATH= cd -- "$here/../../.." && pwd)
-present="ar tar uuencode uudecode"
+present="ar pax tar uuencode uudecode"
 
 if [ "${1:-}" = "--list" ]; then
     for tool in $present; do
