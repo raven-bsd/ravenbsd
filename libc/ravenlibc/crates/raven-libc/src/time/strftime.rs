@@ -7,7 +7,7 @@ use core::ptr;
 use raven_libc_abi::structs::Tm as AbiTm;
 use raven_libc_time::locale::CLocale;
 
-use super::{convert, fill_abi_tm, read_abi_tm, utc};
+use super::{convert, fill_abi_tm, local_tz, read_abi_tm};
 
 /// `strftime`.
 ///
@@ -28,7 +28,7 @@ pub unsafe extern "C" fn strftime(
     // SAFETY: the C contract gives a readable `tm`.
     let source = unsafe { &*tm };
     let value = read_abi_tm(source);
-    let state = utc();
+    let state = local_tz();
     let ctx = raven_libc_time::strftime::StrftimeCtx {
         tzname: [b"UTC", b"UTC"],
         localtime: Some(convert::localtime_r),
@@ -56,7 +56,7 @@ pub unsafe extern "C" fn strptime(
     let fmt = unsafe { crate::ffi::cstr::slice(format) };
     let source = unsafe { &mut *tm };
     let mut value = read_abi_tm(source);
-    let state = utc();
+    let state = local_tz();
     let ctx = raven_libc_time::strptime::StrptimeCtx {
         tzname: [b"UTC", b"UTC"],
         localtime: Some(convert::localtime_r),

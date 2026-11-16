@@ -7,7 +7,7 @@ use core::ptr;
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::structs::{Timespec, Tm as AbiTm};
 
-use super::{convert, fill_abi_tm, platform, static_tm, utc};
+use super::{convert, fill_abi_tm, local_tz, platform, static_tm};
 
 /// `nanosleep`.
 ///
@@ -77,7 +77,7 @@ pub unsafe extern "C" fn localtime_r(timep: *const c_longlong, out: *mut AbiTm) 
     }
     // SAFETY: the C contract says `timep` is readable.
     let seconds = unsafe { *timep };
-    let state = utc();
+    let state = local_tz();
     match convert::localtime_r(&state, seconds) {
         Ok(tm) => {
             // SAFETY: the C contract says `out` is writable.

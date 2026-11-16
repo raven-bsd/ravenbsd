@@ -136,6 +136,7 @@ creat64
 crypt
 crypt_r
 daemon
+daylight
 dcgettext
 dcngettext
 devname
@@ -934,6 +935,7 @@ sl_add
 sl_find
 sl_free
 sl_init
+sleep
 snprintf
 snvis
 sockatmark
@@ -1067,6 +1069,7 @@ timerfd_create
 timerfd_gettime
 timerfd_settime
 times
+timezone
 timingsafe_bcmp
 timingsafe_memcmp
 toascii
@@ -1090,6 +1093,8 @@ tss_get
 tss_set
 ttyname_r
 twalk
+tzname
+tzset
 uid_from_user
 ulckpwdf
 umask
@@ -1103,6 +1108,7 @@ unvis
 updwtmpx
 uselocale
 user_from_uid
+usleep
 uuid_compare
 uuid_create
 uuid_create_nil

@@ -295,10 +295,13 @@ RAVEN_1.0 {
 		uname;
 		unlink;
 		# --- data symbols (C60c) ---
+		daylight;
 		environ;
 		stderr;
 		stdin;
 		stdout;
+		timezone;
+		tzname;
 		optarg;
 		opterr;
 		optind;
@@ -557,10 +560,13 @@ RAVEN_1.0 {
 		localtime_r;
 		mktime;
 		nanosleep;
+		sleep;
 		strftime;
 		strptime;
 		time;
 		timegm;
+		tzset;
+		usleep;
 		# --- stdio (C60b) ---
 		clearerr;
 		fclose;

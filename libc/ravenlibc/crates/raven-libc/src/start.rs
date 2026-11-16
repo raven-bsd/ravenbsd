@@ -29,6 +29,8 @@ const MAX_ENV: usize = 4096;
 
 /// `AT_EXECFN`: the executed path string.
 const AT_EXECFN: usize = 31;
+/// `AT_PHNUM`: the number of program headers (Raven ABI; Linux uses 3).
+const AT_PHNUM: usize = 5;
 /// `AT_PAGESZ`: the page size.
 const AT_PAGESZ: usize = 6;
 /// `AT_CLKTCK`: clock ticks per second.
@@ -85,6 +87,8 @@ static SAVED_EXECFN: AtomicUsize = AtomicUsize::new(0);
 static SAVED_HWCAP: AtomicUsize = AtomicUsize::new(0);
 /// `AT_HWCAP2` from the auxiliary vector.
 static SAVED_HWCAP2: AtomicUsize = AtomicUsize::new(0);
+/// `AT_PHNUM` from the auxiliary vector.
+static SAVED_PHNUM: AtomicUsize = AtomicUsize::new(0);
 /// Presence bits for `AT_EXECFN`, `AT_HWCAP` and `AT_HWCAP2` (a present zero is not absent).
 static SAVED_AUX_MASK: AtomicUsize = AtomicUsize::new(0);
 
@@ -116,6 +120,7 @@ pub(crate) fn saved_aux(key: usize) -> Option<usize> {
         AT_EXECFN if mask & 1 != 0 => Some(SAVED_EXECFN.load(Ordering::Relaxed)),
         AT_HWCAP if mask & 2 != 0 => Some(SAVED_HWCAP.load(Ordering::Relaxed)),
         AT_HWCAP2 if mask & 4 != 0 => Some(SAVED_HWCAP2.load(Ordering::Relaxed)),
+        AT_PHNUM if mask & 8 != 0 => Some(SAVED_PHNUM.load(Ordering::Relaxed)),
         _ => None,
     }
 }
@@ -257,6 +262,7 @@ pub unsafe extern "C" fn __raven_libc_start(
     SAVED_EXECFN.store(aux_value(&aux, AT_EXECFN), Ordering::Relaxed);
     SAVED_HWCAP.store(aux_value(&aux, AT_HWCAP), Ordering::Relaxed);
     SAVED_HWCAP2.store(aux_value(&aux, AT_HWCAP2), Ordering::Relaxed);
+    SAVED_PHNUM.store(aux_value(&aux, AT_PHNUM), Ordering::Relaxed);
     SAVED_AUX_MASK.store(aux_present, Ordering::Release);
     let mut canary = 0usize;
     if aux_value(&aux, AT_RANDOM) != 0 {
@@ -434,6 +440,7 @@ unsafe fn fill_auxv(auxv: *const usize, table: &mut [usize; 64]) -> usize {
             AT_EXECFN => present |= 1,
             AT_HWCAP => present |= 2,
             AT_HWCAP2 => present |= 4,
+            AT_PHNUM => present |= 8,
             _ => {}
         }
         if key < table.len() {

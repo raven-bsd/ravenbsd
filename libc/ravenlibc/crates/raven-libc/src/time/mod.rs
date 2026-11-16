@@ -8,12 +8,15 @@
 //! result cell (single-threaded until C57's thread support lands).
 
 use core::cell::UnsafeCell;
-use core::ffi::c_void;
+use core::ffi::{c_char, c_void};
+use core::sync::atomic::Ordering;
 
 use raven_libc_abi::structs::Tm as AbiTm;
 use raven_libc_time::tz::convert;
+use raven_libc_time::{TzCache, TzState};
 
 use crate::ffi::platform;
+use crate::personality_common::Global;
 use crate::time::sys::ShellTime;
 
 pub(crate) mod sys;
@@ -69,11 +72,62 @@ fn read_abi_tm(src: &AbiTm) -> raven_libc_time::Tm {
     }
 }
 
-fn utc() -> raven_libc_time::TzState {
-    raven_libc_time::TzState::utc()
+static TZ_CACHE: Global<Option<TzCache>> = Global::new(None);
+
+fn tz_env<'a>() -> Option<&'a [u8]> {
+    // SAFETY: `getenv` follows the C string contract; the returned environment string lives for
+    // the process lifetime.
+    let value = unsafe { crate::stdlib::getenv::getenv(b"TZ\0".as_ptr().cast::<c_char>()) };
+    if value.is_null() {
+        None
+    } else {
+        // SAFETY: `getenv` returned a NUL-terminated environment value.
+        Some(unsafe { crate::ffi::cstr::slice(value) })
+    }
 }
 
+/// Refresh the process TZ cache when the environment changed.
+fn sync_tz_locked(cache: &mut TzCache) {
+    let env = tz_env();
+    if cache.needs_reload(env, 0) {
+        cache.reload(&ShellTime, env, 0);
+    }
+    let names = cache.tzname();
+    tzname::tzname[0].store(
+        names[0].as_ptr().cast_mut().cast::<c_char>(),
+        Ordering::Release,
+    );
+    tzname::tzname[1].store(
+        names[1].as_ptr().cast_mut().cast::<c_char>(),
+        Ordering::Release,
+    );
+    timezone::timezone.store(cache.timezone(), Ordering::Release);
+    daylight::daylight.store(cache.daylight(), Ordering::Release);
+}
+
+/// A snapshot of the active local-time zone.
+fn local_tz() -> TzState {
+    TZ_CACHE.with(|slot| {
+        let cache = slot.get_or_insert_with(TzCache::new);
+        sync_tz_locked(cache);
+        cache.state().clone()
+    })
+}
+
+/// `tzset`.
+#[unsafe(no_mangle)]
+pub extern "C" fn tzset() {
+    TZ_CACHE.with(|slot| {
+        let cache = slot.get_or_insert_with(TzCache::new);
+        sync_tz_locked(cache);
+    });
+}
+
+mod daylight;
 mod localtime;
 mod nanosleep;
+mod sleep;
 mod strftime;
 mod time;
+mod timezone;
+mod tzname;

@@ -853,6 +853,7 @@ pub(crate) static TITLE_CACHE: Global<raven_libc_personality_bsd::setproctitle::
 /// `AT_SECURE`). C61's start does not publish the full table yet.
 pub(crate) fn aux_lookup(key: u64) -> Option<u64> {
     match key {
+        5 => crate::start::saved_aux(5).map(|value| u64::try_from(value).unwrap_or(0)),
         6 => Some(u64::try_from(crate::start::page_size()).unwrap_or(0)),
         17 => Some(u64::try_from(crate::start::clk_tck()).unwrap_or(0)),
         23 => Some(0),
