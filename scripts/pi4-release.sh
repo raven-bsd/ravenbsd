@@ -20,14 +20,17 @@ have_device=0
 flash_device=
 log=
 check_only=0
+repro=0
 do_check=1
 markers=tests/fixtures/pi4-release/gate-markers.txt
 initfs=build/aarch64/initfs.img
+dtb=build/fixtures/pi4-release/pi4.dtb
 
 usage() {
     cat <<'EOF'
 usage:
   scripts/pi4-release.sh --check [-i IMAGE]
+  scripts/pi4-release.sh --repro
   scripts/pi4-release.sh --log LOG
   scripts/pi4-release.sh --device TTY [--log LOG] [-i IMAGE]
   scripts/pi4-release.sh --flash DEVICE [--device TTY] [--log LOG]
@@ -37,6 +40,8 @@ usage:
   -f, --flash DEV    write the image to an SD-card block device first (owner only)
   -l, --log PATH     existing log to check, or capture destination
   -c, --check        host-side image/manifest/initfs check only
+      --repro        clean build/fixtures, build the image twice, compare hashes,
+                     and run --check on both; writes only under build/
       --no-check     skip the host-side check before capture
   -h, --help         show this help
 
@@ -74,6 +79,10 @@ while [ "$#" -gt 0 ]; do
             check_only=1
             shift
             ;;
+        --repro)
+            repro=1
+            shift
+            ;;
         --no-check)
             do_check=0
             shift
@@ -92,6 +101,111 @@ done
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/pi4-release.XXXXXX")
 trap 'rm -rf "$work"' EXIT
+
+find_firmware() {
+    if [ -n "${RAVEN_RPI_FIRMWARE:-}" ] && [ -d "$RAVEN_RPI_FIRMWARE" ]; then
+        return 0
+    fi
+    for candidate in \
+        "$root/../ravenbsd-resources/rpi-firmware/boot" \
+        "$root/../../ravenbsd-resources/rpi-firmware/boot" \
+        "$root/../../../ravenbsd-resources/rpi-firmware/boot" \
+        "${HOME:-/nonexistent}/work/ravenos-workspace/ravenbsd-resources/rpi-firmware/boot" \
+        "${HOME:-/nonexistent}/ravenbsd-resources/rpi-firmware/boot"
+    do
+        if [ -d "$candidate" ]; then
+            RAVEN_RPI_FIRMWARE=$candidate
+            export RAVEN_RPI_FIRMWARE
+            return 0
+        fi
+    done
+    echo "pi4-release: Raspberry Pi firmware not found; set RAVEN_RPI_FIRMWARE" >&2
+    return 1
+}
+
+sha256_file() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | awk '{print $1}'
+    else
+        echo "pi4-release: sha256sum or shasum is required" >&2
+        return 1
+    fi
+}
+
+fdt_check() {
+    [ -f "$dtb" ] || {
+        echo "pi4-release: DTB fixture missing: $dtb" >&2
+        return 1
+    }
+    python3 - "$dtb" > "$work/fdt.txt" <<'PY'
+import struct
+import sys
+import zlib
+from pathlib import Path
+
+path = Path(sys.argv[1])
+data = path.read_bytes()
+if len(data) < 40 or data[:4] != b"\xd0\x0d\xfe\xed":
+    raise SystemExit(f"pi4-release: {path} is not an FDT blob")
+total = struct.unpack_from(">I", data, 4)[0]
+if total > len(data) or total < 40:
+    raise SystemExit(f"pi4-release: {path} totalsize {total} exceeds {len(data)}")
+print(len(data), f"{zlib.crc32(data) & 0xffffffff:08x}")
+PY
+    read -r dtb_size dtb_crc < "$work/fdt.txt"
+    cargo run -q -p raven-initfs --features std --example lsinitfs -- "$initfs" > "$work/initfs.list"
+    entry=$(awk '$1 == "/etc/pi4.dtb" { print $2, $4 }' "$work/initfs.list")
+    [ -n "$entry" ] || {
+        echo "pi4-release: /etc/pi4.dtb is not in the initfs" >&2
+        return 1
+    }
+    set -- $entry
+    if [ "$1" != "$dtb_size" ] || [ "$2" != "$dtb_crc" ]; then
+        echo "pi4-release: /etc/pi4.dtb does not match the validated fixture" >&2
+        return 1
+    fi
+    echo "pi4-release: /etc/pi4.dtb FDT ok totalsize=$dtb_size crc32=$dtb_crc"
+}
+
+repro_check() {
+    find_firmware || return 1
+    out=build/pi4-release/repro
+    rm -rf "$out"
+    mkdir -p "$out"
+    for side in a b; do
+        rm -rf build/fixtures
+        sh tests/fixtures/pi4-release/build.sh > "$out/fixture-$side.log" 2>&1 || {
+            echo "pi4-release: fixture build failed for $side" >&2
+            return 1
+        }
+        if ! cargo xtask image --arch aarch64 --platform pi4 --profile pi4-release \
+            --output "$out/$side.img" > "$out/build-$side.log" 2>&1; then
+            echo "pi4-release: image build failed for $side" >&2
+            tail -20 "$out/build-$side.log" >&2
+            return 1
+        fi
+        cp build/aarch64/initfs.img "$out/$side.initfs.img"
+    done
+    hash_a=$(sha256_file "$out/a.img") || return 1
+    hash_b=$(sha256_file "$out/b.img") || return 1
+    if [ "$hash_a" != "$hash_b" ]; then
+        echo "pi4-release: reproducibility FAIL ($hash_a != $hash_b)" >&2
+        return 1
+    fi
+    image="$out/a.img"
+    initfs="$out/a.initfs.img"
+    image_check || return 1
+    image="$out/b.img"
+    initfs="$out/b.initfs.img"
+    image_check || return 1
+    cp "$out/a.img" build/aarch64/ravenbsd-pi4.img
+    cp "$out/a.initfs.img" build/aarch64/initfs.img
+    echo "pi4-release: reproducibility PASS"
+    echo "  build a sha256 $hash_a"
+    echo "  build b sha256 $hash_b"
+}
 
 manifest_check() {
     [ -f "$image" ] || {
@@ -130,30 +244,73 @@ initfs_paths() {
 
 manifest_check_release() {
     failed=0
-    if ! grep -Fq 'args = ["devd", "dtb", "launch"]' profiles/pi4-release.d/devd.manifest; then
+    devd=profiles/pi4-release.d/devd.manifest
+    genet=profiles/pi4-release.d/genet.manifest
+    netd=profiles/pi4-release.d/netd.manifest
+    drivers=userland/servers/devd/drivers.toml
+
+    if ! grep -Fq 'args = ["devd", "dtb", "launch"]' "$devd"; then
         echo "pi4-release: devd.manifest does not use dtb launch" >&2
         failed=1
     fi
-    if grep -Eq '^enable = false$' profiles/pi4-release.d/devd.manifest; then
-        echo "pi4-release: devd.manifest is disabled" >&2
+    for manifest in "$devd" "$genet" "$netd"; do
+        if grep -Eq '^enable = false$' "$manifest"; then
+            echo "pi4-release: $manifest is disabled" >&2
+            failed=1
+        fi
+    done
+    for need in logd vfsd initfsd; do
+        if ! grep -Fq -- "\"$need\"" "$devd"; then
+            echo "pi4-release: devd.manifest lacks $need" >&2
+            failed=1
+        fi
+    done
+    if grep -Fq 'scheme:pci' "$devd"; then
+        echo "pi4-release: devd.manifest still needs scheme:pci" >&2
         failed=1
     fi
-    if grep -Eq '^enable = false$' profiles/pi4-release.d/genet.manifest; then
-        echo "pi4-release: genet.manifest is disabled" >&2
+    if ! grep -Fq 'provides = ["scheme:dev"]' "$devd"; then
+        echo "pi4-release: devd.manifest does not provide scheme:dev" >&2
         failed=1
     fi
-    for need in 'scheme:dev' 'scheme:plat'; do
-        if ! grep -Fq -- "$need" profiles/pi4-release.d/genet.manifest; then
+    for need in logd 'scheme:dev' 'scheme:plat'; do
+        if ! grep -Fq -- "$need" "$genet"; then
             echo "pi4-release: genet.manifest lacks $need" >&2
             failed=1
         fi
     done
-    if ! grep -Fq 'provides = ["scheme:nic"]' profiles/pi4-release.d/genet.manifest; then
+    if ! grep -Fq 'provides = ["scheme:nic"]' "$genet"; then
         echo "pi4-release: genet.manifest does not provide scheme:nic" >&2
         failed=1
     fi
-    if ! grep -Fq 'name = "genet"' userland/servers/devd/drivers.toml; then
-        echo "pi4-release: drivers.toml has no genet entry" >&2
+    for need in logd 'scheme:nic'; do
+        if ! grep -Fq -- "$need" "$netd"; then
+            echo "pi4-release: netd.manifest lacks $need" >&2
+            failed=1
+        fi
+    done
+    if ! grep -Fq 'provides = ["scheme:net"]' "$netd"; then
+        echo "pi4-release: netd.manifest does not provide scheme:net" >&2
+        failed=1
+    fi
+    if ! grep -Fq 'dhcp-first' "$netd"; then
+        echo "pi4-release: netd.manifest is not DHCP-first" >&2
+        failed=1
+    fi
+    if ! grep -A5 '^name = "genet"' "$drivers" | grep -Fq 'slots=platform'; then
+        echo "pi4-release: drivers.toml genet entry lacks slots=platform" >&2
+        failed=1
+    fi
+    if [ "$(grep -c '^name = "genet"' "$drivers")" -ne 1 ]; then
+        echo "pi4-release: duplicate genet driver entry" >&2
+        failed=1
+    fi
+    if [ "$(grep -l '^name = "genet"' profiles/pi4-release.d/*.manifest | wc -l | tr -d ' ')" -ne 1 ]; then
+        echo "pi4-release: duplicate genet service launcher" >&2
+        failed=1
+    fi
+    if [ "$(grep -h '^package = "genet"' profiles/pi4-release.d/*.toml | wc -l | tr -d ' ')" -ne 1 ]; then
+        echo "pi4-release: duplicate genet program entry" >&2
         failed=1
     fi
     [ "$failed" -eq 0 ]
@@ -177,6 +334,7 @@ image_check() {
     }
     echo "pi4-release: kernel8.img $size bytes, banner marker ok"
     initfs_paths || return 1
+    fdt_check || return 1
     manifest_check_release || return 1
     echo "pi4-release: image check PASS (board gates remain UNVERIFIED)"
 }
@@ -213,6 +371,11 @@ evaluate_log() {
     fi
     echo "pi4-release: serial gate PASS"
 }
+
+if [ "$repro" -eq 1 ]; then
+    repro_check
+    exit $?
+fi
 
 if [ "$check_only" -eq 1 ]; then
     image_check

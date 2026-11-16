@@ -38,9 +38,21 @@ scripts/pi4-release.sh --check
 It runs `scripts/pi4-serial.sh --check` (firmware/DTB/FAT), verifies the `kernel8.img` banner and
 checks the release initfs paths: `/sbin/{vfsd,netd,platd,genet,pcid,devd}`,
 `/bin/{rsh,login,getty,brush,ls,ping}`, the account files, `/etc/drivers.toml` and `/etc/pi4.dtb`.
-It also fails if the devd/genet manifests are disabled, the devd args are not `dtb launch`, the
-GENET manifest lacks `scheme:dev`/`scheme:plat`/`scheme:nic`, or `drivers.toml` has no GENET
-entry. It never opens a serial port and never claims a board result.
+The DTB check compares the FDT magic/totalsize/CRC-32 of the staged blob with the validated
+fixture. The manifest linter fails if devd/genet/netd are disabled, devd is not `dtb launch`, the
+expected `scheme:dev`/`scheme:plat`/`scheme:nic` needs or provides are missing, the drivers table
+lacks the `genet`/`slots=platform` entry, or a duplicate genet launcher is present. It never opens
+a serial port and never claims a board result.
+
+## 2.1 Reproducibility
+
+```sh
+scripts/pi4-release.sh --repro
+```
+
+The repro check removes `build/fixtures`, rebuilds the Pi 4 DTB fixture, builds the release image
+twice, compares both SHA-256 values and runs the full `--check` on both. It writes only under
+`build/`. A mismatch or a failed check exits nonzero and prints the logs.
 
 ## 3. Flash and capture
 
