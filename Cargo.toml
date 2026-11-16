@@ -113,6 +113,7 @@ members = [
     "userland/init",
     "userland/init/testsvc",
     "userland/bin/uname",
+    "userland/bin/dtrace",
     "userland/bin/rsh",
     "userland/bin/echo",
     "userland/bin/ifconfig",

@@ -1,0 +1,54 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt DTRACE 1
+.Os RavenBSD
+.Sh NAME
+.Nm dtrace
+.Nd inspect RavenBSD DTrace probes and records
+.Sh SYNOPSIS
+.Nm
+.Op Fl l
+.Op Fl e Ar id
+.Op Fl d Ar id
+.Op Fl r Ar count
+.Op Fl s
+.Op Fl c
+.Op Fl u
+.Op Fl h
+.Sh DESCRIPTION
+.Nm is the userland consumer for the kernel DTrace provider.
+With no action it lists the registered probes.
+.Bl -tag -width Ds
+.It Fl l
+List probes as
+.Dq id provider name .
+.It Fl e Ar id
+Enable the probe
+.Ar id .
+.It Fl d Ar id
+Disable the probe
+.Ar id .
+.It Fl r Ar count
+Read and print up to
+.Ar count
+records.
+.It Fl s
+Print per-CPU ring statistics: produced, consumed, dropped and capacity.
+.It Fl c
+Clear the rings and counters; every probe must be disabled first.
+.It Fl u
+List the USDT marker sites and each site's marker opcode.
+.It Fl h
+Print usage.
+.El
+.Pp
+Records are printed as
+.Dq cpu=N probe=N tid=N syscall=N ts=N args=A0,A1,A2,A3 .
+The probe and record layouts are the S57
+.Xr dtrace_read 2
+wire records.
+.Sh EXIT STATUS
+.Ex -std
+.Sh STANDARDS
+RavenBSD ABI v1.
