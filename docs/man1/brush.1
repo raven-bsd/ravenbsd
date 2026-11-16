@@ -1,0 +1,109 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt BRUSH 1
+.Os RavenBSD
+.Sh NAME
+.Nm brush
+.Nd bash-compatible interactive shell
+.Sh SYNOPSIS
+.Nm
+.Op Fl i
+.Op Fl c Ar command
+.Op Fl -rcfile Ar file
+.Op Fl -input-backend Ar backend
+.Sh DESCRIPTION
+.Nm
+is the RavenBSD interactive shell.
+It is a Rust implementation of the Bourne-Again Shell language and is built from the
+pinned MIT
+.Sy brush
+source.
+It supports variables, quoting, functions, conditionals, loops, redirections,
+command substitution, scripts and a bash-style
+.Ev PS1 .
+The RavenBSD image also keeps
+.Pa /bin/rsh
+as the rescue shell and
+.Pa /bin/sh
+as the POSIX shell.
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl c Ar command
+Run
+.Ar command
+and exit.
+No prompt or interactive history is loaded.
+.It Fl i
+Run interactively.
+.It Fl -rcfile Ar file
+Read the interactive startup file
+.Ar file
+instead of the default system and home rc files.
+.It Fl -norc
+Do not read any interactive rc file.
+.It Fl -input-backend Ar backend
+Select the line-editing backend:
+.Ar reedline ,
+.Ar basic ,
+.Ar minimal
+or
+.Ar vt .
+.El
+.Sh FILES
+.Bl -tag -width /etc/brush/brushrc -compact
+.It Pa /etc/brush/brushrc
+RavenBSD interactive configuration: prompt, history and completion.
+.It Pa /tmp/brush_history
+The image-local history file selected by
+.Ev HISTFILE
+on the read-only initfs.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width HISTTIMEFORMAT -compact
+.It Ev PS1
+The prompt.
+The RavenBSD rc sets a Raven Violet
+.Sy root@host:cwd#
+prompt and a plain prompt when
+.Ev NO_COLOR
+is set or
+.Ev TERM
+is
+.Dq dumb .
+.It Ev HISTFILE
+History file path.
+.It Ev HISTCONTROL
+History deduplication policy; the RavenBSD rc sets
+.Dq ignoreboth .
+.It Ev HISTTIMEFORMAT
+Timestamp format written to the history file.
+.It Ev NO_COLOR
+Disable the prompt and tool colour.
+.It Ev TERM
+.Dq dumb
+selects the plain prompt.
+.El
+.Sh SEE ALSO
+.Xr sh 1 ,
+.Xr rsh 1 ,
+.Xr raven 1
+.Sh HISTORY
+.Nm
+first appeared in RavenBSD 0.1 as the modern-shell profile's interactive shell.
+.Sh BUGS
+Interactive console input is still blocked on the target: the
+.Ar minimal
+backend hits the static-binary TLS destructor, the
+.Ar basic
+backend does not yet consume
+.Pa tty:console
+input, and
+.Ar reedline
+needs the multi-threaded tokio runtime, which static-binary threads do not
+provide yet.
+The
+.Ar shell-test
+profile keeps
+.Xr rsh 1
+as the working console shell until that platform work lands.

@@ -1,0 +1,169 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# U5: the user-tools image. The custom init mounts a writable ramfs /etc, copies the account
+# files and starts rsh. su/passwd are packed 4755 by tests/user/image/build.sh.
+
+name = "user-tools"
+arch = "x86_64"
+profile = "user-tools"
+timeout_secs = 420
+pre = ["sh tests/user/image/build.sh"]
+initfs = "build/user/image/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^rsh: ready$'
+
+[[expect]]
+regex = '^New password: ?$'
+
+[[expect]]
+regex = '^Retype new password: ?$'
+
+[[expect]]
+regex = '^uid=1000\(alice\) gid=1000\(alice\) groups=1000\(alice\)$'
+
+[[expect]]
+regex = '^root$'
+
+[[expect]]
+regex = '^alice$'
+
+[[expect]]
+regex = '^uid=1000\(alice\) gid=1000\(alice\) groups=1000\(alice\)$'
+
+[[expect]]
+regex = '^root$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|command not found|user-tools:|su: .*incorrect|passwd: .*'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "useradd -c \"Alice Example\" -s /bin/rsh alice\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "passwd alice\n"
+delay_ms = 100
+
+[[step]]
+wait = '^New password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "alicepass\n"
+delay_ms = 100
+
+[[step]]
+wait = '^Retype new password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "alicepass\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "id alice\n"
+delay_ms = 100
+
+[[step]]
+wait = '^uid=1000\(alice\) gid=1000\(alice\) groups=1000\(alice\)$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "whoami\n"
+delay_ms = 100
+
+[[step]]
+wait = '^root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "su alice\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rsh: ready$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "whoami\n"
+delay_ms = 100
+
+[[step]]
+wait = '^alice$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "id\n"
+delay_ms = 100
+
+[[step]]
+wait = '^uid=1000\(alice\) gid=1000\(alice\) groups=1000\(alice\)$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "whoami\n"
+delay_ms = 100
+
+[[step]]
+wait = '^root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

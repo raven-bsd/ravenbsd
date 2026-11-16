@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Negative fixture: the launch and link are present, but there is no DHCP lease
+# and therefore no DHCP marker or eth0 publication.
+devd: dtb launch genet bar=0 size=0x10000 dma=1048576 irq=189
+genet: revision=0x06000000 mac=02:00:00:00:00:42 bar=0 size=65536 dma=1048576 irq=189 slots=Platform
+genet: serving nic:
+GENET-NET-LINK speed=1000 duplex=full
+GENET-NET-PING target=192.168.1.1 tx=3 rx=3 rtt_ms=0
+GENET-NET-OK

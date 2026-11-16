@@ -12,6 +12,7 @@
 extern crate alloc;
 
 pub mod dtb;
+pub mod platform;
 
 #[cfg(test)]
 mod dtb_ut;

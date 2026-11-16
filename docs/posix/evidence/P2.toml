@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P2 owner evidence: add [[row]] entries here. A present row needs executable evidence; a waived
+# row needs a written waiver in notes.
+schema = 1
+standard = "posix-2024"

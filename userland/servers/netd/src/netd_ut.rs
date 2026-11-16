@@ -5,7 +5,7 @@
 
 use super::*;
 use crate::Loopback;
-use raven_proto_net::{IfaceRequest, IfaceResponse, Route, Shutdown, SockOpt};
+use raven_proto_net::{IfName, IfaceRequest, IfaceResponse, Route, Shutdown, SockOpt};
 
 const MAC: [u8; 6] = [0x02, 0, 0, 0, 0, 1];
 const SERVER: Endpoint = Endpoint {
@@ -29,18 +29,7 @@ fn new_netd() -> Netd<Loopback> {
 
 fn new_netd_with_nic() -> Netd<Loopback> {
     let mut netd = new_netd();
-    netd.attach_nic(
-        Loopback::new(NIC_MAC),
-        NicConfig {
-            mac: NIC_MAC,
-            mtu: 1500,
-            addr: [10, 0, 2, 15],
-            prefix: 24,
-            gateway: Some([10, 0, 2, 2]),
-            dhcp: false,
-        },
-        0,
-    );
+    netd.attach_nic(Loopback::new(NIC_MAC), NicConfig::qemu(NIC_MAC, 1500), 0);
     netd
 }
 
@@ -514,4 +503,191 @@ fn a_fresh_server_can_rebind_after_drop() {
         call_socket(&mut second, file, Call::Listen { backlog: 1 }),
         Response::Ok
     );
+}
+
+fn test_lease(address: Ipv4Addr, prefix: u8, router: Option<Ipv4Addr>, dns: Ipv4Addr) -> DhcpLease {
+    DhcpLease {
+        address,
+        prefix_len: prefix,
+        router,
+        dns: alloc::vec![dns],
+        renew_at_ms: Some(1_000),
+        rebind_at_ms: Some(2_000),
+        expires_at_ms: Some(3_000),
+    }
+}
+
+#[test]
+fn a_platform_nic_is_not_published_before_a_lease() {
+    let mut netd = new_netd();
+    netd.attach_nic(
+        Loopback::new(NIC_MAC),
+        NicConfig::platform(NIC_MAC, 1500),
+        0,
+    );
+    assert!(netd.published_nic().is_none());
+    let control = netd.open("net:").unwrap();
+    let response = call_iface(&mut netd, control, IfaceRequest::List);
+    assert_eq!(
+        IfaceResponse::decode(&response[..8]).unwrap(),
+        IfaceResponse::Count { count: 1 }
+    );
+    let name = IfName::new("eth0").unwrap();
+    let response = call_iface(&mut netd, control, IfaceRequest::Get { name });
+    assert_eq!(
+        IfaceResponse::decode(&response).unwrap(),
+        IfaceResponse::Err(Errno::ENODEV)
+    );
+    let response = call_iface(&mut netd, control, IfaceRequest::DhcpLease { name });
+    assert_eq!(
+        IfaceResponse::decode(&response).unwrap(),
+        IfaceResponse::Err(Errno::ENOENT)
+    );
+}
+
+#[test]
+fn a_valid_platform_lease_is_applied_and_published() {
+    let mut netd = new_netd();
+    netd.attach_nic(
+        Loopback::new(NIC_MAC),
+        NicConfig::platform(NIC_MAC, 1500),
+        0,
+    );
+    let lease = test_lease(
+        Ipv4Addr::new(192, 168, 1, 23),
+        24,
+        Some(Ipv4Addr::new(192, 168, 1, 1)),
+        Ipv4Addr::new(192, 168, 1, 1),
+    );
+    assert!(netd.apply_nic_lease(&lease));
+    let config = netd.published_nic().unwrap();
+    assert_eq!(config.addr, [192, 168, 1, 23]);
+    assert_eq!(config.prefix, 24);
+    assert_eq!(config.gateway, Some([192, 168, 1, 1]));
+    assert_eq!(
+        netd.dhcp_lease().unwrap().address.octets(),
+        [192, 168, 1, 23]
+    );
+
+    let control = netd.open("net:").unwrap();
+    let response = call_iface(&mut netd, control, IfaceRequest::List);
+    assert_eq!(
+        IfaceResponse::decode(&response[..8]).unwrap(),
+        IfaceResponse::Count { count: 2 }
+    );
+}
+
+#[test]
+fn an_invalid_platform_lease_is_rejected() {
+    let mut netd = new_netd();
+    netd.attach_nic(
+        Loopback::new(NIC_MAC),
+        NicConfig::platform(NIC_MAC, 1500),
+        0,
+    );
+    let cases = [
+        test_lease(
+            Ipv4Addr::UNSPECIFIED,
+            24,
+            Some(Ipv4Addr::new(10, 0, 2, 2)),
+            Ipv4Addr::new(10, 0, 2, 3),
+        ),
+        test_lease(
+            Ipv4Addr::new(224, 0, 0, 1),
+            24,
+            Some(Ipv4Addr::new(10, 0, 2, 2)),
+            Ipv4Addr::new(10, 0, 2, 3),
+        ),
+        test_lease(
+            Ipv4Addr::new(192, 168, 1, 23),
+            0,
+            Some(Ipv4Addr::new(192, 168, 1, 1)),
+            Ipv4Addr::new(192, 168, 1, 1),
+        ),
+        test_lease(
+            Ipv4Addr::new(192, 168, 1, 23),
+            24,
+            Some(Ipv4Addr::new(0, 0, 0, 0)),
+            Ipv4Addr::new(192, 168, 1, 1),
+        ),
+        test_lease(
+            Ipv4Addr::new(192, 168, 1, 23),
+            24,
+            Some(Ipv4Addr::new(192, 168, 1, 1)),
+            Ipv4Addr::UNSPECIFIED,
+        ),
+    ];
+    for lease in cases {
+        assert!(!netd.apply_nic_lease(&lease), "{lease:?}");
+        assert!(netd.published_nic().is_none());
+        assert!(netd.dhcp_lease().is_none());
+    }
+}
+
+#[test]
+fn the_qemu_configuration_keeps_the_user_mode_address() {
+    let netd = new_netd_with_nic();
+    let config = netd.published_nic().unwrap();
+    assert!(config.is_qemu_user());
+    assert_eq!(config.addr, [10, 0, 2, 15]);
+    assert_eq!(config.prefix, 24);
+    assert_eq!(config.gateway, Some([10, 0, 2, 2]));
+
+    let platform = NicConfig::platform(NIC_MAC, 1500);
+    assert!(!platform.is_qemu_user());
+    assert_eq!(platform.addr, [0; 4]);
+    assert_eq!(platform.prefix, 0);
+    assert_eq!(platform.gateway, None);
+}
+
+#[test]
+fn release_markers_are_formatted_from_the_lease_and_reply() {
+    let lease = test_lease(
+        Ipv4Addr::new(192, 168, 1, 23),
+        24,
+        Some(Ipv4Addr::new(192, 168, 1, 1)),
+        Ipv4Addr::new(192, 168, 1, 1),
+    );
+    assert_eq!(
+        release_dhcp_line(&lease).as_deref(),
+        Some("dhcp 192.168.1.23/24 192.168.1.1 192.168.1.1\n")
+    );
+    let no_dns = DhcpLease {
+        dns: alloc::vec![],
+        ..lease
+    };
+    assert_eq!(
+        release_dhcp_line(&no_dns).as_deref(),
+        Some("dhcp 192.168.1.23/24 192.168.1.1 none\n")
+    );
+    let no_router = DhcpLease {
+        router: None,
+        ..no_dns
+    };
+    assert_eq!(release_dhcp_line(&no_router), None);
+    assert_eq!(
+        release_ping_line(ReleasePing {
+            target: [192, 168, 1, 1],
+            rtt_ms: 3,
+        }),
+        "ping 192.168.1.1 tx=1 rx=1 rtt_ms=3\n"
+    );
+}
+
+#[test]
+fn only_the_nic_gateway_records_a_release_ping() {
+    let mut netd = new_netd_with_nic();
+    netd.record_release_ping(Interface::Nic, [10, 0, 2, 9], 4);
+    assert_eq!(netd.take_release_ping(), None);
+    netd.record_release_ping(Interface::Loopback, [10, 0, 2, 2], 4);
+    assert_eq!(netd.take_release_ping(), None);
+    netd.record_release_ping(Interface::Nic, [10, 0, 2, 2], 7);
+    assert_eq!(
+        netd.take_release_ping(),
+        Some(ReleasePing {
+            target: [10, 0, 2, 2],
+            rtt_ms: 7,
+        })
+    );
+    assert_eq!(netd.take_release_ping(), None);
 }

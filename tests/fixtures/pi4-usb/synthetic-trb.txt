@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Synthetic xHCI TRB words for the D1 host test. Four little-endian 32-bit words per line:
+# parameter low, parameter high, status, control. The sequence is our own minimal example:
+# enable slot, address device slot 1, configure endpoint slot 1, then a successful transfer
+# event for slot 1 endpoint 1 with an 8-byte payload.
+00000000 00000000 00000000 00002409
+00001000 00000000 00000000 01002c0b
+00002000 00000000 00000000 0100300c
+00000000 00000000 01000008 01018020

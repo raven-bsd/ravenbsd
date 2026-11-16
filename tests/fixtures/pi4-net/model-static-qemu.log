@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Negative fixture: the log uses the QEMU user-mode address on the Pi path.
+devd: dtb launch genet bar=0 size=0x10000 dma=1048576 irq=189
+genet: revision=0x06000000 mac=02:00:00:00:00:42 bar=0 size=65536 dma=1048576 irq=189 slots=Platform
+genet: serving nic:
+netd: interface eth0 10.0.2.15/24
+GENET-NET-LINK speed=1000 duplex=full
+GENET-NET-DHCP addr=10.0.2.15/24 gateway=10.0.2.2 dns=10.0.2.3
+ping: 10.0.2.2 seq=1 rtt=1ms
+ping: 10.0.2.2 packets transmitted, 1 received, 0% packet loss
+GENET-NET-PING target=10.0.2.2 tx=1 rx=1 rtt_ms=1
+GENET-NET-OK

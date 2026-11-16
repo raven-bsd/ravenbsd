@@ -7,7 +7,7 @@
 resolver = "3"
 # `make toolchain` extracts the pinned Rust source under build/; its bootstrap
 # package must not be pulled into this workspace.
-exclude = ["build", "userland/brush", "toolchain/vendor/libc"]
+exclude = ["build", "userland/brush", "toolchain/vendor/libc", "userland/uutils"]
 # A ticket that creates a new top-level crate appends ONE line to `members` (and nothing else here).
 # Planned members: "kernel", "boot/loader", "userland/rt", "userland/init", "userland/bin/<tool>",
 # "userland/servers/<server>", "userland/drivers/<driver>", "userland/linux-shim", "libc/ravenlibc/crates/*",
@@ -25,6 +25,9 @@ members = [
     "tests/fixtures/s24-spawn/parent",
     "tests/fixtures/s24-spawn/child",
     "tests/fixtures/proc-identity",
+    "tests/fixtures/perm",
+    "tests/fixtures/setuid",
+    "tests/fixtures/proc-handle-info",
     "tests/fixtures/proc-registry",
     "tests/fixtures/proc-credentials",
     "tests/fixtures/s11-echo",
@@ -57,6 +60,7 @@ members = [
     "tests/fixtures/usercopy-cow",
     "tests/fixtures/testkernel",
     "tests/fixtures/update/probe",
+    "tests/tls/client",
     "tests/fixtures/k14-block/mkdisk",
     "tests/fixtures/k33-rootfs",
     "tests/fixtures/b12-netd",
@@ -70,6 +74,9 @@ members = [
     "tests/fixtures/b70-net/probe",
     "tests/fixtures/b70-net/overlay",
     "tests/fixtures/pi4-soak",
+    "tests/fixtures/pi4-net/model",
+    "tests/fixtures/pi4-devd/driver",
+    "tests/fixtures/pi4-platd",
     "profiles/iommu-fixture",
     "tests/qtest/cases/linux-trap-fixture",
     "tests/qtest/cases/linux-root-fixture",
@@ -93,6 +100,8 @@ members = [
     "tests/libc/atf",
     "tests/libc/gate",
     "tests/libc/toolchain-abi",
+    "tests/user",
+    "tests/user/image",
     "tests/ufs-powercut",
     "tools/fs-fuzz",
     "tools/linux-corpus",
@@ -122,6 +131,8 @@ members = [
     "userland/bin/route",
     "userland/bin/netstat",
     "userland/bin/hostname",
+    "userland/bin/login",
+    "userland/bin/getty",
     "userland/bin/sleep",
     "userland/bin/play",
     "userland/bin/beep",
@@ -143,6 +154,13 @@ members = [
     "userland/bin/cp",
     "userland/bin/touch",
     "userland/bin/stat",
+    "userland/bin/useradd",
+    "userland/bin/adduser",
+    "userland/bin/passwd",
+    "userland/bin/groupadd",
+    "userland/bin/su",
+    "userland/bin/id",
+    "userland/bin/whoami",
     "userland/bin/df",
     "userland/servers/logd",
     "userland/servers/sysd",
@@ -188,6 +206,9 @@ members = [
     "userland/drivers/virtio-blk",
     "userland/drivers/emmc2",
     "userland/drivers/genet",
+    "userland/drivers/usb-hid",
+    "userland/drivers/xhci",
+    "userland/drivers/pi4-xhci",
     "userland/drivers/pwm-audio",
     "tools/bench-host",
     "tools/fuzz",
@@ -207,6 +228,8 @@ rust-version = "1.97"
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
 missing_docs = "warn"
+# The custom target OS is not in rustc's built-in list; declare it once for host clippy.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("ravenbsd"))'] }
 
 [workspace.lints.clippy]
 undocumented_unsafe_blocks = "deny"

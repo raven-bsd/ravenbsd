@@ -18,6 +18,11 @@ use raven_linux_abi::Arch;
 use raven_linux_abi::flags::clone as clone_flags;
 use raven_linux_dispatch::{Dispatcher, LinuxContext, SyscallArgs};
 
+use crate::files::{
+    self, AT_FDCWD, F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_SETFD, F_SETFL, FD_CLOEXEC,
+    FileOp, O_ACCMODE, O_APPEND, O_CLOEXEC, O_DIRECTORY, O_NOFOLLOW, O_NONBLOCK, O_RDONLY, O_TRUNC,
+    SEEK_CUR, SEEK_END, SEEK_SET, bounded_len,
+};
 use crate::procfs::{self, Resource};
 use crate::table::{CloneRequest, FileKind, LinuxProcess};
 
@@ -36,6 +41,9 @@ const ARCH_SET_FS: i32 = 0x1002;
 /// `ARCH_GET_FS` of x86-64.
 const ARCH_GET_FS: i32 = 0x1003;
 
+/// The Linux root is read-only for the synthetic surface.
+const EROFS: i32 = Errno::EROFS.0 as i32;
+
 /// `PR_SET_NAME`.
 const PR_SET_NAME: i32 = 15;
 /// `PR_GET_NAME`.
@@ -43,31 +51,6 @@ const PR_GET_NAME: i32 = 16;
 
 /// `sizeof(struct robust_list_head)` on 64-bit Linux.
 const ROBUST_LIST_HEAD_SIZE: usize = 24;
-
-/// `AT_FDCWD`.
-const AT_FDCWD: i32 = -100;
-
-/// Linux access-mode mask.
-const O_ACCMODE: i32 = 0x3;
-
-/// `O_RDONLY`.
-const O_RDONLY: i32 = 0;
-
-/// `O_DIRECTORY`.
-const O_DIRECTORY: i32 = 0x1_0000;
-
-/// `O_NONBLOCK` (accepted and ignored for synthetic files).
-const O_NONBLOCK: i32 = 0x800;
-
-/// `O_CLOEXEC`.
-const O_CLOEXEC: i32 = 0x8_0000;
-
-/// `SEEK_SET`.
-const SEEK_SET: i32 = 0;
-/// `SEEK_CUR`.
-const SEEK_CUR: i32 = 1;
-/// `SEEK_END`.
-const SEEK_END: i32 = 2;
 
 /// A dispatcher with the B20 handlers registered.
 pub fn dispatcher() -> Dispatcher {
@@ -89,6 +72,10 @@ pub fn dispatcher() -> Dispatcher {
         ("readlink", readlink as _),
         ("readlinkat", readlinkat as _),
         ("getdents64", getdents64 as _),
+        ("pread64", pread64 as _),
+        ("pwrite64", pwrite64 as _),
+        ("fcntl", fcntl as _),
+        ("dup3", dup3 as _),
         ("gettid", gettid as _),
         ("set_tid_address", set_tid_address as _),
         ("set_robust_list", set_robust_list as _),
@@ -115,21 +102,6 @@ const EINVAL: i32 = Errno::EINVAL.0 as i32;
 
 fn einval() -> isize {
     -(EINVAL as isize)
-}
-
-fn write(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
-    let fd = args.fd(0);
-    let length = args.size(2);
-    let result = with(ctx, |process| {
-        if fd != 1 && fd != 2 {
-            return -(Errno::EBADF.0 as isize);
-        }
-        let bytes = process.user_buffer.as_slice();
-        let take = bytes.len().min(length);
-        process.output.extend_from_slice(&bytes[..take]);
-        take as isize
-    });
-    result.unwrap_or_else(|_| einval())
 }
 
 fn exit_group(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
@@ -358,35 +330,59 @@ fn path_bytes(process: &LinuxProcess) -> Result<&[u8], i32> {
     buffer.get(..end).ok_or(EINVAL)
 }
 
-/// Shared body of `open` and `openat`; `dirfd` is only meaningful for a relative path.
+/// Shared body of `open` and `openat`.
+///
+/// Synthetic `/proc`/`/sys` paths keep the in-memory content and stay read-only. Every other path
+/// resolves to a `file:`/`ufs:` scheme path and is queued for the trap loop, which obtains the
+/// scheme handle and installs the descriptor.
 fn open_impl(process: &mut LinuxProcess, dirfd: i32, flags: i32) -> isize {
-    if flags & O_ACCMODE != O_RDONLY {
-        return -(Errno::EACCES.0 as isize);
-    }
-    let allowed = O_DIRECTORY | O_NONBLOCK | O_CLOEXEC;
-    if flags & !allowed != 0 {
-        return -(Errno::EINVAL.0 as isize);
-    }
     let path = match path_bytes(process) {
         Ok(path) => path.to_vec(),
         Err(_) => return -(Errno::EINVAL.0 as isize),
     };
-    if dirfd != AT_FDCWD && !path.starts_with(b"/") {
-        return -(Errno::EBADF.0 as isize);
-    }
-    match procfs::lookup(process, &path) {
-        Ok(Resource::File(bytes)) => {
-            if flags & O_DIRECTORY != 0 {
-                return -(Errno::ENOTDIR.0 as isize);
+    let resolved = match files::resolve_path(process, dirfd, &path) {
+        Ok(resolved) => resolved,
+        Err(error) => return -(error.0 as isize),
+    };
+    if files::is_synthetic(&resolved) {
+        if flags & O_ACCMODE != O_RDONLY
+            || flags & (O_APPEND | O_TRUNC | crate::files::O_CREAT) != 0
+        {
+            return -(EROFS as isize);
+        }
+        let allowed = O_DIRECTORY
+            | O_NONBLOCK
+            | O_CLOEXEC
+            | O_NOFOLLOW
+            | crate::files::O_LARGEFILE
+            | crate::files::O_NOCTTY;
+        if flags & !allowed != 0 {
+            return -(Errno::EINVAL.0 as isize);
+        }
+        return match procfs::lookup(process, &resolved) {
+            Ok(Resource::File(bytes)) => {
+                if flags & O_DIRECTORY != 0 {
+                    return -(Errno::ENOTDIR.0 as isize);
+                }
+                process.open_with_flags(resolved, FileKind::Regular(bytes), flags) as isize
             }
-            process.open_file(path, FileKind::Regular(bytes)) as isize
-        }
-        Ok(Resource::Directory(entries)) => {
-            process.open_file(path, FileKind::Directory(entries)) as isize
-        }
-        Ok(Resource::Symlink(_)) => -(Errno::ELOOP.0 as isize),
-        Err(error) => -(error.0 as isize),
+            Ok(Resource::Directory(entries)) => {
+                process.open_with_flags(resolved, FileKind::Directory(entries), flags) as isize
+            }
+            Ok(Resource::Symlink(_)) => -(Errno::ELOOP.0 as isize),
+            Err(error) => -(error.0 as isize),
+        };
     }
+    let scheme = files::scheme_path(&resolved);
+    if scheme.len() > 256 {
+        return -(Errno::ENAMETOOLONG.0 as isize);
+    }
+    process.pending_file = Some(FileOp::Open {
+        scheme,
+        path: resolved,
+        flags,
+    });
+    0
 }
 
 fn open(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
@@ -403,8 +399,17 @@ fn openat(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
 fn read(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
     let fd = args.fd(0);
     let address = args.ptr(1) as u64;
-    let count = args.size(2);
+    let count = bounded_len(args.size(2));
     let result = with(ctx, |process| {
+        let remote = process.file(fd).is_some_and(|file| file.remote().is_some());
+        if remote {
+            process.pending_file = Some(FileOp::Read {
+                fd,
+                address,
+                len: count,
+            });
+            return count as isize;
+        }
         let (data, take) = {
             let Some(file) = process.file_mut(fd) else {
                 return -(Errno::EBADF.0 as isize);
@@ -413,6 +418,7 @@ fn read(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
                 FileKind::Regular(bytes) => bytes,
                 FileKind::Directory(_) => return -(Errno::EISDIR.0 as isize),
                 FileKind::Symlink(_) => return -(Errno::EINVAL.0 as isize),
+                FileKind::Remote(_) => return -(Errno::EBADF.0 as isize),
             };
             let start = usize::try_from(file.offset).unwrap_or(usize::MAX);
             let take = bytes.len().saturating_sub(start).min(count);
@@ -431,9 +437,97 @@ fn read(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
     result.unwrap_or_else(|_| einval())
 }
 
+fn write(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let fd = args.fd(0);
+    let length = args.size(2);
+    let result = with(ctx, |process| {
+        let take = process.user_buffer.len().min(length);
+        if process.file(fd).is_some_and(|file| file.remote().is_some()) {
+            if take == 0 {
+                return 0;
+            }
+            let data = process.user_buffer.get(..take).unwrap_or(&[]).to_vec();
+            process.pending_file = Some(FileOp::Write { fd, data });
+            return take as isize;
+        }
+        if fd != 1 && fd != 2 {
+            return -(Errno::EBADF.0 as isize);
+        }
+        let bytes = process.user_buffer.as_slice();
+        process.output.extend_from_slice(&bytes[..take]);
+        take as isize
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+fn pread64(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let fd = args.fd(0);
+    let address = args.ptr(1) as u64;
+    let count = bounded_len(args.size(2));
+    let offset = args.ptr(3) as u64;
+    let result = with(ctx, |process| {
+        let remote = process.file(fd).is_some_and(|file| file.remote().is_some());
+        if remote {
+            process.pending_file = Some(FileOp::Pread {
+                fd,
+                address,
+                len: count,
+                offset,
+            });
+            return count as isize;
+        }
+        let (data, take) = {
+            let Some(file) = process.file_mut(fd) else {
+                return -(Errno::EBADF.0 as isize);
+            };
+            let bytes = match &file.kind {
+                FileKind::Regular(bytes) => bytes,
+                FileKind::Directory(_) => return -(Errno::EISDIR.0 as isize),
+                FileKind::Symlink(_) => return -(Errno::EINVAL.0 as isize),
+                FileKind::Remote(_) => return -(Errno::EBADF.0 as isize),
+            };
+            let start = usize::try_from(offset).unwrap_or(usize::MAX);
+            let take = bytes.len().saturating_sub(start).min(count);
+            let data = bytes
+                .get(start..start.saturating_add(take))
+                .unwrap_or(&[])
+                .to_vec();
+            (data, take)
+        };
+        if take > 0 {
+            process.pending_write = Some((address, data));
+        }
+        take as isize
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+fn pwrite64(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let fd = args.fd(0);
+    let length = args.size(2);
+    let offset = args.ptr(3) as u64;
+    let result = with(ctx, |process| {
+        let take = process.user_buffer.len().min(length);
+        if process.file(fd).is_some_and(|file| file.remote().is_some()) {
+            if take == 0 {
+                return 0;
+            }
+            let data = process.user_buffer.get(..take).unwrap_or(&[]).to_vec();
+            process.pending_file = Some(FileOp::Pwrite { fd, data, offset });
+            return take as isize;
+        }
+        -(EROFS as isize)
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
 fn close(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
     let fd = args.fd(0);
     let result = with(ctx, |process| {
+        if process.file(fd).is_some_and(|file| file.remote().is_some()) {
+            process.pending_file = Some(FileOp::Close { fd });
+            return 0;
+        }
         if process.close_file(fd) {
             0
         } else {
@@ -448,6 +542,13 @@ fn lseek(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
     let offset = args.ptr(1) as i64;
     let whence = args.int(2);
     let result = with(ctx, |process| {
+        if !matches!(whence, SEEK_SET | SEEK_CUR | SEEK_END) {
+            return -(Errno::EINVAL.0 as isize);
+        }
+        if process.file(fd).is_some_and(|file| file.remote().is_some()) {
+            process.pending_file = Some(FileOp::Seek { fd, offset, whence });
+            return 0;
+        }
         let Some(file) = process.file_mut(fd) else {
             return -(Errno::EBADF.0 as isize);
         };
@@ -468,6 +569,72 @@ fn lseek(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
         }
         file.offset = next as u64;
         next as isize
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+fn fcntl(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let fd = args.fd(0);
+    let command = args.int(1);
+    let argument = args.ptr(2) as u64;
+    let result = with(ctx, |process| {
+        let Some(file) = process.file(fd) else {
+            return -(Errno::EBADF.0 as isize);
+        };
+        match command {
+            F_DUPFD | F_DUPFD_CLOEXEC => {
+                let Ok(min) = i32::try_from(argument) else {
+                    return -(Errno::EINVAL.0 as isize);
+                };
+                if min < 0 {
+                    return -(Errno::EINVAL.0 as isize);
+                }
+                process.pending_file = Some(FileOp::FcntlDup {
+                    fd,
+                    min,
+                    cloexec: command == F_DUPFD_CLOEXEC,
+                });
+                0
+            }
+            F_GETFD => file.fd_flags as isize,
+            F_SETFD => {
+                let flags = argument as i32 & FD_CLOEXEC;
+                if let Some(file) = process.file_mut(fd) {
+                    file.fd_flags = flags;
+                }
+                0
+            }
+            F_GETFL => file.flags as isize,
+            F_SETFL => {
+                let mask = O_APPEND | O_NONBLOCK;
+                if let Some(file) = process.file_mut(fd) {
+                    file.flags = (file.flags & !mask) | (argument as i32 & mask);
+                }
+                0
+            }
+            _ => -(Errno::EINVAL.0 as isize),
+        }
+    });
+    result.unwrap_or_else(|_| einval())
+}
+
+fn dup3(ctx: &mut dyn LinuxContext, args: &SyscallArgs) -> isize {
+    let oldfd = args.fd(0);
+    let newfd = args.fd(1);
+    let flags = args.int(2);
+    let result = with(ctx, |process| {
+        if oldfd == newfd || flags & !O_CLOEXEC != 0 || newfd < 0 {
+            return -(Errno::EINVAL.0 as isize);
+        }
+        if process.file(oldfd).is_none() {
+            return -(Errno::EBADF.0 as isize);
+        }
+        process.pending_file = Some(FileOp::Dup3 {
+            oldfd,
+            newfd,
+            cloexec: flags & O_CLOEXEC != 0,
+        });
+        0
     });
     result.unwrap_or_else(|_| einval())
 }

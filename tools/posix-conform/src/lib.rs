@@ -8,6 +8,7 @@
 
 pub mod gate;
 pub mod model;
+pub mod overlay;
 pub mod render;
 pub mod seed;
 
@@ -18,3 +19,7 @@ mod gate_tests;
 #[cfg(test)]
 #[path = "model_ut.rs"]
 mod model_tests;
+
+#[cfg(test)]
+#[path = "overlay_ut.rs"]
+mod overlay_tests;

@@ -1,0 +1,15 @@
+---
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+source: brush-test-harness/src/runner.rs
+assertion_line: 548
+expression: snapshot_content
+---
+exit_code: 0
+stdout: |
+  hello
+stderr: ""
+files:
+  trace.txt: |
+    + echo hello
+    + true

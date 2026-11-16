@@ -1,0 +1,5 @@
+wheel:x:0:root
+users:x:100:alice
+alice:x:1000:
+bob:x:1001:
+newshell:x:1002:

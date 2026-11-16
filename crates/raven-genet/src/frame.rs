@@ -479,9 +479,14 @@ pub struct FramePath {
 impl FramePath {
     /// Create both paths with the same slot count.
     pub fn new(count: u16) -> Result<Self, FrameError> {
+        Self::with_counts(count, count)
+    }
+
+    /// Create the RX and TX paths with independent slot counts.
+    pub fn with_counts(rx_count: u16, tx_count: u16) -> Result<Self, FrameError> {
         Ok(Self {
-            rx: RxPath::new(count)?,
-            tx: TxPath::new(count)?,
+            rx: RxPath::new(rx_count)?,
+            tx: TxPath::new(tx_count)?,
         })
     }
 

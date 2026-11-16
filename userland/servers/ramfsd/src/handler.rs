@@ -12,10 +12,11 @@ use alloc::string::{String, ToString};
 
 use raven_abi::errno::Errno;
 use raven_proto_fs::{
-    Call, CallRequest, CallResponse, OpenFlags, S_IFDIR, S_IFLNK, S_IFMT, Stat, StatFs,
+    ACCESS_EXEC, ACCESS_READ, ACCESS_WRITE, Call, CallRequest, CallResponse, Credentials,
+    OpenFlags, S_IFDIR, S_IFLNK, S_IFMT, Stat, StatFs,
 };
 use raven_ramfs_core::{ROOT_INO, Ramfs};
-use raven_scheme::{Ctx, Handler, HandlerResult, OpenTable, Opened};
+use raven_scheme::{CallReply, Ctx, Handler, HandlerResult, OpenTable, Opened};
 
 /// Aggregate open-file-description budget.
 pub const MAX_OPEN_FILES: usize = 256;
@@ -107,12 +108,17 @@ impl RamfsHandler {
         }
     }
 
-    fn open_ino(&mut self, path: &str, flags: OpenFlags) -> Result<(u64, bool), Errno> {
+    fn open_ino(
+        &mut self,
+        path: &str,
+        flags: OpenFlags,
+        creds: &Credentials,
+    ) -> Result<(u64, bool), Errno> {
         let now = self.clock();
         let existing = if flags.nofollow() {
-            self.fs.lookup_no_follow(path)
+            self.fs.lookup_no_follow_at_checked(ROOT_INO, path, creds)
         } else {
-            self.fs.lookup(path)
+            self.fs.lookup_at_checked(ROOT_INO, path, creds)
         };
         let (ino, created) = match existing {
             Ok(ino) => {
@@ -125,9 +131,22 @@ impl RamfsHandler {
                 (ino, false)
             }
             Err(Errno::ENOENT) if flags.create() => {
+                let (_, _, parent) = self.fs.parent_and_name_checked(ROOT_INO, path, creds)?;
+                if !creds.permitted(
+                    (parent.mode & 0o7777) as u16,
+                    parent.uid,
+                    parent.gid,
+                    ACCESS_WRITE | ACCESS_EXEC,
+                ) {
+                    return Err(Errno::EACCES);
+                }
                 let mode = u16::try_from(flags.create_mode().unwrap_or(0o644))
                     .map_err(|_| Errno::EINVAL)?;
-                (self.fs.create_file_at(ROOT_INO, path, mode, now)?, true)
+                (
+                    self.fs
+                        .create_file_at_owned(ROOT_INO, path, mode, creds.euid, creds.egid, now)?,
+                    true,
+                )
             }
             Err(error) => return Err(error),
         };
@@ -138,6 +157,16 @@ impl RamfsHandler {
         }
         if is_dir && flags.writable() {
             return Err(Errno::EISDIR);
+        }
+        let mut want = 0;
+        if flags.readable() {
+            want |= ACCESS_READ;
+        }
+        if flags.writable() || flags.truncate() {
+            want |= ACCESS_WRITE;
+        }
+        if want != 0 && !creds.permitted((stat.mode & 0o7777) as u16, stat.uid, stat.gid, want) {
+            return Err(Errno::EACCES);
         }
         if flags.truncate() {
             if is_dir {
@@ -179,7 +208,7 @@ impl Handler for RamfsHandler {
         path: &str,
         flags: OpenFlags,
         _mode: u32,
-        _ctx: &Ctx,
+        ctx: &Ctx,
     ) -> HandlerResult<Opened> {
         let Some((file_id, expected)) = self.pending.take() else {
             return Err(Errno::EINVAL.into());
@@ -190,7 +219,7 @@ impl Handler for RamfsHandler {
         if self.opens.len() >= MAX_OPEN_FILES {
             return Err(Errno::EMFILE.into());
         }
-        let (ino, created) = self.open_ino(path, flags)?;
+        let (ino, created) = self.open_ino(path, flags, &ctx.credentials)?;
         if created && let Ok(parent) = self.parent_ino(ROOT_INO, path) {
             self.bump_dir(parent);
         }
@@ -344,47 +373,103 @@ impl Handler for RamfsHandler {
     }
 
     fn call(&mut self, file: u64, request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {
+        self.call_checked(file, request, response, &Credentials::ROOT)
+    }
+
+    fn call_with(
+        &mut self,
+        file: u64,
+        request: &[u8],
+        response: &mut [u8],
+        ctx: &Ctx,
+    ) -> HandlerResult<CallReply> {
+        let written = self.call_checked(file, request, response, &ctx.credentials)?;
+        Ok(CallReply::new(written))
+    }
+}
+
+impl RamfsHandler {
+    fn call_checked(
+        &mut self,
+        file: u64,
+        request: &[u8],
+        response: &mut [u8],
+        creds: &Credentials,
+    ) -> HandlerResult<usize> {
         let decoded = CallRequest::decode(request).map_err(|_| Errno::EPROTO)?;
         let dir_ino = self.opens.get(file).ok_or(Errno::EBADF)?.file.ino;
         let now = self.clock();
         match decoded.call {
             Call::Mkdir { mode, path } => {
                 let path = text(path)?;
-                let parent = self.parent_ino(dir_ino, path);
+                let (parent, _, parent_stat) =
+                    self.fs.parent_and_name_checked(dir_ino, path, creds)?;
+                if !creds.permitted(
+                    (parent_stat.mode & 0o7777) as u16,
+                    parent_stat.uid,
+                    parent_stat.gid,
+                    ACCESS_WRITE | ACCESS_EXEC,
+                ) {
+                    return Self::status(response, Err(Errno::EACCES));
+                }
                 let result = self
                     .fs
-                    .mkdir_at(
+                    .mkdir_at_owned(
                         dir_ino,
                         path,
                         u16::try_from(mode).map_err(|_| Errno::EINVAL)?,
+                        creds.euid,
+                        creds.egid,
                         now,
                     )
                     .map(|_| ());
-                if result.is_ok()
-                    && let Ok(parent) = parent
-                {
+                if result.is_ok() {
                     self.bump_dir(parent);
                 }
                 Self::status(response, result)
             }
             Call::Unlink { path } => {
                 let path = text(path)?;
-                let parent = self.parent_ino(dir_ino, path);
+                let (parent, _, parent_stat) =
+                    self.fs.parent_and_name_checked(dir_ino, path, creds)?;
+                if !creds.permitted(
+                    (parent_stat.mode & 0o7777) as u16,
+                    parent_stat.uid,
+                    parent_stat.gid,
+                    ACCESS_WRITE | ACCESS_EXEC,
+                ) {
+                    return Self::status(response, Err(Errno::EACCES));
+                }
+                let ino = self.fs.lookup_no_follow_at_checked(dir_ino, path, creds)?;
+                let target = self.fs.stat(ino)?;
+                if !creds.sticky_delete_allowed((parent_stat.mode & 0o7777) as u16, target.uid) {
+                    return Self::status(response, Err(Errno::EPERM));
+                }
                 let result = self.fs.unlink_at(dir_ino, path, now);
-                if result.is_ok()
-                    && let Ok(parent) = parent
-                {
+                if result.is_ok() {
                     self.bump_dir(parent);
                 }
                 Self::status_with_ino(response, result, self)
             }
             Call::Rmdir { path } => {
                 let path = text(path)?;
-                let parent = self.parent_ino(dir_ino, path);
+                let (parent, _, parent_stat) =
+                    self.fs.parent_and_name_checked(dir_ino, path, creds)?;
+                if !creds.permitted(
+                    (parent_stat.mode & 0o7777) as u16,
+                    parent_stat.uid,
+                    parent_stat.gid,
+                    ACCESS_WRITE | ACCESS_EXEC,
+                ) {
+                    return Self::status(response, Err(Errno::EACCES));
+                }
+                let ino = self.fs.lookup_no_follow_at_checked(dir_ino, path, creds)?;
+                let target = self.fs.stat(ino)?;
+                if !creds.sticky_delete_allowed((parent_stat.mode & 0o7777) as u16, target.uid) {
+                    return Self::status(response, Err(Errno::EPERM));
+                }
                 let result = self.fs.rmdir_at(dir_ino, path, now);
-                if result.is_ok()
-                    && let Ok(parent) = parent
-                {
+                if result.is_ok() {
                     self.bump_dir(parent);
                 }
                 Self::status_with_ino(response, result, self)
@@ -392,16 +477,40 @@ impl Handler for RamfsHandler {
             Call::Rename { from, to } => {
                 let from = text(from)?;
                 let to = text(to)?;
-                let from_parent = self.parent_ino(dir_ino, from);
-                let to_parent = self.parent_ino(dir_ino, to);
+                let (from_parent, _, from_parent_stat) =
+                    self.fs.parent_and_name_checked(dir_ino, from, creds)?;
+                let (to_parent, _, to_parent_stat) =
+                    self.fs.parent_and_name_checked(dir_ino, to, creds)?;
+                for parent_stat in [from_parent_stat, to_parent_stat] {
+                    if !creds.permitted(
+                        (parent_stat.mode & 0o7777) as u16,
+                        parent_stat.uid,
+                        parent_stat.gid,
+                        ACCESS_WRITE | ACCESS_EXEC,
+                    ) {
+                        return Self::status(response, Err(Errno::EACCES));
+                    }
+                }
+                let source = self.fs.lookup_no_follow_at_checked(dir_ino, from, creds)?;
+                let source_stat = self.fs.stat(source)?;
+                if !creds
+                    .sticky_delete_allowed((from_parent_stat.mode & 0o7777) as u16, source_stat.uid)
+                {
+                    return Self::status(response, Err(Errno::EPERM));
+                }
+                if let Ok(existing) = self.fs.lookup_no_follow_at_checked(dir_ino, to, creds) {
+                    let existing_stat = self.fs.stat(existing)?;
+                    if !creds.sticky_delete_allowed(
+                        (to_parent_stat.mode & 0o7777) as u16,
+                        existing_stat.uid,
+                    ) {
+                        return Self::status(response, Err(Errno::EPERM));
+                    }
+                }
                 match self.fs.rename_at(dir_ino, from, to, now) {
                     Ok(replaced) => {
-                        if let Ok(parent) = from_parent {
-                            self.bump_dir(parent);
-                        }
-                        if let Ok(parent) = to_parent {
-                            self.bump_dir(parent);
-                        }
+                        self.bump_dir(from_parent);
+                        self.bump_dir(to_parent);
                         if let Some(ino) = replaced {
                             self.release_if_unreferenced(ino);
                         }
@@ -416,22 +525,42 @@ impl Handler for RamfsHandler {
                 if stat.mode & S_IFMT == S_IFDIR {
                     return Err(Errno::EISDIR.into());
                 }
+                if !creds.permitted(
+                    (stat.mode & 0o7777) as u16,
+                    stat.uid,
+                    stat.gid,
+                    ACCESS_WRITE,
+                ) {
+                    return Self::status(response, Err(Errno::EACCES));
+                }
                 Self::status(response, self.fs.truncate(open.file.ino, size, now))
             }
             Call::Symlink { path, target } => {
                 let path = text(path)?;
-                let parent = self.parent_ino(dir_ino, path);
-                let result = self.fs.symlink_at(dir_ino, path, target, now).map(|_| ());
-                if result.is_ok()
-                    && let Ok(parent) = parent
-                {
+                let (parent, _, parent_stat) =
+                    self.fs.parent_and_name_checked(dir_ino, path, creds)?;
+                if !creds.permitted(
+                    (parent_stat.mode & 0o7777) as u16,
+                    parent_stat.uid,
+                    parent_stat.gid,
+                    ACCESS_WRITE | ACCESS_EXEC,
+                ) {
+                    return Self::status(response, Err(Errno::EACCES));
+                }
+                let result = self
+                    .fs
+                    .symlink_at_owned(dir_ino, path, target, creds.euid, creds.egid, now)
+                    .map(|_| ());
+                if result.is_ok() {
                     self.bump_dir(parent);
                 }
                 Self::status(response, result)
             }
             Call::Readlink { path } => {
                 let path = text(path)?;
+                let ino = self.fs.lookup_no_follow_at_checked(dir_ino, path, creds)?;
                 let target = self.fs.readlink_at(dir_ino, path)?;
+                let _ = ino;
                 CallResponse::Readlink {
                     status: 0,
                     target: &target,
@@ -441,6 +570,11 @@ impl Handler for RamfsHandler {
             }
             Call::Chmod { mode, path } => {
                 let path = text(path)?;
+                let ino = self.fs.lookup_at_checked(dir_ino, path, creds)?;
+                let stat = self.fs.stat(ino)?;
+                if !creds.is_root() && creds.euid != stat.uid {
+                    return Self::status(response, Err(Errno::EPERM));
+                }
                 Self::status(
                     response,
                     self.fs.chmod_at(
@@ -452,6 +586,14 @@ impl Handler for RamfsHandler {
                 )
             }
             Call::Sync => Self::status(response, Ok(())),
+            Call::Access { mode, path } => {
+                let path = text(path)?;
+                let ino = self.fs.lookup_at_checked(dir_ino, path, creds)?;
+                let stat = self.fs.stat(ino)?;
+                let allowed =
+                    creds.permitted((stat.mode & 0o7777) as u16, stat.uid, stat.gid, mode as u16);
+                Self::status(response, if allowed { Ok(()) } else { Err(Errno::EACCES) })
+            }
             Call::Mount { .. } | Call::Umount { .. } => Self::status(response, Err(Errno::ENOSYS)),
             Call::Statfs => {
                 let statfs: StatFs = self.fs.statfs();

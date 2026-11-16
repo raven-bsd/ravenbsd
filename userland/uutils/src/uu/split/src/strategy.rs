@@ -1,0 +1,411 @@
+// This file is part of the uutils coreutils package.
+//
+// For the full copyright and license information, please view the LICENSE
+// file that was distributed with this source code.
+
+//! Determine the strategy for breaking up the input (file or stdin) into chunks
+//! based on the command line options
+
+use crate::cli::options;
+use clap::{ArgMatches, parser::ValueSource};
+use std::ffi::OsString;
+use uucore::{
+    diagnostics::OptionValue,
+    display::Quotable,
+    parser::parse_size::{ParseSizeError, parse_size_u64, parse_size_u64_max},
+    translate,
+};
+
+/// Sub-strategy of the [`Strategy::Number`]
+/// Splitting a file into a specific number of chunks.
+#[derive(Debug, PartialEq)]
+pub enum NumberType {
+    /// Split into a specific number of chunks by byte.
+    Bytes(u64),
+
+    /// Split into a specific number of chunks by byte
+    /// but output only the *k*th chunk.
+    KthBytes(u64, u64),
+
+    /// Split into a specific number of chunks by line (approximately).
+    Lines(u64),
+
+    /// Split into a specific number of chunks by line
+    /// (approximately), but output only the *k*th chunk.
+    KthLines(u64, u64),
+
+    /// Assign lines via round-robin to the specified number of output chunks.
+    RoundRobin(u64),
+
+    /// Assign lines via round-robin to the specified number of output
+    /// chunks, but output only the *k*th chunk.
+    KthRoundRobin(u64, u64),
+}
+
+impl NumberType {
+    /// The number of chunks for this number type.
+    pub fn num_chunks(&self) -> u64 {
+        match self {
+            Self::Bytes(n)
+            | Self::KthBytes(_, n)
+            | Self::Lines(n)
+            | Self::KthLines(_, n)
+            | Self::RoundRobin(n)
+            | Self::KthRoundRobin(_, n) => *n,
+        }
+    }
+}
+
+/// An error due to an invalid parameter to the `-n` command-line option.
+#[derive(Debug, PartialEq, thiserror::Error)]
+pub enum NumberTypeError {
+    /// The number of chunks was invalid.
+    ///
+    /// This can happen if the value of `N` in any of the following
+    /// command-line options is not a positive integer:
+    ///
+    /// ```ignore
+    /// -n N
+    /// -n K/N
+    /// -n l/N
+    /// -n l/K/N
+    /// -n r/N
+    /// -n r/K/N
+    /// ```
+    #[error("{}", translate!("split-error-invalid-number-of-chunks", "chunks" => .0.quote()))]
+    NumberOfChunks(String),
+
+    /// The chunk number was invalid.
+    ///
+    /// This can happen if the value of `K` in any of the following
+    /// command-line options is not a positive integer
+    /// or if `K` is 0
+    /// or if `K` is greater than `N`:
+    ///
+    /// ```ignore
+    /// -n K/N
+    /// -n l/K/N
+    /// -n r/K/N
+    /// ```
+    #[error("{}", translate!("split-error-invalid-chunk-number", "chunk" => .0.quote()))]
+    ChunkNumber(String),
+}
+
+impl NumberType {
+    /// Parse a `NumberType` from a string.
+    ///
+    /// The following strings are valid arguments:
+    ///
+    /// ```ignore
+    /// "N"
+    /// "K/N"
+    /// "l/N"
+    /// "l/K/N"
+    /// "r/N"
+    /// "r/K/N"
+    /// ```
+    ///
+    /// The `N` represents the number of chunks and the `K` represents
+    /// a chunk number.
+    ///
+    /// # Errors
+    ///
+    /// If the string is not one of the valid number types,
+    /// if `K` is not a non-negative integer,
+    /// or if `K` is 0,
+    /// or if `N` is not a positive integer,
+    /// or if `K` is greater than `N`
+    /// then this function returns [`NumberTypeError`].
+    fn from(s: &str) -> Result<Self, NumberTypeError> {
+        /// GNU accepts a leading '+' on every number, so strip it first.
+        fn parse_number(value: &str) -> Result<u64, ParseSizeError> {
+            parse_size_u64(value.strip_prefix('+').unwrap_or(value))
+        }
+        /// Parse `N`, which must be positive.
+        fn parse_num_chunks(n_str: &str) -> Result<u64, NumberTypeError> {
+            match parse_number(n_str) {
+                Ok(num_chunks) if num_chunks > 0 => Ok(num_chunks),
+                _ => Err(NumberTypeError::NumberOfChunks(n_str.to_string())),
+            }
+        }
+        /// Parse `K/N`, where `K` must be in `1..=N`.
+        fn parse_kth_chunk(k_str: &str, n_str: &str) -> Result<(u64, u64), NumberTypeError> {
+            let num_chunks = parse_number(n_str)
+                .map_err(|_| NumberTypeError::NumberOfChunks(n_str.to_string()))?;
+            match parse_number(k_str) {
+                Ok(chunk_number) if (1..=num_chunks).contains(&chunk_number) => {
+                    Ok((chunk_number, num_chunks))
+                }
+                _ => Err(NumberTypeError::ChunkNumber(k_str.to_string())),
+            }
+        }
+        let mut parts = s.splitn(4, '/');
+        match (parts.next(), parts.next(), parts.next(), parts.next()) {
+            (Some(n_str), None, None, None) => parse_num_chunks(n_str).map(Self::Bytes),
+            (Some(k_str), Some(n_str), None, None)
+                if !k_str.starts_with('l') && !k_str.starts_with('r') =>
+            {
+                parse_kth_chunk(k_str, n_str).map(|(k, n)| Self::KthBytes(k, n))
+            }
+            (Some("l"), Some(n_str), None, None) => parse_num_chunks(n_str).map(Self::Lines),
+            (Some("l"), Some(k_str), Some(n_str), None) => {
+                parse_kth_chunk(k_str, n_str).map(|(k, n)| Self::KthLines(k, n))
+            }
+            (Some("r"), Some(n_str), None, None) => parse_num_chunks(n_str).map(Self::RoundRobin),
+            (Some("r"), Some(k_str), Some(n_str), None) => {
+                parse_kth_chunk(k_str, n_str).map(|(k, n)| Self::KthRoundRobin(k, n))
+            }
+            _ => Err(NumberTypeError::NumberOfChunks(s.to_string())),
+        }
+    }
+}
+
+/// The strategy for breaking up the input file into chunks.
+pub enum Strategy {
+    /// Each chunk has the specified number of lines.
+    Lines(u64),
+
+    /// Each chunk has the specified number of bytes.
+    Bytes(u64),
+
+    /// Each chunk has as many lines as possible without exceeding the
+    /// specified number of bytes.
+    LineBytes(u64),
+
+    /// Split the file into this many chunks.
+    ///
+    /// There are several sub-strategies available, as defined by
+    /// [`NumberType`].
+    Number(NumberType),
+}
+
+/// An error when parsing a chunking strategy from command-line arguments.
+///
+/// A bad size carries the option it was given to, so that a caret can point
+/// inside it — `None` when it came from no option, as with the obsolete
+/// `split -22` spelling.
+#[derive(Debug, thiserror::Error)]
+pub enum StrategyError {
+    /// Invalid number of lines.
+    #[error("{}", translate!("split-error-invalid-number-of-lines", "error" => .0))]
+    Lines(ParseSizeError, Option<OptionValue>),
+
+    /// Invalid number of bytes.
+    #[error("{}", translate!("split-error-invalid-number-of-bytes", "error" => .0))]
+    Bytes(ParseSizeError, Option<OptionValue>),
+
+    /// Invalid number type.
+    #[error("{0}")]
+    NumberType(NumberTypeError),
+
+    /// Multiple chunking strategies were specified (but only one should be).
+    #[error("{}", translate!("split-error-cannot-split-more-than-one-way"))]
+    MultipleWays,
+}
+
+impl StrategyError {
+    /// Draw a caret under the part of the SIZE that is at fault.
+    ///
+    /// # Arguments
+    ///
+    /// * `diag_args` - The arguments as typed, program name included.
+    /// * `message` - The headline, already localized.
+    ///
+    /// # Returns
+    ///
+    /// `false` when this error is not about a SIZE given to an option, or when
+    /// nothing could be drawn; the caller then falls back to the plain
+    /// one-line message.
+    pub fn render(&self, diag_args: &[OsString], message: &str) -> bool {
+        let (Self::Lines(error, Some(option)) | Self::Bytes(error, Some(option))) = self else {
+            return false;
+        };
+        error.render_size_value(diag_args, option, 0, message)
+    }
+}
+
+impl Strategy {
+    /// Parse a strategy from the command-line arguments.
+    pub fn from(matches: &ArgMatches, obs_lines: Option<&str>) -> Result<Self, StrategyError> {
+        fn get_and_parse(
+            matches: &ArgMatches,
+            option: &'static str,
+            short: char,
+            strategy: fn(u64) -> Strategy,
+            error: fn(ParseSizeError, Option<OptionValue>) -> StrategyError,
+        ) -> Result<Strategy, StrategyError> {
+            let s = matches.get_one::<String>(option).unwrap();
+            // `None` for a size that did not come from an option, such as the
+            // obsolete `split -22` spelling: there is nothing to point at.
+            let origin = || Some(OptionValue::new(s, short, option));
+            let n = parse_size_u64_max(s).map_err(|e| error(e, origin()))?;
+            if n > 0 {
+                Ok(strategy(n))
+            } else {
+                Err(error(ParseSizeError::ParseFailure(s.to_owned()), origin()))
+            }
+        }
+        // Check that the user is not specifying more than one strategy.
+        //
+        // Note: right now, this exact behavior cannot be handled by
+        // overrides_with_all() due to obsolete lines value option
+        match (
+            obs_lines,
+            matches.value_source(options::LINES) == Some(ValueSource::CommandLine),
+            matches.value_source(options::BYTES) == Some(ValueSource::CommandLine),
+            matches.value_source(options::LINE_BYTES) == Some(ValueSource::CommandLine),
+            matches.value_source(options::NUMBER) == Some(ValueSource::CommandLine),
+        ) {
+            (Some(v), false, false, false, false) => {
+                let v = parse_size_u64_max(v).map_err(|_| {
+                    StrategyError::Lines(ParseSizeError::ParseFailure(v.to_string()), None)
+                })?;
+                if v > 0 {
+                    Ok(Self::Lines(v))
+                } else {
+                    Err(StrategyError::Lines(
+                        ParseSizeError::ParseFailure(v.to_string()),
+                        None,
+                    ))
+                }
+            }
+            (None, false, false, false, false) => Ok(Self::Lines(1000)),
+            (None, true, false, false, false) => get_and_parse(
+                matches,
+                options::LINES,
+                'l',
+                Self::Lines,
+                StrategyError::Lines,
+            ),
+            (None, false, true, false, false) => get_and_parse(
+                matches,
+                options::BYTES,
+                'b',
+                Self::Bytes,
+                StrategyError::Bytes,
+            ),
+            (None, false, false, true, false) => get_and_parse(
+                matches,
+                options::LINE_BYTES,
+                'C',
+                Self::LineBytes,
+                StrategyError::Bytes,
+            ),
+            (None, false, false, false, true) => {
+                let s = matches.get_one::<String>(options::NUMBER).unwrap();
+                let number_type = NumberType::from(s).map_err(StrategyError::NumberType)?;
+                Ok(Self::Number(number_type))
+            }
+            _ => Err(StrategyError::MultipleWays),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::{strategy::NumberType, strategy::NumberTypeError};
+
+    #[test]
+    fn test_number_type_from() {
+        assert_eq!(NumberType::from("123").unwrap(), NumberType::Bytes(123));
+        assert_eq!(NumberType::from("l/123").unwrap(), NumberType::Lines(123));
+        assert_eq!(
+            NumberType::from("l/123/456").unwrap(),
+            NumberType::KthLines(123, 456)
+        );
+        assert_eq!(
+            NumberType::from("r/123").unwrap(),
+            NumberType::RoundRobin(123)
+        );
+        assert_eq!(
+            NumberType::from("r/123/456").unwrap(),
+            NumberType::KthRoundRobin(123, 456)
+        );
+    }
+
+    #[test]
+    #[allow(clippy::cognitive_complexity)]
+    fn test_number_type_from_error() {
+        assert_eq!(
+            NumberType::from("xyz").unwrap_err(),
+            NumberTypeError::NumberOfChunks("xyz".to_string())
+        );
+        assert_eq!(
+            NumberType::from("l/xyz").unwrap_err(),
+            NumberTypeError::NumberOfChunks("xyz".to_string())
+        );
+        assert_eq!(
+            NumberType::from("l/123/xyz").unwrap_err(),
+            NumberTypeError::NumberOfChunks("xyz".to_string())
+        );
+        assert_eq!(
+            NumberType::from("l/abc/456").unwrap_err(),
+            NumberTypeError::ChunkNumber("abc".to_string())
+        );
+        assert_eq!(
+            NumberType::from("l/456/123").unwrap_err(),
+            NumberTypeError::ChunkNumber("456".to_string())
+        );
+        assert_eq!(
+            NumberType::from("r/456/123").unwrap_err(),
+            NumberTypeError::ChunkNumber("456".to_string())
+        );
+        assert_eq!(
+            NumberType::from("456/123").unwrap_err(),
+            NumberTypeError::ChunkNumber("456".to_string())
+        );
+        // In GNU split, the number of chunks get precedence:
+        //
+        //     $ split -n l/abc/xyz
+        //     split: invalid number of chunks: ‘xyz’
+        //
+        assert_eq!(
+            NumberType::from("l/abc/xyz").unwrap_err(),
+            NumberTypeError::NumberOfChunks("xyz".to_string())
+        );
+        assert_eq!(
+            NumberType::from("r/xyz").unwrap_err(),
+            NumberTypeError::NumberOfChunks("xyz".to_string())
+        );
+        assert_eq!(
+            NumberType::from("0").unwrap_err(),
+            NumberTypeError::NumberOfChunks("0".to_string())
+        );
+        assert_eq!(
+            NumberType::from("l/0").unwrap_err(),
+            NumberTypeError::NumberOfChunks("0".to_string())
+        );
+        assert_eq!(
+            NumberType::from("r/0").unwrap_err(),
+            NumberTypeError::NumberOfChunks("0".to_string())
+        );
+        assert_eq!(
+            NumberType::from("r/123/xyz").unwrap_err(),
+            NumberTypeError::NumberOfChunks("xyz".to_string())
+        );
+        assert_eq!(
+            NumberType::from("r/abc/456").unwrap_err(),
+            NumberTypeError::ChunkNumber("abc".to_string())
+        );
+        // In GNU split, the number of chunks get precedence:
+        //
+        //     $ split -n r/abc/xyz
+        //     split: invalid number of chunks: ‘xyz’
+        //
+        assert_eq!(
+            NumberType::from("r/abc/xyz").unwrap_err(),
+            NumberTypeError::NumberOfChunks("xyz".to_string())
+        );
+    }
+
+    #[test]
+    fn test_number_type_num_chunks() {
+        assert_eq!(NumberType::from("123").unwrap().num_chunks(), 123);
+        assert_eq!(NumberType::from("123/456").unwrap().num_chunks(), 456);
+        assert_eq!(NumberType::from("l/123").unwrap().num_chunks(), 123);
+        assert_eq!(NumberType::from("l/123/456").unwrap().num_chunks(), 456);
+        assert_eq!(NumberType::from("r/123").unwrap().num_chunks(), 123);
+        assert_eq!(NumberType::from("r/123/456").unwrap().num_chunks(), 456);
+    }
+}

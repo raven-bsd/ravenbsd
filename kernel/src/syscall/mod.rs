@@ -105,6 +105,12 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == process_ctl::PROC_SETCRED_EX {
         return process_ctl::setcred_ex(frame);
     }
+    if number == process_ctl::PROC_HANDLE_INFO {
+        return process_ctl::handle_info(frame);
+    }
+    if number == process_ctl::PROC_EXEC_CRED {
+        return process_ctl::exec_cred(frame);
+    }
     if number == process_ctl::PROC_CRED_INFO {
         return process_ctl::cred_info(frame);
     }

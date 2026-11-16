@@ -175,6 +175,7 @@ cases:
       compopt -- 'a b' "x'y" -foo '*'; echo "rc=$?"
 
   - name: "compopt with options and names prints nothing"
+    min_oracle_version: "5.2" # complete -p ordering differs in bash 5.1
     stdin: |
       complete -W x ls
       compopt -o nospace ls; echo "rc=$?"
@@ -268,6 +269,7 @@ cases:
       complete -p
 
   - name: "complete -p prints options, actions, and arguments in bash's order"
+    min_oracle_version: "5.2" # complete -p quoting/order differs in bash 5.1
     stdin: |
       complete -v -o nospace -A function -a -o default -F fn -G '*.c' -W 'w1 w2' -X '*.x' -P pre -S suf -C cmd mycmd
       complete -p mycmd
@@ -288,6 +290,7 @@ cases:
       [[ $before == "$after" ]] && echo "round-tripped"
 
   - name: "complete -p quotes names like bash, so its output round-trips"
+    min_oracle_version: "5.2" # bash 5.1 rejects the quoted function name
     stdin: |
       complete -F '#fn' -W x '~'
       complete -F a,b cmd1

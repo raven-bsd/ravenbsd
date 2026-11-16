@@ -580,10 +580,16 @@ fn unit(result: R<()>) -> c_int {
 
 mod feof;
 mod fflush;
+#[path = "file/fgetln.rs"]
+mod fgetln;
 mod fopen;
 mod fputc;
 mod ftell;
 mod getchar;
-mod line;
-mod misc;
+#[path = "file/getline.rs"]
+mod getline;
 mod perror;
+#[path = "file/remove.rs"]
+mod remove;
+#[path = "file/rewind.rs"]
+mod rewind;

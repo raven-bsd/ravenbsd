@@ -6,13 +6,13 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-15T01:26:03Z
+- Date: 2026-11-16T19:38:42Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: target QEMU
 - Tool: `posix-conform 0.1.0`
 - Result: **FAIL (release blocked)**
-- Counts: 685 pass, 1073 fail, 11 skip
+- Counts: 736 pass, 1023 fail, 10 skip
 
 ## Summary
 
@@ -20,15 +20,15 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 |---|---:|---:|---:|
 | external | 0 | 0 | 3 |
 | filesystem | 0 | 20 | 0 |
-| header | 29 | 57 | 0 |
-| interface | 655 | 766 | 0 |
-| link | 0 | 0 | 1 |
+| header | 30 | 56 | 0 |
+| interface | 704 | 717 | 0 |
+| link | 1 | 0 | 0 |
 | process | 1 | 16 | 0 |
 | shell | 0 | 25 | 0 |
 | target | 0 | 0 | 7 |
 | tty | 0 | 12 | 0 |
 | utility | 0 | 177 | 0 |
-| **all** | **685** | **1073** | **11** |
+| **all** | **736** | **1023** | **10** |
 
 ## Rows
 
@@ -59,7 +59,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `filesystem.umask` | filesystem | fail | `none` | profile status missing; no executable POSIX behaviour test |
 | `header.aio.h` | header | fail | `profile` | profile status partial |
 | `header.arpa-inet.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_1.c` |  |
-| `header.assert.h` | header | fail | `profile` | profile status partial |
+| `header.assert.h` | header | pass | `tests/posix/check-headers.sh` |  |
 | `header.complex.h` | header | fail | `profile` | profile status partial |
 | `header.cpio.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_4.c` |  |
 | `header.ctype.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_5.c` |  |
@@ -284,14 +284,14 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.cexpl` | interface | fail | `profile` | profile status missing |
 | `interface.cfgetispeed` | interface | fail | `profile` | profile status missing |
 | `interface.cfgetospeed` | interface | fail | `profile` | profile status missing |
-| `interface.cfmakeraw` | interface | fail | `profile` | profile status missing |
+| `interface.cfmakeraw` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_141.c` | declaration did not compile |
 | `interface.cfsetispeed` | interface | fail | `profile` | profile status missing |
 | `interface.cfsetospeed` | interface | fail | `profile` | profile status missing |
 | `interface.cfsetspeed` | interface | fail | `profile` | profile status missing |
-| `interface.chdir` | interface | fail | `profile` | profile status missing |
-| `interface.chmod` | interface | fail | `profile` | profile status missing |
+| `interface.chdir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_145.c` |  |
+| `interface.chmod` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_146.c` |  |
 | `interface.chown` | interface | fail | `profile` | profile status missing |
-| `interface.chroot` | interface | fail | `profile` | profile status missing |
+| `interface.chroot` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_148.c` | declaration did not compile |
 | `interface.cimag` | interface | fail | `profile` | profile status missing |
 | `interface.cimagf` | interface | fail | `profile` | profile status missing |
 | `interface.cimagfNx` | interface | fail | `profile` | profile status missing |
@@ -303,7 +303,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.clock_getres` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_157.c` |  |
 | `interface.clock_gettime` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_158.c` |  |
 | `interface.clock_nanosleep` | interface | fail | `profile` | profile status missing |
-| `interface.clock_settime` | interface | fail | `profile` | profile status missing |
+| `interface.clock_settime` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_160.c` |  |
 | `interface.clog` | interface | fail | `profile` | profile status missing |
 | `interface.clogf` | interface | fail | `profile` | profile status missing |
 | `interface.clogfNx` | interface | fail | `profile` | profile status missing |
@@ -318,7 +318,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.cnd_timedwait` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_172.c` |  |
 | `interface.cnd_wait` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_173.c` |  |
 | `interface.compoundn` | interface | fail | `profile` | profile status missing |
-| `interface.confstr` | interface | fail | `profile` | profile status missing |
+| `interface.confstr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_175.c` |  |
 | `interface.conj` | interface | fail | `profile` | profile status missing |
 | `interface.conjf` | interface | fail | `profile` | profile status missing |
 | `interface.conjfNx` | interface | fail | `profile` | profile status missing |
@@ -445,12 +445,12 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.fallocate` | interface | fail | `profile` | profile status missing |
 | `interface.fattach` | interface | fail | `profile` | profile status missing |
 | `interface.fchdir` | interface | fail | `profile` | profile status missing |
-| `interface.fchmod` | interface | fail | `profile` | profile status missing |
-| `interface.fchmodat` | interface | fail | `profile` | profile status missing |
+| `interface.fchmod` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_302.c` |  |
+| `interface.fchmodat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_303.c` |  |
 | `interface.fchown` | interface | fail | `profile` | profile status missing |
-| `interface.fchownat` | interface | fail | `profile` | profile status missing |
+| `interface.fchownat` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_305.c` | declaration did not compile |
 | `interface.fclose` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_306.c` |  |
-| `interface.fcntl` | interface | fail | `profile` | profile status missing |
+| `interface.fcntl` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_307.c` |  |
 | `interface.fcvt_r` | interface | fail | `profile` | profile status missing |
 | `interface.fdatasync` | interface | fail | `profile` | profile status missing |
 | `interface.fdetach` | interface | fail | `profile` | profile status missing |
@@ -489,7 +489,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.fgetpos` | interface | fail | `profile` | profile status missing |
 | `interface.fgetpos64` | interface | fail | `profile` | profile status missing |
 | `interface.fgets` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_345.c` |  |
-| `interface.fgetwc` | interface | fail | `profile` | profile status missing |
+| `interface.fgetwc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_346.c` |  |
 | `interface.fgetwc_unlocked` | interface | fail | `profile` | profile status missing |
 | `interface.fgetws` | interface | fail | `profile` | profile status missing |
 | `interface.fileno` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_349.c` |  |
@@ -563,24 +563,24 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.fsetpos64` | interface | fail | `profile` | profile status missing |
 | `interface.fstat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_418.c` |  |
 | `interface.fstat64` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_419.c` | declaration did not compile |
-| `interface.fstatat` | interface | fail | `profile` | profile status missing |
+| `interface.fstatat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_420.c` |  |
 | `interface.fstatvfs` | interface | fail | `profile` | profile status missing |
-| `interface.fsync` | interface | fail | `profile` | profile status missing |
+| `interface.fsync` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_422.c` |  |
 | `interface.ftell` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_423.c` |  |
 | `interface.ftello` | interface | fail | `profile` | profile status missing |
 | `interface.ftello64` | interface | fail | `profile` | profile status missing |
 | `interface.ftok` | interface | fail | `profile` | profile status missing |
-| `interface.ftruncate` | interface | fail | `profile` | profile status missing |
+| `interface.ftruncate` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_427.c` |  |
 | `interface.ftruncate64` | interface | fail | `profile` | profile status missing |
 | `interface.ftrylockfile` | interface | fail | `profile` | profile status missing |
 | `interface.ftw` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_430.c` |  |
 | `interface.ftw64` | interface | fail | `profile` | profile status missing |
 | `interface.funlockfile` | interface | fail | `profile` | profile status missing |
-| `interface.futimens` | interface | fail | `profile` | profile status missing |
+| `interface.futimens` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_433.c` |  |
 | `interface.futimes` | interface | fail | `profile` | profile status missing |
 | `interface.futimesat` | interface | fail | `profile` | profile status missing |
 | `interface.fwide` | interface | fail | `profile` | profile status missing |
-| `interface.fwprintf` | interface | fail | `profile` | profile status missing |
+| `interface.fwprintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_437.c` |  |
 | `interface.fwrite` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_438.c` |  |
 | `interface.fwrite_unlocked` | interface | fail | `profile` | profile status missing |
 | `interface.fwscanf` | interface | fail | `profile` | profile status missing |
@@ -611,9 +611,9 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.gethostbyname2_r` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_465.c` | declaration did not compile |
 | `interface.gethostbyname_r` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_466.c` | declaration did not compile |
 | `interface.gethostid` | interface | fail | `profile` | profile status missing |
-| `interface.gethostname` | interface | fail | `profile` | profile status missing |
+| `interface.gethostname` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_468.c` |  |
 | `interface.getitimer` | interface | fail | `profile` | profile status missing |
-| `interface.getline` | interface | fail | `profile` | profile status missing |
+| `interface.getline` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_470.c` |  |
 | `interface.getlogin` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_471.c` |  |
 | `interface.getlogin_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_472.c` |  |
 | `interface.getmsg` | interface | fail | `profile` | profile status missing |
@@ -633,8 +633,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.getpwnam_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_487.c` |  |
 | `interface.getpwuid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_488.c` |  |
 | `interface.getpwuid_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_489.c` |  |
-| `interface.getresgid` | interface | fail | `profile` | profile status missing |
-| `interface.getresuid` | interface | fail | `profile` | profile status missing |
+| `interface.getresgid` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_490.c` | declaration did not compile |
+| `interface.getresuid` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_491.c` | declaration did not compile |
 | `interface.getrlimit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_492.c` |  |
 | `interface.getrlimit64` | interface | fail | `profile` | profile status missing |
 | `interface.getrusage` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_494.c` |  |
@@ -660,7 +660,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.glob` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_514.c` |  |
 | `interface.globfree` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_515.c` |  |
 | `interface.gmtime` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_516.c` |  |
-| `interface.grantpt` | interface | fail | `profile` | profile status missing |
+| `interface.grantpt` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_517.c` |  |
 | `interface.hcreate` | interface | fail | `profile` | profile status missing |
 | `interface.hcreate_r` | interface | fail | `profile` | profile status missing |
 | `interface.hdestroy` | interface | fail | `profile` | profile status missing |
@@ -701,7 +701,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.isalpha_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_555.c` |  |
 | `interface.isascii` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_556.c` |  |
 | `interface.isastream` | interface | fail | `profile` | profile status missing |
-| `interface.isatty` | interface | fail | `profile` | profile status missing |
+| `interface.isatty` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_558.c` |  |
 | `interface.isblank` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_559.c` |  |
 | `interface.isblank_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_560.c` |  |
 | `interface.iscanonical` | interface | fail | `profile` | profile status missing |
@@ -771,7 +771,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.jnf` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_625.c` | declaration did not compile |
 | `interface.jrand48` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_626.c` |  |
 | `interface.kill` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_627.c` |  |
-| `interface.killpg` | interface | fail | `profile` | profile status missing |
+| `interface.killpg` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_628.c` |  |
 | `interface.labs` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_629.c` |  |
 | `interface.lchmod` | interface | fail | `profile` | profile status missing |
 | `interface.lchown` | interface | fail | `profile` | profile status missing |
@@ -787,8 +787,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.lgammaf_r` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_641.c` | declaration did not compile |
 | `interface.lgammal` | interface | fail | `profile` | profile status missing |
 | `interface.lgammal_r` | interface | fail | `profile` | profile status missing |
-| `interface.link` | interface | fail | `profile` | profile status missing |
-| `interface.linkat` | interface | fail | `profile` | profile status missing |
+| `interface.link` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_644.c` |  |
+| `interface.linkat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_645.c` |  |
 | `interface.lio_listio` | interface | fail | `profile` | profile status missing |
 | `interface.lio_listio64` | interface | fail | `profile` | profile status missing |
 | `interface.listen` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_648.c` |  |
@@ -843,7 +843,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.lseek64` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_697.c` | declaration did not compile |
 | `interface.lstat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_698.c` |  |
 | `interface.lstat64` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_699.c` | declaration did not compile |
-| `interface.lutimes` | interface | fail | `profile` | profile status missing |
+| `interface.lutimes` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_700.c` | declaration did not compile |
 | `interface.madvise` | interface | fail | `profile` | profile status missing |
 | `interface.malloc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_702.c` |  |
 | `interface.mblen` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_703.c` |  |
@@ -866,11 +866,11 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.memset` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_720.c` |  |
 | `interface.memset_explicit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_721.c` |  |
 | `interface.mincore` | interface | fail | `profile` | profile status missing |
-| `interface.mkdir` | interface | fail | `profile` | profile status missing |
+| `interface.mkdir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_723.c` |  |
 | `interface.mkdirat` | interface | fail | `profile` | profile status missing |
-| `interface.mkfifo` | interface | fail | `profile` | profile status missing |
+| `interface.mkfifo` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_725.c` |  |
 | `interface.mkfifoat` | interface | fail | `profile` | profile status missing |
-| `interface.mknod` | interface | fail | `profile` | profile status missing |
+| `interface.mknod` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_727.c` |  |
 | `interface.mknodat` | interface | fail | `profile` | profile status missing |
 | `interface.mkstemp` | interface | fail | `profile` | profile status missing |
 | `interface.mktime` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_730.c` |  |
@@ -948,7 +948,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.pclose` | interface | fail | `profile` | profile status missing |
 | `interface.perror` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_803.c` |  |
 | `interface.pipe` | interface | fail | `profile` | profile status missing |
-| `interface.pipe2` | interface | fail | `profile` | profile status missing |
+| `interface.pipe2` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_805.c` |  |
 | `interface.poll` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_806.c` |  |
 | `interface.popen` | interface | fail | `profile` | profile status missing |
 | `interface.posix_close` | interface | fail | `profile` | profile status missing |
@@ -957,7 +957,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.posix_getdents` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_811.c` |  |
 | `interface.posix_madvise` | interface | fail | `profile` | profile status missing |
 | `interface.posix_memalign` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_813.c` |  |
-| `interface.posix_openpt` | interface | fail | `profile` | profile status missing |
+| `interface.posix_openpt` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_814.c` |  |
 | `interface.posix_spawn_file_actions_addclose` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_815.c` |  |
 | `interface.posix_spawn_file_actions_adddup2` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_816.c` |  |
 | `interface.posix_spawn_file_actions_addopen` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_817.c` |  |
@@ -1099,7 +1099,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.pthread_spin_trylock` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_953.c` |  |
 | `interface.pthread_spin_unlock` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_954.c` |  |
 | `interface.pthread_testcancel` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_955.c` |  |
-| `interface.ptsname_r` | interface | fail | `profile` | profile status missing |
+| `interface.ptsname_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_956.c` |  |
 | `interface.putc` | interface | fail | `profile` | profile status missing |
 | `interface.putc_unlocked` | interface | fail | `profile` | profile status missing |
 | `interface.putchar` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_959.c` |  |
@@ -1130,12 +1130,12 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.readahead` | interface | fail | `profile` | profile status missing |
 | `interface.readdir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_985.c` |  |
 | `interface.readdir_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_986.c` |  |
-| `interface.readlink` | interface | fail | `profile` | profile status missing |
+| `interface.readlink` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_987.c` |  |
 | `interface.readlinkat` | interface | fail | `profile` | profile status missing |
-| `interface.readv` | interface | fail | `profile` | profile status missing |
+| `interface.readv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_989.c` |  |
 | `interface.realloc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_990.c` |  |
 | `interface.reallocarray` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_991.c` | declaration did not compile |
-| `interface.realpath` | interface | fail | `profile` | profile status missing |
+| `interface.realpath` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_992.c` |  |
 | `interface.recv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_993.c` |  |
 | `interface.recvfrom` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_994.c` |  |
 | `interface.recvmmsg` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_995.c` | declaration did not compile |
@@ -1150,21 +1150,21 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.remainderf` | interface | fail | `profile` | profile status missing |
 | `interface.remainderfNx` | interface | fail | `profile` | profile status missing |
 | `interface.remainderl` | interface | fail | `profile` | profile status missing |
-| `interface.remove` | interface | fail | `profile` | profile status missing |
+| `interface.remove` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1007.c` |  |
 | `interface.remque` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1008.c` |  |
 | `interface.remquo` | interface | fail | `profile` | profile status missing |
 | `interface.remquof` | interface | fail | `profile` | profile status missing |
 | `interface.remquol` | interface | fail | `profile` | profile status missing |
-| `interface.rename` | interface | fail | `profile` | profile status missing |
-| `interface.renameat` | interface | fail | `profile` | profile status missing |
+| `interface.rename` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1012.c` |  |
+| `interface.renameat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1013.c` |  |
 | `interface.renameat2` | interface | fail | `profile` | profile status missing |
-| `interface.rewind` | interface | fail | `profile` | profile status missing |
+| `interface.rewind` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1015.c` |  |
 | `interface.rewinddir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1016.c` |  |
 | `interface.rint` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1017.c` |  |
 | `interface.rintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1018.c` |  |
 | `interface.rintfNx` | interface | fail | `profile` | profile status missing |
 | `interface.rintl` | interface | fail | `profile` | profile status missing |
-| `interface.rmdir` | interface | fail | `profile` | profile status missing |
+| `interface.rmdir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1021.c` |  |
 | `interface.rootn` | interface | fail | `profile` | profile status missing |
 | `interface.round` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1023.c` |  |
 | `interface.roundevenfNx` | interface | fail | `profile` | profile status missing |
@@ -1240,8 +1240,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.setprotoent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1094.c` |  |
 | `interface.setpwent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1095.c` |  |
 | `interface.setregid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1096.c` |  |
-| `interface.setresgid` | interface | fail | `profile` | profile status missing |
-| `interface.setresuid` | interface | fail | `profile` | profile status missing |
+| `interface.setresgid` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1097.c` | declaration did not compile |
+| `interface.setresuid` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1098.c` | declaration did not compile |
 | `interface.setreuid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1099.c` |  |
 | `interface.setrlimit` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1100.c` |  |
 | `interface.setrlimit64` | interface | fail | `profile` | profile status missing |
@@ -1367,12 +1367,12 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.swab` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1221.c` |  |
 | `interface.swprintf` | interface | fail | `profile` | profile status missing |
 | `interface.swscanf` | interface | fail | `profile` | profile status missing |
-| `interface.symlink` | interface | fail | `profile` | profile status missing |
-| `interface.symlinkat` | interface | fail | `profile` | profile status missing |
-| `interface.sync` | interface | fail | `profile` | profile status missing |
+| `interface.symlink` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1224.c` |  |
+| `interface.symlinkat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1225.c` |  |
+| `interface.sync` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1226.c` |  |
 | `interface.sync_file_range` | interface | fail | `profile` | profile status missing |
 | `interface.syncfs` | interface | fail | `profile` | profile status missing |
-| `interface.syscall` | interface | fail | `profile` | profile status missing |
+| `interface.syscall` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1229.c` | declaration did not compile |
 | `interface.sysconf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1230.c` |  |
 | `interface.syslog` | interface | fail | `profile` | profile status missing |
 | `interface.system` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1232.c` |  |
@@ -1388,13 +1388,13 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.tcdrain` | interface | fail | `profile` | profile status missing |
 | `interface.tcflow` | interface | fail | `profile` | profile status missing |
 | `interface.tcflush` | interface | fail | `profile` | profile status missing |
-| `interface.tcgetattr` | interface | fail | `profile` | profile status missing |
-| `interface.tcgetpgrp` | interface | fail | `profile` | profile status missing |
+| `interface.tcgetattr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1245.c` |  |
+| `interface.tcgetpgrp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1246.c` |  |
 | `interface.tcgetsid` | interface | fail | `profile` | profile status missing |
 | `interface.tcgetwinsize` | interface | fail | `profile` | profile status missing |
 | `interface.tcsendbreak` | interface | fail | `profile` | profile status missing |
-| `interface.tcsetattr` | interface | fail | `profile` | profile status missing |
-| `interface.tcsetpgrp` | interface | fail | `profile` | profile status missing |
+| `interface.tcsetattr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1250.c` |  |
+| `interface.tcsetpgrp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1251.c` |  |
 | `interface.tcsetwinsize` | interface | fail | `profile` | profile status missing |
 | `interface.tee` | interface | fail | `profile` | profile status missing |
 | `interface.telldir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1254.c` |  |
@@ -1445,7 +1445,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.tss_get` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1299.c` |  |
 | `interface.tss_set` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1300.c` |  |
 | `interface.ttyname` | interface | fail | `profile` | profile status missing |
-| `interface.ttyname_r` | interface | fail | `profile` | profile status missing |
+| `interface.ttyname_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1302.c` |  |
 | `interface.twalk` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1303.c` |  |
 | `interface.tzset` | interface | fail | `profile` | profile status missing |
 | `interface.ualarm` | interface | fail | `profile` | profile status missing |
@@ -1453,21 +1453,21 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.ufromfpx` | interface | fail | `profile` | profile status missing |
 | `interface.ufromfpxfNx` | interface | fail | `profile` | profile status missing |
 | `interface.ulimit` | interface | fail | `profile` | profile status missing |
-| `interface.umask` | interface | fail | `profile` | profile status missing |
+| `interface.umask` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1310.c` |  |
 | `interface.umaxabs` | interface | fail | `profile` | profile status missing |
 | `interface.uname` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1312.c` |  |
 | `interface.ungetc` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1313.c` |  |
 | `interface.ungetwc` | interface | fail | `profile` | profile status missing |
 | `interface.unlink` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1315.c` |  |
-| `interface.unlinkat` | interface | fail | `profile` | profile status missing |
-| `interface.unlockpt` | interface | fail | `profile` | profile status missing |
+| `interface.unlinkat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1316.c` |  |
+| `interface.unlockpt` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1317.c` |  |
 | `interface.unsetenv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1318.c` |  |
 | `interface.updwtmpx` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1319.c` | declaration did not compile |
 | `interface.uselocale` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1320.c` |  |
 | `interface.usleep` | interface | fail | `profile` | profile status missing |
 | `interface.utime` | interface | fail | `profile` | profile status missing |
-| `interface.utimensat` | interface | fail | `profile` | profile status missing |
-| `interface.utimes` | interface | fail | `profile` | profile status missing |
+| `interface.utimensat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1323.c` |  |
+| `interface.utimes` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1324.c` |  |
 | `interface.utmpxname` | interface | fail | `profile` | profile status missing |
 | `interface.va_arg` | interface | fail | `profile` | profile status missing |
 | `interface.va_copy` | interface | fail | `profile` | profile status missing |
@@ -1478,7 +1478,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.vfork` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1332.c` | declaration did not compile |
 | `interface.vfprintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1333.c` |  |
 | `interface.vfscanf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1334.c` |  |
-| `interface.vfwprintf` | interface | fail | `profile` | profile status missing |
+| `interface.vfwprintf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1335.c` |  |
 | `interface.vfwscanf` | interface | fail | `profile` | profile status missing |
 | `interface.vhangup` | interface | fail | `profile` | profile status missing |
 | `interface.vmsplice` | interface | fail | `profile` | profile status missing |
@@ -1556,7 +1556,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.wordfree` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1410.c` |  |
 | `interface.wprintf` | interface | fail | `profile` | profile status missing |
 | `interface.write` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1412.c` |  |
-| `interface.writev` | interface | fail | `profile` | profile status missing |
+| `interface.writev` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1413.c` |  |
 | `interface.wscanf` | interface | fail | `profile` | profile status missing |
 | `interface.y0` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1415.c` |  |
 | `interface.y0f` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1416.c` | declaration did not compile |
@@ -1564,7 +1564,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.y1f` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1418.c` | declaration did not compile |
 | `interface.yn` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1419.c` |  |
 | `interface.ynf` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1420.c` | declaration did not compile |
-| `link.libc` | link | skip | `nm build/<arch>/libc.a` | libc.a is not built; run cargo xtask libc-link --arch <arch> |
+| `link.libc` | link | pass | `nm -g --defined-only ./build/x86_64/libc.a` | 0 required symbols absent from libc.a |
 | `process.credential` | process | fail | `none` | profile status missing; no executable POSIX behaviour test |
 | `process.exec` | process | fail | `none` | profile status missing; no executable POSIX behaviour test |
 | `process.fork` | process | pass | `cargo xtask qtest --case proc-fork --arch x86_64` |  |
@@ -1607,13 +1607,13 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `shell.special-builtin` | shell | fail | `none` | profile status missing; no executable POSIX behaviour test |
 | `shell.trap` | shell | fail | `none` | profile status missing; no executable POSIX behaviour test |
 | `shell.umask` | shell | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `target.libc-dynamic` | target | skip | `cargo xtask qtest --case libc-dynamic --arch x86_64` | qtest skipped: needs PG-1 PG-2 PG-13 PG-22 PG-23 PG-24 PG-29 PG-49 PG-50 PG-53 |
-| `target.libc-hello` | target | skip | `cargo xtask qtest --case libc-hello --arch x86_64` | qtest skipped: needs PG-1 PG-13 PG-22 PG-23 PG-24 PG-29 PG-50 PG-53 |
-| `target.libc-signals` | target | skip | `cargo xtask qtest --case libc-signals --arch x86_64` | qtest skipped: needs PG-1 PG-2 PG-13 PG-22 PG-23 PG-24 PG-29 PG-50 PG-53 |
-| `target.libc-spawn` | target | skip | `cargo xtask qtest --case libc-spawn --arch x86_64` | qtest skipped: needs PG-1 PG-13 PG-22 PG-23 PG-24 PG-29 PG-50 PG-53 |
-| `target.libc-stdio` | target | skip | `cargo xtask qtest --case libc-stdio --arch x86_64` | qtest skipped: needs PG-1 PG-13 PG-22 PG-23 PG-24 PG-29 PG-50 PG-53 |
-| `target.libc-threads` | target | skip | `cargo xtask qtest --case libc-threads --arch x86_64` | qtest skipped: needs PG-1 PG-2 PG-13 PG-22 PG-23 PG-24 PG-29 PG-50 PG-53 |
-| `target.libc-time` | target | skip | `cargo xtask qtest --case libc-time --arch x86_64` | qtest skipped: needs PG-1 PG-13 PG-22 PG-23 PG-24 PG-29 PG-50 PG-53 |
+| `target.libc-dynamic` | target | skip | `cargo xtask qtest --case libc-dynamic --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-dynamic --arch x86_64` |
+| `target.libc-hello` | target | skip | `cargo xtask qtest --case libc-hello --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-hello --arch x86_64` |
+| `target.libc-signals` | target | skip | `cargo xtask qtest --case libc-signals --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-signals --arch x86_64` |
+| `target.libc-spawn` | target | skip | `cargo xtask qtest --case libc-spawn --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-spawn --arch x86_64` |
+| `target.libc-stdio` | target | skip | `cargo xtask qtest --case libc-stdio --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-stdio --arch x86_64` |
+| `target.libc-threads` | target | skip | `cargo xtask qtest --case libc-threads --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-threads --arch x86_64` |
+| `target.libc-time` | target | skip | `cargo xtask qtest --case libc-time --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-time --arch x86_64` |
 | `tty.canonical` | tty | fail | `none` | profile status missing; no executable POSIX behaviour test |
 | `tty.control-character` | tty | fail | `none` | profile status missing; no executable POSIX behaviour test |
 | `tty.controlling-terminal` | tty | fail | `none` | profile status missing; no executable POSIX behaviour test |
@@ -1692,7 +1692,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.hash` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.head` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.iconv` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.id` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.id` | utility | fail | `userland/bin/id` | profile status partial; no POSIX utility test |
 | `util.ipcrm` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.ipcs` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.jobs` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1711,7 +1711,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.mail` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.mailx` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.make` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.man` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.man` | utility | fail | `userland/bin/man` | profile status partial; no POSIX utility test |
 | `util.mesg` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.mkdir` | utility | fail | `userland/bin/mkdir` | profile status partial; no POSIX utility test |
 | `util.mkfifo` | utility | fail | `none` | profile status missing; no POSIX utility test |

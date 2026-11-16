@@ -108,19 +108,57 @@ pub(crate) fn lead_new_process_group() -> Result<(), error::Error> {
     Ok(())
 }
 
-pub(crate) fn tstp_signal_listener() -> Result<tokio::signal::unix::Signal, error::Error> {
+// RavenBSD has no AF_UNIX socketpair yet, so tokio's signal driver cannot create its wakeup
+// stream. The job-control listeners are therefore pending futures; the nix-based signal
+// delivery above stays available for `kill` and traps.
+#[cfg(target_os = "ravenbsd")]
+pub(crate) struct FakeSignal;
+
+#[cfg(target_os = "ravenbsd")]
+impl FakeSignal {
+    pub(crate) async fn recv(&self) {
+        core::future::pending::<()>().await;
+    }
+}
+
+#[cfg(target_os = "ravenbsd")]
+pub(crate) type SignalListener = FakeSignal;
+#[cfg(not(target_os = "ravenbsd"))]
+pub(crate) type SignalListener = tokio::signal::unix::Signal;
+
+#[cfg(target_os = "ravenbsd")]
+pub(crate) fn tstp_signal_listener() -> Result<SignalListener, error::Error> {
+    Ok(FakeSignal)
+}
+
+#[cfg(not(target_os = "ravenbsd"))]
+pub(crate) fn tstp_signal_listener() -> Result<SignalListener, error::Error> {
     let signal = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::from_raw(
         nix::libc::SIGTSTP,
     ))?;
     Ok(signal)
 }
 
-pub(crate) fn chld_signal_listener() -> Result<tokio::signal::unix::Signal, error::Error> {
+#[cfg(target_os = "ravenbsd")]
+pub(crate) fn chld_signal_listener() -> Result<SignalListener, error::Error> {
+    Ok(FakeSignal)
+}
+
+#[cfg(not(target_os = "ravenbsd"))]
+pub(crate) fn chld_signal_listener() -> Result<SignalListener, error::Error> {
     let signal = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::child())?;
     Ok(signal)
 }
 
+#[cfg(not(target_os = "ravenbsd"))]
 pub use tokio::signal::ctrl_c as await_ctrl_c;
+
+/// Waits for Ctrl-C; RavenBSD's console has no signal path yet.
+#[cfg(target_os = "ravenbsd")]
+pub async fn await_ctrl_c() -> std::io::Result<()> {
+    core::future::pending::<()>().await;
+    Ok(())
+}
 
 pub(crate) fn mask_sigttou() -> Result<(), error::Error> {
     let ignore = nix::sys::signal::SigAction::new(

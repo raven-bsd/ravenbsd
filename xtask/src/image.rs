@@ -35,10 +35,10 @@ impl Platform {
     }
 }
 
-pub(crate) const IMAGE_BYTES: u64 = 256 * 1024 * 1024;
+pub(crate) const IMAGE_BYTES: u64 = 320 * 1024 * 1024;
 pub(crate) const TOTAL_SECTORS: u64 = IMAGE_BYTES / SECTOR_SIZE;
 pub(crate) const ESP_START_LBA: u64 = 2048;
-pub(crate) const ESP_SECTORS: u64 = 64 * 1024 * 1024 / SECTOR_SIZE;
+pub(crate) const ESP_SECTORS: u64 = 220 * 1024 * 1024 / SECTOR_SIZE;
 pub(crate) const ROOT_START_LBA: u64 = ESP_START_LBA + ESP_SECTORS;
 pub(crate) const ROOT_SECTORS: u64 = 64 * 1024 * 1024 / SECTOR_SIZE;
 pub(crate) const GPT_ENTRY_SECTORS: u64 = 32;
@@ -206,12 +206,17 @@ pub(crate) fn run_with_overrides(
 }
 
 /// Build the initfs for a rootfs profile from release user programs.
+///
+/// The normal image path delegates to `initfs::build`, which resolves the profile's
+/// `[initfs] release` switch and the `RAVEN_USER_RELEASE` override. A rootfs profile is a
+/// production image, so this path keeps the unconditional release build.
 fn build_release_initfs(
     root: &Path,
     arch: Arch,
     profile: &Profile,
     workspace: &Workspace,
 ) -> Result<Vec<u8>> {
+    crate::initfs::ensure_prerequisites(root, arch, profile)?;
     let mut packages: Vec<String> = profile
         .initfs
         .programs
@@ -239,10 +244,13 @@ fn build_release_initfs(
         builder.add_file(&program.path, &data, 0o755)?;
     }
     for file in &profile.initfs.files {
-        let data = fs::read(root.join(&file.src)).with_context(|| {
+        let source = crate::initfs::source_path(root, arch, &file.src);
+        let data = fs::read(&source).with_context(|| {
             format!(
-                "cannot read profile file {} for initfs path {}",
-                file.src, file.path
+                "cannot read profile file {} for initfs path {} (resolved {})",
+                file.src,
+                file.path,
+                source.display()
             )
         })?;
         builder.add_file(&file.path, &data, file.mode)?;

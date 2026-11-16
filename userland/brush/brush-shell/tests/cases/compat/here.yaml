@@ -475,6 +475,7 @@ cases:
       echo "rc=$?"
 
   - name: "Here doc with command substitution that never closes"
+    min_oracle_version: "5.2" # here-doc parsing in command substitution differs in 5.1
     ignore_stderr: true
     stdin: |
       cat <<EOF
@@ -546,6 +547,7 @@ cases:
       A
 
   - name: "Here doc started in command substitution with body after it"
+    min_oracle_version: "5.2" # here-doc parsing in command substitution differs in 5.1
     ignore_stderr: true # bash warns about the unterminated here-document
     stdin: |
       tr a-z A-Z <<<"[$(cat <<EOF)]"
@@ -554,6 +556,7 @@ cases:
       echo after
 
   - name: "Here doc started in command substitution while another here doc is pending"
+    min_oracle_version: "5.2" # here-doc parsing in command substitution differs in 5.1
     ignore_stderr: true # bash warns about the unterminated here-document
     stdin: |
       cat <<A; echo "[$(cat <<B)]"
@@ -568,6 +571,7 @@ cases:
       D
 
   - name: "Here doc started in nested command substitution with body after it"
+    min_oracle_version: "5.2" # here-doc parsing in command substitution differs in 5.1
     ignore_stderr: true # bash warns about the unterminated here-document
     stdin: |
       echo $(echo $(cat <<EOF)
@@ -577,6 +581,7 @@ cases:
       )
 
   - name: "Here doc started in doubly nested command substitution with body after it"
+    min_oracle_version: "5.2" # here-doc parsing in command substitution differs in 5.1
     ignore_stderr: true # bash warns about the unterminated here-document
     stdin: |
       echo "[$(echo $(cat <<EOF))]"
@@ -584,6 +589,7 @@ cases:
       EOF
 
   - name: "Here doc started in command substitution in parameter expansion with body after it"
+    min_oracle_version: "5.2" # here-doc parsing in command substitution differs in 5.1
     ignore_stderr: true # bash warns about the unterminated here-document
     stdin: |
       echo "[${x:-$(cat <<EOF)}]"
@@ -591,6 +597,7 @@ cases:
       EOF
 
   - name: "Here doc started in command substitution with commands after it and body after it"
+    min_oracle_version: "5.2" # here-doc parsing in command substitution differs in 5.1
     ignore_stderr: true # bash warns about the unterminated here-documents
     stdin: |
       echo "[$(cat <<EOF | tr a-z A-Z)]"
@@ -603,6 +610,7 @@ cases:
       	B
 
   - name: "Here doc started in command substitution in command with its own here doc"
+    min_oracle_version: "5.2" # here-doc parsing in command substitution differs in 5.1
     ignore_stderr: true # bash warns about the unterminated here-document
     stdin: |
       f() { echo "arg=$1"; cat; }
@@ -623,6 +631,7 @@ cases:
       echo after
 
   - name: "Here doc operator with no tag in command substitution"
+    min_oracle_version: "5.2" # bash 5.1 treats the empty tag differently
     ignore_stderr: true
     stdin: |
       echo "[$(cat <<)]"

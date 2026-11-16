@@ -142,7 +142,7 @@ impl fmt::Display for BoardRecord {
     }
 }
 
-fn read_mdio<S: Seam>(seam: &mut S, phy: u8, register: u8) -> Result<u16, DriverError> {
+pub(crate) fn read_mdio<S: Seam>(seam: &mut S, phy: u8, register: u8) -> Result<u16, DriverError> {
     let mut transaction = MdioTransaction::start_read(phy, register)?;
     seam.write32(regs::MDIO_CMD, transaction.command().register_value())?;
     loop {
