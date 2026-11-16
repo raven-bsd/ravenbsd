@@ -104,6 +104,10 @@ build_image() {
 	repro_env
 	SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct)}
 	export SOURCE_DATE_EPOCH
+	# The release image must carry release user programs. A debug build of the sha2 crate
+	# currently trips an LLVM split-result error on x86_64-unknown-none; the release build is the
+	# supported release-image path.
+	export RAVEN_USER_RELEASE=1
 	short=$(git rev-parse --short HEAD)
 	dirty=""
 	[ -n "$(git status --porcelain)" ] && dirty="-dirty"
