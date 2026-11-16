@@ -47,7 +47,7 @@ notes = "P17: native libc spawn exists, but libc-spawn needs a built target sysr
 id = "process.priority"
 status = "present"
 evidence = "qtest:proc-priority"
-notes = "P2f/P3: no scheduler priority syscall; PRIO/SCHED remain ENOSYS"
+notes = "P2l: getpriority/setpriority/nice and SCHED_OTHER queries; SCHED_FIFO/RR return ENOTSUP"
 
 [[row]]
 id = "process.process-group"
