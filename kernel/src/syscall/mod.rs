@@ -26,6 +26,7 @@ pub mod ipc;
 pub mod linux;
 pub mod memory_ctl;
 pub mod pipe;
+pub mod priority;
 pub mod process_ctl;
 pub mod thread;
 
@@ -110,6 +111,27 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     if number == pipe::PIPE2 {
         return pipe::pipe2(frame);
+    }
+    if number == priority::GETPRIORITY {
+        return priority::getpriority(frame);
+    }
+    if number == priority::SETPRIORITY {
+        return priority::setpriority(frame);
+    }
+    if number == priority::NICE {
+        return priority::nice(frame);
+    }
+    if number == priority::SCHED_GET_PRIORITY_MAX {
+        return priority::sched_get_priority_max(frame);
+    }
+    if number == priority::SCHED_GET_PRIORITY_MIN {
+        return priority::sched_get_priority_min(frame);
+    }
+    if number == priority::SCHED_SETSCHEDULER {
+        return priority::sched_setscheduler(frame);
+    }
+    if number == priority::SCHED_GETSCHEDULER {
+        return priority::sched_getscheduler(frame);
     }
     if number == process_ctl::PROC_SELF_INFO {
         return process_ctl::self_info(frame);
