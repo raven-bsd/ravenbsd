@@ -221,6 +221,14 @@ fn user_checks() -> Result<(), &'static str> {
     }
     println!("perm: uid1000 dirs 0755=ok 0700=denied");
 
+    if fs::open("file:/tmp/perm/new", O_WRONLY | O_CREAT).is_ok() {
+        return Err("uid1000 create in 0755 root dir");
+    }
+    if fs::mkdir("/tmp/perm/newdir", 0o755).is_ok() {
+        return Err("uid1000 mkdir in 0755 root dir");
+    }
+    println!("perm: uid1000 create=denied");
+
     if fs::access("/tmp/perm/exec644", ACCESS_EXEC as u32).is_ok() {
         return Err("uid1000 0644 exec");
     }

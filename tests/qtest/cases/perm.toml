@@ -26,6 +26,9 @@ regex = '^perm: uid1000 0600=denied 0644=ok$'
 regex = '^perm: uid1000 dirs 0755=ok 0700=denied$'
 
 [[expect]]
+regex = '^perm: uid1000 create=denied$'
+
+[[expect]]
 regex = '^perm: uid1000 exec 0644=denied$'
 
 [[expect]]
