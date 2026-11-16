@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S67: the PCI enumerator serves the `pci:` scheme so devd can find QEMU xHCI.
+name = "pcid"
+exec = "/sbin/pcid"
+provides = ["scheme:pci"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0
+grants = ["root"]

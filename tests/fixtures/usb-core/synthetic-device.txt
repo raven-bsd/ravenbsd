@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Synthetic USB 2.0 descriptor set for the R10/S61 host tests. It is our own construction:
+# one vendor-specific configuration, one interface and one interrupt IN endpoint. It is not a
+# recorded device and contains no HID class data.
+device 1201000200000040041d0100000101020301
+config 0902190001010080320904000001ff0102000705810308000a

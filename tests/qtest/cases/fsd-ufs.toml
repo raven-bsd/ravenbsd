@@ -5,7 +5,7 @@ name = "fsd-ufs"
 arch = "x86_64"
 profile = "fsd-ufs-test"
 timeout_secs = 300
-pre = ["sh tests/fixtures/k54-ufs/build.sh"]
+pre = ["sh tests/fixtures/fsd-ufs/build.sh"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
