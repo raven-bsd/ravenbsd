@@ -112,7 +112,7 @@ util.nice	nice	DEFECT	nice true	P4d-D8
 util.nohup	nohup	DEFECT	nohup true	P4d-D9
 ```
 
-The QEMU case itself passed in 150802 ms with `exit_status: 33` and no unmatched expectation.
+The QEMU case itself passed in 122943 ms with `exit_status: 33` and no unmatched expectation.
 
 ### `cargo xtask posix-check --profile posix --arch x86_64`
 
