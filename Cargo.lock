@@ -2123,6 +2123,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-procd"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-proto-proc",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-procd-fixture"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-proto-proc",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-proto-audio"
 version = "0.1.0"
 dependencies = [
@@ -2150,6 +2174,13 @@ version = "0.1.0"
 
 [[package]]
 name = "raven-proto-net"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
+
+[[package]]
+name = "raven-proto-proc"
 version = "0.1.0"
 dependencies = [
  "raven-abi",

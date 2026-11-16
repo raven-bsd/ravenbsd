@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P2e: procd spawns an initfs image with argv/env, returns its pid, and reaps it through the
+# version-1 proc: WAIT operation. The child prints the inherited environment and exits 7.
+
+name = "proc-exec"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["PROCD_MODE=exec sh tests/fixtures/procd/build.sh"]
+initfs = "build/fixtures/procd/initfs-exec.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^procd-test: hello version=1 pid=[0-9]+$'
+
+[[expect]]
+regex = '^procd-test: spawn pid=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^procd-child: exec TEST=value$'
+unordered = true
+
+[[expect]]
+regex = '^procd-test: wait exit=7$'
+
+[[expect]]
+regex = '^procd-test: unknown=echild$'
+
+[[expect]]
+regex = '^procd-test: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|procd-test: fail|procd-child: unknown'
