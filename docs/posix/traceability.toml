@@ -7,26 +7,26 @@ standard = "posix-2024"
 [[trace]]
 id = "filesystem.access"
 ticket = "P5"
-test = "none"
-evidence = "userland/servers/vfsd"
+test = "tests/qtest/cases/perm.toml"
+evidence = "qtest:perm"
 
 [[trace]]
 id = "filesystem.directory"
 ticket = "P5"
-test = "none"
-evidence = "crates/raven-vfs-core"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "qtest:posix-fs"
 
 [[trace]]
 id = "filesystem.hard-link"
 ticket = "P5"
-test = "none"
-evidence = "none"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "qtest:posix-fs"
 
 [[trace]]
 id = "filesystem.mkdir-rmdir"
 ticket = "P5"
-test = "none"
-evidence = "userland/servers/vfsd"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "qtest:posix-fs"
 
 [[trace]]
 id = "filesystem.mmap-file"
@@ -37,26 +37,26 @@ evidence = "kernel/src/memory/uspace.rs"
 [[trace]]
 id = "filesystem.mount"
 ticket = "P5"
-test = "none"
-evidence = "userland/servers/vfsd"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "qtest:posix-fs"
 
 [[trace]]
 id = "filesystem.ownership"
 ticket = "P5"
-test = "none"
-evidence = "userland/servers/vfsd"
+test = "tests/qtest/cases/fsd-ufs-rw.toml"
+evidence = "qtest:fsd-ufs-rw"
 
 [[trace]]
 id = "filesystem.path-resolution"
 ticket = "P5"
-test = "none"
-evidence = "userland/servers/vfsd"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "qtest:posix-fs"
 
 [[trace]]
 id = "filesystem.permission"
 ticket = "P5"
-test = "none"
-evidence = "userland/servers/vfsd"
+test = "tests/qtest/cases/perm.toml"
+evidence = "qtest:perm"
 
 [[trace]]
 id = "filesystem.record-lock"
@@ -67,62 +67,62 @@ evidence = "none"
 [[trace]]
 id = "filesystem.rename"
 ticket = "P5"
-test = "none"
-evidence = "none"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "qtest:posix-fs"
 
 [[trace]]
 id = "filesystem.sparse-file"
 ticket = "P5"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/fs/sparse-file/test.sh"
 
 [[trace]]
 id = "filesystem.special-file"
 ticket = "P5"
-test = "none"
-evidence = "userland/servers/vfsd"
+test = "tests/qtest/cases/fsd-ufs-rw.toml"
+evidence = "qtest:fsd-ufs-rw"
 
 [[trace]]
 id = "filesystem.stat-family"
 ticket = "P5"
-test = "none"
-evidence = "crates/raven-vfs-core"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "qtest:posix-fs"
 
 [[trace]]
 id = "filesystem.statvfs"
 ticket = "P5"
-test = "none"
-evidence = "none"
+test = "tests/qtest/cases/fsd-ufs-rw.toml"
+evidence = "qtest:fsd-ufs-rw"
 
 [[trace]]
 id = "filesystem.symlink"
 ticket = "P5"
-test = "none"
-evidence = "userland/servers/vfsd"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "qtest:posix-fs"
 
 [[trace]]
 id = "filesystem.sync"
 ticket = "P5"
-test = "none"
-evidence = "none"
+test = "tests/qtest/cases/fsd-ufs-rw.toml"
+evidence = "qtest:fsd-ufs-rw"
 
 [[trace]]
 id = "filesystem.timestamp"
 ticket = "P5"
-test = "none"
-evidence = "none"
+test = "tests/qtest/cases/fsd-ufs-rw.toml"
+evidence = "qtest:fsd-ufs-rw"
 
 [[trace]]
 id = "filesystem.truncate"
 ticket = "P5"
-test = "none"
-evidence = "none"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "qtest:posix-fs"
 
 [[trace]]
 id = "filesystem.umask"
 ticket = "P5"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/fs/umask/test.sh"
 
 [[trace]]
 id = "header.aio.h"
@@ -9506,7 +9506,7 @@ evidence = "none"
 id = "util.ar"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/archive/ar/test.sh"
 
 [[trace]]
 id = "util.arch"
@@ -9530,7 +9530,7 @@ evidence = "none"
 id = "util.awk"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/text2/awk/test.sh"
 
 [[trace]]
 id = "util.b2sum"
@@ -10382,7 +10382,7 @@ evidence = "none"
 id = "util.sed"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/text2/sed/test.sh"
 
 [[trace]]
 id = "util.seq"
@@ -10700,13 +10700,13 @@ evidence = "none"
 id = "util.uudecode"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/archive/uudecode/test.sh"
 
 [[trace]]
 id = "util.uuencode"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/archive/uuencode/test.sh"
 
 [[trace]]
 id = "util.uustat"

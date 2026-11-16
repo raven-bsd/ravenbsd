@@ -129,6 +129,16 @@ impl MountTable {
         Ok(())
     }
 
+    /// Whether two absolute paths resolve to the same mount.
+    ///
+    /// POSIX operations that cannot cross filesystems (`link`, `rename`) use this before
+    /// forwarding a request to a single server.
+    pub fn same_mount(&self, left: &str, right: &str) -> Result<bool, Errno> {
+        let (left_id, _) = self.resolve(left)?;
+        let (right_id, _) = self.resolve(right)?;
+        Ok(left_id == right_id)
+    }
+
     /// Resolve an absolute, normalized `path` to `(mount_id, path_in_mount)`.
     ///
     /// The mount with the longest whole-component prefix wins.  The returned

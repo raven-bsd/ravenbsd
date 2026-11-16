@@ -7,7 +7,7 @@ use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 
-use raven_proto_fs::{DirEntryIter, S_IFLNK, S_IFMT, S_IFREG};
+use raven_proto_fs::{DirEntryIter, S_IFCHR, S_IFIFO, S_IFLNK, S_IFMT, S_IFREG};
 use ufs_core::check::{Mode, check};
 use ufs_core::mkfs::{MkfsOptions, format};
 use ufs_core::{BlockIo, IoError};
@@ -87,6 +87,13 @@ fn view() -> UfsView<VecDisk> {
         .expect("mkdir");
     let disk = ufs.unmount().expect("unmount");
     UfsView::mount(disk, true).expect("mount")
+}
+
+fn rw_view() -> UfsView<VecDisk> {
+    let disk = VecDisk::new(vec![0u8; options().size as usize]);
+    let ufs = format(disk, &options()).expect("format");
+    let disk = ufs.unmount().expect("unmount");
+    UfsView::mount(disk, false).expect("mount rw")
 }
 
 fn names(buffer: &[u8]) -> Vec<String> {
@@ -217,4 +224,84 @@ fn mount_rejects_a_corrupt_superblock() {
     // The primary UFS2 superblock is at 8192; break its magic.
     disk.data[8192 + 1372] ^= 0xff;
     assert!(UfsView::mount(disk, true).is_err());
+}
+
+#[test]
+fn hard_links_share_the_inode_and_link_count() {
+    let mut view = rw_view();
+    let ino = view.create_file("/a", 0o644, true).expect("create");
+    view.write(ino, 0, b"payload").expect("write");
+    view.link("/b", "/a").expect("link");
+    assert_eq!(view.resolve("/b"), Ok(ino));
+    assert_eq!(view.stat(ino).expect("stat").nlink, 2);
+    view.unlink("/a").expect("unlink a");
+    assert_eq!(view.stat(ino).expect("stat").nlink, 1);
+    let mut data = [0u8; 7];
+    assert_eq!(view.read(ino, 0, &mut data), Ok(7));
+    assert_eq!(&data, b"payload");
+    assert_eq!(view.link("/c", "/"), Err(Errno::EPERM));
+}
+
+#[test]
+fn chown_follows_or_keeps_the_symlink_identity() {
+    let mut view = rw_view();
+    let ino = view.create_file("/owned", 0o6755, true).expect("create");
+    view.chown("/owned", 1000, 100, true).expect("chown");
+    let stat = view.stat(ino).expect("stat");
+    assert_eq!((stat.uid, stat.gid), (1000, 100));
+    assert_eq!(stat.mode & 0o7777, 0o755);
+    view.symlink("/link", b"owned").expect("symlink");
+    let link = view.resolve_nofollow("/link").expect("link");
+    view.chown("/link", 2000, 200, false).expect("lchown");
+    assert_eq!(view.stat(link).expect("link stat").uid, 2000);
+    assert_eq!(view.stat(ino).expect("target stat").uid, 1000);
+    view.fchown(ino, u32::MAX, 300).expect("fchown");
+    assert_eq!(view.stat(ino).expect("stat").gid, 300);
+}
+
+#[test]
+fn utimens_sets_the_requested_timestamps() {
+    let mut view = rw_view();
+    let ino = view.create_file("/times", 0o644, true).expect("create");
+    view.utimens("/times", Some(111), Some(222), true)
+        .expect("utimens");
+    let stat = view.stat(ino).expect("stat");
+    assert_eq!((stat.atime, stat.mtime), (111, 222));
+    view.utimens("/times", None, Some(333), true)
+        .expect("utimens omit atime");
+    let stat = view.stat(ino).expect("stat");
+    assert_eq!((stat.atime, stat.mtime), (111, 333));
+}
+
+#[test]
+fn sparse_extension_keeps_block_accounting_small() {
+    let mut view = rw_view();
+    let ino = view.create_file("/sparse", 0o644, true).expect("create");
+    view.truncate(ino, 1024 * 1024).expect("truncate");
+    let stat = view.stat(ino).expect("stat");
+    assert_eq!(stat.size, 1024 * 1024);
+    assert!(
+        stat.blocks * 512 < stat.size / 4,
+        "sparse blocks={} size={}",
+        stat.blocks,
+        stat.size
+    );
+    let mut buffer = [0xffu8; 4096];
+    assert_eq!(view.read(ino, 512 * 1024, &mut buffer), Ok(4096));
+    assert!(buffer.iter().all(|byte| *byte == 0));
+    assert_eq!(view.write(ino, 512 * 1024, b"data"), Ok(4));
+    let stat = view.stat(ino).expect("stat after write");
+    assert!(stat.blocks * 512 < stat.size / 4);
+}
+
+#[test]
+fn mkfifo_and_mknod_create_special_inodes() {
+    let mut view = rw_view();
+    view.mkfifo("/pipe", 0o640).expect("mkfifo");
+    let pipe = view.resolve("/pipe").expect("pipe");
+    assert_eq!(view.stat(pipe).expect("stat").mode & S_IFMT, S_IFIFO);
+    view.mknod("/null", 0o020600, 0x1234).expect("mknod");
+    let node = view.resolve("/null").expect("node");
+    assert_eq!(view.stat(node).expect("stat").mode & S_IFMT, S_IFCHR);
+    assert_eq!(view.mknod("/bad", 0o100644, 0), Err(Errno::EINVAL));
 }

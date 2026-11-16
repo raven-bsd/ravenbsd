@@ -11,7 +11,7 @@ use alloc::string::{String, ToString};
 use raven_abi::errno::Errno;
 use raven_proto_fs::{
     ACCESS_EXEC, ACCESS_READ, ACCESS_WRITE, Call, CallRequest, CallResponse, Credentials, MAX_PATH,
-    OpenFlags, S_IFDIR, S_IFMT, Stat, StatFs,
+    OpenFlags, S_IFDIR, S_IFMT, SetTime, Stat, StatFs, StatVfs,
 };
 use raven_scheme::{Ctx, Handler, HandlerResult, OpenTable, Opened};
 
@@ -99,6 +99,42 @@ pub trait FileSystem {
         Err(Errno::EROFS)
     }
 
+    /// Change ownership of `path`, optionally following a final symlink.
+    fn chown(&mut self, path: &str, uid: u32, gid: u32, follow: bool) -> Result<(), Errno> {
+        let _ = (path, uid, gid, follow);
+        Err(Errno::EROFS)
+    }
+
+    /// Change ownership of an open inode.
+    fn fchown(&mut self, ino: u32, uid: u32, gid: u32) -> Result<(), Errno> {
+        let _ = (ino, uid, gid);
+        Err(Errno::EROFS)
+    }
+
+    /// Set atime/mtime of `path`; `None` leaves that timestamp unchanged.
+    fn utimens(
+        &mut self,
+        path: &str,
+        atime: Option<i64>,
+        mtime: Option<i64>,
+        follow: bool,
+    ) -> Result<(), Errno> {
+        let _ = (path, atime, mtime, follow);
+        Err(Errno::EROFS)
+    }
+
+    /// Create a FIFO.
+    fn mkfifo(&mut self, path: &str, mode: u16) -> Result<(), Errno> {
+        let _ = (path, mode);
+        Err(Errno::EROFS)
+    }
+
+    /// Create a special node; `mode` carries the file type.
+    fn mknod(&mut self, path: &str, mode: u16, dev: u32) -> Result<(), Errno> {
+        let _ = (path, mode, dev);
+        Err(Errno::EROFS)
+    }
+
     /// Change the open file's length.
     fn truncate(&mut self, ino: u32, size: u64) -> Result<(), Errno> {
         let _ = (ino, size);
@@ -128,16 +164,27 @@ pub struct FsHandler<F: FileSystem> {
     fs: F,
     opens: OpenTable<OpenState>,
     pending: Option<(u64, String)>,
+    now: fn() -> i64,
 }
 
 impl<F: FileSystem> FsHandler<F> {
-    /// Create a handler over `fs`.
+    /// Create a handler over `fs` with a zero clock.
     pub fn new(fs: F) -> Self {
+        Self::with_clock(fs, || 0)
+    }
+
+    /// Create a handler over `fs` with an explicit wall clock.
+    pub fn with_clock(fs: F, now: fn() -> i64) -> Self {
         Self {
             fs,
             opens: OpenTable::new(),
             pending: None,
+            now,
         }
+    }
+
+    fn clock(&self) -> i64 {
+        (self.now)()
     }
 
     /// Record the kernel file id and path of the next `OPEN`.
@@ -187,6 +234,51 @@ impl<F: FileSystem> FsHandler<F> {
 
 fn bytes_to_string(bytes: &[u8]) -> Result<&str, Errno> {
     core::str::from_utf8(bytes).map_err(|_| Errno::EINVAL)
+}
+
+fn parent_path(path: &str) -> &str {
+    match path.trim_end_matches('/').rsplit_once('/') {
+        Some((parent, _)) if !parent.is_empty() => parent,
+        _ => "/",
+    }
+}
+
+/// POSIX ownership rules: root may change anything; an owner may keep the uid and select a group
+/// they belong to.
+fn check_chown(creds: &Credentials, stat: &Stat, uid: u32, gid: u32) -> Result<(), Errno> {
+    if creds.is_root() {
+        return Ok(());
+    }
+    if creds.euid != stat.uid {
+        return Err(Errno::EPERM);
+    }
+    if uid != u32::MAX && uid != stat.uid {
+        return Err(Errno::EPERM);
+    }
+    if gid != u32::MAX && gid != stat.gid && !creds.in_group(gid) {
+        return Err(Errno::EPERM);
+    }
+    Ok(())
+}
+
+/// Arbitrary timestamps need ownership; `UTIME_NOW`/`UTIME_OMIT` also accept write permission.
+fn check_utimens(creds: &Credentials, stat: &Stat, explicit: bool) -> Result<(), Errno> {
+    if creds.is_root() || creds.euid == stat.uid {
+        return Ok(());
+    }
+    if explicit {
+        return Err(Errno::EPERM);
+    }
+    if creds.permitted(
+        (stat.mode & 0o7777) as u16,
+        stat.uid,
+        stat.gid,
+        ACCESS_WRITE,
+    ) {
+        Ok(())
+    } else {
+        Err(Errno::EACCES)
+    }
 }
 
 impl<F: FileSystem> Handler for FsHandler<F> {
@@ -360,6 +452,23 @@ impl<F: FileSystem> Handler for FsHandler<F> {
             }
             .encode(response)
             .map_err(|_| Errno::EPROTO.into()),
+            Call::Lstat { path } => {
+                let path = bytes_to_string(path)?;
+                if let Err(error) = self.check_traverse(parent_path(path), &credentials) {
+                    return self.status(response, -i32::from(error.0));
+                }
+                let ino = match self.fs.resolve_nofollow(path) {
+                    Ok(ino) => ino,
+                    Err(error) => return self.status(response, -i32::from(error.0)),
+                };
+                let stat = match self.fs.stat(ino) {
+                    Ok(stat) => stat,
+                    Err(error) => return self.status(response, -i32::from(error.0)),
+                };
+                CallResponse::Stat { status: 0, stat }
+                    .encode(response)
+                    .map_err(|_| Errno::EPROTO.into())
+            }
             Call::Sync => {
                 let result = self.fs.sync();
                 self.result(response, result)
@@ -413,6 +522,115 @@ impl<F: FileSystem> Handler for FsHandler<F> {
                 let mode = u16::try_from(mode & 0o7777).map_err(|_| Errno::EINVAL)?;
                 let result = self.fs.chmod(path, mode);
                 self.result(response, result)
+            }
+            Call::Link { path, target } => {
+                let path = bytes_to_string(path)?;
+                let target = bytes_to_string(target)?;
+                if let Err(error) = self.check_traverse(parent_path(path), &credentials) {
+                    return self.status(response, -i32::from(error.0));
+                }
+                let result = self.fs.link(path, target);
+                self.result(response, result)
+            }
+            Call::Chown { uid, gid, path } | Call::Lchown { uid, gid, path } => {
+                let path = bytes_to_string(path)?;
+                let follow = matches!(decoded.call, Call::Chown { .. });
+                if let Err(error) = self.check_traverse(path, &credentials) {
+                    return self.status(response, -i32::from(error.0));
+                }
+                let ino = match if follow {
+                    self.fs.resolve(path)
+                } else {
+                    self.fs.resolve_nofollow(path)
+                } {
+                    Ok(ino) => ino,
+                    Err(error) => return self.status(response, -i32::from(error.0)),
+                };
+                let stat = match self.fs.stat(ino) {
+                    Ok(stat) => stat,
+                    Err(error) => return self.status(response, -i32::from(error.0)),
+                };
+                if let Err(error) = check_chown(&credentials, &stat, uid, gid) {
+                    return self.status(response, -i32::from(error.0));
+                }
+                let result = self.fs.chown(path, uid, gid, follow);
+                self.result(response, result)
+            }
+            Call::Fchown { uid, gid } => {
+                let ino = self.opens.get(file).ok_or(Errno::EBADF)?.file.ino;
+                let stat = match self.fs.stat(ino) {
+                    Ok(stat) => stat,
+                    Err(error) => return self.status(response, -i32::from(error.0)),
+                };
+                if let Err(error) = check_chown(&credentials, &stat, uid, gid) {
+                    return self.status(response, -i32::from(error.0));
+                }
+                let result = self.fs.fchown(ino, uid, gid);
+                self.result(response, result)
+            }
+            Call::Mkfifo { mode, path } => {
+                let path = bytes_to_string(path)?;
+                let mode = u16::try_from(mode & 0o7777).map_err(|_| Errno::EINVAL)?;
+                if let Err(error) = self.check_traverse(parent_path(path), &credentials) {
+                    return self.status(response, -i32::from(error.0));
+                }
+                let result = self.fs.mkfifo(path, mode);
+                self.result(response, result)
+            }
+            Call::Mknod { mode, dev, path } => {
+                let path = bytes_to_string(path)?;
+                let mode = u16::try_from(mode).map_err(|_| Errno::EINVAL)?;
+                if let Err(error) = self.check_traverse(parent_path(path), &credentials) {
+                    return self.status(response, -i32::from(error.0));
+                }
+                let result = self.fs.mknod(path, mode, dev);
+                self.result(response, result)
+            }
+            Call::Utimens {
+                path,
+                atime,
+                mtime,
+                follow,
+            } => {
+                let path = bytes_to_string(path)?;
+                if let Err(error) = self.check_traverse(path, &credentials) {
+                    return self.status(response, -i32::from(error.0));
+                }
+                let ino = match if follow {
+                    self.fs.resolve(path)
+                } else {
+                    self.fs.resolve_nofollow(path)
+                } {
+                    Ok(ino) => ino,
+                    Err(error) => return self.status(response, -i32::from(error.0)),
+                };
+                let stat = match self.fs.stat(ino) {
+                    Ok(stat) => stat,
+                    Err(error) => return self.status(response, -i32::from(error.0)),
+                };
+                let explicit = matches!(atime, SetTime::Set(_)) || matches!(mtime, SetTime::Set(_));
+                if let Err(error) = check_utimens(&credentials, &stat, explicit) {
+                    return self.status(response, -i32::from(error.0));
+                }
+                let clock = self.clock();
+                let atime = match atime {
+                    SetTime::Set(seconds) => Some(seconds),
+                    SetTime::Now => Some(clock),
+                    SetTime::Omit => None,
+                };
+                let mtime = match mtime {
+                    SetTime::Set(seconds) => Some(seconds),
+                    SetTime::Now => Some(clock),
+                    SetTime::Omit => None,
+                };
+                let result = self.fs.utimens(path, atime, mtime, follow);
+                self.result(response, result)
+            }
+            Call::Statvfs => {
+                let statvfs: StatVfs = self.fs.statfs().into();
+                CallResponse::StatVfs { status: 0, statvfs }
+                    .encode(response)
+                    .map_err(|_| Errno::EPROTO.into())
             }
             Call::Mount { .. } | Call::Umount { .. } => {
                 self.status(response, -i32::from(Errno::EINVAL.0))

@@ -783,11 +783,46 @@ impl SysBackend for FakeSys {
                     None => raven_proto_fs::CallResponse::Status(-(Errno::EINVAL.0 as i32)),
                 }
             }
+            raven_proto_fs::Call::Statvfs => raven_proto_fs::CallResponse::StatVfs {
+                status: 0,
+                statvfs: raven_proto_fs::StatVfs::from(raven_proto_fs::StatFs {
+                    block_size: 4096,
+                    blocks: 1024,
+                    free_blocks: 512,
+                    files: 64,
+                    free_files: 32,
+                }),
+            },
+            raven_proto_fs::Call::Lstat { path } => match world.nodes.get(&key(path)) {
+                Some(node) => raven_proto_fs::CallResponse::Stat {
+                    status: 0,
+                    stat: raven_proto_fs::Stat {
+                        ino: 0,
+                        size: node.data.len() as u64,
+                        blocks: (node.data.len() as u64).div_ceil(512),
+                        mtime: 0,
+                        ctime: 0,
+                        atime: 0,
+                        mode: node.mode,
+                        nlink: 1,
+                        uid: 0,
+                        gid: 0,
+                    },
+                },
+                None => raven_proto_fs::CallResponse::Status(-(Errno::ENOENT.0 as i32)),
+            },
             raven_proto_fs::Call::Truncate { .. }
             | raven_proto_fs::Call::Sync
             | raven_proto_fs::Call::Mount { .. }
             | raven_proto_fs::Call::Umount { .. }
-            | raven_proto_fs::Call::Access { .. } => raven_proto_fs::CallResponse::Status(0),
+            | raven_proto_fs::Call::Access { .. }
+            | raven_proto_fs::Call::Link { .. }
+            | raven_proto_fs::Call::Chown { .. }
+            | raven_proto_fs::Call::Lchown { .. }
+            | raven_proto_fs::Call::Fchown { .. }
+            | raven_proto_fs::Call::Mkfifo { .. }
+            | raven_proto_fs::Call::Mknod { .. }
+            | raven_proto_fs::Call::Utimens { .. } => raven_proto_fs::CallResponse::Status(0),
         };
         let _ = open;
         response.encode(resp).map_err(|error| error.errno())
