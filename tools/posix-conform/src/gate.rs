@@ -611,9 +611,9 @@ fn gate_rows(
                     );
                 } else if let Some(case) = qtest_case(test) {
                     let (result, command, reason) =
-                        run_qtest_cached(root, &case, arch, qtest_cache).unwrap_or_else(
-                            |error| (Verdict::Fail, test.to_string(), format!("{error:#}")),
-                        );
+                        run_qtest_cached(root, &case, arch, qtest_cache).unwrap_or_else(|error| {
+                            (Verdict::Fail, test.to_string(), format!("{error:#}"))
+                        });
                     add_row(
                         &mut rows,
                         &utility.meta.id,

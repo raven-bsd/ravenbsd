@@ -595,7 +595,6 @@ fn qtest_for(id: &str) -> &'static str {
     match id {
         "process.fork" => "tests/qtest/cases/proc-fork.toml",
         "filesystem.access" | "filesystem.permission" => "tests/qtest/cases/perm.toml",
-        "filesystem.mount" => "tests/qtest/cases/vfsd.toml",
         "filesystem.ownership"
         | "filesystem.special-file"
         | "filesystem.statvfs"
@@ -604,6 +603,7 @@ fn qtest_for(id: &str) -> &'static str {
         "filesystem.directory"
         | "filesystem.hard-link"
         | "filesystem.mkdir-rmdir"
+        | "filesystem.mount"
         | "filesystem.path-resolution"
         | "filesystem.rename"
         | "filesystem.stat-family"

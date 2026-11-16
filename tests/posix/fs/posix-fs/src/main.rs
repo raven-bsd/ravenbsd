@@ -104,6 +104,31 @@ fn setup() -> Result<(), String> {
         Ok(()) | Err(Errno::EEXIST) => {}
         Err(error) => return Err(format!("mkdir start {}", error.description())),
     }
+    mount_layout()?;
+    Ok(())
+}
+
+fn mount_layout() -> Result<(), String> {
+    let root = file_stat("/").map_err(|error| format!("stat root: {}", error.description()))?;
+    let tmp = file_stat("/tmp").map_err(|error| format!("stat tmp: {}", error.description()))?;
+    if root.mode & S_IFMT != S_IFDIR || tmp.mode & S_IFMT != S_IFDIR {
+        return Err("root or /tmp is not a directory".to_string());
+    }
+    let mount = format!("{START}/mnt");
+    match fs::mkdir(&mount, 0o755) {
+        Ok(()) | Err(Errno::EEXIST) => {}
+        Err(error) => return Err(format!("mkdir mount: {}", error.description())),
+    }
+    fs::mount(&mount, "ramfs:").map_err(|error| format!("mount: {}", error.description()))?;
+    write_file(&format!("{mount}/nested"), b"nested")?;
+    if file_read(&format!("{mount}/nested")).as_deref() != Ok(b"nested") {
+        return Err("nested mount read".to_string());
+    }
+    fs::umount(&mount).map_err(|error| format!("umount: {}", error.description()))?;
+    if file_stat(&format!("{mount}/nested")) != Err(Errno::ENOENT) {
+        return Err("nested mount survived umount".to_string());
+    }
+    println!("posix-fs: mount ok");
     Ok(())
 }
 

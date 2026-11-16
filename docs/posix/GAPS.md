@@ -1764,7 +1764,7 @@ Traceability rows: 1762; profile rows: 1762.
 | `filesystem.hard-link` | `hard-link` | present | P5 | `qtest:posix-fs` | PG-31 |
 | `filesystem.mkdir-rmdir` | `mkdir-rmdir` | present | P5 | `qtest:posix-fs` | PG-31 |
 | `filesystem.mmap-file` | `mmap-file` | partial | P5 | `kernel/src/memory/uspace.rs` | PG-36, PG-13 |
-| `filesystem.mount` | `mount` | present | P5 | `qtest:vfsd` | PG-37 |
+| `filesystem.mount` | `mount` | present | P5 | `qtest:posix-fs` | PG-37 |
 | `filesystem.ownership` | `ownership` | present | P5 | `qtest:fsd-ufs-rw` | PG-33 |
 | `filesystem.path-resolution` | `path-resolution` | present | P5 | `qtest:posix-fs` | PG-33 |
 | `filesystem.permission` | `permission` | present | P5 | `qtest:perm` | PG-23, PG-33 |

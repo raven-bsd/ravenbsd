@@ -19,6 +19,9 @@ expect_exit = "success"
 regex = '^posix-fs: services ok$'
 
 [[expect]]
+regex = '^posix-fs: mount ok$'
+
+[[expect]]
 regex = '^posix-fs: mkdir-rmdir ok$'
 
 [[expect]]

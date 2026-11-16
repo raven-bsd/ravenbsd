@@ -37,8 +37,8 @@ evidence = "kernel/src/memory/uspace.rs"
 [[trace]]
 id = "filesystem.mount"
 ticket = "P5"
-test = "tests/qtest/cases/vfsd.toml"
-evidence = "qtest:vfsd"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "qtest:posix-fs"
 
 [[trace]]
 id = "filesystem.ownership"
