@@ -3,6 +3,7 @@ HOME=/root
 TERM=${TERM:-vt100}
 USER=root
 LOGNAME=root
-SHELL=/bin/brush
-export PATH HOME TERM USER LOGNAME SHELL
+SHELL=/bin/rsh
+PS1='\u@\h:\w# '
+export PATH HOME TERM USER LOGNAME SHELL PS1
 umask 022

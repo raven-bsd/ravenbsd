@@ -154,7 +154,7 @@ fn build(root: &Path, options: BuildOptions) -> Result<u8> {
         target.to_string(),
         "--no-default-features".to_string(),
         "--features".to_string(),
-        "basic,reedline".to_string(),
+        "basic,reedline,minimal".to_string(),
         "--target-dir".to_string(),
         target_dir.display().to_string(),
     ];
