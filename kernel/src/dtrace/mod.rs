@@ -68,13 +68,16 @@ pub fn probe_syscall(frame: &SyscallFrame) {
         arg3: frame.r10,
         syscall: frame.rax as u32,
         tid: crate::sched::current_thread()
-            .map(|thread| thread.tid as u32)
+            .map(|thread| thread.tid)
             .unwrap_or(0),
         cpu: cpu as u16,
         probe: model::probe::SYSCALL_ENTRY_ID as u16,
     };
-    let empty = RINGS[cpu].is_empty();
-    if RINGS[cpu].push(record) && empty {
+    let Some(ring) = RINGS.get(cpu) else {
+        return;
+    };
+    let empty = ring.is_empty();
+    if ring.push(record) && empty {
         wake_consumer();
     }
 }
@@ -147,7 +150,9 @@ pub fn stats(out: &mut [model::CpuStats]) -> usize {
     let cpus = crate::sched::smp::online_cpus().min(MAX_DTRACE_CPUS);
     let count = out.len().min(cpus);
     for (index, slot) in out.iter_mut().take(count).enumerate() {
-        *slot = RINGS[index].stats();
+        if let Some(ring) = RINGS.get(index) {
+            *slot = ring.stats();
+        }
     }
     count
 }

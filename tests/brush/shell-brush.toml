@@ -1,21 +1,168 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K26a: brush is the target interactive shell. This case boots the shell-test image, checks the
+# installed binary, then runs the bash-compatibility smoke through `/bin/brush`. The rescue
+# `/bin/rsh` still owns the console session; K26b switches the login shell and prompt.
 
-# K26a: brush is the target interactive shell, but its target build is deferred until the C64f
-# std runtime is complete. The case is intentionally skipped so `qtest --all` stays honest; it
-# will be enabled with the brush profile once the
-# nix/mio/rustix/socket2/uzers ravenbsd OS modules and /bin/brush exist.
 name = "shell-brush"
 arch = "x86_64"
 profile = "shell-test"
-timeout_secs = 420
-skip = "brush target build blocked in dependency OS modules and remaining libc API; see tickets/kevin/reports/K26a.md"
+timeout_secs = 600
+pre = ["cargo xtask build brush --arch x86_64"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
 
 [[expect]]
-regex = '^brush: ready$'
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^rsh: ready$'
+
+[[expect]]
+regex = '^brush 0\.4\.0'
+
+[[expect]]
+regex = '^brush:ok$'
+
+[[expect]]
+regex = '^var:world$'
+
+[[expect]]
+regex = '^quote:"a b"$'
+
+[[expect]]
+regex = '^one$'
+
+[[expect]]
+regex = '^redirect$'
+
+[[expect]]
+regex = '^func:ok$'
+
+[[expect]]
+regex = '^if:yes$'
+
+[[expect]]
+regex = '^for:1$'
+
+[[expect]]
+regex = '^for:2$'
+
+[[expect]]
+regex = '^sub:nested$'
+
+[[expect]]
+regex = '^or:ok$'
+
+[[expect]]
+regex = '^or-fallback:ok$'
+
+[[expect]]
+regex = '^status:1$'
+
+[[expect]]
+regex = '^ps1:raven#'
 
 [[expect]]
 regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|command not found|No such file'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "/bin/brush --version\n"
+delay_ms = 100
+
+[[step]]
+wait = '^brush 0\.4\.0'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/brush --norc -c 'echo brush:ok'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^brush:ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/brush --norc /etc/brush-compat.sh\n"
+delay_ms = 100
+
+[[step]]
+wait = '^var:world$'
+timeout_secs = 60
+
+[[step]]
+wait = '^quote:"a b"$'
+timeout_secs = 30
+
+[[step]]
+wait = '^one$'
+timeout_secs = 30
+
+[[step]]
+wait = '^redirect$'
+timeout_secs = 30
+
+[[step]]
+wait = '^func:ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^if:yes$'
+timeout_secs = 30
+
+[[step]]
+wait = '^for:1$'
+timeout_secs = 30
+
+[[step]]
+wait = '^for:2$'
+timeout_secs = 30
+
+[[step]]
+wait = '^sub:nested$'
+timeout_secs = 30
+
+[[step]]
+wait = '^or:ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^or-fallback:ok$'
+timeout_secs = 30
+
+[[step]]
+wait = '^status:1$'
+timeout_secs = 30
+
+[[step]]
+wait = '^ps1:raven#'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

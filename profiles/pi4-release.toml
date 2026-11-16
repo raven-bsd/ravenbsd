@@ -1,61 +1,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# Pi 4 release image (REL3 prep).
+# Pi 4 0.1.0 release image.
 #
-# The login/getty gate waits for REL1, and brush/uutils have no aarch64 build
-# yet. Until then this profile carries the current shell services and first-party
-# tools plus the network and platform services needed by the release serial gate:
-# kernel messages, shell, `ls /bin`, and `ping <gateway>`. The image is built and
-# manifest-checked on the host; every board result stays UNVERIFIED.
+# `pi4` itself extends `base`, and the profile loader permits only one level of
+# inheritance, so this profile extends `base` directly and carries the same Pi 4
+# boot and EMMC2/blockd staging entries. It adds the release userspace: the shell
+# services and first-party tools, the aarch64 brush and uutils slices, the
+# getty/login account files and the network/platform services.
 name = "pi4-release"
 extends = "base"
-
-[initfs]
-programs = [
-    { package = "raven-svcctl", path = "/bin/svcctl" },
-    { package = "raven-logd", path = "/sbin/logd" },
-    { package = "raven-sysd", path = "/sbin/sysd" },
-    { package = "raven-randd", path = "/sbin/randd" },
-    { package = "raven-zerod", path = "/sbin/zerod" },
-    { package = "raven-nulld", path = "/sbin/nulld" },
-    { package = "raven-initfsd", path = "/sbin/initfsd" },
-    { package = "raven-ramfsd", path = "/sbin/ramfsd" },
-    { package = "raven-vfsd", path = "/sbin/vfsd" },
-    { package = "raven-consd", path = "/sbin/consd" },
-    { package = "raven-rsh", path = "/bin/rsh" },
-    { package = "raven-sleep", path = "/bin/sleep" },
-    { package = "raven-date", path = "/bin/date" },
-    { package = "raven-hostname", path = "/bin/hostname" },
-    { package = "raven-dmesg", path = "/sbin/dmesg" },
-    { package = "raven-mount", path = "/sbin/mount" },
-    { package = "raven-umount", path = "/sbin/umount" },
-    { package = "raven-ps", path = "/bin/ps" },
-    { package = "netd", path = "/sbin/netd" },
-    { package = "resolvd", path = "/sbin/resolvd" },
-    { package = "raven-ping", path = "/bin/ping" },
-    { package = "raven-route", path = "/sbin/route" },
-    { package = "raven-netstat", path = "/sbin/netstat" },
-    { package = "raven-platd", path = "/sbin/platd" },
-]
-
-files = [
-    { src = "etc/services.d/logd.toml", path = "/etc/services.d/logd.toml" },
-    { src = "etc/services.d/sysd.toml", path = "/etc/services.d/sysd.toml" },
-    { src = "etc/services.d/randd.toml", path = "/etc/services.d/randd.toml" },
-    { src = "etc/services.d/zerod.toml", path = "/etc/services.d/zerod.toml" },
-    { src = "etc/services.d/nulld.toml", path = "/etc/services.d/nulld.toml" },
-    { src = "etc/services.d/initfsd.toml", path = "/etc/services.d/initfsd.toml" },
-    { src = "etc/services.d/ramfsd.toml", path = "/etc/services.d/ramfsd.toml" },
-    { src = "etc/services.d/vfsd.toml", path = "/etc/services.d/vfsd.toml" },
-    { src = "etc/services.d/consd.toml", path = "/etc/services.d/consd.toml" },
-    { src = "etc/services.d/rsh.toml", path = "/etc/services.d/rsh.toml" },
-    { src = "etc/services.d/netd.toml", path = "/etc/services.d/netd.toml" },
-    { src = "etc/services.d/resolvd.toml", path = "/etc/services.d/resolvd.toml" },
-    { src = "etc/services.d/platd.toml", path = "/etc/services.d/platd.toml" },
-    { src = "etc/mounts", path = "/etc/mounts" },
-    { src = "etc/resolv.conf", path = "/etc/resolv.conf" },
-]
 
 [boot]
 cmdline = "console=ttyAMA0 loglevel=info"

@@ -19,9 +19,22 @@ use crate::process::{CommandSpec, run as run_command};
 const PACKAGE: &str = "brush-shell";
 /// The binary name produced by the package.
 const BINARY: &str = "brush";
-/// Stable staging path used by the shell profile until brush becomes a normal
-/// workspace user package. The x86-64 bring-up image is the only consumer.
-const STAGED: &str = "build/brush";
+
+/// The arch-correct staging path for the brush binary.
+pub(crate) fn staged_for(arch: Arch) -> String {
+    format!("build/{}/brush", arch.as_str())
+}
+
+/// Build release brush for one architecture; used by the image/initfs prerequisite path.
+pub(crate) fn build_for_arch(root: &Path, arch: Arch) -> Result<u8> {
+    build(
+        root,
+        BuildOptions {
+            arch,
+            release: true,
+        },
+    )
+}
 
 /// The RavenBSD target triple for an architecture.
 pub(crate) fn target_for(arch: Arch) -> &'static str {
@@ -41,7 +54,9 @@ struct BuildOptions {
 
 fn parse_build(args: &[String]) -> Result<BuildOptions> {
     let mut arch = None;
-    let mut release = false;
+    // The target shell is installed in the boot image; a debug brush carries megabytes of DWARF
+    // and no longer fits the ESP. Release is the default, as for the uutils target build.
+    let mut release = true;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
@@ -56,6 +71,7 @@ fn parse_build(args: &[String]) -> Result<BuildOptions> {
                 );
             }
             "--release" => release = true,
+            "--debug" => release = false,
             other => bail!("build brush: unknown argument `{other}`"),
         }
         index += 1;
@@ -110,8 +126,29 @@ fn build(root: &Path, options: BuildOptions) -> Result<u8> {
     let target_dir = root
         .join("build/cargo")
         .join(format!("brush-{}", options.arch.as_str()));
+    // A std binary is PIE by default. The Raven spawn loader wants a fixed-address ET_EXEC with
+    // page-aligned segments, so use the same static link script and code model as uutils.
+    let linker = root
+        .join("xtask")
+        .join(format!("brush-{}.ld", options.arch.as_str()));
+    if options.arch == Arch::X86_64 && !linker.is_file() {
+        bail!("missing brush linker script: {}", linker.display());
+    }
+    let code_model = if options.arch == Arch::X86_64 {
+        " -C code-model=small"
+    } else {
+        ""
+    };
+    let linker_arg = if options.arch == Arch::X86_64 {
+        format!(" -C link-arg=-T{}", linker.display())
+    } else {
+        String::new()
+    };
     let flags = format!(
-        "--cfg getrandom_backend=\"custom\" -C link-arg={} -C link-arg={} -C link-arg=-L{} -C link-arg=-lc -C link-arg={}",
+        "--cfg getrandom_backend=\"custom\" -C strip=symbols -C relocation-model=static{}{} \
+         -C link-arg={} -C link-arg={} -C link-arg=-L{} -C link-arg=-lc -C link-arg={}",
+        code_model,
+        linker_arg,
         crt1.display(),
         crti.display(),
         crt_dir.display(),
@@ -130,7 +167,7 @@ fn build(root: &Path, options: BuildOptions) -> Result<u8> {
         target.to_string(),
         "--no-default-features".to_string(),
         "--features".to_string(),
-        "basic,reedline".to_string(),
+        "basic,reedline,minimal".to_string(),
         "--target-dir".to_string(),
         target_dir.display().to_string(),
     ];
@@ -154,9 +191,7 @@ fn build(root: &Path, options: BuildOptions) -> Result<u8> {
             artifact.display()
         );
     }
-    let arch_staged = root.join("build").join(options.arch.as_str()).join(BINARY);
-    let staged = root.join(STAGED);
-    copy(&artifact, &arch_staged)?;
+    let staged = root.join(staged_for(options.arch));
     copy(&artifact, &staged)?;
     println!("{}", staged.display());
     Ok(0)

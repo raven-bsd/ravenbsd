@@ -212,6 +212,7 @@ fn build_release_initfs(
     profile: &Profile,
     workspace: &Workspace,
 ) -> Result<Vec<u8>> {
+    crate::initfs::ensure_prerequisites(root, arch, profile)?;
     let mut packages: Vec<String> = profile
         .initfs
         .programs
@@ -239,10 +240,13 @@ fn build_release_initfs(
         builder.add_file(&program.path, &data, 0o755)?;
     }
     for file in &profile.initfs.files {
-        let data = fs::read(root.join(&file.src)).with_context(|| {
+        let source = crate::initfs::source_path(root, arch, &file.src);
+        let data = fs::read(&source).with_context(|| {
             format!(
-                "cannot read profile file {} for initfs path {}",
-                file.src, file.path
+                "cannot read profile file {} for initfs path {} (resolved {})",
+                file.src,
+                file.path,
+                source.display()
             )
         })?;
         builder.add_file(&file.path, &data, file.mode)?;

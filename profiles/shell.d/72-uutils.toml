@@ -90,6 +90,24 @@ mode = 0o755
 generated = true
 
 [[initfs.files]]
+src = "build/x86_64/uutils/du"
+path = "/bin/du"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/x86_64/uutils/id"
+path = "/bin/id"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/x86_64/uutils/wc"
+path = "/bin/wc"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
 src = "build/x86_64/uutils/true"
 path = "/bin/true"
 mode = 0o755

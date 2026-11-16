@@ -1,0 +1,64 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt USERADD 1
+.Os RavenBSD
+.Sh NAME
+.Nm useradd
+.Nd create a user account
+.Sh SYNOPSIS
+.Nm
+.Op Fl m
+.Op Fl d Ar home
+.Op Fl s Ar shell
+.Op Fl u Ar uid
+.Op Fl g Ar group
+.Op Fl G Ar list
+.Op Fl c Ar gecos
+.Ar name
+.Sh DESCRIPTION
+.Nm
+adds a record to
+.Pa /etc/passwd ,
+creates or reuses the primary group in
+.Pa /etc/group ,
+and creates a locked record in
+.Pa /etc/shadow .
+Without
+.Fl u
+the next regular uid at or above 1000 is allocated monotonically.
+Without
+.Fl g
+a same-name primary group with the same numeric id is created.
+.Pp
+The
+.Fl m
+option creates the home directory with mode 0700 and copies the regular files from
+.Pa /etc/skel .
+The
+.Fl G
+option takes a comma-separated list of existing supplementary groups; at most 16 are
+accepted.
+.Pp
+The 0.2.0 tools are root-only. Home ownership and non-root execution arrive with the kernel
+credential work in U3.
+.Sh FILES
+.Bl -tag -width /etc/shadow -compact
+.It Pa /etc/passwd
+account records, mode 0644
+.It Pa /etc/group
+group records, mode 0644
+.It Pa /etc/shadow
+password records, mode 0600
+.It Pa /etc/.pwd.lock
+exclusive update lock
+.El
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr adduser 1 ,
+.Xr groupadd 1 ,
+.Xr passwd 1
+.Sh STANDARDS
+RavenBSD.

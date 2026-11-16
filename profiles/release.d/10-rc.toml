@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The release session ends when getty exits (the login shell typed `exit`), so the QEMU gate can
+# assert `init exited (0)`. The shell parent starts rsh as a fallback; the release profile disables
+# it in favour of getty.
+
+[[initfs.files]]
+src = "profiles/release.d/rc.conf"
+path = "/etc/rc.conf"
+
+[[initfs.files]]
+src = "profiles/release.d/svcd.conf"
+path = "/etc/svcd.conf"
+mode = 0o644
