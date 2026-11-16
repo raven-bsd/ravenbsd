@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Ordered Pi 4 bring-up markers used by scripts/pi4-bringup.sh --markers.
+# Fields: stage|marker|meaning. The kernel/login/shell rows are the REL3
+# release gate (tests/fixtures/pi4-release/gate-markers.txt); the devd/genet
+# and netd rows are expected only after REL3 enables the platform services
+# and REL4 supplies DHCP-first. No row is a board result.
+firmware|(no RavenBSD text)|firmware/start4.elf runs silently; a rainbow screen is normal
+kernel|RavenBSD kernel 0.1 (aarch64)|first RavenBSD line; REL3 gate
+board|board: Raspberry Pi 4 Model B|live firmware DTB model
+memory|mem:|usable memory map
+cmdline|cmdline: console=ttyAMA0|Pi 4 PL011 console
+init|process: starting /init|svcd starts the initfs
+devd|devd: dtb launch genet|P8 platform launch; requires REL3 enable
+genet|GENET-REV raw=|GENET register bring-up record
+netd|netd: interface eth0 |DHCP-first lease; requires REL4a
+login|login:|getty/login prompt; REL3 gate
+password|assword:|root password prompt; REL3 gate
+prompt|raven#|release rsh shell; REL3 gate
+ls-command|ls /bin|owner command; REL3 gate
+ls-rsh|rsh|rsh is staged; REL3 gate
+ls-brush|brush|brush is staged; REL3 gate
+ping|bytes from|gateway ping reply; REL3 gate
+genet-net|GENET-NET-OK|full link/DHCP/ping evidence; REL4
+clean|init exited (0)|clean release exit; REL3 gate
