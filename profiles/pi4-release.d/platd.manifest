@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# Pi 4 platform server. It needs the mailbox/GPIO/RNG/DMA handles from the
-# platform launcher (P8); staging it disabled keeps svcd from starting a server
-# without those grants. The service will be enabled with the P8 launch.
+# Pi 4 platform server. devd launches platd from the release drivers.toml with
+# the mailbox/GPIO/RNG/DMA plan; this svcd service entry stays disabled so there
+# is exactly one platd launcher. P8b must add the multi-window transfer before
+# the entry is usable on hardware.
 name = "platd"
 exec = "/sbin/platd"
 restart = "never"
