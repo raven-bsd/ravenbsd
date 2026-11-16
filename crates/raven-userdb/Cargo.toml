@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-userdb"
+version = "0.1.0"
+description = "RavenBSD files-backed user database: passwd, group and shadow parsing, lookup and atomic edits."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+raven-abi = { path = "../raven-abi" }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-proto-fs = { path = "../raven-proto-fs" }
+raven-rt = { path = "../../userland/rt" }
+
+[dev-dependencies]
+raven-auth = { path = "../raven-auth" }
+
+[lints]
+workspace = true

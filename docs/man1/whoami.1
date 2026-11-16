@@ -1,0 +1,31 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt WHOAMI 1
+.Os RavenBSD
+.Sh NAME
+.Nm whoami
+.Nd print the effective user name
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+prints the account name for the effective uid.
+If the account database has no record for that uid, it prints the numeric uid and exits 1.
+.Pp
+The kernel is root-only in 0.2.0, so
+.Nm
+prints
+.Ql root .
+U3 supplies the real effective uid.
+.Sh FILES
+.Bl -tag -width /etc/passwd -compact
+.It Pa /etc/passwd
+account records
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr id 1
+.Sh STANDARDS
+RavenBSD.
