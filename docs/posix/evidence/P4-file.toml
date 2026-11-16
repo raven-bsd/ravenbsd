@@ -130,3 +130,15 @@ id = "util.unlink"
 status = "present"
 evidence = "test:tests/posix/utility/file/unlink/test.sh"
 notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.file"
+status = "present"
+evidence = "test:tests/posix/utility/file/file/test.sh"
+notes = "P4b2: first-party file utility behaviour tests"
+
+[[row]]
+id = "util.find"
+status = "present"
+evidence = "test:tests/posix/utility/file/find/test.sh"
+notes = "P4b2: first-party find utility behaviour tests"

@@ -155,6 +155,8 @@ members = [
     "userland/bin/cp",
     "userland/bin/touch",
     "userland/bin/stat",
+    "userland/bin/file",
+    "userland/bin/find",
     "userland/bin/useradd",
     "userland/bin/adduser",
     "userland/bin/passwd",

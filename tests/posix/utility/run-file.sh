@@ -19,8 +19,8 @@ root=$(CDPATH= cd -- "$here/../../.." && pwd)
 target=$root/build/posix-utility/uutils-host
 log=$root/build/posix-utility/build.log
 
-present="cat chgrp chmod chown cp cksum dd df du link ln ls mkdir mkfifo mknod mv pathchk pwd readlink realpath rm rmdir stat touch unlink"
-missing="file find"
+present="cat chgrp chmod chown cp cksum dd df du file find link ln ls mkdir mkfifo mknod mv pathchk pwd readlink realpath rm rmdir stat touch unlink"
+missing=""
 
 if [ "${1:-}" = "--list" ]; then
     for tool in $present; do
@@ -49,16 +49,26 @@ printf '==> file utilities: host build (%s)\n' "$target"
 set +e
 (
     cd "$root"
-    build_args=""
+    uutils_args=""
+    raven_args=""
     for tool in $selected; do
         case " $present " in
-            *" $tool "*) build_args="$build_args -p uu_$tool" ;;
+            *" $tool "*)
+                case "$tool" in
+                    file | find) raven_args="$raven_args -p raven-$tool" ;;
+                    *) uutils_args="$uutils_args -p uu_$tool" ;;
+                esac
+                ;;
         esac
     done
-    if [ -n "$build_args" ]; then
+    if [ -n "$uutils_args" ]; then
         # shellcheck disable=SC2086
-        CARGO_TARGET_DIR=$target cargo build --quiet --locked $build_args \
+        CARGO_TARGET_DIR=$target cargo build --quiet --locked $uutils_args \
             --manifest-path userland/uutils/Cargo.toml
+    fi
+    if [ -n "$raven_args" ]; then
+        # shellcheck disable=SC2086
+        CARGO_TARGET_DIR=$target cargo build --quiet --locked $raven_args
     fi
 ) >"$log" 2>&1
 build_status=$?
@@ -92,7 +102,11 @@ for tool in $selected; do
         failed_names="$failed_names $tool"
         continue
     fi
-    if [ ! -x "$target/debug/$tool" ]; then
+    host_bin=$target/debug/$tool
+    case "$tool" in
+        file | find) host_bin=$target/debug/raven-$tool ;;
+    esac
+    if [ ! -x "$host_bin" ]; then
         printf '[FAIL] %s: host build produced no binary\n' "$tool"
         fail=$((fail + 1))
         failed_names="$failed_names $tool"
@@ -102,7 +116,7 @@ for tool in $selected; do
     mkdir -p "$root/build/posix-utility/logs"
     case_log=$root/build/posix-utility/logs/file-$tool.log
     set +e
-    UTIL=$target/debug/$tool sh "$case_dir/test.sh" >"$case_log" 2>&1
+    UTIL=$host_bin sh "$case_dir/test.sh" >"$case_log" 2>&1
     case_status=$?
     set -e
     if [ "$case_status" -eq 0 ]; then
