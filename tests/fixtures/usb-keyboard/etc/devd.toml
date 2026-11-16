@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S67: run the matched xHCI driver once and wait for it to finish the QEMU keyboard enumeration.
+name = "devd"
+exec = "/sbin/devd"
+args = ["devd", "test"]
+needs = ["scheme:pci"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0
