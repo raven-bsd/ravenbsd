@@ -508,14 +508,25 @@ cases:
   - name: "repeated --norc and --noprofile"
     args: ["--norc", "--noprofile", "--norc", "-c", "echo hi"]
 
+  # These two cases drop `--norc`, so the oracle bash also reads the host's system-wide
+  # `/etc/bash.bashrc`. On Debian/Ubuntu that prints the sudo hint for an interactive shell;
+  # a quiet HOME suppresses it without touching the `testrc` assertion.
   - name: "--init-file names the rc file of an interactive shell"
     removed_default_args: ["--norc"]
     ignore_stderr: true # bash warns that it has no job control
+    home_dir: "."
+    test_files:
+      - path: ".hushlogin"
+        contents: ""
     args: ["--init-file", "testrc", "-i", "-c", 'echo "RC[$RC_MARKER]"']
 
   - name: "--rcfile names the rc file of an interactive -c shell"
     removed_default_args: ["--norc"]
     ignore_stderr: true # bash warns that it has no job control
+    home_dir: "."
+    test_files:
+      - path: ".hushlogin"
+        contents: ""
     args: ["--rcfile", "testrc", "-i", "-c", 'echo "RC[$RC_MARKER]"']
 
   - name: "--rcfile with no file name"

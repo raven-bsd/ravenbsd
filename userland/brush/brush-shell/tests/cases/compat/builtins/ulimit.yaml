@@ -139,7 +139,6 @@ cases:
       ulimit -c 0 -n
 
   - name: "ulimit takes a limit's value after --"
-    known_failure: true # TODO(ulimit): brush reports the limit and ignores the value
     stdin: |
       ulimit -n -- 100; echo "ulimit -n -- 100: $?"; ulimit -n
 
