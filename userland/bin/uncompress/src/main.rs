@@ -48,13 +48,16 @@ mod program {
         } else {
             alloc::format!("{path}.Z")
         };
-        let data = fs::read_to_vec(&with_file_scheme(&fs::resolve(&source)))?;
+        let resolved = with_file_scheme(&fs::resolve(&source));
+        let stat = fs::stat(&resolved)?;
+        let data = fs::read_to_vec(&resolved)?;
         let decoded = decode(&data).map_err(|_| Errno::EINVAL)?;
         if stdout {
             return write_stdout(&decoded);
         }
         let target = output_name(&source);
         write_file(&target, &decoded)?;
+        let _ = fs::chmod(&with_file_scheme(&fs::resolve(&target)), stat.mode & 0o7777);
         let _ = fs::unlink(&with_file_scheme(&fs::resolve(&source)));
         Ok(())
     }

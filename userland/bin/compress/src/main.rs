@@ -53,7 +53,9 @@ mod program {
         } else {
             path.to_string()
         };
-        let data = fs::read_to_vec(&with_file_scheme(&fs::resolve(&source)))?;
+        let resolved = with_file_scheme(&fs::resolve(&source));
+        let stat = fs::stat(&resolved)?;
+        let data = fs::read_to_vec(&resolved)?;
         let result = if options.decompress {
             decode(&data).map_err(|_| Errno::EINVAL)?
         } else {
@@ -69,6 +71,7 @@ mod program {
             format!("{source}.Z")
         };
         write_file(&target, &result)?;
+        let _ = fs::chmod(&with_file_scheme(&fs::resolve(&target)), stat.mode & 0o7777);
         if source != target {
             let _ = fs::unlink(&with_file_scheme(&fs::resolve(&source)));
         }

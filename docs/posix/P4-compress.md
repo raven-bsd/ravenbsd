@@ -32,7 +32,7 @@ All three `util.*` rows are registered in `docs/posix/evidence/P4-compress.toml`
 | Item | Detail |
 |---|---|
 | target streams | target standard input/output archive streaming is not implemented; file operands are required |
-| mode/time | file mode is not restored by the current wrappers; no utimes primitive exists |
+| time | file mode is preserved by the wrappers; mtime is not restored because no utimes primitive exists |
 | non-block mode | only block-mode `.Z` headers with clear codes are accepted |
 | concatenated streams | one member per file; concatenated `.Z` members are not joined |
 
