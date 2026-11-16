@@ -6,13 +6,15 @@
 This file records the exact `toolchain/vendor/libc` additions that the vendored
 brush dependency graph needs. K26c deliberately does **not** change the vendored
 libc source: the directive requires the delta to be listed for the reviewer and
-the vendored version to stay untouched. These definitions are the named
-follow-up **C64h** work.
+the vendored version to stay untouched. These definitions were the named
+follow-up **C64h** work; C64h/C64i implemented them, and the K26c verification
+on `origin/master` `14908851` now builds the target and passes `shell-brush`.
 
 The list was derived by applying the additions locally, compiling the target,
 and then reverting them. With the local delta applied, `mio`, `socket2`,
 `rustix`, `nix`, `uzers`, `rlimit` and `tokio` all compiled; the final link
-stopped on the 19 ravenlibc symbols at the end of this file.
+stopped on the 19 ravenlibc symbols at the end of this file. That observation is
+kept as the historical delta; the merged C64h/C64i symbols close it.
 
 ## Types and structs
 
@@ -116,7 +118,7 @@ Functions: `faccessat`, `mkfifoat`, `mknodat`, `posix_fadvise`,
 `fdatasync`, `setfsuid`, `setfsgid`, `setgroups`, `initgroups`, `daemon`,
 `fexecve`, `forkpty`, `ptsname_r`, `sigsuspend`, `sysinfo`.
 
-## Final link gap observed with the delta applied
+## Final link gap observed with the delta applied (historical)
 
 With the local delta applied, the brush binary linked until these ravenlibc
 symbols were missing from `build/x86_64/libc.a`:
@@ -129,3 +131,17 @@ killpg tcgetattr tcsetattr
 
 These are the concrete C64h implementation items; the declarations alone are not
 enough for the brush target.
+
+## K26c verification (`14908851`)
+
+The merged C64h/C64i libc and ravenlibc symbols close the gap. On the K26c
+verification branch, from a clean `build/cargo/brush-x86_64`:
+
+```
+cargo xtask build brush --arch x86_64                 # exit 0
+cargo xtask qtest --case shell-brush --arch x86_64     # shell-brush: pass
+make check-fast                                        # PASSED
+```
+
+The vendored brush tree and this delta are unchanged by K26c; the port is in
+the merged C64h/K26a base.
