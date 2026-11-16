@@ -2390,10 +2390,38 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
 
 [[package]]
+name = "raven-abi"
+version = "0.1.0"
+
+[[package]]
 name = "raven-getrandom"
 version = "0.1.0"
 dependencies = [
  "getrandom 0.4.3",
+ "raven-scheme",
+]
+
+[[package]]
+name = "raven-ipc"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
+
+[[package]]
+name = "raven-proto-fs"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
+
+[[package]]
+name = "raven-scheme"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-ipc",
+ "raven-proto-fs",
 ]
 
 [[package]]
