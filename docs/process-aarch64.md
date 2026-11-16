@@ -91,21 +91,21 @@ aarch64-only source path. The kernel-stack allocation is six pages: the lowest p
 as the guard, and the five pages above it (20 KiB) are the valid stack.
 
 * `proc-signal`: guard `0xffffc0000000e000`, valid stack starts `0xffffc0000000f000`, and the
-  interrupted kernel `SP` was `0xffffc0000000e0a0` — 0xf60 (3936) bytes below the valid stack
-  bottom. The synchronous exception entry subtracts 288 bytes and stores at `SP+128`, which is
-  the guard base, so the trap-frame store faults (`ELR` is the `stp x16,x17` in vector slot 4).
+  interrupted kernel `SP` was `0xffffc0000000e030` — 0xfd0 (4048) bytes below the valid stack
+  bottom. The faulting instruction is the `str x30, [sp, #240]` in the same vector slot, so the
+  trap-frame save hits the guard base (`FAR=0xffffc0000000e000`).
 * `proc-fork`: the same pattern with guard `0xffffc0000000f000` and
-  `SP=0xffffc0000000f0a0`.
+  `SP=0xffffc0000000f030`.
 * The saved frame pointer (`x29`) is `guard+0x1040`, 64 bytes above the stack bottom. The gap
-  from that frame to the interrupted `SP` is 4000 bytes, so the overflow is a deep multi-frame
+  from that frame to the interrupted `SP` is 4112 bytes, so the overflow is a deep multi-frame
   chain, not the 288-byte trap frame alone.
 * The aarch64 build has several ~4 KiB frames in this path: `process::build_stack` 4000 bytes,
   `process::load_segments` 3984, `process::teardown` 3968, and `fork_clone_from` 2928 (the
   x86-64 `fork_clone_from` prologue uses 2464).
 
-The aarch64 chain therefore needs at least 20,480 + 3,936 = 24,416 bytes before the 288-byte
-exception frame, i.e. over 24.7 KiB. A six-page (24 KiB) stack would still be short; seven pages
-(28 KiB) restore the ~4 KiB headroom the five-page budget was sized for. The fix is outside
+The aarch64 chain therefore needs at least 20,480 + 4,048 = 24,528 bytes before the 288-byte
+exception frame, 24,816 bytes with it saved. A six-page (24 KiB) stack would still be short;
+seven pages (28 KiB) restore about 3.9 KiB headroom after the trap frame. The fix is outside
 P2g's Owns:
 
 1. raise `KERNEL_STACK_PAGES` (currently five, 20 KiB, plus guard) in
