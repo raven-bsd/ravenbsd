@@ -90,6 +90,12 @@ evidence = "test:tests/posix/utility/file/mkfifo/test.sh"
 notes = "P4b: file-family behaviour test"
 
 [[row]]
+id = "util.mknod"
+status = "present"
+evidence = "test:tests/posix/utility/file/mknod/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
 id = "util.mv"
 status = "present"
 evidence = "test:tests/posix/utility/file/mv/test.sh"
@@ -108,6 +114,18 @@ evidence = "test:tests/posix/utility/file/pwd/test.sh"
 notes = "P4b: file-family behaviour test"
 
 [[row]]
+id = "util.readlink"
+status = "present"
+evidence = "test:tests/posix/utility/file/readlink/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.realpath"
+status = "present"
+evidence = "test:tests/posix/utility/file/realpath/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
 id = "util.rm"
 status = "present"
 evidence = "test:tests/posix/utility/file/rm/test.sh"
@@ -117,6 +135,12 @@ notes = "P4b: file-family behaviour test"
 id = "util.rmdir"
 status = "present"
 evidence = "test:tests/posix/utility/file/rmdir/test.sh"
+notes = "P4b: file-family behaviour test"
+
+[[row]]
+id = "util.stat"
+status = "present"
+evidence = "test:tests/posix/utility/file/stat/test.sh"
 notes = "P4b: file-family behaviour test"
 
 [[row]]

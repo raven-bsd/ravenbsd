@@ -3,10 +3,10 @@
 
 # POSIX file utility conformance (P4b)
 
-Status: **PARTIAL — 27 host behaviour suites pass; 23 rows are registered in the P0b overlay and
-4 tested tools have no profile row.** The four unregistered tools need a profile/seed follow-up
-(`P4-file-D1`). No utility binary or shared uutils source was edited and no row is claimed without
-a test.
+Status: **DONE — 27 host behaviour suites pass and all 27 file-family rows are registered as
+present in the P0b overlay.** The seed now carries `mknod`, `readlink`, `realpath` and `stat`; the
+four rows and their host evidence pass the gate. No utility binary or shared uutils source was
+edited and no row is claimed without a test.
 
 ## Method
 
@@ -46,22 +46,21 @@ sh tests/posix/utility/run-file.sh cat cp ls
 | `ls` | 7 | pass | `tests/posix/utility/file/ls/test.sh` |
 | `mkdir` | 5 | pass | `tests/posix/utility/file/mkdir/test.sh` |
 | `mkfifo` | 3 | pass | `tests/posix/utility/file/mkfifo/test.sh` |
-| `mknod` | 3 | pass / no profile row | `tests/posix/utility/file/mknod/test.sh` |
+| `mknod` | 3 | pass | `tests/posix/utility/file/mknod/test.sh` |
 | `mv` | 5 | pass | `tests/posix/utility/file/mv/test.sh` |
 | `pathchk` | 3 | pass | `tests/posix/utility/file/pathchk/test.sh` |
 | `pwd` | 3 | pass | `tests/posix/utility/file/pwd/test.sh` |
-| `readlink` | 3 | pass / no profile row | `tests/posix/utility/file/readlink/test.sh` |
-| `realpath` | 3 | pass / no profile row | `tests/posix/utility/file/realpath/test.sh` |
+| `readlink` | 3 | pass | `tests/posix/utility/file/readlink/test.sh` |
+| `realpath` | 3 | pass | `tests/posix/utility/file/realpath/test.sh` |
 | `rm` | 4 | pass | `tests/posix/utility/file/rm/test.sh` |
 | `rmdir` | 5 | pass | `tests/posix/utility/file/rmdir/test.sh` |
-| `stat` | 3 | pass / no profile row | `tests/posix/utility/file/stat/test.sh` |
+| `stat` | 3 | pass | `tests/posix/utility/file/stat/test.sh` |
 | `touch` | 5 | pass | `tests/posix/utility/file/touch/test.sh` |
 | `unlink` | 3 | pass | `tests/posix/utility/file/unlink/test.sh` |
 
 Total: 27 tested tools, 101 runner cases plus the 20 Rust `file`/`find` tests, 0 failing present
-tool. The P0b overlay registers 23 of them (`file` and `find` included); `mknod`, `readlink`,
-`realpath` and `stat` have no profile row, so their tests cannot be registered without a
-profile/seed change.
+tool. The P0b overlay registers all 27; the seed now carries `mknod`, `readlink`, `realpath` and
+`stat`.
 
 ## P4b2 implementation
 
@@ -76,19 +75,14 @@ profile/seed change.
 
 ## Defects
 
-| Defect | Row/tool | Impact |
-|---|---|---|
-| `P4-file-D1` | `util.mknod`, `util.readlink`, `util.realpath`, `util.stat` | no profile rows exist; their 4 passing tests cannot be registered from P4b Owns |
-
-`file` and `find` are now present rows. The four profile-less tools need a seed/profile follow-up;
-they are not waived and not counted as present in the gate.
+None. `mknod`, `readlink`, `realpath` and `stat` were added to the seed `UTILITIES` list and their
+four rows now exist and pass. No row is waived.
 
 ## Evidence overlay
 
-`docs/posix/evidence/P4-file.toml` is committed with 23 structured `test:` rows for the profile
-rows that exist, including `util.file` and `util.find`. The P0b loader accepts the owner batch
-file and the gate executes each row. The four tools without profile rows are deliberately absent
-from the overlay so they cannot create unsupported-claim failures.
+`docs/posix/evidence/P4-file.toml` is committed with 27 structured `test:` rows. The P0b loader
+accepts the owner batch file and the gate executes each row; the seed also carries the four
+previously missing utility rows.
 
 ```toml
 schema = 1
@@ -101,12 +95,11 @@ evidence = "test:tests/posix/utility/file/cat/test.sh"
 notes = "P4b: file-family behaviour test"
 ```
 
-The gate run reports those 23 as pass; the file family has no remaining profile-row failure.
-The four profile-less tools remain outside the gate until the profile is extended.
+The gate run reports all 27 as pass; the file family has no remaining profile-row failure.
 
 ## Qtest scope
 
 No `tests/qtest/cases/posix-util-file*` case was added. The uutils family is host-tested against
 the same source and `file`/`find` are first-party host-tested; a qtest would boot the target for
-the same code and duplicate the coverage. The target binaries and image staging remain unclaimed
-by this ticket; the profile does not yet stage `raven-file`/`raven-find`.
+the same code and duplicate the coverage. The target image does not yet stage
+`raven-file`/`raven-find`; that profile work remains outside this file-family evidence ticket.
