@@ -1,0 +1,27 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt ZCAT 1
+.Os RavenBSD
+.Sh NAME
+.Nm zcat
+.Nd write expanded .Z LZW files to standard output
+.Sh SYNOPSIS
+.Nm
+.Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility decodes historical `.Z` LZW streams and writes the bytes to standard output. A missing
+.Ql .Z
+suffix is added when reading; input files are not removed.
+.Pp
+The target image requires a file operand; standard input is not available.
+.Sh EXIT STATUS
+.Ex -std
+A corrupt stream or I/O error exits with status 1; a usage error exits with status 2.
+.Sh SEE ALSO
+.Xr compress 1 ,
+.Xr uncompress 1
+.Sh STANDARDS
+RavenBSD implements the historical block-mode `.Z` LZW format.
