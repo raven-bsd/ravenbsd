@@ -130,14 +130,31 @@ does not pretend a copy happened.
 
 ## Userspace driver seam and frame path
 
-`userland/drivers/genet` is a skeleton: `Seam` is the only place that will own MMIO and DMA.
+`userland/drivers/genet` is the target driver: `Seam` is the only place that owns MMIO and DMA.
 The host-testable `Controller` performs the typed bring-up order (probe revision, program MAC,
 program RGMII, plan rings) and rejects an out-of-order transition. `PlatformSeam` wraps the
-`raven_driver::MmioRegion` and a `DmaRegion` split into 256 RX + 256 TX 2 KiB slots; it validates
-alignment, bounds and overlap and exposes the device-visible slot addresses. The real
-`devd`/profile wiring, IRQ delivery and the B39 frame pump are the board integration step; the
-evidence kit and 12-step checklist are in `docs/pi4-genet-board.md`; the ring/fault stress matrix
-is in `docs/pi4-genet-stress.md`.
+`raven_driver::MmioRegion` and a `DmaRegion` split into the B39 RX/TX pools; it validates
+alignment, bounds and overlap and exposes the device-visible slot addresses. The driver now maps
+the P8 platform grant order, programs the rings and serves the `nic:` contract; the evidence kit
+and 12-step checklist are in `docs/pi4-genet-board.md`; the ring/fault stress matrix is in
+`docs/pi4-genet-stress.md`.
+
+### Launch handle slots
+
+`devd` transfers PCI and platform capabilities in different orders; the argv tokens are the same
+shape, so the driver selects the slot layout explicitly:
+
+| Launcher | BAR | Config | DMA | IRQ | Selection |
+|---|---|---|---|---|---|
+| PCI / QEMU | 3 | 4 | 5 | 6 | default |
+| P8 platform (`dtb launch`) | 3 | - | 4 | 5 | `platform`, `platform-slots`, `slots=platform`, or explicit `bar_handle=`/`dma_handle=`/`irq_handle=` |
+
+`userland/drivers/genet/src/options.rs` contains the host-tested parser. It rejects a missing
+`bar_size`, `dma` or `irq` token, a handle below slot 3 and duplicate BAR/DMA/IRQ handles, so the
+driver fails cleanly instead of fabricating a DMA window. The platform manifest must pass a
+platform selector because P8's generated tokens (`bar=0 bar_size=... dma=... irq=...`) are
+identical to the PCI shape. This is a profile/manifest follow-up, not a driver guess.
+
 `FrameBackend` adds the host-tested frame path:
 
 * `RxPath`/`TxPath` keep an owner (`Free`, `Driver`, `Device`) for each of the 256 slots, validate
