@@ -2087,6 +2087,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-posix-fs"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-prng"
 version = "0.1.0"
 

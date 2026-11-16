@@ -26,6 +26,7 @@ members = [
     "tests/fixtures/s24-spawn/child",
     "tests/fixtures/proc-identity",
     "tests/fixtures/perm",
+    "tests/posix/fs/posix-fs",
     "tests/fixtures/setuid",
     "tests/fixtures/proc-handle-info",
     "tests/fixtures/proc-registry",

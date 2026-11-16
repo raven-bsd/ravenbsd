@@ -6,20 +6,20 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-16T19:38:42Z
+- Date: 2026-11-16T20:49:04Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: target QEMU
 - Tool: `posix-conform 0.1.0`
 - Result: **FAIL (release blocked)**
-- Counts: 736 pass, 1023 fail, 10 skip
+- Counts: 752 pass, 1007 fail, 10 skip
 
 ## Summary
 
 | area | pass | fail | skip |
 |---|---:|---:|---:|
 | external | 0 | 0 | 3 |
-| filesystem | 0 | 20 | 0 |
+| filesystem | 16 | 4 | 0 |
 | header | 30 | 56 | 0 |
 | interface | 704 | 717 | 0 |
 | link | 1 | 0 | 0 |
@@ -28,7 +28,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | target | 0 | 0 | 7 |
 | tty | 0 | 12 | 0 |
 | utility | 0 | 177 | 0 |
-| **all** | **736** | **1023** | **10** |
+| **all** | **752** | **1007** | **10** |
 
 ## Rows
 
@@ -37,25 +37,25 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `external.atf` | external | skip | `ATF=<path>` | ATF not set; donor ATF results are recorded in tests/libc/CONFORMANCE.md; run cargo test -p raven-atf-run separately |
 | `external.pjdfstest` | external | skip | `PJDFSTEST=<path>` | PJDFSTEST not set; external pjdfstest (BSD); run it outside the repository |
 | `external.posix-test-suite` | external | skip | `POSIX_TEST_SUITE=<path>` | POSIX_TEST_SUITE not set; external Open POSIX Test Suite (GPL); run it outside the repository |
-| `filesystem.access` | filesystem | fail | `userland/servers/vfsd` | profile status partial; no executable POSIX behaviour test |
-| `filesystem.directory` | filesystem | fail | `crates/raven-vfs-core` | profile status partial; no executable POSIX behaviour test |
-| `filesystem.hard-link` | filesystem | fail | `none` | profile status partial; no executable POSIX behaviour test |
-| `filesystem.mkdir-rmdir` | filesystem | fail | `userland/servers/vfsd` | profile status partial; no executable POSIX behaviour test |
+| `filesystem.access` | filesystem | pass | `tests/qtest/cases/perm.toml` |  |
+| `filesystem.directory` | filesystem | pass | `tests/qtest/cases/posix-fs.toml` |  |
+| `filesystem.hard-link` | filesystem | pass | `tests/qtest/cases/posix-fs.toml` |  |
+| `filesystem.mkdir-rmdir` | filesystem | pass | `tests/qtest/cases/posix-fs.toml` |  |
 | `filesystem.mmap-file` | filesystem | fail | `kernel/src/memory/uspace.rs` | profile status partial; no executable POSIX behaviour test |
-| `filesystem.mount` | filesystem | fail | `userland/servers/vfsd` | profile status partial; no executable POSIX behaviour test |
-| `filesystem.ownership` | filesystem | fail | `userland/servers/vfsd` | profile status partial; no executable POSIX behaviour test |
-| `filesystem.path-resolution` | filesystem | fail | `userland/servers/vfsd` | profile status partial; no executable POSIX behaviour test |
-| `filesystem.permission` | filesystem | fail | `userland/servers/vfsd` | profile status partial; no executable POSIX behaviour test |
+| `filesystem.mount` | filesystem | pass | `tests/qtest/cases/vfsd.toml` |  |
+| `filesystem.ownership` | filesystem | pass | `tests/qtest/cases/fsd-ufs-rw.toml` |  |
+| `filesystem.path-resolution` | filesystem | pass | `tests/qtest/cases/posix-fs.toml` |  |
+| `filesystem.permission` | filesystem | pass | `tests/qtest/cases/perm.toml` |  |
 | `filesystem.record-lock` | filesystem | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `filesystem.rename` | filesystem | fail | `none` | profile status partial; no executable POSIX behaviour test |
+| `filesystem.rename` | filesystem | pass | `tests/qtest/cases/posix-fs.toml` |  |
 | `filesystem.sparse-file` | filesystem | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `filesystem.special-file` | filesystem | fail | `userland/servers/vfsd` | profile status partial; no executable POSIX behaviour test |
-| `filesystem.stat-family` | filesystem | fail | `crates/raven-vfs-core` | profile status partial; no executable POSIX behaviour test |
-| `filesystem.statvfs` | filesystem | fail | `none` | profile status partial; no executable POSIX behaviour test |
-| `filesystem.symlink` | filesystem | fail | `userland/servers/vfsd` | profile status partial; no executable POSIX behaviour test |
-| `filesystem.sync` | filesystem | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `filesystem.timestamp` | filesystem | fail | `none` | profile status partial; no executable POSIX behaviour test |
-| `filesystem.truncate` | filesystem | fail | `none` | profile status missing; no executable POSIX behaviour test |
+| `filesystem.special-file` | filesystem | pass | `tests/qtest/cases/fsd-ufs-rw.toml` |  |
+| `filesystem.stat-family` | filesystem | pass | `tests/qtest/cases/posix-fs.toml` |  |
+| `filesystem.statvfs` | filesystem | pass | `tests/qtest/cases/fsd-ufs-rw.toml` |  |
+| `filesystem.symlink` | filesystem | pass | `tests/qtest/cases/posix-fs.toml` |  |
+| `filesystem.sync` | filesystem | pass | `tests/qtest/cases/fsd-ufs-rw.toml` |  |
+| `filesystem.timestamp` | filesystem | pass | `tests/qtest/cases/fsd-ufs-rw.toml` |  |
+| `filesystem.truncate` | filesystem | pass | `tests/qtest/cases/posix-fs.toml` |  |
 | `filesystem.umask` | filesystem | fail | `none` | profile status missing; no executable POSIX behaviour test |
 | `header.aio.h` | header | fail | `profile` | profile status partial |
 | `header.arpa-inet.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_1.c` |  |

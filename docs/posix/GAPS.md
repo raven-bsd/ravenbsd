@@ -11,14 +11,14 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 
 | area | total | missing | partial | present | waived |
 |---|---:|---:|---:|---:|---:|
-| filesystem | 20 | 5 | 15 | 0 | 0 |
+| filesystem | 20 | 3 | 1 | 16 | 0 |
 | headers | 86 | 10 | 46 | 30 | 0 |
 | interfaces | 1421 | 627 | 0 | 794 | 0 |
 | process | 17 | 11 | 5 | 1 | 0 |
 | shell | 25 | 13 | 12 | 0 | 0 |
 | tty | 12 | 10 | 2 | 0 | 0 |
 | utilities | 177 | 160 | 17 | 0 | 0 |
-| **all** | **1758** | **836** | **97** | **825** | **0** |
+| **all** | **1758** | **834** | **83** | **841** | **0** |
 
 Traceability rows: 1758; profile rows: 1758.
 
@@ -1755,25 +1755,25 @@ Traceability rows: 1758; profile rows: 1758.
 
 | id | behaviour | status | owner | evidence | pg |
 |---|---|---|---|---|---|
-| `filesystem.access` | `access` | partial | P5 | `userland/servers/vfsd` | PG-33 |
-| `filesystem.directory` | `directory` | partial | P5 | `crates/raven-vfs-core` | PG-30 |
-| `filesystem.hard-link` | `hard-link` | partial | P5 | `none` | PG-31 |
-| `filesystem.mkdir-rmdir` | `mkdir-rmdir` | partial | P5 | `userland/servers/vfsd` | PG-31 |
+| `filesystem.access` | `access` | present | P5 | `tests/qtest/cases/perm.toml` | PG-33 |
+| `filesystem.directory` | `directory` | present | P5 | `tests/qtest/cases/posix-fs.toml` | PG-30 |
+| `filesystem.hard-link` | `hard-link` | present | P5 | `tests/qtest/cases/posix-fs.toml` | PG-31 |
+| `filesystem.mkdir-rmdir` | `mkdir-rmdir` | present | P5 | `tests/qtest/cases/posix-fs.toml` | PG-31 |
 | `filesystem.mmap-file` | `mmap-file` | partial | P5 | `kernel/src/memory/uspace.rs` | PG-36, PG-13 |
-| `filesystem.mount` | `mount` | partial | P5 | `userland/servers/vfsd` | PG-37 |
-| `filesystem.ownership` | `ownership` | partial | P5 | `userland/servers/vfsd` | PG-33 |
-| `filesystem.path-resolution` | `path-resolution` | partial | P5 | `userland/servers/vfsd` | PG-33 |
-| `filesystem.permission` | `permission` | partial | P5 | `userland/servers/vfsd` | PG-23, PG-33 |
+| `filesystem.mount` | `mount` | present | P5 | `tests/qtest/cases/vfsd.toml` | PG-37 |
+| `filesystem.ownership` | `ownership` | present | P5 | `tests/qtest/cases/fsd-ufs-rw.toml` | PG-33 |
+| `filesystem.path-resolution` | `path-resolution` | present | P5 | `tests/qtest/cases/posix-fs.toml` | PG-33 |
+| `filesystem.permission` | `permission` | present | P5 | `tests/qtest/cases/perm.toml` | PG-23, PG-33 |
 | `filesystem.record-lock` | `record-lock` | missing | P5 | `none` | PG-32 |
-| `filesystem.rename` | `rename` | partial | P5 | `none` | PG-31 |
+| `filesystem.rename` | `rename` | present | P5 | `tests/qtest/cases/posix-fs.toml` | PG-31 |
 | `filesystem.sparse-file` | `sparse-file` | missing | P5 | `none` | PG-32 |
-| `filesystem.special-file` | `special-file` | partial | P5 | `userland/servers/vfsd` | PG-34, PG-35 |
-| `filesystem.stat-family` | `stat-family` | partial | P5 | `crates/raven-vfs-core` | PG-30 |
-| `filesystem.statvfs` | `statvfs` | partial | P5 | `none` | PG-30 |
-| `filesystem.symlink` | `symlink` | partial | P5 | `userland/servers/vfsd` | PG-31, PG-36 |
-| `filesystem.sync` | `sync` | missing | P5 | `none` | PG-32 |
-| `filesystem.timestamp` | `timestamp` | partial | P5 | `none` | PG-30 |
-| `filesystem.truncate` | `truncate` | missing | P5 | `none` | PG-32 |
+| `filesystem.special-file` | `special-file` | present | P5 | `tests/qtest/cases/fsd-ufs-rw.toml` | PG-34, PG-35 |
+| `filesystem.stat-family` | `stat-family` | present | P5 | `tests/qtest/cases/posix-fs.toml` | PG-30 |
+| `filesystem.statvfs` | `statvfs` | present | P5 | `tests/qtest/cases/fsd-ufs-rw.toml` | PG-30 |
+| `filesystem.symlink` | `symlink` | present | P5 | `tests/qtest/cases/posix-fs.toml` | PG-31, PG-36 |
+| `filesystem.sync` | `sync` | present | P5 | `tests/qtest/cases/fsd-ufs-rw.toml` | PG-32 |
+| `filesystem.timestamp` | `timestamp` | present | P5 | `tests/qtest/cases/fsd-ufs-rw.toml` | PG-30 |
+| `filesystem.truncate` | `truncate` | present | P5 | `tests/qtest/cases/posix-fs.toml` | PG-32 |
 | `filesystem.umask` | `umask` | missing | P5 | `none` | PG-24 |
 
 ## Process behaviour
@@ -1854,25 +1854,9 @@ Traceability rows: 1758; profile rows: 1758.
 
 | area | name | evidence |
 |---|---|---|
-| filesystem | `access` | `userland/servers/vfsd` |
-| filesystem | `directory` | `crates/raven-vfs-core` |
-| filesystem | `hard-link` | `none` |
-| filesystem | `mkdir-rmdir` | `userland/servers/vfsd` |
 | filesystem | `mmap-file` | `kernel/src/memory/uspace.rs` |
-| filesystem | `mount` | `userland/servers/vfsd` |
-| filesystem | `ownership` | `userland/servers/vfsd` |
-| filesystem | `path-resolution` | `userland/servers/vfsd` |
-| filesystem | `permission` | `userland/servers/vfsd` |
 | filesystem | `record-lock` | `none` |
-| filesystem | `rename` | `none` |
 | filesystem | `sparse-file` | `none` |
-| filesystem | `special-file` | `userland/servers/vfsd` |
-| filesystem | `stat-family` | `crates/raven-vfs-core` |
-| filesystem | `statvfs` | `none` |
-| filesystem | `symlink` | `userland/servers/vfsd` |
-| filesystem | `sync` | `none` |
-| filesystem | `timestamp` | `none` |
-| filesystem | `truncate` | `none` |
 | filesystem | `umask` | `none` |
 | header | `aio.h` | `libc/ravenlibc/include` |
 | header | `complex.h` | `libc/ravenlibc/include` |
@@ -1934,5 +1918,21 @@ Traceability rows: 1758; profile rows: 1758.
 | interface | `acosfNx` | `none` |
 | interface | `acoshfNx` | `none` |
 | interface | `acoshl` | `none` |
+| interface | `acosl` | `none` |
+| interface | `acospi` | `none` |
+| interface | `adjtime` | `none` |
+| interface | `aio_cancel` | `none` |
+| interface | `aio_cancel64` | `none` |
+| interface | `aio_error` | `none` |
+| interface | `aio_error64` | `none` |
+| interface | `aio_fsync` | `none` |
+| interface | `aio_fsync64` | `none` |
+| interface | `aio_read` | `none` |
+| interface | `aio_read64` | `none` |
+| interface | `aio_return` | `none` |
+| interface | `aio_return64` | `none` |
+| interface | `aio_suspend` | `none` |
+| interface | `aio_suspend64` | `none` |
+| interface | `aio_write` | `none` |
 
-933 gap rows are listed in full in the tables above; this short table is a review aid.
+917 gap rows are listed in full in the tables above; this short table is a review aid.

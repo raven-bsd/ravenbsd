@@ -371,6 +371,21 @@ fn add_row(
     });
 }
 
+fn run_qtest_cached(
+    root: &Path,
+    case: &str,
+    arch: &str,
+    cache: &mut BTreeMap<String, (Verdict, String, String)>,
+) -> Result<(Verdict, String, String)> {
+    if let Some(hit) = cache.get(case) {
+        return Ok(hit.clone());
+    }
+    let outcome = run_qtest(root, case, arch)?;
+    cache.insert(case.to_string(), outcome.clone());
+    Ok(outcome)
+}
+
+#[allow(clippy::too_many_arguments)] // one row needs the profile, trace, cache and output sink
 fn gate_behaviour(
     root: &Path,
     arch: &str,
@@ -378,6 +393,7 @@ fn gate_behaviour(
     meta: &crate::model::Meta,
     tests: &BTreeMap<String, String>,
     host_only: bool,
+    cache: &mut BTreeMap<String, (Verdict, String, String)>,
     rows: &mut Vec<ResultRow>,
 ) {
     let test = tests
@@ -407,7 +423,7 @@ fn gate_behaviour(
             );
             return;
         };
-        let (result, command, reason) = run_qtest(root, &case, arch)
+        let (result, command, reason) = run_qtest_cached(root, &case, arch, cache)
             .unwrap_or_else(|error| (Verdict::Fail, test.clone(), format!("{error:#}")));
         add_row(rows, &meta.id, area, result, &command, &reason);
         return;
@@ -537,6 +553,8 @@ fn gate_rows(
     }
 
     // Utilities and behaviour rows use the profile status plus the trace test, if any.
+    // One qtest case may back several rows; run it once per gate invocation.
+    let mut qtest_cache: BTreeMap<String, (Verdict, String, String)> = BTreeMap::new();
     for utility in &profile.utility {
         let test = tests
             .get(&utility.meta.id)
@@ -555,9 +573,9 @@ fn gate_rows(
                     );
                 } else if let Some(case) = qtest_case(test) {
                     let (result, command, reason) =
-                        run_qtest(root, &case, arch).unwrap_or_else(|error| {
-                            (Verdict::Fail, test.to_string(), format!("{error:#}"))
-                        });
+                        run_qtest_cached(root, &case, arch, &mut qtest_cache).unwrap_or_else(
+                            |error| (Verdict::Fail, test.to_string(), format!("{error:#}")),
+                        );
                     add_row(
                         &mut rows,
                         &utility.meta.id,
@@ -596,6 +614,7 @@ fn gate_rows(
             &entry.meta,
             &tests,
             host_only,
+            &mut qtest_cache,
             &mut rows,
         );
     }
@@ -607,6 +626,7 @@ fn gate_rows(
             &entry.meta,
             &tests,
             host_only,
+            &mut qtest_cache,
             &mut rows,
         );
     }
@@ -618,11 +638,21 @@ fn gate_rows(
             &entry.meta,
             &tests,
             host_only,
+            &mut qtest_cache,
             &mut rows,
         );
     }
     for entry in &profile.tty {
-        gate_behaviour(root, arch, "tty", &entry.meta, &tests, host_only, &mut rows);
+        gate_behaviour(
+            root,
+            arch,
+            "tty",
+            &entry.meta,
+            &tests,
+            host_only,
+            &mut qtest_cache,
+            &mut rows,
+        );
     }
 
     let libc_archive = root.join("build").join(arch).join("libc.a");

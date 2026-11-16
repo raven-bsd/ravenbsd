@@ -591,15 +591,34 @@ pub fn validate(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<()>
     }
 }
 
+fn qtest_for(id: &str) -> &'static str {
+    match id {
+        "process.fork" => "tests/qtest/cases/proc-fork.toml",
+        "filesystem.access" | "filesystem.permission" => "tests/qtest/cases/perm.toml",
+        "filesystem.mount" => "tests/qtest/cases/vfsd.toml",
+        "filesystem.ownership"
+        | "filesystem.special-file"
+        | "filesystem.statvfs"
+        | "filesystem.sync"
+        | "filesystem.timestamp" => "tests/qtest/cases/fsd-ufs-rw.toml",
+        "filesystem.directory"
+        | "filesystem.hard-link"
+        | "filesystem.mkdir-rmdir"
+        | "filesystem.path-resolution"
+        | "filesystem.rename"
+        | "filesystem.stat-family"
+        | "filesystem.symlink"
+        | "filesystem.truncate" => "tests/qtest/cases/posix-fs.toml",
+        _ => "none",
+    }
+}
+
 /// Build a deterministic traceability file from a profile.
 #[must_use]
 pub fn trace_from_profile(profile: &Profile) -> TraceFile {
     let mut trace = Vec::new();
     for (_, meta) in profile.metas() {
-        let test = match meta.id.as_str() {
-            "process.fork" => "tests/qtest/cases/proc-fork.toml".to_string(),
-            _ => "none".to_string(),
-        };
+        let test = qtest_for(&meta.id).to_string();
         trace.push(TraceRow {
             id: meta.id.clone(),
             ticket: meta.owner.clone(),

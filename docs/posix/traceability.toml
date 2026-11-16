@@ -7,26 +7,26 @@ standard = "posix-2024"
 [[trace]]
 id = "filesystem.access"
 ticket = "P5"
-test = "none"
-evidence = "userland/servers/vfsd"
+test = "tests/qtest/cases/perm.toml"
+evidence = "tests/qtest/cases/perm.toml"
 
 [[trace]]
 id = "filesystem.directory"
 ticket = "P5"
-test = "none"
-evidence = "crates/raven-vfs-core"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "tests/qtest/cases/posix-fs.toml"
 
 [[trace]]
 id = "filesystem.hard-link"
 ticket = "P5"
-test = "none"
-evidence = "none"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "tests/qtest/cases/posix-fs.toml"
 
 [[trace]]
 id = "filesystem.mkdir-rmdir"
 ticket = "P5"
-test = "none"
-evidence = "userland/servers/vfsd"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "tests/qtest/cases/posix-fs.toml"
 
 [[trace]]
 id = "filesystem.mmap-file"
@@ -37,26 +37,26 @@ evidence = "kernel/src/memory/uspace.rs"
 [[trace]]
 id = "filesystem.mount"
 ticket = "P5"
-test = "none"
-evidence = "userland/servers/vfsd"
+test = "tests/qtest/cases/vfsd.toml"
+evidence = "tests/qtest/cases/vfsd.toml"
 
 [[trace]]
 id = "filesystem.ownership"
 ticket = "P5"
-test = "none"
-evidence = "userland/servers/vfsd"
+test = "tests/qtest/cases/fsd-ufs-rw.toml"
+evidence = "tests/qtest/cases/fsd-ufs-rw.toml"
 
 [[trace]]
 id = "filesystem.path-resolution"
 ticket = "P5"
-test = "none"
-evidence = "userland/servers/vfsd"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "tests/qtest/cases/posix-fs.toml"
 
 [[trace]]
 id = "filesystem.permission"
 ticket = "P5"
-test = "none"
-evidence = "userland/servers/vfsd"
+test = "tests/qtest/cases/perm.toml"
+evidence = "tests/qtest/cases/perm.toml"
 
 [[trace]]
 id = "filesystem.record-lock"
@@ -67,8 +67,8 @@ evidence = "none"
 [[trace]]
 id = "filesystem.rename"
 ticket = "P5"
-test = "none"
-evidence = "none"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "tests/qtest/cases/posix-fs.toml"
 
 [[trace]]
 id = "filesystem.sparse-file"
@@ -79,44 +79,44 @@ evidence = "none"
 [[trace]]
 id = "filesystem.special-file"
 ticket = "P5"
-test = "none"
-evidence = "userland/servers/vfsd"
+test = "tests/qtest/cases/fsd-ufs-rw.toml"
+evidence = "tests/qtest/cases/fsd-ufs-rw.toml"
 
 [[trace]]
 id = "filesystem.stat-family"
 ticket = "P5"
-test = "none"
-evidence = "crates/raven-vfs-core"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "tests/qtest/cases/posix-fs.toml"
 
 [[trace]]
 id = "filesystem.statvfs"
 ticket = "P5"
-test = "none"
-evidence = "none"
+test = "tests/qtest/cases/fsd-ufs-rw.toml"
+evidence = "tests/qtest/cases/fsd-ufs-rw.toml"
 
 [[trace]]
 id = "filesystem.symlink"
 ticket = "P5"
-test = "none"
-evidence = "userland/servers/vfsd"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "tests/qtest/cases/posix-fs.toml"
 
 [[trace]]
 id = "filesystem.sync"
 ticket = "P5"
-test = "none"
-evidence = "none"
+test = "tests/qtest/cases/fsd-ufs-rw.toml"
+evidence = "tests/qtest/cases/fsd-ufs-rw.toml"
 
 [[trace]]
 id = "filesystem.timestamp"
 ticket = "P5"
-test = "none"
-evidence = "none"
+test = "tests/qtest/cases/fsd-ufs-rw.toml"
+evidence = "tests/qtest/cases/fsd-ufs-rw.toml"
 
 [[trace]]
 id = "filesystem.truncate"
 ticket = "P5"
-test = "none"
-evidence = "none"
+test = "tests/qtest/cases/posix-fs.toml"
+evidence = "tests/qtest/cases/posix-fs.toml"
 
 [[trace]]
 id = "filesystem.umask"
