@@ -54,6 +54,38 @@ revision from `ravenbsd-resources/donors.lock` and the full image SHA-256 in the
 The manifest is a staging check: `config.txt` and the kernel/DTB are ours, the firmware files are
 the owner's add-on files.
 
+### 2.1 Image variants (J8)
+
+The Pi 4 image has three named variants. Each extends the generic profile of the same role,
+changes the console to the Pi PL011 and stages the EMMC2/blockd declarations:
+
+| Profile | Extends | Initfs role | Storage staging |
+|---|---|---|---|
+| `pi4-base` | `base` | legacy init, `uname`, `echo` | `emmc2`/`blockd` manifests, disabled |
+| `pi4-shell` | `shell` | shell services and console | `emmc2`/`blockd` manifests, disabled |
+| `pi4-server` | `server` | network/server stack in the initfs | `emmc2`/`blockd` manifests, disabled |
+
+Build one variant with:
+
+```
+cargo xtask image --arch aarch64 --platform pi4 --profile pi4-server \
+    --output build/pi4-server.img
+```
+
+The variants share the FAT boot layout and manifest above; only the initfs (and therefore the
+appended `kernel8.img` payload) differs. The `pi4-image` qtest runs
+`tests/fixtures/pi4-image/build.sh`, which builds every variant twice, verifies the two images are
+byte-identical, verifies the three variant image hashes differ, runs the FAT manifest check, and
+records the generated hashes in `build/fixtures/pi4-image/variants.tsv`. The check is
+determinism-based, not a fixed hash: the kernel build id contains the repository head, so a
+recorded hash is only meaningful for the same worktree state.
+
+The image GPT has two partitions: `ESP` (partition 1, 64 MiB) and `ROOT` (partition 2, LBA
+133120..264191, 64 MiB). J8 does not populate `ROOT`; it is reserved for the J5 UFS-root path. J5
+must select GPT partition 2 (`FSD_UFS_PARTITION=2`) or the image layout must move `ROOT` first
+before the root stack is enabled. The fixture fails if `ROOT` is missing or is not partition 2, so
+that integration boundary cannot drift silently.
+
 ## 3. Capture
 
 Connect the adapter and run:

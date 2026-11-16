@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Pi 4 base image variant: the generic base initfs with the Pi 4 UART and the
+# staged EMMC2/blockd service declarations. The image platform (`--platform pi4`)
+# selects the FAT boot layout and the ROOT partition.
+name = "pi4-base"
+extends = "base"
+
+[boot]
+cmdline = "console=ttyAMA0 loglevel=info"
+log_level = "info"

@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Pi 4 server image variant: the generic server initfs with the Pi 4 UART and
+# the staged EMMC2/blockd service declarations. The ROOT GPT partition stays
+# reserved for the J5 UFS-root path; this variant does not populate it.
+name = "pi4-server"
+extends = "server"
+
+[boot]
+cmdline = "console=ttyAMA0 loglevel=info"
+log_level = "info"

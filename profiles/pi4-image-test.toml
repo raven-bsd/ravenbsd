@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Test-only guest for the pi4-image qtest. The variant images are built by the
+# fixture; this profile stays on the legacy base init path so the QEMU guest
+# exits with `test-exit=1` instead of starting svcd's service loop.
+name = "pi4-image-test"
+extends = "base"
+
+[boot]
+cmdline = "console=ttyAMA0 loglevel=info"
+log_level = "info"

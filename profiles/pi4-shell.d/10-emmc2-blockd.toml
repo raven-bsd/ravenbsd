@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Stage the EMMC2/blockd declarations in every Pi 4 variant. They stay disabled
+# until the platform launcher passes the MMIO/DMA/IRQ grants and the J5 root
+# path starts the storage stack.
+[[initfs.files]]
+src = "profiles/pi4.d/emmc2.manifest"
+path = "/etc/services.d/emmc2.toml"
+
+[[initfs.files]]
+src = "profiles/pi4.d/blockd.manifest"
+path = "/etc/services.d/blockd.toml"

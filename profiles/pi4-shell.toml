@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Pi 4 shell image variant: the generic shell initfs with the Pi 4 UART and the
+# staged EMMC2/blockd service declarations.
+name = "pi4-shell"
+extends = "shell"
+
+[boot]
+cmdline = "console=ttyAMA0 loglevel=info"
+log_level = "info"
