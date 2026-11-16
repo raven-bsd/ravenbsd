@@ -55,17 +55,14 @@ fn anonymous_shared_goes_through_memobj_create() {
 }
 
 #[test]
-fn file_mapping_is_enodev_until_pg_36() {
+fn file_mapping_attaches_a_pager_object() {
     let fake = FakeSys::new();
     fake.file(b"/a", b"x");
     let platform = Platform::new(fake);
     let fd = platform
         .open(b"/a", raven_libc_abi::fcntl::O_RDONLY as u32, 0)
         .expect("open");
-    assert_eq!(
-        mmap(&platform, 0, PAGE, 1, mman::MAP_PRIVATE, fd, 0),
-        Err(Errno::ENODEV)
-    );
+    assert!(mmap(&platform, 0, PAGE, 1, mman::MAP_PRIVATE, fd, 0).is_ok());
 }
 
 #[test]
@@ -211,8 +208,19 @@ fn mlock_is_an_accepted_no_op() {
 }
 
 #[test]
-fn msync_and_brk_are_enosys() {
+fn msync_validates_flags_and_flushes() {
     let platform = Platform::new(FakeSys::new());
-    assert_eq!(msync(&platform, 0x1000, PAGE, 0), Err(Errno::ENOSYS));
+    assert_eq!(msync(&platform, 0x1000, PAGE, 0), Err(Errno::EINVAL));
+    let address = mmap(
+        &platform,
+        0,
+        PAGE,
+        1,
+        mman::MAP_SHARED | mman::MAP_ANONYMOUS,
+        -1,
+        0,
+    )
+    .expect("shared map");
+    assert_eq!(msync(&platform, address, PAGE, mman::MS_SYNC), Ok(()));
     assert_eq!(brk(&platform, 0x1000), Err(Errno::ENOSYS));
 }
