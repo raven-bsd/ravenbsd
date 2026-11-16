@@ -12,7 +12,6 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
-    use raven_abi::errno::Errno;
     use raven_proto_fs::{S_IFCHR, Stat};
     use raven_rt::entry;
     use raven_scheme::{Ctx, Handler, HandlerResult, Opened, Server};
