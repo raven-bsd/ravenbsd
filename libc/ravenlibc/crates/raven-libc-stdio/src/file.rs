@@ -316,6 +316,15 @@ impl<E: Env> File<E> {
         self.st().flags
     }
 
+    /// The buffer behind the last `fgetln` result.
+    ///
+    /// The slice stays valid until the next `fgetln` on this stream or `fclose`, which is the
+    /// C `fgetln` contract; the caller must not free it.
+    #[must_use]
+    pub fn getln_buffer(&self) -> &[u8] {
+        self.st().getln_buf.as_deref().unwrap_or(&[])
+    }
+
     /// The fd, or `-1` for a memory or cookie stream.
     #[must_use]
     pub fn fd(&self) -> i32 {

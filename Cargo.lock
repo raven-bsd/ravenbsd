@@ -1220,6 +1220,7 @@ dependencies = [
  "raven-libc-pledge",
  "raven-libc-proc",
  "raven-libc-pwd",
+ "raven-libc-rand",
  "raven-libc-regex",
  "raven-libc-resolv",
  "raven-libc-signal",

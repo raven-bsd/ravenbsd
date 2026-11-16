@@ -76,6 +76,7 @@ RAVEN_1.0 {
 		flsl;
 		flsll;
 		# --- ctype ---
+		__ctype_get_mb_cur_max;
 		isalnum;
 		isalnum_l;
 		isalpha;
@@ -140,6 +141,7 @@ RAVEN_1.0 {
 		_Exit;
 		abort;
 		abs;
+		arc4random_buf;
 		atoi;
 		atol;
 		atoll;
@@ -169,11 +171,18 @@ RAVEN_1.0 {
 		realloc;
 		reallocarray;
 		# --- stdio ---
+		fgetln;
+		fgetwc;
 		fprintf;
+		fwprintf;
+		getline;
 		printf;
+		remove;
+		rewind;
 		snprintf;
 		sprintf;
 		vfprintf;
+		vfwprintf;
 		vprintf;
 		vsnprintf;
 		vsprintf;
@@ -287,6 +296,9 @@ RAVEN_1.0 {
 		unlink;
 		# --- data symbols (C60c) ---
 		environ;
+		stderr;
+		stdin;
+		stdout;
 		optarg;
 		opterr;
 		optind;
@@ -329,12 +341,15 @@ RAVEN_1.0 {
 		getutxent; # x86_64
 		getutxid; # x86_64
 		getutxline; # x86_64
+		grantpt; # x86_64
 		hasmntopt; # x86_64
 		humanize_number; # x86_64
 		login_tty; # x86_64
 		nvis; # x86_64
 		openpty; # x86_64
 		pidfile; # x86_64
+		posix_openpt; # x86_64
+		ptsname_r; # x86_64
 		pututxline; # x86_64
 		readpassphrase; # x86_64
 		scan_scaled; # x86_64
@@ -361,6 +376,7 @@ RAVEN_1.0 {
 		strvis; # x86_64
 		strvisx; # x86_64
 		svis; # x86_64
+		unlockpt; # x86_64
 		unvis; # x86_64
 		updwtmpx; # x86_64
 		uuid_compare; # x86_64

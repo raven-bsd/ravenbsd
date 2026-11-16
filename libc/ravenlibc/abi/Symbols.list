@@ -22,6 +22,7 @@ _Unwind_RaiseException
 _Unwind_Resume
 _Unwind_SetGR
 _Unwind_SetIP
+__ctype_get_mb_cur_max
 __cxa_atexit
 __cxa_finalize
 __errno
@@ -53,6 +54,7 @@ acoshf
 addmntent
 aligned_alloc
 alphasort
+arc4random_buf
 asin
 asinf
 asinh
@@ -225,8 +227,10 @@ ffs
 ffsl
 ffsll
 fgetc
+fgetln
 fgets
 fgetspent
+fgetwc
 fileno
 finite
 finitef
@@ -288,6 +292,7 @@ fts_openat
 fts_read
 fts_set
 ftw
+fwprintf
 fwrite
 gai_strerror
 gamma
@@ -326,6 +331,7 @@ gethostbyname_r
 gethostent
 gethostname
 getisax
+getline
 getlogin
 getlogin_r
 getmntent
@@ -389,6 +395,7 @@ glob
 globfree
 gmtime
 gmtime_r
+grantpt
 group_from_gid
 h_errno
 hasmntopt
@@ -598,6 +605,7 @@ port_getn
 port_send
 posix_getdents
 posix_memalign
+posix_openpt
 posix_spawn
 posix_spawn_file_actions_addchdir_np
 posix_spawn_file_actions_addclose
@@ -747,6 +755,7 @@ pthread_testcancel
 pthread_timedjoin_np
 pthread_tryjoin_np
 pthread_yield
+ptsname_r
 putchar
 putenv
 puts
@@ -779,9 +788,11 @@ regcomp
 regerror
 regexec
 regfree
+remove
 remque
 rename
 res_init
+rewind
 rewinddir
 rindex
 rint
@@ -937,6 +948,9 @@ srandom
 sscanf
 stat
 stat64
+stderr
+stdin
+stdout
 stpcpy
 stpncpy
 str2sig
@@ -1082,6 +1096,7 @@ umask
 uname
 ungetc
 unlink
+unlockpt
 unsetenv
 unveil
 unvis
@@ -1104,6 +1119,7 @@ versionsort
 vfork
 vfprintf
 vfscanf
+vfwprintf
 vis
 vprintf
 vscanf
