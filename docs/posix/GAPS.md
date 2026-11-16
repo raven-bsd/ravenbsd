@@ -12,13 +12,13 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 | area | total | missing | partial | present | waived |
 |---|---:|---:|---:|---:|---:|
 | filesystem | 20 | 5 | 15 | 0 | 0 |
-| headers | 86 | 10 | 46 | 30 | 0 |
+| headers | 86 | 2 | 46 | 38 | 0 |
 | interfaces | 1421 | 627 | 0 | 794 | 0 |
 | process | 17 | 11 | 5 | 1 | 0 |
 | shell | 25 | 13 | 12 | 0 | 0 |
 | tty | 12 | 10 | 2 | 0 | 0 |
 | utilities | 177 | 160 | 17 | 0 | 0 |
-| **all** | **1758** | **836** | **97** | **825** | **0** |
+| **all** | **1758** | **828** | **97** | **833** | **0** |
 
 Traceability rows: 1758; profile rows: 1758.
 
@@ -37,7 +37,7 @@ Traceability rows: 1758; profile rows: 1758.
 | `header.errno.h` | `errno.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.fcntl.h` | `fcntl.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.fenv.h` | `fenv.h` | partial | P1 | `libc/ravenlibc/include` |  |
-| `header.float.h` | `float.h` | missing | P1 | `none` |  |
+| `header.float.h` | `float.h` | present | P1 | `tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.fmtmsg.h` | `fmtmsg.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.fnmatch.h` | `fnmatch.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.ftw.h` | `ftw.h` | partial | P1 | `libc/ravenlibc/include` |  |
@@ -45,10 +45,10 @@ Traceability rows: 1758; profile rows: 1758.
 | `header.grp.h` | `grp.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.iconv.h` | `iconv.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.inttypes.h` | `inttypes.h` | partial | P1 | `libc/ravenlibc/include` |  |
-| `header.iso646.h` | `iso646.h` | missing | P1 | `none` |  |
+| `header.iso646.h` | `iso646.h` | present | P1 | `tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.langinfo.h` | `langinfo.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.libgen.h` | `libgen.h` | partial | P1 | `libc/ravenlibc/include` |  |
-| `header.libintl.h` | `libintl.h` | missing | P1 | `none` |  |
+| `header.libintl.h` | `libintl.h` | present | P1 | `tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.limits.h` | `limits.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.locale.h` | `locale.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.math.h` | `math.h` | partial | P1 | `libc/ravenlibc/include` |  |
@@ -70,10 +70,10 @@ Traceability rows: 1758; profile rows: 1758.
 | `header.setjmp.h` | `setjmp.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.signal.h` | `signal.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.spawn.h` | `spawn.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.stdarg.h` | `stdarg.h` | missing | P1 | `none` |  |
-| `header.stdatomic.h` | `stdatomic.h` | missing | P1 | `none` |  |
-| `header.stdbool.h` | `stdbool.h` | missing | P1 | `none` |  |
-| `header.stddef.h` | `stddef.h` | missing | P1 | `none` |  |
+| `header.stdarg.h` | `stdarg.h` | present | P1 | `tests/libc/posix/headers/check-missing-headers.sh` |  |
+| `header.stdatomic.h` | `stdatomic.h` | present | P1 | `tests/libc/posix/headers/check-missing-headers.sh` |  |
+| `header.stdbool.h` | `stdbool.h` | present | P1 | `tests/libc/posix/headers/check-missing-headers.sh` |  |
+| `header.stddef.h` | `stddef.h` | present | P1 | `tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.stdint.h` | `stdint.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.stdio.h` | `stdio.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.stdlib.h` | `stdlib.h` | partial | P1 | `libc/ravenlibc/include` |  |
@@ -100,7 +100,7 @@ Traceability rows: 1758; profile rows: 1758.
 | `header.syslog.h` | `syslog.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.tar.h` | `tar.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.termios.h` | `termios.h` | partial | P1 | `libc/ravenlibc/include` |  |
-| `header.tgmath.h` | `tgmath.h` | missing | P1 | `none` |  |
+| `header.tgmath.h` | `tgmath.h` | present | P1 | `tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.threads.h` | `threads.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.time.h` | `time.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.trace.h` | `trace.h` | missing | P1 | `none` |  |
@@ -1847,7 +1847,7 @@ Traceability rows: 1758; profile rows: 1758.
 
 - frozen exported symbols: 1215
 - `userland/bin` directories: 41
-- headers under `libc/ravenlibc/include`: 220
+- headers under `libc/ravenlibc/include`: 228
 - utility directories: adduser, beep, cat, cp, date, df, dmesg, dtrace, echo, getty, groupadd, hostname, id, ifconfig, login, ls, man, mixer, mkdir, mount, mv, nc, netstat, passwd, ping, play, ps, raven, rm, rmdir, route, rsh, sleep, stat, su, svcctl, touch, umount, uname, useradd, whoami
 
 ## Top gaps
@@ -1879,15 +1879,12 @@ Traceability rows: 1758; profile rows: 1758.
 | header | `dirent.h` | `libc/ravenlibc/include` |
 | header | `fcntl.h` | `libc/ravenlibc/include` |
 | header | `fenv.h` | `libc/ravenlibc/include` |
-| header | `float.h` | `none` |
 | header | `fmtmsg.h` | `libc/ravenlibc/include` |
 | header | `ftw.h` | `libc/ravenlibc/include` |
 | header | `grp.h` | `libc/ravenlibc/include` |
 | header | `iconv.h` | `libc/ravenlibc/include` |
 | header | `inttypes.h` | `libc/ravenlibc/include` |
-| header | `iso646.h` | `none` |
 | header | `libgen.h` | `libc/ravenlibc/include` |
-| header | `libintl.h` | `none` |
 | header | `math.h` | `libc/ravenlibc/include` |
 | header | `monetary.h` | `libc/ravenlibc/include` |
 | header | `mqueue.h` | `libc/ravenlibc/include` |
@@ -1899,10 +1896,6 @@ Traceability rows: 1758; profile rows: 1758.
 | header | `regex.h` | `libc/ravenlibc/include` |
 | header | `search.h` | `libc/ravenlibc/include` |
 | header | `signal.h` | `libc/ravenlibc/include` |
-| header | `stdarg.h` | `none` |
-| header | `stdatomic.h` | `none` |
-| header | `stdbool.h` | `none` |
-| header | `stddef.h` | `none` |
 | header | `stdio.h` | `libc/ravenlibc/include` |
 | header | `stdlib.h` | `libc/ravenlibc/include` |
 | header | `string.h` | `libc/ravenlibc/include` |
@@ -1920,7 +1913,6 @@ Traceability rows: 1758; profile rows: 1758.
 | header | `sys/uio.h` | `libc/ravenlibc/include` |
 | header | `syslog.h` | `libc/ravenlibc/include` |
 | header | `termios.h` | `libc/ravenlibc/include` |
-| header | `tgmath.h` | `none` |
 | header | `time.h` | `libc/ravenlibc/include` |
 | header | `trace.h` | `none` |
 | header | `uchar.h` | `libc/ravenlibc/include` |
@@ -1934,5 +1926,13 @@ Traceability rows: 1758; profile rows: 1758.
 | interface | `acosfNx` | `none` |
 | interface | `acoshfNx` | `none` |
 | interface | `acoshl` | `none` |
+| interface | `acosl` | `none` |
+| interface | `acospi` | `none` |
+| interface | `adjtime` | `none` |
+| interface | `aio_cancel` | `none` |
+| interface | `aio_cancel64` | `none` |
+| interface | `aio_error` | `none` |
+| interface | `aio_error64` | `none` |
+| interface | `aio_fsync` | `none` |
 
-933 gap rows are listed in full in the tables above; this short table is a review aid.
+925 gap rows are listed in full in the tables above; this short table is a review aid.
