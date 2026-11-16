@@ -10,9 +10,9 @@
 #   scripts/release.sh --build       build the release image and manifest (requires --check)
 #   scripts/release.sh --verify      verify the files recorded in SHA256SUMS
 #
-# The script never creates a git tag. REL5 is blocked until REL2b (QEMU login), REL3 (Pi 4
-# release image) and REL4 (Pi 4 GENET ping) pass and the full `make check` is green; the owner
-# creates the tag after reviewing this output.
+# The script never creates a git tag. REL5c is blocked until REL2b (QEMU login), the Pi 4 board
+# gate (REL3/P8/P10/P12/REL4d), REL8 clean-clone verification and the full `make check` pass; the
+# owner creates the tag after reviewing this output.
 
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
@@ -84,6 +84,9 @@ check_inputs() {
 	# REL4: Pi 4 GENET link/DHCP/ping evidence.
 	need_file "scripts/pi4-net-evidence.sh"
 	need_file "docs/pi4-net.md"
+	# REL8: independent clean-clone verification.
+	need_file "scripts/release-verify.sh"
+	need_file "docs/release-verify.md"
 
 	if git rev-parse HEAD >/dev/null 2>&1 && [ -n "$(git status --porcelain)" ]; then
 		warn "working tree is dirty; a release build requires a clean tree"
@@ -156,12 +159,12 @@ case "$MODE" in
 	candidate)
 		log "candidate profile: $CANDIDATE_PROFILE (not the release profile)"
 		build_image "$CANDIDATE_PROFILE" "$OUT/candidate-$ARCH/ravenbsd-$ARCH.img" candidate
-		warn "candidate is not the 0.1.0 release artifact; REL2b/REL3/REL4 are still required"
+		warn "candidate is not the 0.1.0 release artifact; the Pi 4 board gate and full make check are still required"
 		;;
 	build)
 		check_inputs
 		build_image "$PROFILE" "$OUT/ravenbsd-$ARCH.img" release
-		log "release not tagged: REL2b/REL3/REL4 and full make check are the gate"
+		log "release not tagged: Pi 4 board gate (REL3/P8/P10/P12/REL4d) and full make check are the gate"
 		;;
 	verify)
 		[ -f "$OUT/SHA256SUMS" ] || die "no SHA256SUMS in $OUT"
