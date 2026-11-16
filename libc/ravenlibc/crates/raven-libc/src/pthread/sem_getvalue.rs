@@ -6,7 +6,7 @@ use raven_libc_thread::sem as s;
 #[unsafe(no_mangle)]
 pub extern "C" fn sem_getvalue(sem: *mut s::Sem, out: *mut c_int) -> c_int {
     if sem.is_null() || out.is_null() {
-        return 22;
+        return super::common::sem_err(raven_libc_thread::limits::EINVAL);
     }
     unsafe { *out = s::getvalue(&*sem) }; // SAFETY: the null checks above guarantee a readable semaphore and a writable out slot.
     0

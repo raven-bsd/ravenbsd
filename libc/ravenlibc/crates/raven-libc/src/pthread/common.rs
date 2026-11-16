@@ -10,3 +10,8 @@ use raven_libc_thread::limits::Errno;
 pub(crate) fn err(error: Errno) -> c_int {
     c_int::from(error.0)
 }
+
+/// A POSIX `sem_*` function returns `-1` and sets `errno` on failure.
+pub(crate) fn sem_err(error: Errno) -> c_int {
+    crate::ffi::ret::int(Err(error))
+}
