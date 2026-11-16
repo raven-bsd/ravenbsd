@@ -10,3 +10,53 @@ id = "header.assert.h"
 status = "present"
 evidence = "test:tests/posix/check-headers.sh"
 notes = "P1: assert.h and the assert macro compile under the POSIX feature macros"
+
+# P1 batch (a): the headers absent from the ravenlibc include root. The compile test uses the
+# same POSIX feature macros as the gate and exercises the macro/interface surface where present.
+[[row]]
+id = "header.float.h"
+status = "present"
+evidence = "tests/libc/posix/headers/check-missing-headers.sh"
+notes = "P1 batch a: POSIX.1-2024 <float.h> (C17 7.7) compiles through the libc include root"
+
+[[row]]
+id = "header.iso646.h"
+status = "present"
+evidence = "tests/libc/posix/headers/check-missing-headers.sh"
+notes = "P1 batch a: POSIX.1-2024 <iso646.h> (C17 7.9) alternative operator macros compile and are exercised"
+
+[[row]]
+id = "header.libintl.h"
+status = "present"
+evidence = "tests/libc/posix/headers/check-missing-headers.sh"
+notes = "P1 batch a: the gettext catalog prototypes compile; the raven-libc-locale C ABI implements all nine names"
+
+[[row]]
+id = "header.stdarg.h"
+status = "present"
+evidence = "tests/libc/posix/headers/check-missing-headers.sh"
+notes = "P1 batch a: POSIX.1-2024 <stdarg.h> (C17 7.16) compiles and va_start/va_arg/va_copy/va_end are exercised"
+
+[[row]]
+id = "header.stdatomic.h"
+status = "present"
+evidence = "tests/libc/posix/headers/check-missing-headers.sh"
+notes = "P1 batch a: POSIX.1-2024 <stdatomic.h> (C17 7.17) compiles and atomic store/load are exercised"
+
+[[row]]
+id = "header.stdbool.h"
+status = "present"
+evidence = "tests/libc/posix/headers/check-missing-headers.sh"
+notes = "P1 batch a: POSIX.1-2024 <stdbool.h> (C17 7.18) bool/true/false compile and are exercised"
+
+[[row]]
+id = "header.stddef.h"
+status = "present"
+evidence = "tests/libc/posix/headers/check-missing-headers.sh"
+notes = "P1 batch a: POSIX.1-2024 <stddef.h> (C17 7.19) NULL and offsetof compile and are exercised"
+
+[[row]]
+id = "header.tgmath.h"
+status = "present"
+evidence = "tests/libc/posix/headers/check-missing-headers.sh"
+notes = "P1 batch a: POSIX.1-2024 <tgmath.h> (C17 7.25) type-generic real macros compile and sqrt is exercised"

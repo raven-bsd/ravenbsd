@@ -49,6 +49,7 @@ pub fn decode(request: &[u8]) -> Result<LinuxSyscallV1, TrapError> {
 /// argument 1). The bound protects the server from a hostile or corrupt Linux process.
 pub fn copy_in(call: &LinuxSyscallV1) -> Option<(usize, usize)> {
     const PATH_COPY: usize = 128;
+    const NAME_COPY: usize = 16;
     match call.nr {
         1 | 18 => {
             let count = usize::try_from(call.args[2]).ok()?;
@@ -56,6 +57,8 @@ pub fn copy_in(call: &LinuxSyscallV1) -> Option<(usize, usize)> {
         }
         2 | 4 | 89 => Some((0, PATH_COPY)),
         257 | 262 | 267 => Some((1, PATH_COPY)),
+        // prctl(PR_SET_NAME, name): only the 16-byte task-name window is read.
+        157 if call.args[0] == 15 => Some((1, NAME_COPY)),
         _ => None,
     }
 }

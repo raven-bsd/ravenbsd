@@ -8,7 +8,16 @@ use crate::table::{DirEntry, LinuxProcess, Region};
 use raven_abi::types::Handle;
 
 fn process() -> LinuxProcess {
-    let mut process = LinuxProcess::new(1, Handle(1), 0x40_5000, 0x41_0000, 0x50_0000, 0x60_0000);
+    let mut process = LinuxProcess::new(
+        1,
+        1,
+        Handle(1),
+        Handle(2),
+        0x40_5000,
+        0x41_0000,
+        0x50_0000,
+        0x60_0000,
+    );
     process.regions.push(Region {
         start: 0x40_0000,
         len: 0x2000,
