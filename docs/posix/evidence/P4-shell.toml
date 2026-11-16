@@ -1,0 +1,153 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4a POSIX shell evidence. The qtest runs brush --posix through the supported grammar,
+# expansion, redirection, function, loop, set-option, trap-EXIT and builtin groups. The seven
+# waived rows are the platform or target-stdio gaps named in docs/posix/P4-shell.md; they are
+# not claimed as passes.
+
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "shell.arithmetic-expansion"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: arithmetic-expansion marker in the posix-shell qtest"
+
+[[row]]
+id = "shell.command-substitution"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: command-substitution marker in the posix-shell qtest"
+
+[[row]]
+id = "shell.compound-command"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: brace/subshell groups in the posix-shell qtest"
+
+[[row]]
+id = "shell.conditional"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: if/case markers in the posix-shell qtest"
+
+[[row]]
+id = "shell.exit-status"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: $?/function/errexit/nounset markers in the posix-shell qtest"
+
+[[row]]
+id = "shell.field-splitting"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: IFS field-splitting marker in the posix-shell qtest"
+
+[[row]]
+id = "shell.function"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: function definition/invocation marker in the posix-shell qtest"
+
+[[row]]
+id = "shell.getopts"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: getopts/OPTARG/OPTIND markers in the posix-shell qtest"
+
+[[row]]
+id = "shell.here-document"
+status = "waived"
+notes = "P4a: target script/source stdout returns failed to write whole buffer; << and <<- are proven in the host fixture; follow-up target file-open/stdio"
+
+[[row]]
+id = "shell.interactive-shell"
+status = "waived"
+notes = "P4a: interactive login is P9c; modern-shell-login records the dependency"
+
+[[row]]
+id = "shell.job-control"
+status = "waived"
+notes = "P4a: PG-56 process groups/sessions/tty control is not implemented"
+
+[[row]]
+id = "shell.list"
+status = "waived"
+notes = "P4a: sequence lists pass; asynchronous $! and wait pid need the job model (PG-56)"
+
+[[row]]
+id = "shell.loop"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: for/while/until markers in the posix-shell qtest"
+
+[[row]]
+id = "shell.parameter-expansion"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: default/prefix/suffix/length markers in the posix-shell qtest"
+
+[[row]]
+id = "shell.pathname-expansion"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: glob marker in the posix-shell qtest"
+
+[[row]]
+id = "shell.pipeline"
+status = "waived"
+notes = "P4a: PG-35 pipe2 is ENOSYS"
+
+[[row]]
+id = "shell.quote-removal"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: quoted-argument marker in the posix-shell qtest"
+
+[[row]]
+id = "shell.redirection"
+status = "waived"
+notes = "P4a: input <, exec 3<, exec 3<&- and >&- pass; target > and >> to a file return failed to write whole buffer; follow-up target file-open/stdio"
+
+[[row]]
+id = "shell.regular-builtin"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: read/eval/umask markers in the posix-shell qtest"
+
+[[row]]
+id = "shell.set-options"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: set -e/-u/-x markers in the posix-shell qtest"
+
+[[row]]
+id = "shell.shell-variable"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: assignment and readonly markers in the posix-shell qtest"
+
+[[row]]
+id = "shell.simple-command"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: assignment/argument/exit-status marker in the posix-shell qtest"
+
+[[row]]
+id = "shell.special-builtin"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: eval/trap/readonly/umask/getopts markers in the posix-shell qtest"
+
+[[row]]
+id = "shell.trap"
+status = "waived"
+notes = "P4a: EXIT traps pass; signal traps need PG-7 signal delivery"
+
+[[row]]
+id = "shell.umask"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4a: umask marker in the posix-shell qtest"
