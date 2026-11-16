@@ -40,7 +40,10 @@ fn cid_words() -> [u32; 4] {
 }
 
 fn csd_v2_words() -> [u32; 4] {
-    let c_size = 0xffffu32;
+    csd_v2_words_for(0xffff)
+}
+
+fn csd_v2_words_for(c_size: u32) -> [u32; 4] {
     let mut words = [0u32; 4];
     words[3] |= 1 << 30;
     words[1] |= (c_size & 0xffff) << 16;
@@ -116,6 +119,38 @@ fn the_full_sdhc_sequence_reaches_a_ready_card() {
     assert_eq!(card.capacity_bytes, 32 * 1024 * 1024 * 1024);
     assert_eq!(card.cid, Cid::from_raw(crate::response::RawLong::default()));
     assert_eq!(init.phase(), InitPhase::Ready);
+}
+
+#[test]
+fn an_sdxc_card_reaches_ready_with_two_tib_capacity() {
+    let mut init = Init::new();
+    let step = to_cmd2(&mut init);
+    assert_eq!(command(step), (SdCommand::Cmd2, 0));
+
+    let step = init.advance(Ok(cid_words())).expect("cid accepted");
+    assert_eq!(command(step), (SdCommand::Cmd3, 0));
+    let step = init.advance(Ok(r6(0x4567))).expect("rca accepted");
+    assert_eq!(command(step), (SdCommand::Cmd9, 0x4567));
+    let step = init
+        .advance(Ok(csd_v2_words_for(0x3f_ffff)))
+        .expect("sdxc csd accepted");
+    assert_eq!(command(step), (SdCommand::Cmd7, 0x4567));
+    let step = init.advance(Ok(r1())).expect("card selected");
+    assert_eq!(command(step), (SdCommand::Cmd55, 0x4567));
+    let step = init.advance(Ok(r1_app())).expect("app cmd accepted");
+    assert_eq!(command(step), (SdCommand::Acmd6, 2));
+    let step = init.advance(Ok(r1())).expect("bus width accepted");
+    assert_eq!(command(step), (SdCommand::Cmd16, BLOCK_LEN));
+
+    let card = match init.advance(Ok(r1())).expect("block length accepted") {
+        InitStep::Ready(card) => card,
+        other => panic!("expected ready, got {other:?}"),
+    };
+    assert_eq!(card.rca, 0x4567);
+    assert!(card.high_capacity);
+    assert!(!card.legacy);
+    assert_eq!(card.capacity_bytes, 2 * 1024 * 1024 * 1024 * 1024);
+    assert!(card.capacity_bytes > 32 * 1024 * 1024 * 1024);
 }
 
 #[test]

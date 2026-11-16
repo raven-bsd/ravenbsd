@@ -83,7 +83,7 @@ fn normal_and_error_interrupts_decode() {
 }
 
 #[test]
-fn present_state_exposes_the_inhibit_and_buffer_bits() {
+fn present_state_exposes_the_inhibit_buffer_and_card_bits() {
     let state = PresentState::from_raw(
         PRESENT_CMD_INHIBIT | PRESENT_DAT_INHIBIT | PRESENT_BUFFER_READ_ENABLE,
     );
@@ -91,7 +91,13 @@ fn present_state_exposes_the_inhibit_and_buffer_bits() {
     assert!(state.dat_inhibit());
     assert!(state.buffer_read_ready());
     assert!(!state.buffer_write_ready());
+    assert!(!state.card_inserted());
     assert_eq!(state.raw(), 0x803);
+
+    let inserted = PresentState::from_raw(PRESENT_CARD_INSERTED | PRESENT_BUFFER_WRITE_ENABLE);
+    assert!(inserted.card_inserted());
+    assert!(inserted.buffer_write_ready());
+    assert_eq!(inserted.raw(), 0x1_0400);
 }
 
 #[test]

@@ -140,7 +140,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.assert.h"
 ticket = "P1"
 test = "none"
-evidence = "tests/posix/check-headers.sh"
+evidence = "test:tests/posix/check-headers.sh"
 
 [[trace]]
 id = "header.complex.h"

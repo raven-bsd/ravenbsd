@@ -1,54 +1,36 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# P2e: procd owns a spawned child, sets its process group, reports pgid/sid, maps SIGTERM to
-# PROC_TERMINATE and reports a signal-style wait status. Unsupported kernel rows must answer
-# ENOSYS rather than pretend success.
+# P2f: a child blocks in PROC_SIGRECV, receives two queued signals, exits, and
+# the parent receives SIGCHLD after PROC_WAIT_EX reaps the status.
 
 name = "proc-signal"
 arch = "x86_64"
 profile = "base"
 timeout_secs = 180
-pre = ["PROCD_MODE=signal sh tests/fixtures/procd/build.sh"]
-initfs = "build/fixtures/procd/initfs-signal.img"
+pre = ["sh tests/fixtures/proc/build.sh"]
+initfs = "build/fixtures/proc/signal.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
 
 [[expect]]
-regex = '^procd-test: hello version=1 pid=[0-9]+$'
+regex = '^proc-signal: rx1=10 rx2=12$'
 
 [[expect]]
-regex = '^procd-test: spawn pid=[0-9]+$'
-unordered = true
+regex = '^proc-signal: wait pid=[0-9]+ status=0$'
 
 [[expect]]
-regex = '^procd-child: sleeping$'
-unordered = true
+regex = '^proc-signal: sigchld=17 sender=[0-9]+$'
 
 [[expect]]
-regex = '^procd-test: setpgid pid=[0-9]+$'
+regex = '^proc-signal: eagain=1 invalid=1 unknown=1$'
 
 [[expect]]
-regex = '^procd-test: getpgid=[0-9]+$'
-
-[[expect]]
-regex = '^procd-test: kill signal=15$'
-
-[[expect]]
-regex = '^procd-test: wait signal=15$'
-
-[[expect]]
-regex = '^procd-test: unknown=echild$'
-
-[[expect]]
-regex = '^procd-test: unsupported=enosys$'
-
-[[expect]]
-regex = '^procd-test: ok$'
+regex = '^proc-signal: ok$'
 
 [[expect]]
 regex = '^init exited \(0\)$'
 
 [[forbid]]
-regex = '(?i)panic|EXCEPTION|procd-test: fail|procd-child: unknown'
+regex = '(?i)panic|EXCEPTION|proc-signal: fail'
