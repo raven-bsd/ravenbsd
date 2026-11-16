@@ -31,25 +31,30 @@ mod program {
     const OP_GET_FG: u16 = 0x21;
     const OP_HANGUP: u16 = 0x22;
     const OP_STATE: u16 = 0x23;
+    const OP_SET_SID: u16 = 0x24;
+    const OP_GET_SID: u16 = 0x25;
+    const OP_SESSION_ID: u16 = 0x26;
     const HUNG_BIT: u32 = 0x8000_0000;
 
     struct HandlerImpl {
         sessions: Sessions,
-        files: BTreeMap<u64, u32>,
-        next: u64,
+        refs: BTreeMap<u64, u32>,
     }
 
     impl HandlerImpl {
         fn new() -> Self {
             Self {
                 sessions: Sessions::new(),
-                files: BTreeMap::new(),
-                next: 1,
+                refs: BTreeMap::new(),
             }
         }
 
         fn session(&self, file: u64) -> Result<u32, Errno> {
-            self.files.get(&file).copied().ok_or(Errno::EBADF)
+            if self.refs.contains_key(&file) {
+                u32::try_from(file).map_err(|_| Errno::EBADF)
+            } else {
+                Err(Errno::EBADF)
+            }
         }
     }
 
@@ -62,17 +67,25 @@ mod program {
             _ctx: &Ctx,
         ) -> HandlerResult<Opened> {
             let path = path.strip_prefix('/').unwrap_or(path);
-            if !path.is_empty() && path != "session" && path != "0" {
-                return Err(Errno::ENOENT.into());
-            }
             if flags & 4 != 0 {
                 return Err(Errno::EINVAL.into());
             }
-            let id = self.next;
-            self.next = self.next.wrapping_add(1);
-            let session = self.sessions.open();
-            self.files.insert(id, session);
-            Ok(Opened::File(id))
+            let session = if path.is_empty() || path == "session" || path == "0" {
+                let session = self.sessions.open();
+                self.refs.insert(u64::from(session), 1);
+                session
+            } else if let Some(rest) = path.strip_prefix("session/") {
+                let session = rest.parse::<u32>().map_err(|_| Errno::ENOENT)?;
+                if self.sessions.get(session).is_none() {
+                    return Err(Errno::ENOENT.into());
+                }
+                let count = self.refs.entry(u64::from(session)).or_insert(0);
+                *count = count.saturating_add(1);
+                session
+            } else {
+                return Err(Errno::ENOENT.into());
+            };
+            Ok(Opened::File(u64::from(session)))
         }
 
         fn call(&mut self, file: u64, request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {
@@ -110,6 +123,14 @@ mod program {
                     };
                     (OP_STATE, self.sessions.fg(session) as u32, sid | hung)
                 }
+                OP_SET_SID => {
+                    if !self.sessions.set_sid(session, arg0 as i32) {
+                        return Err(Errno::ESRCH.into());
+                    }
+                    (OP_SET_SID, arg0, 0)
+                }
+                OP_GET_SID => (OP_GET_SID, self.sessions.sid(session) as u32, 0),
+                OP_SESSION_ID => (OP_SESSION_ID, u32::try_from(file).unwrap_or(0), 0),
                 _ => return Err(Errno::ENOSYS.into()),
             };
             response[..2].copy_from_slice(&VERSION.to_le_bytes());
@@ -119,19 +140,50 @@ mod program {
             Ok(CALL_LEN)
         }
 
-        fn fstat(&mut self, _file: u64) -> HandlerResult<Stat> {
+        fn read(&mut self, file: u64, _offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
+            self.session(file)?;
+            if buffer.is_empty() {
+                Ok(0)
+            } else {
+                // The data path belongs to ptyd; the session handle still passes the kernel's
+                // controlling-terminal check and has no data of its own.
+                Err(Errno::EAGAIN.into())
+            }
+        }
+
+        fn write(&mut self, file: u64, _offset: u64, buffer: &[u8]) -> HandlerResult<usize> {
+            self.session(file)?;
+            Ok(buffer.len())
+        }
+
+        fn fstat(&mut self, file: u64) -> HandlerResult<Stat> {
+            self.session(file)?;
             Ok(Stat {
+                ino: file,
                 mode: S_IFCHR | 0o666,
                 nlink: 1,
                 ..Stat::default()
             })
         }
 
+        fn dup(&mut self, file: u64) -> HandlerResult<u64> {
+            self.session(file)?;
+            let count = self.refs.entry(file).or_insert(0);
+            *count = count.saturating_add(1);
+            Ok(file)
+        }
+
         fn close(&mut self, file: u64) -> HandlerResult<()> {
-            let Some(session) = self.files.remove(&file) else {
+            let Some(count) = self.refs.get_mut(&file) else {
                 return Err(Errno::EBADF.into());
             };
-            let _ = self.sessions.close(session);
+            *count = count.saturating_sub(1);
+            if *count == 0 {
+                self.refs.remove(&file);
+                if let Ok(session) = u32::try_from(file) {
+                    let _ = self.sessions.close(session);
+                }
+            }
             Ok(())
         }
     }

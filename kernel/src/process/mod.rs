@@ -13,6 +13,7 @@ pub mod priority;
 pub mod robust;
 pub mod status;
 pub mod thread;
+pub mod tty;
 
 use core::fmt;
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
@@ -171,6 +172,8 @@ pub struct Process {
     pub path: String,
     /// POSIX nice value (`-20..19`); inherited by `PROC_FORK` and preserved by exec.
     pub nice: AtomicI32,
+    /// Controlling terminal acquired by this process, if any.
+    pub ctty: Mutex<Option<Arc<tty::Ctty>>>,
     /// User address space (`None` for the kernel process or an exited process).
     pub address_space: Mutex<Option<UserAddressSpace>>,
     /// Handle table.
@@ -351,6 +354,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         ids: Mutex::new(ProcessIds::kernel()),
         path: String::from("/kernel"),
         nice: AtomicI32::new(0),
+        ctty: Mutex::new(None),
         address_space: Mutex::new(None),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
@@ -406,6 +410,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         ids: Mutex::new(ids),
         path: String::from("child"),
         nice: AtomicI32::new(0),
+        ctty: Mutex::new(None),
         address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
@@ -460,6 +465,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         ids: Mutex::new(ids),
         path: source.path.clone(),
         nice: AtomicI32::new(source.nice()),
+        ctty: Mutex::new(source.ctty.lock().clone()),
         address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
@@ -540,6 +546,68 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
     *child.namespace.lock() = source.namespace.lock().clone();
     register_pid(&child);
     Ok(child)
+}
+
+/// Deliver one signal with POSIX job-control semantics.
+pub fn deliver_signal(target: &Arc<Process>, signo: u32, sender: u64) -> Result<(), Errno> {
+    if status::is_stop_signal(signo) {
+        if target.stop_signal.swap(signo, Ordering::AcqRel) == 0 {
+            target.stop_reported.store(false, Ordering::Release);
+        }
+        notify_parent(target, false);
+        return Ok(());
+    }
+    if signo == status::SIGCONT {
+        if target.stop_signal.swap(0, Ordering::AcqRel) != 0 {
+            target.continued.store(true, Ordering::Release);
+            target.stop_reported.store(false, Ordering::Release);
+        }
+        target.queue_signal(status::SIGCONT, sender);
+        notify_parent(target, false);
+        return Ok(());
+    }
+    target.queue_signal(signo, sender);
+    Ok(())
+}
+
+/// Deliver one signal to every live process in `pgid`.
+pub fn signal_group(pgid: u64, signo: u32, sender: u64) -> usize {
+    let mut count = 0usize;
+    for process in processes() {
+        if *process.state.lock() == ProcessState::Exited {
+            continue;
+        }
+        if process.ids.lock().pgid == pgid {
+            let _ = deliver_signal(&process, signo, sender);
+            count = count.saturating_add(1);
+        }
+    }
+    count
+}
+
+/// True when the process group has no parent in a different group in the same session.
+pub fn group_orphaned(pgid: u64, sid: u64) -> bool {
+    let members: Vec<Arc<Process>> = processes()
+        .into_iter()
+        .filter(|process| {
+            let state = *process.state.lock();
+            let ids = *process.ids.lock();
+            state != ProcessState::Exited && ids.pgid == pgid && ids.sid == sid
+        })
+        .collect();
+    if members.is_empty() {
+        return true;
+    }
+    for member in members {
+        let ppid = member.ids.lock().ppid;
+        if let Some(parent) = lookup_pid(ppid) {
+            let parent_ids = *parent.ids.lock();
+            if parent_ids.sid == sid && parent_ids.pgid != pgid {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 impl Process {
@@ -665,6 +733,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         ids: Mutex::new(ids),
         path: String::from(path),
         nice: AtomicI32::new(0),
+        ctty: Mutex::new(None),
         address_space: Mutex::new(Some(user_address_space)),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
@@ -1306,6 +1375,7 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     crate::syscall::futex::remove_process(process.id);
     let _ = process.waiters.wake_all();
     drop(state);
+    crate::process::tty::hangup_session_leader(process);
     notify_parent(process, true);
     crate::event::notify_all();
     teardown(process, code, own_context);
