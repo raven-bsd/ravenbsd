@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# B21a: the kernel captures the x86-64 Linux trap frame in the request packet's path field. The
+# handler sees RIP/RSP/FS base and replies with a frame that resumes the blocked child at a chosen
+# RIP/RSP; the child writes a shared resume flag and the controller reaps it.
+
+name = "linux-frame"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/linux-frame/build.sh"]
+initfs = "build/fixtures/linux-frame/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^linux-frame: handler nr=7777 rip=0x[0-9a-f]+ rsp=0x[0-9a-f]+ fs=0x7000$'
+
+[[expect]]
+regex = '^linux-frame: handler target=0x[0-9a-f]+ stack=0x[0-9a-f]+$'
+
+[[expect]]
+regex = '^linux-frame: resumed$'
+
+[[expect]]
+regex = '^linux-frame: child exit=0$'
+
+[[expect]]
+regex = '^linux-frame: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|linux-frame: FAIL'
