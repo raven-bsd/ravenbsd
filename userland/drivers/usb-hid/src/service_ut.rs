@@ -15,6 +15,7 @@ struct Fake {
     index: Cell<usize>,
     controls: Cell<usize>,
     submits: Cell<usize>,
+    present: Cell<bool>,
 }
 
 impl Default for Fake {
@@ -25,6 +26,7 @@ impl Default for Fake {
             index: Cell::new(0),
             controls: Cell::new(0),
             submits: Cell::new(0),
+            present: Cell::new(true),
         }
     }
 }
@@ -32,19 +34,34 @@ impl Default for Fake {
 impl TransferRing for Fake {
     fn control_out(&mut self, _setup: SetupPacket, _data: &[u8]) -> Result<(), Error> {
         self.controls.set(self.controls.get().saturating_add(1));
-        Ok(())
+        if self.present.get() {
+            Ok(())
+        } else {
+            Err(Error::NoDevice)
+        }
     }
 
     fn control_in(&mut self, _setup: SetupPacket, _data: &mut [u8]) -> Result<usize, Error> {
-        Ok(0)
+        if self.present.get() {
+            Ok(0)
+        } else {
+            Err(Error::NoDevice)
+        }
     }
 
     fn interrupt_in(&mut self, _endpoint: u8, _length: usize) -> Result<(), Error> {
         self.submits.set(self.submits.get().saturating_add(1));
-        Ok(())
+        if self.present.get() {
+            Ok(())
+        } else {
+            Err(Error::NoDevice)
+        }
     }
 
     fn next_report(&mut self) -> Option<[u8; 8]> {
+        if !self.present.get() {
+            return None;
+        }
         let index = self.index.get();
         if index >= self.count.get() {
             return None;
@@ -133,4 +150,79 @@ fn uk_layout_and_repeat_reach_the_queue() {
     assert_eq!(service.tick(1_100), 1);
     assert_eq!(service.read_console(&mut out), 1);
     assert_eq!(out[0], 0xa3);
+}
+
+#[test]
+fn detach_releases_stuck_keys_and_stops_repeat() {
+    let fake = Fake::default();
+    fake.reports.borrow_mut()[0] = [0x02, 0, 0x04, 0, 0, 0, 0, 0]; // shift+a
+    fake.count.set(1);
+    let mut service = KeyboardService::new(fake);
+    assert_eq!(service.init(&BOOT_KEYBOARD_DESCRIPTOR), Ok(()));
+    assert_eq!(service.poll_at(0), Ok(1));
+    let mut out = [0u8; 4];
+    assert_eq!(service.read_console(&mut out), 1);
+    assert_eq!(out[0], b'A');
+    assert_eq!(service.tick(500_000_000), 1);
+    assert_eq!(service.read_console(&mut out), 1);
+    assert_eq!(out[0], b'A');
+    assert!(service.repeat().active());
+
+    let releases = service.detach();
+    assert_eq!(releases.count, 2);
+    let mut shift = false;
+    let mut key = false;
+    for event in releases.iter() {
+        assert!(!event.pressed);
+        assert_eq!(event.ascii, None);
+        shift |= event.usage == 0xe1;
+        key |= event.usage == 0x04;
+    }
+    assert!(shift);
+    assert!(key);
+    assert!(!service.is_attached());
+    assert!(!service.repeat().active());
+    assert_eq!(service.tick(1_000_000_000), 0);
+    assert_eq!(service.keyboard().keyboard().modifiers(), 0);
+    assert!(!service.keyboard().keyboard().caps());
+    assert!(!service.keyboard().keyboard().num_lock());
+    assert_eq!(service.poll(), Err(Error::NotInitialized));
+    assert_eq!(service.detach().count, 0);
+}
+
+#[test]
+fn init_after_detach_reenumerates_and_clears_stale_modifiers() {
+    let fake = Fake::default();
+    fake.reports.borrow_mut()[0] = [0x02, 0, 0x04, 0, 0, 0, 0, 0]; // shift+a
+    fake.reports.borrow_mut()[1] = [0x00, 0, 0x05, 0, 0, 0, 0, 0]; // b
+    fake.count.set(2);
+    let mut service = KeyboardService::with_layout(fake, Layout::Uk);
+    assert_eq!(service.init(&BOOT_KEYBOARD_DESCRIPTOR), Ok(()));
+    assert_eq!(service.poll_at(0), Ok(1));
+    let _ = service.detach();
+    let mut out = [0u8; 4];
+    assert_eq!(service.read_console(&mut out), 1);
+    assert_eq!(out[0], b'A');
+
+    service.ring_mut().present.set(false);
+    assert_eq!(
+        service.init(&BOOT_KEYBOARD_DESCRIPTOR),
+        Err(Error::NoDevice)
+    );
+    assert!(!service.is_attached());
+    assert_eq!(service.ring().controls.get(), 3);
+    assert_eq!(service.ring().submits.get(), 2);
+
+    service.ring_mut().present.set(true);
+    service.ring_mut().index.set(1);
+    assert_eq!(service.init(&BOOT_KEYBOARD_DESCRIPTOR), Ok(()));
+    assert!(service.is_attached());
+    assert_eq!(service.keyboard().keyboard().layout(), Layout::Uk);
+    assert_eq!(service.ring().controls.get(), 5);
+    assert_eq!(service.ring().submits.get(), 3);
+    assert_eq!(service.poll_at(10), Ok(1));
+    assert_eq!(service.read_console(&mut out), 1);
+    assert_eq!(out[0], b'b');
+    assert_eq!(service.keyboard().keyboard().modifiers(), 0);
+    assert!(!service.keyboard().keyboard().shift());
 }

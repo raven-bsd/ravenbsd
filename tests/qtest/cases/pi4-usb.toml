@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# D2: the Pi 4 xHCI driver in fake-keyboard mode. The D1 ring seam and the S61/S62 enumeration
+# path are exercised without PCI/MMIO; the VL805 board path is UNVERIFIED.
+name = "pi4-usb"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/pi4-usb/build.sh"]
+initfs = "build/fixtures/pi4-usb/initfs.img"
+boot_cmdline = "console=ttyAMA0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^pi4-xhci: ring trbs=3 completion=success$'
+
+[[expect]]
+regex = '^pi4-xhci: device vendor=0x0627 product=0x0001 class=0 configs=1 interfaces=1$'
+
+[[expect]]
+regex = '^pi4-xhci: hid interface=0 report=63 ep=0x81$'
+
+[[expect]]
+regex = '^pi4-xhci: keyboard boot protocol ok$'
+
+[[expect]]
+regex = '^pi4-xhci: key=a$'
+
+[[expect]]
+regex = '^pi4-xhci: ok$'
+
+[[expect]]
+regex = '^svcd: pi4-xhci up$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pi4-xhci: .*fail'
