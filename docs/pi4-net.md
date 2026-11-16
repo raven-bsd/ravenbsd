@@ -33,6 +33,60 @@ netd: interface eth0 <addr>/<prefix>
 ping: <gateway> packets transmitted, <n> received, <loss>% packet loss
 ```
 
+## GENET `nic:` frame service
+
+REL4a wires the frame backend to the B39 contract that `netd` already consumes:
+
+* `userland/drivers/genet/src/nic.rs` owns the host-tested `NicService`;
+* the B39 region is at DMA offset `0x1000`, length `0x6000` (header, 8 RX descriptors,
+  8 TX descriptors, eleven 2 KiB pool buffers);
+* pool buffers 0..7 are the eight GENET RX slots; pool buffers 8..10 are the three GENET TX
+  slots, so GENET and `netd` share the same DMA bytes (no frame copy);
+* `userland/drivers/genet/src/main.rs` maps the `devd` BAR/DMA/IRQ handles through
+  `PlatformSeam`, performs the typed bring-up, calls `FrameBackend::program_rings`, and serves:
+
+| Path | Meaning |
+|---|---|
+| `nic:info` | `mac=...`, `mtu=...`, `link=up\|down`, ring and DMA geometry |
+| `nic:mac`, `nic:mtu`, `nic:link` | one-line values |
+| `nic:ring` | attachment of the DMA window (the B39 region is at `ring_offset`) |
+| `nic:start`, `nic:stop` | arm or pause the RX/TX pump |
+| `nic:release` | read the evidence transcript, or feed one DHCP/ping probe line |
+| `nic:quit` | test-only clean shutdown |
+
+`nic:release` accepts exactly two lines:
+
+```
+dhcp <addr>/<prefix> <gateway> <dns|none>
+ping <gateway> tx=<n> rx=<n> rtt_ms=<n>
+```
+
+A board probe can therefore read the `netd` lease and `ping` result and feed them to the driver;
+when all three stages are complete the driver prints the `GENET-NET-*` transcript. The parser and
+feed path are host-tested; the probe binary and its profile entry are the board follow-up below.
+
+## Board follow-up (exact, outside REL4a Owns)
+
+1. **Platform launch.** `userland/servers/devd/src/main.rs`, `run_dtb()` only prints the DT
+   matches; it does not grant MMIO/DMA/IRQ or spawn a platform driver. The GENET driver cannot
+   start until that path launches `/sbin/genet` with the same `bar`/`dma`/`irq` tokens the PCI
+   path uses.
+2. **Profile.** `profiles/pi4-release.toml` (REL3) includes `netd`, `resolvd` and `ping` but no
+   `genet` program or service manifest. Add the program and a service entry that waits for
+   `logd`, `platd` (`plat:mac`) and the driver's `nic:` readiness. This is outside REL4a Owns.
+3. **netd QEMU constants.** `userland/servers/netd/src/nic.rs`, `NicDevice::open()` constructs
+   `NicConfig` with `GUEST_ADDR = 10.0.2.15`, `GATEWAY_ADDR = 10.0.2.2` and
+   `GUEST_PREFIX = 24` (QEMU user-mode). The Pi 4 path must not claim those addresses before the
+   DHCP lease; it needs a neutral DHCP-first configuration (or a profile-supplied address) and a
+   check that the lease actually arrived. REL4a does not edit `netd`.
+4. **Ring values.** `FrameBackend::program_rings()` writes the documented Pi 4 ring setup
+   (`RING_BUF_SIZE`, start/end, producer/consumer, DMA control, UMAC RX/TX enable). The exact
+   register values and the descriptor producer/consumer index programming remain UNVERIFIED
+   until the board log exists.
+5. **Live device tree.** `userland/drivers/genet/src/main.rs`, `pi4_info()` uses the documented
+   Pi 4 base `0xfd58_0000`, MDIO `0xe14`, PHY 1 and `rgmii-rxid`; the board must confirm the live
+   DT values and the `plat:mac` result.
+
 ## Evidence script
 
 ```
@@ -53,10 +107,10 @@ negative fixture to fail. That proves the script's parser; it does **not** prove
 
 1. **Preconditions.** A `pi4-release` profile must exist and include the GENET driver, `netd`,
    the DHCP client path and `ping`; `devd` must grant the GENET MMIO/DMA/IRQ handles; the driver
-   must expose the `nic:` frame service that `netd` attaches. On the current base these
-   preconditions are missing: REL3 is BLOCKED (no `profiles/pi4-release.toml`, and REL1/REL1b,
-   J8 and REL2a are not merged), and the GENET driver entry point is still a skeleton. Do not
-   claim a network result until they are in the image.
+   must expose the `nic:` frame service that `netd` attaches. The driver and `NicService` are in
+   place and compile for the target, but `devd` platform launch, the profile entry, the netd
+   DHCP-first configuration and the board probe are still missing (see the exact follow-up
+   above). Do not claim a network result until they are in the image.
 2. **Build and flash.** Build the release image for `--arch aarch64 --platform pi4 --profile
    pi4-release`, write the FAT/root layout exactly as REL3 documents, and attach the UART at
    115200 8N1.
@@ -83,6 +137,7 @@ negative fixture to fail. That proves the script's parser; it does **not** prove
 ```
 cargo nextest run -p raven-genet
 cargo nextest run -p genet
+cargo check -p genet --target aarch64-unknown-none-softfloat
 sh -n scripts/pi4-net-evidence.sh
 scripts/pi4-net-evidence.sh --self-test
 ```
@@ -90,17 +145,24 @@ scripts/pi4-net-evidence.sh --self-test
 The `raven-genet` tests cover the gate's order, lease validation, gateway matching, reply
 counts and the exact marker transcript. The `genet` tests drive the same gate through
 `FrameBackend::observe_link`, proving that the debounced link transition reaches `UMAC_CMD` before
-the DHCP and ping observations are accepted.
+the DHCP and ping observations are accepted. They also cover the B39 ring mapping, RX publishing,
+TX queue/reclaim, malformed descriptors, the `nic:release` parser and the target compile.
+
+There is no `pi4-net` QEMU case: QEMU has no GENET v5 model, and adding a fake PCI device would not
+exercise the Pi 4 platform path. The frame service runs in the host tests and the target code is
+compile-checked; the board run is the evidence the owner must supply.
 
 ## UNVERIFIED values
 
 These must come from the owner's serial log, not from the host model or this document:
 
-* the live GENET MMIO/DMA/IRQ resources and the `devd` match;
+* the live GENET MMIO/DMA/IRQ resources, the `devd` match and the platform launch;
 * the resolved link speed and duplex;
 * the DHCP server, lease address, prefix, gateway and DNS;
 * the gateway ping sequence, reply count and RTT;
-* whether the release image actually includes the GENET `nic:` service and `netd` attaches it;
+* the `FrameBackend::program_rings` values and the hardware producer/consumer indices;
+* whether the release image includes the GENET `nic:` service and `netd` attaches it;
+* whether the `nic:release` probe receives the real netd lease and ping result;
 * any board-only driver fix made in response to those observations.
 
 ## Relationship to the other evidence kits

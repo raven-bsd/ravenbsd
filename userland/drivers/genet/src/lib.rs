@@ -34,6 +34,7 @@ use raven_genet::ring::{
 
 pub mod board;
 pub mod frame;
+pub mod nic;
 pub mod platform;
 pub mod release;
 

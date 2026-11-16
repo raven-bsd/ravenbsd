@@ -41,6 +41,12 @@ impl ReleaseSession {
         self.gate.transcript()
     }
 
+    /// Feed one debounced link event to the release gate.
+    pub fn link_event(&mut self, event: LinkEvent) -> Result<(), DriverError> {
+        self.gate.link_event(event).map_err(DriverError::Release)?;
+        Ok(())
+    }
+
     /// Feed one BMSR/AUXSTS sample through the frame backend and the release gate.
     ///
     /// The backend applies a debounced transition to `UMAC_CMD`/`EXT_RGMII_OOB_CTRL`; the
@@ -54,7 +60,7 @@ impl ReleaseSession {
     ) -> Result<Option<LinkEvent>, DriverError> {
         let event = backend.observe_link(bmsr, auxsts)?;
         if let Some(event) = event {
-            self.gate.link_event(event).map_err(DriverError::Release)?;
+            self.link_event(event)?;
         }
         Ok(event)
     }
