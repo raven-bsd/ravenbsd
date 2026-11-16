@@ -397,6 +397,15 @@ impl ThreadKernel for SysKernel {
         Err(ENOSYS)
     }
 
+    fn thread_is_dead(&self, tcb_address: usize) -> bool {
+        // SAFETY: the caller passes a live TCB address (a `pthread_t` that passed the stale-tid
+        // checks); the kernel clears `join_word` on the thread's last exit step.
+        tcb(tcb_address)
+            .join_word
+            .load(core::sync::atomic::Ordering::Acquire)
+            == 0
+    }
+
     fn start_trampoline(&self) -> fn(usize) -> ! {
         production_trampoline
     }

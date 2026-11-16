@@ -330,6 +330,9 @@ pub fn create<K: ThreadKernel>(
     pthread.startarg = arg;
     pthread.result = 0;
     pthread.robust_head = raw::robust_head_addr(pthread);
+    // The kernel clears this word on the thread's last exit step; the libc exit path never
+    // writes it, so it is the A-thr-3 death confirmation the joiner/reaper needs.
+    pthread.join_word.store(1, Ordering::Release);
     raw::set_tsd_base(pthread, allocation.tsd_base);
     raw::zero_bytes(allocation.tsd_base, tsd_size);
     pthread.handle = 0;
@@ -354,7 +357,7 @@ pub fn create<K: ThreadKernel>(
         stack_top: allocation.stack_top,
         arg: args_address,
         tp: pthread_to_tp(tcb),
-        clear_tid_addr: tcb + core::mem::offset_of!(Pthread, tid),
+        clear_tid_addr: tcb + core::mem::offset_of!(Pthread, join_word),
     };
     let result = kernel.create(&create_args);
     match result {
