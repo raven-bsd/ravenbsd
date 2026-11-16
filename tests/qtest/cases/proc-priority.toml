@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P2l priority surface: root get/set/clamp/nice and group/user paths, SCHED_OTHER queries with
+# explicit SCHED_FIFO/RR refusal, then the same calls after dropping to uid 1000 to prove the
+# raise/other-user denials.
+
+name = "proc-priority"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/proc/build.sh"]
+initfs = "build/fixtures/proc/priority.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^proc-priority: root get=1 set=1 clamp=1 nice=1 invalid=1$'
+
+[[expect]]
+regex = '^proc-priority: root group=1 user=1 sched=1$'
+
+[[expect]]
+regex = '^proc-priority: user get=1 set=1 raise=1 nice=1$'
+
+[[expect]]
+regex = '^proc-priority: user path=1 other=1 group=1 sched=1$'
+
+[[expect]]
+regex = '^proc-priority: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|proc-priority: FAIL'

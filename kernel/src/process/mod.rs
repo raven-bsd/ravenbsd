@@ -9,6 +9,7 @@
 pub mod exec;
 pub mod handle;
 pub mod pipe;
+pub mod priority;
 pub mod robust;
 pub mod status;
 pub mod thread;
@@ -168,6 +169,8 @@ pub struct Process {
     pub ids: Mutex<ProcessIds>,
     /// Path used to start the process.
     pub path: String,
+    /// POSIX nice value (`-20..19`); inherited by `PROC_FORK` and preserved by exec.
+    pub nice: AtomicI32,
     /// User address space (`None` for the kernel process or an exited process).
     pub address_space: Mutex<Option<UserAddressSpace>>,
     /// Handle table.
@@ -347,6 +350,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         id: 0,
         ids: Mutex::new(ProcessIds::kernel()),
         path: String::from("/kernel"),
+        nice: AtomicI32::new(0),
         address_space: Mutex::new(None),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
@@ -401,6 +405,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
         path: String::from("child"),
+        nice: AtomicI32::new(0),
         address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
@@ -454,6 +459,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
         path: source.path.clone(),
+        nice: AtomicI32::new(source.nice()),
         address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
@@ -537,6 +543,16 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
 }
 
 impl Process {
+    /// The POSIX nice value (`-20..19`).
+    pub fn nice(&self) -> i32 {
+        self.nice.load(Ordering::Acquire)
+    }
+
+    /// Store the POSIX nice value; callers clamp it with [`priority::clamp_nice`].
+    pub fn set_nice(&self, nice: i32) {
+        self.nice.store(nice, Ordering::Release);
+    }
+
     /// Account for one new thread.
     pub fn thread_started(&self) {
         self.threads.fetch_add(1, Ordering::AcqRel);
@@ -648,6 +664,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         id,
         ids: Mutex::new(ids),
         path: String::from(path),
+        nice: AtomicI32::new(0),
         address_space: Mutex::new(Some(user_address_space)),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
