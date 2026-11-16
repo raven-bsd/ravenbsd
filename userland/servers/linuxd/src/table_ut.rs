@@ -8,16 +8,21 @@ use raven_abi::types::Handle;
 use super::*;
 
 fn process() -> LinuxProcess {
-    LinuxProcess::new(7, Handle(9), 0x4000, 0x5000, 0x8000, 0x9000)
+    LinuxProcess::new(7, 7, Handle(1), Handle(9), 0x4000, 0x5000, 0x8000, 0x9000)
 }
 
 #[test]
 fn a_new_process_starts_at_the_break_and_has_no_exit() {
     let process = process();
     assert_eq!(process.pid, 7);
+    assert_eq!(process.tid, 7);
+    assert_eq!(process.proc, Handle(1));
+    assert_eq!(process.thread, Handle(9));
     assert_eq!(process.brk, 0x4000);
     assert_eq!(process.brk_start, 0x4000);
     assert_eq!(process.exit, None);
+    assert_eq!(process.next_task, 2);
+    assert_eq!(process.trampoline_next, crate::table::TRAMPOLINE_BASE);
     assert!(process.regions.is_empty());
 }
 

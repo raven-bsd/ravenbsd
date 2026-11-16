@@ -12,6 +12,7 @@ use alloc::vec::Vec;
 
 use raven_abi::types::Handle;
 use raven_linux_dispatch::LinuxContext;
+use raven_proto_linux::LinuxFrame;
 
 /// Largest single user buffer the trap loop copies in.
 pub const USER_BUFFER_MAX: usize = 64 * 1024;
@@ -89,11 +90,59 @@ impl OpenFile {
     }
 }
 
+/// Page size of the guest's mappings.
+pub const PAGE: u64 = 4096;
+
+/// Fixed address of the clone coordination page.
+///
+/// linuxd maps one shared, zero-filled page here before the Linux program starts. A clone child
+/// has no process identity in the trap packet, so the fixture children signal their parent through
+/// this page instead of making a syscall. The address is below the loader and stack ranges and is
+/// never handed out by the `mmap` arena.
+pub const FLAG_ADDR: u64 = 0x0000_4800_0000_0000;
+
+/// First fixed address used for clone trampoline pages (one page per `clone`).
+pub const TRAMPOLINE_BASE: u64 = FLAG_ADDR + PAGE;
+
+/// One queued `clone`: the trap frame plus the Linux arguments.
+#[derive(Clone, Copy, Debug)]
+pub struct CloneRequest {
+    /// `clone` flag word (including the low signal byte).
+    pub flags: u64,
+    /// Child stack pointer from the syscall (thread clones).
+    pub child_stack: u64,
+    /// Parent tid output pointer (`CLONE_PARENT_SETTID`).
+    pub ptid: u64,
+    /// Child tid output pointer (`CLONE_CHILD_SETTID`/`CLONE_CHILD_CLEARTID`).
+    pub ctid: u64,
+    /// Child TLS base (`CLONE_SETTLS`).
+    pub tls: u64,
+    /// The parent's saved user frame.
+    pub frame: LinuxFrame,
+}
+
+/// One native task created by `clone`.
+#[derive(Debug)]
+pub struct CloneChild {
+    /// Linux pid (fork-like clone) or tid (thread clone) returned to the parent.
+    pub task: u32,
+    /// Native thread id the kernel assigned to the child thread.
+    pub native_tid: u32,
+    /// Native process handle for a fork-like child; `None` for a thread.
+    pub process: Option<Handle>,
+    /// Native thread handle for a thread child; `None` when the handle was closed.
+    pub thread: Option<Handle>,
+}
+
 /// One Linux process the server is responsible for.
 #[derive(Debug)]
 pub struct LinuxProcess {
     /// Linux pid shown to the embedded program.
     pub pid: i32,
+    /// Native thread id of the Linux main thread (`THREAD_SELF` value).
+    pub tid: u32,
+    /// Native process handle the loader created.
+    pub proc: Handle,
     /// Exit status once `exit_group` was served.
     pub exit: Option<i32>,
     /// Current program break.
@@ -116,6 +165,22 @@ pub struct LinuxProcess {
     pub pending_write: Option<(u64, Vec<u8>)>,
     /// Thread handle of the Linux thread (`THREAD_CREATE`), used by `THREAD_SET_TLS`.
     pub thread: Handle,
+    /// Clear-on-exit word (`set_tid_address`), zero when unset.
+    pub clear_tid: u64,
+    /// Robust-list head and its UAPI length (`set_robust_list`).
+    pub robust_list: u64,
+    /// Length accepted by `set_robust_list` (24 on 64-bit).
+    pub robust_list_len: usize,
+    /// Frame captured by the current trap; `clone` consumes it.
+    pub frame: Option<LinuxFrame>,
+    /// A `clone` the handler validated and the trap loop must perform.
+    pub pending_clone: Option<CloneRequest>,
+    /// Native tasks created by `clone`, reaped when the process exits.
+    pub clones: Vec<CloneChild>,
+    /// Next Linux pid/tid handed to a clone child.
+    pub next_task: u32,
+    /// Next fixed address used for a clone trampoline page.
+    pub trampoline_next: u64,
     /// Current user TLS base, as `arch_prctl` `ARCH_GET_FS` reports it.
     pub fs_base: u64,
     /// A base the `arch_prctl` handler queued for the trap loop to install before it replies.
@@ -131,8 +196,11 @@ pub struct LinuxProcess {
 
 impl LinuxProcess {
     /// Create the context for a freshly loaded process.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         pid: i32,
+        tid: u32,
+        proc: Handle,
         thread: Handle,
         brk: u64,
         brk_limit: u64,
@@ -141,6 +209,8 @@ impl LinuxProcess {
     ) -> Self {
         Self {
             pid,
+            tid,
+            proc,
             exit: None,
             brk,
             brk_start: brk,
@@ -152,6 +222,14 @@ impl LinuxProcess {
             user_buffer: Vec::new(),
             pending_write: None,
             thread,
+            clear_tid: 0,
+            robust_list: 0,
+            robust_list_len: 0,
+            frame: None,
+            pending_clone: None,
+            clones: Vec::new(),
+            next_task: 2,
+            trampoline_next: TRAMPOLINE_BASE,
             fs_base: 0,
             pending_tls: None,
             exe: Vec::new(),
@@ -159,6 +237,45 @@ impl LinuxProcess {
             argv: Vec::new(),
             files: Vec::new(),
         }
+    }
+
+    /// Allocate the next Linux pid/tid for a clone child.
+    pub fn next_task_id(&mut self) -> u32 {
+        let task = self.next_task.max(2);
+        self.next_task = task.saturating_add(1);
+        task
+    }
+
+    /// Hand out the next fixed trampoline page address.
+    pub fn next_trampoline(&mut self) -> u64 {
+        let address = self.trampoline_next.max(TRAMPOLINE_BASE);
+        self.trampoline_next = address.saturating_add(PAGE);
+        address
+    }
+
+    /// Set the program name used by `prctl` and `/proc/self/stat`.
+    pub fn set_name(&mut self, bytes: &[u8]) {
+        let end = bytes
+            .iter()
+            .position(|byte| *byte == 0)
+            .unwrap_or(bytes.len())
+            .min(15);
+        self.comm = bytes.get(..end).unwrap_or(&[]).to_vec();
+    }
+
+    /// The 16-byte `prctl(PR_GET_NAME)` buffer: the name and a NUL terminator.
+    #[must_use]
+    pub fn name_bytes(&self) -> [u8; 16] {
+        let mut out = [0u8; 16];
+        let take = self.comm.len().min(15);
+        out[..take].copy_from_slice(&self.comm[..take]);
+        out
+    }
+
+    /// The NUL-terminated program name, as `prctl` stores it.
+    #[must_use]
+    pub fn comm(&self) -> &[u8] {
+        &self.comm
     }
 
     /// Set the program identity used by the synthetic procfs files.

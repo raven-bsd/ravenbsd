@@ -19,6 +19,8 @@ fn request(nr: u64, args: [u64; 6]) -> [u8; SYSCALL_LEN] {
 fn process() -> LinuxProcess {
     LinuxProcess::new(
         7,
+        7,
+        raven_abi::types::Handle(1),
         raven_abi::types::Handle(9),
         0x4000,
         0x5000,
@@ -78,6 +80,22 @@ fn path_calls_copy_a_bounded_window() {
         let call = LinuxSyscallV1::new(raven_proto_linux::ARCH_X86_64, nr, [0; 6]);
         assert_eq!(copy_in_len(&call), None, "nr {nr}");
     }
+}
+
+#[test]
+fn prctl_set_name_copies_a_sixteen_byte_window() {
+    let set = LinuxSyscallV1::new(
+        raven_proto_linux::ARCH_X86_64,
+        157,
+        [15, 0x1000, 0, 0, 0, 0],
+    );
+    assert_eq!(copy_in_len(&set), Some(16));
+    let get = LinuxSyscallV1::new(
+        raven_proto_linux::ARCH_X86_64,
+        157,
+        [16, 0x1000, 0, 0, 0, 0],
+    );
+    assert_eq!(copy_in_len(&get), None);
 }
 
 #[test]
