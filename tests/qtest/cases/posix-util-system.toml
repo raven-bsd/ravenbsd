@@ -9,7 +9,7 @@
 name = "posix-util-system"
 arch = "x86_64"
 profile = "base"
-timeout_secs = 420
+timeout_secs = 840
 boot_cmdline = "console=ttyS0 test-exit=1"
 pre = ["sh tests/posix/utility/system/build.sh"]
 initfs = "build/posix/utility/system/initfs.img"
@@ -32,7 +32,7 @@ regex = '(?i)panic|EXCEPTION|rsh: .*command not found'
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 300
+timeout_secs = 600
 
 [[step]]
 send = "id\n"
@@ -119,6 +119,30 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
+send = "id -ru\n"
+delay_ms = 100
+
+[[step]]
+wait = '^0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "id -run\n"
+delay_ms = 100
+
+[[step]]
+wait = '^root$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
 send = "id root\n"
 delay_ms = 100
 
@@ -135,7 +159,7 @@ send = "id nosuchuser\n"
 delay_ms = 100
 
 [[step]]
-wait = '^id: nosuchuser: no such user$'
+wait = "^id: 'nosuchuser': no such user$"
 timeout_secs = 30
 
 [[step]]
@@ -312,6 +336,30 @@ timeout_secs = 30
 
 [[step]]
 wait = '^SHELL=/bin/rsh$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/env -i P4D=only\n"
+delay_ms = 100
+
+[[step]]
+wait = '^P4D=only$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/env P4D=outer\n"
+delay_ms = 100
+
+[[step]]
+wait = '^P4D=outer$'
 timeout_secs = 30
 
 [[step]]

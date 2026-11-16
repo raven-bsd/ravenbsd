@@ -9,6 +9,12 @@ schema = 1
 standard = "posix-2024"
 
 [[row]]
+id = "util.id"
+status = "present"
+evidence = "qtest:posix-util-system"
+notes = "P4d: QEMU x86_64 case stages the shell-profile uutils id; checks uid/gid/groups, -n and -r"
+
+[[row]]
 id = "util.uname"
 status = "present"
 evidence = "qtest:posix-util-system"

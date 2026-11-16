@@ -5,7 +5,7 @@
 # An empty defect is a POSIX profile row with executable behaviour evidence in the
 # posix-util-system qtest. A non-empty defect is a known missing or non-conforming
 # implementation; it is reported as DEFECT and is never claimed present.
-util.id	id	id	P4d-D1
+util.id	id	id
 util.ps	ps	ps	P4d-D2
 util.uname	uname	uname -a
 util.env	env	env	P4d-D3

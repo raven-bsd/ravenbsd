@@ -18,7 +18,14 @@ cargo xtask build user --arch x86_64 \
     -p raven-init -p raven-logd -p raven-sysd -p raven-randd -p raven-zerod \
     -p raven-nulld -p raven-initfsd -p raven-ramfsd -p raven-vfsd \
     -p raven-consd -p raven-rsh -p raven-uname -p raven-hostname -p raven-ps \
-    -p id -p whoami >"$out/build-user.log" 2>&1
+    -p whoami >"$out/build-user.log" 2>&1
+
+for tool in id env; do
+    if [ ! -x "$root/build/x86_64/uutils/$tool" ]; then
+        echo "posix-util-system: missing build/x86_64/uutils/$tool; run cargo xtask build uutils --arch x86_64" >&2
+        exit 1
+    fi
+done
 
 cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "$out/initfs.img" \
@@ -37,7 +44,8 @@ cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "/bin/hostname=$root/build/x86_64/user/raven-hostname:0755" \
     "/bin/ps=$root/build/x86_64/user/raven-ps:0755" \
     "/bin/whoami=$root/build/x86_64/user/whoami:0755" \
-    "/bin/id=$root/build/x86_64/user/id:0755" \
+    "/bin/id=$root/build/x86_64/uutils/id:0755" \
+    "/bin/env=$root/build/x86_64/uutils/env:0755" \
     "/etc/services.d/logd.toml=$root/etc/services.d/logd.toml:0644" \
     "/etc/services.d/sysd.toml=$root/etc/services.d/sysd.toml:0644" \
     "/etc/services.d/randd.toml=$root/etc/services.d/randd.toml:0644" \
