@@ -101,8 +101,11 @@ fail to 816 pass / 946 fail.
 
 ## Defects
 
-No P4f-D defect: every tool in the batch has a passing host case and no implementation is missing.
-The missing profile rows are recorded above as adjacent coverage rather than a tool defect.
+| Defect | Scope | Detail | Follow-up |
+|---|---|---|---|
+| `P4f-D1` | 35 adjacent tools | every tool has a passing host case, but the current POSIX profile has no `util.*` row for them, so they cannot be registered from P4f Owns | add the rows in a profile/seed-owning ticket (P0b or a P4 follow-up), then move the existing `test:` evidence to present |
+
+No implementation defect: every tool in the batch builds and its case passes.
 
 ## Limitations
 
