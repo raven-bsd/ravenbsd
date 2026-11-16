@@ -1,0 +1,83 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# REL1 target proof: the shell-test profile with getty on tty:console, login
+# verifying the REL1b root shadow record, the motd and then /bin/rsh as root.
+# The production /etc files and service fragment are REL1c; this case uses
+# test-only copies under tests/login/session/etc.
+
+name = "login-session"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 420
+pre = ["sh tests/login/session/build.sh"]
+initfs = "build/login/session/login-initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^RavenBSD 0\.1 \(x86_64\) \(tty:console\)$'
+
+[[expect]]
+regex = '^Welcome to RavenBSD\.$'
+
+[[expect]]
+regex = '^rsh: ready$'
+
+[[expect]]
+regex = '^svcd: getty up$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|login: error'
+
+[[step]]
+wait = '^login: $'
+timeout_secs = 120
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '^Password: $'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^Welcome to RavenBSD\.$'
+timeout_secs = 30
+
+[[step]]
+wait = '^rsh: ready$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "uname -a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^RavenBSD raven 0\.1 .* x86_64$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

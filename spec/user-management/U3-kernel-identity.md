@@ -1,4 +1,11 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # U3 - kernel identity, permissions and setuid
+
+SPDX-License-Identifier: BSD-3-Clause
+Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
 
 Lane: stuart      Wave: 12      Milestone: M-0.2.0
 Depends: U1, P2a, REL1      Blocks: U2 (setuid su/passwd), U4
