@@ -69,6 +69,7 @@ members = [
     "tests/fixtures/b15-resolv/probe",
     "tests/fixtures/b70-net/probe",
     "tests/fixtures/b70-net/overlay",
+    "tests/fixtures/pi4-soak",
     "profiles/iommu-fixture",
     "tests/qtest/cases/linux-trap-fixture",
     "tests/qtest/cases/linux-root-fixture",
