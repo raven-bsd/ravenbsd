@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Coherent model of the intended Pi 4 release launch/readiness chain.
+# This is a model fixture, not a board transcript.
+devd_args=dtb,launch
+genet_driver=slots=platform
+genet_launchers=1
+netd_needs=scheme:nic
+dtb_staged=yes
+drivers_staged=yes

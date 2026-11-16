@@ -17,6 +17,12 @@ use anyhow::{Context, Result, bail};
 use serde::Serialize;
 
 use crate::model::{InterfaceRow, Profile, Status, TraceFile};
+use crate::overlay::{Claim, Overlay, OverlayOutcome};
+
+/// Outer timeout for an overlay qtest claim. The case itself has a smaller boot timeout.
+const QTEST_TIMEOUT_SECS: u64 = 900;
+/// Timeout for a `test:` evidence script or binary.
+const TEST_TIMEOUT_SECS: u64 = 300;
 
 /// One probe verdict.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -114,6 +120,34 @@ fn run_process(root: &Path, program: &str, args: &[String]) -> Result<(bool, Str
     text.push_str(&String::from_utf8_lossy(&output.stdout));
     text.push_str(&String::from_utf8_lossy(&output.stderr));
     Ok((output.status.success(), text))
+}
+
+fn timeout_args(program: &str, args: &[String], seconds: u64) -> Vec<String> {
+    let mut full = vec![
+        "--signal=KILL".to_string(),
+        seconds.to_string(),
+        program.to_string(),
+    ];
+    full.extend(args.iter().cloned());
+    full
+}
+
+fn run_process_timeout(
+    root: &Path,
+    program: &str,
+    args: &[String],
+    seconds: u64,
+) -> Result<(bool, Option<i32>, String)> {
+    let full = timeout_args(program, args, seconds);
+    let output = Command::new("timeout")
+        .args(&full)
+        .current_dir(root)
+        .output()
+        .with_context(|| format!("cannot run timeout for {program}"))?;
+    let mut text = String::new();
+    text.push_str(&String::from_utf8_lossy(&output.stdout));
+    text.push_str(&String::from_utf8_lossy(&output.stderr));
+    Ok((output.status.success(), output.status.code(), text))
 }
 
 fn last_line(text: &str) -> String {
@@ -233,7 +267,7 @@ fn run_qtest(root: &Path, case: &str, arch: &str) -> Result<(Verdict, String, St
         arch.to_string(),
     ];
     let command = command_string("cargo", &args);
-    let (success, output) = run_process(root, "cargo", &args)?;
+    let (success, code, output) = run_process_timeout(root, "cargo", &args, QTEST_TIMEOUT_SECS)?;
     let json_path = root.join("build/qtest").join(format!("{case}.json"));
     if let Ok(text) = std::fs::read_to_string(&json_path)
         && let Ok(value) = serde_json::from_str::<serde_json::Value>(&text)
@@ -265,7 +299,12 @@ fn run_qtest(root: &Path, case: &str, arch: &str) -> Result<(Verdict, String, St
     } else {
         Verdict::Fail
     };
-    Ok((verdict, command, last_line(&output)))
+    let reason = if code == Some(124) {
+        format!("qtest timed out after {QTEST_TIMEOUT_SECS}s")
+    } else {
+        last_line(&output)
+    };
+    Ok((verdict, command, reason))
 }
 
 fn qtest_rows(root: &Path, arch: &str, host_only: bool) -> Vec<ResultRow> {
@@ -681,6 +720,161 @@ fn gate_rows(
     Ok(rows)
 }
 
+fn run_test_evidence(root: &Path, relative: &Path) -> Result<(bool, String)> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let path = root.join(relative);
+    let metadata = std::fs::metadata(&path)
+        .with_context(|| format!("cannot stat test evidence {}", path.display()))?;
+    let bytes = std::fs::read(&path)
+        .with_context(|| format!("cannot read test evidence {}", path.display()))?;
+    let first = bytes.split(|byte| *byte == b'\n').next().unwrap_or(&[]);
+    let first = String::from_utf8_lossy(first);
+    let (program, mut args) = if let Some(rest) = first.trim().strip_prefix("#!") {
+        let mut parts = rest.split_whitespace();
+        let program = parts
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("test `{}` has an empty shebang", relative.display()))?;
+        (
+            program.to_string(),
+            parts.map(str::to_string).collect::<Vec<_>>(),
+        )
+    } else {
+        if metadata.permissions().mode() & 0o111 == 0 {
+            bail!(
+                "test `{}` has no shebang and is not executable",
+                relative.display()
+            );
+        }
+        (path.display().to_string(), Vec::new())
+    };
+    args.push(path.display().to_string());
+    let (success, code, output) = run_process_timeout(root, &program, &args, TEST_TIMEOUT_SECS)?;
+    if code == Some(124) {
+        return Ok((
+            false,
+            format!("test evidence timed out after {TEST_TIMEOUT_SECS}s"),
+        ));
+    }
+    if success {
+        return Ok((true, String::new()));
+    }
+    let last = last_line(&output);
+    Ok((
+        false,
+        if last.is_empty() {
+            format!("test evidence `{}` failed", relative.display())
+        } else {
+            format!("test evidence `{}` failed: {last}", relative.display())
+        },
+    ))
+}
+
+fn set_overlay_row(
+    rows: &mut Vec<ResultRow>,
+    id: &str,
+    area: &str,
+    result: Verdict,
+    command: String,
+    reason: String,
+) {
+    if let Some(row) = rows.iter_mut().find(|row| row.id == id) {
+        row.result = result;
+        row.command = command;
+        row.reason = reason;
+    } else {
+        rows.push(ResultRow {
+            id: id.to_string(),
+            area: area.to_string(),
+            result,
+            command,
+            reason,
+        });
+    }
+}
+
+/// Execute and apply the owner overlay to the published rows.
+///
+/// A supported `present` claim must run its qtest or test evidence; a failing or timed-out
+/// evidence target becomes a failure. A `waived` claim passes only with a written waiver, and the
+/// waiver stays visible in the row reason. An unsupported claim is reported as a failure.
+fn apply_overlay(
+    root: &Path,
+    arch: &str,
+    rows: &mut Vec<ResultRow>,
+    profile: &Profile,
+    outcome: &OverlayOutcome,
+    host_only: bool,
+) {
+    let areas: BTreeMap<&str, &str> = profile
+        .metas()
+        .into_iter()
+        .map(|(area, meta)| (meta.id.as_str(), area))
+        .collect();
+    for claim in &outcome.claims {
+        let id = claim.id();
+        let area = areas.get(id).copied().unwrap_or("overlay");
+        let (result, command, reason) = match claim {
+            Claim::Qtest { case, .. } => {
+                if host_only {
+                    (
+                        Verdict::Skip,
+                        claim.command(),
+                        "host-only run; qtest evidence not executed".to_string(),
+                    )
+                } else {
+                    match run_qtest(root, case, arch) {
+                        Ok((Verdict::Pass, _, _)) => {
+                            (Verdict::Pass, claim.command(), String::new())
+                        }
+                        Ok((Verdict::Fail, _, reason)) => (
+                            Verdict::Fail,
+                            claim.command(),
+                            if reason.is_empty() {
+                                format!("qtest `{case}` failed")
+                            } else {
+                                reason
+                            },
+                        ),
+                        Ok((Verdict::Skip, _, reason)) => (
+                            Verdict::Fail,
+                            claim.command(),
+                            format!("qtest `{case}` was skipped: {reason}"),
+                        ),
+                        Err(error) => (Verdict::Fail, claim.command(), format!("{error:#}")),
+                    }
+                }
+            }
+            Claim::Test { path, .. } => {
+                let (ok, reason) = run_test_evidence(root, path)
+                    .unwrap_or_else(|error| (false, format!("{error:#}")));
+                if ok {
+                    (Verdict::Pass, claim.command(), String::new())
+                } else {
+                    (Verdict::Fail, claim.command(), reason)
+                }
+            }
+            Claim::Waived { waiver, .. } => (
+                Verdict::Pass,
+                claim.command(),
+                format!("owner waiver: {waiver}"),
+            ),
+        };
+        set_overlay_row(rows, id, area, result, command, reason);
+    }
+    for claim in &outcome.unsupported {
+        let area = areas.get(claim.id.as_str()).copied().unwrap_or("overlay");
+        set_overlay_row(
+            rows,
+            &claim.id,
+            area,
+            Verdict::Fail,
+            "docs/posix/evidence".to_string(),
+            claim.reason.clone(),
+        );
+    }
+}
+
 /// Run the gate and return the report plus target rows.
 pub fn run(
     root: &Path,
@@ -694,7 +888,18 @@ pub fn run(
     if !matches!(options.arch.as_str(), "x86_64" | "aarch64" | "riscv64") {
         bail!("unknown arch `{}`", options.arch);
     }
-    let mut rows = gate_rows(root, &options.arch, profile, trace, options.host_only)?;
+    let overlay = Overlay::load(root)?;
+    let mut merged = profile.clone();
+    let outcome = overlay.apply(root, &mut merged);
+    let mut rows = gate_rows(root, &options.arch, &merged, trace, options.host_only)?;
+    apply_overlay(
+        root,
+        &options.arch,
+        &mut rows,
+        &merged,
+        &outcome,
+        options.host_only,
+    );
     rows.sort_by(|left, right| {
         (left.area.as_str(), left.id.as_str()).cmp(&(right.area.as_str(), right.id.as_str()))
     });

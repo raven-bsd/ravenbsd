@@ -1,12 +1,28 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2024 reuben olinsky
 
-use std::io::{BufRead, IsTerminal, Write};
+use std::io::{BufRead, Write};
+#[cfg(not(target_os = "ravenbsd"))]
+use std::io::IsTerminal;
 
 use crate::{
     InputBackend, ShellError,
     input_backend::{InteractivePrompt, ReadResult},
 };
+
+/// Reads the console descriptor without std's thread-local stdin buffer.
+#[cfg(target_os = "ravenbsd")]
+struct RawStdin;
+
+#[cfg(target_os = "ravenbsd")]
+impl std::io::Read for RawStdin {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        use std::os::fd::AsFd;
+        let stdin = std::io::stdin();
+        nix::unistd::read(stdin.as_fd(), buffer)
+            .map_err(|error| std::io::Error::from_raw_os_error(error as i32))
+    }
+}
 
 /// Represents a minimal shell input backend, capable of taking commands from standard input.
 #[derive(Default)]
@@ -22,10 +38,26 @@ impl InputBackend for MinimalInputBackend {
         shell_ref: &crate::ShellRef<impl brush_core::ShellExtensions>,
         prompt: InteractivePrompt,
     ) -> Result<ReadResult, ShellError> {
-        let stdin = std::io::stdin();
-        let prompt = stdin.is_terminal().then_some(&prompt);
+        #[cfg(target_os = "ravenbsd")]
+        {
+            // The console scheme is not a POSIX tty and std's stdin buffer lives in a
+            // thread-local that the current-thread runtime tears down early. Read fd 0
+            // directly and always show the prompt: the login shell is interactive.
+            let mut reader = std::io::BufReader::new(RawStdin);
+            return Self::read_program_from(
+                shell_ref,
+                Some(&prompt),
+                &mut reader,
+                &mut std::io::stderr(),
+            );
+        }
+        #[cfg(not(target_os = "ravenbsd"))]
+        {
+            let stdin = std::io::stdin();
+            let prompt = stdin.is_terminal().then_some(&prompt);
 
-        Self::read_program_from(shell_ref, prompt, &mut stdin.lock(), &mut std::io::stderr())
+            Self::read_program_from(shell_ref, prompt, &mut stdin.lock(), &mut std::io::stderr())
+        }
     }
 }
 

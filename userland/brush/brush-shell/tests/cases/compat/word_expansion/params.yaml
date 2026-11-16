@@ -910,6 +910,7 @@ cases:
       echo "5 ${x/b/$}" "${x/b/\$}" "${x/b/\q}" "${x/b/\\q}"
 
   - name: "An escaped or quoted ampersand in a pattern substitution's replacement is literal"
+    min_oracle_version: "5.2" # patsub_replacement is a bash 5.2 feature
     stdin: |
       x=abc
       echo "1 ${x/b/<\&>}" ${x/b/<\&>}
@@ -921,6 +922,7 @@ cases:
       echo "5 ${x/b/$r}"
 
   - name: "An ampersand in a pattern substitution's replacement stands for the match"
+    min_oracle_version: "5.2" # patsub_replacement is a bash 5.2 feature
     known_failure: true # TODO(expansion): patsub_replacement is not implemented
     stdin: |
       x=abc
@@ -932,6 +934,7 @@ cases:
       echo "5 ${x/b/x\$1&}"
 
   - name: "A backslash an unquoted replacement expansion yields escapes an ampersand or backslash"
+    min_oracle_version: "5.2" # patsub_replacement is a bash 5.2 feature
     known_failure: true # TODO(expansion): patsub_replacement is not implemented
     stdin: |
       x=abc

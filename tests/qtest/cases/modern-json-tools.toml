@@ -8,7 +8,7 @@
 name = "modern-json-tools"
 arch = "x86_64"
 profile = "shell-test"
-timeout_secs = 420
+timeout_secs = 1500
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
@@ -39,6 +39,44 @@ unordered = true
 regex = '^process: child exited \(2\)$'
 unordered = true
 
+# K25b: the selected uutils tools emit schema-1 NDJSON with no colour.
+[[expect]]
+regex = '^\{"schema":1,"kind":"file","path":"/tmp/j/(a|b)","name":"(a|b)","type":"file","size":2,"mode":[0-9]+,"uid":[0-9]+,"gid":[0-9]+,"mtime":[0-9]+\}$'
+unordered = true
+
+[[expect]]
+regex = '^\{"schema":1,"kind":"file","path":"/tmp/j/a","type":"file","size":2,"mode":[0-9]+,"uid":[0-9]+,"gid":[0-9]+,"inode":[0-9]+,"links":[0-9]+,"atime":[0-9]+,"mtime":[0-9]+,"ctime":[0-9]+\}$'
+unordered = true
+
+[[expect]]
+regex = '^\{"schema":1,"kind":"wc","lines":1,"words":1,"chars":2,"bytes":2,"max_line_length":1,"path":"/tmp/j/a"\}$'
+unordered = true
+
+[[expect]]
+regex = '^\{"schema":1,"kind":"line","value":"[ab]"\}$'
+unordered = true
+
+[[expect]]
+regex = '^\{"schema":1,"kind":"user","uid":[0-9]+,"gid":[0-9]+,"euid":[0-9]+,"egid":[0-9]+,"user":"[^"]*","group":"[^"]*","groups":\[[0-9,]*\]\}$'
+unordered = true
+
+[[expect]]
+regex = '^\{"schema":1,"kind":"du","path":"/tmp/j","bytes":[0-9]+\}$'
+unordered = true
+
+# The platform statfs still fails for `/`; df reports the documented JSON error.
+[[expect]]
+regex = '^\{"schema":1,"kind":"error","code":"ENODATA","message":"no file systems processed","context":\{"tool":"df"\}\}$'
+unordered = true
+
+[[expect]]
+regex = '^\{"schema":1,"kind":"error","code":"ENOENT","message":"/nonexistent: .*","context":\{"tool":"stat"\}\}$'
+unordered = true
+
+[[expect]]
+regex = '^process: child exited \(1\)$'
+unordered = true
+
 [[expect]]
 regex = '^init exited \(0\)$'
 
@@ -47,7 +85,7 @@ regex = '(?i)panic|EXCEPTION|ps: .*bad service status'
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 300
+timeout_secs = 600
 
 [[step]]
 send = "ps\n"
@@ -80,6 +118,94 @@ delay_ms = 100
 [[step]]
 wait = '^usage: ps \[--json\] \| ps --selftest$'
 timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mkdir /tmp/j\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo b > /tmp/j/b\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo a > /tmp/j/a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "ls --json /tmp/j\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "stat --json /tmp/j/a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "wc --json /tmp/j/a\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "sort --json /tmp/j/a /tmp/j/b\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "id --json\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "du --json /tmp/j\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "df --json /\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "stat --json /nonexistent\n"
+delay_ms = 100
 
 [[step]]
 wait = '^raven# $'

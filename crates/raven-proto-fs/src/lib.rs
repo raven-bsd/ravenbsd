@@ -31,6 +31,7 @@
 #![warn(missing_docs)]
 
 pub mod call;
+pub mod cred;
 pub mod dirent;
 pub mod flags;
 pub mod open;
@@ -41,10 +42,11 @@ pub mod wire;
 use core::fmt;
 
 pub use call::{
-    CALL_HEADER_LEN, Call, CallRequest, CallResponse, MAX_CALL_PATHS, OP_CHMOD, OP_MKDIR, OP_MOUNT,
-    OP_READLINK, OP_RENAME, OP_RMDIR, OP_STATFS, OP_SYMLINK, OP_SYNC, OP_TRUNCATE, OP_UMOUNT,
-    OP_UNLINK, STATFS_LEN, StatFs,
+    CALL_HEADER_LEN, Call, CallRequest, CallResponse, MAX_CALL_PATHS, OP_ACCESS, OP_CHMOD,
+    OP_MKDIR, OP_MOUNT, OP_READLINK, OP_RENAME, OP_RMDIR, OP_STATFS, OP_SYMLINK, OP_SYNC,
+    OP_TRUNCATE, OP_UMOUNT, OP_UNLINK, STATFS_LEN, StatFs,
 };
+pub use cred::{ACCESS_EXEC, ACCESS_READ, ACCESS_WRITE, Credentials, MAX_GROUPS};
 pub use dirent::{
     DIRENT_ALIGN, DIRENT_HEADER_LEN, DirCookie, DirEntry, DirEntryHeader, DirEntryIter, MAX_NAME,
 };

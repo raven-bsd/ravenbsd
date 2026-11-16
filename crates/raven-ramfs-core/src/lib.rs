@@ -31,8 +31,8 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use raven_proto_fs::{
-    DT_DIR, DT_LNK, DT_REG, DirEntry, DirEntryHeader, Errno, S_IFDIR, S_IFLNK, S_IFREG, Stat,
-    StatFs,
+    Credentials, DT_DIR, DT_LNK, DT_REG, DirEntry, DirEntryHeader, Errno, S_IFDIR, S_IFLNK,
+    S_IFREG, Stat, StatFs,
 };
 
 /// Inode number of the root directory.
@@ -84,6 +84,10 @@ pub struct Node {
     pub kind: NodeKind,
     /// Permission bits, without the file type.
     pub mode: u16,
+    /// Owning user id.
+    pub uid: u32,
+    /// Owning group id.
+    pub gid: u32,
     /// Link count; zero means unlinked but still open.
     pub nlink: u32,
     /// Modification time, seconds from the caller's clock.
@@ -117,6 +121,8 @@ impl Ramfs {
             Node {
                 kind: NodeKind::Dir(BTreeMap::new()),
                 mode: 0o755,
+                uid: 0,
+                gid: 0,
                 nlink: 2,
                 mtime: now,
                 ctime: now,
@@ -153,12 +159,34 @@ impl Ramfs {
 
     /// Look up `path` relative to `base`, following a final symlink.
     pub fn lookup_at(&self, base: u64, path: &str) -> Result<u64, Errno> {
-        self.resolve(base, path, true)
+        self.resolve(base, path, true, None)
+    }
+
+    /// Look up `path` relative to `base`, following a final symlink, checking directory execute
+    /// permission for every traversed component.
+    pub fn lookup_at_checked(
+        &self,
+        base: u64,
+        path: &str,
+        creds: &Credentials,
+    ) -> Result<u64, Errno> {
+        self.resolve(base, path, true, Some(creds))
     }
 
     /// Look up `path` relative to `base`, without following a final symlink.
     pub fn lookup_no_follow_at(&self, base: u64, path: &str) -> Result<u64, Errno> {
-        self.resolve(base, path, false)
+        self.resolve(base, path, false, None)
+    }
+
+    /// Look up `path` relative to `base`, without following a final symlink, checking directory
+    /// execute permission for every traversed component.
+    pub fn lookup_no_follow_at_checked(
+        &self,
+        base: u64,
+        path: &str,
+        creds: &Credentials,
+    ) -> Result<u64, Errno> {
+        self.resolve(base, path, false, Some(creds))
     }
 
     /// Look up `path` from the root, following a final symlink.
@@ -179,16 +207,52 @@ impl Ramfs {
         mode: u16,
         now: i64,
     ) -> Result<u64, Errno> {
-        self.create_at(base, path, NodeKind::File(Vec::new()), mode & 0o7777, now)
+        self.create_file_at_owned(base, path, mode, 0, 0, now)
+    }
+
+    /// Create a regular file owned by `uid`/`gid`.
+    pub fn create_file_at_owned(
+        &mut self,
+        base: u64,
+        path: &str,
+        mode: u16,
+        uid: u32,
+        gid: u32,
+        now: i64,
+    ) -> Result<u64, Errno> {
+        self.create_at(
+            base,
+            path,
+            NodeKind::File(Vec::new()),
+            mode & 0o7777,
+            uid,
+            gid,
+            now,
+        )
     }
 
     /// Create a directory at `path` relative to `base`.
     pub fn mkdir_at(&mut self, base: u64, path: &str, mode: u16, now: i64) -> Result<u64, Errno> {
+        self.mkdir_at_owned(base, path, mode, 0, 0, now)
+    }
+
+    /// Create a directory owned by `uid`/`gid`.
+    pub fn mkdir_at_owned(
+        &mut self,
+        base: u64,
+        path: &str,
+        mode: u16,
+        uid: u32,
+        gid: u32,
+        now: i64,
+    ) -> Result<u64, Errno> {
         self.create_at(
             base,
             path,
             NodeKind::Dir(BTreeMap::new()),
             mode & 0o7777,
+            uid,
+            gid,
             now,
         )
     }
@@ -201,6 +265,19 @@ impl Ramfs {
         target: &[u8],
         now: i64,
     ) -> Result<u64, Errno> {
+        self.symlink_at_owned(base, path, target, 0, 0, now)
+    }
+
+    /// Create a symbolic link owned by `uid`/`gid`.
+    pub fn symlink_at_owned(
+        &mut self,
+        base: u64,
+        path: &str,
+        target: &[u8],
+        uid: u32,
+        gid: u32,
+        now: i64,
+    ) -> Result<u64, Errno> {
         let target = core::str::from_utf8(target).map_err(|_| Errno::EINVAL)?;
         if target.is_empty() || target.len() > self.limits.max_name || target.contains('\0') {
             return Err(Errno::EINVAL);
@@ -210,6 +287,8 @@ impl Ramfs {
             path,
             NodeKind::Symlink(target.as_bytes().to_vec()),
             0o777,
+            uid,
+            gid,
             now,
         )
     }
@@ -347,8 +426,8 @@ impl Ramfs {
             atime: node.atime,
             mode,
             nlink: node.nlink,
-            uid: 0,
-            gid: 0,
+            uid: node.uid,
+            gid: node.gid,
         })
     }
 
@@ -367,7 +446,7 @@ impl Ramfs {
 
     /// Change permission bits of `path` relative to `base`.
     pub fn chmod_at(&mut self, base: u64, path: &str, mode: u16, now: i64) -> Result<(), Errno> {
-        let ino = self.resolve(base, path, true)?;
+        let ino = self.resolve(base, path, true, None)?;
         let node = self.nodes.get_mut(&ino).ok_or(Errno::EBADF)?;
         node.mode = mode & 0o7777;
         node.ctime = now;
@@ -538,7 +617,7 @@ impl Ramfs {
 
     /// Read a symlink target relative to `base`.
     pub fn readlink_at(&self, base: u64, path: &str) -> Result<Vec<u8>, Errno> {
-        let ino = self.resolve(base, path, false)?;
+        let ino = self.resolve(base, path, false, None)?;
         let node = self.nodes.get(&ino).ok_or(Errno::EBADF)?;
         match &node.kind {
             NodeKind::Symlink(target) => Ok(target.clone()),
@@ -710,12 +789,15 @@ impl Ramfs {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)] // create-at needs path, mode, owner and time
     fn create_at(
         &mut self,
         base: u64,
         path: &str,
         kind: NodeKind,
         mode: u16,
+        uid: u32,
+        gid: u32,
         now: i64,
     ) -> Result<u64, Errno> {
         let (parent_ino, name) = self.parent_and_name(base, path)?;
@@ -749,6 +831,8 @@ impl Ramfs {
             Node {
                 kind,
                 mode,
+                uid,
+                gid,
                 nlink,
                 mtime: now,
                 ctime: now,
@@ -759,6 +843,28 @@ impl Ramfs {
     }
 
     fn parent_and_name(&self, base: u64, path: &str) -> Result<(u64, String), Errno> {
+        self.parent_and_name_inner(base, path, None)
+    }
+
+    /// Resolve the parent directory and final name with directory execute checks and return the
+    /// parent's metadata for caller permission decisions.
+    pub fn parent_and_name_checked(
+        &self,
+        base: u64,
+        path: &str,
+        creds: &Credentials,
+    ) -> Result<(u64, String, Stat), Errno> {
+        let (parent, name) = self.parent_and_name_inner(base, path, Some(creds))?;
+        let stat = self.stat(parent)?;
+        Ok((parent, name, stat))
+    }
+
+    fn parent_and_name_inner(
+        &self,
+        base: u64,
+        path: &str,
+        creds: Option<&Credentials>,
+    ) -> Result<(u64, String), Errno> {
         let trimmed = path.trim_end_matches('/');
         if trimmed.is_empty() || trimmed.contains('\0') {
             return Err(Errno::EINVAL);
@@ -781,9 +887,10 @@ impl Ramfs {
                     parent_text
                 },
                 true,
+                creds,
             )?
         } else {
-            self.resolve(base, parent_text, true)?
+            self.resolve(base, parent_text, true, creds)?
         };
         if !matches!(
             self.nodes.get(&parent).ok_or(Errno::EBADF)?.kind,
@@ -822,7 +929,13 @@ impl Ramfs {
         Ok(components)
     }
 
-    fn resolve(&self, base: u64, path: &str, follow_final: bool) -> Result<u64, Errno> {
+    fn resolve(
+        &self,
+        base: u64,
+        path: &str,
+        follow_final: bool,
+        creds: Option<&Credentials>,
+    ) -> Result<u64, Errno> {
         if !self.nodes.contains_key(&base) {
             return Err(Errno::EBADF);
         }
@@ -840,6 +953,11 @@ impl Ramfs {
         while let Some(name) = queue.pop_front() {
             let parent = current;
             let node = self.nodes.get(&parent).ok_or(Errno::EBADF)?;
+            if let Some(creds) = creds
+                && !creds.permitted(node.mode, node.uid, node.gid, raven_proto_fs::ACCESS_EXEC)
+            {
+                return Err(Errno::EACCES);
+            }
             let NodeKind::Dir(entries) = &node.kind else {
                 return Err(Errno::ENOTDIR);
             };

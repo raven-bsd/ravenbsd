@@ -7,8 +7,9 @@
 //! the boot keyboard reports and feeds the pressed-key ASCII into a bounded console input queue;
 //! the [`raven_usb_hid::BootMouse`] model decodes the boot mouse reports (buttons, X/Y, wheel)
 //! into a bounded [`PointerQueue`]. The queues are the seams a TTY/console or pointer consumer
-//! will drain; the real xHCI transfer ring and the bound TTY server are follow-ups (S61 in
-//! Phil's lane).
+//! will drain. Both services expose a detach/init re-enumeration path that releases stuck input
+//! and stops repeat on removal. The real xHCI transfer ring and the bound TTY server are
+//! follow-ups (S61 in Phil's lane).
 
 #![no_std]
 
@@ -26,8 +27,8 @@ pub use service::KeyboardService;
 
 pub use raven_usb_hid::{
     BUTTON_BACK, BUTTON_FORWARD, BUTTON_LEFT, BUTTON_MIDDLE, BUTTON_RIGHT, BootMouse, Error,
-    Layout, MOUSE_REPORT_LEN, Mouse, MouseError, MouseReport, PointerEvent, SetupPacket,
-    TransferRing,
+    KeyEvent, KeyEvents, Layout, MOUSE_REPORT_LEN, Mouse, MouseError, MouseReport, PointerEvent,
+    SetupPacket, TransferRing,
 };
 
 /// The standard 63-byte boot-keyboard report descriptor.

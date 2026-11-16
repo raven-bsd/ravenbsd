@@ -1,0 +1,96 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K26d: the aarch64 uutils slice. These are the same base-tools names the
+# current x86_64 shell profile carries, excluding `/bin/echo` (already supplied
+# by the base profile). The source paths are build/aarch64/uutils, never
+# build/x86_64/uutils.
+[[initfs.files]]
+src = "build/aarch64/uutils/ls"
+path = "/bin/ls"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/aarch64/uutils/cat"
+path = "/bin/cat"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/aarch64/uutils/cp"
+path = "/bin/cp"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/aarch64/uutils/mv"
+path = "/bin/mv"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/aarch64/uutils/rm"
+path = "/bin/rm"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/aarch64/uutils/mkdir"
+path = "/bin/mkdir"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/aarch64/uutils/rmdir"
+path = "/bin/rmdir"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/aarch64/uutils/touch"
+path = "/bin/touch"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/aarch64/uutils/stat"
+path = "/bin/stat"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/aarch64/uutils/df"
+path = "/bin/df"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/aarch64/uutils/head"
+path = "/bin/head"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/aarch64/uutils/tail"
+path = "/bin/tail"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/aarch64/uutils/sort"
+path = "/bin/sort"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/aarch64/uutils/true"
+path = "/bin/true"
+mode = 0o755
+generated = true
+
+[[initfs.files]]
+src = "build/aarch64/uutils/false"
+path = "/bin/false"
+mode = 0o755
+generated = true

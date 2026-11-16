@@ -287,6 +287,14 @@ pub fn chmod(path: &str, mode: u32) -> Result<(), Errno> {
     })
 }
 
+/// Check `mode` (`4` read, `2` write, `1` execute) at `path` for the caller.
+pub fn access(path: &str, mode: u32) -> Result<(), Errno> {
+    root_call(Call::Access {
+        mode,
+        path: path.as_bytes(),
+    })
+}
+
 /// Flush filesystem state.
 pub fn sync() -> Result<(), Errno> {
     root_call(Call::Sync)

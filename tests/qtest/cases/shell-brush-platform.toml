@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# K26a follow-up: the parts of the bash-compatibility contract that need platform primitives
+# the kernel/libc do not provide yet. Enable this case when both gaps close.
+#
+# PG-35: pipe2(2) is ENOSYS in raven-libc-platform. Brush's pipelines and `$( )` command
+#        substitution use std::io::pipe() (pipe2 under the hood), so they return
+#        "Function not implemented" instead of running.
+# PG-44/45/46: posix_spawn/fork/exec are ENOSYS until procd exists. Every external command
+#        (for example /bin/cat) fails with "failed to execute command ... Function not
+#        implemented"; only brush builtins run today.
+
+name = "shell-brush-platform"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 600
+pre = ["cargo xtask build brush --arch x86_64"]
+skip = "PG-35 pipe2 is ENOSYS and PG-44/45/46 posix_spawn/fork are ENOSYS; enable when the platform primitives land"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^pipeline$'
+
+[[expect]]
+regex = '^external$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "/bin/brush --norc -c 'echo pipeline | /bin/cat'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^pipeline$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/brush --norc -c '/bin/echo external'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^external$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

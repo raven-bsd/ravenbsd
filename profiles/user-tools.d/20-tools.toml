@@ -1,0 +1,76 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The seven U2 utilities and their man pages. su/passwd are root-owned 0755 in this staging
+# profile; the qtest initfs repacks them as 4755 to exercise the U3b setuid path.
+
+[[initfs.programs]]
+package = "useradd"
+path = "/bin/useradd"
+
+[[initfs.programs]]
+package = "adduser"
+path = "/bin/adduser"
+
+[[initfs.programs]]
+package = "passwd"
+path = "/bin/passwd"
+
+[[initfs.programs]]
+package = "groupadd"
+path = "/bin/groupadd"
+
+[[initfs.programs]]
+package = "su"
+path = "/bin/su"
+
+[[initfs.programs]]
+package = "id"
+path = "/bin/id"
+
+[[initfs.programs]]
+package = "whoami"
+path = "/bin/whoami"
+
+[[initfs.files]]
+src = "docs/man1/useradd.1"
+path = "/usr/share/man/man1/useradd.1"
+
+[[initfs.files]]
+src = "docs/man1/adduser.1"
+path = "/usr/share/man/man1/adduser.1"
+
+[[initfs.files]]
+src = "docs/man1/passwd.1"
+path = "/usr/share/man/man1/passwd.1"
+
+[[initfs.files]]
+src = "docs/man1/groupadd.1"
+path = "/usr/share/man/man1/groupadd.1"
+
+[[initfs.files]]
+src = "docs/man1/su.1"
+path = "/usr/share/man/man1/su.1"
+
+[[initfs.files]]
+src = "docs/man1/id.1"
+path = "/usr/share/man/man1/id.1"
+
+[[initfs.files]]
+src = "docs/man1/whoami.1"
+path = "/usr/share/man/man1/whoami.1"
+
+[[initfs.files]]
+src = "etc/passwd"
+path = "/etc/passwd"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/group"
+path = "/etc/group"
+mode = 0o644
+
+[[initfs.files]]
+src = "etc/shadow"
+path = "/etc/shadow"
+mode = 0o600

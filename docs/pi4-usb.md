@@ -23,7 +23,7 @@ wrap. The event ring is FIFO and reports `Full` rather than overwriting an uncon
 
 ## S61 seam
 
-S61 `raven-usb-core` implements `Host`:
+The `pi4-xhci` driver implements `Host` for the D1 model:
 
 * `allocate_dma` / `free_dma` map the controller-visible DMA buffer;
 * `doorbell(slot, target)` writes the xHCI doorbell;
@@ -35,6 +35,28 @@ rings the doorbell, waits for the matching Transfer Event, completes the queued 
 completion code and residual length. The command ring is exposed for Enable Slot, Address Device and
 Configure Endpoint commands. The fixture `tests/fixtures/pi4-usb/synthetic-trb.txt` is an
 own-construction TRB sequence used by the host test.
+
+## Driver integration
+
+`userland/drivers/pi4-xhci` has two paths:
+
+* `pi4-xhci test` (the `pi4-usb` qtest): runs one D1 ring sequence, enumerates a synthetic boot
+  keyboard through S61, binds it to the S62 `KeyboardService`, and decodes the key `a`. The qtest
+  initfs contains only `raven-init` and the driver.
+* default: maps BAR0, the function configuration page, a DMA buffer and the legacy IRQ through
+  `devd`, then drives the standard xHCI controller through `raven-xhci` and the S61/S62 path.
+
+The qtest serial:
+
+```
+pi4-xhci: ring trbs=3 completion=success
+pi4-xhci: device vendor=0x0627 product=0x0001 class=0 configs=1 interfaces=1
+pi4-xhci: hid interface=0 report=63 ep=0x81
+pi4-xhci: keyboard boot protocol ok
+pi4-xhci: key=a
+pi4-xhci: ok
+```
+
 
 ## Board steps (UNVERIFIED)
 

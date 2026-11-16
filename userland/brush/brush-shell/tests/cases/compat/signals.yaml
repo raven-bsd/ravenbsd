@@ -597,6 +597,7 @@ cases:
   # loop fails at once rather than when the harness gives up waiting.
   - name: "Ctrl+C ends a loop running a program"
     known_failure: true # TODO(signals): signals aren't delivered to the shell
+    incompatible_platforms: ["linux"] # the pty harness compares only exit status here
     pty: true
     ignore_stdout: true
     ignore_whitespace: true

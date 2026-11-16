@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P12 qtest: devd launches platd from the driver table. The service name is
+# `pcid` because init's root-device grant is reserved for pcid; the child
+# provides plat:, so readiness is the scheme rather than an exit.
+name = "pcid"
+exec = "/sbin/devd"
+args = ["devd", "dtb", "launch"]
+provides = ["scheme:plat", "scheme:dev"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0
+grants = ["root"]

@@ -7,9 +7,10 @@ Status: model, driver and host-backed qtest. J1 covers the register, command/res
 initialisation and timing model; J2 adds the SDMA/ADMA2 descriptor model, bounce-window rules, the
 multi-block transfer state and the `block:` request service; J3 adds the image/evidence kit; J4 adds
 the real MMIO/DMA/IRQ seam, the `disk:` scheme entry, a deterministic test mode and the
-`pi4-emmc2` qtest. Host tests and the host-backed qtest are OBSERVED; every real-card result remains
-UNVERIFIED because no Pi 4 board log exists. The model is clean-room Rust: the donor files were read
-for behaviour only and no code, comment or table layout was copied.
+`pi4-emmc2` qtest; J7 adds the host card/error matrix, SDXC capacity coverage, card-presence
+decoding and power-cycle/removal tests. Host tests and the host-backed qtest are OBSERVED; every
+real-card result remains UNVERIFIED because no Pi 4 board log exists. The model is clean-room Rust:
+the donor files were read for behaviour only and no code, comment or table layout was copied.
 
 ## 1. What exists
 
@@ -147,6 +148,29 @@ aarch64 image, runs the real driver binary in host-backed mode, and checks the `
 through the block framing: info, marker checksum, 2048-sector pattern checksum, a scratch write,
 flush, `svcd: settled` and `init exited (0)` (guest exit 33). No QEMU model exists for EMMC2, so the
 real MMIO/IRQ/SDMA path has no qtest and the board log is the only remaining gate.
+
+### 5.1 Host card/error matrix (J7)
+
+The J7 matrix is host-only. The "Test" column names the `_ut.rs` test that proves the row; the real
+board value for every row is UNVERIFIED until section 6 is captured.
+
+| Requirement | Host test | Status |
+|---|---|---|
+| SDSC v1 identification (CMD8 timeout, non-HCS ACMD41, CSD v1) | `a_cmd8_timeout_uses_the_v1_card_path`, `init_card_uses_the_v1_path_after_a_cmd8_timeout`, `csd_version_1_reports_a_legacy_capacity` | OBSERVED |
+| SDHC (HCS/CCS, 32 GiB CSD v2) | `the_full_sdhc_sequence_reaches_a_ready_card`, `init_card_selects_a_32_gib_card_and_programs_the_default_timing` | OBSERVED |
+| SDXC (CSD v2 above 32 GiB) | `an_sdxc_card_reaches_ready_with_two_tib_capacity`, `csd_version_2_reports_an_sdxc_capacity` | OBSERVED |
+| CMD8/ACMD41 negotiation and errors | `cmd8_echo_and_voltage_mismatches_are_typed_errors`, `a_non_timeout_cmd8_failure_is_not_a_legacy_card`, `a_busy_acmd41_retries_cmd55_and_still_finishes`, `acmd41_gives_up_after_the_bounded_number_of_rounds` | OBSERVED |
+| 1-bit and 4-bit at 25 and 50 MHz | `the_speed_width_matrix_covers_one_and_four_bit_at_25_and_50_mhz`, `timing_walks_identification_to_default_to_high_speed`, `host_control_respects_the_emmc2_high_speed_quirk` | OBSERVED |
+| SDMA 32-bit path | `sdma_requires_a_direct_32_bit_aligned_address`, `the_dma_matrix_covers_sdma_and_both_adma2_widths` | OBSERVED |
+| ADMA2 32-bit and 64-bit tables | `a_32_bit_transfer_descriptor_round_trips`, `a_64_bit_transfer_descriptor_round_trips_above_four_gib`, `a_64_bit_table_encodes_twelve_byte_descriptors`, `the_dma_matrix_covers_sdma_and_both_adma2_widths` | OBSERVED |
+| CRC and timeout errors | `the_error_matrix_maps_crc_and_timeout_sources`, `command_failures_are_mapped`, `a_polled_error_stops_the_transfer_and_is_sticky`, `init_card_reports_a_command_timeout` | OBSERVED |
+| Card removal | `card_insertion_is_reported_from_the_present_state`, `a_removed_card_is_refused_before_initialisation`, `a_removed_then_reinserted_card_initialises_again` | OBSERVED (model) |
+| Power-cycle and re-initialisation | `a_power_cycle_reinitialises_the_card`, `bring_up_resets_powers_and_programs_the_identification_clock` | OBSERVED (model) |
+| SDSC byte-addressed data transfers | none; the transfer model uses block addresses | NOT MODELLED (open question 6) |
+
+The card-presence row uses SDHCI Present State `Card Inserted` (bit 16). EMMC2 may not implement
+that bit; `init_card` remains the unconditional path and `init_card_checked` is the removable-slot
+gate. The host fake drives both the present and removed states; the live bit is UNVERIFIED.
 
 ## 6. Board steps (UNVERIFIED)
 

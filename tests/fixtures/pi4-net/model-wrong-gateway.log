@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Negative fixture: the DHCP gateway and the ping target disagree.
+devd: dtb launch genet bar=0 size=0x10000 dma=1048576 irq=189
+genet: revision=0x06000000 mac=02:00:00:00:00:42 bar=0 size=65536 dma=1048576 irq=189 slots=Platform
+genet: serving nic:
+netd: interface eth0 192.168.1.23/24
+GENET-NET-LINK speed=1000 duplex=full
+GENET-NET-DHCP addr=192.168.1.23/24 gateway=192.168.1.1 dns=192.168.1.1
+ping: 192.168.1.2 seq=1 rtt=0ms
+ping: 192.168.1.2 packets transmitted, 1 received, 0% packet loss
+GENET-NET-PING target=192.168.1.2 tx=1 rx=1 rtt_ms=0
+GENET-NET-OK

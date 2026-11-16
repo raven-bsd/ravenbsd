@@ -135,6 +135,22 @@ impl PlatformSeam {
         self.dma.len()
     }
 
+    /// Device-visible base of the DMA window.
+    #[must_use]
+    pub fn dma_bus_address(&self) -> u64 {
+        self.dma.bus_address()
+    }
+
+    /// Copy `out.len()` bytes at `offset` out of the DMA window.
+    pub fn read_dma(&self, offset: usize, out: &mut [u8]) -> Result<(), SeamError> {
+        self.dma.read_bytes(offset, out).map_err(map_access)
+    }
+
+    /// Copy `data` into the DMA window at `offset`.
+    pub fn write_dma(&mut self, offset: usize, data: &[u8]) -> Result<(), SeamError> {
+        self.dma.write_bytes(offset, data).map_err(map_access)
+    }
+
     /// Map both regions from `raven_rt` handles.
     #[cfg(target_os = "none")]
     pub fn from_handles(

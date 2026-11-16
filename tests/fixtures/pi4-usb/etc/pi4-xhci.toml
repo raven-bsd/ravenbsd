@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# One-shot D2 qtest: run the Pi 4 xHCI driver's fake-keyboard path and exit.
+name = "pi4-xhci"
+exec = "/sbin/pi4-xhci"
+args = ["pi4-xhci", "test"]
+readiness = "exit"
+restart = "never"
+max_restarts = 0

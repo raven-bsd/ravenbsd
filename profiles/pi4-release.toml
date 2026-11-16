@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Pi 4 0.1.0 release image.
+#
+# `pi4` itself extends `base`, and the profile loader permits only one level of
+# inheritance, so this profile extends `base` directly and carries the same Pi 4
+# boot and EMMC2/blockd staging entries. It adds the release userspace: the shell
+# services and first-party tools, the aarch64 brush and uutils slices, the
+# getty/login account files and the network/platform services.
+name = "pi4-release"
+extends = "base"
+
+[boot]
+cmdline = "console=ttyAMA0 loglevel=info"
+log_level = "info"

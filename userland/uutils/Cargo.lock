@@ -818,7 +818,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c54e03a951783e8b327515db3f2a2fd0e3bed362a96b066f341ce66ed49b4ead"
 dependencies = [
  "data-encoding",
- "syn 3.0.9",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -2390,11 +2390,47 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
 
 [[package]]
+name = "raven-abi"
+version = "0.1.0"
+
+[[package]]
 name = "raven-getrandom"
 version = "0.1.0"
 dependencies = [
  "getrandom 0.4.3",
+ "raven-scheme",
 ]
+
+[[package]]
+name = "raven-ipc"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
+
+[[package]]
+name = "raven-output"
+version = "0.1.0"
+
+[[package]]
+name = "raven-proto-fs"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+]
+
+[[package]]
+name = "raven-scheme"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-ipc",
+ "raven-proto-fs",
+]
+
+[[package]]
+name = "raven-theme"
+version = "0.1.0"
 
 [[package]]
 name = "rayon"
@@ -4438,6 +4474,8 @@ dependencies = [
  "os_display",
  "procfs",
  "raven-getrandom",
+ "raven-output",
+ "raven-theme",
  "rustc-hash",
  "rustix",
  "selinux",

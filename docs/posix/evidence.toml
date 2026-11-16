@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Optional aggregate overlay. Per-owner rows live in evidence/P1.toml through evidence/P5.toml;
+# direct [[row]] entries here are merged too, but the owner split is preferred to avoid conflicts.
+schema = 1
+standard = "posix-2024"

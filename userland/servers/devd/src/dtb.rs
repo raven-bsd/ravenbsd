@@ -59,6 +59,15 @@ impl GicInterrupt {
         };
         format!("{kind}={}", self.number)
     }
+
+    /// GIC INTID: SPIs start at 32 and PPIs at 16.
+    #[must_use]
+    pub const fn intid(&self) -> u32 {
+        match self.kind {
+            InterruptKind::Spi => self.number.saturating_add(32),
+            InterruptKind::Ppi => self.number.saturating_add(16),
+        }
+    }
 }
 
 /// One bindable platform device decoded from the device tree.

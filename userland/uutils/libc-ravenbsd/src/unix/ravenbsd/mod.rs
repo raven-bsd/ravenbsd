@@ -862,7 +862,7 @@ pub const SIGWINCH: c_int = 28;
 pub const SIGIO: c_int = 29;
 pub const SIGPWR: c_int = 30;
 pub const SIGSYS: c_int = 31;
-pub const NSIG: c_int = 32;
+pub const NSIG: c_int = 65;
 
 pub const SA_NOCLDSTOP: c_int = 1;
 pub const SA_NOCLDWAIT: c_int = 2;
@@ -882,7 +882,7 @@ pub const LOCK_NB: c_int = 4;
 pub const LOCK_UN: c_int = 8;
 
 // sys/epoll.h
-pub const EPOLL_CLOEXEC: c_int = 0x0100_0000;
+pub const EPOLL_CLOEXEC: c_int = crate::O_CLOEXEC;
 pub const EPOLL_CTL_ADD: c_int = 1;
 pub const EPOLL_CTL_DEL: c_int = 2;
 pub const EPOLL_CTL_MOD: c_int = 3;
@@ -1914,4 +1914,508 @@ extern "C" {
 
     // utmp.h
     pub fn login_tty(fd: c_int) -> c_int;
+}
+
+// ---------------------------------------------------------------------------
+// C64h: Linux-compatible surface required by the brush dependency graph.
+//
+// The types and constants follow the Raven ABI headers under
+// `libc/ravenlibc/include`; the Linux-only values that the ABI does not name
+// (DCCP, `SO_ORIGINAL_DST`, the MFD huge-page sizes and RWF flags) are the
+// documented Linux UAPI facts. The dependency crates select their Linux
+// branches for `target_os = "ravenbsd"`, so the names must exist here.
+
+
+pub type __fsword_t = c_long;
+pub type off64_t = off_t;
+pub type ino64_t = ino_t;
+pub type blkcnt64_t = blkcnt_t;
+pub type rlim64_t = rlim_t;
+pub type fsblkcnt64_t = fsblkcnt_t;
+pub type fsfilcnt64_t = fsfilcnt_t;
+pub type statfs64 = statfs;
+pub type statvfs64 = statvfs;
+pub type termios2 = termios;
+
+s! {
+
+
+    pub struct pollfd {
+        pub fd: c_int,
+        pub events: c_short,
+        pub revents: c_short,
+    }
+
+
+
+    pub struct signalfd_siginfo {
+        pub ssi_signo: u32,
+        pub ssi_errno: i32,
+        pub ssi_code: i32,
+        pub ssi_pid: u32,
+        pub ssi_uid: u32,
+        pub ssi_fd: i32,
+        pub ssi_tid: u32,
+        pub ssi_band: u32,
+        pub ssi_overrun: u32,
+        pub ssi_trapno: u32,
+        pub ssi_status: i32,
+        pub ssi_int: i32,
+        pub ssi_ptr: u64,
+        pub ssi_utime: u64,
+        pub ssi_stime: u64,
+        pub ssi_addr: u64,
+        pub ssi_addr_lsb: u16,
+        _pad2: Padding<u16>,
+        pub ssi_syscall: i32,
+        pub ssi_call_addr: u64,
+        pub ssi_arch: u32,
+        _pad: Padding<[u8; 28]>,
+    }
+
+    pub struct sockaddr_vm {
+        pub svm_family: crate::sa_family_t,
+        pub svm_reserved1: c_ushort,
+        pub svm_port: c_uint,
+        pub svm_cid: c_uint,
+        pub svm_zero: [u8; 4],
+    }
+
+    pub struct ip_mreqn {
+        pub imr_multiaddr: crate::in_addr,
+        pub imr_address: crate::in_addr,
+        pub imr_ifindex: c_int,
+    }
+
+    pub struct ip_mreq_source {
+        pub imr_multiaddr: crate::in_addr,
+        pub imr_interface: crate::in_addr,
+        pub imr_sourceaddr: crate::in_addr,
+    }
+
+    pub struct sock_filter {
+        pub code: c_ushort,
+        pub jt: c_uchar,
+        pub jf: c_uchar,
+        pub k: c_uint,
+    }
+
+    pub struct sock_fprog {
+        pub len: c_ushort,
+        pub filter: *mut crate::sock_filter,
+    }
+
+    pub struct sysinfo {
+        pub uptime: i64,
+        pub loads: [u64; 3],
+        pub totalram: u64,
+        pub freeram: u64,
+        pub sharedram: u64,
+        pub bufferram: u64,
+        pub totalswap: u64,
+        pub freeswap: u64,
+        pub procs: c_ushort,
+        pub pad: c_ushort,
+        pub totalhigh: u64,
+        pub freehigh: u64,
+        pub mem_unit: c_uint,
+        pub _f: [c_char; 0],
+    }
+}
+
+
+// sys/socket.h and netinet/in.h (Raven ABI).
+pub const SOCK_RDM: c_int = 4;
+pub const SOCK_DCCP: c_int = 6;
+pub const AF_PACKET: c_int = 17;
+pub const AF_VSOCK: c_int = 40;
+pub const IPPROTO_DCCP: c_int = 33;
+pub const IPPROTO_MPTCP: c_int = 262;
+pub const IPPROTO_SCTP: c_int = 132;
+pub const IPPROTO_UDPLITE: c_int = 136;
+pub const SOL_IP: c_int = 0;
+pub const SOL_IPV6: c_int = 41;
+pub const SOL_DCCP: c_int = 269;
+pub const SO_MARK: c_int = 36;
+pub const SO_BINDTODEVICE: c_int = 25;
+pub const SO_BINDTOIFINDEX: c_int = 62;
+pub const SO_BUSY_POLL: c_int = 46;
+pub const SO_INCOMING_CPU: c_int = 49;
+pub const SO_ATTACH_FILTER: c_int = 26;
+pub const SO_DETACH_FILTER: c_int = 27;
+pub const SO_COOKIE: c_int = 57;
+pub const SO_ORIGINAL_DST: c_int = 80;
+pub const IP_TRANSPARENT: c_int = 19;
+pub const IP_FREEBIND: c_int = 15;
+pub const IP_MULTICAST_ALL: c_int = 49;
+pub const IPV6_TRANSPARENT: c_int = 75;
+pub const IPV6_FREEBIND: c_int = 78;
+pub const IPV6_MULTICAST_ALL: c_int = 29;
+pub const IPV6_TCLASS: c_int = 67;
+pub const IP6T_SO_ORIGINAL_DST: c_int = 80;
+pub const TCP_CONGESTION: c_int = 13;
+pub const TCP_CORK: c_int = 3;
+pub const TCP_NOTSENT_LOWAT: c_int = 25;
+pub const TCP_QUICKACK: c_int = 12;
+pub const TCP_THIN_LINEAR_TIMEOUTS: c_int = 16;
+pub const TCP_USER_TIMEOUT: c_int = 18;
+pub const MSG_CONFIRM: c_int = 2048;
+pub const IP_HDRINCL: c_int = 3;
+pub const IPV6_HDRINCL: c_int = 36;
+pub const IPV6_RECVHOPLIMIT: c_int = 51;
+pub const IPV6_RECVTCLASS: c_int = 66;
+pub const IP_ADD_SOURCE_MEMBERSHIP: c_int = 39;
+pub const IP_DROP_SOURCE_MEMBERSHIP: c_int = 40;
+
+pub const DCCP_SOCKOPT_SERVICE: c_int = 2;
+pub const DCCP_SOCKOPT_SERVER_TIMEWAIT: c_int = 6;
+pub const DCCP_SOCKOPT_SEND_CSCOV: c_int = 10;
+pub const DCCP_SOCKOPT_RECV_CSCOV: c_int = 11;
+pub const DCCP_SOCKOPT_QPOLICY_TXQLEN: c_int = 17;
+pub const DCCP_SOCKOPT_AVAILABLE_CCIDS: c_int = 12;
+pub const DCCP_SOCKOPT_CCID: c_int = 13;
+pub const DCCP_SOCKOPT_GET_CUR_MPS: c_int = 5;
+pub const DCCP_SOCKOPT_RX_CCID: c_int = 15;
+pub const DCCP_SOCKOPT_TX_CCID: c_int = 14;
+
+// sys/termios.h and sys/ioctl.h (Raven ABI).
+pub const TCGETS2: c_ulong = 0x802c542a;
+pub const TCSETS2: c_ulong = 0x402c542b;
+pub const TCSETSW2: c_ulong = 0x402c542c;
+pub const TCSETSF2: c_ulong = 0x402c542d;
+pub const FIONCLEX: c_ulong = 0x5450;
+pub const UIO_MAXIOV: usize = 1024;
+pub const BOTHER: crate::speed_t = 0o010_000;
+pub const IBSHIFT: crate::tcflag_t = 16;
+
+// sys/statvfs.h, sys/uio.h, sys/mman.h, sys/signalfd.h.
+pub const ST_NODEV: c_ulong = 4;
+pub const ST_NOEXEC: c_ulong = 8;
+pub const ST_SYNCHRONOUS: c_ulong = 16;
+pub const ST_MANDLOCK: c_ulong = 64;
+pub const ST_NOATIME: c_ulong = 1024;
+pub const ST_NODIRATIME: c_ulong = 2048;
+pub const SFD_CLOEXEC: c_int = 0o200_0000;
+pub const SFD_NONBLOCK: c_int = 0o4_000;
+pub const MFD_CLOEXEC: c_uint = 0x1;
+pub const MFD_ALLOW_SEALING: c_uint = 0x2;
+pub const MFD_HUGETLB: c_uint = 0x4;
+pub const RWF_HIPRI: c_int = 0x0000_0001;
+pub const RWF_DSYNC: c_int = 0x0000_0002;
+pub const RWF_SYNC: c_int = 0x0000_0004;
+pub const RWF_NOWAIT: c_int = 0x0000_0008;
+pub const RWF_APPEND: c_int = 0x0000_0010;
+pub const RWF_NOAPPEND: c_int = 0x0000_0020;
+pub const RWF_ATOMIC: c_int = 0x0000_0040;
+pub const RWF_DONTCACHE: c_int = 0x0000_0080;
+
+// bits/signum.h and sys/wait.h.
+pub const SIGRTMIN: c_int = 35;
+pub const SIGRTMAX: c_int = 64;
+pub const P_PIDFD: idtype_t = 3;
+pub const SYS_pidfd_open: c_long = 434;
+pub const PIDFD_NONBLOCK: c_int = 0o4_000;
+
+extern "C" {
+    // sys/socket.h
+    pub fn accept4(
+        socket: c_int,
+        address: *mut crate::sockaddr,
+        address_len: *mut crate::socklen_t,
+        flags: c_int,
+    ) -> c_int;
+    pub fn eventfd(count: c_uint, flags: c_int) -> c_int;
+    pub fn sendfile(out_fd: c_int, in_fd: c_int, offset: *mut off_t, count: size_t) -> ssize_t;
+
+    // sys/statfs.h
+    pub fn statfs64(path: *const c_char, sz: size_t, buf: *mut crate::statfs64) -> c_int;
+    pub fn fstatfs64(fd: c_int, sz: size_t, buf: *mut crate::statfs64) -> c_int;
+
+    // unistd.h / sys/syscall.h
+    pub fn syscall(num: c_long, ...) -> c_long;
+    pub fn lseek64(fd: c_int, offset: off64_t, whence: c_int) -> off64_t;
+    pub fn syncfs(fd: c_int) -> c_int;
+    pub fn fsync(fd: c_int) -> c_int;
+    pub fn setfsuid(uid: crate::uid_t) -> c_int;
+    pub fn setfsgid(gid: crate::gid_t) -> c_int;
+    pub fn fexecve(
+        fd: c_int,
+        argv: *const *const c_char,
+        envp: *const *const c_char,
+    ) -> c_int;
+    pub fn forkpty(
+        amaster: *mut c_int,
+        name: *mut c_char,
+        termp: *const crate::termios,
+        winp: *const crate::winsize,
+    ) -> crate::pid_t;
+    pub fn ptsname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int;
+    pub fn sysinfo(info: *mut crate::sysinfo) -> c_int;
+    pub fn confstr(name: c_int, buf: *mut c_char, len: size_t) -> size_t;
+    pub fn gethostname(name: *mut c_char, len: size_t) -> c_int;
+    pub fn ttyname_r(fd: c_int, buf: *mut c_char, buflen: size_t) -> c_int;
+    pub fn tcgetattr(fd: c_int, termios_p: *mut crate::termios) -> c_int;
+    pub fn tcsetattr(
+        fd: c_int,
+        optional_actions: c_int,
+        termios_p: *const crate::termios,
+    ) -> c_int;
+    pub fn tcgetpgrp(fd: c_int) -> crate::pid_t;
+    pub fn tcsetpgrp(fd: c_int, pgrp: crate::pid_t) -> c_int;
+    pub fn killpg(pgrp: crate::pid_t, sig: c_int) -> c_int;
+    pub fn cfmakeraw(termios_p: *mut crate::termios);
+    pub fn truncate(path: *const c_char, length: off_t) -> c_int;
+    pub fn readlink(path: *const c_char, buf: *mut c_char, bufsiz: size_t) -> ssize_t;
+    pub fn chdir(path: *const c_char) -> c_int;
+    pub fn chroot(path: *const c_char) -> c_int;
+    pub fn umask(mask: crate::mode_t) -> crate::mode_t;
+    pub fn ppoll(
+        fds: *mut crate::pollfd,
+        nfds: crate::nfds_t,
+        timeout: *const crate::timespec,
+        sigmask: *const crate::sigset_t,
+    ) -> c_int;
+    pub fn signalfd(fd: c_int, mask: *const crate::sigset_t, flags: c_int) -> c_int;
+}
+
+// bits/sysconf.h values used by nix.
+
+// Linux filesystem magic values used by nix `statfs` (UAPI facts).
+pub const ADFS_SUPER_MAGIC: c_long = 0x0000adf5;
+pub const AFFS_SUPER_MAGIC: c_long = 0x0000adff;
+pub const AFS_SUPER_MAGIC: c_long = 0x5346414f;
+pub const AUTOFS_SUPER_MAGIC: c_long = 0x0187;
+pub const BPF_FS_MAGIC: c_long = 0xcafe4a11;
+pub const BTRFS_SUPER_MAGIC: c_long = 0x9123683e;
+pub const CGROUP2_SUPER_MAGIC: c_long = 0x63677270;
+pub const CGROUP_SUPER_MAGIC: c_long = 0x27e0eb;
+pub const CODA_SUPER_MAGIC: c_long = 0x73757245;
+pub const CRAMFS_MAGIC: c_long = 0x28cd3d45;
+pub const DEBUGFS_MAGIC: c_long = 0x64626720;
+pub const DEVPTS_SUPER_MAGIC: c_long = 0x1cd1;
+pub const ECRYPTFS_SUPER_MAGIC: c_long = 0xf15f;
+pub const EFS_SUPER_MAGIC: c_long = 0x00414a53;
+pub const EXT2_SUPER_MAGIC: c_long = 0x0000ef53;
+pub const EXT3_SUPER_MAGIC: c_long = 0x0000ef53;
+pub const EXT4_SUPER_MAGIC: c_long = 0x0000ef53;
+pub const F2FS_SUPER_MAGIC: c_long = 0xf2f52010;
+pub const FUSE_SUPER_MAGIC: c_long = 0x65735546;
+pub const FUTEXFS_SUPER_MAGIC: c_long = 0xbad1dea;
+pub const HOSTFS_SUPER_MAGIC: c_long = 0x00c0ffee;
+pub const HPFS_SUPER_MAGIC: c_long = 0xf995e849;
+pub const HUGETLBFS_MAGIC: c_long = 0x958458f6;
+pub const ISOFS_SUPER_MAGIC: c_long = 0x00009660;
+pub const JFFS2_SUPER_MAGIC: c_long = 0x000072b6;
+pub const MINIX2_SUPER_MAGIC2: c_long = 0x00002478;
+pub const MINIX2_SUPER_MAGIC: c_long = 0x00002468;
+pub const MINIX3_SUPER_MAGIC: c_long = 0x4d5a;
+pub const MINIX_SUPER_MAGIC2: c_long = 0x0000138f;
+pub const MINIX_SUPER_MAGIC: c_long = 0x0000137f;
+pub const MSDOS_SUPER_MAGIC: c_long = 0x00004d44;
+pub const NCP_SUPER_MAGIC: c_long = 0x0000564c;
+pub const NFS_SUPER_MAGIC: c_long = 0x00006969;
+pub const NILFS_SUPER_MAGIC: c_long = 0x3434;
+pub const NSFS_MAGIC: c_long = 0x6e736673;
+pub const OCFS2_SUPER_MAGIC: c_long = 0x7461636f;
+pub const OPENPROM_SUPER_MAGIC: c_long = 0x00009fa1;
+pub const OVERLAYFS_SUPER_MAGIC: c_long = 0x794c7630;
+pub const PROC_SUPER_MAGIC: c_long = 0x00009fa0;
+pub const QNX4_SUPER_MAGIC: c_long = 0x0000002f;
+pub const QNX6_SUPER_MAGIC: c_long = 0x68191122;
+pub const RDTGROUP_SUPER_MAGIC: c_long = 0x7655821;
+pub const REISERFS_SUPER_MAGIC: c_long = 0x52654973;
+pub const SECURITYFS_MAGIC: c_long = 0x73636673;
+pub const SELINUX_MAGIC: c_long = 0xf97cff8c;
+pub const SMACK_MAGIC: c_long = 0x43415d53;
+pub const SMB_SUPER_MAGIC: c_long = 0x0000517b;
+pub const SYSFS_MAGIC: c_long = 0x62656572;
+pub const TMPFS_MAGIC: c_long = 0x01021994;
+pub const TRACEFS_MAGIC: c_long = 0x74726163;
+pub const UDF_SUPER_MAGIC: c_long = 0x15013346;
+pub const USBDEVICE_SUPER_MAGIC: c_long = 0x00009fa2;
+pub const XENFS_SUPER_MAGIC: c_long = 0xabba1974;
+pub const XFS_SUPER_MAGIC: c_long = 0x58465342;
+
+// sys/mman.h huge-page flags (Linux UAPI).
+pub const MFD_HUGE_64KB: c_uint = 0x4000_0000;
+pub const MFD_HUGE_512KB: c_uint = 0x4c00_0000;
+pub const MFD_HUGE_1MB: c_uint = 0x5000_0000;
+pub const MFD_HUGE_2MB: c_uint = 0x5400_0000;
+pub const MFD_HUGE_8MB: c_uint = 0x5c00_0000;
+pub const MFD_HUGE_16MB: c_uint = 0x6000_0000;
+pub const MFD_HUGE_32MB: c_uint = 0x6400_0000;
+pub const MFD_HUGE_256MB: c_uint = 0x7000_0000;
+pub const MFD_HUGE_512MB: c_uint = 0x7400_0000;
+pub const MFD_HUGE_1GB: c_uint = 0x7800_0000;
+pub const MFD_HUGE_2GB: c_uint = 0x7c00_0000;
+pub const MFD_HUGE_16GB: c_uint = 0x8800_0000;
+pub const MFD_HUGE_MASK: c_uint = 63;
+pub const MFD_HUGE_SHIFT: c_uint = 26;
+
+// sys/eventfd.h, errno and sys/sysinfo.h.
+pub const EFD_CLOEXEC: c_int = 0o200_0000;
+pub const EFD_NONBLOCK: c_int = 0o4_000;
+pub const SI_LOAD_SHIFT: c_uint = 16;
+
+// x86_64 syscall numbers used by the brush dependency graph.
+pub const SYS_gettid: c_long = 186;
+pub const SYS_memfd_create: c_long = 319;
+pub const SYS_execveat: c_long = 322;
+pub const SYS_pivot_root: c_long = 155;
+
+// ---------------------------------------------------------------------------
+// K26a merge: Linux-compatible surface needed by the current rustix/nix
+// dependency graph after the C64h/P2 merge. The values are the documented
+// Linux UAPI facts; the Raven ABI does not name these yet.
+
+pub type stat64 = stat;
+pub type dirent64 = dirent;
+pub type loff_t = c_longlong;
+
+// inotify.h
+pub const IN_ACCESS: c_uint = 0x0000_0001;
+pub const IN_MODIFY: c_uint = 0x0000_0002;
+pub const IN_ATTRIB: c_uint = 0x0000_0004;
+pub const IN_CLOSE_WRITE: c_uint = 0x0000_0008;
+pub const IN_CLOSE_NOWRITE: c_uint = 0x0000_0010;
+pub const IN_OPEN: c_uint = 0x0000_0020;
+pub const IN_MOVED_FROM: c_uint = 0x0000_0040;
+pub const IN_MOVED_TO: c_uint = 0x0000_0080;
+pub const IN_CREATE: c_uint = 0x0000_0100;
+pub const IN_DELETE: c_uint = 0x0000_0200;
+pub const IN_DELETE_SELF: c_uint = 0x0000_0400;
+pub const IN_MOVE_SELF: c_uint = 0x0000_0800;
+pub const IN_UNMOUNT: c_uint = 0x0000_2000;
+pub const IN_Q_OVERFLOW: c_uint = 0x0000_4000;
+pub const IN_IGNORED: c_uint = 0x0000_8000;
+pub const IN_ONLYDIR: c_uint = 0x0100_0000;
+pub const IN_DONT_FOLLOW: c_uint = 0x0200_0000;
+pub const IN_EXCL_UNLINK: c_uint = 0x0400_0000;
+pub const IN_MASK_CREATE: c_uint = 0x1000_0000;
+pub const IN_MASK_ADD: c_uint = 0x2000_0000;
+pub const IN_ISDIR: c_uint = 0x4000_0000;
+pub const IN_ONESHOT: c_uint = 0x8000_0000;
+pub const IN_CLOEXEC: c_int = O_CLOEXEC;
+pub const IN_NONBLOCK: c_int = O_NONBLOCK;
+pub const IN_CLOSE: c_uint = IN_CLOSE_WRITE | IN_CLOSE_NOWRITE;
+pub const IN_MOVE: c_uint = IN_MOVED_FROM | IN_MOVED_TO;
+pub const IN_ALL_EVENTS: c_uint = 0x0000_0fff;
+
+// fcntl.h seals and memfd_create(2) flags.
+pub const F_SEAL_EXEC: c_int = 0x0020;
+pub const MFD_EXEC: c_uint = 0x0010;
+pub const MFD_NOEXEC_SEAL: c_uint = 0x0008;
+
+// renameat2(2) flags.
+pub const RENAME_EXCHANGE: c_uint = 2;
+pub const RENAME_WHITEOUT: c_uint = 4;
+
+// lseek(2) extensions.
+pub const SEEK_DATA: c_int = 3;
+pub const SEEK_HOLE: c_int = 4;
+
+// statx(2).
+pub const STATX_TYPE: c_uint = 0x0000_0001;
+pub const STATX_MODE: c_uint = 0x0000_0002;
+pub const STATX_NLINK: c_uint = 0x0000_0004;
+pub const STATX_UID: c_uint = 0x0000_0008;
+pub const STATX_GID: c_uint = 0x0000_0010;
+pub const STATX_ATIME: c_uint = 0x0000_0020;
+pub const STATX_MTIME: c_uint = 0x0000_0040;
+pub const STATX_CTIME: c_uint = 0x0000_0080;
+pub const STATX_INO: c_uint = 0x0000_0100;
+pub const STATX_SIZE: c_uint = 0x0000_0200;
+pub const STATX_BLOCKS: c_uint = 0x0000_0400;
+pub const STATX_BASIC_STATS: c_uint = 0x0000_07ff;
+pub const STATX_BTIME: c_uint = 0x0000_0800;
+pub const STATX_MNT_ID: c_uint = 0x0000_1000;
+pub const STATX_DIOALIGN: c_uint = 0x0000_2000;
+pub const STATX_ALL: c_uint = 0x0000_0fff;
+pub const STATX__RESERVED: c_uint = 0x8000_0000;
+pub const STATX_ATTR_COMPRESSED: c_uint = 0x0000_0004;
+pub const STATX_ATTR_IMMUTABLE: c_uint = 0x0000_0010;
+pub const STATX_ATTR_APPEND: c_uint = 0x0000_0020;
+pub const STATX_ATTR_NODUMP: c_uint = 0x0000_0040;
+pub const STATX_ATTR_ENCRYPTED: c_uint = 0x0000_0800;
+pub const STATX_ATTR_AUTOMOUNT: c_uint = 0x0000_1000;
+pub const STATX_ATTR_MOUNT_ROOT: c_uint = 0x0000_2000;
+pub const STATX_ATTR_VERITY: c_uint = 0x0010_0000;
+pub const STATX_ATTR_DAX: c_uint = 0x0020_0000;
+
+// xattr flags.
+pub const XATTR_CREATE: c_int = 1;
+pub const XATTR_REPLACE: c_int = 2;
+
+// block device ioctls.
+pub const BLKSSZGET: c_ulong = 0x1268;
+pub const BLKPBSZGET: c_ulong = 0x127b;
+
+// FICLONE.
+pub const FICLONE: c_ulong = 0x4004_9409;
+
+// x86_64 syscall numbers used by the current rustix/nix graph.
+pub const SYS_getdents64: c_long = 217;
+pub const SYS_fchmod: c_long = 91;
+pub const SYS_fchown: c_long = 93;
+pub const SYS_fchmodat: c_long = 268;
+pub const SYS_renameat2: c_long = 316;
+pub const SYS_syncfs: c_long = 306;
+pub const SYS_copy_file_range: c_long = 326;
+pub const SYS_statx: c_long = 332;
+
+extern "C" {
+    pub fn inotify_init1(flags: c_int) -> c_int;
+    pub fn inotify_add_watch(fd: c_int, pathname: *const c_char, mask: c_uint) -> c_int;
+    pub fn inotify_rm_watch(fd: c_int, wd: c_int) -> c_int;
+    pub fn sendfile64(
+        out_fd: c_int,
+        in_fd: c_int,
+        offset: *mut loff_t,
+        count: size_t,
+    ) -> ssize_t;
+    pub fn getxattr(
+        path: *const c_char,
+        name: *const c_char,
+        value: *mut c_void,
+        size: size_t,
+    ) -> ssize_t;
+    pub fn lgetxattr(
+        path: *const c_char,
+        name: *const c_char,
+        value: *mut c_void,
+        size: size_t,
+    ) -> ssize_t;
+    pub fn fgetxattr(
+        fd: c_int,
+        name: *const c_char,
+        value: *mut c_void,
+        size: size_t,
+    ) -> ssize_t;
+    pub fn setxattr(
+        path: *const c_char,
+        name: *const c_char,
+        value: *const c_void,
+        size: size_t,
+        flags: c_int,
+    ) -> c_int;
+    pub fn lsetxattr(
+        path: *const c_char,
+        name: *const c_char,
+        value: *const c_void,
+        size: size_t,
+        flags: c_int,
+    ) -> c_int;
+    pub fn fsetxattr(
+        fd: c_int,
+        name: *const c_char,
+        value: *const c_void,
+        size: size_t,
+        flags: c_int,
+    ) -> c_int;
+    pub fn listxattr(path: *const c_char, list: *mut c_char, size: size_t) -> ssize_t;
+    pub fn llistxattr(path: *const c_char, list: *mut c_char, size: size_t) -> ssize_t;
+    pub fn flistxattr(fd: c_int, list: *mut c_char, size: size_t) -> ssize_t;
+    pub fn removexattr(path: *const c_char, name: *const c_char) -> c_int;
+    pub fn lremovexattr(path: *const c_char, name: *const c_char) -> c_int;
+    pub fn fremovexattr(fd: c_int, name: *const c_char) -> c_int;
 }

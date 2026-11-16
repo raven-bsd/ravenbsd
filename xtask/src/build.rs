@@ -100,6 +100,9 @@ pub(crate) fn rustflags_for(
             }
             flags.extend(["-C".to_string(), "relocation-model=static".to_string()]);
             flags.extend(["-C".to_string(), "force-frame-pointers=yes".to_string()]);
+            // sha2 0.11.1 currently hits an LLVM codegen bug on x86_64-unknown-none; the
+            // portable backend produces the same digests and lets raven-auth/users link.
+            flags.extend(["--cfg".to_string(), "sha2_backend=\"soft\"".to_string()]);
             if let Some(linker) = user_linker {
                 flags.push("-C".to_string());
                 flags.push(format!("link-arg=-T{}", linker.display()));
@@ -284,8 +287,9 @@ pub(crate) fn run(
         }
         Component::User => {
             for package in &packages {
+                let binary = user_binary(workspace, package)?;
                 copy_artifact(
-                    &artifact_dir.join(package),
+                    &artifact_dir.join(&binary),
                     &artifact_path(&workspace.root, arch, Component::User, package),
                 )?;
             }
@@ -329,6 +333,36 @@ fn select_packages(
     }
 }
 
+/// Cargo binary name for a user package.
+///
+/// The package name is not always the binary name (`raven-getty` builds `getty`), so the
+/// manifest's first `[[bin]]` name wins when present. A package without an explicit binary uses
+/// its package name, like cargo does.
+fn binary_name(manifest: &str, package: &str) -> Result<String> {
+    let value: toml::Value = toml::from_str(manifest)
+        .with_context(|| format!("cannot parse the manifest of `{package}`"))?;
+    let name = value
+        .get("bin")
+        .and_then(|bins| bins.as_array())
+        .and_then(|bins| bins.first())
+        .and_then(|bin| bin.get("name"))
+        .and_then(|name| name.as_str());
+    Ok(name.unwrap_or(package).to_string())
+}
+
+/// Read the manifest of a user package and return its binary name.
+fn user_binary(workspace: &Workspace, package: &str) -> Result<String> {
+    let entry = workspace
+        .packages
+        .iter()
+        .find(|entry| entry.name == package)
+        .with_context(|| format!("user package `{package}` is not in the workspace"))?;
+    let manifest = workspace.root.join(&entry.rel_dir).join("Cargo.toml");
+    let text = fs::read_to_string(&manifest)
+        .with_context(|| format!("cannot read {}", manifest.display()))?;
+    binary_name(&text, package)
+}
+
 fn copy_artifact(source: &Path, destination: &Path) -> Result<()> {
     if !source.is_file() {
         bail!("built artifact not found: {}", source.display());
@@ -364,188 +398,5 @@ pub(crate) fn artifact_path(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn kernel_target_is_unknown_none() {
-        assert_eq!(
-            target_for(Component::Kernel, Arch::X86_64).unwrap(),
-            "x86_64-unknown-none"
-        );
-        assert_eq!(
-            target_for(Component::Kernel, Arch::Aarch64).unwrap(),
-            "aarch64-unknown-none-softfloat"
-        );
-        assert_eq!(
-            target_for(Component::Kernel, Arch::Riscv64).unwrap(),
-            "riscv64gc-unknown-none-elf"
-        );
-    }
-
-    #[test]
-    fn user_targets_match_kernel_targets() {
-        for arch in [Arch::X86_64, Arch::Aarch64, Arch::Riscv64] {
-            assert_eq!(
-                target_for(Component::User, arch).unwrap(),
-                target_for(Component::Kernel, arch).unwrap()
-            );
-        }
-    }
-
-    #[test]
-    fn loader_targets_are_uefi() {
-        assert_eq!(
-            target_for(Component::Loader, Arch::X86_64).unwrap(),
-            "x86_64-unknown-uefi"
-        );
-        assert_eq!(
-            target_for(Component::Loader, Arch::Aarch64).unwrap(),
-            "aarch64-unknown-uefi"
-        );
-    }
-
-    #[test]
-    fn loader_has_no_riscv64_target() {
-        assert!(target_for(Component::Loader, Arch::Riscv64).is_err());
-    }
-
-    #[test]
-    fn kernel_rustflags_match_c2() {
-        let flags = rustflags_for(Component::Kernel, Arch::X86_64, Path::new("/r"), None);
-        assert_eq!(
-            flags,
-            vec![
-                "-C",
-                "relocation-model=static",
-                "-C",
-                "force-frame-pointers=yes",
-                "--remap-path-prefix=/r=/ravenbsd",
-            ]
-        );
-    }
-
-    #[test]
-    fn user_rustflags_include_small_code_model_on_x86_64() {
-        let linker = Path::new("/r/userland/linker/x86_64.ld");
-        let flags = rustflags_for(Component::User, Arch::X86_64, Path::new("/r"), Some(linker));
-        assert_eq!(
-            flags,
-            vec![
-                "-C",
-                "code-model=small",
-                "-C",
-                "relocation-model=static",
-                "-C",
-                "force-frame-pointers=yes",
-                "-C",
-                "link-arg=-T/r/userland/linker/x86_64.ld",
-                "--remap-path-prefix=/r=/ravenbsd",
-            ]
-        );
-    }
-
-    #[test]
-    fn user_rustflags_omit_missing_linker() {
-        let flags = rustflags_for(Component::User, Arch::Aarch64, Path::new("/r"), None);
-        assert!(!flags.iter().any(|flag| flag.contains("link-arg")));
-        assert!(!flags.iter().any(|flag| flag == "code-model=small"));
-    }
-
-    #[test]
-    fn loader_rustflags_only_remap() {
-        let flags = rustflags_for(Component::Loader, Arch::X86_64, Path::new("/r"), None);
-        assert_eq!(flags, vec!["--remap-path-prefix=/r=/ravenbsd"]);
-    }
-
-    #[test]
-    fn build_id_uses_the_commit_date() {
-        assert_eq!(build_id_from(0, "abc1234", false), "abc1234 1970-01-01");
-        assert_eq!(
-            build_id_from(1_609_459_200, "abc1234", true),
-            "abc1234-dirty 2021-01-01"
-        );
-    }
-
-    #[test]
-    fn civil_date_handles_leap_day() {
-        assert_eq!(civil_from_days(19_782), (2024, 2, 29));
-    }
-
-    #[test]
-    fn civil_date_handles_epoch() {
-        assert_eq!(civil_from_days(0), (1970, 1, 1));
-        assert_eq!(civil_from_days(-1), (1969, 12, 31));
-    }
-
-    #[test]
-    fn artifact_paths_are_stable() {
-        let root = Path::new("/repo");
-        assert_eq!(
-            artifact_path(root, Arch::X86_64, Component::Kernel, ""),
-            Path::new("/repo/build/x86_64/kernel.elf")
-        );
-        assert_eq!(
-            artifact_path(root, Arch::Aarch64, Component::Loader, ""),
-            Path::new("/repo/build/aarch64/loader.efi")
-        );
-        assert_eq!(
-            artifact_path(root, Arch::Riscv64, Component::User, "raven-init"),
-            Path::new("/repo/build/riscv64/user/raven-init")
-        );
-    }
-
-    #[test]
-    fn release_lto_keeps_fat_for_kernel_and_loader() {
-        for arch in [Arch::X86_64, Arch::Aarch64] {
-            assert_eq!(release_lto_for(Component::Kernel, arch), "fat");
-            assert_eq!(release_lto_for(Component::Loader, arch), "fat");
-        }
-        assert_eq!(release_lto_for(Component::Kernel, Arch::Riscv64), "fat");
-    }
-
-    #[test]
-    fn release_lto_follows_the_code_model_table() {
-        assert_eq!(code_model_for(Component::User, Arch::X86_64), Some("small"));
-        assert_eq!(code_model_for(Component::User, Arch::Aarch64), None);
-        assert_eq!(code_model_for(Component::User, Arch::Riscv64), None);
-        assert_eq!(code_model_for(Component::Kernel, Arch::X86_64), None);
-        assert_eq!(code_model_for(Component::Loader, Arch::X86_64), None);
-    }
-
-    #[test]
-    fn release_lto_falls_back_for_user_x86_64() {
-        // Both fat and thin LTO reject the conflicting `Code Model` flag on this target, so the
-        // DR-22 dynamic fallback is the only selection that links.
-        assert_eq!(release_lto_for(Component::User, Arch::X86_64), "false");
-        assert_eq!(release_lto_for(Component::User, Arch::Aarch64), "fat");
-        assert_eq!(release_lto_for(Component::User, Arch::Riscv64), "fat");
-    }
-
-    #[test]
-    fn release_summary_names_the_code_model() {
-        assert_eq!(
-            release_summary(Component::User, Arch::X86_64),
-            "lto=false (code-model=small)"
-        );
-        assert_eq!(release_summary(Component::Kernel, Arch::X86_64), "lto=fat");
-        assert_eq!(release_summary(Component::Loader, Arch::Aarch64), "lto=fat");
-    }
-
-    #[test]
-    fn caller_profile_vars_are_dropped() {
-        let vars = vec![
-            ("PATH".to_string(), "/bin".to_string()),
-            ("CARGO_PROFILE_RELEASE_LTO".to_string(), "fat".to_string()),
-            ("CARGO_PROFILE_DEV_OPT_LEVEL".to_string(), "0".to_string()),
-            ("RUSTFLAGS".to_string(), "-Cfoo".to_string()),
-        ];
-        assert_eq!(
-            caller_profile_vars(vars),
-            vec![
-                "CARGO_PROFILE_DEV_OPT_LEVEL".to_string(),
-                "CARGO_PROFILE_RELEASE_LTO".to_string(),
-            ]
-        );
-    }
-}
+#[path = "build_ut.rs"]
+mod tests;

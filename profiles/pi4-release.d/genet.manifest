@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Pi 4 GENET frame service (REL4/P8). devd launches it from the platform table
+# with the BAR/DMA/IRQ handles; the svcd service entry is staged disabled to
+# keep exactly one launcher. netd waits for the `nic:` scheme it registers.
+name = "genet"
+exec = "/sbin/genet"
+needs = ["logd", "scheme:plat"]
+provides = ["scheme:nic"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0
+enable = false

@@ -113,6 +113,7 @@ cases:
       [[ ${expanded} == ${roundtripped} ]] && echo "History number matches"
 
   - name: "Current command number"
+    min_oracle_version: "5.2" # bash 5.1 numbers a -c prompt differently
     known_failure: true # bash advances the number before a command runs, brush after
     stdin: |
       prompt='\#'
@@ -120,6 +121,7 @@ cases:
       echo "${expanded}"
 
   - name: "Current command number at each interactive prompt"
+    min_oracle_version: "5.2" # bash 5.1 numbers each prompt differently
     args: ["-i"]
     ignore_stderr: true
     env:
@@ -148,6 +150,7 @@ cases:
       true
 
   - name: "Current command number in a -c string"
+    min_oracle_version: "5.2" # bash 5.1 numbers a -c prompt differently
     args:
       - "-c"
       - |

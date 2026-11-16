@@ -1,0 +1,152 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4c text utility evidence: the 24 existing text tools. Each row runs the
+# per-tool POSIX behaviour script; the six missing tools are defects, not rows.
+
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.sort"
+status = "present"
+evidence = "test:tests/posix/utility/text/sort/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.cut"
+status = "present"
+evidence = "test:tests/posix/utility/text/cut/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.tr"
+status = "present"
+evidence = "test:tests/posix/utility/text/tr/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.wc"
+status = "present"
+evidence = "test:tests/posix/utility/text/wc/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.head"
+status = "present"
+evidence = "test:tests/posix/utility/text/head/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.tail"
+status = "present"
+evidence = "test:tests/posix/utility/text/tail/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.uniq"
+status = "present"
+evidence = "test:tests/posix/utility/text/uniq/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.comm"
+status = "present"
+evidence = "test:tests/posix/utility/text/comm/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.fold"
+status = "present"
+evidence = "test:tests/posix/utility/text/fold/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.expand"
+status = "present"
+evidence = "test:tests/posix/utility/text/expand/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.unexpand"
+status = "present"
+evidence = "test:tests/posix/utility/text/unexpand/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.paste"
+status = "present"
+evidence = "test:tests/posix/utility/text/paste/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.join"
+status = "present"
+evidence = "test:tests/posix/utility/text/join/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.nl"
+status = "present"
+evidence = "test:tests/posix/utility/text/nl/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.pr"
+status = "present"
+evidence = "test:tests/posix/utility/text/pr/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.od"
+status = "present"
+evidence = "test:tests/posix/utility/text/od/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.split"
+status = "present"
+evidence = "test:tests/posix/utility/text/split/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.csplit"
+status = "present"
+evidence = "test:tests/posix/utility/text/csplit/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.tsort"
+status = "present"
+evidence = "test:tests/posix/utility/text/tsort/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.tee"
+status = "present"
+evidence = "test:tests/posix/utility/text/tee/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.printf"
+status = "present"
+evidence = "test:tests/posix/utility/text/printf/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.basename"
+status = "present"
+evidence = "test:tests/posix/utility/text/basename/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.dirname"
+status = "present"
+evidence = "test:tests/posix/utility/text/dirname/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"
+
+[[row]]
+id = "util.expr"
+status = "present"
+evidence = "test:tests/posix/utility/text/expr/test.sh"
+notes = "P4c: host build of the vendored uutils source under LC_ALL=C"

@@ -38,6 +38,11 @@ bootstrap configuration and the build wrapper for `make toolchain` (ticket K19).
   from a source tarball)` and contains `cargo`, rustc, host std and the
   `x86_64-unknown-ravenbsd` std rlibs. A reinstall from the cached build tree takes 0:10; a second
   `make toolchain` with a matching stamp skips the build entirely.
+* 2026-11-16: the bootstrap target list includes `aarch64-unknown-ravenbsd` and the stage-1
+  install now ships `lib/rustlib/aarch64-unknown-ravenbsd` std (`manifest-rust-std-aarch64-
+  unknown-ravenbsd`). The compiler-rt C sources are compiled with the host's
+  `aarch64-linux-gnu-gcc`; `build.sh` exports `CC_aarch64_unknown_ravenbsd` when that compiler
+  is present. Install `gcc-aarch64-linux-gnu` before `make toolchain` on a fresh host.
 * Rust's own `src/stage0` pins `1.96.0` as the bootstrap compiler for the 1.97.1 source. That
   download is part of the pinned release, not a substituted version; no nightly is used. The
   `build.sh` check requires the repository's pinned `rustc 1.97.1` to invoke the script.
@@ -50,6 +55,7 @@ bootstrap configuration and the build wrapper for `make toolchain` (ticket K19).
 | `bootstrap.toml` | bootstrap config: host + `x86_64-unknown-ravenbsd`, stable channel, CI LLVM, `build/toolchain` prefix |
 | `patches/0001-add-ravenbsd-targets.patch` | target specs, `Os::Ravenbsd`, supported-target registration, std cfg changes |
 | `patches/0002-libc-ravenbsd.patch` | vendored `libc` 0.2.185 with a `ravenbsd` unix module, plus `library/Cargo.toml`/`Cargo.lock` |
+| `patches/0003-posix-spawn-ravenbsd.patch` | selects std's `posix_spawn` path for `ravenbsd` and adds the target-libc `posix_spawn*` ABI (K91) |
 | `build.sh` | POSIX wrapper: download, verify, extract, patch, `x.py install`, `rustup toolchain link` |
 | `audit-errno.py` | repeatable errno audit against `raven-abi` and the musl donor oracle |
 | `libc-0.2.185-provenance.md` | exact registry/donor identities, license texts and modified file groups |
@@ -57,6 +63,28 @@ bootstrap configuration and the build wrapper for `make toolchain` (ticket K19).
 | `ralibc-symbols.txt` | top libc symbols referenced by `library/std` (raw material for K20-K22) |
 
 `build.sh --dry-run` prints the steps without network, extraction or installation.
+
+## K91: std `posix_spawn` (OBSERVED)
+
+`0003-posix-spawn-ravenbsd.patch` applies after 0001/0002 and carries the two changes that make
+`std` use `posix_spawn` on `x86_64-unknown-ravenbsd`:
+
+* `library/std/src/sys/process/unix/unix.rs`: `ravenbsd` joins the two `posix_spawn` cfg lists
+  and the static-libc `get_posix_spawn_addchdir` branch (weak lookup does not work in a static
+  binary).
+* `library/libc-ravenbsd/src/unix/ravenbsd/mod.rs`: `use crate::pid_t;`, the 336-byte
+  `posix_spawnattr_t`, the 80-byte `posix_spawn_file_actions_t`, the `POSIX_SPAWN_*` constants
+  and the `posix_spawn`/`posix_spawnp`/file-action/attr externs, mirroring
+  `toolchain/vendor/libc/src/unix/ravenbsd/mod.rs`.
+
+The patch is generated deterministically from a pristine Rust 1.97.1 tree after 0001/0002:
+make the two edits, then run `diff -u --label a/<path> --label b/<path>` for each file. The
+patch contains no timestamps, host paths or temporary file names. SHA-256:
+`c734f6bb2e05ed5137231300c54063979456cf5bed5f0d3f98245bcb47192e13`.
+
+`make toolchain` hashes every file under `toolchain/patches/` into the source/prefix stamp, so
+adding this patch forces one re-extract and rebuild; later runs with the same series reuse the
+stamped tree. `docs/toolchain-posix-spawn.md` records the K91 build and runtime evidence.
 
 ## Target properties
 
@@ -138,3 +166,12 @@ stamps the patched source and installed prefix, and registers the result with
 crate. The target std rlibs are installed, but the runtime (ralibc and the userland ABI) is still
 K20-K22 work; the K19 gate only proves the compiler and metadata emission. ralibc implementation
 work for std is separate (K20-K22).
+
+## Shared toolchain link (do not relink from a minion clone)
+
+`make toolchain` installs into the clone's `build/toolchain` and then relinks the global
+`rustup` toolchain `ravenbsd` to that path. Doing this from a minion clone changes the sysroot
+path in every cached rmeta and makes unrelated builds fail with E0460 (`found possibly newer
+version of crate std`). The lead owns the link; minions use `rustc +ravenbsd` as already linked
+and do not run `make toolchain`. A toolchain patch is reviewed and installed by the lead only.
+

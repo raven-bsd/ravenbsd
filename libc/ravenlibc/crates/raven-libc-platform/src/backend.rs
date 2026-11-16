@@ -786,7 +786,8 @@ impl SysBackend for FakeSys {
             raven_proto_fs::Call::Truncate { .. }
             | raven_proto_fs::Call::Sync
             | raven_proto_fs::Call::Mount { .. }
-            | raven_proto_fs::Call::Umount { .. } => raven_proto_fs::CallResponse::Status(0),
+            | raven_proto_fs::Call::Umount { .. }
+            | raven_proto_fs::Call::Access { .. } => raven_proto_fs::CallResponse::Status(0),
         };
         let _ = open;
         response.encode(resp).map_err(|error| error.errno())

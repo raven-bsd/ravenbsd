@@ -3,16 +3,21 @@
 
 //! Keyboard service: boot reports in, console bytes out.
 
-use raven_usb_hid::{BootKeyboard, Error, Layout, TransferRing};
+use raven_usb_hid::{BootKeyboard, Error, KeyEvent, KeyEvents, Keyboard, Layout, TransferRing};
 
 use crate::console::ConsoleInput;
 use crate::repeat::{Repeat, RepeatSettings};
+
+/// Maximum held usages tracked for a detach release: six key slots plus eight modifiers.
+const MAX_HELD: usize = 14;
 
 /// A boot keyboard bound to a transfer ring and a console input queue.
 pub struct KeyboardService<R: TransferRing> {
     keyboard: BootKeyboard<R>,
     console: ConsoleInput,
     repeat: Repeat,
+    attached: bool,
+    held: [u8; MAX_HELD],
 }
 
 impl<R: TransferRing> KeyboardService<R> {
@@ -22,6 +27,8 @@ impl<R: TransferRing> KeyboardService<R> {
             keyboard: BootKeyboard::new(ring),
             console: ConsoleInput::new(),
             repeat: Repeat::new(RepeatSettings::DEFAULT),
+            attached: false,
+            held: [0; MAX_HELD],
         }
     }
 
@@ -31,16 +38,45 @@ impl<R: TransferRing> KeyboardService<R> {
             keyboard: BootKeyboard::with_layout(ring, layout),
             console: ConsoleInput::new(),
             repeat: Repeat::new(RepeatSettings::DEFAULT),
+            attached: false,
+            held: [0; MAX_HELD],
         }
     }
 
     /// Select boot protocol and validate the report descriptor.
     ///
+    /// This is also the re-enumeration entry point after a detach: the keyboard state, locks and
+    /// repeat are reset and the descriptor is validated again. Call [`Self::detach`] first if the
+    /// stuck-key release events are needed.
+    ///
     /// # Errors
     ///
     /// The descriptor/transport errors from [`BootKeyboard::init`].
     pub fn init(&mut self, report_descriptor: &[u8]) -> Result<(), Error> {
-        self.keyboard.init(report_descriptor).map(|_| ())
+        self.attached = false;
+        self.reset_state();
+        self.keyboard.init(report_descriptor)?;
+        self.attached = true;
+        Ok(())
+    }
+
+    /// Mark the device absent and release every held key and modifier.
+    ///
+    /// The returned events are synthetic releases for the usages still held at detach; they are
+    /// not queued as console bytes. The repeat is stopped, the keyboard modifiers/keys/locks are
+    /// reset, and [`Self::poll_at`] returns [`Error::NotInitialized`] until a new [`Self::init`].
+    /// Detaching twice is harmless and returns no events.
+    pub fn detach(&mut self) -> KeyEvents {
+        self.attached = false;
+        self.repeat.clear();
+        self.reset_keyboard();
+        self.release_stuck()
+    }
+
+    /// True while a device is attached and initialized.
+    #[must_use]
+    pub const fn is_attached(&self) -> bool {
+        self.attached
     }
 
     /// Decode one completed report and queue the pressed-key ASCII.
@@ -65,11 +101,15 @@ impl<R: TransferRing> KeyboardService<R> {
     ///
     /// [`Error::NotInitialized`] before [`Self::init`], or a transport/report error.
     pub fn poll_at(&mut self, now_ns: u64) -> Result<usize, Error> {
+        if !self.attached {
+            return Err(Error::NotInitialized);
+        }
         let Some(events) = self.keyboard.poll()? else {
             return Ok(0);
         };
         let mut queued = 0usize;
         for event in events.iter() {
+            self.track(event);
             if event.pressed {
                 if let Some(ascii) = event.ascii
                     && self.console.push(ascii)
@@ -86,6 +126,9 @@ impl<R: TransferRing> KeyboardService<R> {
 
     /// Emit one auto-repeat byte when the deadline has passed.
     pub fn tick(&mut self, now_ns: u64) -> usize {
+        if !self.attached {
+            return 0;
+        }
         let Some(byte) = self.repeat.tick(now_ns) else {
             return 0;
         };
@@ -131,10 +174,61 @@ impl<R: TransferRing> KeyboardService<R> {
         self.keyboard.ring()
     }
 
+    /// The mutable transport, for hotplug and re-enumeration.
+    pub const fn ring_mut(&mut self) -> &mut R {
+        self.keyboard.ring_mut()
+    }
+
     /// The keyboard model.
     #[must_use]
     pub const fn keyboard(&self) -> &BootKeyboard<R> {
         &self.keyboard
+    }
+
+    /// Reset the model state and repeat without emitting releases.
+    fn reset_state(&mut self) {
+        self.repeat.clear();
+        self.reset_keyboard();
+        self.held = [0; MAX_HELD];
+    }
+
+    /// Reset modifiers, held keys, Caps Lock and Num Lock while preserving the layout.
+    fn reset_keyboard(&mut self) {
+        let layout = self.keyboard.keyboard().layout();
+        *self.keyboard.keyboard_mut() = Keyboard::with_layout(layout);
+    }
+
+    /// Track one key transition for the detach release batch.
+    fn track(&mut self, event: &KeyEvent) {
+        if event.pressed {
+            if !self.held.contains(&event.usage)
+                && let Some(slot) = self.held.iter_mut().find(|usage| **usage == 0)
+            {
+                *slot = event.usage;
+            }
+        } else if let Some(slot) = self.held.iter_mut().find(|usage| **usage == event.usage) {
+            *slot = 0;
+        }
+    }
+
+    /// Build synthetic releases for every held usage and clear the held set.
+    fn release_stuck(&mut self) -> KeyEvents {
+        let mut releases = KeyEvents::default();
+        for usage in self.held {
+            if usage == 0 {
+                continue;
+            }
+            if let Some(slot) = releases.events.get_mut(releases.count) {
+                *slot = KeyEvent {
+                    usage,
+                    pressed: false,
+                    ascii: None,
+                };
+                releases.count = releases.count.saturating_add(1);
+            }
+        }
+        self.held = [0; MAX_HELD];
+        releases
     }
 }
 

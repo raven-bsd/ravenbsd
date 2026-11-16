@@ -13,6 +13,7 @@ DRY=${DRY:-0}
 #   image tools      gdisk, mtools, dosfstools: only to VERIFY images (our own builder is pure Rust)
 #   test tools       strace for the Linux syscall corpus, curl/git/xz for fetching
 PKGS="build-essential pkg-config clang cmake ninja-build python3 git curl ca-certificates xz-utils \
+gcc-aarch64-linux-gnu \
 libssl-dev \
 qemu-system-x86 qemu-system-arm ovmf qemu-efi-aarch64 \
 gdisk mtools dosfstools \

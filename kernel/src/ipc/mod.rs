@@ -31,7 +31,7 @@ use crate::process::Process;
 use crate::sched::wait::WaitQueue;
 
 use self::capture::Capture;
-use self::protocol::{Opcode, SchemePacket};
+use self::protocol::{MAX_GROUPS, Opcode, SchemePacket};
 
 /// A registered scheme name owned by one process.
 pub struct SchemeServer {
@@ -188,7 +188,7 @@ impl PendingRequest {
         })
     }
 
-    /// Fill the capture addresses into the packet returned by `RECV`.
+    /// Fill the capture addresses and caller credentials into the packet returned by `RECV`.
     pub fn deliverable_packet(&self) -> SchemePacket {
         let mut packet = *self.packet.lock();
         let buffers = self.buffers.lock();
@@ -197,6 +197,19 @@ impl PendingRequest {
         }
         if let Some(response) = buffers.response.as_ref() {
             packet.response_addr = response.address();
+        }
+        let ids = self.client.ids.lock();
+        packet.uid = ids.uid;
+        packet.euid = ids.euid;
+        packet.gid = ids.gid;
+        packet.egid = ids.egid;
+        packet.group_count = ids.group_count.min(MAX_GROUPS as u32);
+        for (slot, group) in packet
+            .groups
+            .iter_mut()
+            .zip(ids.groups.iter().copied().take(MAX_GROUPS))
+        {
+            *slot = group;
         }
         packet
     }
