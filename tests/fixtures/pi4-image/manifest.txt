@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Required Pi 4 FAT boot files for the K35 image. Fields: path, minimum bytes, check.
+# The `pi4-serial.sh --check` manifest check reads this file with `mtype`; the checks are
+# `config` (the K35 config.txt contract lines), `kernel` (non-zero AArch64 image),
+# `fdt` (big-endian 0xd00dfeed magic) and `none`.
+config.txt 1 config
+kernel8.img 65536 kernel
+bcm2711-rpi-4-b.dtb 1024 fdt
+bootcode.bin 4096 none
+start4.elf 1048576 none
+fixup4.dat 1024 none
+LICENCE.broadcom 1 none
+overlays/disable-bt.dtbo 512 fdt

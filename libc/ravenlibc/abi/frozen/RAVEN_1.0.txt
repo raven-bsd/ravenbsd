@@ -82,6 +82,7 @@ cbrt F 6 x86_64
 cbrtf F 6 x86_64
 ceil F 385 x86_64
 ceilf F 325 x86_64
+cfmakeraw F 18 x86_64
 cgetcap F 153 x86_64
 cgetclose F 25 x86_64
 cgetent F 631 x86_64
@@ -92,6 +93,8 @@ cgetnum F 321 x86_64
 cgetset F 133 x86_64
 cgetstr F 531 x86_64
 cgetustr F 531 x86_64
+chdir F 277 x86_64
+chroot F 22 x86_64
 clearenv F 68 x86_64
 clearerr F 19 x86_64
 clock F 8 x86_64
@@ -113,6 +116,7 @@ cond_init F 40 x86_64
 cond_signal F 38 x86_64
 cond_timedwait F 54 x86_64
 cond_wait F 103 x86_64
+confstr F 100 x86_64
 connect F 149 x86_64
 copy_file_range F 532 x86_64
 copysign F 98 x86_64
@@ -272,6 +276,7 @@ fstat64 F 6 x86_64
 fstatat F 355 x86_64
 fsync F 86 x86_64
 ftell F 5 x86_64
+ftruncate F 129 x86_64
 fts_children F 118 x86_64
 fts_close F 297 x86_64
 fts_open F 97 x86_64
@@ -291,7 +296,7 @@ getaddrinfo F 2454 x86_64
 getauxval F 49 x86_64
 getbsize F 776 x86_64
 getchar F 5 x86_64
-getcontext F 0 x86_64
+getcontext F 5 x86_64
 getcwd F 633 x86_64
 getegid F 72 x86_64
 getenv F 114 x86_64
@@ -307,7 +312,7 @@ getgrgid_r F 776 x86_64
 getgrnam F 536 x86_64
 getgrnam_r F 776 x86_64
 getgrouplist F 836 x86_64
-getgroups F 56 x86_64
+getgroups F 84 x86_64
 gethostbyaddr F 289 x86_64
 gethostbyaddr_r F 610 x86_64
 gethostbyname F 304 x86_64
@@ -315,6 +320,7 @@ gethostbyname2 F 295 x86_64
 gethostbyname2_r F 5 x86_64
 gethostbyname_r F 50 x86_64
 gethostent F 144 x86_64
+gethostname F 264 x86_64
 getisax F 53 x86_64
 getlogin F 19 x86_64
 getlogin_r F 6 x86_64
@@ -349,8 +355,8 @@ getpwnam F 608 x86_64
 getpwnam_r F 824 x86_64
 getpwuid F 569 x86_64
 getpwuid_r F 822 x86_64
-getresgid F 0 x86_64
-getresuid F 0 x86_64
+getresgid F 291 x86_64
+getresuid F 290 x86_64
 getrlimit F 306 x86_64
 getrusage F 100 x86_64
 getservbyname F 328 x86_64
@@ -465,6 +471,7 @@ jnf F 6 x86_64
 jrand48 F 36 x86_64
 kevent F 584 x86_64
 kill F 73 x86_64
+killpg F 96 x86_64
 kqueue F 66 x86_64
 kqueue1 F 99 x86_64
 l64a F 264 x86_64
@@ -575,6 +582,7 @@ optreset D 4 x86_64
 perror F 5 x86_64
 personality F 264 x86_64
 pidfile F 147 x86_64
+pipe2 F 57 x86_64
 pledge F 291 x86_64
 poll F 344 x86_64
 port_alert F 99 x86_64
@@ -753,6 +761,7 @@ read F 291 x86_64
 readdir F 592 x86_64
 readdir64 F 6 x86_64
 readdir_r F 595 x86_64
+readlink F 344 x86_64
 readpassphrase F 1334 x86_64
 readv F 823 x86_64
 realloc F 24 x86_64
@@ -828,11 +837,11 @@ sendfile64 F 6 x86_64
 sendmmsg F 390 x86_64
 sendmsg F 903 x86_64
 sendto F 568 x86_64
-setcontext F 0 x86_64
-setegid F 148 x86_64
+setcontext F 5 x86_64
+setegid F 304 x86_64
 setenv F 294 x86_64
-seteuid F 148 x86_64
-setgid F 148 x86_64
+seteuid F 304 x86_64
+setgid F 304 x86_64
 setgrent F 5 x86_64
 setgroupent F 19 x86_64
 setgroups F 84 x86_64
@@ -840,7 +849,7 @@ sethostent F 5 x86_64
 setjmp F 0 x86_64
 setlocale F 5 x86_64
 setmntent F 23 x86_64
-setmode F 611 x86_64
+setmode F 641 x86_64
 setnetent F 5 x86_64
 setpassent F 19 x86_64
 setpayload F 21 x86_64
@@ -852,10 +861,10 @@ setproctitle_fast F 336 x86_64
 setprogname F 103 x86_64
 setprotoent F 5 x86_64
 setpwent F 5 x86_64
-setregid F 150 x86_64
-setresgid F 0 x86_64
-setresuid F 0 x86_64
-setreuid F 150 x86_64
+setregid F 306 x86_64
+setresgid F 308 x86_64
+setresuid F 308 x86_64
+setreuid F 306 x86_64
 setrlimit F 136 x86_64
 setservent F 5 x86_64
 setsid F 134 x86_64
@@ -863,7 +872,7 @@ setsockopt F 274 x86_64
 setspent F 18 x86_64
 setstate F 81 x86_64
 setttyent F 17 x86_64
-setuid F 148 x86_64
+setuid F 304 x86_64
 setusershell F 5 x86_64
 setutxent F 1 x86_64
 setvbuf F 5 x86_64
@@ -984,7 +993,8 @@ strvisx F 402 x86_64
 suboptarg D 8 x86_64
 svis F 272 x86_64
 swab F 57 x86_64
-swapcontext F 0 x86_64
+swapcontext F 5 x86_64
+syscall F 24 x86_64
 sysconf F 295 x86_64
 sysctl F 612 x86_64
 sysctlbyname F 608 x86_64
@@ -996,6 +1006,10 @@ tan F 6 x86_64
 tanf F 6 x86_64
 tanh F 6 x86_64
 tanhf F 6 x86_64
+tcgetattr F 261 x86_64
+tcgetpgrp F 22 x86_64
+tcsetattr F 277 x86_64
+tcsetpgrp F 22 x86_64
 tdelete F 297 x86_64
 tdestroy F 71 x86_64
 telldir F 33 x86_64
@@ -1056,9 +1070,11 @@ tss_create F 53 x86_64
 tss_delete F 18 x86_64
 tss_get F 38 x86_64
 tss_set F 35 x86_64
+ttyname_r F 131 x86_64
 twalk F 85 x86_64
 uid_from_user F 855 x86_64
 ulckpwdf F 137 x86_64
+umask F 48 x86_64
 uname F 265 x86_64
 ungetc F 5 x86_64
 unlink F 258 x86_64

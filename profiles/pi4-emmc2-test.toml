@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The pi4-emmc2 qtest profile: the EMMC2 driver in host-backed test mode and a one-shot disk:
+# client. The driver uses a memory disk, so the case needs no EMMC2 hardware model.
+
+name = "pi4-emmc2-test"
+
+extends = "base"
+
+[boot]
+cmdline = "console=ttyAMA0 loglevel=info"
+log_level = "info"

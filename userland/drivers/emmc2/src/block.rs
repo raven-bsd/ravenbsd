@@ -84,6 +84,11 @@ impl BlockPlan {
         self.transfer_flags
     }
 
+    /// The multi-block transfer state for this plan.
+    pub const fn transfer(self) -> MultiBlockTransfer {
+        self.transfer
+    }
+
     /// First sector.
     pub const fn sector(self) -> u64 {
         self.transfer.start_lba()

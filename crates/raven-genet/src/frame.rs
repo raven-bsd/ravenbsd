@@ -10,14 +10,54 @@
 
 use crate::regs::DESC_COUNT;
 use crate::ring::{
-    BUFFER_LEN, RingError, RingIndices, RxDescriptor, RxError, RxFrame, RxStatus, TxDescriptor,
-    TxError, TxStatus,
+    BUFFER_LEN, RX_STATUS_OWN, RingError, RingIndices, RxDescriptor, RxError, RxFrame, RxStatus,
+    TX_STATUS_OWN, TxDescriptor, TxError, TxStatus,
 };
 
 /// Number of comparison slots in the fixed ownership table.
 pub const SLOT_COUNT: usize = DESC_COUNT as usize;
 /// Packet buffers must be aligned for the non-coherent cache line.
 pub const FRAME_ALIGN: u64 = 64;
+/// Default number of completions one interrupt services per direction.
+pub const DEFAULT_RECLAIM_BUDGET: usize = 64;
+
+/// How many RX/TX completions one service call may process.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ReclaimBudget {
+    /// Maximum RX completions.
+    pub max_rx: usize,
+    /// Maximum TX completions.
+    pub max_tx: usize,
+}
+
+impl ReclaimBudget {
+    /// A budget with explicit limits.
+    #[must_use]
+    pub const fn new(max_rx: usize, max_tx: usize) -> Self {
+        Self { max_rx, max_tx }
+    }
+}
+
+impl Default for ReclaimBudget {
+    fn default() -> Self {
+        Self::new(DEFAULT_RECLAIM_BUDGET, DEFAULT_RECLAIM_BUDGET)
+    }
+}
+
+/// The result of one bounded reclaim pass.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ReclaimReport {
+    /// RX descriptors completed.
+    pub rx_completed: usize,
+    /// RX descriptors completed with a malformed status.
+    pub rx_errors: usize,
+    /// TX descriptors reclaimed.
+    pub tx_completed: usize,
+    /// True when RX work remains after the budget.
+    pub rx_truncated: bool,
+    /// True when TX work remains after the budget.
+    pub tx_truncated: bool,
+}
 
 /// Who currently owns one descriptor slot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -188,7 +228,7 @@ impl RxPath {
         if entry.owner != SlotOwner::Free {
             return Err(FrameError::SlotBusy(slot as u16));
         }
-        let descriptor = RxDescriptor::new(address, RxStatus::from_raw(0));
+        let descriptor = RxDescriptor::new(address, RxStatus::from_raw(RX_STATUS_OWN));
         entry.owner = SlotOwner::Device;
         entry.descriptor = descriptor;
         self.indices.advance_producer(1)?;
@@ -242,6 +282,36 @@ impl RxPath {
     /// Number of free descriptor slots.
     pub fn free_slots(&self) -> Result<usize, FrameError> {
         Ok(self.indices.free()?)
+    }
+
+    /// Complete up to `max` descriptors from a status batch.
+    ///
+    /// A still-owned status stops the batch because the device has not finished; a malformed
+    /// status is counted and its slot is still freed.
+    pub fn complete_batch(
+        &mut self,
+        statuses: &[RxStatus],
+        max: usize,
+    ) -> Result<ReclaimReport, FrameError> {
+        let mut report = ReclaimReport::default();
+        for status in statuses.iter().take(max) {
+            if self.indices.used()? == 0 {
+                break;
+            }
+            match self.complete_next(*status) {
+                Ok(Some(completion)) => {
+                    report.rx_completed = report.rx_completed.saturating_add(1);
+                    if completion.frame.is_err() {
+                        report.rx_errors = report.rx_errors.saturating_add(1);
+                    }
+                }
+                Ok(None) => break,
+                Err(FrameError::StillOwned(_)) => break,
+                Err(error) => return Err(error),
+            }
+        }
+        report.rx_truncated = self.indices.used()? > 0 && statuses.len() >= max;
+        Ok(report)
     }
 }
 
@@ -311,7 +381,12 @@ impl TxPath {
         if entry.owner != SlotOwner::Free {
             return Err(FrameError::SlotBusy(slot as u16));
         }
-        let status = TxStatus::single(length).map_err(FrameError::BadStatus)?;
+        let status = TxStatus::from_raw(
+            TxStatus::single(length)
+                .map_err(FrameError::BadStatus)?
+                .raw()
+                | TX_STATUS_OWN,
+        );
         let descriptor = TxDescriptor::new(address, status);
         entry.owner = SlotOwner::Device;
         entry.descriptor = descriptor;
@@ -364,6 +439,32 @@ impl TxPath {
     pub fn free_slots(&self) -> Result<usize, FrameError> {
         Ok(self.indices.free()?)
     }
+
+    /// Reclaim up to `max` descriptors from a status batch.
+    ///
+    /// A still-owned status stops the batch because the device has not finished.
+    pub fn reclaim_batch(
+        &mut self,
+        statuses: &[TxStatus],
+        max: usize,
+    ) -> Result<ReclaimReport, FrameError> {
+        let mut report = ReclaimReport::default();
+        for status in statuses.iter().take(max) {
+            if self.indices.used()? == 0 {
+                break;
+            }
+            match self.reclaim_next(*status) {
+                Ok(Some(_)) => {
+                    report.tx_completed = report.tx_completed.saturating_add(1);
+                }
+                Ok(None) => break,
+                Err(FrameError::StillOwned(_)) => break,
+                Err(error) => return Err(error),
+            }
+        }
+        report.tx_truncated = self.indices.used()? > 0 && statuses.len() >= max;
+        Ok(report)
+    }
 }
 
 /// The paired RX/TX frame path.
@@ -382,6 +483,20 @@ impl FramePath {
             rx: RxPath::new(count)?,
             tx: TxPath::new(count)?,
         })
+    }
+
+    /// Reclaim one bounded batch in both directions.
+    pub fn reclaim(
+        &mut self,
+        budget: ReclaimBudget,
+        rx_statuses: &[RxStatus],
+        tx_statuses: &[TxStatus],
+    ) -> Result<ReclaimReport, FrameError> {
+        let mut report = self.rx.complete_batch(rx_statuses, budget.max_rx)?;
+        let tx = self.tx.reclaim_batch(tx_statuses, budget.max_tx)?;
+        report.tx_completed = tx.tx_completed;
+        report.tx_truncated = tx.tx_truncated;
+        Ok(report)
     }
 }
 

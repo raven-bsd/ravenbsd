@@ -1,0 +1,66 @@
+dynamic	arc4random_buf	MISSING	C64i	random; C50 history
+dynamic	dlclose	PRESENT	-	loader
+dynamic	dlerror	PRESENT	-	loader
+dynamic	dlopen	PRESENT	-	loader
+dynamic	dlsym	PRESENT	-	loader
+dynamic	fgetln	MISSING	C64i	string/stdio
+dynamic	grantpt	MISSING	C64i	pty
+dynamic	posix_openpt	MISSING	C64i	pty
+dynamic	ptsname_r	MISSING	C64i	pty
+dynamic	tcgetattr	MISSING	C64i	termios
+dynamic	tcsetattr	MISSING	C64i	termios
+dynamic	umask	MISSING	C64i	process
+dynamic	unlockpt	MISSING	C64i	pty
+hello	atexit	PRESENT	-	process exit
+hello	calloc	PRESENT	-	memory
+hello	close	PRESENT	-	file descriptor
+hello	dup2	PRESENT	-	console setup
+hello	free	PRESENT	-	memory
+hello	getauxval	PRESENT	-	startup auxv
+hello	malloc	PRESENT	-	memory
+hello	memcmp	PRESENT	-	string
+hello	memcpy	PRESENT	-	string
+hello	memmove	PRESENT	-	string
+hello	memset	PRESENT	-	string
+hello	open	PRESENT	-	console setup
+hello	realloc	PRESENT	-	memory
+hello	strchr	PRESENT	-	string
+hello	strcmp	PRESENT	-	string
+hello	strerror	PRESENT	-	string
+hello	strlen	PRESENT	-	string
+hello	strstr	PRESENT	-	string
+hello	write	PRESENT	-	console
+signals	longjmp	PRESENT	-	signals
+signals	raise	PRESENT	-	signals
+signals	setjmp	PRESENT	-	signals
+signals	sigaction	PRESENT	-	signals
+signals	sigaddset	PRESENT	-	signals
+signals	sigemptyset	PRESENT	-	signals
+signals	sigprocmask	PRESENT	-	signals
+spawn	fork	PRESENT	-	process
+spawn	getpid	PRESENT	-	process
+spawn	posix_spawn	PRESENT	-	spawn ABI
+spawn	posix_spawnp	PRESENT	-	spawn ABI
+spawn	wait	PRESENT	-	process
+spawn	waitpid	PRESENT	-	process
+stdio	__ctype_get_mb_cur_max	MISSING	C64i	stdio/C64i
+stdio	fgetwc	MISSING	C64i	wide stdio
+stdio	fwprintf	MISSING	C64i	wide stdio
+stdio	getline	MISSING	C64i	stdio
+stdio	remove	MISSING	C64i	stdio
+stdio	rewind	MISSING	C64i	stdio
+stdio	stderr	MISSING	C64i	stdio object
+stdio	stdin	MISSING	C64i	stdio object
+stdio	stdout	MISSING	C64i	stdio object
+threads	pthread_cond_signal	PRESENT	-	threads
+threads	pthread_cond_wait	PRESENT	-	threads
+threads	pthread_create	PRESENT	-	threads
+threads	pthread_join	PRESENT	-	threads
+threads	pthread_mutex_lock	PRESENT	-	threads
+threads	pthread_mutex_unlock	PRESENT	-	threads
+time	clock_gettime	PRESENT	-	time
+time	difftime	PRESENT	-	time
+time	localtime_r	PRESENT	-	time
+time	nanosleep	PRESENT	-	time
+time	strftime	PRESENT	-	time
+time	time	PRESENT	-	time

@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "pwm-audio"
+version = "0.1.0"
+description = "Raspberry Pi 4 PWM1 audio driver skeleton: register/DMA seam and audiod PCM sink."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raven-proto-audio = { path = "../../../crates/raven-proto-audio" }
+raven-pwm = { path = "../../../crates/raven-pwm" }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-rt = { path = "../../rt", features = ["alloc"] }
+
+[lints]
+workspace = true

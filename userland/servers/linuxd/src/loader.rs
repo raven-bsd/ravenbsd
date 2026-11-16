@@ -11,13 +11,18 @@
 //!
 //! Two read/write arenas (`brk` and anonymous `mmap`) are mapped once, object-backed, so the
 //! handlers can serve those calls without a kernel round trip and the trap loop can copy results
-//! out of them.
+//! out of them. The `brk` arena starts at the end of the main image so the program's break and the
+//! page tables agree; the `mmap` arena is at a fixed address.
+//!
+//! A dynamic image's interpreter is staged as its own memory object and mapped at
+//! [`crate::image::ImageSpec::interp_bias`]; the main image maps at
+//! [`crate::image::ImageSpec::bias`].
 
 use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 use raven_abi::types::{Handle, map, prot};
-use raven_elf::StepKind;
+use raven_elf::{MapStep, StepKind};
 
 use crate::image::ImageSpec;
 use crate::table::Region;
@@ -61,8 +66,6 @@ pub trait Sys {
 /// Page size used by the loader.
 pub const PAGE: u64 = 4096;
 
-/// Base of the pre-mapped `brk` arena.
-pub const BRK_BASE: u64 = 0x0000_2000_0000_0000;
 /// Size of the pre-mapped `brk` arena.
 pub const BRK_SIZE: u64 = 1024 * 1024;
 
@@ -70,6 +73,9 @@ pub const BRK_SIZE: u64 = 1024 * 1024;
 pub const MMAP_BASE: u64 = 0x0000_3000_0000_0000;
 /// Size of the pre-mapped anonymous-`mmap` arena.
 pub const MMAP_SIZE: u64 = 1024 * 1024;
+
+/// Stack reserve below the initial Linux stack image.
+pub const STACK_RESERVE: u64 = 256 * 1024;
 
 /// Why a load failed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -101,61 +107,54 @@ pub struct Loaded {
     pub regions: Vec<Region>,
 }
 
-/// Map `spec` and `image` into a fresh process.
-pub fn load<S: Sys>(spec: &ImageSpec, image: &[u8], sys: &mut S) -> Result<Loaded, LoadError> {
+/// Map `spec`, its optional interpreter `interp` and the main `image` into a fresh process.
+pub fn load<S: Sys>(
+    spec: &ImageSpec,
+    image: &[u8],
+    interp: Option<&[u8]>,
+    sys: &mut S,
+) -> Result<Loaded, LoadError> {
     let mut regions = Vec::new();
     let image_object = stage_image(image, sys)?;
+    let interp_object = match interp {
+        Some(bytes) => match stage_image(bytes, sys) {
+            Ok(object) => Some(object),
+            Err(error) => {
+                let _ = sys.handle_close(image_object);
+                return Err(error);
+            }
+        },
+        None => None,
+    };
     let child = sys.proc_create().map_err(LoadError::Sys)?;
     let result = (|| {
-        for step in &spec.steps {
-            let vaddr = step
-                .vaddr
-                .checked_add(spec.bias)
-                .ok_or(LoadError::TooLarge)?;
-            match step.kind {
-                StepKind::File { offset } => {
-                    map_object(sys, child, image_object, offset, vaddr, step.len, step.prot)?;
-                    regions.push(Region {
-                        start: vaddr,
-                        len: step.len,
-                        backing: image_object,
-                        backing_offset: offset,
-                    });
-                }
-                StepKind::CopyTail { offset, len } => {
-                    let object = stage_tail(image, offset, len, sys)?;
-                    map_object(sys, child, object, 0, vaddr, PAGE, step.prot)?;
-                    regions.push(Region {
-                        start: vaddr,
-                        len: PAGE,
-                        backing: object,
-                        backing_offset: 0,
-                    });
-                }
-                StepKind::Zero => {
-                    let flags = map::pack(step.prot as usize, map::FIXED);
-                    sys.map(
-                        child,
-                        Handle::NONE,
-                        0,
-                        vaddr as usize,
-                        step.len as usize,
-                        flags,
-                    )
-                    .map_err(LoadError::Sys)?;
-                    regions.push(Region {
-                        start: vaddr,
-                        len: step.len,
-                        backing: Handle::NONE,
-                        backing_offset: 0,
-                    });
-                }
-            }
+        map_steps(
+            sys,
+            child,
+            image_object,
+            image,
+            &spec.steps,
+            spec.bias,
+            &mut regions,
+        )?;
+        if let (Some(object), Some(bytes)) = (interp_object, interp) {
+            map_steps(
+                sys,
+                child,
+                object,
+                bytes,
+                &spec.interp_steps,
+                spec.interp_bias,
+                &mut regions,
+            )?;
         }
         let stack = map_stack(spec, sys, child, &mut regions)?;
-        let brk_object = map_arena(sys, child, BRK_BASE, BRK_SIZE)?;
+        // The break starts at the end of the main image; the arena must be mapped exactly there so
+        // a program that grows `brk` writes into mapped memory. A fixed arena elsewhere would make
+        // the handler accept a break the page tables do not cover.
+        let brk_object = map_arena(sys, child, spec.brk_start, BRK_SIZE)?;
         regions.push(Region {
-            start: BRK_BASE,
+            start: spec.brk_start,
             len: BRK_SIZE,
             backing: brk_object,
             backing_offset: 0,
@@ -237,6 +236,61 @@ fn stage_tail<S: Sys>(
     Ok(object)
 }
 
+/// Map one image's page steps at `bias` and record every mapping for the copy-in/out path.
+fn map_steps<S: Sys>(
+    sys: &mut S,
+    child: Handle,
+    object: Handle,
+    image: &[u8],
+    steps: &[MapStep],
+    bias: u64,
+    regions: &mut Vec<Region>,
+) -> Result<(), LoadError> {
+    for step in steps {
+        let vaddr = step.vaddr.checked_add(bias).ok_or(LoadError::TooLarge)?;
+        match step.kind {
+            StepKind::File { offset } => {
+                map_object(sys, child, object, offset, vaddr, step.len, step.prot)?;
+                regions.push(Region {
+                    start: vaddr,
+                    len: step.len,
+                    backing: object,
+                    backing_offset: offset,
+                });
+            }
+            StepKind::CopyTail { offset, len } => {
+                let tail = stage_tail(image, offset, len, sys)?;
+                map_object(sys, child, tail, 0, vaddr, PAGE, step.prot)?;
+                regions.push(Region {
+                    start: vaddr,
+                    len: PAGE,
+                    backing: tail,
+                    backing_offset: 0,
+                });
+            }
+            StepKind::Zero => {
+                let flags = map::pack(step.prot as usize, map::FIXED);
+                sys.map(
+                    child,
+                    Handle::NONE,
+                    0,
+                    vaddr as usize,
+                    step.len as usize,
+                    flags,
+                )
+                .map_err(LoadError::Sys)?;
+                regions.push(Region {
+                    start: vaddr,
+                    len: step.len,
+                    backing: Handle::NONE,
+                    backing_offset: 0,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Map one page step from `object`, turning an executable mapping into RW + `protect`.
 fn map_object<S: Sys>(
     sys: &mut S,
@@ -271,6 +325,11 @@ fn map_object<S: Sys>(
 }
 
 /// Map the initial stack and return its initial pointer.
+///
+/// The Linux stack is mapped with a fixed reserve below the initial image instead of only the
+/// bytes of the image: a static program uses ordinary stack frames (a 4 KiB buffer is enough to
+/// fault the one-page B20 mapping) and Linux does not grow a userspace stack through the scheme
+/// server. The image stays at the top; the reserve is zero-filled by the memory object.
 fn map_stack<S: Sys>(
     spec: &ImageSpec,
     sys: &mut S,
@@ -278,8 +337,14 @@ fn map_stack<S: Sys>(
     regions: &mut Vec<Region>,
 ) -> Result<u64, LoadError> {
     let base = spec.stack.base;
-    let page_base = base - (base % PAGE);
-    let end = align_up(base + spec.stack.bytes.len() as u64, PAGE).ok_or(LoadError::TooLarge)?;
+    let image_end = base
+        .checked_add(spec.stack.bytes.len() as u64)
+        .ok_or(LoadError::TooLarge)?;
+    let reserve_start = image_end
+        .checked_sub(STACK_RESERVE)
+        .ok_or(LoadError::TooLarge)?;
+    let page_base = reserve_start.min(base) - (reserve_start.min(base) % PAGE);
+    let end = align_up(image_end, PAGE).ok_or(LoadError::TooLarge)?;
     let length = end.checked_sub(page_base).ok_or(LoadError::TooLarge)?;
     let length = usize::try_from(length).map_err(|_| LoadError::TooLarge)?;
     let object = sys.memobj_create(length).map_err(LoadError::Sys)?;

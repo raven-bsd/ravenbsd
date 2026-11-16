@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The qtest exits once every service has settled; the driver stops after the probe flushes.
+
+[[initfs.files]]
+src = "profiles/pi4-emmc2-test.d/svcd.conf"
+path = "/etc/svcd.conf"

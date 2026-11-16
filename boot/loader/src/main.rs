@@ -27,7 +27,7 @@ use raven_bootinfo::{BootInfo, Framebuffer, MemoryRegion, PhysRange};
 #[cfg(target_os = "uefi")]
 use raven_loader::layout::HHDM_BASE;
 #[cfg(target_os = "uefi")]
-use raven_loader::{bootinfo, config, fs, handoff, image, memmap, paging, serial};
+use raven_loader::{bootinfo, config, fs, handoff, health, image, memmap, paging, serial};
 #[cfg(target_os = "uefi")]
 use uefi::boot::{self, AllocateType, MemoryType};
 #[cfg(target_os = "uefi")]
@@ -144,23 +144,18 @@ fn run() -> Result<(), String> {
     }
     let filesystem = slot_store.as_mut().unwrap_or(&mut primary);
 
-    let (kernel, initfs_bytes, confirm) = if config.has_slot_config {
+    let (kernel, initfs_bytes) = if config.has_slot_config {
         boot_with_slots(filesystem, &mut config)?
     } else {
         let kernel_bytes = fs::read_file(filesystem, fs::KERNEL_PATH)?;
         let initfs_bytes = fs::read_file(filesystem, fs::INITFS_PATH)?;
         let kernel =
             image::load(&kernel_bytes).map_err(|error| format!("cannot load kernel: {error}"))?;
-        (kernel, initfs_bytes, None)
+        (kernel, initfs_bytes)
     };
 
     let verbose = config.log_level == config::LogLevel::Debug;
     let prepared = prepare(kernel, &initfs_bytes, &config.cmdline, verbose)?;
-    if let Some(slot) = confirm {
-        config.mark_healthy(slot);
-        fs::write_file(filesystem, fs::BOOT_TOML_PATH, config.render().as_bytes())?;
-        serial::log(format_args!("update: slot {} healthy", slot.as_str()));
-    }
 
     drop(initfs_bytes);
     drop(config);
@@ -238,15 +233,32 @@ fn load_slot(
 fn boot_with_slots(
     filesystem: &mut FileSystem,
     config: &mut config::Config,
-) -> Result<(image::LoadedKernel, Vec<u8>, Option<config::Slot>), String> {
+) -> Result<(image::LoadedKernel, Vec<u8>), String> {
     let confirmed = config.slot;
     if let Some(trial) = config.trial {
+        if health_matches(config, trial) {
+            match load_slot(filesystem, trial) {
+                Ok(boot) => {
+                    config.mark_healthy(trial);
+                    fs::write_file(filesystem, fs::BOOT_TOML_PATH, config.render().as_bytes())?;
+                    serial::log(format_args!(
+                        "update: health marker matches slot {}; confirmed",
+                        trial.as_str()
+                    ));
+                    return Ok(boot);
+                }
+                Err(error) => serial::log(format_args!(
+                    "update: marker matches slot {} but its kernel failed: {error}",
+                    trial.as_str()
+                )),
+            }
+        }
+
         if config.attempts == 0 {
             config.rollback();
             fs::write_file(filesystem, fs::BOOT_TOML_PATH, config.render().as_bytes())?;
             serial::log(format_args!("update: rollback to slot {confirmed}"));
-            let (kernel, initfs) = load_slot(filesystem, confirmed)?;
-            return Ok((kernel, initfs, None));
+            return load_slot(filesystem, confirmed);
         }
 
         let mut remaining = config.attempts;
@@ -256,11 +268,14 @@ fn boot_with_slots(
                 trial.as_str()
             ));
             match load_slot(filesystem, trial) {
-                Ok((kernel, initfs)) => {
+                Ok(boot) => {
                     config.fail_attempt();
                     fs::write_file(filesystem, fs::BOOT_TOML_PATH, config.render().as_bytes())?;
-                    serial::log(format_args!("update: trial slot {} loaded", trial.as_str()));
-                    return Ok((kernel, initfs, Some(trial)));
+                    serial::log(format_args!(
+                        "update: trial slot {} loaded; waiting for the health marker",
+                        trial.as_str()
+                    ));
+                    return Ok(boot);
                 }
                 Err(error) => {
                     serial::log(format_args!(
@@ -279,8 +294,34 @@ fn boot_with_slots(
         serial::log(format_args!("update: rollback to slot {confirmed}"));
     }
 
-    let (kernel, initfs) = load_slot(filesystem, confirmed)?;
-    Ok((kernel, initfs, None))
+    load_slot(filesystem, confirmed)
+}
+
+/// True when the persisted health marker confirms the current trial and token.
+#[cfg(target_os = "uefi")]
+fn health_matches(config: &config::Config, trial: config::Slot) -> bool {
+    let Some(token) = config.trial_token else {
+        serial::log(format_args!(
+            "update: no trial token for slot {}",
+            trial.as_str()
+        ));
+        return false;
+    };
+    match health::find_marker() {
+        Some(marker) => {
+            serial::log(format_args!(
+                "update: marker slot {} state {} token {:08x}",
+                marker.slot.as_str(),
+                marker.state,
+                marker.token
+            ));
+            marker.confirms(trial, token)
+        }
+        None => {
+            serial::log(format_args!("update: no health marker found"));
+            false
+        }
+    }
 }
 
 #[cfg(target_os = "uefi")]

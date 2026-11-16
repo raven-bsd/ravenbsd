@@ -1,0 +1,215 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2024 reuben olinsky
+
+use std::io::{Read, Write};
+
+use brush_core::{ErrorKind, ExecutionExitCode, ExecutionResult, builtins, env, error, variables};
+
+/// Read lines from standard input into an indexed array variable.
+#[derive(winnow_args::Args)]
+#[arg(disable_help_short, disable_version_flag, disable_help_subcommand)]
+pub(crate) struct MapFileCommand {
+    /// Delimiter to use (defaults to newline).
+    #[arg(short = 'd')]
+    delimiter: Option<String>,
+
+    /// Maximum number of entries to read (0 means no limit).
+    #[arg(short = 'n', default = "0", parse_with = |s: &str| at_least(s, 0))]
+    max_count: i64,
+
+    /// Index into array at which to start assignment.
+    #[arg(short = 'O', allow_negative_numbers)]
+    origin: Vec<i64>,
+
+    /// Number of initial entries to skip.
+    #[arg(short = 's', default = "0", parse_with = |s: &str| at_least(s, 0))]
+    skip_count: i64,
+
+    /// Whether or not to remove the delimiter from each read line.
+    #[arg(short = 't')]
+    remove_delimiter: bool,
+
+    /// File descriptor to read from (defaults to stdin).
+    #[arg(short = 'u')]
+    fd: Vec<brush_core::ShellFd>,
+
+    /// Name of function to call for each group of lines.
+    #[arg(short = 'C')]
+    callback: Option<String>,
+
+    /// Number of lines to pass the callback for each group.
+    #[arg(short = 'c', default = "5000", parse_with = |s: &str| at_least(s, 1))]
+    callback_group_size: i64,
+
+    /// Name of array to read into.
+    #[arg(positional, default = "MAPFILE")]
+    array_var_name: String,
+}
+
+/// A count of at least `min`. Each occurrence is checked as it is parsed, so a
+/// later valid one doesn't hide an earlier invalid one.
+fn at_least(text: &str, min: i64) -> Result<i64, String> {
+    let count: i64 = text.parse().map_err(|e| format!("{e}"))?;
+    if count < min {
+        return Err("out of range".to_owned());
+    }
+    Ok(count)
+}
+
+brush_winnow_args_adapter::impl_parse_args!(MapFileCommand);
+
+impl<SE: brush_core::ShellExtensions> builtins::Builtin<SE> for MapFileCommand {
+    type Error = brush_core::Error;
+
+    async fn execute(
+        self,
+        context: brush_core::ExecutionContext<'_, SE>,
+    ) -> Result<brush_core::ExecutionResult, Self::Error> {
+        if self.callback_group_size != 5000 || self.callback.is_some() {
+            return error::unimp("mapfile -C/-c is not yet implemented");
+        }
+
+        // Every -O and -u given is checked before reading, and the last one is used.
+        if let Some(origin) = self.origin.iter().find(|origin| **origin < 0) {
+            writeln!(
+                context.stderr(),
+                "{}: {origin}: invalid array origin",
+                context.command_name
+            )?;
+            return Ok(ExecutionExitCode::GeneralError.into());
+        }
+        let origin = self.origin.last().copied();
+
+        if let Some((_, var)) = context.shell.env().get(&self.array_var_name) {
+            if var.value().is_associative_array() {
+                writeln!(
+                    context.stderr(),
+                    "{}: {}: not an indexed array",
+                    context.command_name,
+                    self.array_var_name
+                )?;
+                return Ok(ExecutionExitCode::GeneralError.into());
+            }
+        }
+
+        let mut fd = brush_core::openfiles::OpenFiles::STDIN_FD;
+        for &given in &self.fd {
+            fd = given;
+            context
+                .try_fd(fd)
+                .ok_or_else(|| ErrorKind::BadFileDescriptor(fd))?;
+        }
+        let input_file = context
+            .try_fd(fd)
+            .ok_or_else(|| ErrorKind::BadFileDescriptor(fd))?;
+
+        // Read!
+        let lines = self.read_lines(input_file)?;
+
+        if let Some(origin) = origin {
+            // -O: preserve existing array, assign at offset.
+            for (elem_idx, value) in lines.into_iter().enumerate() {
+                // If the user is getting to wraparounds in *bash*, they got bigger problems.
+                #[allow(clippy::cast_possible_wrap)]
+                let elem_idx = elem_idx as i64;
+                context.shell.env_mut().update_or_add_array_element(
+                    &self.array_var_name,
+                    (elem_idx + origin).to_string(),
+                    value,
+                    |_| Ok(()),
+                    env::EnvironmentLookup::Anywhere,
+                    env::EnvironmentScope::Global,
+                )?;
+            }
+        } else {
+            // No -O: replace the entire variable (clears existing).
+            context.shell.env_mut().update_or_add(
+                &self.array_var_name,
+                variables::ShellValueLiteral::from(lines),
+                |_| Ok(()),
+                env::EnvironmentLookup::Anywhere,
+                env::EnvironmentScope::Global,
+            )?;
+        }
+
+        Ok(ExecutionResult::success())
+    }
+}
+
+impl MapFileCommand {
+    fn read_lines(
+        &self,
+        mut input_file: brush_core::openfiles::OpenFile,
+    ) -> Result<Vec<String>, brush_core::Error> {
+        let _term_mode = setup_terminal_settings(&input_file)?;
+
+        let mut entries = vec![];
+        let mut read_count = 0;
+        let max_count = self.max_count.try_into()?;
+        let delimiter = match &self.delimiter {
+            Some(d) if d.is_empty() => b'\0',
+            Some(d) => d.as_bytes().first().copied().unwrap_or(b'\n'),
+            None => b'\n',
+        };
+
+        let mut buf = [0u8; 1];
+
+        while max_count == 0 || entries.len() < max_count {
+            let mut line = vec![];
+            let mut saw_delimiter = false;
+
+            loop {
+                match input_file.read(&mut buf) {
+                    Ok(0) => break,                                         // End of input
+                    Ok(1) if buf[0] == b'\x03' => break,                    // Ctrl+C
+                    Ok(1) if buf[0] == b'\x04' && line.is_empty() => break, // Ctrl+D
+                    Ok(1) => {
+                        let byte = buf[0];
+                        line.push(byte);
+                        if byte == delimiter {
+                            saw_delimiter = true;
+                            break;
+                        }
+                    }
+                    Ok(_) => unreachable!("input can only be 0, 1, or error"),
+                    Err(e) => return Err(e.into()),
+                }
+            }
+
+            if line.is_empty() && !saw_delimiter {
+                break;
+            }
+
+            if read_count < self.skip_count {
+                read_count += 1;
+                continue;
+            }
+
+            if self.remove_delimiter && line.ends_with(&[delimiter]) {
+                line.pop();
+            }
+
+            let line_str = String::from_utf8_lossy(&line).to_string();
+
+            entries.push(line_str);
+        }
+
+        Ok(entries)
+    }
+}
+
+fn setup_terminal_settings(
+    file: &brush_core::openfiles::OpenFile,
+) -> Result<Option<brush_core::terminal::AutoModeGuard>, brush_core::Error> {
+    let mode = brush_core::terminal::AutoModeGuard::new(file.to_owned()).ok();
+    if let Some(mode) = &mode {
+        let config = brush_core::terminal::Settings::builder()
+            .line_input(false)
+            .interrupt_signals(false)
+            .build();
+
+        mode.apply_settings(&config)?;
+    }
+
+    Ok(mode)
+}

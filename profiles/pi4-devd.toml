@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The K32 Pi 4 platform-bus qtest profile. `devd` runs its `dtb` mode against the fixture tree and
+# exits; no PCI schema or platform driver launch is needed for this discovery test.
+name = "pi4-devd"
+
+[initfs]
+programs = [
+    { package = "raven-init", path = "/init" },
+    { package = "raven-devd", path = "/sbin/devd" },
+]
+
+[boot]
+cmdline = "console=ttyAMA0 loglevel=info"
+log_level = "info"

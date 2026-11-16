@@ -37,6 +37,9 @@ SECTIONS {
     .data ALIGN(4096) : AT(ADDR(.data) - KERNEL_OFFSET) {
         __data_start = .;
         *(.data .data.*)
+        /* S57: keep the GOT in the mapped RW segment (see the x86-64 linker script). */
+        *(.got .got.*)
+        *(.data.rel.ro .data.rel.ro.*)
         __data_end = .;
     } :data
 

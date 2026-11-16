@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# EMMC2 SD driver service for the Pi 4. The driver exposes the `disk:` scheme; blockd is its only
+# consumer in this profile. The service is staged with the profile fragment until the driver has
+# its board entry and MMIO/DMA adapter.
+name = "emmc2"
+exec = "/sbin/emmc2"
+needs = ["logd"]
+provides = ["scheme:disk"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "on-failure"
+max_restarts = 3
+# Staged until the driver program and its MMIO/DMA adapter are in the Pi initfs.
+enable = false

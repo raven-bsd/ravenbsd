@@ -29,6 +29,18 @@ pub const SYSCALL_LEN: usize = 2 + 8 + 6 * 8;
 /// Encoded reply length: version and signed value.
 pub const REPLY_LEN: usize = 1 + 8;
 
+/// Magic at the start of a frame payload carried beside a trap request or reply.
+pub const FRAME_MAGIC: [u8; 4] = *b"LFRM";
+/// Version of the frame payload. The syscall header stays version 1 so an older server can
+/// ignore the frame; the frame envelope has its own version.
+pub const FRAME_VERSION: u8 = 1;
+/// Number of general-purpose registers in a frame.
+pub const FRAME_GPRS: usize = 15;
+/// Frame header: magic, version and two reserved bytes.
+pub const FRAME_HEADER: usize = 8;
+/// Frame length: header plus RIP, RSP, RFLAGS, FS base and [`FRAME_GPRS`] registers.
+pub const FRAME_LEN: usize = FRAME_HEADER + (4 + FRAME_GPRS) * 8;
+
 /// Why a message was rejected.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProtoError {
@@ -40,6 +52,8 @@ pub enum ProtoError {
     BadVersion,
     /// The architecture id is unknown.
     BadArch,
+    /// The frame magic, version or reserved bytes are wrong.
+    BadFrame,
 }
 
 /// One captured Linux syscall.
@@ -124,6 +138,90 @@ impl LinuxSyscallV1 {
             nr,
             args,
         })
+    }
+}
+
+/// The saved user frame carried beside a trap request or reply.
+///
+/// The kernel writes this into the scheme packet's `path` field (256 bytes) because the packet's
+/// inline `data` is only 64 bytes and the version-1 syscall request already uses 58. The server
+/// reads the first [`FRAME_LEN`] bytes. The reply may carry the same envelope to resume the
+/// process at a chosen RIP/RSP; the 9-byte [`LinuxReplyV1`] stays in `data`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct LinuxFrame {
+    /// Instruction pointer.
+    pub rip: u64,
+    /// Stack pointer.
+    pub rsp: u64,
+    /// Saved RFLAGS.
+    pub rflags: u64,
+    /// User FS/TPIDR base at trap time.
+    pub fs_base: u64,
+    /// General registers: RAX, RBX, RCX, RDX, RSI, RDI, RBP, R8-R15.
+    pub gprs: [u64; FRAME_GPRS],
+}
+
+impl LinuxFrame {
+    /// Encode into the first [`FRAME_LEN`] bytes of `out`; returns [`FRAME_LEN`].
+    pub fn encode(&self, out: &mut [u8]) -> Result<usize, ProtoError> {
+        let bytes = out.get_mut(..FRAME_LEN).ok_or(ProtoError::TooShort)?;
+        bytes[..4].copy_from_slice(&FRAME_MAGIC);
+        bytes[4] = FRAME_VERSION;
+        bytes[5] = 0;
+        bytes[6] = 0;
+        bytes[7] = 0;
+        for (index, value) in self.words().iter().enumerate() {
+            let offset = FRAME_HEADER + index * 8;
+            let slot = bytes
+                .get_mut(offset..offset + 8)
+                .ok_or(ProtoError::TooShort)?;
+            slot.copy_from_slice(&value.to_le_bytes());
+        }
+        Ok(FRAME_LEN)
+    }
+
+    /// Decode one frame from a carrier that may be longer than [`FRAME_LEN`] (the packet path is
+    /// zero-padded); the first [`FRAME_LEN`] bytes are the envelope.
+    pub fn decode(input: &[u8]) -> Result<Self, ProtoError> {
+        let bytes = input.get(..FRAME_LEN).ok_or(ProtoError::TooShort)?;
+        if bytes.get(..4) != Some(FRAME_MAGIC.as_slice()) || bytes[4] != FRAME_VERSION {
+            return Err(ProtoError::BadFrame);
+        }
+        if bytes[5] != 0 || bytes[6] != 0 || bytes[7] != 0 {
+            return Err(ProtoError::BadFrame);
+        }
+        let mut words = [0u64; 4 + FRAME_GPRS];
+        let mut index = 0usize;
+        while index < words.len() {
+            let offset = FRAME_HEADER + index * 8;
+            words[index] = u64::from_le_bytes(
+                bytes
+                    .get(offset..offset + 8)
+                    .ok_or(ProtoError::TooShort)?
+                    .try_into()
+                    .map_err(|_| ProtoError::TooShort)?,
+            );
+            index += 1;
+        }
+        let mut gprs = [0u64; FRAME_GPRS];
+        gprs.copy_from_slice(&words[4..]);
+        Ok(Self {
+            rip: words[0],
+            rsp: words[1],
+            rflags: words[2],
+            fs_base: words[3],
+            gprs,
+        })
+    }
+
+    fn words(&self) -> [u64; 4 + FRAME_GPRS] {
+        let mut words = [0u64; 4 + FRAME_GPRS];
+        words[0] = self.rip;
+        words[1] = self.rsp;
+        words[2] = self.rflags;
+        words[3] = self.fs_base;
+        words[4..].copy_from_slice(&self.gprs);
+        words
     }
 }
 

@@ -1,0 +1,3 @@
+alpha	sym_missing	PRESENT	owner-b	missing fixture
+alpha	sym_present	PRESENT	owner-a	present fixture
+beta	sym_present	PRESENT	owner-c	present fixture

@@ -165,6 +165,7 @@ pub mod mntent_state;
 pub mod nvis;
 pub mod openpty;
 pub mod pidfile;
+pub mod pty;
 pub mod pty_state;
 pub mod pututxline;
 pub mod readpassphrase;
@@ -235,10 +236,6 @@ unsafe extern "C" {
         count: usize,
         file: *mut File,
     ) -> usize;
-    pub(crate) fn posix_openpt(flags: c_int) -> c_int;
-    pub(crate) fn grantpt(fd: c_int) -> c_int;
-    pub(crate) fn unlockpt(fd: c_int) -> c_int;
-    pub(crate) fn ptsname_r(fd: c_int, buffer: *mut c_char, length: usize) -> c_int;
     pub(crate) fn tcgetattr(
         fd: c_int,
         termios: *mut raven_libc_abi::generated::structs::Termios,
@@ -255,6 +252,8 @@ unsafe extern "C" {
     pub(crate) fn signal(signum: c_int, handler: usize) -> usize;
     pub(crate) fn raise(signum: c_int) -> c_int;
 }
+
+pub(crate) use pty::{grantpt, posix_openpt, ptsname_r, unlockpt};
 
 /// `TCSAFLUSH`.
 pub(crate) const TCSAFLUSH: c_int = 2;

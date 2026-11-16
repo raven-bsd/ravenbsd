@@ -1,7 +1,7 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1133
+# records: 1149
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
 _Unwind_Backtrace F - all 2 -
@@ -83,6 +83,7 @@ cbrt F - all 1 -
 cbrtf F - all 1 -
 ceil F - all 1 -
 ceilf F - all 1 -
+cfmakeraw F - all 1 termios.h
 cgetcap F - x86_64 2 -
 cgetclose F - x86_64 2 -
 cgetent F - x86_64 2 -
@@ -93,6 +94,8 @@ cgetnum F - x86_64 2 -
 cgetset F - x86_64 2 -
 cgetstr F - x86_64 2 -
 cgetustr F - x86_64 2 -
+chdir F - all 0 unistd.h
+chroot F - all 1 -
 clearenv F - all 1 stdlib.h
 clearerr F - all 0 stdio.h
 clock F - all 0 time.h
@@ -114,6 +117,7 @@ cond_init F - all 1 -
 cond_signal F - all 1 -
 cond_timedwait F - all 1 -
 cond_wait F - all 1 -
+confstr F - all 0 unistd.h
 connect F - all 1 sys/socket.h
 copy_file_range F - all 1 unistd.h
 copysign F - all 1 -
@@ -273,6 +277,7 @@ fstat64 F - all 0 sys/stat.h
 fstatat F - all 0 sys/stat.h
 fsync F - all 0 unistd.h
 ftell F - all 0 stdio.h
+ftruncate F - all 0 unistd.h
 fts_children F - all 1 -
 fts_close F - all 1 -
 fts_open F - all 1 -
@@ -316,6 +321,7 @@ gethostbyname2 F - all 1 netdb.h
 gethostbyname2_r F - all 1 netdb.h
 gethostbyname_r F - all 1 netdb.h
 gethostent F - all 1 netdb.h
+gethostname F - all 0 unistd.h
 getisax F - all 2 -
 getlogin F - all 0 unistd.h
 getlogin_r F - all 1 -
@@ -466,6 +472,7 @@ jnf F - all 1 -
 jrand48 F - all 1 stdlib.h
 kevent F - all 2 -
 kill F - all 0 signal.h
+killpg F - all 0 signal.h
 kqueue F - all 2 -
 kqueue1 F - all 2 -
 l64a F - all 1 stdlib.h
@@ -576,6 +583,7 @@ optreset F - all 2 -
 perror F - all 0 stdio.h
 personality F - all 2 -
 pidfile F - x86_64 2 -
+pipe2 F - all 0 -
 pledge F - all 2 -
 poll F - all 1 -
 port_alert F - all 2 -
@@ -754,6 +762,7 @@ read F - all 0 unistd.h
 readdir F - all 0 dirent.h
 readdir64 F - all 1 dirent.h
 readdir_r F - all 1 dirent.h
+readlink F - all 0 unistd.h
 readpassphrase F - x86_64 2 -
 readv F - all 0 sys/uio.h
 realloc F - all 0 malloc.h
@@ -986,6 +995,7 @@ suboptarg F - all 3 -
 svis F - x86_64 2 -
 swab F - all 1 -
 swapcontext F - all 1 ucontext.h
+syscall F - all 1 unistd.h
 sysconf F - all 0 unistd.h
 sysctl F - all 2 -
 sysctlbyname F - all 2 -
@@ -997,6 +1007,10 @@ tan F - all 1 -
 tanf F - all 1 -
 tanh F - all 1 -
 tanhf F - all 1 -
+tcgetattr F - all 0 termios.h
+tcgetpgrp F - all 0 unistd.h
+tcsetattr F - all 0 termios.h
+tcsetpgrp F - all 0 unistd.h
 tdelete F - all 1 search.h
 tdestroy F - all 1 search.h
 telldir F - all 1 dirent.h
@@ -1057,9 +1071,11 @@ tss_create F - all 0 threads.h
 tss_delete F - all 0 threads.h
 tss_get F - all 0 threads.h
 tss_set F - all 0 threads.h
+ttyname_r F - all 0 unistd.h
 twalk F - all 1 search.h
 uid_from_user F - all 2 -
 ulckpwdf F - all 1 -
+umask F - all 0 sys/stat.h
 uname F - all 0 sys/utsname.h
 ungetc F - all 0 stdio.h
 unlink F - all 0 unistd.h

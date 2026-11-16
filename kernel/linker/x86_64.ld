@@ -37,6 +37,11 @@ SECTIONS {
     .data ALIGN(4096) : AT(ADDR(.data) - KERNEL_OFFSET) {
         __data_start = .;
         *(.data .data.*)
+        /* S57: the GOT is a data section. An orphan `.got` is placed after `.bss`, outside the
+         * kernel image mapping, and an indirect call through it faults once the GOT grows past
+         * the last mapped `.bss` page. Keep it in the mapped RW segment instead. */
+        *(.got .got.*)
+        *(.data.rel.ro .data.rel.ro.*)
         __data_end = .;
     } :data
 
