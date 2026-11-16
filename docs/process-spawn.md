@@ -213,8 +213,10 @@ lengths are page-aligned; `MAP` addresses are inside `USER_MIN..USER_END`.
 14. `PROC_HANDLE_INFO(child, out, 8)` (`0x3E`, **new**) -> `[pid, ppid, pgid, sid, uid, euid,
     gid, egid]`; the wrapper records `pid -> child` for `waitpid`. This call lives in the libc
     `EarlySpawn` wrapper after `spawn_image_with` returns, not in the shared loader, so the
-    loader's `(Handle)` return type and its other callers do not change. On failure,
-    `PROC_TERMINATE(child, code)` (`0x32`, permitted by `Rights::ALL`), `PROC_WAIT`, then close.
+    loader's `(Handle)` return type and its other callers do not change. It must succeed for a
+    live handle even when the child has already exited, or a fast child races the lookup. On
+    failure, `PROC_TERMINATE(child, code)` (`0x32`, permitted by `Rights::ALL`), `PROC_WAIT`,
+    then close.
 15. `PROC_WAIT(child, &code)` (`0x31`) blocks until exit and writes the raw exit code. The libc
     backend encodes it as POSIX wait status `(code & 0xff) << 8`, returns the recorded pid, and
     removes the table entry, so a second `waitpid` returns `ECHILD`.
@@ -231,7 +233,7 @@ lengths are page-aligned; `MAP` addresses are inside `USER_MIN..USER_END`.
 | `pid` out | `PROC_HANDLE_INFO` on the returned child handle; table insert | required (new syscall) |
 | `waitpid` | table lookup, `PROC_WAIT`, status encode, `ECHILD` after reap | required |
 | `POSIX_SPAWN_SETSIGMASK` / `SETSIGDEF` | accepted by the attr object; no child mask syscall yet | no-op, documented |
-| `POSIX_SPAWN_SETPGROUP` | `PROC_SETPGID(pid, pgroup)` (`0x36`) before `THREAD_CREATE` | optional; needs the pid |
+| `POSIX_SPAWN_SETPGROUP` | `PROC_SETPGID(pid, pgroup)` (`0x36`) before `THREAD_CREATE`; needs the pid earlier than the wrapper has it | out of scope; in-loader pid or handle-based setpgid |
 | `POSIX_SPAWN_SETSID` | no child-setsid syscall (`PROC_SETSID` is self only) | out of scope |
 | `POSIX_SPAWN_SETSCHED*` | no scheduler syscall | out of scope |
 | `umask` | `SpawnRequest` field; no child side | not applied |
@@ -315,7 +317,7 @@ lines; P9 claims no target result.
 |---|---|---|---|---|
 | P10 | M | otto | Extract `spawn_image_with`/`spawn_elf`/stack/`Sys` from `userland/rt/src/spawn.rs` into `crates/raven-spawn`; `raven-rt` re-exports it; move `spawn_ut.rs`; add `AT_RAVEN_CWD` and identity-aware auxv | — |
 | P11 | L | dave | Target `EarlySpawn` in libc: `file:` image read, `PROC_CREATE`/`MAP`/`THREAD_CREATE`, `pid -> handle` table, `waitpid` status, `ShellSpawnEnv::open`, `SpawnCtx.table` snapshot point, apply `AT_RAVEN_CWD` in `start.rs` | P10, P12 |
-| P12 | S | stuart | Kernel `PROC_HANDLE_INFO` (raw `0x3E`): 8-word identity for a process handle, `READ` right, host test and ABI constant | — |
+| P12 | S | stuart | Kernel `PROC_HANDLE_INFO` (raw `0x3E`): 8-word identity for a live process handle, including an exited-but-unreaped child; `READ` right, host test and ABI constant | — |
 | P13 | S | otto | `spawn-brush` and `spawn-ping` qtests from `tests/spawn/cases/`; release image wiring; evidence report | P11 |
 | P14 | S | kevin | Flip the 0.1.1 login shell to `/bin/brush` after P13 and K26b; update `etc/passwd`, release profile, `release-login`, `docs/login.md`; keep rsh as fallback | P13, K26b |
 | P15 | M | dave | fd inheritance: `HANDLE_TRANSFER` per distinct fd, `RFDM` block in a mapped object, `AT_RAVEN_FDMAP`/`_N`, `restore_fdmap` in `start.rs`, `SpawnCtx.table` snapshot | P11, U3a |

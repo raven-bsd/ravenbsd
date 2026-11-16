@@ -45,7 +45,8 @@ HANDLE_CLOSE(thread)
 
 # libc EarlySpawn wrapper (not the shared loader):
 PROC_HANDLE_INFO(child, <8-word out>, 8) -> [pid, ppid, pgid, sid, uid, euid, gid, egid]
-# P9 addition: record pid -> child for waitpid.
+# P9 addition: record pid -> child for waitpid. This must work for a live handle even
+# if the child already exited (the pid is still needed to report it).
 PROC_WAIT(child, <code out>) -> 0
 # libc: status = (code & 0xff) << 8; return the recorded pid; remove the table entry.
 HANDLE_CLOSE(child)
