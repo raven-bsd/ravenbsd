@@ -972,6 +972,7 @@ name = "raven-getrandom"
 version = "0.1.0"
 dependencies = [
  "getrandom",
+ "raven-scheme",
 ]
 
 [[package]]

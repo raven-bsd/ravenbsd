@@ -122,7 +122,7 @@ tokio = { version = "1.52.3", features = ["rt", "sync"] }
 
 [target.'cfg(any(unix, windows))'.dependencies]
 crossterm = "0.29.0"
-tokio = { version = "1.52.3", features = ["rt", "rt-multi-thread", "sync"] }
+tokio = { version = "1.52.3", features = ["rt", "rt-multi-thread", "sync", "time"] }
 
 [target.'cfg(target_os = "ravenbsd")'.dependencies]
 raven-getrandom = { path = "../../../toolchain/raven-getrandom" }
