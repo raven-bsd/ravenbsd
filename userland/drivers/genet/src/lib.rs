@@ -27,6 +27,7 @@ use raven_genet::mdio::MdioError;
 use raven_genet::phy;
 use raven_genet::phy::LinkError;
 use raven_genet::regs;
+use raven_genet::release::ReleaseError;
 use raven_genet::ring::{
     RingError, RingIndices, RingSetup, RxDescriptor, RxStatus, TxDescriptor, TxStatus,
 };
@@ -34,6 +35,7 @@ use raven_genet::ring::{
 pub mod board;
 pub mod frame;
 pub mod platform;
+pub mod release;
 
 /// A read or write refused by the seam.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -132,6 +134,8 @@ pub enum DriverError {
     Mdio(MdioError),
     /// The MDIO transaction did not finish within its poll budget.
     MdioTimeout,
+    /// The release network gate rejected an observation.
+    Release(ReleaseError),
 }
 
 impl From<SeamError> for DriverError {
@@ -167,6 +171,12 @@ impl From<FilterError> for DriverError {
 impl From<MdioError> for DriverError {
     fn from(error: MdioError) -> Self {
         Self::Mdio(error)
+    }
+}
+
+impl From<ReleaseError> for DriverError {
+    fn from(error: ReleaseError) -> Self {
+        Self::Release(error)
     }
 }
 

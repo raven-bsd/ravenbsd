@@ -29,4 +29,5 @@ pub mod mdio;
 pub mod phy;
 pub mod recovery;
 pub mod regs;
+pub mod release;
 pub mod ring;
