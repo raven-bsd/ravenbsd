@@ -1,13 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# REL1c getty service, staged disabled until the `raven-getty` package can be
-# staged by its binary name (`getty`) through the image builder. The release
-# login account files and /bin/login are present; enable this when the getty
-# packaging follow-up lands.
+# REL1c getty service. The image builder now maps the `raven-getty` package to
+# its `getty` binary, so the service is enabled and login is the release prompt.
 name = "getty"
 exec = "/bin/getty"
 needs = ["consd", "vfsd", "ramfsd", "initfsd"]
 restart = "on-failure"
 grants = ["initfs"]
-enable = false

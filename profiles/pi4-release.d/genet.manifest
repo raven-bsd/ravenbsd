@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Pi 4 GENET frame service. It waits for platd (`plat:mac`) and serves `nic:`;
+# the devd platform launch that supplies the BAR/DMA/IRQ handles is P8, so the
+# service is staged disabled and the link/DHCP/ping gate stays UNVERIFIED.
+name = "genet"
+exec = "/sbin/genet"
+needs = ["logd", "scheme:plat"]
+provides = ["scheme:nic"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "never"
+max_restarts = 0
+enable = false

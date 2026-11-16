@@ -101,6 +101,22 @@ package = "raven-platd"
 path = "/sbin/platd"
 
 [[initfs.programs]]
+package = "raven-pcid"
+path = "/sbin/pcid"
+
+[[initfs.programs]]
+package = "raven-devd"
+path = "/sbin/devd"
+
+[[initfs.programs]]
+package = "genet"
+path = "/sbin/genet"
+
+[[initfs.programs]]
+package = "raven-getty"
+path = "/bin/getty"
+
+[[initfs.programs]]
 package = "login"
 path = "/bin/login"
 
@@ -153,8 +169,24 @@ src = "etc/services.d/resolvd.toml"
 path = "/etc/services.d/resolvd.toml"
 
 [[initfs.files]]
-src = "etc/services.d/platd.toml"
+src = "profiles/pi4-release.d/platd.manifest"
 path = "/etc/services.d/platd.toml"
+
+[[initfs.files]]
+src = "etc/services.d/pcid.toml"
+path = "/etc/services.d/pcid.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-release.d/devd.manifest"
+path = "/etc/services.d/devd.toml"
+
+[[initfs.files]]
+src = "profiles/pi4-release.d/genet.manifest"
+path = "/etc/services.d/genet.toml"
+
+[[initfs.files]]
+src = "userland/servers/devd/drivers.toml"
+path = "/etc/drivers.toml"
 
 [[initfs.files]]
 src = "profiles/pi4-release.d/getty.manifest"
