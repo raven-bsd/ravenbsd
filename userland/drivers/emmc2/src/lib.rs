@@ -113,6 +113,8 @@ pub enum DriverError {
     ResetTimeout,
     /// The internal clock did not become stable in time.
     ClockStableTimeout,
+    /// The controller reports no card in the slot.
+    NoCard,
     /// A command failed in the controller or the card state machine.
     Init(InitError),
 }
@@ -235,6 +237,26 @@ pub fn init_card<H: Host>(host: &mut H) -> Result<CardReady, DriverError> {
             }
         }
     }
+}
+
+/// True when the controller's present state reports a card in the slot.
+///
+/// The EMMC2 `Card Inserted` bit is UNVERIFIED on silicon. A launcher that knows the slot is
+/// non-removable may initialise unconditionally with [`init_card`]; a removable-slot integration
+/// should confirm the bit on the board first.
+pub fn card_inserted<H: Host>(host: &mut H) -> bool {
+    PresentState::from_raw(host.read(Register::PresentState)).card_inserted()
+}
+
+/// Initialise a card only when the controller reports one present.
+///
+/// This is [`init_card`] with an explicit empty-slot gate for a removable-card launcher. It does
+/// not power-cycle the card; call it again after the slot reports removal and reinsertion.
+pub fn init_card_checked<H: Host>(host: &mut H) -> Result<CardReady, DriverError> {
+    if !card_inserted(host) {
+        return Err(DriverError::NoCard);
+    }
+    init_card(host)
 }
 
 fn reset<H: Host>(host: &mut H) -> Result<(), DriverError> {

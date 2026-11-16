@@ -160,6 +160,13 @@ fn csd_version_2_reports_a_sdhc_capacity() {
 }
 
 #[test]
+fn csd_version_2_reports_an_sdxc_capacity() {
+    let csd = Csd::from_raw(csd_v2(0x3f_ffff));
+    assert_eq!(csd.structure_version(), 1);
+    assert_eq!(csd.capacity_bytes(), Some(2 * 1024 * 1024 * 1024 * 1024));
+}
+
+#[test]
 fn csd_version_1_reports_a_legacy_capacity() {
     let csd = Csd::from_raw(csd_v1(9, 0xfff, 7));
     assert_eq!(csd.structure_version(), 0);
