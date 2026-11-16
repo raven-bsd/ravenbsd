@@ -22,6 +22,12 @@ The shell profile installs the uutils `id` at `/bin/id`; the fixture stages that
 uutils `env` at `/bin/env`. The rsh builtin `env` shadows the external command, so the POSIX
 `env` checks call `/bin/env` explicitly.
 
+The rev 33 merge is `origin/master` `b46a95d8`, which contains P2g, P2h, P2j, P2k and the P4
+batches. P2k adds the kernel `PROC_EXEC` and `raven_rt::exec`, but the libc `execvp` wrapper
+used by the prebuilt uutils `env` still returns `ENOSYS` (PG-50). P2e and P3 are still not on
+`origin/master`: `userland/servers/procd`, `ptyd` and `ttyd` are absent, so the process-list
+and tty/termios rows cannot close in this round.
+
 `tests/posix/utility/run-system.sh` runs the case and maps the transcript to the matrix in
 `tests/posix/utility/system/cases.tsv`. A row with executable evidence is `PASS`; a row with a
 defect id is `DEFECT`; a failed qtest is `FAIL`. The runner exits non-zero when the qtest fails.
@@ -33,13 +39,13 @@ defect id is `DEFECT`; a failed qtest is `FAIL`. The runner exits non-zero when 
 | `util.id` | `id` | **present** | `qtest:posix-util-system` — uutils `id` at `/bin/id` |
 | `util.uname` | `uname` | **present** | `qtest:posix-util-system` |
 | `util.ps` | `ps` | **defect** | `P4d-D2`: no process-list source; `ps` reads `svc:` only |
-| `util.env` | `env` | **defect** | `P4d-D3`: `/bin/env` prints and assigns, but command execution is `ENOSYS` (`execvp`/`execve`, PG-50) |
+| `util.env` | `env` | **defect** | `P4d-D3`: `/bin/env` prints and assigns; P2k kernel exec exists but the libc `execvp` wrapper still returns `ENOSYS` (PG-50) |
 | `util.getconf` | `getconf` | **defect** | `P4d-D4`: no implementation, source, package or profile row |
-| `util.tty` | `tty` | **defect** | `P4d-D5`: `ttyname` PG-21 and `isatty` PG-54 are partial |
-| `util.stty` | `stty` | **defect** | `P4d-D6`: `tcgetattr`/`tcsetattr` PG-54 are partial; P3 is not merged |
+| `util.tty` | `tty` | **defect** | `P4d-D5`: `ttyname` PG-21 and `isatty` PG-54 are partial; P3 is not on master |
+| `util.stty` | `stty` | **defect** | `P4d-D6`: `tcgetattr`/`tcsetattr` PG-54 are partial; P3 is not on master |
 | `util.kill` | `kill` | **defect** | `P4d-D7`: `kill(2)` PG-5 is TBD (external C58) |
 | `util.nice` | `nice` | **defect** | `P4d-D8`: `getpriority`/`setpriority` PG-28 are TBD and return `ENOSYS` |
-| `util.nohup` | `nohup` | **defect** | `P4d-D9`: `execvp`/`execve` PG-50 is partial; the exec path returns `ENOSYS` |
+| `util.nohup` | `nohup` | **defect** | `P4d-D9`: libc `execvp`/`execve` PG-50 still returns `ENOSYS`; no target `nohup` is staged |
 
 The case also exercises two first-party tools that are not POSIX profile rows: `hostname`
 (print and `--selftest`) and `whoami` (name plus the exit-2 usage path). They are adjacent
@@ -81,14 +87,14 @@ print/assignment subset.
 
 | Defect | Row | Exact missing primitive or utility | Follow-up |
 |---|---|---|---|
-| `P4d-D2` | `util.ps` | no userland process-list source; `userland/bin/ps` formats `svc:` service status and its JSON process fields are `null`. `procd` is on `stuart/P2e` `15d47e18` and P3 is on `stuart/P3`; neither is in `origin/master` `f10bbbd7` | merge P2e/P3, expose the process registry, then test POSIX `ps` fields |
-| `P4d-D3` | `util.env` | `execvp`/`execve` PG-50 (partial); the target exec path returns `ENOSYS` (38), as the QEMU witness shows | wire the exec/spawn path and test command execution |
+| `P4d-D2` | `util.ps` | no userland process-list source; `userland/bin/ps` formats `svc:` service status and its JSON process fields are `null`. `procd` is on `stuart/P2e` `15d47e18`; P2e and P3 are not in `origin/master` `b46a95d8` (P2k only adds exec) | merge P2e/P3, expose the process registry, then test POSIX `ps` fields |
+| `P4d-D3` | `util.env` | P2k adds the kernel `PROC_EXEC` and `raven_rt::exec`, but the libc `execvp` wrapper used by the prebuilt uutils `env` still returns `ENOSYS` (38); PG-50 remains partial | wire the libc `execvp`/`execve` wrapper to the P2k runtime, then test command execution |
 | `P4d-D4` | `util.getconf` | no `getconf` implementation: no source, package, profile row or staged binary | add the utility; test the required system variables |
-| `P4d-D5` | `util.tty` | `ttyname` PG-21 (partial) and `isatty` PG-54 (partial); uutils `tty` uses `rustix::termios::ttyname` | implement the OFD-path/ttyname primitive, then stage `tty` |
-| `P4d-D6` | `util.stty` | `tcgetattr`/`tcsetattr` PG-54 (partial, tty `OP_GET_MODE`/`OP_SET_MODE`); P3 (ptyd/ttyd) is not merged | merge P3, complete termios, then stage `stty` |
+| `P4d-D5` | `util.tty` | `ttyname` PG-21 (partial) and `isatty` PG-54 (partial); uutils `tty` uses `rustix::termios::ttyname`; P3 (ptyd/ttyd) is not on `b46a95d8` | merge P3, implement the OFD-path/ttyname primitive, then stage `tty` |
+| `P4d-D6` | `util.stty` | `tcgetattr`/`tcsetattr` PG-54 (partial, tty `OP_GET_MODE`/`OP_SET_MODE`); P3 (ptyd/ttyd) is not on `b46a95d8` | merge P3, complete termios, then stage `stty` |
 | `P4d-D7` | `util.kill` | `kill(2)` PG-5 (TBD, external C58) | implement the signal contract, then stage `kill` and test signal names/delivery |
 | `P4d-D8` | `util.nice` | `getpriority`/`setpriority` PG-28 (TBD; stubs return `ENOSYS` 38) | implement the procd priority primitive, then stage `nice` |
-| `P4d-D9` | `util.nohup` | `execvp`/`execve` PG-50 (partial); `nohup` opens `nohup.out`, ignores `SIGHUP` and then execs, so the exec failure blocks it | wire the exec path, then stage `nohup` and test output/exit status |
+| `P4d-D9` | `util.nohup` | the libc `execvp`/`execve` wrapper still returns `ENOSYS` (PG-50), so the final exec fails; no target `nohup` binary is staged (the uutils target build still fails in rustix) | wire the libc exec wrapper, stage `nohup`, then test output/exit status |
 
 `P4d-D1` (the old `id -r` defect) is resolved by staging the shell-profile uutils `id`; it is
 not a defect row anymore.
@@ -142,14 +148,14 @@ util.nice	nice	DEFECT	nice true	P4d-D8
 util.nohup	nohup	DEFECT	nohup true	P4d-D9
 ```
 
-The QEMU case passed in 222155 ms with `exit_status: 33` and no unmatched expectation.
+The QEMU case passed in 274747 ms with `exit_status: 33` and no unmatched expectation.
 
 ### `cargo xtask posix-check --profile posix --arch x86_64`
 
 Exit code: **1** (the global gate is still release-blocked outside P4d)
 
 ```
-posix-check: 814 pass, 949 fail, 10 skip; FAIL (release blocked)
+posix-check: 863 pass, 935 fail, 10 skip; FAIL (release blocked)
 ```
 
 The P4d rows in the generated report:
@@ -172,15 +178,15 @@ Exit code: **0** — **check-fast: PASSED**
 ==> fmt
 ==> clippy (changed)
 ==> tests (changed, parallel)
-    Starting 172 tests across 5 binaries
-    Summary [   5.844s] 172 tests run: 172 passed, 0 skipped
+    Starting 173 tests across 5 binaries
+    Summary [   2.509s] 173 tests run: 173 passed, 0 skipped
 ==> profiles
 check-fast summary:
-  ok       guard (exit 0, 14.50s)
-  ok       fmt (exit 0, 12.28s)
-  ok       clippy (changed) (exit 0, 0.44s)
-  ok       tests (changed, parallel) (exit 0, 7.17s)
-  ok       profiles (exit 0, 0.10s)
+  ok       guard (exit 0, 9.42s)
+  ok       fmt (exit 0, 6.18s)
+  ok       clippy (changed) (exit 0, 1.34s)
+  ok       tests (changed, parallel) (exit 0, 4.69s)
+  ok       profiles (exit 0, 0.04s)
 check-fast: PASSED
 ```
 
@@ -193,7 +199,9 @@ check-fast: PASSED
   with an exact defect id, not as passes.
 * `util.hostname` and `util.whoami` are verified as adjacent tools but are not POSIX profile
   rows and are not claimed in the overlay.
-* The directive says P2e/P3 are merged into master. The fetched `origin/master` `f10bbbd7`
-  does not contain `userland/servers/procd` or `userland/servers/ptyd`; only `stuart/P2e` and
-  `stuart/P3` contain them. That is why `ps`, `tty`, `stty` and the exec-dependent rows remain
-  defects.
+* The directive says P2e/P3 are merged into master. The fetched `origin/master` `b46a95d8`
+  contains P2k's same-pid execve but does not contain `userland/servers/procd`,
+  `userland/servers/ptyd` or `userland/servers/ttyd`; only `stuart/P2e` and `stuart/P3`
+  contain them. P2k's kernel/runtime exec exists, but the libc `execvp` wrapper still returns
+  `ENOSYS`, so `env`/`nohup` command execution remains blocked. That is why `ps`, `tty`,
+  `stty`, `env` and `nohup` remain defects.
