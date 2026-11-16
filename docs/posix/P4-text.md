@@ -15,8 +15,8 @@ under `tests/posix/utility/text/<tool>/` and are driven by `tests/posix/utility/
   cases.
 * The runner builds the selected packages once into `build/posix-utility/uutils-host` and runs each
   `test.sh` in a fresh temporary directory with `LC_ALL=C`.
-* Cases use only the utility under test plus the test harness (`sh`, `cmp`, `od`, `sed`, `tail`,
-  `seq`) on the host. No utility binary was edited and no shared uutils source was changed.
+* Cases use only the utility under test plus the test harness (`sh`, `cmp`, `od`, `sed`, `tail`)
+  on the host. No utility binary was edited and no shared uutils source was changed.
 * Every case prints one `ok:` line per assertion and exits nonzero on the first failed assertion.
 
 ```sh
@@ -27,7 +27,8 @@ sh tests/posix/utility/run-text.sh sort cut tr
 
 A present tool with a failing case fails the run. A missing implementation is printed as a
 `DEFECT` row and does not claim a pass; the runner still exits zero when every present tool passes.
-The defects below are the reason the text family is partial, not present.
+The six missing tools below are follow-up defects; the 24 existing tools are registered as
+`present` in `docs/posix/evidence/P4-text.toml`.
 
 ## Tool matrix
 
@@ -79,16 +80,18 @@ profile. They cannot be tested without writing product code, which P4c does not 
 
 ## Evidence overlay
 
-The ready overlay rows use structured `test:` evidence and the per-tool `test.sh` paths above.
-They cannot be added to `docs/posix/evidence/P4-text.toml` until the P0b overlay loader accepts
-owner subfiles: `tools/posix-conform/src/overlay.rs` currently accepts only exact file stems
-`P1.toml` through `P5.toml`, and rejects `P4-text.toml` with:
+`docs/posix/evidence/P4-text.toml` registers the 24 passing tools as `present` with structured
+`test:tests/posix/utility/text/<tool>/test.sh` evidence. The P0b loader accepts the owner batch
+file, and the gate executed every script (it shares the runner's standalone path) and applied
+every claim.
+
+Latest gate result with the rows applied:
 
 ```
-overlay file `.../docs/posix/evidence/P4-text.toml` must be named P1.toml through P5.toml
+posix-check: 759 pass, 999 fail, 11 skip; FAIL (release blocked)
+utility area: 24 pass, 153 fail, 0 skip
 ```
 
-That is a P0b dependency defect (`P4c-D7`). The rows are otherwise validated: each `test:` path
-exists, has a `#!/bin/sh` shebang and passes under the reworked `test:` runner semantics. Until the
-loader accepts the owner subfile, `posix-check` cannot mark the text rows present and the text
-family remains partial.
+The utility improvement is exactly the 24 text rows (`735 -> 759`). The remaining 153 utility
+failures include the six missing text tools and the other utility families; no present row is
+unsupported and no waiver was used.
