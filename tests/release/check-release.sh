@@ -26,8 +26,14 @@ grep -q 'QEMU transcript' docs/releases/0.1.0.md
 grep -q 'Pi 4 gate' docs/releases/0.1.0.md
 grep -q 'rsh' docs/releases/0.1.0.md
 grep -q 'P9a' docs/releases/0.1.0.md
-grep -q 'REL3/P8/P10/P12/REL4d' docs/releases/0.1.0.md
+grep -q 'P8/P8b/P10/P12/REL3c' docs/releases/0.1.0.md
+grep -q 'REL7b' docs/releases/0.1.0.md
+grep -q 'self-contained' docs/releases/0.1.0.md
 grep -q 'release-verify' docs/releases/0.1.0.md
+if grep -q 'RAVEN_USER_RELEASE' docs/releases/0.1.0.md; then
+    echo 'release checks: release notes still require RAVEN_USER_RELEASE' >&2
+    exit 1
+fi
 grep -q 'Default password warning' docs/releases/0.1.0.md
 grep -q 'make check' docs/releases/0.1.0.md
 grep -q 'release-evidence' docs/releases/0.1.0.md
