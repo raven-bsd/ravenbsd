@@ -438,6 +438,40 @@ mod program {
         }
         fs::umount("/ufs").map_err(|error| format!("remount umount: {}", error.description()))?;
         raven_rt::println!("fsd-ufs-rw: probe remount ok");
+
+        fs::mount("/ufs", "ufs:")
+            .map_err(|error| format!("crash mount: {}", error.description()))?;
+        let mut file = fs::open("file:/ufs/crash.txt", O_RDWR | O_CREAT)
+            .map_err(|error| format!("crash create: {}", error.description()))?;
+        file.write(b"crash-checkpoint")
+            .map_err(|error| format!("crash write: {}", error.description()))?;
+        file.close()
+            .map_err(|error| format!("crash close: {}", error.description()))?;
+        let client = Client::new();
+        svc_control(&client, "fsd-ufs", Op::Stop)?;
+        wait_state(&client, "fsd-ufs", State::Stopped)?;
+        let mut disk = open_partition("block:0", 1)?;
+        let (findings, clean) = match check(&mut disk, Mode::ReadOnly) {
+            Ok(report) => (report.findings.len(), report.clean_after),
+            Err(_) => (usize::MAX, false),
+        };
+        raven_rt::println!("fsd-ufs-rw: probe crash findings={findings} clean={clean}");
+        let replay = if svc_control(&client, "fsd-ufs", Op::Start).is_err()
+            || wait_state(&client, "fsd-ufs", State::Running).is_err()
+        {
+            "fail-closed"
+        } else {
+            match fs::mount("/ufs", "ufs:") {
+                Ok(()) => {
+                    let _ = fs::read_to_vec("file:/ufs/crash.txt");
+                    let _ = fs::umount("/ufs");
+                    "mounted"
+                }
+                Err(_) => "fail-closed",
+            }
+        };
+        raven_rt::println!("fsd-ufs-rw: probe crash replay={replay}");
+        raven_rt::println!("fsd-ufs-rw: probe crash ok");
         Ok(())
     }
 

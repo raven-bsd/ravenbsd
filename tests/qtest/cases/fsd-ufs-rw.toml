@@ -77,6 +77,15 @@ regex = '^fsd-ufs-rw: probe server restarted$'
 regex = '^fsd-ufs-rw: probe remount ok$'
 
 [[expect]]
+regex = '^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true|false)$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe crash replay=(mounted|fail-closed)$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe crash ok$'
+
+[[expect]]
 regex = '^fsd-ufs-rw: probe ok$'
 
 [[expect]]

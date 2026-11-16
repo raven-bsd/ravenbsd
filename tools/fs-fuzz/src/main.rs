@@ -3,22 +3,24 @@
 
 //! Deterministic corpus generator and stable mutational smoke runner.
 
+use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
 
-use raven_fs_fuzz_replay::{TARGETS, region, replay};
+use raven_fs_fuzz_replay::{TARGETS, crash_matrix, region, replay};
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
     let result = match args.first().map(String::as_str) {
         Some("seed") => seed(&args[1..]),
         Some("run") => run(&args[1..]),
+        Some("crash") => crash(),
         _ => {
             eprintln!(
-                "usage: raven-fs-fuzz seed [--out <dir>] | run [--seconds <n>] [--seed <n>] [--target <name>]"
+                "usage: raven-fs-fuzz seed [--out <dir>] | run [--seconds <n>] [--seed <n>] [--target <name>] | crash"
             );
             return ExitCode::from(2);
         }
@@ -76,6 +78,32 @@ fn seed(args: &[String]) -> Result<(), String> {
         }
         println!("seed {target}: {count} files in {}", directory.display());
     }
+    Ok(())
+}
+
+fn crash() -> Result<(), String> {
+    let report = crash_matrix()?;
+    let mut by_stage: BTreeMap<&str, (u64, u64, u64, u64)> = BTreeMap::new();
+    for cut in &report.cuts {
+        let entry = by_stage.entry(cut.stage.as_str()).or_default();
+        entry.0 += 1;
+        if cut.check == "clean" || cut.check == "repaired" {
+            entry.1 += 1;
+        } else {
+            entry.3 += 1;
+        }
+    }
+    for (stage, counts) in &by_stage {
+        println!(
+            "{stage}\tcuts={}\trecovered={}\tunresolved={}",
+            counts.0, counts.1, counts.3
+        );
+    }
+    println!(
+        "total\twrites={}\tcuts={}",
+        report.total_writes,
+        report.cuts.len()
+    );
     Ok(())
 }
 
