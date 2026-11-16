@@ -9170,7 +9170,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "process.credential"
 ticket = "P2"
 test = "none"
-evidence = "none"
+evidence = "qtest:proc-credentials"
 
 [[trace]]
 id = "process.exec"
@@ -9182,7 +9182,7 @@ evidence = "none"
 id = "process.fork"
 ticket = "P2"
 test = "tests/qtest/cases/proc-fork.toml"
-evidence = "kernel/src/syscall/process_ctl.rs"
+evidence = "qtest:proc-fork"
 
 [[trace]]
 id = "process.job-control"
@@ -9200,7 +9200,7 @@ evidence = "none"
 id = "process.posix-spawn"
 ticket = "P2"
 test = "none"
-evidence = "libc/ravenlibc/crates/raven-libc/src/process/posix_spawn.rs"
+evidence = "none"
 
 [[trace]]
 id = "process.priority"
@@ -9212,31 +9212,31 @@ evidence = "none"
 id = "process.process-group"
 ticket = "P2"
 test = "none"
-evidence = "none"
+evidence = "qtest:proc-session"
 
 [[trace]]
 id = "process.process-id"
 ticket = "P2"
 test = "none"
-evidence = "none"
+evidence = "qtest:proc-registry"
 
 [[trace]]
 id = "process.resource"
 ticket = "P2"
 test = "none"
-evidence = "none"
+evidence = "qtest:proc-session"
 
 [[trace]]
 id = "process.session"
 ticket = "P2"
 test = "none"
-evidence = "none"
+evidence = "qtest:proc-session"
 
 [[trace]]
 id = "process.signal"
 ticket = "P2"
 test = "none"
-evidence = "kernel/src/syscall/thread.rs"
+evidence = "qtest:proc-signal"
 
 [[trace]]
 id = "process.system"
@@ -9248,13 +9248,13 @@ evidence = "none"
 id = "process.terminate"
 ticket = "P2"
 test = "none"
-evidence = "kernel/src/syscall/process_ctl.rs"
+evidence = "qtest:proc-session"
 
 [[trace]]
 id = "process.times"
 ticket = "P2"
 test = "none"
-evidence = "none"
+evidence = "qtest:proc-session"
 
 [[trace]]
 id = "process.tty-control"
@@ -9266,7 +9266,7 @@ evidence = "none"
 id = "process.wait"
 ticket = "P2"
 test = "none"
-evidence = "kernel/src/syscall/process_ctl.rs"
+evidence = "qtest:proc-session"
 
 [[trace]]
 id = "shell.arithmetic-expansion"
@@ -9509,6 +9509,12 @@ test = "none"
 evidence = "none"
 
 [[trace]]
+id = "util.arch"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/arch/test.sh"
+
+[[trace]]
 id = "util.asa"
 ticket = "P4"
 test = "none"
@@ -9527,10 +9533,34 @@ test = "none"
 evidence = "none"
 
 [[trace]]
+id = "util.b2sum"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/b2sum/test.sh"
+
+[[trace]]
+id = "util.base32"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/base32/test.sh"
+
+[[trace]]
+id = "util.base64"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/base64/test.sh"
+
+[[trace]]
 id = "util.basename"
 ticket = "P4"
 test = "none"
 evidence = "test:tests/posix/utility/text/basename/test.sh"
+
+[[trace]]
+id = "util.basenc"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/basenc/test.sh"
 
 [[trace]]
 id = "util.batch"
@@ -9620,7 +9650,7 @@ evidence = "test:tests/posix/utility/file/cksum/test.sh"
 id = "util.cmp"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/text2/cmp/test.sh"
 
 [[trace]]
 id = "util.cod"
@@ -9716,7 +9746,13 @@ evidence = "test:tests/posix/utility/file/df/test.sh"
 id = "util.diff"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/text2/diff/test.sh"
+
+[[trace]]
+id = "util.dircolors"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/dircolors/test.sh"
 
 [[trace]]
 id = "util.dirname"
@@ -9797,10 +9833,16 @@ test = "none"
 evidence = "test:tests/posix/utility/text/expr/test.sh"
 
 [[trace]]
+id = "util.factor"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/factor/test.sh"
+
+[[trace]]
 id = "util.false"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/misc/false/test.sh"
 
 [[trace]]
 id = "util.fc"
@@ -9825,6 +9867,12 @@ id = "util.find"
 ticket = "P4"
 test = "none"
 evidence = "test:tests/posix/utility/file/find/test.sh"
+
+[[trace]]
+id = "util.fmt"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/fmt/test.sh"
 
 [[trace]]
 id = "util.fold"
@@ -9866,7 +9914,13 @@ evidence = "none"
 id = "util.grep"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/text2/grep/test.sh"
+
+[[trace]]
+id = "util.groups"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/groups/test.sh"
 
 [[trace]]
 id = "util.hash"
@@ -9881,6 +9935,12 @@ test = "none"
 evidence = "test:tests/posix/utility/text/head/test.sh"
 
 [[trace]]
+id = "util.hostid"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/hostid/test.sh"
+
+[[trace]]
 id = "util.iconv"
 ticket = "P4"
 test = "none"
@@ -9891,6 +9951,12 @@ id = "util.id"
 ticket = "P4"
 test = "none"
 evidence = "userland/bin/id"
+
+[[trace]]
+id = "util.install"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/install/test.sh"
 
 [[trace]]
 id = "util.ipcrm"
@@ -9962,7 +10028,7 @@ evidence = "none"
 id = "util.logname"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/misc/logname/test.sh"
 
 [[trace]]
 id = "util.lp"
@@ -10007,6 +10073,12 @@ test = "none"
 evidence = "userland/bin/man"
 
 [[trace]]
+id = "util.md5sum"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/md5sum/test.sh"
+
+[[trace]]
 id = "util.mesg"
 ticket = "P4"
 test = "none"
@@ -10029,6 +10101,12 @@ id = "util.mknod"
 ticket = "P4"
 test = "none"
 evidence = "test:tests/posix/utility/file/mknod/test.sh"
+
+[[trace]]
+id = "util.mktemp"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/mktemp/test.sh"
 
 [[trace]]
 id = "util.more"
@@ -10079,6 +10157,18 @@ test = "none"
 evidence = "none"
 
 [[trace]]
+id = "util.nproc"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/nproc/test.sh"
+
+[[trace]]
+id = "util.numfmt"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/numfmt/test.sh"
+
+[[trace]]
 id = "util.od"
 ticket = "P4"
 test = "none"
@@ -10109,10 +10199,22 @@ test = "none"
 evidence = "none"
 
 [[trace]]
+id = "util.pinky"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/pinky/test.sh"
+
+[[trace]]
 id = "util.pr"
 ticket = "P4"
 test = "none"
 evidence = "test:tests/posix/utility/text/pr/test.sh"
+
+[[trace]]
+id = "util.printenv"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/printenv/test.sh"
 
 [[trace]]
 id = "util.printf"
@@ -10131,6 +10233,12 @@ id = "util.ps"
 ticket = "P4"
 test = "none"
 evidence = "userland/bin/ps"
+
+[[trace]]
+id = "util.ptx"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/ptx/test.sh"
 
 [[trace]]
 id = "util.pwd"
@@ -10277,6 +10385,12 @@ test = "none"
 evidence = "none"
 
 [[trace]]
+id = "util.seq"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/seq/test.sh"
+
+[[trace]]
 id = "util.set"
 ticket = "P4"
 test = "none"
@@ -10289,16 +10403,58 @@ test = "none"
 evidence = "userland/bin/rsh"
 
 [[trace]]
+id = "util.sha1sum"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/sha1sum/test.sh"
+
+[[trace]]
+id = "util.sha224sum"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/sha224sum/test.sh"
+
+[[trace]]
+id = "util.sha256sum"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/sha256sum/test.sh"
+
+[[trace]]
+id = "util.sha384sum"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/sha384sum/test.sh"
+
+[[trace]]
+id = "util.sha512sum"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/sha512sum/test.sh"
+
+[[trace]]
 id = "util.shift"
 ticket = "P4"
 test = "none"
 evidence = "none"
 
 [[trace]]
+id = "util.shred"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/shred/test.sh"
+
+[[trace]]
+id = "util.shuf"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/shuf/test.sh"
+
+[[trace]]
 id = "util.sleep"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/sleep"
+evidence = "test:tests/posix/utility/misc/sleep/test.sh"
 
 [[trace]]
 id = "util.sort"
@@ -10319,10 +10475,16 @@ test = "none"
 evidence = "test:tests/posix/utility/file/stat/test.sh"
 
 [[trace]]
+id = "util.stdbuf"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/stdbuf/test.sh"
+
+[[trace]]
 id = "util.strings"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/text2/strings/test.sh"
 
 [[trace]]
 id = "util.strip"
@@ -10337,10 +10499,28 @@ test = "none"
 evidence = "none"
 
 [[trace]]
+id = "util.sum"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/sum/test.sh"
+
+[[trace]]
+id = "util.sync"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/sync/test.sh"
+
+[[trace]]
 id = "util.tabs"
 ticket = "P4"
 test = "none"
 evidence = "none"
+
+[[trace]]
+id = "util.tac"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/tac/test.sh"
 
 [[trace]]
 id = "util.tail"
@@ -10371,6 +10551,12 @@ id = "util.time"
 ticket = "P4"
 test = "none"
 evidence = "none"
+
+[[trace]]
+id = "util.timeout"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/timeout/test.sh"
 
 [[trace]]
 id = "util.times"
@@ -10406,7 +10592,13 @@ evidence = "none"
 id = "util.true"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/misc/true/test.sh"
+
+[[trace]]
+id = "util.truncate"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/truncate/test.sh"
 
 [[trace]]
 id = "util.tsort"
@@ -10487,6 +10679,18 @@ test = "none"
 evidence = "none"
 
 [[trace]]
+id = "util.uptime"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/uptime/test.sh"
+
+[[trace]]
+id = "util.users"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/users/test.sh"
+
+[[trace]]
 id = "util.uucp"
 ticket = "P4"
 test = "none"
@@ -10550,7 +10754,7 @@ evidence = "none"
 id = "util.who"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/misc/who/test.sh"
 
 [[trace]]
 id = "util.write"
@@ -10569,6 +10773,12 @@ id = "util.yacc"
 ticket = "P4"
 test = "none"
 evidence = "none"
+
+[[trace]]
+id = "util.yes"
+ticket = "P4"
+test = "none"
+evidence = "test:tests/posix/utility/misc/yes/test.sh"
 
 [[trace]]
 id = "util.zcat"
