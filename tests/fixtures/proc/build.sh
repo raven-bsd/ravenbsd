@@ -5,6 +5,7 @@
 # Build the P2f process/signal fixtures. Each qtest gets its own initfs:
 #   signal.img   -> /init = proc-signal-init
 #   session.img  -> /init = proc-session-init
+#   exec.img     -> /init = proc-exec-init, /exec-child = proc-exec-child
 
 set -eu
 
@@ -41,3 +42,8 @@ cargo run -q -p raven-initfs --features std --example mkinitfs -- \
 cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "$out/session.img" \
     "/init=$target_dir/$target/release/proc-session-init:0755"
+
+cargo run -q -p raven-initfs --features std --example mkinitfs -- \
+    "$out/exec.img" \
+    "/init=$target_dir/$target/release/proc-exec-init:0755" \
+    "/exec-child=$target_dir/$target/release/proc-exec-child:0755"
