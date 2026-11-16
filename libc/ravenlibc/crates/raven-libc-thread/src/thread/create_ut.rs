@@ -35,6 +35,80 @@ fn init_with_pg1_builds_a_tcb_and_records_the_modules() {
 }
 
 #[test]
+fn main_and_first_child_tids_are_distinct() {
+    let _serial = crate::test_support::serial();
+    let caps = KernelCaps::minimal().with(crate::kernel::CapFlag::Tls, true);
+    let kernel = crate::test_support::MockKernel::with_caps(caps);
+    static IMAGE_TID: [u8; 0x10] = [0; 0x10];
+    let modules = [TlsModuleIn::new(
+        IMAGE_TID.as_ptr() as usize,
+        0x10,
+        0x10,
+        16,
+    )];
+    let tcb = init_main_thread(&kernel, &modules, 0x100_0000, 0x1_0000).unwrap();
+    let main_tid = crate::thread::current_pthread(&kernel)
+        .tid
+        .load(core::sync::atomic::Ordering::Acquire);
+    let next_tid = crate::libc_state::LIBC.next_tid();
+    assert_ne!(main_tid, next_tid);
+    assert_eq!(main_tid, 100);
+    assert_eq!(next_tid, 101);
+    assert_eq!(crate::thread::current_pthread(&kernel).self_ptr, tcb);
+}
+
+#[test]
+fn inserting_a_thread_sets_the_next_back_link() {
+    let main = std::boxed::Box::new(Pthread::new(0));
+    let first = std::boxed::Box::new(Pthread::new(0));
+    let second = std::boxed::Box::new(Pthread::new(0));
+    let main_address = &*main as *const Pthread as usize;
+    let first_address = &*first as *const Pthread as usize;
+    let second_address = &*second as *const Pthread as usize;
+    raw::set_links(&main, main_address, main_address);
+    insert_links(
+        &main,
+        &main,
+        &first,
+        first_address,
+        main_address,
+        main_address,
+    );
+    insert_links(
+        &main,
+        &first,
+        &second,
+        second_address,
+        first_address,
+        main_address,
+    );
+    assert_eq!(
+        raw::next_thread(&main) as *const Pthread as usize,
+        second_address
+    );
+    assert_eq!(
+        raw::prev_thread(&main) as *const Pthread as usize,
+        first_address
+    );
+    assert_eq!(
+        raw::prev_thread(&second) as *const Pthread as usize,
+        main_address
+    );
+    assert_eq!(
+        raw::next_thread(&second) as *const Pthread as usize,
+        first_address
+    );
+    assert_eq!(
+        raw::prev_thread(&first) as *const Pthread as usize,
+        second_address
+    );
+    assert_eq!(
+        raw::next_thread(&first) as *const Pthread as usize,
+        main_address
+    );
+}
+
+#[test]
 fn create_before_init_is_enosys() {
     let _serial = crate::test_support::serial();
     let kernel = crate::test_support::MockKernel::new();

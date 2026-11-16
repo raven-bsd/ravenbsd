@@ -158,6 +158,10 @@ pub fn init_main_thread<K: ThreadKernel>(
     };
     let plan = raw::init_tls(mapped, &layout, modules)?;
     let tcb = plan.tcb;
+    // Reset the process-global counters before taking the main tid: `reset` rewinds
+    // `next_tid` to 100, and assigning the main tid first would make the first child reuse it
+    // (the list lock is keyed by tid, so duplicate tids corrupt the thread list).
+    LIBC.reset(tcb);
     let tid = if kernel.caps().tid {
         kernel.tid_self().unwrap_or_else(|_| LIBC.next_tid())
     } else {
@@ -185,11 +189,29 @@ pub fn init_main_thread<K: ThreadKernel>(
     pthread.handle = 0;
     raw::set_links(pthread, tcb, tcb);
     kernel.set_thread_pointer(pthread_to_tp(tcb))?;
-    LIBC.reset(tcb);
     stack::reset();
     list::reset_for_fork_child();
     crate::fork::reset_registry();
     Ok(tcb)
+}
+
+/// Insert the new TCB between `previous` and `next` in the circular thread list.
+///
+/// The new node's back link is `previous`; the old `next` node's back link must become the new
+/// TCB, not `previous`.
+fn insert_links(
+    previous: &Pthread,
+    next: &Pthread,
+    pthread: &Pthread,
+    tcb: usize,
+    previous_prev: usize,
+    next_next: usize,
+) {
+    let previous_address = previous as *const Pthread as usize;
+    let next_address = next as *const Pthread as usize;
+    raw::set_links(pthread, previous_address, next_address);
+    raw::set_links(next, tcb, next_next);
+    raw::set_links(previous, previous_prev, tcb);
 }
 
 /// `pthread_create`.
@@ -324,9 +346,7 @@ pub fn create<K: ThreadKernel>(
     let next = raw::next_thread(previous);
     let next_address = next as *const Pthread as usize;
     let next_next = raw::next_thread(next) as *const Pthread as usize;
-    raw::set_links(pthread, previous_address, next_address);
-    raw::set_links(next, previous_address, next_next);
-    raw::set_links(previous, previous_prev, tcb);
+    insert_links(previous, next, pthread, tcb, previous_prev, next_next);
     LIBC.add_thread();
     sched_point_before_create(kernel);
     let create_args = CreateArgs {
