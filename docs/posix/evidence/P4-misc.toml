@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4f misc evidence: the remaining POSIX rows backed by vendored uutils.
+# The other vendored tools in this batch have no POSIX profile row and are
+# documented as adjacent coverage in docs/posix/P4-misc.md.
+
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.false"
+status = "present"
+evidence = "test:tests/posix/utility/misc/false/test.sh"
+notes = "P4f: vendored uutils false, status and operand behaviour"
+
+[[row]]
+id = "util.logname"
+status = "present"
+evidence = "test:tests/posix/utility/misc/logname/test.sh"
+notes = "P4f: vendored uutils logname, login-name lookup"
+
+[[row]]
+id = "util.sleep"
+status = "present"
+evidence = "test:tests/posix/utility/misc/sleep/test.sh"
+notes = "P4f: vendored uutils sleep, fractional/zero/invalid intervals"
+
+[[row]]
+id = "util.true"
+status = "present"
+evidence = "test:tests/posix/utility/misc/true/test.sh"
+notes = "P4f: vendored uutils true, status and operand behaviour"
+
+[[row]]
+id = "util.who"
+status = "present"
+evidence = "test:tests/posix/utility/misc/who/test.sh"
+notes = "P4f: vendored uutils who, current-user and -q output"

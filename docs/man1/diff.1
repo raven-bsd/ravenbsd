@@ -1,0 +1,36 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt DIFF 1
+.Os RavenBSD
+.Sh NAME
+.Nm diff
+.Nd compare two text files
+.Sh SYNOPSIS
+.Nm
+.Op Fl u
+.Ar file1 file2
+.Sh DESCRIPTION
+The
+.Nm
+utility compares two text files and prints their line differences.
+.Pp
+With
+.Fl u
+it prints a unified diff with
+.Pa a
+and
+.Pa b
+headers. Without it, the normal
+.Sq c ,
+.Sq d
+and
+.Sq a
+form is used.
+.Sh EXIT STATUS
+.Ex -std
+0 when the files are identical, 1 when they differ, 2 for usage or an I/O error.
+.Sh SEE ALSO
+.Xr cmp 1
+.Sh STANDARDS
+RavenBSD.
