@@ -37,3 +37,213 @@ id = "util.who"
 status = "present"
 evidence = "test:tests/posix/utility/misc/who/test.sh"
 notes = "P4f: vendored uutils who, current-user and -q output"
+
+[[row]]
+id = "util.arch"
+status = "present"
+evidence = "test:tests/posix/utility/misc/arch/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.b2sum"
+status = "present"
+evidence = "test:tests/posix/utility/misc/b2sum/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.base32"
+status = "present"
+evidence = "test:tests/posix/utility/misc/base32/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.base64"
+status = "present"
+evidence = "test:tests/posix/utility/misc/base64/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.basenc"
+status = "present"
+evidence = "test:tests/posix/utility/misc/basenc/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.dircolors"
+status = "present"
+evidence = "test:tests/posix/utility/misc/dircolors/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.factor"
+status = "present"
+evidence = "test:tests/posix/utility/misc/factor/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.fmt"
+status = "present"
+evidence = "test:tests/posix/utility/misc/fmt/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.groups"
+status = "present"
+evidence = "test:tests/posix/utility/misc/groups/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.hostid"
+status = "present"
+evidence = "test:tests/posix/utility/misc/hostid/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.install"
+status = "present"
+evidence = "test:tests/posix/utility/misc/install/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.md5sum"
+status = "present"
+evidence = "test:tests/posix/utility/misc/md5sum/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.mktemp"
+status = "present"
+evidence = "test:tests/posix/utility/misc/mktemp/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.numfmt"
+status = "present"
+evidence = "test:tests/posix/utility/misc/numfmt/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.nproc"
+status = "present"
+evidence = "test:tests/posix/utility/misc/nproc/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.pinky"
+status = "present"
+evidence = "test:tests/posix/utility/misc/pinky/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.printenv"
+status = "present"
+evidence = "test:tests/posix/utility/misc/printenv/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.ptx"
+status = "present"
+evidence = "test:tests/posix/utility/misc/ptx/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.seq"
+status = "present"
+evidence = "test:tests/posix/utility/misc/seq/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.sha1sum"
+status = "present"
+evidence = "test:tests/posix/utility/misc/sha1sum/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.sha224sum"
+status = "present"
+evidence = "test:tests/posix/utility/misc/sha224sum/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.sha256sum"
+status = "present"
+evidence = "test:tests/posix/utility/misc/sha256sum/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.sha384sum"
+status = "present"
+evidence = "test:tests/posix/utility/misc/sha384sum/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.sha512sum"
+status = "present"
+evidence = "test:tests/posix/utility/misc/sha512sum/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.shred"
+status = "present"
+evidence = "test:tests/posix/utility/misc/shred/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.shuf"
+status = "present"
+evidence = "test:tests/posix/utility/misc/shuf/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.stdbuf"
+status = "present"
+evidence = "test:tests/posix/utility/misc/stdbuf/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.sum"
+status = "present"
+evidence = "test:tests/posix/utility/misc/sum/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.sync"
+status = "present"
+evidence = "test:tests/posix/utility/misc/sync/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.tac"
+status = "present"
+evidence = "test:tests/posix/utility/misc/tac/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.timeout"
+status = "present"
+evidence = "test:tests/posix/utility/misc/timeout/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.truncate"
+status = "present"
+evidence = "test:tests/posix/utility/misc/truncate/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.uptime"
+status = "present"
+evidence = "test:tests/posix/utility/misc/uptime/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.users"
+status = "present"
+evidence = "test:tests/posix/utility/misc/users/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
+
+[[row]]
+id = "util.yes"
+status = "present"
+evidence = "test:tests/posix/utility/misc/yes/test.sh"
+notes = "P4g: P4f misc case, host build under LC_ALL=C"
