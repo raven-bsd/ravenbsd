@@ -14,4 +14,4 @@ util.tty	tty	tty
 util.stty	stty	stty -a
 util.kill	kill	kill -l
 util.nice	nice	nice -n 5 true
-util.nohup	nohup	nohup true	P4d-D9
+util.nohup	nohup	nohup true

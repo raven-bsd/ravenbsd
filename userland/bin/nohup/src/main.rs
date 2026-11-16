@@ -4,9 +4,10 @@
 //! The RavenBSD `nohup` utility.
 //!
 //! The kernel queues signals and the exec'd child does not install a SIGHUP handler, so a
-//! queued hangup does not terminate it. The runtime has no descriptor table for stdout; the
-//! utility creates/appends the standard `nohup.out` (mode 0600) and reports it, while the child's
-//! own console output remains on the debug console.
+//! queued hangup does not terminate it. The runtime has no stdout descriptor or `isatty` path;
+//! this utility therefore implements the non-terminal case: it execs the command without
+//! redirecting output and preserves the command's exit status. The POSIX terminal-only
+//! `nohup.out` redirect is unavailable until a stdout/fd API exists.
 
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
@@ -22,7 +23,6 @@ mod program {
     use alloc::vec::Vec;
 
     use raven_abi::errno::Errno;
-    use raven_proto_fs::{O_CREAT, O_WRONLY};
     use raven_rt::entry;
 
     entry!(main);
@@ -40,36 +40,6 @@ mod program {
             environment.push(format!("PWD={}", raven_rt::fs::cwd()));
         }
         environment
-    }
-
-    fn open_output(args: &raven_rt::Args) -> Result<String, Errno> {
-        let flags = O_WRONLY | O_CREAT;
-        let directory = args
-            .env_get("PWD")
-            .map(String::from)
-            .unwrap_or_else(raven_rt::fs::cwd);
-        let display = format!("{directory}/nohup.out");
-        let open_path = format!("file:{display}");
-        match raven_rt::fs::open(&open_path, flags) {
-            Ok(file) => {
-                let _ = file.close();
-                let _ = raven_rt::fs::chmod(&open_path, 0o600);
-                return Ok(display);
-            }
-            Err(error) => {
-                let Some(home) = args.env_get("HOME") else {
-                    return Err(error);
-                };
-                let display = format!("{home}/nohup.out");
-                let open_path = format!("file:{display}");
-                let Ok(file) = raven_rt::fs::open(&open_path, flags) else {
-                    return Err(error);
-                };
-                let _ = file.close();
-                let _ = raven_rt::fs::chmod(&open_path, 0o600);
-                Ok(display)
-            }
-        }
     }
 
     fn run(command: &[String], environment: &[String]) -> i32 {
@@ -100,14 +70,6 @@ mod program {
                 return 2;
             }
         };
-        let output = match open_output(&args) {
-            Ok(path) => path,
-            Err(error) => {
-                raven_rt::eprintln!("nohup: cannot create nohup.out: {}", error.description());
-                return 1;
-            }
-        };
-        raven_rt::eprintln!("nohup: ignoring input and appending output to '{output}'");
         let environment = raven_env::merge_environment(&base_environment(&args), false, &[]);
         run(&options.command, &environment)
     }

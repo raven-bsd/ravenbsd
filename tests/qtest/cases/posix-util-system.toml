@@ -619,20 +619,8 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "cd /tmp\n"
-delay_ms = 100
-
-[[step]]
-wait = '^raven# $'
-timeout_secs = 30
-
-[[step]]
 send = "nohup /bin/whoami\n"
 delay_ms = 100
-
-[[step]]
-wait = "^nohup: ignoring input and appending output to '/tmp/nohup\\.out'$"
-timeout_secs = 30
 
 [[step]]
 wait = '^root$'
@@ -645,10 +633,6 @@ timeout_secs = 30
 [[step]]
 send = "nohup /bin/getconf NOPE; echo status=$?\n"
 delay_ms = 100
-
-[[step]]
-wait = "^nohup: ignoring input and appending output to '/tmp/nohup\\.out'$"
-timeout_secs = 30
 
 [[step]]
 wait = '^getconf: NOPE: unrecognized variable$'

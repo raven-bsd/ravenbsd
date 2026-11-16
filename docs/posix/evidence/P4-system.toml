@@ -55,3 +55,9 @@ id = "util.nice"
 status = "present"
 evidence = "qtest:posix-util-system"
 notes = "P4o: first-party nice; query, set/clamp and execute a command"
+
+[[row]]
+id = "util.nohup"
+status = "present"
+evidence = "qtest:posix-util-system"
+notes = "P4o: non-terminal stdout path; exec and exit status. Terminal-only nohup.out redirection is unavailable (no fd 1/isatty/dup2) and is recorded as a libc/tty follow-up"
