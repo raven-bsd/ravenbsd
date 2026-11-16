@@ -3,7 +3,7 @@
 SPDX-License-Identifier: BSD-3-Clause
 Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-Status: backend implemented; target acceptance is blocked on P9b (`PROC_HANDLE_INFO`).
+Status: backend complete; the `libc-spawn` target case passes on `origin/master` with P9b merged.
 
 ## Contract
 
@@ -32,12 +32,11 @@ returned to the caller.
 
 | Primitive | Raw | State |
 |---|---|---|
-| `PROC_HANDLE_INFO(handle) -> pid` | `0x3E` | In P9b's pushed branch, not on `origin/master` |
-| `PROC_EXEC_CRED(proc, file, flags)` | `0x3F` | P9b moves U3b's call from `0x3E` to `0x3F` |
+| `PROC_HANDLE_INFO(handle) -> pid` | `0x3E` | On master (P9b) |
+| `PROC_EXEC_CRED(proc, file, flags)` | `0x3F` | On master (P9b moved U3b's call from `0x3E`) |
 
-`raven-spawn::sys::pid_for_handle` is the only caller of `0x3E`; `RtHandleInfo` wraps it. When P9b
-is merged, the kernel supplies the syscall and no P9a code changes are needed. Until then the
-on-target `libc-spawn` case fails at the pid conversion and is reported as PARTIAL.
+`raven-spawn::sys::pid_for_handle` is the only caller of `0x3E`; `RtHandleInfo` wraps it. P9b
+supplies the kernel syscall, and the on-target `libc-spawn` case passes on master.
 
 `PROC_WAIT` returns the kernel's raw exit code; `native_spawn` encodes it with
 `wait_status::encode(WaitStatus::Exited(code))`, so `WIFEXITED`/`WEXITSTATUS` work.

@@ -67,7 +67,7 @@ pub const MAX_FILE_IMAGE: usize = 8 * 1024 * 1024;
 
 /// Raw `PROC_EXEC_CRED`: apply the setuid/setgid policy before the first thread starts.
 ///
-/// P9b moves this call from `0x3E` to `0x3F` so `PROC_HANDLE_INFO` can own `0x3E`.
+/// P9b moved this call from `0x3E` to `0x3F` so `PROC_HANDLE_INFO` owns `0x3E`.
 pub const PROC_EXEC_CRED: usize = 0x3F;
 
 pub use crate::spawn_error::SpawnError;
