@@ -2613,6 +2613,20 @@ name = "raven-timemath"
 version = "0.1.0"
 
 [[package]]
+name = "raven-tls"
+version = "0.1.0"
+
+[[package]]
+name = "raven-tls-client"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-net",
+ "raven-scheme",
+ "raven-tls",
+]
+
+[[package]]
 name = "raven-tool-core"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Test PKI for the T2 TLS client smoke. The guest realtime clock is zero until
+# an RTC source is wired into the kernel, so both certificates are issued with
+# a 1970 notBefore and a 2049 notAfter; chain and hostname verification stay on.
+
+[ ca ]
+default_ca = CA_default
+
+[ CA_default ]
+dir = ./build/tls/client/pki
+database = $dir/index.txt
+new_certs_dir = $dir/newcerts
+certificate = $dir/ca.pem
+serial = $dir/serial
+private_key = $dir/ca.key
+default_md = sha256
+default_days = 365
+policy = policy_any
+unique_subject = no
+copy_extensions = none
+email_in_dn = no
+rand_serial = no
+
+[ policy_any ]
+commonName = optional
+countryName = optional
+stateOrProvinceName = optional
+localityName = optional
+organizationName = optional
+organizationalUnitName = optional
+emailAddress = optional
+
+[ req ]
+distinguished_name = req_dn
+prompt = no
+
+[ req_dn ]
+CN = RavenBSD TLS test
+
+[ ca_ext ]
+basicConstraints = critical,CA:TRUE
+keyUsage = critical,keyCertSign,cRLSign
+subjectKeyIdentifier = hash
+
+[ server_ext ]
+basicConstraints = critical,CA:FALSE
+keyUsage = critical,digitalSignature,keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = IP:10.0.2.2
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
