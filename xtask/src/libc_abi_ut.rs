@@ -151,6 +151,17 @@ fn an_export_only_name_is_reported() {
 }
 
 #[test]
+fn an_export_only_name_is_frozen_with_default_metadata() {
+    let census = parse_census(CENSUS).expect("census");
+    let exports = parse_symbol_map("RAVEN_1.0 {\n newsym;\n};").expect("map");
+    let model = derive(&census, &exports, &BTreeMap::new()).expect("derive");
+    assert!(
+        model.records.iter().any(|row| row == "newsym F - all 3 -"),
+        "export-only public names must reach the frozen record"
+    );
+}
+
+#[test]
 fn the_private_prefix_is_not_public() {
     let census = parse_census(CENSUS).expect("census");
     let exports = parse_symbol_map("RAVEN_1.0 {\n __raven_x;\n};").expect("map");
