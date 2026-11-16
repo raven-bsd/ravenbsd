@@ -96,7 +96,7 @@ utility area: 56 pass, 125 fail, 0 skip
 ```
 
 Before this batch the utility area was 51 pass / 130 fail (the ticket's "130 failing util.* rows").
-The five registered rows move it to 56 pass / 125 fail; the whole gate moves from 811 pass / 950
+The five registered rows move it to 56 pass / 125 fail; the whole gate moves from 811 pass / 951
 fail to 816 pass / 946 fail.
 
 ## Defects
