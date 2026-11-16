@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P9c: spawn with non-NULL posix_spawnattr_t and posix_spawn_file_actions_t blobs, the shape
+# std::process::Command uses. The C73 libc-spawn case passes NULL for both.
+
+name = "libc-spawn-attr"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/libc-spawn/spawn_attr.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^spawn-attr: start$'
+
+[[expect]]
+regex = '^spawn-attr: spawn ok$'
+
+[[expect]]
+regex = '^libc-child: argc=3 argv1=a argv2=b c RL=1$'
+
+[[expect]]
+regex = '^spawn-attr: wait ok$'
+
+[[expect]]
+regex = '^spawn-attr: done$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|page fault|spawn-attr: FAIL'

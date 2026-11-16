@@ -95,3 +95,25 @@ pub(crate) mod wait3;
 pub(crate) mod wait4;
 pub(crate) mod waitid;
 pub(crate) mod waitpid;
+
+/// Snapshot the open descriptors for the `posix_spawn` file-action applier.
+///
+/// The spawn model resolves actions such as `adddup2` against the parent's fd table. The
+/// table used to be hardcoded empty, so every `adddup2` returned `EBADF` even for an open
+/// standard descriptor.
+pub(crate) fn parent_fd_table() -> alloc::vec::Vec<raven_libc_proc::spawn_model::FdEntry> {
+    let platform = crate::ffi::platform::global();
+    let mut table = alloc::vec::Vec::new();
+    let mut fd = 0;
+    while fd < 1024 {
+        if let Ok(ofd) = platform.get(fd) {
+            table.push(raven_libc_proc::spawn_model::FdEntry {
+                fd,
+                handle: ofd.handle().0,
+                cloexec: platform.cloexec(fd).unwrap_or(false),
+            });
+        }
+        fd += 1;
+    }
+    table
+}

@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P9c: a minimal std program calls std::process::Command::status for /bin/libc-child. This is
+# the same posix_spawn path brush uses, isolated from brush's line editor and tokio runtime.
+
+name = "libc-spawn-std"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/libc-spawn/std_spawn.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+skip = "blocked on K91/toolchain: std::process::Command::status faults with RBX=0 after a successful posix_spawn; the loader and fd-map path are covered by libc-spawn and libc-spawn-attr"
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|page fault'
