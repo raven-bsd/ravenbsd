@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4q xargs evidence: bounded first-party argument batcher and runner.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.xargs"
+status = "present"
+evidence = "test:tests/posix/utility/xargs/test.sh"
+notes = "P4q: bounded first-party xargs host behaviour tests"

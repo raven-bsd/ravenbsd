@@ -3227,6 +3227,15 @@ name = "raven-vma"
 version = "0.1.0"
 
 [[package]]
+name = "raven-xargs"
+version = "0.1.0"
+dependencies = [
+ "raven-initfs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-xhci"
 version = "0.1.0"
 dependencies = [
