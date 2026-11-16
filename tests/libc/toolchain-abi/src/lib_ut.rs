@@ -223,6 +223,40 @@ fn termios_layout_matches_the_abi() {
 }
 
 #[test]
+fn c64i_exports_are_in_the_abi_list() {
+    const C64I: &[&str] = &[
+        "__ctype_get_mb_cur_max",
+        "fgetwc",
+        "fwprintf",
+        "vfwprintf",
+        "getline",
+        "remove",
+        "rewind",
+        "stdin",
+        "stdout",
+        "stderr",
+        "arc4random_buf",
+        "fgetln",
+        "grantpt",
+        "posix_openpt",
+        "ptsname_r",
+        "tcgetattr",
+        "tcsetattr",
+        "umask",
+        "unlockpt",
+    ];
+    let list = include_str!("../../../../libc/ravenlibc/abi/Symbols.list");
+    let names: std::collections::BTreeSet<&str> = list
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .collect();
+    for name in C64I {
+        assert!(names.contains(name), "{name} is missing from Symbols.list");
+    }
+}
+
+#[test]
 fn vendored_module_is_the_patched_toolchain_module() {
     let marker = "+++ b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs\n";
     let start = PATCH.find(marker).expect("module hunk") + marker.len();
