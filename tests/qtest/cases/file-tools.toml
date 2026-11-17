@@ -3,9 +3,9 @@
 
 name = "file-tools"
 arch = "x86_64"
-profile = "core-servers-files"
+profile = "file-tools-test"
 timeout_secs = 600
-pre = ["sh crates/raven-tool-core/build.sh"]
+pre = ["sh tests/fixtures/file-tools/build.sh"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"

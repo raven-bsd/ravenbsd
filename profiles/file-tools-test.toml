@@ -1,12 +1,41 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-
-# The file-tools integration profile. It inherits the shell profile, its services and the ten
-# base file tools, then adds the one-shot tooltest client and its settled-exit settings.
+#
+# The file-tools integration profile. It is self-contained (not extending `shell`) so the
+# uutils slice can be selected by the case's pre step for the qtest architecture. The real
+# `/etc/mounts`, the file servers, the one-shot tooltest client and the ten base tools are
+# staged; `dynamic = true` keeps the `/bin` program slot on the dynamic loader path.
 
 name = "file-tools-test"
 
-extends = "shell"
+[initfs]
+dynamic = true
+programs = [
+    { package = "raven-init", path = "/init" },
+    { package = "raven-uname", path = "/bin/uname" },
+    { package = "raven-logd", path = "/sbin/logd" },
+    { package = "raven-sysd", path = "/sbin/sysd" },
+    { package = "raven-randd", path = "/sbin/randd" },
+    { package = "raven-zerod", path = "/sbin/zerod" },
+    { package = "raven-nulld", path = "/sbin/nulld" },
+    { package = "raven-consd", path = "/sbin/consd" },
+    { package = "raven-initfsd", path = "/sbin/initfsd" },
+    { package = "raven-ramfsd", path = "/sbin/ramfsd" },
+    { package = "raven-vfsd", path = "/sbin/vfsd" },
+]
+
+files = [
+    { src = "etc/mounts", path = "/etc/mounts" },
+    { src = "etc/services.d/logd.toml", path = "/etc/services.d/logd.toml" },
+    { src = "etc/services.d/sysd.toml", path = "/etc/services.d/sysd.toml" },
+    { src = "etc/services.d/randd.toml", path = "/etc/services.d/randd.toml" },
+    { src = "etc/services.d/zerod.toml", path = "/etc/services.d/zerod.toml" },
+    { src = "etc/services.d/nulld.toml", path = "/etc/services.d/nulld.toml" },
+    { src = "etc/services.d/consd.toml", path = "/etc/services.d/consd.toml" },
+    { src = "etc/services.d/initfsd.toml", path = "/etc/services.d/initfsd.toml" },
+    { src = "etc/services.d/ramfsd.toml", path = "/etc/services.d/ramfsd.toml" },
+    { src = "etc/services.d/vfsd.toml", path = "/etc/services.d/vfsd.toml" },
+]
 
 [boot]
 cmdline = "console=ttyS0 loglevel=info"
