@@ -57,4 +57,10 @@ typedef struct {
 	unsigned int __mxcsr;
 } fenv_t;
 
+typedef struct {
+	unsigned short __control;
+	unsigned short __unused;
+	unsigned int __mxcsr;
+} femode_t;
+
 #define FE_DFL_ENV      ((const fenv_t *) -1)
