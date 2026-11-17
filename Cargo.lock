@@ -2730,6 +2730,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-record-lock"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-renice"
 version = "0.1.0"
 dependencies = [

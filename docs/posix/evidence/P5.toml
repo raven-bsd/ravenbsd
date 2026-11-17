@@ -67,6 +67,12 @@ evidence = "qtest:fsd-ufs-rw"
 notes = "P5: mkfifo/mknod FIFO, character-device and socket nodes on ramfs and UFS"
 
 [[row]]
+id = "filesystem.record-lock"
+status = "present"
+evidence = "qtest:posix-fs-record-lock"
+notes = "P5c: raw RECORD_LOCK shared/exclusive ranges, F_GETLK conflicting owner, F_SETLKW blocking, close and exit release"
+
+[[row]]
 id = "filesystem.stat-family"
 status = "present"
 evidence = "qtest:posix-fs"

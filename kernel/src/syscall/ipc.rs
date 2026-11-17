@@ -147,6 +147,12 @@ pub fn seek(frame: &SyscallFrame) -> Result<usize, Errno> {
 
 fn close(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    // POSIX fcntl locks are per file: closing any descriptor releases this process's locks.
+    if crate::syscall::record_lock::has_locks_for(caller.id)
+        && let Ok(file) = ipc::file_from_handle(caller, handle, Rights::NONE)
+    {
+        crate::syscall::record_lock::release_file_for(caller, &file);
+    }
     router::close(caller, handle)?;
     Ok(0)
 }

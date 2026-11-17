@@ -28,6 +28,7 @@ pub mod memory_ctl;
 pub mod pipe;
 pub mod priority;
 pub mod process_ctl;
+pub mod record_lock;
 pub mod thread;
 /// `TRACE_SET` (R-OBS-6): the calling thread's current trace id.
 pub mod trace;
@@ -247,9 +248,18 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == raven_abi::syscall::TRACE_SET {
         return trace::trace_set(frame);
     }
+    // P5c: RECORD_LOCK (reviewer-assigned raw number 0x0C; not a Syscall variant).
+    if number == raven_abi::syscall::RECORD_LOCK {
+        return record_lock::record_lock(frame);
+    }
     match Syscall::from_usize(number) {
         // EXIT is process-wide: every thread of the process terminates.
-        Some(Syscall::EXIT) => process::exit_process(frame.rdi as i32),
+        Some(Syscall::EXIT) => {
+            if let Some(current) = process::current() {
+                record_lock::release_process(current.id);
+            }
+            process::exit_process(frame.rdi as i32)
+        }
         // C16: authorized termination (contract crate owns the number and wording).
         Some(Syscall::PROC_TERMINATE) => process_ctl::terminate(frame),
         Some(Syscall::PROC_NAMESPACE) => process_ctl::namespace(frame),
