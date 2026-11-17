@@ -67,6 +67,31 @@ pub struct CancelOutcome {
     pub effect: Option<InheritEffect>,
 }
 
+/// Per-object lock statistics, compiled only under the `lockstat` feature.
+///
+/// These are the counters the kernel `lockstat` probes will publish (L5); the pure crate grows
+/// them now so the kernel side is plumbing. Every counter is saturating: it never wraps silently.
+#[cfg(feature = "lockstat")]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct LockStats {
+    /// Number of threads that blocked on this object.
+    pub wait_entries: u64,
+    /// Number of uncontended acquisitions.
+    pub immediate_acquisitions: u64,
+    /// Number of threads woken (`wake_one` + `wake_all`).
+    pub wakes: u64,
+    /// Number of waiters removed by [`Turnstiles::cancel`].
+    pub cancels: u64,
+    /// Reserved for the kernel timeout path; always `0` here (the pure model has no timeout).
+    pub timeouts: u64,
+    /// The largest number of simultaneous waiters observed.
+    pub max_queue_depth: u64,
+    /// The longest inheritance (wait-for) chain observed on this object, in hops.
+    pub max_inheritance_depth: u64,
+    /// Number of times an operation changed an owner's effective priority.
+    pub inherited_priority_changes: u64,
+}
+
 /// Why a turnstile operation was rejected.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Error {
@@ -125,12 +150,38 @@ struct Waiter {
 }
 
 /// One turnstile: the wait queue plus the inheritance link to its owner.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+///
+/// Equality and hashing deliberately ignore the [`LockStats`] counters (when compiled in): the
+/// exhaustive model check deduplicates on the *logical* state, so two reachable states that differ
+/// only in their accumulated statistics must still collapse.
+#[derive(Clone, Debug, Default)]
 struct Turnstile {
     owner: Option<ThreadId>,
     waiters: Vec<Waiter>,
     pi: Option<Priority>,
     next_arrival: u64,
+    #[cfg(feature = "lockstat")]
+    stats: LockStats,
+}
+
+impl PartialEq for Turnstile {
+    fn eq(&self, other: &Self) -> bool {
+        self.owner == other.owner
+            && self.waiters == other.waiters
+            && self.pi == other.pi
+            && self.next_arrival == other.next_arrival
+    }
+}
+
+impl Eq for Turnstile {}
+
+impl core::hash::Hash for Turnstile {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.owner.hash(state);
+        self.waiters.hash(state);
+        self.pi.hash(state);
+        self.next_arrival.hash(state);
+    }
 }
 
 /// The set of turnstiles, keyed by object id, plus per-thread base and effective priorities.
@@ -185,6 +236,8 @@ impl Turnstiles {
             return Err(Error::AlreadyOwned { owner });
         }
         self.objects.entry(object).or_default().owner = Some(thread);
+        #[cfg(feature = "lockstat")]
+        self.stat_acquire(object);
         self.refresh();
         Ok(())
     }
@@ -228,6 +281,8 @@ impl Turnstiles {
             .get(&owner)
             .copied()
             .ok_or(Error::UnknownThread)?;
+        #[cfg(feature = "lockstat")]
+        self.stat_block(object, owner, before != after);
         Ok(InheritEffect {
             owner,
             before,
@@ -255,19 +310,25 @@ impl Turnstiles {
             }
         };
         self.refresh();
+        #[cfg(feature = "lockstat")]
+        if woken.is_some() {
+            self.stat_wake(object, 1);
+        }
         woken
     }
 
     /// Release `object` and wake every waiter, in priority order, at most once each.
     #[must_use]
     pub fn wake_all(&mut self, object: ObjectId) -> Vec<ThreadId> {
-        let woken = match self.objects.get_mut(&object) {
+        let woken: Vec<ThreadId> = match self.objects.get_mut(&object) {
             None => return Vec::new(),
             Some(turnstile) => {
                 turnstile.owner = None;
                 turnstile.waiters.drain(..).map(|w| w.thread).collect()
             }
         };
+        #[cfg(feature = "lockstat")]
+        self.stat_wake(object, woken.len() as u64);
         self.refresh();
         woken
     }
@@ -306,6 +367,10 @@ impl Turnstiles {
         } else {
             None
         };
+        #[cfg(feature = "lockstat")]
+        if removed {
+            self.stat_cancel(object, effect.is_some_and(InheritEffect::changed));
+        }
         CancelOutcome { removed, effect }
     }
 
@@ -321,6 +386,10 @@ impl Turnstiles {
             .get(&owner)
             .copied()
             .ok_or(Error::UnknownThread)?;
+        #[cfg(feature = "lockstat")]
+        if before != after {
+            self.stat_priority_change(object);
+        }
         Ok(Some(InheritEffect {
             owner,
             before,
@@ -347,6 +416,10 @@ impl Turnstiles {
             .get(&owner)
             .copied()
             .ok_or(Error::UnknownThread)?;
+        #[cfg(feature = "lockstat")]
+        if before != after {
+            self.stat_priority_change(object);
+        }
         Ok(Some(InheritEffect {
             owner,
             before,
@@ -509,6 +582,71 @@ impl Turnstiles {
             turnstile.pi = turnstile.waiters.first().map(|waiter| waiter.priority);
         }
         self.effective = effective;
+    }
+}
+
+#[cfg(feature = "lockstat")]
+impl Turnstiles {
+    /// Snapshot the lock statistics for `object` (all zero when it has never been touched).
+    #[must_use]
+    pub fn stats(&self, object: ObjectId) -> LockStats {
+        self.objects
+            .get(&object)
+            .map_or(LockStats::default(), |turnstile| turnstile.stats)
+    }
+
+    fn stat_acquire(&mut self, object: ObjectId) {
+        let stats = &mut self.objects.entry(object).or_default().stats;
+        stats.immediate_acquisitions = stats.immediate_acquisitions.saturating_add(1);
+    }
+
+    fn stat_block(&mut self, object: ObjectId, owner: ThreadId, changed: bool) {
+        let depth = self.waiter_count(object) as u64;
+        let chain = 1u64.saturating_add(self.chain_length(owner) as u64);
+        let stats = &mut self.objects.entry(object).or_default().stats;
+        stats.wait_entries = stats.wait_entries.saturating_add(1);
+        stats.max_queue_depth = stats.max_queue_depth.max(depth);
+        stats.max_inheritance_depth = stats.max_inheritance_depth.max(chain);
+        if changed {
+            stats.inherited_priority_changes = stats.inherited_priority_changes.saturating_add(1);
+        }
+    }
+
+    fn stat_wake(&mut self, object: ObjectId, count: u64) {
+        let stats = &mut self.objects.entry(object).or_default().stats;
+        stats.wakes = stats.wakes.saturating_add(count);
+    }
+
+    fn stat_cancel(&mut self, object: ObjectId, changed: bool) {
+        let stats = &mut self.objects.entry(object).or_default().stats;
+        stats.cancels = stats.cancels.saturating_add(1);
+        if changed {
+            stats.inherited_priority_changes = stats.inherited_priority_changes.saturating_add(1);
+        }
+    }
+
+    fn stat_priority_change(&mut self, object: ObjectId) {
+        let stats = &mut self.objects.entry(object).or_default().stats;
+        stats.inherited_priority_changes = stats.inherited_priority_changes.saturating_add(1);
+    }
+
+    /// The wait-for chain length from `thread`: hops along "thread waits on `O`, owned by `P`; `P`
+    /// waits on `O2`, owned by `Q`; ..." until a thread that owns but does not wait.
+    fn chain_length(&self, thread: ThreadId) -> usize {
+        let mut length = 0usize;
+        let mut current = thread;
+        let mut visited = BTreeSet::new();
+        while visited.insert(current) {
+            let Some(object) = self.waiting_on(current) else {
+                break;
+            };
+            length = length.saturating_add(1);
+            let Some(owner) = self.owner(object) else {
+                break;
+            };
+            current = owner;
+        }
+        length
     }
 }
 

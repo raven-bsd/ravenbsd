@@ -302,3 +302,95 @@ fn seeded_bug_waiter_order_is_detected() {
         Err(InvariantViolation::WaiterOrdering)
     );
 }
+
+#[cfg(feature = "lockstat")]
+#[test]
+fn lockstat_default_zeros_and_timeouts() {
+    let mut t = Turnstiles::new();
+    t.register(0, prio(10)).unwrap();
+    // An untouched object has all-zero statistics.
+    assert_eq!(t.stats(7), LockStats::default());
+    t.acquire(0, 0).unwrap();
+    t.register(1, prio(8)).unwrap();
+    t.block(0, 1).unwrap();
+    let _ = t.wake_all(0);
+    // `timeouts` is reserved for the kernel timeout path and stays zero.
+    assert_eq!(t.stats(0).timeouts, 0);
+}
+
+#[cfg(feature = "lockstat")]
+#[test]
+fn lockstat_counters_track_operations() {
+    let mut t = Turnstiles::new();
+    t.register(0, prio(10)).unwrap();
+    t.register(1, prio(8)).unwrap();
+    t.register(2, prio(6)).unwrap();
+
+    // Immediate acquisition.
+    t.acquire(0, 0).unwrap();
+    let s = t.stats(0);
+    assert_eq!(s.immediate_acquisitions, 1);
+    assert_eq!(s.wait_entries, 0);
+    assert_eq!(s.wakes, 0);
+
+    // First block: one wait entry, queue depth 1, owner boosted (10 -> 8).
+    t.block(0, 1).unwrap();
+    let s = t.stats(0);
+    assert_eq!(s.wait_entries, 1);
+    assert_eq!(s.max_queue_depth, 1);
+    assert_eq!(s.inherited_priority_changes, 1);
+
+    // Second block: queue depth 2, owner boosted again (8 -> 6).
+    t.block(0, 2).unwrap();
+    let s = t.stats(0);
+    assert_eq!(s.wait_entries, 2);
+    assert_eq!(s.max_queue_depth, 2);
+    assert_eq!(s.inherited_priority_changes, 2);
+
+    // wake_all wakes both waiters.
+    assert_eq!(t.wake_all(0).len(), 2);
+    let s = t.stats(0);
+    assert_eq!(s.wakes, 2);
+    assert_eq!(s.timeouts, 0);
+}
+
+#[cfg(feature = "lockstat")]
+#[test]
+fn lockstat_cancel_and_wake_one_counts() {
+    let mut t = Turnstiles::new();
+    t.register(0, prio(10)).unwrap();
+    t.register(1, prio(8)).unwrap();
+    t.acquire(0, 0).unwrap();
+    t.block(0, 1).unwrap();
+    // Cancel removes one waiter and restores the owner (a priority change).
+    assert!(t.cancel(0, 1).removed);
+    let s = t.stats(0);
+    assert_eq!(s.cancels, 1);
+    assert_eq!(s.wakes, 0);
+    assert_eq!(s.inherited_priority_changes, 2); // block boost + cancel restore
+
+    // wake_one wakes exactly one waiter.
+    t.block(0, 1).unwrap();
+    assert!(t.wake_one(0).is_some());
+    let s = t.stats(0);
+    assert_eq!(s.wakes, 1);
+    assert_eq!(s.cancels, 1);
+}
+
+#[cfg(feature = "lockstat")]
+#[test]
+fn lockstat_max_inheritance_depth_is_transitive() {
+    let mut t = Turnstiles::new();
+    t.register(0, prio(10)).unwrap(); // C
+    t.register(1, prio(8)).unwrap(); // B
+    t.register(2, prio(2)).unwrap(); // A
+    t.acquire(1, 1).unwrap(); // B owns lock 1
+    t.acquire(0, 0).unwrap(); // C owns lock 0
+    // Bottom-up so the transitive chain A -> B -> C is observable on lock 1.
+    t.block(0, 1).unwrap(); // B blocks on C (depth 1 on lock 0)
+    t.block(1, 2).unwrap(); // A blocks on B; B already waits on C, so depth 2 on lock 1
+    let lock0 = t.stats(0);
+    let lock1 = t.stats(1);
+    assert_eq!(lock0.max_inheritance_depth, 1);
+    assert_eq!(lock1.max_inheritance_depth, 2);
+}

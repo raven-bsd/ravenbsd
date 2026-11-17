@@ -22,6 +22,8 @@ extern crate std;
 
 mod turnstile;
 
+#[cfg(feature = "lockstat")]
+pub use turnstile::LockStats;
 pub use turnstile::{
     CancelOutcome, Error, InheritEffect, InvariantViolation, ObjectId, Priority, ThreadId,
     Turnstiles,
