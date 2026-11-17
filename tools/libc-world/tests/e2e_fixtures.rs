@@ -174,7 +174,7 @@ fn build_subset(temp: &Path, subset: &str) -> (std::process::Output, PathBuf, Pa
         ("toybox", "1.0"),
     ];
     let mut world =
-        fs::read_to_string(repo_root().join("tools/libc-world/world.toml")).expect("world");
+        fs::read_to_string(repo_root().join("libc/ravenlibc/world.toml")).expect("world");
     for (name, version) in rows {
         let sha = make_tarball(name, version, &tarballs);
         world = fill_row(

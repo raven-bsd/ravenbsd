@@ -240,7 +240,7 @@ fn fill_zlib_row(world: &str) -> String {
 fn a_missing_tarball_is_data_not_an_error() {
     let temp = temp("tarball-missing");
     let world_path = temp.join("world.toml");
-    let world = fs::read_to_string(repo_root().join("tools/libc-world/world.toml")).expect("world");
+    let world = fs::read_to_string(repo_root().join("libc/ravenlibc/world.toml")).expect("world");
     fs::write(&world_path, fill_zlib_row(&world)).expect("scratch world");
     let sysroot = temp.join("sysroot");
     fs::create_dir_all(&sysroot).expect("sysroot");

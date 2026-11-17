@@ -28,7 +28,7 @@ pub mod wrapper;
 pub const SCHEMA: u32 = 1;
 
 /// Default world list, relative to the repository root.
-pub const DEFAULT_WORLD: &str = "tools/libc-world/world.toml";
+pub const DEFAULT_WORLD: &str = "libc/ravenlibc/world.toml";
 
 /// Default committed results directory, relative to the repository root.
 pub const DEFAULT_RESULTS: &str = "tools/libc-world/results";

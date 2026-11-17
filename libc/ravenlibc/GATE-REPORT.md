@@ -24,8 +24,8 @@ host tooling, and are listed with their owning lane.
 | 1 correctness | 1.5 host unit tests | MET | build/libc-gate/1.5.txt | 31 host crates via `cargo nextest run` |
 | 1 correctness | 1.6 Miri (C11) | BLOCKED | build/libc-gate/1.6.txt | preflight command failed |
 | 1 correctness | 1.7 lints (C16) | NOT MET | build/libc-gate/1.7.txt | 17 violations: 3 in `ld/src/raw/exports.rs` (C74g SAFETY comments), 14 pre-existing |
-| 2 portability | 2.1 world check | BLOCKED | build/libc-gate/2.1.txt | missing tools/libc-world/Cargo.toml; C72 outputs are not in origin/master and H-11 tarballs are absent |
-| 2 portability | 2.2 world build gate (C13) | BLOCKED | build/libc-gate/2.2.txt | missing tools/libc-world/Cargo.toml; C72 outputs are not in origin/master and H-11 tarballs are absent |
+| 2 portability | 2.1 world check | BLOCKED | build/libc-gate-c74ah/2.1.txt | harness present; `libc-world check` passes (200 packages, 197.5 weighted); blocked on `results/x86_64/world.json` because `ravenbsd-resources/world-src` and a `donors.lock` world entry are absent (H-11) and the list is PLACEHOLDER (H-12) |
+| 2 portability | 2.2 world build gate (C13) | BLOCKED | build/libc-gate-c74ah/2.2.txt | harness present; real `build --subset smoke5` yields 5/5 `placeholder` (`version not frozen (H-12)`), gate 0/100 built; blocked on H-11 tarballs + H-12 freeze; no synthetic results |
 | 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate-c74z-s10/3.1.txt | exit 1: 11 pass, 52 fail, 69 known, 105 skipped, 0 budget-only; C74z-S10 re-froze the six P9 S/F rows; remaining 44 S/F, 6 B-only, 2 boot |
 | 3 size | 3.2 boot path (C15) | INFO | build/libc-gate/3.2.txt | PG-60 absent; 0-1 syscalls and <=250 instructions are not evaluable |
 | 4 hardening | 4.1 fuzz replay | MET | build/libc-gate/4.1.txt | exit 0 |
@@ -74,7 +74,11 @@ failures are P1b (`libc-hello` string, `libc-stdio`, `libc-time` sleep/usleep/tz
   missing `// SAFETY:` blocks in `ld/src/raw/exports.rs:591/594/596`; the other 14 are
   pre-existing `one-symbol`/`std-path`/`abi-freeze` findings in the libc crate. Owner: C74g
   follow-up plus the P1e/P1h/P1i lanes.
-* 2.1/2.2 world: BLOCKED. `tools/libc-world/Cargo.toml` and the C72 outputs are absent.
+* 2.1/2.2 world: BLOCKED. The harness and the 200-row list are present and `libc-world check`
+  passes. The real build cannot start: `ravenbsd-resources/world-src` and a `donors.lock` world
+  entry are absent (H-11) and every `world.toml` row is `PLACEHOLDER` (H-12), so the smoke5 probe
+  produces 5/5 `placeholder` (`version not frozen (H-12)`) and 0 of 100 built. Owner: the tarball
+  freeze/fetch (H-11/H-12); no result JSON was invented.
 * 3.1 size: NOT MET. `cargo xtask libc-size --check` exits 1 with `11 pass, 52 fail, 69 known,
   105 skipped, 0 budget-only`; C74z-S10 re-froze the six P9 S/F budgets on `e414e47d` after
   C39m/C74zb at measured + 3 percent, leaving 44 real S/F, 6 B-only and 2 boot rows. The P9
@@ -141,7 +145,8 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 * 1.6 Miri: BLOCKED, `build/libc-gate/1.6.txt`; `cargo-miri` is not installed for nightly.
 * 1.7 lints: NOT MET, `build/libc-gate/1.7.txt`; 17 violations (3 C74g SAFETY comments, 14
   pre-existing).
-* 2.1/2.2: BLOCKED, `tools/libc-world/Cargo.toml`, C72 outputs and H-11 tarballs are absent.
+* 2.1/2.2: BLOCKED, harness/list present and `check` green; H-11 `world-src`/`donors.lock` entry
+  and H-12 freeze are absent, so the real smoke5 build is 5/5 `placeholder` and 0/100 built.
 * 3.1: NOT MET, `libc-size check: 11 pass, 52 fail, 69 known, 105 skipped, 0 budget-only`;
   C74z-S10 P9 S/F re-freeze (44 S/F + 6 B-only + 2 boot remain); shrink plan in
   `tests/libc/size/TRIAGE.md`.
@@ -158,7 +163,7 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 | 1.5 host tests | `cargo nextest run` per crate | exit 0; 31 crates MET (gate row changed from `cargo test` to nextest) |
 | 1.6 Miri | nightly Miri preflight | exit 1; `cargo-miri` not installed for nightly → BLOCKED |
 | 1.7 lints | `cargo xtask libc-lint all` | exit 1; 17 violations (3 C74g SAFETY comments, 14 pre-existing) → NOT MET |
-| 2.1/2.2 world | missing files | `tools/libc-world/Cargo.toml` and C72 outputs absent → BLOCKED |
+| 2.1/2.2 world | `libc-world check` / `build --subset smoke5` / `gate` | check exit 0 (200 packages, 197.5 weighted); smoke5 5/5 `placeholder` (H-12), 0/100 built; H-11 `world-src`/`donors.lock` absent → BLOCKED |
 | 3.1 size | `cargo xtask libc-size --check` | exit 1; 11 pass, 52 fail, 69 known, 105 skipped, 0 budget-only; C74z-S10 P9 S/F re-freeze (44 S/F + 6 B-only + 2 boot remain); shrink plan in `tests/libc/size/TRIAGE.md` |
 | 4.2 soak | `tests/libc/fuzz/SOAK.md` | `inet_text` crashed before 1 h; 13 targets 3600 s/0 crashes → NOT MET |
 | 5.1 target | qtest JSON from `eval` | dynamic, signals, spawn, threads pass; hello, stdio, time fail (P1b) |

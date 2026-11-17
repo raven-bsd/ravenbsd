@@ -30,7 +30,7 @@ refused; `2` usage, I/O or a missing required input; `77` a required host tool i
 
 ## The list
 
-`tools/libc-world/world.toml` is the 200-row list of doc 16 section 3.B.6.2: `n`, `name`, `tier`,
+`libc/ravenlibc/world.toml` is the 200-row list of doc 16 section 3.B.6.2: `n`, `name`, `tier`,
 `build`, four placeholder fields, `needs`, `optional`, the verbatim `stresses` text, `configure`,
 `flag_notes`, `make_args`, `jobs_make` and `tests`. The weighted total is 197.5 (rows 182, 183,
 184, 188 and 195 are optional at 0.5). Subsets: `smoke5` = zlib lua sqlite pcre2 toybox, `quick4` =

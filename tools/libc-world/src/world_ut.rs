@@ -449,7 +449,8 @@ fn expected_tiers_match_the_specification() {
 
 #[test]
 fn the_shipped_world_has_two_hundred_rows() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("world.toml");
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../libc/ravenlibc/world.toml");
     let world = World::load(&path).expect("world.toml");
     world.validate().expect("valid world.toml");
     assert_eq!(world.package.len(), 200);
