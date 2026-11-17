@@ -1232,6 +1232,10 @@ name = "raven-elf"
 version = "0.1.0"
 
 [[package]]
+name = "raven-entropy"
+version = "0.1.0"
+
+[[package]]
 name = "raven-env"
 version = "0.1.0"
 dependencies = [

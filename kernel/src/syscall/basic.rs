@@ -19,6 +19,18 @@ use crate::syscall::SyscallFrame;
 use crate::time;
 use crate::usercopy::{copy_from_user, copy_to_user};
 
+/// `getrandom(buf: *mut u8, len: usize, flags: u32) -> usize` syscall number.
+///
+/// Assigned by the reviewer (S72); not yet a `raven-abi` variant, so it is dispatched by raw
+/// number in [`crate::syscall`] and documented here as the required contract diff.
+pub const GETRANDOM: usize = 0x08;
+/// `clock_set(clock_id: u32, ts: *const Timespec) -> 0` syscall number (reviewer-assigned, S72).
+pub const CLOCK_SET: usize = 0x09;
+/// `getrandom` flag: the kernel never blocks on entropy, so this is accepted and ignored.
+pub const GRND_NONBLOCK: u32 = 1;
+/// `getrandom` flag: the single pool serves both requests, so this is accepted and ignored.
+pub const GRND_RANDOM: u32 = 2;
+
 /// Dispatch one decoded syscall.
 pub fn dispatch(call: Syscall, frame: &SyscallFrame) -> Result<usize, Errno> {
     match call {
@@ -65,7 +77,7 @@ fn debug_write(pointer: u64, length: u64) -> Result<usize, Errno> {
 fn clock_get(clock_id: u32, pointer: u64) -> Result<usize, Errno> {
     let ns = match clock_id {
         clock::MONOTONIC => time::now_ns(),
-        clock::REALTIME => time::boot_realtime_ns(),
+        clock::REALTIME => time::realtime_ns(),
         _ => return Err(Errno::EINVAL),
     };
     let timespec = Timespec {
@@ -85,6 +97,75 @@ fn clock_get(clock_id: u32, pointer: u64) -> Result<usize, Errno> {
     };
     copy_to_user(destination, bytes)?;
     Ok(0)
+}
+
+/// `CLOCK_SET`: set the wall clock from a user `Timespec`.
+///
+/// Only `clock::REALTIME` is settable; a non-positive or out-of-range value is `EINVAL`. The
+/// monotonic clock is unaffected.
+pub fn clock_set(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let clock_id = frame.rdi as u32;
+    if clock_id != clock::REALTIME {
+        return Err(Errno::EINVAL);
+    }
+    let mut timespec = Timespec::default();
+    let source = UserSlice::new(
+        frame.rsi,
+        u64::try_from(core::mem::size_of::<Timespec>()).map_err(|_| Errno::EFAULT)?,
+    )?;
+    // SAFETY: `timespec` is a live stack value and the slice covers exactly its bytes.
+    let bytes = unsafe {
+        core::slice::from_raw_parts_mut(
+            core::ptr::addr_of_mut!(timespec).cast::<u8>(),
+            core::mem::size_of::<Timespec>(),
+        )
+    };
+    copy_from_user(bytes, source)?;
+    if timespec.tv_sec < 0 || !(0..1_000_000_000).contains(&timespec.tv_nsec) {
+        return Err(Errno::EINVAL);
+    }
+    let seconds = u64::try_from(timespec.tv_sec).map_err(|_| Errno::EINVAL)?;
+    let nanos = u64::try_from(timespec.tv_nsec).map_err(|_| Errno::EINVAL)?;
+    time::set_realtime_ns(seconds.saturating_mul(1_000_000_000).saturating_add(nanos));
+    Ok(0)
+}
+
+/// `GETRANDOM`: fill a user buffer from the kernel entropy pool.
+///
+/// Never blocks. The pool is seeded on first use from a hardware source or timer jitter; when
+/// neither can be sampled the call returns `EAGAIN`. `flags` is accepted and ignored (the kernel
+/// does not block on entropy, so `GRND_NONBLOCK` is a no-op). The length is capped at
+/// `0x1FFF_FFFF` like Linux.
+pub fn getrandom(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let len = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
+    let flags = frame.rdx as u32;
+    if flags & !(GRND_NONBLOCK | GRND_RANDOM) != 0 {
+        return Err(Errno::EINVAL);
+    }
+    if len > 0x1FFF_FFFF {
+        return Err(Errno::EINVAL);
+    }
+    if len == 0 {
+        return Ok(0);
+    }
+    let mut buffer = [0u8; 256];
+    let mut copied = 0usize;
+    while copied < len {
+        let take = len.saturating_sub(copied).min(buffer.len());
+        let Some(out) = buffer.get_mut(..take) else {
+            return Err(Errno::EINVAL);
+        };
+        match time::entropy_fill(out) {
+            Ok(n) => {
+                let destination =
+                    UserSlice::new(frame.rdi.saturating_add(copied as u64), n as u64)?;
+                copy_to_user(destination, out)?;
+                copied = copied.saturating_add(n);
+            }
+            Err(_) => return Err(Errno::EAGAIN),
+        }
+    }
+    Ok(copied)
 }
 
 fn uname(pointer: u64) -> Result<usize, Errno> {
