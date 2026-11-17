@@ -15,7 +15,7 @@
 
 #[cfg(target_arch = "x86_64")]
 use core::sync::atomic::AtomicU32;
-use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 #[cfg(target_arch = "x86_64")]
 use raven_timemath::{self, Scale};
@@ -26,6 +26,15 @@ use crate::arch::aarch64::timer as arch_timer;
 use crate::arch::x86_64::{apic, tsc};
 use crate::sync::IrqSpinLock;
 use crate::{boot, kprintln};
+
+/// The pure per-CPU deadline timer core (`raven-cyclic`, L2), compiled from the same source the
+/// host tests run. `kernel/Cargo.toml` is not in this ticket's Owns, so it is included by
+/// `#[path]` (the S26/S27 pattern).
+#[path = "../../crates/raven-cyclic/src/lib.rs"]
+#[allow(unused_attributes)] // `raven-cyclic`'s `#![no_std]` is its own crate-root attribute, unused as a module here.
+#[allow(dead_code)]
+// The kernel uses `add`/`on_interrupt`/`cancel`; the rest of raven-cyclic's surface awaits R-TIM-9 consumers.
+mod cyclic;
 
 #[cfg(target_arch = "x86_64")]
 #[path = "arch/x86_64/rtc.rs"]
@@ -80,6 +89,7 @@ pub fn init(counter_hz: u64, boot_counter: u64) {
         COUNTER_HZ.store(counter_hz, Ordering::Release);
         BOOT_COUNTER.store(boot_counter, Ordering::Release);
     }
+    cyclic_selftest();
 }
 
 /// Nanoseconds since [`init`].
@@ -120,12 +130,137 @@ pub fn ticks() -> u64 {
 /// Called from the timer interrupt.
 pub fn on_tick() {
     TICKS.fetch_add(1, Ordering::Relaxed);
+    cyclic_fire();
     #[cfg(target_arch = "x86_64")]
     apic::eoi();
     // S27 fallback: drain COM1 from the tick when the IOAPIC line is unavailable.
     #[cfg(target_arch = "x86_64")]
     crate::console::poll();
     crate::event::notify_all();
+}
+
+// ---------------------------------------------------------------------------
+// Cyclic timer integration (L4)
+// ---------------------------------------------------------------------------
+
+/// The kernel backend for `raven-cyclic`: records the next deadline and reads [`now_ns`].
+///
+/// The hardware timer is still periodic (1000 Hz) until the tickless work (L5) reprograms it, so
+/// `program` records the requested deadline for diagnostics and the self-check rather than
+/// reprogramming the LAPIC/generic timer. The periodic tick stays the fallback interrupt source.
+struct CyclicBackend;
+
+/// The next deadline the backend was last programmed for (0 = disarmed).
+static CYCLIC_NEXT_DEADLINE: AtomicU64 = AtomicU64::new(0);
+
+impl cyclic::Backend for CyclicBackend {
+    fn program(&mut self, deadline_ns: Option<u64>) {
+        CYCLIC_NEXT_DEADLINE.store(deadline_ns.unwrap_or(0), Ordering::Release);
+    }
+
+    fn now_ns(&self) -> u64 {
+        now_ns()
+    }
+}
+
+/// The global per-CPU cyclic registry, seeded lazily on first [`cyclic_add`].
+static CYCLICS: IrqSpinLock<Option<cyclic::Cyclics<CyclicBackend>>> = IrqSpinLock::new(None);
+
+/// Fire-order recording for the cyclic self-test (bounded; extra firings are dropped).
+static CYCLIC_FIRE_LOG: [AtomicU64; 8] = [const { AtomicU64::new(u64::MAX) }; 8];
+static CYCLIC_FIRE_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+/// Schedule a cyclic timer on this CPU and return its handle.
+pub fn cyclic_add(spec: cyclic::CyclicSpec) -> cyclic::CyclicId {
+    let mut guard = CYCLICS.lock();
+    let registry = guard.get_or_insert_with(|| cyclic::Cyclics::new(CyclicBackend));
+    registry.add(spec)
+}
+
+/// Cancel a cyclic timer (idempotent; `false` when unknown or already fired).
+#[allow(dead_code)] // L4 public API; first consumers arrive with R-TIM-9.
+pub fn cyclic_cancel(id: cyclic::CyclicId) -> bool {
+    let mut guard = CYCLICS.lock();
+    guard.as_mut().is_some_and(|registry| registry.cancel(id))
+}
+
+/// Fire due cyclics and reprogram the next deadline.
+///
+/// Runs from the timer interrupt (interrupt context); it performs no allocation. L4 has no cyclic
+/// consumers yet (R-TIM-9), so the fire callback only records the fire order for the self-test.
+fn cyclic_fire() {
+    let mut guard = CYCLICS.lock();
+    if let Some(registry) = guard.as_mut() {
+        registry.on_interrupt(now_ns(), |id| {
+            let index = CYCLIC_FIRE_COUNT.fetch_add(1, Ordering::Relaxed);
+            if let Some(slot) = CYCLIC_FIRE_LOG.get(index) {
+                slot.store(id, Ordering::Relaxed);
+            }
+        });
+    }
+}
+
+/// The recorded next deadline (0 when disarmed); for the self-test and diagnostics.
+#[allow(dead_code)] // Diagnostic accessor for the tickless (L5) work.
+pub fn cyclic_next_deadline() -> u64 {
+    CYCLIC_NEXT_DEADLINE.load(Ordering::Acquire)
+}
+
+/// Boot-time self-check: three one-shots fire in deadline order with no lost wake.
+///
+/// Runs from [`init`] before interrupts are enabled, advancing the monotonic clock with
+/// [`delay_ns`] and firing through [`cyclic_fire`], so the deadline ordering is checked
+/// independently of the periodic tick. Deadlines are spaced 5 ms apart so the TSC-scale precision
+/// and QEMU timing jitter cannot move a fire across a boundary.
+fn cyclic_selftest() {
+    let base = now_ns();
+    if base == 0 {
+        kprintln!("cyclic: skip (no monotonic clock)");
+        return;
+    }
+    CYCLIC_FIRE_COUNT.store(0, Ordering::Relaxed);
+    let a = cyclic_add(cyclic::CyclicSpec {
+        when: base.saturating_add(15_000_000),
+        interval: 0,
+        level: cyclic::Level::Normal,
+        slack_ns: 0,
+    });
+    let b = cyclic_add(cyclic::CyclicSpec {
+        when: base.saturating_add(5_000_000),
+        interval: 0,
+        level: cyclic::Level::Normal,
+        slack_ns: 0,
+    });
+    let c = cyclic_add(cyclic::CyclicSpec {
+        when: base.saturating_add(10_000_000),
+        interval: 0,
+        level: cyclic::Level::Normal,
+        slack_ns: 0,
+    });
+    let end = base.saturating_add(25_000_000);
+    let mut steps = 0u32;
+    while CYCLIC_FIRE_COUNT.load(Ordering::Relaxed) < 3 && now_ns() < end && steps < 500 {
+        delay_ns(500_000);
+        cyclic_fire();
+        steps = steps.saturating_add(1);
+    }
+    cyclic_fire(); // catch anything that became due at the loop boundary
+    let count = CYCLIC_FIRE_COUNT.load(Ordering::Relaxed);
+    let first = CYCLIC_FIRE_LOG
+        .first()
+        .map_or(u64::MAX, |slot| slot.load(Ordering::Relaxed));
+    let second = CYCLIC_FIRE_LOG
+        .get(1)
+        .map_or(u64::MAX, |slot| slot.load(Ordering::Relaxed));
+    let third = CYCLIC_FIRE_LOG
+        .get(2)
+        .map_or(u64::MAX, |slot| slot.load(Ordering::Relaxed));
+    if count == 3 && first == b && second == c && third == a {
+        kprintln!("cyclic: ok fired=3 order=5ms,10ms,15ms");
+    } else {
+        kprintln!("cyclic: fail fired={count} order={first},{second},{third}");
+        boot::exit_qemu(0x11);
+    }
 }
 
 /// Uptime as `(seconds, nanoseconds)`.
