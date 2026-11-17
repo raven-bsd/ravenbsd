@@ -699,6 +699,34 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
+send = "echo filemsg > /tmp/p4u.log\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "logger -t p4uf -p user.info -f /tmp/p4u.log\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "dmesg\n"
+delay_ms = 100
+
+[[step]]
+wait = '^.* p4uf: <14>filemsg$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
 send = "renice -n 5 -p 1\n"
 delay_ms = 100
 
@@ -716,6 +744,54 @@ delay_ms = 100
 
 [[step]]
 wait = '^1: 0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "renice -n 5 -g 1\n"
+delay_ms = 100
+
+[[step]]
+wait = '^1: 5$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "renice -n 0 -g 1\n"
+delay_ms = 100
+
+[[step]]
+wait = '^1: 0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "renice -n 5 -u 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^0: 5$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "renice -n 0 -u 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^0: 0$'
 timeout_secs = 30
 
 [[step]]

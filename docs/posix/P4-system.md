@@ -77,9 +77,11 @@ rows and are not claimed in the overlay.
 * `mesg`: the console mode has the group-write bit, so `mesg` prints `y`; `mesg n` attempts
   `chmod` on `tty:console` and fails because the tty server has no chmod operation.
 * `logger`: `logger -t p4u -p user.info hello` writes `p4u: <14>hello` to the `log:` ring;
-  `dmesg` reads the record back.
-* `renice`: `renice -n 5 -p 1` prints `1: 5`, `renice -n 0 -p 1` restores `1: 0`, and an
-  unknown pid reports `no such process` with exit 1.
+  `logger -t p4uf -p user.info -f /tmp/p4u.log` logs the file contents; `dmesg` reads both
+  records back.
+* `renice`: pid, process-group and user targets work; `renice -n 5 -p 1` / `-g 1` / `-u 0`
+  print the new value and the matching `-n 0` restores it. An unknown pid reports
+  `no such process` with exit 1.
 * `ps`: the default service view is unchanged; `ps --json`/`--selftest` remain; `ps -e` scans
   the kernel pid registry and prints `PID PPID UID GID CMD` (pid 1 is `init`, other `cmd`
   values are `?`).
@@ -155,7 +157,7 @@ util.logger	logger	PASS	logger -t p4u hello	qtest
 util.renice	renice	PASS	renice -n 5 -p 1	qtest
 ```
 
-The QEMU case passed in 22744 ms with `exit_status: 33` and no unmatched expectation.
+The QEMU case passed in 42888 ms with `exit_status: 33` and no unmatched expectation.
 
 ### `cargo xtask qtest --case posix-util-system --arch x86_64`
 
@@ -177,18 +179,18 @@ Exit code: **0** — **check-fast: PASSED**
 
 ```
 check-fast summary:
-  ok       guard (exit 0, 3.33s)
-  ok       fmt (exit 0, 6.81s)
-  ok       clippy (host) (exit 0, 0.33s)
-  ok       tests (host, parallel) (exit 0, 48.27s)
-  ok       tests (doc) (exit 0, 3.37s)
-  ok       profiles (exit 0, 0.04s)
-  ok       provenance (exit 0, 23.97s)
+  ok       guard (exit 0, 4.67s)
+  ok       fmt (exit 0, 5.28s)
+  ok       clippy (host) (exit 0, 0.59s)
+  ok       tests (host, parallel) (exit 0, 46.56s)
+  ok       tests (doc) (exit 0, 10.64s)
+  ok       profiles (exit 0, 0.25s)
+  ok       provenance (exit 0, 50.62s)
   skipped  clippy kernel x86_64 (--fast)
   skipped  clippy kernel aarch64 (--fast)
   skipped  clippy user programs x86_64 (--fast)
   skipped  clippy loader x86_64 (--fast)
-  ok       docs (exit 0, 0.09s)
+  ok       docs (exit 0, 0.05s)
 check-fast: PASSED
 ```
 
