@@ -12,10 +12,9 @@ use std::fs;
 use std::path::Path;
 
 const MAX_CP: usize = 0x11_0000;
-const BLOCK_BITS: usize = 8;
-const BLOCK_LEN: usize = 1 << BLOCK_BITS;
-const PROPS_STAGE1_LEN: usize = MAX_CP >> BLOCK_BITS;
-const CASE_STAGE1_LEN: usize = 0x2_0000 >> BLOCK_BITS;
+const CASE_BLOCK_BITS: usize = 6;
+const CASE_BLOCK_LEN: usize = 1 << CASE_BLOCK_BITS;
+const CASE_STAGE1_LEN: usize = 0x2_0000 >> CASE_BLOCK_BITS;
 const TABLE_BUDGET: usize = 48 * 1024;
 
 const ALPHA: u8 = 1;
@@ -27,10 +26,10 @@ const ZERO: u8 = 8;
 pub struct Generated {
     /// The complete Rust source.
     pub text: String,
-    /// Distinct property blocks.
-    pub props_blocks: usize,
-    /// Bytes of `PROPS_STAGE2`.
-    pub props_stage2_bytes: usize,
+    /// Distinct property ranges.
+    pub props_ranges: usize,
+    /// Bytes of the property range tables.
+    pub props_range_bytes: usize,
     /// Distinct case blocks.
     pub case_blocks: usize,
     /// Distinct case pairs after index 0.
@@ -284,7 +283,12 @@ fn dedup_blocks(blocks: &[Vec<u8>]) -> Result<(Vec<u8>, Vec<u8>, usize), String>
     Ok((stage1, stage2, unique.len()))
 }
 
-fn emit_array<W: Write>(out: &mut W, name: &str, ty: &str, values: &[u8]) -> Result<(), String> {
+fn emit_array<W: Write, T: core::fmt::Display>(
+    out: &mut W,
+    name: &str,
+    ty: &str,
+    values: &[T],
+) -> Result<(), String> {
     writeln!(out, "#[rustfmt::skip]").map_err(|error| error.to_string())?;
     writeln!(
         out,
@@ -392,22 +396,29 @@ pub fn generate(ucd: &Path) -> Result<Generated, String> {
     let alphabetic = parse_alphabetic(&contents[1], &mut data)?;
     let wide = parse_wide(&contents[2], &mut data)?;
 
-    let mut prop_blocks = Vec::with_capacity(PROPS_STAGE1_LEN);
-    for block in 0..PROPS_STAGE1_LEN {
-        let mut packed = vec![0u8; BLOCK_LEN / 2];
-        for (half, slot) in packed.iter_mut().enumerate() {
-            let even = (block * BLOCK_LEN + half * 2) as u32;
-            let odd = even + 1;
-            let low = property_nibble(even, &data);
-            let high = property_nibble(odd, &data);
-            *slot = low | (high << 4);
+    let mut prop_ranges: Vec<(u32, u16, u8)> = Vec::new();
+    let mut cp = 0usize;
+    while cp < MAX_CP {
+        let value = property_nibble(cp as u32, &data);
+        let start = cp;
+        cp = cp.saturating_add(1);
+        while cp < MAX_CP && property_nibble(cp as u32, &data) == value {
+            cp = cp.saturating_add(1);
         }
-        prop_blocks.push(packed);
+        if value != 0 {
+            let len = cp.saturating_sub(start);
+            if len > u16::MAX as usize {
+                return Err(format!(
+                    "property range at U+{start:04X} is longer than u16"
+                ));
+            }
+            prop_ranges.push((start as u32, len as u16, value));
+        }
     }
-    let (props_stage1, props_stage2, props_blocks) = dedup_blocks(&prop_blocks)?;
-    if props_stage1.len() != PROPS_STAGE1_LEN {
-        return Err("property stage1 length mismatch".to_string());
-    }
+    let props_starts: Vec<u32> = prop_ranges.iter().map(|range| range.0).collect();
+    let props_lens: Vec<u16> = prop_ranges.iter().map(|range| range.1).collect();
+    let props_values: Vec<u8> = prop_ranges.iter().map(|range| range.2).collect();
+    let props_range_bytes = props_starts.len() * 4 + props_lens.len() * 2 + props_values.len();
 
     let mut pairs: Vec<(i32, i32)> = vec![(0, 0)];
     let mut pair_index = vec![0u8; 0x2_0000];
@@ -432,15 +443,14 @@ pub fn generate(ucd: &Path) -> Result<Generated, String> {
     }
     let mut case_blocks = Vec::with_capacity(CASE_STAGE1_LEN);
     for block in 0..CASE_STAGE1_LEN {
-        case_blocks.push(pair_index[block * BLOCK_LEN..(block + 1) * BLOCK_LEN].to_vec());
+        case_blocks.push(pair_index[block * CASE_BLOCK_LEN..(block + 1) * CASE_BLOCK_LEN].to_vec());
     }
     let (case_stage1, case_stage2, case_block_count) = dedup_blocks(&case_blocks)?;
     if case_stage1.len() != CASE_STAGE1_LEN {
         return Err("case stage1 length mismatch".to_string());
     }
 
-    let table_bytes = props_stage1.len()
-        + props_stage2.len()
+    let table_bytes = props_range_bytes
         + case_stage1.len()
         + case_stage2.len()
         + pairs.len() * core::mem::size_of::<(i32, i32)>();
@@ -459,7 +469,8 @@ pub fn generate(ucd: &Path) -> Result<Generated, String> {
     .map_err(|error| error.to_string())?;
     writeln!(
         out,
-        "// property blocks {props_blocks}, case blocks {case_block_count}, case pairs {}",
+        "// property ranges {}, case blocks {case_block_count}, case pairs {}",
+        prop_ranges.len(),
         pairs.len()
     )
     .map_err(|error| error.to_string())?;
@@ -471,8 +482,9 @@ pub fn generate(ucd: &Path) -> Result<Generated, String> {
     )
     .map_err(|error| error.to_string())?;
     writeln!(out).map_err(|error| error.to_string())?;
-    emit_array(&mut out, "PROPS_STAGE1", "u8", &props_stage1)?;
-    emit_array(&mut out, "PROPS_STAGE2", "u8", &props_stage2)?;
+    emit_array(&mut out, "PROPS_RANGE_START", "u32", &props_starts)?;
+    emit_array(&mut out, "PROPS_RANGE_LEN", "u16", &props_lens)?;
+    emit_array(&mut out, "PROPS_RANGE_VALUE", "u8", &props_values)?;
     emit_array(&mut out, "CASE_STAGE1", "u8", &case_stage1)?;
     emit_array(&mut out, "CASE_STAGE2", "u8", &case_stage2)?;
     emit_pairs(&mut out, &pairs)?;
@@ -483,8 +495,8 @@ pub fn generate(ucd: &Path) -> Result<Generated, String> {
 
     Ok(Generated {
         text: out,
-        props_blocks,
-        props_stage2_bytes: props_stage2.len(),
+        props_ranges: prop_ranges.len(),
+        props_range_bytes,
         case_blocks: case_block_count,
         case_pairs: pairs.len(),
         table_bytes,

@@ -16,20 +16,34 @@ const ALPHA: u8 = 1;
 const PUNCT: u8 = 2;
 const WIDE: u8 = 4;
 const ZERO: u8 = 8;
+/// Case table block shift; must match the generator's `CASE_BLOCK_BITS`.
+const CASE_BLOCK_SHIFT: u32 = 6;
+/// Case table block mask.
+const CASE_BLOCK_MASK: u32 = (1 << CASE_BLOCK_SHIFT) - 1;
 
 fn props(c: u32) -> u8 {
     if c > 0x10ffff {
         return 0;
     }
-    let block = tables::PROPS_STAGE1
-        .get((c >> 8) as usize)
-        .copied()
-        .unwrap_or(0) as usize;
-    let index = block
-        .wrapping_mul(128)
-        .wrapping_add(((c & 255) >> 1) as usize);
-    let packed = tables::PROPS_STAGE2.get(index).copied().unwrap_or(0);
-    (packed >> (4usize.wrapping_mul((c & 1) as usize))) & 0xf
+    let index = match tables::PROPS_RANGE_START.binary_search(&c) {
+        Ok(index) => index,
+        Err(0) => return 0,
+        Err(index) => index.saturating_sub(1),
+    };
+    let Some(&start) = tables::PROPS_RANGE_START.get(index) else {
+        return 0;
+    };
+    let Some(&len) = tables::PROPS_RANGE_LEN.get(index) else {
+        return 0;
+    };
+    let Some(&value) = tables::PROPS_RANGE_VALUE.get(index) else {
+        return 0;
+    };
+    if c.saturating_sub(start) < u32::from(len) {
+        value
+    } else {
+        0
+    }
 }
 
 /// DerivedCoreProperties `Alphabetic`, plus non-ASCII `Nd`.
@@ -62,10 +76,12 @@ fn case_pair(c: u32) -> (i32, i32) {
         return (0, 0);
     }
     let block = tables::CASE_STAGE1
-        .get((c >> 8) as usize)
+        .get((c >> CASE_BLOCK_SHIFT) as usize)
         .copied()
         .unwrap_or(0) as usize;
-    let index = block.wrapping_mul(256).wrapping_add((c & 255) as usize);
+    let index = block
+        .wrapping_mul(1usize << CASE_BLOCK_SHIFT)
+        .wrapping_add((c & CASE_BLOCK_MASK) as usize);
     let pair = tables::CASE_STAGE2.get(index).copied().unwrap_or(0) as usize;
     tables::CASE_PAIRS.get(pair).copied().unwrap_or((0, 0))
 }
