@@ -409,6 +409,7 @@ getchar
 getchar_unlocked
 getcontext
 getcwd
+getdate
 getdelim
 getegid
 getenv
@@ -694,6 +695,8 @@ mblen
 mbrlen
 mbrtowc
 mbsinit
+mbsnrtowcs
+mbsrtowcs
 mbstowcs
 mbtowc
 memalign
@@ -766,6 +769,7 @@ nvis
 open
 open64
 open_memstream
+open_wmemstream
 openat
 openat64
 opendir
@@ -1313,6 +1317,11 @@ thrd_sleep
 thrd_yield
 time
 timegm
+timer_create
+timer_delete
+timer_getoverrun
+timer_gettime
+timer_settime
 timerfd_create
 timerfd_gettime
 timerfd_settime
@@ -1425,8 +1434,10 @@ wcsncat
 wcsncmp
 wcsncpy
 wcsnlen
+wcsnrtombs
 wcspbrk
 wcsrchr
+wcsrtombs
 wcsspn
 wcsstr
 wcstod

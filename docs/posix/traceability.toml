@@ -3338,7 +3338,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.getdate"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.getdelim"
@@ -4904,13 +4904,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.mbsnrtowcs"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.mbsrtowcs"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.mbstowcs"
@@ -5420,7 +5420,7 @@ evidence = "none"
 id = "interface.open_wmemstream"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.openat"
@@ -8264,31 +8264,31 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.timer_create"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.timer_delete"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.timer_getoverrun"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.timer_gettime"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.timer_settime"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.times"
@@ -8906,7 +8906,7 @@ evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 id = "interface.wcsnrtombs"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcspbrk"
@@ -8924,7 +8924,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wcsrtombs"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcsspn"
@@ -9626,7 +9626,7 @@ evidence = "none"
 id = "util.cflow"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/devtools/test.sh"
 
 [[trace]]
 id = "util.chgrp"
@@ -9710,7 +9710,7 @@ evidence = "test:tests/posix/utility/text/csplit/test.sh"
 id = "util.ctags"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/devtools/test.sh"
 
 [[trace]]
 id = "util.cut"
@@ -9722,7 +9722,7 @@ evidence = "test:tests/posix/utility/text/cut/test.sh"
 id = "util.cxref"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/devtools/test.sh"
 
 [[trace]]
 id = "util.date"
@@ -9998,7 +9998,7 @@ evidence = "qtest:posix-util-system"
 id = "util.lex"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/parsers/lex/test.sh"
 
 [[trace]]
 id = "util.link"
@@ -10238,7 +10238,7 @@ evidence = "none"
 id = "util.ps"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/ps"
+evidence = "qtest:posix-util-system"
 
 [[trace]]
 id = "util.ptx"
@@ -10538,7 +10538,7 @@ evidence = "test:tests/posix/utility/text/tail/test.sh"
 id = "util.talk"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "userland/bin/talk"
 
 [[trace]]
 id = "util.tar"
@@ -10706,7 +10706,7 @@ evidence = "test:tests/posix/utility/misc/users/test.sh"
 id = "util.uucp"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/uucp/uucp/test.sh"
 
 [[trace]]
 id = "util.uudecode"
@@ -10724,13 +10724,13 @@ evidence = "test:tests/posix/utility/archive/uuencode/test.sh"
 id = "util.uustat"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/uucp/uustat/test.sh"
 
 [[trace]]
 id = "util.uux"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/uucp/uux/test.sh"
 
 [[trace]]
 id = "util.val"
@@ -10784,7 +10784,7 @@ evidence = "test:tests/posix/utility/xargs/test.sh"
 id = "util.yacc"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/parsers/yacc/test.sh"
 
 [[trace]]
 id = "util.yes"

@@ -407,6 +407,7 @@ getchar F 5 x86_64
 getchar_unlocked F 5 x86_64
 getcontext F 5 x86_64
 getcwd F 633 x86_64
+getdate F 662 x86_64
 getdelim F 5 x86_64
 getegid F 72 x86_64
 getenv F 114 x86_64
@@ -692,6 +693,8 @@ mblen F 147 x86_64
 mbrlen F 290 x86_64
 mbrtowc F 329 x86_64
 mbsinit F 41 x86_64
+mbsnrtowcs F 209 x86_64
+mbsrtowcs F 220 x86_64
 mbstowcs F 117 x86_64
 mbtowc F 294 x86_64
 memalign F 24 x86_64
@@ -764,6 +767,7 @@ nvis F 128 x86_64
 open F 336 x86_64
 open64 F 336 x86_64
 open_memstream F 5 x86_64
+open_wmemstream F 68 x86_64
 openat F 336 x86_64
 openat64 F 336 x86_64
 opendir F 384 x86_64
@@ -1311,6 +1315,11 @@ thrd_sleep F 48 x86_64
 thrd_yield F 17 x86_64
 time F 132 x86_64
 timegm F 534 x86_64
+timer_create F 328 x86_64
+timer_delete F 180 x86_64
+timer_getoverrun F 5 x86_64
+timer_gettime F 208 x86_64
+timer_settime F 333 x86_64
 timerfd_create F 84 x86_64
 timerfd_gettime F 374 x86_64
 timerfd_settime F 1049 x86_64
@@ -1423,8 +1432,10 @@ wcsncat F 5 x86_64
 wcsncmp F 5 x86_64
 wcsncpy F 5 x86_64
 wcsnlen F 39 x86_64
+wcsnrtombs F 213 x86_64
 wcspbrk F 5 x86_64
 wcsrchr F 5 x86_64
+wcsrtombs F 224 x86_64
 wcsspn F 5 x86_64
 wcsstr F 5 x86_64
 wcstod F 143 x86_64

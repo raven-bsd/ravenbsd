@@ -2160,3 +2160,71 @@ id = "interface.wcstoumax"
 status = "present"
 evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 notes = "P1 batch B: wcstoumax over the UTF-8 bridge and the C42/C41 engines; libc.a symbol"
+
+# P1 batch B time timers/getdate and wchar conversions.
+
+[[row]]
+id = "interface.getdate"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time getdate; raven-libc-time suite and libc.a symbol"
+
+[[row]]
+id = "interface.timer_create"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time timer_create; raven-libc-time suite and libc.a symbol"
+
+[[row]]
+id = "interface.timer_delete"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time timer_delete; raven-libc-time suite and libc.a symbol"
+
+[[row]]
+id = "interface.timer_getoverrun"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time timer_getoverrun; raven-libc-time suite and libc.a symbol"
+
+[[row]]
+id = "interface.timer_gettime"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time timer_gettime; raven-libc-time suite and libc.a symbol"
+
+[[row]]
+id = "interface.timer_settime"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time timer_settime; raven-libc-time suite and libc.a symbol"
+
+[[row]]
+id = "interface.mbsnrtowcs"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar mbsnrtowcs; ctype/stdio suite and libc.a symbol"
+
+[[row]]
+id = "interface.mbsrtowcs"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar mbsrtowcs; ctype/stdio suite and libc.a symbol"
+
+[[row]]
+id = "interface.open_wmemstream"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar open_wmemstream; ctype/stdio suite and libc.a symbol"
+
+[[row]]
+id = "interface.wcsnrtombs"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar wcsnrtombs; ctype/stdio suite and libc.a symbol"
+
+[[row]]
+id = "interface.wcsrtombs"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar wcsrtombs; ctype/stdio suite and libc.a symbol"

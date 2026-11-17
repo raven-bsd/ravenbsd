@@ -76,9 +76,12 @@ fn utc() -> raven_libc_time::TzState {
 mod asctime;
 mod clock_nanosleep;
 mod clock_settime;
+mod getdate;
 mod localtime;
 mod nanosleep;
 mod strftime;
 mod time;
+mod timer_create;
+mod timer_getoverrun;
 mod tzset;
 mod wcsftime_l;

@@ -13,12 +13,12 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 |---|---:|---:|---:|---:|---:|
 | filesystem | 20 | 1 | 0 | 19 | 0 |
 | headers | 86 | 2 | 43 | 41 | 0 |
-| interfaces | 1422 | 283 | 0 | 1057 | 82 |
+| interfaces | 1422 | 272 | 0 | 1068 | 82 |
 | process | 17 | 0 | 0 | 14 | 3 |
 | shell | 25 | 0 | 0 | 22 | 3 |
 | tty | 12 | 0 | 0 | 7 | 5 |
-| utilities | 217 | 82 | 2 | 133 | 0 |
-| **all** | **1799** | **368** | **45** | **1293** | **93** |
+| utilities | 217 | 73 | 2 | 142 | 0 |
+| **all** | **1799** | **348** | **45** | **1313** | **93** |
 
 Traceability rows: 1799; profile rows: 1799.
 
@@ -566,7 +566,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.getchar` | `getchar` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.getchar_unlocked` | `getchar_unlocked` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.getcwd` | `getcwd` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.getdate` | `getdate` | missing | P1 | `none` | time.h |
+| `interface.getdate` | `getdate` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
 | `interface.getdelim` | `getdelim` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.getdents` | `getdents` | missing | P1 | `none` | dirent.h |
 | `interface.getdomainname` | `getdomainname` | missing | P1 | `none` | unistd.h |
@@ -827,8 +827,8 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.mbrtoc8` | `mbrtoc8` | missing | P1 | `none` | uchar.h |
 | `interface.mbrtowc` | `mbrtowc` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
 | `interface.mbsinit` | `mbsinit` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
-| `interface.mbsnrtowcs` | `mbsnrtowcs` | missing | P1 | `none` | wchar.h |
-| `interface.mbsrtowcs` | `mbsrtowcs` | missing | P1 | `none` | wchar.h |
+| `interface.mbsnrtowcs` | `mbsnrtowcs` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
+| `interface.mbsrtowcs` | `mbsrtowcs` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
 | `interface.mbstowcs` | `mbstowcs` | present | P1 | `test:tests/libc/posix/stdlib/check-stdlib.sh` | stdlib.h |
 | `interface.mbtowc` | `mbtowc` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.memchr` | `memchr` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | string.h |
@@ -913,7 +913,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.open` | `open` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fcntl.h |
 | `interface.open64` | `open64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fcntl.h |
 | `interface.open_by_handle_at` | `open_by_handle_at` | missing | P1 | `none` | fcntl.h |
-| `interface.open_wmemstream` | `open_wmemstream` | missing | P1 | `none` | wchar.h |
+| `interface.open_wmemstream` | `open_wmemstream` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
 | `interface.openat` | `openat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fcntl.h |
 | `interface.opendir` | `opendir` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
 | `interface.openlog` | `openlog` | missing | P1 | `none` | syslog.h |
@@ -1387,11 +1387,11 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.thrd_yield` | `thrd_yield` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
 | `interface.time` | `time` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | time.h |
 | `interface.timegm` | `timegm` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | time.h |
-| `interface.timer_create` | `timer_create` | missing | P1 | `none` | time.h |
-| `interface.timer_delete` | `timer_delete` | missing | P1 | `none` | time.h |
-| `interface.timer_getoverrun` | `timer_getoverrun` | missing | P1 | `none` | time.h |
-| `interface.timer_gettime` | `timer_gettime` | missing | P1 | `none` | time.h |
-| `interface.timer_settime` | `timer_settime` | missing | P1 | `none` | time.h |
+| `interface.timer_create` | `timer_create` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
+| `interface.timer_delete` | `timer_delete` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
+| `interface.timer_getoverrun` | `timer_getoverrun` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
+| `interface.timer_gettime` | `timer_gettime` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
+| `interface.timer_settime` | `timer_settime` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
 | `interface.times` | `times` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/times.h |
 | `interface.timespec_get` | `timespec_get` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
 | `interface.timespec_getres` | `timespec_getres` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
@@ -1494,10 +1494,10 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.wcsncmp` | `wcsncmp` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
 | `interface.wcsncpy` | `wcsncpy` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
 | `interface.wcsnlen` | `wcsnlen` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
-| `interface.wcsnrtombs` | `wcsnrtombs` | missing | P1 | `none` | wchar.h |
+| `interface.wcsnrtombs` | `wcsnrtombs` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
 | `interface.wcspbrk` | `wcspbrk` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
 | `interface.wcsrchr` | `wcsrchr` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
-| `interface.wcsrtombs` | `wcsrtombs` | missing | P1 | `none` | wchar.h |
+| `interface.wcsrtombs` | `wcsrtombs` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
 | `interface.wcsspn` | `wcsspn` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
 | `interface.wcsstr` | `wcsstr` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | wchar.h |
 | `interface.wcstod` | `wcstod` | present | P1 | `test:tests/libc/posix/wchar/check-wchar.sh` | wchar.h |
@@ -1565,7 +1565,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `util.cal` | `cal` | missing | P4 | `none` | none |
 | `util.cat` | `cat` | present | P4 | `test:tests/posix/utility/file/cat/test.sh` | none |
 | `util.cd` | `cd` | missing | P4 | `none` | none |
-| `util.cflow` | `cflow` | missing | P4 | `none` | none |
+| `util.cflow` | `cflow` | present | P4 | `test:tests/posix/utility/devtools/test.sh` | none |
 | `util.chgrp` | `chgrp` | present | P4 | `test:tests/posix/utility/file/chgrp/test.sh` | none |
 | `util.chmod` | `chmod` | present | P4 | `test:tests/posix/utility/file/chmod/test.sh` | none |
 | `util.chown` | `chown` | present | P4 | `test:tests/posix/utility/file/chown/test.sh` | none |
@@ -1579,9 +1579,9 @@ Traceability rows: 1799; profile rows: 1799.
 | `util.cp` | `cp` | present | P4 | `test:tests/posix/utility/file/cp/test.sh` | none |
 | `util.crontab` | `crontab` | present | P4 | `test:tests/posix/utility/crontab/test.sh` | none |
 | `util.csplit` | `csplit` | present | P4 | `test:tests/posix/utility/text/csplit/test.sh` | none |
-| `util.ctags` | `ctags` | missing | P4 | `none` | none |
+| `util.ctags` | `ctags` | present | P4 | `test:tests/posix/utility/devtools/test.sh` | none |
 | `util.cut` | `cut` | present | P4 | `test:tests/posix/utility/text/cut/test.sh` | none |
-| `util.cxref` | `cxref` | missing | P4 | `none` | none |
+| `util.cxref` | `cxref` | present | P4 | `test:tests/posix/utility/devtools/test.sh` | none |
 | `util.date` | `date` | present | P4 | `test:tests/posix/utility/misc2/date/test.sh` | none |
 | `util.dd` | `dd` | present | P4 | `test:tests/posix/utility/file/dd/test.sh` | none |
 | `util.delta` | `delta` | missing | P4 | `none` | none |
@@ -1627,7 +1627,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `util.jobs` | `jobs` | missing | P4 | `none` | none |
 | `util.join` | `join` | present | P4 | `test:tests/posix/utility/text/join/test.sh` | none |
 | `util.kill` | `kill` | present | P4 | `qtest:posix-util-system` | none |
-| `util.lex` | `lex` | missing | P4 | `none` | none |
+| `util.lex` | `lex` | present | P4 | `test:tests/posix/utility/parsers/lex/test.sh` | none |
 | `util.link` | `link` | present | P4 | `test:tests/posix/utility/file/link/test.sh` | none |
 | `util.ln` | `ln` | present | P4 | `test:tests/posix/utility/file/ln/test.sh` | none |
 | `util.locale` | `locale` | missing | P4 | `none` | none |
@@ -1667,7 +1667,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `util.printenv` | `printenv` | present | P4 | `test:tests/posix/utility/misc/printenv/test.sh` | none |
 | `util.printf` | `printf` | present | P4 | `test:tests/posix/utility/text/printf/test.sh` | none |
 | `util.prs` | `prs` | missing | P4 | `none` | none |
-| `util.ps` | `ps` | partial | P4 | `userland/bin/ps` | tests/qtest/cases/modern-json-tools.toml |
+| `util.ps` | `ps` | present | P4 | `qtest:posix-util-system` | tests/qtest/cases/modern-json-tools.toml |
 | `util.ptx` | `ptx` | present | P4 | `test:tests/posix/utility/misc/ptx/test.sh` | none |
 | `util.pwd` | `pwd` | present | P4 | `test:tests/posix/utility/file/pwd/test.sh` | none |
 | `util.qalter` | `qalter` | missing | P4 | `none` | none |
@@ -1717,7 +1717,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `util.tabs` | `tabs` | missing | P4 | `none` | none |
 | `util.tac` | `tac` | present | P4 | `test:tests/posix/utility/misc/tac/test.sh` | none |
 | `util.tail` | `tail` | present | P4 | `test:tests/posix/utility/text/tail/test.sh` | none |
-| `util.talk` | `talk` | missing | P4 | `none` | none |
+| `util.talk` | `talk` | partial | P4 | `userland/bin/talk` | none |
 | `util.tar` | `tar` | present | P4 | `test:tests/posix/utility/archive/tar/test.sh` | none |
 | `util.tee` | `tee` | present | P4 | `test:tests/posix/utility/text/tee/test.sh` | none |
 | `util.test` | `test` | missing | P4 | `none` | none |
@@ -1745,11 +1745,11 @@ Traceability rows: 1799; profile rows: 1799.
 | `util.unset` | `unset` | missing | P4 | `none` | none |
 | `util.uptime` | `uptime` | present | P4 | `test:tests/posix/utility/misc/uptime/test.sh` | none |
 | `util.users` | `users` | present | P4 | `test:tests/posix/utility/misc/users/test.sh` | none |
-| `util.uucp` | `uucp` | missing | P4 | `none` | none |
+| `util.uucp` | `uucp` | present | P4 | `test:tests/posix/utility/uucp/uucp/test.sh` | none |
 | `util.uudecode` | `uudecode` | present | P4 | `test:tests/posix/utility/archive/uudecode/test.sh` | none |
 | `util.uuencode` | `uuencode` | present | P4 | `test:tests/posix/utility/archive/uuencode/test.sh` | none |
-| `util.uustat` | `uustat` | missing | P4 | `none` | none |
-| `util.uux` | `uux` | missing | P4 | `none` | none |
+| `util.uustat` | `uustat` | present | P4 | `test:tests/posix/utility/uucp/uustat/test.sh` | none |
+| `util.uux` | `uux` | present | P4 | `test:tests/posix/utility/uucp/uux/test.sh` | none |
 | `util.val` | `val` | missing | P4 | `none` | none |
 | `util.vi` | `vi` | missing | P4 | `none` | none |
 | `util.wait` | `wait` | missing | P4 | `none` | none |
@@ -1758,7 +1758,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `util.who` | `who` | present | P4 | `test:tests/posix/utility/misc/who/test.sh` | none |
 | `util.write` | `write` | present | P4 | `test:tests/posix/utility/ttytools/write/test.sh` | none |
 | `util.xargs` | `xargs` | present | P4 | `test:tests/posix/utility/xargs/test.sh` | none |
-| `util.yacc` | `yacc` | missing | P4 | `none` | none |
+| `util.yacc` | `yacc` | present | P4 | `test:tests/posix/utility/parsers/yacc/test.sh` | none |
 | `util.yes` | `yes` | present | P4 | `test:tests/posix/utility/misc/yes/test.sh` | none |
 | `util.zcat` | `zcat` | present | P4 | `test:tests/posix/utility/compress/zcat/test.sh` | none |
 
@@ -1886,10 +1886,10 @@ Traceability rows: 1799; profile rows: 1799.
 
 ## Current tree
 
-- frozen exported symbols: 1492
-- `userland/bin` directories: 78
+- frozen exported symbols: 1503
+- `userland/bin` directories: 87
 - headers under `libc/ravenlibc/include`: 228
-- utility directories: adduser, ar, at, awk, batch, bc, beep, cat, cmp, compress, cp, crontab, date, df, diff, dmesg, dtrace, echo, ed, env, file, find, getconf, getty, grep, groupadd, hostname, id, ifconfig, kill, logger, login, ls, m4, make, man, mesg, mixer, mkdir, more, mount, mv, nc, netstat, nice, nm, nohup, passwd, patch, pax, ping, play, ps, raven, renice, rm, rmdir, route, rsh, sed, sleep, stat, strings, strip, su, svcctl, tar, touch, umount, uname, uncompress, useradd, uudecode, uuencode, whoami, write, xargs, zcat
+- utility directories: adduser, ar, at, awk, batch, bc, beep, cat, cflow, cmp, compress, cp, crontab, ctags, cxref, date, df, diff, dmesg, dtrace, echo, ed, env, file, find, getconf, getty, grep, groupadd, hostname, id, ifconfig, kill, lex, logger, login, ls, m4, make, man, mesg, mixer, mkdir, more, mount, mv, nc, netstat, nice, nm, nohup, passwd, patch, pax, ping, play, ps, raven, renice, rm, rmdir, route, rsh, sed, sleep, stat, strings, strip, su, svcctl, talk, tar, touch, umount, uname, uncompress, useradd, uucp, uudecode, uuencode, uustat, uux, whoami, write, xargs, yacc, zcat
 
 ## Top gaps
 
@@ -1976,4 +1976,4 @@ Traceability rows: 1799; profile rows: 1799.
 | interface | `cabsfNx` | `none` |
 | interface | `cabsl` | `none` |
 
-506 gap rows are listed in full in the tables above; this short table is a review aid.
+486 gap rows are listed in full in the tables above; this short table is a review aid.

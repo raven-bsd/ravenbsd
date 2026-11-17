@@ -137,7 +137,10 @@ RAVEN_1.0 {
 		mbrlen;
 		mbrtowc;
 		mbsinit;
+		mbsnrtowcs;
+		mbsrtowcs;
 		mbtowc;
+		open_wmemstream;
 		putwc;
 		putwc_unlocked;
 		putwchar;
@@ -157,6 +160,8 @@ RAVEN_1.0 {
 		wcscoll_l;
 		wcsncasecmp_l;
 		wcsnlen;
+		wcsnrtombs;
+		wcsrtombs;
 		wcstod;
 		wcstof;
 		wcstoimax;
@@ -819,6 +824,7 @@ RAVEN_1.0 {
 		clock_nanosleep;
 		ctime;
 		difftime;
+		getdate;
 		gettimeofday;
 		gmtime;
 		gmtime_r;
@@ -833,6 +839,11 @@ RAVEN_1.0 {
 		strptime_l;
 		time;
 		timegm;
+		timer_create;
+		timer_delete;
+		timer_getoverrun;
+		timer_gettime;
+		timer_settime;
 		timespec_get;
 		timespec_getres;
 		tzset;

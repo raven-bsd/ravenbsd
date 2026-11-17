@@ -1,7 +1,7 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1464
+# records: 1475
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
 _Unwind_Backtrace F - all 2 -
@@ -408,6 +408,7 @@ getchar F - all 0 stdio.h
 getchar_unlocked F - all 0 stdio.h
 getcontext F - all 1 ucontext.h
 getcwd F - all 0 unistd.h
+getdate F - all 0 time.h
 getdelim F - all 0 stdio.h
 getegid F - all 0 unistd.h
 getenv F - all 0 stdlib.h
@@ -693,6 +694,8 @@ mblen F - all 0 stdlib.h
 mbrlen F - all 0 wchar.h
 mbrtowc F - all 0 wchar.h
 mbsinit F - all 0 wchar.h
+mbsnrtowcs F - all 1 wchar.h
+mbsrtowcs F - all 0 wchar.h
 mbstowcs F - all 0 stdlib.h
 mbtowc F - all 0 stdlib.h
 memalign F - all 1 malloc.h
@@ -765,6 +768,7 @@ nvis F - x86_64 2 -
 open F - all 0 fcntl.h
 open64 F - all 0 fcntl.h
 open_memstream F - all 1 stdio.h
+open_wmemstream F - all 0 -
 openat F - all 0 fcntl.h
 openat64 F - all 1 fcntl.h
 opendir F - all 0 dirent.h
@@ -1312,6 +1316,11 @@ thrd_sleep F - all 0 threads.h
 thrd_yield F - all 0 threads.h
 time F - all 0 time.h
 timegm F - all 0 time.h
+timer_create F - all 0 -
+timer_delete F - all 0 -
+timer_getoverrun F - all 0 -
+timer_gettime F - all 0 -
+timer_settime F - all 0 -
 timerfd_create F - all 1 -
 timerfd_gettime F - all 1 -
 timerfd_settime F - all 1 -
@@ -1424,8 +1433,10 @@ wcsncat F - all 0 wchar.h
 wcsncmp F - all 0 wchar.h
 wcsncpy F - all 0 wchar.h
 wcsnlen F - all 1 wchar.h
+wcsnrtombs F - all 1 wchar.h
 wcspbrk F - all 0 wchar.h
 wcsrchr F - all 0 wchar.h
+wcsrtombs F - all 0 wchar.h
 wcsspn F - all 0 wchar.h
 wcsstr F - all 0 wchar.h
 wcstod F - all 0 -

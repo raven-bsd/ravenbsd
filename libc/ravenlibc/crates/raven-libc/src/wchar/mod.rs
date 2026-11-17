@@ -7,6 +7,7 @@ pub(crate) mod btowc;
 pub(crate) mod mblen;
 pub(crate) mod mbrlen;
 pub(crate) mod mbrtowc;
+pub(crate) mod mbsrtowcs;
 pub(crate) mod mbtowc;
 pub(crate) mod wcrtomb;
 pub(crate) mod wcs;
