@@ -21,6 +21,8 @@ use core::sync::atomic::Ordering;
 
 use raven_abi::errno::Errno;
 
+#[cfg(target_arch = "aarch64")]
+use crate::arch::aarch64::fpu;
 #[cfg(target_arch = "x86_64")]
 use crate::arch::x86_64::ap_start;
 #[cfg(target_arch = "x86_64")]
@@ -271,6 +273,16 @@ pub unsafe fn switch(from: &Thread, to: &Thread) {
             in(reg) tls_base,
             options(nomem, nostack, preserves_flags),
         );
+    }
+
+    // Park the outgoing thread's live Q0..Q31/FPSR/FPCR and install the incoming thread's copy.
+    // The kernel is soft-float, so no FP/SIMD state has to survive the switch itself. A new
+    // thread restores the reset FPCR/FPSR zeros from `FpuArea::new`.
+    // SAFETY: the scheduler owns this CPU's FP/SIMD state and both areas are live across the
+    // switch.
+    unsafe {
+        fpu::save(from.fpu_area_ptr());
+        fpu::restore(to.fpu_area_const_ptr());
     }
 
     let next_sp = to.saved_rsp();
@@ -536,6 +548,16 @@ pub(crate) fn read_cr3() -> u64 {
 /// Clears CR0.EM/TS, sets MP and CR4.OSFXSR/OSXMMEXCPT, and enables XSAVE when the CPU supports
 /// it. Returns false when SSE is absent, in which case the scheduler refuses to start.
 #[cfg(target_arch = "x86_64")]
+pub(crate) fn init_fpu() -> bool {
+    fpu::init()
+}
+
+/// Enable FP/SIMD at EL0/EL1 on this CPU (`CPACR_EL1.FPEN`).
+///
+/// Per-CPU; every CPU that may run a user thread calls this before the scheduler admits one.
+/// ARMv8-A requires FP/SIMD, so this reports success unconditionally (see
+/// [`crate::arch::aarch64::fpu::init`]).
+#[cfg(target_arch = "aarch64")]
 pub(crate) fn init_fpu() -> bool {
     fpu::init()
 }

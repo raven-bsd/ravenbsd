@@ -172,7 +172,6 @@ pub fn init() -> Result<(), Errno> {
         return Ok(());
     }
     read_user_smp_flags();
-    #[cfg(target_arch = "x86_64")]
     if !context::init_fpu() {
         return Err(Errno::EINVAL);
     }
@@ -248,6 +247,9 @@ pub fn ap_main(cpu: usize) -> ! {
     }
     #[cfg(target_arch = "aarch64")]
     {
+        // FP/SIMD traps are per-CPU (`CPACR_EL1.FPEN`); enable them before this CPU may run a
+        // user thread.
+        let _ = context::init_fpu();
         smp::percpu::mark_online(cpu);
         // SAFETY: the AP now has its current idle thread and per-CPU slot installed; IRQs are
         // safe to take. The BSP waits for `mark_online` before it queues any AP work.
@@ -285,10 +287,10 @@ pub fn enqueue(thread: Arc<Thread>) -> bool {
         return false;
     }
     // User threads spread across the online CPUs when `smp_user=on`; otherwise they stay on the
-    // boot processor. S76's first aarch64 slice is kernel-thread only: aarch64 user threads stay
-    // on CPU 0 until the per-CPU EL0/syscall and FP/SIMD slice lands. Kernel threads stay local.
+    // boot processor. Both architectures now have a per-CPU EL0/syscall path and per-thread
+    // FP/SIMD state, so aarch64 user threads follow the same policy. Kernel threads stay local.
     let cpu = if thread.user {
-        if user_smp_enabled() && cfg!(target_arch = "x86_64") {
+        if user_smp_enabled() {
             pick_user_cpu()
         } else {
             0
@@ -914,8 +916,8 @@ fn target_cpu(thread: &Thread) -> usize {
     let cpu = usize::try_from(thread.last_cpu.load(Ordering::Acquire)).unwrap_or(0);
     let online = smp::online_cpus();
     // A user thread resumes on the CPU it last ran on when user SMP is enabled; otherwise it
-    // stays on the boot processor. aarch64 user SMP is the follow-up slice.
-    let user_smp = thread.user && user_smp_enabled() && cfg!(target_arch = "x86_64");
+    // stays on the boot processor.
+    let user_smp = thread.user && user_smp_enabled();
     if cpu < online && (!thread.user || user_smp) {
         cpu
     } else {

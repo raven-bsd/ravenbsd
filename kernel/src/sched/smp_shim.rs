@@ -162,6 +162,11 @@ pub mod shootdown {
 /// interrupts. Each worker records the CPU it ran on without touching the console; the boot
 /// processor's monitor reads those counters and proves that every AP ran one before exiting
 /// QEMU with success.
+///
+/// A second pair of kernel threads is pinned to the first AP and alternates between two known
+/// `Q31` values across `yield_now()`. Both run on the same CPU, so each switch must park the
+/// outgoing thread's FP/SIMD area and restore the incoming one; without that the resumed thread
+/// would observe its peer's pattern.
 pub mod selftest {
     use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
@@ -172,9 +177,13 @@ pub mod selftest {
 
     const WORKERS: usize = 4;
     const ITERATIONS: u32 = 2_000;
+    /// Rounds each FP/SIMD ping-pong thread runs.
+    const FPU_ROUNDS: u32 = 200;
 
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     static DONE: AtomicU32 = AtomicU32::new(0);
+    static FPU_DONE: AtomicU32 = AtomicU32::new(0);
+    static FPU_FAILURES: AtomicU32 = AtomicU32::new(0);
     /// Per-CPU worker entries. APs only bump their own slot; the BSP monitor prints it.
     static SEEN: [AtomicU32; MAX_CPUS] = [const { AtomicU32::new(0) }; MAX_CPUS];
 
@@ -192,6 +201,18 @@ pub mod selftest {
             let target = index.min(cpus.saturating_sub(1));
             if let Err(error) = sched::spawn_kernel_on(target, name, *entry) {
                 kprintln!("aarch64-smp: spawn failed: {error:?}");
+                crate::boot::exit_qemu(0x11);
+            }
+        }
+        // Both FP/SIMD threads share the first application processor so their Q31 writes
+        // interleave through real context switches.
+        let fpu_cpu = 1.min(cpus.saturating_sub(1));
+        for (name, entry) in [
+            ("aarch64-smp-fpu-a", fpu_a as fn()),
+            ("aarch64-smp-fpu-b", fpu_b as fn()),
+        ] {
+            if let Err(error) = sched::spawn_kernel_on(fpu_cpu, name, entry) {
+                kprintln!("aarch64-smp: fpu spawn failed: {error:?}");
                 crate::boot::exit_qemu(0x11);
             }
         }
@@ -233,6 +254,60 @@ pub mod selftest {
         sched::exit_thread(0)
     }
 
+    fn fpu_a() {
+        fpu_ping_pong(0xa5a5_0000_0000_0000);
+    }
+
+    fn fpu_b() {
+        fpu_ping_pong(0x5a5a_0000_0000_0000);
+    }
+
+    /// Write a private pattern into `Q31`, yield, and require it back after the switch.
+    ///
+    /// The kernel is soft-float, so only the scheduler's per-thread save/restore can explain a
+    /// preserved value: the sibling thread on this CPU overwrites `Q31` on every round.
+    fn fpu_ping_pong(tag: u64) {
+        let mut round = 0u32;
+        while round < FPU_ROUNDS {
+            let expected = tag | u64::from(round);
+            set_q31(expected);
+            sched::yield_now();
+            if read_q31() != expected {
+                FPU_FAILURES.fetch_add(1, Ordering::SeqCst);
+            }
+            round = round.saturating_add(1);
+        }
+        FPU_DONE.fetch_add(1, Ordering::SeqCst);
+        sched::exit_thread(0)
+    }
+
+    fn set_q31(value: u64) {
+        // SAFETY: `Q31` is not an ABI register the soft-float compiler allocates, and the `.arch`
+        // directive enables the FP/SIMD encodings this target does not assemble by default.
+        unsafe {
+            core::arch::asm!(
+                ".arch armv8-a+fp+simd",
+                "fmov d31, {value}",
+                value = in(reg) value,
+                options(nostack, preserves_flags),
+            );
+        }
+    }
+
+    fn read_q31() -> u64 {
+        let value: u64;
+        // SAFETY: as in `set_q31`; the read has no side effects.
+        unsafe {
+            core::arch::asm!(
+                ".arch armv8-a+fp+simd",
+                "fmov {value}, d31",
+                value = out(reg) value,
+                options(nostack, preserves_flags),
+            );
+        }
+        value
+    }
+
     fn monitor() {
         let start = crate::time::now_ns();
         while DONE.load(Ordering::SeqCst) < WORKERS as u32 {
@@ -250,6 +325,25 @@ pub mod selftest {
             kprintln!("aarch64-smp: counter={total} expected={expected}");
             crate::boot::exit_qemu(0x11);
         }
+        let deadline = crate::time::now_ns().saturating_add(10_000_000_000);
+        while FPU_DONE.load(Ordering::SeqCst) < 2 {
+            if crate::time::now_ns() > deadline {
+                kprintln!(
+                    "aarch64-smp: fpu timeout done={}",
+                    FPU_DONE.load(Ordering::SeqCst)
+                );
+                crate::boot::exit_qemu(0x11);
+            }
+            crate::sched::sleep::sleep_ns(1_000_000);
+        }
+        if FPU_FAILURES.load(Ordering::SeqCst) != 0 {
+            kprintln!(
+                "aarch64-smp: fpu state lost failures={}",
+                FPU_FAILURES.load(Ordering::SeqCst)
+            );
+            crate::boot::exit_qemu(0x11);
+        }
+        kprintln!("aarch64-smp: fpu ok rounds={FPU_ROUNDS}");
         let online = super::online_cpus();
         let mut cpu = 1usize;
         while cpu < online {
