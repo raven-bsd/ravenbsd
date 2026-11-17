@@ -3,8 +3,8 @@
 SPDX-License-Identifier: BSD-3-Clause
 Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-Status: PROPOSED. `raven-vmem` (A1) and `raven-kmem` (A2) are implemented; the magazine/depot and
-kernel-integration layers (A3..A6) are next.
+Status: PROPOSED. `raven-vmem` (A1), `raven-kmem` (A2) and its per-CPU magazines/depot (A3) are
+implemented; the kernel-integration layer (A4) and beyond are next.
 
 This is the working note for the memory lane. The requirement source is
 `ravenbsd-prjmgmt/architecture/kernel-next/03-memory.md` (R-MEM-1 .. R-MEM-25); the allocator lane
@@ -89,22 +89,44 @@ to `Kmem::new`, which owns it.
 * **Alignment and statistics**: returned addresses are aligned to `align`; `CacheStats`/`KmemStats`
   expose allocs, frees, alloc failures, slabs, in-use/free objects, waste bytes and reaped slabs.
 
-Typed caches (`Cache<T>` -> `Box<T, CacheAlloc>`, R-MEM-5) and the magazine/depot layers are not
-here: reconstructing a typed pointer from an address is unsafe and belongs with the kernel
-integration (A4) and the magazine work (A3).
+Typed caches (`Cache<T>` -> `Box<T, CacheAlloc>`, R-MEM-5) are not here: reconstructing a typed
+pointer from an address is unsafe and belongs with the kernel integration (A4).
 
-## 4. What A1/A2 defer to A3+
+## 4. Magazines and depot (A3, OBSERVED)
+
+`MagCache` adds the per-CPU magazine layer over the slab [`Cache`], with a [`Cpu`] trait supplying
+the current CPU id and online count (the kernel reads these from hardware; host tests use a fake).
+This is what removes the shared lock from the fast path.
+
+* **Fast path**: [`MagCache::alloc`]/[`MagCache::free`] pop/push the current CPU's `loaded` magazine
+  (falling back to `previous`); a successful operation touches only per-CPU data, takes no lock and
+  performs no atomic read-modify-write. Magazines are preallocated to their capacity, so the fast
+  path never allocates.
+* **Depot** (slow path): when `loaded` and `previous` are both empty (alloc) or both full (free),
+  the cache exchanges a whole magazine with the shared depot; only when the depot cannot help does
+  it touch the slab layer.
+* **Remote free**: a cross-CPU free lands in the freeing CPU's bounded remote queue (`rounds` slots);
+  when it fills, the queue moves into a full magazine in the depot, and the allocator drains it on
+  the next slow path. The depot itself is bounded to `2 * online` full magazines, draining the
+  excess back to the slab layer.
+* **Dynamic sizing**: `magazine_rounds(online)` scales the magazine from [`ROUNDS_MIN`] (15, one
+  CPU) up to [`ROUNDS_MAX`] (143) with the online CPU count; the contention-driven doubling of
+  R-MEM-7 stays deferred to A4, which owns the real per-CPU preemption context.
+* **Correctness invariant** (tested): `slab_in_use == live + free_in_mags + free_in_depot +
+  free_in_remote` at every step; the hammers drive 1/2/4 simulated CPUs and a million operations
+  and assert no object is lost or duplicated.
+
+## 5. What A1/A2/A3 defer to A4+
 
 The architecture names three allocation policies and a quantum/import hierarchy. A1 ships
 `FirstFit`, `BestFit` and `NextFit`; the `InstantFit` power-of-two freelists and quantum caches are
-not part of A1's contract and belong with the kmem hot path (A3, where the `O(1)` fast path and its
-contention counters are specified). A1 also keeps the import source explicit: the caller passes the
+not part of A1's contract and belong with the kmem hot path (A4, where the real per-CPU preemption
+and contention counters live). A1 also keeps the import source explicit: the caller passes the
 range, and the kernel-integrating ticket will feed it from the kva/ID arenas (R-MEM-3). There is no
 global or static state, and no release hook yet; both land when the arena is wired to real mapping.
 
-## 5. kmem next steps (A3..A6, PROPOSED)
+## 6. kmem next steps (A4..A6, PROPOSED)
 
-* **A3** per-CPU magazines and the depot layer (R-MEM-6, R-MEM-7).
 * **A4** kernel integration replacing `kernel/src/memory/heap.rs` once the kernel lane releases
   that path (R-MEM-3, R-MEM-23, R-MEM-24).
 * **A5** per-CPU frame caches, buddy/zones and pager hooks (R-MEM-13..15).
