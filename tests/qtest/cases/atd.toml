@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P40: atd runs one regular and one batch job through the kernel spawn path.
+
+name = "atd"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/posix/utility/at/build-qtest.sh"]
+initfs = "build/fixtures/at/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^at: services ok$'
+
+[[expect]]
+regex = '^at: queue ok regular=[0-9.]+ batch=[0-9.]+$'
+
+[[expect]]
+regex = '^atd: ready spool=/var/at$'
+
+[[expect]]
+regex = '^atd: start job=[0-9.]+ command=echo at-ok$'
+
+[[expect]]
+regex = '^atd: exit job=[0-9.]+ status=0$'
+
+[[expect]]
+regex = '^atd: start job=[0-9.]+ command=echo batch-ok$'
+
+[[expect]]
+regex = '^atd: exit job=[0-9.]+ status=0$'
+
+[[expect]]
+regex = '^at: fixture ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|at: fail'

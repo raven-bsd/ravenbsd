@@ -6,13 +6,13 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-17T00:49:54Z
+- Date: 2026-11-17T01:28:45Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: target QEMU
 - Tool: `posix-conform 0.1.0`
 - Result: **FAIL (release blocked)**
-- Counts: 914 pass, 885 fail, 10 skip
+- Counts: 916 pass, 883 fail, 10 skip
 
 ## Summary
 
@@ -27,8 +27,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | shell | 7 | 18 | 0 |
 | target | 0 | 0 | 7 |
 | tty | 12 | 0 | 0 |
-| utility | 116 | 101 | 0 |
-| **all** | **914** | **885** | **10** |
+| utility | 118 | 99 | 0 |
+| **all** | **916** | **883** | **10** |
 
 ## Rows
 
@@ -1631,14 +1631,14 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.ar` | utility | pass | `test:tests/posix/utility/archive/ar/test.sh` |  |
 | `util.arch` | utility | pass | `test:tests/posix/utility/misc/arch/test.sh` |  |
 | `util.asa` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.at` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.at` | utility | pass | `test:tests/posix/utility/at/test.sh` |  |
 | `util.awk` | utility | pass | `test:tests/posix/utility/text2/awk/test.sh` |  |
 | `util.b2sum` | utility | pass | `test:tests/posix/utility/misc/b2sum/test.sh` |  |
 | `util.base32` | utility | pass | `test:tests/posix/utility/misc/base32/test.sh` |  |
 | `util.base64` | utility | pass | `test:tests/posix/utility/misc/base64/test.sh` |  |
 | `util.basename` | utility | pass | `test:tests/posix/utility/text/basename/test.sh` |  |
 | `util.basenc` | utility | pass | `test:tests/posix/utility/misc/basenc/test.sh` |  |
-| `util.batch` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.batch` | utility | pass | `test:tests/posix/utility/at/test.sh` |  |
 | `util.bc` | utility | pass | `test:tests/posix/utility/bc/test.sh` |  |
 | `util.bg` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.break` | utility | fail | `none` | profile status missing; no POSIX utility test |

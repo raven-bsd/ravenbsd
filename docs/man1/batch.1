@@ -1,0 +1,38 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt BATCH 1
+.Os RavenBSD
+.Sh NAME
+.Nm batch
+.Nd queue a command for the idle at queue
+.Sh SYNOPSIS
+.Nm
+.Op Ar command ...
+.Sh DESCRIPTION
+The
+.Nm
+utility queues one command line on the idle queue. It is equivalent to
+.Nm at
+with an immediate due time and the batch flag set. The command is read from standard input on
+the host; the target accepts command words.
+.Pp
+The
+.Nm atd
+daemon runs batch jobs on a scheduler tick with no due regular job. There is no load-average
+source, so an idle tick is the low-load proxy.
+.Sh ENVIRONMENT
+.Bl -tag -width AT_SPOOL
+.It Ev AT_SPOOL
+Override the spool directory. Used by the host tests.
+.El
+.Sh EXIT STATUS
+.Ex -std
+0 on success, 1 for a validation or spool error, 2 for usage.
+.Sh SEE ALSO
+.Xr at 1 ,
+.Xr atd 1
+.Sh STANDARDS
+The queueing subset of POSIX
+.Nm batch .
+Multi-line scripts and shell metacharacters are unsupported.
