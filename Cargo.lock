@@ -3166,6 +3166,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-service-restart"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-svc",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-setuid"
 version = "0.1.0"
 dependencies = [

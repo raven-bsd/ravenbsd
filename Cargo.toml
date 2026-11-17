@@ -45,6 +45,7 @@ members = [
     "tests/fixtures/s27-echo",
     "tests/fixtures/s35-handles",
     "tests/fixtures/k68-svc",
+    "tests/fixtures/service-restart",
     "tests/fixtures/s21-edu",
     "tests/fixtures/s21d-aarch64",
     "tests/fixtures/b47a-ipc",
