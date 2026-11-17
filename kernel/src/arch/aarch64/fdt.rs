@@ -77,6 +77,37 @@ pub fn map_node_regs(node: &Node<'_>, out: &mut [MappedReg]) -> Result<usize, Ma
     Ok(count)
 }
 
+/// PSCI conduit selected by the device tree.
+///
+/// `psci.method = "hvc"` (QEMU `virt` under AAVMF) returns true; `"smc"` (Pi 4 firmware)
+/// returns false. A missing DTB or `psci` node defaults to HVC, which is the QEMU path; the Pi 4
+/// secondary bring-up is gated off and stays UNVERIFIED.
+#[must_use]
+pub fn psci_hvc() -> bool {
+    // SAFETY: paging published the copied BootInfo during init and it is immutable afterwards.
+    let boot_info = unsafe { &*crate::memory::paging::boot_info_ptr() };
+    if let Some(fdt) = dtb(boot_info.dtb.base, boot_info.dtb.len)
+        && let Some(root) = fdt.root()
+        && let Some(node) = find_node(&root, "psci")
+        && let Some(method) = node.property_str("method")
+    {
+        return method == "hvc";
+    }
+    true
+}
+
+fn find_node<'a>(node: &Node<'a>, name: &str) -> Option<Node<'a>> {
+    if node.name() == name {
+        return Some(*node);
+    }
+    for child in node.children() {
+        if let Some(found) = find_node(&child, name) {
+            return Some(found);
+        }
+    }
+    None
+}
+
 /// Parse a device tree at physical `base`/`len` through the HHDM.
 ///
 /// The returned view borrows firmware memory for the lifetime of the kernel; it must be called
