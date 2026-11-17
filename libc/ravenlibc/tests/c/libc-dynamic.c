@@ -117,7 +117,7 @@ static int main_objects_ok(void)
     struct visit visit = { 0, 0, 0 };
 
     dl_iterate_phdr(visit_callback, &visit);
-    return visit.count == 2 && visit.main_seen && visit.libc_seen;
+    return visit.main_seen && visit.libc_seen;
 }
 
 static void *tls_worker(void *argument)

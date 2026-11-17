@@ -3,9 +3,9 @@
 
 # ravenlibc libc gate report
 
-Evaluated by `libc-gate` on 2026-11-17 from the C74d tree (origin/master `bd1d1de1`). C74f
-refreshed the `libc-dynamic` row and the section 4 dynamic paragraph from `72237c57`; the table
-verdict is unchanged. Every status below has an evidence file under `build/libc-gate/`; the table
+Evaluated by `libc-gate` on 2026-11-17 from the C74d tree (origin/master `bd1d1de1`). C74f and
+C74g refreshed the `libc-dynamic` row and the section 4 dynamic paragraph; the table verdict is
+otherwise unchanged. Every status below has an evidence file under `build/libc-gate/`; the table
 is `cargo run -q -p libc-gate -- table`. C74d refreshed the non-P1 rows (audit, G1, compat, Miri,
 world, size, soak, mandoc) with their exact current commands and results; the remaining NOT MET
 rows are P1b/P1c, the dynamic runtime, or unavailable host tooling, and are listed with their
@@ -92,7 +92,7 @@ Each row is a direct `cargo xtask qtest --case <case> --arch x86_64` run.
 | libc-time | ERROR (build) | The C fixture does not link: `rust-lld: undefined symbol: usleep`, `sleep`, `tzname`. These are genuinely absent from `libc.a` (`nm` shows only `nanosleep`); `sleep`/`usleep` are unistd and `tzname` is time (P1b), all outside C74b's Owns. C74b makes the sysroot repeatable but does not add these symbols. |
 | libc-threads | PASS | `cargo xtask qtest --case libc-threads --arch x86_64` exit 0 after `libc-pack` skips the five compiler wrappers. |
 | libc-signals | PASS | `cargo xtask qtest --case libc-signals --arch x86_64` exit 0. |
-| libc-dynamic | FAIL (runtime) | `shape-check.sh` passes (`--image-base=0x400000` on the test PIE; the check validates the file range instead of a page-rounded `p_filesz`). C74f fixes the spawn `EINVAL`: `copy_tail` mapped the initfs source `SHARED`, which `resolve_object` rejects for `Handle::INITFS`; the source map is now private. The case now reaches `ld-elf.so.1`, which prints `ld-elf.so.1: no direct target start yet` and exits 127 because `_rtld_main` and the target `dl*` bodies are C73 stubs; `RealPlatform::open/read` still return `file_layer_unavailable`. |
+| libc-dynamic | PASS | `cargo xtask qtest --case libc-dynamic --arch x86_64` exit 0: `interp`, `needed`, `dlopen`, `dlsym`, `init`, `error`, `global`, `libc`, `tls`, `iterate`, `plug fini`, `dlclose`, `closed dlsym`, `version`, `done`, `init exited (0)`. C74g implements the target rtld: self-relocation, pre-mapped main registration, `DT_NEEDED`, RELA/RELR/PLT, RUNPATH/RPATH, lazy dynamic TLS, `dl*` forwarding, and `AT_ENTRY` transfer. |
 | libc-spawn | PASS | `cargo xtask qtest --case libc-spawn --arch x86_64` exit 0. |
 
 Supporting acceptance:
@@ -118,14 +118,14 @@ C74c publishes `AT_PHDR`/`AT_PHENT`/`AT_PHNUM` from the retained startup auxv, s
 `getauxval(AT_PHNUM)` is nonzero and `libc-hello: auxv ok`; `libc-link` stages the freshly linked
 `libc.so.1`/`ld-elf.so.1` into the sysroot, and `libc-pack` skips the five compiler wrappers
 (`stddef.h`, `stdbool.h`, `stdatomic.h`, `stdarg.h`, `float.h`) when staging headers. With that,
-`libc-threads` **passes**. The dynamic test now links at `--image-base=0x400000` and the shape
-check accepts it (`shape: ok`); before C74f the case then failed before `libc-dynamic: start` with
-`svcd: libc-test failed: invalid argument`. C74f traced that `EINVAL` to `copy_tail` in
-`raven-spawn` mapping its initfs source `SHARED`; the kernel rejects shared mappings of
-`Handle::INITFS`. With the source map private, the child reaches `ld-elf.so.1`, which prints
-`ld-elf.so.1: no direct target start yet` and exits 127: the target rtld entry and `dl*` bodies
-are C73 stubs and the real file layer is not implemented. The remaining libc failures are P1b
-(`libc-hello` string, `libc-stdio`, `libc-time` `sleep`/`usleep`/`tzname`) plus the C73 rtld target.
+`libc-threads` **passes**. The dynamic test links at `--image-base=0x400000` and the shape check
+accepts it (`shape: ok`). C74f traced the old `libc-dynamic` `EINVAL` to `copy_tail` mapping its
+initfs source `SHARED`; with the source map private the child reached `ld-elf.so.1`. C74g
+implements the target start path (self-relocation, main registration from `AT_PHDR`, `DT_NEEDED`,
+RELA/RELR/PLT, TLS, `dl*` forwarding and `AT_ENTRY` transfer), so `libc-dynamic` now passes through
+`done` with `init exited (0)`. C74g also adds `AT_BASE`/`AT_ENTRY` to the libc auxiliary lookup and
+repairs the dynamic fixture's TLS constructor/build. The remaining libc failures are P1b
+(`libc-hello` string, `libc-stdio`, `libc-time` `sleep`/`usleep`/`tzname`).
 
 ## 5. Other rows
 

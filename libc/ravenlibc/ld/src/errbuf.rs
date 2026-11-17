@@ -36,7 +36,11 @@ impl ErrBuf {
             len: 0,
         };
         let _ = fmt::write(&mut writer, args);
-        self.len = writer.len.min(self.bytes.len());
+        // Reserve the last byte for the NUL `dlerror` returns to C.
+        self.len = writer.len.min(self.bytes.len().saturating_sub(1));
+        if let Some(slot) = self.bytes.get_mut(self.len) {
+            *slot = 0;
+        }
         self.pending = true;
     }
 

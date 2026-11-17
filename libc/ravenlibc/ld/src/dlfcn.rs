@@ -41,9 +41,13 @@ impl<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier> L
                 && let Some(object) = self.object_mut(id)
             {
                 object.refcount = object.refcount.saturating_add(1);
+                object.dl_open = true;
                 if flags & RTLD_NODELETE != 0 {
                     object.nodelete = true;
                 }
+            }
+            if flags & RTLD_GLOBAL != 0 && !self.scope.global.contains(&id) {
+                self.scope.global.push(id);
             }
             self.error.clear();
             return Ok(id);
@@ -63,17 +67,25 @@ impl<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier> L
         let id = match self.load_object(path.as_bytes(), name) {
             Ok(id) => id,
             Err(error) => {
-                self.error.set(format_args!("dlopen: cannot load object"));
+                self.error.set(format_args!(
+                    "dlopen: {}: {}",
+                    core::str::from_utf8(name).unwrap_or("?"),
+                    error.text()
+                ));
                 return Err(error);
             }
         };
         if let Err(error) = self.load_needed_objects(id) {
-            self.error
-                .set(format_args!("dlopen: cannot load dependencies"));
+            self.error.set(format_args!(
+                "dlopen: {}: {}",
+                core::str::from_utf8(name).unwrap_or("?"),
+                error.text()
+            ));
             return Err(error);
         }
         if let Some(object) = self.object_mut(id) {
             object.refcount = 1;
+            object.dl_open = true;
             if flags & RTLD_NODELETE != 0 {
                 object.nodelete = true;
             }
@@ -121,6 +133,13 @@ impl<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier> L
         } else {
             let table = self.table();
             let id = handle?;
+            if self
+                .object(id)
+                .is_none_or(|object| object.dl_open && object.refcount == 0)
+            {
+                self.error.set(format_args!("dlsym: invalid handle"));
+                return None;
+            }
             symlook_needed(&table, &self.mem, id, &request, &mut [].to_vec())
                 .ok()
                 .flatten()
@@ -147,7 +166,10 @@ impl<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier> L
             file: None,
         });
         let table = self.table();
-        let id = handle.unwrap_or(self.scope.main);
+        let id = match handle {
+            None | Some(RTLD_DEFAULT) => self.scope.main,
+            Some(id) => id,
+        };
         let value = symlook_needed(&table, &self.mem, id, &request, &mut [].to_vec())
             .ok()
             .flatten()
@@ -173,9 +195,16 @@ impl<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier> L
         if object.refcount > 0 {
             object.refcount = object.refcount.saturating_sub(1);
         }
-        let unload = object.refcount == 0 && !object.nodelete && !object.has_tls();
-        if unload {
+        let closed = object.refcount == 0;
+        let run_fini = closed && !object.fini_done;
+        let unload = closed && !object.nodelete && !object.has_tls();
+        if run_fini {
+            if let Some(object) = self.object_mut(id) {
+                object.fini_done = true;
+            }
             let _ = self.run_fini(id);
+        }
+        if unload {
             let _ = self.unload_object(id);
         }
         self.error.clear();
@@ -249,6 +278,7 @@ impl<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier> L
             };
             let id = ObjId(index);
             if Some(id) != Some(self.scope.main)
+                && Some(id) != self.scope.rtld
                 && self.object(id).is_some()
                 && position < out.len()
             {

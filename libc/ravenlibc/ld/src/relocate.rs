@@ -37,7 +37,7 @@
 
 use raven_libc_elf::{
     BindMode, IfuncArg, MemView, ObjId, ObjTable, Phase, RelocError, SymDef, SymLook, SymResolver,
-    apply_object, lookup::SymFlags, scope::symlook_default,
+    apply_object, scope::symlook_default,
 };
 
 use crate::loadobj::{LoadError, Loader, ObjectTable};
@@ -62,7 +62,7 @@ impl<M: MemView> SymResolver for Resolver<'_, M> {
         let name = view
             .name_at(self.mem, sym.name)
             .map_err(|_| RelocError::BadSymbol)?;
-        let request = SymLook::new(name).with_flags(SymFlags::NO_TLS);
+        let request = SymLook::new(name);
         let hit = symlook_default(
             self.table,
             self.mem,

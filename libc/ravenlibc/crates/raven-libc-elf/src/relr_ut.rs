@@ -65,6 +65,15 @@ fn a_bitmap_may_cross_a_page_boundary() {
 }
 
 #[test]
+fn consecutive_bitmaps_advance_to_the_next_word_run() {
+    // First bitmap relocates 0x1408; the next bitmap's first word is after the 63-word run.
+    let first = 1u64 | (1 << 1);
+    let second = 1u64 | (1 << 1);
+    let result = offsets(&[0x1400, first, second]);
+    assert_eq!(result, vec![0x1400, 0x1408, 0x1600]);
+}
+
+#[test]
 fn two_address_entries_are_both_yielded() {
     assert_eq!(offsets(&[0x1400, 0x1600]), vec![0x1400, 0x1600]);
 }

@@ -40,6 +40,10 @@ const AT_CLKTCK: usize = 17;
 const AT_RANDOM: usize = 25;
 /// `AT_PHDR`: the program-header table address (`PG-50` publishes it).
 const AT_PHDR: usize = 3;
+/// `AT_BASE`: the interpreter load bias.
+const AT_BASE: usize = 7;
+/// `AT_ENTRY`: the program entry point.
+const AT_ENTRY: usize = 9;
 /// `AT_PHENT`: the size of one program-header entry.
 const AT_PHENT: usize = 4;
 /// `AT_PHNUM`: the number of program headers.
@@ -102,6 +106,10 @@ static SAVED_PHDR: AtomicUsize = AtomicUsize::new(0);
 static SAVED_PHENT: AtomicUsize = AtomicUsize::new(0);
 /// `AT_PHNUM` from the auxiliary vector (`PG-50`).
 static SAVED_PHNUM: AtomicUsize = AtomicUsize::new(0);
+/// `AT_BASE` from the auxiliary vector (the interpreter load bias).
+static SAVED_BASE: AtomicUsize = AtomicUsize::new(0);
+/// `AT_ENTRY` from the auxiliary vector.
+static SAVED_ENTRY: AtomicUsize = AtomicUsize::new(0);
 /// Presence bits for `AT_EXECFN`, `AT_HWCAP` and `AT_HWCAP2` (a present zero is not absent).
 static SAVED_AUX_MASK: AtomicUsize = AtomicUsize::new(0);
 
@@ -136,6 +144,16 @@ pub(crate) fn phent() -> usize {
 /// The program-header count recorded at start, or 0 (`AT_PHNUM`).
 pub(crate) fn phnum() -> usize {
     SAVED_PHNUM.load(Ordering::Relaxed)
+}
+
+/// The interpreter load bias recorded at start, or 0 (`AT_BASE`).
+pub(crate) fn base() -> usize {
+    SAVED_BASE.load(Ordering::Relaxed)
+}
+
+/// The program entry point recorded at start, or 0 (`AT_ENTRY`).
+pub(crate) fn entry() -> usize {
+    SAVED_ENTRY.load(Ordering::Relaxed)
 }
 
 /// One saved auxiliary value for the Solaris identity calls (C67 `getexecname`/`getisax`).
@@ -292,6 +310,8 @@ pub unsafe extern "C" fn __raven_libc_start(
     SAVED_PHDR.store(aux_value(&aux, AT_PHDR), Ordering::Relaxed);
     SAVED_PHENT.store(aux_value(&aux, AT_PHENT), Ordering::Relaxed);
     SAVED_PHNUM.store(aux_value(&aux, AT_PHNUM), Ordering::Relaxed);
+    SAVED_BASE.store(aux_value(&aux, AT_BASE), Ordering::Relaxed);
+    SAVED_ENTRY.store(aux_value(&aux, AT_ENTRY), Ordering::Relaxed);
     SAVED_AUX_MASK.store(aux_present, Ordering::Release);
     let mut canary = 0usize;
     if aux_value(&aux, AT_RANDOM) != 0 {

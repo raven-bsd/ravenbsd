@@ -12,4 +12,5 @@ pub mod mapper_real;
 pub mod mem;
 pub mod memview;
 pub mod panic;
+pub mod selfreloc;
 pub mod sys;

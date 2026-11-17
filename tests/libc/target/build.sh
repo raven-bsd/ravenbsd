@@ -179,7 +179,7 @@ link_dynamic() {
             -Wl,--image-base=0x400000 \
             -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
             "$sysroot/usr/lib/Scrt1.o" "$sysroot/usr/lib/crti.o" "$1" \
-            -L"$sysroot/lib" -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
+            "$out/obj/tls-stub.o" -L"$sysroot/lib" -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
             "$sysroot/usr/lib/crtn.o" -o "$2"
     else
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
@@ -187,7 +187,7 @@ link_dynamic() {
             -Wl,--image-base=0x400000 \
             -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
             "$sysroot/usr/lib/Scrt1.o" "$sysroot/usr/lib/crti.o" "$1" \
-            -L"$sysroot/lib" -L"$sysroot/usr/lib" -lc \
+            "$out/obj/tls-stub.o" -L"$sysroot/lib" -L"$sysroot/usr/lib" -lc \
             "$sysroot/usr/lib/crtn.o" -o "$2"
     fi
 }
@@ -215,14 +215,17 @@ compile_pie() {
 }
 
 compile_pic() {
+    # The plugin's `__attribute__((constructor))` is emitted into `.init_array` only at -O0
+    # with this target: clang 14 drops a static constructor at -O1 for the unknown OS, which
+    # would silently remove the `init` check from the dynamic case. The plugin is tiny.
     if [ "$float" = soft ]; then
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" \
-            -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
+            -std=gnu11 -O0 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
             -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float -fPIC \
             -I "$root/libc/ravenlibc/tests/c" -c "$1" -o "$2"
     else
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" \
-            -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
+            -std=gnu11 -O0 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
             -D__ravenbsd__=1 -D__unix__=1 -fPIC \
             -I "$root/libc/ravenlibc/tests/c" -c "$1" -o "$2"
     fi
@@ -267,6 +270,8 @@ case $link_kind in
         ;;
     dynamic)
         compile_pic "$root/libc/ravenlibc/tests/c/libplug.c" "$out/obj/libplug.o"
+        "$CC" --target="$arch-unknown-ravenbsd" -c \
+            "$root/tests/libc/target/tls-stub.s" -o "$out/obj/tls-stub.o"
         link_shared "$out/obj/libplug.o" "$out/libplug.so"
         link_dynamic "$obj" "$out/libc-test"
         cp "$sysroot/lib/libc.so.1" "$out/libc.so.1"

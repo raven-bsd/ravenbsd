@@ -7,10 +7,10 @@
 //! The real entry glue parses the stack and auxv; this module takes a [`StartCtx`] and executes
 //! the steps that are the same on the host and the target.
 
-use raven_libc_elf::{Arch, ObjId};
+use raven_libc_elf::{Arch, ObjId, ObjView};
 
-use crate::loadobj::{LoadError, Loader, Name};
-use crate::mapper::Platform;
+use crate::loadobj::{LoadError, LoadedObject, Loader, MAX_DEPS, Name};
+use crate::mapper::{Mapped, Platform};
 
 /// The start-up inputs.
 #[derive(Clone, Copy, Debug)]
@@ -128,6 +128,79 @@ pub fn rtld_main<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::Rel
         entry: usize::try_from(entry).unwrap_or(0),
         exit_proc: 0,
     })
+}
+
+/// The load bias of an already-mapped PIE, derived from its `PT_PHDR` record.
+///
+/// `phdr` is the absolute address the kernel placed in `AT_PHDR`; the program header's
+/// link-time `p_vaddr` is compared with it. `None` means the table has no `PT_PHDR`.
+#[must_use]
+pub fn main_bias(mem: &dyn raven_libc_elf::MemView, phdr: u64, phnum: u16) -> Option<u64> {
+    let headers = raven_libc_elf::elf::read_phdrs(mem, phdr, phnum).ok()?;
+    let entry = headers
+        .iter()
+        .find(|header| header.p_type == raven_libc_elf::consts::PT_PHDR)?;
+    phdr.checked_sub(entry.p_vaddr)
+}
+
+/// Register a pre-mapped main program (the normal interpreter case) in the object table.
+///
+/// The kernel or spawner already mapped the executable, so this only digests the view and
+/// records the absolute program headers; the entry point comes from `AT_ENTRY`.
+///
+/// # Errors
+///
+/// A missing `PT_PHDR`, a malformed dynamic section or a full object table.
+pub fn register_main<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier>(
+    loader: &mut Loader<P, M, A>,
+    phdr: u64,
+    phnum: u16,
+    name: &[u8],
+) -> Result<ObjId, LoadError> {
+    let bias = main_bias(&loader.mem, phdr, phnum)
+        .ok_or(LoadError::Elf(raven_libc_elf::ElfError::BadEntry))?;
+    let link_phdr = phdr
+        .checked_sub(bias)
+        .ok_or(LoadError::Elf(raven_libc_elf::ElfError::BadEntry))?;
+    let view = ObjView::digest(&loader.mem, link_phdr, phnum, bias).map_err(LoadError::Digest)?;
+    if view.gnu_stack_exec {
+        return Err(LoadError::ExecutableStack);
+    }
+    let end = view
+        .segments
+        .iter()
+        .map(|segment| segment.vaddr.saturating_add(segment.memsz))
+        .max()
+        .unwrap_or(bias);
+    let mut object = LoadedObject {
+        rpath: view.rpath,
+        runpath: view.runpath,
+        view,
+        mapped: Mapped {
+            base: bias,
+            span: end.saturating_sub(bias),
+            bias,
+        },
+        names: [Name::empty(); crate::loadobj::MAX_NAMES],
+        name_count: 0,
+        deps: [ObjId(u32::MAX); MAX_DEPS],
+        dep_count: 0,
+        refcount: 0,
+        nodelete: false,
+        tls_offset: 0,
+        tls_size: 0,
+        relocated: false,
+        ifunc_done: false,
+        fini_done: false,
+        dl_open: false,
+    };
+    // `dl_iterate_phdr` reports the main program with an empty `dlpi_name`; the path is an
+    // alias used by diagnostics.
+    object.add_name(b"");
+    object.add_name(name);
+    let id = loader.insert(object).ok_or(LoadError::TooManyObjects)?;
+    loader.scope.main = id;
+    Ok(id)
 }
 
 /// Print the loaded object list in the `ldd` shape through the platform debug console.

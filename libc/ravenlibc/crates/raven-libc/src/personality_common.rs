@@ -890,6 +890,8 @@ pub(crate) fn aux_lookup(key: u64) -> Option<u64> {
         4 => Some(u64::try_from(crate::start::phent()).unwrap_or(0)),
         5 => Some(u64::try_from(crate::start::phnum()).unwrap_or(0)),
         6 => Some(u64::try_from(crate::start::page_size()).unwrap_or(0)),
+        7 => Some(u64::try_from(crate::start::base()).unwrap_or(0)),
+        9 => Some(u64::try_from(crate::start::entry()).unwrap_or(0)),
         17 => Some(u64::try_from(crate::start::clk_tck()).unwrap_or(0)),
         23 => Some(0),
         25 => Some(u64::try_from(crate::start::random_pointer()).unwrap_or(0)),

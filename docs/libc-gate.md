@@ -57,7 +57,7 @@ symbol audit has all 66 required symbols PRESENT but its frozen `expected.tsv` i
 C74d's Owns); G1 is 0/4 (C2-C5 not run, C6 unvendored); 4 of 27 oracle families lack
 `oracle-*` features; the size check is 6 pass / 63 fail; the `inet_text` soak crashed before one
 hour; Miri, the world build and `mandoc` are UNAVAILABLE in this environment. On target,
-`libc-signals`, `libc-spawn` and `libc-threads` pass; `libc-hello` fails only the P1b `string`
-check (auxv ok); `libc-dynamic` passes the shape check and, after C74f's private `copy_tail`
-source map, spawns `ld-elf.so.1`, which exits 127 at the C73 target-rtld stub
-(`ld-elf.so.1: no direct target start yet`); `libc-stdio` and `libc-time` remain P1b.
+`libc-signals`, `libc-spawn`, `libc-threads` pass; `libc-hello` fails only the P1b `string`
+check (auxv ok); `libc-dynamic` now passes: C74g implements the target rtld start path, so it
+reaches `done` with `init exited (0)` (C74f fixed the earlier private `copy_tail` source map);
+`libc-stdio` and `libc-time` remain P1b.

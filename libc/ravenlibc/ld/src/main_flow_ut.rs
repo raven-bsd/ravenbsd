@@ -4,6 +4,22 @@
 use super::*;
 
 #[test]
+fn main_bias_comes_from_the_pt_phdr_record() {
+    let base = 0x0000_1000_0000_0000u64;
+    let mut bytes = [0u8; 0x100];
+    // One PT_PHDR at absolute base + 0x40 with link-time vaddr 0x40.
+    bytes[0x40..0x44].copy_from_slice(&6u32.to_le_bytes());
+    bytes[0x50..0x58].copy_from_slice(&0x40u64.to_le_bytes());
+    let mem = raven_libc_elf::SliceMem::new(base, &bytes);
+    assert_eq!(main_bias(&mem, base + 0x40, 1), Some(base));
+
+    // No PT_PHDR: the layout is not derivable.
+    bytes[0x40..0x44].copy_from_slice(&1u32.to_le_bytes());
+    let mem = raven_libc_elf::SliceMem::new(base, &bytes);
+    assert_eq!(main_bias(&mem, base + 0x40, 1), None);
+}
+
+#[test]
 fn split_paths_keeps_the_order() {
     let mut out = [Name::empty(); 8];
     let count = split_paths(b"/lib:/usr/lib::/x", &mut out);

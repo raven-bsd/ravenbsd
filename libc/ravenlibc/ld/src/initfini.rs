@@ -43,6 +43,27 @@ impl<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier> L
         })
     }
 
+    /// Run `DT_INIT`, then `DT_INIT_ARRAY` in file order, when an object is loaded.
+    pub fn run_init(&mut self, id: ObjId) -> bool {
+        let Some(object) = self.object(id) else {
+            return false;
+        };
+        let init = object.view.init;
+        let entries =
+            init_array_entries(&object.view, &self.mem, InitKind::Init).unwrap_or_default();
+        if init != 0
+            && let Ok(address) = usize::try_from(init)
+        {
+            self.platform.call_function(address);
+        }
+        for entry in entries.iter() {
+            if let Ok(address) = usize::try_from(*entry) {
+                self.platform.call_function(address);
+            }
+        }
+        true
+    }
+
     /// Run `DT_FINI_ARRAY` backwards, then the legacy `DT_FINI`, before an object unloads.
     pub fn run_fini(&mut self, id: ObjId) -> bool {
         let Some(object) = self.object(id) else {

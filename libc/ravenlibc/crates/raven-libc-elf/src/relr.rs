@@ -55,6 +55,7 @@ pub struct RelrIter<'a> {
     bitmap: u64,
     bit: u32,
     base: u64,
+    advance: bool,
     failed: bool,
 }
 
@@ -111,6 +112,12 @@ impl Iterator for RelrIter<'_> {
             if self.remaining == 0 {
                 return None;
             }
+            // A bitmap covers the 63 words after its address entry; the next bitmap (or
+            // address) starts after that run.
+            if self.advance {
+                self.base = self.base.wrapping_add(63u64.wrapping_mul(8));
+                self.advance = false;
+            }
             let entry = match self.word() {
                 Ok(entry) => entry,
                 Err(error) => {
@@ -127,10 +134,12 @@ impl Iterator for RelrIter<'_> {
                 self.base = entry;
                 self.bitmap = 0;
                 self.bit = 64;
+                self.advance = false;
                 return Some(Ok(entry));
             }
             self.bitmap = entry;
             self.bit = 1;
+            self.advance = true;
         }
     }
 }
@@ -150,6 +159,7 @@ pub fn relr_offsets<'a>(obj: &ObjView, mem: &'a dyn MemView) -> Result<RelrIter<
         bitmap: 0,
         bit: 64,
         base: 0,
+        advance: false,
         failed: false,
     })
 }
