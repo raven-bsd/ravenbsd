@@ -137,15 +137,33 @@ frames and 1 MiB growth steps imported into the arena on allocation failure.
   heap (the slab layer is the A4 fast path); that is the remaining piece of the original "use the
   boot CPU id and online count" note and lands with the magazine-kernel glue.
 
-## 6. What A1..A4 defer to A5+
+## 6. Debug modes and the hammer (A6, OBSERVED)
+
+`raven-kmem` ships an opt-in `debug` feature (off by default, so a release allocator has no
+per-allocation cost). With `--features debug`, `DebugAlloc` wraps the size-class allocator and adds:
+
+* **Redzones**: `guard = align_up(8, align)` bytes of a fixed pattern on each side of every object,
+  checked on free; a leading/trailing mismatch counts as underflow/overflow.
+* **Freed-pattern poison**: freed objects are overwritten with `0xde` (and fresh ones with `0xba`),
+  so a use-after-free read returns a recognizable byte.
+* **Allocation audit**: a 256-entry ring of `AuditRecord { op, addr, size, seq }`.
+* **Double-free**: surfaced through the existing slab free-bitmap (`DoubleFree`) and counted.
+
+`DebugAlloc::realloc` grows/shrinks with a byte copy. The host hammer (`debug_hammer_millions`)
+drives a million mixed alloc/free/realloc operations against a real backing buffer, checking byte
+patterns and asserting zero redzone/double-free detections on correct use; `failure_injection_*`
+pins a tiny arena and asserts `alloc` returns `Exhausted` rather than a bad or duplicate pointer.
+
+## 7. What A1..A6 defer to A5+
 
 The architecture names three allocation policies and a quantum/import hierarchy. A1 ships
 `FirstFit`, `BestFit` and `NextFit`; the `InstantFit` power-of-two freelists and quantum caches are
 not part of A1's contract and belong with the kmem hot path (where the real per-CPU preemption and
 contention counters live). A1 also keeps the import source explicit: the kernel feeds the arena
 from the mapped heap range, and the wider kva/ID arenas (R-MEM-3) land with the frame/ID work.
+The R-MEM-10 debug bitmask (`REDZONE|POISON|AUDIT|LITE|LEAK`) remains a kernel-side runtime flag;
+A6 provides the mechanisms behind a compile-time host/test feature.
 
-## 7. kmem next steps (A5..A6, PROPOSED)
+## 8. kmem next steps (A5, PROPOSED)
 
 * **A5** per-CPU frame caches, buddy/zones and pager hooks (R-MEM-13..15).
-* **A6** debug modes behind `kmem_flags` (R-MEM-10).
