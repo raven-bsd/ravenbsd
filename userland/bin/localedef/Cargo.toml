@@ -14,6 +14,7 @@ rust-version.workspace = true
 gencat = { path = "../gencat" }
 
 [target.'cfg(target_os = "none")'.dependencies]
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
 raven-rt = { path = "../../rt", features = ["alloc"] }
 
 [dev-dependencies]

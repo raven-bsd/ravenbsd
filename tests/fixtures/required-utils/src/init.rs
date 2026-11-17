@@ -28,12 +28,6 @@ mod program {
 
     entry!(main);
 
-    #[derive(Clone, Copy)]
-    enum Verdict {
-        Pass,
-        Fail,
-    }
-
     fn main(_args: raven_rt::Args) -> i32 {
         match run() {
             Ok(false) => 0,
@@ -60,7 +54,6 @@ mod program {
             &["/bin/time", "-p", "/bin/true"],
             &[],
             0,
-            Verdict::Pass,
             &mut pass,
             &mut fail,
         )?;
@@ -71,7 +64,6 @@ mod program {
             &["/bin/times"],
             &[],
             0,
-            Verdict::Pass,
             &mut pass,
             &mut fail,
         )?;
@@ -82,7 +74,6 @@ mod program {
             &["/bin/tput", "cols"],
             &[],
             0,
-            Verdict::Pass,
             &mut pass,
             &mut fail,
         )?;
@@ -93,7 +84,6 @@ mod program {
             &["/bin/ulimit", "-n"],
             &[],
             0,
-            Verdict::Pass,
             &mut pass,
             &mut fail,
         )?;
@@ -104,7 +94,6 @@ mod program {
             &["/bin/ulimit", "-n", "128"],
             &[],
             0,
-            Verdict::Pass,
             &mut pass,
             &mut fail,
         )?;
@@ -115,7 +104,6 @@ mod program {
             &["/bin/ulimit", "-n"],
             &[],
             0,
-            Verdict::Pass,
             &mut pass,
             &mut fail,
         )?;
@@ -126,7 +114,6 @@ mod program {
             &["/bin/lp"],
             &[],
             1,
-            Verdict::Pass,
             &mut pass,
             &mut fail,
         )?;
@@ -145,11 +132,11 @@ mod program {
                 "test",
             ],
             &[],
-            1,
-            Verdict::Fail,
+            0,
             &mut pass,
             &mut fail,
         )?;
+        catalog_case(&mut pass, &mut fail)?;
         case(
             &initfs,
             "newgrp",
@@ -157,13 +144,40 @@ mod program {
             &["/bin/newgrp", "users"],
             &["SHELL=/bin/sh"],
             0,
-            Verdict::Pass,
             &mut pass,
             &mut fail,
         )?;
 
-        println!("required-utils: 9 cases, {pass} pass, {fail} fail");
+        println!("required-utils: 10 cases, {pass} pass, {fail} fail");
         Ok(fail > 0)
+    }
+
+    fn catalog_case(pass: &mut usize, fail: &mut usize) -> Result<(), String> {
+        let path = "file:/tmp/catalog";
+        match fs::read_to_vec(path) {
+            Ok(data) if data.starts_with(&[0xff, 0x88, 0xff, 0x89]) => {
+                println!(
+                    "required-utils: localedef catalog magic=ff88ff89 bytes={} PASS",
+                    data.len()
+                );
+                *pass = pass.saturating_add(1);
+            }
+            Ok(data) => {
+                println!(
+                    "required-utils: localedef catalog magic=bad bytes={} FAIL",
+                    data.len()
+                );
+                *fail = fail.saturating_add(1);
+            }
+            Err(error) => {
+                println!(
+                    "required-utils: localedef catalog read FAIL {}",
+                    error.description()
+                );
+                *fail = fail.saturating_add(1);
+            }
+        }
+        Ok(())
     }
 
     fn start_services(initfs: &Initfs<'_>) -> Result<(), String> {
@@ -205,7 +219,6 @@ mod program {
         args: &[&str],
         env: &[&str],
         expected: i32,
-        verdict: Verdict,
         pass: &mut usize,
         fail: &mut usize,
     ) -> Result<(), String> {
@@ -217,7 +230,7 @@ mod program {
             .proc_wait(child, &mut code)
             .map_err(|_| format!("wait {name}"))?;
         let expected_ok = code == expected;
-        let passed = expected_ok && matches!(verdict, Verdict::Pass);
+        let passed = expected_ok;
         println!(
             "required-utils: {name} exit={code} {}",
             if passed { "PASS" } else { "FAIL" }

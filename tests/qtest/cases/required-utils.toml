@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# P4a10: run the seven required POSIX utilities in the booted image. The fixture prints one
-# PASS/FAIL row per case and exits non-zero because localedef still reports its host-only target
-# stub; that row stays FAIL. The six passing utilities are the target evidence.
+# P4a10/P4a11: run the seven required POSIX utilities in the booted image. The fixture prints one
+# PASS/FAIL row per case and exits non-zero if any required row fails. P4a11 fixed localedef's
+# target build, so all seven required utilities now pass.
 
 name = "required-utils"
 arch = "x86_64"
@@ -13,7 +13,7 @@ pre = ["sh tests/fixtures/required-utils/build.sh"]
 initfs = "build/fixtures/required-utils/initfs.img"
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
-expect_exit = "failure"
+expect_exit = "success"
 
 [[expect]]
 regex = '^required-utils: services ok$'
@@ -92,10 +92,10 @@ regex = '^required-utils: lp exit=1 PASS$'
 regex = '^required-utils: localedef start$'
 
 [[expect]]
-regex = '^localedef: target build is host-only$'
+regex = '^required-utils: localedef exit=0 PASS$'
 
 [[expect]]
-regex = '^required-utils: localedef exit=1 FAIL$'
+regex = '^required-utils: localedef catalog magic=ff88ff89 bytes=[0-9]+ PASS$'
 
 [[expect]]
 regex = '^required-utils: newgrp start$'
@@ -107,7 +107,7 @@ regex = '^required-utils: shell uid=0 gid=100$'
 regex = '^required-utils: newgrp exit=0 PASS$'
 
 [[expect]]
-regex = '^required-utils: 9 cases, 8 pass, 1 fail$'
+regex = '^required-utils: 10 cases, 10 pass, 0 fail$'
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|required-utils: fail'

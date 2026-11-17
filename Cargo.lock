@@ -655,6 +655,7 @@ version = "0.1.0"
 dependencies = [
  "gencat",
  "raven-libc-locale",
+ "raven-proto-fs",
  "raven-rt",
 ]
 
