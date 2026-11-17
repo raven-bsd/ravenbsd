@@ -221,6 +221,26 @@ pid_t gettid(void);
 
 #define POSIX_CLOSE_RESTART     0
 
+/* RavenBSD: these XSI/BSD spellings are part of the Raven POSIX profile and are visible under
+ * _POSIX_C_SOURCE/_XOPEN_SOURCE as well as _DEFAULT_SOURCE. The 64-bit spellings alias the
+ * native 64-bit off_t, so they share the same signatures. */
+int chroot(const char *);
+int daemon(int, int);
+pid_t vfork(void);
+void setusershell(void);
+void endusershell(void);
+long syscall(long, ...);
+int execvpe(const char *, char *const [], char *const []);
+int issetugid(void);
+int setresuid(uid_t, uid_t, uid_t);
+int setresgid(gid_t, gid_t, gid_t);
+int getresuid(uid_t *, uid_t *, uid_t *);
+int getresgid(gid_t *, gid_t *, gid_t *);
+ssize_t copy_file_range(int, off_t *, int, off_t *, size_t, unsigned);
+ssize_t pread64(int, void *, size_t, off_t);
+ssize_t pwrite64(int, const void *, size_t, off_t);
+off_t lseek64(int, off_t, int);
+
 #define _XOPEN_VERSION          700
 #define _XOPEN_UNIX             1
 #define _XOPEN_ENH_I18N         1
