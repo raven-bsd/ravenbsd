@@ -207,6 +207,7 @@ members = [
     "userland/bin/strings",
     "userland/bin/sed",
     "userland/bin/awk",
+    "userland/bin/localedef",
     "userland/bin/lex",
     "userland/bin/yacc",
     "userland/bin/ar",

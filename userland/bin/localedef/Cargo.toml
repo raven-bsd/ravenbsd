@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "localedef"
+version = "0.1.0"
+description = "RavenBSD localedef: compile a bounded POSIX locale source into the runtime catalog."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gencat = { path = "../gencat" }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-rt = { path = "../../rt", features = ["alloc"] }
+
+[dev-dependencies]
+raven-libc-locale = { path = "../../../libc/ravenlibc/crates/raven-libc-locale" }
+
+[lints]
+workspace = true

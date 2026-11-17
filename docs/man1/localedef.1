@@ -1,0 +1,100 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt LOCALEDEF 1
+.Os RavenBSD
+.Sh NAME
+.Nm localedef
+.Nd compile a bounded POSIX locale definition into the runtime catalog
+.Sh SYNOPSIS
+.Nm
+.Fl i Ar input
+.Fl f Ar charmap
+.Op Fl c
+.Op Fl o Ar output
+.Op Ar name
+.Sh DESCRIPTION
+The
+.Nm
+utility parses a bounded POSIX locale definition and charmap and writes the runtime catalog
+image read by
+.Xr gencat 1
+and the RavenBSD locale catalog runtime
+.Pq magic Sq ff88ff89 .
+The six locale categories become catalog sets 1 through 6; the
+.Dq LOCALE
+set 7 records the optional name, the charmap name, the charmap entry count and the list of
+categories present.
+.Pp
+Supported categories are
+.Sy LC_CTYPE , LC_NUMERIC , LC_TIME , LC_COLLATE , LC_MONETARY
+and
+.Sy LC_MESSAGES .
+Each category starts with its name, contains
+.Ic keyword Ar \(dqvalue\(dq
+lines and ends with
+.Sy END
+followed by the category name.
+.Ic copy Ar \(dqC\(dq
+and
+.Ic copy Ar \(dqC.UTF-8\(dq
+are recorded. Values are quoted strings with
+.Sq \e\e ,
+.Sq \e\(dq ,
+.Sq \en ,
+.Sq \et
+and
+.Sq \er
+escapes; a
+.Sq ;
+separated list is stored joined by
+.Sq ; .
+Comments start with
+.Sq # .
+.Pp
+The charmap supports
+.Sm off
+.Ic <symbol> /xHH U+HHHH Op name ...
+.Sm on
+lines. Comments start with
+.Sq #
+or
+.Sq % ;
+at least one entry is required.
+.Pp
+Unsupported categories, keywords, charmap lines and malformed values are errors. The image is
+built in memory and written only after the whole source and charmap parse, so a failure never
+leaves a partial catalog as a success.
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl i Ar input
+Read the locale definition from
+.Ar input .
+.It Fl f Ar charmap
+Read the charmap from
+.Ar charmap .
+.It Fl o Ar output
+Write the catalog image to
+.Ar output .
+Without
+.Fl o
+the image goes to standard output.
+.It Fl c
+Create the output. Accepted for POSIX compatibility; the tool always creates it.
+.El
+.Sh EXIT STATUS
+.Ex -std
+0 on success; 1 for a malformed or unsupported source, a charmap error or an I/O failure; 2 for
+an invalid command line.
+.Sh SEE ALSO
+.Xr gencat 1 ,
+.Xr locale 1
+.Sh STANDARDS
+RavenBSD bounded subset of POSIX.1-2024.
+.Sh LIMITATIONS
+The target binary is a host-only stub, like
+.Xr gencat 1 .
+The source subset is listed in
+.Pa docs/posix/P4-simple3.md ;
+copied locale data is recorded, not expanded, and the charmap is validated but not compiled into
+a code-set table.
