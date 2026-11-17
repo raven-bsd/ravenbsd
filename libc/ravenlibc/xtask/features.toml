@@ -24,6 +24,9 @@ crates = ["raven-libc"]
 name = "server"
 crates = ["raven-libc"]
 [[feature]]
+name = "float"
+crates = ["raven-libc-fmt"]
+[[feature]]
 name = "float-printf"
 crates = ["raven-libc", "raven-libc-fmt", "raven-libc-dtoa"]
 [[feature]]
