@@ -164,12 +164,31 @@ impl WaitQueue {
         waiters.retain(|waiter| waiter.thread.id != thread_id);
     }
 
-    /// Drop every waiter belonging to `process_id` without waking it.
+    /// Wake every waiter belonging to `process_id` with `EIO` and remove it from the queue.
     ///
-    /// Used by process teardown for blocked sibling threads.
-    pub fn remove_process(&self, process_id: u64) {
-        let mut waiters = self.waiters.lock();
-        waiters.retain(|waiter| waiter.thread.process.id != process_id);
+    /// Used by process teardown for blocked sibling threads.  Removing without waking (the old
+    /// `remove_process` behaviour) left the thread, its kernel stack and its local object
+    /// references alive forever; waking it lets `block_current` observe `process.exiting` and
+    /// run the normal exit path.  The wait-queue lock is released before the scheduler lock, so
+    /// the usual queue-to-scheduler order is preserved.
+    pub fn wake_process(&self, process_id: u64) -> usize {
+        let mut count = 0usize;
+        loop {
+            let thread = {
+                let mut waiters = self.waiters.lock();
+                waiters
+                    .iter()
+                    .position(|waiter| waiter.thread.process.id == process_id)
+                    .map(|index| waiters.remove(index).thread)
+            };
+            let Some(thread) = thread else {
+                break;
+            };
+            if super::wake(thread, None, Errno::EIO.to_ret()) {
+                count = count.saturating_add(1);
+            }
+        }
+        count
     }
 
     /// Wake waiters of `process_id` on a private key in `[start, end)` with `EFAULT`.

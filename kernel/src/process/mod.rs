@@ -1293,6 +1293,17 @@ const TARGET_MACHINE: Machine = Machine::X86_64;
 #[cfg(target_arch = "aarch64")]
 const TARGET_MACHINE: Machine = Machine::Aarch64;
 
+fn cleanup_evidence(process: &Process) -> bool {
+    if !paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "s69-cleanupcheck")
+    {
+        return false;
+    }
+    let command = process.command.lock();
+    command.starts_with("s69-") && !command.starts_with("s69-victim")
+}
+
 /// One-shot process teardown: scheme teardown, address space, handle table, exit reporting.
 ///
 /// The first caller wins; later callers (the last-thread path racing an `EXIT`, a terminate
@@ -1336,6 +1347,42 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     // every other object release their resources even while a last reference to the process
     // survives elsewhere (for example on the abandoned stack of its dead thread).
     *process.handles.lock() = HandleTable::new();
+    // S69 cleanup evidence: every kernel-owned resource count plus the process-local waiter and
+    // request queues after the table was replaced.  The line is gated to fixture command names so
+    // the ten-thousand-exit soak does not flood the serial log; the fixture sets them with
+    // PROC_SET_COMMAND.  It runs in both own and foreign teardown contexts because the interesting
+    // `PROC_TERMINATE` path is foreign.
+    if cleanup_evidence(process) {
+        let command = process.command.lock().clone();
+        let (heap_used, _) = crate::memory::heap::stats();
+        kprintln!(
+            "s69: exit {} processes={} zombies={} handles={} lineage={} timers={} timers_live={} dma={} dma_live={} irq={} mmio={} events={} captures={} pager={} wait={} childwait={} sigwait={} schemewait={} client={} active={} queued={} stack_fresh={} stack_cached={} heap={}",
+            command,
+            processes().len(),
+            ZOMBIES.lock().len(),
+            process.handles.lock().len(),
+            crate::process::handle::lineage_nodes(),
+            process.timer_count.load(Ordering::Acquire),
+            crate::event::live_timers(),
+            process.dma_bytes.load(Ordering::Acquire),
+            crate::driver::dma_in_use(),
+            crate::driver::irq::live_objects(),
+            crate::process::handle::live_mmio(),
+            crate::event::live_queues(),
+            ipc::capture::frames_in_use(),
+            crate::process::handle::pager_objects(),
+            process.waiters.len(),
+            process.child_waiters.len(),
+            process.signal_waiters.len(),
+            process.scheme_waiters.len(),
+            process.client_requests.lock().len(),
+            process.active_requests.lock().len(),
+            process.scheme_queue.lock().len(),
+            crate::sched::thread::stack_fresh(),
+            crate::sched::thread::stack_cached(),
+            heap_used
+        );
+    }
     // S16 churn evidence: after the handle table is replaced, the process must own no handles
     // and no lineage nodes that are not kept alive by a descendant in another process. The
     // controller terminates the fixture server first, so its own final line is the baseline.
@@ -1422,6 +1469,130 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     }
 }
 
+/// Wake every wait-queue entry owned by a dying process before its objects are released.
+///
+/// A blocked thread holds the `Arc` of the object it waits on and a queue entry that keeps its
+/// own `Arc<Thread>` alive.  Dropping the handle table alone therefore frees neither the object
+/// nor the thread/stack: the queue still names the waiter and the waiter keeps the syscall frame
+/// alive.  The sweep runs in the terminal process's state, before `ipc::on_process_exit` and the
+/// handle-table replacement, and wakes the threads with `EIO`; `block_current` then observes
+/// `exiting` and runs the normal thread-exit path.
+///
+/// The wait-queue lock is the innermost lock on every path here (`state` -> handles -> queue is
+/// used only by this terminal path, which no syscall can race on the boot CPU), and every wake
+/// releases the queue before taking the scheduler lock.
+fn wake_process_waiters(process: &Arc<Process>) {
+    // Process-owned queues.
+    let _ = process.signal_waiters.wake_process(process.id);
+    let _ = process.child_waiters.wake_process(process.id);
+    let _ = process.scheme_waiters.wake_process(process.id);
+    // Futex buckets are global.
+    crate::syscall::futex::remove_process(process.id);
+
+    // Resources reachable from the dying table.  A blocked syscall keeps its object `Arc`, so
+    // the object is still live even after this table is replaced.  IRQ objects are collected and
+    // retired after the table lock is released: deciding whether another live process shares one
+    // needs the pid registry and another process's handle table.
+    let mut irqs: Vec<Arc<crate::driver::irq::Irq>> = Vec::new();
+    let mut pipes: Vec<Arc<crate::process::pipe::PipeEnd>> = Vec::new();
+    {
+        let handles = process.handles.lock();
+        handles.for_each_live(|_, object, _, _| match object {
+            Object::Process(target) => {
+                // The dying process had a thread blocked in PROC_WAIT on this target.
+                let _ = target.waiters.wake_process(process.id);
+            }
+            Object::Thread(thread) => {
+                // A helper thread may be in a pure scheduler sleep; a queue waiter is already
+                // removed above.  The wake is harmless when the thread is ready or already gone.
+                let _ = crate::sched::wake(Arc::clone(thread), None, Errno::EIO.to_ret());
+            }
+            Object::Irq(irq) => {
+                irq.wake_process(process.id);
+                irqs.push(Arc::clone(irq));
+            }
+            Object::Pipe(end) => {
+                end.wake_process(process.id);
+                pipes.push(Arc::clone(end));
+            }
+            Object::Memory(memory) => {
+                let _ = memory.page_waiters().wake_process(process.id);
+            }
+            _ => {}
+        });
+    }
+    for irq in irqs {
+        if !irq_held_elsewhere(process, &irq) {
+            irq.retire();
+        }
+    }
+    let mut retired_pipe: Option<Arc<crate::process::pipe::PipeEnd>> = None;
+    for pipe in pipes {
+        let duplicate = retired_pipe
+            .as_ref()
+            .is_some_and(|retired| retired.same_pipe(&pipe));
+        if !duplicate && !pipe_held_elsewhere(process, &pipe) {
+            pipe.retire();
+            retired_pipe = Some(pipe);
+        }
+    }
+}
+
+/// True when a live process other than `owner` still has a handle to the same pipe.
+fn pipe_held_elsewhere(owner: &Arc<Process>, pipe: &Arc<crate::process::pipe::PipeEnd>) -> bool {
+    let registry = PID_REGISTRY.lock();
+    for (id, weak) in registry.iter() {
+        if *id == owner.id {
+            continue;
+        }
+        let Some(other) = weak.upgrade() else {
+            continue;
+        };
+        let table = other.handles.lock();
+        let mut found = false;
+        table.for_each_live(|_, object, _, _| {
+            if let Object::Pipe(candidate) = object
+                && candidate.same_pipe(pipe)
+            {
+                found = true;
+            }
+        });
+        if found {
+            return true;
+        }
+    }
+    false
+}
+
+/// True when a live process other than `owner` still has a handle to `irq`.
+///
+/// An `Arc` retained only by an abandoned syscall frame is not a live owner: the thread can never
+/// run again, so the hardware claim must be released even though that reference still exists.
+fn irq_held_elsewhere(owner: &Arc<Process>, irq: &Arc<crate::driver::irq::Irq>) -> bool {
+    let registry = PID_REGISTRY.lock();
+    for (id, weak) in registry.iter() {
+        if *id == owner.id {
+            continue;
+        }
+        let Some(other) = weak.upgrade() else {
+            continue;
+        };
+        let table = other.handles.lock();
+        let mut found = false;
+        table.for_each_live(|_, object, _, _| {
+            if let Object::Irq(candidate) = object
+                && Arc::ptr_eq(candidate, irq)
+            {
+                found = true;
+            }
+        });
+        if found {
+            return true;
+        }
+    }
+    false
+}
+
 /// Set the terminal state exactly once: exit code, wake every waiter, run the teardown.
 ///
 /// Returns false when the process was already terminal (no resurrection, no second teardown).
@@ -1440,7 +1611,7 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     process.continued.store(false, Ordering::Release);
     reparent_children(process);
     robust::walk_process(process);
-    crate::syscall::futex::remove_process(process.id);
+    wake_process_waiters(process);
     let _ = process.waiters.wake_all();
     drop(state);
     crate::process::tty::hangup_session_leader(process);

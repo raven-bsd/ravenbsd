@@ -323,6 +323,9 @@ pub fn on_process_exit(process: &Arc<Process>) {
     }
 
     registry::on_process_exit(process);
+    // A deferred last-close notice for a dead server has no receiver; drop it before it keeps
+    // the dead processes alive through its two `Arc<Process>` fields.
+    router::on_process_exit(process);
 
     while let Some(request) = pop_queued(&process.scheme_queue) {
         request.fail(Errno::EIO);

@@ -2464,6 +2464,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-proc-death-cleanup"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-elf",
+ "raven-initfs",
+ "raven-ipc",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-proc-handle-info"
 version = "0.1.0"
 dependencies = [

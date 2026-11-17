@@ -27,6 +27,14 @@ pub const IRQ_MSI: u32 = 2;
 /// `IRQ_CREATE` kinds.
 pub const IRQ_MSIX: u32 = 3;
 
+/// Live interrupt objects (S69 cleanup evidence).
+static LIVE_IRQS: AtomicU64 = AtomicU64::new(0);
+
+/// Number of live interrupt objects across all processes.
+pub fn live_objects() -> u64 {
+    LIVE_IRQS.load(Ordering::Acquire)
+}
+
 /// The user-visible `IrqInfo` record. Its layout is fixed by the ABI syscall documentation.
 #[repr(C)]
 struct IrqInfo {
@@ -220,6 +228,8 @@ pub struct Irq {
     closing_handle: AtomicU64,
     pending: AtomicU64,
     waiters: WaitQueue,
+    /// Resource release already happened (explicit process-exit retire or `Drop`).
+    retired: AtomicBool,
 }
 
 impl Irq {
@@ -258,6 +268,15 @@ impl Irq {
             .store(closing_key(handle), Ordering::Release);
         let _ = self.waiters.wake_all();
     }
+
+    /// Wake and remove every waiter owned by `process_id` after that process exits.
+    ///
+    /// The dying thread may be the only holder of this object's `Arc`; without this sweep the
+    /// waiter would stay queued, the object would never drop and the vector/GSI claim would
+    /// leak.  Other processes waiting on the same shared interrupt stay queued.
+    pub(crate) fn wake_process(&self, process_id: u64) {
+        let _ = self.waiters.wake_process(process_id);
+    }
 }
 
 /// Packed handle value with a "valid" marker so zero means "no handle is closing".
@@ -265,8 +284,9 @@ fn closing_key(handle: u32) -> u64 {
     u64::from(handle) | (1 << 32)
 }
 
-impl Drop for Irq {
-    fn drop(&mut self) {
+impl Irq {
+    /// Release the GSI/vector claim once.
+    fn release_resources(&self) {
         match self.kind {
             IrqKind::Legacy => {
                 let _ = ioapic::mask(self.gsi);
@@ -286,6 +306,25 @@ impl Drop for Irq {
                 }
             }
         }
+    }
+
+    /// Release the hardware claim when the last live process reference is gone.
+    ///
+    /// A thread blocked in `IRQ_WAIT` holds an `Arc<Irq>` on its kernel stack.  The scheduler
+    /// abandons that stack on thread exit, so the `Arc` is never dropped and `Drop` alone would
+    /// keep the GSI/vector claimed forever.  Process teardown calls this after checking that no
+    /// other live process holds the same object; a second call is a no-op.
+    pub(crate) fn retire(&self) {
+        if !self.retired.swap(true, Ordering::AcqRel) {
+            self.release_resources();
+            LIVE_IRQS.fetch_sub(1, Ordering::AcqRel);
+        }
+    }
+}
+
+impl Drop for Irq {
+    fn drop(&mut self) {
+        self.retire();
     }
 }
 
@@ -327,7 +366,9 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
                 closing_handle: AtomicU64::new(0),
                 pending: AtomicU64::new(0),
                 waiters: WaitQueue::new(),
+                retired: AtomicBool::new(false),
             });
+            LIVE_IRQS.fetch_add(1, Ordering::AcqRel);
             vector::install_owner(vector, Arc::as_ptr(&irq));
             // `route` programs the entry masked; only IRQ_WAIT/IRQ_ACK unmask it.
             ioapic::route(gsi, vector, apic::id(), active_low, level).map_err(|_| Errno::EINVAL)?;
@@ -353,7 +394,9 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
                 closing_handle: AtomicU64::new(0),
                 pending: AtomicU64::new(0),
                 waiters: WaitQueue::new(),
+                retired: AtomicBool::new(false),
             });
+            LIVE_IRQS.fetch_add(1, Ordering::AcqRel);
             vector::install_owner(vector, Arc::as_ptr(&irq));
             let data = msi_data(vector, DELIVERY_FIXED, false);
             let fill = IrqInfo {

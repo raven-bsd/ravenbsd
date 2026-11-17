@@ -351,9 +351,18 @@ pub struct MmioRegion {
     attrs: u32,
 }
 
+/// Live MMIO windows (S69 cleanup evidence).
+static LIVE_MMIO: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+
+/// Number of live MMIO window objects across all processes.
+pub fn live_mmio() -> u64 {
+    LIVE_MMIO.load(core::sync::atomic::Ordering::Acquire)
+}
+
 impl MmioRegion {
     /// Construct a region. Callers must have validated the range.
-    pub const fn new(phys: u64, len: u64, attrs: u32) -> Self {
+    pub fn new(phys: u64, len: u64, attrs: u32) -> Self {
+        LIVE_MMIO.fetch_add(1, core::sync::atomic::Ordering::AcqRel);
         Self { phys, len, attrs }
     }
 
@@ -371,6 +380,12 @@ impl MmioRegion {
     #[allow(dead_code)] // Reported to drivers by later tickets.
     pub const fn attrs(&self) -> u32 {
         self.attrs
+    }
+}
+
+impl Drop for MmioRegion {
+    fn drop(&mut self) {
+        LIVE_MMIO.fetch_sub(1, core::sync::atomic::Ordering::AcqRel);
     }
 }
 
