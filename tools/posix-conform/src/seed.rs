@@ -107,6 +107,11 @@ const STANDARD_HEADERS: &[&str] = &[
     "wordexp.h",
 ];
 
+/// Interface names that are language macros rather than `libc.a` symbols.
+const MACRO_INTERFACES: &[&str] = &[
+    "assert", "offsetof", "va_arg", "va_copy", "va_end", "va_start",
+];
+
 /// POSIX Shell and Utilities volume names; optional utilities are included.
 const UTILITIES: &[&str] = &[
     "admin",
@@ -774,6 +779,11 @@ pub fn seed_profile(root: &Path) -> Result<Profile> {
         } else {
             "none"
         };
+        let kind = if MACRO_INTERFACES.contains(&name.as_str()) {
+            "macro"
+        } else {
+            "func"
+        };
         interface_rows.push(InterfaceRow {
             meta: meta(
                 format!("interface.{name}"),
@@ -785,7 +795,7 @@ pub fn seed_profile(root: &Path) -> Result<Profile> {
             ),
             name,
             header,
-            kind: "func".to_string(),
+            kind: kind.to_string(),
             required: true,
             signature: "declared by the named header".to_string(),
         });
@@ -1456,6 +1466,36 @@ pub fn seed_profile(root: &Path) -> Result<Profile> {
     Ok(profile)
 }
 
+/// Recompute header status from the (possibly overlaid) interface statuses.
+///
+/// The seed derives header rows before the owner overlays run, so a header whose missing
+/// interfaces are later waived or closed by executable evidence would stay `partial`. A header
+/// is present when every required function is present or waived in the profile and the header
+/// file exists; a header with an explicit overlay claim or a missing file keeps its status.
+pub fn reconcile_header_status(profile: &mut Profile, claimed: &BTreeSet<String>) {
+    let statuses: BTreeMap<&str, Status> = profile
+        .interface
+        .iter()
+        .map(|row| (row.name.as_str(), row.meta.status))
+        .collect();
+    for header in &mut profile.header {
+        if claimed.contains(&header.meta.id) || header.meta.status == Status::Missing {
+            continue;
+        }
+        let all = header.required_functions.iter().all(|name| {
+            matches!(
+                statuses.get(name.as_str()).copied(),
+                Some(Status::Present | Status::Waived)
+            )
+        });
+        header.meta.status = if all {
+            Status::Present
+        } else {
+            Status::Partial
+        };
+    }
+}
+
 /// Write the seed profile, traceability file and generated gap matrix.
 ///
 /// The owner overlays under `docs/posix/evidence/` are merged after the derivation. Unsupported
@@ -1470,6 +1510,12 @@ pub fn seed(root: &Path) -> Result<()> {
             claim.id, claim.reason
         );
     }
+    let claimed: BTreeSet<String> = outcome
+        .claims
+        .iter()
+        .map(|claim| claim.id().to_string())
+        .collect();
+    reconcile_header_status(&mut profile, &claimed);
     let trace = trace_from_profile(&profile);
     let dir = root.join("docs/posix");
     std::fs::create_dir_all(&dir).with_context(|| format!("cannot create {}", dir.display()))?;
@@ -1487,3 +1533,7 @@ pub fn seed(root: &Path) -> Result<()> {
     std::fs::write(dir.join("GAPS.md"), gaps).context("cannot write GAPS.md")?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "seed_ut.rs"]
+mod tests;

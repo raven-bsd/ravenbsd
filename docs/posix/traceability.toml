@@ -590,7 +590,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.trace.h"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "https://pubs.opengroup.org/onlinepubs/9799919799/idx/headers.html"
 
 [[trace]]
 id = "header.uchar.h"
@@ -932,7 +932,7 @@ evidence = "test:tests/libc/posix/math/check-math.sh"
 id = "interface.assert"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
 
 [[trace]]
 id = "interface.at_quick_exit"
@@ -5408,7 +5408,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.offsetof"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
 
 [[trace]]
 id = "interface.open"
@@ -8624,25 +8624,25 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.va_arg"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
 
 [[trace]]
 id = "interface.va_copy"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
 
 [[trace]]
 id = "interface.va_end"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
 
 [[trace]]
 id = "interface.va_start"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/p1c-core/check-core.sh"
 
 [[trace]]
 id = "interface.vdprintf"

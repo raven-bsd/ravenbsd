@@ -738,7 +738,7 @@ fn gate_rows(
             let present: Vec<&str> = profile
                 .interface
                 .iter()
-                .filter(|row| row.meta.status == Status::Present)
+                .filter(|row| row.meta.status == Status::Present && row.kind == "func")
                 .map(|row| row.name.as_str())
                 .collect();
             let missing = present
