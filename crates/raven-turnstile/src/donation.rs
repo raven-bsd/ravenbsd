@@ -338,6 +338,20 @@ impl Default for Donation {
     }
 }
 
+#[cfg(feature = "lockstat")]
+impl Donation {
+    /// Snapshot the lock statistics for `object` (delegated to the turnstile).
+    #[must_use]
+    pub fn stats(&self, object: ObjectId) -> super::LockStats {
+        self.turnstiles.stats(object)
+    }
+
+    /// The object ids with recorded statistics (delegated to the turnstile).
+    pub fn objects(&self) -> impl Iterator<Item = ObjectId> + '_ {
+        self.turnstiles.objects()
+    }
+}
+
 #[cfg(test)]
 #[path = "donation_ut.rs"]
 mod tests;

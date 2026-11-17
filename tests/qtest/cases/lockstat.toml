@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# L5: two waiters contend on one kernel mutex, the owner is boosted once, the lock is handed off
+# twice, and the lockstat counters plus the priority restoration are printed.
+
+name = "lockstat"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 60
+boot_cmdline = "console=ttyS0 test-exit=1 selftest=lockstat"
+expect_exit = "success"
+
+[[expect]]
+regex = '^lockstat: ok object=\d+ wait_entries=2 wakes=2 cancels=0 timeouts=0 boosts=1 max_queue=2 owner_boost=0 restored=ok$'
+
+[[forbid]]
+regex = '(?i)lockstat: fail|panic'
