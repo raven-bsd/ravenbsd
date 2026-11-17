@@ -21,6 +21,7 @@ raven-elf = { path = "../../crates/raven-elf" }
 raven-proto-fs = { path = "../../crates/raven-proto-fs" }
 raven-scheme = { path = "../../crates/raven-scheme" }
 raven-spawn = { path = "../../crates/raven-spawn" }
+raven-trace-core = { path = "../../crates/raven-trace-core" }
 
 [target.'cfg(target_os = "none")'.dependencies]
 raven-initfs = { path = "../../crates/raven-initfs" }

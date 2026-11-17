@@ -32,7 +32,6 @@ raven-initfs = { path = "../../../crates/raven-initfs" }
 raven-scheme = { path = "../../../crates/raven-scheme" }
 raven-trace-core = { path = "../../../crates/raven-trace-core" }
 raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
-trace = { path = "../../../userland/bin/trace" }
 
 [lints]
 workspace = true
