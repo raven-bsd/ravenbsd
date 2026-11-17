@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# P2 process rows backed by the kernel and procd work. A `present` row names executable QEMU
+# P2 process rows backed by the kernel process model. A `present` row names executable QEMU
 # evidence; a `waived` row names the missing primitive and its owner.
 
 schema = 1
@@ -35,13 +35,13 @@ notes = "P2e/P3: foreground process-group handoff plus Ctrl-C/SIGINT; P2f stop/c
 id = "process.popen"
 status = "waived"
 evidence = "none"
-notes = "P3/P17: no pipe primitive and no libc procd client; procd SPAWN/WAIT are available but not wired to popen"
+notes = "P3/P17: pipe/exec exist in the kernel; libc popen/system integration is still open"
 
 [[row]]
 id = "process.posix-spawn"
 status = "waived"
 evidence = "none"
-notes = "P17: native libc spawn exists, but libc-spawn needs a built target sysroot; procd's SPAWN protocol is not wired into libc in P2e"
+notes = "P17: native kernel spawn exists; libc target sysroot wiring remains"
 
 [[row]]
 id = "process.priority"
@@ -83,7 +83,7 @@ notes = "P2f: process queue, SIGCHLD, SIGKILL/stop/continue; libc pending-set in
 id = "process.system"
 status = "waived"
 evidence = "none"
-notes = "P3/P17: needs a pipe-capable shell client; no procd/libc system() path in P2e"
+notes = "P3/P17: needs libc system()/popen integration; no userspace process server"
 
 [[row]]
 id = "process.terminate"
