@@ -17,6 +17,7 @@ use crate::exclude::ExcludeFile;
 use crate::gen_make;
 use crate::gen_meson;
 use crate::owners::Owners;
+use crate::qemu;
 use crate::result::parse_result;
 use crate::runner::{self, RunOptions};
 use crate::table;
@@ -423,9 +424,12 @@ pub fn run(config: &RunConfig) -> Result<SuiteRun> {
                 bail!("host-linux: raven-libc-sys has no Linux backend (O-B5)");
             }
             RunBackend::Qemu => {
-                bail!(
-                    "not implemented here: the on-target ATF run is a later ticket (needs raven-atf-run on target and PG-35/44/45/49, C73 covers hello..spawn only)"
-                );
+                if config.suite.framework == Framework::Atf {
+                    bail!(
+                        "qemu backend: on-target ATF listing/execution is a later ticket (C73); \
+                         exit-status suites are supported"
+                    );
+                }
             }
             RunBackend::None => {}
         }
@@ -564,7 +568,13 @@ fn process_programs(
     owners: &Owners,
     incomplete: Option<&Path>,
 ) -> Result<Vec<Result<ProgramResult>>> {
-    let jobs = config.jobs.max(1).min(programs.len().max(1));
+    // One QEMU at a time: the image builder takes the cargo lock and a boot already saturates
+    // the host cores it is given.
+    let jobs = if config.backend == RunBackend::Qemu {
+        1
+    } else {
+        config.jobs.max(1).min(programs.len().max(1))
+    };
     let results: Mutex<Vec<Option<Result<ProgramResult>>>> =
         Mutex::new((0..programs.len()).map(|_| None).collect());
     let next = AtomicUsize::new(0);
@@ -830,12 +840,6 @@ fn run_case(
     let Some(binary) = binary else {
         bail!("program {} has no binary", program.name);
     };
-    if config.mode == Mode::Target {
-        return Ok(runner::Observation {
-            verdict: Verdict::NotRun,
-            reason: "no-run-backend".to_string(),
-        });
-    }
     let work_root = config
         .out
         .join("work")
@@ -843,6 +847,18 @@ fn run_case(
         .join(&program.name);
     fs::create_dir_all(&work_root)
         .with_context(|| format!("cannot create {}", work_root.display()))?;
+    if config.mode == Mode::Target {
+        return match config.backend {
+            RunBackend::Qemu => {
+                let qemu = qemu::QemuConfig::new(&config.root, config.max_timeout);
+                qemu::run_init_program(&qemu, binary, 0, &work_root, config.keep)
+            }
+            _ => Ok(runner::Observation {
+                verdict: Verdict::NotRun,
+                reason: "no-run-backend".to_string(),
+            }),
+        };
+    }
     let options = RunOptions {
         timeout_secs: config.max_timeout,
         vars: config.vars.clone(),
@@ -860,12 +876,6 @@ fn run_exit(
     let Some(binary) = binary else {
         bail!("program {} has no binary", program.name);
     };
-    if config.mode == Mode::Target {
-        return Ok(runner::Observation {
-            verdict: Verdict::NotRun,
-            reason: "no-run-backend".to_string(),
-        });
-    }
     let work_root = config
         .out
         .join("work")
@@ -873,6 +883,26 @@ fn run_exit(
         .join(&program.name);
     fs::create_dir_all(&work_root)
         .with_context(|| format!("cannot create {}", work_root.display()))?;
+    if config.mode == Mode::Target {
+        return match config.backend {
+            RunBackend::Qemu => {
+                if !program.args.is_empty() {
+                    // The kernel starts `/init` with only argv[0] (`kernel/src/process/mod.rs`);
+                    // a program that needs arguments is honestly not run, not a false failure.
+                    return Ok(runner::Observation {
+                        verdict: Verdict::NotRun,
+                        reason: "qemu-no-argv".to_string(),
+                    });
+                }
+                let qemu = qemu::QemuConfig::new(&config.root, config.max_timeout);
+                qemu::run_init_program(&qemu, binary, program.expect_exit, &work_root, config.keep)
+            }
+            _ => Ok(runner::Observation {
+                verdict: Verdict::NotRun,
+                reason: "no-run-backend".to_string(),
+            }),
+        };
+    }
     let options = RunOptions {
         timeout_secs: config.max_timeout,
         vars: BTreeMap::new(),

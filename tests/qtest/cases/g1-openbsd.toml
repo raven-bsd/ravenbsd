@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "g1-openbsd"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 300
+pre = ["sh tests/fixtures/g1/build.sh"]
+initfs = "build/fixtures/g1/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+# One built donor program (`openbsd-libc/strnlen`) runs as PID 1. The full G1 measurement is
+# `raven-atf-run suite --suite openbsd-libc --mode target --run-backend qemu`; this case proves
+# the same boot path and exit protocol in the qtest harness.
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '^process: starting /init$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

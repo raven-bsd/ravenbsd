@@ -21,6 +21,7 @@ pub mod gate;
 pub mod gen_make;
 pub mod gen_meson;
 pub mod owners;
+pub mod qemu;
 pub mod report;
 pub mod result;
 pub mod runner;
