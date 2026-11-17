@@ -1823,8 +1823,8 @@ Traceability rows: 1797; profile rows: 1797.
 | `process.exec` | `exec` | waived | P2 | `none` | PG-44, PG-46; waiver: P2e: spawn is available, but same-pid image replacement needs PROC_RESET; not on this base |
 | `process.fork` | `fork` | present | P2 | `qtest:proc-fork` | PG-45 |
 | `process.job-control` | `job-control` | waived | P2 | `none` | PG-10, PG-56; waiver: P2f stop/continue and process groups are covered by proc-session, but the P3 tty foreground/terminal-owner branch is not on this base; no false combined claim |
-| `process.popen` | `popen` | waived | P2 | `none` | PG-35; waiver: No pipe primitive or libc procd client on this base; P3/P17 |
-| `process.posix-spawn` | `posix-spawn` | waived | P2 | `none` | PG-49; waiver: Native spawn exists, but libc-spawn needs a built target sysroot and procd/libc wiring is not on this base |
+| `process.popen` | `popen` | waived | P2 | `none` | PG-35; waiver: No pipe primitive or libc spawn backend on this base; P3/P17 |
+| `process.posix-spawn` | `posix-spawn` | waived | P2 | `none` | PG-49; waiver: Native spawn exists, but libc-spawn needs a built target sysroot and kernel/libc wiring is not on this base |
 | `process.priority` | `priority` | waived | P2 | `none` | PG-11; waiver: No scheduler priority syscall; PRIO/SCHED remain ENOSYS |
 | `process.process-group` | `process-group` | present | P2 | `qtest:proc-session` | PG-44, PG-56 |
 | `process.process-id` | `process-id` | present | P2 | `qtest:proc-registry` | PG-44 |

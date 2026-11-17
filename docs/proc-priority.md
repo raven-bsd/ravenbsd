@@ -73,7 +73,7 @@ The fair scheduler does not implement real-time classes. The surface is explicit
 
 ## Exposure
 
-`userland/rt` is the exposed client. The kernel `PROC_*` priority calls are the contract; there is no procd.
+`userland/rt` is the exposed client. The kernel `PROC_*` priority calls are the contract; there is no userspace process server.
 
 ## Tests
 

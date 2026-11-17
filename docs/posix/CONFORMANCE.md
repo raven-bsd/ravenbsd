@@ -1569,15 +1569,15 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `process.exec` | process | pass | `qtest:proc-exec` |  |
 | `process.fork` | process | pass | `qtest:proc-fork` |  |
 | `process.job-control` | process | pass | `qtest:tty-job-control` |  |
-| `process.popen` | process | pass | `waiver` | owner waiver: P3/P17: no pipe primitive and no libc procd client; procd SPAWN/WAIT are available but not wired to popen |
-| `process.posix-spawn` | process | pass | `waiver` | owner waiver: P17: native libc spawn exists, but libc-spawn needs a built target sysroot; procd's SPAWN protocol is not wired into libc in P2e |
+| `process.popen` | process | pass | `waiver` | owner waiver: P3/P17: no pipe primitive and no libc spawn backend; kernel SPAWN/WAIT are available but not wired to popen |
+| `process.posix-spawn` | process | pass | `waiver` | owner waiver: P17: native libc spawn exists, but libc-spawn needs a built target sysroot; the former process-server SPAWN protocol is not wired into libc |
 | `process.priority` | process | pass | `qtest:proc-priority` |  |
 | `process.process-group` | process | pass | `qtest:proc-session` |  |
 | `process.process-id` | process | pass | `qtest:proc-registry` |  |
 | `process.resource` | process | pass | `qtest:proc-session` |  |
 | `process.session` | process | pass | `qtest:proc-session` |  |
 | `process.signal` | process | pass | `qtest:proc-signal` |  |
-| `process.system` | process | pass | `waiver` | owner waiver: P3/P17: needs a pipe-capable shell client; no procd/libc system() path in P2e |
+| `process.system` | process | pass | `waiver` | owner waiver: P3/P17: needs a pipe-capable shell client; no process-server/libc system() path |
 | `process.terminate` | process | pass | `qtest:proc-session` |  |
 | `process.times` | process | pass | `qtest:proc-session` |  |
 | `process.tty-control` | process | pass | `qtest:tty-control` |  |

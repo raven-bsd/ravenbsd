@@ -12,8 +12,8 @@ still red at this base.
 The smallest safe path is an **in-process libc spawn** that reads an ELF image from the `file:`
 scheme and drives the existing `PROC_CREATE` / `MAP` / `THREAD_CREATE` sequence. The loader
 already exists in `userland/rt/src/spawn.rs`; P10 extracts it into a shared `no_std` crate and
-both `raven-rt` and `ravenlibc` call it. No new server, no procd RPC, and no fd transfer are
-required for the 0.1.1 target:
+both `raven-rt` and `ravenlibc` call it. No new server, no process-server RPC, and no fd transfer
+are required for the 0.1.1 target:
 
 ```
 brush -c '/bin/ls /bin'
@@ -322,7 +322,7 @@ lines; P9 claims no target result.
 | P14 | S | kevin | Flip the 0.1.1 login shell to `/bin/brush` after P13 and K26b; update `etc/passwd`, release profile, `release-login`, `docs/login.md`; keep rsh as fallback | P13, K26b |
 | P15 | M | dave | fd inheritance: `HANDLE_TRANSFER` per distinct fd, `RFDM` block in a mapped object, `AT_RAVEN_FDMAP`/`_N`, `restore_fdmap` in `start.rs`, `SpawnCtx.table` snapshot | P11, U3a |
 | P16 | M | stuart | Nested spawn: initfs `TRANSFER` grant, transferred handle publication (`AT_RAVEN_INITFS`), loader handle selection | P15 |
-| P17 | - | - | SUPERSEDED by DR-46: no procd RPC; kernel owns sessions and job control | - |
+| P17 | - | - | SUPERSEDED by DR-46: no process-server RPC; kernel owns sessions and job control | - |
 
 Sizes are implementation estimates, not schedule commitments. P10 and P11 are the only tickets
 on the 0.1.1 critical path; P15-P17 are follow-ups.
