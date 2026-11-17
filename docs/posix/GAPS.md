@@ -12,13 +12,13 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 | area | total | missing | partial | present | waived |
 |---|---:|---:|---:|---:|---:|
 | filesystem | 20 | 0 | 0 | 20 | 0 |
-| headers | 86 | 2 | 11 | 73 | 0 |
-| interfaces | 1425 | 15 | 0 | 1280 | 130 |
+| headers | 86 | 1 | 3 | 81 | 1 |
+| interfaces | 1425 | 9 | 0 | 1286 | 130 |
 | process | 17 | 0 | 0 | 14 | 3 |
 | shell | 25 | 0 | 0 | 22 | 3 |
 | tty | 12 | 0 | 0 | 7 | 5 |
 | utilities | 217 | 0 | 1 | 180 | 36 |
-| **all** | **1802** | **17** | **12** | **1596** | **177** |
+| **all** | **1802** | **10** | **4** | **1610** | **178** |
 
 Traceability rows: 1802; profile rows: 1802.
 
@@ -29,13 +29,13 @@ Traceability rows: 1802; profile rows: 1802.
 | `header.aio.h` | `aio.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.arpa-inet.h` | `arpa/inet.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.assert.h` | `assert.h` | present | P1 | `test:tests/posix/check-headers.sh` |  |
-| `header.complex.h` | `complex.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.complex.h` | `complex.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.cpio.h` | `cpio.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.ctype.h` | `ctype.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.dirent.h` | `dirent.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.dlfcn.h` | `dlfcn.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.errno.h` | `errno.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.fcntl.h` | `fcntl.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.fcntl.h` | `fcntl.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.fenv.h` | `fenv.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.float.h` | `float.h` | present | P1 | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.fmtmsg.h` | `fmtmsg.h` | present | P1 | `libc/ravenlibc/include` |  |
@@ -51,7 +51,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `header.libintl.h` | `libintl.h` | present | P1 | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.limits.h` | `limits.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.locale.h` | `locale.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.math.h` | `math.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.math.h` | `math.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.monetary.h` | `monetary.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.mqueue.h` | `mqueue.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.ndbm.h` | `ndbm.h` | missing | P1 | `none` |  |
@@ -83,14 +83,14 @@ Traceability rows: 1802; profile rows: 1802.
 | `header.sys-ipc.h` | `sys/ipc.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-mman.h` | `sys/mman.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-msg.h` | `sys/msg.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.sys-resource.h` | `sys/resource.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.sys-resource.h` | `sys/resource.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-select.h` | `sys/select.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-sem.h` | `sys/sem.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-shm.h` | `sys/shm.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-socket.h` | `sys/socket.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-stat.h` | `sys/stat.h` | partial | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-statvfs.h` | `sys/statvfs.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.sys-time.h` | `sys/time.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.sys-time.h` | `sys/time.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-times.h` | `sys/times.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-types.h` | `sys/types.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.sys-uio.h` | `sys/uio.h` | present | P1 | `libc/ravenlibc/include` |  |
@@ -103,13 +103,13 @@ Traceability rows: 1802; profile rows: 1802.
 | `header.tgmath.h` | `tgmath.h` | present | P1 | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.threads.h` | `threads.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.time.h` | `time.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.trace.h` | `trace.h` | missing | P1 | `none` |  |
+| `header.trace.h` | `trace.h` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/headers.html` | waiver: P1f9: POSIX.1-2024 removed trace.h and the posix_trace_* interfaces (Issue 8 header index does not list trace.h); waived as removed |
 | `header.uchar.h` | `uchar.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.ulimit.h` | `ulimit.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.ulimit.h` | `ulimit.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.unistd.h` | `unistd.h` | partial | P1 | `libc/ravenlibc/include` |  |
-| `header.utime.h` | `utime.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.utime.h` | `utime.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.utmpx.h` | `utmpx.h` | present | P1 | `libc/ravenlibc/include` |  |
-| `header.wchar.h` | `wchar.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.wchar.h` | `wchar.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.wctype.h` | `wctype.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.wordexp.h` | `wordexp.h` | present | P1 | `libc/ravenlibc/include` |  |
 
@@ -165,7 +165,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.asinhl` | `asinhl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.asinl` | `asinl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.asinpi` | `asinpi` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
-| `interface.assert` | `assert` | missing | P1 | `none` | assert.h |
+| `interface.assert` | `assert` | present | P1 | `test:tests/libc/p1c-core/check-core.sh` | assert.h |
 | `interface.at_quick_exit` | `at_quick_exit` | present | P1 | `test:tests/libc/posix/stdlib/check-stdlib2.sh` | stdlib.h |
 | `interface.atan` | `atan` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.atan2` | `atan2` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
@@ -911,7 +911,7 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.nrand48` | `nrand48` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.ntohl` | `ntohl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | arpa/inet.h |
 | `interface.ntohs` | `ntohs` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | arpa/inet.h |
-| `interface.offsetof` | `offsetof` | missing | P1 | `none` | stddef.h |
+| `interface.offsetof` | `offsetof` | present | P1 | `test:tests/libc/p1c-core/check-core.sh` | stddef.h |
 | `interface.open` | `open` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fcntl.h |
 | `interface.open64` | `open64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fcntl.h |
 | `interface.open_by_handle_at` | `open_by_handle_at` | waived | P1 | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` | fcntl.h; waiver: P1f: open_by_handle_at is not in the POSIX.1-2024 Issue 8 XSH function index (Linux extension); kept under its extension macro, waived as an extension. |
@@ -1447,10 +1447,10 @@ Traceability rows: 1802; profile rows: 1802.
 | `interface.utimensat` | `utimensat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.utimes` | `utimes` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/time.h |
 | `interface.utmpxname` | `utmpxname` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | utmpx.h |
-| `interface.va_arg` | `va_arg` | missing | P1 | `none` | stdarg.h |
-| `interface.va_copy` | `va_copy` | missing | P1 | `none` | stdarg.h |
-| `interface.va_end` | `va_end` | missing | P1 | `none` | stdarg.h |
-| `interface.va_start` | `va_start` | missing | P1 | `none` | stdarg.h |
+| `interface.va_arg` | `va_arg` | present | P1 | `test:tests/libc/p1c-core/check-core.sh` | stdarg.h |
+| `interface.va_copy` | `va_copy` | present | P1 | `test:tests/libc/p1c-core/check-core.sh` | stdarg.h |
+| `interface.va_end` | `va_end` | present | P1 | `test:tests/libc/p1c-core/check-core.sh` | stdarg.h |
+| `interface.va_start` | `va_start` | present | P1 | `test:tests/libc/p1c-core/check-core.sh` | stdarg.h |
 | `interface.vdprintf` | `vdprintf` | present | P1 | `test:tests/libc/posix/stdio/check-stdio2.sh` | stdio.h |
 | `interface.versionsort` | `versionsort` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
 | `interface.vfork` | `vfork` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
@@ -1898,19 +1898,11 @@ Traceability rows: 1802; profile rows: 1802.
 
 | area | name | evidence |
 |---|---|---|
-| header | `complex.h` | `libc/ravenlibc/include` |
-| header | `fcntl.h` | `libc/ravenlibc/include` |
-| header | `math.h` | `libc/ravenlibc/include` |
 | header | `ndbm.h` | `none` |
 | header | `sys/mman.h` | `libc/ravenlibc/include` |
-| header | `sys/resource.h` | `libc/ravenlibc/include` |
 | header | `sys/stat.h` | `libc/ravenlibc/include` |
-| header | `sys/time.h` | `libc/ravenlibc/include` |
-| header | `trace.h` | `none` |
-| header | `ulimit.h` | `libc/ravenlibc/include` |
+| header | `trace.h` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/headers.html` |
 | header | `unistd.h` | `libc/ravenlibc/include` |
-| header | `utime.h` | `libc/ravenlibc/include` |
-| header | `wchar.h` | `libc/ravenlibc/include` |
 | interface | `acct` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
 | interface | `acosfNx` | `none` |
 | interface | `acoshfNx` | `none` |
@@ -1918,7 +1910,6 @@ Traceability rows: 1802; profile rows: 1802.
 | interface | `alarm` | `none` |
 | interface | `asinfNx` | `none` |
 | interface | `asinhfNx` | `none` |
-| interface | `assert` | `none` |
 | interface | `atan2fNx` | `none` |
 | interface | `atanfNx` | `none` |
 | interface | `atanhfNx` | `none` |
@@ -1978,5 +1969,14 @@ Traceability rows: 1802; profile rows: 1802.
 | interface | `gethostid` | `none` |
 | interface | `getitimer` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
 | interface | `getpagesize` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
+| interface | `getpayloadfNx` | `none` |
+| interface | `getrlimit64` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
+| interface | `gettid` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
+| interface | `hypotfNx` | `none` |
+| interface | `lchmod` | `https://pubs.opengroup.org/onlinepubs/9799919799/idx/functions.html` |
+| interface | `lchown` | `none` |
+| interface | `ldexpfNx` | `none` |
+| interface | `llogbfNx` | `none` |
+| interface | `llrintfNx` | `none` |
 
-206 gap rows are listed in full in the tables above; this short table is a review aid.
+192 gap rows are listed in full in the tables above; this short table is a review aid.
