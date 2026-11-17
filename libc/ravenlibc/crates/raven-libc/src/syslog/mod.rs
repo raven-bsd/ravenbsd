@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-//! `<syslog.h>` exports.
+//! `<syslog.h>` state and shared formatting.
 //!
 //! The base has no `/dev/log` daemon, so `vsyslog` formats the message with the shared
 //! `vsnprintf` engine and writes it to standard error. That is honest local logging, not a
@@ -14,6 +14,9 @@ use raven_libc_abi::errno::Errno;
 
 use crate::stdio::va::List;
 
+mod closelog;
+mod openlog;
+mod setlogmask;
 mod trampolines;
 pub(crate) mod vsyslog;
 
@@ -43,46 +46,6 @@ pub(crate) fn enabled(priority: c_int) -> bool {
     let mask = MASK.load(Ordering::Relaxed);
     let severity = priority & 7;
     mask & (1 << severity) != 0
-}
-
-/// `openlog`.
-///
-/// # Safety
-/// `ident` is NULL or NUL terminated.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn openlog(
-    ident_ptr: *const c_char,
-    option_value: c_int,
-    facility_value: c_int,
-) {
-    if !ident_ptr.is_null() {
-        // SAFETY: the caller's C string contract.
-        let bytes = unsafe { crate::ffi::cstr::slice(ident_ptr) };
-        // SAFETY: single-threaded access.
-        let cell = unsafe { &mut *IDENT.0.get() };
-        cell.clear();
-        cell.extend_from_slice(bytes);
-    }
-    OPTION.store(option_value, Ordering::Relaxed);
-    FACILITY.store(facility_value, Ordering::Relaxed);
-}
-
-/// `closelog`.
-#[unsafe(no_mangle)]
-pub extern "C" fn closelog() {
-    // SAFETY: single-threaded access.
-    let cell = unsafe { &mut *IDENT.0.get() };
-    cell.clear();
-    OPTION.store(0, Ordering::Relaxed);
-}
-
-/// `setlogmask`.
-#[unsafe(no_mangle)]
-pub extern "C" fn setlogmask(mask: c_int) -> c_int {
-    if mask == 0 {
-        return MASK.load(Ordering::Relaxed);
-    }
-    MASK.swap(mask, Ordering::Relaxed)
 }
 
 /// Format one message and write it to standard error.

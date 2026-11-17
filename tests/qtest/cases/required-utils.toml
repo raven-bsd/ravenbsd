@@ -1,0 +1,113 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P4a10: run the seven required POSIX utilities in the booted image. The fixture prints one
+# PASS/FAIL row per case and exits non-zero because localedef still reports its host-only target
+# stub; that row stays FAIL. The six passing utilities are the target evidence.
+
+name = "required-utils"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/required-utils/build.sh"]
+initfs = "build/fixtures/required-utils/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "failure"
+
+[[expect]]
+regex = '^required-utils: services ok$'
+
+[[expect]]
+regex = '^required-utils: time start$'
+
+[[expect]]
+regex = '^real [0-9]+\.[0-9][0-9]$'
+
+[[expect]]
+regex = '^user 0\.00$'
+
+[[expect]]
+regex = '^sys 0\.00$'
+
+[[expect]]
+regex = '^required-utils: time exit=0 PASS$'
+
+[[expect]]
+regex = '^required-utils: times start$'
+
+[[expect]]
+regex = '^[0-9]+m[0-9]+\.[0-9][0-9]s [0-9]+m[0-9]+\.[0-9][0-9]s$'
+
+[[expect]]
+regex = '^[0-9]+m[0-9]+\.[0-9][0-9]s [0-9]+m[0-9]+\.[0-9][0-9]s$'
+
+[[expect]]
+regex = '^required-utils: times exit=0 PASS$'
+
+[[expect]]
+regex = '^required-utils: tput start$'
+
+# tput writes its capability without a trailing newline.
+[[expect]]
+regex = '^80'
+
+[[expect]]
+regex = '^required-utils: tput exit=0 PASS$'
+
+[[expect]]
+regex = '^required-utils: ulimit-default start$'
+
+[[expect]]
+regex = '^[0-9]+$'
+
+[[expect]]
+regex = '^required-utils: ulimit-default exit=0 PASS$'
+
+[[expect]]
+regex = '^required-utils: ulimit-set start$'
+
+[[expect]]
+regex = '^required-utils: ulimit-set exit=0 PASS$'
+
+[[expect]]
+regex = '^required-utils: ulimit-get start$'
+
+[[expect]]
+regex = '^[0-9]+$'
+
+[[expect]]
+regex = '^required-utils: ulimit-get exit=0 PASS$'
+
+[[expect]]
+regex = '^required-utils: lp start$'
+
+[[expect]]
+regex = '^lp: no print destination configured$'
+
+[[expect]]
+regex = '^required-utils: lp exit=1 PASS$'
+
+[[expect]]
+regex = '^required-utils: localedef start$'
+
+[[expect]]
+regex = '^localedef: target build is host-only$'
+
+[[expect]]
+regex = '^required-utils: localedef exit=1 FAIL$'
+
+[[expect]]
+regex = '^required-utils: newgrp start$'
+
+[[expect]]
+regex = '^required-utils: shell uid=0 gid=100$'
+
+[[expect]]
+regex = '^required-utils: newgrp exit=0 PASS$'
+
+[[expect]]
+regex = '^required-utils: 9 cases, 8 pass, 1 fail$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|required-utils: fail'

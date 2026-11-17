@@ -486,6 +486,266 @@ macro_rules! nexttoward {
     };
 }
 
+// The aarch64 binary128 `long double` C ABI (C47n). AAPCS64 passes and returns a `long double` in
+// a single 128-bit SIMD register (`q0`, `q1`, ... for further arguments), and Rust has no `f128` on
+// stable, so every export below is a naked stub: it parks the incoming `q` registers on the stack,
+// calls a pointer-based `extern "C"` helper and reloads the result into `q0`. The helpers take and
+// return `raven_libc_m::LongDouble` by pointer, which keeps the aggregate out of the register ABI.
+#[cfg(target_arch = "aarch64")]
+macro_rules! lda_unary {
+    ($name:ident, $inner:path) => {
+        /// `long double` unary entry point.
+        ///
+        /// # Safety
+        /// The compiler-generated C ABI contract applies.
+        #[unsafe(naked)]
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $name() -> ! {
+            core::arch::naked_asm!(
+                ".arch armv8-a+fp+simd",
+                "sub sp, sp, #48",
+                "str x30, [sp, #32]",
+                "str q0, [sp, #16]",
+                "mov x0, sp",
+                "add x1, sp, #16",
+                "bl {inner}",
+                "ldr q0, [sp, #0]",
+                "ldr x30, [sp, #32]",
+                "add sp, sp, #48",
+                "ret",
+                inner = sym $inner,
+            )
+        }
+    };
+}
+
+#[cfg(target_arch = "aarch64")]
+macro_rules! lda_binary {
+    ($name:ident, $inner:path) => {
+        /// `long double` binary entry point.
+        ///
+        /// # Safety
+        /// The compiler-generated C ABI contract applies.
+        #[unsafe(naked)]
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $name() -> ! {
+            core::arch::naked_asm!(
+                ".arch armv8-a+fp+simd",
+                "sub sp, sp, #64",
+                "str x30, [sp, #48]",
+                "str q0, [sp, #16]",
+                "str q1, [sp, #32]",
+                "mov x0, sp",
+                "add x1, sp, #16",
+                "add x2, sp, #32",
+                "bl {inner}",
+                "ldr q0, [sp, #0]",
+                "ldr x30, [sp, #48]",
+                "add sp, sp, #64",
+                "ret",
+                inner = sym $inner,
+            )
+        }
+    };
+}
+
+#[cfg(target_arch = "aarch64")]
+macro_rules! lda_scalbn_i32 {
+    ($name:ident, $inner:path) => {
+        /// `long double` scaling entry point with a C `int` exponent.
+        ///
+        /// # Safety
+        /// The compiler-generated C ABI contract applies.
+        #[unsafe(naked)]
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $name() -> ! {
+            core::arch::naked_asm!(
+                ".arch armv8-a+fp+simd",
+                "sub sp, sp, #48",
+                "str x30, [sp, #32]",
+                "str q0, [sp, #16]",
+                "mov w2, w0",
+                "mov x0, sp",
+                "add x1, sp, #16",
+                "bl {inner}",
+                "ldr q0, [sp, #0]",
+                "ldr x30, [sp, #32]",
+                "add sp, sp, #48",
+                "ret",
+                inner = sym $inner,
+            )
+        }
+    };
+}
+
+#[cfg(target_arch = "aarch64")]
+macro_rules! lda_scalbn_i64 {
+    ($name:ident, $inner:path) => {
+        /// `long double` scaling entry point with a C `long` exponent.
+        ///
+        /// # Safety
+        /// The compiler-generated C ABI contract applies.
+        #[unsafe(naked)]
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $name() -> ! {
+            core::arch::naked_asm!(
+                ".arch armv8-a+fp+simd",
+                "sub sp, sp, #48",
+                "str x30, [sp, #32]",
+                "str q0, [sp, #16]",
+                "mov x2, x0",
+                "mov x0, sp",
+                "add x1, sp, #16",
+                "bl {inner}",
+                "ldr q0, [sp, #0]",
+                "ldr x30, [sp, #32]",
+                "add sp, sp, #48",
+                "ret",
+                inner = sym $inner,
+            )
+        }
+    };
+}
+
+#[cfg(target_arch = "aarch64")]
+macro_rules! lda_value_ptr {
+    ($name:ident, $inner:path) => {
+        /// `long double` value plus a writable pointer (in `x0`).
+        ///
+        /// # Safety
+        /// The compiler-generated C ABI contract applies.
+        #[unsafe(naked)]
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $name() -> ! {
+            core::arch::naked_asm!(
+                ".arch armv8-a+fp+simd",
+                "sub sp, sp, #48",
+                "str x30, [sp, #32]",
+                "str q0, [sp, #16]",
+                "mov x2, x0",
+                "mov x0, sp",
+                "add x1, sp, #16",
+                "bl {inner}",
+                "ldr q0, [sp, #0]",
+                "ldr x30, [sp, #32]",
+                "add sp, sp, #48",
+                "ret",
+                inner = sym $inner,
+            )
+        }
+    };
+}
+
+#[cfg(target_arch = "aarch64")]
+macro_rules! lda_remquo {
+    ($name:ident, $inner:path) => {
+        /// `remquol` entry point.
+        ///
+        /// # Safety
+        /// The compiler-generated C ABI contract applies.
+        #[unsafe(naked)]
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $name() -> ! {
+            core::arch::naked_asm!(
+                ".arch armv8-a+fp+simd",
+                "sub sp, sp, #64",
+                "str x30, [sp, #48]",
+                "str q0, [sp, #16]",
+                "str q1, [sp, #32]",
+                "mov x3, x0",
+                "mov x0, sp",
+                "add x1, sp, #16",
+                "add x2, sp, #32",
+                "bl {inner}",
+                "ldr q0, [sp, #0]",
+                "ldr x30, [sp, #48]",
+                "add sp, sp, #64",
+                "ret",
+                inner = sym $inner,
+            )
+        }
+    };
+}
+
+#[cfg(target_arch = "aarch64")]
+macro_rules! lda_to_i32 {
+    ($name:ident, $inner:path) => {
+        /// `long double` to `int` entry point.
+        ///
+        /// # Safety
+        /// The compiler-generated C ABI contract applies.
+        #[unsafe(naked)]
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $name() -> ! {
+            core::arch::naked_asm!(
+                ".arch armv8-a+fp+simd",
+                "sub sp, sp, #32",
+                "str x30, [sp, #16]",
+                "str q0, [sp, #0]",
+                "mov x0, sp",
+                "bl {inner}",
+                "ldr x30, [sp, #16]",
+                "add sp, sp, #32",
+                "ret",
+                inner = sym $inner,
+            )
+        }
+    };
+}
+
+#[cfg(target_arch = "aarch64")]
+macro_rules! lda_to_i64 {
+    ($name:ident, $inner:path) => {
+        /// `long double` to C `long` entry point.
+        ///
+        /// # Safety
+        /// The compiler-generated C ABI contract applies.
+        #[unsafe(naked)]
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $name() -> ! {
+            core::arch::naked_asm!(
+                ".arch armv8-a+fp+simd",
+                "sub sp, sp, #32",
+                "str x30, [sp, #16]",
+                "str q0, [sp, #0]",
+                "mov x0, sp",
+                "bl {inner}",
+                "ldr x30, [sp, #16]",
+                "add sp, sp, #32",
+                "ret",
+                inner = sym $inner,
+            )
+        }
+    };
+}
+
+#[cfg(target_arch = "aarch64")]
+macro_rules! lda_nan {
+    ($name:ident, $inner:path) => {
+        /// `nanl` entry point; the tag is advisory.
+        ///
+        /// # Safety
+        /// `tag` is NULL or a NUL-terminated string.
+        #[unsafe(naked)]
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $name() -> ! {
+            core::arch::naked_asm!(
+                ".arch armv8-a+fp+simd",
+                "sub sp, sp, #32",
+                "str x30, [sp, #16]",
+                "mov x1, x0",
+                "mov x0, sp",
+                "bl {inner}",
+                "ldr q0, [sp, #0]",
+                "ldr x30, [sp, #16]",
+                "add sp, sp, #32",
+                "ret",
+                inner = sym $inner,
+            )
+        }
+    };
+}
+
 mod fma;
 mod frexp;
 mod getpayload;
@@ -577,6 +837,8 @@ mod m66;
 mod m67;
 mod m68;
 mod m69;
+#[cfg(target_arch = "aarch64")]
+mod m70;
 mod sincos;
 mod strfromd;
 mod totalordermag;

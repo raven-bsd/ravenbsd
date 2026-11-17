@@ -1,39 +1,13 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-//! `<iconv.h>` exports over C48's `raven-libc-iconv`.
+//! `iconv` from `<iconv.h>`.
 
-use alloc::boxed::Box;
 use core::ffi::{c_char, c_void};
 
 use raven_libc_abi::errno::Errno;
-use raven_libc_iconv::{Iconv, IconvError};
+use raven_libc_iconv::Iconv;
 
-/// Map a conversion failure to the C errno.
-fn set_errno(error: IconvError) {
-    let value = match error {
-        IconvError::TooBig => 7,
-        IconvError::Unsupported | IconvError::Incomplete => 22,
-        IconvError::IllegalSequence => 84,
-    };
-    crate::ffi::errno::set(Errno(value));
-}
-
-/// `iconv_open`.
-///
-/// # Safety
-/// Both strings are NUL terminated.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn iconv_open(to: *const c_char, from: *const c_char) -> *mut c_void {
-    if to.is_null() || from.is_null() {
-        return crate::ffi::ret::null(Errno(22));
-    }
-    // SAFETY: the caller's C string contract.
-    let (to, from) = unsafe { (crate::ffi::cstr::slice(to), crate::ffi::cstr::slice(from)) };
-    match raven_libc_iconv::iconv_open(to, from) {
-        Ok(conversion) => Box::into_raw(Box::new(conversion)).cast::<c_void>(),
-        Err(_) => crate::ffi::ret::null(Errno(22)),
-    }
-}
+use super::iconv_support::set_errno;
 
 /// `iconv`.
 ///
@@ -99,19 +73,4 @@ pub unsafe extern "C" fn iconv(
             usize::MAX
         }
     }
-}
-
-/// `iconv_close`.
-///
-/// # Safety
-/// `cd` is a descriptor from `iconv_open` or `(iconv_t)-1`.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn iconv_close(cd: *mut c_void) -> core::ffi::c_int {
-    if cd.is_null() || cd as usize == usize::MAX {
-        crate::ffi::errno::set(Errno(9));
-        return -1;
-    }
-    // SAFETY: `cd` is a Box from `iconv_open`.
-    drop(unsafe { Box::from_raw(cd.cast::<Iconv>()) });
-    0
 }

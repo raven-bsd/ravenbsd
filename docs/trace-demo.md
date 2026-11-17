@@ -3,10 +3,16 @@
 SPDX-License-Identifier: BSD-3-Clause
 Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-Status: OBSERVED (Q4e). The Q4b fixture server still proves the scheme → span-sink → `trace`
-path, and the same demo stages the real `initfsd`, `blockd`, `fsd-ufs` and `vfsd` with the sink
-transferred. A mounted `file:/mnt/ten.txt` read records client → `vfsd` → `fsd-ufs` → `blockd`
-spans under one trace id. The direct `ufs:/ten.txt` read stays in the demo.
+Status: OBSERVED (Q4e, reconfirmed in the Q4 close-out on 2026-11-17). The Q4b fixture server still
+proves the scheme → span-sink → `trace` path, and the same demo stages the real `initfsd`,
+`blockd`, `fsd-ufs` and `vfsd` with the sink transferred. A mounted `file:/mnt/ten.txt` read
+records client → `vfsd` → `fsd-ufs` → `blockd` spans under one trace id. The direct `ufs:/ten.txt`
+read stays in the demo.
+
+Q4 close-out: `cargo xtask qtest --case trace-demo` passes on x86_64 and aarch64. Both runs record
+13 spans with `gaps=0` (11 traced, 2 untraced) in the same order, so there is no orphan span. The
+x86_64 transcript below is from the earlier Q4e observation; the close-out run differs only in the
+monotonic timestamps.
 
 ## 1. The path
 

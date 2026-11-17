@@ -9,6 +9,9 @@ mod env;
 mod float_traits;
 pub mod hex_float;
 mod int_traits;
+#[cfg(test)]
+#[path = "int_traits_ut.rs"]
+mod int_traits_ut;
 mod modular;
 
 #[allow(unused_imports)]

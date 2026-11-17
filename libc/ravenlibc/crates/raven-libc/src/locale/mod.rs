@@ -533,11 +533,16 @@ fn _locale_name() -> Vec<u8> {
     locale_name()
 }
 
+mod basename;
 mod bind_textdomain_codeset;
 mod c16rtomb;
 mod c32rtomb;
 mod c8rtomb;
 mod catalog;
+mod catclose;
+mod catgets;
+mod catopen;
+mod dirname;
 mod dngettext;
 mod fmtmsg;
 mod freelocale;
@@ -549,7 +554,9 @@ mod hdestroy_r;
 mod hsearch;
 mod hsearch_r;
 mod iconv;
-mod inttypes;
+mod iconv_close;
+mod iconv_open;
+mod iconv_support;
 mod libgen;
 mod mbrtoc16;
 mod mbrtoc32;
@@ -559,3 +566,4 @@ mod search;
 mod setlocale;
 mod trampolines;
 mod uchar;
+mod umaxabs;

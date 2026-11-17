@@ -32,8 +32,8 @@ with their owning lane.
 | 4 hardening | 4.3 hardened malloc default | MET | build/libc-gate/4.3.txt | hardened backend selected; tiny not in libc.so.1 |
 | 4 hardening | 4.4 ENTROPY_WEAK status (H-5) | INFO | build/libc-gate/4.4.txt | ENTROPY_WEAK CLEAR; PG-52 release blocker, not a libc-gate blocker |
 | 5 on-target | 5.1 on-target libc cases (C12) | NOT MET | build/libc-gate/5.1.txt | 7 qtest cases: dynamic, threads, signals, spawn pass; hello/stdio/time fail (P1b) |
-| 5 on-target | 5.2.core-servers core-servers regression | NOT MET | build/libc-gate/5.2.core-servers.txt | exit 1: expected 0 |
-| 5 on-target | 5.2.file-tools file-tools regression | NOT MET | build/libc-gate/5.2.file-tools.txt | exit 1: expected 0 |
+| 5 on-target | 5.2.core-servers core-servers regression | NOT MET | build/libc-gate/5.2.core-servers.txt | 120 s timeout; last serial `sched: running`; the same case passes at 600 s (`coretest: ok`, `init exited (0)`) — qtest timeout/core-test profile lane |
+| 5 on-target | 5.2.file-tools file-tools regression | NOT MET | build/libc-gate/5.2.file-tools.txt | times out at 240 s and 600 s; last serial `svcd: rsh up` / `rsh: ready` / `raven#`, no `tooltest` — file-tools-test profile/init/tooltest lane |
 | 5 on-target | 5.3 second architecture | INFO | build/libc-gate/5.3.txt | aarch64: not delivered (C73 open item); owner decides whether G1 closes on x86_64 alone |
 | 6 documentation | 6.1 page coverage | MET | build/libc-gate/6.1.txt | exit 0 |
 | 6 documentation | 6.2 render lint | BLOCKED | build/libc-gate/6.2.txt | preflight command failed |
@@ -80,8 +80,14 @@ failures are P1b (`libc-hello` string, `libc-stdio`, `libc-time` sleep/usleep/tz
   other 13 targets completed 3600 s with 0 crashes. Owner: test/fuzz lane.
 * 5.1: `libc-dynamic`, `libc-signals`, `libc-spawn` and `libc-threads` pass; `libc-hello`,
   `libc-stdio` and `libc-time` remain P1b. Section 4 has the exact output.
-* 5.2: both inherited qtests fail with timeouts. `core-servers` times out and never reaches
-  `init`; `file-tools` times out after the same loader stop. Kernel/server-lane regression.
+* 5.2: both inherited qtests fail with timeouts, but not in libc code.
+  `core-servers` (120 s) stops at `sched: running`; the identical case with a 600 s budget
+  completes (`coretest: ok`, `init exited (0)`), so the case timeout is too small for the
+  inherited shell initfs (owner: `tests/qtest/cases/core-servers.toml` / core-test profile).
+  `file-tools` (240 s and 600 s) reaches `svcd: rsh up`, `rsh: ready` and the `raven#` prompt but
+  never starts `tooltest`; `initfsd` alone takes ~90 s (owner: file-tools-test profile /
+  `userland/init` service plan / `crates/raven-tool-core/src/bin/tooltest.rs`). Neither is a
+  libc-test profile or libc-target harness defect, so C74j left the cases untouched.
 * 6.2 mandoc: BLOCKED. `which mandoc` exits 1; the render lint cannot run.
 
 ## 4. Seven-case matrix (OBSERVED, 2026-11-17, C74h)
@@ -155,7 +161,7 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 | 3.1 size | `cargo xtask libc-size --check` | exit 1; 4 pass, 48 fail, 25 known, 282 skipped, 40 budget-only |
 | 4.2 soak | `tests/libc/fuzz/SOAK.md` | `inet_text` crashed before 1 h; 13 targets 3600 s/0 crashes → NOT MET |
 | 5.1 target | qtest JSON from `eval` | dynamic, signals, spawn, threads pass; hello, stdio, time fail (P1b) |
-| 5.2 kernel | `qtest --case core-servers/file-tools` | both time out after the loader; kernel/server lane |
+| 5.2 kernel | `qtest --case core-servers` (120 s/600 s) and `file-tools` (240 s/600 s) | core-servers passes at 600 s but times out at 120 s; file-tools never starts `tooltest` even at 600 s (`rsh` prompt) → NOT MET; owners are the qtest/core-test and file-tools-test/init lanes |
 | 6.2 mandoc | `which mandoc` | exit 1; not installed → BLOCKED |
 
 `cargo run -q -p libc-gate -- eval` evaluated 90 checks; `table` and `verdict` exit 1 with
