@@ -215,6 +215,72 @@ impl Real for f32 {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
+use crate::LongDouble;
+
+#[cfg(target_arch = "x86_64")]
+impl Real for LongDouble {
+    const ZERO: Self = LongDouble::zero(false);
+    const ONE: Self = LongDouble::one();
+    // x87 extended constants: sign, biased exponent, explicit integer bit.
+    const HALF: Self = LongDouble::from_parts(false, 0x3ffe, 1u64 << 63);
+    const TWO: Self = LongDouble::from_parts(false, 0x4000, 1u64 << 63);
+    const PI: Self = LongDouble::from_parts(false, 0x4000, 0xC90F_DAA2_2168_C234);
+    const NAN: Self = LongDouble::nan();
+
+    fn abs(self) -> Self {
+        LongDouble::abs(self)
+    }
+    fn sqrt(self) -> Self {
+        LongDouble::sqrt(self)
+    }
+    fn exp(self) -> Self {
+        crate::long_double_math::expl(self)
+    }
+    fn ln(self) -> Self {
+        crate::long_double_math::logl(self)
+    }
+    fn sin(self) -> Self {
+        crate::long_double_math::sinl(self)
+    }
+    fn cos(self) -> Self {
+        crate::long_double_math::cosl(self)
+    }
+    fn tan(self) -> Self {
+        crate::long_double_math::tanl(self)
+    }
+    fn atan2(self, x: Self) -> Self {
+        crate::long_double_math::atan2l(self, x)
+    }
+    fn sinh(self) -> Self {
+        crate::long_double_math::sinhl(self)
+    }
+    fn cosh(self) -> Self {
+        crate::long_double_math::coshl(self)
+    }
+    fn tanh(self) -> Self {
+        crate::long_double_math::tanhl(self)
+    }
+    fn asinh(self) -> Self {
+        crate::long_double_math::asinhl(self)
+    }
+    fn acosh(self) -> Self {
+        crate::long_double_math::acoshl(self)
+    }
+    fn atanh(self) -> Self {
+        crate::long_double_math::atanhl(self)
+    }
+    fn hypot(self, other: Self) -> Self {
+        crate::long_double_c23::hypotl(self, other)
+    }
+    fn is_nan(self) -> bool {
+        LongDouble::is_nan(self)
+    }
+    fn is_infinite(self) -> bool {
+        LongDouble::is_infinite(self)
+    }
+}
+
 impl<T: Real> Add for Complex<T> {
     type Output = Self;
     fn add(self, other: Self) -> Self {
@@ -583,6 +649,120 @@ pub fn catanh(z: Complex<f64>) -> Complex<f64> {
 }
 /// `catanhf(z)`.
 pub fn catanhf(z: Complex<f32>) -> Complex<f32> {
+    z.catanh()
+}
+
+// long double complex: `Complex<LongDouble>` uses the x87/binary128 value type and the
+// long-double real family through the `Real for LongDouble` impl above.
+
+/// `cabsl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn cabsl(z: Complex<LongDouble>) -> LongDouble {
+    z.cabs()
+}
+/// `cargl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn cargl(z: Complex<LongDouble>) -> LongDouble {
+    z.carg()
+}
+/// `creall(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn creall(z: Complex<LongDouble>) -> LongDouble {
+    z.re
+}
+/// `cimagl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn cimagl(z: Complex<LongDouble>) -> LongDouble {
+    z.im
+}
+/// `conjl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn conjl(z: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.conj()
+}
+/// `cprojl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn cprojl(z: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.proj()
+}
+/// `cexpl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn cexpl(z: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.cexp()
+}
+/// `clogl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn clogl(z: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.clog()
+}
+/// `csqrtl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn csqrtl(z: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.csqrt()
+}
+/// `cpowl(z, w)`.
+#[cfg(target_arch = "x86_64")]
+pub fn cpowl(z: Complex<LongDouble>, w: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.cpow(w)
+}
+/// `csinl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn csinl(z: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.csin()
+}
+/// `ccosl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn ccosl(z: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.ccos()
+}
+/// `ctanl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn ctanl(z: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.ctan()
+}
+/// `csinhl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn csinhl(z: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.csinh()
+}
+/// `ccoshl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn ccoshl(z: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.ccosh()
+}
+/// `ctanhl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn ctanhl(z: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.ctanh()
+}
+/// `casinl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn casinl(z: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.casin()
+}
+/// `cacosl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn cacosl(z: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.cacos()
+}
+/// `catanl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn catanl(z: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.catan()
+}
+/// `casinhl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn casinhl(z: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.casinh()
+}
+/// `cacoshl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn cacoshl(z: Complex<LongDouble>) -> Complex<LongDouble> {
+    z.cacosh()
+}
+/// `catanhl(z)`.
+#[cfg(target_arch = "x86_64")]
+pub fn catanhl(z: Complex<LongDouble>) -> Complex<LongDouble> {
     z.catanh()
 }
 

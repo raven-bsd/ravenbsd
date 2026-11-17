@@ -173,3 +173,90 @@ fn the_f32_forms_agree_with_f64() {
         assert!(close(small_pow.im as f64, wide_pow.im, 1e-3));
     }
 }
+
+#[cfg(target_arch = "x86_64")]
+#[test]
+fn long_double_complex_matches_the_double_family() {
+    use crate::LongDouble;
+    let ld = |re: f64, im: f64| Complex::new(LongDouble::from_f64(re), LongDouble::from_f64(im));
+    for (re, im) in [
+        (1.0, 2.0),
+        (-3.5, 0.25),
+        (0.0, 1.0),
+        (2.0, -0.5),
+        (0.5, 0.5),
+    ] {
+        let wide = z(re, im);
+        let l = ld(re, im);
+        assert!(close(cabsl(l).to_f64(), cabs(wide), 1e-6));
+        assert!(close(cargl(l).to_f64(), carg(wide), 1e-6));
+        assert!(close(creall(l).to_f64(), creal(wide), 1e-12));
+        assert!(close(cimagl(l).to_f64(), cimag(wide), 1e-12));
+
+        let e = cexpl(l);
+        let ed = cexp(wide);
+        assert!(close(e.re.to_f64(), ed.re, 1e-6));
+        assert!(close(e.im.to_f64(), ed.im, 1e-6));
+
+        let sq = csqrtl(l);
+        let sqd = csqrt(wide);
+        assert!(close(sq.re.to_f64(), sqd.re, 1e-6));
+        assert!(close(sq.im.to_f64(), sqd.im, 1e-6));
+
+        let lg = clogl(l);
+        let lgd = clog(wide);
+        assert!(close(lg.re.to_f64(), lgd.re, 1e-6));
+        assert!(close(lg.im.to_f64(), lgd.im, 1e-6));
+
+        let s = csinl(l);
+        let sd = csin(wide);
+        assert!(close(s.re.to_f64(), sd.re, 1e-5));
+        assert!(close(s.im.to_f64(), sd.im, 1e-5));
+
+        let c = ccosl(l);
+        let cd = ccos(wide);
+        assert!(close(c.re.to_f64(), cd.re, 1e-5));
+        assert!(close(c.im.to_f64(), cd.im, 1e-5));
+
+        let t = ctanl(l);
+        let td = ctan(wide);
+        assert!(close(t.re.to_f64(), td.re, 1e-4));
+        assert!(close(t.im.to_f64(), td.im, 1e-4));
+
+        let sh = csinhl(l);
+        let shd = csinh(wide);
+        assert!(close(sh.re.to_f64(), shd.re, 1e-4));
+        assert!(close(sh.im.to_f64(), shd.im, 1e-4));
+
+        let ch = ccoshl(l);
+        let chd = ccosh(wide);
+        assert!(close(ch.re.to_f64(), chd.re, 1e-4));
+        assert!(close(ch.im.to_f64(), chd.im, 1e-4));
+
+        let asin = casinl(l);
+        let asind = casin(wide);
+        assert!(close(asin.re.to_f64(), asind.re, 1e-4));
+        assert!(close(asin.im.to_f64(), asind.im, 1e-4));
+
+        let acos = cacosl(l);
+        let acosd = cacos(wide);
+        assert!(close(acos.re.to_f64(), acosd.re, 1e-4));
+        assert!(close(acos.im.to_f64(), acosd.im, 1e-4));
+
+        let atan = catanl(l);
+        let atand = catan(wide);
+        assert!(close(atan.re.to_f64(), atand.re, 1e-4));
+        assert!(close(atan.im.to_f64(), atand.im, 1e-4));
+    }
+
+    let l = ld(1.0, 2.0);
+    assert_eq!(conjl(l).re.to_f64(), 1.0);
+    assert_eq!(conjl(l).im.to_f64(), -2.0);
+    assert_eq!(cprojl(l).re.to_f64(), 1.0);
+    assert_eq!(cprojl(l).im.to_f64(), 2.0);
+
+    let pw = cpowl(ld(1.5, 0.5), ld(2.0, 0.0));
+    let pwd = cpow(z(1.5, 0.5), z(2.0, 0.0));
+    assert!(close(pw.re.to_f64(), pwd.re, 1e-5));
+    assert!(close(pw.im.to_f64(), pwd.im, 1e-5));
+}
