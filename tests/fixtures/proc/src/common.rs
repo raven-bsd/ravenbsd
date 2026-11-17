@@ -253,6 +253,7 @@ pub fn self_info() -> Result<[u64; 8], Errno> {
 
 pub fn pid_info(pid: i32) -> Result<[u64; 8], Errno> {
     let mut values = [0u64; 8];
+    // SAFETY: PROC_PID_INFO writes eight u64 identity words to the live caller-owned array.
     checked(unsafe {
         syscall6(
             PROC_PID_INFO,
