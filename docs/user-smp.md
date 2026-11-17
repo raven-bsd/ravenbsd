@@ -40,15 +40,21 @@ user thread still running there observes `process.exiting` at its next schedulin
 with user threads on APs the same path invalidates user mappings on every CPU that may have them.
 The kernel's own user page-table mutation calls this before recycling frames.
 
-## 4. Known limits
+## 4. External IRQ distribution (S75a)
 
-* Interrupt distribution stays on the BSP for this ticket: MSI messages encode the BSP APIC id and
-  legacy IOAPIC entries use the BSP destination. Distributing device interrupts to other CPUs is a
-  follow-up.
-* The select-CPU policy is round-robin, not load-aware or affinity-aware. A real affinity API is a
-  follow-up.
+Each new external interrupt object (IOAPIC legacy and MSI/MSI-X) chooses a destination CPU at
+creation: with `smp_user=on` the destination round-robins over the application processors; with
+`smp_user=off` it stays on the BSP. The IOAPIC redirection entry and the MSI message address carry
+that CPU's APIC id, and `handle_interrupt` records the delivery CPU. The kernel timer and the
+serial console stay on the BSP. MSI/MSI-X on the Pi 4 platform is not covered by this ticket.
 
-## 5. Boot flag
+## 5. Known limits
+
+* The select-CPU policy for both user threads and external IRQs is round-robin, not load-aware or
+  affinity-aware. A real affinity API is a follow-up.
+* MSI/MSI-X destination selection is x86-64 only; the Pi 4 platform work is separate.
+
+## 6. Boot flag
 
 `smp_user=off|on` is parsed once in `sched::init`. Off is the default until the soak gate passes.
 `smp-user-trace` prints the first user thread per CPU and cross-CPU wakeups; it is test-only

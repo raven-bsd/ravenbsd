@@ -21,9 +21,12 @@ It is not an architecture document; the lead owns `architecture/`.
 * **CPUs 1..N (APs)** run kernel threads and, when `smp_user=on`, user threads.
   Every CPU has its own TSS, IST stacks, `syscall` MSRs, GS block and FP/SIMD
   state (see `docs/user-smp.md`).
-* Device interrupts are routed to the BSP.  MSI messages are encoded with the
-  BSP APIC id (`irq_create(2)`), and legacy IOAPIC entries use the BSP
-  destination.  Distributing interrupts to other CPUs is a follow-up.
+* The kernel timer and serial console are routed to the BSP.  External device
+  interrupts (IOAPIC legacy and MSI/MSI-X) choose a destination CPU at creation:
+  with `smp_user=on` they round-robin over the application processors, with
+  `smp_user=off` they stay on the BSP (`irq_dist`).  The consequence below about
+  single-CPU `Irq` close therefore holds only for the BSP-owned sources; the
+  vector pool's atomic owner slots keep a distributed handler safe.
 * The timer LAPIC interrupt runs on the CPU whose timer was programmed; the BSP
   keeps the S07 timer and each AP runs its own timer (vector `0x21`).
 
