@@ -22,6 +22,12 @@ regex = '^trace: codec ok$'
 regex = '^trace: server ready$'
 
 [[expect]]
+regex = '^trace: server id=0xdeadbeefcafef00d$'
+
+[[expect]]
+regex = '^trace: server untraced$'
+
+[[expect]]
 regex = '^trace: scheme ok$'
 
 [[expect]]
