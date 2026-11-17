@@ -41,15 +41,15 @@ cargo xtask qtest --case libc-spawn --arch x86_64
 
 The donor G1 suite is `cargo run -q -p raven-atf-run -- gate --g1`.
 
-## Current verdict (2026-11-17, C74z-S12)
+## Current verdict (2026-11-17, C74z-S16)
 
 **NOT MET.** `cargo run -q -p libc-gate -- verdict` exits 1.
 
 * MET: 1.1, 1.1.pack, 1.1.audit, 1.4, 1.5, 5.1, 5.2, 4.1, 4.3, 6.1, 6.3, 6.4.
 * NOT MET: 1.2 (G1 0/4; C74x qemu backend C4 7/15, C5 12/18), 1.7 (15 lint violations:
-  P1f 14, ABI 1), 3.1 (C74z-S12 full three-arch rebuild and S/F classification: 17 pass, 48
-  fail, 69 known, 105 skipped, 0 budget-only; 44 S/F + 2 INV-S-P2-P0 + 2 boot; budgets proposed,
-  not applied), 4.2 (one-hour `inet_text` soak recorded; row re-eval pending).
+  P1f 14, ABI 1), 3.1 (C74z-S16 reconciliation: 46 pass, 28 fail, 69 known, 105 skipped, 0
+  budget-only; 28 legitimate-row +3% budgets applied; shrink-first/held/invariant rows remain),
+  4.2 (one-hour `inet_text` soak recorded; row re-eval pending).
 * BLOCKED: 1.6 (Miri), 2.1/2.2 (`tools/libc-world` and C72 outputs), 6.2 (`mandoc`).
 
 The exact evidence and the seven-case matrix are in `libc/ravenlibc/GATE-REPORT.md` and under
@@ -64,34 +64,28 @@ C74u closed 5.1 (`sscanf`, `tzname`). C74q closed 1.4 (27/27) and C74k recorded 
 `inet_text` soak. The gate cannot close until G1, the size-budget cluster, the remaining lint
 backlog, and the missing Miri/world/mandoc tooling are resolved by their owners.
 
-## 3.1 size triage (C74w/C74z/C74z-S12; OBSERVED on `d97f7c1a`)
+## 3.1 size triage (C74w/C74z/C74z-S16; OBSERVED on `1355d85c`)
 
-`cargo xtask libc-size --check` reports `17 pass, 48 fail, 69 known, 105 skipped, 0 budget-only`
-after a full three-arch rebuild on `d97f7c1a`; C47r and K97c did not change any measured size
-row, and C74z-S9a is not merged. The residual is the same 44 S/F + 2 `INV-S-P2-P0` + 2 boot
-rows. C74z-S12 does not apply a budget; it classifies the rows and files exact shrink tickets:
+`cargo xtask libc-size --check` reports `46 pass, 28 fail, 69 known, 105 skipped, 0 budget-only`
+after the S14/S15a/S5/S6/S13 merges and the C74z-S16 reconciliation. The full three-arch rebuild
+before the budget edit was `31 pass, 43 fail` (the directive's 32/50 last run lacked a full arch
+build); `tests/libc/size/reconcile.py` compared the S12 before run with the rebuild. The 28
+legitimate P0/P1/P4/P6 and x86_64/aarch64 P3 blocks were re-frozen at measured + 3 percent; the
+P2/P5/P7/riscv64 P3 and P8/P9 blocks were left unchanged. The remaining 28 rows:
 
-* **Real-growth budget candidates (27 rows):** P0/P1/P4/P6 (all arch/set) plus the x86/aarch64
-  P3 rows. Proposal only: `current + 3%` S/F, with B `current + 3%` on the five P0/P4/P6 rows
-  where B is also over and aarch64 P3 tiny. C74z-S15 (`dtoa` floor over-link) should re-measure
-  first; if it lands, re-freeze lower.
-* **Shrink/measurement first (17 rows):** P2 (5), P5 (4), P7 (6) and riscv64 P3 (2). The exact
-  tickets are C74z-S14 (integer `%d` must not link the float path), C74z-S13 (riscv64 P2/P3
-  still link a printf stub: P2-P0 is 32 B versus 25,704 x86 and 31,707 aarch64), C74z-S5
-  (resolv/net) and C74z-S6 (time).
-* **Measurement correction:** the old aarch64 P2/P3 rows linked an 8-byte `printf` stub; the
-  current rows link the real `printf`/`vformat_dyn` path (+31,675 S). The current budgets are
-  under and are not raised without review. The same correction makes `INV-S-P2-P0` fail
-  (31,707/28,659 vs 5,120); the limit needs a reviewer decision after C74z-S14.
-* P9 is closed: all six P9 rows pass. P7 has real tz growth (`tzload`/`tzparse`) plus
-  `strptime`/`strftime` duplication (C74z-S6); P5 has real resolv/net growth plus name-buffer
-  duplication (C74z-S5).
-* Boot: x86_64 start instructions 1,245 > 908; aarch64 syscalls 8 > 3 and instructions 3,403 >
-  1,847. C74z-S9a is not merged, so these are unchanged.
+* **17 budget/rule rows:** P2 aarch64/riscv64 S/F (S14 rework), P3 riscv64 S/F/B (S14/S13),
+  P5 x86_64 server / aarch64 server / riscv64 server B-only (S5 layout), P7 x86_64 tiny/server
+  B-only, P7 aarch64/riscv64 S/F/B (S6), P8 aarch64 tiny/server B-only (held) and the
+  `P7-R-14` iconv member rule.
+* **10 invariants:** `INV-S-P2-P0` aarch64/riscv64 tiny/server and `INV-S-P3-P2` x86_64,
+  aarch64 and riscv64 tiny/server. These are real rule failures, not budget rows; the P2/P3
+  owners and the reviewer for the limit must decide.
+* Boot rows pass; P9 remains green. S15a removed the `dtoa` floor, S6/S5 removed most P7/P5 S
+  growth, S14 made the x86_64 P2 rows pass, and S13 now links the real riscv64 printf path.
 * `B` is the Berkeley `llvm-size` bss field (all NOBITS, including `.relro_padding`), not only
   the `.bss` section. `build/size/libc-size.json`/`.md` are run artifacts and leave `budget_* = 0`
-  and `status = ok`; the console and `build/libc-gate-c74z-s12/3.1.txt` are the check evidence.
+  and `status = ok`; the console and `build/libc-gate-c74z-s16/3.1.txt` are the check evidence.
 
-3.1 stays NOT MET because the 44 S/F, 2 `INV-S-P2-P0` and 2 boot rows do not fit. The exact
-per-probe classification, shrink tickets (C74z-S13/S14/S15, S5/S6) and reviewer budget proposal
-are in the C74z-S12 section of `tests/libc/size/TRIAGE.md` and the C74z-S12 report.
+3.1 stays NOT MET because the 17 budget/rule and 10 invariant rows do not fit. The exact
+current/budget table and owners are in the C74z-S16 section of `tests/libc/size/TRIAGE.md` and
+the C74z-S16 report.

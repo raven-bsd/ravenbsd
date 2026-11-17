@@ -11,6 +11,10 @@
 # tiny/server; riscv64 P8 server) are re-measured on the full three-arch build and their B fields
 # are re-frozen at measured + 3 percent. S/F and boot budgets are unchanged; the aarch64 P2/P3 S
 # measurement correction is reported, not budgeted.
+# C74z-S16 (1355d85c): the 28 legitimate P0/P1/P4/P6 and x86_64/aarch64 P3 rows are re-frozen at
+# measured + 3 percent after the S14/S15a/S5/S6/S13 shrinks. P2/P5/P7/riscv64 P3 and the held
+# P8/P9 rows keep their previous budgets; the remaining aarch64/riscv64 P2/P3 rows are left to
+# the S14 rework. No source-crate edits.
 schema = 1
 metric = "S = Berkeley text+data of the stripped executable; B = bss; F = file bytes"
 headroom_percent = 3
@@ -23,13 +27,13 @@ arch = "x86_64"
 linkage = "static"
 set = "tiny"
 lang = "rust"
-measured_s = 66364
-measured_b = 13856
-measured_f = 67824
-members = 117
-budget_s = 68355
-budget_b = 14272
-budget_f = 69859
+measured_s = 51851
+measured_b = 12072
+measured_f = 53320
+members = 115
+budget_s = 53407
+budget_b = 12435
+budget_f = 54920
 
 [[budget]]
 probe = "P1"
@@ -37,13 +41,13 @@ arch = "x86_64"
 linkage = "static"
 set = "tiny"
 lang = "rust"
-measured_s = 66548
-measured_b = 13664
-measured_f = 68016
-members = 119
-budget_s = 68545
-budget_b = 14074
-budget_f = 70057
+measured_s = 53683
+measured_b = 14408
+measured_f = 55144
+members = 122
+budget_s = 55294
+budget_b = 14841
+budget_f = 56799
 
 [[budget]]
 probe = "P2"
@@ -65,13 +69,13 @@ arch = "x86_64"
 linkage = "static"
 set = "tiny"
 lang = "rust"
-measured_s = 90148
-measured_b = 14640
-measured_f = 91616
-members = 145
-budget_s = 92853
-budget_b = 15080
-budget_f = 94365
+measured_s = 91059
+measured_b = 13832
+measured_f = 92520
+members = 149
+budget_s = 93791
+budget_b = 14247
+budget_f = 95296
 
 [[budget]]
 probe = "P4"
@@ -79,13 +83,13 @@ arch = "x86_64"
 linkage = "static"
 set = "tiny"
 lang = "rust"
-measured_s = 73472
-measured_b = 16720
-measured_f = 74944
-members = 133
-budget_s = 75677
-budget_b = 17222
-budget_f = 77193
+measured_s = 59431
+measured_b = 14480
+measured_f = 60896
+members = 132
+budget_s = 61214
+budget_b = 14915
+budget_f = 62723
 
 [[budget]]
 probe = "P5"
@@ -107,13 +111,13 @@ arch = "x86_64"
 linkage = "static"
 set = "tiny"
 lang = "rust"
-measured_s = 66508
-measured_b = 13728
-measured_f = 67968
-members = 120
-budget_s = 68504
-budget_b = 14140
-budget_f = 70008
+measured_s = 52011
+measured_b = 11912
+measured_f = 53480
+members = 118
+budget_s = 53572
+budget_b = 12270
+budget_f = 55085
 
 [[budget]]
 probe = "P7"
@@ -163,13 +167,13 @@ arch = "x86_64"
 linkage = "static"
 set = "server"
 lang = "rust"
-measured_s = 71210
-measured_b = 13136
-measured_f = 72672
-members = 102
-budget_s = 73347
-budget_b = 13531
-budget_f = 74853
+measured_s = 50405
+measured_b = 13560
+measured_f = 51864
+members = 98
+budget_s = 51918
+budget_b = 13967
+budget_f = 53420
 
 [[budget]]
 probe = "P1"
@@ -177,13 +181,13 @@ arch = "x86_64"
 linkage = "static"
 set = "server"
 lang = "rust"
-measured_s = 71370
-measured_b = 12976
-measured_f = 72832
+measured_s = 51981
+measured_b = 12040
+measured_f = 53448
 members = 103
-budget_s = 73512
-budget_b = 13366
-budget_f = 75017
+budget_s = 53541
+budget_b = 12402
+budget_f = 55052
 
 [[budget]]
 probe = "P2"
@@ -205,13 +209,13 @@ arch = "x86_64"
 linkage = "static"
 set = "server"
 lang = "rust"
-measured_s = 98770
-measured_b = 15512
-measured_f = 100240
-members = 122
-budget_s = 101734
-budget_b = 15978
-budget_f = 103248
+measured_s = 101341
+measured_b = 11776
+measured_f = 102800
+members = 124
+budget_s = 104382
+budget_b = 12130
+budget_f = 105884
 
 [[budget]]
 probe = "P4"
@@ -219,13 +223,13 @@ arch = "x86_64"
 linkage = "static"
 set = "server"
 lang = "rust"
-measured_s = 78398
-measured_b = 15920
-measured_f = 79872
-members = 116
-budget_s = 80750
-budget_b = 16398
-budget_f = 82269
+measured_s = 58137
+measured_b = 15800
+measured_f = 59608
+members = 113
+budget_s = 59882
+budget_b = 16274
+budget_f = 61397
 
 [[budget]]
 probe = "P5"
@@ -247,13 +251,13 @@ arch = "x86_64"
 linkage = "static"
 set = "server"
 lang = "rust"
-measured_s = 71362
-measured_b = 12992
-measured_f = 72832
-members = 105
-budget_s = 73503
-budget_b = 13382
-budget_f = 75017
+measured_s = 50557
+measured_b = 13400
+measured_f = 52024
+members = 101
+budget_s = 52074
+budget_b = 13802
+budget_f = 53585
 
 [[budget]]
 probe = "P7"
@@ -303,13 +307,13 @@ arch = "aarch64"
 linkage = "static"
 set = "tiny"
 lang = "rust"
-measured_s = 75924
-measured_b = 13168
-measured_f = 77376
-members = 96
-budget_s = 78202
-budget_b = 13564
-budget_f = 79698
+measured_s = 66332
+measured_b = 13992
+measured_f = 67784
+members = 103
+budget_s = 68322
+budget_b = 14412
+budget_f = 69818
 
 [[budget]]
 probe = "P1"
@@ -317,13 +321,13 @@ arch = "aarch64"
 linkage = "static"
 set = "tiny"
 lang = "rust"
-measured_s = 76224
-measured_b = 14264
-measured_f = 77680
-members = 98
-budget_s = 78511
-budget_b = 14692
-budget_f = 80011
+measured_s = 69404
+measured_b = 15080
+measured_f = 70856
+members = 110
+budget_s = 71487
+budget_b = 15533
+budget_f = 72982
 
 [[budget]]
 probe = "P2"
@@ -345,13 +349,13 @@ arch = "aarch64"
 linkage = "static"
 set = "tiny"
 lang = "rust"
-measured_s = 75968
-measured_b = 13120
-measured_f = 77424
-members = 97
-budget_s = 78248
-budget_b = 13514
-budget_f = 79747
+measured_s = 109967
+measured_b = 15408
+measured_f = 111424
+members = 136
+budget_s = 113267
+budget_b = 15871
+budget_f = 114767
 
 [[budget]]
 probe = "P4"
@@ -359,13 +363,13 @@ arch = "aarch64"
 linkage = "static"
 set = "tiny"
 lang = "rust"
-measured_s = 87468
-measured_b = 14056
-measured_f = 88920
-members = 120
-budget_s = 90093
-budget_b = 14478
-budget_f = 91588
+measured_s = 75428
+measured_b = 14880
+measured_f = 76880
+members = 119
+budget_s = 77691
+budget_b = 15327
+budget_f = 79187
 
 [[budget]]
 probe = "P5"
@@ -387,13 +391,13 @@ arch = "aarch64"
 linkage = "static"
 set = "tiny"
 lang = "rust"
-measured_s = 76160
-measured_b = 12936
-measured_f = 77616
-members = 99
-budget_s = 78445
-budget_b = 13325
-budget_f = 79945
+measured_s = 66576
+measured_b = 13744
+measured_f = 68032
+members = 106
+budget_s = 68574
+budget_b = 14157
+budget_f = 70073
 
 [[budget]]
 probe = "P7"
@@ -443,13 +447,13 @@ arch = "aarch64"
 linkage = "static"
 set = "server"
 lang = "rust"
-measured_s = 70972
-measured_b = 14720
-measured_f = 72424
-members = 77
-budget_s = 73102
-budget_b = 15162
-budget_f = 74597
+measured_s = 60922
+measured_b = 15328
+measured_f = 62384
+members = 87
+budget_s = 62750
+budget_b = 15788
+budget_f = 64256
 
 [[budget]]
 probe = "P1"
@@ -457,13 +461,13 @@ arch = "aarch64"
 linkage = "static"
 set = "server"
 lang = "rust"
-measured_s = 71212
-measured_b = 12624
-measured_f = 72664
-members = 78
-budget_s = 73349
-budget_b = 13003
-budget_f = 74844
+measured_s = 63082
+measured_b = 13232
+measured_f = 64544
+members = 92
+budget_s = 64975
+budget_b = 13629
+budget_f = 66481
 
 [[budget]]
 probe = "P2"
@@ -485,13 +489,13 @@ arch = "aarch64"
 linkage = "static"
 set = "server"
 lang = "rust"
-measured_s = 71024
-measured_b = 14664
-measured_f = 72480
-members = 78
-budget_s = 73155
-budget_b = 15104
-budget_f = 74655
+measured_s = 108373
+measured_b = 12936
+measured_f = 109832
+members = 113
+budget_s = 111625
+budget_b = 13325
+budget_f = 113127
 
 [[budget]]
 probe = "P4"
@@ -499,13 +503,13 @@ arch = "aarch64"
 linkage = "static"
 set = "server"
 lang = "rust"
-measured_s = 81560
-measured_b = 16112
-measured_f = 83016
-members = 99
-budget_s = 84007
-budget_b = 16596
-budget_f = 85507
+measured_s = 69514
+measured_b = 16720
+measured_f = 70976
+members = 102
+budget_s = 71600
+budget_b = 17222
+budget_f = 73106
 
 [[budget]]
 probe = "P5"
@@ -527,13 +531,13 @@ arch = "aarch64"
 linkage = "static"
 set = "server"
 lang = "rust"
-measured_s = 71224
-measured_b = 14488
-measured_f = 72680
-members = 80
-budget_s = 73361
-budget_b = 14923
-budget_f = 74861
+measured_s = 61174
+measured_b = 15080
+measured_f = 62632
+members = 90
+budget_s = 63010
+budget_b = 15533
+budget_f = 64511
 
 [[budget]]
 probe = "P7"
@@ -583,13 +587,13 @@ arch = "riscv64"
 linkage = "static"
 set = "tiny"
 lang = "rust"
-measured_s = 54602
-measured_b = 13064
-measured_f = 56184
-members = 133
-budget_s = 56241
-budget_b = 13456
-budget_f = 57870
+measured_s = 48724
+measured_b = 15200
+measured_f = 50296
+members = 139
+budget_s = 50186
+budget_b = 15656
+budget_f = 51805
 
 [[budget]]
 probe = "P1"
@@ -597,13 +601,13 @@ arch = "riscv64"
 linkage = "static"
 set = "tiny"
 lang = "rust"
-measured_s = 54770
-measured_b = 15520
-measured_f = 56352
-members = 135
-budget_s = 56414
-budget_b = 15986
-budget_f = 58043
+measured_s = 50426
+measured_b = 13560
+measured_f = 52000
+members = 142
+budget_s = 51939
+budget_b = 13967
+budget_f = 53560
 
 [[budget]]
 probe = "P2"
@@ -639,13 +643,13 @@ arch = "riscv64"
 linkage = "static"
 set = "tiny"
 lang = "rust"
-measured_s = 62588
-measured_b = 16856
-measured_f = 64160
-members = 157
-budget_s = 64466
-budget_b = 17362
-budget_f = 66085
+measured_s = 54912
+measured_b = 14896
+measured_f = 56488
+members = 155
+budget_s = 56560
+budget_b = 15343
+budget_f = 58183
 
 [[budget]]
 probe = "P5"
@@ -667,13 +671,13 @@ arch = "riscv64"
 linkage = "static"
 set = "tiny"
 lang = "rust"
-measured_s = 54766
-measured_b = 12912
-measured_f = 56344
-members = 136
-budget_s = 56409
-budget_b = 13300
-budget_f = 58035
+measured_s = 48888
+measured_b = 15048
+measured_f = 50464
+members = 142
+budget_s = 50355
+budget_b = 15500
+budget_f = 51978
 
 [[budget]]
 probe = "P7"
@@ -723,13 +727,13 @@ arch = "riscv64"
 linkage = "static"
 set = "server"
 lang = "rust"
-measured_s = 51290
-measured_b = 15160
-measured_f = 52880
-members = 109
-budget_s = 52829
-budget_b = 15615
-budget_f = 54467
+measured_s = 44680
+measured_b = 15176
+measured_f = 46256
+members = 120
+budget_s = 46021
+budget_b = 15632
+budget_f = 47644
 
 [[budget]]
 probe = "P1"
@@ -737,13 +741,13 @@ arch = "riscv64"
 linkage = "static"
 set = "server"
 lang = "rust"
-measured_s = 51448
+measured_s = 46174
 measured_b = 13744
-measured_f = 53032
-members = 110
-budget_s = 52992
+measured_f = 47752
+members = 122
+budget_s = 47560
 budget_b = 14157
-budget_f = 54623
+budget_f = 49185
 
 [[budget]]
 probe = "P2"
@@ -779,13 +783,13 @@ arch = "riscv64"
 linkage = "static"
 set = "server"
 lang = "rust"
-measured_s = 58832
-measured_b = 14920
-measured_f = 60416
-members = 131
-budget_s = 60597
-budget_b = 15368
-budget_f = 62229
+measured_s = 50806
+measured_b = 14936
+measured_f = 52384
+members = 135
+budget_s = 52331
+budget_b = 15385
+budget_f = 53956
 
 [[budget]]
 probe = "P5"
@@ -807,13 +811,13 @@ arch = "riscv64"
 linkage = "static"
 set = "server"
 lang = "rust"
-measured_s = 51454
-measured_b = 15008
-measured_f = 53040
-members = 112
-budget_s = 52998
-budget_b = 15459
-budget_f = 54632
+measured_s = 44844
+measured_b = 15032
+measured_f = 46416
+members = 123
+budget_s = 46190
+budget_b = 15483
+budget_f = 47809
 
 [[budget]]
 probe = "P7"

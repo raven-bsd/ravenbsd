@@ -3,12 +3,13 @@
 
 # libc size gate 3.1 triage and budget correction (C74w/C74z/C74z-S10)
 
-Status: OBSERVED (C74z-S12, `origin/master` `d97f7c1a`). C74w classified the C74h/C69 data;
+Status: OBSERVED (C74z-S16, `origin/master` `1355d85c`). C74w classified the C74h/C69 data;
 C74z corrected the objective budget-data errors; C74z-S10 re-froze the six P9 S/F budgets;
-C74z-S11 rebuilt all three arches and fixed the six B-only/layout rows; C74z-S12 rebuilt again
-after C47r/K97c, confirmed the same 17/48 residual, and classified the 44 S/F rows with exact
-shrink tickets and reviewer-only budget proposals. **3.1 remains NOT MET**: 17 pass / 48 fail /
-69 known / 105 skipped / 0 budget-only. No S/F or boot budget is applied by C74z-S12.
+C74z-S11 rebuilt all three arches and fixed the six B-only/layout rows; C74z-S12 classified the
+S/F residual; C74z-S14/S15a/S5/S6/S13 landed and C74z-S16 applied the reviewed current+3%
+budgets to the 28 legitimate P0/P1/P4/P6 and x86_64/aarch64 P3 rows. **3.1 remains NOT MET**:
+46 pass / 28 fail / 69 known / 105 skipped / 0 budget-only. The 28 remaining rows are
+shrink-first/held/invariant rows listed below; no source crate is edited.
 
 ## C74zb shrink result (OBSERVED, 2026-11-17)
 
@@ -483,6 +484,7 @@ the concrete change and the acceptance it must satisfy; none may raise an S/F or
 | C74z-S13 | riscv64 P2/P3 measurement | Link the real riscv64 printf/variadic path instead of the stub; P2-P0 is 32 B versus 25,704 x86 and 31,707 aarch64 | honest P2/P3 rows | carl/C43 + platform | P2/P3 riscv link real printf; no stub; re-measure |
 | C74z-S14 | P2 `%d` float-path duplication | Split an integer-only vformat path; `%d` must not link `float_layout::emit_inner` 1,772-2,695 and the float hook | -2k S on P2; `INV-S-P2-P0` closer | carl/C43 | P2 S shrink, fmt oracle, invariant re-eval |
 | C74z-S15 | P0 floor dtoa over-link | Trace `raven_libc_dtoa::dtoa` 4,906-9,235 in P0 and remove the reference chain from start/platform/locale | -5-9k S on every row | carl/C42 + mel/C48 + dave/C55 | P0 S shrink, dtoa oracle |
+| C74z-S16 | 3.1 reconciliation | Done in C74z-S16: applied the reviewed current+3% budgets to the 28 legitimate P0/P1/P4/P6 and x86_64/aarch64 P3 rows after S14/S15a/S5/S6/S13; shrink-first rows unraised | reviewed budget | lance/C74z-S16 | 46 pass / 28 fail; exact residual and owners in the C74z-S16 section |
 
 ### C74z-S14 result (OBSERVED, `265b996a`)
 
@@ -512,6 +514,55 @@ P2/P3 printf core (`vformat_dyn` 3,148-5,646 plus float/pos/emit), the P7 time c
 (`lookup_name`/`msend`). The old ctype/vformat/dtoa cluster sizes in the C74z section were the
 `1bfeaafa` baseline; C39m and C74zb removed the ctype and six-vformat duplication.
 
+## C74z-S16 reconciliation (OBSERVED, `1355d85c`)
+
+The S14/S15a/S5/S6/S13 merges are in `origin/master` `1355d85c`. A full three-arch rebuild
+(different from the directive's 32/50 last run, which lacked a full arch build) first gave
+**31 pass / 43 fail** because many rows had become B-only layout rows after the S/F shrink.
+`tests/libc/size/reconcile.py` compared the S12 before run with this build and proposed the
+current+3% budgets for the 28 legitimate P0/P1/P4/P6 and x86_64/aarch64 P3 rows; it listed
+P2/P5/P7/riscv64 P3 as `HOLD`.
+
+The 28 legitimate `BUDGETS.toml` blocks were re-frozen from the helper proposal (S/B/F measured +
+3 percent; `members` updated). The 32 shrink-first/held blocks were left byte-identical, including
+P2/P5/P7/riscv64 P3 and P8/P9. The gate after the budget edit is **46 pass / 28 fail / 69 known /
+105 skipped / 0 budget-only**.
+
+S15a removed the eager `dtoa` floor from P0/P1/P4/P6 (about -17.6k S on x86/aarch64 and -10.7k
+to -12.7k on riscv64). S6 and S5 removed most of the P7/P5 S growth; S14 made the x86_64 P2 rows
+pass; S13 links the real riscv64 printf path, so the riscv P2/P3 rows now measure the real (and
+still over) sizes. The remaining rows are deliberately not budgeted:
+
+| Row | Current/budget | Owner |
+|---|---|---|
+| P7 x86_64 tiny | B 15080 > 14915 | mel/C44 (S6; B/layout) |
+| P5 x86_64 server | B 13656 > 13423 | dave/C51 (S5; B/layout) |
+| P7 x86_64 server | B 14880 > 12509 | mel/C44 (S6; B/layout) |
+| P2 aarch64 tiny | S 93003 > 78235; F 94464 > 79731 | carl/C43 (S14 rework) |
+| P7 aarch64 tiny | S 99836 > 96071; F 101288 > 97570 | mel/C44 (S6; R-14 iconv lane) |
+| P8 aarch64 tiny | B 13304 > 12393 | carl/C45/C41/C40 (P8; held) |
+| P2 aarch64 server | S 90101 > 73143; F 91560 > 74638 | carl/C43 (S14 rework) |
+| P5 aarch64 server | B 14464 > 11916 | dave/C51 (S5; B/layout) |
+| P7 aarch64 server | S 94438 > 92659; B 15176 > 12550; F 95896 > 94159 | mel/C44 (S6; R-14 iconv lane) |
+| P8 aarch64 server | B 13848 > 13489 | carl/C45/C41/C40 (P8; held) |
+| P2 riscv64 tiny | S 67799 > 56282; F 69376 > 57911 | carl/C43 (S14/S13 rework) |
+| P3 riscv64 tiny | S 78603 > 56302; B 13984 > 13399; F 80184 > 57928 | carl/C43 (S14/S13 rework) |
+| P7 riscv64 tiny | S 72622 > 69979; B 12384 > 12056; F 74200 > 71598 | mel/C44 (S6) |
+| P2 riscv64 server | S 68227 > 52879; F 69808 > 54516 | carl/C43 (S14/S13 rework) |
+| P3 riscv64 server | S 80627 > 52899; F 82216 > 54533 | carl/C43 (S14/S13 rework) |
+| P5 riscv64 server | B 15136 > 14808 | dave/C51 (S5; B/layout) |
+| P7 riscv64 server | S 68920 > 67381; F 70496 > 69010 | mel/C44 (S6) |
+| rule P7 aarch64 | R-14: `iconv*` member pulled | mel/C44 + iconv lane |
+| INV-S-P3-P2 x86 tiny/server | 17,160 / 23,104 > 10,240 | carl/C43 + reviewer (limit) |
+| INV-S-P2-P0 aarch64 tiny/server | 26,671 / 29,179 > 5,120 | carl/C43 + reviewer (limit) |
+| INV-S-P3-P2 aarch64 tiny/server | 16,964 / 18,272 > 10,240 | carl/C43 + reviewer (limit) |
+| INV-S-P2-P0 riscv64 tiny/server | 19,075 / 23,547 > 5,120 | carl/C43 + reviewer (limit) |
+| INV-S-P3-P2 riscv64 tiny/server | 10,804 / 12,400 > 10,240 | carl/C43 + reviewer (limit) |
+
+**3.1 remains NOT MET** at 46/28. The remaining rows are 17 budget/rule rows + 10 invariants;
+the shrink-first P2/P5/P7/riscv P3 rows are unraised by design, and P8 is held. No source-crate
+edit was made.
+
 ## Budget actions
 
 * C74z added x86_64 P9 tiny/server budgets from the `1bfeaafa` first measurement + 3 percent
@@ -535,6 +586,11 @@ P2/P3 printf core (`vformat_dyn` 3,148-5,646 plus float/pos/emit), the P7 time c
 * C74z-S12 does **not** change any budget. It classifies the 44 S/F rows and proposes (a)
   current+3% for P0/P1/P4/P6 and the x86/aarch64 P3 rows, and (b) shrink-first for P2/P5/P7 and
   riscv P3. The proposal is in the C74z-S12 section; the 3.1 count remains 17/48.
+* C74z-S16 applies that proposal after the S14/S15a/S5/S6/S13 merges: **28 legitimate blocks**
+  (P0/P1/P4/P6 all arch/set and x86_64/aarch64 P3) are re-frozen at measured + 3 percent, and
+  the 32 shrink-first/held blocks are unchanged. The gate moves to **46 pass / 28 fail / 69
+  known / 105 skipped / 0 budget-only**; the exact remaining rows and owners are in the
+  C74z-S16 section above. 3.1 remains **NOT MET**.
 
 ## C39m ctype table shrink (OBSERVED, `e1f252e5`)
 
