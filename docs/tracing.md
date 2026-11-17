@@ -105,3 +105,28 @@ server's current `trace_id` becomes the caller's for the call (`R-OBS-6`).
 * `TRACE_SET` (`R-OBS-6`): an unprivileged syscall to set the calling thread's current `trace_id`;
   the number is unassigned and must be added to `crates/raven-abi/src/syscall.rs`.
 * The scheme-packet `trace_id` field lands in `kernel/src/ipc/protocol.rs` once S69 merges.
+
+## 10. W3C `traceparent` conformance (Q3a)
+
+For external propagation the codec also parses/formats the W3C Trace Context `traceparent` (version
+00) text form (`crates/raven-proto-trace::traceparent`):
+
+```text
+traceparent = "00" "-" trace-id "-" parent-id "-" trace-flags
+trace-id    = 32HEXDIGLC   ; 16 bytes, not all zero
+parent-id   = 16HEXDIGLC   ; 8 bytes, not all zero
+trace-flags = 2HEXDIGLC    ; bit 0 = sampled, other bits reserved/ignored
+```
+
+Accepted grammar and limits:
+
+* Exactly 55 bytes; fields separated by `-` at offsets 2, 35 and 52.
+* Strict lowercase hex (`HEXDIGLC`); uppercase is rejected as `NonHex`.
+* Version must be `00`; a non-zero version is `UnsupportedVersion`.
+* `trace_id`/`parent_id` must not be all zero (`ZeroTraceId`/`ZeroParentId`).
+* Malformed input returns a typed `TraceparentError` (`BadLength`, `BadSeparator`, `NonHex`,
+  `UnsupportedVersion`, `ZeroTraceId`, `ZeroParentId`) — no panic, no allocation.
+
+Covered by W3C conformance vectors (valid/edge ids, sampled flag, uppercase, wrong length, non-hex,
+trailing bytes, empty, oversized), an exhaustive version-field sweep, a randomized fuzz and a
+format/parse round-trip property in `traceparent_ut.rs`.
