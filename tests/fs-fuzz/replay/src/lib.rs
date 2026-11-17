@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 
 use std::cell::{Cell, RefCell};
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -21,7 +22,7 @@ use std::rc::Rc;
 use std::sync::OnceLock;
 
 use flate2::read::GzDecoder;
-use ufs_core::check::{Mode, check};
+use ufs_core::check::{Mode, Report, check};
 use ufs_core::{BlockIo, IoError, MountOptions, Ufs};
 
 /// Fuzz targets implemented by this harness.
@@ -523,13 +524,14 @@ pub fn crash_matrix() -> Result<CrashReport, String> {
                 };
                 match check(&mut repair_disk, Mode::Repair) {
                     Ok(report) if report.clean_after => "repaired".to_string(),
-                    Ok(report) => {
+                    Ok(_report) => {
                         let mut verify = CrashVecDisk {
                             data: repair_disk.data,
                         };
                         match check(&mut verify, Mode::ReadOnly) {
                             Ok(report) if report.clean_after => "repaired".to_string(),
-                            _ => format!("repair-incomplete: {}", report.findings.len()),
+                            Ok(residual) => describe_residual(&residual),
+                            Err(error) => format!("verify-failed: {error:?}"),
                         }
                     }
                     Err(error) => format!("repair-failed: {error:?}"),
@@ -547,4 +549,45 @@ pub fn crash_matrix() -> Result<CrashReport, String> {
         });
     }
     Ok(CrashReport { total_writes, cuts })
+}
+
+/// Compact, deterministic description of the residual findings that keep a cut refused.
+fn describe_residual(report: &Report) -> String {
+    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+    let mut links: Vec<String> = Vec::new();
+    let mut cgs: Vec<String> = Vec::new();
+    for finding in &report.findings {
+        *counts
+            .entry(format!("p{}.{:?}", finding.phase, finding.problem))
+            .or_insert(0) += 1;
+        if finding.problem == ufs_core::check::Problem::BadLinkCount {
+            links.push(format!(
+                "ino={:?} expected={:?}",
+                finding.inode, finding.block
+            ));
+        }
+        if finding.phase == 5 {
+            cgs.push(format!("{:?}={:?}", finding.problem, finding.block));
+        }
+    }
+    let mut parts = counts
+        .iter()
+        .map(|(kind, count)| format!("{kind}={count}"))
+        .collect::<Vec<_>>();
+    parts.sort();
+    if !links.is_empty() {
+        links.sort();
+        links.dedup();
+        parts.push(format!("links[{}]", links.join(" ")));
+    }
+    if !cgs.is_empty() {
+        cgs.sort();
+        cgs.dedup();
+        parts.push(format!("cgs[{}]", cgs.join(" ")));
+    }
+    format!(
+        "repair-incomplete: {} ({})",
+        report.findings.len(),
+        parts.join(", ")
+    )
 }
