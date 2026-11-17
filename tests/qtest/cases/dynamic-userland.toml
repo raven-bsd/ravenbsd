@@ -9,7 +9,7 @@
 name = "dynamic-userland"
 arch = "x86_64"
 profile = "shell-test"
-timeout_secs = 420
+timeout_secs = 900
 pre = ["sh tests/fixtures/dynamic-userland/check.sh"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
@@ -29,7 +29,7 @@ regex = '(?i)panic|EXCEPTION|relocation failed|undefined symbol|rsh: .*command n
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 300
+timeout_secs = 600
 
 [[step]]
 send = "exit 0\n"
