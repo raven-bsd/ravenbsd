@@ -8,7 +8,7 @@
 #![allow(clippy::arithmetic_side_effects)] // RavenBSD: the clock conversions are checked by the vectors.
 
 use raven_libc_abi::errno::Errno;
-use raven_libc_abi::errno::{EINVAL, ENOSYS, EPERM};
+use raven_libc_abi::errno::{EINVAL, ENOSYS, ENOTSUP, EPERM};
 use raven_libc_abi::structs::Timespec;
 use raven_libc_abi::time::{
     CLOCK_BOOTTIME, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE, CLOCK_MONOTONIC_RAW,
@@ -37,6 +37,18 @@ pub fn time(sys: &dyn TimeSys) -> Result<i64, Errno> {
 
 /// `clock_gettime(2)`.
 pub fn clock_gettime(sys: &dyn TimeSys, id: i32) -> Result<Timespec, Errno> {
+    if id == CLOCK_PROCESS_CPUTIME_ID {
+        let (user, system) = sys.process_times()?;
+        let ns = user.saturating_add(system);
+        return Ok(Timespec {
+            tv_sec: (ns / 1_000_000_000) as i64,
+            tv_nsec: (ns % 1_000_000_000) as i64,
+        });
+    }
+    if id == CLOCK_THREAD_CPUTIME_ID {
+        // No per-thread counter exists yet; the C contract's defined result is ENOTSUP.
+        return Err(errno(ENOTSUP));
+    }
     let Some(clock) = clock_id(id) else {
         return Err(errno(EINVAL));
     };

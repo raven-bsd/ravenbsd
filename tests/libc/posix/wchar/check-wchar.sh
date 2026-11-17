@@ -11,6 +11,7 @@ root=$(CDPATH= cd -- "$(dirname -- "$0")/../../../.." && pwd)
 cd "$root"
 
 cargo nextest run -p raven-libc-ctype
+cargo nextest run -p raven-libc-stdio
 
 archive=build/x86_64/libc.a
 [ -f "$archive" ] || { echo "posix wchar: $archive is missing" >&2; exit 1; }
@@ -19,7 +20,11 @@ for symbol in \
     iswalnum_l iswalpha_l iswblank_l iswcntrl_l iswctype_l iswdigit_l iswgraph_l \
     iswlower_l iswprint_l iswpunct_l iswspace_l iswupper_l iswxdigit_l towctrans_l \
     towlower_l towupper_l wctrans_l wctype_l \
-    wcscasecmp_l wcscoll wcscoll_l wcsncasecmp_l wcsnlen wcstok wcsxfrm wcsxfrm_l wcsftime_l
+    wcscasecmp_l wcscoll wcscoll_l wcsncasecmp_l wcsnlen wcstok wcsxfrm wcsxfrm_l wcsftime_l \
+    fgetwc_unlocked fgetws fputwc fputwc_unlocked fputws fputws_unlocked fwide getwc \
+    getwc_unlocked getwchar getwchar_unlocked putwc putwc_unlocked putwchar putwchar_unlocked \
+    ungetwc wprintf fwprintf swprintf wscanf fwscanf swscanf vwprintf vfwprintf vswprintf \
+    vwscanf vfwscanf vswscanf wcstod wcstof wcstold wcstol wcstoll wcstoul wcstoull wcstoimax wcstoumax
 do
     if ! nm -g --defined-only "$archive" 2>/dev/null | grep -Eq " $symbol$"; then
         echo "posix wchar: missing libc.a symbol $symbol" >&2

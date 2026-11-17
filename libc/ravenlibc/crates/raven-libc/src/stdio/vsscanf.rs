@@ -52,7 +52,7 @@ weak_hook! {
     dummy = crate::stdio::vsscanf::dummy_scan_float;
 }
 
-struct ScanFloat;
+pub(crate) struct ScanFloat;
 
 impl FloatScan for ScanFloat {
     fn parse(&self, token: &[u8], kind: FloatKind) -> Result<FloatBits, FmtErr> {
@@ -89,7 +89,7 @@ fn result(result: Result<ScanResult, FmtErr>) -> c_int {
     }
 }
 
-fn scan_options() -> ScanOptions<'static> {
+pub(crate) fn scan_options() -> ScanOptions<'static> {
     ScanOptions::default()
 }
 

@@ -45,16 +45,57 @@ fn time_and_gettimeofday_read_the_realtime_clock() {
     assert_eq!(gettimeofday(&sys), Ok((1_700_000_000, 123_456)));
 }
 
+struct CpuSys {
+    user: u64,
+    system: u64,
+}
+
+impl TimeSys for CpuSys {
+    fn clock_get(&self, _id: ClockId) -> Result<Timespec, Errno> {
+        Ok(Timespec {
+            tv_sec: 1,
+            tv_nsec: 0,
+        })
+    }
+
+    fn nanosleep(&self, _ns: u64) -> Result<(), Errno> {
+        Ok(())
+    }
+
+    fn read_file(&self, _path: &[u8], _buf: &mut [u8]) -> Result<usize, Errno> {
+        Ok(0)
+    }
+
+    fn issetugid(&self) -> bool {
+        false
+    }
+
+    fn process_times(&self) -> Result<(u64, u64), Errno> {
+        Ok((self.user, self.system))
+    }
+}
+
 #[test]
-fn clock_gettime_rejects_cpu_clocks() {
+fn clock_gettime_reports_process_cpu_time_and_enotsup_for_threads() {
+    let cpu = CpuSys {
+        user: 1_000_000_000,
+        system: 500_000_000,
+    };
+    assert_eq!(
+        clock_gettime(&cpu, CLOCK_PROCESS_CPUTIME_ID),
+        Ok(Timespec {
+            tv_sec: 1,
+            tv_nsec: 500_000_000
+        })
+    );
     let sys = FakeSys::epoch();
     assert_eq!(
         clock_gettime(&sys, CLOCK_PROCESS_CPUTIME_ID),
-        Err(errno(EINVAL))
+        Err(errno(ENOTSUP))
     );
     assert_eq!(
         clock_gettime(&sys, CLOCK_THREAD_CPUTIME_ID),
-        Err(errno(EINVAL))
+        Err(errno(ENOTSUP))
     );
     assert_eq!(clock_gettime(&sys, 99), Err(errno(EINVAL)));
 }

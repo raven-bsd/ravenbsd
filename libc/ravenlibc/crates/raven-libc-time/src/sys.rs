@@ -8,7 +8,7 @@
 //! trait; the pure logic never calls a syscall, reads the environment or opens a
 //! file by itself. `raven-libc-platform` implements it for the real process.
 
-use raven_libc_abi::errno::Errno;
+use raven_libc_abi::errno::{ENOTSUP, Errno};
 use raven_libc_abi::structs::Timespec;
 
 /// A clock the crate can read.
@@ -33,6 +33,17 @@ pub trait TimeSys {
     fn read_file(&self, path: &[u8], buf: &mut [u8]) -> Result<usize, Errno>;
     /// Whether the process is privileged (`AT_SECURE` / set-id).
     fn issetugid(&self) -> bool;
+
+    /// The process CPU time in nanoseconds (`user`, `system`).
+    ///
+    /// The default reports `ENOTSUP`; the shell overrides it with the kernel `PROC_TIMES`
+    /// primitive.
+    ///
+    /// # Errors
+    /// [`ENOTSUP`] when the platform has no CPU-time accounting.
+    fn process_times(&self) -> Result<(u64, u64), Errno> {
+        Err(errno(ENOTSUP))
+    }
 }
 
 /// Build an [`Errno`] from a Linux number.

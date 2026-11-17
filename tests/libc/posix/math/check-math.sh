@@ -52,7 +52,7 @@ for symbol in \
     remainderf remainderl remquo remquof remquol \
     rintl rootn roundl scalbln scalblnf \
     scalblnl scalbnl signbit sincosl sinhl \
-    sinl sqrtl strfromd strfromf strtof \
+    sinl sqrtl statvfs strfromd strfromf strtof \
     tanhl tanl tanpi tgammal truncl \
     ufromfp ufromfpx
 do

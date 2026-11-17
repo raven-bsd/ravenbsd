@@ -9,8 +9,6 @@ use raven_libc_stdio::file_from_ptr;
 
 use crate::stdio::va::{List, reader};
 
-crate::raven_variadic!(prefix: "", export: "fwprintf", target: crate::stdio::vfwprintf::vfwprintf, named: 2);
-
 /// A `wchar_t` string as a slice; `wchar_t` is 32-bit on the RavenBSD targets.
 ///
 /// # Safety
