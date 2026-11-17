@@ -646,6 +646,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mail"
+version = "0.1.0"
+
+[[package]]
+name = "mailx"
+version = "0.1.0"
+dependencies = [
+ "mail",
+]
+
+[[package]]
 name = "make"
 version = "0.1.0"
 dependencies = [
