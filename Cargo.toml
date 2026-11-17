@@ -63,6 +63,7 @@ members = [
     "tests/fixtures/s40-teardown",
     "tests/fixtures/proc-death-cleanup",
     "tests/fixtures/smp-user",
+    "tests/fixtures/irq-dist",
     "tests/fixtures/s16-rights",
     "tests/fixtures/cap-revoke",
     "tests/fixtures/trace-context",

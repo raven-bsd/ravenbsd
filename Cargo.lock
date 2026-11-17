@@ -1552,6 +1552,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-irq-dist"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-k14-controller"
 version = "0.1.0"
 dependencies = [
