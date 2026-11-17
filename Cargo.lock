@@ -376,6 +376,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "gencat"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-locale",
+ "raven-rt",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -474,6 +482,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27f864f10dfb56725ce5ce5472bc52252c8f93a4ab86327122cebf62c5f59a17"
 dependencies = [
  "typenum",
+]
+
+[[package]]
+name = "iconv"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
 ]
 
 [[package]]
@@ -601,6 +616,14 @@ dependencies = [
  "raven-linux-abi",
  "raven-linux-dispatch",
  "raven-proto-linux",
+ "raven-rt",
+]
+
+[[package]]
+name = "locale"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-locale",
  "raven-rt",
 ]
 

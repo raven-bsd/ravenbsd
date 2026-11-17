@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "iconv"
+version = "0.1.0"
+description = "RavenBSD iconv: convert UTF-8, ASCII and ISO-8859-1."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-rt = { path = "../../rt", features = ["alloc"] }
+
+[lints]
+workspace = true
