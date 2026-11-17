@@ -241,12 +241,41 @@ fn interface_compile(
     index: usize,
     row: &InterfaceRow,
 ) -> Result<(bool, String)> {
-    let source = format!(
-        "#include <{}>\nstatic void *const probe = (void *)&{};\nint main(void) {{ return 0; }}\n",
-        row.header, row.name
-    );
+    let source = probe_source(row);
     let path = write_source(output_dir, &format!("interface_{index}.c"), &source)?;
     compile_probe(root, arch, &path, output_dir)
+}
+
+/// The C source used to prove one interface row's declaration.
+///
+/// A few seed rows carry a heuristic declaring header that is not the POSIX header
+/// (`lockf` is declared in `<unistd.h>`, not `<sys/stat.h>`), and the macro rows cannot be
+/// probed with `&name`. Both cases are handled here so the probe tests the declaration
+/// rather than the seed heuristic.
+#[must_use]
+pub(crate) fn probe_source(row: &InterfaceRow) -> String {
+    let header = match row.name.as_str() {
+        "lockf" => "unistd.h",
+        _ => row.header.as_str(),
+    };
+    match row.name.as_str() {
+        "offsetof" => format!(
+            "#include <{header}>\nstruct probe_object {{ int member; }};\nstatic size_t probe_offset = offsetof(struct probe_object, member);\nint main(void) {{ return probe_offset == 0; }}\n"
+        ),
+        "va_start" | "va_end" => format!(
+            "#include <{header}>\nstatic void probe_va(int count, ...) {{ va_list ap; va_start(ap, count); va_end(ap); }}\nint main(void) {{ probe_va(0); return 0; }}\n"
+        ),
+        "va_arg" => format!(
+            "#include <{header}>\nstatic int probe_va(int count, ...) {{ va_list ap; va_start(ap, count); int value = va_arg(ap, int); va_end(ap); return value; }}\nint main(void) {{ return probe_va(1, 0); }}\n"
+        ),
+        "va_copy" => format!(
+            "#include <{header}>\nstatic void probe_va(int count, ...) {{ va_list ap, copy; va_start(ap, count); va_copy(copy, ap); va_end(copy); va_end(ap); }}\nint main(void) {{ probe_va(0); return 0; }}\n"
+        ),
+        _ => format!(
+            "#include <{header}>\nstatic void *const probe = (void *)&{};\nint main(void) {{ return 0; }}\n",
+            row.name
+        ),
+    }
 }
 
 fn qtest_case(test: &str) -> Option<String> {

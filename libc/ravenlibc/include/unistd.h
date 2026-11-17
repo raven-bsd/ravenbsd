@@ -178,6 +178,10 @@ int usleep(unsigned);
 unsigned ualarm(unsigned, unsigned);
 #endif
 
+#if __POSIX_VISIBLE >= 202405 || __BSD_VISIBLE
+int getentropy(void *, size_t);
+#endif
+
 #if __BSD_VISIBLE
 #define L_SET 0
 #define L_INCR 1
@@ -201,7 +205,6 @@ int acct(const char *);
 long syscall(long, ...);
 int execvpe(const char *, char *const [], char *const []);
 int issetugid(void);
-int getentropy(void *, size_t);
 extern int optreset;
 #endif
 
