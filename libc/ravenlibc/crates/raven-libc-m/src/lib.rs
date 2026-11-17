@@ -123,6 +123,11 @@ pub use complex::{
     cimagf, clog, clogf, conj, conjf, cpow, cpowf, cproj, cprojf, creal, crealf, csin, csinf,
     csinh, csinhf, csqrt, csqrtf, ctan, ctanf, ctanh, ctanhf,
 };
+#[cfg(target_arch = "x86_64")]
+pub use complex::{
+    cabsl, cacoshl, cacosl, cargl, casinhl, casinl, catanhl, catanl, ccoshl, ccosl, cexpl, cimagl,
+    clogl, conjl, cpowl, cprojl, creall, csinhl, csinl, csqrtl, ctanhl, ctanl,
+};
 pub use fenv::{
     Femode, FenvT, FexceptT, feclearexcept, fedisableexcept, feenableexcept, fegetenv, fegetexcept,
     fegetexceptflag, fegetmode, fegetround, feholdexcept, feraiseexcept, fesetenv, fesetexcept,
