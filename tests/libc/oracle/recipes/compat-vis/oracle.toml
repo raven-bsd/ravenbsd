@@ -30,7 +30,7 @@ exports = [
   "vis",
 ]
 opt = ["O2", "O0"]
-defines = ["NBBY=8", "CTASSERT(x)=", "__RENAME(x)="]
+defines = ["NBBY=8", "CTASSERT(x)=", "__RENAME(x)=", "__arraycount(x)=sizeof(x)/sizeof((x)[0])"]
 include = ["shim:compat"]
 flags = []
 
