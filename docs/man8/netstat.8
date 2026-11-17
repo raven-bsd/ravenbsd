@@ -14,7 +14,8 @@
 .Nm
 reads the live network state through the
 .Dq net:
-control channel. With no options it prints the socket table and then the per-interface packet
+control channel.
+With no options it prints the socket table and then the per-interface packet
 and byte counters.
 .Pp
 The options are:
@@ -28,7 +29,8 @@ Print only the interface counters.
 .El
 .Pp
 Every socket row carries the transport (tcp, udp or icmp), the state, the local endpoint, the peer
-when connected, the interface, and the receive and transmit queue sizes. Every counter row carries
+when connected, the interface, and the receive and transmit queue sizes.
+Every counter row carries
 the received and transmitted packet and byte counts, receive and transmit errors, and receive and
 transmit drops, all as reported by
 .Xr netd 8 .
@@ -41,8 +43,8 @@ No raw socket is opened and no kernel memory is read directly.
 .Sh EXIT STATUS
 .Ex -std
 .Sh SEE ALSO
+.Xr netd 8 ,
 .Xr ping 8 ,
-.Xr route 8 ,
-.Xr netd 8
+.Xr route 8
 .Sh STANDARDS
 RavenBSD.

@@ -21,7 +21,8 @@ Services start in dependency order computed at boot.
 When the initfs contains the storage chain
 .Pq Pa blockd , fsd-ufs , vfsd ,
 .Nm
-uses two phases.  Phase 1 starts only the bootstrap closure of
+uses two phases.
+Phase 1 starts only the bootstrap closure of
 .Pa logd , initfsd , ramfsd , nulld , zerod , randd , blockd , fsd-ufs , vfsd
 and their dependencies (including the device servers).
 Once
@@ -47,7 +48,8 @@ prefix, not a second root mount: vfsd keeps its one
 .Pa /
 mount.
 .Pp
-Profiles without the storage chain keep the one-phase initfs plan.  The
+Profiles without the storage chain keep the one-phase initfs plan.
+The
 .Pa hw
 profile uses release user programs and an 8 MiB UFS root image; until the virtio-blk driver lands,
 blockd serves that image from the initfs RAM disk.

@@ -16,17 +16,20 @@ reads the driver table from
 .Pa /etc/drivers.toml
 inside the initfs archive, reads the device directory from the
 .Dq pci:
-scheme, and matches each device by vendor and device id.  For a match it opens
+scheme, and matches each device by vendor and device id.
+For a match it opens
 the BAR selected by the driver's
 .Va bar
 argument (default
 .Ql 0 )
 and one page of the function's PCI configuration space, then spawns the
-configured driver in a new process.  Both
+configured driver in a new process.
+Both
 .Dv MmioRegion
 handles are transferred into the child before its first thread starts, in
 order: the BAR is the child's handle 3 and the configuration page its handle 4
-(a fresh child has 0 for itself, 1 for the initfs and 2 for the namespace).  The
+(a fresh child has 0 for itself, 1 for the initfs and 2 for the namespace).
+The
 child does not receive the RootDevice capability.
 .Pp
 When the driver's arguments contain
@@ -36,10 +39,13 @@ also opens
 .Pa /dma
 and
 .Pa /irq
-for the same function.  The 64 KiB DMA buffer is handle 5 and the legacy IRQ
-handle 6.  If the list names only one resource, only that handle is added, in
+for the same function.
+The 64 KiB DMA buffer is handle 5 and the legacy IRQ
+handle 6.
+If the list names only one resource, only that handle is added, in
 the same order; the endpoint exists on every 3.0 function, but a function that
-reports interrupt line 255 has no IRQ.  This is how a driver gets the memory and
+reports interrupt line 255 has no IRQ.
+This is how a driver gets the memory and
 interrupt a queue needs while still receiving no RootDevice and no
 .Dv ADMIN .
 .Pp
@@ -81,7 +87,8 @@ are required;
 .Va args
 defaults to an empty list and
 .Va cycles
-defaults to 1 with a maximum of 100.  An argument of the form
+defaults to 1 with a maximum of 100.
+An argument of the form
 .Ql bar= Ns Ar n
 is consumed by
 .Nm
@@ -93,7 +100,8 @@ and
 .Ql none
 as the accepted values (a
 .Ql +
-rather than a comma, because the table parser splits an array on commas).  A
+rather than a comma, because the table parser splits an array on commas).
+A
 malformed table or an executable path that does not start with
 .Pa /
 is rejected before any spawn.
@@ -102,7 +110,8 @@ Without arguments
 .Nm
 launches the matched driver once and then registers the
 .Dq dev:
-scheme.  With
+scheme.
+With
 .Ar test
 it launches the driver for the manifest's
 .Va cycles
@@ -115,7 +124,8 @@ qtest.
 .Pp
 The
 .Ql dummy
-argument is the built-in test driver.  It maps the transferred BAR, verifies
+argument is the built-in test driver.
+It maps the transferred BAR, verifies
 that
 .Dv MMIO_CREATE
 on that non-root handle fails with
@@ -131,12 +141,12 @@ service manifest
 .Sh EXIT STATUS
 .Ex -std
 .Sh SEE ALSO
-.Xr pcid 8 ,
 .Xr init 8 ,
+.Xr pcid 8 ,
 .Xr svcd 8
+.Sh STANDARDS
+RavenBSD ABI v1.
 .Sh HISTORY
 The
 .Nm
 server first appeared in RavenBSD 0.1.
-.Sh STANDARDS
-RavenBSD ABI v1.

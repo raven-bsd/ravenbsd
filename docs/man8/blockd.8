@@ -25,7 +25,8 @@ names one, for example
 .Ql disk:0
 for the
 .Xr virtio-blk 8
-driver.  The in-memory image is scanned as GPT before the first client is
+driver.
+The in-memory image is scanned as GPT before the first client is
 accepted; the remote backend reads at most a one-mebibyte GPT prefix, never the
 whole disk.
 .Pp
@@ -36,7 +37,8 @@ per operation: it opens the driver path, issues one
 .Dq WRITE
 or
 .Dq FLUSH ,
-closes the handle and decodes the reply.  A driver restart between operations
+closes the handle and decodes the reply.
+A driver restart between operations
 therefore cannot leave a stale handle, and a failed open or a short reply is an
 error, never a guessed result.
 .Pp
@@ -95,27 +97,24 @@ The primary and backup arrays must agree.
 A corrupt table is reported as a startup error instead of being guessed; the
 server exits non-zero and never serves a partial partition list.
 .Pp
-With the remote backend the scanner runs on the one-mebibyte prefix.  The
+With the remote backend the scanner runs on the one-mebibyte prefix.
+The
 primary header and entry array must lie inside that prefix; the primary entries
-may name partitions beyond it.  The backup header and array are validated when
+may name partitions beyond it.
+The backup header and array are validated when
 they also lie inside the prefix, and are optional when the standard backup
-sits at the device's last sector.  The scanner still checks the protective MBR,
+sits at the device's last sector.
+The scanner still checks the protective MBR,
 both CRCs, the header's own and alternate LBA, the usable range, the entry
 bounds and entry overlap, and rejects a `total_sectors` that disagrees with the
-header.  The in-memory RAM backend keeps the strict both-tables validation.
+header.
+The in-memory RAM backend keeps the strict both-tables validation.
 The
 .Ql virtio-blk
 qtest fixture uses a standard last-LBA GPT and proves the bounded read.
 .Pp
 A GPT name longer than the 40-byte wire field is shortened on a UTF-8
 character boundary.
-.Sh FILES
-.Bl -tag -width /etc/services.d -compact
-.It Pa /etc/services.d/blockd.toml
-Service manifest.
-.It Pa /etc/blockd.img
-Initial logical disk image (RAM backend).
-.El
 .Sh ENVIRONMENT
 .Bl -tag -width BLOCKD_DISK -compact
 .It Ev BLOCKD_IMAGE
@@ -128,7 +127,16 @@ is set.
 Driver scheme to use as the backend, for example
 .Ql disk:0 .
 .El
-.Sh ERRORS
+.Sh FILES
+.Bl -tag -width /etc/services.d -compact
+.It Pa /etc/services.d/blockd.toml
+Service manifest.
+.It Pa /etc/blockd.img
+Initial logical disk image (RAM backend).
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh DIAGNOSTICS
 A malformed or out-of-range request returns
 .Er EINVAL .
 A write on a read-only open, or a call on an unknown file, returns
@@ -137,12 +145,10 @@ A writable open or write on a read-only device returns
 .Er EROFS .
 An internal encoding failure returns
 .Er EPROTO .
-.Sh EXIT STATUS
-.Ex -std
 .Sh SEE ALSO
+.Xr svcctl 1 ,
 .Xr init 8 ,
 .Xr initfsd 8 ,
-.Xr svcctl 1 ,
 .Xr virtio-blk 8
 .Sh STANDARDS
 RavenBSD.
