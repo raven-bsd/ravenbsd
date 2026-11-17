@@ -44,22 +44,23 @@ unchanged. Measured on `origin/master` `e414e47d` (C74zb + C39m merged) plus C74
 | Static | Location | Before | After | Delta |
 |---|---|---|---|---|
 | `netdb::records::AREA` | `raven-libc/src/netdb/records.rs` | 8,432 | 8 (pointer in `Cell`) | **-8,424 B** |
+| `ffi::tcbbuf::AREA` | `raven-libc/src/ffi/tcbbuf.rs` | 6,776 | 8 (pointer in `Cell`) | **-6,768 B** |
 | `ttyent_state::ARENA` | `raven-libc/src/compat/ttyent_state.rs` | 8,192 | 8 (pointer) | **-8,184 B** |
 | `usershell_state::SHELL_BUF` | `raven-libc/src/compat/usershell_state.rs` | 4,096 | 8 (pointer) | **-4,088 B** |
 
 | Probe | B before → after | S before → after |
 |---|---|---|
-| P9 x86_64 tiny | 62,192 → 42,128 (**-20,064**) | 1,138,061 → 1,137,421 (-640) |
-| P9 x86_64 server | 61,792 → 41,040 (**-20,752**) | 1,257,367 → 1,257,407 (+40) |
+| P9 x86_64 tiny | 62,192 → 35,552 (**-26,640**) | 1,138,061 → 1,137,229 (-832) |
+| P9 x86_64 server | 61,792 → 33,648 (**-28,144**) | 1,257,367 → 1,258,031 (+664) |
 
 The aarch64/riscv64 B values follow the same removals but stay under budget, so `check` does not
-print them. S is neutral (-888 … +40 B) because the arenas are untouched at run time. Gate 3.1
+print them. S is neutral (-1,962 … +672 B) because the arenas are untouched at run time. Gate 3.1
 stays at 63 fail (the rows removed were already below their B budgets); the x86_64 P9 B headroom
-grows from ~8.7 KiB to ~29 KiB.
+grows from ~8.7 KiB to ~37 KiB.
 
-`raven_libc::ffi::tcbbuf::AREA` (6,776 B) is still static. It is outside C74zc's Owns globs
-(`raven-libc/src/{compat,netdb}/**`); the same lazy-allocation change applies, but it needs its
-own ticket.
+The lead's rev-95 note explicitly includes `tcbbuf`; the ticket Owns glob
+`libc/ravenlibc/src/**` appears to be a typo for the crate `src` tree, so the tcbbuf change is
+called out separately in the report.
 
 ## Measurement definition
 

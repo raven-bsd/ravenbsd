@@ -11,10 +11,9 @@
 //! area (caller state, never a static list). Access is serialised by [`super::lock::SpinLock`]
 //! and no lock is held across a file or server call.
 
+use alloc::boxed::Box;
 use core::cell::UnsafeCell;
 use core::ffi::c_char;
-use core::mem::MaybeUninit;
-use core::sync::atomic::{AtomicU8, Ordering};
 
 use raven_libc_abi::errno::{ERANGE, Errno};
 use raven_libc_abi::structs::{Group, Passwd};
@@ -136,35 +135,28 @@ impl Area {
     }
 }
 
-const UNINIT: u8 = 0;
-const READY: u8 = 2;
-
-struct Cell(UnsafeCell<MaybeUninit<Area>>);
+/// The area is allocated on first use: the static keeps only a pointer, so the process image
+/// pays one word of BSS instead of the 6.7 KiB `Area`. The non-`_r` user/netdb APIs already
+/// allocate for their parsed database vectors, so this adds no new allocation class.
+struct Cell(UnsafeCell<*mut Area>);
 
 // SAFETY: every access goes through [`with_area`], which serialises readers with `LOCK`; the
-// area is written once before `READY` is published with Release (the `ffi::platform` pattern).
+// pointer is written once under the lock and never freed.
 unsafe impl Sync for Cell {}
 
-static STATE: AtomicU8 = AtomicU8::new(UNINIT);
-static AREA: Cell = Cell(UnsafeCell::new(MaybeUninit::uninit()));
+static AREA: Cell = Cell(UnsafeCell::new(core::ptr::null_mut()));
 static LOCK: SpinLock = SpinLock::new();
 
 /// Run `f` over the one area.
 pub(crate) fn with_area<R>(f: impl FnOnce(&mut Area) -> R) -> R {
     LOCK.acquire();
-    if STATE
-        .compare_exchange(UNINIT, 1, Ordering::AcqRel, Ordering::Acquire)
-        .is_ok()
-    {
-        // SAFETY: this caller won the one-shot initialisation and owns the slot until READY.
-        unsafe { (*AREA.0.get()).write(Area::new()) };
-        STATE.store(READY, Ordering::Release);
+    // SAFETY: `LOCK` serialises this cell and the slot is private to this module.
+    let slot = unsafe { &mut *AREA.0.get() };
+    if slot.is_null() {
+        *slot = Box::into_raw(Box::new(Area::new()));
     }
-    while STATE.load(Ordering::Acquire) != READY {
-        core::hint::spin_loop();
-    }
-    // SAFETY: READY was published with Release after the write and the storage is a static.
-    let area = unsafe { (&mut *AREA.0.get()).assume_init_mut() };
+    // SAFETY: the pointer was published under `LOCK` and is never freed.
+    let area = unsafe { &mut **slot };
     let result = f(area);
     LOCK.release();
     result

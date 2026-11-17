@@ -112,6 +112,14 @@ fn group_record_builds_the_member_array() {
 }
 
 #[test]
+fn the_area_is_one_stable_heap_allocation() {
+    let first = with_area(|area| area as *mut Area);
+    let second = with_area(|area| area as *mut Area);
+    assert!(!first.is_null());
+    assert_eq!(first, second);
+}
+
+#[test]
 fn area_pack_is_eight_aligned_and_writable() {
     with_area(|area| {
         let pointer = area.passwd.buf.as_mut_ptr();
