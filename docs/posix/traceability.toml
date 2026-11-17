@@ -4073,6 +4073,12 @@ test = "none"
 evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
+id = "interface.isinf"
+ticket = "P1"
+test = "none"
+evidence = "none"
+
+[[trace]]
 id = "interface.isless"
 ticket = "P1"
 test = "none"

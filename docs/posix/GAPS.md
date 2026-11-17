@@ -13,14 +13,14 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 |---|---:|---:|---:|---:|---:|
 | filesystem | 20 | 1 | 0 | 19 | 0 |
 | headers | 86 | 2 | 29 | 55 | 0 |
-| interfaces | 1422 | 375 | 0 | 1047 | 0 |
+| interfaces | 1423 | 376 | 0 | 1047 | 0 |
 | process | 17 | 0 | 0 | 14 | 3 |
 | shell | 25 | 0 | 0 | 22 | 3 |
 | tty | 12 | 0 | 0 | 7 | 5 |
 | utilities | 217 | 38 | 1 | 173 | 5 |
-| **all** | **1799** | **416** | **30** | **1337** | **16** |
+| **all** | **1800** | **417** | **30** | **1337** | **16** |
 
-Traceability rows: 1799; profile rows: 1799.
+Traceability rows: 1800; profile rows: 1800.
 
 ## Headers
 
@@ -689,6 +689,7 @@ Traceability rows: 1799; profile rows: 1799.
 | `interface.isgraph_l` | `isgraph_l` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | ctype.h |
 | `interface.isgreater` | `isgreater` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.isgreaterequal` | `isgreaterequal` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
+| `interface.isinf` | `isinf` | missing | P1 | `none` | math.h |
 | `interface.isless` | `isless` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.islessequal` | `islessequal` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.islessgreater` | `islessgreater` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
@@ -1976,4 +1977,4 @@ Traceability rows: 1799; profile rows: 1799.
 | interface | `casinfNx` | `none` |
 | interface | `casinh` | `none` |
 
-462 gap rows are listed in full in the tables above; this short table is a review aid.
+463 gap rows are listed in full in the tables above; this short table is a review aid.
