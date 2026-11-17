@@ -1,0 +1,26 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt WHAT 1
+.Os RavenBSD
+.Sh NAME
+.Nm what
+.Nd extract SCCS identification strings
+.Sh SYNOPSIS
+.Nm
+.Op Fl s
+.Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility scans each file for the SCCS marker
+.Li @(#)
+and writes the marker string up to a quote, greater-than sign, newline or
+NUL.
+The
+.Fl s
+option stops after the first string in each file.
+.Sh EXIT STATUS
+Returns 0 on success; a file error returns 1 and a usage error 2.
+.Sh SEE ALSO
+.Xr unget 1

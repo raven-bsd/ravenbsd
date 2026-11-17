@@ -1,0 +1,32 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt ULIMIT 1
+.Os RavenBSD
+.Sh NAME
+.Nm ulimit
+.Nd POSIX resource-limit command surface
+.Sh SYNOPSIS
+.Nm
+.Op Fl HS
+.Op Fl a
+.Op Fl cdfnstv
+.Op Ar limit
+.Sh DESCRIPTION
+The
+.Nm
+utility parses the POSIX resource-limit options and limit value.
+.Pp
+The RavenBSD ABI has no
+.Fn getrlimit
+or
+.Fn setrlimit
+syscall, so a query or assignment reports
+.Dq resource limits are not available in this kernel
+and exits with status 1. No limit is fabricated.
+.Sh EXIT STATUS
+Returns 0 only for
+.Fl -help ; usage errors exit with status 2 and an unavailable limit
+with status 1.
+.Sh SEE ALSO
+.Xr sh 1

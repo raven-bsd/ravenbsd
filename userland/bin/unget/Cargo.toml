@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "unget"
+version = "0.1.0"
+description = "RavenBSD unget: cancel an SCCS get through its p-file."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "unget"
+path = "src/lib.rs"
+
+[[bin]]
+name = "unget"
+path = "src/main.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-rt = { path = "../../rt" }
+raven-tool-core = { path = "../../../crates/raven-tool-core" }
+
+[lints]
+workspace = true

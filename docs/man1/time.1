@@ -1,0 +1,31 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt TIME 1
+.Os RavenBSD
+.Sh NAME
+.Nm time
+.Nd measure utility real time
+.Sh SYNOPSIS
+.Nm
+.Op Fl p
+.Ar utility
+.Op Ar argument ...
+.Sh DESCRIPTION
+The
+.Nm
+utility runs
+.Ar utility
+and writes the observed real time in seconds.
+The
+.Fl p
+option selects the portable report form.
+.Pp
+The kernel exposes a monotonic clock but no per-process CPU accounting, so
+the user and sys values are reported as zero.
+.Sh EXIT STATUS
+The exit status of
+.Ar utility
+is returned; a usage error exits with status 2.
+.Sh SEE ALSO
+.Xr times 1

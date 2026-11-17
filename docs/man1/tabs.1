@@ -1,0 +1,36 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt TABS 1
+.Os RavenBSD
+.Sh NAME
+.Nm tabs
+.Nd set terminal tab stops
+.Sh SYNOPSIS
+.Nm
+.Op Fl c
+.Op Fl T Ar type
+.Op Ar stop ...
+.Sh DESCRIPTION
+The
+.Nm
+utility writes ANSI escapes that clear and set tab stops at the given
+1-based columns.
+The default stop list is every eight columns through 80.
+The
+.Fl c
+option emits cursor-motion escapes instead of setting stops, and
+.Fl T
+accepts a terminal type (the implementation is ANSI only).
+.Pp
+The historical
+.Fl a , f , p , s
+and
+.Fl u
+styles and
+.Sy +m
+are not supported and produce a usage error.
+.Sh EXIT STATUS
+Returns 0 on success and 2 on usage errors.
+.Sh SEE ALSO
+.Xr tput 1

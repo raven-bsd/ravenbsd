@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4g simple time/tty utility evidence. `ulimit` has no row: the RavenBSD ABI has no
+# getrlimit/setrlimit syscall, so the utility cannot report or set a resource limit.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.time"
+status = "present"
+evidence = "test:tests/posix/utility/simple2/time/test.sh"
+notes = "P4g: -p parsing, real-time report, child spawn; user/sys are 0 because the kernel has no process CPU clock"
+
+[[row]]
+id = "util.times"
+status = "present"
+evidence = "test:tests/posix/utility/simple2/times/test.sh"
+notes = "P4g: POSIX XmY.ZZs two-line rendering; the target prints zero ticks because the kernel has no process CPU clock"
+
+[[row]]
+id = "util.tput"
+status = "present"
+evidence = "test:tests/posix/utility/simple2/tput/test.sh"
+notes = "P4g: -T and ANSI capability subset (clear, cup, bold, sgr0, smso/rmso, smul/rmul, el, ed, bel, cols, lines)"
+
+[[row]]
+id = "util.tabs"
+status = "present"
+evidence = "test:tests/posix/utility/simple2/tabs/test.sh"
+notes = "P4g: default tab-stop and -c cursor-motion escape sequences; other historical styles return usage"
+
+[[row]]
+id = "util.unget"
+status = "present"
+evidence = "test:tests/posix/utility/simple2/unget/test.sh"
+notes = "P4g: -n/-s/-r parsing and s.* to p.* restore; full SCCS delta bookkeeping is out of scope"
+
+[[row]]
+id = "util.what"
+status = "present"
+evidence = "test:tests/posix/utility/simple2/what/test.sh"
+notes = "P4g: @(#) extraction to quote/greater-than/newline/NUL with -s"
