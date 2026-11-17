@@ -16,7 +16,7 @@
 //! resumes.
 
 use alloc::collections::BTreeMap;
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use core::cell::UnsafeCell;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, Ordering};
@@ -250,63 +250,141 @@ impl<T> Drop for IrqGuard<'_, T> {
 // Pure, host-tested heap/queue math with bounded indices.
 mod turnstile;
 
-use turnstile::{Error as TurnstileError, ObjectId, Priority, ThreadId, Turnstiles};
+/// IPC call-edge model (L6a) compiled from the same source as the host tests.
+///
+/// `donation.rs` resolves its imports through its parent module (`super`), so the turnstile types
+/// it names are imported here first; `kernel/Cargo.toml` is outside this ticket's Owns.
+#[path = "../../crates/raven-turnstile/src/donation.rs"]
+#[allow(dead_code)] // The kernel uses `begin_call`/`end_call`; the rest awaits consumers.
+#[allow(unexpected_cfgs)] // The `lockstat` feature cfg belongs to the turnstile crate, not the kernel.
+#[allow(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+// Pure, host-tested graph math with bounded indices.
+mod donation;
 
-/// The global turnstile registry plus the `tid -> Arc<Thread>` map used to wake handed-off owners.
+use donation::Donation;
+use turnstile::{CancelOutcome, Error, InheritEffect, ObjectId, Priority, ThreadId, Turnstiles};
+
+/// The global donation graph plus the `tid -> Weak<Thread>` map used to apply and restore boosts.
+///
+/// The map holds weak references: a thread that exits must not be kept alive (with its kernel
+/// stack) just because it once used a lock or an IPC call.
 struct KernelTurnstile {
-    turnstiles: Turnstiles,
-    threads: BTreeMap<ThreadId, Arc<Thread>>,
+    graph: Donation,
+    threads: BTreeMap<ThreadId, Weak<Thread>>,
 }
 
 impl KernelTurnstile {
     fn new() -> Self {
         Self {
-            turnstiles: Turnstiles::new(),
+            graph: Donation::new(),
             threads: BTreeMap::new(),
         }
     }
 
-    /// Register a thread's base priority once, remembering its `Arc<Thread>` for wakeups.
+    /// Register a thread's base priority once and remember it weakly for boost application.
     fn register(&mut self, tid: ThreadId, thread: &Arc<Thread>) {
-        if self.turnstiles.base_priority(tid).is_none() {
-            self.turnstiles
+        if self.graph.base_priority(tid).is_none() {
+            self.graph
                 .register(tid, Priority::new(thread.priority.load(Ordering::Acquire)))
                 .ok();
-            self.threads.insert(tid, Arc::clone(thread));
         }
+        self.threads.insert(tid, Arc::downgrade(thread));
     }
 }
 
 static TURNSTILES: IrqSpinLock<Option<KernelTurnstile>> = IrqSpinLock::new(None);
 static NEXT_MUTEX_ID: AtomicU32 = AtomicU32::new(1);
 
-/// Re-sync `tid`'s scheduler boost to its current turnstile effective priority.
+/// Apply `effective` to `thread` as the scheduler boost, clearing it when no donor is active.
+fn apply_boost(thread: &Thread, effective: u8) {
+    let base = thread.priority.load(Ordering::Acquire);
+    if effective < base {
+        thread.set_boost(effective);
+    } else {
+        thread.clear_boost();
+    }
+}
+
+/// Re-sync `tid`'s scheduler boost to its current donation-graph effective priority.
 ///
-/// The turnstile computes the inherited priority (the least fixed point over lock waiters); this
-/// writes it into `Thread.boost` via [`Thread::set_boost`]/[`Thread::clear_boost`] so the
-/// scheduler's `effective_priority` observes it. The atomic boost field makes this safe across
-/// CPUs. Called after every mutation that changes an owner's priority.
+/// The graph computes the inherited priority (the least fixed point over lock waiters and IPC
+/// call edges); this writes it into `Thread.boost` via [`Thread::set_boost`]/
+/// [`Thread::clear_boost`] so the scheduler's `effective_priority` observes it. The atomic boost
+/// field makes this safe across CPUs. Called after every mutation that changes a priority.
 fn sync_thread_boost(tid: ThreadId) {
     let (effective, thread) = {
         let guard = TURNSTILES.lock();
         let Some(kernel) = guard.as_ref() else {
             return;
         };
-        let Some(effective) = kernel.turnstiles.effective_priority(tid) else {
+        let Some(effective) = kernel.graph.effective_priority(tid) else {
             return;
         };
-        let Some(thread) = kernel.threads.get(&tid).cloned() else {
+        let Some(thread) = kernel.threads.get(&tid).and_then(Weak::upgrade) else {
             return;
         };
-        (effective, thread)
+        (effective.raw(), thread)
     };
-    let base = thread.priority.load(Ordering::Acquire);
-    let boosted = effective.raw();
-    if boosted < base {
-        thread.set_boost(boosted);
-    } else {
-        thread.clear_boost();
+    apply_boost(&thread, effective);
+}
+
+/// Re-apply every registered thread's effective priority.
+///
+/// A call edge can lift a server and, transitively, the owner of a lock the server waits on; a
+/// single `set_boost` for the named thread is not enough once the two edge kinds compose. The
+/// registered set is small (threads that used a lock or an IPC call) and the weak map drops dead
+/// threads, so a full pass is bounded. Only atomics are touched while the graph lock is held.
+fn sync_all_boosts() {
+    let guard = TURNSTILES.lock();
+    let Some(kernel) = guard.as_ref() else {
+        return;
+    };
+    for (tid, weak) in &kernel.threads {
+        let Some(effective) = kernel.graph.effective_priority(*tid) else {
+            continue;
+        };
+        let Some(thread) = weak.upgrade() else {
+            continue;
+        };
+        apply_boost(&thread, effective.raw());
     }
+}
+
+/// Register `thread` with the donation graph so an IPC call edge can name it as the client.
+///
+/// Called once per request by the client thread; the base priority is captured at that point.
+pub fn register_thread(thread: &Arc<Thread>) {
+    let mut guard = TURNSTILES.lock();
+    let kernel = guard.get_or_insert_with(KernelTurnstile::new);
+    kernel.register(thread.tid, thread);
+}
+
+/// Open the IPC call edge `client -> server` and apply the resulting boosts.
+///
+/// The client must already be registered (see [`register_thread`]); the server is registered
+/// here. Returns `false` when the client is unknown, in which case no edge is created.
+pub fn donation_begin_call(client: ThreadId, server: &Arc<Thread>) -> bool {
+    {
+        let mut guard = TURNSTILES.lock();
+        let kernel = guard.get_or_insert_with(KernelTurnstile::new);
+        kernel.register(server.tid, server);
+        if kernel.graph.begin_call(client, server.tid).is_err() {
+            return false;
+        }
+    }
+    sync_all_boosts();
+    true
+}
+
+/// Close the IPC call edge `client -> server` and restore every boost the edge contributed to.
+pub fn donation_end_call(client: ThreadId, server: ThreadId) {
+    {
+        let mut guard = TURNSTILES.lock();
+        if let Some(kernel) = guard.as_mut() {
+            let _ = kernel.graph.end_call(client, server);
+        }
+    }
+    sync_all_boosts();
 }
 
 /// A blocking mutex with priority inheritance.
@@ -368,12 +446,12 @@ impl<T> Mutex<T> {
             let mut guard = TURNSTILES.lock();
             let kernel = guard.get_or_insert_with(KernelTurnstile::new);
             kernel.register(tid, &thread);
-            match kernel.turnstiles.acquire(object, tid) {
+            match kernel.graph.acquire(object, tid) {
                 Ok(()) => (true, None),
-                Err(TurnstileError::AlreadyOwned { .. }) => {
+                Err(Error::AlreadyOwned { .. }) => {
                     // Block on the owner; the returned `InheritEffect` names the owner whose
                     // effective priority the block may have raised.
-                    let effect = kernel.turnstiles.block(object, tid).ok();
+                    let effect = kernel.graph.block(object, tid).ok();
                     (false, effect.map(|effect| effect.owner))
                 }
                 Err(_) => (false, None),
@@ -400,9 +478,9 @@ impl<T> Mutex<T> {
             let mut guard = TURNSTILES.lock();
             let kernel = guard.get_or_insert_with(KernelTurnstile::new);
             kernel
-                .turnstiles
+                .graph
                 .wake_one(object)
-                .and_then(|next_tid| kernel.threads.get(&next_tid).cloned())
+                .and_then(|next_tid| kernel.threads.get(&next_tid).and_then(Weak::upgrade))
         };
         // The releasing owner drops its boost; the handed-off owner inherits any remaining waiter.
         if let Some(old) = old_owner {
@@ -457,7 +535,7 @@ pub fn turnstile_effective_priority(tid: ThreadId) -> Option<u8> {
     let guard = TURNSTILES.lock();
     guard
         .as_ref()
-        .and_then(|kernel| kernel.turnstiles.effective_priority(tid))
+        .and_then(|kernel| kernel.graph.effective_priority(tid))
         .map(|priority| priority.raw())
 }
 
@@ -526,5 +604,142 @@ pub fn selftest() {
             WAITER_GOT_LOCK.load(Ordering::Acquire)
         );
         crate::boot::exit_qemu(0x11);
+    }
+}
+
+/// The `selftest=ipc-donation` kernel-thread test: a high-priority client opens a call edge to a
+/// low-priority server, the server waits on a mutex held by a lower-priority owner, and the
+/// client's priority reaches the owner through the call edge plus the turnstile wait edge. Every
+/// boost is restored when the lock is released and the call completes.
+#[allow(dead_code)] // The dispatcher is x86-64 only (aarch64 has no `selftest=ipc-donation` entry yet).
+pub fn selftest_ipc_donation() {
+    static M: Mutex<u32> = Mutex::new(0);
+    static CLIENT_THREAD: IrqSpinLock<Option<Arc<Thread>>> = IrqSpinLock::new(None);
+    static CLIENT_TID: AtomicU32 = AtomicU32::new(0);
+    static CLIENT_BLOCKED: AtomicBool = AtomicBool::new(false);
+    static OWNER_HELD: AtomicBool = AtomicBool::new(false);
+    static CLIENT_RESTORED: AtomicBool = AtomicBool::new(false);
+    static OWNER_BOOST: AtomicU8 = AtomicU8::new(NO_BOOST);
+    static OWNER_RESTORED: AtomicBool = AtomicBool::new(false);
+    static SERVER_BOOST: AtomicU8 = AtomicU8::new(NO_BOOST);
+    static SERVER_RESTORED: AtomicBool = AtomicBool::new(false);
+
+    fn client() {
+        let me = crate::sched::current_thread().expect("ipc-donation: client thread");
+        me.priority.store(0, Ordering::Release); // highest: the donor
+        register_thread(&me);
+        CLIENT_TID.store(me.tid, Ordering::Release);
+        CLIENT_THREAD.lock().replace(Arc::clone(&me));
+        // The client blocks on the reply; the server owns the call edge from here on.
+        let token = crate::sched::begin_block().expect("ipc-donation: client block");
+        CLIENT_BLOCKED.store(true, Ordering::Release);
+        let _ = crate::sched::block_current();
+        crate::sched::end_block(token);
+        CLIENT_RESTORED.store(
+            me.boost.load(Ordering::Acquire) == NO_BOOST,
+            Ordering::Release,
+        );
+    }
+
+    fn owner() {
+        let me = crate::sched::current_thread().expect("ipc-donation: owner thread");
+        me.priority.store(5, Ordering::Release); // above the server, below the client
+        let guard = M.lock();
+        OWNER_HELD.store(true, Ordering::Release);
+        // Sleep while holding the mutex: the server's lock wait must do the waking.
+        let token = crate::sched::begin_block().expect("ipc-donation: owner block");
+        let _ = crate::sched::block_current();
+        crate::sched::end_block(token);
+        OWNER_BOOST.store(me.boost.load(Ordering::Acquire), Ordering::Release);
+        drop(guard); // unlock hands the mutex to the server
+        OWNER_RESTORED.store(
+            me.boost.load(Ordering::Acquire) == NO_BOOST,
+            Ordering::Release,
+        );
+    }
+
+    fn server() {
+        let me = crate::sched::current_thread().expect("ipc-donation: server thread");
+        me.priority.store(10, Ordering::Release);
+        while !OWNER_HELD.load(Ordering::Acquire) {
+            core::hint::spin_loop();
+        }
+        let client_tid = CLIENT_TID.load(Ordering::Acquire);
+        if !donation_begin_call(client_tid, &me) {
+            SERVER_RESTORED.store(false, Ordering::Release);
+            return;
+        }
+        SERVER_BOOST.store(me.boost.load(Ordering::Acquire), Ordering::Release);
+        // Block on the mutex the sleeping owner holds; the block applies the inherited priority
+        // to the owner. The orchestrator wakes the owner once this wait edge exists.
+        let guard = M.lock();
+        drop(guard);
+        donation_end_call(client_tid, me.tid);
+        SERVER_RESTORED.store(
+            me.boost.load(Ordering::Acquire) == NO_BOOST,
+            Ordering::Release,
+        );
+        if let Some(client) = CLIENT_THREAD.lock().clone() {
+            crate::sched::wake(client, None, 0);
+        }
+    }
+
+    // Keep the orchestrator below every worker so a ready worker always wins the pick.
+    let main = crate::sched::current_thread();
+    let saved_priority = main
+        .as_ref()
+        .map(|thread| thread.priority.load(Ordering::Acquire));
+    if let Some(thread) = main.as_ref() {
+        thread.priority.store(31, Ordering::Release);
+    }
+    let client_thread = crate::sched::spawn_kernel("ipc-donation-client", client)
+        .expect("ipc-donation: spawn client");
+    client_thread.priority.store(0, Ordering::Release);
+    let owner_thread =
+        crate::sched::spawn_kernel("ipc-donation-owner", owner).expect("ipc-donation: spawn owner");
+    owner_thread.priority.store(5, Ordering::Release);
+    let server_thread = crate::sched::spawn_kernel("ipc-donation-server", server)
+        .expect("ipc-donation: spawn server");
+    server_thread.priority.store(10, Ordering::Release);
+
+    let mut owner_woken = false;
+    while !CLIENT_BLOCKED.load(Ordering::Acquire)
+        || !OWNER_HELD.load(Ordering::Acquire)
+        || !SERVER_RESTORED.load(Ordering::Acquire)
+        || !OWNER_RESTORED.load(Ordering::Acquire)
+        || !CLIENT_RESTORED.load(Ordering::Acquire)
+    {
+        // The owner sleeps holding the mutex; wake it only once the server's lock wait has
+        // applied the inherited priority, so it observes the boost rather than racing the wake.
+        if turnstile_effective_priority(owner_thread.tid) == Some(0) && !owner_woken {
+            owner_woken = true;
+            crate::sched::wake(Arc::clone(&owner_thread), None, 0);
+        }
+        core::hint::spin_loop();
+    }
+
+    if let (Some(thread), Some(priority)) = (main.as_ref(), saved_priority) {
+        thread.priority.store(priority, Ordering::Release);
+    }
+
+    let server_boost = SERVER_BOOST.load(Ordering::Acquire);
+    let owner_boost = OWNER_BOOST.load(Ordering::Acquire);
+    if server_boost == 0
+        && owner_boost == 0
+        && SERVER_RESTORED.load(Ordering::Acquire)
+        && OWNER_RESTORED.load(Ordering::Acquire)
+        && CLIENT_RESTORED.load(Ordering::Acquire)
+    {
+        crate::kprintln!(
+            "ipc-donation: ok client_boost=0 server_boost=0 owner_boost=0 restored=ok"
+        );
+    } else {
+        crate::kprintln!(
+            "ipc-donation: fail server_boost={server_boost} owner_boost={owner_boost} server_restored={} owner_restored={} client_restored={}",
+            SERVER_RESTORED.load(Ordering::Acquire),
+            OWNER_RESTORED.load(Ordering::Acquire),
+            CLIENT_RESTORED.load(Ordering::Acquire)
+        );
+        crate::boot::exit_qemu(0x12);
     }
 }

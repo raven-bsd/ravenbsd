@@ -26,6 +26,7 @@ pub fn run(cmdline: &CmdLine) {
         Some("timer") => timer_selftest(),
         Some("sched") => crate::sched::selftest::run(),
         Some("locking") => crate::sync::selftest(),
+        Some("ipc-donation") => crate::sync::selftest_ipc_donation(),
         _ => {}
     }
 }
