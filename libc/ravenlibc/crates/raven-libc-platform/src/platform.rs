@@ -17,7 +17,7 @@ use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 use raven_libc_abi::fcntl;
 use raven_libc_abi::structs::Stat;
-use raven_proto_fs::{Call, CallRequest, CallResponse, Stat as WireStat};
+use raven_proto_fs::{Call, CallRequest, CallResponse, SetTime, Stat as WireStat};
 
 use crate::backend::SysBackend;
 use crate::fd::fdsan::{Action, FdsanState, Mismatch};
@@ -921,8 +921,138 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
         })
     }
 
-    /// `fchmod`: change the permission bits of the open file.
-    ///
+    /// Resolve a path relative to `dirfd` (or the cwd) for the `*at` calls.
+    fn absolute_at(&self, dirfd: i32, path: &[u8]) -> Result<Vec<u8>, Errno> {
+        if dirfd == fcntl::AT_FDCWD {
+            return self
+                .cwd
+                .resolve(path, false, &self.limits)
+                .map(|resolved| resolved.abs)
+                .map_err(crate::path::path_errno);
+        }
+        let mut base = self.base_for(dirfd)?;
+        if base.last() != Some(&b'/') {
+            base.push(b'/');
+        }
+        base.extend_from_slice(path);
+        Ok(base)
+    }
+
+    /// `chown` through `OP_CHOWN` on the root handle.
+    pub fn chown(&self, path: &[u8], uid: u32, gid: u32) -> Result<(), Errno> {
+        let resolved = self
+            .cwd
+            .resolve(path, false, &self.limits)
+            .map_err(crate::path::path_errno)?;
+        self.root_call(Call::Chown {
+            uid,
+            gid,
+            path: &resolved.abs,
+        })
+    }
+
+    /// `lchown` through `OP_LCHOWN` on the root handle.
+    pub fn lchown(&self, path: &[u8], uid: u32, gid: u32) -> Result<(), Errno> {
+        let resolved = self
+            .cwd
+            .resolve(path, true, &self.limits)
+            .map_err(crate::path::path_errno)?;
+        self.root_call(Call::Lchown {
+            uid,
+            gid,
+            path: &resolved.abs,
+        })
+    }
+
+    /// `fchown`: use the OFD path and `OP_CHOWN`, like `fchmod`.
+    pub fn fchown(&self, fd: i32, uid: u32, gid: u32) -> Result<(), Errno> {
+        let reference = self.get(fd)?;
+        let path = reference.path().ok_or(Errno::EOPNOTSUPP)?;
+        drop(reference);
+        self.root_call(Call::Chown {
+            uid,
+            gid,
+            path: &path,
+        })
+    }
+
+    /// `mkfifoat` through `OP_MKFIFO`.
+    pub fn mkfifoat(&self, dirfd: i32, path: &[u8], mode: u32) -> Result<(), Errno> {
+        let resolved = self.absolute_at(dirfd, path)?;
+        self.root_call(Call::Mkfifo {
+            mode: mode & 0o7777,
+            path: &resolved,
+        })
+    }
+
+    /// `mknodat` through `OP_MKNOD`.
+    pub fn mknodat(&self, dirfd: i32, path: &[u8], mode: u32, dev: u32) -> Result<(), Errno> {
+        let resolved = self.absolute_at(dirfd, path)?;
+        self.root_call(Call::Mknod {
+            mode,
+            dev,
+            path: &resolved,
+        })
+    }
+
+    /// `utime` through `OP_UTIMENS`; `None` omits that timestamp.
+    pub fn utime(&self, path: &[u8], atime: Option<i64>, mtime: Option<i64>) -> Result<(), Errno> {
+        let resolved = self
+            .cwd
+            .resolve(path, false, &self.limits)
+            .map_err(crate::path::path_errno)?;
+        self.root_call(Call::Utimens {
+            path: &resolved.abs,
+            atime: atime.map_or(SetTime::Omit, SetTime::Set),
+            mtime: mtime.map_or(SetTime::Omit, SetTime::Set),
+            follow: true,
+        })
+    }
+
+    /// `getdtablesize`: the soft `RLIMIT_NOFILE` value.
+    pub fn getdtablesize(&self) -> i32 {
+        i32::try_from(self.rlimits().nofile_soft).unwrap_or(i32::MAX)
+    }
+
+    /// `gethostid`: `sys:kern/hostid`, or zero when the sysctl is absent.
+    pub fn gethostid(&self) -> i32 {
+        let Ok(bytes) = self.read_sys(b"kern/hostid") else {
+            return 0;
+        };
+        let Ok(text) = core::str::from_utf8(&bytes) else {
+            return 0;
+        };
+        text.trim().parse::<i32>().unwrap_or(0)
+    }
+
+    /// `getdomainname`: `sys:kern/domainname`, truncated to the caller buffer.
+    pub fn getdomainname(&self, buf: &mut [u8]) -> Result<(), Errno> {
+        let value = self.read_sys(b"kern/domainname").unwrap_or_default();
+        let line = value.split(|byte| *byte == b'\n').next().unwrap_or(&[]);
+        let end = line
+            .iter()
+            .rposition(|byte| !byte.is_ascii_whitespace())
+            .map_or(0, |index| index.saturating_add(1));
+        let value = line.get(..end).unwrap_or(&[]);
+        let length = value.len().min(buf.len().saturating_sub(1));
+        buf.get_mut(..length)
+            .ok_or(Errno::EINVAL)?
+            .copy_from_slice(value.get(..length).unwrap_or(&[]));
+        if let Some(slot) = buf.get_mut(length) {
+            *slot = 0;
+        }
+        Ok(())
+    }
+
+    /// `setdomainname`: write `sys:kern/domainname`.
+    pub fn setdomainname(&self, name: &[u8]) -> Result<(), Errno> {
+        if name.len() > 64 || name.contains(&0) {
+            return Err(Errno::EINVAL);
+        }
+        self.write_sys(b"kern/domainname", name)
+    }
+
+    /// `fchmod`: change the permission bits of the open file.    ///
     /// `OP_CHMOD` is directory-relative: the scheme resolves its path against
     /// the handle it is sent on, and an attached file handle is not a
     /// directory, so the handle-relative `"."` form is rejected (`EINVAL` in
@@ -1655,3 +1785,7 @@ impl<B: SysBackend, L: Lock> OfdRef<'_, B, L> {
         self.status() & 0o3 != 0
     }
 }
+
+#[cfg(test)]
+#[path = "p1c_ut.rs"]
+mod p1c_tests;

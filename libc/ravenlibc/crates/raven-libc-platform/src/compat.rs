@@ -559,6 +559,16 @@ pub fn setrlimit<B: SysBackend, L: Lock>(
     Ok(())
 }
 
+/// `setrlimit64`: the native 64-bit alias.
+pub fn setrlimit64<B: SysBackend, L: Lock>(
+    platform: &Platform<B, L>,
+    resource: i32,
+    soft: u64,
+    hard: u64,
+) -> Result<(), Errno> {
+    setrlimit(platform, resource, soft, hard)
+}
+
 /// `prlimit`.
 pub fn prlimit<B: SysBackend, L: Lock>(
     platform: &Platform<B, L>,
