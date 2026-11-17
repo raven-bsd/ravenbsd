@@ -17,7 +17,8 @@ utility validates a five-field crontab and installs it atomically as
 .Pa /var/cron/<user> .
 With no file operand it reads standard input.
 .Pp
-The time fields are minute, hour, day of month, month and day of week. Each accepts
+The time fields are minute, hour, day of month, month and day of week.
+Each accepts
 .Ql * ,
 a number, a range
 .Pq Ql a-b ,
@@ -34,12 +35,14 @@ Remove the current spool.
 .El
 .Pp
 .Nm
-does not interpret the command. Shell metacharacters are supported only by a shell-capable
+does not interpret the command.
+Shell metacharacters are supported only by a shell-capable
 runner; the target crond executes a simple program plus arguments.
 .Sh ENVIRONMENT
 .Bl -tag -width CRON_SPOOL
 .It Ev CRON_SPOOL
-Override the spool directory. Used by the host tests.
+Override the spool directory.
+Used by the host tests.
 .El
 .Sh EXIT STATUS
 .Ex -std

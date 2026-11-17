@@ -29,11 +29,13 @@ option prefixes the hash with
 removes one such marker.
 A locked record never authenticates.
 .Pp
-Root may change every account. Other users may change only their own password after
+Root may change every account.
+Other users may change only their own password after
 verifying the old one; that path needs the setuid binary and kernel credentials from U3 and is
 not shipped in 0.2.0.
 .Pp
-The console server echoes input in this release. Echo suppression needs the terminal-mode
+The console server echoes input in this release.
+Echo suppression needs the terminal-mode
 work in U3.
 .Sh FILES
 .Bl -tag -width /etc/shadow -compact
@@ -46,7 +48,7 @@ exclusive update lock
 .Ex -std
 A usage error exits with status 2.
 .Sh SEE ALSO
-.Xr useradd 1 ,
-.Xr su 1
+.Xr su 1 ,
+.Xr useradd 1
 .Sh STANDARDS
 RavenBSD.

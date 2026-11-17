@@ -50,15 +50,16 @@ Undo, quit or print a line number.
 .El
 .Pp
 Shell escapes
-.Pq Ic !
-are explicitly unsupported and return a diagnostic. The target image has no
+.Pq Ic \&!
+are explicitly unsupported and return a diagnostic.
+The target image has no
 standard-input stream, so the current wrapper expects commands on the serial
 console; host tests execute the same command model directly.
 .Sh EXIT STATUS
 .Ex -std
 An invalid command/address exits with status 1; a usage error exits with status 2.
 .Sh SEE ALSO
-.Xr sed 1 ,
-.Xr ex 1
+.Xr ex 1 ,
+.Xr sed 1
 .Sh STANDARDS
 RavenBSD implements the documented POSIX ed subset.

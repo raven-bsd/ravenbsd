@@ -21,25 +21,32 @@ Each job logs
 .Dq atd: start
 with the job id and command, then
 .Dq atd: exit
-with the id and status. A job is retired after the run attempt, including a failed spawn, so a
-broken command does not retry forever. On a filesystem without unlink the job becomes a hidden
+with the id and status.
+A job is retired after the run attempt, including a failed spawn, so a
+broken command does not retry forever.
+On a filesystem without unlink the job becomes a hidden
 .Dq due=-1
 tombstone instead of being removed.
 .Pp
-Regular jobs run before batch jobs. A batch job runs only on a tick with no due regular job;
-the kernel has no load-average source, so an idle tick is the low-load proxy. The scheduler is
+Regular jobs run before batch jobs.
+A batch job runs only on a tick with no due regular job;
+the kernel has no load-average source, so an idle tick is the low-load proxy.
+The scheduler is
 serial and never starts one job twice concurrently.
 .Pp
-The spool persists across a restart: pending jobs are found again by the next scan. Removal
+The spool persists across a restart: pending jobs are found again by the next scan.
+Removal
 after a run attempt is not atomic with the spawn, so a crash in that window can repeat a job.
 .Sh FILES
 .Bl -tag -width /var/at -compact
 .It Pa /var/at
-Job spool. The image must mount a writable filesystem there.
+Job spool.
+The image must mount a writable filesystem there.
 .El
 .Sh EXIT STATUS
 .Nm
-runs until terminated. It exits non-zero only on an unrecoverable startup error.
+runs until terminated.
+It exits non-zero only on an unrecoverable startup error.
 .Sh SEE ALSO
 .Xr at 1 ,
 .Xr batch 1

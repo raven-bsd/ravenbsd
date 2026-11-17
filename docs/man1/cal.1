@@ -13,7 +13,8 @@
 .Sh DESCRIPTION
 The
 .Nm
-utility prints a calendar for the C locale. With no operands it prints the
+utility prints a calendar for the C locale.
+With no operands it prints the
 current month; with one operand it prints the whole year; with two operands
 it prints the selected
 .Ar month
@@ -27,15 +28,19 @@ and
 prints the previous, selected and next month side by side.
 .Pp
 The calendar is proleptic Gregorian: leap years are divisible by four, except
-century years that are not divisible by four hundred. The 1752 reform gap and
+century years that are not divisible by four hundred.
+The 1752 reform gap and
 Julian dates are not modelled.
 .Pp
-Years are accepted from 1 through 9999. A three-month view also needs the
-neighbouring months, so its year must be between 2 and 9998. With operands,
+Years are accepted from 1 through 9999.
+A three-month view also needs the
+neighbouring months, so its year must be between 2 and 9998.
+With operands,
 the month is 1 through 12 and the year includes the century.
 .Pp
 The protocol version 1 realtime clock returns zero, so the no-operand and
-no-year views currently show January 1970 until a wall clock exists. Explicit
+no-year views currently show January 1970 until a wall clock exists.
+Explicit
 .Ar month
 and
 .Ar year

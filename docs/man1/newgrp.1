@@ -32,15 +32,16 @@ Start the shell as a login shell: the argv[0] name is prefixed with a dash and t
 environment is supplied.
 .El
 .Pp
-A group password is not prompted for in this slice. A caller who is not a member is denied with
+A group password is not prompted for in this slice.
+A caller who is not a member is denied with
 .Dq permission denied: group password is not supported
 rather than blocking on the console.
 .Sh EXIT STATUS
 .Ex -std
 0 on success, 1 for an unknown group, permission or credential failure, 2 for usage.
 .Sh SEE ALSO
-.Xr su 1 ,
-.Xr login 1
+.Xr login 1 ,
+.Xr su 1
 .Sh STANDARDS
 A documented subset of POSIX
 .Nm newgrp .

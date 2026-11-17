@@ -110,15 +110,6 @@ Select the line-editing backend:
 or
 .Ar vt .
 .El
-.Sh FILES
-.Bl -tag -width /etc/brush/brushrc -compact
-.It Pa /etc/brush/brushrc
-RavenBSD interactive configuration: prompt, history and completion.
-.It Pa /tmp/brush_history
-The image-local history file selected by
-.Ev HISTFILE
-on the read-only initfs.
-.El
 .Sh ENVIRONMENT
 .Bl -tag -width HISTTIMEFORMAT -compact
 .It Ev PS1
@@ -142,10 +133,19 @@ Disable the prompt and tool colour.
 .Dq dumb
 selects the plain prompt.
 .El
+.Sh FILES
+.Bl -tag -width /etc/brush/brushrc -compact
+.It Pa /etc/brush/brushrc
+RavenBSD interactive configuration: prompt, history and completion.
+.It Pa /tmp/brush_history
+The image-local history file selected by
+.Ev HISTFILE
+on the read-only initfs.
+.El
 .Sh SEE ALSO
-.Xr sh 1 ,
+.Xr raven 1 ,
 .Xr rsh 1 ,
-.Xr raven 1
+.Xr sh 1
 .Sh HISTORY
 .Nm
 first appeared in RavenBSD 0.1 as the modern-shell profile's interactive shell.
