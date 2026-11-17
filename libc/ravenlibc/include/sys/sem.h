@@ -32,9 +32,7 @@ __BEGIN_DECLS
 #define __NEED_size_t
 #define __NEED_pid_t
 #define __NEED_time_t
-#if __BSD_VISIBLE
 #define __NEED_struct_timespec
-#endif
 #include <bits/alltypes.h>
 
 #include <sys/ipc.h>
@@ -78,10 +76,7 @@ struct sembuf {
 int semctl(int, int, int, ...);
 int semget(key_t, int, int);
 int semop(int, struct sembuf *, size_t);
-
-#if __BSD_VISIBLE
 int semtimedop(int, struct sembuf *, size_t, const struct timespec *);
-#endif
 
 __END_DECLS
 #endif

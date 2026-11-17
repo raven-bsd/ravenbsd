@@ -6,29 +6,29 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-17T04:23:51Z
+- Date: 2026-11-17T10:10:26Z
 - Profile: `posix`
 - Target: `x86_64`
-- Mode: target QEMU
+- Mode: host-only
 - Tool: `posix-conform 0.1.0`
 - Result: **FAIL (release blocked)**
-- Counts: 1145 pass, 655 fail, 10 skip
+- Counts: 1190 pass, 516 fail, 104 skip
 
 ## Summary
 
 | area | pass | fail | skip |
 |---|---:|---:|---:|
 | external | 0 | 0 | 3 |
-| filesystem | 14 | 6 | 0 |
-| header | 40 | 46 | 0 |
-| interface | 925 | 497 | 0 |
+| filesystem | 1 | 2 | 17 |
+| header | 48 | 38 | 0 |
+| interface | 985 | 437 | 0 |
 | link | 1 | 0 | 0 |
-| process | 16 | 1 | 0 |
-| shell | 3 | 22 | 0 |
+| process | 3 | 0 | 14 |
+| shell | 3 | 0 | 22 |
 | target | 0 | 0 | 7 |
-| tty | 12 | 0 | 0 |
-| utility | 134 | 83 | 0 |
-| **all** | **1145** | **655** | **10** |
+| tty | 5 | 0 | 7 |
+| utility | 144 | 39 | 34 |
+| **all** | **1190** | **516** | **104** |
 
 ## Rows
 
@@ -37,27 +37,27 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `external.atf` | external | skip | `ATF=<path>` | ATF not set; donor ATF results are recorded in tests/libc/CONFORMANCE.md; run cargo test -p raven-atf-run separately |
 | `external.pjdfstest` | external | skip | `PJDFSTEST=<path>` | PJDFSTEST not set; external pjdfstest (BSD); run it outside the repository |
 | `external.posix-test-suite` | external | skip | `POSIX_TEST_SUITE=<path>` | POSIX_TEST_SUITE not set; external Open POSIX Test Suite (GPL); run it outside the repository |
-| `filesystem.access` | filesystem | pass | `qtest:perm` |  |
-| `filesystem.directory` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.hard-link` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.mkdir-rmdir` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.mmap-file` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.mount` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.ownership` | filesystem | fail | `qtest:fsd-ufs-rw` | qtest `fsd-ufs-rw` was skipped: qtest skipped: timed out after 300 s (expected success); unmatched expectations: ^svcd: blockd up$, ^svcd: fsd-ufs up$, ^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$, ^fsd-ufs: mode=rw journal=none$, ^fsd-ufs-rw: probe mount ok$, ^fsd-ufs-rw: probe create/write ok$, ^fsd-ufs-rw: probe truncate/append ok$, ^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$, ^fsd-ufs-rw: probe posix operations ok$, ^fsd-ufs-rw: probe sparse ok$, ^fsd-ufs-rw: probe mmap ok$, ^fsd-ufs-rw: probe unlink/rmdir ok$, ^fsd-ufs-rw: probe fsync ok$, ^fsd-ufs-rw: probe umount ok$, ^fsd-ufs-rw: probe server stopped$, ^fsd-ufs-rw: ufs-fsck -n clean$, ^fsd-ufs-rw: probe server restarted$, ^fsd-ufs-rw: probe remount ok$, ^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true\|false)$, ^fsd-ufs-rw: probe crash replay=(mounted\|fail-closed)$, ^fsd-ufs-rw: probe crash ok$, ^fsd-ufs-rw: probe ok$, ^svcd: settled$, ^init exited \(0\)$ |
-| `filesystem.path-resolution` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.permission` | filesystem | pass | `qtest:perm` |  |
+| `filesystem.access` | filesystem | skip | `qtest:perm` | host-only run; qtest evidence not executed |
+| `filesystem.directory` | filesystem | skip | `qtest:posix-fs` | host-only run; qtest evidence not executed |
+| `filesystem.hard-link` | filesystem | skip | `qtest:posix-fs` | host-only run; qtest evidence not executed |
+| `filesystem.mkdir-rmdir` | filesystem | skip | `qtest:posix-fs` | host-only run; qtest evidence not executed |
+| `filesystem.mmap-file` | filesystem | skip | `qtest:posix-fs` | host-only run; qtest evidence not executed |
+| `filesystem.mount` | filesystem | skip | `qtest:posix-fs` | host-only run; qtest evidence not executed |
+| `filesystem.ownership` | filesystem | skip | `qtest:fsd-ufs-rw` | host-only run; qtest evidence not executed |
+| `filesystem.path-resolution` | filesystem | skip | `qtest:posix-fs` | host-only run; qtest evidence not executed |
+| `filesystem.permission` | filesystem | skip | `qtest:perm` | host-only run; qtest evidence not executed |
 | `filesystem.record-lock` | filesystem | fail | `none` | profile status missing; no executable POSIX behaviour test |
-| `filesystem.rename` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.sparse-file` | filesystem | pass | `test:tests/posix/fs/sparse-file/test.sh` |  |
-| `filesystem.special-file` | filesystem | fail | `qtest:fsd-ufs-rw` | qtest `fsd-ufs-rw` was skipped: qtest skipped: timed out after 300 s (expected success); unmatched expectations: ^svcd: blockd up$, ^svcd: fsd-ufs up$, ^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$, ^fsd-ufs: mode=rw journal=none$, ^fsd-ufs-rw: probe mount ok$, ^fsd-ufs-rw: probe create/write ok$, ^fsd-ufs-rw: probe truncate/append ok$, ^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$, ^fsd-ufs-rw: probe posix operations ok$, ^fsd-ufs-rw: probe sparse ok$, ^fsd-ufs-rw: probe mmap ok$, ^fsd-ufs-rw: probe unlink/rmdir ok$, ^fsd-ufs-rw: probe fsync ok$, ^fsd-ufs-rw: probe umount ok$, ^fsd-ufs-rw: probe server stopped$, ^fsd-ufs-rw: ufs-fsck -n clean$, ^fsd-ufs-rw: probe server restarted$, ^fsd-ufs-rw: probe remount ok$, ^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true\|false)$, ^fsd-ufs-rw: probe crash replay=(mounted\|fail-closed)$, ^fsd-ufs-rw: probe crash ok$, ^fsd-ufs-rw: probe ok$, ^svcd: settled$, ^init exited \(0\)$ |
-| `filesystem.stat-family` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.statvfs` | filesystem | fail | `qtest:fsd-ufs-rw` | qtest `fsd-ufs-rw` was skipped: qtest skipped: timed out after 300 s (expected success); unmatched expectations: ^svcd: blockd up$, ^svcd: fsd-ufs up$, ^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$, ^fsd-ufs: mode=rw journal=none$, ^fsd-ufs-rw: probe mount ok$, ^fsd-ufs-rw: probe create/write ok$, ^fsd-ufs-rw: probe truncate/append ok$, ^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$, ^fsd-ufs-rw: probe posix operations ok$, ^fsd-ufs-rw: probe sparse ok$, ^fsd-ufs-rw: probe mmap ok$, ^fsd-ufs-rw: probe unlink/rmdir ok$, ^fsd-ufs-rw: probe fsync ok$, ^fsd-ufs-rw: probe umount ok$, ^fsd-ufs-rw: probe server stopped$, ^fsd-ufs-rw: ufs-fsck -n clean$, ^fsd-ufs-rw: probe server restarted$, ^fsd-ufs-rw: probe remount ok$, ^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true\|false)$, ^fsd-ufs-rw: probe crash replay=(mounted\|fail-closed)$, ^fsd-ufs-rw: probe crash ok$, ^fsd-ufs-rw: probe ok$, ^svcd: settled$, ^init exited \(0\)$ |
-| `filesystem.symlink` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.sync` | filesystem | fail | `qtest:fsd-ufs-rw` | qtest `fsd-ufs-rw` was skipped: qtest skipped: timed out after 300 s (expected success); unmatched expectations: ^svcd: blockd up$, ^svcd: fsd-ufs up$, ^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$, ^fsd-ufs: mode=rw journal=none$, ^fsd-ufs-rw: probe mount ok$, ^fsd-ufs-rw: probe create/write ok$, ^fsd-ufs-rw: probe truncate/append ok$, ^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$, ^fsd-ufs-rw: probe posix operations ok$, ^fsd-ufs-rw: probe sparse ok$, ^fsd-ufs-rw: probe mmap ok$, ^fsd-ufs-rw: probe unlink/rmdir ok$, ^fsd-ufs-rw: probe fsync ok$, ^fsd-ufs-rw: probe umount ok$, ^fsd-ufs-rw: probe server stopped$, ^fsd-ufs-rw: ufs-fsck -n clean$, ^fsd-ufs-rw: probe server restarted$, ^fsd-ufs-rw: probe remount ok$, ^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true\|false)$, ^fsd-ufs-rw: probe crash replay=(mounted\|fail-closed)$, ^fsd-ufs-rw: probe crash ok$, ^fsd-ufs-rw: probe ok$, ^svcd: settled$, ^init exited \(0\)$ |
-| `filesystem.timestamp` | filesystem | fail | `qtest:fsd-ufs-rw` | qtest `fsd-ufs-rw` was skipped: qtest skipped: timed out after 300 s (expected success); unmatched expectations: ^svcd: blockd up$, ^svcd: fsd-ufs up$, ^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$, ^fsd-ufs: mode=rw journal=none$, ^fsd-ufs-rw: probe mount ok$, ^fsd-ufs-rw: probe create/write ok$, ^fsd-ufs-rw: probe truncate/append ok$, ^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$, ^fsd-ufs-rw: probe posix operations ok$, ^fsd-ufs-rw: probe sparse ok$, ^fsd-ufs-rw: probe mmap ok$, ^fsd-ufs-rw: probe unlink/rmdir ok$, ^fsd-ufs-rw: probe fsync ok$, ^fsd-ufs-rw: probe umount ok$, ^fsd-ufs-rw: probe server stopped$, ^fsd-ufs-rw: ufs-fsck -n clean$, ^fsd-ufs-rw: probe server restarted$, ^fsd-ufs-rw: probe remount ok$, ^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true\|false)$, ^fsd-ufs-rw: probe crash replay=(mounted\|fail-closed)$, ^fsd-ufs-rw: probe crash ok$, ^fsd-ufs-rw: probe ok$, ^svcd: settled$, ^init exited \(0\)$ |
-| `filesystem.truncate` | filesystem | pass | `qtest:posix-fs` |  |
+| `filesystem.rename` | filesystem | skip | `qtest:posix-fs` | host-only run; qtest evidence not executed |
+| `filesystem.sparse-file` | filesystem | fail | `test:tests/posix/fs/sparse-file/test.sh` | test evidence `tests/posix/fs/sparse-file/test.sh` failed: error: command `/home/bo/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/cargo test --no-run --message-format json-render-diagnostics --package fsd-ufs` exited with code 101 |
+| `filesystem.special-file` | filesystem | skip | `qtest:fsd-ufs-rw` | host-only run; qtest evidence not executed |
+| `filesystem.stat-family` | filesystem | skip | `qtest:posix-fs` | host-only run; qtest evidence not executed |
+| `filesystem.statvfs` | filesystem | skip | `qtest:fsd-ufs-rw` | host-only run; qtest evidence not executed |
+| `filesystem.symlink` | filesystem | skip | `qtest:posix-fs` | host-only run; qtest evidence not executed |
+| `filesystem.sync` | filesystem | skip | `qtest:fsd-ufs-rw` | host-only run; qtest evidence not executed |
+| `filesystem.timestamp` | filesystem | skip | `qtest:fsd-ufs-rw` | host-only run; qtest evidence not executed |
+| `filesystem.truncate` | filesystem | skip | `qtest:posix-fs` | host-only run; qtest evidence not executed |
 | `filesystem.umask` | filesystem | pass | `test:tests/posix/fs/umask/test.sh` |  |
-| `header.aio.h` | header | fail | `profile` | profile status partial |
+| `header.aio.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_0.c` |  |
 | `header.arpa-inet.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_1.c` |  |
 | `header.assert.h` | header | pass | `test:tests/posix/check-headers.sh` |  |
 | `header.complex.h` | header | fail | `profile` | profile status partial |
@@ -84,7 +84,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `header.locale.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_24.c` |  |
 | `header.math.h` | header | fail | `profile` | profile status partial |
 | `header.monetary.h` | header | fail | `profile` | profile status partial |
-| `header.mqueue.h` | header | fail | `profile` | profile status partial |
+| `header.mqueue.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_27.c` |  |
 | `header.ndbm.h` | header | fail | `profile` | profile status missing |
 | `header.net-if.h` | header | fail | `profile` | profile status partial |
 | `header.netdb.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_30.c` |  |
@@ -110,14 +110,14 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `header.stdlib.h` | header | fail | `profile` | profile status partial |
 | `header.string.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_51.c` |  |
 | `header.strings.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_52.c` |  |
-| `header.stropts.h` | header | fail | `profile` | profile status partial |
-| `header.sys-ipc.h` | header | fail | `profile` | profile status partial |
+| `header.stropts.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_53.c` |  |
+| `header.sys-ipc.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_54.c` |  |
 | `header.sys-mman.h` | header | fail | `profile` | profile status partial |
-| `header.sys-msg.h` | header | fail | `profile` | profile status partial |
+| `header.sys-msg.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_56.c` |  |
 | `header.sys-resource.h` | header | fail | `profile` | profile status partial |
 | `header.sys-select.h` | header | fail | `profile` | profile status partial |
-| `header.sys-sem.h` | header | fail | `profile` | profile status partial |
-| `header.sys-shm.h` | header | fail | `profile` | profile status partial |
+| `header.sys-sem.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_59.c` |  |
+| `header.sys-shm.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_60.c` |  |
 | `header.sys-socket.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_61.c` |  |
 | `header.sys-stat.h` | header | fail | `profile` | profile status partial |
 | `header.sys-statvfs.h` | header | fail | `profile` | profile status partial |
@@ -130,7 +130,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `header.sys-wait.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_70.c` |  |
 | `header.syslog.h` | header | fail | `profile` | profile status partial |
 | `header.tar.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_72.c` |  |
-| `header.termios.h` | header | fail | `profile` | profile status partial |
+| `header.termios.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_73.c` |  |
 | `header.tgmath.h` | header | pass | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.threads.h` | header | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/header_75.c` |  |
 | `header.time.h` | header | fail | `profile` | profile status partial |
@@ -165,20 +165,20 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.acosl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.acospi` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.adjtime` | interface | fail | `profile` | profile status missing |
-| `interface.aio_cancel` | interface | fail | `profile` | profile status missing |
-| `interface.aio_cancel64` | interface | fail | `profile` | profile status missing |
-| `interface.aio_error` | interface | fail | `profile` | profile status missing |
-| `interface.aio_error64` | interface | fail | `profile` | profile status missing |
-| `interface.aio_fsync` | interface | fail | `profile` | profile status missing |
-| `interface.aio_fsync64` | interface | fail | `profile` | profile status missing |
-| `interface.aio_read` | interface | fail | `profile` | profile status missing |
-| `interface.aio_read64` | interface | fail | `profile` | profile status missing |
-| `interface.aio_return` | interface | fail | `profile` | profile status missing |
-| `interface.aio_return64` | interface | fail | `profile` | profile status missing |
-| `interface.aio_suspend` | interface | fail | `profile` | profile status missing |
-| `interface.aio_suspend64` | interface | fail | `profile` | profile status missing |
-| `interface.aio_write` | interface | fail | `profile` | profile status missing |
-| `interface.aio_write64` | interface | fail | `profile` | profile status missing |
+| `interface.aio_cancel` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_22.c` |  |
+| `interface.aio_cancel64` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_23.c` |  |
+| `interface.aio_error` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_24.c` |  |
+| `interface.aio_error64` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_25.c` |  |
+| `interface.aio_fsync` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_26.c` |  |
+| `interface.aio_fsync64` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_27.c` |  |
+| `interface.aio_read` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_28.c` |  |
+| `interface.aio_read64` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_29.c` |  |
+| `interface.aio_return` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_30.c` |  |
+| `interface.aio_return64` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_31.c` |  |
+| `interface.aio_suspend` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_32.c` |  |
+| `interface.aio_suspend64` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_33.c` |  |
+| `interface.aio_write` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_34.c` |  |
+| `interface.aio_write64` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_35.c` |  |
 | `interface.alarm` | interface | fail | `profile` | profile status missing |
 | `interface.alphasort` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_37.c` |  |
 | `interface.asctime` | interface | pass | `test:tests/libc/posix/time/check-time.sh` |  |
@@ -282,12 +282,12 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.cexpf` | interface | fail | `profile` | profile status missing |
 | `interface.cexpfNx` | interface | fail | `profile` | profile status missing |
 | `interface.cexpl` | interface | fail | `profile` | profile status missing |
-| `interface.cfgetispeed` | interface | fail | `profile` | profile status missing |
-| `interface.cfgetospeed` | interface | fail | `profile` | profile status missing |
-| `interface.cfmakeraw` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_141.c` | declaration did not compile |
-| `interface.cfsetispeed` | interface | fail | `profile` | profile status missing |
-| `interface.cfsetospeed` | interface | fail | `profile` | profile status missing |
-| `interface.cfsetspeed` | interface | fail | `profile` | profile status missing |
+| `interface.cfgetispeed` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_139.c` |  |
+| `interface.cfgetospeed` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_140.c` |  |
+| `interface.cfmakeraw` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_141.c` |  |
+| `interface.cfsetispeed` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_142.c` |  |
+| `interface.cfsetospeed` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_143.c` |  |
+| `interface.cfsetspeed` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_144.c` |  |
 | `interface.chdir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_145.c` |  |
 | `interface.chmod` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_146.c` |  |
 | `interface.chown` | interface | fail | `profile` | profile status missing |
@@ -443,7 +443,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.fabsl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.faccessat` | interface | fail | `profile` | profile status missing |
 | `interface.fallocate` | interface | fail | `profile` | profile status missing |
-| `interface.fattach` | interface | fail | `profile` | profile status missing |
+| `interface.fattach` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_300.c` |  |
 | `interface.fchdir` | interface | fail | `profile` | profile status missing |
 | `interface.fchmod` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_302.c` |  |
 | `interface.fchmodat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_303.c` |  |
@@ -453,7 +453,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.fcntl` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_307.c` |  |
 | `interface.fcvt_r` | interface | fail | `profile` | profile status missing |
 | `interface.fdatasync` | interface | fail | `profile` | profile status missing |
-| `interface.fdetach` | interface | fail | `profile` | profile status missing |
+| `interface.fdetach` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_310.c` |  |
 | `interface.fdim` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_311.c` |  |
 | `interface.fdimf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_312.c` |  |
 | `interface.fdimfNx` | interface | fail | `profile` | profile status missing |
@@ -569,7 +569,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.ftell` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_423.c` |  |
 | `interface.ftello` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.ftello64` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
-| `interface.ftok` | interface | fail | `profile` | profile status missing |
+| `interface.ftok` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_426.c` |  |
 | `interface.ftruncate` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_427.c` |  |
 | `interface.ftruncate64` | interface | fail | `profile` | profile status missing |
 | `interface.ftrylockfile` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
@@ -616,7 +616,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.getline` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_470.c` |  |
 | `interface.getlogin` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_471.c` |  |
 | `interface.getlogin_r` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_472.c` |  |
-| `interface.getmsg` | interface | fail | `profile` | profile status missing |
+| `interface.getmsg` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_473.c` |  |
 | `interface.getnameinfo` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_474.c` |  |
 | `interface.getopt` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_475.c` |  |
 | `interface.getpagesize` | interface | fail | `profile` | profile status missing |
@@ -625,7 +625,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.getpgid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_479.c` |  |
 | `interface.getpgrp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_480.c` |  |
 | `interface.getpid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_481.c` |  |
-| `interface.getpmsg` | interface | fail | `profile` | profile status missing |
+| `interface.getpmsg` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_482.c` |  |
 | `interface.getppid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_483.c` |  |
 | `interface.getpriority` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_484.c` |  |
 | `interface.getpwent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_485.c` |  |
@@ -700,7 +700,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.isalpha` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_554.c` |  |
 | `interface.isalpha_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_555.c` |  |
 | `interface.isascii` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_556.c` |  |
-| `interface.isastream` | interface | fail | `profile` | profile status missing |
+| `interface.isastream` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_557.c` |  |
 | `interface.isatty` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_558.c` |  |
 | `interface.isblank` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_559.c` |  |
 | `interface.isblank_l` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_560.c` |  |
@@ -789,8 +789,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.lgammal_r` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.link` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_644.c` |  |
 | `interface.linkat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_645.c` |  |
-| `interface.lio_listio` | interface | fail | `profile` | profile status missing |
-| `interface.lio_listio64` | interface | fail | `profile` | profile status missing |
+| `interface.lio_listio` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_646.c` |  |
+| `interface.lio_listio64` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_647.c` |  |
 | `interface.listen` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_648.c` |  |
 | `interface.llabs` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_649.c` |  |
 | `interface.lldiv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_650.c` |  |
@@ -883,21 +883,21 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.modffNx` | interface | fail | `profile` | profile status missing |
 | `interface.modfl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.mprotect` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_739.c` |  |
-| `interface.mq_close` | interface | fail | `profile` | profile status missing |
-| `interface.mq_getattr` | interface | fail | `profile` | profile status missing |
-| `interface.mq_notify` | interface | fail | `profile` | profile status missing |
-| `interface.mq_open` | interface | fail | `profile` | profile status missing |
-| `interface.mq_receive` | interface | fail | `profile` | profile status missing |
-| `interface.mq_send` | interface | fail | `profile` | profile status missing |
-| `interface.mq_setattr` | interface | fail | `profile` | profile status missing |
-| `interface.mq_timedreceive` | interface | fail | `profile` | profile status missing |
-| `interface.mq_timedsend` | interface | fail | `profile` | profile status missing |
-| `interface.mq_unlink` | interface | fail | `profile` | profile status missing |
+| `interface.mq_close` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_740.c` |  |
+| `interface.mq_getattr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_741.c` |  |
+| `interface.mq_notify` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_742.c` |  |
+| `interface.mq_open` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_743.c` |  |
+| `interface.mq_receive` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_744.c` |  |
+| `interface.mq_send` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_745.c` |  |
+| `interface.mq_setattr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_746.c` |  |
+| `interface.mq_timedreceive` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_747.c` |  |
+| `interface.mq_timedsend` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_748.c` |  |
+| `interface.mq_unlink` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_749.c` |  |
 | `interface.mrand48` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_750.c` |  |
-| `interface.msgctl` | interface | fail | `profile` | profile status missing |
-| `interface.msgget` | interface | fail | `profile` | profile status missing |
-| `interface.msgrcv` | interface | fail | `profile` | profile status missing |
-| `interface.msgsnd` | interface | fail | `profile` | profile status missing |
+| `interface.msgctl` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_751.c` |  |
+| `interface.msgget` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_752.c` |  |
+| `interface.msgrcv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_753.c` |  |
+| `interface.msgsnd` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_754.c` |  |
 | `interface.msync` | interface | fail | `profile` | profile status missing |
 | `interface.mtx_destroy` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_756.c` |  |
 | `interface.mtx_init` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_757.c` |  |
@@ -1106,8 +1106,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.putchar_unlocked` | interface | pass | `test:tests/libc/posix/stdio/check-stdio.sh` |  |
 | `interface.putenv` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_961.c` |  |
 | `interface.putgrent` | interface | fail | `profile` | profile status missing |
-| `interface.putmsg` | interface | fail | `profile` | profile status missing |
-| `interface.putpmsg` | interface | fail | `profile` | profile status missing |
+| `interface.putmsg` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_963.c` |  |
+| `interface.putpmsg` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_964.c` |  |
 | `interface.putpwent` | interface | fail | `profile` | profile status missing |
 | `interface.puts` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_966.c` |  |
 | `interface.pututxline` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_967.c` |  |
@@ -1206,10 +1206,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.sem_trywait` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1060.c` |  |
 | `interface.sem_unlink` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1061.c` |  |
 | `interface.sem_wait` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1062.c` |  |
-| `interface.semctl` | interface | fail | `profile` | profile status missing |
-| `interface.semget` | interface | fail | `profile` | profile status missing |
-| `interface.semop` | interface | fail | `profile` | profile status missing |
-| `interface.semtimedop` | interface | fail | `profile` | profile status missing |
+| `interface.semctl` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1063.c` |  |
+| `interface.semget` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1064.c` |  |
+| `interface.semop` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1065.c` |  |
+| `interface.semtimedop` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1066.c` |  |
 | `interface.send` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1067.c` |  |
 | `interface.sendmsg` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1068.c` |  |
 | `interface.sendto` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1069.c` |  |
@@ -1254,11 +1254,11 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.setutxent` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1108.c` |  |
 | `interface.setvbuf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1109.c` |  |
 | `interface.shm_open` | interface | fail | `profile` | profile status missing |
-| `interface.shm_unlink` | interface | fail | `profile` | profile status missing |
-| `interface.shmat` | interface | fail | `profile` | profile status missing |
-| `interface.shmctl` | interface | fail | `profile` | profile status missing |
-| `interface.shmdt` | interface | fail | `profile` | profile status missing |
-| `interface.shmget` | interface | fail | `profile` | profile status missing |
+| `interface.shm_unlink` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1111.c` |  |
+| `interface.shmat` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1112.c` |  |
+| `interface.shmctl` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1113.c` |  |
+| `interface.shmdt` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1114.c` |  |
+| `interface.shmget` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1115.c` |  |
 | `interface.shutdown` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1116.c` |  |
 | `interface.sigaction` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1117.c` |  |
 | `interface.sigaddset` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1118.c` |  |
@@ -1386,17 +1386,17 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.tanhl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.tanl` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
 | `interface.tanpi` | interface | pass | `test:tests/libc/posix/math/check-math.sh` |  |
-| `interface.tcdrain` | interface | fail | `profile` | profile status missing |
-| `interface.tcflow` | interface | fail | `profile` | profile status missing |
-| `interface.tcflush` | interface | fail | `profile` | profile status missing |
+| `interface.tcdrain` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1243.c` |  |
+| `interface.tcflow` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1244.c` |  |
+| `interface.tcflush` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1245.c` |  |
 | `interface.tcgetattr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1246.c` |  |
 | `interface.tcgetpgrp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1247.c` |  |
-| `interface.tcgetsid` | interface | fail | `profile` | profile status missing |
-| `interface.tcgetwinsize` | interface | fail | `profile` | profile status missing |
-| `interface.tcsendbreak` | interface | fail | `profile` | profile status missing |
+| `interface.tcgetsid` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1248.c` |  |
+| `interface.tcgetwinsize` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1249.c` |  |
+| `interface.tcsendbreak` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1250.c` |  |
 | `interface.tcsetattr` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1251.c` |  |
 | `interface.tcsetpgrp` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1252.c` |  |
-| `interface.tcsetwinsize` | interface | fail | `profile` | profile status missing |
+| `interface.tcsetwinsize` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1253.c` |  |
 | `interface.tee` | interface | fail | `profile` | profile status missing |
 | `interface.telldir` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1255.c` |  |
 | `interface.textdomain` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1256.c` |  |
@@ -1566,72 +1566,72 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.yn` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1420.c` |  |
 | `interface.ynf` | interface | fail | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1421.c` | declaration did not compile |
 | `link.libc` | link | pass | `nm -g --defined-only ./build/x86_64/libc.a` | 0 required symbols absent from libc.a |
-| `process.credential` | process | pass | `qtest:proc-credentials` |  |
-| `process.exec` | process | pass | `qtest:proc-exec` |  |
-| `process.fork` | process | pass | `qtest:proc-fork` |  |
-| `process.job-control` | process | pass | `qtest:tty-job-control` |  |
+| `process.credential` | process | skip | `qtest:proc-credentials` | host-only run; qtest evidence not executed |
+| `process.exec` | process | skip | `qtest:proc-exec` | host-only run; qtest evidence not executed |
+| `process.fork` | process | skip | `qtest:proc-fork` | host-only run; qtest evidence not executed |
+| `process.job-control` | process | skip | `qtest:tty-job-control` | host-only run; qtest evidence not executed |
 | `process.popen` | process | pass | `waiver` | owner waiver: P3/P17: pipe/exec exist in the kernel; libc popen/system integration is still open |
 | `process.posix-spawn` | process | pass | `waiver` | owner waiver: P17: native kernel spawn exists; libc target sysroot wiring remains |
-| `process.priority` | process | pass | `qtest:proc-priority` |  |
-| `process.process-group` | process | pass | `qtest:proc-session` |  |
-| `process.process-id` | process | pass | `qtest:proc-registry` |  |
-| `process.resource` | process | pass | `qtest:proc-session` |  |
-| `process.session` | process | pass | `qtest:proc-session` |  |
-| `process.signal` | process | pass | `qtest:proc-signal` |  |
+| `process.priority` | process | skip | `qtest:proc-priority` | host-only run; qtest evidence not executed |
+| `process.process-group` | process | skip | `qtest:proc-session` | host-only run; qtest evidence not executed |
+| `process.process-id` | process | skip | `qtest:proc-registry` | host-only run; qtest evidence not executed |
+| `process.resource` | process | skip | `qtest:proc-session` | host-only run; qtest evidence not executed |
+| `process.session` | process | skip | `qtest:proc-session` | host-only run; qtest evidence not executed |
+| `process.signal` | process | skip | `qtest:proc-signal` | host-only run; qtest evidence not executed |
 | `process.system` | process | pass | `waiver` | owner waiver: P3/P17: needs libc system()/popen integration; no userspace process server |
-| `process.terminate` | process | pass | `qtest:proc-session` |  |
-| `process.times` | process | pass | `qtest:proc-session` |  |
-| `process.tty-control` | process | fail | `qtest:tty-control` | qtest: exit status 35; expected success; unmatched expectations: ^tty-control: ctty=1 fg=1$, ^tty-control: ttyd=1 orphan=1$, ^tty-control: sig=1$, ^tty-control: hangup=1$, ^tty-control: ok$, ^tty-ctl: fg-read$, ^tty-ctl: ttou$, ^tty-ctl: fg-write$, ^tty-hup: leader$, ^tty-hup: got$, ^tty-hup: eio$, ^init exited \(0\)$ |
-| `process.wait` | process | pass | `qtest:proc-session` |  |
-| `shell.arithmetic-expansion` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.command-substitution` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.compound-command` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.conditional` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.exit-status` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.field-splitting` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.function` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.getopts` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.here-document` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
+| `process.terminate` | process | skip | `qtest:proc-session` | host-only run; qtest evidence not executed |
+| `process.times` | process | skip | `qtest:proc-session` | host-only run; qtest evidence not executed |
+| `process.tty-control` | process | skip | `qtest:tty-control` | host-only run; qtest evidence not executed |
+| `process.wait` | process | skip | `qtest:proc-session` | host-only run; qtest evidence not executed |
+| `shell.arithmetic-expansion` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.command-substitution` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.compound-command` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.conditional` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.exit-status` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.field-splitting` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.function` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.getopts` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.here-document` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `shell.interactive-shell` | shell | pass | `waiver` | owner waiver: P4a: interactive login is P9c; modern-shell-login records the dependency |
 | `shell.job-control` | shell | pass | `waiver` | owner waiver: P4a: PG-56 process groups/sessions/tty control is not implemented |
-| `shell.list` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.loop` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.parameter-expansion` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.pathname-expansion` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.pipeline` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.quote-removal` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.redirection` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.regular-builtin` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.set-options` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.shell-variable` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.simple-command` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `shell.special-builtin` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
+| `shell.list` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.loop` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.parameter-expansion` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.pathname-expansion` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.pipeline` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.quote-removal` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.redirection` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.regular-builtin` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.set-options` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.shell-variable` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.simple-command` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `shell.special-builtin` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `shell.trap` | shell | pass | `waiver` | owner waiver: P4a: EXIT traps pass; signal traps need PG-7 signal delivery |
-| `shell.umask` | shell | fail | `qtest:posix-shell` | qtest `posix-shell` was skipped: qtest skipped: Running `target/debug/xtask qtest --case posix-shell --arch x86_64` |
-| `target.libc-dynamic` | target | skip | `cargo xtask qtest --case libc-dynamic --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-dynamic --arch x86_64` |
-| `target.libc-hello` | target | skip | `cargo xtask qtest --case libc-hello --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-hello --arch x86_64` |
-| `target.libc-signals` | target | skip | `cargo xtask qtest --case libc-signals --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-signals --arch x86_64` |
-| `target.libc-spawn` | target | skip | `cargo xtask qtest --case libc-spawn --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-spawn --arch x86_64` |
-| `target.libc-stdio` | target | skip | `cargo xtask qtest --case libc-stdio --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-stdio --arch x86_64` |
-| `target.libc-threads` | target | skip | `cargo xtask qtest --case libc-threads --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-threads --arch x86_64` |
-| `target.libc-time` | target | skip | `cargo xtask qtest --case libc-time --arch x86_64` | qtest skipped: Running `target/debug/xtask qtest --case libc-time --arch x86_64` |
-| `tty.canonical` | tty | pass | `qtest:pty-session` |  |
-| `tty.control-character` | tty | pass | `qtest:tty-job-control` |  |
+| `shell.umask` | shell | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `target.libc-dynamic` | target | skip | `cargo xtask qtest --case libc-dynamic --arch x86_64` | host-only run; target not booted |
+| `target.libc-hello` | target | skip | `cargo xtask qtest --case libc-hello --arch x86_64` | host-only run; target not booted |
+| `target.libc-signals` | target | skip | `cargo xtask qtest --case libc-signals --arch x86_64` | host-only run; target not booted |
+| `target.libc-spawn` | target | skip | `cargo xtask qtest --case libc-spawn --arch x86_64` | host-only run; target not booted |
+| `target.libc-stdio` | target | skip | `cargo xtask qtest --case libc-stdio --arch x86_64` | host-only run; target not booted |
+| `target.libc-threads` | target | skip | `cargo xtask qtest --case libc-threads --arch x86_64` | host-only run; target not booted |
+| `target.libc-time` | target | skip | `cargo xtask qtest --case libc-time --arch x86_64` | host-only run; target not booted |
+| `tty.canonical` | tty | skip | `qtest:pty-session` | host-only run; qtest evidence not executed |
+| `tty.control-character` | tty | skip | `qtest:tty-job-control` | host-only run; qtest evidence not executed |
 | `tty.controlling-terminal` | tty | pass | `waiver` | owner waiver: P3: ttyd records the foreground group/session and ptyd signals it, but the kernel has no TIOCSCTTY/acquisition call; P3 documents the logical-only state |
-| `tty.echo` | tty | pass | `qtest:pty-session` |  |
+| `tty.echo` | tty | skip | `qtest:pty-session` | host-only run; qtest evidence not executed |
 | `tty.flow-control` | tty | pass | `waiver` | owner waiver: P3: IXON/IXOFF and output pause are not implemented; the current discipline has no flow-control state |
-| `tty.job-control-glue` | tty | pass | `qtest:tty-job-control` |  |
-| `tty.line-discipline` | tty | pass | `qtest:pty-session` |  |
-| `tty.pty` | tty | pass | `qtest:pty-session` |  |
-| `tty.raw` | tty | pass | `qtest:pty-session` |  |
+| `tty.job-control-glue` | tty | skip | `qtest:tty-job-control` | host-only run; qtest evidence not executed |
+| `tty.line-discipline` | tty | skip | `qtest:pty-session` | host-only run; qtest evidence not executed |
+| `tty.pty` | tty | skip | `qtest:pty-session` | host-only run; qtest evidence not executed |
+| `tty.raw` | tty | skip | `qtest:pty-session` | host-only run; qtest evidence not executed |
 | `tty.stty` | tty | pass | `waiver` | owner waiver: P3: no stty utility; the termios/pty CALL surface is present but the command-line front-end is a later utility ticket |
 | `tty.termios` | tty | pass | `waiver` | owner waiver: P3: the existing ravenlibc platform wrapper has host tests over GET_MODE/SET_MODE/FLUSH, but no target libc termios case covers the speed/flag fields; pty-session exercises the protocol only. Kept waived rather than claiming a false pass |
 | `tty.ttyname` | tty | pass | `waiver` | owner waiver: P3: isatty/ttyname wrappers exist but there is no target pty identity case; P3 keeps the row honest instead of claiming the libc path |
 | `util.admin` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.alias` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.alias` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.ar` | utility | pass | `test:tests/posix/utility/archive/ar/test.sh` |  |
 | `util.arch` | utility | pass | `test:tests/posix/utility/misc/arch/test.sh` |  |
-| `util.asa` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.asa` | utility | pass | `test:tests/posix/utility/simple/asa/test.sh` |  |
 | `util.at` | utility | pass | `test:tests/posix/utility/at/test.sh` |  |
 | `util.awk` | utility | pass | `test:tests/posix/utility/text2/awk/test.sh` |  |
 | `util.b2sum` | utility | pass | `test:tests/posix/utility/misc/b2sum/test.sh` |  |
@@ -1641,13 +1641,13 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.basenc` | utility | pass | `test:tests/posix/utility/misc/basenc/test.sh` |  |
 | `util.batch` | utility | pass | `test:tests/posix/utility/at/test.sh` |  |
 | `util.bc` | utility | pass | `test:tests/posix/utility/bc/test.sh` |  |
-| `util.bg` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.break` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.bg` | utility | pass | `waiver` | owner waiver: P45: PG-56 job control; asynchronous lists and $! are not implemented |
+| `util.break` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.c17` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.c99` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.cal` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.cal` | utility | pass | `test:tests/posix/utility/simple/cal/test.sh` |  |
 | `util.cat` | utility | pass | `test:tests/posix/utility/file/cat/test.sh` |  |
-| `util.cd` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.cd` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.cflow` | utility | pass | `test:tests/posix/utility/devtools/test.sh` |  |
 | `util.chgrp` | utility | pass | `test:tests/posix/utility/file/chgrp/test.sh` |  |
 | `util.chmod` | utility | pass | `test:tests/posix/utility/file/chmod/test.sh` |  |
@@ -1656,9 +1656,9 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.cmp` | utility | pass | `test:tests/posix/utility/text2/cmp/test.sh` |  |
 | `util.cod` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.comm` | utility | pass | `test:tests/posix/utility/text/comm/test.sh` |  |
-| `util.command` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.command` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.compress` | utility | pass | `test:tests/posix/utility/compress/compress/test.sh` |  |
-| `util.continue` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.continue` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.cp` | utility | pass | `test:tests/posix/utility/file/cp/test.sh` |  |
 | `util.crontab` | utility | pass | `test:tests/posix/utility/crontab/test.sh` |  |
 | `util.csplit` | utility | pass | `test:tests/posix/utility/text/csplit/test.sh` |  |
@@ -1672,22 +1672,22 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.diff` | utility | pass | `test:tests/posix/utility/text2/diff/test.sh` |  |
 | `util.dircolors` | utility | pass | `test:tests/posix/utility/misc/dircolors/test.sh` |  |
 | `util.dirname` | utility | pass | `test:tests/posix/utility/text/dirname/test.sh` |  |
-| `util.dot` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.dot` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.du` | utility | pass | `test:tests/posix/utility/file/du/test.sh` |  |
 | `util.echo` | utility | pass | `test:tests/posix/utility/misc2/echo/test.sh` |  |
 | `util.ed` | utility | pass | `test:tests/posix/utility/ed/ed/test.sh` |  |
-| `util.env` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
-| `util.eval` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.env` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
+| `util.eval` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.ex` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.exec` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.exit` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.exec` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `util.exit` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.expand` | utility | pass | `test:tests/posix/utility/text/expand/test.sh` |  |
-| `util.export` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.export` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.expr` | utility | pass | `test:tests/posix/utility/text/expr/test.sh` |  |
 | `util.factor` | utility | pass | `test:tests/posix/utility/misc/factor/test.sh` |  |
 | `util.false` | utility | pass | `test:tests/posix/utility/misc/false/test.sh` |  |
-| `util.fc` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.fg` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.fc` | utility | pass | `waiver` | owner waiver: P45: interactive history editing is outside the non-interactive posix-shell qtest (P9c login) |
+| `util.fg` | utility | pass | `waiver` | owner waiver: P45: PG-56 job control; no foreground/background job model |
 | `util.file` | utility | pass | `test:tests/posix/utility/file/file/test.sh` |  |
 | `util.find` | utility | pass | `test:tests/posix/utility/file/find/test.sh` |  |
 | `util.fmt` | utility | pass | `test:tests/posix/utility/misc/fmt/test.sh` |  |
@@ -1695,37 +1695,37 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.fort77` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.gencat` | utility | pass | `test:tests/posix/utility/locale/test.sh` |  |
 | `util.get` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.getconf` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
-| `util.getopts` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.getconf` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
+| `util.getopts` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.grep` | utility | pass | `test:tests/posix/utility/text2/grep/test.sh` |  |
 | `util.groups` | utility | pass | `test:tests/posix/utility/misc/groups/test.sh` |  |
-| `util.hash` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.hash` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.head` | utility | pass | `test:tests/posix/utility/text/head/test.sh` |  |
 | `util.hostid` | utility | pass | `test:tests/posix/utility/misc/hostid/test.sh` |  |
 | `util.iconv` | utility | pass | `test:tests/posix/utility/locale/test.sh` |  |
-| `util.id` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.id` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
 | `util.install` | utility | pass | `test:tests/posix/utility/misc/install/test.sh` |  |
 | `util.ipcrm` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.ipcs` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.jobs` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.jobs` | utility | pass | `waiver` | owner waiver: P45: PG-56 job control; no job table or asynchronous list |
 | `util.join` | utility | pass | `test:tests/posix/utility/text/join/test.sh` |  |
-| `util.kill` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.kill` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
 | `util.lex` | utility | pass | `test:tests/posix/utility/parsers/lex/test.sh` |  |
 | `util.link` | utility | pass | `test:tests/posix/utility/file/link/test.sh` |  |
 | `util.ln` | utility | pass | `test:tests/posix/utility/file/ln/test.sh` |  |
 | `util.locale` | utility | pass | `test:tests/posix/utility/locale/test.sh` |  |
 | `util.localedef` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.logger` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.logger` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
 | `util.logname` | utility | pass | `test:tests/posix/utility/misc/logname/test.sh` |  |
 | `util.lp` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.ls` | utility | pass | `test:tests/posix/utility/file/ls/test.sh` |  |
 | `util.m4` | utility | pass | `test:tests/posix/utility/m4/test.sh` |  |
-| `util.mail` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.mailx` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.mail` | utility | pass | `test:tests/posix/utility/mail/mail/test.sh` |  |
+| `util.mailx` | utility | pass | `test:tests/posix/utility/mail/mailx/test.sh` |  |
 | `util.make` | utility | pass | `test:tests/posix/utility/make/test.sh` |  |
 | `util.man` | utility | pass | `test:tests/posix/utility/misc2/man/test.sh` |  |
 | `util.md5sum` | utility | pass | `test:tests/posix/utility/misc/md5sum/test.sh` |  |
-| `util.mesg` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.mesg` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
 | `util.mkdir` | utility | pass | `test:tests/posix/utility/file/mkdir/test.sh` |  |
 | `util.mkfifo` | utility | pass | `test:tests/posix/utility/file/mkfifo/test.sh` |  |
 | `util.mknod` | utility | pass | `test:tests/posix/utility/file/mknod/test.sh` |  |
@@ -1734,10 +1734,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.mv` | utility | pass | `test:tests/posix/utility/file/mv/test.sh` |  |
 | `util.neqn` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.newgrp` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.nice` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.nice` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
 | `util.nl` | utility | pass | `test:tests/posix/utility/text/nl/test.sh` |  |
 | `util.nm` | utility | pass | `test:tests/posix/utility/binutils/nm/test.sh` |  |
-| `util.nohup` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.nohup` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
 | `util.nproc` | utility | pass | `test:tests/posix/utility/misc/nproc/test.sh` |  |
 | `util.numfmt` | utility | pass | `test:tests/posix/utility/misc/numfmt/test.sh` |  |
 | `util.od` | utility | pass | `test:tests/posix/utility/text/od/test.sh` |  |
@@ -1750,7 +1750,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.printenv` | utility | pass | `test:tests/posix/utility/misc/printenv/test.sh` |  |
 | `util.printf` | utility | pass | `test:tests/posix/utility/text/printf/test.sh` |  |
 | `util.prs` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.ps` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.ps` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
 | `util.ptx` | utility | pass | `test:tests/posix/utility/misc/ptx/test.sh` |  |
 | `util.pwd` | utility | pass | `test:tests/posix/utility/file/pwd/test.sh` |  |
 | `util.qalter` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1764,12 +1764,12 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.qsig` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.qstat` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.qsub` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.read` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.read` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.readlink` | utility | pass | `test:tests/posix/utility/file/readlink/test.sh` |  |
-| `util.readonly` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.readonly` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.realpath` | utility | pass | `test:tests/posix/utility/file/realpath/test.sh` |  |
-| `util.renice` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
-| `util.return` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.renice` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
+| `util.return` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.rm` | utility | pass | `test:tests/posix/utility/file/rm/test.sh` |  |
 | `util.rmdel` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.rmdir` | utility | pass | `test:tests/posix/utility/file/rmdir/test.sh` |  |
@@ -1777,14 +1777,14 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.sccs` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.sed` | utility | pass | `test:tests/posix/utility/text2/sed/test.sh` |  |
 | `util.seq` | utility | pass | `test:tests/posix/utility/misc/seq/test.sh` |  |
-| `util.set` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.set` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.sh` | utility | fail | `userland/bin/rsh` | profile status partial; no POSIX utility test |
 | `util.sha1sum` | utility | pass | `test:tests/posix/utility/misc/sha1sum/test.sh` |  |
 | `util.sha224sum` | utility | pass | `test:tests/posix/utility/misc/sha224sum/test.sh` |  |
 | `util.sha256sum` | utility | pass | `test:tests/posix/utility/misc/sha256sum/test.sh` |  |
 | `util.sha384sum` | utility | pass | `test:tests/posix/utility/misc/sha384sum/test.sh` |  |
 | `util.sha512sum` | utility | pass | `test:tests/posix/utility/misc/sha512sum/test.sh` |  |
-| `util.shift` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.shift` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.shred` | utility | pass | `test:tests/posix/utility/misc/shred/test.sh` |  |
 | `util.shuf` | utility | pass | `test:tests/posix/utility/misc/shuf/test.sh` |  |
 | `util.sleep` | utility | pass | `test:tests/posix/utility/misc/sleep/test.sh` |  |
@@ -1800,32 +1800,32 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.tabs` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.tac` | utility | pass | `test:tests/posix/utility/misc/tac/test.sh` |  |
 | `util.tail` | utility | pass | `test:tests/posix/utility/text/tail/test.sh` |  |
-| `util.talk` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.talk` | utility | pass | `test:tests/posix/utility/talk/test.sh` |  |
 | `util.tar` | utility | pass | `test:tests/posix/utility/archive/tar/test.sh` |  |
 | `util.tee` | utility | pass | `test:tests/posix/utility/text/tee/test.sh` |  |
-| `util.test` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.test` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.time` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.timeout` | utility | pass | `test:tests/posix/utility/misc/timeout/test.sh` |  |
 | `util.times` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.touch` | utility | pass | `test:tests/posix/utility/file/touch/test.sh` |  |
 | `util.tput` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.tr` | utility | pass | `test:tests/posix/utility/text/tr/test.sh` |  |
-| `util.trap` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.trap` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.true` | utility | pass | `test:tests/posix/utility/misc/true/test.sh` |  |
 | `util.truncate` | utility | pass | `test:tests/posix/utility/misc/truncate/test.sh` |  |
 | `util.tsort` | utility | pass | `test:tests/posix/utility/text/tsort/test.sh` |  |
 | `util.tty` | utility | pass | `test:tests/posix/utility/system/tty/test.sh` |  |
-| `util.type` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.type` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.ulimit` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.umask` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.unalias` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.uname` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
+| `util.umask` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `util.unalias` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
+| `util.uname` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
 | `util.uncompress` | utility | pass | `test:tests/posix/utility/compress/uncompress/test.sh` |  |
 | `util.unexpand` | utility | pass | `test:tests/posix/utility/text/unexpand/test.sh` |  |
 | `util.unget` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.uniq` | utility | pass | `test:tests/posix/utility/text/uniq/test.sh` |  |
 | `util.unlink` | utility | pass | `test:tests/posix/utility/file/unlink/test.sh` |  |
-| `util.unset` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.unset` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.uptime` | utility | pass | `test:tests/posix/utility/misc/uptime/test.sh` |  |
 | `util.users` | utility | pass | `test:tests/posix/utility/misc/users/test.sh` |  |
 | `util.uucp` | utility | pass | `test:tests/posix/utility/uucp/uucp/test.sh` |  |
@@ -1835,7 +1835,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.uux` | utility | pass | `test:tests/posix/utility/uucp/uux/test.sh` |  |
 | `util.val` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.vi` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.wait` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.wait` | utility | pass | `waiver` | owner waiver: P45: PG-56 job control; no asynchronous child/job table |
 | `util.wc` | utility | pass | `test:tests/posix/utility/text/wc/test.sh` |  |
 | `util.what` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.who` | utility | pass | `test:tests/posix/utility/misc/who/test.sh` |  |

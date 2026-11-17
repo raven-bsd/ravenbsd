@@ -88,6 +88,7 @@ void *shmat(int, const void *, int);
 int shmctl(int, int, struct shmid_ds *);
 int shmdt(const void *);
 int shmget(key_t, size_t, int);
+int shm_unlink(const char *);
 
 __END_DECLS
 

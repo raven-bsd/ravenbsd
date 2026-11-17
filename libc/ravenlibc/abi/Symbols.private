@@ -12,10 +12,12 @@ __raven_va_execlp
 __raven_va_fcntl
 __raven_va_ioctl
 __raven_va_makecontext
+__raven_va_mq_open
 __raven_va_open
 __raven_va_openat
 __raven_va_prctl
 __raven_va_sem_open
+__raven_va_semctl
 __raven_va_setproctitle
 __raven_va_setproctitle_fast
 __rl_dl_install

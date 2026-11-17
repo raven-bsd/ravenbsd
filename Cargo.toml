@@ -113,6 +113,7 @@ members = [
     "tests/genet",
     "tests/ufs-oracle",
     "tests/libc/oracle",
+    "tests/libc/p1c-ipc",
     "tests/libc/va",
     "tests/libc/headers",
     "tests/libc/atf",

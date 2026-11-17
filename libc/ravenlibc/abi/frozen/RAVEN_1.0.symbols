@@ -1,7 +1,7 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1413
+# records: 1472
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
 _Unwind_Backtrace F - all 2 -
@@ -53,6 +53,20 @@ acoshl F - all 1 -
 acosl F - all 1 -
 acospi F - all 0 -
 addmntent F - x86_64 2 mntent.h
+aio_cancel F - all 0 aio.h
+aio_cancel64 F - all 0 aio.h
+aio_error F - all 0 aio.h
+aio_error64 F - all 0 aio.h
+aio_fsync F - all 0 aio.h
+aio_fsync64 F - all 0 aio.h
+aio_read F - all 0 aio.h
+aio_read64 F - all 0 aio.h
+aio_return F - all 0 aio.h
+aio_return64 F - all 0 aio.h
+aio_suspend F - all 0 aio.h
+aio_suspend64 F - all 0 aio.h
+aio_write F - all 0 aio.h
+aio_write64 F - all 0 aio.h
 aligned_alloc F - all 1 stdlib.h
 alphasort F - all 1 dirent.h
 arc4random_buf F - all 1 stdlib.h
@@ -101,7 +115,12 @@ cbrtl F - all 1 -
 ceil F - all 1 -
 ceilf F - all 1 -
 ceill F - all 1 -
+cfgetispeed F - all 0 termios.h
+cfgetospeed F - all 0 termios.h
 cfmakeraw F - all 1 termios.h
+cfsetispeed F - all 0 termios.h
+cfsetospeed F - all 0 termios.h
+cfsetspeed F - all 1 termios.h
 cgetcap F - x86_64 2 -
 cgetclose F - x86_64 2 -
 cgetent F - x86_64 2 -
@@ -248,11 +267,13 @@ expm1l F - all 1 -
 fabs F - all 1 -
 fabsf F - all 1 -
 fabsl F - all 1 -
+fattach F - all 1 -
 fchmod F - all 0 sys/stat.h
 fchmodat F - all 0 -
 fchownat F - all 0 -
 fclose F - all 0 stdio.h
 fcntl F - all 0 fcntl.h
+fdetach F - all 1 -
 fdim F - all 1 -
 fdimf F - all 1 -
 fdiml F - all 1 -
@@ -363,6 +384,7 @@ fsync F - all 0 unistd.h
 ftell F - all 0 stdio.h
 ftello F - all 0 stdio.h
 ftello64 F - all 0 stdio.h
+ftok F - all 0 -
 ftruncate F - all 0 unistd.h
 ftrylockfile F - all 0 stdio.h
 fts_children F - all 1 -
@@ -427,6 +449,7 @@ getmntent F - x86_64 1 mntent.h
 getmntent_r F - x86_64 2 mntent.h
 getmntinfo F - all 2 -
 getmode F - x86_64 2 -
+getmsg F - all 1 -
 getnameinfo F - all 1 -
 getnetbyaddr F - all 1 netdb.h
 getnetbyname F - all 1 netdb.h
@@ -440,6 +463,7 @@ getpeername F - all 1 sys/socket.h
 getpgid F - all 0 unistd.h
 getpgrp F - all 0 unistd.h
 getpid F - all 0 unistd.h
+getpmsg F - all 1 -
 getppid F - all 0 unistd.h
 getpriority F - all 1 sys/resource.h
 getprogname F - all 1 -
@@ -528,6 +552,7 @@ isalnum_l F - all 1 -
 isalpha F - all 0 ctype.h
 isalpha_l F - all 1 -
 isascii F - all 1 ctype.h
+isastream F - all 1 -
 isatty F - all 0 unistd.h
 isblank F - all 0 ctype.h
 isblank_l F - all 1 -
@@ -620,6 +645,8 @@ lgammal F - all 1 -
 lgammal_r F - all 1 -
 link F - all 0 unistd.h
 linkat F - all 0 unistd.h
+lio_listio F - all 0 aio.h
+lio_listio64 F - all 0 aio.h
 listen F - all 1 sys/socket.h
 llabs F - all 1 -
 lldiv F - all 0 stdlib.h
@@ -700,7 +727,21 @@ modf F - all 1 -
 modff F - all 1 -
 modfl F - all 1 -
 mprotect F - all 0 sys/mman.h
+mq_close F - all 0 -
+mq_getattr F - all 0 -
+mq_notify F - all 0 -
+mq_open F - all 0 -
+mq_receive F - all 0 -
+mq_send F - all 0 -
+mq_setattr F - all 0 -
+mq_timedreceive F - all 0 -
+mq_timedsend F - all 0 -
+mq_unlink F - all 0 -
 mrand48 F - all 1 stdlib.h
+msgctl F - all 0 -
+msgget F - all 0 -
+msgrcv F - all 0 -
+msgsnd F - all 0 -
 mtx_destroy F - all 0 threads.h
 mtx_init F - all 0 threads.h
 mtx_lock F - all 0 threads.h
@@ -932,6 +973,8 @@ putc_unlocked F - all 0 stdio.h
 putchar F - all 0 stdio.h
 putchar_unlocked F - all 0 stdio.h
 putenv F - all 1 stdlib.h
+putmsg F - all 1 -
+putpmsg F - all 1 -
 puts F - all 0 stdio.h
 putspent F - all 1 -
 pututxline F - x86_64 0 utmpx.h
@@ -1037,6 +1080,10 @@ sema_init F - all 1 -
 sema_post F - all 1 -
 sema_trywait F - all 1 -
 sema_wait F - all 1 -
+semctl F - all 0 -
+semget F - all 0 -
+semop F - all 0 -
+semtimedop F - all 1 -
 send F - all 1 sys/socket.h
 sendfile F - all 1 -
 sendfile64 F - all 1 -
@@ -1085,6 +1132,11 @@ setuid F - all 0 unistd.h
 setusershell F - x86_64 1 -
 setutxent F - x86_64 0 utmpx.h
 setvbuf F - all 0 stdio.h
+shm_unlink F - all 0 -
+shmat F - all 0 -
+shmctl F - all 0 -
+shmdt F - all 0 -
+shmget F - all 0 -
 shutdown F - all 1 sys/socket.h
 sig2str F - all 1 -
 sigaction F - all 0 signal.h
@@ -1243,10 +1295,17 @@ tanhf F - all 1 -
 tanhl F - all 1 -
 tanl F - all 1 -
 tanpi F - all 0 -
+tcdrain F - all 0 termios.h
+tcflow F - all 0 termios.h
+tcflush F - all 0 termios.h
 tcgetattr F - all 0 termios.h
 tcgetpgrp F - all 0 unistd.h
+tcgetsid F - all 0 termios.h
+tcgetwinsize F - all 0 -
+tcsendbreak F - all 0 termios.h
 tcsetattr F - all 0 termios.h
 tcsetpgrp F - all 0 unistd.h
+tcsetwinsize F - all 0 -
 tdelete F - all 1 search.h
 tdestroy F - all 1 search.h
 telldir F - all 1 dirent.h

@@ -1755,6 +1755,7 @@ dependencies = [
  "raven-libc-fmt",
  "raven-libc-fts",
  "raven-libc-glob",
+ "raven-libc-ipc",
  "raven-libc-locale",
  "raven-libc-m",
  "raven-libc-malloc",
@@ -1898,6 +1899,13 @@ name = "raven-libc-iconv-cjk"
 version = "0.1.0"
 
 [[package]]
+name = "raven-libc-ipc"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+]
+
+[[package]]
 name = "raven-libc-locale"
 version = "0.1.0"
 dependencies = [
@@ -1964,6 +1972,14 @@ dependencies = [
  "raven-libc-tls",
  "serde",
  "toml",
+]
+
+[[package]]
+name = "raven-libc-p1c-ipc-test"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-ipc",
 ]
 
 [[package]]
