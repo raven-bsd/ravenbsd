@@ -25,7 +25,7 @@ with their owning lane.
 | 1 correctness | 1.7 lints (C16) | NOT MET | build/libc-gate/1.7.txt | 17 violations: 3 in `ld/src/raw/exports.rs` (C74g SAFETY comments), 14 pre-existing |
 | 2 portability | 2.1 world check | BLOCKED | build/libc-gate/2.1.txt | missing tools/libc-world/Cargo.toml; C72 outputs are not in origin/master and H-11 tarballs are absent |
 | 2 portability | 2.2 world build gate (C13) | BLOCKED | build/libc-gate/2.2.txt | missing tools/libc-world/Cargo.toml; C72 outputs are not in origin/master and H-11 tarballs are absent |
-| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate/3.1.txt | exit 1: 4 pass, 48 fail, 25 known, 282 skipped, 40 budget-only |
+| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate-c74w/3.1.txt | exit 1: 5 pass, 58 fail, 69 known, 105 skipped, 0 budget-only; triage in `tests/libc/size/TRIAGE.md` |
 | 3 size | 3.2 boot path (C15) | INFO | build/libc-gate/3.2.txt | PG-60 absent; 0-1 syscalls and <=250 instructions are not evaluable |
 | 4 hardening | 4.1 fuzz replay | MET | build/libc-gate/4.1.txt | exit 0 |
 | 4 hardening | 4.2 fuzz soak (C10) | NOT MET | build/libc-gate/4.2.txt | inet_text has no soak duration; inet_text has 1 crash(es); inet_text has no executions |
@@ -74,8 +74,9 @@ failures are P1b (`libc-hello` string, `libc-stdio`, `libc-time` sleep/usleep/tz
   pre-existing `one-symbol`/`std-path`/`abi-freeze` findings in the libc crate. Owner: C74g
   follow-up plus the P1e/P1h/P1i lanes.
 * 2.1/2.2 world: BLOCKED. `tools/libc-world/Cargo.toml` and the C72 outputs are absent.
-* 3.1 size: NOT MET. `cargo xtask libc-size --check` exits 1 with `4 pass, 48 fail, 25 known,
-  282 skipped, 40 budget-only`; budgets were not lowered.
+* 3.1 size: NOT MET. `cargo xtask libc-size --check` exits 1 with `5 pass, 58 fail, 69 known,
+  105 skipped, 0 budget-only`; C74w triage in `tests/libc/size/TRIAGE.md`; budgets were not
+  raised.
 * 4.2 soak: NOT MET. `tests/libc/fuzz/SOAK.md` records `inet_text` crashing before one hour; the
   other 13 targets completed 3600 s with 0 crashes. Owner: test/fuzz lane.
 * 5.1: `libc-dynamic`, `libc-signals`, `libc-spawn` and `libc-threads` pass; `libc-hello`,
@@ -143,11 +144,12 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 * 1.7 lints: NOT MET, `build/libc-gate/1.7.txt`; 17 violations (3 C74g SAFETY comments, 14
   pre-existing).
 * 2.1/2.2: BLOCKED, `tools/libc-world/Cargo.toml`, C72 outputs and H-11 tarballs are absent.
-* 3.1: NOT MET, `libc-size check: 4 pass, 48 fail, 25 known, 282 skipped, 40 budget-only`.
+* 3.1: NOT MET, `libc-size check: 5 pass, 58 fail, 69 known, 105 skipped, 0 budget-only`;
+  C74w triage in `tests/libc/size/TRIAGE.md`.
 * 4.2: NOT MET, the `inet_text` soak has no duration, one crash and no executions.
 * 6.2: BLOCKED, `which mandoc` exits 1.
 
-## 6. C74h evidence refresh (OBSERVED, origin/master `beedfbbd`)
+## 6. C74h evidence refresh (OBSERVED, origin/master `beedfbbd`; 3.1 re-evaluated by C74w on `19b6f229`)
 
 | Row | Command | Result |
 |---|---|---|
@@ -158,7 +160,7 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 | 1.6 Miri | nightly Miri preflight | exit 1; `cargo-miri` not installed for nightly → BLOCKED |
 | 1.7 lints | `cargo xtask libc-lint all` | exit 1; 17 violations (3 C74g SAFETY comments, 14 pre-existing) → NOT MET |
 | 2.1/2.2 world | missing files | `tools/libc-world/Cargo.toml` and C72 outputs absent → BLOCKED |
-| 3.1 size | `cargo xtask libc-size --check` | exit 1; 4 pass, 48 fail, 25 known, 282 skipped, 40 budget-only |
+| 3.1 size | `cargo xtask libc-size --check` | exit 1; 5 pass, 58 fail, 69 known, 105 skipped, 0 budget-only; C74w triage in `tests/libc/size/TRIAGE.md` |
 | 4.2 soak | `tests/libc/fuzz/SOAK.md` | `inet_text` crashed before 1 h; 13 targets 3600 s/0 crashes → NOT MET |
 | 5.1 target | qtest JSON from `eval` | dynamic, signals, spawn, threads pass; hello, stdio, time fail (P1b) |
 | 5.2 kernel | `qtest core-servers` / `qtest file-tools` | core-servers MET (minimal profile, 300 s case, 36-77 s); file-tools NOT MET: tooltest starts but `df` exits 1 (`no file systems processed`), uutils `read_fs_list` empty on RavenBSD |

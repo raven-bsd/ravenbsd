@@ -149,7 +149,7 @@ title = "size budgets (C14)"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "libc-size", "--check"]
-note = "C74h: 4 pass, 48 fail, 25 known, 282 skipped, 40 budget-only; budgets not lowered"
+note = "C74w: 5 pass, 58 fail, 69 known, 105 skipped, 0 budget-only; triage in tests/libc/size/TRIAGE.md; 3.1 NOT MET, budgets not raised"
 evidence = "build/libc-gate/3.1.txt"
 source = "C69, 16 3.B.9 C14"
 
