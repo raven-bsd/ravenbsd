@@ -22,11 +22,12 @@ if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
 fi
 
 case_name=${1#libc-}
-arch=${2:-x86_64}
+arch=${RAVEN_QT_ARCH:-${2:-x86_64}}
 
 case $arch in
     x86_64) ;;
-    aarch64 | riscv64)
+    aarch64) ;;
+    riscv64)
         printf 'skipped: arch not in this ticket\n'
         exit 77
         ;;
@@ -115,15 +116,23 @@ fi
 # the other cases keep the conservative soft-float vector.
 float=${RL_TEST_FLOAT:-}
 if [ -z "$float" ]; then
-    case $case_name in
-        time) float=hard ;;
-        *) float=soft ;;
-    esac
+    if [ "$arch" = aarch64 ]; then
+        # The aarch64 userland is built for the soft-float target; the C cases use the base
+        # AAPCS64 integer/FP ABI and must not receive the x86 -mno-sse/-msoft-float vector.
+        float=hard
+    else
+        case $case_name in
+            time) float=hard ;;
+            *) float=soft ;;
+        esac
+    fi
 fi
 case $float in
     soft) ;;
     hard)
-        if ! "$root/tests/libc/target/pg-probe.sh" all | grep -qx 'PG-12: present'; then
+        # PG-12 is the x86 FXSAVE/SSE context; aarch64 does not use that vector.
+        if [ "$arch" = x86_64 ] &&
+            ! "$root/tests/libc/target/pg-probe.sh" all | grep -qx 'PG-12: present'; then
             printf 'skipped: hard-float build needs PG-12\n'
             exit 77
         fi
@@ -133,7 +142,13 @@ esac
 
 out=$root/build/libc-test
 mkdir -p "$out/obj"
-linker_script=$root/tests/libc/target/x86_64.ld
+if [ "$arch" = aarch64 ]; then
+    linker_script=$root/userland/linker/aarch64.ld
+    linker_flavor="-Wl,-m,aarch64linux"
+else
+    linker_script=$root/tests/libc/target/x86_64.ld
+    linker_flavor=
+fi
 
 builtins=
 if [ -f "$sysroot/usr/lib/libclang_rt.builtins.a" ]; then
@@ -156,14 +171,14 @@ compile_obj() {
 
 link_static() {
     if [ -n "$builtins" ]; then
-        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
+        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
             -nostdlib -nostartfiles -static -T"$linker_script" \
             -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
             "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$1" \
             -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
             "$sysroot/usr/lib/crtn.o" -o "$2"
     else
-        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
+        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
             -nostdlib -nostartfiles -static -T"$linker_script" \
             -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
             "$sysroot/usr/lib/crt1.o" "$sysroot/usr/lib/crti.o" "$1" \
@@ -174,7 +189,7 @@ link_static() {
 
 link_dynamic() {
     if [ -n "$builtins" ]; then
-        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
+        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
             -nostdlib -nostartfiles -pie -Wl,-dynamic-linker,/libexec/ld-elf.so.1 \
             -Wl,--image-base=0x400000 \
             -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
@@ -182,7 +197,7 @@ link_dynamic() {
             "$out/obj/tls-stub.o" -L"$sysroot/lib" -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
             "$sysroot/usr/lib/crtn.o" -o "$2"
     else
-        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
+        "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
             -nostdlib -nostartfiles -pie -Wl,-dynamic-linker,/libexec/ld-elf.so.1 \
             -Wl,--image-base=0x400000 \
             -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
@@ -193,7 +208,7 @@ link_dynamic() {
 }
 
 link_shared() {
-    "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
+    "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld $linker_flavor \
         -shared -nostdlib -nostartfiles -Wl,-soname,libplug.so \
         -Wl,--image-base=0x200000 \
         -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
