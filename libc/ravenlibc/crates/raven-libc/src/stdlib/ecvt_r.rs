@@ -104,7 +104,11 @@ pub unsafe extern "C" fn fcvt_r(
         Kind::Inf | Kind::Nan => {
             // SAFETY: the caller's buffer and out-pointers.
             unsafe {
-                let text = if shortest.kind == Kind::Inf { b"inf" } else { b"nan" };
+                let text = if shortest.kind == Kind::Inf {
+                    b"inf"
+                } else {
+                    b"nan"
+                };
                 core::ptr::copy_nonoverlapping(text.as_ptr(), buf.cast::<u8>(), 3);
                 *buf.cast::<u8>().add(3) = 0;
                 *decpt = 0;
@@ -139,7 +143,9 @@ pub unsafe extern "C" fn fcvt_r(
         0
     };
     let total = if result.decpt >= 0 {
-        usize::try_from(result.decpt).unwrap_or(0).saturating_add(fraction)
+        usize::try_from(result.decpt)
+            .unwrap_or(0)
+            .saturating_add(fraction)
     } else {
         fraction
     };
@@ -151,18 +157,18 @@ pub unsafe extern "C" fn fcvt_r(
             position += 1;
         }
         let available = result.len.min(total.saturating_sub(position));
-        core::ptr::copy_nonoverlapping(
-            digits.as_ptr(),
-            buf.cast::<u8>().add(position),
-            available,
-        );
+        core::ptr::copy_nonoverlapping(digits.as_ptr(), buf.cast::<u8>().add(position), available);
         position += available;
         while position < total {
             *buf.cast::<u8>().add(position) = b'0';
             position += 1;
         }
         *buf.cast::<u8>().add(position) = 0;
-        *decpt = if result.kind == Kind::Zero { 1 } else { result.decpt };
+        *decpt = if result.kind == Kind::Zero {
+            1
+        } else {
+            result.decpt
+        };
         *sign = c_int::from(result.negative);
     }
     0

@@ -17,7 +17,9 @@ extern "C" fn wcstold_inner(out: *mut u128, input: *const u32, endptr: *mut *mut
             if !endptr.is_null() {
                 // SAFETY: the caller grants a writable end pointer.
                 unsafe {
-                    *endptr = input.add(units_for_bytes(input, parsed.consumed)).cast_mut();
+                    *endptr = input
+                        .add(units_for_bytes(input, parsed.consumed))
+                        .cast_mut();
                 }
             }
             if parsed.range.contains(RangeFlags::OVERFLOW)

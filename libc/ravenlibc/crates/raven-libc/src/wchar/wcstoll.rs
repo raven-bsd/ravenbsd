@@ -9,7 +9,11 @@ use super::wcstod::{wcstol, wcstoul};
 /// # Safety
 /// As `wcstol`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn wcstoll(input: *const u32, endptr: *mut *mut u32, base: core::ffi::c_int) -> i64 {
+pub unsafe extern "C" fn wcstoll(
+    input: *const u32,
+    endptr: *mut *mut u32,
+    base: core::ffi::c_int,
+) -> i64 {
     // SAFETY: forwarded C contract.
     unsafe { wcstol(input, endptr, base) }
 }
@@ -19,7 +23,11 @@ pub unsafe extern "C" fn wcstoll(input: *const u32, endptr: *mut *mut u32, base:
 /// # Safety
 /// As `wcstoul`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn wcstoull(input: *const u32, endptr: *mut *mut u32, base: core::ffi::c_int) -> u64 {
+pub unsafe extern "C" fn wcstoull(
+    input: *const u32,
+    endptr: *mut *mut u32,
+    base: core::ffi::c_int,
+) -> u64 {
     // SAFETY: forwarded C contract.
     unsafe { wcstoul(input, endptr, base) }
 }
@@ -29,7 +37,11 @@ pub unsafe extern "C" fn wcstoull(input: *const u32, endptr: *mut *mut u32, base
 /// # Safety
 /// As `wcstol`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn wcstoimax(input: *const u32, endptr: *mut *mut u32, base: core::ffi::c_int) -> i64 {
+pub unsafe extern "C" fn wcstoimax(
+    input: *const u32,
+    endptr: *mut *mut u32,
+    base: core::ffi::c_int,
+) -> i64 {
     // SAFETY: forwarded C contract.
     unsafe { wcstol(input, endptr, base) }
 }
@@ -39,7 +51,11 @@ pub unsafe extern "C" fn wcstoimax(input: *const u32, endptr: *mut *mut u32, bas
 /// # Safety
 /// As `wcstoul`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn wcstoumax(input: *const u32, endptr: *mut *mut u32, base: core::ffi::c_int) -> u64 {
+pub unsafe extern "C" fn wcstoumax(
+    input: *const u32,
+    endptr: *mut *mut u32,
+    base: core::ffi::c_int,
+) -> u64 {
     // SAFETY: forwarded C contract.
     unsafe { wcstoul(input, endptr, base) }
 }

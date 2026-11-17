@@ -5,7 +5,9 @@ use core::ffi::{c_int, c_void};
 
 use raven_libc_stdio::{Fail, file_from_ptr};
 
-fn file(pointer: *mut c_void) -> Option<&'static raven_libc_stdio::File<crate::ffi::env::ShellEnv>> {
+fn file(
+    pointer: *mut c_void,
+) -> Option<&'static raven_libc_stdio::File<crate::ffi::env::ShellEnv>> {
     if pointer.is_null() {
         None
     } else {

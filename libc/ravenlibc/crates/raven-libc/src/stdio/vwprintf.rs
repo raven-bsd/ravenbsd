@@ -62,16 +62,21 @@ pub unsafe extern "C" fn vswprintf(
         crate::stdio::vprintf::alloc,
     );
     let options = crate::stdio::vprintf::options();
-    match vswprintf_core(buffer, cap, format, &mut env, &options, &crate::stdio::vprintf::FloatHook) {
+    match vswprintf_core(
+        buffer,
+        cap,
+        format,
+        &mut env,
+        &options,
+        &crate::stdio::vprintf::FloatHook,
+    ) {
         Ok(value) => value,
         Err(FmtErr::Invalid) => crate::ffi::ret::int(Err(raven_libc_abi::errno::Errno(22))),
         Err(_) => -1,
     }
 }
 
-fn scan_result(
-    result: Result<raven_libc_fmt::ScanResult, FmtErr>,
-) -> c_int {
+fn scan_result(result: Result<raven_libc_fmt::ScanResult, FmtErr>) -> c_int {
     match result {
         Ok(value) if value.return_eof => -1,
         Ok(value) => value.assigned,

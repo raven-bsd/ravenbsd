@@ -3,7 +3,7 @@
 
 use core::ffi::{c_int, c_void};
 
-use raven_libc_fmt::{ScanSource, ScanOptions, vscan};
+use raven_libc_fmt::{ScanOptions, ScanSource, vscan};
 
 use crate::stdio::va::{List, reader};
 
@@ -40,11 +40,7 @@ fn wide_length(value: *const u32) -> usize {
 /// # Safety
 /// `input` and `format` are NUL-terminated; `list` is the trampoline list.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn vswscanf(
-    input: *const u32,
-    format: *const u32,
-    list: *mut List,
-) -> c_int {
+pub unsafe extern "C" fn vswscanf(input: *const u32, format: *const u32, list: *mut List) -> c_int {
     if input.is_null() || format.is_null() {
         return crate::ffi::ret::int(Err(raven_libc_abi::errno::Errno(22)));
     }
@@ -63,7 +59,13 @@ pub unsafe extern "C" fn vswscanf(
         crate::stdio::vprintf::alloc,
     );
     let options = ScanOptions::default();
-    match vscan(&mut source, format, &mut env, &options, &crate::stdio::vsscanf::ScanFloat) {
+    match vscan(
+        &mut source,
+        format,
+        &mut env,
+        &options,
+        &crate::stdio::vsscanf::ScanFloat,
+    ) {
         Ok(value) if value.return_eof => -1,
         Ok(value) => value.assigned,
         Err(error) => crate::ffi::map_fmt::apply(error),
