@@ -3316,6 +3316,10 @@ name = "raven-vma"
 version = "0.1.0"
 
 [[package]]
+name = "raven-vmem"
+version = "0.1.0"
+
+[[package]]
 name = "raven-xargs"
 version = "0.1.0"
 dependencies = [
