@@ -37,12 +37,39 @@ const fn make_tables() -> [[u32; 256]; 8] {
 /// The slicing-by-8 tables, built at compile time.
 static TABLES: [[u32; 256]; 8] = make_tables();
 
+/// Test-only accounting of how many bytes the CRC has been asked to scan.
+///
+/// The regression guard uses this to prove that `parse_unchecked` does not walk file data and
+/// that `get` validates only the entry it returns. It is compiled out of production builds.
+#[cfg(test)]
+pub(crate) mod scan {
+    use std::cell::Cell;
+
+    std::thread_local! {
+        static BYTES: Cell<usize> = const { Cell::new(0) };
+    }
+
+    pub(crate) fn reset() {
+        BYTES.with(|bytes| bytes.set(0));
+    }
+
+    pub(crate) fn bytes() -> usize {
+        BYTES.with(|bytes| bytes.get())
+    }
+
+    pub(crate) fn add(length: usize) {
+        BYTES.with(|bytes| bytes.set(bytes.get().saturating_add(length)));
+    }
+}
+
 /// Compute the IEEE 802.3 CRC-32 of `data`.
 ///
 /// Reflected polynomial `0xEDB8_8320`, initial value `0xFFFF_FFFF`, final XOR with
 /// `0xFFFF_FFFF`. Slicing-by-8 consumes eight bytes per iteration with one table lookup per
 /// byte; the tail falls back to the byte loop.
 pub fn crc32(data: &[u8]) -> u32 {
+    #[cfg(test)]
+    scan::add(data.len());
     let mut crc = 0xFFFF_FFFFu32;
     let mut chunks = data.chunks_exact(8);
     for chunk in &mut chunks {

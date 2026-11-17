@@ -443,3 +443,95 @@ fn zero_length_file_roundtrip() {
     assert!(entry.data.is_empty());
     assert_eq!(entry.data_offset % PAGE_SIZE as u64, 0);
 }
+
+/// K26k guard: `parse_unchecked` must not walk file data, and `get` must check only its entry.
+///
+/// A 16 MiB file makes a full-image scan unmistakable in the byte counter; the test does not
+/// depend on wall-clock time, so a loaded host cannot make it flaky.
+#[test]
+fn parse_unchecked_and_get_scan_only_what_they_must() {
+    let big = vec![0xA5u8; 16 * 1024 * 1024];
+    let small = b"small".to_vec();
+    let image = image(&[
+        File {
+            path: b"/big",
+            data: &big,
+            mode: 0o644,
+        },
+        File {
+            path: b"/small",
+            data: &small,
+            mode: 0o644,
+        },
+    ]);
+    let total = big.len() + small.len();
+
+    crate::crc::scan::reset();
+    let initfs = Initfs::parse_unchecked(&image).unwrap();
+    assert_eq!(
+        crate::crc::scan::bytes(),
+        0,
+        "parse_unchecked scanned file data"
+    );
+
+    crate::crc::scan::reset();
+    assert!(initfs.get("/big").is_some());
+    assert_eq!(
+        crate::crc::scan::bytes(),
+        big.len(),
+        "get scanned beyond its entry"
+    );
+
+    crate::crc::scan::reset();
+    assert!(initfs.get("/missing").is_none());
+    assert_eq!(crate::crc::scan::bytes(), 0, "a miss scanned file data");
+
+    crate::crc::scan::reset();
+    assert!(Initfs::parse(&image).is_ok());
+    assert_eq!(
+        crate::crc::scan::bytes(),
+        total,
+        "parse did not validate exactly the data"
+    );
+}
+
+/// K26k guard: a corrupt entry costs one entry scan, not a full-image rescan.
+#[test]
+fn get_checks_only_the_requested_entry() {
+    let big = vec![0x5Au8; 8 * 1024 * 1024];
+    let mut image = image(&[
+        File {
+            path: b"/big",
+            data: &big,
+            mode: 0o644,
+        },
+        File {
+            path: b"/small",
+            data: b"ok",
+            mode: 0o644,
+        },
+    ]);
+    let offset = Initfs::parse_unchecked(&image)
+        .unwrap()
+        .get("/big")
+        .unwrap()
+        .data_offset as usize;
+    image[offset] ^= 1;
+    let initfs = Initfs::parse_unchecked(&image).unwrap();
+
+    crate::crc::scan::reset();
+    assert!(initfs.get("/big").is_none());
+    assert_eq!(
+        crate::crc::scan::bytes(),
+        big.len(),
+        "a failed get scanned the whole image"
+    );
+
+    crate::crc::scan::reset();
+    assert!(initfs.get("/small").is_some());
+    assert_eq!(
+        crate::crc::scan::bytes(),
+        2,
+        "a good get scanned more than its entry"
+    );
+}

@@ -3,11 +3,15 @@
 
 # The milestone test: boot to a shell prompt and play the scripted session of
 # `architecture/16-first-shell.md` section 1 over the serial console.
+#
+# K26k budget (shell-test image, 84 MB initfs): measured boot ~33 s and whole case ~51 s.
+# Boot wait 120 s (3.6x), per-step 15 s, case 150 s (2.9x). A full-image initfs re-scan
+# pushes the first external command past 30 s.
 
 name = "shell-session"
 arch = "x86_64"
 profile = "shell-test"
-timeout_secs = 420
+timeout_secs = 150
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
@@ -52,7 +56,7 @@ regex = '(?i)panic|EXCEPTION|rsh: .*command not found'
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 300
+timeout_secs = 120
 
 [[step]]
 send = "uname -a\n"
@@ -60,11 +64,11 @@ delay_ms = 100
 
 [[step]]
 wait = '^RavenBSD raven 0\.1 .* x86_64$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "echo hello > /tmp/a\n"
@@ -72,7 +76,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "cat /tmp/a\n"
@@ -80,11 +84,11 @@ delay_ms = 100
 
 [[step]]
 wait = '^hello$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "mkdir /tmp/d\n"
@@ -92,7 +96,7 @@ delay_ms = 100
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "ls /tmp\n"
@@ -100,15 +104,15 @@ delay_ms = 100
 
 [[step]]
 wait = '^a$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^d/$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "ls /bin\n"
@@ -116,19 +120,19 @@ delay_ms = 100
 
 [[step]]
 wait = '^cat$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^ls$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^uname$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "svcctl list\n"
@@ -136,23 +140,23 @@ delay_ms = 100
 
 [[step]]
 wait = '^consd running \d+$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^logd running \d+$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^ramfsd running \d+$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^vfsd running \d+$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "cat /nonexistent\n"
@@ -160,11 +164,11 @@ delay_ms = 100
 
 [[step]]
 wait = '^rsh: cat: /nonexistent: no such file or directory$'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 wait = '^raven# $'
-timeout_secs = 30
+timeout_secs = 15
 
 [[step]]
 send = "exit 0\n"
@@ -172,4 +176,4 @@ delay_ms = 100
 
 [[step]]
 wait = '^init exited \(0\)$'
-timeout_secs = 60
+timeout_secs = 30
