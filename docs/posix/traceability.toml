@@ -1094,7 +1094,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.brk"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.bsearch"
@@ -2132,7 +2132,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.dup3"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.duplocale"
@@ -2144,7 +2144,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.eaccess"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.ecvt_r"
@@ -2246,7 +2246,7 @@ evidence = "test:tests/libc/posix/math/check-math.sh"
 id = "interface.euidaccess"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.execl"
@@ -2432,7 +2432,7 @@ evidence = "test:tests/libc/posix/math/check-math.sh"
 id = "interface.faccessat"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.fallocate"
@@ -2450,7 +2450,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fchdir"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.fchmod"
@@ -2498,7 +2498,7 @@ evidence = "test:tests/libc/posix/stdlib/check-stdlib2.sh"
 id = "interface.fdatasync"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.fdetach"
@@ -2960,7 +2960,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fpathconf"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.fpclassify"
@@ -3170,7 +3170,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fstatvfs"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.fsync"
@@ -3212,7 +3212,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.ftruncate64"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.ftrylockfile"
@@ -3350,7 +3350,7 @@ evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 id = "interface.getdents"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.getdomainname"
@@ -3374,7 +3374,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.getentropy"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.getenv"
@@ -3500,7 +3500,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.getpagesize"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.getpayloadfNx"
@@ -3602,7 +3602,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.getrlimit64"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.getrusage"
@@ -4430,7 +4430,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.lchmod"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.lchown"
@@ -4628,7 +4628,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.lockf"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.log"
@@ -4856,7 +4856,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.madvise"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.malloc"
@@ -4994,7 +4994,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.mkdirat"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.mkfifo"
@@ -5036,19 +5036,19 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.mlock"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.mlock2"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.mlockall"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.mmap"
@@ -5180,7 +5180,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.msync"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.mtx_destroy"
@@ -5222,13 +5222,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.munlock"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.munlockall"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.munmap"
@@ -5450,7 +5450,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.pathconf"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.pause"
@@ -5474,7 +5474,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.pipe"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.pipe2"
@@ -5498,19 +5498,19 @@ evidence = "test:tests/libc/posix/stdio/check-stdio2.sh"
 id = "interface.posix_close"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.posix_fadvise"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.posix_fallocate"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.posix_getdents"
@@ -5522,7 +5522,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.posix_madvise"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.posix_memalign"
@@ -5708,7 +5708,7 @@ evidence = "test:tests/libc/posix/math/check-math.sh"
 id = "interface.ppoll"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.pread"
@@ -5726,13 +5726,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.preadv"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.preadv2"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.printf"
@@ -5750,7 +5750,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.pselect"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.psiginfo"
@@ -6500,13 +6500,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.pwritev"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.pwritev2"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.qsort"
@@ -6578,7 +6578,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.readlinkat"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.readv"
@@ -6956,7 +6956,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.select"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.sem_clockwait"
@@ -7136,7 +7136,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.sethostname"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.setitimer"
@@ -7586,7 +7586,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.sleep"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.snprintf"
@@ -8024,7 +8024,7 @@ evidence = "none"
 id = "interface.syncfs"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.syscall"
@@ -8408,13 +8408,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.truncate"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.truncate64"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.truncf"
@@ -8462,7 +8462,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.ttyname"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.ttyname_r"
@@ -8582,7 +8582,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.usleep"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
 
 [[trace]]
 id = "interface.utime"

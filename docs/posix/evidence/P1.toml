@@ -2249,3 +2249,276 @@ id = "interface.clock_getcpuclockid"
 status = "present"
 evidence = "test:tests/libc/posix/time/check-time.sh"
 notes = "P1 batch B: clock_getcpuclockid returns CLOCK_PROCESS_CPUTIME_ID for pid 0/the caller; other pids return ESRCH. raven-libc-time suite and libc.a symbol"
+
+# P1c (P1f round 6): the 45 unistd/IO ABI names. The symbol audit checks Symbol.map,
+# Symbols.list, the frozen record and (when present) build/x86_64/libc.a.
+
+[[row]]
+id = "interface.getdents"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: getdents export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.posix_fadvise"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: posix_fadvise export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.posix_fallocate"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: posix_fallocate export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.ppoll"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: ppoll export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.madvise"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: madvise export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.mlock2"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: mlock2 export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.mlockall"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: mlockall export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.mlock"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: mlock export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.msync"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: msync export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.munlockall"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: munlockall export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.munlock"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: munlock export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.posix_madvise"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: posix_madvise export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.getrlimit64"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: getrlimit64 export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.pselect"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: pselect export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.select"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: select export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.lchmod"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: lchmod export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.lockf"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: lockf export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.mkdirat"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: mkdirat export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.fstatvfs"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: fstatvfs export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.preadv2"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: preadv2 export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.preadv"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: preadv export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.pwritev2"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: pwritev2 export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.pwritev"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: pwritev export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.brk"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: brk export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.dup3"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: dup3 export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.eaccess"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: eaccess export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.euidaccess"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: euidaccess export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.faccessat"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: faccessat export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.fchdir"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: fchdir export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.fdatasync"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: fdatasync export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.fpathconf"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: fpathconf export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.ftruncate64"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: ftruncate64 export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.getentropy"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: getentropy export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.getpagesize"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: getpagesize export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.pathconf"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: pathconf export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.pipe"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: pipe export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.posix_close"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: posix_close export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.readlinkat"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: readlinkat export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.sethostname"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: sethostname export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.sleep"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: sleep export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.syncfs"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: syncfs export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.truncate64"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: truncate64 export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.truncate"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: truncate export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.ttyname"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: ttyname export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
+
+[[row]]
+id = "interface.usleep"
+status = "present"
+evidence = "test:tests/libc/p1c-unistd/check-p1c-exports.sh"
+notes = "P1c: usleep export; symbol audit over Symbol.map/Symbols.list/frozen/libc.a"
