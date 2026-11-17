@@ -890,6 +890,9 @@ fn deliver(
     // while serving it inherits the caller's trace. Cleared when SEND finishes.
     if let Some(thread) = sched::current_thread() {
         thread.trace_id.store(packet.trace_id, Ordering::Release);
+        // L6: the receiving server thread runs with the blocked client's priority until the
+        // reply (or cancellation/death) removes this call edge.
+        request.begin_donation(&thread);
     }
     let mut bytes = [0u8; PACKET_SIZE];
     if protocol::encode(&packet, &mut bytes).is_err() {

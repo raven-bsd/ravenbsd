@@ -4,20 +4,22 @@
 #
 # S71 deterministic server-death fault-injection driver.
 #
-# Boots the release profile, logs in, and restarts the resident data servers (netd and vfsd)
-# through svcctl, then asserts the shell survives, the services come back and the restart counts
-# are stable. With `--soak <seconds>` it repeats the baseline run until the budget is exhausted
-# and reports the pass/fail counts, the per-run recovery time and the first failure.
+# With no selector it runs the cross-architecture fault cases:
 #
-# The release image only stages netd and vfsd as resident data servers (blockd and fsd-ufs live
-# in their own test profiles), and release rc.conf pins the resident services' restart policy to
-# "never", so every restart here is an explicit `svcctl start`/`svcctl restart`.
+#   fault-restart    after-reply, during-restart and idle STOP/START on the `frt` worker
+#   fault-reconnect  in-flight request death: EIO/EPIPE, generation change, bounded reopen
+#
+# `--profile release` selects the x86_64 release-image matrix (netd and vfsd through svcctl).
+# `--case <name>` runs one case. With `--soak <seconds>` the selected set repeats until the
+# budget is exhausted and the driver reports the pass/fail counts, the per-run wall time and the
+# first failure.
 
 set -eu
 
-profile=release
+profile=
 arch=x86_64
 soak=0
+selected_case=
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -33,6 +35,10 @@ while [ "$#" -gt 0 ]; do
             soak=$2
             shift 2
             ;;
+        --case)
+            selected_case=$2
+            shift 2
+            ;;
         *)
             printf 'fault-injection: unknown option %s\n' "$1" >&2
             exit 2
@@ -40,13 +46,21 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-if [ "$profile" != "release" ]; then
-    printf 'fault-injection: only --profile release is supported today\n' >&2
+if [ -n "$selected_case" ]; then
+    cases=$selected_case
+elif [ "$profile" = "release" ]; then
+    cases=fault-restart-release
+elif [ -z "$profile" ]; then
+    cases="fault-restart fault-reconnect"
+else
+    printf 'fault-injection: only --profile release or the default cross-arch set is supported\n' >&2
     exit 2
 fi
 
 run_once() {
-    cargo xtask qtest --case fault-restart --arch "$arch"
+    for case_name in $cases; do
+        cargo xtask qtest --case "$case_name" --arch "$arch" || return $?
+    done
 }
 
 if [ "$soak" -le 0 ]; then

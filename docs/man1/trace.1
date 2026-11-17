@@ -1,0 +1,58 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt TRACE 1
+.Os RavenBSD
+.Sh NAME
+.Nm trace
+.Nd print the recorded span sink as a request tree
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+maps the shared span sink at the fixed address
+.Pa 0x3000_0000
+and drains every committed record from the
+.Pa raven-trace-core
+ring.
+It prints a summary line followed by one line per span:
+.Bd -literal -offset indent
+trace: spans=<n> gaps=<n> traced=<n> untraced=<n>
+trace: id=<id> span=<span> parent=<parent> pid=<pid> ts=<ns> kind=<kind> op=<op>
+.Ed
+.Pp
+The summary counts spans whose trace id is zero as
+.Ql untraced .
+A span line prints a zero trace id as
+.Ql untraced
+and a non-zero id as
+.Ql 0x
+followed by the lower-case hexadecimal value.
+The
+.Ql kind
+field is one of
+.Ql client ,
+.Ql server ,
+.Ql kernel
+or
+.Ql io ;
+.Ql op
+is the wire opcode of the recorded request.
+.Pp
+The sink is created and populated by the process that spawned
+.Nm ,
+which transfers the sink memory object before the first thread starts.
+The current implementation is the Q4b fixture harness:
+.Pa tests/fixtures/trace-demo
+creates the sink, runs a scheme server that records spans with the caller's inherited trace id, and
+then runs
+.Nm
+to print the result.
+A real
+.Xr vfsd 8
+tree follows in Q4.
+.Sh EXIT STATUS
+.Ex -std
+An unreadable or malformed sink exits with status 1.
+.Sh SEE ALSO
+.Xr vfsd 8

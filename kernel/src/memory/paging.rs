@@ -98,6 +98,8 @@ pub enum PagingError {
     #[cfg_attr(target_arch = "x86_64", allow(dead_code))]
     // Only the aarch64 init audits tables.
     WxViolation,
+    /// The optional `frames_selftest=1` frame-allocator soak failed.
+    FrameSelftest,
 }
 
 impl fmt::Display for PagingError {
@@ -111,6 +113,7 @@ impl fmt::Display for PagingError {
             PagingError::Overflow => f.write_str("address overflow"),
             PagingError::HhdmMismatch => f.write_str("HHDM base mismatch"),
             PagingError::WxViolation => f.write_str("writable executable page in kernel tables"),
+            PagingError::FrameSelftest => f.write_str("frame allocator soak failed"),
         }
     }
 }
@@ -699,6 +702,17 @@ fn copy_boot_data(data: &BootData) -> Result<(), PagingError> {
     // SAFETY: the cell is written once during single-CPU init before it is published.
     unsafe {
         BOOT_INFO.0.get().write(info);
+    }
+    // Configure the per-CPU frame magazines and run the optional frame soak from the command
+    // line. This runs after `frame::init` and needs no mapped frames of its own.
+    let cmdline = crate::cmdline::CmdLine::parse(data.cmdline);
+    let frames_percpu = !matches!(
+        cmdline.get("frames_percpu"),
+        Some("off" | "0" | "false" | "no")
+    );
+    frame::set_percpu_enabled(frames_percpu);
+    if cmdline.get("frames_selftest").is_some() && !frame::selftest() {
+        return Err(PagingError::FrameSelftest);
     }
     Ok(())
 }

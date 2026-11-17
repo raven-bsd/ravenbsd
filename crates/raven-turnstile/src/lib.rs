@@ -13,8 +13,10 @@
 //! effective priority of a thread is the most urgent of its base priority and the effective
 //! priorities of every thread waiting on a lock it owns, transitively (see [`Turnstiles`]).
 
-#![no_std]
+#![cfg_attr(not(target_os = "none"), no_std)]
 #![forbid(unsafe_code)]
+// When compiled into the kernel (target_os = "none") the host-test-only public surface is unused.
+#![cfg_attr(target_os = "none", allow(dead_code))]
 
 extern crate alloc;
 #[cfg(test)]

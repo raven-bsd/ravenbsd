@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "kmem-frames-nopcpu"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 90
+boot_cmdline = "console=ttyS0 test-exit=1 frames_percpu=off frames_selftest=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^frames: soak percpu=on allocated=\d+ ok=true$'
+
+[[expect]]
+regex = '^frames: soak percpu=off allocated=\d+ ok=true$'
+
+[[expect]]
+regex = '^frames: contiguous ok$'
+
+[[expect]]
+regex = '^frames: oom probe=\d+ free_before=\d+ free_after=\d+ ok=true$'
+
+[[forbid]]
+regex = '(?i)panic'

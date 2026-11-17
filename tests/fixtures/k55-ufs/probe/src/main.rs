@@ -30,6 +30,7 @@ mod program {
     use raven_rt::entry;
     use raven_rt::fs;
     use raven_scheme::Client;
+    use ufs_core::BlockIo;
     use ufs_core::check::{Mode, check};
 
     entry!(main);
@@ -61,6 +62,7 @@ mod program {
         sparse_file()?;
         mmap_file()?;
         persistence()?;
+        refusal()?;
         Ok(())
     }
 
@@ -448,11 +450,23 @@ mod program {
         file.close()
             .map_err(|error| format!("crash close: {}", error.description()))?;
         let client = Client::new();
+        let _ = fs::umount("/ufs");
         svc_control(&client, "fsd-ufs", Op::Stop)?;
         wait_state(&client, "fsd-ufs", State::Stopped)?;
         let mut disk = open_partition("block:0", 1)?;
         let (findings, clean) = match check(&mut disk, Mode::ReadOnly) {
-            Ok(report) => (report.findings.len(), report.clean_after),
+            Ok(report) => {
+                for finding in &report.findings {
+                    raven_rt::println!(
+                        "fsd-ufs-rw: probe crash finding phase={} problem={:?} inode={:?} block={:?}",
+                        finding.phase,
+                        finding.problem,
+                        finding.inode,
+                        finding.block
+                    );
+                }
+                (report.findings.len(), report.clean_after)
+            }
             Err(_) => (usize::MAX, false),
         };
         raven_rt::println!("fsd-ufs-rw: probe crash findings={findings} clean={clean}");
@@ -475,6 +489,61 @@ mod program {
         Ok(())
     }
 
+    /// Corrupt the superblock magic so `fsd-ufs` must refuse to mount, then restore it and
+    /// verify a clean image mounts again.
+    fn refusal() -> Result<(), String> {
+        let client = Client::new();
+        svc_control(&client, "fsd-ufs", Op::Stop)?;
+        wait_state(&client, "fsd-ufs", State::Stopped)?;
+
+        // UFS2 magic lives at the superblock (8192) plus 1372 bytes.
+        let magic_offset = 8192u64 + 1372;
+        let mut magic = [0u8; 4];
+        {
+            let mut disk = open_partition("block:0", 1)?;
+            disk.read_at(magic_offset, &mut magic)
+                .map_err(|_| "read magic".to_string())?;
+            let zero = [0u8; 4];
+            disk.write_at(magic_offset, &zero)
+                .map_err(|_| "corrupt magic".to_string())?;
+        }
+
+        svc_control(&client, "fsd-ufs", Op::Start)?;
+        if reaches_running(&client) {
+            return Err("fsd-ufs mounted a corrupted image".to_string());
+        }
+        raven_rt::println!("fsd-ufs-rw: probe refuse ok");
+
+        {
+            let mut disk = open_partition("block:0", 1)?;
+            disk.write_at(magic_offset, &magic)
+                .map_err(|_| "restore magic".to_string())?;
+        }
+        // The refused start waits out the readiness timeout; once svcd marks it failed,
+        // restart it and verify the restored clean image mounts.
+        let _ = wait_state(&client, "fsd-ufs", State::Failed);
+        let _ = svc_control(&client, "fsd-ufs", Op::Start);
+        wait_state(&client, "fsd-ufs", State::Running)?;
+        let _ = fs::umount("/ufs");
+        fs::mount("/ufs", "ufs:")
+            .map_err(|error| format!("refuse-clean mount: {}", error.description()))?;
+        let _ = fs::read_to_vec(PERSIST_PATH);
+        fs::umount("/ufs")
+            .map_err(|error| format!("refuse-clean umount: {}", error.description()))?;
+        raven_rt::println!("fsd-ufs-rw: probe refuse-clean ok");
+        Ok(())
+    }
+
+    fn reaches_running(client: &Client) -> bool {
+        for _ in 0..300 {
+            if service_state(client, "fsd-ufs").is_ok_and(|state| state == State::Running) {
+                return true;
+            }
+            let _ = raven_rt::nanosleep(10_000_000);
+        }
+        false
+    }
+
     fn svc_control(client: &Client, name: &str, operation: Op) -> Result<(), String> {
         let path = format!("svc:/{name}");
         let handle = client
@@ -489,7 +558,7 @@ mod program {
     }
 
     fn wait_state(client: &Client, name: &str, wanted: State) -> Result<(), String> {
-        for _ in 0..200 {
+        for _ in 0..7000 {
             if service_state(client, name)? == wanted {
                 return Ok(());
             }

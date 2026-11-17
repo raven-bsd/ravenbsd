@@ -3,9 +3,10 @@
 
 # Locking: turnstiles and priority inheritance
 
-Status: PROPOSED. Implements the pure half of `kernel-next/04` R-LCK-5 and R-LCK-6 in
-`crates/raven-turnstile` (L1); the kernel glue (`sync.rs` blocking `Mutex`, `RwLock`, `Condvar`)
-lands later.
+Status: OBSERVED (model) + OBSERVED (kernel glue). Implements the pure half of `kernel-next/04`
+R-LCK-5 and R-LCK-6 in `crates/raven-turnstile` (L1). The kernel glue is live: the blocking
+`Mutex` in `sync.rs` (L3) and the IPC call-edge donation in `ipc/mod.rs` + `ipc/router.rs` (L6).
+`RwLock`/`Condvar` glue remains PROPOSED.
 
 ## What a turnstile is
 
@@ -82,7 +83,31 @@ off in arrival order).
 
 `crates/raven-turnstile` has an off-by-default `lockstat` feature. When enabled, each turnstile
 carries per-object counters (`Turnstiles::stats(object) -> LockStats`) that the kernel `lockstat`
-probes will publish (L5). The default build has no counters and no extra cost or layout.
+probes publish (L5). The crate's default build has no counters and no extra cost or layout.
+
+Kernel build mechanism (L5, OBSERVED): `kernel/Cargo.toml` declares a `lockstat` feature that is
+**on by default** (`default = ["lockstat"]`). The kernel includes the pure model by `#[path]`, so
+that feature cfg reaches the same `#[cfg(feature = "lockstat")]` counters the host suite tests;
+no second flag and no `raven-turnstile` dependency edge is needed. `--no-default-features` drops
+the counters, `sync::lockstat()` and the `selftest=lockstat` arm (both arches compile clean that
+way). Cost: with the feature on, each model object carries eight `u64` saturating counters and each
+lock operation performs one saturating add plus, for `block`, the queue/depth maximum update. The
+byte and cycle overhead is **UNMEASURED** (no timed kernel benchmark in this ticket).
+
+`sync::lockstat()` returns `Vec<(ObjectId, LockStats)>` over every object the graph has touched.
+`selftest=lockstat` runs a bounded workload (one owner, two waiters at higher priority, one
+inherited boost, two handoffs) and prints one machine-readable line; the `lockstat` qtest asserts
+it. Observed QEMU line:
+
+```
+lockstat: ok object=3 wait_entries=2 wakes=2 cancels=0 timeouts=0 boosts=1 max_queue=2 owner_boost=0 restored=ok
+```
+
+`boosts` is `inherited_priority_changes` (how often an operation changed an owner's effective
+priority), `max_queue` is `max_queue_depth`; `timeouts` is always `0` because the pure model has no
+timeout path. The counter counts the blocking edge that actually raised the owner and any handoff
+that changes the incoming owner's priority; the bounded two-waiter run above observes `1` (the
+second waiter has lower priority than the first and does not raise the owner again).
 
 | Counter | Meaning |
 |---|---|
@@ -122,9 +147,31 @@ invariants every 512 steps; a hand-built inversion case proves a low-priority lo
 high-priority client's priority while the server waits on its lock, and returns to base once the
 lock is released and the call completes.
 
-## Kernel integration (later)
+## Kernel integration
 
-The kernel hosts the real threads and calls these operations from the blocking mutex/rwlock/condvar
-paths, applying each `InheritEffect` to the scheduler. The global recomputation may be replaced by
-incremental propagation along the wait-for chain (bounded depth 8) as long as it yields the same
-effective priorities. Deadlock detection and the IPC donation edges (R-LCK-7) are separate tickets.
+Landed (OBSERVED):
+
+* `kernel/src/sync.rs` hosts one global `Donation` graph (lock wait edges plus IPC call edges) and
+  a `tid -> Weak<Thread>` map. `Mutex::lock` registers the caller, blocks in the turnstile and
+  applies the returned `InheritEffect`; `Mutex::unlock` hands the lock to the highest-priority
+  waiter and re-syncs the releaser and the new owner. `sync_thread_boost` writes the graph's
+  effective priority to `Thread::boost` through `Thread::set_boost`/`clear_boost`, which the
+  scheduler's `effective_priority` reads (`AtomicU8`, cross-CPU safe).
+* `kernel/src/ipc/router.rs` opens the call edge in `deliver`, where the receiving server thread is
+  known (`PendingRequest::begin_donation`). The client tid is captured when the request is created.
+  `PendingRequest::complete` closes the edge, so a reply, cancellation, client death and server
+  death all remove it exactly once (`server_tid` is a swap-to-zero marker). One-way CLOSE/DUP
+  notifications get no edge because no client blocks on them.
+* Composition: the graph's least fixed point already folds call edges into lock inheritance, so a
+  client -> server -> lock-owner chain runs the owner at the client's priority. After every edge
+  change the kernel re-applies all registered threads' effective priorities
+  (`sync_all_boosts`), which also restores base priorities when an edge disappears.
+* Nested calls compose recursively: the boosted server thread is itself the client of the next
+  call, and its effective priority (not its base) is the donation value.
+* `selftest=locking` and `selftest=ipc-donation` are QEMU qtests (`locking`, `ipc-donation`); both
+  assert the observed boost and the restoration.
+
+The global recomputation may be replaced by incremental propagation along the wait-for chain
+(bounded depth 8) as long as it yields the same effective priorities (PROPOSED). Deadlock
+detection and the remaining R-LCK-7 consumers are separate tickets; `RwLock`/`Condvar` glue and
+the user-visible priority syscalls remain PROPOSED.
