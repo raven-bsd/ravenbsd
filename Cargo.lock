@@ -393,6 +393,7 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
+ "trace",
  "ufs-core",
 ]
 
@@ -1095,6 +1096,7 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
+ "trace",
 ]
 
 [[package]]
@@ -1755,6 +1757,7 @@ dependencies = [
  "raven-libc-fmt",
  "raven-libc-fts",
  "raven-libc-glob",
+ "raven-libc-iconv",
  "raven-libc-ipc",
  "raven-libc-locale",
  "raven-libc-m",
@@ -2746,6 +2749,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-record-lock"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-renice"
 version = "0.1.0"
 dependencies = [
@@ -2851,6 +2865,7 @@ dependencies = [
  "raven-proto-fs",
  "raven-scheme",
  "raven-spawn",
+ "raven-trace-core",
 ]
 
 [[package]]
@@ -3241,6 +3256,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-smp-soak-aarch64"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-smp-tlb"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-smp-user"
 version = "0.1.0"
 dependencies = [
@@ -3468,7 +3499,6 @@ dependencies = [
  "raven-rt",
  "raven-scheme",
  "raven-trace-core",
- "trace",
 ]
 
 [[package]]
@@ -3822,6 +3852,7 @@ name = "strip"
 version = "0.1.0"
 dependencies = [
  "raven-elf",
+ "raven-proto-fs",
  "raven-rt",
  "raven-tool-core",
 ]

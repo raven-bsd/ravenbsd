@@ -62,7 +62,7 @@ evidence = "qtest:perm"
 id = "filesystem.record-lock"
 ticket = "P5"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-fs-record-lock"
 
 [[trace]]
 id = "filesystem.rename"
@@ -5756,13 +5756,13 @@ evidence = "none"
 id = "interface.psiginfo"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.psignal"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.pthread_atfork"
