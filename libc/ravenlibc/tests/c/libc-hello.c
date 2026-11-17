@@ -158,7 +158,7 @@ static int check_strings(void)
     vectors++;
     memcpy(moved, "abcdef", 7);
     memmove(moved + 1, moved, 5);
-    if (strcmp(moved, "aabcdf") != 0) {
+    if (strcmp(moved, "aabcde") != 0) {
         return 0;
     }
     vectors++;
