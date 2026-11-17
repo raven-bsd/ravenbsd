@@ -80,6 +80,7 @@ mod sinpi;
 mod support;
 pub mod binary128;
 mod c23;
+mod c23x;
 mod complex;
 mod coremath;
 mod fdlibm;
@@ -87,6 +88,8 @@ mod generic;
 mod legacy;
 #[cfg(target_arch = "x86_64")]
 mod long_double;
+#[cfg(target_arch = "x86_64")]
+mod long_double_c23;
 pub mod long_double_math;
 mod portable;
 
@@ -102,6 +105,17 @@ pub use c23::{
     canonicalize, canonicalizef, getpayload, getpayloadf, issignaling, issignalingf, nextdown,
     nextup, roundeven, setpayload, setpayloadf, setpayloadsig, setpayloadsigf, totalorder,
     totalorderf, totalordermag, totalordermagf,
+};
+pub use c23x::{
+    FP_INT_DOWNWARD, FP_INT_TONEAREST, FP_INT_TONEARESTFROMZERO, FP_INT_TOWARDZERO, FP_INT_UPWARD,
+    acospi, asinpi, atan2pi, atanpi, compoundn, compoundnf, cospi, exp2m1, exp2m1f, exp10m1,
+    exp10m1f, fmaximum_mag_num, fmaximum_mag_numf, fmaxmag, fmaxmagf, fminimum_mag_num,
+    fminimum_mag_numf, fminmag, fminmagf, fromfp, fromfpx, iscanonical, iseqsig, isgreater,
+    isgreaterequal, isless, islessequal, islessgreater, issubnormal, isunordered, iszero, llogb,
+    llrint, llrintf, llround, llroundf, log2p1, log2p1f, log10p1, log10p1f, logb, logbf, lrint,
+    lrintf, lround, lroundf, nearbyint, nearbyintf, nextafter, nextafterf, nexttoward, nexttowardf,
+    pown, pownf, powr, powrf, remainder, remainderf, remquo, remquof, rootn, rootnf, scalbln,
+    scalblnf, tanpi, ufromfp, ufromfpx,
 };
 pub use complex::{
     Complex, Real, cabs, cabsf, cacos, cacosf, cacosh, cacoshf, carg, cargf, casin, casinf, casinh,
@@ -130,6 +144,12 @@ pub use long_double::{
     nextafterl, nexttowardl, remainderl, remquol, rintl, roundevenl, roundl, scalbnl, signbitl,
     sqrtl, totalorderl, truncl,
 };
+#[cfg(target_arch = "x86_64")]
+pub use long_double_c23::{
+    cbrtl, fmal, frexpl, hypotl, ilogbl, ldexpl, llogbl, logbl, modfl, nanl_with_tag, pow10l,
+    scalblnl, significandl, sincosl,
+};
+#[cfg(target_arch = "x86_64")]
 pub use long_double_math::{
     acoshl, acosl, asinhl, asinl, atan2l, atanhl, atanl, coshl, cosl, erfcl, erfl, exp2l, exp10l,
     expl, expm1l, j0l, j1l, jnl, lgamma_rl, lgammal, log1pl, log2l, log10l, logl, powl, sinhl,

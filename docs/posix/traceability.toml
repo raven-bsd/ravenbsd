@@ -32,7 +32,7 @@ evidence = "qtest:posix-fs"
 id = "filesystem.mmap-file"
 ticket = "P5"
 test = "none"
-evidence = "kernel/src/memory/uspace.rs"
+evidence = "qtest:posix-fs"
 
 [[trace]]
 id = "filesystem.mount"
@@ -194,7 +194,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.float.h"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/include"
+evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.fmtmsg.h"
@@ -242,7 +242,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.iso646.h"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/include"
+evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.langinfo.h"
@@ -260,7 +260,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.libintl.h"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/include"
+evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.limits.h"
@@ -392,25 +392,25 @@ evidence = "libc/ravenlibc/include"
 id = "header.stdarg.h"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/include"
+evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.stdatomic.h"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/include"
+evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.stdbool.h"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/include"
+evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.stddef.h"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/include"
+evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.stdint.h"
@@ -572,7 +572,7 @@ evidence = "libc/ravenlibc/include"
 id = "header.tgmath.h"
 ticket = "P1"
 test = "none"
-evidence = "libc/ravenlibc/include"
+evidence = "test:tests/libc/posix/headers/check-missing-headers.sh"
 
 [[trace]]
 id = "header.threads.h"
@@ -752,19 +752,19 @@ evidence = "none"
 id = "interface.acoshl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.acosl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.acospi"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.adjtime"
@@ -872,7 +872,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.asctime"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.asin"
@@ -914,19 +914,19 @@ evidence = "none"
 id = "interface.asinhl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.asinl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.asinpi"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.assert"
@@ -968,13 +968,13 @@ evidence = "none"
 id = "interface.atan2l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.atan2pi"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.atanf"
@@ -1010,19 +1010,19 @@ evidence = "none"
 id = "interface.atanhl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.atanl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.atanpi"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.atexit"
@@ -1034,7 +1034,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.atof"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib.sh"
 
 [[trace]]
 id = "interface.atoi"
@@ -1376,7 +1376,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.cbrtl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.ccos"
@@ -1448,7 +1448,7 @@ evidence = "none"
 id = "interface.ceill"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.cexp"
@@ -1568,7 +1568,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.clearerr_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.clock"
@@ -1598,7 +1598,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.clock_nanosleep"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.clock_settime"
@@ -1688,7 +1688,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.compoundn"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.confstr"
@@ -1754,7 +1754,7 @@ evidence = "none"
 id = "interface.copysignl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.cos"
@@ -1796,19 +1796,19 @@ evidence = "none"
 id = "interface.coshl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.cosl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.cospi"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.cpow"
@@ -2018,13 +2018,13 @@ evidence = "none"
 id = "interface.ctermid"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.ctime"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.cuserid"
@@ -2228,7 +2228,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.erfcl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.erff"
@@ -2240,7 +2240,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.erfl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.euidaccess"
@@ -2324,13 +2324,13 @@ evidence = "none"
 id = "interface.exp10l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.exp10m1"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.exp2"
@@ -2354,13 +2354,13 @@ evidence = "none"
 id = "interface.exp2l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.exp2m1"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.expf"
@@ -2378,7 +2378,7 @@ evidence = "none"
 id = "interface.expl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.expm1"
@@ -2402,7 +2402,7 @@ evidence = "none"
 id = "interface.expm1l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.fabs"
@@ -2426,7 +2426,7 @@ evidence = "none"
 id = "interface.fabsl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.faccessat"
@@ -2528,7 +2528,7 @@ evidence = "none"
 id = "interface.fdiml"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.fdopen"
@@ -2582,7 +2582,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.feof_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.feraiseexcept"
@@ -2600,7 +2600,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.ferror_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fesetenv"
@@ -2666,7 +2666,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fflush_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.ffs"
@@ -2696,19 +2696,19 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fgetc_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fgetpos"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fgetpos64"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fgets"
@@ -2744,7 +2744,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fileno_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.finitef"
@@ -2756,7 +2756,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.flockfile"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.floor"
@@ -2780,7 +2780,7 @@ evidence = "none"
 id = "interface.floorl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.flsl"
@@ -2816,7 +2816,7 @@ evidence = "none"
 id = "interface.fmal"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.fmax"
@@ -2840,19 +2840,19 @@ evidence = "none"
 id = "interface.fmaximum_mag_num"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.fmaxl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.fmaxmag"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.fmaxmagfNx"
@@ -2882,19 +2882,19 @@ evidence = "none"
 id = "interface.fminimum_mag_num"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.fminl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.fminmag"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.fminmagfNx"
@@ -2924,7 +2924,7 @@ evidence = "none"
 id = "interface.fmodl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.fmtmsg"
@@ -2948,7 +2948,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fopen64"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fork"
@@ -2966,7 +2966,7 @@ evidence = "none"
 id = "interface.fpclassify"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.fprintf"
@@ -2984,7 +2984,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fputc_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fputs"
@@ -2996,7 +2996,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fputs_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fputwc"
@@ -3032,7 +3032,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fread_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.free"
@@ -3044,13 +3044,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.free_aligned_sized"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib.sh"
 
 [[trace]]
 id = "interface.free_sized"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib.sh"
 
 [[trace]]
 id = "interface.freeaddrinfo"
@@ -3074,7 +3074,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.freopen64"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.frexp"
@@ -3098,19 +3098,19 @@ evidence = "none"
 id = "interface.frexpl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.fromfp"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.fromfpx"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.fscanf"
@@ -3128,25 +3128,25 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fseeko"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fseeko64"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fsetpos"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fsetpos64"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fstat"
@@ -3188,13 +3188,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.ftello"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.ftello64"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.ftok"
@@ -3218,7 +3218,7 @@ evidence = "none"
 id = "interface.ftrylockfile"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.ftw"
@@ -3236,7 +3236,7 @@ evidence = "none"
 id = "interface.funlockfile"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.futimens"
@@ -3278,7 +3278,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.fwrite_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.fwscanf"
@@ -3296,7 +3296,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.gammal"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.getaddrinfo"
@@ -3308,13 +3308,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.getc"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.getc_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.getchar"
@@ -3326,7 +3326,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.getchar_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.getcwd"
@@ -3344,7 +3344,7 @@ evidence = "none"
 id = "interface.getdelim"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.getdents"
@@ -3698,7 +3698,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.getw"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.getwc"
@@ -3818,7 +3818,7 @@ evidence = "none"
 id = "interface.hypotl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.iconv"
@@ -3878,7 +3878,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.ilogbl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.imaxabs"
@@ -4010,7 +4010,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iscanonical"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.iscntrl"
@@ -4040,13 +4040,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iseqsig"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.isfinite"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.isgraph"
@@ -4064,31 +4064,31 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.isgreater"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.isgreaterequal"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.isless"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.islessequal"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.islessgreater"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.islower"
@@ -4106,13 +4106,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.isnan"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.isnormal"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.isprint"
@@ -4166,13 +4166,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.issubnormal"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.isunordered"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.isupper"
@@ -4196,7 +4196,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswalnum_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswalpha"
@@ -4208,7 +4208,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswalpha_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswblank"
@@ -4220,7 +4220,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswblank_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswcntrl"
@@ -4232,7 +4232,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswcntrl_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswctype"
@@ -4244,7 +4244,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswctype_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswdigit"
@@ -4256,7 +4256,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswdigit_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswgraph"
@@ -4268,7 +4268,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswgraph_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswlower"
@@ -4280,7 +4280,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswlower_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswprint"
@@ -4292,7 +4292,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswprint_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswpunct"
@@ -4304,7 +4304,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswpunct_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswspace"
@@ -4316,7 +4316,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswspace_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswupper"
@@ -4328,7 +4328,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswupper_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswxdigit"
@@ -4340,7 +4340,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswxdigit_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.isxdigit"
@@ -4358,7 +4358,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iszero"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.j0"
@@ -4460,7 +4460,7 @@ evidence = "none"
 id = "interface.ldexpl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.ldiv"
@@ -4496,13 +4496,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.lgammal"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.lgammal_r"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.link"
@@ -4550,7 +4550,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.llogb"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.llogbfNx"
@@ -4562,13 +4562,13 @@ evidence = "none"
 id = "interface.llrint"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.llrintf"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.llrintfNx"
@@ -4580,19 +4580,19 @@ evidence = "none"
 id = "interface.llrintl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.llround"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.llroundf"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.llroundfNx"
@@ -4604,7 +4604,7 @@ evidence = "none"
 id = "interface.llroundl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.localeconv"
@@ -4652,13 +4652,13 @@ evidence = "none"
 id = "interface.log10l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.log10p1"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.log1p"
@@ -4676,7 +4676,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.log1pl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.log2"
@@ -4700,25 +4700,25 @@ evidence = "none"
 id = "interface.log2l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.log2p1"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.logb"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.logbf"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.logbfNx"
@@ -4730,7 +4730,7 @@ evidence = "none"
 id = "interface.logbl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.logf"
@@ -4748,7 +4748,7 @@ evidence = "none"
 id = "interface.logl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.logp1fNx"
@@ -4772,13 +4772,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.lrint"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.lrintf"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.lrintfNx"
@@ -4790,19 +4790,19 @@ evidence = "none"
 id = "interface.lrintl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.lround"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.lroundf"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.lroundfNx"
@@ -4814,7 +4814,7 @@ evidence = "none"
 id = "interface.lroundl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.lseek"
@@ -4916,7 +4916,7 @@ evidence = "none"
 id = "interface.mbstowcs"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib.sh"
 
 [[trace]]
 id = "interface.mbtowc"
@@ -5072,7 +5072,7 @@ evidence = "none"
 id = "interface.modfl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.mprotect"
@@ -5240,13 +5240,13 @@ evidence = "none"
 id = "interface.nan"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.nanf"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.nanfNx"
@@ -5258,7 +5258,7 @@ evidence = "none"
 id = "interface.nanl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.nanosleep"
@@ -5270,13 +5270,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.nearbyint"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.nearbyintf"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.nearbyintfNx"
@@ -5288,7 +5288,7 @@ evidence = "none"
 id = "interface.nearbyintl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.newlocale"
@@ -5300,13 +5300,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.nextafter"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.nextafterf"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.nextafterfNx"
@@ -5318,7 +5318,7 @@ evidence = "none"
 id = "interface.nextafterl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.nextdownfNx"
@@ -5330,19 +5330,19 @@ evidence = "none"
 id = "interface.nexttoward"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.nexttowardf"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.nexttowardl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.nextupfNx"
@@ -5666,7 +5666,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.pow10l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.powf"
@@ -5684,19 +5684,19 @@ evidence = "none"
 id = "interface.powl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.pown"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.powr"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.ppoll"
@@ -6386,13 +6386,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.putc"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.putc_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.putchar"
@@ -6404,7 +6404,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.putchar_unlocked"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.putenv"
@@ -6452,7 +6452,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.putw"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.putwc"
@@ -6662,13 +6662,13 @@ evidence = "none"
 id = "interface.remainder"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.remainderf"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.remainderfNx"
@@ -6680,7 +6680,7 @@ evidence = "none"
 id = "interface.remainderl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.remove"
@@ -6698,19 +6698,19 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.remquo"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.remquof"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.remquol"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.rename"
@@ -6764,7 +6764,7 @@ evidence = "none"
 id = "interface.rintl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.rmdir"
@@ -6776,7 +6776,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.rootn"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.round"
@@ -6806,7 +6806,7 @@ evidence = "none"
 id = "interface.roundl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.scalb"
@@ -6824,19 +6824,19 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.scalbln"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.scalblnf"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.scalblnl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.scalbn"
@@ -6854,7 +6854,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.scalbnl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.scandir"
@@ -7064,13 +7064,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.setbuf"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.setbuffer"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.setdomainname"
@@ -7148,7 +7148,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.setlinebuf"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 
 [[trace]]
 id = "interface.setlocale"
@@ -7430,7 +7430,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.signbit"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.significandf"
@@ -7526,7 +7526,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.sincosl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.sinf"
@@ -7562,13 +7562,19 @@ evidence = "none"
 id = "interface.sinhl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.sinl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
+
+[[trace]]
+id = "interface.sinpi"
+ticket = "P1"
+test = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.sleep"
@@ -7634,7 +7640,7 @@ evidence = "none"
 id = "interface.sqrtl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.srand"
@@ -7688,7 +7694,7 @@ evidence = "none"
 id = "interface.stime"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.strcasecmp"
@@ -7724,13 +7730,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.strcoll"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/string/check-string.sh"
 
 [[trace]]
 id = "interface.strcoll_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/string/check-string.sh"
 
 [[trace]]
 id = "interface.strcpy"
@@ -7754,7 +7760,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.strerror_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/string/check-string.sh"
 
 [[trace]]
 id = "interface.strerror_r"
@@ -7778,13 +7784,13 @@ evidence = "none"
 id = "interface.strfromd"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.strfromf"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.strftime"
@@ -7796,7 +7802,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.strftime_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.strlcat"
@@ -7862,7 +7868,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.strptime_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.strrchr"
@@ -7886,13 +7892,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.strtod"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib.sh"
 
 [[trace]]
 id = "interface.strtof"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.strtoimax"
@@ -7958,13 +7964,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.strxfrm"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/string/check-string.sh"
 
 [[trace]]
 id = "interface.strxfrm_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/string/check-string.sh"
 
 [[trace]]
 id = "interface.swab"
@@ -8078,19 +8084,19 @@ evidence = "none"
 id = "interface.tanhl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.tanl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.tanpi"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.tcdrain"
@@ -8192,7 +8198,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.tgammal"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.thrd_create"
@@ -8294,13 +8300,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.timespec_get"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.timespec_getres"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.tmpfile"
@@ -8360,7 +8366,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.towctrans_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.towlower"
@@ -8372,7 +8378,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.towlower_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.towupper"
@@ -8384,7 +8390,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.towupper_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.trunc"
@@ -8420,7 +8426,7 @@ evidence = "none"
 id = "interface.truncl"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.tss_create"
@@ -8468,7 +8474,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.tzset"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.ualarm"
@@ -8480,13 +8486,13 @@ evidence = "none"
 id = "interface.ufromfp"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.ufromfpx"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.ufromfpxfNx"
@@ -8786,7 +8792,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wcscasecmp_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcscat"
@@ -8810,13 +8816,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wcscoll"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcscoll_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcscpy"
@@ -8834,13 +8840,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wcsftime"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.wcsftime_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcslcat"
@@ -8870,7 +8876,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wcsncasecmp_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcsncat"
@@ -8894,7 +8900,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wcsnlen"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcsnrtombs"
@@ -8960,7 +8966,7 @@ evidence = "none"
 id = "interface.wcstok"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcstol"
@@ -8984,7 +8990,7 @@ evidence = "none"
 id = "interface.wcstombs"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/stdlib/check-stdlib.sh"
 
 [[trace]]
 id = "interface.wcstoul"
@@ -9014,13 +9020,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wcsxfrm"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcsxfrm_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wctob"
@@ -9044,7 +9050,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wctrans_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wctype"
@@ -9056,7 +9062,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wctype_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcwidth"
@@ -9176,7 +9182,7 @@ evidence = "qtest:proc-credentials"
 id = "process.exec"
 ticket = "P2"
 test = "none"
-evidence = "none"
+evidence = "qtest:proc-exec"
 
 [[trace]]
 id = "process.fork"
@@ -9188,7 +9194,7 @@ evidence = "qtest:proc-fork"
 id = "process.job-control"
 ticket = "P2"
 test = "none"
-evidence = "none"
+evidence = "qtest:tty-job-control"
 
 [[trace]]
 id = "process.popen"
@@ -9206,7 +9212,7 @@ evidence = "none"
 id = "process.priority"
 ticket = "P2"
 test = "none"
-evidence = "none"
+evidence = "qtest:proc-priority"
 
 [[trace]]
 id = "process.process-group"
@@ -9260,7 +9266,7 @@ evidence = "qtest:proc-session"
 id = "process.tty-control"
 ticket = "P2"
 test = "none"
-evidence = "none"
+evidence = "qtest:tty-control"
 
 [[trace]]
 id = "process.wait"
@@ -9272,49 +9278,49 @@ evidence = "qtest:proc-session"
 id = "shell.arithmetic-expansion"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.command-substitution"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.compound-command"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.conditional"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.exit-status"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/rsh"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.field-splitting"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/rsh"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.function"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.getopts"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.here-document"
@@ -9326,7 +9332,7 @@ evidence = "none"
 id = "shell.interactive-shell"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/rsh"
+evidence = "none"
 
 [[trace]]
 id = "shell.job-control"
@@ -9338,73 +9344,73 @@ evidence = "none"
 id = "shell.list"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/rsh"
+evidence = "none"
 
 [[trace]]
 id = "shell.loop"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.parameter-expansion"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/rsh"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.pathname-expansion"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.pipeline"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/rsh"
+evidence = "none"
 
 [[trace]]
 id = "shell.quote-removal"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/rsh"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.redirection"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/rsh"
+evidence = "none"
 
 [[trace]]
 id = "shell.regular-builtin"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/rsh"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.set-options"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/rsh"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.shell-variable"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/rsh"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.simple-command"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/rsh"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.special-builtin"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "shell.trap"
@@ -9416,19 +9422,19 @@ evidence = "none"
 id = "shell.umask"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-shell"
 
 [[trace]]
 id = "tty.canonical"
 ticket = "P3"
 test = "none"
-evidence = "none"
+evidence = "qtest:pty-session"
 
 [[trace]]
 id = "tty.control-character"
 ticket = "P3"
 test = "none"
-evidence = "none"
+evidence = "qtest:tty-job-control"
 
 [[trace]]
 id = "tty.controlling-terminal"
@@ -9440,7 +9446,7 @@ evidence = "none"
 id = "tty.echo"
 ticket = "P3"
 test = "none"
-evidence = "none"
+evidence = "qtest:pty-session"
 
 [[trace]]
 id = "tty.flow-control"
@@ -9452,25 +9458,25 @@ evidence = "none"
 id = "tty.job-control-glue"
 ticket = "P3"
 test = "none"
-evidence = "none"
+evidence = "qtest:tty-job-control"
 
 [[trace]]
 id = "tty.line-discipline"
 ticket = "P3"
 test = "none"
-evidence = "none"
+evidence = "qtest:pty-session"
 
 [[trace]]
 id = "tty.pty"
 ticket = "P3"
 test = "none"
-evidence = "none"
+evidence = "qtest:pty-session"
 
 [[trace]]
 id = "tty.raw"
 ticket = "P3"
 test = "none"
-evidence = "none"
+evidence = "qtest:pty-session"
 
 [[trace]]
 id = "tty.stty"
@@ -9482,13 +9488,13 @@ evidence = "none"
 id = "tty.termios"
 ticket = "P3"
 test = "none"
-evidence = "libc/ravenlibc/include/termios.h"
+evidence = "none"
 
 [[trace]]
 id = "tty.ttyname"
 ticket = "P3"
 test = "none"
-evidence = "libc/ravenlibc/include/unistd.h"
+evidence = "none"
 
 [[trace]]
 id = "util.admin"
@@ -9572,7 +9578,7 @@ evidence = "none"
 id = "util.bc"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/bc/test.sh"
 
 [[trace]]
 id = "util.bg"
@@ -9674,7 +9680,7 @@ evidence = "none"
 id = "util.compress"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/compress/compress/test.sh"
 
 [[trace]]
 id = "util.continue"
@@ -9692,7 +9698,7 @@ evidence = "test:tests/posix/utility/file/cp/test.sh"
 id = "util.crontab"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/crontab/test.sh"
 
 [[trace]]
 id = "util.csplit"
@@ -9782,13 +9788,13 @@ evidence = "userland/bin/echo"
 id = "util.ed"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/ed/ed/test.sh"
 
 [[trace]]
 id = "util.env"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-util-system"
 
 [[trace]]
 id = "util.eval"
@@ -9902,7 +9908,7 @@ evidence = "none"
 id = "util.getconf"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-util-system"
 
 [[trace]]
 id = "util.getopts"
@@ -9950,7 +9956,7 @@ evidence = "none"
 id = "util.id"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/id"
+evidence = "qtest:posix-util-system"
 
 [[trace]]
 id = "util.install"
@@ -9986,7 +9992,7 @@ evidence = "test:tests/posix/utility/text/join/test.sh"
 id = "util.kill"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-util-system"
 
 [[trace]]
 id = "util.lex"
@@ -10022,7 +10028,7 @@ evidence = "none"
 id = "util.logger"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-util-system"
 
 [[trace]]
 id = "util.logname"
@@ -10046,7 +10052,7 @@ evidence = "test:tests/posix/utility/file/ls/test.sh"
 id = "util.m4"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/m4/test.sh"
 
 [[trace]]
 id = "util.mail"
@@ -10064,7 +10070,7 @@ evidence = "none"
 id = "util.make"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/make/test.sh"
 
 [[trace]]
 id = "util.man"
@@ -10082,7 +10088,7 @@ evidence = "test:tests/posix/utility/misc/md5sum/test.sh"
 id = "util.mesg"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-util-system"
 
 [[trace]]
 id = "util.mkdir"
@@ -10112,7 +10118,7 @@ evidence = "test:tests/posix/utility/misc/mktemp/test.sh"
 id = "util.more"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/ttytools/more/test.sh"
 
 [[trace]]
 id = "util.mv"
@@ -10136,7 +10142,7 @@ evidence = "none"
 id = "util.nice"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-util-system"
 
 [[trace]]
 id = "util.nl"
@@ -10154,7 +10160,7 @@ evidence = "none"
 id = "util.nohup"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-util-system"
 
 [[trace]]
 id = "util.nproc"
@@ -10184,7 +10190,7 @@ evidence = "test:tests/posix/utility/text/paste/test.sh"
 id = "util.patch"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/patch/test.sh"
 
 [[trace]]
 id = "util.pathchk"
@@ -10196,7 +10202,7 @@ evidence = "test:tests/posix/utility/file/pathchk/test.sh"
 id = "util.pax"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/archive/pax/test.sh"
 
 [[trace]]
 id = "util.pinky"
@@ -10340,7 +10346,7 @@ evidence = "test:tests/posix/utility/file/realpath/test.sh"
 id = "util.renice"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "qtest:posix-util-system"
 
 [[trace]]
 id = "util.return"
@@ -10496,7 +10502,7 @@ evidence = "none"
 id = "util.stty"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/system/stty/test.sh"
 
 [[trace]]
 id = "util.sum"
@@ -10616,7 +10622,7 @@ evidence = "test:tests/posix/utility/text/tsort/test.sh"
 id = "util.tty"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/system/tty/test.sh"
 
 [[trace]]
 id = "util.type"
@@ -10646,13 +10652,13 @@ evidence = "none"
 id = "util.uname"
 ticket = "P4"
 test = "none"
-evidence = "userland/bin/uname"
+evidence = "qtest:posix-util-system"
 
 [[trace]]
 id = "util.uncompress"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/compress/uncompress/test.sh"
 
 [[trace]]
 id = "util.unexpand"
@@ -10766,13 +10772,13 @@ evidence = "test:tests/posix/utility/misc/who/test.sh"
 id = "util.write"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/ttytools/write/test.sh"
 
 [[trace]]
 id = "util.xargs"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/xargs/test.sh"
 
 [[trace]]
 id = "util.yacc"
@@ -10790,4 +10796,4 @@ evidence = "test:tests/posix/utility/misc/yes/test.sh"
 id = "util.zcat"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/compress/zcat/test.sh"

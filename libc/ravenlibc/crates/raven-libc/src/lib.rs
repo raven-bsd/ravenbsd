@@ -143,3 +143,5 @@ pub(crate) mod unistd;
 pub mod va;
 #[cfg(target_os = "none")]
 pub(crate) mod wchar;
+#[cfg(target_os = "none")]
+pub(crate) mod wctype;
