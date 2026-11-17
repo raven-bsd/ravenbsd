@@ -95,7 +95,9 @@ and checks the magic, and asserts that an unsupported source writes nothing.
 
 ## Verification record
 
-* `cargo nextest run -p localedef`: **pending run**.
-* `sh tests/posix/utility/run-simple3.sh`: **pending run**.
-* `cargo xtask posix-check --profile posix --arch x86_64 --host-only`: **pending run**.
-* `make check-fast`: **pending run**.
+* `cargo nextest run -p localedef`: **10 passed**.
+* `sh tests/posix/utility/run-simple3.sh`: **1 pass, 0 fail** (`localedef: 3 case(s)`).
+* `cargo xtask posix-check --profile posix --arch x86_64 --host-only`: exit 1 for the global
+  profile (**1489 pass, 217 fail, 105 skip**); the `util.localedef` row is **pass**. The global
+  red is the other required utilities, not this tool.
+* `make check-fast`: **PASSED**.
