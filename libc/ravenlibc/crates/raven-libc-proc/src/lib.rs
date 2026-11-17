@@ -53,6 +53,7 @@ pub mod local_backend;
 pub mod lock_registry;
 pub mod native_spawn;
 pub mod nice;
+pub mod p1c;
 pub mod popen_model;
 pub mod procinfo;
 pub mod request;
