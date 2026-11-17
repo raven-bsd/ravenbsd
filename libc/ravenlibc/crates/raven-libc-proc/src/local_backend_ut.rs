@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! Host tests for the early-boot backend.
+//! Host tests for the early fallback backend.
 
 use super::*;
 use crate::consts::RLIMIT_NOFILE;
@@ -21,15 +21,15 @@ impl Spawner {
 }
 
 impl EarlySpawn for Spawner {
-    fn spawn(&self, request: &crate::wire::SpawnRequest) -> Result<i32, Errno> {
+    fn spawn(&self, request: &crate::request::SpawnRequest) -> Result<i32, Errno> {
         self.calls.set(self.calls.get() + 1);
         *self.path.borrow_mut() = request.path.clone();
         Ok(55)
     }
 }
 
-fn spawn_request(path: &[u8]) -> crate::wire::SpawnRequest {
-    crate::wire::SpawnRequest {
+fn spawn_request(path: &[u8]) -> crate::request::SpawnRequest {
+    crate::request::SpawnRequest {
         spawn_flags: 0,
         pgroup: 0,
         sigdefault: [0; 128],
@@ -95,7 +95,7 @@ fn spawn_with_an_early_spawner_forwards() {
 fn fork_and_exec_are_enosys() {
     let backend = LocalBackend::new(None);
     assert_eq!(
-        backend.fork(&crate::wire::ForkRequest {
+        backend.fork(&crate::request::ForkRequest {
             entry: 0,
             sp: 0,
             arg: 0,
@@ -104,7 +104,7 @@ fn fork_and_exec_are_enosys() {
         Err(ENOSYS)
     );
     assert_eq!(
-        backend.exec(&crate::wire::ExecRequest {
+        backend.exec(&crate::request::ExecRequest {
             exec_flags: 0,
             fd_handle: 0,
             path: Vec::new(),

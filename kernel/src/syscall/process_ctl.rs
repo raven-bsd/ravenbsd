@@ -1059,7 +1059,7 @@ pub fn signal(frame: &SyscallFrame) -> Result<usize, Errno> {
 ///
 /// Writes `[signo, sender_pid, 0]` as three little-endian u64 words. `WNOHANG`
 /// returns `EAGAIN` instead of blocking. The kernel queue does not interpret
-/// signal dispositions; libc/procd own the user pending set.
+/// signal dispositions; libc owns the user pending set.
 pub fn sigrecv(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let destination = UserSlice::new(frame.rdi, 24)?;

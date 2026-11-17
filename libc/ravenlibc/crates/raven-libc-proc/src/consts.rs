@@ -3,7 +3,7 @@
 
 //! Numeric constants of the process interfaces.
 //!
-//! Flag values are the Linux/musl values used by the headers and the procd wire protocol; the
+//! Flag values are the Linux/musl values used by the headers and the kernel process interface; the
 //! FreeBSD `POSIX_SPAWN_*` and BSD `wait` values are deliberately not used.
 
 /// `POSIX_SPAWN_RESETIDS`.
@@ -164,8 +164,6 @@ pub const AT_EXECFN: usize = 31;
 /// `AT_MINSIGSTKSZ`.
 pub const AT_MINSIGSTKSZ: usize = 51;
 
-/// Raven procd connection handle.
-pub const AT_RAVEN_PROCD: usize = 0x7001;
 /// Raven procinfo page address.
 pub const AT_RAVEN_PROCINFO: usize = 0x7002;
 /// Raven fdmap pointer.

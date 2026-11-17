@@ -4,8 +4,8 @@
 //! Session and foreground process-group records.
 //!
 //! The terminal server cannot yet change the kernel controlling terminal; it records the session
-//! id, foreground group and hangup state that the tty and procd glue will use. The table is pure
-//! and host-testable.
+//! id, foreground group and hangup state that the tty and kernel job-control paths will use. The
+//! table is pure and host-testable.
 
 use alloc::collections::BTreeMap;
 

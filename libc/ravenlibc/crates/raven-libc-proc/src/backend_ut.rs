@@ -39,13 +39,13 @@ fn the_backend_trait_is_object_safe() {
 fn early_spawn_is_object_safe() {
     struct Spawner;
     impl EarlySpawn for Spawner {
-        fn spawn(&self, _request: &crate::wire::SpawnRequest) -> Result<i32, Errno> {
+        fn spawn(&self, _request: &crate::request::SpawnRequest) -> Result<i32, Errno> {
             Ok(7)
         }
     }
     let spawner = Spawner;
     let object: &dyn EarlySpawn = &spawner;
-    let request = crate::wire::SpawnRequest {
+    let request = crate::request::SpawnRequest {
         spawn_flags: 0,
         pgroup: 0,
         sigdefault: [0; 128],

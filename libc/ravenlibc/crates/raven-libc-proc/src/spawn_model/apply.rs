@@ -9,8 +9,8 @@
 use alloc::vec::Vec;
 
 use crate::errors::{EBADF, ENOSYS, ENOTDIR, Errno};
+use crate::request::FdMapEntry;
 use crate::spawn_model::api::{FileAction, FileActions};
-use crate::wire::FdMapEntry;
 
 /// One inherited descriptor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

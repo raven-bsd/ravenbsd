@@ -4,7 +4,7 @@
 //! Spawn attributes layered over the shared `raven-spawn` loader.
 //!
 //! `raven-spawn` on this branch starts a child with an empty descriptor table and no signal
-//! attributes.  The procd `SPAWN` request already carries an fd map and three 1024-bit signal
+//! attributes.  The kernel spawn path already carries an fd map and three 1024-bit signal
 //! sets, so the runtime supplies the missing loader step here without copying the loader:
 //!
 //! * each source handle is transferred into the child with `HANDLE_TRANSFER`;
