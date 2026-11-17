@@ -59,7 +59,7 @@ typedef struct {
 
 typedef struct {
 	unsigned short __control;
-	unsigned short __unused;
+	unsigned short __reserved;
 	unsigned int __mxcsr;
 } femode_t;
 
