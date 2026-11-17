@@ -1035,6 +1035,12 @@ pub fn irq_return(from_user: bool) {
     if !from_user || !INITIALIZED.load(Ordering::Acquire) || !sync::preemption_enabled() {
         return;
     }
+    // Kernel threads are cooperative: an IRQ that interrupts one must not switch away from it.
+    // The `from_user` flag comes from the vector slot; this guard keeps a misclassified
+    // current-EL slot from preempting a kernel worker.
+    if !current_thread().is_some_and(|thread| thread.user) {
+        return;
+    }
     preempt_if_needed();
 }
 
