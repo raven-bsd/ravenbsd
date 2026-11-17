@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# The U5 user-tools overlay. It extends the minimal base image with the console/shell services
+# and the seven account utilities. It does not change the 0.1.0 `release` profile; the release
+# login gate remains on its own profile.
+#
+# The qtest fixture under tests/user/image replaces this profile's initfs with one that installs
+# su/passwd setuid and provides a writable ramfs /etc, because the stock initfs is read-only.
+
+name = "user-tools"
+
+extends = "base"
+
+[boot]
+cmdline = "console=ttyS0 test-exit=1"
+log_level = "info"

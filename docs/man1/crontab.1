@@ -1,0 +1,51 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt CRONTAB 1
+.Os RavenBSD
+.Sh NAME
+.Nm crontab
+.Nd install, list or remove a per-user cron spool
+.Sh SYNOPSIS
+.Nm
+.Op Fl l | Fl r
+.Op Ar file
+.Sh DESCRIPTION
+The
+.Nm
+utility validates a five-field crontab and installs it atomically as
+.Pa /var/cron/<user> .
+With no file operand it reads standard input.
+.Pp
+The time fields are minute, hour, day of month, month and day of week. Each accepts
+.Ql * ,
+a number, a range
+.Pq Ql a-b ,
+a comma list, and
+.Ql /step .
+The command must be non-empty.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl l
+List the current spool.
+.It Fl r
+Remove the current spool.
+.El
+.Pp
+.Nm
+does not interpret the command. Shell metacharacters are supported only by a shell-capable
+runner; the target crond executes a simple program plus arguments.
+.Sh ENVIRONMENT
+.Bl -tag -width CRON_SPOOL
+.It Ev CRON_SPOOL
+Override the spool directory. Used by the host tests.
+.El
+.Sh EXIT STATUS
+.Ex -std
+0 on success, 1 for a validation or spool error, 2 for usage.
+.Sh SEE ALSO
+.Xr crond 1
+.Sh STANDARDS
+The five-field syntax, install/list/remove operations and atomic replacement follow POSIX
+crontab. `@reboot` and GNU extensions are unsupported.

@@ -6,9 +6,14 @@
 //! S08 has one thread per process. The process owns its address space and handle table; the
 //! single thread owns the kernel stack used by syscall and trap entry.
 
+pub mod exec;
 pub mod handle;
+pub mod pipe;
+pub mod priority;
 pub mod robust;
+pub mod status;
 pub mod thread;
+pub mod tty;
 
 use core::fmt;
 use core::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
@@ -17,6 +22,7 @@ use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec;
+use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
 #[cfg(target_arch = "aarch64")]
@@ -53,6 +59,7 @@ use crate::memory::{frame, paging};
 use crate::sched::wait::WaitQueue;
 
 use self::handle::Object;
+use self::status::{RLIMIT_COUNT, Rlimit, SIGCHLD, default_limits};
 
 /// Page size used by the user loader and stack.
 const PAGE: u64 = 4096;
@@ -68,6 +75,12 @@ static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 /// Live process ids. The weak references never keep a process alive; teardown removes its entry,
 /// and lookup removes an entry whose last strong reference has already gone.
 static PID_REGISTRY: Mutex<BTreeMap<u64, Weak<Process>>> = Mutex::new(BTreeMap::new());
+/// Exited processes retained until a wait consumes their status.
+///
+/// The pid registry is weak so a process that is done and has no handles disappears; a zombie
+/// must remain visible to `PROC_WAIT_EX` by pid even when the parent closed its process handle
+/// (and after its parent exits and it is reparented to init).
+static ZOMBIES: Mutex<Vec<Arc<Process>>> = Mutex::new(Vec::new());
 
 /// Process lifecycle state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -110,6 +123,15 @@ pub struct ProcessIds {
 /// Maximum supplementary groups stored by this slice.
 pub const MAX_GROUPS: usize = 16;
 
+/// One queued process signal.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PendingSignal {
+    /// Signal number.
+    pub signo: u32,
+    /// Sender pid.
+    pub sender: u64,
+}
+
 impl ProcessIds {
     /// The kernel process identity.
     pub const fn kernel() -> Self {
@@ -146,6 +168,34 @@ impl ProcessIds {
     }
 }
 
+/// Maximum command-name bytes stored in a process record.
+pub const MAX_COMMAND: usize = 256;
+
+/// Truncate a command name to [`MAX_COMMAND`] bytes without splitting UTF-8.
+#[must_use]
+pub fn truncate_command(text: &str) -> String {
+    let mut end = 0usize;
+    for (index, character) in text.char_indices() {
+        let next = index.saturating_add(character.len_utf8());
+        if next > MAX_COMMAND {
+            break;
+        }
+        end = next;
+    }
+    String::from(&text[..end])
+}
+
+/// Pick the command name from `argv[0]`, falling back to the image path.
+#[must_use]
+pub fn command_from_argv(argv: &[alloc::vec::Vec<u8>], path: &[u8]) -> String {
+    let bytes = argv.first().map_or(path, alloc::vec::Vec::as_slice);
+    let text = core::str::from_utf8(bytes)
+        .ok()
+        .or_else(|| core::str::from_utf8(path).ok())
+        .unwrap_or("?");
+    truncate_command(text)
+}
+
 /// A process.
 pub struct Process {
     /// Process id (PID 1 for the first process).
@@ -154,6 +204,12 @@ pub struct Process {
     pub ids: Mutex<ProcessIds>,
     /// Path used to start the process.
     pub path: String,
+    /// Command name shown to `ps` (argv[0], replaced by exec and copied by fork).
+    pub command: Mutex<String>,
+    /// POSIX nice value (`-20..19`); inherited by `PROC_FORK` and preserved by exec.
+    pub nice: AtomicI32,
+    /// Controlling terminal acquired by this process, if any.
+    pub ctty: Mutex<Option<Arc<tty::Ctty>>>,
     /// User address space (`None` for the kernel process or an exited process).
     pub address_space: Mutex<Option<UserAddressSpace>>,
     /// Handle table.
@@ -191,6 +247,34 @@ pub struct Process {
     pub capture_slots: Mutex<CaptureSlots>,
     /// Syscall personality and optional Linux trap handler (S41).
     pub personality: Mutex<PersonalityState>,
+    /// Signals queued for this process.
+    pub pending_signals: Mutex<VecDeque<PendingSignal>>,
+    /// A successful exec's new user context, applied on syscall return.
+    pub pending_exec: Mutex<Option<exec::ExecContext>>,
+    /// Threads blocked in `PROC_SIGRECV`.
+    pub signal_waiters: WaitQueue,
+    /// Parents blocked in `PROC_WAIT_EX` on this process's children.
+    pub child_waiters: WaitQueue,
+    /// Non-zero stop signal while the process is stopped.
+    pub stop_signal: AtomicU32,
+    /// True when the current stop was already reported to a waiter.
+    pub stop_reported: AtomicBool,
+    /// True when a stopped process continued and that event is not reported yet.
+    pub continued: AtomicBool,
+    /// True after `PROC_WAIT_EX` reaped the exit status.
+    pub reaped: AtomicBool,
+    /// Soft/hard resource limits.
+    pub limits: Mutex<[Rlimit; RLIMIT_COUNT]>,
+    /// Process start time in nanoseconds.
+    pub start_ns: u64,
+    /// Accumulated kernel/syscall time.
+    pub system_ns: AtomicU64,
+    /// Accumulated user time (not sampled yet; zero).
+    pub user_ns: AtomicU64,
+    /// Accumulated reaped-child kernel time.
+    pub child_system_ns: AtomicU64,
+    /// Accumulated reaped-child user time.
+    pub child_user_ns: AtomicU64,
 }
 
 /// Per-process syscall personality and Linux handler handle.
@@ -225,8 +309,8 @@ pub enum ProcessError {
     OutOfFrames,
     /// Handle insertion failed.
     Handle(Errno),
-    /// The init path does not fit the stack string area.
-    PathTooLong,
+    /// The argv/envp strings exceed `ARG_MAX` or the stack block.
+    ArgTooLong,
     /// A virtual address was not canonical or an arithmetic operation overflowed.
     BadAddress,
     /// The ELF declared an interpreter.
@@ -243,7 +327,7 @@ impl fmt::Display for ProcessError {
             ProcessError::Map(error) => write!(f, "user mapping failed: {error}"),
             ProcessError::OutOfFrames => f.write_str("out of frames for the init process"),
             ProcessError::Handle(error) => write!(f, "handle setup failed: {error:?}"),
-            ProcessError::PathTooLong => f.write_str("init path is too long"),
+            ProcessError::ArgTooLong => f.write_str("argument list too long"),
             ProcessError::BadAddress => f.write_str("invalid user address"),
             ProcessError::Interpreter => f.write_str("init ELF has a PT_INTERP"),
             ProcessError::Sched(error) => write!(f, "scheduler setup failed: {error:?}"),
@@ -278,6 +362,18 @@ pub fn lookup_pid(pid: u64) -> Option<Arc<Process>> {
     upgraded
 }
 
+/// Snapshot every currently live process.
+///
+/// The wait/signal scans use this instead of holding the registry lock while
+/// taking process locks. Exited zombies stay in the registry until reaped.
+pub fn processes() -> alloc::vec::Vec<Arc<Process>> {
+    PID_REGISTRY
+        .lock()
+        .values()
+        .filter_map(Weak::upgrade)
+        .collect()
+}
+
 /// True when at least one live process is in `pgid` inside `sid`.
 pub fn group_in_session(pgid: u64, sid: u64) -> bool {
     let registry = PID_REGISTRY.lock();
@@ -293,6 +389,9 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         id: 0,
         ids: Mutex::new(ProcessIds::kernel()),
         path: String::from("/kernel"),
+        command: Mutex::new(String::from("/kernel")),
+        nice: AtomicI32::new(0),
+        ctty: Mutex::new(None),
         address_space: Mutex::new(None),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
@@ -311,23 +410,45 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         client_requests: Mutex::new(alloc::vec::Vec::new()),
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
+        pending_signals: Mutex::new(VecDeque::new()),
+        pending_exec: Mutex::new(None),
+        signal_waiters: WaitQueue::new(),
+        child_waiters: WaitQueue::new(),
+        stop_signal: AtomicU32::new(0),
+        stop_reported: AtomicBool::new(false),
+        continued: AtomicBool::new(false),
+        reaped: AtomicBool::new(false),
+        limits: Mutex::new(default_limits()),
+        start_ns: 0,
+        system_ns: AtomicU64::new(0),
+        user_ns: AtomicU64::new(0),
+        child_system_ns: AtomicU64::new(0),
+        child_user_ns: AtomicU64::new(0),
     }))
 }
 
 /// Create an empty process for `PROC_CREATE`, with the well-known handles installed.
 pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
-    let (namespace, ids) = if let Some(parent) = current() {
+    let (namespace, ids, limits) = if let Some(parent) = current() {
         let snapshot = parent.namespace.lock().clone();
         let ids = ProcessIds::inherited(&parent.ids.lock(), parent.id);
-        (snapshot.child_snapshot(&ipc::registry::names()), ids)
+        let limits = *parent.limits.lock();
+        (
+            snapshot.child_snapshot(&ipc::registry::names()),
+            ids,
+            limits,
+        )
     } else {
-        (Namespace::root(), ProcessIds::kernel())
+        (Namespace::root(), ProcessIds::kernel(), default_limits())
     };
     let process = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
         path: String::from("child"),
+        command: Mutex::new(String::from("child")),
+        nice: AtomicI32::new(0),
+        ctty: Mutex::new(None),
         address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
@@ -346,6 +467,20 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         client_requests: Mutex::new(alloc::vec::Vec::new()),
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
+        pending_signals: Mutex::new(VecDeque::new()),
+        pending_exec: Mutex::new(None),
+        signal_waiters: WaitQueue::new(),
+        child_waiters: WaitQueue::new(),
+        stop_signal: AtomicU32::new(0),
+        stop_reported: AtomicBool::new(false),
+        continued: AtomicBool::new(false),
+        reaped: AtomicBool::new(false),
+        limits: Mutex::new(limits),
+        start_ns: crate::time::now_ns(),
+        system_ns: AtomicU64::new(0),
+        user_ns: AtomicU64::new(0),
+        child_system_ns: AtomicU64::new(0),
+        child_user_ns: AtomicU64::new(0),
     });
     handle::install_initial(&mut process.handles.lock(), &process, false)?;
     register_pid(&process);
@@ -362,10 +497,14 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
     let address_space = AddressSpace::new().map_err(|_| Errno::ENOMEM)?;
     let personality = *source.personality.lock();
     let ids = ProcessIds::inherited(&source.ids.lock(), source.id);
+    let limits = *source.limits.lock();
     let child = Arc::new(Process {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
         path: source.path.clone(),
+        command: Mutex::new(source.command.lock().clone()),
+        nice: AtomicI32::new(source.nice()),
+        ctty: Mutex::new(source.ctty.lock().clone()),
         address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
@@ -384,6 +523,20 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         client_requests: Mutex::new(alloc::vec::Vec::new()),
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(personality),
+        pending_signals: Mutex::new(VecDeque::new()),
+        pending_exec: Mutex::new(None),
+        signal_waiters: WaitQueue::new(),
+        child_waiters: WaitQueue::new(),
+        stop_signal: AtomicU32::new(0),
+        stop_reported: AtomicBool::new(false),
+        continued: AtomicBool::new(false),
+        reaped: AtomicBool::new(false),
+        limits: Mutex::new(limits),
+        start_ns: crate::time::now_ns(),
+        system_ns: AtomicU64::new(0),
+        user_ns: AtomicU64::new(0),
+        child_system_ns: AtomicU64::new(0),
+        child_user_ns: AtomicU64::new(0),
     });
 
     {
@@ -434,7 +587,79 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
     Ok(child)
 }
 
+/// Deliver one signal with POSIX job-control semantics.
+pub fn deliver_signal(target: &Arc<Process>, signo: u32, sender: u64) -> Result<(), Errno> {
+    if status::is_stop_signal(signo) {
+        if target.stop_signal.swap(signo, Ordering::AcqRel) == 0 {
+            target.stop_reported.store(false, Ordering::Release);
+        }
+        notify_parent(target, false);
+        return Ok(());
+    }
+    if signo == status::SIGCONT {
+        if target.stop_signal.swap(0, Ordering::AcqRel) != 0 {
+            target.continued.store(true, Ordering::Release);
+            target.stop_reported.store(false, Ordering::Release);
+        }
+        target.queue_signal(status::SIGCONT, sender);
+        notify_parent(target, false);
+        return Ok(());
+    }
+    target.queue_signal(signo, sender);
+    Ok(())
+}
+
+/// Deliver one signal to every live process in `pgid`.
+pub fn signal_group(pgid: u64, signo: u32, sender: u64) -> usize {
+    let mut count = 0usize;
+    for process in processes() {
+        if *process.state.lock() == ProcessState::Exited {
+            continue;
+        }
+        if process.ids.lock().pgid == pgid {
+            let _ = deliver_signal(&process, signo, sender);
+            count = count.saturating_add(1);
+        }
+    }
+    count
+}
+
+/// True when the process group has no parent in a different group in the same session.
+pub fn group_orphaned(pgid: u64, sid: u64) -> bool {
+    let members: Vec<Arc<Process>> = processes()
+        .into_iter()
+        .filter(|process| {
+            let state = *process.state.lock();
+            let ids = *process.ids.lock();
+            state != ProcessState::Exited && ids.pgid == pgid && ids.sid == sid
+        })
+        .collect();
+    if members.is_empty() {
+        return true;
+    }
+    for member in members {
+        let ppid = member.ids.lock().ppid;
+        if let Some(parent) = lookup_pid(ppid) {
+            let parent_ids = *parent.ids.lock();
+            if parent_ids.sid == sid && parent_ids.pgid != pgid {
+                return false;
+            }
+        }
+    }
+    true
+}
+
 impl Process {
+    /// The POSIX nice value (`-20..19`).
+    pub fn nice(&self) -> i32 {
+        self.nice.load(Ordering::Acquire)
+    }
+
+    /// Store the POSIX nice value; callers clamp it with [`priority::clamp_nice`].
+    pub fn set_nice(&self, nice: i32) {
+        self.nice.store(nice, Ordering::Release);
+    }
+
     /// Account for one new thread.
     pub fn thread_started(&self) {
         self.threads.fetch_add(1, Ordering::AcqRel);
@@ -444,6 +669,81 @@ impl Process {
     pub fn thread_exited(&self) -> bool {
         self.threads.fetch_sub(1, Ordering::AcqRel) <= 1
     }
+
+    /// Queue a signal and wake a `PROC_SIGRECV` waiter.
+    pub fn queue_signal(&self, signo: u32, sender: u64) {
+        self.pending_signals
+            .lock()
+            .push_back(PendingSignal { signo, sender });
+        self.signal_waiters.wake_all();
+    }
+
+    /// Pop the oldest queued signal.
+    pub fn pop_signal(&self) -> Option<PendingSignal> {
+        self.pending_signals.lock().pop_front()
+    }
+
+    /// True when at least one signal is queued.
+    pub fn has_pending_signal(&self) -> bool {
+        !self.pending_signals.lock().is_empty()
+    }
+}
+
+/// Reparent every live child of `parent` to PID 1 (init).
+///
+/// Called once from the dying parent's exit path; the child keeps its own pid, group and
+/// session, but its next `PROC_WAIT_EX` notification goes to init. A dying PID 1 does not
+/// reparent (the system is ending).
+pub fn reparent_children(parent: &Process) -> usize {
+    if parent.id == 1 {
+        return 0;
+    }
+    let mut count = 0usize;
+    for child in processes() {
+        if child.id == parent.id {
+            continue;
+        }
+        let mut ids = child.ids.lock();
+        if ids.ppid == parent.id {
+            ids.ppid = 1;
+            count = count.saturating_add(1);
+        }
+    }
+    count
+}
+
+/// Wake a parent waiting for a child event and optionally queue `SIGCHLD`.
+///
+/// The caller must not hold `process.state`; exit accounting reads the child's
+/// accumulated time and the parent's signal queue.
+pub fn notify_parent(process: &Process, sigchld: bool) {
+    let ppid = process.ids.lock().ppid;
+    let Some(parent) = lookup_pid(ppid) else {
+        return;
+    };
+    if sigchld {
+        parent
+            .child_system_ns
+            .fetch_add(process.system_ns.load(Ordering::Acquire), Ordering::AcqRel);
+        parent
+            .child_user_ns
+            .fetch_add(process.user_ns.load(Ordering::Acquire), Ordering::AcqRel);
+        parent.queue_signal(SIGCHLD, process.id);
+    }
+    parent.child_waiters.wake_all();
+}
+
+/// Mark an exited child reaped and remove its pid from the registry.
+///
+/// Returns `ECHILD` when the exit status was already consumed by another
+/// `PROC_WAIT_EX`; PID 1 and the old handle wait keep their existing behavior.
+pub fn reap_pid(process: &Process) -> Result<(), Errno> {
+    if process.reaped.swap(true, Ordering::AcqRel) {
+        return Err(Errno::ECHILD);
+    }
+    ZOMBIES.lock().retain(|zombie| zombie.id != process.id);
+    unregister_pid(process.id);
+    Ok(())
 }
 
 /// True when the initfs contains the requested init path.
@@ -462,28 +762,42 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         return Err(ProcessError::Interpreter);
     }
 
+    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+    let ids = ProcessIds {
+        ppid: 0,
+        pgid: id,
+        sid: id,
+        uid: 0,
+        euid: 0,
+        gid: 0,
+        egid: 0,
+        suid: 0,
+        sgid: 0,
+        groups: [0; MAX_GROUPS],
+        group_count: 0,
+    };
     let address_space = AddressSpace::new().map_err(ProcessError::Map)?;
     let mut user_address_space = UserAddressSpace::new(address_space);
     load_segments(&mut user_address_space, &elf, data)?;
-    let user_stack = build_stack(&mut user_address_space, path, elf.entry(), &elf)?;
+    let path_bytes = path.as_bytes();
+    let argv: [&[u8]; 1] = [path_bytes];
+    let user_stack = build_stack(
+        &mut user_address_space,
+        path_bytes,
+        &argv,
+        &[],
+        &ids,
+        elf.entry(),
+        &elf,
+    )?;
 
-    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
     let process = Arc::new(Process {
         id,
-        ids: Mutex::new(ProcessIds {
-            ppid: 0,
-            pgid: id,
-            sid: id,
-            uid: 0,
-            euid: 0,
-            gid: 0,
-            egid: 0,
-            suid: 0,
-            sgid: 0,
-            groups: [0; MAX_GROUPS],
-            group_count: 0,
-        }),
+        ids: Mutex::new(ids),
         path: String::from(path),
+        command: Mutex::new(String::from(path)),
+        nice: AtomicI32::new(0),
+        ctty: Mutex::new(None),
         address_space: Mutex::new(Some(user_address_space)),
         handles: Mutex::new(HandleTable::new()),
         exit_code: AtomicI32::new(0),
@@ -502,6 +816,20 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         client_requests: Mutex::new(alloc::vec::Vec::new()),
         capture_slots: Mutex::new(CaptureSlots::new()),
         personality: Mutex::new(PersonalityState::native()),
+        pending_signals: Mutex::new(VecDeque::new()),
+        pending_exec: Mutex::new(None),
+        signal_waiters: WaitQueue::new(),
+        child_waiters: WaitQueue::new(),
+        stop_signal: AtomicU32::new(0),
+        stop_reported: AtomicBool::new(false),
+        continued: AtomicBool::new(false),
+        reaped: AtomicBool::new(false),
+        limits: Mutex::new(default_limits()),
+        start_ns: crate::time::now_ns(),
+        system_ns: AtomicU64::new(0),
+        user_ns: AtomicU64::new(0),
+        child_system_ns: AtomicU64::new(0),
+        child_user_ns: AtomicU64::new(0),
     });
     handle::install_initial(&mut process.handles.lock(), &process, true)
         .map_err(ProcessError::Handle)?;
@@ -623,7 +951,10 @@ fn prot_flags(bits: u8) -> Result<PageFlags, ProcessError> {
 
 fn build_stack(
     address_space: &mut UserAddressSpace,
-    path: &str,
+    path: &[u8],
+    argv: &[&[u8]],
+    envp: &[&[u8]],
+    ids: &ProcessIds,
     entry: u64,
     elf: &Elf<'_>,
 ) -> Result<u64, ProcessError> {
@@ -648,86 +979,108 @@ fn build_stack(
     const AT_EXECFN: u64 = 31;
     const AT_MINSIGSTKSZ: u64 = 51;
     const PHENT: u64 = 56;
+    const ARG_MAX: usize = 128 * 1024;
+    const MAX_COUNT: usize = 4096;
+
+    if argv.len() > MAX_COUNT || envp.len() > MAX_COUNT {
+        return Err(ProcessError::ArgTooLong);
+    }
+    let platform = platform_name();
+    let mut string_bytes = path
+        .len()
+        .checked_add(1)
+        .and_then(|total| total.checked_add(platform.len().saturating_add(1)))
+        .ok_or(ProcessError::ArgTooLong)?;
+    for argument in argv {
+        string_bytes = string_bytes
+            .checked_add(argument.len().saturating_add(1))
+            .ok_or(ProcessError::ArgTooLong)?;
+    }
+    for variable in envp {
+        string_bytes = string_bytes
+            .checked_add(variable.len().saturating_add(1))
+            .ok_or(ProcessError::ArgTooLong)?;
+    }
+    if string_bytes > ARG_MAX {
+        return Err(ProcessError::ArgTooLong);
+    }
 
     let stack_base = USER_END
         .checked_sub(USER_STACK_SIZE + USER_GUARD)
         .ok_or(ProcessError::BadAddress)?;
-    let stack_top = USER_END
-        .checked_sub(USER_GUARD)
-        .ok_or(ProcessError::BadAddress)?;
-    let sp0 = stack_top
-        .checked_sub(0x400)
-        .ok_or(ProcessError::BadAddress)?;
-
     let mut buffer = vec![0u8; USER_STACK_SIZE as usize];
-    let string_offset = USER_STACK_SIZE
-        .checked_sub(0x200)
-        .ok_or(ProcessError::BadAddress)?;
-    let platform_offset = USER_STACK_SIZE
-        .checked_sub(0x180)
-        .ok_or(ProcessError::BadAddress)?;
-    let random_offset = USER_STACK_SIZE
-        .checked_sub(0x80)
-        .ok_or(ProcessError::BadAddress)?;
-    let sp_offset = USER_STACK_SIZE
-        .checked_sub(0x400)
-        .ok_or(ProcessError::BadAddress)?;
-
-    let path_bytes = path.as_bytes();
-    if path_bytes.len() >= 0x80 {
-        return Err(ProcessError::PathTooLong);
-    }
-    let string_start = usize::try_from(string_offset).map_err(|_| ProcessError::BadAddress)?;
-    let string_end = string_start
-        .checked_add(path_bytes.len())
-        .and_then(|end| end.checked_add(1))
-        .ok_or(ProcessError::BadAddress)?;
-    let string_slice = buffer
-        .get_mut(string_start..string_end)
-        .ok_or(ProcessError::BadAddress)?;
-    string_slice.fill(0);
-    if let Some(destination) = string_slice.get_mut(..path_bytes.len()) {
-        destination.copy_from_slice(path_bytes);
-    }
-
-    let platform = platform_name();
-    let platform_start = usize::try_from(platform_offset).map_err(|_| ProcessError::BadAddress)?;
-    let platform_end = platform_start
-        .checked_add(platform.len())
-        .and_then(|end| end.checked_add(1))
-        .ok_or(ProcessError::BadAddress)?;
-    let platform_slice = buffer
-        .get_mut(platform_start..platform_end)
-        .ok_or(ProcessError::BadAddress)?;
-    platform_slice.fill(0);
-    if let Some(destination) = platform_slice.get_mut(..platform.len()) {
-        destination.copy_from_slice(platform.as_bytes());
-    }
+    let mut cursor = buffer.len();
 
     let random = random16();
-    let random_start = usize::try_from(random_offset).map_err(|_| ProcessError::BadAddress)?;
-    let random_end = random_start
-        .checked_add(random.len())
+    let random_start = cursor
+        .checked_sub(random.len())
+        .ok_or(ProcessError::ArgTooLong)?;
+    let random_slot = buffer
+        .get_mut(random_start..cursor)
         .ok_or(ProcessError::BadAddress)?;
-    if let Some(slot) = buffer.get_mut(random_start..random_end) {
-        slot.copy_from_slice(&random);
+    random_slot.copy_from_slice(&random);
+    cursor = random_start;
+    let random_address = stack_base
+        .checked_add(u64::try_from(cursor).map_err(|_| ProcessError::BadAddress)?)
+        .ok_or(ProcessError::BadAddress)?;
+
+    let platform_address = place_bytes(&mut buffer, &mut cursor, stack_base, platform.as_bytes())?;
+    let path_address = place_bytes(&mut buffer, &mut cursor, stack_base, path)?;
+    let mut argv_addresses = Vec::new();
+    argv_addresses
+        .try_reserve(argv.len())
+        .map_err(|_| ProcessError::OutOfFrames)?;
+    for argument in argv {
+        argv_addresses.push(place_bytes(&mut buffer, &mut cursor, stack_base, argument)?);
+    }
+    let mut env_addresses = Vec::new();
+    env_addresses
+        .try_reserve(envp.len())
+        .map_err(|_| ProcessError::OutOfFrames)?;
+    for variable in envp {
+        env_addresses.push(place_bytes(&mut buffer, &mut cursor, stack_base, variable)?);
     }
 
-    let path_address = stack_base
-        .checked_add(string_offset)
-        .ok_or(ProcessError::BadAddress)?;
-    let platform_address = stack_base
-        .checked_add(platform_offset)
-        .ok_or(ProcessError::BadAddress)?;
-    let random_address = stack_base
-        .checked_add(random_offset)
-        .ok_or(ProcessError::BadAddress)?;
+    let auxv_pairs = 19usize;
+    let words = 1usize
+        .checked_add(argv.len())
+        .and_then(|total| total.checked_add(1))
+        .and_then(|total| total.checked_add(envp.len()))
+        .and_then(|total| total.checked_add(1))
+        .and_then(|total| total.checked_add(auxv_pairs.saturating_mul(2)))
+        .and_then(|total| total.checked_add(2))
+        .ok_or(ProcessError::ArgTooLong)?;
+    let block_bytes = words.checked_mul(8).ok_or(ProcessError::ArgTooLong)?;
+    let block_start = cursor
+        .checked_sub(
+            block_bytes
+                .checked_add(16)
+                .ok_or(ProcessError::ArgTooLong)?,
+        )
+        .ok_or(ProcessError::ArgTooLong)?
+        & !0xf;
+    if block_start
+        .checked_add(block_bytes)
+        .ok_or(ProcessError::ArgTooLong)?
+        > cursor
+    {
+        return Err(ProcessError::ArgTooLong);
+    }
 
-    let mut cursor = usize::try_from(sp_offset).map_err(|_| ProcessError::BadAddress)?;
-    write_word(&mut buffer, &mut cursor, 1)?;
-    write_word(&mut buffer, &mut cursor, path_address)?;
-    write_word(&mut buffer, &mut cursor, 0)?;
-    write_word(&mut buffer, &mut cursor, 0)?;
+    let mut block_cursor = block_start;
+    write_word(
+        &mut buffer,
+        &mut block_cursor,
+        u64::try_from(argv.len()).map_err(|_| ProcessError::ArgTooLong)?,
+    )?;
+    for address in &argv_addresses {
+        write_word(&mut buffer, &mut block_cursor, *address)?;
+    }
+    write_word(&mut buffer, &mut block_cursor, 0)?;
+    for address in &env_addresses {
+        write_word(&mut buffer, &mut block_cursor, *address)?;
+    }
+    write_word(&mut buffer, &mut block_cursor, 0)?;
     for (key, value) in [
         (AT_PHDR, elf.phdr_vaddr().unwrap_or(0)),
         (AT_PHENT, PHENT),
@@ -736,10 +1089,10 @@ fn build_stack(
         (AT_BASE, 0),
         (AT_FLAGS, 0),
         (AT_ENTRY, entry),
-        (AT_UID, 0),
-        (AT_EUID, 0),
-        (AT_GID, 0),
-        (AT_EGID, 0),
+        (AT_UID, u64::from(ids.uid)),
+        (AT_EUID, u64::from(ids.euid)),
+        (AT_GID, u64::from(ids.gid)),
+        (AT_EGID, u64::from(ids.egid)),
         (AT_PLATFORM, platform_address),
         (AT_HWCAP, 0),
         (AT_CLKTCK, 100),
@@ -749,11 +1102,17 @@ fn build_stack(
         (AT_EXECFN, path_address),
         (AT_MINSIGSTKSZ, 8192),
     ] {
-        write_word(&mut buffer, &mut cursor, key)?;
-        write_word(&mut buffer, &mut cursor, value)?;
+        write_word(&mut buffer, &mut block_cursor, key)?;
+        write_word(&mut buffer, &mut block_cursor, value)?;
     }
-    write_word(&mut buffer, &mut cursor, 0)?;
-    write_word(&mut buffer, &mut cursor, 0)?;
+    write_word(&mut buffer, &mut block_cursor, 0)?;
+    write_word(&mut buffer, &mut block_cursor, 0)?;
+    if block_cursor > cursor {
+        return Err(ProcessError::ArgTooLong);
+    }
+    let sp0 = stack_base
+        .checked_add(u64::try_from(block_start).map_err(|_| ProcessError::BadAddress)?)
+        .ok_or(ProcessError::BadAddress)?;
 
     address_space
         .vmas_mut()
@@ -801,6 +1160,28 @@ fn build_stack(
         page = page.saturating_add(1);
     }
     Ok(sp0)
+}
+
+/// Place one NUL-terminated string below `cursor` and return its user address.
+fn place_bytes(
+    buffer: &mut [u8],
+    cursor: &mut usize,
+    stack_base: u64,
+    bytes: &[u8],
+) -> Result<u64, ProcessError> {
+    let need = bytes.len().checked_add(1).ok_or(ProcessError::ArgTooLong)?;
+    let start = cursor.checked_sub(need).ok_or(ProcessError::ArgTooLong)?;
+    let slot = buffer
+        .get_mut(start..*cursor)
+        .ok_or(ProcessError::BadAddress)?;
+    slot.fill(0);
+    if let Some(destination) = slot.get_mut(..bytes.len()) {
+        destination.copy_from_slice(bytes);
+    }
+    *cursor = start;
+    stack_base
+        .checked_add(u64::try_from(start).map_err(|_| ProcessError::BadAddress)?)
+        .ok_or(ProcessError::BadAddress)
 }
 
 /// `AT_PLATFORM` spelling for the build architecture.
@@ -935,7 +1316,8 @@ fn teardown(process: &Arc<Process>, code: i32, own_context: bool) {
     if process.torn_down.swap(true, Ordering::AcqRel) {
         return;
     }
-    unregister_pid(process.id);
+    // The pid registry keeps a weak zombie entry until `PROC_WAIT_EX` reaps the status; a weak
+    // entry whose process is gone is removed by `lookup_pid`.
     // Fail pending scheme requests and remove the registry entries while the server page tables
     // still exist, so capture mappings can be removed before the address space is released.
     ipc::on_process_exit(process);
@@ -1048,13 +1430,21 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     if *state == ProcessState::Exited {
         return false;
     }
+    // Publish the strong zombie reference before `Exited` becomes visible, so a wait that sees
+    // the state can always find the status even if the parent already closed its handle.
+    ZOMBIES.lock().push(Arc::clone(process));
     *state = ProcessState::Exited;
     process.exit_code.store(code, Ordering::Release);
     process.exiting.store(true, Ordering::Release);
+    process.stop_signal.store(0, Ordering::Release);
+    process.continued.store(false, Ordering::Release);
+    reparent_children(process);
     robust::walk_process(process);
     crate::syscall::futex::remove_process(process.id);
     let _ = process.waiters.wake_all();
     drop(state);
+    crate::process::tty::hangup_session_leader(process);
+    notify_parent(process, true);
     crate::event::notify_all();
     teardown(process, code, own_context);
     true
@@ -1194,3 +1584,7 @@ const _: () = {
     assert!(PAGE == 4096);
     assert!(USER_STACK_SIZE == 256 * 1024);
 };
+
+#[cfg(test)]
+#[path = "mod_ut.rs"]
+mod tests;

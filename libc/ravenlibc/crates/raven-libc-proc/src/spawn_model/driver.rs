@@ -13,10 +13,10 @@ use crate::consts::{
 use crate::errors::{E2BIG, ENOENT, ENOSYS, Errno};
 use crate::exec_path::{script_argv, search_path};
 use crate::limits::{ARG_MAX, MAX_ARGS};
+use crate::request::SpawnRequest;
 use crate::spawn_model::api::{FileActions, SpawnAttr};
 use crate::spawn_model::apply::{FdEntry, Scratch, SpawnEnv, apply_actions};
 use crate::spawnp::spawnp_prechecks;
-use crate::wire::SpawnRequest;
 
 /// The parent-side context of a spawn.
 #[derive(Clone, Debug, PartialEq, Eq)]

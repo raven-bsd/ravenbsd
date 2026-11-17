@@ -1,0 +1,8 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
+# Pi 4 bring-up hash fixture
+
+This file is not a bootable image and must never be flashed. It exists only so
+`scripts/pi4-bringup.sh --check -i ... --sha256 ...` can exercise the image-hash
+path on a host that has not built the REL3 release image.

@@ -37,8 +37,6 @@ pub const AT_HWCAP2: usize = 26;
 /// `AT_EXECFN`: executed file name pointer.
 pub const AT_EXECFN: usize = 31;
 
-/// Raven procd connection handle (`PG-50`).
-pub const AT_RAVEN_PROCD: usize = 0x7001;
 /// Raven procinfo page address (`PG-50`).
 pub const AT_RAVEN_PROCINFO: usize = 0x7002;
 /// Raven fdmap block address (`PG-50`).
@@ -247,11 +245,6 @@ impl AuxVec {
     /// `AT_RAVEN_PROCINFO`.
     pub fn raven_procinfo(&self) -> Option<usize> {
         self.get(AT_RAVEN_PROCINFO)
-    }
-
-    /// `AT_RAVEN_PROCD`.
-    pub fn raven_procd(&self) -> Option<usize> {
-        self.get(AT_RAVEN_PROCD)
     }
 
     /// Compare `AT_RAVEN_ABI` with this libc's ABI version.

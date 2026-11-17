@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Minimal at daemon. It reads /var/at and spawns due jobs through the kernel; the image must
+# mount a writable /var/at (the P40 qtest mounts ramfs there).
+name = "atd"
+exec = "/sbin/atd"
+needs = ["scheme:file"]
+readiness = "none"
+restart = "on-failure"

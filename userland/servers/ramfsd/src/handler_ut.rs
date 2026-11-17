@@ -7,6 +7,7 @@ use super::*;
 use alloc::vec::Vec;
 use raven_abi::types::Handle;
 use raven_ipc::protocol::{Opcode, SchemePacket};
+use raven_proto_fs::{DT_FIFO, DirEntryIter};
 use raven_scheme::testing::FakeKernel;
 use raven_scheme::{HandlerError, Packet, Server};
 
@@ -30,6 +31,7 @@ fn ctx() -> Ctx {
         token: 1,
         buffer_len: 0,
         response_len: 0,
+        credentials: Credentials::ROOT,
     }
 }
 
@@ -571,4 +573,198 @@ fn positional_io_respects_access_mode() {
     let writer = open(&mut handler, 11, "e", flags(O_WRONLY | O_CREAT)).expect("write open");
     let mut data = [0u8; 1];
     assert_eq!(pread(&mut handler, writer, 0, &mut data), Err(Errno::EBADF));
+}
+
+#[test]
+fn hard_link_shares_data_and_link_count() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    let file = open(&mut handler, 10, "src", flags(O_RDWR | O_CREAT)).expect("open");
+    write(&mut handler, file, b"shared").expect("write");
+    close(&mut handler, file).expect("close");
+    let root = root(&mut handler);
+    call_status(
+        &mut handler,
+        root,
+        Call::Link {
+            path: b"dst",
+            target: b"src",
+        },
+    )
+    .expect("link");
+    let linked = open(&mut handler, 11, "dst", flags(O_RDONLY)).expect("open link");
+    let mut data = [0u8; 6];
+    assert_eq!(read(&mut handler, linked, &mut data).expect("read"), 6);
+    assert_eq!(&data, b"shared");
+    assert_eq!(handler.fstat(linked).expect("stat").nlink, 2);
+    close(&mut handler, linked).expect("close");
+    call_status(&mut handler, root, Call::Unlink { path: b"src" }).expect("unlink src");
+    let linked = open(&mut handler, 12, "dst", flags(O_RDONLY)).expect("open remaining");
+    assert_eq!(handler.fstat(linked).expect("stat").nlink, 1);
+    close(&mut handler, linked).expect("close");
+    handler.fs.audit().expect("audit");
+}
+
+#[test]
+fn chown_variants_change_owner_and_clear_setid() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    let file = open(&mut handler, 10, "owned", flags(O_RDWR | O_CREAT)).expect("open");
+    close(&mut handler, file).expect("close");
+    let root = root(&mut handler);
+    call_status(
+        &mut handler,
+        root,
+        Call::Chmod {
+            mode: 0o6755,
+            path: b"owned",
+        },
+    )
+    .expect("chmod");
+    call_status(
+        &mut handler,
+        root,
+        Call::Chown {
+            uid: 1000,
+            gid: 100,
+            path: b"owned",
+        },
+    )
+    .expect("chown");
+    let ino = handler.fs.lookup("owned").expect("lookup");
+    let stat = handler.fs.stat(ino).expect("stat");
+    assert_eq!((stat.uid, stat.gid), (1000, 100));
+    assert_eq!(stat.mode & 0o7777, 0o755);
+
+    call_status(
+        &mut handler,
+        root,
+        Call::Symlink {
+            path: b"link",
+            target: b"owned",
+        },
+    )
+    .expect("symlink");
+    call_status(
+        &mut handler,
+        root,
+        Call::Lchown {
+            uid: 2000,
+            gid: u32::MAX,
+            path: b"link",
+        },
+    )
+    .expect("lchown");
+    let link_ino = handler.fs.lookup_no_follow("link").expect("link ino");
+    assert_eq!(handler.fs.stat(link_ino).expect("link stat").uid, 2000);
+    assert_eq!(handler.fs.stat(ino).expect("target stat").uid, 1000);
+
+    let handle = open(&mut handler, 11, "owned", flags(O_RDONLY)).expect("open owned");
+    call_status(
+        &mut handler,
+        handle,
+        Call::Fchown {
+            uid: u32::MAX,
+            gid: 200,
+        },
+    )
+    .expect("fchown");
+    assert_eq!(handler.fstat(handle).expect("stat").gid, 200);
+    close(&mut handler, handle).expect("close");
+}
+
+#[test]
+fn mkfifo_and_mknod_report_special_types() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    let root = root(&mut handler);
+    call_status(
+        &mut handler,
+        root,
+        Call::Mkfifo {
+            mode: 0o640,
+            path: b"pipe",
+        },
+    )
+    .expect("mkfifo");
+    call_status(
+        &mut handler,
+        root,
+        Call::Mknod {
+            mode: 0o020600,
+            dev: 0x1234,
+            path: b"null",
+        },
+    )
+    .expect("mknod");
+    let pipe = handler.fs.lookup("pipe").expect("pipe");
+    assert_eq!(
+        handler.fs.stat(pipe).expect("pipe stat").mode & S_IFMT,
+        S_IFIFO
+    );
+    let device = handler.fs.lookup("null").expect("device");
+    assert_eq!(
+        handler.fs.stat(device).expect("device stat").mode & S_IFMT,
+        S_IFCHR
+    );
+    let mut buffer = [0u8; 256];
+    let read = handler
+        .fs
+        .readdir(root, 0, &mut buffer, 1000)
+        .expect("readdir");
+    assert!(
+        DirEntryIter::new(&buffer[..read])
+            .map(|entry| entry.expect("entry"))
+            .any(|entry| entry.name == b"pipe" && entry.header.kind == DT_FIFO)
+    );
+}
+
+#[test]
+fn utimens_sets_and_omits_times() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    let file = open(&mut handler, 10, "times", flags(O_RDWR | O_CREAT)).expect("open");
+    close(&mut handler, file).expect("close");
+    let root = root(&mut handler);
+    call_status(
+        &mut handler,
+        root,
+        Call::Utimens {
+            path: b"times",
+            atime: raven_proto_fs::SetTime::Set(111),
+            mtime: raven_proto_fs::SetTime::Set(222),
+            follow: true,
+        },
+    )
+    .expect("utimens");
+    let ino = handler.fs.lookup("times").expect("lookup");
+    let stat = handler.fs.stat(ino).expect("stat");
+    assert_eq!((stat.atime, stat.mtime), (111, 222));
+
+    call_status(
+        &mut handler,
+        root,
+        Call::Utimens {
+            path: b"times",
+            atime: raven_proto_fs::SetTime::Now,
+            mtime: raven_proto_fs::SetTime::Omit,
+            follow: true,
+        },
+    )
+    .expect("utimens now");
+    let stat = handler.fs.stat(ino).expect("stat");
+    assert_eq!((stat.atime, stat.mtime), (1000, 222));
+}
+
+#[test]
+fn statvfs_reports_capacity_and_fragment_size() {
+    let mut handler = RamfsHandler::new(|| 1000);
+    let root = root(&mut handler);
+    let (op, response) = call(&mut handler, root, Call::Statvfs).expect("statvfs");
+    match CallResponse::decode(op, &response).expect("decode") {
+        CallResponse::StatVfs { status: 0, statvfs } => {
+            assert_eq!(statvfs.block_size, 4096);
+            assert_eq!(statvfs.fragment_size, 4096);
+            assert!(statvfs.blocks > 0);
+            assert!(statvfs.free_blocks <= statvfs.blocks);
+            assert_eq!(statvfs.name_max, 255);
+        }
+        other => panic!("unexpected response: {other:?}"),
+    }
 }

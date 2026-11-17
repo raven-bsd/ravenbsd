@@ -5,9 +5,11 @@
 .Os RavenBSD
 .Sh NAME
 .Nm ps
-.Nd list services from the svc: scheme
+.Nd list services or process-table fields
 .Sh SYNOPSIS
 .Nm
+.Nm
+.Fl e
 .Nm
 .Fl -json
 .Nm
@@ -32,12 +34,31 @@ The state is one of
 or
 .Ql gave-up .
 .Pp
+.Fl e
+scans the kernel pid registry and prints one row per live process:
+.Bd -literal -offset indent
+PID PPID UID GID CMD
+.Ed
+.Pp
+The kernel's
+.Ql PROC_PID_INFO
+is asked for 41 words: the first eight are pid, ppid, pgid, sid, uid, euid, gid and egid,
+and the UTF-8 command name follows at byte offset 64.
+The
+.Ql CMD
+field prints that name.
+Kernel-spawned service children may show
+.Ql child
+until their spawn sets a more specific command.
+.Pp
 .Fl -selftest
 reads every status record, checks that the directory is non-empty and every
 line parses, and prints
 .Dq ps: selftest ok .
 .Sh OPTIONS
 .Bl -tag -width Ds
+.It Fl e
+Print the bounded process-table fields instead of the service view.
 .It Fl -json
 Print one NDJSON object per service instead of the aligned human lines.
 The object has the fixed envelope
@@ -82,6 +103,9 @@ $ ps --json
 .Xr svcctl 1 ,
 .Xr init 8
 .Sh STANDARDS
-The output is a RavenBSD service view, not the process table of a POSIX
-.Nm
-utility.
+The service view is RavenBSD-specific.
+The
+.Fl e
+fields are the POSIX subset available from the 41-word
+.Ql PROC_PID_INFO
+payload; the command name is the kernel process command.

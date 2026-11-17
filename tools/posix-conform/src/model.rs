@@ -255,6 +255,32 @@ impl Profile {
         rows
     }
 
+    /// Find one row's shared fields by id.
+    pub fn meta_mut(&mut self, id: &str) -> Option<&mut Meta> {
+        if let Some(row) = self.header.iter_mut().find(|row| row.meta.id == id) {
+            return Some(&mut row.meta);
+        }
+        if let Some(row) = self.interface.iter_mut().find(|row| row.meta.id == id) {
+            return Some(&mut row.meta);
+        }
+        if let Some(row) = self.utility.iter_mut().find(|row| row.meta.id == id) {
+            return Some(&mut row.meta);
+        }
+        if let Some(row) = self.shell_feature.iter_mut().find(|row| row.meta.id == id) {
+            return Some(&mut row.meta);
+        }
+        if let Some(row) = self.filesystem.iter_mut().find(|row| row.meta.id == id) {
+            return Some(&mut row.meta);
+        }
+        if let Some(row) = self.process.iter_mut().find(|row| row.meta.id == id) {
+            return Some(&mut row.meta);
+        }
+        if let Some(row) = self.tty.iter_mut().find(|row| row.meta.id == id) {
+            return Some(&mut row.meta);
+        }
+        None
+    }
+
     /// All ids, rejecting duplicates.
     pub fn unique_ids(&self) -> Result<BTreeSet<String>> {
         let mut ids = BTreeSet::new();
@@ -547,10 +573,20 @@ pub fn validate(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<()>
         }
     }
     for row in &profile.utility {
-        if matches!(row.meta.status, Status::Present | Status::Partial)
-            && row.meta.evidence != "none"
-            && !root.join(&row.meta.evidence).exists()
+        if !matches!(row.meta.status, Status::Present | Status::Partial)
+            || row.meta.evidence == "none"
         {
+            continue;
+        }
+        let evidence = row
+            .meta
+            .evidence
+            .strip_prefix("test:")
+            .unwrap_or(&row.meta.evidence);
+        if evidence.starts_with("qtest:") {
+            continue;
+        }
+        if !root.join(evidence).exists() {
             errors.push(format!(
                 "utility `{}` evidence `{}` is absent",
                 row.name, row.meta.evidence
@@ -565,15 +601,34 @@ pub fn validate(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<()>
     }
 }
 
+fn qtest_for(id: &str) -> &'static str {
+    match id {
+        "process.fork" => "tests/qtest/cases/proc-fork.toml",
+        "filesystem.access" | "filesystem.permission" => "tests/qtest/cases/perm.toml",
+        "filesystem.ownership"
+        | "filesystem.special-file"
+        | "filesystem.statvfs"
+        | "filesystem.sync"
+        | "filesystem.timestamp" => "tests/qtest/cases/fsd-ufs-rw.toml",
+        "filesystem.directory"
+        | "filesystem.hard-link"
+        | "filesystem.mkdir-rmdir"
+        | "filesystem.mount"
+        | "filesystem.path-resolution"
+        | "filesystem.rename"
+        | "filesystem.stat-family"
+        | "filesystem.symlink"
+        | "filesystem.truncate" => "tests/qtest/cases/posix-fs.toml",
+        _ => "none",
+    }
+}
+
 /// Build a deterministic traceability file from a profile.
 #[must_use]
 pub fn trace_from_profile(profile: &Profile) -> TraceFile {
     let mut trace = Vec::new();
     for (_, meta) in profile.metas() {
-        let test = match meta.id.as_str() {
-            "process.fork" => "tests/qtest/cases/proc-fork.toml".to_string(),
-            _ => "none".to_string(),
-        };
+        let test = qtest_for(&meta.id).to_string();
         trace.push(TraceRow {
             id: meta.id.clone(),
             ticket: meta.owner.clone(),

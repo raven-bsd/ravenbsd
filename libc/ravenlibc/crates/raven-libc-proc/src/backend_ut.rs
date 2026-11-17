@@ -39,17 +39,27 @@ fn the_backend_trait_is_object_safe() {
 fn early_spawn_is_object_safe() {
     struct Spawner;
     impl EarlySpawn for Spawner {
-        fn spawn_initfs(
-            &self,
-            _path: &[u8],
-            _argv: &[Vec<u8>],
-            _envp: &[Vec<u8>],
-            _fds: &[FdMapEntry],
-        ) -> Result<i32, Errno> {
+        fn spawn(&self, _request: &crate::request::SpawnRequest) -> Result<i32, Errno> {
             Ok(7)
         }
     }
     let spawner = Spawner;
     let object: &dyn EarlySpawn = &spawner;
-    assert_eq!(object.spawn_initfs(b"x", &[], &[], &[]), Ok(7));
+    let request = crate::request::SpawnRequest {
+        spawn_flags: 0,
+        pgroup: 0,
+        sigdefault: [0; 128],
+        sigmask: [0; 128],
+        ignored: [0; 128],
+        sched_policy: 0,
+        sched_prio: 0,
+        umask: 0,
+        tcpgrp_fd: -1,
+        path: b"/x".to_vec(),
+        cwd: b"/".to_vec(),
+        argv: Vec::new(),
+        envp: Vec::new(),
+        fdmap: Vec::new(),
+    };
+    assert_eq!(object.spawn(&request), Ok(7));
 }

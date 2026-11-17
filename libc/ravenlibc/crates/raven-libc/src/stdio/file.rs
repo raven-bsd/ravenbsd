@@ -409,6 +409,58 @@ pub(crate) unsafe extern "C" fn getline_impl(
     }
 }
 
+/// `getdelim`: grow the caller's buffer up to `delim` and return the length.
+///
+/// # Safety
+/// `lineptr` and `capacity` are writable, `*lineptr` is NULL or a live malloc block, and
+/// `stream` is a FILE.
+pub(crate) unsafe extern "C" fn getdelim_impl(
+    lineptr: *mut *mut c_char,
+    capacity: *mut usize,
+    delim: c_int,
+    stream: *mut c_void,
+) -> isize {
+    let Some(target) = file(stream) else {
+        return crate::ffi::ret::ssize(Err(Errno(9)));
+    };
+    if lineptr.is_null() || capacity.is_null() {
+        return crate::ffi::ret::ssize(Err(Errno(22)));
+    }
+    // SAFETY: the caller's `char **` and `size_t *` are writable and hold the C buffer pair.
+    let (old, old_capacity) = unsafe { (*lineptr, *capacity) };
+    let mut data = Vec::new();
+    let mut line = LineBuf::new(&mut data, old_capacity);
+    match raven_libc_stdio::getdelim(target, &mut line, delim) {
+        Ok(_) => {
+            let bytes = line.bytes();
+            let needed = line.capacity().max(bytes.len());
+            let block = if old.is_null() {
+                // SAFETY: the allocator returns `needed` writable bytes or null.
+                unsafe { crate::malloc::abi_alloc(needed) }
+            } else {
+                crate::malloc::heap::api().realloc(old as usize, needed) as *mut u8
+            };
+            if block.is_null() {
+                crate::ffi::errno::set(Errno(12));
+                return -1;
+            }
+            // SAFETY: `block` has `needed >= bytes.len()` writable bytes and the caller's
+            // out-pointers are writable.
+            unsafe {
+                core::ptr::copy_nonoverlapping(bytes.as_ptr(), block, bytes.len());
+                *lineptr = block.cast::<c_char>();
+                *capacity = needed;
+            }
+            isize::try_from(bytes.len().saturating_sub(1)).unwrap_or(-1)
+        }
+        Err(Fail::Eof) => -1,
+        Err(Fail::Errno(error)) => {
+            errno::set(error);
+            -1
+        }
+    }
+}
+
 /// `remove`.
 ///
 /// # Safety
@@ -578,12 +630,31 @@ fn unit(result: R<()>) -> c_int {
     }
 }
 
+mod clearerr_unlocked;
+mod ctermid;
 mod feof;
 mod fflush;
+mod fflush_unlocked;
+#[path = "file/fgetln.rs"]
+mod fgetln;
+mod fgetpos;
+mod fgets_unlocked;
+mod flockfile;
 mod fopen;
+mod fopen64;
 mod fputc;
+mod fseeko;
 mod ftell;
+mod getc;
 mod getchar;
-mod line;
-mod misc;
+mod getdelim;
+#[path = "file/getline.rs"]
+mod getline;
+mod getw;
 mod perror;
+mod putc;
+#[path = "file/remove.rs"]
+mod remove;
+#[path = "file/rewind.rs"]
+mod rewind;
+mod setbuf;

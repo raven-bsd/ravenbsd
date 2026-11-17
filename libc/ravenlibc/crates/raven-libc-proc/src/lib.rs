@@ -3,12 +3,12 @@
 
 //! Pure process logic for `ravenlibc`.
 //!
-//! On Raven the kernel has no `fork`, `exec`, pids or signals: the process API is a thin client
-//! of the `procd` userspace server. This crate holds the parts that are pure logic and can run on
-//! the host: the `exec` PATH search, the `posix_spawn` attribute and file-action model, the Linux
-//! wait-status codec, the `wait4`/`waitid` mapping, the `popen` pid list, the `atfork` and fork
-//! lock registries, the rlimit table, the startup stack parser, the procinfo page reader and the
-//! client-side encoders of the proposed `procd` protocol.
+//! On Raven the kernel owns pids, parentage, groups/sessions, credentials, signals, wait, spawn
+//! and `execve`. This crate holds the parts of the libc process API that are pure logic and can
+//! run on the host: the `exec` PATH search, the `posix_spawn` attribute and file-action model,
+//! the Linux wait-status codec, the `wait4`/`waitid` mapping, the `popen` pid list, the `atfork`
+//! and fork-lock registries, the rlimit table, the startup stack parser, the procinfo page reader
+//! and the request models passed to the backend seam.
 //!
 //! The crate is `no_std` plus `alloc`, class P and contains no `unsafe` token.
 
@@ -44,7 +44,6 @@ pub mod consts;
 pub mod daemon;
 pub mod errors;
 pub mod exec_path;
-pub mod fake;
 pub mod getauxval;
 pub mod getprogname;
 pub mod ids;
@@ -52,9 +51,11 @@ pub mod initgroups;
 pub mod limits;
 pub mod local_backend;
 pub mod lock_registry;
+pub mod native_spawn;
 pub mod nice;
 pub mod popen_model;
 pub mod procinfo;
+pub mod request;
 pub mod rlimit_model;
 pub mod setprogname;
 pub mod spawn_model;
@@ -67,6 +68,5 @@ pub mod wait3;
 pub mod wait_status;
 pub mod waitid;
 pub mod waitpid;
-pub mod wire;
 
 pub use errors::Errno;

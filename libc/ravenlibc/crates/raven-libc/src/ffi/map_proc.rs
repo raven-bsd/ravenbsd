@@ -3,8 +3,8 @@
 //!
 //! The map tables of the process family (C64 4.6): the C argument/status words to C53's request
 //! types, the `Struct tms`/`rusage` conversions, the single-policy scheduler table, the CPU
-//! affinity fill and the two opaque spawn objects. Host tests drive every function with C53's
-//! `FakeProcd`; the exports are pointer checks and one call into this module.
+//! affinity fill and the two opaque spawn objects. Host tests drive every function with a local
+//! backend fake; the exports are pointer checks and one call into this module.
 //!
 //! `posix_spawnattr_t` is a 336-byte blob and is laid out inline; `posix_spawn_file_actions_t`
 //! is an 80-byte blob that holds one owned pointer plus a magic word (the crate's
@@ -16,9 +16,9 @@ use raven_libc_abi::errno::{EINVAL, Errno};
 use raven_libc_abi::structs::{PosixSpawnFileActionsT, PosixSpawnattrT, Rlimit, Rusage, SiginfoT};
 use raven_libc_proc::backend::{ProcBackend, WaitResult};
 use raven_libc_proc::consts::{P_ALL, SCHED_BATCH, SCHED_FIFO, SCHED_IDLE, SCHED_OTHER, SCHED_RR};
+use raven_libc_proc::request::{ExecRequest, ForkRequest};
 use raven_libc_proc::spawn_model::apply::SpawnEnv;
 use raven_libc_proc::spawn_model::{FileActions, SpawnAttr, SpawnCtx};
-use raven_libc_proc::wire::{ExecRequest, ForkRequest};
 
 /// C53's positive error number.
 pub(crate) type ProcErrno = raven_libc_proc::Errno;
@@ -33,7 +33,7 @@ pub(crate) fn invalid() -> Errno {
     Errno(EINVAL as u16)
 }
 
-/// `fork`/`vfork`/`_Fork` through the backend; the request is the pre-`procd` zero shape.
+/// `fork`/`vfork`/`_Fork` through the backend; the request is the zero shape.
 pub(crate) fn fork<B: ProcBackend>(backend: &B) -> Result<i32, ProcErrno> {
     backend.fork(&ForkRequest {
         entry: 0,

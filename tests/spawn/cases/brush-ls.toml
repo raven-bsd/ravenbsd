@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P9 planning sketch, not an active qtest case. P13 moves this to tests/qtest/cases/.
+# It proves std::process::Command -> posix_spawnp -> raven-spawn from the release image,
+# without flipping the login shell (rsh runs the brush command).
+
+name = "spawn-brush"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 600
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^cat$'
+
+[[expect]]
+regex = '^ls$'
+
+[[expect]]
+regex = '^uname$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|posix_spawn|Function not implemented'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "/bin/brush -c '/bin/ls /bin'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^cat$'
+timeout_secs = 60
+
+[[step]]
+wait = '^ls$'
+timeout_secs = 30
+
+[[step]]
+wait = '^uname$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 60
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

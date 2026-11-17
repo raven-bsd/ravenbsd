@@ -17,6 +17,7 @@ pub mod driver;
 /// `DTRACE_*` provider control syscalls (S57).
 pub mod dtrace;
 pub mod event;
+pub mod exec;
 pub mod futex;
 pub mod handle_xfer;
 /// Scheme IPC (`0x60..0x69`) is shared by x86-64 and aarch64.
@@ -24,14 +25,30 @@ pub mod ipc;
 /// Linux-personality trap routing to the per-process userspace handler (S41).
 pub mod linux;
 pub mod memory_ctl;
+pub mod pipe;
+pub mod priority;
 pub mod process_ctl;
 pub mod thread;
+pub mod tty;
+
+use core::sync::atomic::Ordering;
 
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
 use raven_abi::types::Personality;
 
 use crate::process;
+
+/// Dispatch one syscall frame, accounting kernel time to the caller.
+fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let start = crate::time::now_ns();
+    let result = dispatch_inner(frame);
+    if let Some(caller) = process::current() {
+        let elapsed = crate::time::now_ns().saturating_sub(start);
+        caller.system_ns.fetch_add(elapsed, Ordering::AcqRel);
+    }
+    result
+}
 
 /// Register view shared by every syscall handler.
 ///
@@ -56,7 +73,7 @@ pub struct SyscallFrame {
 }
 
 /// Dispatch one syscall frame and return its raw result.
-fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
+fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     // S41: a Linux-personality process never enters the native table. Route the
     // raw number to the process handler before interpreting any native meaning;
     // in particular Linux `write` (1) must not reach native `EXIT`.
@@ -87,6 +104,48 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == ipc::SEEK {
         return ipc::seek(frame);
     }
+    if number == raven_abi::syscall::MSYNC {
+        return memory_ctl::msync(frame);
+    }
+    if number == exec::PROC_EXEC {
+        return exec::exec(frame);
+    }
+    if number == pipe::PIPE {
+        return pipe::pipe(frame);
+    }
+    if number == pipe::PIPE2 {
+        return pipe::pipe2(frame);
+    }
+    if number == priority::GETPRIORITY {
+        return priority::getpriority(frame);
+    }
+    if number == priority::SETPRIORITY {
+        return priority::setpriority(frame);
+    }
+    if number == priority::NICE {
+        return priority::nice(frame);
+    }
+    if number == priority::SCHED_GET_PRIORITY_MAX {
+        return priority::sched_get_priority_max(frame);
+    }
+    if number == priority::SCHED_GET_PRIORITY_MIN {
+        return priority::sched_get_priority_min(frame);
+    }
+    if number == priority::SCHED_SETSCHEDULER {
+        return priority::sched_setscheduler(frame);
+    }
+    if number == priority::SCHED_GETSCHEDULER {
+        return priority::sched_getscheduler(frame);
+    }
+    if number == tty::PROC_CTTY_SET {
+        return tty::set_ctty(frame);
+    }
+    if number == tty::PROC_CTTY_GET {
+        return tty::get_pgrp(frame);
+    }
+    if number == tty::PROC_CTTY_SET_FG {
+        return tty::set_pgrp(frame);
+    }
     if number == process_ctl::PROC_SELF_INFO {
         return process_ctl::self_info(frame);
     }
@@ -102,14 +161,47 @@ fn dispatch(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == process_ctl::PROC_PID_INFO {
         return process_ctl::pid_info(frame);
     }
+    if number == process_ctl::PROC_SET_COMMAND {
+        return process_ctl::set_command(frame);
+    }
     if number == process_ctl::PROC_SETCRED_EX {
         return process_ctl::setcred_ex(frame);
+    }
+    if number == process_ctl::PROC_HANDLE_INFO {
+        return process_ctl::handle_info(frame);
+    }
+    if number == process_ctl::PROC_EXEC_CRED {
+        return process_ctl::exec_cred(frame);
     }
     if number == process_ctl::PROC_CRED_INFO {
         return process_ctl::cred_info(frame);
     }
     if number == process_ctl::PROC_GETGROUPS {
         return process_ctl::getgroups(frame);
+    }
+    if number == process_ctl::PROC_WAIT_EX {
+        return process_ctl::wait_ex(frame);
+    }
+    if number == process_ctl::PROC_GETPGID {
+        return process_ctl::getpgid(frame);
+    }
+    if number == process_ctl::PROC_SIGNAL {
+        return process_ctl::signal(frame);
+    }
+    if number == process_ctl::PROC_SIGRECV {
+        return process_ctl::sigrecv(frame);
+    }
+    if number == process_ctl::PROC_TIMES {
+        return process_ctl::times(frame);
+    }
+    if number == process_ctl::PROC_GETRUSAGE {
+        return process_ctl::getrusage(frame);
+    }
+    if number == process_ctl::PROC_GETRLIMIT {
+        return process_ctl::getrlimit(frame);
+    }
+    if number == process_ctl::PROC_SETRLIMIT {
+        return process_ctl::setrlimit(frame);
     }
     if number == raven_abi::syscall::PROC_SET_PERSONALITY {
         return process_ctl::set_personality(frame);
@@ -199,6 +291,49 @@ fn result_value(result: Result<usize, Errno>) -> u64 {
     }
 }
 
+/// Install a successful exec's entry and stack on the saved user frame.
+///
+/// The old image is already gone; every general register is cleared so no old-pointer value
+/// leaks into the new program. `_start` takes the C8 stack from `rsp`/`sp`, not from a GPR.
+#[cfg(target_arch = "x86_64")]
+fn apply_exec_context(
+    frame: &mut crate::arch::x86_64::trapframe::TrapFrame,
+    context: crate::process::exec::ExecContext,
+) {
+    frame.rip = context.entry;
+    frame.rsp = context.stack;
+    frame.rflags = 0x202;
+    frame.rax = 0;
+    frame.rbx = 0;
+    frame.rcx = 0;
+    frame.rdx = 0;
+    frame.rsi = 0;
+    frame.rdi = 0;
+    frame.rbp = 0;
+    frame.r8 = 0;
+    frame.r9 = 0;
+    frame.r10 = 0;
+    frame.r11 = 0;
+    frame.r12 = 0;
+    frame.r13 = 0;
+    frame.r14 = 0;
+    frame.r15 = 0;
+}
+
+/// Install a successful exec's entry and stack on the saved user frame.
+#[cfg(target_arch = "aarch64")]
+fn apply_exec_context(
+    frame: &mut crate::arch::aarch64::vectors::TrapFrame,
+    context: crate::process::exec::ExecContext,
+) {
+    frame.x = [0; 31];
+    frame.sp = context.stack;
+    frame.elr = context.entry;
+    frame.spsr = 0;
+    frame.esr = 0;
+    frame.far = 0;
+}
+
 /// Rust side of the x86-64 `syscall` entry stub.
 ///
 /// The assembly stub saves a TrapFrame-compatible register image, passes its address here, and
@@ -237,7 +372,11 @@ pub extern "C" fn syscall_dispatch(frame: &mut crate::arch::x86_64::trapframe::T
         }
     } else {
         frame.rax = result_value(dispatch(&registers));
-        crate::arch::x86_64::syscall::deliver_signal(frame);
+        if let Some(context) = process::exec::take_pending() {
+            apply_exec_context(frame, context);
+        } else {
+            crate::arch::x86_64::syscall::deliver_signal(frame);
+        }
     }
     crate::sched::syscall_return();
 }
@@ -273,7 +412,11 @@ pub fn svc_dispatch(frame: &mut crate::arch::aarch64::vectors::TrapFrame) {
         if let Some(slot) = frame.x.get_mut(0) {
             *slot = value;
         }
-        crate::arch::aarch64::vectors::deliver_signal(frame);
+        if let Some(context) = process::exec::take_pending() {
+            apply_exec_context(frame, context);
+        } else {
+            crate::arch::aarch64::vectors::deliver_signal(frame);
+        }
     }
     crate::sched::syscall_return();
 }

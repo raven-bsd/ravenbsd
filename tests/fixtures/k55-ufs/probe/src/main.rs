@@ -21,8 +21,10 @@ mod program {
 
     use fsd_ufs::block::open_partition;
     use raven_abi::errno::Errno;
+    use raven_abi::types::{Handle, prot};
     use raven_proto_fs::{
-        Call, CallRequest, CallResponse, O_APPEND, O_CREAT, O_RDWR, O_WRONLY, S_IFMT, S_IFREG,
+        Call, CallRequest, CallResponse, O_APPEND, O_CREAT, O_RDONLY, O_RDWR, O_WRONLY, S_IFCHR,
+        S_IFIFO, S_IFMT, S_IFREG, SetTime, StatVfs,
     };
     use raven_proto_svc::{Op, State, Status};
     use raven_rt::entry;
@@ -55,6 +57,9 @@ mod program {
 
         create_write_truncate()?;
         namespace()?;
+        posix_operations()?;
+        sparse_file()?;
+        mmap_file()?;
         persistence()?;
         Ok(())
     }
@@ -155,6 +160,211 @@ mod program {
         Ok(())
     }
 
+    fn posix_operations() -> Result<(), String> {
+        fs::mkdir("/ufs/posix", 0o755)
+            .map_err(|error| format!("posix mkdir: {}", error.description()))?;
+        let mut file = fs::open("file:/ufs/posix/file", O_RDWR | O_CREAT)
+            .map_err(|error| format!("posix create: {}", error.description()))?;
+        file.write(b"link-data")
+            .map_err(|error| format!("posix write: {}", error.description()))?;
+        file.close()
+            .map_err(|error| format!("posix close: {}", error.description()))?;
+
+        call_root(Call::Link {
+            path: b"/ufs/posix/hard",
+            target: b"/ufs/posix/file",
+        })?;
+        let stat = fs::stat("file:/ufs/posix/hard")
+            .map_err(|error| format!("link stat: {}", error.description()))?;
+        if stat.nlink != 2 {
+            return Err(format!("hard link count {}", stat.nlink));
+        }
+
+        call_root(Call::Chown {
+            uid: 1000,
+            gid: 100,
+            path: b"/ufs/posix/file",
+        })?;
+        let stat = fs::stat("file:/ufs/posix/file")
+            .map_err(|error| format!("chown stat: {}", error.description()))?;
+        if (stat.uid, stat.gid) != (1000, 100) {
+            return Err(format!("chown uid={} gid={}", stat.uid, stat.gid));
+        }
+
+        call_root(Call::Utimens {
+            path: b"/ufs/posix/file",
+            atime: SetTime::Set(111),
+            mtime: SetTime::Set(222),
+            follow: true,
+        })?;
+        let stat = fs::stat("file:/ufs/posix/file")
+            .map_err(|error| format!("utimens stat: {}", error.description()))?;
+        if (stat.atime, stat.mtime) != (111, 222) {
+            return Err(format!("utimens atime={} mtime={}", stat.atime, stat.mtime));
+        }
+
+        call_root(Call::Mkfifo {
+            mode: 0o640,
+            path: b"/ufs/posix/fifo",
+        })?;
+        let stat = fs::stat("file:/ufs/posix/fifo")
+            .map_err(|error| format!("fifo stat: {}", error.description()))?;
+        if stat.mode & S_IFMT != S_IFIFO {
+            return Err(format!("fifo mode {:o}", stat.mode));
+        }
+        call_root(Call::Mknod {
+            mode: 0o020600,
+            dev: 0,
+            path: b"/ufs/posix/node",
+        })?;
+        let stat = fs::stat("file:/ufs/posix/node")
+            .map_err(|error| format!("mknod stat: {}", error.description()))?;
+        if stat.mode & S_IFMT != S_IFCHR {
+            return Err(format!("mknod mode {:o}", stat.mode));
+        }
+
+        let client = Client::new();
+        let root = client
+            .open("file:/ufs/posix", 1)
+            .map_err(|error| format!("statvfs open: {}", error.description()))?;
+        let request = CallRequest::new(Call::Statvfs);
+        let mut response = [0u8; 128];
+        let result = client.call_typed(root, &request, &mut response);
+        let _ = client.close(root);
+        let length = result.map_err(|error| format!("statvfs call: {}", error.description()))?;
+        match CallResponse::decode(request.op(), &response[..length])
+            .map_err(|_| "statvfs decode".to_string())?
+        {
+            CallResponse::StatVfs { status: 0, statvfs } => check_statvfs(&statvfs)?,
+            CallResponse::StatVfs { status, .. } | CallResponse::Status(status) => {
+                return Err(format!("statvfs status {status}"));
+            }
+            other => return Err(format!("statvfs response {other:?}")),
+        }
+
+        raven_rt::println!("fsd-ufs-rw: probe posix operations ok");
+        Ok(())
+    }
+
+    fn mmap_file() -> Result<(), String> {
+        let path = "file:/ufs/mmap";
+        let mut file = fs::open(path, O_RDWR | O_CREAT)
+            .map_err(|error| format!("mmap create: {}", error.description()))?;
+        let data = [0x42u8; 8192];
+        file.write(&data)
+            .map_err(|error| format!("mmap write: {}", error.description()))?;
+        file.close()
+            .map_err(|error| format!("mmap close: {}", error.description()))?;
+        let client = Client::new();
+        let handle = client
+            .open(path, 3)
+            .map_err(|error| format!("mmap open: {}", error.description()))?;
+        let request = CallRequest::new(Call::Mmap {
+            offset: 0,
+            len: 8192,
+            shared: true,
+        });
+        let mut encoded = [0u8; 64];
+        let length = request
+            .encode(&mut encoded)
+            .map_err(|_| "mmap encode".to_string())?;
+        let mut response = [0u8; 8];
+        let count = client
+            .call(handle, &encoded[..length], &mut response)
+            .map_err(|error| format!("mmap call: {}", error.description()))?;
+        if count < 8 {
+            return Err(format!("mmap response {count}"));
+        }
+        let object = Handle(u32::from_le_bytes(
+            response[..4]
+                .try_into()
+                .map_err(|_| "mmap handle".to_string())?,
+        ));
+        let address =
+            raven_rt::sys::map_object(object, 0, 8192, (prot::READ | prot::WRITE) as usize, true)
+                .map_err(|error| format!("mmap map: {}", error.description()))?;
+        raven_rt::sys::copy_to_mapping(address, b"UFS!");
+        raven_rt::sys::msync(Handle::SELF_PROC, address, 8192, 4)
+            .map_err(|error| format!("mmap msync: {}", error.description()))?;
+        raven_rt::sys::unmap(Handle::SELF_PROC, address, 8192)
+            .map_err(|error| format!("mmap unmap: {}", error.description()))?;
+        let _ = client.close(handle);
+        let contents =
+            fs::read_to_vec(path).map_err(|error| format!("mmap read: {}", error.description()))?;
+        if contents.get(..4) != Some(b"UFS!") {
+            return Err("mmap write-back".to_string());
+        }
+        raven_rt::println!("fsd-ufs-rw: probe mmap ok");
+        Ok(())
+    }
+
+    fn sparse_file() -> Result<(), String> {
+        let path = "file:/ufs/posix/sparse";
+        let file = fs::open(path, O_RDWR | O_CREAT)
+            .map_err(|error| format!("sparse create: {}", error.description()))?;
+        file.close()
+            .map_err(|error| format!("sparse close: {}", error.description()))?;
+        truncate_file(path, 1024 * 1024)?;
+        let stat =
+            fs::stat(path).map_err(|error| format!("sparse stat: {}", error.description()))?;
+        if stat.size != 1024 * 1024 || stat.blocks * 512 >= stat.size / 4 {
+            return Err(format!("sparse size={} blocks={}", stat.size, stat.blocks));
+        }
+        let mut file = fs::open(path, O_RDONLY)
+            .map_err(|error| format!("sparse open: {}", error.description()))?;
+        let mut data = [0xffu8; 4096];
+        let mut position = 0usize;
+        while position < 512 * 1024 + data.len() {
+            let read = file
+                .read(&mut data)
+                .map_err(|error| format!("sparse read: {}", error.description()))?;
+            if read == 0 {
+                return Err("sparse file ended early".to_string());
+            }
+            if data[..read].iter().any(|byte| *byte != 0) {
+                return Err("sparse hole did not read as zeros".to_string());
+            }
+            position += read;
+        }
+        file.close()
+            .map_err(|error| format!("sparse close: {}", error.description()))?;
+        raven_rt::println!("fsd-ufs-rw: probe sparse ok");
+        Ok(())
+    }
+
+    fn check_statvfs(statvfs: &StatVfs) -> Result<(), String> {
+        if statvfs.block_size == 0
+            || statvfs.blocks == 0
+            || statvfs.free_blocks > statvfs.blocks
+            || statvfs.name_max == 0
+        {
+            return Err(format!("statvfs {statvfs:?}"));
+        }
+        Ok(())
+    }
+
+    fn call_root(call: Call<'_>) -> Result<(), String> {
+        let client = Client::new();
+        let root = client
+            .open("file:/", 1)
+            .map_err(|error| format!("root open: {}", error.description()))?;
+        let request = CallRequest::new(call);
+        let mut response = [0u8; 512];
+        let result = client.call_typed(root, &request, &mut response);
+        let _ = client.close(root);
+        let length = result.map_err(|error| format!("root call: {}", error.description()))?;
+        match CallResponse::decode(request.op(), &response[..length])
+            .map_err(|_| "root response decode".to_string())?
+        {
+            CallResponse::Status(0) => Ok(()),
+            CallResponse::Status(status)
+            | CallResponse::Readlink { status, .. }
+            | CallResponse::StatFs { status, .. }
+            | CallResponse::StatVfs { status, .. }
+            | CallResponse::Stat { status, .. } => Err(format!("root status {status}")),
+        }
+    }
+
     fn persistence() -> Result<(), String> {
         let mut file = fs::open(PERSIST_PATH, O_RDWR | O_CREAT)
             .map_err(|error| format!("persist create: {}", error.description()))?;
@@ -228,6 +438,40 @@ mod program {
         }
         fs::umount("/ufs").map_err(|error| format!("remount umount: {}", error.description()))?;
         raven_rt::println!("fsd-ufs-rw: probe remount ok");
+
+        fs::mount("/ufs", "ufs:")
+            .map_err(|error| format!("crash mount: {}", error.description()))?;
+        let mut file = fs::open("file:/ufs/crash.txt", O_RDWR | O_CREAT)
+            .map_err(|error| format!("crash create: {}", error.description()))?;
+        file.write(b"crash-checkpoint")
+            .map_err(|error| format!("crash write: {}", error.description()))?;
+        file.close()
+            .map_err(|error| format!("crash close: {}", error.description()))?;
+        let client = Client::new();
+        svc_control(&client, "fsd-ufs", Op::Stop)?;
+        wait_state(&client, "fsd-ufs", State::Stopped)?;
+        let mut disk = open_partition("block:0", 1)?;
+        let (findings, clean) = match check(&mut disk, Mode::ReadOnly) {
+            Ok(report) => (report.findings.len(), report.clean_after),
+            Err(_) => (usize::MAX, false),
+        };
+        raven_rt::println!("fsd-ufs-rw: probe crash findings={findings} clean={clean}");
+        let replay = if svc_control(&client, "fsd-ufs", Op::Start).is_err()
+            || wait_state(&client, "fsd-ufs", State::Running).is_err()
+        {
+            "fail-closed"
+        } else {
+            match fs::mount("/ufs", "ufs:") {
+                Ok(()) => {
+                    let _ = fs::read_to_vec("file:/ufs/crash.txt");
+                    let _ = fs::umount("/ufs");
+                    "mounted"
+                }
+                Err(_) => "fail-closed",
+            }
+        };
+        raven_rt::println!("fsd-ufs-rw: probe crash replay={replay}");
+        raven_rt::println!("fsd-ufs-rw: probe crash ok");
         Ok(())
     }
 

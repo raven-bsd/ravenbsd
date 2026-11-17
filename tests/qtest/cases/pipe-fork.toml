@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P2j pipe inheritance across PROC_FORK: the child blocks on an inherited read end, the parent
+# wakes it, EOF arrives when the last write end closes, and EPIPE/SIGPIPE fires after the last
+# read end closes. Runs on aarch64 to pin the cross-architecture block/wake path.
+
+name = "pipe-fork"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/pipe/build.sh"]
+initfs = "build/fixtures/pipe/pipe-fork.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^pipe-fork: inherit=1 block=1$'
+
+[[expect]]
+regex = '^pipe-fork: eof=1 epipe=1 sigpipe=1$'
+
+[[expect]]
+regex = '^pipe-fork: bulk=1 child code=0$'
+
+[[expect]]
+regex = '^pipe-fork: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pipe-fork: FAIL'

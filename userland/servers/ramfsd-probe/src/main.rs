@@ -199,9 +199,10 @@ mod program {
             .map_err(|_| "decode CALL response".to_string())?
         {
             CallResponse::Status(status) => status_result(status),
-            CallResponse::Readlink { status, .. } | CallResponse::StatFs { status, .. } => {
-                status_result(status)
-            }
+            CallResponse::Readlink { status, .. }
+            | CallResponse::StatFs { status, .. }
+            | CallResponse::StatVfs { status, .. }
+            | CallResponse::Stat { status, .. } => status_result(status),
         }
     }
 
@@ -223,10 +224,11 @@ mod program {
             .map_err(|_| "decode READLINK".to_string())?
         {
             CallResponse::Readlink { status: 0, target } => Ok(target.to_vec()),
-            CallResponse::Status(status) | CallResponse::Readlink { status, .. } => {
-                status_result(status).map(|()| Vec::new())
-            }
-            CallResponse::StatFs { status, .. } => status_result(status).map(|()| Vec::new()),
+            CallResponse::Status(status)
+            | CallResponse::Readlink { status, .. }
+            | CallResponse::StatFs { status, .. }
+            | CallResponse::StatVfs { status, .. }
+            | CallResponse::Stat { status, .. } => status_result(status).map(|()| Vec::new()),
         }
     }
 

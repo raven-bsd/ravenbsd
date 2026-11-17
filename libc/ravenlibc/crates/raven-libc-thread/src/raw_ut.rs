@@ -13,22 +13,22 @@ fn sys_kernel_reports_the_pg1_tls_capability() {
 #[test]
 fn the_thread_create_call_carries_the_extended_payload() {
     let args = CreateArgs {
-        entry: 0x1111,
-        stack_top: 0x2222,
-        arg: 0x3333,
-        tp: 0x4444,
-        clear_tid_addr: 0x5555,
+        entry: 0x1111_2222,
+        stack_top: 0x3333_4444,
+        arg: 0x5555_6666,
+        tp: 0x7777_8888,
+        clear_tid_addr: 0x9999_aaaa,
     };
     let call = create_call(&args);
-    assert_eq!(call.nr, 0x20);
-    assert_eq!(call.proc_handle, 0);
-    assert_eq!(call.entry, 0x1111);
-    assert_eq!(call.stack_top, 0x2222);
-    assert_eq!(call.arg, 0x3333);
-    assert_eq!(call.flags, 1);
-    assert_eq!(call.extended.tp, 0x4444);
+    assert_eq!(call.number, THREAD_CREATE);
+    assert_eq!(call.process, SELF_PROC);
+    assert_eq!(call.entry, args.entry);
+    assert_eq!(call.stack_top, args.stack_top);
+    assert_eq!(call.arg, args.arg);
+    assert_eq!(call.flags, THREAD_CREATE_EX);
+    assert_eq!(call.extended.tp, args.tp);
     assert_eq!(call.extended.tid_out, 0);
-    assert_eq!(call.extended.clear_tid_addr, 0x5555);
+    assert_eq!(call.extended.clear_tid_addr, args.clear_tid_addr);
     assert_eq!(core::mem::size_of::<ThreadCreateEx>(), 24);
     assert_eq!(core::mem::align_of::<ThreadCreateEx>(), 8);
     assert_eq!(core::mem::offset_of!(ThreadCreateEx, tp), 0);

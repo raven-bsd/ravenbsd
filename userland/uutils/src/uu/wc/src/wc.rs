@@ -56,6 +56,7 @@ struct Settings<'a> {
     debug: bool,
     files0_from: Option<Input<'a>>,
     total_when: TotalWhen,
+    json: bool,
 }
 
 impl Default for Settings<'_> {
@@ -71,6 +72,7 @@ impl Default for Settings<'_> {
             debug: false,
             files0_from: None,
             total_when: TotalWhen::default(),
+            json: false,
         }
     }
 }
@@ -86,17 +88,19 @@ impl<'a> Settings<'a> {
             .map(Into::into)
             .unwrap_or_default();
 
-        let show_chars = matches.get_flag(options::CHAR);
+        let json = uucore::raven::json(matches);
+        let show_chars = json || matches.get_flag(options::CHAR);
         let settings = Self {
-            show_bytes: matches.get_flag(options::BYTES),
+            show_bytes: json || matches.get_flag(options::BYTES),
             show_chars,
             count_chars_as_bytes: show_chars && locale_encoding() == Encoding::SingleByte,
-            show_lines: matches.get_flag(options::LINES),
-            show_words: matches.get_flag(options::WORDS),
-            show_max_line_length: matches.get_flag(options::MAX_LINE_LENGTH),
+            show_lines: json || matches.get_flag(options::LINES),
+            show_words: json || matches.get_flag(options::WORDS),
+            show_max_line_length: json || matches.get_flag(options::MAX_LINE_LENGTH),
             debug: matches.get_flag(options::DEBUG),
             files0_from,
             total_when,
+            json,
         };
 
         if settings.number_enabled() > 0 {
@@ -106,6 +110,7 @@ impl<'a> Settings<'a> {
                 files0_from: settings.files0_from,
                 total_when,
                 debug: settings.debug,
+                json: settings.json,
                 ..Default::default()
             }
         }
@@ -395,78 +400,94 @@ pub fn uumain(args: impl uucore::Args) -> UResult<()> {
 }
 
 pub fn uu_app() -> Command {
-    Command::new("wc")
-        .version(uucore::crate_version!())
-        .help_template(uucore::localized_help_template(uucore::util_name()))
-        .about(translate!("wc-about"))
-        .override_usage(format_usage(&translate!("wc-usage")))
-        .infer_long_args(true)
-        .args_override_self(true)
-        .arg(
-            Arg::new(options::BYTES)
-                .short('c')
-                .long(options::BYTES)
-                .help(translate!("wc-help-bytes"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::CHAR)
-                .short('m')
-                .long(options::CHAR)
-                .help(translate!("wc-help-chars"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::FILES0_FROM)
-                .long(options::FILES0_FROM)
-                .value_name("F")
-                .help(translate!("wc-help-files0-from"))
-                .value_parser(ValueParser::os_string())
-                .value_hint(clap::ValueHint::FilePath),
-        )
-        .arg(
-            Arg::new(options::LINES)
-                .short('l')
-                .long(options::LINES)
-                .help(translate!("wc-help-lines"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::MAX_LINE_LENGTH)
-                .short('L')
-                .long(options::MAX_LINE_LENGTH)
-                .help(translate!("wc-help-max-line-length"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::TOTAL)
-                .long(options::TOTAL)
-                .value_parser(ShortcutValueParser::new([
-                    "auto", "always", "only", "never",
-                ]))
-                .value_name("WHEN")
-                .hide_possible_values(true)
-                .help(translate!("wc-help-total")),
-        )
-        .arg(
-            Arg::new(options::WORDS)
-                .short('w')
-                .long(options::WORDS)
-                .help(translate!("wc-help-words"))
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new(options::DEBUG)
-                .long(options::DEBUG)
-                .action(ArgAction::SetTrue)
-                .hide(true),
-        )
-        .arg(
-            Arg::new(ARG_FILES)
-                .action(ArgAction::Append)
-                .value_parser(ValueParser::os_string())
-                .value_hint(clap::ValueHint::FilePath),
-        )
+    uucore::raven::style(
+        Command::new("wc")
+            .version(uucore::crate_version!())
+            .help_template(uucore::localized_help_template(uucore::util_name()))
+            .about(translate!("wc-about"))
+            .override_usage(format_usage(&translate!("wc-usage")))
+            .infer_long_args(true)
+            .args_override_self(true)
+            .arg(
+                Arg::new(options::BYTES)
+                    .short('c')
+                    .long(options::BYTES)
+                    .help(translate!("wc-help-bytes"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::CHAR)
+                    .short('m')
+                    .long(options::CHAR)
+                    .help(translate!("wc-help-chars"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::FILES0_FROM)
+                    .long(options::FILES0_FROM)
+                    .value_name("F")
+                    .help(translate!("wc-help-files0-from"))
+                    .value_parser(ValueParser::os_string())
+                    .value_hint(clap::ValueHint::FilePath),
+            )
+            .arg(
+                Arg::new(options::LINES)
+                    .short('l')
+                    .long(options::LINES)
+                    .help(translate!("wc-help-lines"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::MAX_LINE_LENGTH)
+                    .short('L')
+                    .long(options::MAX_LINE_LENGTH)
+                    .help(translate!("wc-help-max-line-length"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::TOTAL)
+                    .long(options::TOTAL)
+                    .value_parser(ShortcutValueParser::new([
+                        "auto", "always", "only", "never",
+                    ]))
+                    .value_name("WHEN")
+                    .hide_possible_values(true)
+                    .help(translate!("wc-help-total")),
+            )
+            .arg(
+                Arg::new(options::WORDS)
+                    .short('w')
+                    .long(options::WORDS)
+                    .help(translate!("wc-help-words"))
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(options::DEBUG)
+                    .long(options::DEBUG)
+                    .action(ArgAction::SetTrue)
+                    .hide(true),
+            )
+            .arg(
+                Arg::new(ARG_FILES)
+                    .action(ArgAction::Append)
+                    .value_parser(ValueParser::os_string())
+                    .value_hint(clap::ValueHint::FilePath),
+            )
+            .arg(
+                Arg::new(uucore::raven::JSON)
+                    .long("json")
+                    .help("Write one NDJSON record per file")
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new(uucore::raven::COLOR)
+                    .long("color")
+                    .value_name("WHEN")
+                    .value_parser(["auto", "always", "never"])
+                    .default_value("auto")
+                    .help("Colour the human output"),
+            ),
+    )
 }
 
 fn word_count_from_reader<T: WordCountable>(
@@ -1081,6 +1102,21 @@ fn print_stats(
     title: Option<&OsStr>,
     number_width: usize,
 ) -> io::Result<()> {
+    if settings.json {
+        use uucore::raven::{Record, Value};
+        let path = title.map_or(Value::Null, |title| {
+            Value::String(title.to_string_lossy().into_owned())
+        });
+        let record = Record::new("wc")
+            .u64("lines", result.lines as u64)
+            .u64("words", result.words as u64)
+            .u64("chars", result.chars as u64)
+            .u64("bytes", result.bytes as u64)
+            .u64("max_line_length", result.max_line_length as u64)
+            .field("path", path);
+        return uucore::raven::write_records(&[record]);
+    }
+
     let mut stdout = io::stdout().lock();
 
     let maybe_cols = [

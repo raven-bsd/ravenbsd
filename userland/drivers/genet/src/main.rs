@@ -35,6 +35,7 @@ mod program {
         NIC_RING, NIC_SCHEME, NIC_START, NIC_STOP, NicService, RING_REGION_LEN, RING_REGION_OFFSET,
         RING_RX_COUNT, RING_TX_BUFFERS, ReleaseCommand, platform_layout, ring_layout,
     };
+    use genet::options::Options;
     use genet::platform::PlatformSeam;
     use raven_abi::errno::Errno;
     use raven_abi::types::Handle;
@@ -51,10 +52,7 @@ mod program {
 
     entry!(main);
 
-    /// A fresh child has 0 (self), 1 (initfs), 2 (namespace); `devd` grants in order.
-    const BAR_HANDLE: Handle = Handle::new(3, 0);
-    const DMA_HANDLE: Handle = Handle::new(5, 0);
-    const IRQ_HANDLE: Handle = Handle::new(6, 0);
+    /// A fresh child has 0 (self), 1 (initfs), 2 (namespace); grant handles start at slot 3.
     const OPEN_READ: u32 = 1;
     const IRQ_WAIT_NS: u64 = 10_000_000;
     const LINK_POLL_LOOPS: usize = 100;
@@ -84,45 +82,23 @@ mod program {
     }
 
     fn run(args: raven_rt::Args) -> Result<(), String> {
-        let mut bar_index = 0usize;
-        let mut bar_size = 0usize;
-        let mut dma_size = 0usize;
-        let mut irq_line = 0u32;
-        let mut test = false;
-        for argument in args.iter().skip(1) {
-            if let Some(value) = argument.strip_prefix("bar=") {
-                bar_index = value
-                    .parse()
-                    .map_err(|_| format!("bad bar argument `{argument}`"))?;
-            } else if let Some(value) = argument.strip_prefix("bar_size=") {
-                bar_size = value
-                    .parse()
-                    .map_err(|_| format!("bad bar_size argument `{argument}`"))?;
-            } else if let Some(value) = argument.strip_prefix("dma=") {
-                dma_size = value
-                    .parse()
-                    .map_err(|_| format!("bad dma argument `{argument}`"))?;
-            } else if let Some(value) = argument.strip_prefix("irq=") {
-                irq_line = value
-                    .parse()
-                    .map_err(|_| format!("bad irq argument `{argument}`"))?;
-            } else if argument == "test" {
-                test = true;
-            } else if argument == "serve" {
-                // The production mode token; accepted for profile symmetry.
-            }
+        let options = Options::parse(args.iter().skip(1)).map_err(describe)?;
+        if options.bar > 5 {
+            return Err(format!("bar{} is not a PCI BAR index", options.bar));
         }
-        if bar_index > 5 {
-            return Err(format!("bar{bar_index} is not a PCI BAR index"));
-        }
-        if bar_size == 0 || dma_size == 0 {
-            return Err("devd did not pass a usable BAR and DMA buffer".to_string());
-        }
+        let bar_handle = Handle::new(options.bar_handle, 0);
+        let dma_handle = Handle::new(options.dma_handle, 0);
 
         let ring = ring_layout().map_err(describe)?;
-        let layout = platform_layout(ring, dma_size).map_err(describe)?;
-        let seam = PlatformSeam::from_handles(BAR_HANDLE, bar_size, DMA_HANDLE, dma_size, layout)
-            .map_err(describe)?;
+        let layout = platform_layout(ring, options.dma_size).map_err(describe)?;
+        let seam = PlatformSeam::from_handles(
+            bar_handle,
+            options.bar_size,
+            dma_handle,
+            options.dma_size,
+            layout,
+        )
+        .map_err(describe)?;
         let mac = read_plat_mac().ok_or_else(|| "plat:mac did not return a MAC".to_string())?;
         let info = pi4_info(Some(mac));
         let mut controller = Controller::attach(seam, info).map_err(describe)?;
@@ -131,7 +107,12 @@ mod program {
         controller.program_rgmii(false).map_err(describe)?;
         controller.ready().map_err(describe)?;
         raven_rt::println!(
-            "genet: revision=0x{revision:08x} mac={mac} bar={bar_index} size={bar_size} dma={dma_size} irq={irq_line}"
+            "genet: revision=0x{revision:08x} mac={mac} bar={} size={} dma={} irq={} slots={:?}",
+            options.bar,
+            options.bar_size,
+            options.dma_size,
+            options.irq,
+            options.layout
         );
 
         let mut backend =
@@ -140,7 +121,8 @@ mod program {
         backend.program_rings().map_err(describe)?;
         backend.program_filters(mac, &[], false).map_err(describe)?;
         let region_bus = backend.seam().dma_bus_address() + RING_REGION_OFFSET as u64;
-        let mut service = NicService::new(backend, ring, region_bus, dma_size).map_err(describe)?;
+        let mut service =
+            NicService::new(backend, ring, region_bus, options.dma_size).map_err(describe)?;
         let mut region = vec![0u8; RING_REGION_LEN];
         service.init_region(&mut region).map_err(describe)?;
         service.arm_rx().map_err(describe)?;
@@ -150,10 +132,10 @@ mod program {
         STARTED.store(false, Ordering::Release);
         QUIT.store(false, Ordering::Release);
         PUMP_DONE.store(false, Ordering::Release);
-        thread::spawn(pump_thread, 0, 128 * 1024)
+        thread::spawn(pump_thread, options.irq_handle as usize, 128 * 1024)
             .map_err(|error| format!("pump thread: {}", error.description()))?;
 
-        let mut handler = NicHandler::new(test);
+        let mut handler = NicHandler::new(options.test, dma_handle);
         let mut server = Server::register(NIC_SCHEME)
             .map_err(|error| format!("register {NIC_SCHEME}: {}", error.description()))?;
         raven_rt::println!("genet: serving {NIC_SCHEME}:");
@@ -184,8 +166,8 @@ mod program {
         Ok(())
     }
 
-    fn pump_thread(_: usize) {
-        let irq = Irq::new(IRQ_HANDLE);
+    fn pump_thread(irq_handle: usize) {
+        let irq = Irq::new(Handle::new(irq_handle as u32, 0));
         let mut loops = 0usize;
         loop {
             if QUIT.load(Ordering::Acquire) {
@@ -269,6 +251,7 @@ mod program {
 
     struct NicHandler {
         test: bool,
+        dma_handle: Handle,
         pending: Option<(u64, String)>,
         opens: BTreeMap<u64, OpenKind>,
         next_id: u64,
@@ -284,9 +267,10 @@ mod program {
     }
 
     impl NicHandler {
-        fn new(test: bool) -> Self {
+        fn new(test: bool, dma_handle: Handle) -> Self {
             Self {
                 test,
+                dma_handle,
                 pending: None,
                 opens: BTreeMap::new(),
                 next_id: 1,
@@ -381,7 +365,7 @@ mod program {
                 if !flags.readable() {
                     return Err(Errno::EACCES.into());
                 }
-                return Ok(Opened::Attach(DMA_HANDLE));
+                return Ok(Opened::Attach(self.dma_handle));
             }
             if path == NIC_RELEASE {
                 if !flags.readable() && !flags.writable() {

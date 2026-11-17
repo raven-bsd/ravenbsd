@@ -24,19 +24,27 @@ mod program {
     use raven_rt::entry;
     use raven_rt::event::{EventQueue, EvqEvent, READABLE, event_create, event_signal};
     use raven_scheme::{
-        CallReply, Ctx, Handler, HandlerError, HandlerResult, Kernel, Opened, RtKernel, Server,
+        CallReply, Client, Ctx, Handler, HandlerError, HandlerResult, Kernel, Opened, RtKernel,
+        Server,
     };
 
+    use netd::nic::NicMode;
     use netd::{Loopback, NetEvent, Netd};
 
     entry!(main);
 
     const MAC: [u8; 6] = [0x02, 0, 0, 0, 0, 0x01];
+    const OPEN_WRITE: u32 = 2;
 
     struct NetHandler {
         netd: Netd<Loopback>,
         events: BTreeMap<u64, Handle>,
         nic_retry_ms: i64,
+        nic_mode: NicMode,
+        printed_eth0: bool,
+        release_dhcp: bool,
+        release_ping: bool,
+        release_unavailable: bool,
     }
 
     fn main(args: raven_rt::Args) -> i32 {
@@ -47,6 +55,11 @@ mod program {
             netd,
             events: BTreeMap::new(),
             nic_retry_ms: now,
+            nic_mode: NicMode::select(&args),
+            printed_eth0: false,
+            release_dhcp: false,
+            release_ping: false,
+            release_unavailable: false,
         };
         if require_nic {
             if let Err(error) = handler.try_nic(now) {
@@ -56,6 +69,7 @@ mod program {
         } else {
             let _ = handler.try_nic(now);
         }
+        handler.publish_and_feed();
         let registered = Rc::new(Cell::new(None));
         let kernel = RecordingKernel {
             inner: RtKernel,
@@ -94,6 +108,7 @@ mod program {
             }
             let ready = handler.netd.poll(now);
             handler.signal_events(&ready);
+            handler.publish_and_feed();
             // No stack timer pending: block on the scheme-server source and its client events.
             // The one-second cap is only a safety net for a missed wakeup, not a heartbeat.
             let timeout_ns = handler
@@ -114,6 +129,7 @@ mod program {
             let now = now_ms();
             let ready = handler.netd.poll(now);
             handler.signal_events(&ready);
+            handler.publish_and_feed();
         }
     }
 
@@ -122,16 +138,71 @@ mod program {
             if self.netd.has_nic() {
                 return Ok(());
             }
-            let config = netd::nic::attach(&mut self.netd, now)?;
-            raven_rt::println!(
-                "netd: interface eth0 {}.{}.{}.{}/{}",
-                config.addr[0],
-                config.addr[1],
-                config.addr[2],
-                config.addr[3],
-                config.prefix
-            );
+            let _config = netd::nic::attach(&mut self.netd, now, self.nic_mode)?;
             Ok(())
+        }
+
+        fn publish_and_feed(&mut self) {
+            if !self.printed_eth0
+                && let Some(config) = self.netd.published_nic()
+            {
+                raven_rt::println!(
+                    "netd: interface eth0 {}.{}.{}.{}/{}",
+                    config.addr[0],
+                    config.addr[1],
+                    config.addr[2],
+                    config.addr[3],
+                    config.prefix
+                );
+                self.printed_eth0 = true;
+            }
+            self.feed_dhcp();
+            self.feed_ping();
+        }
+
+        fn feed_dhcp(&mut self) {
+            if self.release_dhcp || self.release_unavailable {
+                return;
+            }
+            if self.netd.published_nic().is_none() {
+                return;
+            }
+            let Some(lease) = self.netd.dhcp_lease() else {
+                return;
+            };
+            let Some(line) = netd::release_dhcp_line(&lease) else {
+                return;
+            };
+            if Self::write_release(&line) {
+                self.release_dhcp = true;
+            } else {
+                self.release_unavailable = true;
+            }
+        }
+
+        fn feed_ping(&mut self) {
+            if self.release_ping || self.release_unavailable {
+                return;
+            }
+            let Some(ping) = self.netd.take_release_ping() else {
+                return;
+            };
+            let line = netd::release_ping_line(ping);
+            if Self::write_release(&line) {
+                self.release_ping = true;
+            } else {
+                self.release_unavailable = true;
+            }
+        }
+
+        fn write_release(line: &str) -> bool {
+            let client = Client::new();
+            let Ok(handle) = client.open("nic:release", OPEN_WRITE) else {
+                return false;
+            };
+            let written = client.write(handle, 0, line.as_bytes()).is_ok();
+            let _ = client.close(handle);
+            written
         }
 
         fn signal_events(&mut self, ready: &[NetEvent]) {

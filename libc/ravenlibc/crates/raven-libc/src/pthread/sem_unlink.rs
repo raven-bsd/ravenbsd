@@ -12,12 +12,12 @@ use raven_libc_thread::sem;
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sem_unlink(name: *const c_char) -> c_int {
     if name.is_null() {
-        return 22;
+        return super::common::sem_err(raven_libc_thread::limits::EINVAL);
     }
     // SAFETY: the caller supplies a NUL-terminated name.
     let bytes = unsafe { crate::ffi::cstr::slice(name) };
     match sem::unlink(bytes) {
         Ok(()) => 0,
-        Err(error) => super::common::err(error),
+        Err(error) => super::common::sem_err(error),
     }
 }

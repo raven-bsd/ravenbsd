@@ -9,8 +9,8 @@
 use super::*;
 use crate::consts::{
     AT_CLKTCK, AT_EXECFN, AT_HWCAP, AT_HWCAP2, AT_NULL, AT_PAGESZ, AT_RANDOM, AT_RAVEN_ABI,
-    AT_RAVEN_CWD, AT_RAVEN_FDMAP, AT_RAVEN_FDMAP_N, AT_RAVEN_PROCD, AT_RAVEN_PROCINFO,
-    AT_RAVEN_TIMEPAGE, AT_SECURE,
+    AT_RAVEN_CWD, AT_RAVEN_FDMAP, AT_RAVEN_FDMAP_N, AT_RAVEN_PROCINFO, AT_RAVEN_TIMEPAGE,
+    AT_SECURE,
 };
 
 struct Words {
@@ -122,8 +122,6 @@ fn raven_keys_are_decoded() {
         0,
         0,
         0,
-        AT_RAVEN_PROCD,
-        0x42,
         AT_RAVEN_PROCINFO,
         0x7000,
         AT_RAVEN_FDMAP,
@@ -140,7 +138,6 @@ fn raven_keys_are_decoded() {
         0,
     ];
     let info = parse_stack(&Words::new(words)).expect("stack");
-    assert_eq!(info.raven.procd, Some(0x42));
     assert_eq!(info.raven.procinfo, Some(0x7000));
     assert_eq!(info.raven.fdmap, Some(0x8000));
     assert_eq!(info.raven.fdmap_n, 3);

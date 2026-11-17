@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# The fixture keeps the read-only account originals in initfs and copies them into a writable
+# ramfs `/etc` before running passwd.
+
+/ initfs:
+/tmp ramfs:
+/etc ramfs:

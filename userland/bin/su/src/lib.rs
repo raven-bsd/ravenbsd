@@ -13,7 +13,7 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use raven_userdb::PasswdEntry;
+use raven_userdb::{PasswdEntry, ShadowEntry};
 
 /// The account used when the operand is omitted.
 pub const DEFAULT_USER: &str = "root";
@@ -139,6 +139,39 @@ pub fn shell_path(user: &PasswdEntry) -> String {
     } else {
         user.shell.clone()
     }
+}
+
+/// A non-root caller must authenticate; root does not.
+#[must_use]
+pub const fn needs_password(caller_uid: u32) -> bool {
+    caller_uid != 0
+}
+
+/// Verify a target password against its shadow record.
+///
+/// A locked or missing hash never authenticates. The comparison is the constant-time
+/// `raven-auth` verifier.
+#[must_use]
+pub fn verify_target_password(entry: &ShadowEntry, password: &str) -> bool {
+    if entry.is_locked() {
+        return false;
+    }
+    raven_auth::verify_password(password, &entry.hash)
+}
+
+/// The supplementary groups to install before dropping to the target uid.
+///
+/// The kernel stores supplementary groups separately from the primary gid; the primary is set
+/// with `setresgid`, so it is removed from this list.
+#[must_use]
+pub fn supplementary_groups(groups: &[u32], primary: u32) -> Vec<u32> {
+    let mut result = Vec::new();
+    for gid in groups {
+        if *gid != primary && !result.contains(gid) {
+            result.push(*gid);
+        }
+    }
+    result
 }
 
 #[cfg(test)]

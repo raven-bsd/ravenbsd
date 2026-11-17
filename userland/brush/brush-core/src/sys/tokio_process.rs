@@ -121,6 +121,9 @@ fn compose_std_command(command: LaunchRequest) -> std::io::Result<std::process::
     cmd.inject_fds(open_files.iter_fds().map(|(fd, file)| (fd, file.clone())))
         .map_err(std::io::Error::other)?;
 
+    // Process groups need a `pre_exec` hook, which forces std's fork path; RavenBSD only has
+    // the native posix_spawn backend in 0.1.x, so a foreground command inherits the group.
+    #[cfg(not(target_os = "ravenbsd"))]
     match command.process_group {
         ProcessGroup::Inherit => {}
         ProcessGroup::Join(pgid) => {
@@ -135,6 +138,8 @@ fn compose_std_command(command: LaunchRequest) -> std::io::Result<std::process::
         // setsid() makes a new process group too.
         ProcessGroup::NewSession => cmd.lead_session(),
     }
+    #[cfg(target_os = "ravenbsd")]
+    let _ = command.process_group;
 
     Ok(cmd)
 }

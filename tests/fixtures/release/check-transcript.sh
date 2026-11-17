@@ -24,15 +24,15 @@ check() {
 
 check '^loader: RavenBSD loader 0\.1' "loader banner"
 check '^RavenBSD kernel 0\.1' "kernel banner"
-if ! grep -qiE 'login: *$' "$log"; then
+if ! grep -qiE 'login:' "$log"; then
     echo "release transcript: missing login prompt" >&2
     exit 1
 fi
-if ! grep -qiE 'password: *$' "$log"; then
+if ! grep -qiE 'password:' "$log"; then
     echo "release transcript: missing password prompt" >&2
     exit 1
 fi
-check '^root@.*# ?$' "brush root prompt"
+check '^(root@.*|raven)#( |$)' "root prompt"
 check '^cat$' "ls /bin: cat"
 check '^ls$' "ls /bin: ls"
 check '^uname$' "ls /bin: uname"

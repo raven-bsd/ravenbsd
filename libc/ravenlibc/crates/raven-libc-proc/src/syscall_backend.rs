@@ -5,14 +5,15 @@
 //!
 //! The pure [`ProcBackend`] implementation calls a small [`Syscall`] trait. The target shell
 //! supplies a raw-syscall implementation; host tests supply a deterministic fake. Non-identity
-//! operations continue through [`LocalBackend`] so this slice does not pretend `procd` exists.
+//! operations continue through [`LocalBackend`], the early fallback for callers that have not
+//! wired the kernel path yet.
 
 use alloc::vec::Vec;
 
-use crate::backend::{ProcBackend, WaitResult};
+use crate::backend::{EarlySpawn, ProcBackend, WaitResult};
 use crate::ids::SetCred;
 use crate::local_backend::LocalBackend;
-use crate::wire::{ExecRequest, ForkRequest, SpawnRequest};
+use crate::request::{ExecRequest, ForkRequest, SpawnRequest};
 
 /// Raw `proc_self_info(out, count)`.
 pub const PROC_SELF_INFO: usize = 0x35;
@@ -94,12 +95,21 @@ pub struct SyscallBackend<S: Syscall> {
 }
 
 impl<S: Syscall> SyscallBackend<S> {
-    /// Wrap a syscall implementation. Spawn/fork/wait retain the pre-procd behavior.
+    /// Wrap a syscall implementation. Spawn/fork/wait retain the early fallback behavior.
     #[must_use]
     pub const fn new(sys: S) -> Self {
         Self {
             sys,
             local: LocalBackend::new(None),
+        }
+    }
+
+    /// Wrap a syscall implementation with the P9a native spawner.
+    #[must_use]
+    pub const fn with_spawner(sys: S, spawner: &'static dyn EarlySpawn) -> Self {
+        Self {
+            sys,
+            local: LocalBackend::new(Some(spawner)),
         }
     }
 

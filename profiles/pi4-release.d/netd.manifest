@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Pi 4 netd in DHCP-first mode (REL4b). It waits for the GENET `nic:` scheme
+# and does not publish an address before a validated lease. No link/DHCP result
+# is claimed without the board transcript.
+name = "netd"
+exec = "/sbin/netd"
+args = ["netd", "nic", "dhcp-first"]
+needs = ["logd", "scheme:nic"]
+provides = ["scheme:net"]
+readiness = "scheme"
+ready_timeout_ms = 60_000
+restart = "on-failure"

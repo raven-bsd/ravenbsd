@@ -158,6 +158,10 @@ pub fn init_main_thread<K: ThreadKernel>(
     };
     let plan = raw::init_tls(mapped, &layout, modules)?;
     let tcb = plan.tcb;
+    // Reset the process-global counters before taking the main tid: `reset` rewinds
+    // `next_tid` to 100, and assigning the main tid first would make the first child reuse it
+    // (the list lock is keyed by tid, so duplicate tids corrupt the thread list).
+    LIBC.reset(tcb);
     let tid = if kernel.caps().tid {
         kernel.tid_self().unwrap_or_else(|_| LIBC.next_tid())
     } else {
@@ -185,11 +189,29 @@ pub fn init_main_thread<K: ThreadKernel>(
     pthread.handle = 0;
     raw::set_links(pthread, tcb, tcb);
     kernel.set_thread_pointer(pthread_to_tp(tcb))?;
-    LIBC.reset(tcb);
     stack::reset();
     list::reset_for_fork_child();
     crate::fork::reset_registry();
     Ok(tcb)
+}
+
+/// Insert the new TCB between `previous` and `next` in the circular thread list.
+///
+/// The new node's back link is `previous`; the old `next` node's back link must become the new
+/// TCB, not `previous`.
+fn insert_links(
+    previous: &Pthread,
+    next: &Pthread,
+    pthread: &Pthread,
+    tcb: usize,
+    previous_prev: usize,
+    next_next: usize,
+) {
+    let previous_address = previous as *const Pthread as usize;
+    let next_address = next as *const Pthread as usize;
+    raw::set_links(pthread, previous_address, next_address);
+    raw::set_links(next, tcb, next_next);
+    raw::set_links(previous, previous_prev, tcb);
 }
 
 /// `pthread_create`.
@@ -279,10 +301,10 @@ pub fn create<K: ThreadKernel>(
     let parent = crate::thread::current_pthread(kernel);
     let parent_sigmask = parent.sigmask.load(Ordering::Acquire);
     let parent_canary = parent.canary;
-    let args_address = allocation
-        .stack_top
-        .wrapping_sub(core::mem::size_of::<StartArgs>())
-        & !15;
+    // Carve the hand-over block at the bottom of the new stack, not below its top: the Rust
+    // entry prologue grows down from `stack_top` and would overwrite a top-carved block before
+    // `thread_start` reads it.
+    let args_address = allocation.stack_limit.wrapping_add(16) & !15;
     let pthread = raw::tcb_mut(tcb);
     pthread.self_ptr = tcb;
     pthread.tid.store(tid, Ordering::Release);
@@ -308,6 +330,8 @@ pub fn create<K: ThreadKernel>(
     pthread.startarg = arg;
     pthread.result = 0;
     pthread.robust_head = raw::robust_head_addr(pthread);
+    // The kernel clears this word on the thread's last exit step; the libc exit path never
+    // writes it, so it is the A-thr-3 death confirmation the joiner/reaper needs.
     pthread.join_word.store(1, Ordering::Release);
     raw::set_tsd_base(pthread, allocation.tsd_base);
     raw::zero_bytes(allocation.tsd_base, tsd_size);
@@ -325,20 +349,14 @@ pub fn create<K: ThreadKernel>(
     let next = raw::next_thread(previous);
     let next_address = next as *const Pthread as usize;
     let next_next = raw::next_thread(next) as *const Pthread as usize;
-    raw::set_links(pthread, previous_address, next_address);
-    raw::set_links(next, previous_address, next_next);
-    raw::set_links(previous, previous_prev, tcb);
+    insert_links(previous, next, pthread, tcb, previous_prev, next_next);
     LIBC.add_thread();
     sched_point_before_create(kernel);
     let create_args = CreateArgs {
         entry: raw::entry::entry_address(),
-        // Start `rsp` at the start-args block, not above it: the trampoline's Rust prologue
-        // pushes below `rsp` and must not overwrite the three words it is about to read.
-        stack_top: args_address,
+        stack_top: allocation.stack_top,
         arg: args_address,
         tp: pthread_to_tp(tcb),
-        // The kernel clears this word after the thread's last user instruction. `join_word` is
-        // not touched by the exit path, so it is the A-thr-3 death confirmation the reaper needs.
         clear_tid_addr: tcb + core::mem::offset_of!(Pthread, join_word),
     };
     let result = kernel.create(&create_args);

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! The `procd` client seam.
+//! The process backend seam.
 
 use alloc::vec::Vec;
 
 use crate::errors::Errno;
 use crate::ids::SetCred;
-use crate::wire::{ExecRequest, ForkRequest, SpawnRequest};
+use crate::request::{ExecRequest, ForkRequest, SpawnRequest};
 
-pub use crate::wire::FdMapEntry;
+pub use crate::request::FdMapEntry;
 
 /// One completed wait result.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,16 +24,17 @@ pub struct WaitResult {
     pub rusage: [u8; 144],
 }
 
-/// The early-boot spawn seam implemented by the shell.
+/// The native spawn seam used by the early kernel backend.
+///
+/// P9a implements it with the shared `raven-spawn` loader and the pid -> handle table; host tests
+/// implement it with a fake.
 pub trait EarlySpawn {
-    /// Spawn one initfs program.
-    fn spawn_initfs(
-        &self,
-        path: &[u8],
-        argv: &[Vec<u8>],
-        envp: &[Vec<u8>],
-        fds: &[FdMapEntry],
-    ) -> Result<i32, Errno>;
+    /// Spawn one `file:` image and return the child pid.
+    fn spawn(&self, request: &SpawnRequest) -> Result<i32, Errno>;
+    /// Wait for one recorded child.
+    fn wait(&self, _idtype: u32, _id: i64, _options: u32) -> Result<WaitResult, Errno> {
+        Err(crate::errors::ECHILD)
+    }
 }
 
 /// The process operations the models need.

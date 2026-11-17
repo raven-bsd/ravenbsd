@@ -1,0 +1,95 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P9c: a std program (brush) starts two uutils binaries from their `file:` images through
+# posix_spawn. The release image already stages `/bin/true` and `/bin/ls`; rsh remains the root
+# login shell, so this case does not enable brush as the login shell.
+
+name = "brush-spawn"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 600
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '^loader: RavenBSD loader 0\.1 \(x86_64\)$'
+
+[[expect]]
+regex = '^RavenBSD kernel 0\.1 \(x86_64\)'
+
+[[expect]]
+regex = '(?i)^password: ?'
+
+[[expect]]
+regex = '^brush-spawn:true:0$'
+
+[[expect]]
+regex = '^brush-spawn:ls:0$'
+
+[[expect]]
+regex = '^(brush|ls|true)$'
+unordered = true
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)page fault|panic|EXCEPTION|brush-spawn: FAIL'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "/bin/true; echo rsh-true:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^rsh-true:0$'
+timeout_secs = 60
+
+[[step]]
+send = "/bin/brush -c '/bin/true; echo brush-spawn:true:$?; /bin/ls /bin; echo brush-spawn:ls:$?'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^brush-spawn:true:0$'
+timeout_secs = 60
+
+[[step]]
+wait = '^brush-spawn:ls:0$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

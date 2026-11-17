@@ -3,9 +3,9 @@
 
 # User management tools (U2)
 
-Status: implemented on `mel/U2`. This page documents the 0.2.0 files-backed user database and the
-seven administration utilities. The normative model is `docs/user-management.md`; this page is the
-implementation and handoff record.
+Status: implemented on `mel/U2` and extended by `mel/U2b` with the setuid credential path. This page
+documents the 0.2.0 files-backed user database and the seven administration utilities. The
+normative model is `docs/user-management.md`; this page is the implementation and handoff record.
 
 ## Scope
 
@@ -33,13 +33,16 @@ retrieval. Those are U3.
 | `adduser` | `adduser [name]` | same as `useradd`, prompts for every field | prompts twice, hashes, writes the record | 0 ok, 1 validation/I/O, 2 usage |
 | `passwd` | `passwd [-l\|-u] [name]` | none | `$6$` hash, lock/unlock | 0 ok, 1 validation/I/O, 2 usage |
 | `groupadd` | `groupadd [-g gid] [-r] name` | adds empty group | none | 0 ok, 1 validation/I/O, 2 usage |
-| `su` | `su [-] [-c command] [user]` | none | verifies target hash when a non-root caller is possible | 0 ok, 1 failure, 2 usage |
+| `su` | `su [-] [-c command] [user]` | none | verifies the target hash for non-root callers, then installs target ids/groups | 0 ok, 1 failure, 2 usage |
 | `id` | `id [-u] [-g] [-G] [-n] [user]` | none | none | 0 ok, 1 unknown user, 2 usage |
 | `whoami` | `whoami` | none | none | 0 known uid, 1 unknown uid, 2 usage |
 
-All tools are root-only in 0.2.0. `passwd` does not accept a password on the command line, in the
-environment or in a temporary file. `useradd` and `adduser` create the shadow record locked; the
-first `passwd` call installs a hash.
+`useradd`, `adduser` and `groupadd` stay root-only. `su` and `passwd` are installed setuid root by
+the U5 image overlay; they use the real uid to decide the caller and the effective root uid only
+for the credential/database operation. `id` and `whoami` read the caller's process credentials.
+`passwd` does not accept a password on the command line, in the environment or in a temporary
+file. `useradd` and `adduser` create the shadow record locked; the first `passwd` call installs a
+hash.
 
 ## `raven-userdb`
 
@@ -97,22 +100,30 @@ exercises lock contention, rollback, UTF-8 rejection, duplicate ids, range exhau
 root-allocation rules. `tests/user/check.sh` runs the canonical structural check plus the U2
 fixture shapes.
 
-## U3 and image handoffs
+## Credential integration (U2b)
 
-The following are deliberately not faked in U2:
+U2b adds the safe credential seam in `raven-rt::proc` and uses it in the tools:
 
-* **Real credentials.** `raven-rt` has no safe wrapper for `PROC_SELF_INFO`/`PROC_CRED_INFO`, and
-  the kernel is root-only. `id`/`whoami` therefore report root, and `su` implements only the
-  root-to-root path. `su alice` reports the U3 gap and exits 1.
-* **Setuid and non-root `passwd`.** `passwd` has the root path only. The own-password verification
-  path needs a setuid binary and kernel credentials.
-* **Echo suppression.** `read_line` reads canonical `tty:console` input. The console server echoes
-  the typed bytes; disabling echo needs terminal-mode support, which is not in U2.
-* **Home ownership.** The VFS has no `chown` in this slice. `-m` creates the home with mode 0700 and
-  copies `/etc/skel`, but the files remain owned by the caller (root). The mode is correct.
-* **Writable `/etc`.** The 0.1.0 image serves `/etc` from the read-only initfs. Atomic updates
-  require a writable root filesystem, or a writable `/etc` mount, before the tools can change a
-  running image. Profile/rootfs wiring is outside U2.
+* `Credentials` reads `PROC_CRED_INFO`; `groups` reads `PROC_GETGROUPS`; `setresuid`,
+  `setresgid` and `setgroups` call `PROC_SETCRED_EX`.
+* `id`/`whoami` use the caller's real/effective ids and kernel groups. `id <name>` still uses the
+  account database for a named operand.
+* `passwd` is installed setuid root. Root changes any account without an old password; a non-root
+  real uid may change only its own account after proving the old hash. Lock/unlock stay root-only.
+* `su` is installed setuid root. Root skips authentication; a non-root caller verifies the target
+  shadow hash with `raven-auth`, installs the target primary/supplementary groups and all three
+  uids/gids, then starts the target shell through the native spawn path.
+* `su` and `passwd` use the `login::tty::Console` echo control for password prompts.
+
+Still image/U3 work:
+
+* **Setuid modes and writable `/etc`.** The U5 image overlay must install `su` and `passwd` with
+  the setuid bit and provide a writable `/etc` (or a writable root filesystem). The 0.1.0 image
+  serves `/etc` from the read-only initfs, so the tools cannot update it there.
+* **Home ownership.** The VFS has no `chown` in this slice. `-m` creates the home with mode 0700
+  and copies `/etc/skel`, but the files remain owned by the caller (root).
+* **`adduser` echo.** `adduser` still uses the U2 console reader; `su`/`passwd` use the login
+  console helper.
 * **NSS.** No libc symbols were added; see the scope note above.
 * **Target build of `raven-auth`.** The pinned `sha2` 0.11.1 currently fails LLVM codegen for
   `x86_64-unknown-none` (`rustc-LLVM ERROR: Do not know how to split the result of this
@@ -127,7 +138,9 @@ The following are deliberately not faked in U2:
 ```
 cargo nextest run -p raven-userdb          # 57 tests
 cargo nextest run -p useradd               # 7 argument tests
-cargo nextest run -p passwd                # 7 argument and password-policy tests
+cargo nextest run -p su -p passwd -p id -p whoami   # 29 policy/format tests
+cargo nextest run -p raven-rt              # includes credential-word tests
+cargo xtask qtest --case setuid --arch x86_64
 sh tests/user/check.sh                     # canonical + U2 fixture shapes
 make check-fast                            # PASSED
 ```

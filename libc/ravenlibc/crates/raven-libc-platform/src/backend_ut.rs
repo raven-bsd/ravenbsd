@@ -418,6 +418,27 @@ fn inheritance_block_round_trip_from_a_platform() {
 }
 
 #[test]
+fn platform_umask_masks_mkdir_and_create() {
+    let fake = FakeSys::new();
+    fake.dir(b"/");
+    let platform = Platform::new(fake);
+    assert_eq!(platform.set_umask(0o077), 0o022);
+    platform.mkdir(b"/private", 0o777).expect("mkdir");
+    let directory = platform.stat(b"/private").expect("stat directory");
+    assert_eq!(directory.st_mode & 0o777, 0o700);
+    let fd = platform
+        .open(
+            b"/private/file",
+            (fcntl::O_RDWR | fcntl::O_CREAT) as u32,
+            0o666,
+        )
+        .expect("create");
+    let file = platform.fstat(fd).expect("fstat file");
+    assert_eq!(file.st_mode & 0o777, 0o600);
+    assert_eq!(platform.close(fd), Ok(()));
+}
+
+#[test]
 fn platform_open_create_applies_mode_and_umask() {
     let fake = FakeSys::new();
     fake.dir(b"/");

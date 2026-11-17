@@ -1,0 +1,140 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt M4 1
+.Os RavenBSD
+.Sh NAME
+.Nm m4
+.Nd macro processor (bounded POSIX core)
+.Sh SYNOPSIS
+.Nm
+.Op Fl D Ar name Ns Op = Ns Ar value
+.Op Fl U Ar name
+.Op Fl I Ar dir
+.Op Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility reads the file operands in order, or standard input when no operand is given or the
+operand is
+.Sq - ,
+expands macro calls, and writes the result to standard output.
+Definitions and diversions persist across file operands.
+.Pp
+The default beginning and ending quote strings are
+.Sq \`
+and
+.Sq ' ;
+quoted text is copied without macro expansion, and nested quote pairs are matched while finding
+the closing quote.
+Comments begin with
+.Sq #
+and end at a newline; they are copied without expansion.
+.Pp
+The following options are supported:
+.Bl -tag -width changequote
+.It Fl D Ar name Ns Op = Ns Ar value
+Define
+.Ar name
+as
+.Ar value ,
+or as the empty string when the assignment is omitted.
+.It Fl U Ar name
+Remove every definition of
+.Ar name .
+.It Fl I Ar dir
+Search
+.Ar dir
+for files named by
+.Ic include
+before the process path.
+.El
+.Pp
+A macro call is a name token immediately followed by an optional parenthesized argument list.
+Arguments are expanded while they are collected; unquoted commas separate arguments and nested
+parentheses are retained.
+The substitutions
+.Va $0
+through
+.Va $9 ,
+.Va $# ,
+.Va $*
+and
+.Va $@
+are supported.
+.Pp
+The following built-in macros are implemented:
+.Bl -tag -width changequote
+.It Ic define
+Define or replace a macro.
+.It Ic undefine
+Remove all definitions of the named macros.
+.It Ic defn
+Expand to the quoted definition of the named macros.
+.It Ic pushdef , popdef
+Push and pop definitions.
+.It Ic dnl
+Discard input through the next newline.
+.It Ic include
+Process the named file; the
+.Fl I
+directories are searched first.
+.It Ic changequote , changecom
+Change the quote or comment delimiters.
+.It Ic ifdef , ifelse
+Select expansion text.
+.It Ic incr , decr
+Increment or decrement a decimal integer.
+.It Ic eval
+Evaluate a signed-integer expression with C-like operators and parentheses.
+.It Ic substr , index , translit
+Substring, position and character-translation operations.
+.It Ic divert , undivert
+Write to, or emit from, numbered diversion buffers.
+.El
+.Pp
+The
+.Ic syscmd
+and
+.Ic esyscmd
+macros are not implemented; calling either is a usage error.
+The omitted built-ins are
+.Ic divnum ,
+.Ic dumpdef ,
+.Ic errprint ,
+.Ic len ,
+.Ic m4exit ,
+.Ic m4wrap ,
+.Ic mkstemp ,
+.Ic shift ,
+.Ic sinclude ,
+.Ic sysval ,
+.Ic traceon
+and
+.Ic traceoff .
+The
+.Fl s
+option and the optional result-radix and minimum-digit arguments of
+.Ic eval
+are not implemented.
+.Pp
+On the target image, standard input is read from the console terminal; there is no general
+process pipeline handle yet.
+.Sh EXIT STATUS
+.Ex -std
+An invalid or unsupported program exits with status 2; a file, include or expansion failure exits
+with status 1.
+.Sh SEE ALSO
+.Xr awk 1 ,
+.Xr grep 1 ,
+.Xr sed 1
+.Sh STANDARDS
+The bounded core follows the POSIX.1-2024
+.Xr m4 1
+expansion model, with the
+.Fl I
+extension.
+.Sh HISTORY
+The
+.Nm
+utility first appeared in Version 7 AT&T UNIX.

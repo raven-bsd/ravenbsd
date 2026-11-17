@@ -53,6 +53,15 @@ pub struct NetEvent {
     pub event: Event,
 }
 
+/// How a NIC gets its IPv4 address.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NicAddressing {
+    /// QEMU user-mode: claim the fixed guest address before DHCP, then let the lease override it.
+    QemuUser,
+    /// Platform NIC: no address is published until a validated DHCP lease arrives.
+    DhcpFirst,
+}
+
 /// Static NIC configuration supplied by the target glue after `nic:info`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NicConfig {
@@ -68,6 +77,53 @@ pub struct NicConfig {
     pub gateway: Option<[u8; 4]>,
     /// Start the stack's DHCP client on this interface.
     pub dhcp: bool,
+    /// QEMU fixed-address mode or platform DHCP-first mode.
+    pub addressing: NicAddressing,
+}
+
+impl NicConfig {
+    /// The QEMU user-mode configuration: `10.0.2.15/24`, gateway `10.0.2.2`, DHCP enabled.
+    #[must_use]
+    pub const fn qemu(mac: [u8; 6], mtu: u16) -> Self {
+        Self {
+            mac,
+            mtu,
+            addr: [10, 0, 2, 15],
+            prefix: 24,
+            gateway: Some([10, 0, 2, 2]),
+            dhcp: true,
+            addressing: NicAddressing::QemuUser,
+        }
+    }
+
+    /// The platform configuration: no address, prefix, gateway or publication until DHCP.
+    #[must_use]
+    pub const fn platform(mac: [u8; 6], mtu: u16) -> Self {
+        Self {
+            mac,
+            mtu,
+            addr: [0; 4],
+            prefix: 0,
+            gateway: None,
+            dhcp: true,
+            addressing: NicAddressing::DhcpFirst,
+        }
+    }
+
+    /// Whether this is the QEMU fixed-address mode.
+    #[must_use]
+    pub const fn is_qemu_user(self) -> bool {
+        matches!(self.addressing, NicAddressing::QemuUser)
+    }
+}
+
+/// One ICMP echo reply that matched the NIC gateway.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ReleasePing {
+    /// Gateway that replied.
+    pub target: [u8; 4],
+    /// Measured round-trip time.
+    pub rtt_ms: u32,
 }
 
 trait SocketCore {
@@ -370,6 +426,8 @@ pub struct Netd<D: Device> {
     nic: Option<Box<dyn SocketCore>>,
     nic_config: Option<NicConfig>,
     nic_control: Option<NicControl>,
+    nic_lease: Option<DhcpLease>,
+    release_ping: Option<ReleasePing>,
     files: BTreeMap<u64, File>,
     next_file: u64,
     accepted: BTreeMap<u32, Accepted>,
@@ -389,6 +447,8 @@ impl<D: Device> Netd<D> {
             nic: None,
             nic_config: None,
             nic_control: None,
+            nic_lease: None,
+            release_ping: None,
             files: BTreeMap::new(),
             next_file: 1,
             accepted: BTreeMap::new(),
@@ -405,17 +465,20 @@ impl<D: Device> Netd<D> {
     /// Attach the persistent NIC as a second socket core.
     pub fn attach_nic<N: Device + 'static>(&mut self, device: N, config: NicConfig, now_ms: i64) {
         let mut core = NetCore::new(device, config.mac, now_ms);
-        core.set_ipv4(
-            Ipv4Addr::from_octets(config.addr),
-            config.prefix,
-            config.gateway.map(Ipv4Addr::from_octets),
-        );
+        if config.is_qemu_user() {
+            core.set_ipv4(
+                Ipv4Addr::from_octets(config.addr),
+                config.prefix,
+                config.gateway.map(Ipv4Addr::from_octets),
+            );
+        }
         if config.dhcp {
             let _ = core.try_enable_dhcp();
         }
         self.nic = Some(Box::new(core));
         self.nic_config = Some(config);
-        self.nic_control = Some(NicControl {
+        self.nic_lease = None;
+        self.nic_control = config.is_qemu_user().then_some(NicControl {
             addr: config.addr,
             prefix: config.prefix,
             gateway: config.gateway,
@@ -435,6 +498,71 @@ impl<D: Device> Netd<D> {
         self.nic_config
     }
 
+    /// The published NIC address, or `None` before a platform DHCP lease is validated.
+    #[must_use]
+    pub fn published_nic(&self) -> Option<NicConfig> {
+        let control = self.nic_control.as_ref()?;
+        let mut config = self.nic_config?;
+        config.addr = control.addr;
+        config.prefix = control.prefix;
+        config.gateway = control.gateway;
+        Some(config)
+    }
+
+    /// The live NIC DHCP lease, if the stack has one or a platform lease was applied.
+    #[must_use]
+    pub fn dhcp_lease(&self) -> Option<DhcpLease> {
+        self.nic
+            .as_ref()
+            .and_then(|nic| nic.dhcp_lease())
+            .or_else(|| self.nic_lease.clone())
+    }
+
+    /// Apply one validated platform DHCP lease and publish `eth0`.
+    ///
+    /// Returns `false` for a QEMU-mode interface, a malformed lease or an already published
+    /// address.
+    pub fn apply_nic_lease(&mut self, lease: &DhcpLease) -> bool {
+        let Some(mut config) = self.nic_config else {
+            return false;
+        };
+        if config.is_qemu_user() || self.nic_control.is_some() {
+            return false;
+        }
+        let Some(control) = lease_control(lease) else {
+            return false;
+        };
+        config.addr = control.addr;
+        config.prefix = control.prefix;
+        config.gateway = control.gateway;
+        self.nic_config = Some(config);
+        self.nic_control = Some(control);
+        self.nic_lease = Some(lease.clone());
+        true
+    }
+
+    /// Take the latest gateway ICMP reply for the GENET release gate, if any.
+    #[must_use]
+    pub fn take_release_ping(&mut self) -> Option<ReleasePing> {
+        self.release_ping.take()
+    }
+
+    fn record_release_ping(&mut self, interface: Interface, source: [u8; 4], rtt_ms: u32) {
+        if interface != Interface::Nic {
+            return;
+        }
+        let gateway = self
+            .nic_control
+            .as_ref()
+            .and_then(|control| control.gateway);
+        if gateway == Some(source) {
+            self.release_ping = Some(ReleasePing {
+                target: source,
+                rtt_ms,
+            });
+        }
+    }
+
     /// Drive both stacks and return readiness transitions.
     pub fn poll(&mut self, now_ms: i64) -> Vec<NetEvent> {
         self.now_ms = now_ms;
@@ -452,6 +580,9 @@ impl<D: Device> Netd<D> {
                 interface: Interface::Nic,
                 event,
             }));
+        }
+        if let Some(lease) = self.nic.as_ref().and_then(|nic| nic.dhcp_lease()) {
+            let _ = self.apply_nic_lease(&lease);
         }
         events
     }
@@ -557,7 +688,7 @@ impl<D: Device> Netd<D> {
         } else {
             let parsed = path::parse(path).map_err(|_| Errno::EINVAL)?;
             let endpoint = parsed.endpoint.ok_or(Errno::EINVAL)?;
-            let interface = if self.nic.is_some() && endpoint.ip[0] != 127 {
+            let interface = if self.nic_control.is_some() && endpoint.ip[0] != 127 {
                 Interface::Nic
             } else {
                 Interface::Loopback
@@ -814,6 +945,7 @@ impl<D: Device> Netd<D> {
                     (pending.target, pending.sent_ms, icmp.id.unwrap_or(0))
                 };
                 let rtt_ms = u32::try_from(self.now_ms.saturating_sub(sent_ms)).unwrap_or(u32::MAX);
+                self.record_release_ping(interface, source.ip, rtt_ms);
                 let header = Response::Icmp {
                     source,
                     id,
@@ -1268,11 +1400,12 @@ impl<D: Device> Netd<D> {
         let request = IfaceRequest::decode(request).map_err(|_| Errno::EINVAL)?;
         match request {
             IfaceRequest::List => {
-                let count = if self.nic.is_some() { 2 } else { 1 };
+                let nic = self.nic_iface();
+                let count = 1 + u16::from(nic.is_some());
                 let mut offset = 0usize;
                 append_iface(response, &mut offset, IfaceResponse::Count { count })?;
                 append_iface(response, &mut offset, IfaceResponse::Iface(self.iface()))?;
-                if let Some(nic) = self.nic_iface() {
+                if let Some(nic) = nic {
                     append_iface(response, &mut offset, IfaceResponse::Iface(nic))?;
                 }
                 Ok(offset)
@@ -1569,6 +1702,69 @@ impl<D: Device> Netd<D> {
     fn write_socket_error(&self, response: &mut [u8], error: Errno) -> Result<usize, Errno> {
         self.write_response(response, &Response::Err(error))
     }
+}
+
+/// Format the `nic:release` DHCP marker from the live lease.
+pub fn release_dhcp_line(lease: &DhcpLease) -> Option<alloc::string::String> {
+    let gateway = lease.router?;
+    let line = match lease.dns.first() {
+        Some(dns) => alloc::format!(
+            "dhcp {}/{} {} {}\n",
+            lease.address,
+            lease.prefix_len,
+            gateway,
+            dns
+        ),
+        None => alloc::format!(
+            "dhcp {}/{} {} none\n",
+            lease.address,
+            lease.prefix_len,
+            gateway
+        ),
+    };
+    Some(line)
+}
+
+/// Format the `nic:release` ping marker from one gateway reply.
+#[must_use]
+pub fn release_ping_line(ping: ReleasePing) -> alloc::string::String {
+    alloc::format!(
+        "ping {}.{}.{}.{} tx=1 rx=1 rtt_ms={}\n",
+        ping.target[0],
+        ping.target[1],
+        ping.target[2],
+        ping.target[3],
+        ping.rtt_ms
+    )
+}
+
+fn lease_control(lease: &DhcpLease) -> Option<NicControl> {
+    let addr = lease.address.octets();
+    if !usable_unicast(addr) || lease.prefix_len == 0 || lease.prefix_len > 32 {
+        return None;
+    }
+    let gateway = lease.router.map(|router| router.octets());
+    if gateway.is_some_and(|gateway| !usable_unicast(gateway)) {
+        return None;
+    }
+    if lease
+        .dns
+        .iter()
+        .any(|server| !usable_unicast(server.octets()))
+    {
+        return None;
+    }
+    Some(NicControl {
+        addr,
+        prefix: lease.prefix_len,
+        gateway,
+        up: true,
+    })
+}
+
+fn usable_unicast(address: [u8; 4]) -> bool {
+    let value = u32::from_be_bytes(address);
+    value != 0 && value != u32::MAX && address[0] != 127 && (address[0] & 0xf0) != 0xe0
 }
 
 fn lease_timer_ms(at: Option<i64>, now_ms: i64) -> u32 {

@@ -27,12 +27,12 @@ The spawn functions return 0 on success and an errno value on failure. .Fn syste
 child status or -1. .Fn popen returns a stream or a null pointer.
 .Sh ERRORS
 .Er ENOENT is returned when the program is absent. .Er ENOSYS is returned for a file action or
-pipe that needs the process daemon.
+pipe that needs an external spawn backend.
 .Sh STANDARDS
 POSIX.1-2024; ring 0.
 .Sh CAVEATS
-Initfs binaries work first. File actions and pipes depend on procd; until it exists the
-affected forms fail honestly. See C53 and document 10.
+Initfs binaries work first. File actions and pipes that need an external spawn backend are not
+implemented; the affected forms fail honestly. See C53 and document 10.
 .Sh SEE ALSO
 .Xr fork 3
 .Xr libc 7

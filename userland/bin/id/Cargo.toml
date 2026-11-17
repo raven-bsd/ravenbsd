@@ -15,6 +15,7 @@ publish = false
 raven-userdb = { path = "../../../crates/raven-userdb" }
 
 [target.'cfg(target_os = "none")'.dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
 raven-rt = { path = "../../rt" }
 
 [lints]

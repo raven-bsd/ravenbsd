@@ -6,7 +6,7 @@ use raven_libc_thread::sem as s;
 #[unsafe(no_mangle)]
 pub extern "C" fn sem_init(sem: *mut s::Sem, pshared: c_int, value: u32) -> c_int {
     if sem.is_null() {
-        return 22;
+        return super::common::sem_err(raven_libc_thread::limits::EINVAL);
     }
     match s::init(
         &raven_libc_thread::raw::SysKernel,
@@ -15,6 +15,6 @@ pub extern "C" fn sem_init(sem: *mut s::Sem, pshared: c_int, value: u32) -> c_in
         value,
     ) {
         Ok(()) => 0,
-        Err(e) => super::common::err(e),
+        Err(e) => super::common::sem_err(e),
     }
 }

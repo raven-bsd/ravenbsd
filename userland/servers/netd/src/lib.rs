@@ -19,5 +19,8 @@ mod netd;
 pub mod nic;
 
 pub use loopback::Loopback;
-pub use netd::{Interface, NetEvent, Netd, NicConfig};
+pub use netd::{
+    Interface, NetEvent, Netd, NicAddressing, NicConfig, ReleasePing, release_dhcp_line,
+    release_ping_line,
+};
 pub use raven_proto_net::socket::Endpoint;

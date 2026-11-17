@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-cap-revoke"
+version = "0.1.0"
+description = "S73 capability handoff and revocation demo fixture."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[lib]
+name = "raven_cap_revoke"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raven-cap-revoke-init"
+path = "src/bin/init.rs"
+
+[[bin]]
+name = "raven-cap-revoke-client1"
+path = "src/bin/client1.rs"
+
+[[bin]]
+name = "raven-cap-revoke-client2"
+path = "src/bin/client2.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-elf = { path = "../../../crates/raven-elf" }
+raven-initfs = { path = "../../../crates/raven-initfs" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
+
+[lints]
+workspace = true

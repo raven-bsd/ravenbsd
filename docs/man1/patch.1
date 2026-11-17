@@ -1,0 +1,83 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt PATCH 1
+.Os RavenBSD
+.Sh NAME
+.Nm patch
+.Nd apply unified diffs (bounded strict applier)
+.Sh SYNOPSIS
+.Nm
+.Op Fl Ruf
+.Op Fl p Ar strip
+.Op Fl i Ar patchfile
+.Op Ar patchfile ...
+.Sh DESCRIPTION
+The
+.Nm
+utility applies unified diffs to files named by the
+.Sq ---
+and
+.Sq +++
+headers.
+Patch text is read from
+.Fl i Ar patchfile ,
+from the patch-file operands in order, or from standard input when neither is present.
+.Pp
+Every hunk is checked before a file is changed.
+Context and removed lines must match at the expected offset.
+There is no context fuzz: a hunk that does not match rejects the whole invocation and no file is
+written or removed.
+.Pp
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl i Ar patchfile
+Read the patch from
+.Ar patchfile .
+A single
+.Sq -
+means standard input.
+.It Fl p Ar strip
+Strip
+.Ar strip
+leading slash-separated components from the target path.
+The default is 0.
+.It Fl R
+Apply the patch in reverse, swapping the old and new sides.
+.It Fl u
+Accept unified input.
+Unified diffs are the only supported format, so this is a no-op.
+.It Fl f
+Force mode.
+Accepted for command-line compatibility; it does not relax hunk matching.
+.El
+.Pp
+A file is created when the old side is
+.Pa /dev/null
+or the first hunk has a zero-length old range.
+A file is deleted when the new side is
+.Pa /dev/null .
+Paths containing a
+.Sq ..
+component are rejected.
+Header timestamps separated from the path by a tab are ignored.
+.Pp
+Only unified diffs are supported.
+Context diffs, ed scripts, binary patches, backup files, reject files, interactive prompts and
+file-mode changes are not implemented.
+.Sh EXIT STATUS
+.Ex -std
+Status 2 indicates invalid usage; status 1 indicates a malformed patch, a missing target, a
+non-applying hunk or an I/O error.
+.Sh SEE ALSO
+.Xr diff 1 ,
+.Xr grep 1 ,
+.Xr sed 1
+.Sh STANDARDS
+The bounded core follows the POSIX.1-2024
+.Xr patch 1
+unified-diff model, with the documented strict-matching limitation.
+.Sh HISTORY
+The
+.Nm
+utility first appeared in 4.3BSD.

@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4z misc2 evidence: echo, date and man.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.echo"
+status = "present"
+evidence = "test:tests/posix/utility/misc2/echo/test.sh"
+notes = "P4z: -n first-operand handling, literal backslashes/operands and write-failure status"
+
+[[row]]
+id = "util.date"
+status = "present"
+evidence = "test:tests/posix/utility/misc2/date/test.sh"
+notes = "P4z: fixed-epoch uptime form and usage status; POSIX -u/+format is defect P4z-D1"
+
+[[row]]
+id = "util.man"
+status = "present"
+evidence = "test:tests/posix/utility/misc2/man/test.sh"
+notes = "P4z: fixture mdoc rendering, section/name validation and unknown-page lookup"

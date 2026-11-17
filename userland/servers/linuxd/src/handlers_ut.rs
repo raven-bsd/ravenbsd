@@ -5,7 +5,9 @@
 
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
+use raven_linux_abi::flags::clone as clone_flags;
 use raven_linux_dispatch::SyscallArgs;
+use raven_proto_linux::LinuxFrame;
 
 use crate::files::O_CLOEXEC;
 use crate::files::O_RDWR;
@@ -13,7 +15,7 @@ use crate::files::O_RDWR;
 use super::*;
 
 fn process() -> LinuxProcess {
-    LinuxProcess::new(7, Handle(9), 0x4000, 0x5000, 0x8000, 0x9000)
+    LinuxProcess::new(7, 7, Handle(1), Handle(9), 0x4000, 0x5000, 0x8000, 0x9000)
 }
 
 fn call(nr: usize, a: [usize; 6]) -> SyscallArgs {
@@ -160,17 +162,84 @@ fn arch_prctl_get_fs_copies_the_stored_base() {
 }
 
 #[test]
+fn process_identity_handlers_record_the_linux_state() {
+    let mut process = process();
+    assert_eq!(dispatch(&mut process, 186, [0; 6]), 7);
+    assert_eq!(dispatch(&mut process, 218, [0x3000, 0, 0, 0, 0, 0]), 7);
+    assert_eq!(process.clear_tid, 0x3000);
+    assert_eq!(dispatch(&mut process, 273, [0x4000, 24, 0, 0, 0, 0]), 0);
+    assert_eq!(process.robust_list, 0x4000);
+    assert_eq!(process.robust_list_len, 24);
+    assert_eq!(
+        dispatch(&mut process, 273, [0x4000, 16, 0, 0, 0, 0]),
+        -(Errno::EINVAL.0 as isize)
+    );
+    process.user_buffer.extend_from_slice(b"worker\0");
+    assert_eq!(dispatch(&mut process, 157, [15, 0x5000, 0, 0, 0, 0]), 0);
+    assert_eq!(process.comm(), b"worker");
+    assert_eq!(dispatch(&mut process, 157, [16, 0x5000, 0, 0, 0, 0]), 0);
+    let (address, bytes) = process.pending_write.take().expect("the name copy-out");
+    assert_eq!(address, 0x5000);
+    assert_eq!(bytes, b"worker\0\0\0\0\0\0\0\0\0\0");
+}
+
+fn clone_frame() -> LinuxFrame {
+    let mut gprs = [0u64; raven_proto_linux::FRAME_GPRS];
+    gprs[0] = 56;
+    gprs[1] = 0x1234;
+    LinuxFrame {
+        rip: 0x40_1234,
+        rsp: 0x7fff_0000,
+        rflags: 0x202,
+        fs_base: 0x7000,
+        gprs,
+    }
+}
+
+#[test]
+fn clone_queues_the_frame_and_arguments_for_the_trap_loop() {
+    let mut process = process();
+    process.frame = Some(clone_frame());
+    let flags = clone_flags::CLONE_VM | clone_flags::CLONE_THREAD | clone_flags::CLONE_SIGHAND;
+    assert_eq!(
+        dispatch(&mut process, 56, [flags as usize, 0x9000, 0, 0, 0x7000, 0]),
+        0
+    );
+    let request = process.pending_clone.take().expect("a queued clone");
+    assert_eq!(request.flags, flags);
+    assert_eq!(request.child_stack, 0x9000);
+    assert_eq!(request.tls, 0x7000);
+    assert_eq!(request.frame.rip, 0x40_1234);
+    assert_eq!(request.frame.rsp, 0x7fff_0000);
+}
+
+#[test]
+fn clone_without_a_frame_or_with_bad_flags_is_rejected() {
+    let mut process = process();
+    assert_eq!(
+        dispatch(&mut process, 56, [17, 0, 0, 0, 0, 0]),
+        -(Errno::ENOSYS.0 as isize)
+    );
+    process.frame = Some(clone_frame());
+    assert_eq!(
+        dispatch(&mut process, 56, [0xdead_beef, 0, 0, 0, 0, 0]),
+        -(Errno::EINVAL.0 as isize)
+    );
+    assert!(process.pending_clone.is_none());
+}
+
+#[test]
 fn an_unknown_number_is_enosys_and_counted() {
     let mut process = process();
     let mut dispatcher = dispatcher();
     assert_eq!(
-        dispatcher.dispatch(&mut process, &call(218, [0; 6])),
+        dispatcher.dispatch(&mut process, &call(60, [0; 6])),
         -(Errno::ENOSYS.0 as isize)
     );
     let hits = dispatcher.unimplemented_hits();
     assert_eq!(hits.len(), 1);
-    assert_eq!(hits[0].0, 218);
-    assert_eq!(hits[0].1, Some("set_tid_address"));
+    assert_eq!(hits[0].0, 60);
+    assert_eq!(hits[0].1, Some("exit"));
     assert_eq!(hits[0].2, 1);
 }
 
@@ -185,22 +254,27 @@ fn the_stats_name_every_implemented_handler() {
         [
             "arch_prctl",
             "brk",
+            "clone",
             "close",
             "dup3",
             "exit_group",
             "fcntl",
             "getdents64",
             "getpid",
+            "gettid",
             "lseek",
             "mmap",
             "open",
             "openat",
+            "prctl",
             "pread64",
             "pwrite64",
             "read",
             "readlink",
             "readlinkat",
             "rt_sigprocmask",
+            "set_robust_list",
+            "set_tid_address",
             "uname",
             "write"
         ]

@@ -1,17 +1,20 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! The early-boot `ProcBackend` used before `procd` exists.
+//! The early fallback `ProcBackend` for callers that have not wired the kernel path.
 
 use alloc::vec::Vec;
 
 use crate::backend::{EarlySpawn, ProcBackend, WaitResult};
 use crate::errors::{ECHILD, ENOSYS, ESRCH, Errno};
 use crate::ids::SetCred;
+use crate::request::{ExecRequest, ForkRequest, SpawnRequest};
 use crate::rlimit_model::RlimitTable;
-use crate::wire::{ExecRequest, ForkRequest, SpawnRequest};
 
-/// The pre-procd backend.
+/// The early fallback backend.
+///
+/// Identity is the init-process default. Spawn and wait go through the optional native spawner;
+/// operations that have no kernel path yet fail honestly with `ENOSYS`, `ESRCH` or `ECHILD`.
 #[derive(Default)]
 pub struct LocalBackend<'a> {
     /// Optional initfs spawner supplied by the shell.
@@ -72,10 +75,10 @@ impl ProcBackend for LocalBackend<'_> {
     }
 
     fn spawn(&self, req: &SpawnRequest) -> Result<i32, Errno> {
-        let Some(early) = self.early else {
+        let Some(spawner) = self.early else {
             return Err(ENOSYS);
         };
-        early.spawn_initfs(&req.path, &req.argv, &req.envp, &req.fdmap)
+        spawner.spawn(req)
     }
 
     fn fork(&self, _req: &ForkRequest) -> Result<i32, Errno> {
@@ -86,8 +89,11 @@ impl ProcBackend for LocalBackend<'_> {
         ENOSYS
     }
 
-    fn wait(&self, _idtype: u32, _id: i64, _options: u32) -> Result<WaitResult, Errno> {
-        Err(ECHILD)
+    fn wait(&self, idtype: u32, id: i64, options: u32) -> Result<WaitResult, Errno> {
+        let Some(spawner) = self.early else {
+            return Err(ECHILD);
+        };
+        spawner.wait(idtype, id, options)
     }
 
     fn kill(&self, _pid: i64, _sig: u32, _queue_value: Option<u64>) -> Result<(), Errno> {

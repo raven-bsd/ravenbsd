@@ -6,8 +6,8 @@
 //! The production mode registers the `dev:` scheme after scanning. The `test` argument runs the
 //! matched driver a fixed number of cycles and exits, which the qtest uses to prove clean
 //! MMIO-handle teardown and restart. The `dtb` argument decodes the platform bus from
-//! `/etc/pi4.dtb` and reports the `compatible` matches; it is the aarch64/Pi 4 path and does not
-//! touch the PCI scheme.
+//! `/etc/pi4.dtb`; `dtb launch` creates the declared MMIO/DMA/IRQ grants and spawns each matched
+//! platform driver. It is the aarch64/Pi 4 path and does not touch the PCI scheme.
 
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
@@ -26,6 +26,7 @@ mod program {
     use raven_abi::errno::Errno;
     use raven_abi::types::{Handle, Rights};
     use raven_devd::dtb;
+    use raven_devd::platform;
     use raven_initfs::Initfs;
     use raven_proto_dev::{DEVICE_INFO_LEN, DeviceInfo, DriverSpec, parse_drivers};
     use raven_proto_fs::{S_IFREG, Stat};
@@ -43,10 +44,11 @@ mod program {
     fn main(args: raven_rt::Args) -> i32 {
         let executable = args.get(0).unwrap_or("devd");
         let mode = args.get(1).unwrap_or("serve");
+        let action = args.get(2).unwrap_or("");
         if executable == "dummy" || mode == "dummy" {
             return dummy_driver();
         }
-        match run(mode) {
+        match run(mode, action) {
             Ok(()) => 0,
             Err(message) => {
                 raven_rt::eprintln!("devd: {message}");
@@ -55,9 +57,9 @@ mod program {
         }
     }
 
-    fn run(mode: &str) -> Result<(), String> {
+    fn run(mode: &str, action: &str) -> Result<(), String> {
         if mode == "dtb" {
-            return run_dtb();
+            return run_dtb(action == "launch");
         }
         let test = mode == "test";
         let image = raven_rt::map_initfs().map_err(|error| error.description().to_string())?;
@@ -117,12 +119,14 @@ mod program {
         if test { Ok(()) } else { serve() }
     }
 
-    /// Decode the platform device tree and report the compatible-string matches.
+    /// Decode the platform device tree and, when `launch` is set, start the matched drivers.
     ///
-    /// This is the aarch64/Pi 4 discovery path. It deliberately stops at matching: launching a
-    /// platform driver needs MMIO/DMA/IRQ capabilities from the supervisor (B47/profile work),
-    /// which is not part of K32.
-    fn run_dtb() -> Result<(), String> {
+    /// Without `launch` this is the K32 discovery path: print the decoded devices and the
+    /// compatible matches, then exit. With `launch` every matched driver is spawned with its
+    /// declared grants before the first wait, so one long-lived driver (the GENET `nic:` server)
+    /// cannot starve the drivers after it. The one-shot `dtb launch` then waits for each child
+    /// and exits nonzero if any driver fails.
+    fn run_dtb(launch: bool) -> Result<(), String> {
         let image = raven_rt::map_initfs().map_err(|error| error.description().to_string())?;
         let initfs = Initfs::parse(image).map_err(|error| alloc::format!("{error:?}"))?;
         let drivers = load_drivers(&initfs)?;
@@ -155,8 +159,191 @@ mod program {
                 device.path
             );
         }
+        if launch {
+            let mut children = Vec::with_capacity(matched.len());
+            for (device, driver) in &matched {
+                match spawn_platform(&initfs, device, driver) {
+                    Ok(child) => children.push(child),
+                    Err(error) => {
+                        for child in children.drain(..) {
+                            abort_platform(child);
+                        }
+                        return Err(error);
+                    }
+                }
+            }
+            let mut remaining = children.into_iter();
+            while let Some(child) = remaining.next() {
+                if let Err(error) = finish_platform(child) {
+                    for child in remaining {
+                        abort_platform(child);
+                    }
+                    return Err(error);
+                }
+            }
+        }
         raven_rt::println!("devd: dtb matched={}", matched.len());
         Ok(())
+    }
+
+    /// A spawned platform driver and its devd-side process handle.
+    struct PlatformChild {
+        name: String,
+        child: Handle,
+    }
+
+    /// Create the declared grants, transfer them to a fresh child and start the driver.
+    ///
+    /// `devd` holds the root-device capability in the platform profile. The grant set comes from
+    /// [`platform::PlatformPlan::grants`], so only the selected `reg` window, the requested DMA
+    /// buffer and the device's first GIC interrupt are created. The child receives the handles in
+    /// that order (BAR, DMA, IRQ); the argv tokens keep the PCI shape.
+    fn spawn_platform(
+        initfs: &Initfs<'_>,
+        device: &dtb::DeviceSpec,
+        driver: &DriverSpec,
+    ) -> Result<PlatformChild, String> {
+        let plan = platform::plan(device, &driver.args)
+            .map_err(|error| alloc::format!("{}: {error}", driver.name))?;
+        let root = Handle::ROOT_DEVICE;
+        let mut handles = Vec::with_capacity(3);
+        let mut dma_size = 0usize;
+        let mut irq_line = 0u32;
+        for grant in plan.grants() {
+            let created = match grant {
+                platform::Grant::Bar { base, size, .. } => page_len(size).and_then(|length| {
+                    raven_rt::mmio_create(root, base, length, 0)
+                        .map_err(|error| error.description().to_string())
+                }),
+                platform::Grant::Dma { len } => {
+                    raven_rt::dma_alloc(root, len, platform::PLATFORM_PAGE_SIZE, 32, 0)
+                        .map_err(|error| error.description().to_string())
+                }
+                platform::Grant::Irq { intid } => {
+                    raven_rt::irq_create(root, raven_rt::IRQ_LEGACY, intid, None)
+                        .map_err(|error| error.description().to_string())
+                }
+            };
+            let handle = match created {
+                Ok(handle) => handle,
+                Err(error) => {
+                    close_all(&handles);
+                    return Err(alloc::format!(
+                        "{} resource {grant:?}: {error}",
+                        driver.name
+                    ));
+                }
+            };
+            if let platform::Grant::Dma { .. } = grant {
+                let info = match raven_rt::dma_info(handle) {
+                    Ok(info) => info,
+                    Err(error) => {
+                        let _ = raven_rt::handle_close(handle);
+                        close_all(&handles);
+                        return Err(alloc::format!(
+                            "{} dma info: {}",
+                            driver.name,
+                            error.description()
+                        ));
+                    }
+                };
+                dma_size = match usize::try_from(info.len) {
+                    Ok(length) => length,
+                    Err(_) => {
+                        let _ = raven_rt::handle_close(handle);
+                        close_all(&handles);
+                        return Err(alloc::format!("{} dma length overflow", driver.name));
+                    }
+                };
+            }
+            if let platform::Grant::Irq { intid } = grant {
+                irq_line = intid;
+            }
+            handles.push(handle);
+        }
+
+        let tokens = plan.tokens();
+        let mut argv: Vec<&str> = Vec::with_capacity(tokens.len() + 1);
+        argv.push(driver.name.as_str());
+        argv.extend(tokens.iter().map(String::as_str));
+        if let (Some(bar), Some(reg)) = (plan.bars.first(), plan.regs.first()) {
+            if plan.bars.len() == 1 {
+                raven_rt::println!(
+                    "devd: dtb launch {} bar={} size={:#x} dma={} irq={}",
+                    driver.name,
+                    bar,
+                    reg.size,
+                    dma_size,
+                    irq_line
+                );
+            } else {
+                raven_rt::println!(
+                    "devd: dtb launch {} bars={} bar={} size={:#x} dma={} irq={}",
+                    driver.name,
+                    plan.bars.len(),
+                    bar,
+                    reg.size,
+                    dma_size,
+                    irq_line
+                );
+            }
+        }
+        let mut sys = GrantSys { handles };
+        let child = match spawn_with(
+            initfs,
+            &driver.exec,
+            &SpawnOptions {
+                args: &argv,
+                env: &[],
+            },
+            &mut sys,
+        ) {
+            Ok(child) => child,
+            Err(error) => {
+                close_all(&sys.handles);
+                return Err(alloc::format!("{} spawn: {error:?}", driver.name));
+            }
+        };
+        // A successful spawn transferred the handles into the child. Closing the stale values
+        // here could close a slot reused by the next launch, so the child owns them now.
+        sys.handles.clear();
+        Ok(PlatformChild {
+            name: driver.name.clone(),
+            child,
+        })
+    }
+
+    /// Wait for one platform driver and report a nonzero exit as a launch failure.
+    fn finish_platform(child: PlatformChild) -> Result<(), String> {
+        let mut code = -1i32;
+        let waited = RtSys.proc_wait(child.child, &mut code);
+        let _ = raven_rt::handle_close(child.child);
+        waited.map_err(|error| alloc::format!("{} wait: {error:?}", child.name))?;
+        raven_rt::println!("devd: dtb launch {} exit={}", child.name, code);
+        if code != 0 {
+            return Err(alloc::format!("{} exited {code}", child.name));
+        }
+        Ok(())
+    }
+
+    /// Stop a child that was spawned before a later launch failed.
+    fn abort_platform(child: PlatformChild) {
+        let _ = raven_rt::proc_terminate(child.child, 1);
+        let mut code = -1i32;
+        let _ = RtSys.proc_wait(child.child, &mut code);
+        let _ = raven_rt::handle_close(child.child);
+    }
+
+    fn page_len(size: u64) -> Result<usize, String> {
+        let page = platform::PLATFORM_PAGE_SIZE;
+        let length = size
+            .checked_add(page as u64 - 1)
+            .ok_or_else(|| "platform window is too large".to_string())?
+            & !(page as u64 - 1);
+        if length == 0 {
+            return Err("platform window is empty".to_string());
+        }
+        usize::try_from(length).map_err(|_| "platform window is too large".to_string())
     }
 
     /// The launch-time arguments `devd` consumes from the driver's own list.

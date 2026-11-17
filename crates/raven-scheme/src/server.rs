@@ -13,10 +13,12 @@ use raven_ipc::protocol::{
     self, Attachment, MAX_ATTACHMENTS, MAX_DATA, MAX_TRANSFER, OFFSET_EXPLICIT, Opcode,
     PACKET_SIZE, SchemePacket,
 };
-use raven_proto_fs::{OpenFlags, Stat};
+use raven_proto_fs::{Credentials, OpenFlags, Stat};
 
 use crate::kernel::{Kernel, RtKernel};
 use crate::sync::SpinLock;
+
+const _: () = assert!(raven_proto_fs::MAX_GROUPS == protocol::MAX_GROUPS);
 
 /// A handler failure or a deferred reply.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -130,6 +132,8 @@ pub struct Ctx {
     pub buffer_len: u64,
     /// Captured response buffer length (zero when absent).
     pub response_len: u64,
+    /// Caller credentials attached by the kernel.
+    pub credentials: Credentials,
 }
 
 /// A scheme server handler.
@@ -232,6 +236,90 @@ pub trait Handler {
         response: &mut [u8],
     ) -> HandlerResult<CallReply> {
         Ok(CallReply::new(self.call(file, request, response)?))
+    }
+
+    /// Read with the per-request context.
+    fn read_with(
+        &mut self,
+        file: u64,
+        offset: u64,
+        buffer: &mut [u8],
+        ctx: &Ctx,
+    ) -> HandlerResult<usize> {
+        let _ = ctx;
+        self.read(file, offset, buffer)
+    }
+
+    /// Positional read with the per-request context.
+    fn pread_with(
+        &mut self,
+        file: u64,
+        offset: u64,
+        buffer: &mut [u8],
+        ctx: &Ctx,
+    ) -> HandlerResult<usize> {
+        let _ = ctx;
+        self.pread(file, offset, buffer)
+    }
+
+    /// Write with the per-request context.
+    fn write_with(
+        &mut self,
+        file: u64,
+        offset: u64,
+        buffer: &[u8],
+        ctx: &Ctx,
+    ) -> HandlerResult<usize> {
+        let _ = ctx;
+        self.write(file, offset, buffer)
+    }
+
+    /// Positional write with the per-request context.
+    fn pwrite_with(
+        &mut self,
+        file: u64,
+        offset: u64,
+        buffer: &[u8],
+        ctx: &Ctx,
+    ) -> HandlerResult<usize> {
+        let _ = ctx;
+        self.pwrite(file, offset, buffer)
+    }
+
+    /// Seek with the per-request context.
+    fn seek_with(&mut self, file: u64, offset: i64, whence: u32, ctx: &Ctx) -> HandlerResult<u64> {
+        let _ = ctx;
+        self.seek(file, offset, whence)
+    }
+
+    /// Close with the per-request context.
+    fn close_with(&mut self, file: u64, ctx: &Ctx) -> HandlerResult<()> {
+        let _ = ctx;
+        self.close(file)
+    }
+
+    /// Duplicate with the per-request context.
+    fn dup_with(&mut self, file: u64, ctx: &Ctx) -> HandlerResult<u64> {
+        let _ = ctx;
+        self.dup(file)
+    }
+
+    /// Stat with the per-request context.
+    fn fstat_with(&mut self, file: u64, ctx: &Ctx) -> HandlerResult<Stat> {
+        let _ = ctx;
+        self.fstat(file)
+    }
+
+    /// Typed `CALL` with attachments and the per-request context.
+    fn call_with(
+        &mut self,
+        file: u64,
+        request: &[u8],
+        response: &mut [u8],
+        ctx: &Ctx,
+    ) -> HandlerResult<CallReply> {
+        let _ = ctx;
+        self.call_attach(file, request, response)
     }
 }
 
@@ -373,6 +461,14 @@ impl<K: Kernel> Server<K> {
             token,
             buffer_len: packet.packet.buffer_len,
             response_len: packet.packet.response_len,
+            credentials: Credentials::new(
+                packet.packet.uid,
+                packet.packet.euid,
+                packet.packet.gid,
+                packet.packet.egid,
+                packet.packet.groups,
+                packet.packet.group_count,
+            ),
         };
         match self.handle(packet.packet, handler, &ctx) {
             Ok(()) => Ok(()),
@@ -425,9 +521,9 @@ impl<K: Kernel> Server<K> {
                     request_buffer_mut(&request)?
                 };
                 let written = if request.flags & OFFSET_EXPLICIT != 0 {
-                    handler.pread(request.file_id, request.offset, buffer)?
+                    handler.pread_with(request.file_id, request.offset, buffer, ctx)?
                 } else {
-                    handler.read(request.file_id, request.offset, buffer)?
+                    handler.read_with(request.file_id, request.offset, buffer, ctx)?
                 };
                 if written > buffer.len() {
                     return Err(Errno::EPROTO.into());
@@ -442,9 +538,9 @@ impl<K: Kernel> Server<K> {
                     request_buffer(&request)?
                 };
                 let written = if request.flags & OFFSET_EXPLICIT != 0 {
-                    handler.pwrite(request.file_id, request.offset, buffer)?
+                    handler.pwrite_with(request.file_id, request.offset, buffer, ctx)?
                 } else {
-                    handler.write(request.file_id, request.offset, buffer)?
+                    handler.write_with(request.file_id, request.offset, buffer, ctx)?
                 };
                 if written > buffer.len() {
                     return Err(Errno::EPROTO.into());
@@ -453,17 +549,17 @@ impl<K: Kernel> Server<K> {
                     .map_err(HandlerError::from)
             }
             Opcode::Close => {
-                handler.close(request.file_id)?;
+                handler.close_with(request.file_id, ctx)?;
                 self.send_response(ctx.request, request, Reply::ok())
                     .map_err(HandlerError::from)
             }
             Opcode::Dup => {
-                let id = handler.dup(request.file_id)?;
+                let id = handler.dup_with(request.file_id, ctx)?;
                 self.send_response(ctx.request, request, Reply::ok().cookie(id))
                     .map_err(HandlerError::from)
             }
             Opcode::Fstat => {
-                let stat = handler.fstat(request.file_id)?;
+                let stat = handler.fstat_with(request.file_id, ctx)?;
                 let mut data = [0u8; 64];
                 stat.encode(&mut data)
                     .map_err(|_| HandlerError::from(Errno::EPROTO))?;
@@ -471,17 +567,20 @@ impl<K: Kernel> Server<K> {
                     .map_err(HandlerError::from)
             }
             Opcode::Seek => {
-                let offset = handler.seek(
+                let offset = handler.seek_with(
                     request.file_id,
                     request.offset as i64,
                     u32::from(request.flags),
+                    ctx,
                 )?;
                 self.send_response(ctx.request, request, Reply::ok().new_offset(offset))
                     .map_err(HandlerError::from)
             }
             Opcode::Call => {
+                // A kernel pager request carries its bounded `PagerPacket` in the inline data
+                // area and has no captured client buffer. Normal client CALLs use the capture.
                 let request_bytes = if request.buffer_len == 0 {
-                    &[][..]
+                    request.data_bytes()
                 } else {
                     request_buffer(&request)?
                 };
@@ -491,7 +590,8 @@ impl<K: Kernel> Server<K> {
                 } else {
                     response_buffer_mut(&request)?
                 };
-                let reply = handler.call_attach(request.file_id, request_bytes, response_bytes)?;
+                let reply =
+                    handler.call_with(request.file_id, request_bytes, response_bytes, ctx)?;
                 let attach_count =
                     usize::try_from(reply.attach_count).map_err(|_| Errno::EPROTO)?;
                 if attach_count > MAX_ATTACHMENTS

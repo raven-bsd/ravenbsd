@@ -108,7 +108,46 @@ pub fn parse_args<'a>(args: impl IntoIterator<Item = &'a str>) -> Result<Options
     Ok(options)
 }
 
-/// Find the credential for an account operand, or the root identity for the current process.
+/// The ids the process API reports for the caller.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProcessIds {
+    /// Real user id.
+    pub uid: u32,
+    /// Effective user id.
+    pub euid: u32,
+    /// Real group id.
+    pub gid: u32,
+    /// Effective group id.
+    pub egid: u32,
+    /// Supplementary groups in kernel order.
+    pub groups: Vec<u32>,
+}
+
+/// Build the display credential from the caller's process ids.
+///
+/// The primary gid is placed first; the kernel's supplementary list follows without duplicates.
+#[must_use]
+pub fn process_credential(ids: &ProcessIds) -> Credential {
+    let mut groups = Vec::new();
+    groups.push(ids.gid);
+    for gid in &ids.groups {
+        if *gid != ids.gid && !groups.contains(gid) {
+            groups.push(*gid);
+        }
+    }
+    Credential {
+        uid: ids.uid,
+        euid: ids.euid,
+        gid: ids.gid,
+        egid: ids.egid,
+        groups,
+    }
+}
+
+/// Find the credential for an account operand, or the root identity when no operand is given.
+///
+/// The target binary uses [`process_credential`] for the caller; this helper remains for named
+/// lookups and for callers that have no process credential source.
 ///
 /// # Errors
 /// [`DbError::UnknownUser`] for an unknown operand and [`DbError::TooManyGroups`] when the account

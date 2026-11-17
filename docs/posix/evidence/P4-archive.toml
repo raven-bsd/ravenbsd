@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4j archive evidence: first-party ar, uuencode and uudecode host tests.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.ar"
+status = "present"
+evidence = "test:tests/posix/utility/archive/ar/test.sh"
+notes = "P4j: POSIX r/t/x/s archive, long names and ELF symbol table host tests"
+
+[[row]]
+id = "util.uuencode"
+status = "present"
+evidence = "test:tests/posix/utility/archive/uuencode/test.sh"
+notes = "P4j: POSIX begin/end encoder, mode and line-limit host tests"
+
+[[row]]
+id = "util.uudecode"
+status = "present"
+evidence = "test:tests/posix/utility/archive/uudecode/test.sh"
+notes = "P4j: POSIX begin/end decoder, mode, safe-name and malformed-input host tests"
+
+[[row]]
+id = "util.tar"
+status = "present"
+evidence = "test:tests/posix/utility/archive/tar/test.sh"
+notes = "P4l: POSIX ustar create/list/extract, modes, symlinks and nested-path host tests"
+
+[[row]]
+id = "util.pax"
+status = "present"
+evidence = "test:tests/posix/utility/archive/pax/test.sh"
+notes = "P4r: pax ustar/extended-header write/append/read/extract, long paths and link targets"

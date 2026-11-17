@@ -1,0 +1,40 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt NOHUP 1
+.Os RavenBSD
+.Sh NAME
+.Nm nohup
+.Nd run a command immune to hangups
+.Sh SYNOPSIS
+.Nm
+.Ar command
+.Op Ar argument ...
+.Sh DESCRIPTION
+.Nm
+executes
+.Ar command
+with the caller's environment.
+The kernel queues signals and the exec'd child does not install a SIGHUP
+handler, so a queued hangup does not terminate it.
+.Pp
+The runtime has no stdout descriptor or
+.Fn isatty
+path, so
+.Nm
+implements the non-terminal case: it does not redirect output.
+The POSIX terminal-only
+.Pa nohup.out
+redirect needs a stdout/fd API and is a documented follow-up.
+.Sh EXIT STATUS
+.Ex -std
+A command that cannot be found exits 127; a command that cannot be executed
+exits 126.
+A usage error exits 2.
+.Sh SEE ALSO
+.Xr env 1 ,
+.Xr kill 1
+.Sh STANDARDS
+IEEE Std 1003.1-2024
+.Pq POSIX.1-2024 ,
+except the unavailable terminal-only output redirect noted above.

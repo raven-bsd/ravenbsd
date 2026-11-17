@@ -37,7 +37,7 @@ use core::sync::atomic::{AtomicI32, AtomicU32};
 use raven_libc_tls::Pthread;
 
 use crate::kernel::{CreateArgs, KernelCaps, ThreadKernel};
-use crate::limits::{EINVAL, ENOMEM, ENOSYS, Errno, NS_PER_SEC};
+use crate::limits::{EINVAL, ENOMEM, ENOSYS, EOVERFLOW, Errno, NS_PER_SEC};
 
 pub mod entry;
 pub mod futex;
@@ -182,57 +182,64 @@ pub fn tlsdesc_dynamic(descriptor: &mut [usize; 2]) -> usize {
     unsafe { tlsdesc::dynamic_entry(descriptor.as_mut_ptr()) }
 }
 
-/// `THREAD_CREATE` syscall number (`crates/raven-abi/src/syscall.rs`).
+/// The production `ThreadKernel`: every method that has no Raven primitive returns `ENOSYS` or
+/// the documented fallback; no kernel flag is invented.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SysKernel;
+
+/// `THREAD_CREATE` syscall number (`raven_abi::syscall::Syscall::THREAD_CREATE`).
 const THREAD_CREATE: usize = 0x20;
-/// The `THREAD_CREATE_EX` payload flag.
+/// `THREAD_CREATE` flag selecting the [`ThreadCreateEx`] payload.
 const THREAD_CREATE_EX: usize = 1;
-/// `Handle::SELF_PROC`.
+/// Raw `Handle::SELF_PROC`.
 const SELF_PROC: usize = 0;
 
-/// The extended `THREAD_CREATE` payload; mirrors `raven_abi::syscall::ThreadCreateEx`, which is
-/// a contract-crate type this crate does not depend on.
+/// The extended `THREAD_CREATE` payload, matching `raven_abi::syscall::ThreadCreateEx`.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct ThreadCreateEx {
-    /// New thread's user TLS base.
-    pub tp: usize,
-    /// Optional destination for the kernel tid; zero skips the write.
-    pub tid_out: usize,
-    /// New thread's clear-on-exit word; zero disables it.
-    pub clear_tid_addr: usize,
+struct ThreadCreateEx {
+    /// User TLS base installed for the new thread.
+    tp: usize,
+    /// Optional caller tid output (unused: the library owns the TCB tid).
+    tid_out: usize,
+    /// New thread's clear-on-exit word.
+    clear_tid_addr: usize,
 }
 
-const _: () = assert!(core::mem::size_of::<ThreadCreateEx>() == 24);
-const _: () = assert!(core::mem::align_of::<ThreadCreateEx>() == 8);
-const _: () = assert!(core::mem::offset_of!(ThreadCreateEx, tp) == 0);
-const _: () = assert!(core::mem::offset_of!(ThreadCreateEx, tid_out) == 8);
-const _: () = assert!(core::mem::offset_of!(ThreadCreateEx, clear_tid_addr) == 16);
+const _: () = {
+    assert!(core::mem::size_of::<ThreadCreateEx>() == 24);
+    assert!(core::mem::align_of::<ThreadCreateEx>() == 8);
+    assert!(core::mem::offset_of!(ThreadCreateEx, tp) == 0);
+    assert!(core::mem::offset_of!(ThreadCreateEx, tid_out) == 8);
+    assert!(core::mem::offset_of!(ThreadCreateEx, clear_tid_addr) == 16);
+};
 
-/// One `THREAD_CREATE` argument set, kept separate from the syscall so the host test can check it.
+/// One fully built extended `THREAD_CREATE` call.
+///
+/// Kept separate from the syscall instruction so the host test can inspect every wire value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct CreateCall {
+struct CreateCall {
     /// Syscall number.
-    pub nr: usize,
+    number: usize,
     /// Target process handle (`SELF_PROC`).
-    pub proc_handle: usize,
-    /// Entry stub.
-    pub entry: usize,
-    /// New stack top.
-    pub stack_top: usize,
-    /// Start arguments.
-    pub arg: usize,
+    process: usize,
+    /// Thread entry stub.
+    entry: usize,
+    /// Top of the new user stack.
+    stack_top: usize,
+    /// Entry argument (`StartArgs` address).
+    arg: usize,
     /// `THREAD_CREATE_EX`.
-    pub flags: usize,
-    /// The extended payload.
-    pub extended: ThreadCreateEx,
+    flags: usize,
+    /// Extended payload passed in the sixth argument.
+    extended: ThreadCreateEx,
 }
 
-/// Build the production `THREAD_CREATE` argument set.
-#[must_use]
-pub(crate) fn create_call(args: &CreateArgs) -> CreateCall {
+/// Build the extended create call from the library arguments.
+fn create_call(args: &CreateArgs) -> CreateCall {
     CreateCall {
-        nr: THREAD_CREATE,
-        proc_handle: SELF_PROC,
+        number: THREAD_CREATE,
+        process: SELF_PROC,
         entry: args.entry,
         stack_top: args.stack_top,
         arg: args.arg,
@@ -245,10 +252,25 @@ pub(crate) fn create_call(args: &CreateArgs) -> CreateCall {
     }
 }
 
-/// The production `ThreadKernel`: every method that has no Raven primitive returns `ENOSYS` or
-/// the documented fallback; no kernel flag is invented.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct SysKernel;
+/// Invoke the extended create call and decode the returned thread handle.
+fn invoke_create(call: &CreateCall) -> Result<u32, Errno> {
+    // SAFETY: the scalar arguments name user addresses in the calling process; `call.extended`
+    // is a live, correctly aligned payload read by the kernel for the duration of the call.
+    let raw = unsafe {
+        raven_libc_sys::arch::syscall6(
+            call.number,
+            call.process,
+            call.entry,
+            call.stack_top,
+            call.arg,
+            call.flags,
+            &call.extended as *const ThreadCreateEx as usize,
+        )
+    };
+    raven_libc_sys::errno::ret(raw)
+        .map_err(|error| Errno(error.0))
+        .and_then(|value| u32::try_from(value).map_err(|_| EOVERFLOW))
+}
 
 impl SysKernel {
     /// The production kernel.
@@ -257,9 +279,10 @@ impl SysKernel {
         Self
     }
 
-    /// What the current kernel actually provides: PG-1 (`THREAD_SET_TLS`) and the
-    /// PG-2 `THREAD_CREATE_EX` payload are present. Real tids (`THREAD_SELF`) and
-    /// `THREAD_EXIT_EX` remain optional and are not advertised.
+    /// What the current kernel actually provides: PG-1 (`THREAD_SET_TLS`) is
+    /// present on x86-64; AArch64/RISC-V write the user register directly.
+    /// The extended `THREAD_CREATE_EX` create path is present; `THREAD_SELF`
+    /// kernel tids are still absent.
     #[must_use]
     pub const fn caps_const() -> KernelCaps {
         let mut caps = KernelCaps::minimal();
@@ -291,36 +314,8 @@ impl ThreadKernel for SysKernel {
         Err(ENOSYS)
     }
 
-    fn thread_is_dead(&self, tcb_address: usize) -> bool {
-        // The kernel clears `Pthread.join_word` when the thread exits; the libc exit path never
-        // writes it, so a zero word is the kernel's confirmation that the user stack can be
-        // reclaimed (A-thr-3).
-        tcb(tcb_address)
-            .join_word
-            .load(core::sync::atomic::Ordering::Acquire)
-            == 0
-    }
-
     fn create(&self, args: &CreateArgs) -> Result<u32, Errno> {
-        let call = create_call(args);
-        let mut extended = call.extended;
-        // SAFETY: `extended` is a live, fully initialised payload for the duration of the call;
-        // the kernel copies it from user space. The entry, stack and TLS addresses were built by
-        // `pthread_create` in the caller's address space, and `SELF_PROC` is the kernel's
-        // self-process handle.
-        let raw = unsafe {
-            raven_libc_sys::arch::syscall6(
-                call.nr,
-                call.proc_handle,
-                call.entry,
-                call.stack_top,
-                call.arg,
-                call.flags,
-                &mut extended as *mut ThreadCreateEx as usize,
-            )
-        };
-        let value = raven_libc_sys::errno::ret(raw).map_err(|error| Errno(error.0))?;
-        u32::try_from(value).map_err(|_| EINVAL)
+        invoke_create(&create_call(args))
     }
 
     fn exit(&self, code: i32) -> ! {
@@ -400,6 +395,15 @@ impl ThreadKernel for SysKernel {
 
     fn set_robust_list(&self, _head: usize) -> Result<(), Errno> {
         Err(ENOSYS)
+    }
+
+    fn thread_is_dead(&self, tcb_address: usize) -> bool {
+        // SAFETY: the caller passes a live TCB address (a `pthread_t` that passed the stale-tid
+        // checks); the kernel clears `join_word` on the thread's last exit step.
+        tcb(tcb_address)
+            .join_word
+            .load(core::sync::atomic::Ordering::Acquire)
+            == 0
     }
 
     fn start_trampoline(&self) -> fn(usize) -> ! {

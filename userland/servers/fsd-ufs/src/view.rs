@@ -16,7 +16,7 @@ use raven_proto_fs::{
     DirEntry as ProtoDirEntry, DirEntryHeader as ProtoDirEntryHeader, MAX_PATH, PathError, Stat,
     StatFs, normalize_absolute,
 };
-use ufs_core::{Attr, BlockIo, FileType, Ino, MountOptions, SetAttr, Ufs, UfsError};
+use ufs_core::{Attr, BlockIo, FileType, Ino, MountOptions, SetAttr, Timespec, Ufs, UfsError};
 
 use crate::handler::FileSystem;
 
@@ -69,6 +69,27 @@ impl<D: BlockIo> UfsView<D> {
             self.read_only = true;
         }
         errno(error)
+    }
+
+    fn set_owner(&mut self, ino: Ino, uid: u32, gid: u32) -> Result<(), Errno> {
+        let attr = self.ufs.getattr(ino).map_err(errno)?;
+        let mut set = SetAttr::default();
+        let mut changed = false;
+        if uid != u32::MAX && uid != attr.uid {
+            set.uid = Some(uid);
+            changed = true;
+        }
+        if gid != u32::MAX && gid != attr.gid {
+            set.gid = Some(gid);
+            changed = true;
+        }
+        if !changed {
+            return Ok(());
+        }
+        set.mode = Some(attr.mode & !0o6000);
+        self.ufs
+            .setattr(ino, set)
+            .map_err(|error| self.note_error(error))
     }
 
     /// Split a path into its resolved parent directory and final name.
@@ -398,6 +419,9 @@ impl<D: BlockIo> FileSystem for UfsView<D> {
         self.ensure_writable()?;
         let (parent, name) = self.parent_and_name(path)?;
         let target = self.resolve_inner(target, false)?;
+        if self.ufs.getattr(target).map_err(errno)?.kind == FileType::Directory {
+            return Err(Errno::EPERM);
+        }
         self.ufs
             .link(parent, name.as_bytes(), target)
             .map_err(|error| self.note_error(error))
@@ -414,6 +438,60 @@ impl<D: BlockIo> FileSystem for UfsView<D> {
                     ..SetAttr::default()
                 },
             )
+            .map_err(|error| self.note_error(error))
+    }
+
+    fn chown(&mut self, path: &str, uid: u32, gid: u32, follow: bool) -> Result<(), Errno> {
+        self.ensure_writable()?;
+        let ino = self.resolve_inner(path, follow)?;
+        self.set_owner(ino, uid, gid)
+    }
+
+    fn fchown(&mut self, ino: u32, uid: u32, gid: u32) -> Result<(), Errno> {
+        self.ensure_writable()?;
+        self.set_owner(ino, uid, gid)
+    }
+
+    fn utimens(
+        &mut self,
+        path: &str,
+        atime: Option<i64>,
+        mtime: Option<i64>,
+        follow: bool,
+    ) -> Result<(), Errno> {
+        self.ensure_writable()?;
+        let ino = self.resolve_inner(path, follow)?;
+        self.ufs
+            .setattr(
+                ino,
+                SetAttr {
+                    atime: atime.map(|sec| Timespec { sec, nsec: 0 }),
+                    mtime: mtime.map(|sec| Timespec { sec, nsec: 0 }),
+                    ..SetAttr::default()
+                },
+            )
+            .map_err(|error| self.note_error(error))
+    }
+
+    fn mkfifo(&mut self, path: &str, mode: u16) -> Result<(), Errno> {
+        self.ensure_writable()?;
+        let (parent, name) = self.parent_and_name(path)?;
+        self.ufs
+            .mknod(parent, name.as_bytes(), 0o010000 | (mode & 0o7777), 0, 0, 0)
+            .map(|_| ())
+            .map_err(|error| self.note_error(error))
+    }
+
+    fn mknod(&mut self, path: &str, mode: u16, dev: u32) -> Result<(), Errno> {
+        self.ensure_writable()?;
+        let kind = mode & 0o170000;
+        if !matches!(kind, 0o010000 | 0o020000 | 0o060000 | 0o140000) {
+            return Err(Errno::EINVAL);
+        }
+        let (parent, name) = self.parent_and_name(path)?;
+        self.ufs
+            .mknod(parent, name.as_bytes(), mode, u64::from(dev), 0, 0)
+            .map(|_| ())
             .map_err(|error| self.note_error(error))
     }
 

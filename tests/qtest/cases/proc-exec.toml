@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P2k same-pid exec: a bad ELF and an oversized kernel request leave the old image running,
+# then a real exec replaces it while keeping pid/pgid/sid/credentials and non-CLOEXEC handles
+# and closing an O_CLOEXEC pipe.
+
+name = "proc-exec"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/proc/build.sh"]
+initfs = "build/fixtures/proc/exec.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^proc-exec: bad-image=1 bad-kernel=1$'
+
+[[expect]]
+regex = '^proc-exec: exec-start$'
+
+[[expect]]
+regex = '^proc-exec: child argv=1$'
+
+[[expect]]
+regex = '^proc-exec: child identity=1$'
+
+[[expect]]
+regex = '^proc-exec: child handles=1$'
+
+[[expect]]
+regex = '^proc-exec: child ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|proc-exec: FAIL|proc-exec: child FAIL'

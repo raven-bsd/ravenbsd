@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# REL4d/REL4f: model the Pi 4 release launch/readiness chain and run the
+# deterministic network soak in a guest. The chain files and soak are host
+# fixtures, not board transcripts. The checker must accept the coherent chain,
+# reject the duplicate-launcher chain, and exercise both successful and failed
+# link/DHCP/ring cycles without claiming GENET-NET-OK on a failed cycle.
+
+name = "pi4-net-model"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/pi4-net/build.sh"]
+initfs = "build/fixtures/pi4-net/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^pi4-net-model: start$'
+
+[[expect]]
+regex = '^pi4-net-model: chain pass$'
+
+[[expect]]
+regex = '^pi4-net-model: duplicate rejected$'
+
+[[expect]]
+regex = '^pi4-net-soak: start cycles=128$'
+
+[[expect]]
+regex = '^pi4-net-soak: cycles=128 ok=[0-9]+ failed=[0-9]+$'
+
+[[expect]]
+regex = '^pi4-net-soak: faults link_flap=[1-9][0-9]* dhcp_timeout=[1-9][0-9]* renewal=[1-9][0-9]* ring_wrap=[1-9][0-9]* tx_drop=[1-9][0-9]* malformed_rx=[1-9][0-9]*$'
+
+[[expect]]
+regex = '^pi4-net-soak: markers=ok leaks=0$'
+
+[[expect]]
+regex = '^pi4-net-soak: pass$'
+
+[[expect]]
+regex = '^pi4-net-model: pass$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|pi4-net-model: (coherent chain rejected|duplicate launcher accepted)|pi4-net-soak: (FAIL|leak)'

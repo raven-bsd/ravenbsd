@@ -1,0 +1,59 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt AR 1
+.Os RavenBSD
+.Sh NAME
+.Nm ar
+.Nd create, list and extract POSIX archives
+.Sh SYNOPSIS
+.Nm
+.Op Fl r|t|x|s
+.Op Fl vc
+.Ar archive
+.Op Ar members ...
+.Sh DESCRIPTION
+The
+.Nm
+utility manages the portable
+.Ql !<arch>\n
+archive format.
+.Bl -tag -width Ds
+.It Fl r
+Replace members in the archive, appending members that are not present.
+.It Fl t
+List member names.
+.It Fl x
+Extract members into the current directory, restoring their mode.
+.It Fl s
+Rewrite the ELF symbol table.
+.It Fl v
+Verbose listing/extraction.
+.It Fl c
+Accepted compatibility flag; archive creation is silent.
+.El
+.Pp
+Short member names use
+.Ql name/ ;
+longer names use the
+.Ql #1/<len>
+extension.
+A
+.Ql /
+member carries a simple symbol table for ELF32/ELF64 little-endian objects.
+Operations
+.Fl d ,
+.Fl m ,
+.Fl p ,
+.Fl q
+and
+.Fl u
+are not implemented and are reported as usage errors.
+.Sh EXIT STATUS
+.Ex -std
+A missing or malformed archive exits with status 1; a usage error exits with status 2.
+.Sh SEE ALSO
+.Xr uuencode 1 ,
+.Xr uudecode 1
+.Sh STANDARDS
+RavenBSD implements the POSIX archive format with the documented subset.
