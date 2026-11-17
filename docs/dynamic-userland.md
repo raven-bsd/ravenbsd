@@ -51,6 +51,27 @@ The existing `tests/fixtures/dynamic-exec` C binary shows the same `PT_INTERP` a
 
 ## Remaining integration (not landed)
 
+The opt-in build mode is in `xtask` behind a profile's `initfs.dynamic` switch (off by default).
+Enabling the shell profile produced dynamic `/bin` programs with `PT_INTERP` and
+`DT_NEEDED libc.so.1`, and static `/sbin`/`init`. Boot then failed before `main`:
+
+```
+ld-elf.so.1: relocation failed
+process: child exited (127)
+```
+
+The dynamic Rust binary has 1851 `R_X86_64_RELATIVE` entries. The loader's
+`libc/ravenlibc/crates/raven-libc-elf/src/reloc/mod.rs` `apply_one` computes
+`place = bias + r_offset` but `check_offset` (same file, lines 172-183) compares that absolute
+place against the object's relative segment `vaddr`. The C dynamic fixture has no RELATIVE
+entries, which is why `dynamic-exec` passes. The fix is in the C74g/S81 loader lane:
+compare the relocation offset in the same address space as the segments (or make the segment
+views absolute). `libc-dynamic` also regressed on this base with `AT_BASE == 0`; that is the same
+kernel/loader lane and must be fixed before the dynamic-userland qtest can pass.
+
+The `dynamic-userland` qtest is therefore not added; the exact failing bound is the loader above,
+not the build flags.
+
 1. `xtask/src/build.rs`: a dynamic-userland mode for `Component::User` (x86_64) that uses the
    wrapper and flags above instead of `relocation-model=static` plus
    `userland/linker/x86_64.ld`.
