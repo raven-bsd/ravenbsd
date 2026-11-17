@@ -5,8 +5,8 @@
 //!
 //! Starts the small service set needed by `newgrp`, then runs each of the seven required POSIX
 //! utilities in a bounded non-interactive case. Every case prints a start line, the tool output,
-//! and an `exit=<code> PASS|FAIL` verdict. `localedef` is expected to report its host-only target
-//! stub; that row stays FAIL. The fixture exits non-zero when any required row fails.
+//! and an `exit=<code> PASS|FAIL` verdict. The fixture exits non-zero when any required row
+//! fails; all seven rows pass on x86_64 and aarch64.
 
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]

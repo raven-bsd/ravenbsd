@@ -3,7 +3,9 @@
 
 # P4a10/P4a11: run the seven required POSIX utilities in the booted image. The fixture prints one
 # PASS/FAIL row per case and exits non-zero if any required row fails. P4a11 fixed localedef's
-# target build, so all seven required utilities now pass.
+# target build, so all seven required utilities now pass. The fixture build is arch-aware: the
+# qtest `--arch` selects the target and passes RAVEN_QT_ARCH to the pre build, so this same case
+# runs on x86_64 and aarch64.
 
 name = "required-utils"
 arch = "x86_64"
