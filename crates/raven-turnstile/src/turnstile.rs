@@ -481,6 +481,16 @@ impl Turnstiles {
             .collect()
     }
 
+    /// All registered threads and their base priorities (for the IPC donation layer).
+    pub(crate) fn threads(&self) -> impl Iterator<Item = (ThreadId, Priority)> + '_ {
+        self.threads.iter().map(|(thread, base)| (*thread, *base))
+    }
+
+    /// All object ids that currently exist (for the IPC donation layer).
+    pub(crate) fn objects(&self) -> impl Iterator<Item = ObjectId> + '_ {
+        self.objects.keys().copied()
+    }
+
     /// Check every invariant the model promises.
     ///
     /// Returns the first violation. Used by the exhaustive model check and by the kernel glue in

@@ -1,0 +1,343 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+//! IPC priority donation graph layered on the turnstile.
+//!
+//! A turnstile propagates priority through a lock wait queue. An IPC call adds a second edge: a
+//! client blocked on a server reply donates its priority to the server, and that boost must flow
+//! through any lock the server then waits on. This module models both edge kinds and computes each
+//! thread's effective priority as the *least fixed point* over them:
+//!
+//! `eff(t) = min(base(t), { eff(w) | w waits on a lock owned by t }, { eff(c) | c has a call to t })`
+//!
+//! The lookup path (`effective_priority`) is allocation-free (a cached map); mutations recompute
+//! the fixed point. Call edges are `client -> server` with at most one outstanding call per
+//! client; completion, cancellation, client death and server death remove exactly the right edges.
+
+use alloc::collections::BTreeMap;
+use alloc::vec::Vec;
+
+use super::{CancelOutcome, Error, InheritEffect, ObjectId, Priority, ThreadId, Turnstiles};
+
+/// Why a donation operation was rejected.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DonationError {
+    /// A thread id is not registered.
+    UnknownThread,
+    /// The client already has an outstanding call.
+    DuplicateCall,
+    /// No matching outstanding call exists to end or cancel.
+    StaleCall,
+}
+
+/// A violated donation invariant, returned by [`Donation::check_invariants`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DonationViolation {
+    /// A call edge references an unregistered thread.
+    DanglingCall,
+    /// The cached effective priority diverges from the least fixed point.
+    EffectiveMismatch,
+    /// A thread with no donor (call or lock) is not at its base priority.
+    BaseNotRestored,
+}
+
+/// A turnstile registry extended with IPC call edges for priority donation.
+pub struct Donation {
+    turnstiles: Turnstiles,
+    calls: BTreeMap<ThreadId, ThreadId>,
+    effective: BTreeMap<ThreadId, Priority>,
+    max_depth: usize,
+}
+
+impl Donation {
+    /// Create an empty donation graph.
+    #[must_use]
+    pub fn new() -> Self {
+        Donation {
+            turnstiles: Turnstiles::new(),
+            calls: BTreeMap::new(),
+            effective: BTreeMap::new(),
+            max_depth: 0,
+        }
+    }
+
+    /// Register a thread with its base priority.
+    pub fn register(&mut self, thread: ThreadId, base: Priority) -> Result<(), Error> {
+        self.turnstiles.register(thread, base)?;
+        self.refresh();
+        Ok(())
+    }
+
+    /// The thread's base priority.
+    #[must_use]
+    pub fn base_priority(&self, thread: ThreadId) -> Option<Priority> {
+        self.turnstiles.base_priority(thread)
+    }
+
+    /// The thread's combined effective priority (base, lock waiters and call clients, transitive).
+    ///
+    /// Allocation-free: a cached map lookup.
+    #[must_use]
+    pub fn effective_priority(&self, thread: ThreadId) -> Option<Priority> {
+        self.effective.get(&thread).copied()
+    }
+
+    /// Open a call edge: `client` is blocked on a reply from `server`.
+    pub fn begin_call(&mut self, client: ThreadId, server: ThreadId) -> Result<(), DonationError> {
+        if !self.is_registered(client) || !self.is_registered(server) {
+            return Err(DonationError::UnknownThread);
+        }
+        if self.calls.contains_key(&client) {
+            return Err(DonationError::DuplicateCall);
+        }
+        self.calls.insert(client, server);
+        self.refresh();
+        Ok(())
+    }
+
+    /// Close a call edge after the server replies.
+    pub fn end_call(&mut self, client: ThreadId, server: ThreadId) -> Result<(), DonationError> {
+        match self.calls.get(&client) {
+            Some(&actual) if actual == server => {
+                self.calls.remove(&client);
+                self.refresh();
+                Ok(())
+            }
+            _ => Err(DonationError::StaleCall),
+        }
+    }
+
+    /// Cancel a client's outstanding call.
+    pub fn cancel_call(&mut self, client: ThreadId) -> Result<(), DonationError> {
+        if self.calls.remove(&client).is_none() {
+            return Err(DonationError::StaleCall);
+        }
+        self.refresh();
+        Ok(())
+    }
+
+    /// Remove a dead client's call edge. Returns the number of edges removed (0 or 1).
+    pub fn client_death(&mut self, client: ThreadId) -> usize {
+        let removed = usize::from(self.calls.remove(&client).is_some());
+        if removed != 0 {
+            self.refresh();
+        }
+        removed
+    }
+
+    /// Remove every call edge to a dead server. Returns the number of edges removed.
+    pub fn server_death(&mut self, server: ThreadId) -> usize {
+        let mut removed = 0usize;
+        self.calls.retain(|_, &mut actual| {
+            if actual == server {
+                removed = removed.saturating_add(1);
+                false
+            } else {
+                true
+            }
+        });
+        if removed != 0 {
+            self.refresh();
+        }
+        removed
+    }
+
+    /// Take ownership of `object` (lock operation, delegated to the turnstile).
+    pub fn acquire(&mut self, object: ObjectId, thread: ThreadId) -> Result<(), Error> {
+        self.turnstiles.acquire(object, thread)?;
+        self.refresh();
+        Ok(())
+    }
+
+    /// Block `thread` on `object` and return the owner's combined inheritance effect.
+    pub fn block(&mut self, object: ObjectId, thread: ThreadId) -> Result<InheritEffect, Error> {
+        let before = self.owner_effective(object);
+        self.turnstiles.block(object, thread)?;
+        self.refresh();
+        let owner = self.turnstiles.owner(object).ok_or(Error::UnknownThread)?;
+        let after = self
+            .effective
+            .get(&owner)
+            .copied()
+            .unwrap_or(Priority::LOWEST);
+        Ok(InheritEffect {
+            owner,
+            before: before.unwrap_or(after),
+            after,
+        })
+    }
+
+    /// Wake the highest-priority waiter and hand it ownership (delegated).
+    #[must_use]
+    pub fn wake_one(&mut self, object: ObjectId) -> Option<ThreadId> {
+        let woken = self.turnstiles.wake_one(object);
+        self.refresh();
+        woken
+    }
+
+    /// Release and wake every waiter (delegated).
+    #[must_use]
+    pub fn wake_all(&mut self, object: ObjectId) -> Vec<ThreadId> {
+        let woken = self.turnstiles.wake_all(object);
+        self.refresh();
+        woken
+    }
+
+    /// Cancel a waiter (delegated).
+    pub fn cancel(&mut self, object: ObjectId, thread: ThreadId) -> CancelOutcome {
+        let outcome = self.turnstiles.cancel(object, thread);
+        self.refresh();
+        outcome
+    }
+
+    /// Recompute the owner's inheritance effect (delegated).
+    pub fn boost(&mut self, object: ObjectId) -> Result<Option<InheritEffect>, Error> {
+        let effect = self.turnstiles.boost(object)?;
+        self.refresh();
+        Ok(effect)
+    }
+
+    /// Drop the inheritance contribution (delegated).
+    pub fn unboost(&mut self, object: ObjectId) -> Result<Option<InheritEffect>, Error> {
+        let effect = self.turnstiles.unboost(object)?;
+        self.refresh();
+        Ok(effect)
+    }
+
+    /// The owner of `object` (delegated).
+    #[must_use]
+    pub fn owner(&self, object: ObjectId) -> Option<ThreadId> {
+        self.turnstiles.owner(object)
+    }
+
+    /// The waiters of `object` (delegated).
+    #[must_use]
+    pub fn waiters(&self, object: ObjectId) -> Vec<ThreadId> {
+        self.turnstiles.waiters(object)
+    }
+
+    /// The number of waiters on `object` (delegated).
+    #[must_use]
+    pub fn waiter_count(&self, object: ObjectId) -> usize {
+        self.turnstiles.waiter_count(object)
+    }
+
+    /// The object `thread` waits on (delegated).
+    #[must_use]
+    pub fn waiting_on(&self, thread: ThreadId) -> Option<ObjectId> {
+        self.turnstiles.waiting_on(thread)
+    }
+
+    /// The objects owned by `thread` (delegated).
+    #[must_use]
+    pub fn owned_objects(&self, thread: ThreadId) -> Vec<ObjectId> {
+        self.turnstiles.owned_objects(thread)
+    }
+
+    /// The outstanding call edges, in `(client, server)` order.
+    #[must_use]
+    pub fn call_edges(&self) -> Vec<(ThreadId, ThreadId)> {
+        self.calls
+            .iter()
+            .map(|(&client, &server)| (client, server))
+            .collect()
+    }
+
+    /// The maximum donation-chain depth observed so far (an upper bound on the longest chain).
+    #[must_use]
+    pub fn max_chain_depth(&self) -> usize {
+        self.max_depth
+    }
+
+    /// Check every donation invariant.
+    ///
+    /// Returns the first violation. Never panics; reads only the current state.
+    pub fn check_invariants(&self) -> Result<(), DonationViolation> {
+        for (&client, &server) in &self.calls {
+            if !self.is_registered(client) || !self.is_registered(server) {
+                return Err(DonationViolation::DanglingCall);
+            }
+        }
+        let (recomputed, _) = self.compute_effective();
+        if recomputed != self.effective {
+            return Err(DonationViolation::EffectiveMismatch);
+        }
+        for (thread, base) in self.turnstiles.threads() {
+            let has_donor = self.calls.values().any(|&server| server == thread)
+                || self
+                    .turnstiles
+                    .owned_objects(thread)
+                    .iter()
+                    .any(|&object| self.turnstiles.waiter_count(object) > 0);
+            if !has_donor && self.effective.get(&thread).copied() != Some(base) {
+                return Err(DonationViolation::BaseNotRestored);
+            }
+        }
+        Ok(())
+    }
+
+    fn is_registered(&self, thread: ThreadId) -> bool {
+        self.turnstiles.base_priority(thread).is_some()
+    }
+
+    fn owner_effective(&self, object: ObjectId) -> Option<Priority> {
+        let owner = self.turnstiles.owner(object)?;
+        self.effective.get(&owner).copied()
+    }
+
+    /// Compute the least fixed point over lock edges and call edges.
+    fn compute_effective(&self) -> (BTreeMap<ThreadId, Priority>, usize) {
+        let mut effective: BTreeMap<ThreadId, Priority> = self.turnstiles.threads().collect();
+        let mut depth = 0usize;
+        loop {
+            let mut changed = false;
+            for object in self.turnstiles.objects() {
+                let Some(owner) = self.turnstiles.owner(object) else {
+                    continue;
+                };
+                for waiter in self.turnstiles.waiters(object) {
+                    let Some(priority) = effective.get(&waiter).copied() else {
+                        continue;
+                    };
+                    if let Some(current) = effective.get_mut(&owner)
+                        && priority < *current
+                    {
+                        *current = priority;
+                        changed = true;
+                    }
+                }
+            }
+            for (&client, &server) in &self.calls {
+                let Some(priority) = effective.get(&client).copied() else {
+                    continue;
+                };
+                if let Some(current) = effective.get_mut(&server)
+                    && priority < *current
+                {
+                    *current = priority;
+                    changed = true;
+                }
+            }
+            if !changed {
+                return (effective, depth);
+            }
+            depth = depth.saturating_add(1);
+        }
+    }
+
+    fn refresh(&mut self) {
+        let (effective, depth) = self.compute_effective();
+        self.effective = effective;
+        self.max_depth = self.max_depth.max(depth);
+    }
+}
+
+impl Default for Donation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+#[path = "donation_ut.rs"]
+mod tests;
