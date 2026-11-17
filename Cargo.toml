@@ -118,6 +118,7 @@ members = [
     "tests/user/image",
     "tests/ufs-powercut",
     "tools/fs-fuzz",
+    "tools/abi-diff",
     "tools/linux-corpus",
     "tools/ufs-fsck",
     "tools/ufs-mkfs",
