@@ -28,6 +28,8 @@ use crate::process::Process;
 
 /// Lowest priority (idle).
 pub const PRIORITY_MAX: u8 = 31;
+/// No inherited priority boost is active.
+pub const NO_BOOST: u8 = u8::MAX;
 /// Default priority for user and ordinary kernel threads.
 pub const PRIORITY_DEFAULT: u8 = 16;
 /// Priority of the per-CPU idle thread.
@@ -126,7 +128,9 @@ pub struct Thread {
     pub process: Arc<Process>,
     state: AtomicU8,
     /// Static priority.
-    pub priority: u8,
+    pub priority: AtomicU8,
+    /// Inherited turnstile/donation boost, [`NO_BOOST`] when no donor is active.
+    pub boost: AtomicU8,
     /// Reserved scheduling context (DR-20).
     #[allow(dead_code)] // placeholder read by the future RT class
     pub sched: SchedContext,
@@ -214,11 +218,31 @@ impl Thread {
     /// User threads derive it from the owning process's POSIX nice value, so `setpriority`
     /// reaches every later enqueue/wake. Kernel and idle threads keep their static priority.
     pub fn effective_priority(&self) -> u8 {
-        if self.user && !self.idle {
+        let base = if self.user && !self.idle {
             crate::process::priority::nice_to_priority(self.process.nice())
         } else {
-            self.priority
+            self.priority.load(Ordering::Acquire)
+        };
+        let boost = self.boost.load(Ordering::Acquire);
+        if boost == NO_BOOST {
+            base
+        } else {
+            base.min(boost)
         }
+    }
+
+    /// Apply an inherited priority boost (0 is the most urgent).
+    #[allow(dead_code)] // L3 is the first consumer
+    #[inline]
+    pub fn set_boost(&self, priority: u8) {
+        self.boost.store(priority, Ordering::Release);
+    }
+
+    /// Clear the inherited boost and return to the base priority.
+    #[allow(dead_code)] // L3 is the first consumer
+    #[inline]
+    pub fn clear_boost(&self) {
+        self.boost.store(NO_BOOST, Ordering::Release);
     }
 
     /// Change state.
@@ -301,7 +325,8 @@ impl Thread {
             name,
             process,
             state: AtomicU8::new(ThreadState::Ready as u8),
-            priority,
+            priority: AtomicU8::new(priority),
+            boost: AtomicU8::new(NO_BOOST),
             sched: SchedContext::fair(priority),
             kernel_stack_base: base,
             kernel_stack_top: top,
@@ -398,7 +423,8 @@ impl Thread {
             name: String::from("idle"),
             process,
             state: AtomicU8::new(ThreadState::Running as u8),
-            priority: PRIORITY_IDLE,
+            priority: AtomicU8::new(PRIORITY_IDLE),
+            boost: AtomicU8::new(NO_BOOST),
             sched: SchedContext::fair(PRIORITY_IDLE),
             kernel_stack_base: 0,
             kernel_stack_top: current_rsp & !0xf,
@@ -451,7 +477,8 @@ impl Thread {
             name: String::from("idle-ap"),
             process,
             state: AtomicU8::new(ThreadState::Running as u8),
-            priority: PRIORITY_IDLE,
+            priority: AtomicU8::new(PRIORITY_IDLE),
+            boost: AtomicU8::new(NO_BOOST),
             sched: SchedContext::fair(PRIORITY_IDLE),
             kernel_stack_base: base,
             kernel_stack_top: top,
