@@ -251,7 +251,9 @@ impl Driver {
         let directory = workdir()?;
         std::fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
         let serial = BUILD_SERIAL.fetch_add(1, Ordering::Relaxed);
-        let hash = hash64(source.as_bytes()) ^ serial.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        let hash = hash64(source.as_bytes())
+            ^ serial.wrapping_mul(0x9E37_79B9_7F4A_7C15)
+            ^ u64::from(std::process::id());
         let path = directory.join(format!("driver_{hash:016x}.c"));
         std::fs::write(&path, source.as_bytes()).map_err(|error| error.to_string())?;
         let library = directory.join(format!("libdriver_{hash:016x}.so"));

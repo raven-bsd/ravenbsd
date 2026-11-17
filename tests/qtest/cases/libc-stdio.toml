@@ -4,7 +4,7 @@ name = "libc-stdio"
 arch = "x86_64"
 profile = "libc-test"
 timeout_secs = 240
-pre = ["sh tests/libc/target/build.sh stdio x86_64"]
+pre = ["sh tests/libc/target/build.sh stdio"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
