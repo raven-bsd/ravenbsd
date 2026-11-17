@@ -1,0 +1,75 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt LOCALE 1
+.Os RavenBSD
+.Sh NAME
+.Nm locale
+.Nd report locale categories
+.Sh SYNOPSIS
+.Nm
+.Op Fl a | Fl m | Fl k
+.Op Ar category ...
+.Sh DESCRIPTION
+The
+.Nm
+utility resolves the environment through the locale state and reports locale information.
+Without options or operands it prints
+.Ev LANG ,
+each
+.Ev LC_*
+category, the raw
+.Ev LC_ALL
+value and
+.Cm codeset
+from
+.Xr nl_langinfo 3 .
+An unset environment falls back to
+.Ql C.UTF-8 .
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl a
+List known locales:
+.Ql C ,
+.Ql POSIX
+and
+.Ql C.UTF-8 .
+.It Fl m
+List known charmaps:
+.Ql ANSI_X3.4-1968
+and
+.Ql UTF-8 .
+.It Fl k
+List the keyword names:
+.Ql LANG ,
+the six
+.Ql LC_*
+categories,
+.Ql LC_ALL
+and
+.Ql codeset .
+.El
+.Pp
+A category operand prints one
+.Ql NAME="value"
+line.
+.Ql LANG
+prints the raw environment value and
+.Ql LC_ALL
+prints the resolved composite.
+Unknown categories are an error. Options and category operands are mutually exclusive.
+.Sh EXIT STATUS
+.Ex -std
+0 on success, 1 for an unknown category, 2 for usage.
+.Sh SEE ALSO
+.Xr iconv 1 ,
+.Xr gencat 1
+.Sh STANDARDS
+A documented subset of POSIX
+.Nm locale .
+This build knows only the C, POSIX and C.UTF-8 names; locale-archive discovery,
+.Fl c ,
+.Fl u ,
+.Fl v
+and target execution are unsupported.

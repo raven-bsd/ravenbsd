@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S71 S70-scenario fault case: the `frt` worker dies inside the handler for an in-flight READ, so
+# the client's request is pending when the process exits. The kernel must fail that request with
+# the defined EIO/EPIPE, svcd must restart the worker and advance the `svc:/frt.gen` generation,
+# the stale handle must keep failing promptly, and the bounded reconnect must open a fresh handle
+# and read from the restarted worker.
+
+name = "fault-reconnect"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/fault/build.sh"]
+initfs = "build/fixtures/fault/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: frt up$'
+unordered = true
+
+[[expect]]
+regex = '^fault-reconnect: gen0=[0-9]+$'
+
+# The in-flight READ must fail with the defined dead-server error: EIO (5) or EPIPE (32).
+[[expect]]
+regex = '^fault-reconnect: inflight:(5|32)$'
+
+[[expect]]
+regex = '^fault-reconnect: gen1=[0-9]+$'
+
+# A stale handle read must keep failing promptly instead of hanging.
+[[expect]]
+regex = '^fault-reconnect: stale:(5|32)$'
+
+[[expect]]
+regex = '^fault-reconnect: reopened$'
+
+[[expect]]
+regex = '^fault-reconnect: ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

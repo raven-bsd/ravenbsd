@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "smp-soak-off"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/smp-soak/build.sh"]
+initfs = "build/fixtures/smp-soak/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=off"
+qemu_extra = []
+expect_exit = "success"
+
+[[step]]
+wait = '^smp-soak: ready$'
+send = "60 1 off\n"
+delay_ms = 50
+
+[[expect]]
+regex = '^smp-soak: workers=8 duration_s=60 cpus=1 mode=off$'
+
+# The single-CPU baseline pins every worker to CPU 0.
+[[expect]]
+regex = '^smp-soak: per-cpu cpu0=[1-9]\d* cpu1=0 cpu2=0 cpu3=0$'
+
+[[expect]]
+regex = '^smp-soak: hops=\d+ total=\d+ ops_per_s=\d+$'
+
+[[expect]]
+regex = '^smp-soak: latency p50_ns=\d+ p99_ns=\d+ samples=[1-9]\d*$'
+
+[[expect]]
+regex = '^smp-soak: complete workers=8$'
+
+[[expect]]
+regex = '^smp-soak: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|smp-soak: failed'

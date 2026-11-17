@@ -8,6 +8,8 @@
 
 extern crate alloc;
 
+pub mod peers;
 pub mod sessions;
 
+pub use peers::{Peer, Peers};
 pub use sessions::{Session, Sessions};

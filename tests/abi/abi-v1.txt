@@ -1,0 +1,70 @@
+SYSCALL 0x01 EXIT argc=1 ret=!
+SYSCALL 0x02 YIELD argc=0 ret=0
+SYSCALL 0x03 DEBUG_WRITE argc=2 ret=bytes_written
+SYSCALL 0x04 CLOCK_GET argc=2 ret=0
+SYSCALL 0x05 NANOSLEEP argc=1 ret=0
+SYSCALL 0x06 UNAME argc=1 ret=0
+SYSCALL 0x07 DEBUG_READ argc=3 ret=isize
+SYSCALL 0x0b TRACE_SET argc=1 ret=0
+SYSCALL 0x0c RECORD_LOCK argc=3 ret=0
+SYSCALL 0x20 THREAD_CREATE argc=5 ret=Handle
+SYSCALL 0x21 THREAD_EXIT argc=1 ret=!
+SYSCALL 0x22 FUTEX argc=4 ret=isize
+SYSCALL 0x23 THREAD_SET_TLS argc=2 ret=0
+SYSCALL 0x24 THREAD_SELF argc=0 ret=tid
+SYSCALL 0x25 THREAD_EXIT_EX argc=4 ret=!
+SYSCALL 0x26 ROBUST_LIST_SET argc=2 ret=0
+SYSCALL 0x30 PROC_CREATE argc=1 ret=Handle
+SYSCALL 0x31 PROC_WAIT argc=2 ret=0
+SYSCALL 0x32 PROC_TERMINATE argc=2 ret=0
+SYSCALL 0x33 PROC_NAMESPACE argc=3 ret=0
+SYSCALL 0x34 PROC_SET_PERSONALITY argc=3 ret=0
+SYSCALL 0x40 MAP argc=6 ret=addr
+SYSCALL 0x41 UNMAP argc=3 ret=0
+SYSCALL 0x42 PROTECT argc=4 ret=0
+SYSCALL 0x43 MEMOBJ_CREATE argc=2 ret=Handle
+SYSCALL 0x44 MSYNC argc=4 ret=0
+SYSCALL 0x50 HANDLE_CLOSE argc=1 ret=0
+SYSCALL 0x51 HANDLE_DUP argc=2 ret=Handle
+SYSCALL 0x52 HANDLE_TRANSFER argc=3 ret=Handle
+SYSCALL 0x53 HANDLE_REVOKE argc=2 ret=0
+SYSCALL 0x54 HANDLE_COPY argc=3 ret=Handle
+SYSCALL 0x55 HANDLE_TRANSFER_FILE argc=3 ret=Handle
+SYSCALL 0x58 EVQ_CREATE argc=1 ret=Handle
+SYSCALL 0x59 EVQ_CTL argc=5 ret=0
+SYSCALL 0x5a EVQ_WAIT argc=4 ret=count
+SYSCALL 0x5b TIMER_CREATE argc=2 ret=Handle
+SYSCALL 0x5c EVENT_CREATE argc=1 ret=Handle
+SYSCALL 0x5d EVENT_SIGNAL argc=2 ret=0
+SYSCALL 0x5e TIMER_SET argc=3 ret=0
+SYSCALL 0x60 SCHEME_REGISTER argc=2 ret=0
+SYSCALL 0x61 OPEN argc=3 ret=Handle
+SYSCALL 0x62 READ argc=2 ret=usize
+SYSCALL 0x63 WRITE argc=2 ret=usize
+SYSCALL 0x64 CLOSE argc=1 ret=0
+SYSCALL 0x65 DUP argc=2 ret=Handle
+SYSCALL 0x66 FSTAT argc=2 ret=0
+SYSCALL 0x67 CALL argc=2 ret=(u32,responsebuffer)
+SYSCALL 0x68 RECV argc=0 ret=(Handle,packet)
+SYSCALL 0x69 SEND argc=2 ret=0
+SYSCALL 0x70 MMIO_CREATE argc=4 ret=Handle
+SYSCALL 0x71 BOOT_BLOB argc=2 ret=Handle
+SYSCALL 0x72 DMA_ALLOC argc=5 ret=Handle
+SYSCALL 0x73 DMA_INFO argc=2 ret=0
+SYSCALL 0x74 IRQ_CREATE argc=4 ret=Handle
+SYSCALL 0x75 IRQ_WAIT argc=2 ret=count
+SYSCALL 0x76 IRQ_ACK argc=1 ret=0
+SYSCALL 0x80 SIG_SETUP argc=3 ret=0
+SYSCALL 0x81 THREAD_KICK argc=2 ret=0
+SYSCALL 0x82 SIGRETURN argc=0 ret=!
+SYSCALL 0x84 SIGRESEND argc=3 ret=!
+SYSCALL 0x100 PAGER_SUPPLY argc=3 ret=0
+STRUCT Errno size=0 align=0
+STRUCT FaultRecord size=24 align=8
+STRUCT Handle size=4 align=0
+STRUCT MContext size=256 align=8
+STRUCT RecordLock size=32 align=8
+STRUCT Rights size=0 align=0
+STRUCT ThreadCreateEx size=24 align=8
+STRUCT Timespec size=16 align=0
+STRUCT Uname size=0 align=1

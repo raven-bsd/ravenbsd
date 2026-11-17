@@ -3,8 +3,9 @@
 SPDX-License-Identifier: BSD-3-Clause
 Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-Status: OBSERVED for A1–A4. `raven-vmem` (A1), `raven-kmem` (A2), its per-CPU magazines/depot (A3)
-and the kernel heap integration (A4) are implemented and booting; A5/A6 remain.
+Status: OBSERVED for A1–A5c. `raven-vmem` (A1), `raven-kmem` (A2), its per-CPU magazines/depot (A3),
+the kernel heap integration (A4), the buddy core (A5a), the per-CPU frame caches (A5b) and the
+kernel frame integration (A5c) are implemented and booting; A6 remains.
 
 This is the working note for the memory lane. The requirement source is
 `ravenbsd-prjmgmt/architecture/kernel-next/03-memory.md` (R-MEM-1 .. R-MEM-25); the allocator lane
@@ -171,7 +172,57 @@ range with orders `0..=top_order`, all metadata in fixed inline storage (no glob
 
 The per-CPU frame caches and the kernel wiring are A5b, after S75.
 
-## 8. What A1..A6 defer to A5b+
+## 8. Physical frames: per-CPU magazines (A5b, OBSERVED)
+
+`FrameCache<NCPUS, CACHE_CAP, REMOTE_CAP>` adds the per-CPU fast path over the A5a buddy: fixed
+order-0 caches with high/low watermarks, batch refill/drain to a [`FrameSource`] (the buddy), a
+bounded remote-free queue per CPU, and per-CPU stats (`hits`, `misses`, `refills`, `drains`,
+`remote_frees`, `evictions`). Every call takes an explicit CPU id and the source, so the layer reads
+no hardware or globals. The pager failure path is complete: a `Pager` that refuses to back surfaces
+`BuddyError::Pager` through `alloc`, and conservation (`free + cached + remote + live + reserved ==
+total`) is intact. The 4-CPU million-op model and a single-CPU baseline assert no frame lost or
+duplicated, no cache above its capacity, and full coalescing after a drain.
+
+Kernel wiring (A5c) remains, after S75 releases the SMP paths.
+
+## 9. Physical frames: kernel integration (A5c, OBSERVED)
+
+`kernel/src/memory/frame.rs` now routes every page allocation through the A5a buddy and the A5b
+per-CPU magazines; the old bitmap path is gone from the kernel.
+
+* **Range and reservations**: the buddy is based at the lowest usable frame — not at zero — and
+  spans the usable interval rounded up to a power of two, capped at `MAX_BLOCKS = 1<<17` order-0
+  descriptors (512 MiB). This matters on aarch64: QEMU `virt` places RAM at 1 GiB, so a
+  zero-based range that is capped at 512 MiB would manage only non-usable frames and fail boot
+  with `out of frames`. Every non-`Usable` region from the boot map, every gap between regions,
+  and the padding to the power-of-two end is `reserve`d, so kernel, loader, ACPI, firmware and
+  MMIO frames are never handed out. The descriptor array lives in `.bss` (`Block` storage), so
+  construction never puts ~1 MiB on the 8 MiB boot stack. QEMU 512M boots leave 112,631
+  (aarch64, base=262144) / 113,611 (x86_64, base=256) free frames after reservations.
+* **Per-CPU path**: `FrameCache<MAX_CPUS, 64, 32>` is indexed by `smp::percpu::this_cpu()`; one
+  global spin mutex guards the buddy and the cache together, so a refill/drain and a foreign free
+  cannot race. `frames_percpu=off` (or `0`/`false`/`no`) drains the caches and routes allocations
+  straight to the buddy for debugging.
+* **DMA contiguity**: `alloc_contiguous` takes each frame of the run as an independent order-0
+  block (`alloc_at`), so the existing DMA teardown that frees a buffer frame by frame keeps
+  working; an occupied frame rolls the probe back and the scan moves to the next aligned run.
+* **Reclaim**: `free_range` releases reserved frames through `BuddyAllocator::release`, which
+  drops the reservation count and coalesces. Loader-reclaimable frames thus return to the buddy
+  once paging copied the boot data.
+* **Statistics**: `stats()` reports `total_bytes`, `free_bytes` (buddy free + cached),
+  `cached_bytes`, `reserved_bytes`, `allocated_bytes` and `regions`; `cpu_stats(cpu)` exposes the
+  per-CPU hit/miss/refill/drain/remote/eviction counters.
+* **Soak**: `frame::selftest` (`frames_selftest=1`) runs a 256-frame alloc/free probe with the
+  caches on and off, a 32-frame contiguous run freed frame by frame, and an OOM/conservation probe;
+  `cargo xtask qtest --case kmem-frames` runs it in QEMU. A 1,000,000-frame host model in
+  `buddy_ut.rs` exercises the allocator at the 4 GiB equivalent size.
+
+Known limits: the 512 MiB cap is a descriptor-storage constant, not an allocator limit; the
+per-CPU caches share one lock today (correctness first, contention reduction is a follow-up); and
+a double free of a frame still sitting in a CPU cache is not detected (the buddy detects double
+frees once the frame is back in its free lists).
+
+## 10. What A1..A6 defer to A5c+
 
 The architecture names three allocation policies and a quantum/import hierarchy. A1 ships
 `FirstFit`, `BestFit` and `NextFit`; the `InstantFit` power-of-two freelists and quantum caches are
@@ -181,7 +232,6 @@ from the mapped heap range, and the wider kva/ID arenas (R-MEM-3) land with the 
 The R-MEM-10 debug bitmask (`REDZONE|POISON|AUDIT|LITE|LEAK`) remains a kernel-side runtime flag;
 A6 provides the mechanisms behind a compile-time host/test feature.
 
-## 9. kmem next steps (A5b, PROPOSED)
-
-* **A5b** per-CPU frame caches over the A5a buddy core, kernel wiring and pager integration
-  (R-MEM-13..15), after S75.
+The remaining frame work is zones (`dma32`/`normal`) and NUMA node hints from R-MEM-13/14, the
+pager-backed frame hooks beyond the existing `BlockIo` path, and moving the per-CPU caches off the
+single allocator lock.

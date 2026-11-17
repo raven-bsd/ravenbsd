@@ -152,14 +152,18 @@ impl<P: PageProvider, L: Lock, X: Platform> Tiny<P, L, X> {
                     set_size(current, alloc);
                     let tail = current.wrapping_add(alloc);
                     set_size(tail, remainder);
+                    // Unlink `current` from the free list, then reinsert the tail as a free
+                    // chunk. `insert_free` marks the tail free and coalesces it with the
+                    // following free chunk when the split leaves them adjacent; linking the
+                    // tail by hand here previously left it without its free bit, so a later
+                    // free/realloc of that memory was not recognised as a double free.
                     if previous == 0 {
-                        self.free_list.set(tail);
+                        self.free_list.set(next);
                     } else {
                         // SAFETY: `previous` is a free chunk.
-                        raw::write_usize(previous, tail);
+                        raw::write_usize(previous, next);
                     }
-                    // SAFETY: the tail chunk is free.
-                    raw::write_usize(tail, next);
+                    self.insert_free(tail);
                 } else if previous == 0 {
                     self.free_list.set(next);
                 } else {

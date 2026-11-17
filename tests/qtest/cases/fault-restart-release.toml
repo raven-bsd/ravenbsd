@@ -1,0 +1,166 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# S71 release-image server-death/restart evidence. The release profile stages only netd and vfsd
+# as resident data servers (blockd and fsd-ufs live in their own test profiles), and release
+# rc.conf pins every resident service's restart policy to "never", so the harness restarts them
+# explicitly through svcctl. Killing is the supervisor-mediated stop: svcd terminates the child
+# and the shell restarts it; the S69 cleanup guarantees the old handles are retired.
+#
+# This case is x86_64-only: the release profile's pcid/devd/netd need the ACPI/PCIe platform and
+# it stages x86_64 user programs (see profiles/release.toml). The cross-arch kill matrix and the
+# S70 in-flight/reconnect scenario are in fault-restart and fault-reconnect (self-contained
+# initfs, run on x86_64 and aarch64).
+
+name = "fault-restart-release"
+arch = "x86_64"
+profile = "release"
+timeout_secs = 420
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = [
+    "-nic", "none",
+    "-netdev", "user,id=n0",
+    "-device", "virtio-net-pci,netdev=n0,disable-legacy=on",
+]
+expect_exit = "success"
+
+[[expect]]
+regex = '(?i)^password: ?$'
+
+[[expect]]
+regex = '^netd running [0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^netd stopped [0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^vfsd running [0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^vfsd stopped [0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|command not found|login: .*incorrect|login: .*failed'
+
+[[step]]
+wait = '(?i)^.*login: ?$'
+timeout_secs = 300
+
+[[step]]
+send = "root\n"
+delay_ms = 100
+
+[[step]]
+wait = '(?i)^password: ?$'
+timeout_secs = 30
+
+[[step]]
+send = "raven\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "svcctl list\n"
+delay_ms = 100
+
+[[step]]
+wait = '^netd running [0-9]+$'
+timeout_secs = 60
+
+[[step]]
+wait = '^vfsd running [0-9]+$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "svcctl restart netd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^netd stopped [0-9]+$'
+timeout_secs = 60
+
+[[step]]
+wait = '^netd running [0-9]+$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "svcctl stop netd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^netd stopped [0-9]+$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "svcctl start netd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^netd running [0-9]+$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "svcctl restart vfsd\n"
+delay_ms = 100
+
+[[step]]
+wait = '^vfsd stopped [0-9]+$'
+timeout_secs = 60
+
+[[step]]
+wait = '^vfsd running [0-9]+$'
+timeout_secs = 60
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "svcctl list\n"
+delay_ms = 100
+
+[[step]]
+wait = '^netd running [0-9]+$'
+timeout_secs = 60
+
+[[step]]
+wait = '^vfsd running [0-9]+$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

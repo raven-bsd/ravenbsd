@@ -161,14 +161,9 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
     // 4. symbols
     let versions = root.join("libc/ravenlibc/abi/Versions.def");
     let symbol_map = root.join("libc/ravenlibc/crates/raven-libc/Symbol.map");
-    // `abi/Symbols.list` is the canonical x86_64 list used by the host archive tests.
-    // Other architectures keep their own list beside their archive so a cross-arch pack
-    // cannot overwrite the canonical file.
-    let list = if options.arch == Arch::X86_64 {
-        root.join("libc/ravenlibc/abi/Symbols.list")
-    } else {
-        options.out.join("Symbols.list")
-    };
+    // The symbol list is a build artifact. Write it beside the archive for every architecture
+    // so `libc-pack` never dirties the canonical `libc/ravenlibc/abi/Symbols.list` in the tree.
+    let list = options.out.join("Symbols.list");
     let libc_map = options.out.join("libc.map");
     let merged = crate::libc_pack_tools::mkmap(
         root,
@@ -252,7 +247,110 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
     if options.host_run {
         crate::libc_pack_hostrun::run(root, &options.arch, &options.out)?;
     }
+
+    // 9. stage the libc sysroot
+    stage_sysroot(root, &options)?;
+    println!("libc-pack: sysroot: ok");
     Ok(0)
+}
+
+/// Stage `build/<arch>/sysroot` so the target C tests compile and link without a manual step.
+///
+/// The sysroot mirrors what a clang `--sysroot` expects: crt objects and `libc.a` under
+/// `usr/lib`, the base/arch/generated headers under `usr/include`, and — when they have been
+/// produced by `libc-link` — `libc.so.1` under `lib` and `ld-elf.so.1` under `libexec`.
+fn stage_sysroot(root: &Path, options: &Options) -> Result<()> {
+    let sysroot = options.out.join("sysroot");
+    let usr_lib = sysroot.join("usr/lib");
+    let usr_include = sysroot.join("usr/include");
+    std::fs::create_dir_all(&usr_lib).with_context(|| "cannot create sysroot/usr/lib")?;
+    std::fs::create_dir_all(&usr_include).with_context(|| "cannot create sysroot/usr/include")?;
+
+    for name in [
+        "crt1.o",
+        "Scrt1.o",
+        "rcrt1.o",
+        "crti.o",
+        "crtn.o",
+        "crtbegin.o",
+        "crtbeginS.o",
+        "crtend.o",
+        "libc.a",
+    ] {
+        copy_if_exists(&options.out.join(name), &usr_lib.join(name))?;
+    }
+
+    let stubs = options.out.join("stubs");
+    if stubs.is_dir() {
+        for entry in std::fs::read_dir(&stubs).with_context(|| "cannot read stubs")? {
+            let entry = entry?;
+            let source = entry.path();
+            let Some(name) = source.file_name().and_then(|name| name.to_str()) else {
+                continue;
+            };
+            if name.ends_with(".a") || name.ends_with(".so") {
+                copy_if_exists(&source, &usr_lib.join(name))?;
+            }
+        }
+    }
+
+    copy_headers(&root.join("libc/ravenlibc/include"), &usr_include)?;
+    copy_headers(
+        &root
+            .join("libc/ravenlibc/arch")
+            .join(options.arch.short())
+            .join("include"),
+        &usr_include,
+    )?;
+    copy_headers(
+        &root.join("libc/ravenlibc/abi/generated/include"),
+        &usr_include,
+    )?;
+
+    let lib = sysroot.join("lib");
+    let libexec = sysroot.join("libexec");
+    std::fs::create_dir_all(&lib).with_context(|| "cannot create sysroot/lib")?;
+    std::fs::create_dir_all(&libexec).with_context(|| "cannot create sysroot/libexec")?;
+    copy_if_exists(&options.out.join("libc.so.1"), &lib.join("libc.so.1"))?;
+    copy_if_exists(
+        &options.out.join("ld-elf.so.1"),
+        &libexec.join("ld-elf.so.1"),
+    )?;
+    // `-lc` finds `libc.so`; a linker script keeps static and dynamic links on one file.
+    let libc_so = usr_lib.join("libc.so");
+    if options.out.join("libc.so.1").is_file() && !libc_so.is_file() {
+        std::fs::write(&libc_so, b"INPUT ( libc.so.1 )\n")
+            .with_context(|| "cannot write libc.so script")?;
+    }
+    Ok(())
+}
+
+fn copy_if_exists(source: &Path, target: &Path) -> Result<()> {
+    if source.is_file() {
+        std::fs::copy(source, target)
+            .with_context(|| format!("cannot copy {} -> {}", source.display(), target.display()))?;
+    }
+    Ok(())
+}
+
+fn copy_headers(source: &Path, target: &Path) -> Result<()> {
+    if !source.is_dir() {
+        return Ok(());
+    }
+    for entry in std::fs::read_dir(source).with_context(|| "cannot read headers")? {
+        let entry = entry?;
+        let path = entry.path();
+        let name = entry.file_name();
+        let destination = target.join(&name);
+        if path.is_dir() {
+            std::fs::create_dir_all(&destination)
+                .with_context(|| format!("cannot create {}", destination.display()))?;
+            copy_headers(&path, &destination)?;
+        } else {
+            copy_if_exists(&path, &destination)?;
+        }
+    }
+    Ok(())
 }
 
 /// The exact `cargo rustc` command vector of step 1, without spawning it.

@@ -8,8 +8,24 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname "$0")/../../../.." && pwd)
 target=$root/build/posix-utility/talk-host
 
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+fail() {
+    printf 'FAIL: %s\n' "$1" >&2
+    exit 1
+}
+
 cd "$root"
-cargo nextest run -p talk
+cargo nextest run -p talk >"$tmp/nextest.log" 2>&1 || {
+    cat "$tmp/nextest.log"
+    exit 1
+}
+grep -q 'two_peer_registry_and_pty_transcript' "$tmp/nextest.log" || {
+    cat "$tmp/nextest.log"
+    exit 1
+}
+printf 'ok: two-peer registry and pty transcript\n'
 printf 'ok: talk host tests\n'
 
 (
@@ -20,14 +36,6 @@ if [ ! -x "$TALK" ]; then
     printf 'talk test: missing host binary\n' >&2
     exit 1
 fi
-
-tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
-
-fail() {
-    printf 'FAIL: %s\n' "$1" >&2
-    exit 1
-}
 
 cd "$tmp"
 
@@ -63,10 +71,10 @@ printf 'ok: network addresses are explicitly unsupported\n'
 if "$TALK" alice >out 2>err; then
     fail 'local address was accepted without a registry'
 fi
-grep -q 'no logged-in terminal for alice' err || fail 'registry diagnostic missing'
+grep -q 'no terminal registry entry for alice' err || fail 'registry diagnostic missing'
 printf 'ok: local addresses report the missing terminal registry\n'
 
-if "$TALK" -l >out 2>err; then
+if "$TALK" -l alice >out 2>err; then
     fail 'listener mode was accepted without a transport'
 fi
 grep -q 'no peer transport for a local listener' err || fail 'listener diagnostic missing'

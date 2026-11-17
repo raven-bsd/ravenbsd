@@ -1,0 +1,44 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt ASA 1
+.Os RavenBSD
+.Sh NAME
+.Nm asa
+.Nd interpret FORTRAN carriage-control characters
+.Sh SYNOPSIS
+.Nm
+.Op Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility reads each
+.Ar file
+in order, or the standard input when no file is given or a file is
+.Ql - ,
+and writes the text with the first character of every line interpreted as
+a FORTRAN carriage-control character:
+.Bl -tag -width Ds
+.It space
+Advance one line. Any character other than the controls below is treated
+as a space.
+.It Ql 0
+Advance two lines.
+.It Ql 1
+Advance to the first line of the next page (form feed).
+.It Ql +
+Overstrike the previous line (carriage return).
+.El
+.Pp
+The control character is removed from the output. The first line of a file
+does not start with a blank line or carriage return. A non-empty input ends
+with a newline.
+.Pp
+The target image reads the standard input from the console.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2.
+.Sh SEE ALSO
+.Xr cal 1
+.Sh STANDARDS
+RavenBSD implements the POSIX asa carriage-control subset for the C locale.

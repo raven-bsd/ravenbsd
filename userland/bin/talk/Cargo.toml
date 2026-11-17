@@ -19,10 +19,18 @@ name = "talk"
 path = "src/main.rs"
 
 [target.'cfg(target_os = "none")'.dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
 raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+raven-proto-tty = { path = "../../../crates/raven-proto-tty" }
 raven-rt = { path = "../../rt" }
 raven-scheme = { path = "../../../crates/raven-scheme" }
 raven-tool-core = { path = "../../../crates/raven-tool-core" }
+
+[dev-dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-proto-tty = { path = "../../../crates/raven-proto-tty" }
+raven-ptyd = { path = "../../../userland/servers/ptyd" }
+raven-ttyd = { path = "../../../userland/servers/ttyd" }
 
 [lints]
 workspace = true

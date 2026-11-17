@@ -13,6 +13,8 @@
 
 extern crate alloc;
 
+pub mod pairs;
 pub mod pty;
 
+pub use pairs::Pairs;
 pub use pty::{Pty, SignalSink};

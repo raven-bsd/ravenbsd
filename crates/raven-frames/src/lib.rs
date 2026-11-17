@@ -11,7 +11,9 @@
 #![forbid(unsafe_code)]
 
 mod buddy;
+mod cache;
 mod imp;
 
-pub use buddy::{BuddyAllocator, BuddyError, BuddyStats, NoPager, Pager};
+pub use buddy::{Block, BuddyAllocator, BuddyError, BuddyStats, FrameState, NoPager, Pager};
+pub use cache::{CpuFrameStats, FrameCache, FrameSource};
 pub use imp::*;

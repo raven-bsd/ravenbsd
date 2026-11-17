@@ -3,11 +3,15 @@
 #
 # P44 talk evidence.
 #
-# util.talk remains partial/missing: this image has no peer-terminal registry
-# (ttyd exposes only foreground/session ids), no who/utmp terminal list, and no
-# talkd or peer transport. The bounded local protocol loopback is tested by
-# test:tests/posix/utility/talk/test.sh but it is not the POSIX peer surface.
-# No [[row]] is emitted, so the profile row stays honestly partial instead of
-# claiming a session the platform cannot establish.
+# The local two-peer path is implemented with the ttyd logged-in terminal
+# registry (user, tty path, writable state) and independent ptyd pair ids.
+# The evidence script runs the library/CLI suite including the two-peer
+# registry + pty transcript. Network talkd remains out of scope.
 schema = 1
 standard = "posix-2024"
+
+[[row]]
+id = "util.talk"
+status = "present"
+evidence = "test:tests/posix/utility/talk/test.sh"
+notes = "P44 rework 2: two-peer local pty transcript through the ttyd registry; no network talkd"

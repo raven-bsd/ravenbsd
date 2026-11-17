@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# L6: a high-priority client's call edge boosts a low-priority server, the server's mutex wait
+# carries that priority to the owner, and every boost is restored when the lock and call end.
+
+name = "ipc-donation"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 60
+boot_cmdline = "console=ttyS0 test-exit=1 selftest=ipc-donation"
+expect_exit = "success"
+
+[[expect]]
+regex = '^ipc-donation: ok client_boost=0 server_boost=0 owner_boost=0 restored=ok$'
+
+[[forbid]]
+regex = '(?i)ipc-donation: fail|panic'

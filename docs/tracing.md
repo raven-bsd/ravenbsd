@@ -133,3 +133,23 @@ Accepted grammar and limits:
 Covered by W3C conformance vectors (valid/edge ids, sampled flag, uppercase, wrong length, non-hex,
 trailing bytes, empty, oversized), an exhaustive version-field sweep, a randomized fuzz and a
 format/parse round-trip property in `traceparent_ut.rs`.
+
+## 11. Cross-process span sink (`SpanRing`, Q4a)
+
+The one-reader span ring a `trace` command will read the demo spans from. A versioned header
+(magic, version, capacity, record size, producer count) plus fixed-size records over
+caller-supplied storage; producers reserve slots with a lock-free increment of the reserve cursor,
+write their record (a seqlock generation publishes it), and advance the commit cursor in slot
+order. One reader iterates the committed prefix.
+
+* Record: trace id, span id, parent span id, pid, monotonic timestamp, kind, opcode/status and a
+  per-producer sequence (plus the seqlock generation).
+* Overwrite is explicit: a reader that falls behind detects a gap (`commit - cursor > capacity`)
+  and skips, instead of returning a torn or stale record.
+* A reserved-but-not-finished slot is a torn record (`RingError::Torn`).
+* No allocation on the record path; `TraceSink` records only when enabled, and `Tracer::emit_sink`
+  writes nothing when tracing is disabled.
+
+Host tests: wrap, gap detection, torn rejection, capacity bounds, interleaved reserve/write/publish
+commit order, a deterministic randomized model (no lost/duplicated record, monotonic per-producer
+sequence) and a 4-producer × 100,000-record volume run.

@@ -3,52 +3,59 @@
 
 # P44 - POSIX talk
 
-First-party `talk` protocol, split-screen and session-state implementation, with host tests and a
-local loopback diagnostic. The `util.talk` profile row is **not claimed present**: the image has no
-peer-terminal registry or peer transport, so a real two-user session cannot be established.
+First-party `talk` with a ttyd logged-in terminal registry, independent pty pairs and a local
+two-peer transcript, plus the bounded `RVTALK/1` protocol and split-screen model.
 
 ## Method
 
-* `talk` parses `talk [-l] address [terminal]`, where `address` is `user[@host]`. `-l` is a local
-  listener extension; POSIX defines no options.
-* The bounded `RVTALK/1` wire protocol has `INVITE`, `ACCEPT`, `DECLINE`, `DATA`, `ALERT`, `END`
-  and `BYE` frames. Text fields are percent-escaped, every line is limited to 1024 bytes, text to
-  256 bytes and addresses/terminals to 64 bytes.
-* The session state machine implements the POSIX invitation, accept/decline, simultaneous
-  forwarding, explicit EOF, explicit termination and exit statuses. Once one side ends, the other
-  can only exit; both sides must terminate explicitly.
-* The split-screen helpers emit the labelled panes and refresh escape. `Ctrl-L` refreshes,
-  `Ctrl-G` alerts the peer, `Ctrl-D` sends `END`, `Ctrl-C` sends `BYE` and exits 0. Remote text is
-  filtered to printable ASCII and spaces.
-* The target wrapper probes `ttyd:session` (`STATE`) so the diagnostic names the local session and
-  foreground group, then reports the missing peer registry. It never acquires pids, waits or
-  signals (DR-46).
-* `--loopback` runs both endpoints in one process through the encoded frames and prints a readable
-  transcript. It is a local protocol diagnostic, not a peer session.
+* `ttyd` records each logged-in terminal as `(user, tty path, session, writable)`. A peer registers
+  with `OPEN ttyd:peer/<session>/<user>/<tty>`; the handle stays open for the login lifetime and
+  closing it (or the session) unregisters the terminal. `OPEN ttyd:who/<user>[/<tty>]` returns a
+  lookup handle; `CALL OP_PEER_LOOKUP` replies with the tty path and writable state. `SET_WRITE`
+  keeps the registry's writable bit in sync with the session.
+* `ptyd` now keeps a table of independent pairs. `pty:master`/`pty:slave` remain pair `0`;
+  `pty:master/<id>`/`pty:slave/<id>` select a second pair. Each pair has its own discipline,
+  queues and foreground group.
+* `talk -l address [terminal]` registers the local user's terminal (default
+  `pty:<session>/slave`) and waits for an invitation. `talk address [terminal]` opens its own
+  session, registers `pty:<session>/master`, looks the recipient up in ttyd, refuses a
+  non-writable terminal, and connects to the complementary pty endpoint.
+* The bounded `RVTALK/1` protocol has `INVITE`, `ACCEPT`, `DECLINE`, `DATA`, `ALERT`, `END` and
+  `BYE` frames. Text is percent-escaped, every line is limited to 1024 bytes, text to 256 bytes
+  and addresses/terminals to 64 bytes.
+* The state machine implements the POSIX invitation, accept/decline, simultaneous forwarding,
+  explicit EOF, explicit termination and exit statuses. Once one side ends, the other can only
+  exit; both sides terminate explicitly. The split-screen helpers emit the labelled panes and
+  refresh escape. `Ctrl-L` refreshes, `Ctrl-G` alerts, `Ctrl-D` sends `END`, `Ctrl-C` sends
+  `BYE` and exits 0.
+* The target wrapper reads the local console through `tty:console` on a reader thread and switches
+  the pty transport to raw/no-echo. It never acquires pids, waits or signals (DR-46).
 
 ## Tool matrix
 
 | Surface | Covered | Tests |
 |---|---|---:|
-| parser | `user[@host]`, terminal, `-l`, usage and bounds | 5 lib |
-| wire | all frames, escaping, UTF-8, malformed and oversized input | 2 lib |
-| session | invite/accept/decline, both-way forwarding, alert, refresh, EOF/BYE, out-of-order events | 7 lib |
-| UI | invitation text, split panes, refresh, sanitisation | 3 lib |
-| loopback | full encoded two-endpoint transcript | 1 lib + 5 host |
-| CLI | usage, network rejection, missing registry, missing listener transport | 5 host |
+| ttyd registry | register, user/terminal lookup, duplicate replacement, writable by record/session, session cleanup | 4 lib |
+| ptyd pairs | pair 0 compatibility, independent queues and settings for pair 1 | 1 lib |
+| talk parser | `user[@host]`, listener address, terminal, `-l`, usage and bounds | 5 lib |
+| talk wire | all frames, escaping, UTF-8, malformed and oversized input | 2 lib |
+| talk session | invite/accept/decline, both-way forwarding, alert, refresh, EOF/BYE, out-of-order events | 7 lib |
+| talk UI | invitation text, split panes, refresh, sanitisation | 3 lib |
+| loopback | full encoded two-endpoint transcript | 1 lib + 1 host |
+| two-peer path | ttyd registry lookup plus pair-1 pty transcript | 1 host |
+| CLI | usage, network rejection, missing registry, missing listener transport | 4 host |
 
-The host suite is 20 tests (15 library + 5 command-line).
+The host `talk` suite is 23 tests (17 library + 6 command-line). The registry and pty modules add
+their own host tests.
 
 ## Exact unsupported cases
 
-| Case | Why |
+| Case | Detail |
 |---|---|
-| `who`-style logged-in terminal lookup | no `who`/utmp terminal registry exists; `ttyd` stores only a session's foreground group, session id and hangup bit |
-| peer terminal addressing | `consd` serves one console (`tty:console`) and `ptyd` serves one anonymous master/slave pair; there is no per-terminal name or second terminal to attach |
-| `talkd`/network `user@host` | not implemented; non-`localhost` hosts are rejected before any session is attempted |
-| `mesg n` permission | no `mesg` utility or terminal-message flag is available |
+| network `user@host` / `talkd` | not implemented; non-`localhost` hosts are rejected before a session starts |
+| `mesg n` permission | no `mesg` utility; the registry carries the writable bit, but there is no command-line toggle |
 | extended `stty iexten` controls | only printable ASCII, space, alert, refresh, EOF and interrupt are handled |
-| local two-user tty-to-tty | impossible without the peer registry and a second terminal; the tested local loopback is explicitly not claimed as that surface |
+| two console users | one `tty:console` UI exists; two peers can have independent pty transports, but both local UIs share the console |
 
 ## Acceptance
 
@@ -59,6 +66,5 @@ cargo xtask posix-check --profile posix --arch x86_64
 make check-fast
 ```
 
-The runner reports `1 pass, 0 fail` with 7 cases. `docs/posix/evidence/P4-talk.toml` intentionally
-emits no row; the gate keeps `util.talk` missing/partial instead of claiming a false pass. No board
-claim.
+The runner reports `1 pass, 0 fail` with 8 cases. `docs/posix/evidence/P4-talk.toml` claims
+`util.talk` only because the two-peer registry + pty transcript passes. No board claim.

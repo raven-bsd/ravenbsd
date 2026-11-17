@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S71 cross-architecture kill matrix: a self-contained initfs runs the restartable `frt` scheme
+# worker and a driver that exercises the after-reply point (a live handle, then a read), the
+# during-restart point (`svc:` RESTART), the dead-handle error, a bounded reopen, and the idle
+# point (`svc:` STOP then START) with a second reopen. This runs on x86_64 and aarch64; the
+# x86_64-only release-image matrix (netd and vfsd through svcctl) is fault-restart-release.
+
+name = "fault-restart"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/fault/build.sh"]
+initfs = "build/fixtures/fault/initfs-restart.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: frt up$'
+unordered = true
+
+[[expect]]
+regex = '^fault-restart: gen0=[0-9]+$'
+
+[[expect]]
+regex = '^fault-restart: read-before=ok$'
+
+[[expect]]
+regex = '^fault-restart: restarted$'
+
+[[expect]]
+regex = '^fault-restart: gen1=[0-9]+$'
+
+# The handle opened before the restart must fail with EIO/EPIPE, not hang.
+[[expect]]
+regex = '^fault-restart: stale:(5|32)$'
+
+[[expect]]
+regex = '^fault-restart: reopen1$'
+
+[[expect]]
+regex = '^fault-restart: stopped$'
+
+[[expect]]
+regex = '^fault-restart: started$'
+
+[[expect]]
+regex = '^fault-restart: gen2=[0-9]+$'
+
+[[expect]]
+regex = '^fault-restart: reopen2$'
+
+[[expect]]
+regex = '^fault-restart: ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

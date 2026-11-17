@@ -140,6 +140,8 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
         return Ok(1);
     }
     println!("libc-link: ld-elf.so.1: ok");
+    stage_sysroot(&out, &libc, &loader)?;
+    println!("libc-link: sysroot: ok");
 
     if options.check {
         let mut failed = false;
@@ -185,6 +187,31 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<u8> {
         );
     }
     Ok(0)
+}
+
+/// Publish the freshly linked dynamic objects into the arch sysroot.
+///
+/// `libc-pack` stages the static sysroot; the dynamic `libc.so.1`/`ld-elf.so.1` are only known
+/// after this step, so write them here so the C target cases link against the current build.
+fn stage_sysroot(out: &Path, libc: &Path, loader: &Path) -> Result<()> {
+    let sysroot = out.join("sysroot");
+    let lib = sysroot.join("lib");
+    let libexec = sysroot.join("libexec");
+    let usr_lib = sysroot.join("usr/lib");
+    for directory in [&lib, &libexec, &usr_lib] {
+        std::fs::create_dir_all(directory)
+            .with_context(|| format!("cannot create {}", directory.display()))?;
+    }
+    std::fs::copy(libc, lib.join("libc.so.1"))
+        .with_context(|| format!("cannot copy {} to sysroot/lib", libc.display()))?;
+    std::fs::copy(loader, libexec.join("ld-elf.so.1"))
+        .with_context(|| format!("cannot copy {} to sysroot/libexec", loader.display()))?;
+    let libc_so = usr_lib.join("libc.so");
+    if !libc_so.is_file() {
+        std::fs::write(&libc_so, b"INPUT ( libc.so.1 )\n")
+            .with_context(|| "cannot write sysroot libc.so script")?;
+    }
+    Ok(())
 }
 
 /// Run the K7 part of the mkmap check against the linked `libc.so.1`.

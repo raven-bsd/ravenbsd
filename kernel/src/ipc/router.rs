@@ -686,6 +686,11 @@ pub fn send(
     packet.trace_id = request.packet.lock().trace_id;
     request.complete(status, result, Some(packet));
     retire(caller, &request, request_handle);
+    // SEND finished: clear the inherited trace id so the server's later requests are untraced
+    // unless they adopt their own caller.
+    if let Some(thread) = sched::current_thread() {
+        thread.trace_id.store(0, Ordering::Release);
+    }
     Ok(())
 }
 
@@ -881,6 +886,14 @@ fn deliver(
     packet_address: u64,
 ) -> Result<Handle, Errno> {
     let packet = request.deliverable_packet();
+    // Adopt the caller's trace id for the duration of this call: a nested call the server makes
+    // while serving it inherits the caller's trace. Cleared when SEND finishes.
+    if let Some(thread) = sched::current_thread() {
+        thread.trace_id.store(packet.trace_id, Ordering::Release);
+        // L6: the receiving server thread runs with the blocked client's priority until the
+        // reply (or cancellation/death) removes this call edge.
+        request.begin_donation(&thread);
+    }
     let mut bytes = [0u8; PACKET_SIZE];
     if protocol::encode(&packet, &mut bytes).is_err() {
         request.fail(Errno::EPROTO);

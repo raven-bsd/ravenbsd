@@ -3,6 +3,10 @@
 version = 4
 
 [[package]]
+name = "abi-diff"
+version = "0.1.0"
+
+[[package]]
 name = "acpi"
 version = "5.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -50,6 +54,14 @@ name = "ar"
 version = "0.1.0"
 dependencies = [
  "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
+name = "asa"
+version = "0.1.0"
+dependencies = [
  "raven-rt",
  "raven-tool-core",
 ]
@@ -167,6 +179,15 @@ name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
+
+[[package]]
+name = "cal"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+ "raven-tool-core",
+]
 
 [[package]]
 name = "cfg-if"
@@ -376,6 +397,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "gencat"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-locale",
+ "raven-rt",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -474,6 +503,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27f864f10dfb56725ce5ce5472bc52252c8f93a4ab86327122cebf62c5f59a17"
 dependencies = [
  "typenum",
+]
+
+[[package]]
+name = "iconv"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
 ]
 
 [[package]]
@@ -605,6 +641,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "locale"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-locale",
+ "raven-rt",
+]
+
+[[package]]
 name = "log"
 version = "0.4.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -620,6 +664,17 @@ dependencies = [
  "raven-proto-tty",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "mail"
+version = "0.1.0"
+
+[[package]]
+name = "mailx"
+version = "0.1.0"
+dependencies = [
+ "mail",
 ]
 
 [[package]]
@@ -1292,6 +1347,16 @@ name = "raven-evq-core"
 version = "0.1.0"
 
 [[package]]
+name = "raven-fault-reconnect"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-svc",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-fdt-lite"
 version = "0.1.0"
 
@@ -1494,6 +1559,14 @@ name = "raven-ipc"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+]
+
+[[package]]
+name = "raven-irq-dist"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
 ]
 
 [[package]]
@@ -3111,6 +3184,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-service-restart"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-svc",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "raven-setuid"
 version = "0.1.0"
 dependencies = [
@@ -3130,6 +3213,23 @@ name = "raven-sleep"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-smp-soak"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-smp-user"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
  "raven-rt",
 ]
 
@@ -3341,6 +3441,19 @@ dependencies = [
 [[package]]
 name = "raven-trace-core"
 version = "0.1.0"
+
+[[package]]
+name = "raven-trace-demo"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-elf",
+ "raven-initfs",
+ "raven-rt",
+ "raven-scheme",
+ "raven-trace-core",
+ "trace",
+]
 
 [[package]]
 name = "raven-tty-core"
@@ -3730,10 +3843,14 @@ dependencies = [
 name = "talk"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
  "raven-proto-fs",
+ "raven-proto-tty",
+ "raven-ptyd",
  "raven-rt",
  "raven-scheme",
  "raven-tool-core",
+ "raven-ttyd",
 ]
 
 [[package]]
@@ -3783,6 +3900,15 @@ name = "toml_writer"
 version = "1.2.0+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "009dbb7700f11c55ef83aebbe4c0e9cf1f1ac0844bd8d6f00dc38f302026e13a"
+
+[[package]]
+name = "trace"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+ "raven-trace-core",
+]
 
 [[package]]
 name = "typenum"
