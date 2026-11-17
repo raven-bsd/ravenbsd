@@ -6,8 +6,8 @@
 Evaluated by `libc-gate` on 2026-11-17 from the C74h tree (origin/master `beedfbbd`). C74h ran
 `libc-gate eval` and refreshed every row; C74g had already made `libc-dynamic` pass. Every status
 below has an evidence file under `build/libc-gate/`; the table is
-`cargo run -q -p libc-gate -- table`. C74z-S12 re-evaluated row 3.1 on `d97f7c1a` and wrote
-`build/libc-gate-c74z-s12/3.1.txt`; the row below uses that evidence. The remaining NOT MET rows
+`cargo run -q -p libc-gate -- table`. C74z-S16 re-evaluated row 3.1 on `1355d85c` and wrote
+`build/libc-gate-c74z-s16/3.1.txt`; the row below uses that evidence. The remaining NOT MET rows
 are P1b/P1c work, lint fixes, missing donor data, a size-budget lane, a fuzz soak, and unavailable
 host tooling, and are listed with their owning lane.
 
@@ -26,7 +26,7 @@ host tooling, and are listed with their owning lane.
 | 1 correctness | 1.7 lints (C16) | MET | build/libc-gate/1.7.txt | `cargo xtask libc-lint` clean (C74i/P1f5/ABI sync) |
 | 2 portability | 2.1 world check | BLOCKED | build/libc-gate-c74ah/2.1.txt | harness present; `libc-world check` passes (200 packages, 197.5 weighted); blocked on `results/x86_64/world.json` because `ravenbsd-resources/world-src` and a `donors.lock` world entry are absent (H-11) and the list is PLACEHOLDER (H-12) |
 | 2 portability | 2.2 world build gate (C13) | BLOCKED | build/libc-gate-c74ah/2.2.txt | harness present; real `build --subset smoke5` yields 5/5 `placeholder` (`version not frozen (H-12)`), gate 0/100 built; blocked on H-11 tarballs + H-12 freeze; no synthetic results |
-| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate-c74z-s12/3.1.txt | exit 1: 17 pass, 48 fail, 69 known, 105 skipped, 0 budget-only; C74z-S12 full rebuild and S/F classification (27 real-growth candidates, 17 shrink/measurement-first); budgets proposed, not applied; 44 S/F + 2 INV-S-P2-P0 + 2 boot remain |
+| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate-c74z-s16/3.1.txt | exit 1: 46 pass, 28 fail, 69 known, 105 skipped, 0 budget-only; C74z-S16 applied 28 legitimate-row +3% budgets; 17 budget/rule + 10 invariant rows remain |
 | 3 size | 3.2 boot path (C15) | INFO | build/libc-gate/3.2.txt | PG-60 absent; 0-1 syscalls and <=250 instructions are not evaluable |
 | 4 hardening | 4.1 fuzz replay | MET | build/libc-gate/4.1.txt | exit 0 |
 | 4 hardening | 4.2 fuzz soak (C10) | MET | tests/libc/fuzz/SOAK.md | 2026-11-17 `inet_text` 3601 s, 261,966,448 runs, 0 crashes (C74k) |
@@ -77,12 +77,11 @@ failures are P1b (`libc-hello` string, `libc-stdio`, `libc-time` sleep/usleep/tz
   entry are absent (H-11) and every `world.toml` row is `PLACEHOLDER` (H-12), so the smoke5 probe
   produces 5/5 `placeholder` (`version not frozen (H-12)`) and 0 of 100 built. Owner: the tarball
   freeze/fetch (H-11/H-12); no result JSON was invented.
-* 3.1 size: NOT MET. `cargo xtask libc-size --check` exits 1 with `17 pass, 48 fail, 69 known,
-  105 skipped, 0 budget-only`; C74z-S12 rebuilt on `d97f7c1a` after C47r/K97c and found the same
-  residual. It classified the 44 S/F rows into 27 real-growth budget candidates and 17
-  shrink/measurement-first rows (C74z-S13/S14/S15, S5/S6); no budget is applied. The riscv64
-  P2/P3 rows still link a printf stub and must be re-measured before any budget. The exact table
-  is in the C74z-S12 report and `tests/libc/size/TRIAGE.md`.
+* 3.1 size: NOT MET. `cargo xtask libc-size --check` exits 1 with `46 pass, 28 fail, 69 known,
+  105 skipped, 0 budget-only`; C74z-S16 re-froze the 28 legitimate P0/P1/P4/P6 and
+  x86_64/aarch64 P3 blocks at measured + 3 percent after S14/S15a/S5/S6/S13. The remaining 28
+  are 17 budget/rule rows and 10 invariants; P2/P5/P7/riscv64 P3 and P8 are unraised by design.
+  The exact table is in the C74z-S16 report and `tests/libc/size/TRIAGE.md`.
 * 4.2 soak: MET. The 2026-11-17 `inet_text` one-hour soak completed 3601 s with
   261,966,448 runs and 0 crashes; the other 13 targets completed 3600 s with 0 crashes.
 * 5.1: **MET**. `libc-hello`, `libc-stdio` and `libc-time` pass after C74u/C74ae; the dynamic,
@@ -148,14 +147,13 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
   pre-existing).
 * 2.1/2.2: BLOCKED, harness/list present and `check` green; H-11 `world-src`/`donors.lock` entry
   and H-12 freeze are absent, so the real smoke5 build is 5/5 `placeholder` and 0/100 built.
-* 3.1: NOT MET, `libc-size check: 17 pass, 48 fail, 69 known, 105 skipped, 0 budget-only`;
-  C74z-S12 classification: 27 real-growth budget candidates, 17 shrink/measurement-first
-  (C74z-S13/S14/S15, S5/S6), no budget applied; 44 S/F + 2 `INV-S-P2-P0` + 2 boot remain;
-  table in `tests/libc/size/TRIAGE.md`.
+* 3.1: NOT MET, `libc-size check: 46 pass, 28 fail, 69 known, 105 skipped, 0 budget-only`;
+  C74z-S16 applied 28 legitimate-row +3% budgets; 17 budget/rule + 10 invariant rows remain
+  (P2/P5/P7/riscv64 P3 and P8 unraised); table in `tests/libc/size/TRIAGE.md`.
 * 4.2: NOT MET, the `inet_text` soak has no duration, one crash and no executions.
 * 6.2: MET, `sh scripts/check-mandoc.sh` and `libc-gate eval --only 6.2` exit 0.
 
-## 6. C74h evidence refresh (OBSERVED, origin/master `beedfbbd`; 3.1 re-evaluated by C74z-S12 on `d97f7c1a`)
+## 6. C74h evidence refresh (OBSERVED, origin/master `beedfbbd`; 3.1 re-evaluated by C74z-S16 on `1355d85c`)
 
 | Row | Command | Result |
 |---|---|---|
@@ -166,7 +164,7 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 | 1.6 Miri | `sh scripts/check-miri.sh` | 715 tests, 0 UB; full row has the inline-asm/mmap alignment-test exclusion (C74y-r1) → PARTIAL |
 | 1.7 lints | `cargo xtask libc-lint` | exit 0; clean after C74i/P1f5/ABI sync → MET |
 | 2.1/2.2 world | `libc-world check` / `build --subset smoke5` / `gate` | check exit 0 (200 packages, 197.5 weighted); smoke5 5/5 `placeholder` (H-12), 0/100 built; H-11 `world-src`/`donors.lock` absent → BLOCKED |
-| 3.1 size | `cargo xtask libc-size --check` | exit 1; 17 pass, 48 fail, 69 known, 105 skipped, 0 budget-only; C74z-S12 classification (27 budget candidates, 17 shrink/measurement-first), no budget applied; 44 S/F + 2 `INV-S-P2-P0` + 2 boot remain |
+| 3.1 size | `cargo xtask libc-size --check` | exit 1; 46 pass, 28 fail, 69 known, 105 skipped, 0 budget-only; C74z-S16 applied 28 legitimate-row +3% budgets; 17 budget/rule + 10 invariant rows remain |
 | 4.2 soak | `tests/libc/fuzz/SOAK.md` | MET: 2026-11-17 one-hour `inet_text` soak, 3601 s, 261,966,448 runs, 0 crashes (C74k) |
 | 5.1 target | qtest JSON from `eval` | dynamic, signals, spawn, threads, hello, stdio and time pass (C74u/C74ae) → MET |
 | 5.2 kernel | `qtest core-servers` / `qtest file-tools` | both MET: minimal profiles; `df` reads `/etc/mounts`; `tooltest: ok`, `init exited (0)` |
