@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4v binutils evidence: first-party nm and strip host behaviour tests.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.nm"
+status = "present"
+evidence = "test:tests/posix/utility/binutils/nm/test.sh"
+notes = "P4v: ELF32/ELF64 symbol listing; -a -g -u -n -p -r; type letters"
+
+[[row]]
+id = "util.strip"
+status = "present"
+evidence = "test:tests/posix/utility/binutils/strip/test.sh"
+notes = "P4v: symbol/debug header removal; -g -s -o; nm before/after and runnable stripped ELF"
