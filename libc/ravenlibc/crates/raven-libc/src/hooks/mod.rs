@@ -3,12 +3,16 @@
 //!
 //! The strong members of the weak-hook table (`donor-map/16` 3.A.4.3).
 //!
-//! One file per hook; every file defines exactly one exported `__rl_*_impl` symbol and one
-//! `install` function. The weak cell itself is declared in the file of its caller
-//! (`raven_libc_sys::weak_hook!`, C54's chosen mechanism: the spike showed that a weak
-//! `global_asm!` symbol cannot be overridden by a fat-LTO consumer, so the shipped macro is the
-//! function-pointer cell installed by `__raven_libc_init`). C61 calls [`install_all`] from the
-//! start path; until then each cell keeps its documented dummy.
+//! One file per hook; every file defines exactly one exported `__rl_*_impl` symbol. The weak
+//! cell itself is declared in the file of its caller (`raven_libc_sys::weak_hook!`, C54's
+//! chosen mechanism: the spike showed that a weak `global_asm!` symbol cannot be overridden by
+//! a fat-LTO consumer, so the shipped macro is the function-pointer cell installed by
+//! `__raven_libc_init`). C61 calls [`install_all`] from the start path; until then each cell
+//! keeps its documented dummy.
+//!
+//! The float-digit hook is the exception: it is an optional member (R-13, mechanism M2). The
+//! start path installs it from the weak `__rl_fmt_float_impl` symbol, so a program that does
+//! not request float keeps the `*float*` dummy and never links `raven-libc-dtoa`.
 
 pub(crate) mod fini_array;
 pub(crate) mod fmt_float;
@@ -28,7 +32,8 @@ pub(crate) mod tz_load;
 pub(crate) fn install_all() {
     funcs_on_exit::install();
     stdio_exit::install();
-    fmt_float::install();
+    // `fmt_float` is installed by `__raven_libc_init` only when the optional plug-in member is
+    // linked (R-13/M2): the bare floor must not pull `raven-libc-dtoa`.
     fmt_wide::install();
     scan_float::install();
     tz_load::install();

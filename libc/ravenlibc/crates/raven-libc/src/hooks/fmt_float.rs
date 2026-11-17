@@ -42,8 +42,3 @@ pub fn __rl_fmt_float_impl(
         class,
     })
 }
-
-/// Install the strong hook.
-pub(crate) fn install() {
-    crate::stdio::vprintf::__rl_fmt_float::install(Some(__rl_fmt_float_impl));
-}
