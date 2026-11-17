@@ -95,10 +95,15 @@ pub fn init(distributor_phys: u64, cpu_interface_phys: u64) -> Result<(), GicErr
     unsafe {
         core::arch::asm!("dsb sy", options(nostack, preserves_flags));
     }
-    // Enable both groups: firmware may leave boot devices in Group 0 (QEMU `virt`) or hand a
-    // non-secure kernel Group 1 lines (Pi 4). A GIC without security extensions implements bit 0.
+    // Enable every group the CPU interface can signal. `GICC_CTLR` bit 0 is EnableGrp0, bit 1 is
+    // EnableGrp1NS and bit 2 is EnableGrp1S: a GIC with security extensions splits Group 1 into
+    // Secure and Non-secure, and firmware may leave the timer PPI in Group 0 (QEMU `virt`) while
+    // the SGIs below are Group 1. Enabling only bits 0..1 leaves a Group 1 Secure SGI pending but
+    // unsignalled: `GICC_IAR` then reads 1022 (spurious) forever while the CPU keeps taking the
+    // IRQ, which is the AP timer/IPI storm S76 round 3 fixed. A GIC without security extensions
+    // implements only bit 0 and ignores the rest.
     write32(distributor, GICD_CTLR, 0b11);
-    write32(cpu_interface, GICC_CTLR, 0b11);
+    write32(cpu_interface, GICC_CTLR, 0b111);
 
     GICD.store(distributor, Ordering::Release);
     GICC.store(cpu_interface, Ordering::Release);
@@ -114,7 +119,9 @@ pub fn init_cpu() -> Result<(), GicError> {
     let cpu_interface = base(&GICC)?;
     write32(cpu_interface, GICC_PMR, 0xff);
     write32(cpu_interface, GICC_BPR, 0);
-    write32(cpu_interface, GICC_CTLR, 0b11);
+    // Same enable set as `init`; see the Group 1 Secure note there. The SGI/IPI lines below are
+    // Group 1, so this CPU must signal Group 1 Secure as well or the reschedule IPI stays pending.
+    write32(cpu_interface, GICC_CTLR, 0b111);
     // SGIs 0..2: priority, Group 1 and enable for this CPU. The writes are banked.
     let priority_word = u32::from(PRIORITY).saturating_mul(0x0101_0101);
     write32(distributor, GICD_IPRIORITYR, priority_word);

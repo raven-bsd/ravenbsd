@@ -157,21 +157,26 @@ pub mod shootdown {
 
 /// The kernel-thread SMP proof used by `selftest=smp`.
 ///
-/// Four pinned kernel workers count increments on the online CPUs, and a monitor proves that at
-/// least one application processor ran a worker before exiting QEMU with success.
+/// Four pinned kernel workers count increments on the online CPUs and yield on every iteration,
+/// so an application processor can only finish its worker if it keeps resuming after timer
+/// interrupts. Each worker records the CPU it ran on without touching the console; the boot
+/// processor's monitor reads those counters and proves that every AP ran one before exiting
+/// QEMU with success.
 pub mod selftest {
     use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
     use crate::kprintln;
     use crate::sched;
 
-    use super::percpu;
+    use super::{MAX_CPUS, percpu};
 
     const WORKERS: usize = 4;
     const ITERATIONS: u32 = 2_000;
 
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     static DONE: AtomicU32 = AtomicU32::new(0);
+    /// Per-CPU worker entries. APs only bump their own slot; the BSP monitor prints it.
+    static SEEN: [AtomicU32; MAX_CPUS] = [const { AtomicU32::new(0) }; MAX_CPUS];
 
     /// Run the kernel-thread SMP proof; on success this exits QEMU.
     pub fn run() -> ! {
@@ -215,7 +220,9 @@ pub mod selftest {
 
     fn worker() {
         let cpu = percpu::this_cpu();
-        kprintln!("aarch64-smp: worker cpu={cpu}");
+        if let Some(seen) = SEEN.get(cpu) {
+            seen.fetch_add(1, Ordering::SeqCst);
+        }
         let mut iteration = 0u32;
         while iteration < ITERATIONS {
             COUNTER.fetch_add(1, Ordering::SeqCst);
@@ -243,10 +250,21 @@ pub mod selftest {
             kprintln!("aarch64-smp: counter={total} expected={expected}");
             crate::boot::exit_qemu(0x11);
         }
-        kprintln!(
-            "aarch64-smp: ok cpus={} counter={total}",
-            super::online_cpus()
-        );
+        let online = super::online_cpus();
+        let mut cpu = 1usize;
+        while cpu < online {
+            let seen = SEEN
+                .get(cpu)
+                .map_or(0, |value| value.load(Ordering::SeqCst));
+            if seen == 0 {
+                kprintln!("aarch64-smp: worker cpu={cpu} did not run");
+                crate::boot::exit_qemu(0x11);
+            }
+            // Printed by the BSP: AP workers never touch the shared console lock.
+            kprintln!("aarch64-smp: worker cpu={cpu} runs={seen}");
+            cpu = cpu.saturating_add(1);
+        }
+        kprintln!("aarch64-smp: ok cpus={online} counter={total}");
         crate::boot::exit_qemu(0x10)
     }
 }
