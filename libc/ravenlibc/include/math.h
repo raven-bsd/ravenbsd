@@ -400,6 +400,7 @@ float       scalbf(float, float);
 
 double      significand(double);
 float       significandf(float);
+long double significandl(long double);
 
 double      lgamma_r(double, int*);
 float       lgammaf_r(float, int*);
@@ -447,6 +448,7 @@ double      fminmag(double, double);
 double      fmaximum_mag_num(double, double);
 double      fminimum_mag_num(double, double);
 long        llogb(double);
+long        llogbl(long double);
 intmax_t    fromfp(double, int, unsigned int);
 intmax_t    fromfpx(double, int, unsigned int);
 uintmax_t   ufromfp(double, int, unsigned int);

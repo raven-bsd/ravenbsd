@@ -187,10 +187,12 @@ macro_rules! int_impl_common {
         }
 
         fn ilog2(self) -> u32 {
-            // On our older MSRV, this resolves to the trait method. Which won't actually work,
-            // but this is only called behind other gates.
-            #[allow(clippy::incompatible_msrv)]
-            <Self>::ilog2(self)
+            // Avoid core's `int_log10` helper: its non-positive panic symbol is internal and
+            // does not survive the `no_std` staticlib archive, so `-z defs` cannot resolve it.
+            // Every libm call site guards against zero; returning 0 keeps the trait total.
+            Self::BITS
+                .saturating_sub(1)
+                .saturating_sub(self.leading_zeros())
         }
 
         fn carrying_add(self, other: Self, carry: bool) -> (Self, bool) {

@@ -380,11 +380,32 @@ fn known_donors(resources: &Path) -> Option<BTreeSet<String>> {
         .map(|lock| lock.keys().cloned().collect())
 }
 
+/// The environment variable that names the integration resources directory.
+const RESOURCES_ENV: &str = "RAVENBSD_RESOURCES";
+
 fn resolve_resources(explicit: Option<PathBuf>) -> Result<PathBuf> {
+    resolve_resources_with(explicit, &|name| std::env::var_os(name))
+}
+
+/// Resolve the resources path with an injectable environment lookup.
+///
+/// `--resources` wins; `RAVENBSD_RESOURCES` is honoured next; the ancestor walk is the last
+/// fallback. An empty environment value is ignored.
+fn resolve_resources_with<F>(explicit: Option<PathBuf>, env: &F) -> Result<PathBuf>
+where
+    F: Fn(&str) -> Option<std::ffi::OsString>,
+{
     if let Some(path) = explicit {
         return Ok(path);
     }
-    let current = std::env::current_dir().context("cannot read the current directory")?;
+    if let Some(path) = env(RESOURCES_ENV)
+        && !path.is_empty()
+    {
+        return Ok(PathBuf::from(path));
+    }
+    let current = std::env::current_dir().with_context(|| {
+        format!("cannot read the current directory (set {RESOURCES_ENV} or pass --resources)")
+    })?;
     let base = current.canonicalize().unwrap_or(current);
     for directory in base.ancestors() {
         let candidate = directory.join("ravenbsd-resources");
@@ -393,7 +414,7 @@ fn resolve_resources(explicit: Option<PathBuf>) -> Result<PathBuf> {
         }
     }
     bail!(
-        "cannot find ravenbsd-resources at or above {}; pass --resources",
+        "cannot find ravenbsd-resources at or above {}; set {RESOURCES_ENV} or pass --resources",
         base.display()
     )
 }

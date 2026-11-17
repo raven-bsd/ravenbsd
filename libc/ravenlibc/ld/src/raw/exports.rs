@@ -340,8 +340,15 @@ pub extern "C" fn _rtld_main(sp: usize) -> ! {
         };
         crate::raw::memview::set_tls_offset(id, object.tls_offset);
     }
-    if loader.relocate_all().is_err() {
-        fail(b"ld-elf.so.1: relocation failed\n");
+    if let Err(error) = loader.relocate_all() {
+        sys::debug_write(b"ld-elf.so.1: ");
+        sys::debug_write(error.text().as_bytes());
+        if !loader.error.as_bytes().is_empty() {
+            sys::debug_write(b": ");
+            sys::debug_write(loader.error.as_bytes());
+        }
+        sys::debug_write(b"\n");
+        sys::exit(127)
     }
     if !loader.install_table(&TABLE) {
         fail(b"ld-elf.so.1: cannot install the dl table\n");

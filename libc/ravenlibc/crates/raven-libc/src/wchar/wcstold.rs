@@ -47,6 +47,7 @@ extern "C" fn wcstold_inner(out: *mut u128, input: *const u32, endptr: *mut *mut
 ///
 /// # Safety
 /// The compiler-generated C ABI contract applies.
+#[cfg(target_arch = "x86_64")]
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn wcstold() -> ! {
@@ -58,6 +59,30 @@ pub unsafe extern "C" fn wcstold() -> ! {
         "call {inner}",
         "fld tbyte ptr [rsp]",
         "add rsp, 24",
+        "ret",
+        inner = sym wcstold_inner,
+    )
+}
+
+/// `wcstold`: the aarch64 AAPCS64 binary128-in-`v0` C ABI wrapper.
+///
+/// # Safety
+/// The compiler-generated C ABI contract applies.
+#[cfg(target_arch = "aarch64")]
+#[unsafe(naked)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wcstold() -> ! {
+    core::arch::naked_asm!(
+        ".arch armv8-a",
+        "sub sp, sp, #32",
+        "str x30, [sp, #16]",
+        "mov x2, x1",
+        "mov x1, x0",
+        "mov x0, sp",
+        "bl {inner}",
+        "ldr q0, [sp]",
+        "ldr x30, [sp, #16]",
+        "add sp, sp, #32",
         "ret",
         inner = sym wcstold_inner,
     )

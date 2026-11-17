@@ -126,6 +126,19 @@ fn check_with_an_empty_resource_tree_prints_skipped() {
 }
 
 #[test]
+fn the_resources_environment_variable_is_used() {
+    let temp = TempDir::new("env-resources");
+    let recipes = real_recipes();
+    let output = run(
+        &["check", "--recipes", recipes.to_str().expect("utf8")],
+        &[("RAVENBSD_RESOURCES", temp.path().to_str().expect("utf8"))],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("skipped"), "{stdout}");
+}
+
+#[test]
 fn a_missing_cc_exits_77() {
     let fixtures = fixtures();
     let temp = TempDir::new("missing-cc");

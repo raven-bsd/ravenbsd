@@ -393,6 +393,25 @@ fn a_relative_relocation_writes_b_plus_a() {
 }
 
 #[test]
+fn an_aarch64_relative_relocation_writes_b_plus_a() {
+    let bias = 0x2000;
+    let (image, view) = build(&[(SLOT, 0, R_AARCH64_RELATIVE, 0x123)], &[], bias);
+    let mut resolver = Resolver::with(None);
+    let mut applier = Applier::new(0);
+    apply(
+        Arch::Aarch64,
+        &image,
+        &view,
+        bias,
+        &mut resolver,
+        &mut applier,
+        Phase::NonPlt,
+    )
+    .unwrap();
+    assert_eq!(applier.read(bias + SLOT), Some(bias + 0x123));
+}
+
+#[test]
 fn a_glob_dat_on_x86_64_ignores_the_addend() {
     let bias = 0x2000;
     let (image, view) = build(&[(SLOT, SYM, R_X86_64_GLOB_DAT, 0x99)], &[], bias);

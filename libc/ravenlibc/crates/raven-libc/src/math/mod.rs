@@ -577,6 +577,8 @@ mod m66;
 mod m67;
 mod m68;
 mod m69;
+#[cfg(target_arch = "aarch64")]
+mod m70;
 mod sincos;
 mod strfromd;
 mod totalordermag;

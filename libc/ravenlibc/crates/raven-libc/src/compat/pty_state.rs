@@ -22,7 +22,7 @@
     clippy::needless_return
 )]
 
-use core::ffi::c_int;
+use core::ffi::{c_char, c_int};
 
 use raven_libc_abi::generated::structs::Termios;
 use raven_libc_compat::{ForkResult, PtyOps, Winsize};
@@ -73,12 +73,12 @@ impl PtyOps for RealPty {
     }
 
     fn open(&mut self, path: &[u8], flags: i32) -> Result<i32, raven_libc_abi::errno::Errno> {
-        let mut name = [0i8; 4096];
+        let mut name = [0 as c_char; 4096];
         if path.len() >= name.len() {
             return Err(raven_libc_abi::errno::Errno(super::ENAMETOOLONG as u16));
         }
         for (slot, byte) in name.iter_mut().zip(path.iter()) {
-            *slot = *byte as i8;
+            *slot = *byte as c_char;
         }
         name[path.len()] = 0;
         // SAFETY: `name` is NUL-terminated.
