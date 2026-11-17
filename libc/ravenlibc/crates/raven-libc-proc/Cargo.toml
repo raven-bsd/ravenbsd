@@ -19,5 +19,9 @@ default = []
 std = []
 
 [dependencies]
+raven-abi = { path = "../../../../crates/raven-abi" }
 raven-libc-abi = { path = "../raven-libc-abi" }
 raven-spawn = { path = "../../../../crates/raven-spawn", features = ["alloc"] }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-libc-sys = { path = "../raven-libc-sys" }

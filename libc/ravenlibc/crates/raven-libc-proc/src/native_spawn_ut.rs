@@ -222,3 +222,22 @@ fn wait_rejects_wait_any_and_wnohang() {
     assert_eq!(spawner.wait(P_PID, 1, WNOHANG), Err(ENOSYS));
     assert_eq!(spawner.wait(P_PID, 1, 0x80), Err(EINVAL));
 }
+
+#[test]
+fn command_name_uses_argv_zero() {
+    assert_eq!(command_name(&["ls", "-l"], "/bin/ls"), "ls");
+}
+
+#[test]
+fn command_name_falls_back_to_the_image_path() {
+    assert_eq!(command_name(&[], "/bin/ls"), "/bin/ls");
+    assert_eq!(command_name(&[""], "/bin/ls"), "/bin/ls");
+}
+
+#[test]
+fn command_name_is_bounded_at_a_utf8_boundary() {
+    let long = "é".repeat(MAX_COMMAND);
+    let name = command_name(&[long.as_str()], "/bin/ls");
+    assert!(name.len() <= MAX_COMMAND);
+    assert!(name.is_char_boundary(name.len()));
+}
