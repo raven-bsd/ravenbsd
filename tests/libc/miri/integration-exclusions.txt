@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# Explicit integration-test exclusions for libc gate 1.6 (Miri).
+#
+# The bounded Miri runner executes the five crate library suites and the one integration binary
+# with a cfg(miri) path, raven-libc-str/tests/alignment.rs. The binaries below are outside the
+# bounded Miri row: they either spawn host toolchain subprocesses (Miri isolation forbids open and
+# spawn), read the host filesystem, or are pure fixture/vector suites covered by nextest. They are
+# not UB findings and no Miri check is disabled.
+#
+# Format: <crate> <test-binary> <reason>
+raven-libc-str no_recursion       builds an rlib and runs nm/objdump subprocesses; Miri isolation forbids open/spawn
+raven-libc-str secure_structural  builds an rlib and runs rustc/nm subprocesses; Miri isolation forbids open/spawn
+raven-libc-fmt api                pure fixture suite outside the bounded row; nextest covers it
+raven-libc-fmt link_separation    runs an nm subprocess; Miri isolation forbids spawn
+raven-libc-dtoa directed_f32      deterministic vector suite outside the bounded row; nextest covers it
+raven-libc-dtoa exhaustive_shard  deterministic vector suite outside the bounded row; nextest covers it
+raven-libc-dtoa fuzz_consumed     deterministic fuzz-consumed fixture outside the bounded row; nextest covers it
+raven-libc-dtoa golden_vectors    deterministic vector suite outside the bounded row; nextest covers it
+raven-libc-dtoa required_api      pure API fixture outside the bounded row; nextest covers it
+raven-libc-dtoa vector_cases      deterministic vector suite outside the bounded row; nextest covers it
+raven-libc-regex binary           deterministic binary fixture outside the bounded row; nextest covers it
+raven-libc-regex exhaust          deterministic exhaustive suite outside the bounded row; nextest covers it
+raven-libc-regex fuzz_icase_nospec deterministic fuzz fixture outside the bounded row; nextest covers it
+raven-libc-regex hardening        deterministic hardening fixture outside the bounded row; nextest covers it
+raven-libc-regex leak             leak fixture outside the bounded row; nextest covers it
+raven-libc-regex vectors          deterministic vector suite outside the bounded row; nextest covers it
+raven-libc-glob fnmatch_corners   deterministic vector suite outside the bounded row; nextest covers it
+raven-libc-glob fnmatch_freebsd   deterministic vector suite outside the bounded row; nextest covers it
+raven-libc-glob fnmatch_vectors   deterministic vector suite outside the bounded row; nextest covers it
+raven-libc-glob glob_flags        deterministic flag fixture outside the bounded row; nextest covers it
+raven-libc-glob glob              deterministic glob fixture outside the bounded row; nextest covers it
+raven-libc-glob host_backend      host filesystem backend (read_dir/metadata); Miri isolation does not provide it
+raven-libc-glob wordexp           deterministic wordexp fixture outside the bounded row; nextest covers it
