@@ -68,11 +68,8 @@ mod program {
             }
         }
         let mut pager = ConsolePager;
-        if page(&text, options.page, &mut pager) {
-            EXIT_OK
-        } else {
-            EXIT_OK
-        }
+        let _ = page(&text, options.page, &mut pager);
+        EXIT_OK
     }
 }
 
