@@ -394,3 +394,53 @@ fn lockstat_max_inheritance_depth_is_transitive() {
     assert_eq!(lock0.max_inheritance_depth, 1);
     assert_eq!(lock1.max_inheritance_depth, 2);
 }
+
+#[test]
+fn deep_inheritance_chain_32_owners() {
+    // 33 threads: thread 0 (highest) blocks on object 1, thread i blocks on object i+1, down to
+    // the deepest owner (thread 32). The chain is 32 owners deep.
+    const N: usize = 33;
+    let mut t = Turnstiles::new();
+    t.register(0, prio(0)).unwrap(); // highest priority
+    for i in 1..N {
+        t.register(i as ThreadId, prio(10 + i as u8)).unwrap();
+    }
+    // Thread i owns object i.
+    for i in 0..N {
+        t.acquire(i as ObjectId, i as ThreadId).unwrap();
+    }
+    // Thread i blocks on object i+1 (32 blocks).
+    for i in 0..(N - 1) {
+        t.block((i + 1) as ObjectId, i as ThreadId).unwrap();
+    }
+    // The deepest owner inherits thread 0's highest priority transitively.
+    assert_eq!(t.effective_priority((N - 1) as ThreadId), Some(prio(0)));
+    // Every intermediate owner is also boosted to the same priority.
+    for i in 1..N {
+        assert_eq!(t.effective_priority(i as ThreadId), Some(prio(0)));
+    }
+    t.check_invariants().expect("deep chain invariant");
+}
+
+#[test]
+fn fairness_equal_priorities_hand_off_in_arrival_order() {
+    const N: usize = 64;
+    let mut t = Turnstiles::new();
+    t.register(0, prio(5)).unwrap(); // owner
+    for i in 1..=N {
+        t.register(i as ThreadId, prio(3)).unwrap(); // all equal priority
+    }
+    t.acquire(0, 0).unwrap();
+    // N equal-priority waiters block in arrival order.
+    for i in 1..=N {
+        t.block(0, i as ThreadId).unwrap();
+    }
+    assert_eq!(t.waiter_count(0), N);
+    // wake_one hands the lock off in arrival (FIFO) order, not reverse order.
+    for i in 1..=N {
+        assert_eq!(t.wake_one(0), Some(i as ThreadId), "handoff {i}");
+    }
+    assert_eq!(t.wake_one(0), None);
+    assert_eq!(t.waiter_count(0), 0);
+    assert_eq!(t.owner(0), None);
+}
