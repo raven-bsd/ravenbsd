@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4j lp evidence: first-party POSIX lp client host tests.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.lp"
+status = "present"
+evidence = "test:tests/posix/utility/simple5/lp/test.sh"
+notes = "P4j: POSIX lp options, -d/LPDEST/PRINTER precedence, local output path, no-destination and unavailable-destination diagnostics"
