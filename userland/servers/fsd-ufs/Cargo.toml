@@ -19,6 +19,7 @@ ufs-core = { path = "../../../crates/ufs-core" }
 
 [target.'cfg(target_os = "none")'.dependencies]
 raven-rt = { path = "../../rt", features = ["alloc"] }
+trace = { path = "../../bin/trace" }
 
 [lints]
 workspace = true

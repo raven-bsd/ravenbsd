@@ -15,7 +15,9 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use raven_trace_core::{RingError, Span, SpanKind, SpanRing};
+use raven_trace_core::{RingError, SpanRing};
+
+pub use raven_trace_core::{Span, SpanKind};
 
 /// Sink ring capacity (records).
 pub const CAPACITY: u32 = 64;

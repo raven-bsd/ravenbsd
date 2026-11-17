@@ -393,6 +393,7 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
+ "trace",
  "ufs-core",
 ]
 
@@ -1095,6 +1096,7 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
+ "trace",
 ]
 
 [[package]]

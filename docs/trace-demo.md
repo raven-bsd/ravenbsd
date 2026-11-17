@@ -3,8 +3,10 @@
 SPDX-License-Identifier: BSD-3-Clause
 Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-Status: OBSERVED (Q4b). This proves the scheme → span-sink → `trace`-command path with a dedicated
-fixture server before the real `vfsd`/`fsd-ufs`/`blockd` probes land in Q4.
+Status: OBSERVED (Q4c). The Q4b fixture server still proves the scheme → span-sink → `trace`
+path, and the same demo now stages the real `initfsd`, `blockd` and `fsd-ufs` with the sink
+transferred. A real `ufs:/ten.txt` read records client → `fsd-ufs` → `blockd` spans under one
+trace id. The mounted `file:` path still needs `vfsd` (P5c/Q4e); this demo opens `ufs:` directly.
 
 ## 1. The path
 
@@ -31,26 +33,43 @@ cargo xtask qtest --case trace-demo --arch x86_64
 cargo xtask qtest --case trace-demo --arch aarch64
 ```
 
-The fixture (`tests/fixtures/trace-demo/`) runs `/init`, `/server` and `/trace`:
+The fixture (`tests/fixtures/trace-demo/`) packs `/init`, `/server`, `/trace`, `/initfsd`,
+`/blockd`, `/fsd-ufs` and `/etc/blockd.img`. The controller runs the fixture proof, then starts the
+real block stack (initfsd → blockd → fsd-ufs, sink transferred as handle 3) and reads
+`ufs:/ten.txt`. Observed transcript, aarch64 (`build/qtest/trace-demo.log`):
 
 ```
 demo: server ready
-trace: spans=4 gaps=0 traced=2 untraced=2
-trace: id=0xdeadbeefcafef00d span=0x1 parent=0x0 pid=2 ts=236864471 kind=server op=1
-trace: id=0xdeadbeefcafef00d span=0x2 parent=0x0 pid=2 ts=253034408 kind=server op=2
-trace: id=untraced span=0x3 parent=0x0 pid=2 ts=262914730 kind=server op=1
-trace: id=untraced span=0x4 parent=0x0 pid=2 ts=265078015 kind=server op=2
+blockd: gpt ok partitions=1
+blockd: part 1 ufs-root 34..32801
+fsd-ufs: mounted block:0 partition 1 as ufs: (16777216 bytes)
+fsd-ufs: mode=rw journal=none
+trace: spans=10 gaps=0 traced=8 untraced=2
+trace: id=0xdeadbeefcafef00d span=0x1 parent=0x0 pid=2 ts=17180062048 kind=server op=1
+trace: id=0xdeadbeefcafef00d span=0x2 parent=0x0 pid=2 ts=17185575456 kind=server op=2
+trace: id=untraced span=0x3 parent=0x0 pid=2 ts=17192703552 kind=server op=1
+trace: id=untraced span=0x4 parent=0x0 pid=2 ts=17197691968 kind=server op=2
+trace: id=0xdeadbeefcafef00d span=0x1 parent=0x0 pid=0 ts=18705188032 kind=server op=1
+trace: id=0xdeadbeefcafef00d span=0x1 parent=0x0 pid=0 ts=18708408880 kind=io op=7
+trace: id=0xdeadbeefcafef00d span=0x2 parent=0x0 pid=0 ts=18714389968 kind=io op=7
+trace: id=0xdeadbeefcafef00d span=0x3 parent=0x0 pid=0 ts=18719286480 kind=io op=7
+trace: id=0xdeadbeefcafef00d span=0x2 parent=0x0 pid=0 ts=18725814448 kind=server op=2
+trace: id=0xdeadbeefcafef00d span=0x4 parent=0x0 pid=0 ts=18727523712 kind=io op=7
 demo: ok
 ```
 
-The controller sets `0xdeadbeefcafef00d` with `TRACE_SET`, opens and reads the fixture scheme (the
-server records a span per data-path request with the inherited id), clears the id and repeats the
-call untraced. The `op` field is the wire opcode (1 = open, 2 = read).
+The controller sets `0xdeadbeefcafef00d` with `TRACE_SET`, opens and reads the fixture scheme, then
+`ufs:/ten.txt`, clears the id, and repeats both calls untraced. The fixture server records
+`pid=2` spans (open/read); the real servers record `pid=0` because userspace has no `getpid` (the
+kernel owns pids). `fsd-ufs` records server open/read, and `blockd` records the nested block I/O
+with the same trace id (`op` is the wire opcode: fsd-ufs 1 = open, 2 = read; blockd 7 = call).
+The x86_64 run records the same tree with different timestamps.
 
-## 4. Remaining real-server probes (Q4, after P5e/P5g)
+## 4. Remaining: the vfsd span (P5c/Q4e)
 
-The real `vfsd`, `fsd-ufs` and `blockd` probes are Q4's step once their paths are free. Each server
-adds the same one-line record at its open/read/reply entry, into the same sink, and the `trace`
-command prints the client → `vfsd` → `fsd-ufs` → `blockd` tree. The kernel's last-close
-notification (generated in the server's own RECV context) carries no caller trace id, so the demo
-records the data-path requests (open/read), not the close.
+The real `fsd-ufs` and `blockd` probes are landed above. The mounted `file:` path still goes
+through `vfsd`, which has no probe; adding it would give the client → `vfsd` → `fsd-ufs` →
+`blockd` tree for a normal mounted read. `vfsd` is owned by P5c and is Q4e. This demo reaches the
+two servers through the direct `ufs:` scheme instead. The kernel's last-close notification
+(generated in the server's own RECV context) carries no caller trace id, so the demo records the
+data-path requests (open/read), not the close.

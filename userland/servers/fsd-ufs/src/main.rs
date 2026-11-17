@@ -15,6 +15,9 @@
 extern crate alloc;
 
 #[cfg(target_os = "none")]
+mod trace;
+
+#[cfg(target_os = "none")]
 mod program {
     use alloc::format;
 
@@ -28,6 +31,8 @@ mod program {
 
     /// S11 `Opcode::Open` wire value.
     const OPEN_OPCODE: u16 = 1;
+    /// S11 `Opcode::Read` wire value.
+    const READ_OPCODE: u16 = 2;
     const DEFAULT_DEVICE: &str = "block:0";
     const DEFAULT_SCHEME: &str = "ufs";
     const DEFAULT_PARTITION: u32 = 1;
@@ -119,11 +124,16 @@ mod program {
             }
         };
         log_started("fsd-ufs");
+        let mut probe = crate::trace::Probe::server();
         loop {
             let Some(packet) = server.poll(None) else {
                 continue;
             };
-            if packet.packet.opcode == OPEN_OPCODE
+            let opcode = packet.packet.opcode;
+            if opcode == OPEN_OPCODE || opcode == READ_OPCODE {
+                probe.record(packet.packet.trace_id, opcode);
+            }
+            if opcode == OPEN_OPCODE
                 && let Ok(path) = core::str::from_utf8(packet.packet.path_bytes())
             {
                 handler.expect_open(packet.packet.file_id, path);

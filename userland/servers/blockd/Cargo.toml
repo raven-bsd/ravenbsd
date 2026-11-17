@@ -18,6 +18,7 @@ raven-scheme = { path = "../../../crates/raven-scheme" }
 
 [target.'cfg(target_os = "none")'.dependencies]
 raven-rt = { path = "../../rt", features = ["alloc"] }
+trace = { path = "../../bin/trace" }
 
 [lints]
 workspace = true

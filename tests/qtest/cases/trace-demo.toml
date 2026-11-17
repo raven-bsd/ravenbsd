@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# Q4b trace-demo: a fixture scheme server records one span per request into the shared Q4a sink;
-# the controller makes a traced call (TRACE_SET) and an untraced one, then runs the trace command,
-# which prints the recorded tree. Runs on x86_64 and aarch64.
+# Q4c trace-demo: the Q4b fixture server proves the scheme -> sink path, and the controller then
+# starts initfsd, blockd and fsd-ufs with the sink transferred, reads ufs:/ten.txt on a traced and
+# an untraced call, and runs the trace command. The real spans (pid=0) share the caller trace id:
+# fsd-ufs records server open/read and blockd records the nested block I/O. Runs on x86_64 and
+# aarch64.
 
 name = "trace-demo"
 arch = "x86_64"
@@ -19,7 +21,7 @@ expect_exit = "success"
 regex = '^demo: server ready$'
 
 [[expect]]
-regex = '^trace: spans=4 gaps=0 traced=2 untraced=2$'
+regex = '^trace: spans=[0-9]+ gaps=0 traced=[0-9]+ untraced=2$'
 
 [[expect]]
 regex = '^trace: id=0xdeadbeefcafef00d span=0x1 parent=0x0 pid=2 ts=[0-9]+ kind=server op=1$'
@@ -32,3 +34,16 @@ regex = '^demo: ok$'
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|demo: failed'
+
+# Q4c real-server spans: the fsd-ufs open/read and the nested blockd I/O inherit the same id.
+[[expect]]
+regex = '^trace: id=0xdeadbeefcafef00d span=0x[0-9a-f]+ parent=0x0 pid=0 ts=[0-9]+ kind=server op=1$'
+unordered = true
+
+[[expect]]
+regex = '^trace: id=0xdeadbeefcafef00d span=0x[0-9a-f]+ parent=0x0 pid=0 ts=[0-9]+ kind=server op=2$'
+unordered = true
+
+[[expect]]
+regex = '^trace: id=0xdeadbeefcafef00d span=0x[0-9a-f]+ parent=0x0 pid=0 ts=[0-9]+ kind=io op=[0-9]+$'
+unordered = true
