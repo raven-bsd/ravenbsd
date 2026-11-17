@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+# synthetic fixture capture
+# image sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+# commit: 1111111111111111111111111111111111111111
+# device: /dev/ttyUSB0
+bcm2711: RavenBSD Pi 4 board
+login: root
+Password: 
+raven# /bin/uname -a
+RavenBSD 0.1 aarch64
+raven# readelf -d /bin/raven-uname
+ 0x0000000000000001 (NEEDED) Shared library: [libc.so.1]
+genet: link up
+dhcp: lease acquired
+64 bytes from 10.0.2.2: seq=1 ttl=64 time=1.0 ms
+init exited (0)
