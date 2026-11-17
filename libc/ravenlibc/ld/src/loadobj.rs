@@ -134,6 +134,10 @@ pub struct LoadedObject {
     pub relocated: bool,
     /// Whether the IFUNC/IRELATIVE pass has run.
     pub ifunc_done: bool,
+    /// Whether the finalisers have run (a static-TLS object stays mapped after `dlclose`).
+    pub fini_done: bool,
+    /// Whether the object was loaded through `dlopen` (a closed handle rejects `dlsym`).
+    pub dl_open: bool,
 }
 
 impl LoadedObject {
@@ -411,7 +415,14 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
         let mapped = map_object(&plan, &file, &mut self.platform).map_err(LoadError::Map)?;
         self.platform.close(file);
 
-        let view = ObjView::digest(&self.mem, header.e_phoff, header.e_phnum, mapped.bias)
+        // `e_phoff` is a file offset; the view wants the link-time vaddr of the table. For an
+        // image whose first segment starts above zero these differ, so use `PT_PHDR` when the
+        // linker emitted it.
+        let phdr_vaddr = headers[..phnum]
+            .iter()
+            .find(|header| header.p_type == raven_libc_elf::consts::PT_PHDR)
+            .map_or(header.e_phoff, |header| header.p_vaddr);
+        let view = ObjView::digest(&self.mem, phdr_vaddr, header.e_phnum, mapped.bias)
             .map_err(LoadError::Digest)?;
         if view.gnu_stack_exec {
             return Err(LoadError::ExecutableStack);
@@ -433,6 +444,8 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
             runpath,
             relocated: false,
             ifunc_done: false,
+            fini_done: false,
+            dl_open: false,
         };
         object.add_name(requested);
         object.add_name(path);

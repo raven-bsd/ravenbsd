@@ -312,6 +312,13 @@ pub fn symlook_default(
     }
 
     if !is_final(&found, dynamic_weak)
+        && !done.contains(&refobj)
+        && let Some(hit) = lookup_in(table, mem, refobj, req, true)?
+    {
+        found = prefer(found, Some(hit), dynamic_weak);
+    }
+
+    if !is_final(&found, dynamic_weak)
         && let Some(rtld) = scope.rtld
         && !done.contains(&rtld)
     {

@@ -10,6 +10,16 @@ use raven_libc_elf::{ApplyError, MemView, RelocApplier};
 /// The highest address the loader has mapped (for the raw view's sanity check).
 static LIMIT: AtomicUsize = AtomicUsize::new(0);
 
+/// Static TLS TPOFF bases indexed by object id.
+static TLS_OFFSETS: [AtomicUsize; 64] = [const { AtomicUsize::new(0) }; 64];
+
+/// Record one object's static TLS offset for the relocation applier.
+pub fn set_tls_offset(id: raven_libc_elf::ObjId, offset: usize) {
+    if let Some(slot) = TLS_OFFSETS.get(usize::try_from(id.0).unwrap_or(usize::MAX)) {
+        slot.store(offset, Ordering::Release);
+    }
+}
+
 /// Record the top of the mapped address space.
 pub fn set_limit(top: usize) {
     LIMIT.store(top, Ordering::Relaxed);
@@ -20,6 +30,9 @@ pub struct LiveMem;
 
 impl MemView for LiveMem {
     fn read(&self, vaddr: u64, len: usize) -> Option<&[u8]> {
+        if len == 0 {
+            return Some(&[]);
+        }
         let start = usize::try_from(vaddr).ok()?;
         let end = start.checked_add(len)?;
         let limit = LIMIT.load(Ordering::Relaxed);
@@ -33,9 +46,22 @@ impl MemView for LiveMem {
 
     fn cstr(&self, vaddr: u64) -> Option<&[u8]> {
         let start = usize::try_from(vaddr).ok()?;
-        // SAFETY: the string is inside a validated object range and NUL-terminated there.
-        let rest = unsafe { core::slice::from_raw_parts(start as *const u8, 1) };
-        let _ = rest;
+        let limit = LIMIT.load(Ordering::Relaxed);
+        let max = if limit > start {
+            limit.saturating_sub(start).min(1 << 20)
+        } else {
+            1 << 20
+        };
+        let mut length = 0usize;
+        while length < max {
+            // SAFETY: the loader asks only for strings inside a validated object; the bound
+            // stops the scan at the end of the user address space (or 1 MiB).
+            if unsafe { *(start as *const u8).add(length) } == 0 {
+                // SAFETY: the bytes scanned above are readable; the slice ends before the NUL.
+                return Some(unsafe { core::slice::from_raw_parts(start as *const u8, length) });
+            }
+            length = length.saturating_add(1);
+        }
         None
     }
 }
@@ -83,8 +109,11 @@ impl RelocApplier for LiveApplier {
         u64::from(obj.0).saturating_add(1)
     }
 
-    fn tls_static_offset(&mut self, _obj: raven_libc_elf::ObjId) -> Result<i64, ApplyError> {
-        Ok(0)
+    fn tls_static_offset(&mut self, obj: raven_libc_elf::ObjId) -> Result<i64, ApplyError> {
+        let offset = TLS_OFFSETS
+            .get(usize::try_from(obj.0).unwrap_or(usize::MAX))
+            .map_or(0, |slot| slot.load(Ordering::Acquire));
+        i64::try_from(offset).map_err(|_| ApplyError::OutOfRange)
     }
 
     fn tls_desc_alloc(

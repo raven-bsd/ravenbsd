@@ -17,10 +17,14 @@ pub const MAP: usize = 0x40;
 pub const UNMAP: usize = 0x41;
 /// `PROTECT`.
 pub const PROTECT: usize = 0x42;
+/// `THREAD_SET_TLS`.
+pub const THREAD_SET_TLS: usize = 0x23;
 /// `OPEN`.
 pub const OPEN: usize = 0x61;
 /// `READ`.
 pub const READ: usize = 0x62;
+/// `PREAD`.
+pub const PREAD: usize = 0x6b;
 /// `CLOSE`.
 pub const CLOSE: usize = 0x64;
 /// `FSTAT`.
@@ -232,6 +236,67 @@ pub unsafe fn syscall3(nr: usize, a0: usize, a1: usize, a2: usize) -> isize {
                 in("a0") a0,
                 in("a1") a1,
                 in("a2") a2,
+                lateout("a0") ret,
+                options(nostack),
+            );
+        }
+        ret
+    }
+}
+
+/// Raw syscall with four arguments.
+///
+/// # Safety
+/// See [`syscall0`].
+pub unsafe fn syscall4(nr: usize, a0: usize, a1: usize, a2: usize, a3: usize) -> isize {
+    #[cfg(target_arch = "x86_64")]
+    {
+        let ret: isize;
+        // SAFETY: the syscall convention is number in `rax`, arguments in `rdi..r10`.
+        unsafe {
+            asm!(
+                "syscall",
+                inlateout("rax") nr as isize => ret,
+                in("rdi") a0,
+                in("rsi") a1,
+                in("rdx") a2,
+                in("r10") a3,
+                clobber_abi("C"),
+                options(nostack),
+            );
+        }
+        ret
+    }
+    #[cfg(target_arch = "aarch64")]
+    {
+        let ret: isize;
+        // SAFETY: the syscall convention is number in `x8`, arguments in `x0..x3`.
+        unsafe {
+            asm!(
+                "svc 0",
+                in("x8") nr,
+                in("x0") a0,
+                in("x1") a1,
+                in("x2") a2,
+                in("x3") a3,
+                lateout("x0") ret,
+                options(nostack),
+            );
+        }
+        ret
+    }
+    #[cfg(target_arch = "riscv64")]
+    {
+        let ret: isize;
+        // SAFETY: the syscall convention is number in `a7`, arguments in `a0..a3`.
+        unsafe {
+            asm!(
+                "ecall",
+                in("a7") nr,
+                in("a0") a0,
+                in("a1") a1,
+                in("a2") a2,
+                in("a3") a3,
                 lateout("a0") ret,
                 options(nostack),
             );
