@@ -204,6 +204,20 @@ build_image() {
     esac
 }
 
+# True when a strings dump carries `id` as a whole clean build-id token. Kept separate so
+# --self-test can exercise the clean/dirty/stale classification without building an image.
+id_is_clean() {
+    dump=$1
+    id=$2
+    case "$id" in
+        '' | *[!0-9a-f]*) return 1 ;;
+    esac
+    if printf '%s\n' "$dump" | grep -Fq "$id-dirty"; then
+        return 1
+    fi
+    printf '%s\n' "$dump" | grep -Eq "(^|[^0-9a-f])${id}([^0-9a-f]|$)"
+}
+
 verify_kernel_id() {
     arch=$1
     case "$arch" in
@@ -218,16 +232,11 @@ verify_kernel_id() {
         echo "repro-release: $kernel is missing after the $arch build" >&2
         return 1
     fi
-    id_pattern="(^|[^0-9a-f])${head}([^0-9a-f]|$)"
-    if ! strings "$kernel" 2>/dev/null | grep -Eq "$id_pattern"; then
+    if ! id_is_clean "$(strings "$kernel" 2>/dev/null || true)" "$head"; then
         echo "repro-release: $arch kernel does not carry the clean-tree build id '$head'" >&2
         echo "  the image builder reused an artifact from another commit or a dirty tree" >&2
         echo "  remove the kernel target directory under build/cargo and rerun" >&2
         strings "$kernel" 2>/dev/null | grep -E 'RavenBSD kernel|20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | head -3 >&2 || true
-        return 1
-    fi
-    if strings "$kernel" 2>/dev/null | grep -Fq "$head-dirty"; then
-        echo "repro-release: $arch kernel was built from a dirty tree" >&2
         return 1
     fi
 }
@@ -318,11 +327,36 @@ self_test() {
             ;;
     esac
 
+    # The embedded id is `<short>[-dirty][ <date>]`; only a clean whole token is accepted.
+    check_id() {
+        expected=$1
+        dump=$2
+        id=$3
+        if id_is_clean "$dump" "$id"; then
+            actual=clean
+        else
+            actual=rejected
+        fi
+        if [ "$actual" != "$expected" ]; then
+            echo "repro-release: self-test FAIL: id '$id' in '$dump' is $actual, expected $expected" >&2
+            failures=$((failures + 1))
+        fi
+    }
+    check_id clean ') abc1234 2026-11-17' abc1234
+    check_id clean ') abc1234' abc1234
+    check_id clean 'abc1234' abc1234
+    check_id rejected ') abc1234-dirty 2026-11-17' abc1234
+    check_id rejected ') def5678 2026-11-17' abc1234
+    check_id rejected ') abc12345' abc1234
+    check_id rejected ') 0abc1234' abc1234
+    check_id rejected '' abc1234
+    check_id rejected ') abc1234' ''
+
     if [ "$failures" -ne 0 ]; then
         echo "repro-release: self-test FAILED ($failures case(s))" >&2
         return 1
     fi
-    echo "repro-release: self-test PASS (identical/content/size classification, sha256, byte offset)"
+    echo "repro-release: self-test PASS (identical/content/size classification, sha256, byte offset, clean/dirty/stale build id)"
     return 0
 }
 

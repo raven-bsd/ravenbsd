@@ -88,8 +88,20 @@ pub(crate) fn run_with_overrides(
     overrides: Overrides<'_>,
     platform: Platform,
 ) -> Result<u8> {
+    // A release image must embed the kernel built from the clean checked-out HEAD. Reject a
+    // dirty tree up front and a kernel override, which would bypass that guarantee.
+    let release_image = build::is_release_image_profile(arch, profile_name);
+    if release_image {
+        build::require_clean_release_head(root, profile_name)?;
+        if overrides.kernel.is_some() {
+            bail!(
+                "{profile_name} image build does not accept a --kernel override: the release image must embed the kernel built from HEAD"
+            );
+        }
+    }
+
     if platform == Platform::Pi4 {
-        return crate::pi::build(
+        let code = crate::pi::build(
             root,
             arch,
             profile_name,
@@ -97,7 +109,12 @@ pub(crate) fn run_with_overrides(
             overrides.initfs,
             overrides.kernel,
             overrides.output,
-        );
+        )?;
+        if code == 0 && release_image {
+            let kernel = build::pi4_kernel_artifact(root)?;
+            build::verify_release_kernel(root, &kernel, profile_name)?;
+        }
+        return Ok(code);
     }
     let profile = Profile::load(root, profile_name)?;
     let workspace = Workspace::load(root)?;
@@ -112,6 +129,10 @@ pub(crate) fn run_with_overrides(
         let code = build::run(&workspace, Component::Kernel, arch, false, &[], false)?;
         if code != 0 {
             bail!("kernel build failed with exit code {code}");
+        }
+        if release_image {
+            let kernel = build::artifact_path(root, arch, Component::Kernel, "");
+            build::verify_release_kernel(root, &kernel, profile_name)?;
         }
     }
 

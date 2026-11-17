@@ -453,3 +453,68 @@ fn textrel_patch_ignores_non_aarch64_objects() {
     assert_eq!(read_u32(&data, 64 + 4), Some(PF_R));
     fs::remove_file(&path).ok();
 }
+
+#[test]
+fn release_image_profiles_are_explicit() {
+    assert!(is_release_image_profile(Arch::X86_64, "release"));
+    assert!(is_release_image_profile(Arch::Aarch64, "pi4-release"));
+    for (arch, profile) in [
+        (Arch::X86_64, "shell"),
+        (Arch::X86_64, "base"),
+        (Arch::X86_64, "release-test"),
+        (Arch::X86_64, "pi4-release"),
+        (Arch::Aarch64, "release"),
+        (Arch::Aarch64, "pi4"),
+        (Arch::Riscv64, "release"),
+    ] {
+        assert!(
+            !is_release_image_profile(arch, profile),
+            "{arch:?} profile {profile} must not trigger the release build-id guard"
+        );
+    }
+}
+
+#[test]
+fn clean_release_build_id_is_accepted() {
+    // Both embedded forms: x86_64 carries `<short> <date>`, the Pi build id has no date.
+    assert!(verify_release_build_id(b") #1: abc1234 2026-11-17\0", "abc1234", false).is_ok());
+    assert!(verify_release_build_id(b") abc1234\0", "abc1234", false).is_ok());
+    // The token may start or end the inspected bytes.
+    assert!(verify_release_build_id(b"abc1234", "abc1234", false).is_ok());
+    assert!(verify_release_build_id(b"abc1234\0", "abc1234", false).is_ok());
+    assert!(contains_clean_build_id(b"(abc1234)", "abc1234"));
+}
+
+#[test]
+fn dirty_release_build_id_is_rejected() {
+    assert!(verify_release_build_id(b") abc1234-dirty 2026-11-17\0", "abc1234", false).is_err());
+    assert!(contains_dirty_build_id(b") abc1234-dirty\0", "abc1234"));
+    let err = verify_release_build_id(b") abc1234 2026-11-17\0", "abc1234", true)
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("clean worktree"), "{err}");
+}
+
+#[test]
+fn stale_release_build_id_is_rejected() {
+    let err = verify_release_build_id(b") def5678 2026-11-17\0", "abc1234", false)
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("does not embed the clean HEAD id"), "{err}");
+}
+
+#[test]
+fn longer_hashes_do_not_satisfy_the_clean_id() {
+    // The clean short id must be a whole token, not a prefix or a substring of a longer hash.
+    assert!(!contains_clean_build_id(b") abc12345\0", "abc1234"));
+    assert!(!contains_clean_build_id(b") 0abc1234\0", "abc1234"));
+    assert!(!contains_clean_build_id(b") abc1234-dirty\0", "abc1234"));
+    assert!(!contains_clean_build_id(b"", "abc1234"));
+    assert!(!contains_clean_build_id(b"abc1234", ""));
+}
+
+#[test]
+fn invalid_short_id_is_rejected() {
+    assert!(verify_release_build_id(b"abc1234", "", false).is_err());
+    assert!(verify_release_build_id(b"abc1234", "not-hex!", false).is_err());
+}

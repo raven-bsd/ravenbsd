@@ -256,6 +256,101 @@ fn civil_from_days(days: i64) -> (i64, u32, u32) {
     )
 }
 
+/// True when the image profile is a release artifact whose kernel must carry the clean HEAD id.
+///
+/// The profile name is matched explicitly: `pi4-release` does not enable `[initfs] release`, so
+/// the release flag cannot be the trigger. Debug and test profiles keep their current behavior.
+pub(crate) fn is_release_image_profile(arch: Arch, profile_name: &str) -> bool {
+    matches!(
+        (arch, profile_name),
+        (Arch::X86_64, "release") | (Arch::Aarch64, "pi4-release")
+    )
+}
+
+/// True when `data` contains `short` as a standalone build-id token.
+///
+/// The embedded id is `<short>[-dirty][ <date>]`. A longer hash that merely contains `short`
+/// (preceded by another hex digit) and a `short-dirty` id are not a clean match.
+pub(crate) fn contains_clean_build_id(data: &[u8], short: &str) -> bool {
+    let needle = short.as_bytes();
+    if needle.is_empty() {
+        return false;
+    }
+    data.windows(needle.len())
+        .enumerate()
+        .any(|(index, window)| {
+            if window != needle {
+                return false;
+            }
+            let before_ok = index == 0 || !data[index - 1].is_ascii_hexdigit();
+            let after_ok = data
+                .get(index + needle.len())
+                .is_none_or(|byte| *byte != b'-' && !byte.is_ascii_hexdigit());
+            before_ok && after_ok
+        })
+}
+
+/// True when `data` contains the dirty form of `short` (`<short>-dirty`).
+pub(crate) fn contains_dirty_build_id(data: &[u8], short: &str) -> bool {
+    let needle = format!("{short}-dirty");
+    data.windows(needle.len())
+        .any(|window| window == needle.as_bytes())
+}
+
+/// Reject a release kernel that does not carry the clean HEAD build id.
+pub(crate) fn verify_release_build_id(data: &[u8], short: &str, dirty: bool) -> Result<()> {
+    if short.is_empty() || !short.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        bail!("invalid HEAD short id `{short}`");
+    }
+    if dirty {
+        bail!(
+            "release image requires a clean worktree, but HEAD is {short}-dirty; commit or stash the changes"
+        );
+    }
+    if contains_dirty_build_id(data, short) {
+        bail!("release kernel was built from a dirty tree ({short}-dirty)");
+    }
+    if !contains_clean_build_id(data, short) {
+        bail!(
+            "release kernel does not embed the clean HEAD id {short}; the artifact is stale or was built from another commit"
+        );
+    }
+    Ok(())
+}
+
+/// Inspect the kernel artifact that the image embeds and require the clean HEAD id.
+///
+/// The caller passes the file the image builder actually consumes, so a cached copy from
+/// another commit or a dirty tree is rejected instead of trusted.
+pub(crate) fn verify_release_kernel(root: &Path, kernel: &Path, profile_name: &str) -> Result<()> {
+    let head = crate::repo::head_info(root)?;
+    let data = fs::read(kernel)
+        .with_context(|| format!("cannot read release kernel {}", kernel.display()))?;
+    verify_release_build_id(&data, &head.short, head.dirty)
+        .with_context(|| format!("{profile_name} image build rejected"))
+}
+
+/// Fail before building a release image from a dirty worktree.
+pub(crate) fn require_clean_release_head(root: &Path, profile_name: &str) -> Result<()> {
+    let head = crate::repo::head_info(root)?;
+    if head.dirty {
+        bail!(
+            "{profile_name} image requires a clean worktree, but HEAD is {}-dirty; commit or stash the changes",
+            head.short
+        );
+    }
+    Ok(())
+}
+
+/// The Pi 4 kernel artifact that the image flattens into `kernel8.img`.
+pub(crate) fn pi4_kernel_artifact(root: &Path) -> Result<PathBuf> {
+    Ok(root
+        .join("build/cargo/kernel-aarch64-pi4")
+        .join(target_for(Component::Kernel, Arch::Aarch64)?)
+        .join("debug")
+        .join("raven-kernel"))
+}
+
 /// Build one component and copy its artifacts into `build/<arch>/`.
 pub(crate) fn run(
     workspace: &Workspace,
