@@ -35,6 +35,33 @@ P3 x86_64 server flips to a B-only row because `.relro_padding` grows from 0xb8 
 real `.bss` section is 11,424 B before and after, so this is layout padding, not RAM. The gate
 count changes 63 fail -> 64 fail for that reason while S/F drop by 37-70 KiB on every P9 row.
 
+## C74zc remaining static shrink (OBSERVED, 2026-11-17)
+
+C74zc moves the remaining per-process scratch arenas from `.bss` to one lazy heap allocation each.
+The C APIs already allocate for their parsed database vectors, so the allocation class is
+unchanged. Measured on `origin/master` `e414e47d` (C74zb + C39m merged) plus C74zc:
+
+| Static | Location | Before | After | Delta |
+|---|---|---|---|---|
+| `netdb::records::AREA` | `raven-libc/src/netdb/records.rs` | 8,432 | 8 (pointer in `Cell`) | **-8,424 B** |
+| `ffi::tcbbuf::AREA` | `raven-libc/src/ffi/tcbbuf.rs` | 6,776 | 8 (pointer in `Cell`) | **-6,768 B** |
+| `ttyent_state::ARENA` | `raven-libc/src/compat/ttyent_state.rs` | 8,192 | 8 (pointer) | **-8,184 B** |
+| `usershell_state::SHELL_BUF` | `raven-libc/src/compat/usershell_state.rs` | 4,096 | 8 (pointer) | **-4,088 B** |
+
+| Probe | B before → after | S before → after |
+|---|---|---|
+| P9 x86_64 tiny | 62,192 → 35,552 (**-26,640**) | 1,138,061 → 1,137,229 (-832) |
+| P9 x86_64 server | 61,792 → 33,648 (**-28,144**) | 1,257,367 → 1,258,031 (+664) |
+
+The aarch64/riscv64 B values follow the same removals but stay under budget, so `check` does not
+print them. S is neutral (-1,962 … +672 B) because the arenas are untouched at run time. Gate 3.1
+stays at 63 fail (the rows removed were already below their B budgets); the x86_64 P9 B headroom
+grows from ~8.7 KiB to ~37 KiB.
+
+The lead's rev-95 note explicitly includes `tcbbuf`; the ticket Owns glob
+`libc/ravenlibc/src/**` appears to be a typo for the crate `src` tree, so the tcbbuf change is
+called out separately in the report.
+
 ## Measurement definition
 
 `S` is the Berkeley `text + data` of the stripped probe; `B` is the Berkeley **bss** field of

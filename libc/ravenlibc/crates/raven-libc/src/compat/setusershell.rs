@@ -7,7 +7,7 @@
 
 use core::ffi::{c_char, c_int};
 
-use super::usershell_state::{SHELL_BUF, SHELLS, init};
+use super::usershell_state::{SHELLS, init};
 
 /// `setusershell`.
 #[unsafe(no_mangle)]
