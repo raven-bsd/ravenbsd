@@ -97,11 +97,26 @@ copy_artifacts() {
     arch=$1
     destination=$2
     mkdir -p "$destination"
-    for artifact in kernel.elf loader.efi initfs.img; do
-        if [ -f "build/$arch/$artifact" ]; then
-            cp "build/$arch/$artifact" "$destination/$artifact"
-        fi
-    done
+    case "$arch" in
+        aarch64)
+            # The Pi image uses the flat kernel from its own target dir, not build/aarch64/kernel.elf
+            # (that one belongs to the generic kernel build and may be stale).
+            pi_kernel=build/cargo/kernel-aarch64-pi4/aarch64-unknown-none-softfloat/debug/raven-kernel
+            if [ -f "$pi_kernel" ]; then
+                cp "$pi_kernel" "$destination/kernel.elf"
+            fi
+            ;;
+        *)
+            for artifact in kernel.elf loader.efi; do
+                if [ -f "build/$arch/$artifact" ]; then
+                    cp "build/$arch/$artifact" "$destination/$artifact"
+                fi
+            done
+            ;;
+    esac
+    if [ -f "build/$arch/initfs.img" ]; then
+        cp "build/$arch/initfs.img" "$destination/initfs.img"
+    fi
 }
 
 diagnose_artifacts() {
@@ -191,19 +206,27 @@ build_image() {
 
 verify_kernel_id() {
     arch=$1
-    kernel=build/$arch/kernel.elf
+    case "$arch" in
+        aarch64)
+            kernel=build/cargo/kernel-aarch64-pi4/aarch64-unknown-none-softfloat/debug/raven-kernel
+            ;;
+        *)
+            kernel=build/$arch/kernel.elf
+            ;;
+    esac
     if [ ! -f "$kernel" ]; then
         echo "repro-release: $kernel is missing after the $arch build" >&2
         return 1
     fi
-    if ! strings "$kernel" 2>/dev/null | grep -qF "$head "; then
-        echo "repro-release: $arch kernel does not carry the clean-tree build id '$head '" >&2
+    id_pattern="(^|[^0-9a-f])${head}([^0-9a-f]|$)"
+    if ! strings "$kernel" 2>/dev/null | grep -Eq "$id_pattern"; then
+        echo "repro-release: $arch kernel does not carry the clean-tree build id '$head'" >&2
         echo "  the image builder reused an artifact from another commit or a dirty tree" >&2
-        echo "  remove build/$arch/kernel.elf (and loader/initfs if advised) and rerun" >&2
+        echo "  remove the kernel target directory under build/cargo and rerun" >&2
         strings "$kernel" 2>/dev/null | grep -E 'RavenBSD kernel|20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | head -3 >&2 || true
         return 1
     fi
-    if strings "$kernel" 2>/dev/null | grep -qF "$head-dirty "; then
+    if strings "$kernel" 2>/dev/null | grep -Fq "$head-dirty"; then
         echo "repro-release: $arch kernel was built from a dirty tree" >&2
         return 1
     fi
