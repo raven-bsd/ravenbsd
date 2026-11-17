@@ -20,7 +20,7 @@ cc=${CC:-cc}
 command -v "$cc" >/dev/null 2>&1 || { echo "p1e-math: no C compiler" >&2; exit 1; }
 
 inc="-I libc/ravenlibc/include -I libc/ravenlibc/arch/x86_64/include"
-flags="-fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value"
+flags="-fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value -Werror"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
