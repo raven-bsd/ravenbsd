@@ -987,6 +987,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-chan"
+version = "0.1.0"
+
+[[package]]
 name = "raven-cli"
 version = "0.1.0"
 dependencies = [
