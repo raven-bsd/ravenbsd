@@ -12,12 +12,20 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
+    use alloc::string::String;
+    use alloc::vec::Vec;
+
     use raven_abi::errno::Errno;
     use raven_abi::types::Handle;
+    use raven_initfs::Initfs;
     use raven_rt::entry;
 
     const PROC_SIGRECV: usize = 0x4B;
     const PROC_SELF_INFO: usize = 0x35;
+    const PROC_FORK: usize = 0x39;
+    const PROC_HANDLE_INFO: usize = 0x3E;
+    const PROC_PID_INFO: usize = 0x3A;
+    const INFO_WORDS: usize = 41;
     const FDMAP_MAGIC: &[u8; 4] = b"RFDM";
     const FDMAP_HEADER: usize = 8;
     const FDMAP_ENTRY: usize = 18;
@@ -46,6 +54,8 @@ mod program {
                 }
             }
             "attrs" => attrs(&args),
+            "exec-name" => exec_name(),
+            "exec-check" => exec_check(),
             _ => {
                 raven_rt::println!("proc-attrs-child: unknown mode={mode}");
                 2
@@ -68,21 +78,125 @@ mod program {
         } else {
             true
         };
+        let cmd_ok = wait_command("proc-attrs-child");
+        let fork_ok = fork_command_check();
         raven_rt::println!(
-            "proc-attrs-child: attrs fd={} cloexec={} pgid={} sig={}",
+            "proc-attrs-child: attrs fd={} cloexec={} pgid={} sig={} cmd={} fork={}",
             u8::from(fd_ok),
             u8::from(cloexec_ok),
             u8::from(pgid_ok),
-            u8::from(sig_ok)
+            u8::from(sig_ok),
+            u8::from(cmd_ok),
+            u8::from(fork_ok)
         );
-        if fd_ok && cloexec_ok && pgid_ok && sig_ok {
+        if fd_ok && cloexec_ok && pgid_ok && sig_ok && cmd_ok && fork_ok {
             raven_rt::println!("proc-attrs-child: ok");
-            // Keep the child alive long enough for procd's post-spawn pid/group queries.
             let _ = raven_rt::nanosleep(100_000_000);
             0
         } else {
             3
         }
+    }
+
+    fn exec_name() -> i32 {
+        if !wait_command("proc-attrs-child") {
+            return 4;
+        }
+        let image = match raven_rt::map_initfs() {
+            Ok(image) => image,
+            Err(_) => return 5,
+        };
+        let initfs = match Initfs::parse(image) {
+            Ok(initfs) => initfs,
+            Err(_) => return 6,
+        };
+        let Some(entry) = initfs.get("/bin/proc-attrs-child") else {
+            return 7;
+        };
+        let argv: [&[u8]; 2] = [b"proc-attrs-exec", b"exec-check"];
+        match raven_rt::exec::exec_image(entry.data, b"/bin/proc-attrs-child", &argv, &[], &[]) {
+            Ok(()) => 8,
+            Err(_) => 9,
+        }
+    }
+
+    fn exec_check() -> i32 {
+        let ok = wait_command("proc-attrs-exec");
+        raven_rt::println!("proc-attrs-child: exec-cmd={}", u8::from(ok));
+        if ok {
+            let _ = raven_rt::nanosleep(100_000_000);
+            0
+        } else {
+            3
+        }
+    }
+
+    fn wait_command(expected: &str) -> bool {
+        for _ in 0..100 {
+            if own_command().as_deref() == Some(expected) {
+                return true;
+            }
+            let _ = raven_rt::nanosleep(10_000_000);
+        }
+        false
+    }
+
+    fn own_command() -> Option<String> {
+        let mut words = [0u64; INFO_WORDS];
+        // SAFETY: PROC_SELF_INFO writes INFO_WORDS u64 words to the live caller-owned array.
+        let raw = unsafe {
+            raven_rt::sys::syscall2(PROC_SELF_INFO, words.as_mut_ptr() as usize, words.len())
+        };
+        Errno::from_ret(raw).ok()?;
+        command_from_words(&words)
+    }
+
+    fn command_of_pid(pid: i32) -> Option<String> {
+        let mut words = [0u64; INFO_WORDS];
+        // SAFETY: PROC_PID_INFO writes INFO_WORDS u64 words to the live caller-owned array.
+        let raw = unsafe {
+            raven_rt::sys::syscall3(
+                PROC_PID_INFO,
+                pid as isize as usize,
+                words.as_mut_ptr() as usize,
+                words.len(),
+            )
+        };
+        Errno::from_ret(raw).ok()?;
+        command_from_words(&words)
+    }
+
+    fn command_from_words(words: &[u64; INFO_WORDS]) -> Option<String> {
+        let mut bytes = Vec::new();
+        for word in words.iter().skip(8) {
+            for byte in word.to_le_bytes() {
+                if byte == 0 {
+                    return core::str::from_utf8(&bytes).ok().map(String::from);
+                }
+                bytes.push(byte);
+            }
+        }
+        core::str::from_utf8(&bytes).ok().map(String::from)
+    }
+
+    fn fork_command_check() -> bool {
+        // SAFETY: PROC_FORK takes a self-process handle and an explicit zero flag word.
+        let raw = unsafe { raven_rt::sys::syscall2(PROC_FORK, Handle::SELF_PROC.0 as usize, 0) };
+        let Ok(value) = Errno::from_ret(raw) else {
+            return false;
+        };
+        let handle = Handle(u32::try_from(value).unwrap_or(Handle::NONE.0));
+        // SAFETY: PROC_HANDLE_INFO takes the process handle returned by PROC_FORK.
+        let raw_pid = unsafe { raven_rt::sys::syscall1(PROC_HANDLE_INFO, handle.0 as usize) };
+        let ok = Errno::from_ret(raw_pid)
+            .ok()
+            .and_then(|pid| i32::try_from(pid).ok())
+            .and_then(command_of_pid)
+            .as_deref()
+            == Some("proc-attrs-child");
+        let _ = raven_rt::sys::proc_terminate(handle, 0);
+        let _ = raven_rt::sys::handle_close(handle);
+        ok
     }
 
     fn inherited_fds(args: &raven_rt::Args) -> (bool, bool) {

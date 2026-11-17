@@ -15,10 +15,24 @@ qemu_extra = []
 expect_exit = "success"
 
 [[expect]]
-regex = '^proc-attrs-child: attrs fd=1 cloexec=1 pgid=1 sig=1$'
+regex = '^proc-attrs: cmd=1$'
+unordered = true
+
+[[expect]]
+regex = '^proc-attrs: exec=1$'
+unordered = true
+
+[[expect]]
+regex = '^proc-attrs-child: attrs fd=1 cloexec=1 pgid=1 sig=1 cmd=1 fork=1$'
+unordered = true
+
+[[expect]]
+regex = '^proc-attrs-child: exec-cmd=1$'
+unordered = true
 
 [[expect]]
 regex = '^proc-attrs-child: ok$'
+unordered = true
 
 [[expect]]
 regex = '^proc-attrs: ok$'

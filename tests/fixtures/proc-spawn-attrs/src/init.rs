@@ -15,16 +15,19 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
+    use alloc::string::String;
+
     use raven_abi::types::Handle;
     use raven_initfs::Initfs;
     use raven_rt::entry;
     use raven_rt::println;
-    use raven_rt::spawn::{SpawnAttributes, SpawnOptions, spawn_with_attributes};
+    use raven_rt::spawn::{SpawnAttributes, SpawnOptions, spawn, spawn_with_attributes};
 
     const PROC_HANDLE_INFO: usize = 0x3E;
+    const PROC_PID_INFO: usize = 0x3A;
     const PROC_WAIT: usize = 0x31;
     const PROC_SETPGID: usize = 0x36;
-    const PROC_GETPGID: usize = 0x49;
+    const INFO_WORDS: usize = 41;
     const SIGUSR1: u32 = 10;
     const SIGUSR2: u32 = 12;
     const SIGTERM: u32 = 15;
@@ -74,12 +77,34 @@ mod program {
         )
         .map_err(|_| "spawn1")?;
         let pid = handle_pid(child)?;
+        let cmd_ok = kernel_command_is(pid, "proc-attrs-child");
+        println!("proc-attrs: cmd={}", u8::from(cmd_ok));
+        if !cmd_ok {
+            return Err("command");
+        }
         setpgid(pid, 0)?;
         let code = wait(child)?;
+        let _ = raven_rt::sys::handle_close(child);
         println!("proc-attrs: case1 exit={code}");
         if code != 0 {
             return Err("attrs1 exit");
         }
+
+        let exec_child = spawn(
+            &initfs,
+            "/bin/proc-attrs-child",
+            &SpawnOptions {
+                args: &["proc-attrs-child", "exec-name"],
+                env: &[],
+            },
+        )
+        .map_err(|_| "spawn-exec")?;
+        let code = wait(exec_child)?;
+        let _ = raven_rt::sys::handle_close(exec_child);
+        if code != 0 {
+            return Err("exec exit");
+        }
+        println!("proc-attrs: exec=1");
 
         let _ = raven_rt::sys::handle_close(read);
         let _ = raven_rt::sys::handle_close(write);
@@ -121,6 +146,36 @@ mod program {
         if let Some(byte) = set.get_mut(bit / 8) {
             *byte |= 1 << (bit % 8);
         }
+    }
+
+    fn kernel_command_is(pid: i32, expected: &str) -> bool {
+        let mut words = [0u64; INFO_WORDS];
+        // SAFETY: PROC_PID_INFO writes INFO_WORDS u64 words to the live caller-owned array.
+        let raw = unsafe {
+            raven_rt::sys::syscall3(
+                PROC_PID_INFO,
+                pid as isize as usize,
+                words.as_mut_ptr() as usize,
+                words.len(),
+            )
+        };
+        if raw < 0 {
+            return false;
+        }
+        command_from_words(&words).as_deref() == Some(expected)
+    }
+
+    fn command_from_words(words: &[u64; INFO_WORDS]) -> Option<String> {
+        let mut bytes = alloc::vec::Vec::new();
+        for word in words.iter().skip(8) {
+            for byte in word.to_le_bytes() {
+                if byte == 0 {
+                    return core::str::from_utf8(&bytes).ok().map(String::from);
+                }
+                bytes.push(byte);
+            }
+        }
+        core::str::from_utf8(&bytes).ok().map(String::from)
     }
 }
 
