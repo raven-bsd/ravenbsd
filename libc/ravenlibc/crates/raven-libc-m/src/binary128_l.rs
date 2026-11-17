@@ -123,6 +123,46 @@ pub fn scalbnl(x: LongDouble, n: i32) -> LongDouble {
     x.scalbn(n)
 }
 
+/// `ldexpl`: the same scaling as `scalbnl` (C `long double` exponent is an `int`).
+pub fn ldexpl(x: LongDouble, n: i32) -> LongDouble {
+    x.scalbn(n)
+}
+
+/// `scalblnl`: `scalbnl` with a C `long` exponent; out-of-range exponents saturate.
+pub fn scalblnl(x: LongDouble, n: i64) -> LongDouble {
+    x.scalbn(i32::try_from(n).unwrap_or(if n < 0 { i32::MIN } else { i32::MAX }))
+}
+
+/// `frexpl`: the mantissa in `[0.5, 1)` plus the exponent.
+pub fn frexpl(x: LongDouble) -> (LongDouble, i32) {
+    x.frexp()
+}
+
+/// `modfl`: the fractional and integral parts.
+pub fn modfl(x: LongDouble) -> (LongDouble, LongDouble) {
+    x.modf()
+}
+
+/// `ilogbl`.
+pub fn ilogbl(x: LongDouble) -> i32 {
+    x.ilogb()
+}
+
+/// `llogbl`: `ilogbl` widened to a C `long`.
+pub fn llogbl(x: LongDouble) -> i64 {
+    i64::from(x.ilogb())
+}
+
+/// `logbl`.
+pub fn logbl(x: LongDouble) -> LongDouble {
+    x.logb()
+}
+
+/// `significandl`: the value scaled to `[1, 2)`.
+pub fn significandl(x: LongDouble) -> LongDouble {
+    x.significand()
+}
+
 /// `nanl`.
 pub fn nanl() -> LongDouble {
     LongDouble::nan()

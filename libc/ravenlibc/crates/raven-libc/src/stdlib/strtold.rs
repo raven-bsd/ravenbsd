@@ -40,6 +40,7 @@ extern "C" fn strtold_inner(out: *mut u128, s: *const c_char, endptr: *mut *mut 
 ///
 /// # Safety
 /// The compiler-generated C ABI contract applies.
+#[cfg(target_arch = "x86_64")]
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn strtold() -> ! {
@@ -51,6 +52,33 @@ pub unsafe extern "C" fn strtold() -> ! {
         "call {inner}",
         "fld tbyte ptr [rsp]",
         "add rsp, 24",
+        "ret",
+        inner = sym strtold_inner,
+    )
+}
+
+/// `strtold`: the aarch64 AAPCS64 binary128-in-`v0` C ABI wrapper.
+///
+/// The inner function writes the 16-byte binary128 image; `ldr q0` returns it in the register
+/// the AAPCS64 uses for a 16-byte floating-point result.
+///
+/// # Safety
+/// The compiler-generated C ABI contract applies.
+#[cfg(target_arch = "aarch64")]
+#[unsafe(naked)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn strtold() -> ! {
+    core::arch::naked_asm!(
+        ".arch armv8-a",
+        "sub sp, sp, #32",
+        "str x30, [sp, #16]",
+        "mov x2, x1",
+        "mov x1, x0",
+        "mov x0, sp",
+        "bl {inner}",
+        "ldr q0, [sp]",
+        "ldr x30, [sp, #16]",
+        "add sp, sp, #32",
         "ret",
         inner = sym strtold_inner,
     )

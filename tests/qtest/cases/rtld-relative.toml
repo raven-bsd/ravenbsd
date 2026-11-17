@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# C74l regression: a normally linked C PIE with a global pointer produces one
+# R_X86_64_RELATIVE relocation. The kernel loads the PIE and its PT_INTERP; the loader must
+# apply the relative relocation and reach main. The build script embeds the PIE in the static
+# dynamic-exec launcher and stages it as /bin/libc-test under the libc-test profile.
+
+name = "rtld-relative"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/rtld-relative/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^dynamic-exec: launching$'
+
+[[expect]]
+regex = '^rtld-relative: main$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|relocation failed|dynamic-exec: exec failed'

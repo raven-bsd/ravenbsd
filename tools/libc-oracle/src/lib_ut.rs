@@ -74,6 +74,44 @@ fn adhoc_paths_are_restricted() {
     assert!(!valid_adhoc_path("include/chacha_private.c", "header"));
 }
 
+fn env_with(value: Option<&str>) -> impl Fn(&str) -> Option<std::ffi::OsString> {
+    let value = value.map(std::ffi::OsString::from);
+    move |name| {
+        if name == RESOURCES_ENV {
+            value.clone()
+        } else {
+            None
+        }
+    }
+}
+
+#[test]
+fn the_environment_resources_path_wins_over_the_ancestor_walk() {
+    let resolved = resolve_resources_with(None, &env_with(Some("/env/resources"))).expect("env");
+    assert_eq!(resolved, PathBuf::from("/env/resources"));
+}
+
+#[test]
+fn explicit_resources_beat_the_environment() {
+    let resolved = resolve_resources_with(
+        Some(PathBuf::from("/flag/resources")),
+        &env_with(Some("/env/resources")),
+    )
+    .expect("flag");
+    assert_eq!(resolved, PathBuf::from("/flag/resources"));
+}
+
+#[test]
+fn an_empty_environment_value_is_ignored() {
+    // No RAVENBSD_RESOURCES value: the function falls through to the ancestor walk. The walk
+    // either finds a resources tree or returns the improved error; a returned path must never
+    // be the empty environment value.
+    match resolve_resources_with(None, &env_with(Some(""))) {
+        Ok(path) => assert!(!path.as_os_str().is_empty()),
+        Err(error) => assert!(error.to_string().contains(RESOURCES_ENV)),
+    }
+}
+
 #[test]
 fn check_reports_skipped_for_an_empty_resource_tree() {
     let temp = TempDir::new("check-empty");

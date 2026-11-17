@@ -340,8 +340,15 @@ pub extern "C" fn _rtld_main(sp: usize) -> ! {
         };
         crate::raw::memview::set_tls_offset(id, object.tls_offset);
     }
-    if loader.relocate_all().is_err() {
-        fail(b"ld-elf.so.1: relocation failed\n");
+    if let Err(error) = loader.relocate_all() {
+        sys::debug_write(b"ld-elf.so.1: ");
+        sys::debug_write(error.text().as_bytes());
+        if !loader.error.as_bytes().is_empty() {
+            sys::debug_write(b": ");
+            sys::debug_write(loader.error.as_bytes());
+        }
+        sys::debug_write(b"\n");
+        sys::exit(127)
     }
     if !loader.install_table(&TABLE) {
         fail(b"ld-elf.so.1: cannot install the dl table\n");
@@ -588,11 +595,14 @@ pub extern "C" fn __tls_get_addr(index: *mut usize) -> *mut u8 {
         core::hint::spin_loop();
     }
     // Re-check under the lock: another thread may have grown this DTV.
+    // SAFETY: `tp + 8` is the `dtv` field of the live TCB.
     let dtv = unsafe { *((tp + 8) as *const usize) };
     let mut result = core::ptr::null_mut();
     if dtv != 0 {
+        // SAFETY: word 0 of a published DTV is its module count.
         let count = unsafe { *(dtv as *const usize) };
         if module <= count {
+            // SAFETY: the DTV has `count` entries after word 0.
             let entry = unsafe { *((dtv as *const usize).add(module)) };
             if entry != 0 {
                 result = entry.wrapping_add(offset) as *mut u8;

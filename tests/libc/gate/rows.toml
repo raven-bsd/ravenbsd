@@ -114,7 +114,7 @@ title = "lints (C16)"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "libc-lint", "all"]
-note = "C74h: 17 violations (3 C74g SAFETY comments in ld/src/raw/exports.rs, 14 pre-existing)"
+note = "C74i: 26 violations remain; loader files are clean (3 C74g SAFETY comments fixed). Owners: P1f/phil 14, P1h/otto 8, P1i/tim 3, ABI/contract 1. Not edited here."
 evidence = "build/libc-gate/1.7.txt"
 source = "C34"
 
@@ -228,7 +228,7 @@ title = "core-servers regression"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "qtest", "--case", "core-servers", "--arch", "x86_64"]
-note = "timeout after 120 s before init; serial stops at the loader"
+note = "C74j: 120 s timeout at `sched: running`; the same case passes at 600 s (coretest: ok, init exited 0). Owner: qtest/core-test case timeout, not libc."
 evidence = "build/libc-gate/5.2.core-servers.txt"
 source = "LEAD-TICKET-CHECKLIST 8"
 
@@ -239,7 +239,7 @@ title = "file-tools regression"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "qtest", "--case", "file-tools", "--arch", "x86_64"]
-note = "timeout after 240 s before init; serial stops at the loader"
+note = "C74j: times out at 240 s and 600 s; reaches `rsh: ready`/`raven#` but never starts `tooltest`. Owner: file-tools-test profile/init or tooltest, not libc."
 evidence = "build/libc-gate/5.2.file-tools.txt"
 source = "LEAD-TICKET-CHECKLIST 8"
 

@@ -160,6 +160,19 @@ impl LongDouble128 {
         self.bits
     }
 
+    /// Bridge from C42's `raven_libc_dtoa::LongDouble` byte image.
+    ///
+    /// The gdtoa output is already the target `long double` bit image; on aarch64/riscv64 that
+    /// image is IEEE binary128, so the bridge is the little-endian 128-bit pattern.
+    pub fn from_dtoa_bytes(bytes: [u8; 16]) -> Self {
+        Self::from_bits(u128::from_le_bytes(bytes))
+    }
+
+    /// Bridge to C42's `raven_libc_dtoa::LongDouble` byte image.
+    pub fn to_dtoa_bytes(self) -> [u8; 16] {
+        self.to_bits().to_le_bytes()
+    }
+
     /// Signed zero.
     pub const fn zero(negative: bool) -> Self {
         Self {
@@ -403,6 +416,80 @@ impl LongDouble128 {
         Self {
             bits: sign | (significand & SIGNIFICAND_MASK),
         }
+    }
+
+    /// `frexp`: split into a mantissa in `[0.5, 1)` and a base-2 exponent, `x = m * 2^e`.
+    ///
+    /// Zero returns `(0, 0)`; an infinity or NaN returns `(x, 0)` unchanged. Subnormals are
+    /// normalized first, so `e` is the true exponent of the leading bit.
+    pub fn frexp(self) -> (Self, i32) {
+        if self.is_zero() || !self.is_finite() {
+            return (self, 0);
+        }
+        let (exponent, significand) = unpack(self.bits);
+        let sign = if self.sign_bit() { SIGN } else { 0 };
+        // `value = significand * 2^(exponent - 112)` and the leading bit of `significand` is the
+        // hidden bit, so the mantissa has the unbiased exponent -1 and `e = exponent + 1`.
+        let mantissa = Self {
+            bits: sign
+                | (((BIAS - 1) as u128) << EXPONENT_SHIFT)
+                | (significand & SIGNIFICAND_MASK),
+        };
+        (mantissa, exponent.saturating_add(1))
+    }
+
+    /// `ilogb`: the unbiased base-2 exponent with the C edge results.
+    ///
+    /// `ilogb(0)` is `FP_ILOGB0`; NaN and infinity return `FP_ILOGBNAN`.
+    pub fn ilogb(self) -> i32 {
+        if self.is_zero() {
+            return crate::consts::FP_ILOGB0;
+        }
+        if !self.is_finite() {
+            return crate::consts::FP_ILOGBNAN;
+        }
+        let (exponent, _) = unpack(self.bits);
+        exponent
+    }
+
+    /// `logb`: `ilogb` as a value; zero is `-inf` and infinity keeps its sign.
+    pub fn logb(self) -> Self {
+        if self.is_nan() {
+            return self;
+        }
+        if self.is_infinite() {
+            return Self::infinity(self.sign_bit());
+        }
+        if self.is_zero() {
+            return Self::infinity(true);
+        }
+        Self::from_i64(i64::from(self.ilogb()))
+    }
+
+    /// `significand`: `x` scaled to `[1, 2)`; zero, infinity and NaN pass through.
+    pub fn significand(self) -> Self {
+        if !self.is_finite() || self.is_zero() {
+            return self;
+        }
+        let (_, significand) = unpack(self.bits);
+        let sign = if self.sign_bit() { SIGN } else { 0 };
+        Self {
+            bits: sign | ((BIAS as u128) << EXPONENT_SHIFT) | (significand & SIGNIFICAND_MASK),
+        }
+    }
+
+    /// `modf`: `(fractional part, integral part)`, both carrying the sign of `x`.
+    ///
+    /// Infinity returns `(0, x)` and NaN returns `(x, x)`.
+    pub fn modf(self) -> (Self, Self) {
+        if self.is_nan() {
+            return (self, self);
+        }
+        if self.is_infinite() {
+            return (Self::zero(self.sign_bit()), self);
+        }
+        let integral = self.trunc();
+        (self.sub(integral), integral)
     }
 
     /// The value scaled to `[1, 2)` (the mantissa used by the logarithm reduction).
