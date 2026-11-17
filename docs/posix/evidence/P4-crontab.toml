@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4y POSIX crontab evidence.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.crontab"
+status = "present"
+evidence = "test:tests/posix/utility/crontab/test.sh"
+notes = "P4y: install/list/remove, five-field validation, atomic replacement and @reboot rejection; crond qtest runs one job through the kernel spawn path"

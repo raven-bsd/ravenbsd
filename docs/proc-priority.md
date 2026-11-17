@@ -73,8 +73,7 @@ The fair scheduler does not implement real-time classes. The surface is explicit
 
 ## Exposure
 
-`userland/rt` is the exposed client. `procd` is not on the `b46a95d8` base (P2e remains
-unmerged), so a procd request wrapper is a follow-up when that server lands.
+`userland/rt` is the exposed client. The kernel `PROC_*` priority calls are the contract; there is no userspace process server.
 
 ## Tests
 

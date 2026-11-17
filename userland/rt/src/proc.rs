@@ -8,6 +8,7 @@
 //! never writes more than the caller supplied.
 
 use raven_abi::errno::Errno;
+use raven_abi::types::Handle;
 
 /// Kernel supplementary-group limit.
 pub const MAX_GROUPS: usize = 16;
@@ -21,6 +22,45 @@ const PROC_SETCRED_EX: usize = 0x3B;
 /// Raw `proc_getgroups(out, size)`.
 #[cfg(target_os = "none")]
 const PROC_GETGROUPS: usize = 0x3D;
+/// Raw `proc_set_command(proc, name, len)`.
+#[cfg(target_os = "none")]
+const PROC_SET_COMMAND: usize = 0x45;
+/// Maximum command-name bytes the kernel stores.
+pub const MAX_COMMAND: usize = 256;
+
+/// Set the command name the kernel reports for `handle`.
+///
+/// The handle must be `SELF_PROC` or a process handle with `ADMIN`. Names longer than
+/// [`MAX_COMMAND`] are rejected with `ENAMETOOLONG`; the kernel truncates at a UTF-8 boundary.
+///
+/// # Errors
+/// [`Errno`] from `PROC_SET_COMMAND`; `ENOSYS` on the host.
+#[cfg(target_os = "none")]
+pub fn set_command(handle: Handle, command: &str) -> Result<(), Errno> {
+    if command.len() > MAX_COMMAND {
+        return Err(Errno::ENAMETOOLONG);
+    }
+    // SAFETY: `command` is a live caller-owned byte slice; the kernel validates the handle and
+    // reads exactly `command.len()` bytes through usercopy.
+    let result = unsafe {
+        crate::sys::syscall3(
+            PROC_SET_COMMAND,
+            handle.0 as usize,
+            command.as_ptr() as usize,
+            command.len(),
+        )
+    };
+    Errno::from_ret(result).map(|_| ())
+}
+
+/// Set a command name; `ENOSYS` on the host.
+///
+/// # Errors
+/// [`Errno::ENOSYS`].
+#[cfg(not(target_os = "none"))]
+pub fn set_command(_handle: Handle, _command: &str) -> Result<(), Errno> {
+    Err(Errno::ENOSYS)
+}
 
 /// The six credential words returned by `PROC_CRED_INFO`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

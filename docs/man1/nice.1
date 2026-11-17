@@ -1,0 +1,50 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt NICE 1
+.Os RavenBSD
+.Sh NAME
+.Nm nice
+.Nd run a command with an altered niceness
+.Sh SYNOPSIS
+.Nm
+.Op Fl n Ar increment
+.Op Ar command Op Ar argument ...
+.Sh DESCRIPTION
+.Nm
+prints the caller's current nice value when no command is given, or executes
+.Ar command
+after applying
+.Ar increment
+(default 10).
+The resulting value is clamped to the POSIX range
+.Pq -20 through 19 .
+.Pp
+The
+.Fl n
+form and the traditional
+.Fl N
+form are accepted.
+A bare
+.Nm
+without
+.Fl n
+is a query.
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl n Ar increment
+Add
+.Ar increment
+to the current nice value before running the command.
+.El
+.Sh EXIT STATUS
+.Ex -std
+A command that cannot be found exits 127; a command that cannot be executed
+exits 126.
+A usage error exits 2.
+.Sh SEE ALSO
+.Xr kill 1 ,
+.Xr getpriority 2
+.Sh STANDARDS
+IEEE Std 1003.1-2024
+.Pq POSIX.1-2024 .

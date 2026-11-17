@@ -20,7 +20,16 @@ use crate::backend::{EarlySpawn, WaitResult};
 #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 use crate::errors::{E2BIG, ENOENT, ENOEXEC};
 use crate::errors::{EAGAIN, EINVAL, Errno};
-use crate::wire::SpawnRequest;
+use crate::request::SpawnRequest;
+
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+use raven_abi::errno::Errno as AbiErrno;
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+use raven_abi::types::Handle;
+
+/// Maximum command bytes accepted by the kernel `PROC_SET_COMMAND`.
+#[cfg(any(target_os = "none", target_os = "ravenbsd", test))]
+const MAX_COMMAND: usize = 256;
 
 /// Maximum number of children tracked at once.
 pub const MAX_CHILDREN: usize = 128;
@@ -191,7 +200,7 @@ fn resolve_image_path(path: &str, cwd: &[u8]) -> Result<String, Errno> {
     }
 }
 
-/// Convert the wire byte strings into the loader's UTF-8 argument view.
+/// Convert the request byte strings into the loader's UTF-8 argument view.
 fn strings(items: &[Vec<u8>]) -> Result<Vec<&str>, Errno> {
     let mut view = Vec::with_capacity(items.len());
     for item in items {
@@ -209,6 +218,98 @@ fn map_spawn_error(error: raven_spawn::SpawnError) -> Errno {
         SpawnError::BadElf(_) | SpawnError::HasInterpreter => ENOEXEC,
         SpawnError::TooLarge => E2BIG,
         SpawnError::Sys(error) => i32::from(error.0),
+    }
+}
+
+/// Choose and truncate the kernel command name for a native spawn.
+///
+/// `argv[0]` wins; an empty/missing argument list uses the image path. The result is capped at
+/// [`MAX_COMMAND`] bytes at a UTF-8 boundary.
+#[cfg(any(target_os = "none", target_os = "ravenbsd", test))]
+fn command_name<'a>(argv: &[&'a str], path: &'a str) -> &'a str {
+    let mut text = argv.first().copied().unwrap_or(path);
+    if text.is_empty() {
+        text = path;
+    }
+    let mut end = 0usize;
+    for (index, character) in text.char_indices() {
+        let next = index.saturating_add(character.len_utf8());
+        if next > MAX_COMMAND {
+            break;
+        }
+        end = next;
+    }
+    &text[..end]
+}
+
+/// A syscall sink that names the child before its first thread starts.
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+struct CommandSys<'a> {
+    inner: raven_spawn::RtSys,
+    command: &'a str,
+}
+
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+impl raven_spawn::Sys for CommandSys<'_> {
+    fn proc_create(&mut self) -> Result<Handle, AbiErrno> {
+        self.inner.proc_create()
+    }
+
+    fn memobj_create(&mut self, len: usize) -> Result<Handle, AbiErrno> {
+        self.inner.memobj_create(len)
+    }
+
+    fn map(
+        &mut self,
+        proc: Handle,
+        memobj: Handle,
+        offset: usize,
+        addr: usize,
+        len: usize,
+        flags: usize,
+    ) -> Result<usize, AbiErrno> {
+        self.inner.map(proc, memobj, offset, addr, len, flags)
+    }
+
+    fn unmap(&mut self, proc: Handle, addr: usize, len: usize) -> Result<(), AbiErrno> {
+        self.inner.unmap(proc, addr, len)
+    }
+
+    fn protect(
+        &mut self,
+        proc: Handle,
+        addr: usize,
+        len: usize,
+        protection: u8,
+    ) -> Result<(), AbiErrno> {
+        self.inner.protect(proc, addr, len, protection)
+    }
+
+    fn thread_create(
+        &mut self,
+        proc: Handle,
+        entry: usize,
+        stack_top: usize,
+        arg: usize,
+    ) -> Result<Handle, AbiErrno> {
+        raven_libc_sys::sys::proc_set_command(proc, self.command.as_bytes())?;
+        self.inner.thread_create(proc, entry, stack_top, arg)
+    }
+
+    fn exec_cred(&mut self, proc: Handle, file: Handle, nosuid: bool) -> Result<(), AbiErrno> {
+        self.inner.exec_cred(proc, file, nosuid)
+    }
+
+    fn handle_close(&mut self, handle: Handle) -> Result<(), AbiErrno> {
+        self.inner.handle_close(handle)
+    }
+
+    fn write_parent_mem(&mut self, addr: usize, bytes: &[u8]) {
+        self.inner.write_parent_mem(addr, bytes);
+    }
+
+    fn copy_mapping(&mut self, destination: usize, source: usize, len: usize) {
+        self.inner.copy_mapping(destination, source, len);
     }
 }
 
@@ -232,7 +333,11 @@ impl Loader for RtLoader {
         fdmap: &[(i32, u32)],
     ) -> Result<u32, Errno> {
         let options = raven_spawn::SpawnOptions { args: argv, env };
-        raven_spawn::spawn_image_with_fdmap(image, path, &options, fdmap, &mut raven_spawn::RtSys)
+        let mut sys = CommandSys {
+            inner: raven_spawn::RtSys,
+            command: command_name(argv, path),
+        };
+        raven_spawn::spawn_image_with_fdmap(image, path, &options, fdmap, &mut sys)
             .map(|handle| handle.0)
             .map_err(map_spawn_error)
     }

@@ -98,6 +98,10 @@ pub const PROC_SETSID: usize = 0x37;
 pub const PROC_SETCRED: usize = 0x38;
 /// Raw `proc_pid_info(pid, out, count) -> 0` number.
 pub const PROC_PID_INFO: usize = 0x3A;
+/// Raw `proc_set_command(proc, name, len) -> 0` number (P2o).
+pub const PROC_SET_COMMAND: usize = 0x45;
+/// Maximum `PROC_PID_INFO` words: eight identity words plus a 256-byte name and NUL.
+pub const PROC_INFO_MAX_WORDS: usize = 41;
 /// Raw `proc_setcred_ex(which, a, b, c, groups, count) -> 0` number.
 pub const PROC_SETCRED_EX: usize = 0x3B;
 /// Raw `proc_cred_info(out, count) -> 0` number.
@@ -134,12 +138,16 @@ const S_IFREG: u32 = 0o100000;
 const S_ISUID: u32 = 0o4000;
 const S_ISGID: u32 = 0o2000;
 
-/// Write the eight identity words for `target` to user memory.
-fn write_info(target: &Process, out: u64, count: usize) -> Result<usize, Errno> {
-    if count != 8 {
+/// Encode the identity and optional command name for `target`.
+///
+/// The first eight words are unchanged from P2a. When `count > 8`, the UTF-8 command name is
+/// written NUL-terminated at byte offset 64, truncated to the remaining buffer at a character
+/// boundary.
+fn encode_info(target: &Process, count: usize) -> Result<Vec<u8>, Errno> {
+    if !(8..=PROC_INFO_MAX_WORDS).contains(&count) {
         return Err(Errno::EINVAL);
     }
-    let destination = UserSlice::new(out, 64)?;
+    let length = count.checked_mul(8).ok_or(Errno::EINVAL)?;
     let ids = *target.ids.lock();
     let values = [
         target.id,
@@ -151,18 +159,49 @@ fn write_info(target: &Process, out: u64, count: usize) -> Result<usize, Errno> 
         u64::from(ids.gid),
         u64::from(ids.egid),
     ];
-    let mut bytes = [0u8; 64];
-    for (chunk, value) in bytes.chunks_exact_mut(8).zip(values) {
+    let mut bytes = vec![0u8; length];
+    for (chunk, value) in bytes
+        .get_mut(..64)
+        .ok_or(Errno::EINVAL)?
+        .chunks_exact_mut(8)
+        .zip(values)
+    {
         chunk.copy_from_slice(&value.to_le_bytes());
     }
-    copy_to_user(destination, &bytes)?;
+    if count > 8 {
+        let command = target.command.lock();
+        let capacity = length.saturating_sub(64).saturating_sub(1);
+        let mut end = 0usize;
+        for (index, character) in command.char_indices() {
+            let next = index.saturating_add(character.len_utf8());
+            if next > capacity {
+                break;
+            }
+            end = next;
+        }
+        if let (Some(slot), Some(source)) = (
+            bytes.get_mut(64..64usize.saturating_add(end)),
+            command.as_bytes().get(..end),
+        ) {
+            slot.copy_from_slice(source);
+        }
+    }
+    Ok(bytes)
+}
+
+/// Write the identity words (and optional name) for `target` to user memory.
+fn write_info(target: &Process, out: u64, count: usize) -> Result<usize, Errno> {
+    let bytes = encode_info(target, count)?;
+    let length = u64::try_from(bytes.len()).map_err(|_| Errno::EINVAL)?;
+    copy_to_user(UserSlice::new(out, length)?, &bytes)?;
     Ok(0)
 }
 
 /// `proc_self_info(out: *mut u64, count: usize) -> 0`.
 ///
 /// Writes `[pid, ppid, pgid, sid, uid, euid, gid, egid]` as eight little-endian u64 words.
-/// Count must be exactly eight; the destination is checked by `UserSlice`.
+/// With `count` in `9..=41`, the command name follows at byte offset 64. The destination is
+/// checked by `UserSlice`.
 pub fn self_info(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let count = usize::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
@@ -172,6 +211,8 @@ pub fn self_info(frame: &SyscallFrame) -> Result<usize, Errno> {
 /// `proc_pid_info(pid: i32, out: *mut u64, count: usize) -> 0`.
 ///
 /// `pid == 0` means the caller. The target must still be in the pid registry and not exited.
+/// `count=8` preserves the P2a payload; `count` in `9..=41` appends the command name at byte
+/// offset 64.
 pub fn pid_info(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let pid = frame.rdi as u32 as i32;
@@ -187,6 +228,44 @@ pub fn pid_info(frame: &SyscallFrame) -> Result<usize, Errno> {
     };
     let count = usize::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
     write_info(&target, frame.rsi, count)
+}
+
+/// `proc_set_command(proc: Handle, name: &[u8]) -> 0` (raw 0x45, P2o).
+///
+/// `proc` is `SELF_PROC` or a process handle with `ADMIN`. The name is UTF-8 without NUL and is
+/// truncated to [`process::MAX_COMMAND`] bytes at a character boundary.
+pub fn set_command(frame: &SyscallFrame) -> Result<usize, Errno> {
+    let caller = process::current().ok_or(Errno::ESRCH)?;
+    let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let length = usize::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
+    if length > process::MAX_COMMAND {
+        return Err(Errno::ENAMETOOLONG);
+    }
+    let mut bytes = vec![0u8; length];
+    if length != 0 {
+        let slice = UserSlice::new(frame.rsi, u64::try_from(length).map_err(|_| Errno::EINVAL)?)?;
+        copy_from_user(&mut bytes, slice)?;
+    }
+    if bytes.contains(&0) {
+        return Err(Errno::EINVAL);
+    }
+    let text = core::str::from_utf8(&bytes).map_err(|_| Errno::EILSEQ)?;
+    let target = if handle == Handle::SELF_PROC {
+        caller
+    } else {
+        let handles = caller.handles.lock();
+        match handles.get(handle, Rights::ADMIN) {
+            Ok(Object::Process(target)) => Arc::clone(target),
+            Ok(_) => return Err(Errno::EBADF),
+            Err(Errno::EACCES) => return Err(Errno::EPERM),
+            Err(error) => return Err(error),
+        }
+    };
+    if *target.state.lock() == ProcessState::Exited {
+        return Err(Errno::ESRCH);
+    }
+    *target.command.lock() = process::truncate_command(text);
+    Ok(0)
 }
 
 /// `proc_setpgid(pid: i32, pgid: i32) -> 0`.
@@ -782,6 +861,7 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
             let code = target.exit_code.load(Ordering::Acquire);
             drop(state);
             copy_to_user(destination, &code.to_le_bytes())?;
+            let _ = process::reap_pid(&target);
             return Ok(0);
         }
         if *state == ProcessState::Created {
@@ -789,6 +869,7 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
             // it immediately (the terminal state and the one-shot teardown are the same).
             drop(state);
             let _ = process::reap_unstarted(&target);
+            let _ = process::reap_pid(&target);
             continue;
         }
         let token = sched::begin_block_interruptible()?;
@@ -1059,7 +1140,7 @@ pub fn signal(frame: &SyscallFrame) -> Result<usize, Errno> {
 ///
 /// Writes `[signo, sender_pid, 0]` as three little-endian u64 words. `WNOHANG`
 /// returns `EAGAIN` instead of blocking. The kernel queue does not interpret
-/// signal dispositions; libc/procd own the user pending set.
+/// signal dispositions; libc owns the user pending set.
 pub fn sigrecv(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let destination = UserSlice::new(frame.rdi, 24)?;

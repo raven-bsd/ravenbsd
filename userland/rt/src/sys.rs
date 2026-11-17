@@ -8,7 +8,7 @@ use core::sync::atomic::AtomicU32;
 
 use raven_abi::errno::Errno;
 use raven_abi::syscall::Syscall;
-use raven_abi::types::{Handle, Rights, Timespec, futex, map, prot};
+use raven_abi::types::{Handle, Rights, Timespec, futex, map, memobj, prot};
 use raven_abi::uname::Uname;
 
 use crate::sync::Mutex;
@@ -949,6 +949,108 @@ pub fn thread_exit(code: i32) -> ! {
     loop {
         core::hint::spin_loop();
     }
+}
+
+/// Create a pager-backed memory object; the caller becomes its pager.
+pub fn memobj_create_pager(len: usize) -> Result<Handle, Errno> {
+    // SAFETY: MEMOBJ_CREATE takes scalar arguments only.
+    handle_from_ret(unsafe { syscall2(Syscall::MEMOBJ_CREATE as usize, len, memobj::PAGER) })
+}
+
+/// Supply one page to a pager-backed object owned by the caller.
+pub fn pager_supply(object: Handle, offset: usize, data: &[u8]) -> Result<(), Errno> {
+    // SAFETY: PAGER_SUPPLY reads `data.len()` bytes from the valid slice.
+    checked(unsafe {
+        syscall4(
+            Syscall::PAGER_SUPPLY as usize,
+            object.0 as usize,
+            offset,
+            data.as_ptr() as usize,
+            data.len(),
+        )
+    })
+    .map(|_| ())
+}
+
+/// Map a memory object into the calling process at a kernel-chosen address.
+pub fn map_object(
+    object: Handle,
+    offset: usize,
+    len: usize,
+    protection: usize,
+    shared: bool,
+) -> Result<usize, Errno> {
+    // SAFETY: MAP takes scalar arguments only; the kernel validates the handle and range.
+    checked(unsafe {
+        syscall6(
+            Syscall::MAP as usize,
+            Handle::SELF_PROC.0 as usize,
+            object.0 as usize,
+            offset,
+            0,
+            len,
+            map::pack(protection, if shared { map::SHARED } else { 0 }),
+        )
+    })
+}
+
+/// Copy bytes out of a mapping the caller owns.
+///
+/// The caller must pass an address inside a readable mapping of at least `out.len()` bytes.
+pub fn copy_from_mapping(address: usize, out: &mut [u8]) {
+    // SAFETY: the caller guarantees that `address` is readable for `out.len()` bytes.
+    unsafe {
+        core::ptr::copy_nonoverlapping(address as *const u8, out.as_mut_ptr(), out.len());
+    }
+}
+
+/// Copy bytes into a writable mapping the caller owns.
+///
+/// The caller must pass an address inside a writable mapping of at least `bytes.len()` bytes.
+pub fn copy_to_mapping(address: usize, bytes: &[u8]) {
+    // SAFETY: the caller guarantees that `address` is writable for `bytes.len()` bytes.
+    unsafe {
+        core::ptr::copy_nonoverlapping(bytes.as_ptr(), address as *mut u8, bytes.len());
+    }
+}
+
+/// Map a memory object into `process` with explicit protection and map flags.
+pub fn map_object_in(
+    process: Handle,
+    object: Handle,
+    offset: usize,
+    address: usize,
+    len: usize,
+    protection: usize,
+    map_flags: usize,
+) -> Result<usize, Errno> {
+    // SAFETY: MAP takes scalar arguments only; the kernel validates the handle and range.
+    checked(unsafe {
+        syscall6(
+            Syscall::MAP as usize,
+            process.0 as usize,
+            object.0 as usize,
+            offset,
+            address,
+            len,
+            map::pack(protection, map_flags),
+        )
+    })
+}
+
+/// Flush dirty pager-backed pages in `[address, address + len)`.
+pub fn msync(process: Handle, address: usize, len: usize, flags: usize) -> Result<(), Errno> {
+    // SAFETY: MSYNC takes scalar arguments only; the kernel validates the range and flags.
+    checked(unsafe {
+        syscall4(
+            raven_abi::syscall::MSYNC,
+            process.0 as usize,
+            address,
+            len,
+            flags,
+        )
+    })
+    .map(|_| ())
 }
 
 /// Map anonymous read/write memory and return its base address.

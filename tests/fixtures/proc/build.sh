@@ -52,3 +52,7 @@ cargo run -q -p raven-initfs --features std --example mkinitfs -- \
 cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "$out/priority.img" \
     "/init=$target_dir/$target/release/proc-priority-init:0755"
+
+cargo run -q -p raven-initfs --features std --example mkinitfs -- \
+    "$out/wait.img" \
+    "/init=$target_dir/$target/release/proc-wait-init:0755"

@@ -5,11 +5,11 @@
 
 Status: the raw syscall surface, wait-status encoding, signal queue, process
 groups/sessions, times/getrusage and rlimits are implemented and exercised by
-the `proc-signal` and `proc-session` qtests. Stop/continue are reported as wait
-events; actual scheduler suspension is a follow-up. Signal delivery to the libc
-pending set is not wired (the kernel queue is read through `PROC_SIGRECV`).
-User CPU time is not sampled yet; `times`/`getrusage` report accumulated
-syscall time as system time and zero user time.
+the `proc-signal`, `proc-session` and `proc-wait` qtests. Stop/continue are
+reported as wait events; actual scheduler suspension is a follow-up. Signal
+delivery to the libc pending set is not wired (the kernel queue is read through
+`PROC_SIGRECV`). User CPU time is not sampled yet; `times`/`getrusage` report
+accumulated syscall time as system time and zero user time.
 
 The ABI contract crate is unchanged. The new calls use the unused native
 process-control range `0x48..=0x4F`, coordinated with P2e:
@@ -34,10 +34,20 @@ process-control range `0x48..=0x4F`, coordinated with P2e:
 * `WNOHANG=1`, `WUNTRACED=2`, `WCONTINUED=4`.
 * A wait is restricted to the caller's direct children. `P_PID` selects one;
   `P_PGID` selects children whose `pgid` matches (0 means the caller's group);
-  `P_ALL` selects any child.
+  `P_ALL` selects any child, so the native `wait(-1)` call is `P_ALL` with
+  `id=0`.
 * A blocking wait sleeps on the caller's child wait queue and is woken by an
   exit, stop or continue notification. `WNOHANG` returns 0 when no event is
   ready. No matching child is `ECHILD`.
+* An exited child is retained as a zombie until `PROC_WAIT_EX` consumes its
+  status, even after the parent closes its process handle. The wait removes the
+  pid from the registry and releases the zombie reference. A second wait for
+  that pid is `ECHILD`.
+* When a parent exits, every live child is reparented to PID 1 (init) without
+  changing the child's own pid, group or session. A later child exit queues
+  `SIGCHLD` to init and wakes its wait queue, so init can reap the orphan.
+* The legacy handle `PROC_WAIT` returns the exit code and removes the pid entry
+  after the copy; it does not add a second wait protocol.
 
 ## Status encoding
 
@@ -48,8 +58,10 @@ process-control range `0x48..=0x4F`, coordinated with P2e:
 | Continued | `0xFFFF` |
 
 Exit status is reaped once by `PROC_WAIT_EX`; a stopped/continued report clears
-that event flag. `PROC_WAIT` and `PROC_WAIT_EX` share the exited state but the
-old handle wait does not consume the new reap marker.
+that event flag. The legacy handle `PROC_WAIT` returns the exit code and removes
+the pid entry after the copy; the new `PROC_WAIT_EX` reap marker is the POSIX
+path. A process that exits without any waiter stays a zombie until init (or its
+reparented parent) waits for it.
 
 ## Signal queue
 
@@ -106,6 +118,8 @@ cargo check -p raven-kernel --target x86_64-unknown-none
 cargo check -p raven-kernel --target aarch64-unknown-none-softfloat
 cargo xtask qtest --case proc-signal --arch x86_64
 cargo xtask qtest --case proc-session --arch x86_64
+cargo xtask qtest --case proc-wait --arch x86_64
+cargo xtask qtest --case proc-wait --arch aarch64
 make check-fast
 ```
 
@@ -114,7 +128,9 @@ tests the status/stop/continue encodings, signal bounds and rlimit defaults.
 The signal qtest covers two queued signals, `SIGCHLD`, `EAGAIN` and invalid/
 unknown-target errors. The session qtest covers groups, sessions, stop/continue
 statuses, `P_PID`/`P_PGID`/`P_ALL`, kill statuses, times/rusage, rlimits and
-`RLIMIT_NPROC` enforcement. Existing `proc-identity`, `proc-registry`,
+`RLIMIT_NPROC` enforcement. The `proc-wait` qtest covers `waitpid`, `wait(-1)`,
+`WNOHANG`, double-wait `ECHILD`, stop/continue and an orphan that is reparented
+to init after its parent exits. Existing `proc-identity`, `proc-registry`,
 `proc-handle-info`, `proc-credentials` and `proc-fork` remain green.
 
 ## Limits / follow-ups
@@ -124,13 +140,15 @@ statuses, `P_PID`/`P_PGID`/`P_ALL`, kill statuses, times/rusage, rlimits and
    stop/resume seam.
 2. **No libc pending-set injection.** Queued signals are consumed by
    `PROC_SIGRECV`; the existing libc signal-entry path still owns its own
-   pending set. P2e/procd can use the queue directly.
+   pending set. A future libc signal-entry integration can consume the queue directly.
 3. **User time and rusage counters.** Only syscall time is accumulated; user
    time, RSS and fault/context-switch counters are zero until scheduler and MM
    accounting hooks land.
-4. **Zombie reaping.** Exited children stay in the pid registry while a handle
-   or waiter keeps the process alive; `PROC_WAIT_EX` removes the pid. The old
-   handle `PROC_WAIT` does not reap the new pid entry.
+4. **Zombies and reparenting.** An exited child is held as a strong zombie until
+   `PROC_WAIT_EX` (or the legacy handle `PROC_WAIT`) reaps it, independent of the
+   parent's handles. A parent exit reparents live children to PID 1, whose wait
+   consumes them. A parent that never waits therefore keeps a zombie by design;
+   init is the eventual reaper for orphaned children.
 5. **No board claim.** All evidence is host/QEMU.
 
 ## Provenance

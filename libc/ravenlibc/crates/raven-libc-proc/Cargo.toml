@@ -4,7 +4,7 @@
 [package]
 name = "raven-libc-proc"
 version = "0.1.0"
-description = "ravenlibc process logic: exec/spawn/wait models, atfork and lock registries, startup parser, procd wire encoders and ProcBackend."
+description = "ravenlibc process logic: exec/spawn/wait models, atfork and lock registries, startup parser and ProcBackend."
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
@@ -19,5 +19,9 @@ default = []
 std = []
 
 [dependencies]
+raven-abi = { path = "../../../../crates/raven-abi" }
 raven-libc-abi = { path = "../raven-libc-abi" }
 raven-spawn = { path = "../../../../crates/raven-spawn", features = ["alloc"] }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-libc-sys = { path = "../raven-libc-sys" }

@@ -4,12 +4,13 @@
 //! Host tests for the `posix_spawn` driver.
 
 use super::*;
+use crate::backend::{ProcBackend, WaitResult};
 use crate::errors::{EACCES, ENOEXEC};
-use crate::fake::FakeProcd;
+use crate::ids::SetCred;
 use crate::spawn_model::api::{FileAction, FileActions, SpawnAttr};
-use crate::wire::FdMapEntry;
 use alloc::vec;
 use alloc::vec::Vec;
+use core::cell::RefCell;
 
 struct DriverEnv {
     opens: Vec<u32>,
@@ -46,6 +47,160 @@ impl SpawnEnv for DriverEnv {
     }
 }
 
+struct FakeBackend {
+    requests: RefCell<Vec<SpawnRequest>>,
+    spawn_results: RefCell<Vec<Result<i32, Errno>>>,
+}
+
+impl FakeBackend {
+    fn new() -> Self {
+        Self {
+            requests: RefCell::new(Vec::new()),
+            spawn_results: RefCell::new(Vec::new()),
+        }
+    }
+
+    fn fail_next(&self, error: Errno) {
+        self.spawn_results.borrow_mut().push(Err(error));
+    }
+
+    fn push_spawn_result(&self, result: Result<i32, Errno>) {
+        self.spawn_results.borrow_mut().push(result);
+    }
+
+    fn last_request(&self) -> Option<SpawnRequest> {
+        self.requests.borrow().last().cloned()
+    }
+
+    fn requests(&self) -> Vec<SpawnRequest> {
+        self.requests.borrow().clone()
+    }
+}
+
+impl ProcBackend for FakeBackend {
+    fn getpid(&self) -> i32 {
+        1
+    }
+
+    fn getppid(&self) -> i32 {
+        0
+    }
+
+    fn getuid(&self) -> u32 {
+        0
+    }
+
+    fn geteuid(&self) -> u32 {
+        0
+    }
+
+    fn getgid(&self) -> u32 {
+        0
+    }
+
+    fn getegid(&self) -> u32 {
+        0
+    }
+
+    fn getpgid(&self, _pid: i32) -> Result<i32, Errno> {
+        Ok(1)
+    }
+
+    fn getsid(&self, _pid: i32) -> Result<i32, Errno> {
+        Ok(1)
+    }
+
+    fn getgroups(&self, _out: &mut [u32]) -> Result<usize, Errno> {
+        Ok(0)
+    }
+
+    fn spawn(&self, req: &SpawnRequest) -> Result<i32, Errno> {
+        let pid = 100 + i32::try_from(self.requests.borrow().len()).unwrap_or(0);
+        self.requests.borrow_mut().push(req.clone());
+        let mut results = self.spawn_results.borrow_mut();
+        if results.is_empty() {
+            Ok(pid)
+        } else {
+            results.remove(0)
+        }
+    }
+
+    fn fork(&self, _req: &crate::request::ForkRequest) -> Result<i32, Errno> {
+        Err(ENOSYS)
+    }
+
+    fn exec(&self, _req: &crate::request::ExecRequest) -> Errno {
+        ENOSYS
+    }
+
+    fn wait(&self, _idtype: u32, _id: i64, _options: u32) -> Result<WaitResult, Errno> {
+        Err(crate::errors::ECHILD)
+    }
+
+    fn kill(&self, _pid: i64, _sig: u32, _queue_value: Option<u64>) -> Result<(), Errno> {
+        Err(crate::errors::ESRCH)
+    }
+
+    fn setpgid(&self, _pid: i32, _pgid: i32) -> Result<(), Errno> {
+        Err(ENOSYS)
+    }
+
+    fn setsid(&self) -> Result<i32, Errno> {
+        Err(ENOSYS)
+    }
+
+    fn setcred(&self, _req: &SetCred) -> Result<(), Errno> {
+        Err(ENOSYS)
+    }
+
+    fn rlimit(
+        &self,
+        _pid: i32,
+        _resource: u32,
+        _new: Option<(u64, u64)>,
+    ) -> Result<(u64, u64), Errno> {
+        Err(ENOSYS)
+    }
+
+    fn rusage(&self, _who: i32) -> Result<[u8; 144], Errno> {
+        Err(ENOSYS)
+    }
+
+    fn prio(&self, _which: u32, _who: i32, _set: Option<i32>) -> Result<i32, Errno> {
+        Err(ENOSYS)
+    }
+
+    fn sched(
+        &self,
+        _op: u32,
+        _pid: i32,
+        _policy: i32,
+        _param: [i32; 4],
+    ) -> Result<(i32, [i32; 4]), Errno> {
+        Err(ENOSYS)
+    }
+
+    fn set_title(&self, _title: &[u8]) -> Result<(), Errno> {
+        Err(ENOSYS)
+    }
+
+    fn prctl(&self, _option: u32, _a: [u64; 4]) -> Result<i64, Errno> {
+        Err(ENOSYS)
+    }
+
+    fn login(&self, _set: Option<&[u8]>) -> Result<Vec<u8>, Errno> {
+        Err(ENOSYS)
+    }
+
+    fn pledge(&self, _promises: Option<&[u8]>, _exec_promises: Option<&[u8]>) -> Result<(), Errno> {
+        Err(ENOSYS)
+    }
+
+    fn cap_enter(&self) -> Result<(), Errno> {
+        Err(ENOSYS)
+    }
+}
+
 fn ctx<'a>(table: &'a [FdEntry], cwd: &'a [u8]) -> SpawnCtx<'a> {
     SpawnCtx {
         table,
@@ -56,21 +211,18 @@ fn ctx<'a>(table: &'a [FdEntry], cwd: &'a [u8]) -> SpawnCtx<'a> {
     }
 }
 
-fn spawn_request(procd: &FakeProcd) -> SpawnRequest {
-    match procd.last_request() {
-        Some(crate::wire::Request::Spawn(request)) => request,
-        other => panic!("unexpected request {other:?}"),
-    }
+fn spawn_request(backend: &FakeBackend) -> SpawnRequest {
+    backend.last_request().expect("spawn request")
 }
 
 #[test]
 fn success_returns_zero_and_the_child_pid() {
-    let procd = FakeProcd::new();
+    let backend = FakeBackend::new();
     let mut env = DriverEnv::new(Vec::new());
     let context = ctx(&[], b"/");
     assert_eq!(
         posix_spawn_model(
-            &procd,
+            &backend,
             &mut env,
             &context,
             b"/bin/true",
@@ -85,7 +237,7 @@ fn success_returns_zero_and_the_child_pid() {
     );
     assert_eq!(
         spawn_model_pid(
-            &procd,
+            &backend,
             &mut env,
             &context,
             b"/bin/true",
@@ -101,14 +253,14 @@ fn success_returns_zero_and_the_child_pid() {
 }
 
 #[test]
-fn a_procd_error_is_returned_as_the_value() {
-    let procd = FakeProcd::new();
-    procd.fail_next(crate::wire::Op::Spawn, EACCES);
+fn a_backend_error_is_returned_as_the_value() {
+    let backend = FakeBackend::new();
+    backend.fail_next(EACCES);
     let mut env = DriverEnv::new(Vec::new());
     let context = ctx(&[], b"/");
     assert_eq!(
         posix_spawn_model(
-            &procd,
+            &backend,
             &mut env,
             &context,
             b"/bin/true",
@@ -125,7 +277,7 @@ fn a_procd_error_is_returned_as_the_value() {
 
 #[test]
 fn the_request_carries_the_inherited_fdmap() {
-    let procd = FakeProcd::new();
+    let backend = FakeBackend::new();
     let mut env = DriverEnv::new(Vec::new());
     let table = [FdEntry {
         fd: 1,
@@ -134,7 +286,7 @@ fn the_request_carries_the_inherited_fdmap() {
     }];
     let context = ctx(&table, b"/tmp");
     posix_spawn_model(
-        &procd,
+        &backend,
         &mut env,
         &context,
         b"/bin/true",
@@ -145,8 +297,11 @@ fn the_request_carries_the_inherited_fdmap() {
         &[b"true".to_vec()],
         &[],
     );
-    let request = spawn_request(&procd);
-    assert_eq!(request.fdmap, vec![FdMapEntry { fd: 1, handle: 7 }]);
+    let request = spawn_request(&backend);
+    assert_eq!(
+        request.fdmap,
+        vec![crate::request::FdMapEntry { fd: 1, handle: 7 }]
+    );
     assert_eq!(request.cwd, b"/tmp".to_vec());
     assert_eq!(request.umask, 0o022);
     assert_eq!(request.sigmask, [3; 128]);
@@ -155,13 +310,13 @@ fn the_request_carries_the_inherited_fdmap() {
 
 #[test]
 fn temporary_handles_are_closed_after_success() {
-    let procd = FakeProcd::new();
+    let backend = FakeBackend::new();
     let mut env = DriverEnv::new(vec![9]);
     let mut actions = FileActions::new();
     actions.add_open(3, b"/dev/null", 0, 0).expect("open");
     let context = ctx(&[], b"/");
     posix_spawn_model(
-        &procd,
+        &backend,
         &mut env,
         &context,
         b"/bin/true",
@@ -174,22 +329,22 @@ fn temporary_handles_are_closed_after_success() {
     );
     assert_eq!(env.closed, vec![9]);
     assert_eq!(
-        spawn_request(&procd).fdmap,
-        vec![FdMapEntry { fd: 3, handle: 9 }]
+        spawn_request(&backend).fdmap,
+        vec![crate::request::FdMapEntry { fd: 3, handle: 9 }]
     );
 }
 
 #[test]
 fn temporary_handles_are_closed_after_failure() {
-    let procd = FakeProcd::new();
-    procd.fail_next(crate::wire::Op::Spawn, EACCES);
+    let backend = FakeBackend::new();
+    backend.fail_next(EACCES);
     let mut env = DriverEnv::new(vec![9]);
     let mut actions = FileActions::new();
     actions.add_open(3, b"/dev/null", 0, 0).expect("open");
     let context = ctx(&[], b"/");
     assert_eq!(
         posix_spawn_model(
-            &procd,
+            &backend,
             &mut env,
             &context,
             b"/bin/true",
@@ -207,12 +362,12 @@ fn temporary_handles_are_closed_after_failure() {
 
 #[test]
 fn an_empty_path_is_enoent_without_a_request() {
-    let procd = FakeProcd::new();
+    let backend = FakeBackend::new();
     let mut env = DriverEnv::new(Vec::new());
     let context = ctx(&[], b"/");
     assert_eq!(
         posix_spawn_model(
-            &procd,
+            &backend,
             &mut env,
             &context,
             b"",
@@ -225,18 +380,18 @@ fn an_empty_path_is_enoent_without_a_request() {
         ),
         ENOENT
     );
-    assert!(procd.requests().is_empty());
+    assert!(backend.requests().is_empty());
 }
 
 #[test]
 fn too_many_arguments_are_rejected_before_a_request() {
-    let procd = FakeProcd::new();
+    let backend = FakeBackend::new();
     let mut env = DriverEnv::new(Vec::new());
     let context = ctx(&[], b"/");
     let argv = vec![b"x".to_vec(); MAX_ARGS + 1];
     assert_eq!(
         posix_spawn_model(
-            &procd,
+            &backend,
             &mut env,
             &context,
             b"/bin/true",
@@ -249,18 +404,18 @@ fn too_many_arguments_are_rejected_before_a_request() {
         ),
         E2BIG
     );
-    assert!(procd.requests().is_empty());
+    assert!(backend.requests().is_empty());
 }
 
 #[test]
 fn too_many_argument_bytes_are_rejected_before_a_request() {
-    let procd = FakeProcd::new();
+    let backend = FakeBackend::new();
     let mut env = DriverEnv::new(Vec::new());
     let context = ctx(&[], b"/");
     let argv = vec![vec![b'x'; ARG_MAX]];
     assert_eq!(
         posix_spawn_model(
-            &procd,
+            &backend,
             &mut env,
             &context,
             b"/bin/true",
@@ -273,19 +428,19 @@ fn too_many_argument_bytes_are_rejected_before_a_request() {
         ),
         E2BIG
     );
-    assert!(procd.requests().is_empty());
+    assert!(backend.requests().is_empty());
 }
 
 #[test]
 fn a_path_search_tries_each_element() {
-    let procd = FakeProcd::new();
-    procd.push_spawn_result(Err(ENOENT));
-    procd.push_spawn_result(Ok(100));
+    let backend = FakeBackend::new();
+    backend.push_spawn_result(Err(ENOENT));
+    backend.push_spawn_result(Ok(100));
     let mut env = DriverEnv::new(Vec::new());
     let context = ctx(&[], b"/");
     assert_eq!(
         posix_spawn_model(
-            &procd,
+            &backend,
             &mut env,
             &context,
             b"tool",
@@ -298,27 +453,21 @@ fn a_path_search_tries_each_element() {
         ),
         0
     );
-    let requests = procd.requests();
-    let paths: Vec<Vec<u8>> = requests
-        .iter()
-        .map(|request| match request {
-            crate::wire::Request::Spawn(spawn) => spawn.path.clone(),
-            _ => Vec::new(),
-        })
-        .collect();
+    let requests = backend.requests();
+    let paths: Vec<Vec<u8>> = requests.iter().map(|spawn| spawn.path.clone()).collect();
     assert_eq!(paths, vec![b"/a/tool".to_vec(), b"/b/tool".to_vec()]);
 }
 
 #[test]
 fn enoexec_retries_with_the_shell() {
-    let procd = FakeProcd::new();
-    procd.push_spawn_result(Err(ENOEXEC));
-    procd.push_spawn_result(Ok(100));
+    let backend = FakeBackend::new();
+    backend.push_spawn_result(Err(ENOEXEC));
+    backend.push_spawn_result(Ok(100));
     let mut env = DriverEnv::new(Vec::new());
     let context = ctx(&[], b"/");
     assert_eq!(
         posix_spawn_model(
-            &procd,
+            &backend,
             &mut env,
             &context,
             b"script",
@@ -331,27 +480,23 @@ fn enoexec_retries_with_the_shell() {
         ),
         0
     );
-    let requests = procd.requests();
+    let requests = backend.requests();
     assert_eq!(requests.len(), 2);
-    match &requests[1] {
-        crate::wire::Request::Spawn(spawn) => {
-            assert_eq!(spawn.path, b"/bin/sh".to_vec());
-            assert_eq!(
-                spawn.argv,
-                vec![b"sh".to_vec(), b"/a/script".to_vec(), b"one".to_vec()]
-            );
-        }
-        other => panic!("unexpected {other:?}"),
-    }
+    let spawn = &requests[1];
+    assert_eq!(spawn.path, b"/bin/sh".to_vec());
+    assert_eq!(
+        spawn.argv,
+        vec![b"sh".to_vec(), b"/a/script".to_vec(), b"one".to_vec()]
+    );
 }
 
 #[test]
 fn a_slash_name_is_a_direct_spawn() {
-    let procd = FakeProcd::new();
+    let backend = FakeBackend::new();
     let mut env = DriverEnv::new(Vec::new());
     let context = ctx(&[], b"/");
     posix_spawn_model(
-        &procd,
+        &backend,
         &mut env,
         &context,
         b"/bin/tool",
@@ -362,13 +507,13 @@ fn a_slash_name_is_a_direct_spawn() {
         &[b"tool".to_vec()],
         &[],
     );
-    assert_eq!(procd.requests().len(), 1);
-    assert_eq!(spawn_request(&procd).path, b"/bin/tool".to_vec());
+    assert_eq!(backend.requests().len(), 1);
+    assert_eq!(spawn_request(&backend).path, b"/bin/tool".to_vec());
 }
 
 #[test]
 fn attributes_are_forwarded() {
-    let procd = FakeProcd::new();
+    let backend = FakeBackend::new();
     let mut env = DriverEnv::new(Vec::new());
     let mut attr = SpawnAttr::new();
     attr.set_flags(
@@ -385,7 +530,7 @@ fn attributes_are_forwarded() {
     attr.set_sched_priority(9);
     let context = ctx(&[], b"/");
     posix_spawn_model(
-        &procd,
+        &backend,
         &mut env,
         &context,
         b"/bin/true",
@@ -396,7 +541,7 @@ fn attributes_are_forwarded() {
         &[b"true".to_vec()],
         &[],
     );
-    let request = spawn_request(&procd);
+    let request = spawn_request(&backend);
     assert_eq!(request.sigmask, [1; 128]);
     assert_eq!(request.sigdefault, [2; 128]);
     assert_eq!(request.pgroup, 7);
@@ -406,7 +551,7 @@ fn attributes_are_forwarded() {
 
 #[test]
 fn cloexec_default_sets_the_hint_and_hides_inherited_fds() {
-    let procd = FakeProcd::new();
+    let backend = FakeBackend::new();
     let mut env = DriverEnv::new(Vec::new());
     let mut attr = SpawnAttr::new();
     attr.set_flags(POSIX_SPAWN_CLOEXEC_DEFAULT).expect("flags");
@@ -417,7 +562,7 @@ fn cloexec_default_sets_the_hint_and_hides_inherited_fds() {
     }];
     let context = ctx(&table, b"/");
     posix_spawn_model(
-        &procd,
+        &backend,
         &mut env,
         &context,
         b"/bin/true",
@@ -428,18 +573,18 @@ fn cloexec_default_sets_the_hint_and_hides_inherited_fds() {
         &[b"true".to_vec()],
         &[],
     );
-    let request = spawn_request(&procd);
+    let request = spawn_request(&backend);
     assert_eq!(request.spawn_flags & S_CLOEXEC_DEFAULT, S_CLOEXEC_DEFAULT);
     assert!(request.fdmap.is_empty());
 }
 
 #[test]
 fn a_path_search_sets_the_path_hint() {
-    let procd = FakeProcd::new();
+    let backend = FakeBackend::new();
     let mut env = DriverEnv::new(Vec::new());
     let context = ctx(&[], b"/");
     posix_spawn_model(
-        &procd,
+        &backend,
         &mut env,
         &context,
         b"true",
@@ -451,20 +596,20 @@ fn a_path_search_sets_the_path_hint() {
         &[],
     );
     assert_eq!(
-        spawn_request(&procd).spawn_flags & S_USE_PATH_HINT,
+        spawn_request(&backend).spawn_flags & S_USE_PATH_HINT,
         S_USE_PATH_HINT
     );
 }
 
 #[test]
 fn an_open_action_is_in_the_request_and_closed() {
-    let procd = FakeProcd::new();
+    let backend = FakeBackend::new();
     let mut env = DriverEnv::new(vec![9]);
     let mut actions = FileActions::new();
     actions.add_open(3, b"/dev/null", 0, 0).expect("open");
     let context = ctx(&[], b"/");
     posix_spawn_model(
-        &procd,
+        &backend,
         &mut env,
         &context,
         b"/bin/true",
@@ -478,18 +623,18 @@ fn an_open_action_is_in_the_request_and_closed() {
     assert!(matches!(actions.actions()[0], FileAction::Open { .. }));
     assert_eq!(env.closed, vec![9]);
     assert_eq!(
-        spawn_request(&procd).fdmap,
-        vec![FdMapEntry { fd: 3, handle: 9 }]
+        spawn_request(&backend).fdmap,
+        vec![crate::request::FdMapEntry { fd: 3, handle: 9 }]
     );
 }
 
 #[test]
 fn spawn_with_mask_sets_both_signal_flags() {
-    let procd = FakeProcd::new();
+    let backend = FakeBackend::new();
     let context = ctx(&[], b"/");
     assert_eq!(
         spawn_with_mask(
-            &procd,
+            &backend,
             &context,
             b"/bin/sh",
             &[b"sh".to_vec()],
@@ -499,7 +644,7 @@ fn spawn_with_mask_sets_both_signal_flags() {
         ),
         Ok(100)
     );
-    let request = spawn_request(&procd);
+    let request = spawn_request(&backend);
     assert_eq!(
         request.spawn_flags & 0x000c,
         (POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF) as u32
@@ -510,13 +655,13 @@ fn spawn_with_mask_sets_both_signal_flags() {
 
 #[test]
 fn tcsetpgrp_is_forwarded() {
-    let procd = FakeProcd::new();
+    let backend = FakeBackend::new();
     let mut env = DriverEnv::new(Vec::new());
     let mut actions = FileActions::new();
     actions.add_tcsetpgrp(2).expect("tcsetpgrp");
     let context = ctx(&[], b"/");
     posix_spawn_model(
-        &procd,
+        &backend,
         &mut env,
         &context,
         b"/bin/true",
@@ -527,5 +672,5 @@ fn tcsetpgrp_is_forwarded() {
         &[b"true".to_vec()],
         &[],
     );
-    assert_eq!(spawn_request(&procd).tcpgrp_fd, 2);
+    assert_eq!(spawn_request(&backend).tcpgrp_fd, 2);
 }

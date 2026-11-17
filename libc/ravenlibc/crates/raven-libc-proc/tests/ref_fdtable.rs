@@ -18,8 +18,8 @@
 use std::collections::BTreeMap;
 
 use raven_libc_proc::errors::{EBADF, ENOENT, ENOSYS, ENOTDIR, Errno};
+use raven_libc_proc::request::FdMapEntry;
 use raven_libc_proc::spawn_model::{FdEntry, FileAction, FileActions, SpawnEnv, apply_actions};
-use raven_libc_proc::wire::FdMapEntry;
 
 #[derive(Debug, Default)]
 struct RefScratch {

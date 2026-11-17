@@ -23,10 +23,13 @@ mod program {
 
     use raven_abi::errno::Errno;
     use raven_proto_fs::{S_IFCHR, Stat};
-    use raven_proto_tty::{CALL_LEN, Request, Response, decode_request, encode_response};
+    use raven_proto_tty::{
+        CALL_LEN, OP_GET_WRITE, OP_SET_WRITE, Request, Response, WriteRequest, decode_request,
+        decode_write_request, encode_response, encode_write_response,
+    };
     use raven_rt::entry;
     use raven_rt::sync::Mutex;
-    use raven_scheme::{Ctx, Handler, HandlerError, HandlerResult, Opened, Server};
+    use raven_scheme::{CallReply, Ctx, Handler, HandlerError, HandlerResult, Opened, Server};
     use raven_tty_core::{Discipline, Event, Output};
 
     entry!(main);
@@ -50,6 +53,7 @@ mod program {
         ready: VecDeque<u8>,
         interrupt: bool,
         eof: bool,
+        write_allowed: bool,
     }
 
     impl Console {
@@ -59,6 +63,7 @@ mod program {
                 ready: VecDeque::new(),
                 interrupt: false,
                 eof: false,
+                write_allowed: true,
             }
         }
 
@@ -236,9 +241,11 @@ mod program {
 
         fn fstat(&mut self, file: u64) -> HandlerResult<Stat> {
             self.file(file)?;
+            let allowed = CONSOLE.lock().write_allowed;
+            let mode = if allowed { 0o620 } else { 0o600 };
             Ok(Stat {
                 ino: file,
-                mode: S_IFCHR | 0o620,
+                mode: S_IFCHR | mode,
                 nlink: 1,
                 ..Stat::default()
             })
@@ -246,6 +253,27 @@ mod program {
 
         fn call(&mut self, file: u64, request: &[u8], response: &mut [u8]) -> HandlerResult<usize> {
             self.file(file)?;
+            if response.len() < CALL_LEN {
+                return Err(Errno::EINVAL.into());
+            }
+            if request.len() >= CALL_LEN {
+                let op = u16::from_le_bytes([request[2], request[3]]);
+                if op == OP_GET_WRITE || op == OP_SET_WRITE {
+                    let allowed = match decode_write_request(request)
+                        .map_err(|_| HandlerError::from(Errno::EINVAL))?
+                    {
+                        WriteRequest::Get => CONSOLE.lock().write_allowed,
+                        WriteRequest::Set { allowed } => {
+                            CONSOLE.lock().write_allowed = allowed;
+                            allowed
+                        }
+                    };
+                    let mut encoded = [0u8; CALL_LEN];
+                    encode_write_response(allowed, &mut encoded);
+                    response[..CALL_LEN].copy_from_slice(&encoded);
+                    return Ok(CALL_LEN);
+                }
+            }
             let request = decode_request(request).map_err(|_| HandlerError::from(Errno::ENOSYS))?;
             let reply = match request {
                 Request::GetMode => Response::Mode(CONSOLE.lock().discipline.settings()),
@@ -268,13 +296,39 @@ mod program {
                     Response::Flushed { bytes }
                 }
             };
-            if response.len() < CALL_LEN {
-                return Err(Errno::EINVAL.into());
-            }
             let mut encoded = [0u8; CALL_LEN];
             encode_response(reply, &mut encoded);
             response[..CALL_LEN].copy_from_slice(&encoded);
             Ok(CALL_LEN)
+        }
+
+        fn call_with(
+            &mut self,
+            file: u64,
+            request: &[u8],
+            response: &mut [u8],
+            ctx: &Ctx,
+        ) -> HandlerResult<CallReply> {
+            if request.len() >= 4 {
+                let op = u16::from_le_bytes([request[2], request[3]]);
+                if op == OP_SET_WRITE && ctx.credentials.euid != 0 {
+                    return Err(Errno::EPERM.into());
+                }
+            }
+            Ok(CallReply::new(self.call(file, request, response)?))
+        }
+
+        fn write_with(
+            &mut self,
+            file: u64,
+            offset: u64,
+            buffer: &[u8],
+            ctx: &Ctx,
+        ) -> HandlerResult<usize> {
+            if !CONSOLE.lock().write_allowed && ctx.credentials.euid != 0 {
+                return Err(Errno::EACCES.into());
+            }
+            self.write(file, offset, buffer)
         }
     }
 

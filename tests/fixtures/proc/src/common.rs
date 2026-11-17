@@ -17,6 +17,7 @@ pub const PROC_SELF_INFO: usize = 0x35;
 pub const PROC_SETPGID: usize = 0x36;
 pub const PROC_SETSID: usize = 0x37;
 pub const PROC_HANDLE_INFO: usize = 0x3E;
+pub const PROC_PID_INFO: usize = 0x3A;
 pub const PROC_WAIT_EX: usize = 0x48;
 pub const PROC_GETPGID: usize = 0x49;
 pub const PROC_SIGNAL: usize = 0x4A;
@@ -242,6 +243,23 @@ pub fn self_info() -> Result<[u64; 8], Errno> {
             values.as_mut_ptr() as usize,
             values.len(),
             0,
+            0,
+            0,
+            0,
+        )
+    })?;
+    Ok(values)
+}
+
+pub fn pid_info(pid: i32) -> Result<[u64; 8], Errno> {
+    let mut values = [0u64; 8];
+    // SAFETY: PROC_PID_INFO writes eight u64 identity words to the live caller-owned array.
+    checked(unsafe {
+        syscall6(
+            PROC_PID_INFO,
+            pid as isize as usize,
+            values.as_mut_ptr() as usize,
+            values.len(),
             0,
             0,
             0,

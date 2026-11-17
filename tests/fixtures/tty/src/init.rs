@@ -12,17 +12,12 @@ extern crate alloc;
 #[cfg(target_os = "none")]
 mod program {
     use alloc::format;
-    use alloc::vec;
     use alloc::vec::Vec;
 
     use raven_abi::errno::Errno;
     use raven_abi::types::Handle;
     use raven_initfs::Initfs;
     use raven_proto_fs::OpenFlags;
-    use raven_proto_proc::{
-        Body, Request, Response, SetPgidRequest, SpawnRequest, WaitRequest, decode_response,
-        encode_request,
-    };
     use raven_rt::entry;
     use raven_rt::fs;
     use raven_rt::println;
@@ -55,6 +50,9 @@ mod program {
     const WCONTINUED: u32 = 8;
 
     const HUNG_BIT: u32 = 0x8000_0000;
+    const PROC_HANDLE_INFO: usize = 0x3E;
+    const PROC_SETPGID: usize = 0x36;
+    const PROC_WAIT_EX: usize = 0x48;
 
     fn main(_args: raven_rt::Args) -> i32 {
         match run() {
@@ -71,17 +69,16 @@ mod program {
 
     fn run() -> Result<(), &'static str> {
         start_service("/sbin/initfsd", "initfs:")?;
-        // Start the tty servers before procd: a procd-spawned child inherits the namespace
-        // snapshot taken when procd starts, so the tty schemes must already be registered.
         start_service("/sbin/ttyd", "ttyd:session")?;
         start_service("/sbin/ptyd", "pty:master")?;
-        start_service("/sbin/procd", "proc:")?;
+        let image = raven_rt::map_initfs().map_err(|_| "initfs map")?;
+        let initfs = Initfs::parse(image).map_err(|_| "initfs parse")?;
         let mode = fs::read_to_vec("initfs:/etc/tty-mode").map_err(|_| "mode")?;
         let mode = core::str::from_utf8(&mode).map_err(|_| "mode utf8")?.trim();
         match mode {
             "pty" => pty_cases(),
-            "job" => job_cases(),
-            "control" => control_cases(),
+            "job" => job_cases(&initfs),
+            "control" => control_cases(&initfs),
             _ => Err("mode"),
         }
     }
@@ -167,15 +164,11 @@ mod program {
         Ok(())
     }
 
-    fn job_cases() -> Result<(), &'static str> {
+    fn job_cases(initfs: &Initfs<'_>) -> Result<(), &'static str> {
         let client = Client::new();
-        let proc_handle = client
-            .open("proc:", u32::from(OpenFlags::READ_WRITE.to_wire()))
-            .map_err(|_| "open proc")?;
-        let mut seq = 1u64;
-        let pid = spawn_child(&client, proc_handle, &mut seq)?;
+        let (pid, _child) = spawn_child(initfs)?;
         raven_rt::println!("tty: child={pid}");
-        set_pgid(&client, proc_handle, &mut seq, pid)?;
+        set_pgid(pid)?;
 
         let master = client
             .open("pty:master", u32::from(OpenFlags::READ_WRITE.to_wire()))
@@ -191,7 +184,7 @@ mod program {
 
         let _ = raven_rt::nanosleep(150_000_000);
         write_all(&client, master, b"\x03")?;
-        let status = wait_child(&client, proc_handle, &mut seq, pid)?;
+        let status = wait_child(pid)?;
         if exited(status) != Some(130) {
             return Err("job wait");
         }
@@ -220,7 +213,6 @@ mod program {
         let _ = client.close(master);
         let _ = client.close(slave);
         let _ = client.close(session);
-        let _ = client.close(proc_handle);
         raven_rt::println!("tty: tty-job-control=ok");
         Ok(())
     }
@@ -298,12 +290,8 @@ mod program {
         }
     }
 
-    fn control_cases() -> Result<(), &'static str> {
+    fn control_cases(initfs: &Initfs<'_>) -> Result<(), &'static str> {
         let client = Client::new();
-        let proc_handle = client
-            .open("proc:", u32::from(OpenFlags::READ_WRITE.to_wire()))
-            .map_err(|_| "open proc")?;
-        let mut seq = 1u64;
         let session = client
             .open("ttyd:session", u32::from(OpenFlags::READ_WRITE.to_wire()))
             .map_err(|_| "open ttyd")?;
@@ -319,14 +307,12 @@ mod program {
         let ttyd_ok = ttyd_sid == init_pgid as u32 && ttyd_fg == init_pgid as u32;
 
         let sid_text = format!("{sid}");
-        let pid = spawn_program(
-            &client,
-            proc_handle,
-            &mut seq,
+        let (pid, _child) = spawn_program(
+            initfs,
             "/bin/tty-ctl-child",
             &["tty-ctl-child", sid_text.as_str()],
         )?;
-        set_pgid(&client, proc_handle, &mut seq, pid)?;
+        set_pgid(pid)?;
         sleep_ms(200);
 
         tcsetpgrp(session, pid).map_err(|_| "orphan fg")?;
@@ -334,10 +320,10 @@ mod program {
 
         tcsetpgrp(session, init_pgid).map_err(|_| "ttin fg")?;
         signal(pid, SIGUSR1).map_err(|_| "usr1")?;
-        let stop = wait_child_opts(&client, proc_handle, &mut seq, pid, WUNTRACED)?;
+        let stop = wait_child_opts(pid, WUNTRACED)?;
         let ttin = stopped_signal(stop) == Some(SIGTTIN);
         signal(pid, SIGCONT).map_err(|_| "cont1")?;
-        let _ = wait_child_opts(&client, proc_handle, &mut seq, pid, WCONTINUED)?;
+        let _ = wait_child_opts(pid, WCONTINUED)?;
 
         tcsetpgrp(session, pid).map_err(|_| "fg read")?;
         signal(pid, SIGUSR1).map_err(|_| "usr1b")?;
@@ -345,24 +331,18 @@ mod program {
 
         tcsetpgrp(session, init_pgid).map_err(|_| "ttou fg")?;
         signal(pid, SIGUSR2).map_err(|_| "usr2")?;
-        let stop = wait_child_opts(&client, proc_handle, &mut seq, pid, WUNTRACED)?;
+        let stop = wait_child_opts(pid, WUNTRACED)?;
         let ttou = stopped_signal(stop) == Some(SIGTTOU);
         signal(pid, SIGCONT).map_err(|_| "cont2")?;
-        let _ = wait_child_opts(&client, proc_handle, &mut seq, pid, WCONTINUED)?;
+        let _ = wait_child_opts(pid, WCONTINUED)?;
 
         tcsetpgrp(session, pid).map_err(|_| "fg write")?;
         signal(pid, SIGUSR2).map_err(|_| "usr2b")?;
-        let done = wait_child_opts(&client, proc_handle, &mut seq, pid, 0)?;
+        let done = wait_child_opts(pid, 0)?;
         let sig = ttin && ttou && exited(done) == Some(0);
 
-        let hup = spawn_program(
-            &client,
-            proc_handle,
-            &mut seq,
-            "/bin/tty-hup-child",
-            &["tty-hup-child"],
-        )?;
-        let _ = wait_child_opts(&client, proc_handle, &mut seq, hup, 0)?;
+        let (hup, _hup_child) = spawn_program(initfs, "/bin/tty-hup-child", &["tty-hup-child"])?;
+        let _ = wait_child_opts(hup, 0)?;
         sleep_ms(500);
 
         println!(
@@ -378,62 +358,11 @@ mod program {
         println!("tty-control: sig={}", u8::from(sig));
         println!("tty-control: hangup=1");
         let _ = client.close(session);
-        let _ = client.close(proc_handle);
         if !(ctty && ttyd_ok && orphan && sig) {
             return Err("control checks");
         }
         println!("tty-control: ok");
         Ok(())
-    }
-
-    fn spawn_program(
-        client: &Client,
-        proc_handle: Handle,
-        seq: &mut u64,
-        path: &str,
-        argv: &[&str],
-    ) -> Result<i32, &'static str> {
-        let request = SpawnRequest {
-            spawn_flags: 0,
-            pgroup: 0,
-            sigdefault: [0u8; 128],
-            sigmask: [0u8; 128],
-            ignored: [0u8; 128],
-            sched_policy: 0,
-            sched_prio: 0,
-            umask: 0o022,
-            tcpgrp_fd: -1,
-            path: path.as_bytes().to_vec(),
-            cwd: b"/".to_vec(),
-            argv: argv.iter().map(|arg| arg.as_bytes().to_vec()).collect(),
-            envp: vec![],
-            fdmap: vec![],
-        };
-        let response = procd_call(client, proc_handle, seq, &Request::Spawn(request))?;
-        i32::try_from(response.value).map_err(|_| "spawn pid")
-    }
-
-    fn wait_child_opts(
-        client: &Client,
-        proc_handle: Handle,
-        seq: &mut u64,
-        pid: i32,
-        options: u32,
-    ) -> Result<i32, &'static str> {
-        let response = procd_call(
-            client,
-            proc_handle,
-            seq,
-            &Request::Wait(WaitRequest {
-                idtype: 1,
-                id: i64::from(pid),
-                options,
-            }),
-        )?;
-        match response.body {
-            Body::Wait { status, .. } => Ok(status),
-            _ => Err("wait body"),
-        }
     }
 
     fn stopped_signal(status: i32) -> Option<u32> {
@@ -448,90 +377,62 @@ mod program {
         let _ = raven_rt::nanosleep(milliseconds.saturating_mul(1_000_000));
     }
 
-    fn spawn_child(
-        client: &Client,
-        proc_handle: Handle,
-        seq: &mut u64,
-    ) -> Result<i32, &'static str> {
-        let request = SpawnRequest {
-            spawn_flags: 0,
-            pgroup: 0,
-            sigdefault: [0u8; 128],
-            sigmask: [0u8; 128],
-            ignored: [0u8; 128],
-            sched_policy: 0,
-            sched_prio: 0,
-            umask: 0o022,
-            tcpgrp_fd: -1,
-            path: b"/bin/tty-child".to_vec(),
-            cwd: b"/".to_vec(),
-            argv: vec![b"tty-child".to_vec(), b"sleep".to_vec()],
-            envp: vec![],
-            fdmap: vec![],
+    fn spawn_program(
+        initfs: &Initfs<'_>,
+        path: &str,
+        argv: &[&str],
+    ) -> Result<(i32, Handle), &'static str> {
+        let options = SpawnOptions {
+            args: argv,
+            env: &[],
         };
-        let response = procd_call(client, proc_handle, seq, &Request::Spawn(request))?;
-        i32::try_from(response.value).map_err(|_| "spawn pid")
+        let child = spawn(initfs, path, &options).map_err(|_| "spawn child")?;
+        let pid = child_pid(child)?;
+        Ok((pid, child))
     }
 
-    fn set_pgid(
-        client: &Client,
-        proc_handle: Handle,
-        seq: &mut u64,
-        pid: i32,
-    ) -> Result<(), &'static str> {
-        let response = procd_call(
-            client,
-            proc_handle,
-            seq,
-            &Request::SetPgid(SetPgidRequest { pid, pgid: 0 }),
-        )?;
-        if response.status < 0 {
+    fn spawn_child(initfs: &Initfs<'_>) -> Result<(i32, Handle), &'static str> {
+        spawn_program(initfs, "/bin/tty-child", &["tty-child", "sleep"])
+    }
+
+    fn child_pid(child: Handle) -> Result<i32, &'static str> {
+        // SAFETY: PROC_HANDLE_INFO reads the pid from a process handle owned by the caller.
+        let pid = unsafe { raven_rt::sys::syscall1(PROC_HANDLE_INFO, child.0 as usize) };
+        if pid < 0 {
+            return Err("handle info");
+        }
+        i32::try_from(pid).map_err(|_| "pid range")
+    }
+
+    fn set_pgid(pid: i32) -> Result<(), &'static str> {
+        // SAFETY: PROC_SETPGID takes the pid and the new group (0 = own group).
+        let result = unsafe { raven_rt::sys::syscall2(PROC_SETPGID, pid as usize, 0) };
+        if result < 0 {
             return Err("setpgid");
         }
         Ok(())
     }
 
-    fn wait_child(
-        client: &Client,
-        proc_handle: Handle,
-        seq: &mut u64,
-        pid: i32,
-    ) -> Result<i32, &'static str> {
-        let response = procd_call(
-            client,
-            proc_handle,
-            seq,
-            &Request::Wait(WaitRequest {
-                idtype: 1,
-                id: i64::from(pid),
-                options: 0,
-            }),
-        )?;
-        match response.body {
-            Body::Wait { status, .. } => Ok(status),
-            _ => Err("wait body"),
-        }
+    fn wait_child(pid: i32) -> Result<i32, &'static str> {
+        wait_child_opts(pid, 0)
     }
 
-    fn procd_call(
-        client: &Client,
-        proc_handle: Handle,
-        seq: &mut u64,
-        request: &Request,
-    ) -> Result<Response, &'static str> {
-        let mut encoded = [0u8; 4096];
-        let length = encode_request(request, *seq, &mut encoded).map_err(|_| "encode")?;
-        *seq = seq.saturating_add(1);
-        let mut response = [0u8; 1024];
-        let length = client
-            .call(proc_handle, &encoded[..length], &mut response)
-            .map_err(|_| "procd call")?;
-        let response =
-            decode_response(request.op(), &response[..length]).map_err(|_| "procd decode")?;
-        if response.status < 0 {
-            return Err("procd status");
+    fn wait_child_opts(pid: i32, options: u32) -> Result<i32, &'static str> {
+        let mut status = 0i32;
+        // SAFETY: PROC_WAIT_EX writes one i32 status to a stack slot owned by this frame.
+        let result = unsafe {
+            raven_rt::sys::syscall4(
+                PROC_WAIT_EX,
+                1,
+                pid as usize,
+                options as usize,
+                &mut status as *mut i32 as usize,
+            )
+        };
+        if result < 0 {
+            return Err("wait");
         }
-        Ok(response)
+        Ok(status)
     }
 
     fn exited(status: i32) -> Option<i32> {

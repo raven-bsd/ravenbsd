@@ -17,6 +17,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use raven_abi::errno::Errno;
+use raven_abi::types::{Handle, prot};
 use raven_initfs::Initfs;
 use raven_proto_fs::{
     Call, CallRequest, CallResponse, DT_CHR, DT_FIFO, O_CREAT, O_RDONLY, O_WRONLY, S_IFCHR,
@@ -33,6 +34,8 @@ entry!(main);
 const START: &str = "/tmp/fs";
 const READ_WRITE: u32 = 3;
 const READ_ONLY: u32 = 1;
+const PAGE: usize = 4096;
+const MS_SYNC: usize = 4;
 
 fn main(_args: raven_rt::Args) -> i32 {
     match run() {
@@ -62,6 +65,7 @@ fn run() -> Result<(), String> {
     timestamp()?;
     special_file()?;
     statvfs()?;
+    mmap_file()?;
     Ok(())
 }
 
@@ -470,6 +474,87 @@ fn statvfs() -> Result<(), String> {
     }
     println!("posix-fs: statvfs ok");
     Ok(())
+}
+
+fn mmap_file() -> Result<(), String> {
+    let path = format!("{START}/mmap");
+    let data = [0x41u8; 2 * PAGE];
+    write_file(&path, &data)?;
+    let shared = attach_mmap(&path, 0, 2 * PAGE as u64, true)
+        .map_err(|error| format!("shared mmap: {}", error.description()))?;
+    let address = raven_rt::sys::map_object(
+        shared,
+        0,
+        2 * PAGE,
+        (prot::READ | prot::WRITE) as usize,
+        true,
+    )
+    .map_err(|error| format!("shared map: {}", error.description()))?;
+    raven_rt::sys::copy_to_mapping(address, b"MMAP");
+    raven_rt::sys::msync(Handle::SELF_PROC, address, 2 * PAGE, MS_SYNC)
+        .map_err(|error| format!("msync: {}", error.description()))?;
+    let contents =
+        file_read(&path).map_err(|error| format!("read shared: {}", error.description()))?;
+    if contents.get(..4) != Some(b"MMAP") {
+        return Err("shared write-back".to_string());
+    }
+    raven_rt::sys::unmap(Handle::SELF_PROC, address, 2 * PAGE)
+        .map_err(|error| format!("shared unmap: {}", error.description()))?;
+
+    let private = attach_mmap(&path, 0, PAGE as u64, false)
+        .map_err(|error| format!("private mmap: {}", error.description()))?;
+    let address =
+        raven_rt::sys::map_object(private, 0, PAGE, (prot::READ | prot::WRITE) as usize, false)
+            .map_err(|error| format!("private map: {}", error.description()))?;
+    raven_rt::sys::copy_to_mapping(address, b"PRIV");
+    raven_rt::sys::unmap(Handle::SELF_PROC, address, PAGE)
+        .map_err(|error| format!("private unmap: {}", error.description()))?;
+    let contents =
+        file_read(&path).map_err(|error| format!("read private: {}", error.description()))?;
+    if contents.get(..4) != Some(b"MMAP") {
+        return Err("private mapping changed the file".to_string());
+    }
+
+    if attach_mmap(&path, 2 * PAGE as u64, PAGE as u64, false) != Err(Errno::EINVAL) {
+        return Err("mmap accepted an offset past EOF".to_string());
+    }
+    println!("posix-fs: mmap-file ok");
+    Ok(())
+}
+
+fn attach_mmap(path: &str, offset: u64, len: u64, shared: bool) -> Result<Handle, Errno> {
+    let client = Client::new();
+    let handle = client.open(&format!("file:{path}"), READ_WRITE)?;
+    let request = CallRequest::new(Call::Mmap {
+        offset,
+        len,
+        shared,
+    });
+    let mut encoded = [0u8; 64];
+    let encoded_len = request
+        .encode(&mut encoded)
+        .map_err(|error| error.errno())?;
+    let mut response = [0u8; 8];
+    let result = client.call(handle, &encoded[..encoded_len], &mut response);
+    let count = result?;
+    if count == 4 {
+        let status = i32::from_le_bytes(response[..4].try_into().map_err(|_| Errno::EPROTO)?);
+        return Err(errno_from_status(status));
+    }
+    if count < 8 {
+        return Err(Errno::EPROTO);
+    }
+    Ok(Handle(u32::from_le_bytes(
+        response[..4].try_into().map_err(|_| Errno::EPROTO)?,
+    )))
+}
+
+fn errno_from_status(status: i32) -> Errno {
+    if (-4095..0).contains(&status) {
+        Errno(u16::try_from(-status).unwrap_or(Errno::EIO.0))
+    } else {
+        Errno::EIO
+    }
 }
 
 fn check_statvfs(statvfs: &StatVfs) -> Result<(), String> {

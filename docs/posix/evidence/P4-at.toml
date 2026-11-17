@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P40 POSIX at/batch evidence.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.at"
+status = "present"
+evidence = "test:tests/posix/utility/at/test.sh"
+notes = "P40: schedule now/relative/HH:MM/date, list, remove, validation and spool persistence; the atd qtest runs a due job through the kernel spawn path"
+
+[[row]]
+id = "util.batch"
+status = "present"
+evidence = "test:tests/posix/utility/at/test.sh"
+notes = "P40: batch queues a job on the idle queue; atd runs it when no regular job is due, because the kernel has no load-average source"

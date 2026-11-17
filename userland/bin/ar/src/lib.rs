@@ -373,7 +373,7 @@ fn put(field: &mut [u8], value: &str) {
 }
 
 fn pad(out: &mut Vec<u8>) {
-    if out.len() % 2 != 0 {
+    if !out.len().is_multiple_of(2) {
         out.push(b'\n');
     }
 }
@@ -493,7 +493,7 @@ pub fn elf_symbols(data: &[u8]) -> Vec<String> {
         let Some(str_base) = str_base else {
             break;
         };
-        let count = if entsize == 0 { 0 } else { size / entsize };
+        let count = size.checked_div(entsize).unwrap_or(0);
         for symbol in 0..count {
             let entry = offset + symbol.saturating_mul(entsize);
             let (st_name, st_info, st_shndx) = if is_64 {

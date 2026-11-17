@@ -16,7 +16,7 @@ fn words(line: &str) -> Vec<String> {
     let list = parse(line).expect("parses");
     list.items
         .iter()
-        .flat_map(|item| item.command.words.iter().map(Word::render))
+        .flat_map(|item| item.pipeline.commands[0].words.iter().map(Word::render))
         .collect()
 }
 
@@ -62,8 +62,8 @@ fn quotes_can_be_adjacent() {
 #[test]
 fn empty_quotes_make_an_empty_word() {
     let list = parse("echo ''").unwrap();
-    assert_eq!(list.items[0].command.words.len(), 2);
-    assert!(list.items[0].command.words[1].is_blank());
+    assert_eq!(list.items[0].pipeline.commands[0].words.len(), 2);
+    assert!(list.items[0].pipeline.commands[0].words[1].is_blank());
 }
 
 #[test]
@@ -86,7 +86,14 @@ fn operators_are_recognised_attached_to_words() {
     let parsed = tokens("echo a>b");
     assert_eq!(parsed.len(), 4);
     assert_eq!(parsed[1], Token::Word(Word::expandable("a")));
-    assert_eq!(parsed[2], Token::Redir(RedirKind::Out));
+    assert_eq!(
+        parsed[2],
+        Token::Redir {
+            fd: 1,
+            kind: RedirKind::Out,
+            strip_tabs: false
+        }
+    );
 }
 
 #[test]
@@ -111,21 +118,27 @@ fn a_single_ampersand_is_rejected() {
 #[test]
 fn the_append_operator_is_recognised() {
     let parsed = tokens("a >> b");
-    assert!(
-        parsed
-            .iter()
-            .any(|token| matches!(token, Token::Redir(RedirKind::Append)))
-    );
+    assert!(parsed.iter().any(|token| matches!(
+        token,
+        Token::Redir {
+            fd: 1,
+            kind: RedirKind::Append,
+            strip_tabs: false
+        }
+    )));
 }
 
 #[test]
 fn the_input_operator_is_recognised() {
     let parsed = tokens("a < b");
-    assert!(
-        parsed
-            .iter()
-            .any(|token| matches!(token, Token::Redir(RedirKind::In)))
-    );
+    assert!(parsed.iter().any(|token| matches!(
+        token,
+        Token::Redir {
+            fd: 0,
+            kind: RedirKind::In,
+            strip_tabs: false
+        }
+    )));
 }
 
 #[test]
@@ -222,18 +235,85 @@ fn two_semicolons_are_a_syntax_error() {
 }
 
 #[test]
-fn a_pipe_is_reported_as_unsupported() {
-    assert_eq!(parse("ls | wc"), Err(ParseError::PipeUnsupported));
+fn a_pipe_builds_a_pipeline() {
+    let list = parse("ls | wc | cat").unwrap();
+    assert_eq!(list.items.len(), 1);
+    assert_eq!(list.items[0].pipeline.commands.len(), 3);
+    assert_eq!(list.items[0].pipeline.commands[1].words[0].render(), "wc");
+}
+
+#[test]
+fn a_pipeline_keeps_redirections_per_stage() {
+    let list = parse("echo a > /tmp/a | cat < /tmp/a").unwrap();
+    let stages = &list.items[0].pipeline.commands;
+    assert_eq!(stages.len(), 2);
+    assert_eq!(stages[0].redirs[0].kind, RedirKind::Out);
+    assert_eq!(stages[1].redirs[0].kind, RedirKind::In);
+}
+
+#[test]
+fn stderr_and_dup_redirections_are_captured() {
+    let list = parse("echo err 2> /tmp/e 2>&1").unwrap();
+    let redirs = &list.items[0].pipeline.commands[0].redirs;
+    assert_eq!(redirs[0].fd, 2);
+    assert_eq!(redirs[0].kind, RedirKind::Out);
+    assert_eq!(redirs[1].fd, 2);
+    assert_eq!(redirs[1].kind, RedirKind::Dup);
+    assert_eq!(redirs[1].dup, Some(1));
+}
+
+#[test]
+fn a_here_document_captures_its_body() {
+    let list = parse("cat <<EOF\nbody\nEOF\n").unwrap();
+    let redir = &list.items[0].pipeline.commands[0].redirs[0];
+    assert_eq!(redir.kind, RedirKind::HereDoc);
+    assert_eq!(redir.body.as_deref(), Some("body\n"));
+}
+
+#[test]
+fn a_tab_stripped_here_document_captures_its_body() {
+    let list = parse("cat <<-EOF\n\tbody\n\tEOF\n").unwrap();
+    let redir = &list.items[0].pipeline.commands[0].redirs[0];
+    assert_eq!(redir.body.as_deref(), Some("body\n"));
+}
+
+#[test]
+fn an_unterminated_here_document_is_incomplete() {
     assert_eq!(
-        ParseError::PipeUnsupported.message(),
-        "pipes are not supported yet"
+        parse("cat <<EOF\nbody\n"),
+        Err(ParseError::IncompleteHereDoc)
+    );
+}
+
+#[test]
+fn a_command_renders_to_parseable_source() {
+    let list = parse("echo 'a b' \"$NAME\" > /tmp/out 2>&1").unwrap();
+    let rendered = list.items[0].pipeline.commands[0].render();
+    let reparsed = parse(&rendered).unwrap();
+    assert_eq!(
+        reparsed.items[0].pipeline.commands[0].words[1].render(),
+        "a b"
+    );
+    assert_eq!(reparsed.items[0].pipeline.commands[0].redirs.len(), 2);
+}
+
+#[test]
+fn a_here_document_renders_and_reparses() {
+    let list = parse("cat <<EOF\nbody\nEOF\n").unwrap();
+    let rendered = list.items[0].pipeline.commands[0].render();
+    let reparsed = parse(&rendered).unwrap();
+    assert_eq!(
+        reparsed.items[0].pipeline.commands[0].redirs[0]
+            .body
+            .as_deref(),
+        Some("body\n")
     );
 }
 
 #[test]
 fn redirection_targets_are_captured() {
     let list = parse("echo hi > /tmp/a").unwrap();
-    let command = &list.items[0].command;
+    let command = &list.items[0].pipeline.commands[0];
     assert_eq!(command.words.len(), 2);
     assert_eq!(command.redirs.len(), 1);
     assert_eq!(command.redirs[0].kind, RedirKind::Out);
@@ -243,7 +323,7 @@ fn redirection_targets_are_captured() {
 #[test]
 fn append_and_input_redirections_are_captured() {
     let list = parse("echo hi >> /tmp/a < /etc/in").unwrap();
-    let redirs = &list.items[0].command.redirs;
+    let redirs = &list.items[0].pipeline.commands[0].redirs;
     assert_eq!(redirs[0].kind, RedirKind::Append);
     assert_eq!(redirs[1].kind, RedirKind::In);
 }
@@ -299,8 +379,8 @@ fn a_quoted_pipe_is_text() {
 #[test]
 fn commands_before_a_connector_keep_their_redirections() {
     let list = parse("echo a > f && echo b").unwrap();
-    assert_eq!(list.items[0].command.redirs.len(), 1);
-    assert!(list.items[1].command.redirs.is_empty());
+    assert_eq!(list.items[0].pipeline.commands[0].redirs.len(), 1);
+    assert!(list.items[1].pipeline.commands[0].redirs.is_empty());
 }
 
 // --- expansion ---------------------------------------------------------------------------------
@@ -375,7 +455,7 @@ fn a_backslash_escaped_dollar_is_literal() {
     assert_eq!(words("echo \\$NAME"), alloc::vec!["echo", "$NAME"]);
     let list = parse("echo \\$NAME").unwrap();
     assert_eq!(
-        expand(&list.items[0].command.words[1], &table(), 0),
+        expand(&list.items[0].pipeline.commands[0].words[1], &table(), 0),
         "$NAME"
     );
 }
@@ -384,7 +464,7 @@ fn a_backslash_escaped_dollar_is_literal() {
 fn an_escaped_dollar_inside_double_quotes_is_literal() {
     let list = parse("echo \"\\$NAME\"").unwrap();
     assert_eq!(
-        expand(&list.items[0].command.words[1], &table(), 0),
+        expand(&list.items[0].pipeline.commands[0].words[1], &table(), 0),
         "$NAME"
     );
 }
@@ -410,7 +490,7 @@ fn the_table_keeps_insertion_order() {
 #[test]
 fn a_redirection_target_expands() {
     let list = parse("echo hi > $PWD/out").unwrap();
-    let target = &list.items[0].command.redirs[0].target;
+    let target = &list.items[0].pipeline.commands[0].redirs[0].target;
     assert_eq!(expand(target, &table(), 0), "/tmp/out");
 }
 
@@ -445,14 +525,23 @@ fn adjacent_segments_of_the_same_kind_merge() {
 fn parse_and_expand_a_pipeline_of_commands() {
     let list = parse("cd /tmp && echo $? ; pwd").unwrap();
     assert_eq!(list.items.len(), 3);
-    assert_eq!(expand(&list.items[1].command.words[0], &table(), 0), "echo");
-    assert_eq!(expand(&list.items[1].command.words[1], &table(), 7), "7");
+    assert_eq!(
+        expand(&list.items[1].pipeline.commands[0].words[0], &table(), 0),
+        "echo"
+    );
+    assert_eq!(
+        expand(&list.items[1].pipeline.commands[0].words[1], &table(), 7),
+        "7"
+    );
 }
 
 #[test]
 fn an_unknown_variable_in_quotes_is_empty() {
     let list = parse("echo \"[$NOPE]\"").unwrap();
-    assert_eq!(expand(&list.items[0].command.words[1], &table(), 0), "[]");
+    assert_eq!(
+        expand(&list.items[0].pipeline.commands[0].words[1], &table(), 0),
+        "[]"
+    );
 }
 
 #[test]
@@ -467,12 +556,23 @@ fn error_messages_are_never_empty() {
         ParseError::Empty,
         ParseError::UnterminatedQuote('\''),
         ParseError::TrailingBackslash,
-        ParseError::PipeUnsupported,
         ParseError::MissingRedirectionTarget,
         ParseError::UnexpectedOperator(";"),
         ParseError::TooManyWords,
         ParseError::TooManyRedirs,
+        ParseError::TooManyStages,
+        ParseError::IncompleteHereDoc,
+        ParseError::InvalidRedirection,
     ] {
         assert!(!error.message().is_empty());
     }
+}
+
+#[test]
+fn a_here_document_without_a_trailing_newline_parses() {
+    let list = parse("cat <<EOF\nhere:body\nEOF").expect("parses");
+    assert_eq!(
+        list.items[0].pipeline.commands[0].redirs[0].body.as_deref(),
+        Some("here:body\n")
+    );
 }

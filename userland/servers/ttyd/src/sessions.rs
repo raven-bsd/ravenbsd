@@ -4,13 +4,13 @@
 //! Session and foreground process-group records.
 //!
 //! The terminal server cannot yet change the kernel controlling terminal; it records the session
-//! id, foreground group and hangup state that the tty and procd glue will use. The table is pure
-//! and host-testable.
+//! id, foreground group and hangup state that the tty and kernel job-control paths will use. The
+//! table is pure and host-testable.
 
 use alloc::collections::BTreeMap;
 
 /// One terminal session.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Session {
     /// Foreground process group.
     pub fg_pgrp: i32,
@@ -18,6 +18,19 @@ pub struct Session {
     pub sid: i32,
     /// True after a hangup.
     pub hung: bool,
+    /// True when terminal writes are allowed.
+    pub write_allowed: bool,
+}
+
+impl Default for Session {
+    fn default() -> Self {
+        Self {
+            fg_pgrp: 0,
+            sid: 0,
+            hung: false,
+            write_allowed: true,
+        }
+    }
 }
 
 /// The session table.
@@ -105,6 +118,25 @@ impl Sessions {
     #[must_use]
     pub fn hung(&self, id: u32) -> bool {
         self.entries.get(&id).is_some_and(|session| session.hung)
+    }
+
+    /// True when terminal writes are allowed for the session.
+    #[must_use]
+    pub fn write_allowed(&self, id: u32) -> bool {
+        self.entries
+            .get(&id)
+            .is_some_and(|session| session.write_allowed)
+    }
+
+    /// Set the session's terminal write permission.
+    pub fn set_write_allowed(&mut self, id: u32, allowed: bool) -> bool {
+        match self.entries.get_mut(&id) {
+            Some(session) => {
+                session.write_allowed = allowed;
+                true
+            }
+            None => false,
+        }
     }
 
     /// Remove a session.

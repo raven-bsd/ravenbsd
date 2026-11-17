@@ -10,7 +10,7 @@ pub extern "C" fn sem_clockwait(
     at: *const raven_libc_abi::structs::Timespec,
 ) -> c_int {
     if sem.is_null() {
-        return 22;
+        return super::common::sem_err(raven_libc_thread::limits::EINVAL);
     }
     match s::clockwait(
         &raven_libc_thread::raw::SysKernel,
@@ -22,6 +22,6 @@ pub extern "C" fn sem_clockwait(
         },
     ) {
         Ok(()) => 0,
-        Err(e) => super::common::err(e),
+        Err(e) => super::common::sem_err(e),
     }
 }

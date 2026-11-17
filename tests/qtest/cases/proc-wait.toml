@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# Kernel wait matrix: waitpid, wait(-1), WNOHANG, double-wait ECHILD, stop/continue and an
+# orphan reparented to init after its parent exits.
+
+name = "proc-wait"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/proc/build.sh"]
+initfs = "build/fixtures/proc/wait.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^proc-wait: waitpid=1 echild=1$'
+
+[[expect]]
+regex = '^proc-wait: wait-any=1$'
+
+[[expect]]
+regex = '^proc-wait: nohang=1$'
+
+[[expect]]
+regex = '^proc-wait: stop=1$'
+
+[[expect]]
+regex = '^proc-wait: reparent=1$'
+
+[[expect]]
+regex = '^proc-wait: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|proc-wait: fail'

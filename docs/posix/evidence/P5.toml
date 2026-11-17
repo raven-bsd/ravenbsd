@@ -113,3 +113,9 @@ id = "filesystem.umask"
 status = "present"
 evidence = "test:tests/posix/fs/umask/test.sh"
 notes = "P5: the process-local umask masks mkdir and O_CREAT modes through the libc platform"
+
+[[row]]
+id = "filesystem.mmap-file"
+status = "present"
+evidence = "qtest:posix-fs"
+notes = "P5b: file-backed mmap maps the attached VFS pager object; shared write-back, private COW, msync/munmap and EOF offset rejection"

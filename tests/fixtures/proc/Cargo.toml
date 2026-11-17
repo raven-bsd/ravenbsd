@@ -42,6 +42,11 @@ name = "proc-priority-init"
 path = "src/bin/priority.rs"
 test = false
 
+[[bin]]
+name = "proc-wait-init"
+path = "src/bin/wait.rs"
+test = false
+
 [dependencies]
 raven-abi = { path = "../../../crates/raven-abi" }
 raven-initfs = { path = "../../../crates/raven-initfs" }

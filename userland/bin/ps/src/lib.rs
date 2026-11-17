@@ -21,6 +21,8 @@ pub enum Action {
     List,
     /// List the services as NDJSON process records.
     ListJson,
+    /// List POSIX process fields from the kernel registry.
+    Posix,
     /// Check the `svc:` server against the kernel.
     Selftest,
 }
@@ -61,6 +63,8 @@ const STATES: [&str; 6] = [
 pub fn parse_args<'a>(args: impl Iterator<Item = &'a str>) -> Result<Action, UsageError> {
     let mut json = false;
     let mut selftest = false;
+    let mut posix = false;
+    let mut services = false;
     let mut ended = false;
     for argument in args {
         if ended {
@@ -68,12 +72,18 @@ pub fn parse_args<'a>(args: impl Iterator<Item = &'a str>) -> Result<Action, Usa
         }
         match argument {
             "--" => ended = true,
-            "--json" if !json && !selftest => json = true,
-            "--selftest" if !selftest && !json => selftest = true,
+            "--json" if !json && !selftest && !posix && !services => json = true,
+            "--selftest" if !selftest && !json && !posix && !services => selftest = true,
+            "-e" | "--all" | "--posix" if !posix && !json && !selftest && !services => {
+                posix = true;
+            }
+            "--services" if !services && !json && !selftest && !posix => services = true,
             _ => return Err(UsageError),
         }
     }
-    Ok(if json {
+    Ok(if posix {
+        Action::Posix
+    } else if json {
         Action::ListJson
     } else if selftest {
         Action::Selftest
@@ -89,6 +99,8 @@ pub struct Status {
     pub name: String,
     /// One of the documented states.
     pub state: String,
+    /// Service process handle, or zero when no process is running.
+    pub handle: u32,
     /// Restart count.
     pub restarts: u32,
 }
@@ -103,13 +115,12 @@ pub fn parse_status(line: &str) -> Result<Status, StatusError> {
     if fields.next().is_some() || !STATES.contains(&state) {
         return Err(StatusError);
     }
-    if handle.parse::<u32>().is_err() {
-        return Err(StatusError);
-    }
+    let handle = handle.parse::<u32>().map_err(|_| StatusError)?;
     let restarts = restarts.parse::<u32>().map_err(|_| StatusError)?;
     Ok(Status {
         name: String::from(name),
         state: String::from(state),
+        handle,
         restarts,
     })
 }
@@ -118,6 +129,35 @@ pub fn parse_status(line: &str) -> Result<Status, StatusError> {
 pub fn format_status(line: &str, out: &mut impl fmt::Write) -> Result<(), StatusError> {
     let status = parse_status(line)?;
     writeln!(out, "{} {} {}", status.name, status.state, status.restarts).map_err(|_| StatusError)
+}
+
+/// One POSIX process-table row.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProcessRow {
+    /// Process id.
+    pub pid: i32,
+    /// Parent process id.
+    pub ppid: i32,
+    /// Real user id.
+    pub uid: u32,
+    /// Real group id.
+    pub gid: u32,
+    /// Command name; `?` when the kernel registry has no path source.
+    pub cmd: String,
+}
+
+/// Format the POSIX table header.
+pub fn format_posix_header(out: &mut impl fmt::Write) -> fmt::Result {
+    writeln!(out, "PID PPID UID GID CMD")
+}
+
+/// Format one POSIX table row as space-separated fields.
+pub fn format_posix_row(row: &ProcessRow, out: &mut impl fmt::Write) -> fmt::Result {
+    writeln!(
+        out,
+        "{} {} {} {} {}",
+        row.pid, row.ppid, row.uid, row.gid, row.cmd
+    )
 }
 
 /// The JSON record for one service-derived process entry.

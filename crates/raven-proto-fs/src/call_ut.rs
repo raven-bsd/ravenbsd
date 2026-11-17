@@ -136,6 +136,31 @@ fn statvfs_rejects_short_payloads() {
 }
 
 #[test]
+fn mmap_round_trips_with_offset_and_length() {
+    roundtrip(Call::Mmap {
+        offset: 0x1000,
+        len: 0x4000,
+        shared: true,
+    });
+    roundtrip(Call::Mmap {
+        offset: 0,
+        len: 0x1000,
+        shared: false,
+    });
+}
+
+#[test]
+fn mmap_flags_are_limited_to_shared() {
+    let mut bytes = encoded(&CallRequest::new(Call::Mmap {
+        offset: 0,
+        len: 0x1000,
+        shared: false,
+    }));
+    bytes[24..28].copy_from_slice(&2u32.to_le_bytes());
+    assert_eq!(CallRequest::decode(&bytes), Err(ProtoError::Malformed));
+}
+
+#[test]
 fn lstat_response_round_trips() {
     let stat = Stat {
         ino: 7,

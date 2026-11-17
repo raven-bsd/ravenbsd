@@ -104,6 +104,9 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == ipc::SEEK {
         return ipc::seek(frame);
     }
+    if number == raven_abi::syscall::MSYNC {
+        return memory_ctl::msync(frame);
+    }
     if number == exec::PROC_EXEC {
         return exec::exec(frame);
     }
@@ -157,6 +160,9 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     if number == process_ctl::PROC_PID_INFO {
         return process_ctl::pid_info(frame);
+    }
+    if number == process_ctl::PROC_SET_COMMAND {
+        return process_ctl::set_command(frame);
     }
     if number == process_ctl::PROC_SETCRED_EX {
         return process_ctl::setcred_ex(frame);

@@ -39,7 +39,7 @@ per-thread `tp`/`tid_out`/`clear_tid_addr`, private `FUTEX_WAIT`/`FUTEX_WAKE` in
 | libc-threads | page fault `0x31` | libc | `libc-threads: start` then fault; the kernel `libc-kernel` TLS/THREAD_CREATE_EX probe passes, so the fault is the libc TLS init/`set_thread_pointer` path, not the S23 syscall | kevin (K25a/C57 TLS init) |
 | libc-signals | page fault `0x0` | libc | `sigset sigaction raise mask setjmp` ok then fault; the kernel signal delivery probe passes | carl (C64k ucontext) |
 | libc-dynamic | build link fail | libc | undefined `tcgetattr tcsetattr fgetln umask arc4random_buf posix_openpt grantpt unlockpt` | kevin (pty/termios/random; C64h adds tc*/umask) |
-| libc-spawn | FAIL 7 | libc | `spawn wait wait twice enoent spawnp exit codes getpid` fail; `sigdefault`/`fork enosys` ok | kevin (spawn/procd client) |
+| libc-spawn | FAIL 7 | libc | `spawn wait wait twice enoent spawnp exit codes getpid` fail; `sigdefault`/`fork enosys` ok | kevin (spawn/libc proc) |
 
 Observed commands (temporary worktree `e822300b`, sysroot from `cargo xtask libc-pack
 --arch x86_64` + `libc-link --arch x86_64`):

@@ -79,6 +79,8 @@ use core::ops::Range;
 
 mod plan;
 
+pub mod inspect;
+
 pub use plan::{LoadMode, MapStep, StepKind, plan_load};
 
 const EHDR_SIZE: usize = 64;
@@ -140,6 +142,8 @@ pub enum ElfError {
     BadType,
     /// A program header or ELF header field is malformed.
     BadPhdr,
+    /// The section-header table, a section name or a symbol entry is malformed.
+    BadSection,
     /// A segment's file range is not fully inside the file.
     SegmentOutOfBounds,
     /// Two segments overlap after rounding their address ranges to 4096-byte pages.
@@ -164,6 +168,7 @@ impl core::fmt::Display for ElfError {
             Self::BadMachine => "ELF machine does not match",
             Self::BadType => "ELF type is not ET_EXEC or ET_DYN",
             Self::BadPhdr => "malformed ELF header or program header",
+            Self::BadSection => "malformed ELF section or symbol table",
             Self::SegmentOutOfBounds => "segment file range outside the file",
             Self::SegmentOverlap => "segments overlap after page rounding",
             Self::SegmentOutsideUserRange => "segment memory range outside the user range",

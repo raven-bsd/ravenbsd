@@ -753,7 +753,9 @@ impl RamfsHandler {
                     creds.permitted((stat.mode & 0o7777) as u16, stat.uid, stat.gid, mode as u16);
                 Self::status(response, if allowed { Ok(()) } else { Err(Errno::EACCES) })
             }
-            Call::Mount { .. } | Call::Umount { .. } => Self::status(response, Err(Errno::ENOSYS)),
+            Call::Mount { .. } | Call::Umount { .. } | Call::Mmap { .. } => {
+                Self::status(response, Err(Errno::ENOSYS))
+            }
             Call::Statfs => {
                 let statfs: StatFs = self.fs.statfs();
                 CallResponse::StatFs { status: 0, statfs }

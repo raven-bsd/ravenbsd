@@ -2,14 +2,171 @@
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 use super::*;
+use core::cell::{Cell, RefCell};
 use core::ffi::c_int;
 
 use raven_libc_abi::structs::Rusage;
 use raven_libc_abi::structs::{PosixSpawnFileActionsT, PosixSpawnattrT};
+use raven_libc_proc::backend::{ProcBackend, WaitResult};
 use raven_libc_proc::errors::{EACCES, ECHILD, ENOENT, ENOSYS};
-use raven_libc_proc::fake::FakeProcd;
+use raven_libc_proc::ids::SetCred;
 use raven_libc_proc::local_backend::LocalBackend;
-use raven_libc_proc::wire::Op;
+use raven_libc_proc::request::{ExecRequest, ForkRequest, SpawnRequest};
+
+struct FakeBackend {
+    requests: RefCell<alloc::vec::Vec<SpawnRequest>>,
+    wait_results: RefCell<alloc::vec::Vec<Result<WaitResult, ProcErrno>>>,
+    exec_error: Cell<Option<ProcErrno>>,
+}
+
+impl FakeBackend {
+    fn new() -> Self {
+        Self {
+            requests: RefCell::new(alloc::vec::Vec::new()),
+            wait_results: RefCell::new(alloc::vec::Vec::new()),
+            exec_error: Cell::new(None),
+        }
+    }
+
+    fn fail_next_exec(&self, error: ProcErrno) {
+        self.exec_error.set(Some(error));
+    }
+
+    fn push_wait_result(&self, result: Result<WaitResult, ProcErrno>) {
+        self.wait_results.borrow_mut().push(result);
+    }
+
+    fn requests(&self) -> alloc::vec::Vec<SpawnRequest> {
+        self.requests.borrow().clone()
+    }
+}
+
+impl ProcBackend for FakeBackend {
+    fn getpid(&self) -> i32 {
+        1
+    }
+
+    fn getppid(&self) -> i32 {
+        0
+    }
+
+    fn getuid(&self) -> u32 {
+        0
+    }
+
+    fn geteuid(&self) -> u32 {
+        0
+    }
+
+    fn getgid(&self) -> u32 {
+        0
+    }
+
+    fn getegid(&self) -> u32 {
+        0
+    }
+
+    fn getpgid(&self, _pid: i32) -> Result<i32, ProcErrno> {
+        Ok(1)
+    }
+
+    fn getsid(&self, _pid: i32) -> Result<i32, ProcErrno> {
+        Ok(1)
+    }
+
+    fn getgroups(&self, _out: &mut [u32]) -> Result<usize, ProcErrno> {
+        Ok(0)
+    }
+
+    fn spawn(&self, req: &SpawnRequest) -> Result<i32, ProcErrno> {
+        self.requests.borrow_mut().push(req.clone());
+        Ok(100)
+    }
+
+    fn fork(&self, _req: &ForkRequest) -> Result<i32, ProcErrno> {
+        Ok(100)
+    }
+
+    fn exec(&self, _req: &ExecRequest) -> ProcErrno {
+        self.exec_error.take().unwrap_or(ENOSYS)
+    }
+
+    fn wait(&self, _idtype: u32, _id: i64, _options: u32) -> Result<WaitResult, ProcErrno> {
+        let mut results = self.wait_results.borrow_mut();
+        if results.is_empty() {
+            Err(ECHILD)
+        } else {
+            results.remove(0)
+        }
+    }
+
+    fn kill(&self, _pid: i64, _sig: u32, _queue_value: Option<u64>) -> Result<(), ProcErrno> {
+        Err(raven_libc_proc::errors::ESRCH)
+    }
+
+    fn setpgid(&self, _pid: i32, _pgid: i32) -> Result<(), ProcErrno> {
+        Err(ENOSYS)
+    }
+
+    fn setsid(&self) -> Result<i32, ProcErrno> {
+        Err(ENOSYS)
+    }
+
+    fn setcred(&self, _req: &SetCred) -> Result<(), ProcErrno> {
+        Err(ENOSYS)
+    }
+
+    fn rlimit(
+        &self,
+        _pid: i32,
+        _resource: u32,
+        _new: Option<(u64, u64)>,
+    ) -> Result<(u64, u64), ProcErrno> {
+        Err(ENOSYS)
+    }
+
+    fn rusage(&self, _who: i32) -> Result<[u8; 144], ProcErrno> {
+        Err(ENOSYS)
+    }
+
+    fn prio(&self, _which: u32, _who: i32, _set: Option<i32>) -> Result<i32, ProcErrno> {
+        Err(ENOSYS)
+    }
+
+    fn sched(
+        &self,
+        _op: u32,
+        _pid: i32,
+        _policy: i32,
+        _param: [i32; 4],
+    ) -> Result<(i32, [i32; 4]), ProcErrno> {
+        Err(ENOSYS)
+    }
+
+    fn set_title(&self, _title: &[u8]) -> Result<(), ProcErrno> {
+        Err(ENOSYS)
+    }
+
+    fn prctl(&self, _option: u32, _a: [u64; 4]) -> Result<i64, ProcErrno> {
+        Err(ENOSYS)
+    }
+
+    fn login(&self, _set: Option<&[u8]>) -> Result<alloc::vec::Vec<u8>, ProcErrno> {
+        Err(ENOSYS)
+    }
+
+    fn pledge(
+        &self,
+        _promises: Option<&[u8]>,
+        _exec_promises: Option<&[u8]>,
+    ) -> Result<(), ProcErrno> {
+        Err(ENOSYS)
+    }
+
+    fn cap_enter(&self) -> Result<(), ProcErrno> {
+        Err(ENOSYS)
+    }
+}
 
 struct TestEnv;
 
@@ -40,23 +197,23 @@ fn context() -> SpawnCtx<'static> {
 }
 
 #[test]
-fn fork_is_enosys_without_procd() {
+fn fork_is_enosys_without_a_kernel_path() {
     let backend = LocalBackend::new(None);
     assert_eq!(fork(&backend), Err(ENOSYS));
 }
 
 #[test]
 fn fake_backend_forks() {
-    let backend = FakeProcd::new();
+    let backend = FakeBackend::new();
     assert_eq!(fork(&backend), Ok(100));
 }
 
 #[test]
 fn exec_reports_the_backend_error() {
-    let backend = FakeProcd::new();
-    backend.fail_next(Op::Exec, ENOENT);
+    let backend = FakeBackend::new();
+    backend.fail_next_exec(ENOENT);
     assert_eq!(exec(&backend, b"/", b"/missing", &[], &[], None), ENOENT);
-    backend.fail_next(Op::Exec, EACCES);
+    backend.fail_next_exec(EACCES);
     assert_eq!(exec(&backend, b"/", b"/noexec", &[], &[], None), EACCES);
 }
 
@@ -71,7 +228,7 @@ fn wait_without_children_is_echild() {
 
 #[test]
 fn wait_copies_the_status_and_zeroes_usage() {
-    let backend = FakeProcd::new();
+    let backend = FakeBackend::new();
     backend.push_wait_result(Ok(wait_result(7, 0x100)));
     let mut status = 0 as c_int;
     let mut usage = Rusage::ZERO;
@@ -85,7 +242,7 @@ fn wait_copies_the_status_and_zeroes_usage() {
 
 #[test]
 fn spawn_with_the_fake_backend_returns_a_pid() {
-    let backend = FakeProcd::new();
+    let backend = FakeBackend::new();
     let mut env = TestEnv;
     let ctx = context();
     assert_eq!(
@@ -107,7 +264,7 @@ fn spawn_with_the_fake_backend_returns_a_pid() {
 
 #[test]
 fn failing_file_action_spawns_nothing() {
-    let backend = FakeProcd::new();
+    let backend = FakeBackend::new();
     let mut actions = FileActions::new();
     actions.add_close(1).expect("valid close");
     actions

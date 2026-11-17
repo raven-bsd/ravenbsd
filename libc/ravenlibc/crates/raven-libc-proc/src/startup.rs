@@ -8,8 +8,8 @@ use alloc::vec::Vec;
 use crate::auxv::AuxTable;
 use crate::consts::{
     AT_CLKTCK, AT_EXECFN, AT_HWCAP, AT_HWCAP2, AT_NULL, AT_PAGESZ, AT_RANDOM, AT_RAVEN_ABI,
-    AT_RAVEN_CWD, AT_RAVEN_FDMAP, AT_RAVEN_FDMAP_N, AT_RAVEN_PROCD, AT_RAVEN_PROCINFO,
-    AT_RAVEN_TIMEPAGE, AT_SECURE,
+    AT_RAVEN_CWD, AT_RAVEN_FDMAP, AT_RAVEN_FDMAP_N, AT_RAVEN_PROCINFO, AT_RAVEN_TIMEPAGE,
+    AT_SECURE,
 };
 use crate::limits::{MAX_AUXV_PAIRS, MAX_ENV_WORDS};
 
@@ -28,8 +28,6 @@ pub trait StrSource {
 /// The `AT_RAVEN_*` values decoded from the auxiliary vector.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RavenKeys {
-    /// Procd connection handle.
-    pub procd: Option<u32>,
     /// Procinfo page address.
     pub procinfo: Option<usize>,
     /// Fdmap pointer.
@@ -160,9 +158,6 @@ pub fn parse_stack(source: &dyn WordSource) -> Result<StartInfo, StartError> {
     let hwcap = auxv.get(AT_HWCAP).unwrap_or(0);
     let hwcap2 = auxv.get(AT_HWCAP2).unwrap_or(0);
     let raven = RavenKeys {
-        procd: auxv
-            .get(AT_RAVEN_PROCD)
-            .and_then(|value| u32::try_from(value).ok()),
         procinfo: auxv.get(AT_RAVEN_PROCINFO),
         fdmap: auxv.get(AT_RAVEN_FDMAP),
         fdmap_n: auxv.get(AT_RAVEN_FDMAP_N).unwrap_or(0),

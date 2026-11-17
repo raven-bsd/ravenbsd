@@ -75,6 +75,12 @@ static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 /// Live process ids. The weak references never keep a process alive; teardown removes its entry,
 /// and lookup removes an entry whose last strong reference has already gone.
 static PID_REGISTRY: Mutex<BTreeMap<u64, Weak<Process>>> = Mutex::new(BTreeMap::new());
+/// Exited processes retained until a wait consumes their status.
+///
+/// The pid registry is weak so a process that is done and has no handles disappears; a zombie
+/// must remain visible to `PROC_WAIT_EX` by pid even when the parent closed its process handle
+/// (and after its parent exits and it is reparented to init).
+static ZOMBIES: Mutex<Vec<Arc<Process>>> = Mutex::new(Vec::new());
 
 /// Process lifecycle state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -162,6 +168,34 @@ impl ProcessIds {
     }
 }
 
+/// Maximum command-name bytes stored in a process record.
+pub const MAX_COMMAND: usize = 256;
+
+/// Truncate a command name to [`MAX_COMMAND`] bytes without splitting UTF-8.
+#[must_use]
+pub fn truncate_command(text: &str) -> String {
+    let mut end = 0usize;
+    for (index, character) in text.char_indices() {
+        let next = index.saturating_add(character.len_utf8());
+        if next > MAX_COMMAND {
+            break;
+        }
+        end = next;
+    }
+    String::from(&text[..end])
+}
+
+/// Pick the command name from `argv[0]`, falling back to the image path.
+#[must_use]
+pub fn command_from_argv(argv: &[alloc::vec::Vec<u8>], path: &[u8]) -> String {
+    let bytes = argv.first().map_or(path, alloc::vec::Vec::as_slice);
+    let text = core::str::from_utf8(bytes)
+        .ok()
+        .or_else(|| core::str::from_utf8(path).ok())
+        .unwrap_or("?");
+    truncate_command(text)
+}
+
 /// A process.
 pub struct Process {
     /// Process id (PID 1 for the first process).
@@ -170,6 +204,8 @@ pub struct Process {
     pub ids: Mutex<ProcessIds>,
     /// Path used to start the process.
     pub path: String,
+    /// Command name shown to `ps` (argv[0], replaced by exec and copied by fork).
+    pub command: Mutex<String>,
     /// POSIX nice value (`-20..19`); inherited by `PROC_FORK` and preserved by exec.
     pub nice: AtomicI32,
     /// Controlling terminal acquired by this process, if any.
@@ -353,6 +389,7 @@ pub fn new_kernel_process() -> Result<Arc<Process>, Errno> {
         id: 0,
         ids: Mutex::new(ProcessIds::kernel()),
         path: String::from("/kernel"),
+        command: Mutex::new(String::from("/kernel")),
         nice: AtomicI32::new(0),
         ctty: Mutex::new(None),
         address_space: Mutex::new(None),
@@ -409,6 +446,7 @@ pub fn new_empty_process() -> Result<Arc<Process>, Errno> {
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
         path: String::from("child"),
+        command: Mutex::new(String::from("child")),
         nice: AtomicI32::new(0),
         ctty: Mutex::new(None),
         address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
@@ -464,6 +502,7 @@ pub fn new_forked_process(source: &Arc<Process>) -> Result<Arc<Process>, Errno> 
         id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
         ids: Mutex::new(ids),
         path: source.path.clone(),
+        command: Mutex::new(source.command.lock().clone()),
         nice: AtomicI32::new(source.nice()),
         ctty: Mutex::new(source.ctty.lock().clone()),
         address_space: Mutex::new(Some(UserAddressSpace::new(address_space))),
@@ -650,6 +689,29 @@ impl Process {
     }
 }
 
+/// Reparent every live child of `parent` to PID 1 (init).
+///
+/// Called once from the dying parent's exit path; the child keeps its own pid, group and
+/// session, but its next `PROC_WAIT_EX` notification goes to init. A dying PID 1 does not
+/// reparent (the system is ending).
+pub fn reparent_children(parent: &Process) -> usize {
+    if parent.id == 1 {
+        return 0;
+    }
+    let mut count = 0usize;
+    for child in processes() {
+        if child.id == parent.id {
+            continue;
+        }
+        let mut ids = child.ids.lock();
+        if ids.ppid == parent.id {
+            ids.ppid = 1;
+            count = count.saturating_add(1);
+        }
+    }
+    count
+}
+
 /// Wake a parent waiting for a child event and optionally queue `SIGCHLD`.
 ///
 /// The caller must not hold `process.state`; exit accounting reads the child's
@@ -679,6 +741,7 @@ pub fn reap_pid(process: &Process) -> Result<(), Errno> {
     if process.reaped.swap(true, Ordering::AcqRel) {
         return Err(Errno::ECHILD);
     }
+    ZOMBIES.lock().retain(|zombie| zombie.id != process.id);
     unregister_pid(process.id);
     Ok(())
 }
@@ -732,6 +795,7 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
         id,
         ids: Mutex::new(ids),
         path: String::from(path),
+        command: Mutex::new(String::from(path)),
         nice: AtomicI32::new(0),
         ctty: Mutex::new(None),
         address_space: Mutex::new(Some(user_address_space)),
@@ -1366,11 +1430,15 @@ fn terminate_once(process: &Arc<Process>, code: i32, own_context: bool) -> bool 
     if *state == ProcessState::Exited {
         return false;
     }
+    // Publish the strong zombie reference before `Exited` becomes visible, so a wait that sees
+    // the state can always find the status even if the parent already closed its handle.
+    ZOMBIES.lock().push(Arc::clone(process));
     *state = ProcessState::Exited;
     process.exit_code.store(code, Ordering::Release);
     process.exiting.store(true, Ordering::Release);
     process.stop_signal.store(0, Ordering::Release);
     process.continued.store(false, Ordering::Release);
+    reparent_children(process);
     robust::walk_process(process);
     crate::syscall::futex::remove_process(process.id);
     let _ = process.waiters.wake_all();
@@ -1516,3 +1584,7 @@ const _: () = {
     assert!(PAGE == 4096);
     assert!(USER_STACK_SIZE == 256 * 1024);
 };
+
+#[cfg(test)]
+#[path = "mod_ut.rs"]
+mod tests;
