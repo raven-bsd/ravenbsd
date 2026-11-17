@@ -311,9 +311,9 @@ erand48 F - all 1 stdlib.h
 erf F - all 1 -
 erfc F - all 1 -
 erfcf F - all 1 -
-erfcl F - x86_64 1 -
+erfcl F - x86_64,aarch64 1 -
 erff F - all 1 -
-erfl F - x86_64 1 -
+erfl F - x86_64,aarch64 1 -
 error F - all 1 error.h
 error_at_line F - all 2 error.h
 error_message_count D 4 all 2 error.h
@@ -519,7 +519,7 @@ fwscanf F - all 0 wchar.h
 gai_strerror F - all 1 -
 gamma F - all 1 -
 gammaf F - all 1 -
-gammal F - x86_64 1 math.h
+gammal F - x86_64,aarch64 1 math.h
 get_avphys_pages F - all 2 sys/sysinfo.h
 get_nprocs F - all 1 sys/sysinfo.h
 get_nprocs_conf F - all 1 sys/sysinfo.h
@@ -783,8 +783,8 @@ lgamma F - all 1 -
 lgamma_r F - all 1 -
 lgammaf F - all 1 -
 lgammaf_r F - all 1 -
-lgammal F - x86_64 1 -
-lgammal_r F - x86_64 1 -
+lgammal F - x86_64,aarch64 1 -
+lgammal_r F - x86_64,aarch64 1 -
 link F - all 0 unistd.h
 linkat F - all 0 unistd.h
 lio_listio F - all 0 aio.h
@@ -1512,7 +1512,7 @@ textdomain F - all 0 libintl.h
 tfind F - all 1 search.h
 tgamma F - all 0 math.h
 tgammaf F - all 0 math.h
-tgammal F - x86_64 0 math.h
+tgammal F - x86_64,aarch64 0 math.h
 thr_continue F - all 2 -
 thr_create F - all 1 -
 thr_exit F - all 1 -
