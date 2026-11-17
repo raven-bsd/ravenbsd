@@ -4,8 +4,9 @@
 # Pi 4 release image and serial gate (REL3)
 
 Status: host image and transcript checker OBSERVED. No Pi 4 board transcript exists; every board
-gate below is UNVERIFIED. The release session uses `/bin/rsh`; `/bin/login` and getty provide the
-login prompt. brush is staged but cannot spawn a session yet.
+gate below is UNVERIFIED. The REL3d refresh rebuilt and checked the image on master `d97f7c1a`
+(section 2.2). The release session uses `/bin/rsh`; `/bin/login` and getty provide the login
+prompt. brush is staged but cannot spawn a session yet.
 
 ## 1. Profile
 
@@ -56,6 +57,25 @@ scripts/pi4-release.sh --repro
 The repro check removes `build/fixtures`, rebuilds the Pi 4 DTB fixture, builds the release image
 twice, compares both SHA-256 values and runs the full `--check` on both. It writes only under
 `build/`. A mismatch or a failed check exits nonzero and prints the logs.
+
+## 2.2 Release refresh (REL3d, 2026-11-18)
+
+On master `d97f7c1a` the host path was rebuilt and checked end to end against the current
+aarch64 dynamic userland:
+
+* `cargo xtask image --arch aarch64 --platform pi4 --profile pi4-release` — exit 0;
+  `build/aarch64/ravenbsd-pi4.img` is 335544320 bytes, SHA-256
+  `0a3e917d45e80d38c2c2e842639bca77a38a6457c86bfd4b03a254d7cf8c64d4`.
+* `scripts/pi4-release.sh --check` — exit 0, `pi4-manifest: PASSED`; every release initfs
+  path is present and `/etc/pi4.dtb` matches the validated FDT (totalsize 371, CRC-32
+  `4047538b`).
+* The staged dynamic `/bin` has 10 aarch64 `ET_DYN` binaries with `DT_NEEDED libc.so.1` and
+  no `DT_TEXTREL`/`DF_TEXTREL` entry; `/bin/rsh` is PIE (`FLAGS_1: PIE`).
+* `cargo xtask qtest --case dynamic-userland --arch aarch64` — exit 0 on QEMU virt.
+
+This is not a board result and not a literal `raspi4b` disk boot: this host's QEMU has no
+`raspi4b` machine and the USB-TTL adapter is still missing. Board serial, the GENET
+link/DHCP lease and the gateway ping remain UNVERIFIED.
 
 ## 3. Flash and capture
 
