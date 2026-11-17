@@ -1965,6 +1965,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-logger"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-ls"
 version = "0.1.0"
 dependencies = [
@@ -1991,6 +2000,14 @@ dependencies = [
 [[package]]
 name = "raven-mem"
 version = "0.1.0"
+
+[[package]]
+name = "raven-mesg"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
 
 [[package]]
 name = "raven-mixer"
@@ -2457,6 +2474,14 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
+]
+
+[[package]]
+name = "raven-renice"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
 ]
 
 [[package]]
