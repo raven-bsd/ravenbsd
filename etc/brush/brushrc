@@ -5,10 +5,10 @@
 # `--rcfile /etc/brush/brushrc`; non-interactive `brush -c` does not load it.
 
 if [ -n "${NO_COLOR:-}" ] || [ "${TERM:-}" = "dumb" ]; then
-    PS1='root@raven:\w\$ '
+    PS1='\u@\h:\w\$ '
 else
     # Raven Violet: accent #b388ff (xterm 183), path #f8f8f2 (231).
-    PS1='\[\e[38;5;183m\]root@raven\[\e[0m\]:\[\e[38;5;231m\]\w\[\e[0m\]\[\e[38;5;183m\]\$\[\e[0m\] '
+    PS1='\[\e[38;5;183m\]\u@\h\[\e[0m\]:\[\e[38;5;231m\]\w\[\e[0m\]\[\e[38;5;183m\]\$\[\e[0m\] '
 fi
 
 # A writable, image-local history store; the initfs itself is read-only.
