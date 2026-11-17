@@ -6,8 +6,8 @@
 Evaluated by `libc-gate` on 2026-11-17 from the C74h tree (origin/master `beedfbbd`). C74h ran
 `libc-gate eval` and refreshed every row; C74g had already made `libc-dynamic` pass. Every status
 below has an evidence file under `build/libc-gate/`; the table is
-`cargo run -q -p libc-gate -- table`. C74z-S11 re-evaluated row 3.1 on `72c630bd` and wrote
-`build/libc-gate-c74z-s11/3.1.txt`; the row below uses that evidence. The remaining NOT MET rows
+`cargo run -q -p libc-gate -- table`. C74z-S12 re-evaluated row 3.1 on `d97f7c1a` and wrote
+`build/libc-gate-c74z-s12/3.1.txt`; the row below uses that evidence. The remaining NOT MET rows
 are P1b/P1c work, lint fixes, missing donor data, a size-budget lane, a fuzz soak, and unavailable
 host tooling, and are listed with their owning lane.
 
@@ -26,7 +26,7 @@ host tooling, and are listed with their owning lane.
 | 1 correctness | 1.7 lints (C16) | NOT MET | build/libc-gate/1.7.txt | 17 violations: 3 in `ld/src/raw/exports.rs` (C74g SAFETY comments), 14 pre-existing |
 | 2 portability | 2.1 world check | BLOCKED | build/libc-gate/2.1.txt | missing tools/libc-world/Cargo.toml; C72 outputs are not in origin/master and H-11 tarballs are absent |
 | 2 portability | 2.2 world build gate (C13) | BLOCKED | build/libc-gate/2.2.txt | missing tools/libc-world/Cargo.toml; C72 outputs are not in origin/master and H-11 tarballs are absent |
-| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate-c74z-s11/3.1.txt | exit 1: 17 pass, 48 fail, 69 known, 105 skipped, 0 budget-only; full three-arch rebuild + six B-only/layout rows re-frozen; remaining 44 S/F + 2 INV-S-P2-P0 + 2 boot |
+| 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate-c74z-s12/3.1.txt | exit 1: 17 pass, 48 fail, 69 known, 105 skipped, 0 budget-only; C74z-S12 full rebuild and S/F classification (27 real-growth candidates, 17 shrink/measurement-first); budgets proposed, not applied; 44 S/F + 2 INV-S-P2-P0 + 2 boot remain |
 | 3 size | 3.2 boot path (C15) | INFO | build/libc-gate/3.2.txt | PG-60 absent; 0-1 syscalls and <=250 instructions are not evaluable |
 | 4 hardening | 4.1 fuzz replay | MET | build/libc-gate/4.1.txt | exit 0 |
 | 4 hardening | 4.2 fuzz soak (C10) | NOT MET | build/libc-gate/4.2.txt | inet_text has no soak duration; inet_text has 1 crash(es); inet_text has no executions |
@@ -76,10 +76,11 @@ failures are P1b (`libc-hello` string, `libc-stdio`, `libc-time` sleep/usleep/tz
   follow-up plus the P1e/P1h/P1i lanes.
 * 2.1/2.2 world: BLOCKED. `tools/libc-world/Cargo.toml` and the C72 outputs are absent.
 * 3.1 size: NOT MET. `cargo xtask libc-size --check` exits 1 with `17 pass, 48 fail, 69 known,
-  105 skipped, 0 budget-only`; the full three-arch rebuild removed the missing-artifact rows,
-  C74z-S11 re-froze the six B-only/layout budgets at measured + 3 percent and corrected the
-  aarch64 P2/P3 printf-stub measurement. The remaining 48 are 44 real S/F, 2 `INV-S-P2-P0` and
-  2 boot rows. The full per-row table is in the C74z-S11 report and `tests/libc/size/TRIAGE.md`.
+  105 skipped, 0 budget-only`; C74z-S12 rebuilt on `d97f7c1a` after C47r/K97c and found the same
+  residual. It classified the 44 S/F rows into 27 real-growth budget candidates and 17
+  shrink/measurement-first rows (C74z-S13/S14/S15, S5/S6); no budget is applied. The riscv64
+  P2/P3 rows still link a printf stub and must be re-measured before any budget. The exact table
+  is in the C74z-S12 report and `tests/libc/size/TRIAGE.md`.
 * 4.2 soak: NOT MET. `tests/libc/fuzz/SOAK.md` records `inet_text` crashing before one hour; the
   other 13 targets completed 3600 s with 0 crashes. Owner: test/fuzz lane.
 * 5.1: `libc-dynamic`, `libc-signals`, `libc-spawn` and `libc-threads` pass; `libc-hello`,
@@ -144,12 +145,13 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
   pre-existing).
 * 2.1/2.2: BLOCKED, `tools/libc-world/Cargo.toml`, C72 outputs and H-11 tarballs are absent.
 * 3.1: NOT MET, `libc-size check: 17 pass, 48 fail, 69 known, 105 skipped, 0 budget-only`;
-  C74z-S11 full three-arch rebuild + B-only/layout fix (44 S/F + 2 `INV-S-P2-P0` + 2 boot
-  remain); table in `tests/libc/size/TRIAGE.md`.
+  C74z-S12 classification: 27 real-growth budget candidates, 17 shrink/measurement-first
+  (C74z-S13/S14/S15, S5/S6), no budget applied; 44 S/F + 2 `INV-S-P2-P0` + 2 boot remain;
+  table in `tests/libc/size/TRIAGE.md`.
 * 4.2: NOT MET, the `inet_text` soak has no duration, one crash and no executions.
 * 6.2: BLOCKED, `which mandoc` exits 1.
 
-## 6. C74h evidence refresh (OBSERVED, origin/master `beedfbbd`; 3.1 re-evaluated by C74z-S11 on `72c630bd`)
+## 6. C74h evidence refresh (OBSERVED, origin/master `beedfbbd`; 3.1 re-evaluated by C74z-S12 on `d97f7c1a`)
 
 | Row | Command | Result |
 |---|---|---|
@@ -160,7 +162,7 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 | 1.6 Miri | nightly Miri preflight | exit 1; `cargo-miri` not installed for nightly → BLOCKED |
 | 1.7 lints | `cargo xtask libc-lint all` | exit 1; 17 violations (3 C74g SAFETY comments, 14 pre-existing) → NOT MET |
 | 2.1/2.2 world | missing files | `tools/libc-world/Cargo.toml` and C72 outputs absent → BLOCKED |
-| 3.1 size | `cargo xtask libc-size --check` | exit 1; 17 pass, 48 fail, 69 known, 105 skipped, 0 budget-only; C74z-S11 full three-arch rebuild + B-only/layout fix (44 S/F + 2 `INV-S-P2-P0` + 2 boot remain) |
+| 3.1 size | `cargo xtask libc-size --check` | exit 1; 17 pass, 48 fail, 69 known, 105 skipped, 0 budget-only; C74z-S12 classification (27 budget candidates, 17 shrink/measurement-first), no budget applied; 44 S/F + 2 `INV-S-P2-P0` + 2 boot remain |
 | 4.2 soak | `tests/libc/fuzz/SOAK.md` | `inet_text` crashed before 1 h; 13 targets 3600 s/0 crashes → NOT MET |
 | 5.1 target | qtest JSON from `eval` | dynamic, signals, spawn, threads pass; hello, stdio, time fail (P1b) |
 | 5.2 kernel | `qtest core-servers` / `qtest file-tools` | both MET: minimal profiles; `df` reads `/etc/mounts`; `tooltest: ok`, `init exited (0)` |
