@@ -8,10 +8,11 @@
 
 use core::mem::size_of;
 
-use raven_libc_thread::raw::SysKernel;
 use raven_libc_thread::thread::init_main_thread;
 use raven_libc_tls::TlsModuleIn;
 use raven_libc_tls::tcb::{Pthread, tp_to_pthread};
+
+use super::startup_kernel::StartupKernel;
 
 const AT_NULL: usize = 0;
 const AT_PHDR: usize = 3;
@@ -122,7 +123,7 @@ pub unsafe extern "C" fn __raven_init_main_thread(auxv: *const usize, canary: us
         _ => None,
     };
     let modules = module.into_iter().collect::<heapless_vec::Vec1>();
-    let kernel = SysKernel::new();
+    let kernel = StartupKernel::new();
     let Ok(tp) = init_main_thread(&kernel, modules.as_slice(), 0, 0) else {
         return;
     };

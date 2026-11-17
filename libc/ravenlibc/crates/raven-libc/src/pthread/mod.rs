@@ -261,3 +261,5 @@ mod sem_trywait;
 mod sem_unlink;
 #[path = "sem_wait.rs"]
 mod sem_wait;
+#[path = "startup_kernel.rs"]
+mod startup_kernel;
