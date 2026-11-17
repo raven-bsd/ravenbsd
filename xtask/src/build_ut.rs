@@ -159,6 +159,34 @@ fn x86_64_dynamic_user_rustflags_keep_the_small_model() {
 }
 
 #[test]
+fn dynamic_user_rustflags_pull_the_float_plugin() {
+    for arch in [Arch::X86_64, Arch::Aarch64] {
+        let flags = rustflags_for(Component::User, arch, Path::new("/r"), None, true);
+        assert!(
+            flags.windows(2).any(|pair| pair == ["-C", "link-arg=-u"]),
+            "{arch:?} dynamic flags do not force a symbol"
+        );
+        assert!(
+            flags
+                .iter()
+                .any(|flag| flag == "link-arg=__rl_fmt_float_impl"),
+            "{arch:?} dynamic flags do not name the float plug-in"
+        );
+    }
+}
+
+#[test]
+fn static_user_rustflags_leave_the_float_plugin_lazy() {
+    let flags = rustflags_for(Component::User, Arch::X86_64, Path::new("/r"), None, false);
+    assert!(
+        !flags
+            .iter()
+            .any(|flag| flag.contains("__rl_fmt_float_impl")),
+        "a static raven-rt program must not force the libc float plug-in"
+    );
+}
+
+#[test]
 fn loader_rustflags_only_remap() {
     let flags = rustflags_for(
         Component::Loader,
