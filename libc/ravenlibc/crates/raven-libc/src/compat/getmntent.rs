@@ -7,7 +7,7 @@
 
 use core::ffi::{c_char, c_int};
 
-use super::mntent_state::{CMntEnt, LINE, store};
+use super::mntent_state::{CMntEnt, SCRATCH, store};
 use raven_libc_compat::mntent::parse_line;
 
 /// `getmntent`.
@@ -16,8 +16,8 @@ pub unsafe extern "C" fn getmntent(file: *mut super::File) -> *mut CMntEnt {
     if file.is_null() {
         return core::ptr::null_mut();
     }
-    // SAFETY: `LINE` is a private static buffer.
-    let buffer = unsafe { &mut *(&raw mut LINE) };
+    // SAFETY: `SCRATCH` is a private static buffer.
+    let buffer = unsafe { &mut *(&raw mut SCRATCH) };
     let mut index = 0usize;
     loop {
         // SAFETY: `file` is open and the buffer writable.

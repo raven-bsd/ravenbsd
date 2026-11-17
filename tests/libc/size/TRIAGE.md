@@ -8,6 +8,33 @@ corrects the objective budget-data errors (x86_64 P9 budgets, aarch64/riscv64 B 
 records the shrink plan. **3.1 remains NOT MET**: 7 pass / 56 fail / 69 known / 105 skipped / 0
 budget-only. No libc body, S/F budget or boot budget is changed.
 
+## C74zb shrink result (OBSERVED, 2026-11-17)
+
+C74zb collapses the `printf` engine behind one type-erased core and shares the `mntent` line and
+arena buffers. Budgets are untouched. Measured with `cargo xtask libc-size --check` on
+`origin/master` `e1f252e5` plus C74zb:
+
+| Cluster | Probe | Before | After | Delta |
+|---|---|---|---|---|
+| `vformat` monomorphizations | P9 x86_64 tiny (sum of the five `vformat` symbols) | 23,246 | 9,818 (`vformat_dyn::<u8>` 4,964 + `::<u32>` 4,854) | -13,428 |
+| `vformat` + `emit_common`/`float_layout`/`str` instantiations | P9 x86_64 tiny S | 1,206,381 | 1,151,149 | -55,232 |
+| same | P9 x86_64 server S | 1,341,423 | 1,270,815 | -70,608 |
+| same | P9 aarch64 tiny/server S | 1,365,588 / 1,414,024 | 1,324,940 / 1,351,496 | -40,648 / -62,528 |
+| same | P9 riscv64 tiny/server S | 893,350 / 963,506 | 856,286 / 911,070 | -37,064 / -52,436 |
+| compat scratch | P9 x86_64 tiny / server B | 67,600 / 67,840 | 61,384 / 60,632 | -6,216 / -7,208 |
+| dtoa | P9 x86_64 tiny `dtoa`/`strtodg`/`strtod` | 8,418 / 10,285 / 7,674 | unchanged | 0 |
+
+No duplicated dtoa instantiation or table was found: `dtoa`, `strtodg` and `strtod` are three
+distinct donor algorithms (fast double generator, generic parser, dedicated double parser), not
+duplicated instantiations, so C74zb leaves them byte-identical.
+
+The `printf` core is now instantiated once per character unit (`vformat_dyn::<u8>`,
+`::<u32>`) instead of once per sink/env/float combination. Probes that previously linked one
+instantiation (P2/P3) pay the indirect-call cost: P2/P3 tiny S +1,960 B, P2 server S +200 B.
+P3 x86_64 server flips to a B-only row because `.relro_padding` grows from 0xb8 to 0xff8; the
+real `.bss` section is 11,424 B before and after, so this is layout padding, not RAM. The gate
+count changes 63 fail -> 64 fail for that reason while S/F drop by 37-70 KiB on every P9 row.
+
 ## Measurement definition
 
 `S` is the Berkeley `text + data` of the stripped probe; `B` is the Berkeley **bss** field of
