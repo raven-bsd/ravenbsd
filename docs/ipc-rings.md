@@ -64,3 +64,14 @@ cancelled bit, so the queue stays FIFO and the counters stay consistent.
 * An interleaved reference model: every operation sequence up to depth 6 over a capacity-2 ring is
   replayed against a `VecDeque` reference and the observable state must agree.
 * A million-operation fill/drain model proving order and wrap (slots reused ~1000 times).
+* A deterministic randomized model (seeded xorshift, 1,000,000 operations over submit/submit_batch/
+  complete/cancel/poison) replayed against a `VecDeque` reference. It exercises wrap, full/empty,
+  batch, cancellation, poison and descriptor exhaustion, and proves no descriptor is lost or
+  duplicated: `accepted == completed` and `cancelled <= accepted` at the end.
+
+## 7. No allocation in the fast path
+
+`Ring` holds only a caller-provided `&[AtomicU64]`, the `head`/`tail` `AtomicU64` counters, a
+poison `AtomicBool` and a `rejected` counter — no `Vec`, `Box` or other alloc type. `submit`,
+`complete`, `cancel`, `batch` and `poison` touch only these atomics and slice indices, so the fast
+path never allocates; the caller allocates the storage once at construction.
