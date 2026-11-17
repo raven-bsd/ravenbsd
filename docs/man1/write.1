@@ -1,0 +1,33 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt WRITE 1
+.Os RavenBSD
+.Sh NAME
+.Nm write
+.Nd send a message to another user's terminal
+.Sh SYNOPSIS
+.Nm
+.Ar user
+.Op Ar tty
+.Sh DESCRIPTION
+The
+.Nm
+utility sends the text read from the terminal to another user. It checks that
+the user exists, has a logged-in terminal and has not disabled messages with
+.Ql mesg n .
+Lines are sent with terminal CRLF endings.
+.Pp
+The target image has one console terminal; the host tests exercise the
+unknown-user, not-logged-in and
+.Ql mesg n
+refusal paths through the directory/terminal seams.
+.Sh EXIT STATUS
+.Ex -std
+An unknown user, no logged-in terminal, disabled messages or a write failure
+exits with status 1; a usage error exits with status 2.
+.Sh SEE ALSO
+.Xr more 1 ,
+.Xr who 1
+.Sh STANDARDS
+RavenBSD implements the documented POSIX write subset.
