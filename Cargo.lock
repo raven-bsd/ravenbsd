@@ -1972,6 +1972,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-libc-spawn-test"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-abi",
+ "raven-libc-personality-linux",
+ "raven-libc-platform",
+]
+
+[[package]]
 name = "raven-libc-ssp"
 version = "0.1.0"
 dependencies = [

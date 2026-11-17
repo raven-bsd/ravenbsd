@@ -109,6 +109,7 @@ members = [
     "tests/libc/headers",
     "tests/libc/atf",
     "tests/libc/gate",
+    "tests/libc/spawn",
     "tests/libc/toolchain-abi",
     "tests/user",
     "tests/user/image",
