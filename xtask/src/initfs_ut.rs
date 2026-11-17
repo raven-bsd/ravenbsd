@@ -165,7 +165,7 @@ fn a_partial_libc_pack_reports_only_the_missing_output() {
 }
 
 #[test]
-fn dynamic_stage_files_are_x86_64_only_and_ordered() {
+fn dynamic_stage_files_cover_x86_64_and_aarch64() {
     assert_eq!(
         dynamic_stage_files(Arch::X86_64, true),
         [
@@ -176,8 +176,19 @@ fn dynamic_stage_files_are_x86_64_only_and_ordered() {
             ),
         ]
     );
+    assert_eq!(
+        dynamic_stage_files(Arch::Aarch64, true),
+        [
+            ("/lib/libc.so.1", "build/aarch64/libc.so.1".to_string()),
+            (
+                "/libexec/ld-elf.so.1",
+                "build/aarch64/ld-elf.so.1".to_string()
+            ),
+        ]
+    );
     assert!(dynamic_stage_files(Arch::X86_64, false).is_empty());
-    assert!(dynamic_stage_files(Arch::Aarch64, true).is_empty());
+    assert!(dynamic_stage_files(Arch::Aarch64, false).is_empty());
+    assert!(dynamic_stage_files(Arch::Riscv64, true).is_empty());
 }
 
 #[test]
@@ -197,7 +208,18 @@ fn a_dynamic_profile_requires_the_loader_and_libc_prerequisites() {
         ]
     );
     let aarch64 = prerequisite_plan(&profile, Arch::Aarch64, |_| false);
-    assert!(!aarch64.libc.iter().any(|path| path.ends_with(".so.1")));
+    assert!(
+        aarch64
+            .libc
+            .contains(&"build/aarch64/libc.so.1".to_string())
+    );
+    assert!(
+        aarch64
+            .libc
+            .contains(&"build/aarch64/ld-elf.so.1".to_string())
+    );
+    let riscv = prerequisite_plan(&profile, Arch::Riscv64, |_| false);
+    assert!(!riscv.libc.iter().any(|path| path.ends_with(".so.1")));
 }
 
 #[test]

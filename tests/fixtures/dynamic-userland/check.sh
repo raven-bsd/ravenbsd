@@ -14,7 +14,28 @@ root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 cd "$root"
 
 arch=x86_64
-profile=shell-test
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --arch)
+            arch=${2:?--arch needs a value}
+            shift 2
+            ;;
+        *)
+            echo "dynamic-userland: unknown argument: $1" >&2
+            exit 2
+            ;;
+    esac
+done
+
+case "$arch" in
+    x86_64) profile=shell-test ;;
+    aarch64) profile=pi4-release ;;
+    *)
+        echo "dynamic-userland: unsupported arch: $arch" >&2
+        exit 2
+        ;;
+esac
+
 out="build/$arch"
 
 cargo xtask initfs --arch "$arch" --profile "$profile" >/dev/null
