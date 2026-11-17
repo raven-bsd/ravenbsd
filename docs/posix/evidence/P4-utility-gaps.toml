@@ -1,0 +1,194 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4f utility requirement audit: POSIX.1-2024 removed or optional rows.
+# Required rows (localedef, lp, newgrp, time, times, tput, ulimit) are left
+# missing in the profile; this file only records the defensible waivers.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.c99"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 (Issue 8) replaces c99 with c17 and omits c99 from the utility list. Removed; waived."
+
+[[row]]
+id = "util.cod"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 omits cod from the Issue 8 utility list. Removed; waived."
+
+[[row]]
+id = "util.fort77"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 omits fort77 from the Issue 8 utility list (FORTRAN dropped). Removed; waived."
+
+[[row]]
+id = "util.neqn"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 omits neqn from the Issue 8 utility list. Removed; waived."
+
+[[row]]
+id = "util.qalter"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 omits the Batch Environment Services qalter utility from the Issue 8 list. Removed; waived."
+
+[[row]]
+id = "util.qdel"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 omits the Batch Environment Services qdel utility from the Issue 8 list. Removed; waived."
+
+[[row]]
+id = "util.qhold"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 omits the Batch Environment Services qhold utility from the Issue 8 list. Removed; waived."
+
+[[row]]
+id = "util.qmove"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 omits the Batch Environment Services qmove utility from the Issue 8 list. Removed; waived."
+
+[[row]]
+id = "util.qmsg"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 omits the Batch Environment Services qmsg utility from the Issue 8 list. Removed; waived."
+
+[[row]]
+id = "util.qrerun"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 omits the Batch Environment Services qrerun utility from the Issue 8 list. Removed; waived."
+
+[[row]]
+id = "util.qrls"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 omits the Batch Environment Services qrls utility from the Issue 8 list. Removed; waived."
+
+[[row]]
+id = "util.qselect"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 omits the Batch Environment Services qselect utility from the Issue 8 list. Removed; waived."
+
+[[row]]
+id = "util.qsig"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 omits the Batch Environment Services qsig utility from the Issue 8 list. Removed; waived."
+
+[[row]]
+id = "util.qstat"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 omits the Batch Environment Services qstat utility from the Issue 8 list. Removed; waived."
+
+[[row]]
+id = "util.qsub"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 omits the Batch Environment Services qsub utility from the Issue 8 list. Removed; waived."
+
+[[row]]
+id = "util.admin"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 lists admin only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived."
+
+[[row]]
+id = "util.delta"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 lists delta only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived."
+
+[[row]]
+id = "util.get"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 lists get only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived."
+
+[[row]]
+id = "util.prs"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 lists prs only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived."
+
+[[row]]
+id = "util.rmdel"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 lists rmdel only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived."
+
+[[row]]
+id = "util.sact"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 lists sact only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived."
+
+[[row]]
+id = "util.sccs"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 lists sccs only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived."
+
+[[row]]
+id = "util.unget"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 lists unget only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived."
+
+[[row]]
+id = "util.val"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 lists val only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived."
+
+[[row]]
+id = "util.what"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 lists what only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived."
+
+[[row]]
+id = "util.c17"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 lists c17 only under the optional C-Language Development Utilities option ([ CD ]). RavenBSD has no C compiler; waived."
+
+[[row]]
+id = "util.ex"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 lists ex only under the optional User Portability Utilities option ([ UP ]). Not supported; waived."
+
+[[row]]
+id = "util.vi"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 lists vi only under the optional User Portability Utilities option ([ UP ]). Not supported; waived."
+
+[[row]]
+id = "util.ipcrm"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 lists ipcrm only under the optional XSI option ([ XSI ]). Not supported; waived."
+
+[[row]]
+id = "util.ipcs"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 lists ipcs only under the optional XSI option ([ XSI ]). Not supported; waived."
+
+[[row]]
+id = "util.tabs"
+status = "waived"
+evidence = "none"
+notes = "P4f: POSIX.1-2024 lists tabs under the optional XSI option ([ XSI ]); it was removed from the User Portability Utilities option in Issue 7. Not supported; waived."
