@@ -90,6 +90,10 @@ pub(crate) mod math;
 pub(crate) mod netdb;
 #[cfg(target_os = "none")]
 pub(crate) mod panic;
+// P1c's ABI-ready exports. The host build compiles the module for its unit tests too; the
+// `no_mangle` attribute is target-only.
+#[cfg(any(target_os = "none", test))]
+pub(crate) mod p1c_exports;
 #[cfg(target_os = "none")]
 pub(crate) mod personality_bsd;
 #[cfg(target_os = "none")]

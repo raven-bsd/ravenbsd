@@ -1,7 +1,7 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1661
+# records: 1645
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
 _Unwind_Backtrace F - all 2 -
@@ -53,20 +53,6 @@ acoshl F - all 1 -
 acosl F - all 1 -
 acospi F - all 0 -
 addmntent F - x86_64 2 mntent.h
-aio_cancel F - all 0 aio.h
-aio_cancel64 F - all 0 aio.h
-aio_error F - all 0 aio.h
-aio_error64 F - all 0 aio.h
-aio_fsync F - all 0 aio.h
-aio_fsync64 F - all 0 aio.h
-aio_read F - all 0 aio.h
-aio_read64 F - all 0 aio.h
-aio_return F - all 0 aio.h
-aio_return64 F - all 0 aio.h
-aio_suspend F - all 0 aio.h
-aio_suspend64 F - all 0 aio.h
-aio_write F - all 0 aio.h
-aio_write64 F - all 0 aio.h
 aligned_alloc F - all 1 stdlib.h
 alphasort F - all 1 dirent.h
 arc4random_buf F - all 1 stdlib.h
@@ -104,6 +90,7 @@ bcopy F - all 1 string.h
 bind F - all 1 sys/socket.h
 bind_textdomain_codeset F - all 0 libintl.h
 bindtextdomain F - all 0 libintl.h
+brk F - all 1 unistd.h
 bsearch F - all 0 stdlib.h
 btowc F - all 0 wchar.h
 bzero F - all 1 string.h
@@ -156,12 +143,7 @@ ceill F - all 1 -
 cexp F - all 0 -
 cexpf F - all 1 -
 cexpl F - all 1 -
-cfgetispeed F - all 0 termios.h
-cfgetospeed F - all 0 termios.h
 cfmakeraw F - all 1 termios.h
-cfsetispeed F - all 0 termios.h
-cfsetospeed F - all 0 termios.h
-cfsetspeed F - all 1 termios.h
 cgetcap F - x86_64 2 -
 cgetclose F - x86_64 2 -
 cgetent F - x86_64 2 -
@@ -282,7 +264,9 @@ drem F - all 1 -
 dremf F - all 1 -
 dup F - all 0 unistd.h
 dup2 F - all 0 unistd.h
+dup3 F - all 0 unistd.h
 duplocale F - all 1 -
+eaccess F - all 3 -
 ecvt_r F - all 2 stdlib.h
 elf_aux_info F - all 2 -
 endgrent F - all 1 grp.h
@@ -315,6 +299,7 @@ error_at_line F - all 2 error.h
 error_message_count D 4 all 2 error.h
 error_one_per_line D 4 all 2 error.h
 error_print_progname F - all 3 -
+euidaccess F - all 3 -
 eventfd F - all 1 -
 eventfd_read F - all 1 -
 eventfd_write F - all 1 -
@@ -347,14 +332,15 @@ expm1l F - all 1 -
 fabs F - all 1 -
 fabsf F - all 1 -
 fabsl F - all 1 -
-fattach F - all 1 -
+faccessat F - all 0 unistd.h
+fchdir F - all 0 unistd.h
 fchmod F - all 0 sys/stat.h
 fchmodat F - all 0 -
 fchownat F - all 0 -
 fclose F - all 0 stdio.h
 fcntl F - all 0 fcntl.h
 fcvt_r F - all 2 stdlib.h
-fdetach F - all 1 -
+fdatasync F - all 0 unistd.h
 fdim F - all 1 -
 fdimf F - all 1 -
 fdiml F - all 1 -
@@ -448,6 +434,7 @@ fopen64 F - all 0 stdio.h
 fork F - all 0 unistd.h
 forkpty F - x86_64 1 pty.h
 fparseln F - x86_64 2 -
+fpathconf F - all 0 unistd.h
 fpclassify F - all 0 math.h
 fprintf F - all 0 stdio.h
 fputc F - all 0 stdio.h
@@ -483,12 +470,13 @@ fstat F - all 0 sys/stat.h
 fstat64 F - all 0 sys/stat.h
 fstatat F - all 0 sys/stat.h
 fstatfs F - all 1 -
+fstatvfs F - all 0 -
 fsync F - all 0 unistd.h
 ftell F - all 0 stdio.h
 ftello F - all 0 stdio.h
 ftello64 F - all 0 stdio.h
-ftok F - all 0 -
 ftruncate F - all 0 unistd.h
+ftruncate64 F - all 0 unistd.h
 ftrylockfile F - all 0 stdio.h
 fts_children F - all 1 -
 fts_close F - all 1 -
@@ -525,7 +513,9 @@ getcontext F - all 1 ucontext.h
 getcwd F - all 0 unistd.h
 getdate F - all 0 time.h
 getdelim F - all 0 stdio.h
+getdents F - all 1 -
 getegid F - all 0 unistd.h
+getentropy F - all 1 sys/random.h
 getenv F - all 0 stdlib.h
 getenv_r F - all 2 -
 geteuid F - all 0 unistd.h
@@ -556,7 +546,6 @@ getmntent F - x86_64 1 mntent.h
 getmntent_r F - x86_64 2 mntent.h
 getmntinfo F - all 2 -
 getmode F - x86_64 2 -
-getmsg F - all 1 -
 getnameinfo F - all 1 -
 getnetbyaddr F - all 1 netdb.h
 getnetbyname F - all 1 netdb.h
@@ -564,13 +553,13 @@ getnetent F - all 1 netdb.h
 getopt F - all 0 unistd.h
 getopt_long F - all 1 getopt.h
 getopt_long_only F - all 1 getopt.h
+getpagesize F - all 1 unistd.h
 getpayload F - all 3 -
 getpayloadf F - all 3 -
 getpeername F - all 1 sys/socket.h
 getpgid F - all 0 unistd.h
 getpgrp F - all 0 unistd.h
 getpid F - all 0 unistd.h
-getpmsg F - all 1 -
 getppid F - all 0 unistd.h
 getpriority F - all 1 sys/resource.h
 getprogname F - all 1 -
@@ -588,6 +577,7 @@ getpwuid_r F - all 1 pwd.h
 getresgid F - all 1 -
 getresuid F - all 1 -
 getrlimit F - all 1 sys/resource.h
+getrlimit64 F - all 0 sys/resource.h
 getrusage F - all 1 sys/resource.h
 gets F - all 0 stdio.h
 getservbyname F - all 1 netdb.h
@@ -677,7 +667,6 @@ isalnum_l F - all 1 -
 isalpha F - all 0 ctype.h
 isalpha_l F - all 1 -
 isascii F - all 1 ctype.h
-isastream F - all 1 -
 isatty F - all 0 unistd.h
 isblank F - all 0 ctype.h
 isblank_l F - all 1 -
@@ -756,6 +745,7 @@ kqueue F - all 2 -
 kqueue1 F - all 2 -
 l64a F - all 1 stdlib.h
 labs F - all 1 -
+lchmod F - all 1 -
 lckpwdf F - all 1 -
 lcong48 F - all 1 stdlib.h
 ldexp F - all 1 -
@@ -771,8 +761,6 @@ lgammal F - all 1 -
 lgammal_r F - all 1 -
 link F - all 0 unistd.h
 linkat F - all 0 unistd.h
-lio_listio F - all 0 aio.h
-lio_listio64 F - all 0 aio.h
 listen F - all 1 sys/socket.h
 llabs F - all 1 -
 lldiv F - all 0 stdlib.h
@@ -787,6 +775,7 @@ llroundl F - all 1 -
 localeconv F - all 0 locale.h
 localtime F - all 0 time.h
 localtime_r F - all 1 time.h
+lockf F - all 0 -
 log F - all 1 -
 log10 F - all 1 -
 log10f F - all 1 -
@@ -821,6 +810,7 @@ lseek64 F - all 0 unistd.h
 lstat F - all 1 sys/stat.h
 lstat64 F - all 0 sys/stat.h
 lutimes F - all 1 sys/time.h
+madvise F - all 0 sys/mman.h
 makecontext F - all 1 ucontext.h
 malloc F - all 0 malloc.h
 malloc_usable_size F - all 1 -
@@ -849,37 +839,30 @@ memset_explicit F - all 0 string.h
 memset_s F - all 1 -
 mergesort F - all 2 -
 mkdir F - all 0 sys/stat.h
+mkdirat F - all 0 sys/stat.h
 mkfifo F - all 0 sys/stat.h
 mknod F - all 0 sys/stat.h
 mkstemp F - all 0 stdlib.h
 mktime F - all 0 time.h
+mlock F - all 0 sys/mman.h
+mlock2 F - all 2 sys/mman.h
+mlockall F - all 0 sys/mman.h
 mmap F - all 0 sys/mman.h
 mmap64 F - all 1 sys/mman.h
 modf F - all 1 -
 modff F - all 1 -
 modfl F - all 1 -
 mprotect F - all 0 sys/mman.h
-mq_close F - all 0 -
-mq_getattr F - all 0 -
-mq_notify F - all 0 -
-mq_open F - all 0 -
-mq_receive F - all 0 -
-mq_send F - all 0 -
-mq_setattr F - all 0 -
-mq_timedreceive F - all 0 -
-mq_timedsend F - all 0 -
-mq_unlink F - all 0 -
 mrand48 F - all 1 stdlib.h
-msgctl F - all 0 -
-msgget F - all 0 -
-msgrcv F - all 0 -
-msgsnd F - all 0 -
+msync F - all 0 sys/mman.h
 mtx_destroy F - all 0 threads.h
 mtx_init F - all 0 threads.h
 mtx_lock F - all 0 threads.h
 mtx_timedlock F - all 0 threads.h
 mtx_trylock F - all 0 threads.h
 mtx_unlock F - all 0 threads.h
+munlock F - all 0 sys/mman.h
+munlockall F - all 0 sys/mman.h
 munmap F - all 0 sys/mman.h
 mutex_destroy F - all 1 -
 mutex_init F - all 1 -
@@ -931,10 +914,12 @@ opterr D 4 all 0 unistd.h
 optind D 4 all 0 unistd.h
 optopt D 4 all 0 unistd.h
 optreset F - all 2 -
+pathconf F - all 0 unistd.h
 pclose F - all 0 stdio.h
 perror F - all 0 stdio.h
 personality F - all 2 -
 pidfile F - x86_64 2 -
+pipe F - all 0 unistd.h
 pipe2 F - all 0 -
 pledge F - all 2 -
 poll F - all 1 -
@@ -946,7 +931,11 @@ port_dissociate F - all 2 -
 port_get F - all 2 -
 port_getn F - all 2 -
 port_send F - all 2 -
+posix_close F - all 3 -
+posix_fadvise F - all 0 -
+posix_fallocate F - all 0 -
 posix_getdents F - all 2 -
+posix_madvise F - all 0 -
 posix_memalign F - all 0 stdlib.h
 posix_openpt F - x86_64 0 stdlib.h
 posix_spawn F - all 1 -
@@ -983,15 +972,17 @@ pown F - all 0 -
 pownf F - all 3 -
 powr F - all 0 -
 powrf F - all 3 -
+ppoll F - all 1 -
 prctl F - all 2 -
 pread F - all 0 unistd.h
 pread64 F - all 0 unistd.h
+preadv F - all 1 sys/uio.h
+preadv2 F - all 2 sys/uio.h
 printf F - all 0 stdio.h
 prlimit F - all 2 -
 program_invocation_name D 8 all 2 errno.h
 program_invocation_short_name D 8 all 2 errno.h
-psiginfo F - all 0 -
-psignal F - all 0 signal.h
+pselect F - all 0 -
 pthread_atfork F - all 1 -
 pthread_attr_destroy F - all 1 -
 pthread_attr_getdetachstate F - all 1 -
@@ -1113,8 +1104,6 @@ putchar F - all 0 stdio.h
 putchar_unlocked F - all 0 stdio.h
 putenv F - all 1 stdlib.h
 putgrent F - all 2 -
-putmsg F - all 1 -
-putpmsg F - all 1 -
 putpwent F - all 1 pwd.h
 puts F - all 0 stdio.h
 putspent F - all 1 -
@@ -1126,6 +1115,8 @@ putwchar F - all 0 wchar.h
 putwchar_unlocked F - all 2 wchar.h
 pwrite F - all 0 unistd.h
 pwrite64 F - all 0 unistd.h
+pwritev F - all 1 sys/uio.h
+pwritev2 F - all 2 sys/uio.h
 qsort F - all 0 stdlib.h
 qsort_r F - all 1 -
 quick_exit F - all 0 -
@@ -1139,6 +1130,7 @@ readdir F - all 0 dirent.h
 readdir64 F - all 1 dirent.h
 readdir_r F - all 1 dirent.h
 readlink F - all 0 unistd.h
+readlinkat F - all 0 -
 readpassphrase F - x86_64 2 -
 readv F - all 0 sys/uio.h
 realloc F - all 0 malloc.h
@@ -1213,6 +1205,7 @@ sched_yield F - all 0 sched.h
 secure_getenv F - all 0 stdlib.h
 seed48 F - all 1 stdlib.h
 seekdir F - all 1 dirent.h
+select F - all 0 sys/select.h
 sem_clockwait F - all 0 semaphore.h
 sem_close F - all 0 semaphore.h
 sem_destroy F - all 0 semaphore.h
@@ -1229,10 +1222,6 @@ sema_init F - all 1 -
 sema_post F - all 1 -
 sema_trywait F - all 1 -
 sema_wait F - all 1 -
-semctl F - all 0 -
-semget F - all 0 -
-semop F - all 0 -
-semtimedop F - all 1 -
 send F - all 1 sys/socket.h
 sendfile F - all 1 -
 sendfile64 F - all 1 -
@@ -1250,6 +1239,7 @@ setgrent F - all 1 grp.h
 setgroupent F - all 2 -
 setgroups F - all 1 grp.h
 sethostent F - all 1 netdb.h
+sethostname F - all 1 unistd.h
 setjmp F - all 0 setjmp.h
 setlinebuf F - all 1 stdio.h
 setlocale F - all 0 locale.h
@@ -1282,11 +1272,6 @@ setuid F - all 0 unistd.h
 setusershell F - x86_64 1 -
 setutxent F - x86_64 0 utmpx.h
 setvbuf F - all 0 stdio.h
-shm_unlink F - all 0 -
-shmat F - all 0 -
-shmctl F - all 0 -
-shmdt F - all 0 -
-shmget F - all 0 -
 shutdown F - all 1 sys/socket.h
 sig2str F - all 1 -
 sigaction F - all 0 signal.h
@@ -1335,6 +1320,7 @@ sl_add F - x86_64 2 -
 sl_find F - x86_64 2 -
 sl_free F - x86_64 2 -
 sl_init F - x86_64 2 -
+sleep F - all 0 unistd.h
 snprintf F - all 1 stdio.h
 snvis F - x86_64 2 -
 sockatmark F - all 1 -
@@ -1436,6 +1422,7 @@ swscanf F - all 0 wchar.h
 symlink F - all 0 unistd.h
 symlinkat F - all 0 -
 sync F - all 0 unistd.h
+syncfs F - all 1 -
 syscall F - all 1 unistd.h
 sysconf F - all 0 unistd.h
 sysctl F - all 2 -
@@ -1452,17 +1439,10 @@ tanhf F - all 1 -
 tanhl F - all 1 -
 tanl F - all 1 -
 tanpi F - all 0 -
-tcdrain F - all 0 termios.h
-tcflow F - all 0 termios.h
-tcflush F - all 0 termios.h
 tcgetattr F - all 0 termios.h
 tcgetpgrp F - all 0 unistd.h
-tcgetsid F - all 0 termios.h
-tcgetwinsize F - all 0 -
-tcsendbreak F - all 0 termios.h
 tcsetattr F - all 0 termios.h
 tcsetpgrp F - all 0 unistd.h
-tcsetwinsize F - all 0 -
 tdelete F - all 1 search.h
 tdestroy F - all 1 search.h
 telldir F - all 1 dirent.h
@@ -1531,6 +1511,8 @@ towlower_l F - all 1 -
 towupper F - all 0 wctype.h
 towupper_l F - all 1 -
 trunc F - all 1 -
+truncate F - all 0 unistd.h
+truncate64 F - all 0 unistd.h
 truncf F - all 1 -
 truncl F - all 1 -
 tsearch F - all 1 search.h
@@ -1538,6 +1520,7 @@ tss_create F - all 0 threads.h
 tss_delete F - all 0 threads.h
 tss_get F - all 0 threads.h
 tss_set F - all 0 threads.h
+ttyname F - all 0 unistd.h
 ttyname_r F - all 0 unistd.h
 twalk F - all 1 search.h
 tzset F - all 0 time.h
@@ -1559,6 +1542,7 @@ unvis F - x86_64 2 -
 updwtmpx F - x86_64 1 -
 uselocale F - all 1 -
 user_from_uid F - all 2 -
+usleep F - all 0 -
 utimensat F - all 0 sys/stat.h
 utimes F - all 0 sys/time.h
 utmpxname F - x86_64 0 utmpx.h
