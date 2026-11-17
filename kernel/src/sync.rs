@@ -22,7 +22,7 @@ use core::ops::{Deref, DerefMut};
 use core::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, Ordering};
 
 use crate::sched::smp::percpu;
-use crate::sched::thread::{NO_BOOST, Thread};
+use crate::sched::thread::{NO_BOOST, Thread, ThreadState};
 
 #[cfg(target_arch = "x86_64")]
 const RFLAGS_IF: u64 = 1 << 9;
@@ -379,8 +379,24 @@ pub fn donation_begin_call(client: ThreadId, server: &Arc<Thread>) -> bool {
 pub fn donation_end_call(client: ThreadId, server: ThreadId) {
     let mut guard = TURNSTILES.lock();
     if let Some(kernel) = guard.as_mut() {
-        let _ = kernel.graph.end_call(client, server);
+        // Allocation-free: this runs from process-death/fault/cancel completion paths.
+        let _ = kernel.graph.end_call_no_alloc(client, server);
         sync_all_boosts_locked(kernel);
+    }
+}
+
+/// Wake `thread`, retrying while the scheduler still sees it `Ready`.
+///
+/// `sched::wake` returns `false` for a `Ready` thread without setting the pending-wake flag: if
+/// the target was preempted between `begin_block` and `block_current`, a single wake is lost.
+/// The target sets its "asleep" flag after `begin_block`, so retrying until the wake is accepted
+/// (or the thread is dead) closes that window without sleeping.
+fn wake_blocked(thread: &Arc<Thread>) {
+    while !crate::sched::wake(Arc::clone(thread), None, 0) {
+        if thread.state() == ThreadState::Dead {
+            break;
+        }
+        core::hint::spin_loop();
     }
 }
 
@@ -488,7 +504,7 @@ impl<T> Mutex<T> {
         if let Some(next_tid) = next
             && let Some(next_thread) = registered_thread(next_tid)
         {
-            crate::sched::wake(next_thread, None, 0);
+            wake_blocked(&next_thread);
         }
     }
 }
@@ -633,9 +649,9 @@ pub fn selftest() {
 pub fn selftest_lockstat() {
     static M: Mutex<u32> = Mutex::new(0);
     static OWNER_HELD: AtomicBool = AtomicBool::new(false);
+    static OWNER_ASLEEP: AtomicBool = AtomicBool::new(false);
     static OWNER_BOOST: AtomicU8 = AtomicU8::new(NO_BOOST);
     static OWNER_RESTORED: AtomicBool = AtomicBool::new(false);
-    static A_QUEUED: AtomicBool = AtomicBool::new(false);
     static WAITER_A_GOT: AtomicBool = AtomicBool::new(false);
     static WAITER_B_GOT: AtomicBool = AtomicBool::new(false);
 
@@ -643,22 +659,15 @@ pub fn selftest_lockstat() {
         let me = crate::sched::current_thread().expect("lockstat: owner thread");
         me.priority.store(20, Ordering::Release); // low priority: the donee
         let guard = M.lock();
-        let object = M.object_id();
         OWNER_HELD.store(true, Ordering::Release);
-        // Hold the mutex until both waiters are queued, so the queue depth reaches 2 and the
-        // first waiter's turnstile edge has boosted us before we release.
-        loop {
-            let queued = lockstat()
-                .into_iter()
-                .find(|(id, _)| *id == object)
-                .is_some_and(|(_, stats)| stats.wait_entries >= 2);
-            if queued {
-                break;
-            }
-            core::hint::spin_loop();
-        }
+        // Sleep while both waiters queue up; the orchestrator wakes us with the retrying wake
+        // once the queue depth reaches two, so no spin gate can starve the owner's CPU.
+        let token = crate::sched::begin_block().expect("lockstat: owner block");
+        OWNER_ASLEEP.store(true, Ordering::Release);
+        let _ = crate::sched::block_current();
+        crate::sched::end_block(token);
         OWNER_BOOST.store(me.boost.load(Ordering::Acquire), Ordering::Release);
-        drop(guard); // handoff to waiter A
+        drop(guard); // handoff to the first waiter
         OWNER_RESTORED.store(
             me.boost.load(Ordering::Acquire) == NO_BOOST,
             Ordering::Release,
@@ -679,9 +688,7 @@ pub fn selftest_lockstat() {
     fn waiter_b() {
         let me = crate::sched::current_thread().expect("lockstat: waiter B");
         me.priority.store(1, Ordering::Release);
-        // Arrive only after A is already in the turnstile, so the boost count is deterministic
-        // (A raises the owner; B has a lower priority and does not raise it again).
-        while !A_QUEUED.load(Ordering::Acquire) {
+        while !OWNER_HELD.load(Ordering::Acquire) {
             core::hint::spin_loop();
         }
         let guard = M.lock();
@@ -708,21 +715,21 @@ pub fn selftest_lockstat() {
     waiter_b_thread.priority.store(1, Ordering::Release);
 
     let object = M.object_id();
-    let mut a_released = false;
+    let mut owner_woken = false;
     while !OWNER_RESTORED.load(Ordering::Acquire)
         || !WAITER_A_GOT.load(Ordering::Acquire)
         || !WAITER_B_GOT.load(Ordering::Acquire)
     {
-        // Release B only after A is queued on the turnstile; the counters then have one
-        // deterministic inherited-priority change.
-        if !a_released {
+        // Wake the sleeping owner only once both waiters are queued, so the queue depth reaches
+        // two and the boost is visible; the retrying wake survives a preemption window.
+        if !owner_woken && OWNER_ASLEEP.load(Ordering::Acquire) {
             let queued = lockstat()
                 .into_iter()
                 .find(|(id, _)| *id == object)
-                .is_some_and(|(_, stats)| stats.wait_entries >= 1);
+                .is_some_and(|(_, stats)| stats.wait_entries >= 2);
             if queued {
-                A_QUEUED.store(true, Ordering::Release);
-                a_released = true;
+                owner_woken = true;
+                wake_blocked(&owner_thread);
             }
         }
         core::hint::spin_loop();
@@ -740,12 +747,14 @@ pub fn selftest_lockstat() {
         crate::kprintln!("lockstat: fail object={object} stats=missing");
         crate::boot::exit_qemu(0x13);
     };
+    // The waiters race for the turnstile; the first one lowers the owner's priority and the
+    // second one (priority 1) does not lower it further when A (priority 0) arrived first.
     if stats.wait_entries == 2
         && stats.wakes == 2
         && stats.cancels == 0
         && stats.timeouts == 0
         && stats.max_queue_depth == 2
-        && stats.inherited_priority_changes == 1
+        && (1..=2).contains(&stats.inherited_priority_changes)
         && owner_boost == 0
         && OWNER_RESTORED.load(Ordering::Acquire)
         && WAITER_A_GOT.load(Ordering::Acquire)
@@ -785,8 +794,9 @@ pub fn selftest_ipc_donation() {
     static M: Mutex<u32> = Mutex::new(0);
     static CLIENT_THREAD: IrqSpinLock<Option<Arc<Thread>>> = IrqSpinLock::new(None);
     static CLIENT_TID: AtomicU32 = AtomicU32::new(0);
-    static CLIENT_BLOCKED: AtomicBool = AtomicBool::new(false);
+    static CLIENT_ASLEEP: AtomicBool = AtomicBool::new(false);
     static OWNER_HELD: AtomicBool = AtomicBool::new(false);
+    static OWNER_ASLEEP: AtomicBool = AtomicBool::new(false);
     static CLIENT_RESTORED: AtomicBool = AtomicBool::new(false);
     static OWNER_BOOST: AtomicU8 = AtomicU8::new(NO_BOOST);
     static OWNER_RESTORED: AtomicBool = AtomicBool::new(false);
@@ -799,9 +809,10 @@ pub fn selftest_ipc_donation() {
         register_thread(&me);
         CLIENT_TID.store(me.tid, Ordering::Release);
         CLIENT_THREAD.lock().replace(Arc::clone(&me));
-        // The client blocks on the reply; the server owns the call edge from here on.
+        // The client blocks on the reply; the server owns the call edge from here on. The asleep
+        // flag is set after `begin_block`, so the waker's retry cannot land before the flag.
         let token = crate::sched::begin_block().expect("ipc-donation: client block");
-        CLIENT_BLOCKED.store(true, Ordering::Release);
+        CLIENT_ASLEEP.store(true, Ordering::Release);
         let _ = crate::sched::block_current();
         crate::sched::end_block(token);
         CLIENT_RESTORED.store(
@@ -815,8 +826,10 @@ pub fn selftest_ipc_donation() {
         me.priority.store(5, Ordering::Release); // above the server, below the client
         let guard = M.lock();
         OWNER_HELD.store(true, Ordering::Release);
-        // Sleep while holding the mutex: the server's lock wait must do the waking.
+        // Sleep while holding the mutex: the server's lock wait must do the boosting and the
+        // orchestrator wakes us with the retrying wake once the wait edge exists.
         let token = crate::sched::begin_block().expect("ipc-donation: owner block");
+        OWNER_ASLEEP.store(true, Ordering::Release);
         let _ = crate::sched::block_current();
         crate::sched::end_block(token);
         OWNER_BOOST.store(me.boost.load(Ordering::Acquire), Ordering::Release);
@@ -830,7 +843,7 @@ pub fn selftest_ipc_donation() {
     fn server() {
         let me = crate::sched::current_thread().expect("ipc-donation: server thread");
         me.priority.store(10, Ordering::Release);
-        while !OWNER_HELD.load(Ordering::Acquire) {
+        while !CLIENT_ASLEEP.load(Ordering::Acquire) || !OWNER_HELD.load(Ordering::Acquire) {
             core::hint::spin_loop();
         }
         let client_tid = CLIENT_TID.load(Ordering::Acquire);
@@ -849,7 +862,7 @@ pub fn selftest_ipc_donation() {
             Ordering::Release,
         );
         if let Some(client) = CLIENT_THREAD.lock().clone() {
-            crate::sched::wake(client, None, 0);
+            wake_blocked(&client);
         }
     }
 
@@ -872,7 +885,7 @@ pub fn selftest_ipc_donation() {
     server_thread.priority.store(10, Ordering::Release);
 
     let mut owner_woken = false;
-    while !CLIENT_BLOCKED.load(Ordering::Acquire)
+    while !CLIENT_ASLEEP.load(Ordering::Acquire)
         || !OWNER_HELD.load(Ordering::Acquire)
         || !SERVER_RESTORED.load(Ordering::Acquire)
         || !OWNER_RESTORED.load(Ordering::Acquire)
@@ -880,9 +893,12 @@ pub fn selftest_ipc_donation() {
     {
         // The owner sleeps holding the mutex; wake it only once the server's lock wait has
         // applied the inherited priority, so it observes the boost rather than racing the wake.
-        if turnstile_effective_priority(owner_thread.tid) == Some(0) && !owner_woken {
+        if !owner_woken
+            && OWNER_ASLEEP.load(Ordering::Acquire)
+            && turnstile_effective_priority(owner_thread.tid) == Some(0)
+        {
             owner_woken = true;
-            crate::sched::wake(Arc::clone(&owner_thread), None, 0);
+            wake_blocked(&owner_thread);
         }
         core::hint::spin_loop();
     }

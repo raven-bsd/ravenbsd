@@ -41,12 +41,18 @@ pub enum DonationViolation {
     BaseNotRestored,
 }
 
+/// Maximum number of threads whose cached effective priority one allocation-free edge removal
+/// recomputes. Larger dependent graphs are marked dirty and refreshed at the next allocating
+/// mutation (which is not a teardown/fault context); the bound keeps the exit path stack-bounded.
+pub const MAX_NO_ALLOC_AFFECTED: usize = 64;
+
 /// A turnstile registry extended with IPC call edges for priority donation.
 pub struct Donation {
     turnstiles: Turnstiles,
     calls: BTreeMap<ThreadId, ThreadId>,
     effective: BTreeMap<ThreadId, Priority>,
     max_depth: usize,
+    dirty: bool,
 }
 
 impl Donation {
@@ -58,6 +64,7 @@ impl Donation {
             calls: BTreeMap::new(),
             effective: BTreeMap::new(),
             max_depth: 0,
+            dirty: false,
         }
     }
 
@@ -105,6 +112,128 @@ impl Donation {
             }
             _ => Err(DonationError::StaleCall),
         }
+    }
+
+    /// Close a call edge without allocating or sorting (process death, fault and cancel context).
+    ///
+    /// The edge is removed immediately and the cached effective priorities of the server and its
+    /// dependent closure are recomputed by a local fixed point over a fixed-capacity set
+    /// ([`MAX_NO_ALLOC_AFFECTED`]). When the dependent closure exceeds that bound the graph is
+    /// marked dirty and the next allocating mutation refreshes it wholesale
+    /// ([`Donation::refresh_if_dirty`]); the exit path never allocates.
+    pub fn end_call_no_alloc(
+        &mut self,
+        client: ThreadId,
+        server: ThreadId,
+    ) -> Result<(), DonationError> {
+        match self.calls.get(&client) {
+            Some(&actual) if actual == server => {
+                self.calls.remove(&client);
+            }
+            _ => return Err(DonationError::StaleCall),
+        }
+        self.restore_without_alloc(server);
+        Ok(())
+    }
+
+    /// Recompute the whole graph now if [`Donation::end_call_no_alloc`] overflowed its bound.
+    pub fn refresh_if_dirty(&mut self) {
+        if self.dirty {
+            self.refresh();
+        }
+    }
+
+    /// Whether an allocation-free edge removal left the cached graph stale.
+    #[must_use]
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Recompute the cached priorities of `changed` and its dependent closure, without allocating.
+    ///
+    /// Dependents of a thread are the owners of the locks it waits on (they inherit its priority)
+    /// and the servers of the calls it makes. Outside the closure the cached values are stable, so
+    /// a fixed point over the closure is exact; cycles stay inside the closure by construction.
+    fn restore_without_alloc(&mut self, changed: ThreadId) {
+        let mut set = [0u32; MAX_NO_ALLOC_AFFECTED];
+        let mut len = 1usize;
+        set[0] = changed;
+        let mut next = 0usize;
+        let mut overflow = false;
+        while next < len {
+            let thread = set[next];
+            next += 1;
+            let mut add = |candidate: ThreadId| {
+                if set[..len].contains(&candidate) {
+                    return;
+                }
+                if len == MAX_NO_ALLOC_AFFECTED {
+                    overflow = true;
+                    return;
+                }
+                set[len] = candidate;
+                len += 1;
+            };
+            if let Some(object) = self.turnstiles.waiting_on(thread)
+                && let Some(owner) = self.turnstiles.owner(object)
+            {
+                add(owner);
+            }
+            if let Some(&server) = self.calls.get(&thread) {
+                add(server);
+            }
+        }
+        if overflow {
+            self.dirty = true;
+            return;
+        }
+        let mut sweeps = 0usize;
+        loop {
+            let mut any = false;
+            for &thread in &set[..len] {
+                let Some(base) = self.turnstiles.base_priority(thread) else {
+                    continue;
+                };
+                let mut effective = base;
+                for (&client, &server) in &self.calls {
+                    if server == thread
+                        && let Some(priority) = self.effective.get(&client)
+                        && *priority < effective
+                    {
+                        effective = *priority;
+                    }
+                }
+                let effective_ref = &self.effective;
+                for object in self.turnstiles.objects() {
+                    if self.turnstiles.owner(object) != Some(thread) {
+                        continue;
+                    }
+                    self.turnstiles.for_each_waiter(object, |waiter| {
+                        if let Some(priority) = effective_ref.get(&waiter)
+                            && *priority < effective
+                        {
+                            effective = *priority;
+                        }
+                    });
+                }
+                if let Some(current) = self.effective.get_mut(&thread)
+                    && *current != effective
+                {
+                    *current = effective;
+                    any = true;
+                }
+            }
+            if !any {
+                break;
+            }
+            sweeps = sweeps.saturating_add(1);
+            if sweeps > len {
+                // Monotone decrease over a finite set: a fixed point is reached in at most one
+                // sweep per thread; the bound only guards against a corrupt cached value.
+                break;
+            }
+        }
+        self.max_depth = self.max_depth.max(sweeps);
     }
 
     /// Cancel a client's outstanding call.
@@ -329,6 +458,7 @@ impl Donation {
         let (effective, depth) = self.compute_effective();
         self.effective = effective;
         self.max_depth = self.max_depth.max(depth);
+        self.dirty = false;
     }
 }
 

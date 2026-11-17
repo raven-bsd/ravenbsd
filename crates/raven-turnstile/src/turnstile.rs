@@ -491,6 +491,16 @@ impl Turnstiles {
         self.objects.keys().copied()
     }
 
+    /// Visit every waiter on `object` without allocating (the donation teardown path is
+    /// stack- and allocation-bounded).
+    pub(crate) fn for_each_waiter(&self, object: ObjectId, mut visit: impl FnMut(ThreadId)) {
+        if let Some(turnstile) = self.objects.get(&object) {
+            for waiter in &turnstile.waiters {
+                visit(waiter.thread);
+            }
+        }
+    }
+
     /// Check every invariant the model promises.
     ///
     /// Returns the first violation. Used by the exhaustive model check and by the kernel glue in
