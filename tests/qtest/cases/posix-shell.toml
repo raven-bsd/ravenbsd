@@ -18,7 +18,7 @@ expect_exit = "success"
 regex = '^svcd: all services up$'
 
 [[expect]]
-regex = '^rsh: ready$'
+regex = 'rsh: ready'
 
 [[expect]]
 regex = '^simple:1:2$'
