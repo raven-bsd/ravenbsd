@@ -162,6 +162,8 @@ members = [
     "userland/bin/beep",
     "userland/bin/mixer",
     "userland/bin/date",
+    "userland/bin/asa",
+    "userland/bin/cal",
     "userland/bin/dmesg",
     "userland/bin/mount",
     "userland/bin/umount",
