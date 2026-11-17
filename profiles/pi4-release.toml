@@ -11,6 +11,9 @@
 name = "pi4-release"
 extends = "base"
 
+[initfs]
+dynamic = true
+
 [boot]
 cmdline = "console=ttyAMA0 loglevel=info"
 log_level = "info"

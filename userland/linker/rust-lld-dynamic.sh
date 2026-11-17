@@ -2,13 +2,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# rust-lld wrapper for dynamic x86_64 user programs.
+# rust-lld wrapper for dynamic x86_64 and aarch64 user programs.
 #
-# The built-in x86_64-unknown-none target passes `-static` to rust-lld, which cannot be undone
-# with `-Bdynamic`. This wrapper removes only that flag (and the equivalent `--no-pie`) and
-# forwards every other argument unchanged so the dynamic `-pie`/`-dynamic-linker` flags take
-# effect. It is used only by the dynamic-userland build path; static builds keep the default
-# linker.
+# The built-in bare-metal targets pass `-static` to rust-lld, which cannot be undone with
+# `-Bdynamic`. This wrapper removes only that flag (and the equivalent `--no-pie`) and forwards
+# every other argument unchanged so the dynamic `-pie`/`-dynamic-linker` flags take effect. It is
+# used only by the dynamic-userland build path; static builds keep the default linker.
 
 set -euo pipefail
 

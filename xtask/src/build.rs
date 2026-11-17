@@ -83,10 +83,10 @@ pub(crate) fn target_for(component: Component, arch: Arch) -> Result<&'static st
 ///
 /// Whether `Component::User` has a dynamic (PIE) link mode for this arch.
 ///
-/// K97 wires the Rust PIE path for x86_64; the other arches keep the static linker script until
-/// their loader/libc start ABI is ready.
+/// K97 wired the Rust PIE path for x86_64; K97a extends it to aarch64. Other arches keep the
+/// static linker script until their loader/libc start ABI is ready.
 pub(crate) fn dynamic_supported(arch: Arch) -> bool {
-    arch == Arch::X86_64
+    matches!(arch, Arch::X86_64 | Arch::Aarch64)
 }
 
 /// `user_linker` is passed only when the linker script exists; K06 creates it later.
@@ -105,7 +105,11 @@ pub(crate) fn rustflags_for(
         }
         Component::User if dynamic && dynamic_supported(arch) => {
             let wrapper = root.join("userland/linker/rust-lld-dynamic.sh");
-            flags.extend(["-C".to_string(), "code-model=small".to_string()]);
+            // `small` is the x86_64 user-program model K06 established; aarch64's default is
+            // already the small model, so leaving it unset keeps its static flag set unchanged.
+            if arch == Arch::X86_64 {
+                flags.extend(["-C".to_string(), "code-model=small".to_string()]);
+            }
             flags.extend(["-C".to_string(), "relocation-model=pic".to_string()]);
             flags.extend(["-C".to_string(), "force-frame-pointers=yes".to_string()]);
             flags.extend(["-C".to_string(), format!("linker={}", wrapper.display())]);
@@ -122,6 +126,16 @@ pub(crate) fn rustflags_for(
             ] {
                 flags.push("-C".to_string());
                 flags.push(format!("link-arg={arg}"));
+            }
+            // The precompiled aarch64 `libcore` is not PIC: its anonymous rodata carries
+            // `R_AARCH64_ABS64` records. lld accepts those in a PIE only with `notext`, which
+            // leaves `DF_TEXTREL` set. The loader rejects text relocations, so this is a build
+            // proof only until a PIC libcore or an equivalent build-side fix lands (K97a report).
+            if arch == Arch::Aarch64 {
+                flags.push("-C".to_string());
+                flags.push("link-arg=-z".to_string());
+                flags.push("-C".to_string());
+                flags.push("link-arg=notext".to_string());
             }
             for path in ["sysroot/lib", "sysroot/usr/lib"] {
                 flags.push("-C".to_string());
