@@ -73,3 +73,9 @@ id = "util.renice"
 status = "present"
 evidence = "qtest:posix-util-system"
 notes = "P4u: first-party renice; set/query niceness through P2l and kernel permission rules"
+
+[[row]]
+id = "util.mesg"
+status = "present"
+evidence = "qtest:posix-util-system"
+notes = "P4u: tty write permission via the tty protocol; y/n, fstat group-write bit and non-tty error"

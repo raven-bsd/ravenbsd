@@ -80,6 +80,38 @@ fn flushed_response_golden_bytes() {
 }
 
 #[test]
+fn write_permission_helpers_round_trip_and_have_stable_bytes() {
+    let mut bytes = [0u8; CALL_LEN];
+    encode_write_request(WriteRequest::Get, &mut bytes);
+    assert_eq!(
+        bytes,
+        [
+            0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        ]
+    );
+    assert_eq!(decode_write_request(&bytes), Ok(WriteRequest::Get));
+    encode_write_request(WriteRequest::Set { allowed: false }, &mut bytes);
+    assert_eq!(
+        bytes,
+        [
+            0x01, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        ]
+    );
+    assert_eq!(
+        decode_write_request(&bytes),
+        Ok(WriteRequest::Set { allowed: false })
+    );
+    encode_write_response(true, &mut bytes);
+    assert_eq!(
+        bytes,
+        [
+            0x01, 0x00, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        ]
+    );
+    assert_eq!(decode_write_response(&bytes), Ok(true));
+}
+
+#[test]
 fn requests_round_trip() {
     for request in [
         Request::GetMode,
@@ -177,6 +209,7 @@ fn errors_have_descriptions() {
         TtyError::UnknownOp(1),
         TtyError::InvalidMode(1),
         TtyError::InvalidEcho(1),
+        TtyError::InvalidWrite(1),
     ] {
         assert!(!error.describe().is_empty());
     }

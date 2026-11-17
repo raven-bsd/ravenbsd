@@ -15,6 +15,6 @@ util.stty	stty	stty -a
 util.kill	kill	kill -l
 util.nice	nice	nice -n 5 true
 util.nohup	nohup	nohup true
-util.mesg	mesg	mesg	P4u-D1
+util.mesg	mesg	mesg
 util.logger	logger	logger -t p4u hello
 util.renice	renice	renice -n 5 -p 1

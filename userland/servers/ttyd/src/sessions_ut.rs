@@ -34,6 +34,18 @@ fn unknown_sessions_are_rejected_without_state_change() {
 }
 
 #[test]
+fn write_permission_defaults_to_allowed_and_is_persistent() {
+    let mut sessions = Sessions::new();
+    let id = sessions.open();
+    assert!(sessions.write_allowed(id));
+    assert!(sessions.set_write_allowed(id, false));
+    assert!(!sessions.write_allowed(id));
+    assert!(sessions.set_write_allowed(id, true));
+    assert!(sessions.write_allowed(id));
+    assert!(!sessions.set_write_allowed(99, false));
+}
+
+#[test]
 fn close_removes_the_session() {
     let mut sessions = Sessions::new();
     let id = sessions.open();
