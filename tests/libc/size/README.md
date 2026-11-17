@@ -18,6 +18,7 @@ Sources, rule tables, the frozen budget and the baseline result of the size gate
 | `malloc-roots.toml` | `BP-2` roots and reviewed exceptions |
 | `BUDGETS.toml` | **generated** by `libc-size freeze`; measured + 3 percent |
 | `results/libc-size.json`, `.md` | the committed first-measurement baseline |
+| `reconcile.py` | bounded before/after `libc-size` reconciliation helper (C74bw) |
 | `qtest/*.toml` | B1-B3 seeds; C73 copies them to `tests/qtest/cases/` |
 
 ## Probes
@@ -41,6 +42,21 @@ not weakened by a frozen row, and the reviewer removes the row after a fix.
 While `C62` has not landed, every dynamic and `libc.so.1` row is
 `skipped: libc.so.1 absent (C62 not landed)` with the exact path `build/<arch>/libc.so.1`. No
 dynamic number in this directory is measured or invented.
+
+## Reconciliation helper
+
+`reconcile.py` reads two `libc-size` JSON runs, matches the static Rust rows by
+`(arch, linkage, set, lang, probe)`, and prints the C74z-S12 legitimate-growth rows with the
+proposed `ceil(current * 103 / 100)` budgets. Shrink-first rows (P2/P5/P7 and riscv64 P3) are
+listed with `HOLD` and never auto-raised. It does not read or write `BUDGETS.toml`.
+
+```sh
+python3 tests/libc/size/reconcile.py --before old.json --after build/size/libc-size.json
+python3 tests/libc/size/reconcile.py --self-test
+```
+
+The helper bounds each input to 8 MiB and 10,000 rows. `--self-test` checks the empty diff, a
+P0 shrink (+3% budget diff), the P2 hold, the P3 arch split and missing/added rows.
 
 ## B1-B3 seeds
 
