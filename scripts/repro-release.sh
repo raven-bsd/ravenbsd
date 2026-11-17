@@ -320,12 +320,11 @@ export SOURCE_DATE_EPOCH
 echo "repro-release: commit=$head SOURCE_DATE_EPOCH=$epoch"
 
 # The kernel embeds `RAVEN_BUILD_ID`; cargo reruns the kernel build when the id env changes, but
-# a cached artifact from another tree state must never be accepted. Rebuild the kernel from this
-# checkout before the pair (cheap: one crate), which also makes the embedded-id check meaningful.
-if ! cargo clean -p raven-kernel >/dev/null 2>&1; then
-    echo "repro-release: could not clean the cached kernel crate" >&2
-    exit 2
-fi
+# a cached artifact from another tree state must never be accepted. The image builder keeps its
+# own target directory per component/arch (`build/cargo/kernel-*`), so clean those exact caches
+# before the pair. This is cheap: one crate per architecture.
+cargo clean -p raven-kernel --target-dir build/cargo/kernel-x86_64 >/dev/null 2>&1 || true
+cargo clean -p raven-kernel --target-dir build/cargo/kernel-aarch64-pi4 >/dev/null 2>&1 || true
 
 if [ "$archs" = all ]; then
     list="x86_64 aarch64"
