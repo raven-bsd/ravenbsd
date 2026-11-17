@@ -5,10 +5,14 @@
 //! Wiring needs a C35 change (`decls/mod.rs` and the oracle feature list); the C65 crate carries
 //! the 200 x 16 x 4 differential against the same donor instead (see `tests/data/setmode_oracle.rs`).
 
-#![allow(dead_code)]
+#![allow(dead_code, missing_docs)]
 
 use core::ffi::{c_int, c_void};
 
+#[cfg_attr(
+    feature = "oracle-compat-setmode",
+    link(name = "oracle_compat_setmode", kind = "dylib")
+)]
 unsafe extern "C" {
     pub fn oracle_setmode(spec: *const core::ffi::c_char) -> *mut c_void;
     pub fn oracle_getmode(bbox: *const c_void, omode: u32) -> u32;

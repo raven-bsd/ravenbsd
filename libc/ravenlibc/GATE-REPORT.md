@@ -32,8 +32,8 @@ with their owning lane.
 | 4 hardening | 4.3 hardened malloc default | MET | build/libc-gate/4.3.txt | hardened backend selected; tiny not in libc.so.1 |
 | 4 hardening | 4.4 ENTROPY_WEAK status (H-5) | INFO | build/libc-gate/4.4.txt | ENTROPY_WEAK CLEAR; PG-52 release blocker, not a libc-gate blocker |
 | 5 on-target | 5.1 on-target libc cases (C12) | NOT MET | build/libc-gate/5.1.txt | 7 qtest cases: dynamic, threads, signals, spawn pass; hello/stdio/time fail (P1b) |
-| 5 on-target | 5.2.core-servers core-servers regression | NOT MET | build/libc-gate/5.2.core-servers.txt | 120 s timeout; last serial `sched: running`; the same case passes at 600 s (`coretest: ok`, `init exited (0)`) — qtest timeout/core-test profile lane |
-| 5 on-target | 5.2.file-tools file-tools regression | NOT MET | build/libc-gate/5.2.file-tools.txt | times out at 240 s and 600 s; last serial `svcd: rsh up` / `rsh: ready` / `raven#`, no `tooltest` — file-tools-test profile/init/tooltest lane |
+| 5 on-target | 5.2.core-servers core-servers regression | MET | build/libc-gate/5.2.core-servers.txt | exit 0: minimal `core-servers` profile (36-77 s), 300 s case limit |
+| 5 on-target | 5.2.file-tools file-tools regression | NOT MET | build/libc-gate/5.2.file-tools.txt | tooltest starts and reaches `df`, which exits 1 (`df: no file systems processed`); owner: uutils mount list (`userland/uutils/src/uucore/src/lib/features/fsext/mod.rs:421`) |
 | 5 on-target | 5.3 second architecture | INFO | build/libc-gate/5.3.txt | aarch64: not delivered (C73 open item); owner decides whether G1 closes on x86_64 alone |
 | 6 documentation | 6.1 page coverage | MET | build/libc-gate/6.1.txt | exit 0 |
 | 6 documentation | 6.2 render lint | BLOCKED | build/libc-gate/6.2.txt | preflight command failed |
@@ -80,14 +80,14 @@ failures are P1b (`libc-hello` string, `libc-stdio`, `libc-time` sleep/usleep/tz
   other 13 targets completed 3600 s with 0 crashes. Owner: test/fuzz lane.
 * 5.1: `libc-dynamic`, `libc-signals`, `libc-spawn` and `libc-threads` pass; `libc-hello`,
   `libc-stdio` and `libc-time` remain P1b. Section 4 has the exact output.
-* 5.2: both inherited qtests fail with timeouts, but not in libc code.
-  `core-servers` (120 s) stops at `sched: running`; the identical case with a 600 s budget
-  completes (`coretest: ok`, `init exited (0)`), so the case timeout is too small for the
-  inherited shell initfs (owner: `tests/qtest/cases/core-servers.toml` / core-test profile).
-  `file-tools` (240 s and 600 s) reaches `svcd: rsh up`, `rsh: ready` and the `raven#` prompt but
-  never starts `tooltest`; `initfsd` alone takes ~90 s (owner: file-tools-test profile /
-  `userland/init` service plan / `crates/raven-tool-core/src/bin/tooltest.rs`). Neither is a
-  libc-test profile or libc-target harness defect, so C74j left the cases untouched.
+* 5.2: `core-servers` is **MET**. C74n replaced the shell-inheriting `core-test` profile with a
+  minimal `core-servers` profile (init, five scheme servers, consd, coretest) and set the case
+  timeout to 300 s; the in-tree case passes in 36-77 s. `file-tools` is still NOT MET: C74n
+  replaced the shell profile with a minimal `core-servers-files` profile (file servers, uutils
+  slice, tooltest) and the service now starts, but `tooltest` fails at `df` because the uutils
+  `read_fs_list` returns an empty list on RavenBSD
+  (`userland/uutils/src/uucore/src/lib/features/fsext/mod.rs:421`), so `df: no file systems
+  processed` / `tooltest: df exited 1`. Owner: uutils/P1f, not libc.
 * 6.2 mandoc: BLOCKED. `which mandoc` exits 1; the render lint cannot run.
 
 ## 4. Seven-case matrix (OBSERVED, 2026-11-17, C74h)
@@ -161,7 +161,7 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 | 3.1 size | `cargo xtask libc-size --check` | exit 1; 4 pass, 48 fail, 25 known, 282 skipped, 40 budget-only |
 | 4.2 soak | `tests/libc/fuzz/SOAK.md` | `inet_text` crashed before 1 h; 13 targets 3600 s/0 crashes → NOT MET |
 | 5.1 target | qtest JSON from `eval` | dynamic, signals, spawn, threads pass; hello, stdio, time fail (P1b) |
-| 5.2 kernel | `qtest --case core-servers` (120 s/600 s) and `file-tools` (240 s/600 s) | core-servers passes at 600 s but times out at 120 s; file-tools never starts `tooltest` even at 600 s (`rsh` prompt) → NOT MET; owners are the qtest/core-test and file-tools-test/init lanes |
+| 5.2 kernel | `qtest core-servers` / `qtest file-tools` | core-servers MET (minimal profile, 300 s case, 36-77 s); file-tools NOT MET: tooltest starts but `df` exits 1 (`no file systems processed`), uutils `read_fs_list` empty on RavenBSD |
 | 6.2 mandoc | `which mandoc` | exit 1; not installed → BLOCKED |
 
 `cargo run -q -p libc-gate -- eval` evaluated 90 checks; `table` and `verdict` exit 1 with

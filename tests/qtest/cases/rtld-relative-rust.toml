@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# C74o regression: a dynamic Rust PIE with PT_INTERP and DT_NEEDED libc.so.1. The PIE uses
+# raven_rt's _start/__raven_main and exports no C main. Before the libc start-ABI fix, the
+# loader rejected the strong undefined main in libc.so.1; after it, the PIE reaches main,
+# calls getpid through libc and exits 0.
+
+name = "rtld-relative-rust"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/rtld-relative/build-rust.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^dynamic-exec: launching$'
+
+[[expect]]
+regex = '^rtld-relative-rust: main pid=\d+$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|relocation failed|Undefined\(2\)|dynamic-exec: exec failed'

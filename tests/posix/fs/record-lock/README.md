@@ -1,15 +1,23 @@
 <!-- SPDX-License-Identifier: BSD-3-Clause -->
 <!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
 
-# `filesystem.record-lock` defect - P5-D2
+# `filesystem.record-lock`
 
-The row remains `missing` because no layer carries a POSIX record lock:
+The kernel provides POSIX advisory byte-range locks through the raw `RECORD_LOCK` syscall
+(`0x0C`) and the libc `fcntl(F_GETLK/F_SETLK/F_SETLKW)` wrapper. Both paths share one lock
+table keyed by `(pid, server, inode)`; a close of any descriptor for the file releases the
+process's locks for that file, and process exit releases all of them.
 
-* The kernel has no `FCNTL` syscall surface for `F_GETLK`/`F_SETLK`/`F_SETLKW`.
-* The scheme `Ctx` carries effective credentials but no process id or lock-owner identity, so
-  a VFS server cannot implement process-owned locks or release them on process exit.
-* `raven-proto-fs` has no `LOCK`/`UNLOCK` control call. The libc `lockf` path and the
-  `fcntl` record-lock commands return `ENOSYS` until PG-21.
+The qtest (`posix-fs-record-lock`) runs one parent and short-lived children:
 
-Ticket: `P5-D2` (profile gap PG-21). Executable evidence requires the kernel lock-owner model
-first; a server-only lock table keyed by open-file description would not be POSIX.
+* raw syscall phases: free `F_GETLK`, child conflict, conflicting-owner `F_GETLK`, blocking
+  `F_SETLKW`, close release and exit release;
+* libc `fcntl` phases on a separate byte range: free `F_GETLK`, conflicting-owner `F_GETLK`,
+  `EAGAIN` from `F_SETLK`, a raw child seeing a libc-held lock, libc `F_SETLKW` blocking until
+  the child exits, libc close release and a libc lock released on child exit.
+
+The fixture links `build/x86_64/libc.a`; `build.sh` refreshes the archive with
+`cargo xtask libc-pack --arch x86_64` when the libc sources are newer.
+
+Ticket: `P5c` (raw kernel path) and `P5c2` (libc `fcntl` glue). Executable evidence:
+`cargo xtask qtest --case posix-fs-record-lock --arch x86_64`.

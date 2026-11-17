@@ -2,6 +2,7 @@
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
 # P5c: raw RECORD_LOCK advisory byte-range locks over the file: scheme.
+# P5c2 adds the libc fcntl F_GETLK/F_SETLK/F_SETLKW path over the same kernel table.
 
 name = "posix-fs-record-lock"
 arch = "x86_64"
@@ -32,6 +33,27 @@ regex = '^record-lock: close ok$'
 
 [[expect]]
 regex = '^record-lock: exit ok$'
+
+[[expect]]
+regex = '^record-lock: libc-getlk-free ok$'
+
+[[expect]]
+regex = '^record-lock: libc-getlk-conflict ok$'
+
+[[expect]]
+regex = '^record-lock: libc-setlk-conflict ok$'
+
+[[expect]]
+regex = '^record-lock: libc-conflict ok$'
+
+[[expect]]
+regex = '^record-lock: libc-setlkw ok$'
+
+[[expect]]
+regex = '^record-lock: libc-close ok$'
+
+[[expect]]
+regex = '^record-lock: libc-exit ok$'
 
 [[expect]]
 regex = '^record-lock: ok$'

@@ -18,6 +18,12 @@ pub static B: u8 = 22;
 pub static C: u8 = 33;
 
 /// A function-pointer table: RELATIVE relocations, packed into RELR when the linker is asked.
+/// The crt passes this address to `__raven_libc_start`; the fixture start does not call it.
+#[unsafe(no_mangle)]
+pub extern "C" fn main(_argc: i32, _argv: *const *const u8, _envp: *const *const u8) -> i32 {
+    0
+}
+
 #[used]
 #[unsafe(no_mangle)]
 pub static TABLE: [&u8; 3] = [&A, &B, &C];
@@ -40,6 +46,7 @@ pub unsafe extern "C" fn __raven_libc_start(
     rtld_fini: usize,
     iplt_start: usize,
     iplt_end: usize,
+    _entry: usize,
 ) -> ! {
     if rtld_fini != 0 || iplt_start != 0 || iplt_end != 0 {
         exit(1);

@@ -562,6 +562,7 @@ impl<P: Platform, M: MemView, A: raven_libc_elf::RelocApplier> Loader<P, M, A> {
                 object.tls_offset = offset;
                 object.tls_size = usize::try_from(tls.memsz).unwrap_or(0);
             }
+            self.applier.set_tls_offset(id, offset);
         }
         Ok(())
     }

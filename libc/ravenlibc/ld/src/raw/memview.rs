@@ -13,6 +13,43 @@ static LIMIT: AtomicUsize = AtomicUsize::new(0);
 /// Static TLS TPOFF bases indexed by object id.
 static TLS_OFFSETS: [AtomicUsize; 64] = [const { AtomicUsize::new(0) }; 64];
 
+// A trivial `TLSDESC` resolver: the descriptor's second word is the TP-relative offset the
+// caller adds to the thread pointer. The ABI passes the descriptor address in `x0` (aarch64)
+// or `rdi` (x86_64), so load and return the argument word.
+#[cfg(target_arch = "aarch64")]
+core::arch::global_asm!(
+    ".text",
+    ".globl __rl_tlsdesc_return",
+    ".type __rl_tlsdesc_return,%function",
+    "__rl_tlsdesc_return:",
+    "ldr x0, [x0, #8]",
+    "ret",
+    ".size __rl_tlsdesc_return, .-__rl_tlsdesc_return",
+    ".section .note.GNU-stack,\"\",%progbits",
+);
+
+#[cfg(target_arch = "x86_64")]
+core::arch::global_asm!(
+    ".text",
+    ".globl __rl_tlsdesc_return",
+    ".type __rl_tlsdesc_return,@function",
+    "__rl_tlsdesc_return:",
+    "mov rax, [rdi + 8]",
+    "ret",
+    ".size __rl_tlsdesc_return, .-__rl_tlsdesc_return",
+    ".section .note.GNU-stack,\"\",@progbits",
+);
+
+#[cfg(target_arch = "riscv64")]
+extern "C" fn __rl_tlsdesc_return(_descriptor: *const u64) -> u64 {
+    0
+}
+
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+unsafe extern "C" {
+    fn __rl_tlsdesc_return(descriptor: *const u64) -> u64;
+}
+
 /// Record one object's static TLS offset for the relocation applier.
 pub fn set_tls_offset(id: raven_libc_elf::ObjId, offset: usize) {
     if let Some(slot) = TLS_OFFSETS.get(usize::try_from(id.0).unwrap_or(usize::MAX)) {
@@ -116,15 +153,21 @@ impl RelocApplier for LiveApplier {
         i64::try_from(offset).map_err(|_| ApplyError::OutOfRange)
     }
 
+    fn set_tls_offset(&mut self, obj: raven_libc_elf::ObjId, offset: usize) {
+        crate::raw::memview::set_tls_offset(obj, offset);
+    }
+
     fn tls_desc_alloc(
         &mut self,
-        _obj: raven_libc_elf::ObjId,
-        _sym_value: u64,
-        _addend: i64,
+        obj: raven_libc_elf::ObjId,
+        sym_value: u64,
+        addend: i64,
     ) -> Result<raven_libc_elf::TlsDesc, ApplyError> {
+        let offset = self.tls_static_offset(obj)?;
+        let arg = crate::tls::desc_argument(crate::arch::target_arch(), sym_value, addend, offset);
         Ok(raven_libc_elf::TlsDesc {
-            resolver: 0,
-            arg: 0,
+            resolver: __rl_tlsdesc_return as *const () as u64,
+            arg,
         })
     }
 
