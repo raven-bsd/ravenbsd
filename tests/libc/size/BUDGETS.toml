@@ -7,6 +7,10 @@
 # C74z-S10 (e414e47d): the six P9 S/F rows are re-frozen from the post-C39m/C74zb measurement
 # (measured + 3 percent); the P9 B fields stay the C74z Berkeley-bss baseline. No other row is
 # changed, so the smaller profiles and boot rows keep their C69/C74z values.
+# C74z-S11 (72c630bd): the six B-only/layout rows (x86_64 P3 server, P5 tiny/server; aarch64 P8
+# tiny/server; riscv64 P8 server) are re-measured on the full three-arch build and their B fields
+# are re-frozen at measured + 3 percent. S/F and boot budgets are unchanged; the aarch64 P2/P3 S
+# measurement correction is reported, not budgeted.
 schema = 1
 metric = "S = Berkeley text+data of the stripped executable; B = bss; F = file bytes"
 headroom_percent = 3
@@ -90,11 +94,11 @@ linkage = "static"
 set = "tiny"
 lang = "rust"
 measured_s = 146221
-measured_b = 11944
+measured_b = 13008
 measured_f = 147688
 members = 183
 budget_s = 150608
-budget_b = 12303
+budget_b = 13399
 budget_f = 152119
 
 [[budget]]
@@ -202,11 +206,11 @@ linkage = "static"
 set = "server"
 lang = "rust"
 measured_s = 98770
-measured_b = 14240
+measured_b = 15512
 measured_f = 100240
 members = 122
 budget_s = 101734
-budget_b = 14668
+budget_b = 15978
 budget_f = 103248
 
 [[budget]]
@@ -230,11 +234,11 @@ linkage = "static"
 set = "server"
 lang = "rust"
 measured_s = 150764
-measured_b = 11536
+measured_b = 13032
 measured_f = 152224
 members = 155
 budget_s = 155287
-budget_b = 11883
+budget_b = 13423
 budget_f = 156791
 
 [[budget]]
@@ -412,11 +416,11 @@ linkage = "static"
 set = "tiny"
 lang = "rust"
 measured_s = 175634
-measured_b = 11632
+measured_b = 12032
 measured_f = 177088
 members = 135
 budget_s = 180904
-budget_b = 11981
+budget_b = 12393
 budget_f = 182401
 
 [[budget]]
@@ -552,11 +556,11 @@ linkage = "static"
 set = "server"
 lang = "rust"
 measured_s = 171938
-measured_b = 12048
+measured_b = 13096
 measured_f = 173392
 members = 105
 budget_s = 177097
-budget_b = 12410
+budget_b = 13489
 budget_f = 178594
 
 [[budget]]
@@ -832,11 +836,11 @@ linkage = "static"
 set = "server"
 lang = "rust"
 measured_s = 138704
-measured_b = 13768
+measured_b = 14616
 measured_f = 140288
 members = 136
 budget_s = 142866
-budget_b = 14182
+budget_b = 15055
 budget_f = 144497
 
 [[budget]]
