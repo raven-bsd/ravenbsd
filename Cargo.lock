@@ -3806,6 +3806,7 @@ name = "strip"
 version = "0.1.0"
 dependencies = [
  "raven-elf",
+ "raven-proto-fs",
  "raven-rt",
  "raven-tool-core",
 ]

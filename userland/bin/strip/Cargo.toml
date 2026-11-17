@@ -22,6 +22,7 @@ path = "src/main.rs"
 raven-elf = { path = "../../../crates/raven-elf" }
 
 [target.'cfg(target_os = "none")'.dependencies]
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
 raven-rt = { path = "../../rt" }
 raven-tool-core = { path = "../../../crates/raven-tool-core" }
 

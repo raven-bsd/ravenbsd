@@ -60,10 +60,10 @@ mod program {
             u64::from(target.unsigned_abs())
         };
         for pid in 1..=4096 {
-            if let Ok(info) = pid_info(pid) {
-                if info[2] == group {
-                    return Ok(());
-                }
+            if let Ok(info) = pid_info(pid)
+                && info[2] == group
+            {
+                return Ok(());
             }
         }
         Err(Errno::ESRCH)
@@ -80,11 +80,11 @@ mod program {
             raven_rt::println!();
             return 0;
         };
-        if let Ok(number) = query.parse::<u32>() {
-            if let Some(name) = raven_kill::by_number(number) {
-                raven_rt::println!("{name}");
-                return 0;
-            }
+        if let Ok(number) = query.parse::<u32>()
+            && let Some(name) = raven_kill::by_number(number)
+        {
+            raven_rt::println!("{name}");
+            return 0;
         }
         if let Some(number) = raven_kill::by_name(query) {
             raven_rt::println!("{number}");
