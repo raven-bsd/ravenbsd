@@ -38,11 +38,11 @@
 //! NetBSD conversion table, including its padding rules and the `%s` copy of
 //! the `tm` (A-time-7).
 
-use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
 use crate::locale::TimeLocale;
+use crate::timefmt::{FormatIter, Item, Pad, composite, day_name, month_name};
 use crate::tz::consts::{
     DAYSPERNYEAR, DAYSPERWEEK, HOURSPERDAY, MONSPERYEAR, SECSPERMIN, TM_YEAR_BASE,
 };
@@ -66,14 +66,6 @@ impl Default for StrftimeCtx<'_> {
             localtime: None,
         }
     }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Pad {
-    Default,
-    Less,
-    Space,
-    Zero,
 }
 
 /// Format `tm` into `out`; return the byte count excluding the NUL, or 0.
@@ -107,35 +99,28 @@ fn append_format(
     tm: &Tm,
     ctx: &StrftimeCtx<'_>,
 ) {
-    let mut index = 0usize;
-    while let Some(byte) = format.get(index).copied() {
-        index += 1;
-        if byte != b'%' {
-            out.push(byte);
-            continue;
-        }
-        let mut pad = Pad::Default;
+    for item in FormatIter::new(format) {
+        let directive = match item {
+            Item::Literal(byte) => {
+                out.push(byte);
+                continue;
+            }
+            Item::TrailingPercent => {
+                out.push(b'%');
+                break;
+            }
+            Item::Directive(directive) => directive,
+        };
+        let conversion = directive.conversion;
+        let pad = directive.pad;
         // RavenBSD: GNU extensions (RD-28): `^` upper-cases the conversion and
         // `#` swaps the case of `%Z`/`%p`.
-        let mut upper = false;
-        let mut swap = false;
-        loop {
-            match format.get(index).copied() {
-                Some(b'-') => pad = Pad::Less,
-                Some(b'_') => pad = Pad::Space,
-                Some(b'0') => pad = Pad::Zero,
-                Some(b'^') => upper = true,
-                Some(b'#') => swap = true,
-                Some(b'E' | b'O') => {}
-                _ => break,
-            }
-            index += 1;
+        let upper = directive.upper;
+        let swap = directive.swap;
+        if let Some(subformat) = composite(conversion, locale) {
+            append_format(state, locale, out, subformat, tm, ctx);
+            continue;
         }
-        let Some(conversion) = format.get(index).copied() else {
-            out.push(b'%');
-            break;
-        };
-        index += 1;
         let mut piece = String::new();
         match conversion {
             b'A' => piece.push_str(day_name(locale, tm.tm_wday, false)),
@@ -143,33 +128,8 @@ fn append_format(
             b'B' => piece.push_str(month_name(locale, tm.tm_mon, false)),
             b'b' | b'h' => piece.push_str(month_name(locale, tm.tm_mon, true)),
             b'C' => piece.push_str(&yconv(tm.tm_year, TM_YEAR_BASE, true, false)),
-            b'c' => {
-                let mut nested = Vec::new();
-                append_format(
-                    state,
-                    locale,
-                    &mut nested,
-                    locale.d_t_fmt().as_bytes(),
-                    tm,
-                    ctx,
-                );
-                out.extend_from_slice(&nested);
-                continue;
-            }
-            b'D' => {
-                let mut nested = Vec::new();
-                append_format(state, locale, &mut nested, b"%m/%d/%y", tm, ctx);
-                out.extend_from_slice(&nested);
-                continue;
-            }
             b'd' => push_num(&mut piece, i64::from(tm.tm_mday), pad, 2, Pad::Zero),
             b'e' => push_num(&mut piece, i64::from(tm.tm_mday), pad, 2, Pad::Space),
-            b'F' => {
-                let mut nested = Vec::new();
-                append_format(state, locale, &mut nested, b"%Y-%m-%d", tm, ctx);
-                out.extend_from_slice(&nested);
-                continue;
-            }
             b'H' => push_num(&mut piece, i64::from(tm.tm_hour), pad, 2, Pad::Zero),
             b'I' => {
                 let hour = if tm.tm_hour % 12 == 0 {
@@ -201,36 +161,11 @@ fn append_format(
                         .to_ascii_lowercase(),
                 );
             }
-            b'R' => {
-                let mut nested = Vec::new();
-                append_format(state, locale, &mut nested, b"%H:%M", tm, ctx);
-                out.extend_from_slice(&nested);
-                continue;
-            }
-            b'r' => {
-                let mut nested = Vec::new();
-                append_format(
-                    state,
-                    locale,
-                    &mut nested,
-                    locale.t_fmt_ampm().as_bytes(),
-                    tm,
-                    ctx,
-                );
-                out.extend_from_slice(&nested);
-                continue;
-            }
             b'S' => push_num(&mut piece, i64::from(tm.tm_sec), pad, 2, Pad::Zero),
             b's' => {
                 let mut copy = *tm;
                 let value = timeoff(&mut copy, tm.tm_gmtoff).unwrap_or(-1);
-                piece.push_str(&format!("{value}"));
-            }
-            b'T' => {
-                let mut nested = Vec::new();
-                append_format(state, locale, &mut nested, b"%H:%M:%S", tm, ctx);
-                out.extend_from_slice(&nested);
-                continue;
+                push_i64(&mut piece, value);
             }
             b't' => piece.push('\t'),
             b'U' => {
@@ -245,7 +180,7 @@ fn append_format(
                     i64::from(tm.tm_wday)
                 };
                 // The donor formats `%u` with "%d": no padding, regardless of flags.
-                piece.push_str(&format!("{value}"));
+                push_i64(&mut piece, value);
             }
             b'V' | b'G' | b'g' => {
                 let (week, year, base) = iso_week(tm);
@@ -257,12 +192,6 @@ fn append_format(
                     piece.push_str(&yconv(year, base, true, true));
                 }
             }
-            b'v' => {
-                let mut nested = Vec::new();
-                append_format(state, locale, &mut nested, b"%e-%b-%Y", tm, ctx);
-                out.extend_from_slice(&nested);
-                continue;
-            }
             b'W' => {
                 let weekday = if tm.tm_wday != 0 {
                     i64::from(tm.tm_wday - 1)
@@ -273,33 +202,7 @@ fn append_format(
                 push_num(&mut piece, value, pad, 2, Pad::Zero);
             }
             // The donor formats `%w` with "%d": no padding, regardless of flags.
-            b'w' => piece.push_str(&format!("{}", tm.tm_wday)),
-            b'X' => {
-                let mut nested = Vec::new();
-                append_format(
-                    state,
-                    locale,
-                    &mut nested,
-                    locale.t_fmt().as_bytes(),
-                    tm,
-                    ctx,
-                );
-                out.extend_from_slice(&nested);
-                continue;
-            }
-            b'x' => {
-                let mut nested = Vec::new();
-                append_format(
-                    state,
-                    locale,
-                    &mut nested,
-                    locale.d_fmt().as_bytes(),
-                    tm,
-                    ctx,
-                );
-                out.extend_from_slice(&nested);
-                continue;
-            }
+            b'w' => push_i64(&mut piece, i64::from(tm.tm_wday)),
             b'y' => piece.push_str(&yconv(tm.tm_year, TM_YEAR_BASE, false, true)),
             b'Y' => piece.push_str(&yconv(tm.tm_year, TM_YEAR_BASE, true, true)),
             b'Z' => {
@@ -329,19 +232,6 @@ fn append_format(
                 piece.push(if negative { '-' } else { '+' });
                 push_num(&mut piece, value, Pad::Default, 4, Pad::Zero);
             }
-            b'+' => {
-                let mut nested = Vec::new();
-                append_format(
-                    state,
-                    locale,
-                    &mut nested,
-                    b"%a %b %e %H:%M:%S %Z %Y",
-                    tm,
-                    ctx,
-                );
-                out.extend_from_slice(&nested);
-                continue;
-            }
             b'%' => piece.push('%'),
             _ => {
                 out.push(b'%');
@@ -365,36 +255,66 @@ fn append_format(
     }
 }
 
-fn day_name(locale: &dyn TimeLocale, index: i32, abbreviated: bool) -> &str {
-    let Some(index) = usize::try_from(index).ok().filter(|value| *value < 7) else {
-        return "?";
-    };
-    if abbreviated {
-        locale.abday(index)
-    } else {
-        locale.day(index)
+fn push_i64(out: &mut String, value: i64) {
+    if value < 0 {
+        out.push('-');
     }
-}
-
-fn month_name(locale: &dyn TimeLocale, index: i32, abbreviated: bool) -> &str {
-    let Some(index) = usize::try_from(index).ok().filter(|value| *value < 12) else {
-        return "?";
-    };
-    if abbreviated {
-        locale.abmon(index)
-    } else {
-        locale.mon(index)
+    let mut magnitude = value.unsigned_abs();
+    let mut buffer = [0u8; 20];
+    let mut index = buffer.len();
+    loop {
+        index -= 1;
+        if let Some(slot) = buffer.get_mut(index) {
+            *slot = b'0' + (magnitude % 10) as u8;
+        } else {
+            break;
+        }
+        magnitude /= 10;
+        if magnitude == 0 {
+            break;
+        }
+    }
+    for byte in buffer.get(index..).unwrap_or(&[]) {
+        out.push(char::from(*byte));
     }
 }
 
 fn push_num(out: &mut String, value: i64, pad: Pad, width: usize, default: Pad) {
     let effective = if pad == Pad::Default { default } else { pad };
-    let text = match effective {
-        Pad::Less => format!("{value}"),
-        Pad::Space => format!("{value:>width$}"),
-        Pad::Zero | Pad::Default => format!("{value:0width$}"),
-    };
-    out.push_str(&text);
+    if effective == Pad::Less {
+        push_i64(out, value);
+        return;
+    }
+    let negative = value < 0;
+    let mut magnitude = value.unsigned_abs();
+    let mut buffer = [0u8; 20];
+    let mut index = buffer.len();
+    loop {
+        index -= 1;
+        if let Some(slot) = buffer.get_mut(index) {
+            *slot = b'0' + (magnitude % 10) as u8;
+        } else {
+            break;
+        }
+        magnitude /= 10;
+        if magnitude == 0 {
+            break;
+        }
+    }
+    let digits = buffer.get(index..).unwrap_or(&[]);
+    let total = digits.len() + if negative { 1 } else { 0 };
+    if width > total {
+        let fill = if effective == Pad::Space { ' ' } else { '0' };
+        for _ in 0..width.saturating_sub(total) {
+            out.push(fill);
+        }
+    }
+    if negative {
+        out.push('-');
+    }
+    for byte in digits {
+        out.push(char::from(*byte));
+    }
 }
 
 fn yconv(a: i32, b: i32, convert_top: bool, convert_yy: bool) -> String {
@@ -414,11 +334,17 @@ fn yconv(a: i32, b: i32, convert_top: bool, convert_yy: bool) -> String {
         if lead == 0 && trail < 0 {
             out.push_str("-0");
         } else {
-            out.push_str(&format!("{lead:02}"));
+            push_num(&mut out, i64::from(lead), Pad::Zero, 2, Pad::Zero);
         }
     }
     if convert_yy {
-        out.push_str(&format!("{:02}", if trail < 0 { -trail } else { trail }));
+        push_num(
+            &mut out,
+            i64::from(if trail < 0 { -trail } else { trail }),
+            Pad::Zero,
+            2,
+            Pad::Zero,
+        );
     }
     out
 }
