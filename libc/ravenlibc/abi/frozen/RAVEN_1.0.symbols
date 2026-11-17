@@ -1,7 +1,7 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1376
+# records: 1413
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
 _Unwind_Backtrace F - all 2 -
@@ -56,6 +56,7 @@ addmntent F - x86_64 2 mntent.h
 aligned_alloc F - all 1 stdlib.h
 alphasort F - all 1 dirent.h
 arc4random_buf F - all 1 stdlib.h
+asctime F - all 0 time.h
 asin F - all 1 -
 asinf F - all 1 -
 asinh F - all 1 -
@@ -120,6 +121,7 @@ clearerr_unlocked F - all 1 stdio.h
 clock F - all 0 time.h
 clock_getres F - all 0 time.h
 clock_gettime F - all 0 time.h
+clock_nanosleep F - all 0 time.h
 clock_settime F - all 0 time.h
 close F - all 0 unistd.h
 close_range F - all 1 unistd.h
@@ -157,6 +159,7 @@ creat64 F - all 0 fcntl.h
 crypt F - x86_64 1 -
 crypt_r F - x86_64 1 -
 ctermid F - all 0 stdio.h
+ctime F - all 0 time.h
 daemon F - all 1 -
 dcgettext F - all 0 libintl.h
 dcngettext F - all 0 libintl.h
@@ -560,18 +563,31 @@ isunordered F - all 0 math.h
 isupper F - all 0 ctype.h
 isupper_l F - all 1 -
 iswalnum F - all 0 wctype.h
+iswalnum_l F - all 1 -
 iswalpha F - all 0 wctype.h
+iswalpha_l F - all 1 -
 iswblank F - all 0 wctype.h
+iswblank_l F - all 1 -
 iswcntrl F - all 0 wctype.h
+iswcntrl_l F - all 1 -
 iswctype F - all 0 wctype.h
+iswctype_l F - all 1 -
 iswdigit F - all 0 wctype.h
+iswdigit_l F - all 1 -
 iswgraph F - all 0 wctype.h
+iswgraph_l F - all 1 -
 iswlower F - all 0 ctype.h
+iswlower_l F - all 1 -
 iswprint F - all 0 wctype.h
+iswprint_l F - all 1 -
 iswpunct F - all 0 wctype.h
+iswpunct_l F - all 1 -
 iswspace F - all 0 wctype.h
+iswspace_l F - all 1 -
 iswupper F - all 0 wctype.h
+iswupper_l F - all 1 -
 iswxdigit F - all 0 wctype.h
+iswxdigit_l F - all 1 -
 isxdigit F - all 0 ctype.h
 isxdigit_l F - all 1 -
 iszero F - all 0 math.h
@@ -1136,6 +1152,7 @@ statfs F - all 1 -
 stderr D 8 all 0 stdio.h
 stdin D 8 all 0 stdio.h
 stdout D 8 all 0 stdio.h
+stime F - all 1 time.h
 stpcpy F - all 1 string.h
 stpncpy F - all 1 string.h
 str2sig F - all 1 -
@@ -1157,6 +1174,7 @@ strerror_r F - all 0 string.h
 strfromd F - all 0 -
 strfromf F - all 0 -
 strftime F - all 0 time.h
+strftime_l F - all 0 time.h
 strlcat F - all 0 string.h
 strlcpy F - all 0 string.h
 strlen F - all 0 string.h
@@ -1175,6 +1193,7 @@ strnvis F - x86_64 2 -
 strnvisx F - x86_64 2 -
 strpbrk F - all 0 string.h
 strptime F - all 1 time.h
+strptime_l F - all 0 -
 strrchr F - all 0 string.h
 strsep F - all 1 string.h
 strsignal F - all 1 string.h
@@ -1268,6 +1287,8 @@ timerfd_create F - all 1 -
 timerfd_gettime F - all 1 -
 timerfd_settime F - all 1 -
 times F - all 0 sys/times.h
+timespec_get F - all 0 time.h
+timespec_getres F - all 0 time.h
 timingsafe_bcmp F - all 2 -
 timingsafe_memcmp F - all 2 -
 toascii F - all 1 ctype.h
@@ -1280,8 +1301,11 @@ totalordermagf F - all 3 -
 toupper F - all 0 ctype.h
 toupper_l F - all 1 -
 towctrans F - all 0 wctype.h
+towctrans_l F - all 1 -
 towlower F - all 0 wctype.h
+towlower_l F - all 1 -
 towupper F - all 0 wctype.h
+towupper_l F - all 1 -
 trunc F - all 1 -
 truncf F - all 1 -
 truncl F - all 1 -
@@ -1292,6 +1316,7 @@ tss_get F - all 0 threads.h
 tss_set F - all 0 threads.h
 ttyname_r F - all 0 unistd.h
 twalk F - all 1 search.h
+tzset F - all 0 time.h
 ufromfp F - all 0 -
 ufromfpx F - all 0 -
 uid_from_user F - all 2 -
@@ -1340,28 +1365,40 @@ waitid F - all 1 -
 waitpid F - all 0 sys/wait.h
 wcrtomb F - all 0 wchar.h
 wcscasecmp F - all 1 wchar.h
+wcscasecmp_l F - all 1 -
 wcscat F - all 0 wchar.h
 wcschr F - all 0 wchar.h
 wcscmp F - all 0 wchar.h
+wcscoll F - all 0 wchar.h
+wcscoll_l F - all 1 -
 wcscpy F - all 0 wchar.h
 wcscspn F - all 0 wchar.h
+wcsftime F - all 0 time.h
+wcsftime_l F - all 1 -
 wcslcat F - all 0 string.h
 wcslcpy F - all 0 string.h
 wcslen F - all 0 wchar.h
 wcsncasecmp F - all 1 wchar.h
+wcsncasecmp_l F - all 1 -
 wcsncat F - all 0 wchar.h
 wcsncmp F - all 0 wchar.h
 wcsncpy F - all 0 wchar.h
+wcsnlen F - all 1 wchar.h
 wcspbrk F - all 0 wchar.h
 wcsrchr F - all 0 wchar.h
 wcsspn F - all 0 wchar.h
 wcsstr F - all 0 wchar.h
+wcstok F - all 0 wchar.h
 wcstombs F - all 0 stdlib.h
 wcswidth F - all 1 -
+wcsxfrm F - all 0 wchar.h
+wcsxfrm_l F - all 1 -
 wctob F - all 0 wchar.h
 wctomb F - all 0 stdlib.h
 wctrans F - all 0 wctype.h
+wctrans_l F - all 1 -
 wctype F - all 0 wctype.h
+wctype_l F - all 1 -
 wcwidth F - all 1 -
 wmemchr F - all 0 wchar.h
 wmemcmp F - all 0 wchar.h

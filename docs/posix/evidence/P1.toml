@@ -1111,3 +1111,229 @@ id = "interface.ufromfpx"
 status = "present"
 evidence = "test:tests/libc/posix/math/check-math.sh"
 notes = "P1 batch B: ufromfpx; raven-libc-m unit test plus libc.a symbol and long-double ABI check"
+
+# P1 batch B time: the added time exports; raven-libc-time engine tests and libc.a symbols.
+
+[[row]]
+id = "interface.asctime"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time asctime; raven-libc-time unit suite and libc.a symbol"
+
+[[row]]
+id = "interface.clock_nanosleep"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time clock_nanosleep; raven-libc-time unit suite and libc.a symbol"
+
+[[row]]
+id = "interface.ctime"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time ctime; raven-libc-time unit suite and libc.a symbol"
+
+[[row]]
+id = "interface.stime"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time stime; raven-libc-time unit suite and libc.a symbol"
+
+[[row]]
+id = "interface.strftime_l"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time strftime_l; raven-libc-time unit suite and libc.a symbol"
+
+[[row]]
+id = "interface.strptime_l"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time strptime_l; raven-libc-time unit suite and libc.a symbol"
+
+[[row]]
+id = "interface.timespec_get"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time timespec_get; raven-libc-time unit suite and libc.a symbol"
+
+[[row]]
+id = "interface.timespec_getres"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time timespec_getres; raven-libc-time unit suite and libc.a symbol"
+
+[[row]]
+id = "interface.tzset"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time tzset; raven-libc-time unit suite and libc.a symbol"
+
+[[row]]
+id = "interface.wcsftime"
+status = "present"
+evidence = "test:tests/libc/posix/time/check-time.sh"
+notes = "P1 batch B: time wcsftime; raven-libc-time unit suite and libc.a symbol"
+
+# P1 batch B wchar/wctype: the _l classification plus the wide string/time exports.
+
+[[row]]
+id = "interface.iswalnum_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype iswalnum_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.iswalpha_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype iswalpha_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.iswblank_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype iswblank_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.iswcntrl_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype iswcntrl_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.iswctype_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype iswctype_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.iswdigit_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype iswdigit_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.iswgraph_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype iswgraph_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.iswlower_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype iswlower_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.iswprint_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype iswprint_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.iswpunct_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype iswpunct_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.iswspace_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype iswspace_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.iswupper_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype iswupper_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.iswxdigit_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype iswxdigit_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.towctrans_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype towctrans_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.towlower_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype towlower_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.towupper_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype towupper_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.wctrans_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype wctrans_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.wctype_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype wctype_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.wcscasecmp_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype wcscasecmp_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.wcscoll"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype wcscoll; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.wcscoll_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype wcscoll_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.wcsncasecmp_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype wcsncasecmp_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.wcsnlen"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype wcsnlen; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.wcstok"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype wcstok; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.wcsxfrm"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype wcsxfrm; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.wcsxfrm_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype wcsxfrm_l; raven-libc-ctype suite and libc.a symbol"
+
+[[row]]
+id = "interface.wcsftime_l"
+status = "present"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
+notes = "P1 batch B: wchar/wctype wcsftime_l; raven-libc-ctype suite and libc.a symbol"

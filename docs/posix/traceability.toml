@@ -872,7 +872,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.asctime"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.asin"
@@ -1598,7 +1598,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.clock_nanosleep"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.clock_settime"
@@ -2024,7 +2024,7 @@ evidence = "test:tests/libc/posix/stdio/check-stdio.sh"
 id = "interface.ctime"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.cuserid"
@@ -4196,7 +4196,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswalnum_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswalpha"
@@ -4208,7 +4208,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswalpha_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswblank"
@@ -4220,7 +4220,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswblank_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswcntrl"
@@ -4232,7 +4232,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswcntrl_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswctype"
@@ -4244,7 +4244,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswctype_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswdigit"
@@ -4256,7 +4256,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswdigit_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswgraph"
@@ -4268,7 +4268,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswgraph_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswlower"
@@ -4280,7 +4280,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswlower_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswprint"
@@ -4292,7 +4292,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswprint_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswpunct"
@@ -4304,7 +4304,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswpunct_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswspace"
@@ -4316,7 +4316,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswspace_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswupper"
@@ -4328,7 +4328,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswupper_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.iswxdigit"
@@ -4340,7 +4340,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.iswxdigit_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.isxdigit"
@@ -7694,7 +7694,7 @@ evidence = "none"
 id = "interface.stime"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.strcasecmp"
@@ -7802,7 +7802,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.strftime_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.strlcat"
@@ -7868,7 +7868,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.strptime_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.strrchr"
@@ -8300,13 +8300,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.timespec_get"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.timespec_getres"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.tmpfile"
@@ -8366,7 +8366,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.towctrans_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.towlower"
@@ -8378,7 +8378,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.towlower_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.towupper"
@@ -8390,7 +8390,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.towupper_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.trunc"
@@ -8474,7 +8474,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.tzset"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.ualarm"
@@ -8792,7 +8792,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wcscasecmp_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcscat"
@@ -8816,13 +8816,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wcscoll"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcscoll_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcscpy"
@@ -8840,13 +8840,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wcsftime"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/time/check-time.sh"
 
 [[trace]]
 id = "interface.wcsftime_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcslcat"
@@ -8876,7 +8876,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wcsncasecmp_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcsncat"
@@ -8900,7 +8900,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wcsnlen"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcsnrtombs"
@@ -8966,7 +8966,7 @@ evidence = "none"
 id = "interface.wcstok"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcstol"
@@ -9020,13 +9020,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wcsxfrm"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcsxfrm_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wctob"
@@ -9050,7 +9050,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wctrans_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wctype"
@@ -9062,7 +9062,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.wctype_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "test:tests/libc/posix/wchar/check-wchar.sh"
 
 [[trace]]
 id = "interface.wcwidth"

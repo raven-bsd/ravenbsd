@@ -10,4 +10,6 @@ pub(crate) mod mbrtowc;
 pub(crate) mod mbtowc;
 pub(crate) mod wcrtomb;
 pub(crate) mod wcs;
+pub(crate) mod wcscoll;
+pub(crate) mod wcsnlen;
 pub(crate) mod wcwidth;
