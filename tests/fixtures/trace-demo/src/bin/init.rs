@@ -14,7 +14,7 @@ use raven_initfs::Initfs;
 use raven_rt::entry;
 use raven_rt::println;
 use raven_trace_demo::{
-    PAGE, handle_close, memobj_create, nanosleep, proc_wait, stage, start, transfer,
+    PAGE, Staged, handle_close, memobj_create, nanosleep, proc_wait, stage, start, transfer,
 };
 
 entry!(main);
@@ -38,28 +38,39 @@ fn trace_set(id: u64) -> Result<(), Errno> {
 }
 
 fn open_retry(path: &str) -> Result<Handle, Errno> {
-    let mut attempt = 0usize;
-    loop {
+    for attempt in 0..OPEN_RETRIES {
         match raven_rt::sys::open(path, O_READ) {
             Ok(handle) => return Ok(handle),
-            Err(Errno::ENOENT) | Err(Errno::EIO) if attempt < OPEN_RETRIES => {
-                core::hint::spin_loop();
-                attempt += 1;
+            Err(Errno::ENOENT) | Err(Errno::EIO) if attempt + 1 < OPEN_RETRIES => {
+                nanosleep(25_000_000);
             }
             Err(error) => return Err(error),
         }
     }
+    Err(Errno::ENOENT)
 }
 
-fn one_call() -> Result<(), &'static str> {
-    let file = open_retry("trace-demo:probe").map_err(|_| "open")?;
+fn one_call(path: &str, expected: u8) -> Result<(), &'static str> {
+    let file = open_retry(path).map_err(|_| "open")?;
     let mut byte = [0u8; 1];
     match raven_rt::sys::read(file, &mut byte) {
-        Ok(1) if byte[0] == b'R' => {}
+        Ok(1) if byte[0] == expected => {}
         _ => return Err("read"),
     }
     let _ = raven_rt::sys::close(file);
     Ok(())
+}
+
+fn start_with_sink(initfs: &Initfs<'_>, path: &str, sink: Handle) -> Result<Staged, &'static str> {
+    let staged = stage(initfs, path).map_err(|_| "real server stage")?;
+    transfer(
+        staged.process,
+        sink,
+        Rights::MAP.union(Rights::READ).union(Rights::WRITE),
+    )
+    .map_err(|_| "real server transfer")?;
+    start(&staged).map_err(|_| "real server start")?;
+    Ok(staged)
 }
 
 fn main(_args: raven_rt::Args) -> i32 {
@@ -101,17 +112,66 @@ fn main(_args: raven_rt::Args) -> i32 {
     }
     nanosleep(50_000_000);
 
-    // A traced request, then an untraced one.
+    // Start the real block stack: initfsd serves /etc/blockd.img, blockd the GPT disk, and
+    // fsd-ufs mounts block:0 and serves ufs:.
+    let initfsd = match stage(&initfs, "/initfsd") {
+        Ok(staged) => staged,
+        Err(_) => return fail("initfsd stage"),
+    };
+    if start(&initfsd).is_err() {
+        return fail("initfsd start");
+    }
+    nanosleep(100_000_000);
+    // Wait for initfsd to serve the disk image before blockd opens it.
+    match open_retry("initfs:/etc/blockd.img") {
+        Ok(handle) => {
+            let _ = raven_rt::sys::close(handle);
+        }
+        Err(_) => return fail("initfsd ready"),
+    }
+    let blockd = match start_with_sink(&initfs, "/blockd", sink) {
+        Ok(staged) => staged,
+        Err(message) => return fail(message),
+    };
+    nanosleep(300_000_000);
+    // Wait for blockd to publish block:0 before fsd-ufs mounts it.
+    match open_retry("block:0") {
+        Ok(handle) => {
+            let _ = raven_rt::sys::close(handle);
+        }
+        Err(_) => return fail("blockd ready"),
+    }
+    let fsd = match start_with_sink(&initfs, "/fsd-ufs", sink) {
+        Ok(staged) => staged,
+        Err(message) => return fail(message),
+    };
+    nanosleep(300_000_000);
+
+    // Fixture-server proof: one traced and one untraced request.
     if trace_set(TRACE_ID).is_err() {
         return fail("trace_set");
     }
-    if let Err(message) = one_call() {
+    if let Err(message) = one_call("trace-demo:probe", b'R') {
         return fail(message);
     }
     if trace_set(0).is_err() {
         return fail("trace_clear");
     }
-    if let Err(message) = one_call() {
+    if let Err(message) = one_call("trace-demo:probe", b'R') {
+        return fail(message);
+    }
+
+    // Real read: client -> fsd-ufs -> blockd, then the same path untraced.
+    if trace_set(TRACE_ID).is_err() {
+        return fail("trace_set");
+    }
+    if let Err(message) = one_call("ufs:/ten.txt", b'0') {
+        return fail(message);
+    }
+    if trace_set(0).is_err() {
+        return fail("trace_clear");
+    }
+    if let Err(message) = one_call("ufs:/ten.txt", b'0') {
         return fail(message);
     }
 
@@ -138,6 +198,11 @@ fn main(_args: raven_rt::Args) -> i32 {
     }
     handle_close(tracer.process);
 
+    for server in [&fsd, &blockd, &initfsd] {
+        let _ = raven_rt::proc_terminate(server.process, 0);
+        let _ = proc_wait(server.process);
+        handle_close(server.process);
+    }
     let _ = raven_rt::proc_terminate(staged.process, 0);
     match proc_wait(staged.process) {
         Ok(0) => {}

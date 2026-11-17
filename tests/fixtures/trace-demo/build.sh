@@ -29,10 +29,19 @@ mkdir -p "$out"
 target_dir=${CARGO_TARGET_DIR:-target}
 
 RUSTFLAGS="$rustflags" \
-    cargo build -p raven-trace-demo -p trace --target "$target" --release
+    cargo build -p raven-trace-demo -p trace -p raven-initfsd -p raven-blockd -p fsd-ufs \
+        --target "$target" --release
+
+# The real blockd RAM backend serves this GPT-wrapped UFS image from the initfs.
+gzip -dc tests/ufs-vectors/golden/ufs2-b4096.img.gz > "$out/ufs.img"
+cargo run -q -p raven-k54-mkimage -- "$out/ufs.img" "$out/blockd.img"
 
 cargo run -q -p raven-initfs --features std --example mkinitfs -- \
     "$out/initfs.img" \
     "/init=$target_dir/$target/release/raven-trace-demo-init:0755" \
     "/server=$target_dir/$target/release/raven-trace-demo-server:0755" \
-    "/trace=$target_dir/$target/release/trace:0755"
+    "/trace=$target_dir/$target/release/trace:0755" \
+    "/initfsd=$target_dir/$target/release/raven-initfsd:0755" \
+    "/blockd=$target_dir/$target/release/raven-blockd:0755" \
+    "/fsd-ufs=$target_dir/$target/release/fsd-ufs:0755" \
+    "/etc/blockd.img=$out/blockd.img:0644"

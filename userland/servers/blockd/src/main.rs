@@ -18,6 +18,8 @@ mod device;
 mod handler;
 #[cfg(target_os = "none")]
 mod remote;
+#[cfg(target_os = "none")]
+mod trace;
 
 #[cfg(target_os = "none")]
 mod program {
@@ -166,10 +168,12 @@ mod program {
             Err(error) => return Err(error.description().to_string()),
         };
         log_started("blockd");
+        let mut probe = crate::trace::Probe::io();
         loop {
             let Some(packet) = server.poll(None) else {
                 continue;
             };
+            probe.record(packet.packet.trace_id, packet.packet.opcode);
             if packet.packet.opcode == OPEN_OPCODE
                 && let Ok(path) = core::str::from_utf8(packet.packet.path_bytes())
             {
