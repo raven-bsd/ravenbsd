@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S73 capability handoff and revocation demo: a controller transfers a reduced-rights MemObject to
+# a child, the child uses it (MAP ok, DUP denied), the controller revokes MAP (child sees EPERM),
+# and a second object proves the object is released only after the last live handle (alive after
+# source close, stale EBADF after close, slot reused safely). Runs on x86_64 and aarch64.
+
+name = "cap-revoke"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 180
+pre = ["sh tests/fixtures/cap-revoke/build.sh"]
+initfs = "build/fixtures/cap-revoke/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^cap: use ok$'
+
+[[expect]]
+regex = '^cap: reduced ok$'
+
+[[expect]]
+regex = '^cap: revoke eperm ok$'
+
+[[expect]]
+regex = '^cap: revoke case ok$'
+
+[[expect]]
+regex = '^cap: lifetime use ok$'
+
+[[expect]]
+regex = '^cap: lifetime alive ok$'
+
+[[expect]]
+regex = '^cap: lifetime reuse ok$'
+
+[[expect]]
+regex = '^cap: lifetime stale ok$'
+
+[[expect]]
+regex = '^cap: lifetime case ok$'
+
+[[expect]]
+regex = '^cap: ok$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|cap: failed'
