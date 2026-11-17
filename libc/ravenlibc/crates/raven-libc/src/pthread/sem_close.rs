@@ -12,11 +12,11 @@ use raven_libc_thread::sem;
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sem_close(sem: *mut sem::Sem) -> c_int {
     if sem.is_null() {
-        return 22;
+        return super::common::sem_err(raven_libc_thread::limits::EINVAL);
     }
     // SAFETY: sem is non-NULL after the check and points to a live named semaphore.
     match sem::close(unsafe { &*sem }) {
         Ok(()) => 0,
-        Err(error) => super::common::err(error),
+        Err(error) => super::common::sem_err(error),
     }
 }

@@ -239,6 +239,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ed"
+version = "0.1.0"
+dependencies = [
+ "raven-libc-regex",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "emmc2"
 version = "0.1.0"
 dependencies = [
@@ -589,6 +599,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "more"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "netd"
 version = "0.1.0"
 dependencies = [
@@ -888,6 +906,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-bc"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-tool-core",
+]
+
+[[package]]
 name = "raven-beep"
 version = "0.1.0"
 dependencies = [
@@ -1108,6 +1134,14 @@ name = "raven-elf"
 version = "0.1.0"
 
 [[package]]
+name = "raven-env"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-esr"
 version = "0.1.0"
 
@@ -1199,6 +1233,14 @@ version = "0.1.0"
 dependencies = [
  "raven-fdt-lite",
  "raven-genet",
+]
+
+[[package]]
+name = "raven-getconf"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
 ]
 
 [[package]]
@@ -1468,6 +1510,14 @@ dependencies = [
  "raven-usercopy",
  "raven-vma",
  "spin",
+]
+
+[[package]]
+name = "raven-kill"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
 ]
 
 [[package]]
@@ -2023,6 +2073,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-nice"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-env",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-nohup"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-env",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-nulld"
 version = "0.1.0"
 dependencies = [
@@ -2248,27 +2316,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "raven-procd"
+name = "raven-proc-spawn-attrs"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-initfs",
- "raven-proto-fs",
- "raven-proto-proc",
  "raven-rt",
- "raven-scheme",
-]
-
-[[package]]
-name = "raven-procd-fixture"
-version = "0.1.0"
-dependencies = [
- "raven-abi",
- "raven-initfs",
- "raven-proto-fs",
- "raven-proto-proc",
- "raven-rt",
- "raven-scheme",
 ]
 
 [[package]]
@@ -2299,13 +2352,6 @@ version = "0.1.0"
 
 [[package]]
 name = "raven-proto-net"
-version = "0.1.0"
-dependencies = [
- "raven-abi",
-]
-
-[[package]]
-name = "raven-proto-proc"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
@@ -3083,7 +3129,6 @@ dependencies = [
  "raven-abi",
  "raven-initfs",
  "raven-proto-fs",
- "raven-proto-proc",
  "raven-rt",
  "raven-scheme",
 ]
@@ -3674,6 +3719,15 @@ name = "winnow"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3b93199df0ab874cdf0c6a94f0a0dc3423fe41f1cafb62b8bd7b1deb277aef"
+
+[[package]]
+name = "write"
+version = "0.1.0"
+dependencies = [
+ "raven-rt",
+ "raven-tool-core",
+ "raven-userdb",
+]
 
 [[package]]
 name = "xhci"

@@ -522,10 +522,20 @@ static int check_exit_value(void)
     return (intptr_t)value == 0x1234;
 }
 
+#define TIMED_CHECK(name, expression)                                            \
+    do {                                                                        \
+        if (expression) {                                                       \
+            checks++;                                                           \
+        } else {                                                                \
+            rl_out("libc-threads: timedwait " name " failed");                  \
+        }                                                                       \
+    } while (0)
+
 static int check_timedwait(void)
 {
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t condition = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t condition;
+    pthread_condattr_t attr;
     struct timespec deadline;
     struct timespec before;
     struct timespec after;
@@ -533,22 +543,52 @@ static int check_timedwait(void)
     int result;
     int checks = 0;
 
-    checks += clock_gettime(CLOCK_REALTIME, &before) == 0;
+    if (pthread_condattr_init(&attr) != 0 ||
+        pthread_condattr_setclock(&attr, CLOCK_MONOTONIC) != 0 ||
+        pthread_cond_init(&condition, &attr) != 0) {
+        return 0;
+    }
+    TIMED_CHECK("clock1", clock_gettime(CLOCK_MONOTONIC, &before) == 0);
     deadline = before;
     deadline.tv_nsec += 100 * 1000 * 1000;
     if (deadline.tv_nsec >= 1000000000L) {
         deadline.tv_nsec -= 1000000000L;
         deadline.tv_sec += 1;
     }
-    checks += pthread_mutex_lock(&mutex) == 0;
+    TIMED_CHECK("lock", pthread_mutex_lock(&mutex) == 0);
     result = pthread_cond_timedwait(&condition, &mutex, &deadline);
-    checks += result == ETIMEDOUT;
-    checks += pthread_mutex_unlock(&mutex) == 0;
-    checks += clock_gettime(CLOCK_REALTIME, &after) == 0;
+    TIMED_CHECK("timeout", result == ETIMEDOUT);
+    TIMED_CHECK("unlock", pthread_mutex_unlock(&mutex) == 0);
+    TIMED_CHECK("clock2", clock_gettime(CLOCK_MONOTONIC, &after) == 0);
     elapsed = ((long long)after.tv_sec - (long long)before.tv_sec) * 1000 +
               ((long long)after.tv_nsec - (long long)before.tv_nsec) / 1000000;
-    checks += elapsed >= 100 && elapsed <= 600;
+    {
+        char line[RL_LINE_MAX + 1];
+        char *cursor = line;
+        rl_copy(line, "libc-threads: timedwait before=");
+        cursor = line + rl_strlen(line);
+        rl_append_uint(&cursor, (long)before.tv_sec);
+        rl_append(&cursor, ".");
+        rl_append_uint(&cursor, (long)before.tv_nsec);
+        rl_append(&cursor, " after=");
+        rl_append_uint(&cursor, (long)after.tv_sec);
+        rl_append(&cursor, ".");
+        rl_append_uint(&cursor, (long)after.tv_nsec);
+        rl_out(line);
+    }
+    {
+        char line[RL_LINE_MAX + 1];
+        char *cursor = line;
+        rl_copy(line, "libc-threads: timedwait result=");
+        cursor = line + rl_strlen(line);
+        rl_append_uint(&cursor, result);
+        rl_append(&cursor, " elapsed=");
+        rl_append_uint(&cursor, (long)elapsed);
+        rl_out(line);
+    }
+    TIMED_CHECK("elapsed", elapsed >= 100 && elapsed <= 600);
     pthread_cond_destroy(&condition);
+    pthread_condattr_destroy(&attr);
     pthread_mutex_destroy(&mutex);
     return checks >= 6;
 }

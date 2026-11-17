@@ -1,0 +1,46 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt GETCONF 1
+.Os RavenBSD
+.Sh NAME
+.Nm getconf
+.Nd query POSIX configuration values
+.Sh SYNOPSIS
+.Nm
+.Op Fl a
+.Op Ar name ...
+.Sh DESCRIPTION
+.Nm
+prints the value of each
+.Ar name .
+The bounded table includes
+.Ql ARG_MAX ,
+.Ql PAGESIZE ,
+.Ql PAGE_SIZE ,
+.Ql _POSIX_VERSION ,
+.Ql _POSIX_ARG_MAX ,
+.Ql _POSIX_CHOWN_RESTRICTED ,
+.Ql _POSIX_NAME_MAX ,
+.Ql _POSIX_PATH_MAX ,
+.Ql _POSIX_PIPE_BUF
+and
+.Ql _POSIX_VDISABLE .
+Unsupported names are reported and exit 1; values are never invented.
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl a , Fl -all
+Print every supported
+.Ar name
+and value.
+.El
+.Sh EXIT STATUS
+.Ex -std
+An unknown variable exits 1.
+A usage error exits 2.
+.Sh SEE ALSO
+.Xr env 1 ,
+.Xr limits 3
+.Sh STANDARDS
+IEEE Std 1003.1-2024
+.Pq POSIX.1-2024 .

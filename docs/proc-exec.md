@@ -69,8 +69,7 @@ Applying executable setuid/setgid bits on exec is a follow-up (the spawn path us
 * In-flight IPC client/server requests and capture slots are not reset. The caller must be
   single-threaded and not inside another scheme request; a server that execs needs an IPC-state
   reset ticket.
-* `procd` is not on the `f20bc3a7` base (P2e is unmerged), so the exposed client is
-  `userland/rt`; the procd `EXEC` request is a follow-up when that server lands.
+* The exposed client is `userland/rt`; the kernel `PROC_EXEC`/`execve` path is the contract. There is no procd.
 
 ## Tests
 
