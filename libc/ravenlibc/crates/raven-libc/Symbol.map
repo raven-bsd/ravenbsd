@@ -1671,6 +1671,70 @@ RAVEN_1.0 {
 		ttyname_r;
 		# --- K96/F3 merge ---
 		fsync;
+		# --- P1c-ipc-tty: aio ---
+		aio_cancel;
+		aio_cancel64;
+		aio_error;
+		aio_error64;
+		aio_fsync;
+		aio_fsync64;
+		aio_read;
+		aio_read64;
+		aio_return;
+		aio_return64;
+		aio_suspend;
+		aio_suspend64;
+		aio_write;
+		aio_write64;
+		lio_listio;
+		lio_listio64;
+		# --- P1c-ipc-tty: mqueue ---
+		mq_close;
+		mq_getattr;
+		mq_notify;
+		mq_open;
+		mq_receive;
+		mq_send;
+		mq_setattr;
+		mq_timedreceive;
+		mq_timedsend;
+		mq_unlink;
+		# --- P1c-ipc-tty: STREAMS ---
+		fattach;
+		fdetach;
+		getmsg;
+		getpmsg;
+		isastream;
+		putmsg;
+		putpmsg;
+		# --- P1c-ipc-tty: termios ---
+		cfgetispeed;
+		cfgetospeed;
+		cfsetispeed;
+		cfsetospeed;
+		cfsetspeed;
+		tcdrain;
+		tcflow;
+		tcflush;
+		tcgetsid;
+		tcgetwinsize;
+		tcsendbreak;
+		tcsetwinsize;
+		# --- P1c-ipc-tty: SysV IPC ---
+		ftok;
+		msgctl;
+		msgget;
+		msgrcv;
+		msgsnd;
+		semctl;
+		semget;
+		semop;
+		semtimedop;
+		shmat;
+		shmctl;
+		shmdt;
+		shmget;
+		shm_unlink;
 };
 
 RAVENprivate_1.0 {
@@ -1687,6 +1751,8 @@ RAVENprivate_1.0 {
 		__raven_va_ioctl;
 		__raven_va_prctl;
 		__raven_va_makecontext;
+		__raven_va_mq_open;
+		__raven_va_semctl;
 		__raven_va_sem_open;
 		__raven_va_setproctitle;
 		__raven_va_setproctitle_fast;

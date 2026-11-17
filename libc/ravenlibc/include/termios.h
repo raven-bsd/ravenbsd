@@ -62,10 +62,8 @@ int tcflow (int, int);
 
 pid_t tcgetsid (int);
 
-#if __BSD_VISIBLE
 void cfmakeraw(struct termios *);
 int cfsetspeed(struct termios *, speed_t);
-#endif
 
 #endif
 __END_DECLS
