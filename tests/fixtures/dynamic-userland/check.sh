@@ -13,7 +13,7 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)
 cd "$root"
 
-arch=x86_64
+arch=${RAVEN_QT_ARCH:-x86_64}
 while [ $# -gt 0 ]; do
     case "$1" in
         --arch)
