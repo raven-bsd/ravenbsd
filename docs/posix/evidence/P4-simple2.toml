@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4a3 required time/tty utility evidence. The optional SCCS/tty tools (tabs, unget, what) are
+# waived by P4a2 and have no row here.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.time"
+status = "present"
+evidence = "test:tests/posix/utility/simple2/time/test.sh"
+notes = "P4a3: -p parsing, real time, child user/sys from PROC_TIMES, statistics on stderr, child status propagation"
+
+[[row]]
+id = "util.times"
+status = "present"
+evidence = "test:tests/posix/utility/simple2/times/test.sh"
+notes = "P4a3: POSIX XmY.ZZs two-line rendering from the PROC_TIMES process/child counters"
+
+[[row]]
+id = "util.tput"
+status = "present"
+evidence = "test:tests/posix/utility/simple2/tput/test.sh"
+notes = "P4a3: -T and ANSI capability subset (clear, cup, bold, sgr0, smso/rmso, smul/rmul, el, ed, bel, cols, lines)"
+
+[[row]]
+id = "util.ulimit"
+status = "present"
+evidence = "test:tests/posix/utility/simple2/ulimit/test.sh"
+notes = "P4a3: -a report plus soft/hard query and set over PROC_GETRLIMIT/PROC_SETRLIMIT; POSIX display units"
