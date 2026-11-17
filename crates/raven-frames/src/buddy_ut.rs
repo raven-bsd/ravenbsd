@@ -9,10 +9,14 @@ use super::*;
 const ORDERS: usize = 8;
 const MAX_BLOCKS: usize = 128;
 
-type Buddy = BuddyAllocator<ORDERS, MAX_BLOCKS, NoPager>;
-
-fn buddy(frames: u64) -> Buddy {
-    Buddy::new(0, frames).expect("valid buddy")
+/// Declare the descriptor storage and the allocator over it in the caller's scope.
+macro_rules! buddy {
+    ($storage:ident, $allocator:ident, $frames:expr) => {
+        let mut $storage = [Block::empty(); MAX_BLOCKS];
+        let mut $allocator =
+            BuddyAllocator::<ORDERS, NoPager>::with_pager(&mut $storage, 0, $frames, NoPager)
+                .expect("valid buddy");
+    };
 }
 
 /// A pager whose `back` always fails, for failure injection.
@@ -30,8 +34,8 @@ fn allocated_frames(live: &[(u64, usize)]) -> u64 {
     live.iter().map(|&(_, order)| 1u64 << order).sum()
 }
 
-fn assert_conserved<const O: usize, const B: usize>(
-    allocator: &BuddyAllocator<O, B, NoPager>,
+fn assert_conserved<'a, const O: usize>(
+    allocator: &BuddyAllocator<'a, O, NoPager>,
     live: &[(u64, usize)],
 ) {
     let stats = allocator.stats();
@@ -54,7 +58,7 @@ fn assert_conserved<const O: usize, const B: usize>(
 
 #[test]
 fn alloc_and_free_round_trip() {
-    let mut allocator = buddy(64);
+    buddy!(storage, allocator, 64);
     let a = allocator.alloc(0).expect("alloc");
     let b = allocator.alloc(0).expect("alloc");
     assert_ne!(a, b);
@@ -65,7 +69,7 @@ fn alloc_and_free_round_trip() {
 
 #[test]
 fn coalescing_merges_buddies() {
-    let mut allocator = buddy(64);
+    buddy!(storage, allocator, 64);
     let a = allocator.alloc(0).expect("a");
     let b = allocator.alloc(0).expect("b");
     let c = allocator.alloc(0).expect("c");
@@ -85,7 +89,7 @@ fn coalescing_merges_buddies() {
 
 #[test]
 fn alloc_splits_larger_blocks() {
-    let mut allocator = buddy(8); // top order 3
+    buddy!(storage, allocator, 8); // top order 3
     // First order-0 alloc splits the order-3 block all the way down.
     let a = allocator.alloc(0).expect("alloc");
     assert_eq!(a, 0);
@@ -99,7 +103,7 @@ fn alloc_splits_larger_blocks() {
 
 #[test]
 fn double_free_and_out_of_range_are_rejected() {
-    let mut allocator = buddy(16);
+    buddy!(storage, allocator, 16);
     let a = allocator.alloc(1).expect("alloc");
     allocator.free(a, 1).expect("free");
     assert_eq!(allocator.free(a, 1), Err(BuddyError::DoubleFree));
@@ -110,7 +114,7 @@ fn double_free_and_out_of_range_are_rejected() {
 
 #[test]
 fn alloc_at_places_exactly() {
-    let mut allocator = buddy(32);
+    buddy!(storage, allocator, 32);
     allocator.alloc_at(16, 1).expect("place at 16");
     assert!(allocator.alloc(2).is_ok(), "the rest still allocates");
     assert_eq!(
@@ -129,7 +133,7 @@ fn alloc_at_places_exactly() {
 
 #[test]
 fn reserve_marks_frames_unallocatable() {
-    let mut allocator = buddy(16);
+    buddy!(storage, allocator, 16);
     allocator.reserve(0, 4).expect("reserve low frames");
     assert_eq!(allocator.stats().reserved, 4);
     // The reserved frames are never handed out; the rest is still available.
@@ -142,7 +146,7 @@ fn reserve_marks_frames_unallocatable() {
 
 #[test]
 fn reserve_over_allocated_is_rejected() {
-    let mut allocator = buddy(16);
+    buddy!(storage, allocator, 16);
     let a = allocator.alloc(1).expect("alloc");
     assert_eq!(allocator.reserve(0, 4), Err(BuddyError::Occupied));
     allocator.free(a, 1).expect("free");
@@ -151,8 +155,9 @@ fn reserve_over_allocated_is_rejected() {
 
 #[test]
 fn pager_failure_injection_rolls_back() {
+    let mut storage = [Block::empty(); MAX_BLOCKS];
     let mut allocator =
-        BuddyAllocator::<ORDERS, MAX_BLOCKS, FailingPager>::with_pager(0, 32, FailingPager)
+        BuddyAllocator::<ORDERS, FailingPager>::with_pager(&mut storage, 0, 32, FailingPager)
             .expect("buddy");
     assert_eq!(allocator.alloc(0), Err(BuddyError::Pager));
     assert_eq!(allocator.alloc(2), Err(BuddyError::Pager));
@@ -163,7 +168,7 @@ fn pager_failure_injection_rolls_back() {
 
 #[test]
 fn stats_accounting() {
-    let mut allocator = buddy(64);
+    buddy!(storage, allocator, 64);
     let a = allocator.alloc(2).expect("alloc order 2");
     let b = allocator.alloc(0).expect("alloc order 0");
     let stats = allocator.stats();
@@ -182,7 +187,9 @@ fn exhaustive_small_model() {
     // conservation/coalescing invariants after every step.
     const OPS: usize = 4;
     for code in 0..(OPS as u32).pow(3) {
-        let mut allocator = BuddyAllocator::<3, 4, NoPager>::new(0, 4).expect("buddy");
+        let mut storage = [Block::empty(); 4];
+        let mut allocator =
+            BuddyAllocator::<3, NoPager>::with_pager(&mut storage, 0, 4, NoPager).expect("buddy");
         let mut live: Vec<(u64, usize)> = Vec::new();
         let mut value = code;
         for _ in 0..3 {
@@ -235,7 +242,7 @@ impl Rng {
 
 #[test]
 fn random_alloc_free_model() {
-    let mut allocator = buddy(128);
+    buddy!(storage, allocator, 128);
     let mut rng = Rng(0x0123_4567_89ab_cdef);
     let mut live: Vec<(u64, usize)> = Vec::new();
 
@@ -270,10 +277,142 @@ fn random_alloc_free_model() {
 
 #[test]
 fn oom_returns_a_real_error() {
-    let mut allocator = buddy(16);
+    buddy!(storage, allocator, 16);
     for _ in 0..4 {
         allocator.alloc(2).expect("four order-2 blocks fit");
     }
     assert_eq!(allocator.alloc(2), Err(BuddyError::OutOfFrames));
     assert_eq!(allocator.alloc(3), Err(BuddyError::OutOfFrames));
+}
+
+#[test]
+fn state_reports_free_allocated_and_reserved() {
+    buddy!(storage, allocator, 16);
+    assert_eq!(allocator.state(0), Some(FrameState::Free));
+    let frame = allocator.alloc(0).expect("alloc");
+    assert_eq!(allocator.state(frame), Some(FrameState::Allocated));
+    allocator.reserve(8, 2).expect("reserve");
+    assert_eq!(allocator.state(8), Some(FrameState::Reserved));
+    assert_eq!(allocator.state(16), None);
+    allocator.free(frame, 0).expect("free");
+    assert_eq!(allocator.state(frame), Some(FrameState::Free));
+}
+
+#[test]
+fn release_frees_reserved_and_allocated_frames() {
+    buddy!(storage, allocator, 16);
+    allocator.reserve(4, 4).expect("reserve");
+    assert_eq!(allocator.stats().reserved, 4);
+    for frame in 4..8 {
+        allocator.release(frame).expect("release reserved");
+    }
+    assert_eq!(allocator.stats().reserved, 0);
+    // The released run is allocatable again and coalesces with the rest.
+    assert_eq!(allocator.alloc(3), Ok(0));
+    // Releasing an allocated order-0 frame works like free.
+    allocator.free(0, 3).expect("free order 3");
+    let single = allocator.alloc(0).expect("alloc");
+    allocator.release(single).expect("release allocated");
+    assert_eq!(allocator.state(single), Some(FrameState::Free));
+    // Releasing a free frame reports a double free.
+    assert_eq!(allocator.release(single), Err(BuddyError::DoubleFree));
+}
+
+#[test]
+fn alloc_contiguous_places_an_aligned_run() {
+    buddy!(storage, allocator, 64);
+    // Make frame 0 reserved so the first aligned run is not trivially zero.
+    allocator.reserve(0, 1).expect("reserve");
+    let start = allocator.alloc_contiguous(4, 4, 64).expect("run");
+    assert_eq!(start, 4);
+    assert_eq!(start % 4, 0);
+    for frame in start..start + 4 {
+        assert_eq!(allocator.state(frame), Some(FrameState::Allocated));
+    }
+    // Each frame is independently freeable, exactly as the DMA teardown expects.
+    for frame in start..start + 4 {
+        allocator.free(frame, 0).expect("free frame");
+    }
+    assert_eq!(allocator.stats().free, 63);
+}
+
+#[test]
+fn alloc_contiguous_skips_occupied_runs() {
+    buddy!(storage, allocator, 32);
+    allocator.reserve(0, 8).expect("reserve");
+    allocator.alloc_at(8, 0).expect("occupy 8");
+    let start = allocator.alloc_contiguous(4, 4, 32).expect("run");
+    assert!(start >= 12, "run must avoid the occupied frame: {start}");
+    for frame in start..start + 4 {
+        allocator.free(frame, 0).expect("free frame");
+    }
+}
+
+#[test]
+fn alloc_contiguous_rejects_bad_arguments() {
+    buddy!(storage, allocator, 16);
+    assert_eq!(
+        allocator.alloc_contiguous(0, 1, 16),
+        Err(BuddyError::ZeroSize)
+    );
+    assert_eq!(
+        allocator.alloc_contiguous(1, 3, 16),
+        Err(BuddyError::Misaligned)
+    );
+    assert_eq!(
+        allocator.alloc_contiguous(17, 1, 16),
+        Err(BuddyError::OutOfFrames)
+    );
+    // A run that cannot fit below max_frame fails cleanly.
+    assert_eq!(
+        allocator.alloc_contiguous(8, 8, 4),
+        Err(BuddyError::OutOfFrames)
+    );
+}
+
+/// A 1,000,000-frame model: the kernel's largest supported range, exercised through the buddy with
+/// alloc/free and conservation checks. The inline block array is 8 MiB, so the test runs on a
+/// thread with a 64 MiB stack instead of the default test stack.
+#[test]
+fn million_frame_model() {
+    std::thread::Builder::new()
+        .stack_size(64 * 1024 * 1024)
+        .spawn(|| {
+            const BIG_ORDERS: usize = 21;
+            const BIG_BLOCKS: usize = 1 << 20;
+            let mut storage = [Block::zeroed(); BIG_BLOCKS];
+            let mut allocator = BuddyAllocator::<BIG_ORDERS, NoPager>::with_pager(
+                &mut storage,
+                0,
+                1 << 20,
+                NoPager,
+            )
+            .expect("1M-frame buddy");
+            let mut rng = Rng(0x00c0_ffee_1234_5678);
+            let mut live: Vec<u64> = Vec::new();
+            for _ in 0..200_000 {
+                if live.is_empty() || rng.below(100) < 55 {
+                    if let Ok(frame) = allocator.alloc(0) {
+                        live.push(frame);
+                    }
+                } else {
+                    let index = rng.below(live.len() as u64) as usize;
+                    let frame = live.swap_remove(index);
+                    allocator.free(frame, 0).expect("free live");
+                }
+                if live.len().is_multiple_of(1000) {
+                    let stats = allocator.stats();
+                    assert_eq!(stats.free + live.len() as u64, stats.total, "conservation");
+                }
+            }
+            for frame in live.drain(..) {
+                allocator.free(frame, 0).expect("free remaining");
+            }
+            let stats = allocator.stats();
+            assert_eq!(stats.free, 1 << 20);
+            assert_eq!(allocator.free_blocks(20), 1, "full coalescing");
+        })
+        .expect("spawn")
+        .join()
+        .expect("model thread");
 }
