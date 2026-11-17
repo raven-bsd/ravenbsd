@@ -777,6 +777,39 @@ fn interpreter_is_mapped_and_the_thread_starts_at_its_entry() {
 }
 
 #[test]
+fn initfs_copy_tail_maps_the_source_private() {
+    let mut main = child_elf(true, true);
+    put_u16(&mut main, 16, 3);
+    let interpreter = interp_elf();
+    let image = two_file_initfs(&main, &interpreter);
+    let initfs = Initfs::parse(&image).unwrap();
+    let mut mock = Mock::default();
+    spawn_with(&initfs, "/child", &options(&[], &[]), &mut mock).unwrap();
+    let calls = mock.calls();
+    assert!(calls.iter().any(|call| matches!(
+        call,
+        Call::CopyMapping { len, .. } if *len == 0x800
+    )));
+    for call in &calls {
+        if let Call::Map {
+            proc,
+            memobj,
+            flags,
+            ..
+        } = call
+            && *proc == Handle::SELF_PROC.0
+            && *memobj == Handle::INITFS.0
+        {
+            assert_eq!(
+                *flags & map::pack(0, map::SHARED),
+                0,
+                "initfs source map must be private: {call:?}"
+            );
+        }
+    }
+}
+
+#[test]
 fn platform_and_execfn_point_into_the_stack() {
     let (buffer, _, sp0) = build(
         "/child",

@@ -933,7 +933,7 @@ fn copy_tail<S: Sys>(
             return Err(SpawnError::Sys(error));
         }
     };
-    let source_flags = map::pack(prot::READ, map::SHARED);
+    let source_flags = map::pack(prot::READ, 0);
     let source_map = match sys.map(Handle::SELF_PROC, handle, offset, 0, page, source_flags) {
         Ok(address) => address,
         Err(error) => {

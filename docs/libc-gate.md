@@ -58,5 +58,6 @@ C74d's Owns); G1 is 0/4 (C2-C5 not run, C6 unvendored); 4 of 27 oracle families 
 `oracle-*` features; the size check is 6 pass / 63 fail; the `inet_text` soak crashed before one
 hour; Miri, the world build and `mandoc` are UNAVAILABLE in this environment. On target,
 `libc-signals`, `libc-spawn` and `libc-threads` pass; `libc-hello` fails only the P1b `string`
-check (auxv ok); `libc-dynamic` passes the shape check but fails at runtime
-(`svcd: libc-test failed: invalid argument`); `libc-stdio` and `libc-time` remain P1b.
+check (auxv ok); `libc-dynamic` passes the shape check and, after C74f's private `copy_tail`
+source map, spawns `ld-elf.so.1`, which exits 127 at the C73 target-rtld stub
+(`ld-elf.so.1: no direct target start yet`); `libc-stdio` and `libc-time` remain P1b.
