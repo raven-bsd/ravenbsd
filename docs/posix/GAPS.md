@@ -13,14 +13,14 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 |---|---:|---:|---:|---:|---:|
 | filesystem | 20 | 0 | 0 | 20 | 0 |
 | headers | 86 | 2 | 11 | 73 | 0 |
-| interfaces | 1423 | 43 | 0 | 1298 | 82 |
+| interfaces | 1425 | 43 | 0 | 1300 | 82 |
 | process | 17 | 0 | 0 | 14 | 3 |
 | shell | 25 | 0 | 0 | 22 | 3 |
 | tty | 12 | 0 | 0 | 7 | 5 |
 | utilities | 217 | 0 | 1 | 180 | 36 |
-| **all** | **1800** | **45** | **12** | **1614** | **129** |
+| **all** | **1802** | **45** | **12** | **1616** | **129** |
 
-Traceability rows: 1800; profile rows: 1800.
+Traceability rows: 1802; profile rows: 1802.
 
 ## Headers
 
@@ -771,6 +771,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.lldiv` | `lldiv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.llogb` | `llogb` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.llogbfNx` | `llogbfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
+| `interface.llogbl` | `llogbl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.llrint` | `llrint` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.llrintf` | `llrintf` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.llrintfNx` | `llrintfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
@@ -1251,6 +1252,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.signal` | `signal` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | signal.h |
 | `interface.signbit` | `signbit` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.significandf` | `significandf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
+| `interface.significandl` | `significandl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.sigorset` | `sigorset` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | signal.h |
 | `interface.sigpause` | `sigpause` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | signal.h |
 | `interface.sigpending` | `sigpending` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | signal.h |

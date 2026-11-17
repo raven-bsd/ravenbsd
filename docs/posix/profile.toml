@@ -371,7 +371,7 @@ pg = []
 name = "math.h"
 required_macros = ["FP_ILOGB0", "FP_ILOGBNAN", "FP_LLOGB0", "FP_LLOGBNAN", "HUGE_VAL_FNx", "INFINITY", "signgam"]
 required_types = []
-required_functions = ["acos", "acosf", "acosfNx", "acosh", "acoshf", "acoshfNx", "acoshl", "acosl", "acospi", "asin", "asinf", "asinfNx", "asinh", "asinhf", "asinhfNx", "asinhl", "asinl", "asinpi", "atan", "atan2", "atan2f", "atan2fNx", "atan2l", "atan2pi", "atanf", "atanfNx", "atanh", "atanhf", "atanhfNx", "atanhl", "atanl", "atanpi", "canonicalizefNx", "cbrt", "cbrtf", "cbrtl", "ceil", "ceilf", "ceilfNx", "ceill", "compoundn", "copysign", "copysignf", "copysignfNx", "copysignl", "cos", "cosf", "cosfNx", "cosh", "coshf", "coshfNx", "coshl", "cosl", "cospi", "dremf", "erf", "erfc", "erfcf", "erfcl", "erff", "erfl", "exp", "exp10", "exp10f", "exp10fNx", "exp10l", "exp10m1", "exp2", "exp2f", "exp2fNx", "exp2l", "exp2m1", "expf", "expfNx", "expl", "expm1", "expm1f", "expm1fNx", "expm1l", "fabs", "fabsf", "fabsfNx", "fabsl", "fdim", "fdimf", "fdimfNx", "fdiml", "finitef", "floor", "floorf", "floorfNx", "floorl", "fma", "fmaf", "fmafNx", "fmal", "fmax", "fmaxf", "fmaxfNx", "fmaximum_mag_num", "fmaxl", "fmaxmag", "fmaxmagfNx", "fmin", "fminf", "fminfNx", "fminimum_mag_num", "fminl", "fminmag", "fminmagfNx", "fmod", "fmodf", "fmodfNx", "fmodl", "fpclassify", "frexp", "frexpf", "frexpfNx", "frexpl", "fromfp", "fromfpx", "gammaf", "gammal", "getpayloadfNx", "hypot", "hypotf", "hypotfNx", "hypotl", "ilogb", "ilogbf", "ilogbl", "iscanonical", "iseqsig", "isfinite", "isgreater", "isgreaterequal", "isinf", "isless", "islessequal", "islessgreater", "isnan", "isnormal", "issignaling", "issubnormal", "isunordered", "iszero", "j0", "j0f", "j1", "j1f", "jn", "jnf", "ldexp", "ldexpf", "ldexpfNx", "ldexpl", "lgamma", "lgamma_r", "lgammaf", "lgammaf_r", "lgammal", "lgammal_r", "llogb", "llogbfNx", "llrint", "llrintf", "llrintfNx", "llrintl", "llround", "llroundf", "llroundfNx", "llroundl", "log", "log10", "log10f", "log10fNx", "log10l", "log10p1", "log1p", "log1pf", "log1pl", "log2", "log2f", "log2fNx", "log2l", "log2p1", "logb", "logbf", "logbfNx", "logbl", "logf", "logfNx", "logl", "logp1fNx", "lrint", "lrintf", "lrintfNx", "lrintl", "lround", "lroundf", "lroundfNx", "lroundl", "modf", "modff", "modffNx", "modfl", "nan", "nanf", "nanfNx", "nanl", "nearbyint", "nearbyintf", "nearbyintfNx", "nearbyintl", "nextafter", "nextafterf", "nextafterfNx", "nextafterl", "nextdownfNx", "nexttoward", "nexttowardf", "nexttowardl", "nextupfNx", "pow", "pow10", "pow10f", "pow10l", "powf", "powfNx", "powl", "pown", "powr", "remainder", "remainderf", "remainderfNx", "remainderl", "remquo", "remquof", "remquol", "rint", "rintf", "rintfNx", "rintl", "rootn", "round", "roundevenfNx", "roundf", "roundfNx", "roundl", "scalb", "scalbf", "scalbln", "scalblnf", "scalblnl", "scalbn", "scalbnf", "scalbnl", "setpayloadfNx", "setpayloadsigfNx", "signbit", "significandf", "sin", "sincos", "sincosf", "sincosl", "sinf", "sinfNx", "sinh", "sinhf", "sinhfNx", "sinhl", "sinl", "sinpi", "sqrt", "sqrtf", "sqrtfNx", "sqrtl", "statvfs", "strfromd", "strfromf", "strptime_l", "strtof", "tan", "tanf", "tanfNx", "tanh", "tanhf", "tanhfNx", "tanhl", "tanl", "tanpi", "tgamma", "tgammaf", "tgammal", "trunc", "truncf", "truncfNx", "truncl", "ufromfp", "ufromfpx", "ufromfpxfNx", "y0", "y0f", "y1", "y1f", "yn", "ynf"]
+required_functions = ["acos", "acosf", "acosfNx", "acosh", "acoshf", "acoshfNx", "acoshl", "acosl", "acospi", "asin", "asinf", "asinfNx", "asinh", "asinhf", "asinhfNx", "asinhl", "asinl", "asinpi", "atan", "atan2", "atan2f", "atan2fNx", "atan2l", "atan2pi", "atanf", "atanfNx", "atanh", "atanhf", "atanhfNx", "atanhl", "atanl", "atanpi", "canonicalizefNx", "cbrt", "cbrtf", "cbrtl", "ceil", "ceilf", "ceilfNx", "ceill", "compoundn", "copysign", "copysignf", "copysignfNx", "copysignl", "cos", "cosf", "cosfNx", "cosh", "coshf", "coshfNx", "coshl", "cosl", "cospi", "dremf", "erf", "erfc", "erfcf", "erfcl", "erff", "erfl", "exp", "exp10", "exp10f", "exp10fNx", "exp10l", "exp10m1", "exp2", "exp2f", "exp2fNx", "exp2l", "exp2m1", "expf", "expfNx", "expl", "expm1", "expm1f", "expm1fNx", "expm1l", "fabs", "fabsf", "fabsfNx", "fabsl", "fdim", "fdimf", "fdimfNx", "fdiml", "finitef", "floor", "floorf", "floorfNx", "floorl", "fma", "fmaf", "fmafNx", "fmal", "fmax", "fmaxf", "fmaxfNx", "fmaximum_mag_num", "fmaxl", "fmaxmag", "fmaxmagfNx", "fmin", "fminf", "fminfNx", "fminimum_mag_num", "fminl", "fminmag", "fminmagfNx", "fmod", "fmodf", "fmodfNx", "fmodl", "fpclassify", "frexp", "frexpf", "frexpfNx", "frexpl", "fromfp", "fromfpx", "gammaf", "gammal", "getpayloadfNx", "hypot", "hypotf", "hypotfNx", "hypotl", "ilogb", "ilogbf", "ilogbl", "iscanonical", "iseqsig", "isfinite", "isgreater", "isgreaterequal", "isinf", "isless", "islessequal", "islessgreater", "isnan", "isnormal", "issignaling", "issubnormal", "isunordered", "iszero", "j0", "j0f", "j1", "j1f", "jn", "jnf", "ldexp", "ldexpf", "ldexpfNx", "ldexpl", "lgamma", "lgamma_r", "lgammaf", "lgammaf_r", "lgammal", "lgammal_r", "llogb", "llogbfNx", "llogbl", "llrint", "llrintf", "llrintfNx", "llrintl", "llround", "llroundf", "llroundfNx", "llroundl", "log", "log10", "log10f", "log10fNx", "log10l", "log10p1", "log1p", "log1pf", "log1pl", "log2", "log2f", "log2fNx", "log2l", "log2p1", "logb", "logbf", "logbfNx", "logbl", "logf", "logfNx", "logl", "logp1fNx", "lrint", "lrintf", "lrintfNx", "lrintl", "lround", "lroundf", "lroundfNx", "lroundl", "modf", "modff", "modffNx", "modfl", "nan", "nanf", "nanfNx", "nanl", "nearbyint", "nearbyintf", "nearbyintfNx", "nearbyintl", "nextafter", "nextafterf", "nextafterfNx", "nextafterl", "nextdownfNx", "nexttoward", "nexttowardf", "nexttowardl", "nextupfNx", "pow", "pow10", "pow10f", "pow10l", "powf", "powfNx", "powl", "pown", "powr", "remainder", "remainderf", "remainderfNx", "remainderl", "remquo", "remquof", "remquol", "rint", "rintf", "rintfNx", "rintl", "rootn", "round", "roundevenfNx", "roundf", "roundfNx", "roundl", "scalb", "scalbf", "scalbln", "scalblnf", "scalblnl", "scalbn", "scalbnf", "scalbnl", "setpayloadfNx", "setpayloadsigfNx", "signbit", "significandf", "significandl", "sin", "sincos", "sincosf", "sincosl", "sinf", "sinfNx", "sinh", "sinhf", "sinhfNx", "sinhl", "sinl", "sinpi", "sqrt", "sqrtf", "sqrtfNx", "sqrtl", "statvfs", "strfromd", "strfromf", "strptime_l", "strtof", "tan", "tanf", "tanfNx", "tanh", "tanhf", "tanhfNx", "tanhl", "tanl", "tanpi", "tgamma", "tgammaf", "tgammal", "trunc", "truncf", "truncfNx", "truncl", "ufromfp", "ufromfpx", "ufromfpxfNx", "y0", "y0f", "y1", "y1f", "yn", "ynf"]
 
 [[header]]
 id = "header.monetary.h"
@@ -11024,6 +11024,21 @@ required = true
 signature = "declared by the named header"
 
 [[interface]]
+id = "interface.llogbl"
+standard = "posix-2024"
+status = "present"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+owner = "P1"
+waiver = ""
+notes = "export presence is file-level evidence; behavior is P1"
+pg = []
+name = "llogbl"
+header = "math.h"
+kind = "func"
+required = true
+signature = "declared by the named header"
+
+[[interface]]
 id = "interface.llrint"
 standard = "posix-2024"
 status = "present"
@@ -18218,6 +18233,21 @@ waiver = ""
 notes = "export presence is file-level evidence; behavior is P1"
 pg = []
 name = "significandf"
+header = "math.h"
+kind = "func"
+required = true
+signature = "declared by the named header"
+
+[[interface]]
+id = "interface.significandl"
+standard = "posix-2024"
+status = "present"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+owner = "P1"
+waiver = ""
+notes = "export presence is file-level evidence; behavior is P1"
+pg = []
+name = "significandl"
 header = "math.h"
 kind = "func"
 required = true

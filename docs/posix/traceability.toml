@@ -4565,6 +4565,12 @@ test = "none"
 evidence = "none"
 
 [[trace]]
+id = "interface.llogbl"
+ticket = "P1"
+test = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+
+[[trace]]
 id = "interface.llrint"
 ticket = "P1"
 test = "none"
@@ -7440,6 +7446,12 @@ evidence = "test:tests/libc/posix/math/check-math.sh"
 
 [[trace]]
 id = "interface.significandf"
+ticket = "P1"
+test = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
+
+[[trace]]
+id = "interface.significandl"
 ticket = "P1"
 test = "none"
 evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
