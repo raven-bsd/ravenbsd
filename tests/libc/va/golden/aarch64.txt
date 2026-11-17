@@ -1,2 +1,3 @@
 0000000000000000 <t_snprintf>:
-       0:      	b	0x0 <t_snprintf>
+       0:      	mov	w0, #-38
+       4:      	ret

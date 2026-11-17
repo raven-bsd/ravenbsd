@@ -402,6 +402,11 @@ fn build_spec(
         // re-codegens their bitcode under the PIC relocation model with the shell.
         flags.push_str(" -C lto=thin -C embed-bitcode=yes");
     }
+    if arch == Arch::Aarch64 {
+        // The AAPCS64 reader has passed the host model/golden sweep; link the real variadic
+        // implementations instead of the H-16 link-time failing stubs.
+        flags.push_str(" --cfg raven_va_verified_aarch64");
+    }
     flags.push_str(&format!(
         " --remap-path-prefix={}=/ravenbsd",
         root.display()

@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-//! The H-16 failing-stub test: on aarch64 and riscv64, until the reviewer sets
-//! `cfg(raven_va_verified_aarch64)` / `cfg(raven_va_verified_riscv64)`, every non-`v` form is
-//! a branch to a symbol that is never defined, so a program that references `printf` does not
-//! LINK (and the linker names the missing symbol).
+//! The unverified aarch64/riscv64 stub: C62a made the fallback a defined `-ENOSYS` stub
+//! instead of a branch to an undefined symbol. The verified arm still replaces it with the
+//! real trampoline; the golden test checks its disassembly.
 //!
-//! The test compiles the same tiny instance the golden test uses and inspects it with
-//! `llvm-nm`, then attempts a link with `rust-lld` and checks the diagnostic.
+//! The test compiles the same tiny instance the golden test uses and inspects its symbols
+//! with `llvm-nm`.
 
 #![allow(unexpected_cfgs)] // `raven_va_softfloat` and `raven_va_verified_*` are build-profile cfgs
 
@@ -91,21 +90,7 @@ fn nm(arguments: &[&str], object: &Path) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
-fn rust_lld() -> Option<PathBuf> {
-    let sysroot = Command::new("rustc")
-        .arg("--print")
-        .arg("sysroot")
-        .output()
-        .ok()?;
-    if !sysroot.status.success() {
-        return None;
-    }
-    let root = PathBuf::from(String::from_utf8_lossy(&sysroot.stdout).trim());
-    let candidate = root.join("lib/rustlib/x86_64-unknown-linux-gnu/bin/rust-lld");
-    candidate.is_file().then_some(candidate)
-}
-
-fn check_failing_stub(name: &str, target: &str) {
+fn check_unverified_stub(name: &str, target: &str) {
     let object = match build(name, target, &[]) {
         Ok(object) => object,
         Err(reason) => {
@@ -113,52 +98,27 @@ fn check_failing_stub(name: &str, target: &str) {
             return;
         }
     };
-    let undefined = nm(&["-u"], &object).expect("llvm-nm -u");
-    assert!(
-        undefined.contains("__raven_variadic_unsupported_t_snprintf"),
-        "{name}: the stub does not reference the undefined symbol: {undefined}"
-    );
     let defined = nm(&["--defined-only"], &object).expect("llvm-nm");
     assert!(
         defined.contains(" t_snprintf"),
-        "{name}: the stub symbol is not defined: {defined}"
+        "{name}: the unverified stub symbol is not defined: {defined}"
     );
-    // The link must fail, and it must fail naming the missing symbol.
-    let Some(lld) = rust_lld() else {
-        println!("{name}: rust-lld not found, link check skipped");
-        return;
-    };
-    let executable = workdir().join(format!("{name}.elf"));
-    let output = Command::new(lld)
-        .arg("-flavor")
-        .arg("gnu")
-        .arg("-o")
-        .arg(&executable)
-        .arg(&object)
-        .arg("-e")
-        .arg("t_snprintf")
-        .output()
-        .expect("run rust-lld");
-    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    let undefined = nm(&["-u"], &object).expect("llvm-nm -u");
     assert!(
-        !output.status.success(),
-        "{name}: a program referencing the stub LINKED; the failing-stub rule is broken"
+        !undefined.contains("__raven_variadic_unsupported_"),
+        "{name}: the unverified stub still references an undefined symbol: {undefined}"
     );
-    assert!(
-        stderr.contains("__raven_variadic_unsupported_t_snprintf"),
-        "{name}: the link error does not name the missing symbol: {stderr}"
-    );
-    println!("{name}: link fails as intended: {}", stderr.trim());
+    println!("{name}: unverified ENOSYS stub is defined");
 }
 
 #[test]
-fn aarch64_printf_does_not_link() {
-    check_failing_stub("aarch64", "aarch64-unknown-none-softfloat");
+fn aarch64_printf_is_the_enosys_stub() {
+    check_unverified_stub("aarch64", "aarch64-unknown-none-softfloat");
 }
 
 #[test]
-fn riscv64_printf_does_not_link() {
-    check_failing_stub("riscv64", "riscv64gc-unknown-none-elf");
+fn riscv64_printf_is_the_enosys_stub() {
+    check_unverified_stub("riscv64", "riscv64gc-unknown-none-elf");
 }
 
 #[test]

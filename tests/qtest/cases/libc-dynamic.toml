@@ -4,7 +4,7 @@ name = "libc-dynamic"
 arch = "x86_64"
 profile = "libc-test"
 timeout_secs = 300
-pre = ["sh tests/libc/target/build.sh dynamic x86_64"]
+pre = ["sh tests/libc/target/build.sh dynamic"]
 boot_cmdline = "console=ttyS0 test-exit=1"
 qemu_extra = []
 expect_exit = "success"
