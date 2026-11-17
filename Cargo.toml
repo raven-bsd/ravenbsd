@@ -204,6 +204,8 @@ members = [
     "userland/bin/uustat",
     "userland/bin/uux",
     "userland/bin/m4",
+    "userland/bin/mail",
+    "userland/bin/mailx",
     "userland/bin/patch",
     "userland/bin/xargs",
     "userland/bin/bc",

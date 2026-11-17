@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P47 local mail evidence: mbox and Maildir delivery, listing, reading, deletion and exit status.
+
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.mail"
+status = "present"
+evidence = "test:tests/posix/utility/mail/mail/test.sh"
+notes = "P47: mbox send from stdin/file, list, read, delete, -e and unsupported reply"
+
+[[row]]
+id = "util.mailx"
+status = "present"
+evidence = "test:tests/posix/utility/mail/mailx/test.sh"
+notes = "P47: Maildir send from file, list, read, delete, -e and unsupported forward"

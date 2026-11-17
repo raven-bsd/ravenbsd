@@ -1,0 +1,90 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt MAIL 1
+.Os RavenBSD
+.Sh NAME
+.Nm mail
+.Nd local mbox and Maildir mail reader and sender
+.Sh SYNOPSIS
+.Nm
+.Op Fl f Ar mailbox
+.Op Fl s Ar subject
+.Op Fl b Ar body-file
+.Ar recipient ...
+.Nm
+.Op Fl f Ar mailbox
+.Op Fl H | e | r Ar N | d Ar N
+.Sh DESCRIPTION
+.Nm
+reads and writes one local mbox file or Maildir.
+With recipients it appends a message to the selected store; the body comes from standard input
+or from
+.Fl b Ar body-file .
+With no action it lists message headers.
+The supported actions are:
+.Bl -tag -width Ds
+.It Fl H
+List headers explicitly.
+.It Fl e
+Exit 0 when at least one message exists, 1 otherwise.
+.It Fl r Ar N
+Read message
+.Ar N
+(one-based).
+.It Fl d Ar N
+Delete message
+.Ar N .
+.El
+.Pp
+The store is selected by
+.Fl f ,
+then the
+.Ev MAIL
+environment variable, then
+.Pa $HOME/Maildir ,
+.Pa $HOME/.maildir
+or
+.Pa $HOME/mbox .
+A directory is treated as a Maildir; a regular file is treated as mbox.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl s Ar subject
+Subject for an outgoing message.
+.It Fl b Ar body-file
+Read the body from
+.Ar body-file ;
+.Li -
+means standard input.
+.It Fl f Ar mailbox
+Select the mbox file or Maildir.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width MAIL
+.It Ev MAIL
+Default mailbox when
+.Fl f
+is absent.
+.It Ev USER , LOGNAME
+Sender name used in the local
+.Li From:
+header.
+.It Ev HOME
+Base for the default Maildir/mbox selection.
+.El
+.Sh FILES
+.Bl -tag -width $HOME/Maildir
+.It Pa $HOME/Maildir
+Preferred default Maildir.
+.It Pa $HOME/mbox
+Fallback mbox.
+.El
+.Sh EXIT STATUS
+.Ex -std
+A usage error or an unsupported option exits 2.
+.Sh SEE ALSO
+.Xr mailx 1
+.Sh BUGS
+Reply, forward, SMTP/network delivery, cc/bcc, attachments and an interactive prompt are not
+implemented.
