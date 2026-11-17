@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "zcat"
+version = "0.1.0"
+description = "RavenBSD zcat: write decompressed .Z streams to stdout."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "zcat"
+path = "src/lib.rs"
+
+[[bin]]
+name = "zcat"
+path = "src/main.rs"
+
+[dependencies]
+compress = { path = "../compress" }
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-rt = { path = "../../rt" }
+raven-tool-core = { path = "../../../crates/raven-tool-core" }
+raven-proto-fs = { path = "../../../crates/raven-proto-fs" }
+
+[lints]
+workspace = true

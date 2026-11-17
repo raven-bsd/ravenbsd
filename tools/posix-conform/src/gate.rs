@@ -409,6 +409,21 @@ fn add_row(
     });
 }
 
+fn run_qtest_cached(
+    root: &Path,
+    case: &str,
+    arch: &str,
+    cache: &mut BTreeMap<String, (Verdict, String, String)>,
+) -> Result<(Verdict, String, String)> {
+    if let Some(hit) = cache.get(case) {
+        return Ok(hit.clone());
+    }
+    let outcome = run_qtest(root, case, arch)?;
+    cache.insert(case.to_string(), outcome.clone());
+    Ok(outcome)
+}
+
+#[allow(clippy::too_many_arguments)] // one row needs the profile, trace, cache and output sink
 fn gate_behaviour(
     root: &Path,
     arch: &str,
@@ -416,6 +431,7 @@ fn gate_behaviour(
     meta: &crate::model::Meta,
     tests: &BTreeMap<String, String>,
     host_only: bool,
+    cache: &mut BTreeMap<String, (Verdict, String, String)>,
     rows: &mut Vec<ResultRow>,
 ) {
     let test = tests
@@ -445,7 +461,7 @@ fn gate_behaviour(
             );
             return;
         };
-        let (result, command, reason) = run_qtest(root, &case, arch)
+        let (result, command, reason) = run_qtest_cached(root, &case, arch, cache)
             .unwrap_or_else(|error| (Verdict::Fail, test.clone(), format!("{error:#}")));
         add_row(rows, &meta.id, area, result, &command, &reason);
         return;
@@ -469,6 +485,7 @@ fn gate_rows(
     profile: &Profile,
     trace: &TraceFile,
     host_only: bool,
+    qtest_cache: &mut BTreeMap<String, (Verdict, String, String)>,
 ) -> Result<Vec<ResultRow>> {
     let mut rows = Vec::new();
     let output_dir = root.join("build/posix-gate").join(arch);
@@ -575,6 +592,7 @@ fn gate_rows(
     }
 
     // Utilities and behaviour rows use the profile status plus the trace test, if any.
+    // One qtest case may back several rows; run it once per gate invocation.
     for utility in &profile.utility {
         let test = tests
             .get(&utility.meta.id)
@@ -593,7 +611,7 @@ fn gate_rows(
                     );
                 } else if let Some(case) = qtest_case(test) {
                     let (result, command, reason) =
-                        run_qtest(root, &case, arch).unwrap_or_else(|error| {
+                        run_qtest_cached(root, &case, arch, qtest_cache).unwrap_or_else(|error| {
                             (Verdict::Fail, test.to_string(), format!("{error:#}"))
                         });
                     add_row(
@@ -634,6 +652,7 @@ fn gate_rows(
             &entry.meta,
             &tests,
             host_only,
+            qtest_cache,
             &mut rows,
         );
     }
@@ -645,6 +664,7 @@ fn gate_rows(
             &entry.meta,
             &tests,
             host_only,
+            qtest_cache,
             &mut rows,
         );
     }
@@ -656,11 +676,21 @@ fn gate_rows(
             &entry.meta,
             &tests,
             host_only,
+            qtest_cache,
             &mut rows,
         );
     }
     for entry in &profile.tty {
-        gate_behaviour(root, arch, "tty", &entry.meta, &tests, host_only, &mut rows);
+        gate_behaviour(
+            root,
+            arch,
+            "tty",
+            &entry.meta,
+            &tests,
+            host_only,
+            qtest_cache,
+            &mut rows,
+        );
     }
 
     let libc_archive = root.join("build").join(arch).join("libc.a");
@@ -798,6 +828,7 @@ fn set_overlay_row(
 /// A supported `present` claim must run its qtest or test evidence; a failing or timed-out
 /// evidence target becomes a failure. A `waived` claim passes only with a written waiver, and the
 /// waiver stays visible in the row reason. An unsupported claim is reported as a failure.
+#[allow(clippy::too_many_arguments)] // rows, profile, overlay and the shared qtest cache
 fn apply_overlay(
     root: &Path,
     arch: &str,
@@ -805,6 +836,7 @@ fn apply_overlay(
     profile: &Profile,
     outcome: &OverlayOutcome,
     host_only: bool,
+    qtest_cache: &mut BTreeMap<String, (Verdict, String, String)>,
 ) {
     let areas: BTreeMap<&str, &str> = profile
         .metas()
@@ -823,7 +855,7 @@ fn apply_overlay(
                         "host-only run; qtest evidence not executed".to_string(),
                     )
                 } else {
-                    match run_qtest(root, case, arch) {
+                    match run_qtest_cached(root, case, arch, qtest_cache) {
                         Ok((Verdict::Pass, _, _)) => {
                             (Verdict::Pass, claim.command(), String::new())
                         }
@@ -891,7 +923,15 @@ pub fn run(
     let overlay = Overlay::load(root)?;
     let mut merged = profile.clone();
     let outcome = overlay.apply(root, &mut merged);
-    let mut rows = gate_rows(root, &options.arch, &merged, trace, options.host_only)?;
+    let mut qtest_cache: BTreeMap<String, (Verdict, String, String)> = BTreeMap::new();
+    let mut rows = gate_rows(
+        root,
+        &options.arch,
+        &merged,
+        trace,
+        options.host_only,
+        &mut qtest_cache,
+    )?;
     apply_overlay(
         root,
         &options.arch,
@@ -899,6 +939,7 @@ pub fn run(
         &merged,
         &outcome,
         options.host_only,
+        &mut qtest_cache,
     );
     rows.sort_by(|left, right| {
         (left.area.as_str(), left.id.as_str()).cmp(&(right.area.as_str(), right.id.as_str()))

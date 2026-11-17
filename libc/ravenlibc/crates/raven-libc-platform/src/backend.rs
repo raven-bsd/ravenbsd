@@ -97,6 +97,8 @@ pub trait SysBackend {
     fn unmap(&self, addr: usize, len: usize) -> Result<(), Errno>;
     /// Change protection.
     fn protect(&self, addr: usize, len: usize, prot: u32) -> Result<(), Errno>;
+    /// Flush dirty shared pages.
+    fn msync(&self, addr: usize, len: usize, flags: u32) -> Result<(), Errno>;
     /// Create a memory object.
     fn memobj_create(&self, len: usize, flags: u32) -> Result<Handle, Errno>;
     /// Read a clock.
@@ -207,6 +209,10 @@ impl SysBackend for RealSys {
 
     fn protect(&self, addr: usize, len: usize, prot: u32) -> Result<(), Errno> {
         raven_libc_sys::sys::protect(Handle::SELF_PROC, addr, len, prot)
+    }
+
+    fn msync(&self, addr: usize, len: usize, flags: u32) -> Result<(), Errno> {
+        raven_libc_sys::sys::msync(Handle::SELF_PROC, addr, len, flags)
     }
 
     fn memobj_create(&self, len: usize, flags: u32) -> Result<Handle, Errno> {
@@ -702,6 +708,24 @@ impl SysBackend for FakeSys {
             return Ok(copied);
         }
         let request = raven_proto_fs::CallRequest::decode(req).map_err(|error| error.errno())?;
+        if let raven_proto_fs::Call::Mmap { len, .. } = request.call {
+            drop(world);
+            let object = self.memobj_create(len as usize, 0)?;
+            let mut bytes = [0u8; 8];
+            bytes[..4].copy_from_slice(&object.0.to_le_bytes());
+            bytes[4..].copy_from_slice(
+                &Rights::READ
+                    .union(Rights::WRITE)
+                    .union(Rights::MAP)
+                    .bits()
+                    .to_le_bytes(),
+            );
+            let copied = bytes.len().min(resp.len());
+            resp.get_mut(..copied)
+                .ok_or(Errno::EINVAL)?
+                .copy_from_slice(&bytes[..copied]);
+            return Ok(copied);
+        }
         let response = match request.call {
             raven_proto_fs::Call::Statfs => raven_proto_fs::CallResponse::StatFs {
                 status: 0,
@@ -783,11 +807,47 @@ impl SysBackend for FakeSys {
                     None => raven_proto_fs::CallResponse::Status(-(Errno::EINVAL.0 as i32)),
                 }
             }
+            raven_proto_fs::Call::Statvfs => raven_proto_fs::CallResponse::StatVfs {
+                status: 0,
+                statvfs: raven_proto_fs::StatVfs::from(raven_proto_fs::StatFs {
+                    block_size: 4096,
+                    blocks: 1024,
+                    free_blocks: 512,
+                    files: 64,
+                    free_files: 32,
+                }),
+            },
+            raven_proto_fs::Call::Lstat { path } => match world.nodes.get(&key(path)) {
+                Some(node) => raven_proto_fs::CallResponse::Stat {
+                    status: 0,
+                    stat: raven_proto_fs::Stat {
+                        ino: 0,
+                        size: node.data.len() as u64,
+                        blocks: (node.data.len() as u64).div_ceil(512),
+                        mtime: 0,
+                        ctime: 0,
+                        atime: 0,
+                        mode: node.mode,
+                        nlink: 1,
+                        uid: 0,
+                        gid: 0,
+                    },
+                },
+                None => raven_proto_fs::CallResponse::Status(-(Errno::ENOENT.0 as i32)),
+            },
             raven_proto_fs::Call::Truncate { .. }
             | raven_proto_fs::Call::Sync
             | raven_proto_fs::Call::Mount { .. }
             | raven_proto_fs::Call::Umount { .. }
-            | raven_proto_fs::Call::Access { .. } => raven_proto_fs::CallResponse::Status(0),
+            | raven_proto_fs::Call::Access { .. }
+            | raven_proto_fs::Call::Link { .. }
+            | raven_proto_fs::Call::Chown { .. }
+            | raven_proto_fs::Call::Lchown { .. }
+            | raven_proto_fs::Call::Fchown { .. }
+            | raven_proto_fs::Call::Mkfifo { .. }
+            | raven_proto_fs::Call::Mknod { .. }
+            | raven_proto_fs::Call::Utimens { .. }
+            | raven_proto_fs::Call::Mmap { .. } => raven_proto_fs::CallResponse::Status(0),
         };
         let _ = open;
         response.encode(resp).map_err(|error| error.errno())
@@ -935,6 +995,15 @@ impl SysBackend for FakeSys {
                 *current = prot;
                 Ok(())
             }
+            _ => Err(Errno::EINVAL),
+        }
+    }
+
+    fn msync(&self, addr: usize, len: usize, _flags: u32) -> Result<(), Errno> {
+        self.record(0x4D53_594E);
+        let world = self.world.borrow();
+        match world.maps.get(&addr) {
+            Some((mapped_len, _, _)) if *mapped_len == len => Ok(()),
             _ => Err(Errno::EINVAL),
         }
     }

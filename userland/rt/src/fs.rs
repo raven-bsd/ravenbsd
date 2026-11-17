@@ -272,10 +272,11 @@ pub fn readlink(path: &str) -> Result<String, Errno> {
         CallResponse::Readlink { status: 0, target } => {
             String::from_utf8(target.to_vec()).map_err(|_| Errno::EINVAL)
         }
-        CallResponse::Readlink { status, .. } | CallResponse::Status(status) => {
-            Err(errno_from_status(status))
-        }
-        CallResponse::StatFs { status, .. } => Err(errno_from_status(status)),
+        CallResponse::Readlink { status, .. }
+        | CallResponse::Status(status)
+        | CallResponse::StatFs { status, .. }
+        | CallResponse::StatVfs { status, .. }
+        | CallResponse::Stat { status, .. } => Err(errno_from_status(status)),
     }
 }
 
@@ -325,9 +326,10 @@ pub fn statfs(path: &str) -> Result<StatFs, Errno> {
         raven_scheme::Client::new().call_typed(root.raw_handle()?, &request, &mut response)?;
     match CallResponse::decode(request.op(), &response[..length]).map_err(|_| Errno::EPROTO)? {
         CallResponse::StatFs { status: 0, statfs } => Ok(statfs),
-        CallResponse::StatFs { status, .. } | CallResponse::Status(status) => {
-            Err(errno_from_status(status))
-        }
+        CallResponse::StatFs { status, .. }
+        | CallResponse::StatVfs { status, .. }
+        | CallResponse::Stat { status, .. }
+        | CallResponse::Status(status) => Err(errno_from_status(status)),
         CallResponse::Readlink { status, .. } => Err(errno_from_status(status)),
     }
 }
@@ -344,9 +346,10 @@ fn root_call(call: Call<'_>) -> Result<(), Errno> {
 fn check_response(op: u16, response: &[u8]) -> Result<(), Errno> {
     match CallResponse::decode(op, response).map_err(|_| Errno::EPROTO)? {
         CallResponse::Status(status) => status_result(status),
-        CallResponse::Readlink { status, .. } | CallResponse::StatFs { status, .. } => {
-            status_result(status)
-        }
+        CallResponse::Readlink { status, .. }
+        | CallResponse::StatFs { status, .. }
+        | CallResponse::StatVfs { status, .. }
+        | CallResponse::Stat { status, .. } => status_result(status),
     }
 }
 

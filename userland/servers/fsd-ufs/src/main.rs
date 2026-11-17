@@ -86,7 +86,7 @@ mod program {
                 "none"
             }
         );
-        let mut handler = fsd_ufs::FsHandler::new(view);
+        let mut handler = fsd_ufs::FsHandler::with_clock(view, wall_clock);
         let mut server = match Server::register(scheme) {
             Ok(server) => server,
             Err(error) => {
@@ -106,6 +106,10 @@ mod program {
             }
             let _ = server.dispatch(packet, &mut handler);
         }
+    }
+
+    fn wall_clock() -> i64 {
+        raven_rt::sys::clock_get(0).map_or(0, |time| time.tv_sec)
     }
 
     fn parse_bool(value: &str) -> Option<bool> {

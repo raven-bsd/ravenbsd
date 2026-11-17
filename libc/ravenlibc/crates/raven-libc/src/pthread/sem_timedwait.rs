@@ -9,7 +9,7 @@ pub extern "C" fn sem_timedwait(
     at: *const raven_libc_abi::structs::Timespec,
 ) -> c_int {
     if sem.is_null() {
-        return 22;
+        return super::common::sem_err(raven_libc_thread::limits::EINVAL);
     }
     match s::timedwait(
         &raven_libc_thread::raw::SysKernel,
@@ -21,6 +21,6 @@ pub extern "C" fn sem_timedwait(
         },
     ) {
         Ok(()) => 0,
-        Err(e) => super::common::err(e),
+        Err(e) => super::common::sem_err(e),
     }
 }

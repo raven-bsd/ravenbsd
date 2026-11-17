@@ -1349,6 +1349,16 @@ impl<B: SysBackend, L: Lock> Platform<B, L> {
             Call::Umount { .. } => raven_proto_fs::OP_UMOUNT,
             Call::Statfs => raven_proto_fs::OP_STATFS,
             Call::Access { .. } => raven_proto_fs::OP_ACCESS,
+            Call::Link { .. } => raven_proto_fs::OP_LINK,
+            Call::Chown { .. } => raven_proto_fs::OP_CHOWN,
+            Call::Lchown { .. } => raven_proto_fs::OP_LCHOWN,
+            Call::Fchown { .. } => raven_proto_fs::OP_FCHOWN,
+            Call::Mkfifo { .. } => raven_proto_fs::OP_MKFIFO,
+            Call::Mknod { .. } => raven_proto_fs::OP_MKNOD,
+            Call::Utimens { .. } => raven_proto_fs::OP_UTIMENS,
+            Call::Statvfs => raven_proto_fs::OP_STATVFS,
+            Call::Lstat { .. } => raven_proto_fs::OP_LSTAT,
+            Call::Mmap { .. } => raven_proto_fs::OP_MMAP,
         };
         let call_response =
             CallResponse::decode(op, &response[..count]).map_err(|error| error.errno())?;

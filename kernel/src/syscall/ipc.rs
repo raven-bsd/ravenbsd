@@ -80,13 +80,38 @@ fn open(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
 
 fn read(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let object = caller.handles.lock().get(handle, Rights::NONE)?.clone();
+    if let Object::Pipe(end) = object {
+        if !end.is_reader() {
+            return Err(Errno::EBADF);
+        }
+        // Direction is a property of the end; the READ right still gates a revoked handle.
+        caller.handles.lock().get(handle, Rights::READ)?;
+        return crate::process::pipe::read(
+            &end,
+            raven_usercopy::UserSlice::new(frame.rsi, frame.rdx)?,
+        );
+    }
     let file = ipc::file_from_handle(caller, handle, Rights::READ)?;
+    crate::process::tty::check_access(caller, &file, false)?;
     router::read(caller, &file, frame.rsi, frame.rdx)
 }
 
 fn write(caller: &Arc<Process>, frame: &SyscallFrame) -> Result<usize, Errno> {
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
+    let object = caller.handles.lock().get(handle, Rights::NONE)?.clone();
+    if let Object::Pipe(end) = object {
+        if end.is_reader() {
+            return Err(Errno::EBADF);
+        }
+        caller.handles.lock().get(handle, Rights::WRITE)?;
+        return crate::process::pipe::write(
+            &end,
+            raven_usercopy::UserSlice::new(frame.rsi, frame.rdx)?,
+        );
+    }
     let file = ipc::file_from_handle(caller, handle, Rights::WRITE)?;
+    crate::process::tty::check_access(caller, &file, true)?;
     router::write(caller, &file, frame.rsi, frame.rdx)
 }
 
@@ -95,6 +120,7 @@ pub fn pread(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let file = ipc::file_from_handle(&caller, handle, Rights::READ)?;
+    crate::process::tty::check_access(&caller, &file, false)?;
     router::pread(&caller, &file, frame.rsi, frame.rdx, frame.r10)
 }
 
@@ -103,6 +129,7 @@ pub fn pwrite(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let handle = Handle(u32::try_from(frame.rdi).map_err(|_| Errno::EBADF)?);
     let file = ipc::file_from_handle(&caller, handle, Rights::WRITE)?;
+    crate::process::tty::check_access(&caller, &file, true)?;
     router::pwrite(&caller, &file, frame.rsi, frame.rdx, frame.r10)
 }
 

@@ -14,7 +14,7 @@ root=$(CDPATH= cd -- "$here/../../.." && pwd)
 target=$root/build/posix-utility/uutils-host
 log=$root/build/posix-utility/build.log
 
-present="grep cmp diff strings"
+present="grep cmp diff strings sed awk"
 
 if [ "${1:-}" = "--list" ]; then
     for tool in $present; do

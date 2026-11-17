@@ -20,11 +20,17 @@ pub mod args;
 pub mod entry;
 pub mod event;
 #[cfg(feature = "alloc")]
+pub mod exec;
+#[cfg(feature = "alloc")]
 pub mod fs;
 pub mod initfs;
+pub mod pipe;
 pub mod print;
+pub mod priority;
 pub mod proc;
 pub mod spawn;
+#[cfg(feature = "alloc")]
+pub mod spawn_attrs;
 mod spawn_error;
 pub mod sync;
 pub mod sys;

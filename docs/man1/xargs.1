@@ -1,0 +1,102 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt XARGS 1
+.Os RavenBSD
+.Sh NAME
+.Nm xargs
+.Nd construct argument lists and run a command
+.Sh SYNOPSIS
+.Nm
+.Op Fl 0rtx
+.Op Fl n Ar max
+.Op Fl I Ar repl
+.Op Fl s Ar size
+.Op Ar command Op Ar argument ...
+.Sh DESCRIPTION
+The
+.Nm
+utility reads items from standard input, appends the items to
+.Ar command
+and its initial arguments, and runs the resulting command.
+A command that is not specified defaults to
+.Ic echo .
+.Pp
+By default, items are separated by blanks, tabs and newlines.
+Single and double quotes group blanks into one item, and a backslash escapes the next character.
+An unmatched quote or a trailing backslash is an input error.
+.Pp
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl 0
+Separate input items with NUL bytes instead of blanks and newlines.
+.It Fl n Ar max
+Use at most
+.Ar max
+items per command.
+.It Fl I Ar repl
+Replace every occurrence of
+.Ar repl
+in the command and its initial arguments with one input line.
+This implies one item per invocation and strict size checking.
+If
+.Ar repl
+does not occur in the command, the command runs unchanged once per item.
+.It Fl r
+Do not run the command when the input is empty.
+Without
+.Fl r ,
+an empty input runs the command once with no appended items.
+.It Fl t
+Write each command to standard error before running it.
+.It Fl x
+Exit with an error if an
+.Fl n
+group would exceed the
+.Fl s
+size instead of splitting the group.
+A single item larger than
+.Fl s
+is always an error.
+.It Fl s Ar size
+Limit a command line to
+.Ar size
+bytes.
+The default bound is 4096 bytes.
+.El
+.Pp
+The command is executed with the items appended in input order.
+The child's exit status is mapped to the POSIX xargs status: 0 for success, 123 for a child exit
+1-125, 124 for 255, 125 for a signal, 126 when the command cannot be invoked, and 127 when the
+command is not found.
+.Pp
+On the target image the command is resolved in the initfs
+.Pa /bin
+and
+.Pa /sbin
+and started through the native spawn path.
+Standard input items are read from the console terminal; there is no general process pipeline
+handle yet.
+.Pp
+Only the listed options are implemented.
+GNU extensions such as
+.Fl L ,
+.Fl P ,
+.Fl o ,
+.Fl e ,
+.Fl d ,
+.Fl a
+and
+.Fl p
+are not supported.
+.Sh EXIT STATUS
+.Ex -std
+Status 1 indicates an input or size error, status 2 invalid usage, and the xargs-specific child
+status codes are listed above.
+.Sh SEE ALSO
+.Xr patch 1 ,
+.Xr rsh 1
+.Sh STANDARDS
+The bounded core follows the POSIX.1-2024
+.Nm
+model for the listed options.

@@ -124,7 +124,7 @@ statuses, `P_PID`/`P_PGID`/`P_ALL`, kill statuses, times/rusage, rlimits and
    stop/resume seam.
 2. **No libc pending-set injection.** Queued signals are consumed by
    `PROC_SIGRECV`; the existing libc signal-entry path still owns its own
-   pending set. P2e/procd can use the queue directly.
+   pending set. A future libc signal-entry integration can consume the queue directly.
 3. **User time and rusage counters.** Only syscall time is accumulated; user
    time, RSS and fault/context-switch counters are zero until scheduler and MM
    accounting hooks land.

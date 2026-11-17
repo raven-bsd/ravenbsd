@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-bc"
+version = "0.1.0"
+description = "RavenBSD bc utility: bounded POSIX arbitrary-precision calculator."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[target.'cfg(target_os = "none")'.dependencies]
+raven-rt = { path = "../../rt" }
+raven-tool-core = { path = "../../../crates/raven-tool-core" }
+
+[lints]
+workspace = true

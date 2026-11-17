@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4x tty-tool evidence: more and write.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.more"
+status = "present"
+evidence = "test:tests/posix/utility/ttytools/more/test.sh"
+notes = "P4x: paging height, tty commands, non-tty streaming and address/state tests"
+
+[[row]]
+id = "util.write"
+status = "present"
+evidence = "test:tests/posix/utility/ttytools/write/test.sh"
+notes = "P4x: target lookup, logged-in/mesg refusal, message normalization and status tests"

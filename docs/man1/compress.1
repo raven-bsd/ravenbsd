@@ -1,0 +1,43 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt COMPRESS 1
+.Os RavenBSD
+.Sh NAME
+.Nm compress
+.Nd compress files with adaptive LZW (.Z)
+.Sh SYNOPSIS
+.Nm
+.Op Fl c
+.Op Fl d
+.Op Fl b Ar bits
+.Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility compresses each
+.Ar file
+to
+.Ar file Ns .Z
+using the historical `.Z` LZW format
+.Pq magic Ql 1f 9d .
+The default maximum code width is 16 bits; block mode and clear codes are used.
+.Bl -tag -width Ds
+.It Fl c
+Write the result to standard output and keep the input.
+.It Fl d
+Decompress instead of compress.
+.It Fl b Ar bits
+Use a maximum code width from 9 through 16.
+.El
+.Pp
+On a file operation the input is removed after a successful write. The target image requires a
+file operand; standard input is not available.
+.Sh EXIT STATUS
+.Ex -std
+A corrupt stream or I/O error exits with status 1; a usage error exits with status 2.
+.Sh SEE ALSO
+.Xr uncompress 1 ,
+.Xr zcat 1
+.Sh STANDARDS
+RavenBSD implements the historical block-mode `.Z` LZW format.

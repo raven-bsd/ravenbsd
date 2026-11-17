@@ -31,8 +31,9 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use raven_proto_fs::{
-    Credentials, DT_DIR, DT_LNK, DT_REG, DirEntry, DirEntryHeader, Errno, S_IFDIR, S_IFLNK,
-    S_IFREG, Stat, StatFs,
+    Credentials, DT_BLK, DT_CHR, DT_DIR, DT_FIFO, DT_LNK, DT_REG, DT_SOCK, DirEntry,
+    DirEntryHeader, Errno, S_IFBLK, S_IFCHR, S_IFDIR, S_IFIFO, S_IFLNK, S_IFREG, S_IFSOCK, Stat,
+    StatFs,
 };
 
 /// Inode number of the root directory.
@@ -66,6 +67,19 @@ impl Default for Limits {
     }
 }
 
+/// One special-file node type.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SpecialKind {
+    /// A named pipe.
+    Fifo,
+    /// A character device node.
+    CharDevice,
+    /// A block device node.
+    BlockDevice,
+    /// A Unix-domain socket node.
+    Socket,
+}
+
 /// The payload of one inode.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NodeKind {
@@ -75,6 +89,8 @@ pub enum NodeKind {
     Dir(BTreeMap<String, u64>),
     /// A symbolic link target.
     Symlink(Vec<u8>),
+    /// A FIFO, device or socket node.
+    Special(SpecialKind),
 }
 
 /// One inode with its metadata.
@@ -293,6 +309,50 @@ impl Ramfs {
         )
     }
 
+    /// Create a FIFO owned by `uid`/`gid`.
+    pub fn mkfifo_at_owned(
+        &mut self,
+        base: u64,
+        path: &str,
+        mode: u16,
+        uid: u32,
+        gid: u32,
+        now: i64,
+    ) -> Result<u64, Errno> {
+        self.create_at(
+            base,
+            path,
+            NodeKind::Special(SpecialKind::Fifo),
+            mode & 0o7777,
+            uid,
+            gid,
+            now,
+        )
+    }
+
+    /// Create a special node owned by `uid`/`gid`.
+    #[allow(clippy::too_many_arguments)] // node kind, mode, owner and time are all independent
+    pub fn mknod_at_owned(
+        &mut self,
+        base: u64,
+        path: &str,
+        kind: SpecialKind,
+        mode: u16,
+        uid: u32,
+        gid: u32,
+        now: i64,
+    ) -> Result<u64, Errno> {
+        self.create_at(
+            base,
+            path,
+            NodeKind::Special(kind),
+            mode & 0o7777,
+            uid,
+            gid,
+            now,
+        )
+    }
+
     /// Read from a file at `offset`; updates atime to `now`.
     pub fn read(
         &mut self,
@@ -405,7 +465,7 @@ impl Ramfs {
         Ok(match &node.kind {
             NodeKind::File(data) => data.len() as u64,
             NodeKind::Symlink(target) => target.len() as u64,
-            NodeKind::Dir(_) => 0,
+            NodeKind::Dir(_) | NodeKind::Special(_) => 0,
         })
     }
 
@@ -416,6 +476,7 @@ impl Ramfs {
             NodeKind::File(data) => (S_IFREG | u32::from(node.mode), data.len() as u64),
             NodeKind::Dir(_) => (S_IFDIR | u32::from(node.mode), 0),
             NodeKind::Symlink(target) => (S_IFLNK | u32::from(node.mode), target.len() as u64),
+            NodeKind::Special(kind) => (special_type(*kind) | u32::from(node.mode), 0),
         };
         Ok(Stat {
             ino,
@@ -453,6 +514,67 @@ impl Ramfs {
         Ok(())
     }
 
+    /// Change ownership of `path`, optionally following a final symlink.
+    ///
+    /// `u32::MAX` leaves the corresponding id unchanged. A successful ownership change clears the
+    /// set-user-ID and set-group-ID bits, as POSIX requires.
+    pub fn chown_at(
+        &mut self,
+        base: u64,
+        path: &str,
+        uid: u32,
+        gid: u32,
+        follow: bool,
+        now: i64,
+    ) -> Result<(), Errno> {
+        let ino = self.resolve(base, path, follow, None)?;
+        self.chown_ino(ino, uid, gid, now)
+    }
+
+    /// Change ownership of an open inode.
+    pub fn chown_ino(&mut self, ino: u64, uid: u32, gid: u32, now: i64) -> Result<(), Errno> {
+        let node = self.nodes.get_mut(&ino).ok_or(Errno::EBADF)?;
+        let mut changed = false;
+        if uid != u32::MAX && uid != node.uid {
+            node.uid = uid;
+            changed = true;
+        }
+        if gid != u32::MAX && gid != node.gid {
+            node.gid = gid;
+            changed = true;
+        }
+        if changed {
+            node.mode &= !0o6000;
+            node.ctime = now;
+        }
+        Ok(())
+    }
+
+    /// Set access and modification times of `path`, optionally following a final symlink.
+    ///
+    /// `None` leaves the corresponding timestamp unchanged. The status-change time always
+    /// advances to `now`.
+    pub fn utimens_at(
+        &mut self,
+        base: u64,
+        path: &str,
+        atime: Option<i64>,
+        mtime: Option<i64>,
+        follow: bool,
+        now: i64,
+    ) -> Result<(), Errno> {
+        let ino = self.resolve(base, path, follow, None)?;
+        let node = self.nodes.get_mut(&ino).ok_or(Errno::EBADF)?;
+        if let Some(atime) = atime {
+            node.atime = atime;
+        }
+        if let Some(mtime) = mtime {
+            node.mtime = mtime;
+        }
+        node.ctime = now;
+        Ok(())
+    }
+
     /// Remove a file or symlink `path` relative to `base`; returns the unlinked inode.
     pub fn unlink_at(&mut self, base: u64, path: &str, now: i64) -> Result<u64, Errno> {
         let (parent_ino, name) = self.parent_and_name(base, path)?;
@@ -479,7 +601,7 @@ impl Ramfs {
             parent.ctime = now;
         }
         if let Some(node) = self.nodes.get_mut(&ino) {
-            node.nlink = 0;
+            node.nlink = node.nlink.saturating_sub(1);
         }
         Ok(ino)
     }
@@ -576,7 +698,11 @@ impl Ramfs {
                 _ => {}
             }
             if let Some(node) = self.nodes.get_mut(&dest_ino) {
-                node.nlink = 0;
+                if matches!(&dest_kind, NodeKind::Dir(_)) {
+                    node.nlink = 0;
+                } else {
+                    node.nlink = node.nlink.saturating_sub(1);
+                }
             }
             if matches!(&dest_kind, NodeKind::Dir(_))
                 && let Some(parent) = self.nodes.get_mut(&dest_parent)
@@ -622,7 +748,7 @@ impl Ramfs {
         match &node.kind {
             NodeKind::Symlink(target) => Ok(target.clone()),
             NodeKind::Dir(_) => Err(Errno::EISDIR),
-            NodeKind::File(_) => Err(Errno::EINVAL),
+            NodeKind::File(_) | NodeKind::Special(_) => Err(Errno::EINVAL),
         }
     }
 
@@ -651,6 +777,7 @@ impl Ramfs {
                 NodeKind::File(_) => DT_REG,
                 NodeKind::Dir(_) => DT_DIR,
                 NodeKind::Symlink(_) => DT_LNK,
+                NodeKind::Special(kind) => special_dt(*kind),
             };
             let entry = DirEntry {
                 header: DirEntryHeader {
@@ -698,22 +825,54 @@ impl Ramfs {
         }
         let bytes = match &node.kind {
             NodeKind::File(data) => data.len(),
-            _ => 0,
+            NodeKind::Dir(_) | NodeKind::Symlink(_) | NodeKind::Special(_) => 0,
         };
         self.nodes.remove(&ino);
         self.total_bytes = self.total_bytes.saturating_sub(bytes);
         Ok(())
     }
 
-    /// Hard links are not supported in this milestone.
-    pub fn link_at(
-        &mut self,
-        _base: u64,
-        _path: &str,
-        _target: &str,
-        _now: i64,
-    ) -> Result<(), Errno> {
-        Err(Errno::EPERM)
+    /// Add a hard link at `path` to the existing entry `target`.
+    ///
+    /// A final symlink in `target` is not followed, matching POSIX `link`. Directories cannot be
+    /// linked and an existing destination is `EEXIST`.
+    pub fn link_at(&mut self, base: u64, path: &str, target: &str, now: i64) -> Result<(), Errno> {
+        let (parent_ino, name) = self.parent_and_name(base, path)?;
+        let target_ino = self.resolve(base, target, false, None)?;
+        if matches!(
+            self.nodes.get(&target_ino).ok_or(Errno::EBADF)?.kind,
+            NodeKind::Dir(_)
+        ) {
+            return Err(Errno::EPERM);
+        }
+        {
+            let parent = self.nodes.get(&parent_ino).ok_or(Errno::EBADF)?;
+            let NodeKind::Dir(entries) = &parent.kind else {
+                return Err(Errno::ENOTDIR);
+            };
+            if entries.contains_key(&name) {
+                return Err(Errno::EEXIST);
+            }
+        }
+        if target_ino == ROOT_INO {
+            return Err(Errno::EPERM);
+        }
+        {
+            let target = self.nodes.get_mut(&target_ino).ok_or(Errno::EBADF)?;
+            target.nlink = target.nlink.checked_add(1).ok_or(Errno::EMLINK)?;
+            target.ctime = now;
+        }
+        let parent = self.nodes.get_mut(&parent_ino).ok_or(Errno::EBADF)?;
+        let NodeKind::Dir(entries) = &mut parent.kind else {
+            if let Some(target) = self.nodes.get_mut(&target_ino) {
+                target.nlink = target.nlink.saturating_sub(1);
+            }
+            return Err(Errno::ENOTDIR);
+        };
+        entries.insert(name, target_ino);
+        parent.mtime = now;
+        parent.ctime = now;
+        Ok(())
     }
 
     /// Check the inode graph and accounting invariants.
@@ -725,44 +884,48 @@ impl Ramfs {
         if !matches!(root.kind, NodeKind::Dir(_)) {
             return Err("root is not a directory");
         }
-        let mut reachable = BTreeSet::new();
+        let mut links: BTreeMap<u64, u32> = BTreeMap::new();
+        let mut visited_dirs = BTreeSet::new();
         let mut stack = vec![ROOT_INO];
         while let Some(ino) = stack.pop() {
-            if !reachable.insert(ino) {
-                return Err("directory graph contains a cycle or duplicate");
-            }
             let node = self
                 .nodes
                 .get(&ino)
                 .ok_or("directory entry points to a missing inode")?;
             if let NodeKind::Dir(entries) = &node.kind {
+                if !visited_dirs.insert(ino) {
+                    return Err("directory graph contains a cycle");
+                }
                 for child in entries.values() {
-                    if !self.nodes.contains_key(child) {
-                        return Err("directory entry points to a missing inode");
+                    let child_node = self
+                        .nodes
+                        .get(child)
+                        .ok_or("directory entry points to a missing inode")?;
+                    let count = links.entry(*child).or_insert(0);
+                    *count = count.checked_add(1).ok_or("link count overflow")?;
+                    if matches!(child_node.kind, NodeKind::Dir(_)) {
+                        stack.push(*child);
                     }
-                    stack.push(*child);
                 }
             }
         }
         let mut total = 0usize;
         for (ino, node) in &self.nodes {
-            let linked = reachable.contains(ino);
+            let expected = links.get(ino).copied().unwrap_or(0);
             match &node.kind {
                 NodeKind::File(data) => {
                     total = total.checked_add(data.len()).ok_or("byte count overflow")?;
-                    let expected = u32::from(linked);
                     if node.nlink != expected {
                         return Err("file link count mismatch");
                     }
                 }
-                NodeKind::Symlink(_) => {
-                    let expected = u32::from(linked);
+                NodeKind::Symlink(_) | NodeKind::Special(_) => {
                     if node.nlink != expected {
-                        return Err("symlink link count mismatch");
+                        return Err("special link count mismatch");
                     }
                 }
                 NodeKind::Dir(entries) => {
-                    if linked {
+                    if *ino == ROOT_INO || expected != 0 {
                         let subdirs = entries
                             .values()
                             .filter(|child| {
@@ -1014,6 +1177,24 @@ impl Ramfs {
             }
         }
         false
+    }
+}
+
+const fn special_type(kind: SpecialKind) -> u32 {
+    match kind {
+        SpecialKind::Fifo => S_IFIFO,
+        SpecialKind::CharDevice => S_IFCHR,
+        SpecialKind::BlockDevice => S_IFBLK,
+        SpecialKind::Socket => S_IFSOCK,
+    }
+}
+
+const fn special_dt(kind: SpecialKind) -> u8 {
+    match kind {
+        SpecialKind::Fifo => DT_FIFO,
+        SpecialKind::CharDevice => DT_CHR,
+        SpecialKind::BlockDevice => DT_BLK,
+        SpecialKind::Socket => DT_SOCK,
     }
 }
 
@@ -1559,10 +1740,13 @@ mod tests {
     }
 
     #[test]
-    fn hard_links_are_eperm() {
+    fn hard_links_share_the_inode() {
         let mut fs = root();
-        fs.create_file_at(ROOT_INO, "/f", 0o644, 1).unwrap();
-        assert_eq!(fs.link_at(ROOT_INO, "/g", "/f", 2), Err(Errno::EPERM));
+        let ino = fs.create_file_at(ROOT_INO, "/f", 0o644, 1).unwrap();
+        fs.link_at(ROOT_INO, "/g", "/f", 2).unwrap();
+        assert_eq!(fs.lookup("/g").unwrap(), ino);
+        assert_eq!(fs.stat(ino).unwrap().nlink, 2);
+        fs.audit().unwrap();
     }
 
     #[test]

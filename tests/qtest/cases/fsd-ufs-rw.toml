@@ -47,6 +47,15 @@ regex = '^fsd-ufs-rw: probe truncate/append ok$'
 regex = '^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$'
 
 [[expect]]
+regex = '^fsd-ufs-rw: probe posix operations ok$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe sparse ok$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe mmap ok$'
+
+[[expect]]
 regex = '^fsd-ufs-rw: probe unlink/rmdir ok$'
 
 [[expect]]
@@ -66,6 +75,15 @@ regex = '^fsd-ufs-rw: probe server restarted$'
 
 [[expect]]
 regex = '^fsd-ufs-rw: probe remount ok$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true|false)$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe crash replay=(mounted|fail-closed)$'
+
+[[expect]]
+regex = '^fsd-ufs-rw: probe crash ok$'
 
 [[expect]]
 regex = '^fsd-ufs-rw: probe ok$'

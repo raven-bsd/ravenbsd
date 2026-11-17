@@ -1,0 +1,54 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt PAX 1
+.Os RavenBSD
+.Sh NAME
+.Nm pax
+.Nd read and write POSIX pax archives
+.Sh SYNOPSIS
+.Nm
+.Fl w|a|r|x|t
+.Op Fl v
+.Op Fl p
+.Fl f Ar archive
+.Op Ar paths ...
+.Sh DESCRIPTION
+The
+.Nm
+utility reads and writes POSIX pax archives: ustar headers with
+.Ql x
+extended-header records for paths, link paths, large sizes and negative
+mtimes. Regular files, directories and symbolic links are supported.
+.Bl -tag -width Ds
+.It Fl w
+Write the named paths to a new archive.
+.It Fl a
+Append the named paths to an existing archive.
+.It Fl r
+Read and extract.
+.It Fl x
+Extract.
+.It Fl t
+List.
+.It Fl v
+Verbose list/extract.
+.It Fl p
+Preserve modes (extraction restores stored modes).
+.It Fl f Ar archive
+Archive file.
+.El
+.Pp
+Extended records use the
+.Ql <length> <keyword>=<value>
+form. Compression
+.Pq Fl z , Fl j , Fl J
+is not supported and is a usage error.
+.Sh EXIT STATUS
+.Ex -std
+A malformed archive or unsafe path exits with status 1; a usage error exits with status 2.
+.Sh SEE ALSO
+.Xr tar 1 ,
+.Xr ar 1
+.Sh STANDARDS
+RavenBSD implements the pax extended-header subset described above.

@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P3: foreground process-group handoff, Ctrl-C -> SIGINT, wait status and hangup through a pty,
+# with ttyd recording the same foreground group.
+
+name = "tty-job-control"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["TTY_MODE=job sh tests/fixtures/tty/build.sh"]
+initfs = "build/fixtures/tty/initfs-job.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^tty-child: ready$'
+unordered = true
+
+[[expect]]
+regex = '^tty: child=[0-9]+$'
+unordered = true
+
+[[expect]]
+regex = '^tty-child: sigint$'
+unordered = true
+
+[[expect]]
+regex = '^tty: job wait=130$'
+
+[[expect]]
+regex = '^tty: pty-fg=[0-9]+$'
+
+[[expect]]
+regex = '^tty: ttyd-fg=[0-9]+$'
+
+[[expect]]
+regex = '^tty: hangup=eof$'
+
+[[expect]]
+regex = '^tty: ttyd-hung=ok$'
+
+[[expect]]
+regex = '^tty: tty-job-control=ok$'
+
+[[expect]]
+regex = '^tty: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|tty: fail'

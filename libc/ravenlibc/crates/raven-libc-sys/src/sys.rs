@@ -293,6 +293,21 @@ pub fn protect(proc_: Handle, addr: usize, len: usize, prot: u32) -> Result<(), 
     .map(|_| ())
 }
 
+/// Flush dirty shared pages in `[addr, addr + len)`.
+pub fn msync(proc_: Handle, addr: usize, len: usize, flags: u32) -> Result<(), Errno> {
+    // SAFETY: MSYNC takes scalar arguments only; the kernel validates the range and flags.
+    crate::errno::ret(unsafe {
+        arch::syscall4(
+            raven_abi::syscall::MSYNC,
+            proc_.0 as usize,
+            addr,
+            len,
+            flags as usize,
+        )
+    })
+    .map(|_| ())
+}
+
 /// Create a memory object of `len` bytes.
 pub fn memobj_create(len: usize, flags: usize) -> Result<Handle, Errno> {
     // SAFETY: MEMOBJ_CREATE takes scalar arguments only.

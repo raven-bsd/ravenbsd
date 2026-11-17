@@ -577,8 +577,10 @@ impl<K: Kernel> Server<K> {
                     .map_err(HandlerError::from)
             }
             Opcode::Call => {
+                // A kernel pager request carries its bounded `PagerPacket` in the inline data
+                // area and has no captured client buffer. Normal client CALLs use the capture.
                 let request_bytes = if request.buffer_len == 0 {
-                    &[][..]
+                    request.data_bytes()
                 } else {
                     request_buffer(&request)?
                 };

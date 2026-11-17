@@ -5,3 +5,117 @@
 # evidence; a waived row needs a written waiver in notes.
 schema = 1
 standard = "posix-2024"
+
+[[row]]
+id = "filesystem.access"
+status = "present"
+evidence = "qtest:perm"
+notes = "P5: access/faccessat through vfsd with U3a effective credentials and the root execute rule"
+
+[[row]]
+id = "filesystem.directory"
+status = "present"
+evidence = "qtest:posix-fs"
+notes = "P5: opendir/readdir/closedir via ramfsd directory cursors and generation invalidation"
+
+[[row]]
+id = "filesystem.hard-link"
+status = "present"
+evidence = "qtest:posix-fs"
+notes = "P5: link/unlink on ramfs and UFS; nlink drops to one and the data survives the first unlink"
+
+[[row]]
+id = "filesystem.mkdir-rmdir"
+status = "present"
+evidence = "qtest:posix-fs"
+notes = "P5: mkdir EEXIST, rmdir of empty/non-empty directories and permission checks"
+
+[[row]]
+id = "filesystem.mount"
+status = "present"
+evidence = "qtest:posix-fs"
+notes = "P5: vfsd mount table, nested mount visibility and longest-prefix routing"
+
+[[row]]
+id = "filesystem.ownership"
+status = "present"
+evidence = "qtest:fsd-ufs-rw"
+notes = "P5: chown/lchown/fchown owner rules and set-id clearing on ramfs and UFS"
+
+[[row]]
+id = "filesystem.path-resolution"
+status = "present"
+evidence = "qtest:posix-fs"
+notes = "P5: dot, dot-dot, repeated separators and trailing-slash directory intent"
+
+[[row]]
+id = "filesystem.permission"
+status = "present"
+evidence = "qtest:perm"
+notes = "P5: owner/group/other access, sticky deletion, setgid directories and symlink denial"
+
+[[row]]
+id = "filesystem.rename"
+status = "present"
+evidence = "qtest:posix-fs"
+notes = "P5: rename across directories, replacement and EXDEV through the mount table"
+
+[[row]]
+id = "filesystem.special-file"
+status = "present"
+evidence = "qtest:fsd-ufs-rw"
+notes = "P5: mkfifo/mknod FIFO, character-device and socket nodes on ramfs and UFS"
+
+[[row]]
+id = "filesystem.stat-family"
+status = "present"
+evidence = "qtest:posix-fs"
+notes = "P5: stat/fstat/lstat mode, size, inode, link count and owner fields"
+
+[[row]]
+id = "filesystem.statvfs"
+status = "present"
+evidence = "qtest:fsd-ufs-rw"
+notes = "P5: STATVFS block, fragment, capacity, inode and name-length fields"
+
+[[row]]
+id = "filesystem.symlink"
+status = "present"
+evidence = "qtest:posix-fs"
+notes = "P5: symlink/readlink, following, dangling targets and loop detection"
+
+[[row]]
+id = "filesystem.sync"
+status = "present"
+evidence = "qtest:fsd-ufs-rw"
+notes = "P5: fsync commits UFS state, the server stops, fsck -n is clean and data survives remount"
+
+[[row]]
+id = "filesystem.timestamp"
+status = "present"
+evidence = "qtest:fsd-ufs-rw"
+notes = "P5: utimensat set/now/omit updates atime/mtime and advances ctime"
+
+[[row]]
+id = "filesystem.truncate"
+status = "present"
+evidence = "qtest:posix-fs"
+notes = "P5: ftruncate shrink, zero extension and truncate call cursor updates"
+
+[[row]]
+id = "filesystem.sparse-file"
+status = "present"
+evidence = "test:tests/posix/fs/sparse-file/test.sh"
+notes = "P5: UFS extension creates holes; st_blocks stays far below the file size and reads return zeros"
+
+[[row]]
+id = "filesystem.umask"
+status = "present"
+evidence = "test:tests/posix/fs/umask/test.sh"
+notes = "P5: the process-local umask masks mkdir and O_CREAT modes through the libc platform"
+
+[[row]]
+id = "filesystem.mmap-file"
+status = "present"
+evidence = "qtest:posix-fs"
+notes = "P5b: file-backed mmap maps the attached VFS pager object; shared write-back, private COW, msync/munmap and EOF offset rejection"

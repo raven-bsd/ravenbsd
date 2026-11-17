@@ -1,0 +1,47 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 16, 2026
+.Dt TAR 1
+.Os RavenBSD
+.Sh NAME
+.Nm tar
+.Nd create, list and extract POSIX ustar archives
+.Sh SYNOPSIS
+.Nm
+.Fl c|t|x
+.Op Fl v
+.Fl f Ar archive
+.Op Ar paths ...
+.Sh DESCRIPTION
+The
+.Nm
+utility reads and writes the POSIX ustar format.
+It supports regular files, directories, symbolic links, modes, uid/gid fields
+(written as zero for a non-root process), modification times and nested paths.
+.Bl -tag -width Ds
+.It Fl c
+Create an archive from the path operands.
+Directories are stored recursively.
+.It Fl t
+List archive members.
+.It Fl x
+Extract archive members below the current directory.
+.It Fl v
+Verbose listing or extraction.
+.It Fl f Ar archive
+Archive file; this implementation does not use standard input/output for the archive.
+.El
+.Pp
+The name field is 100 bytes and the ustar prefix field is 155 bytes.
+A path that cannot be split into those fields is rejected rather than truncated.
+Long-name/PAX extensions, compression
+.Pq Fl z , Fl j , Fl J
+and unsupported member types are explicit errors.
+.Sh EXIT STATUS
+.Ex -std
+A malformed archive or unsafe path exits with status 1; a usage error exits with status 2.
+.Sh SEE ALSO
+.Xr ar 1 ,
+.Xr uuencode 1
+.Sh STANDARDS
+RavenBSD implements the ustar subset described above.
