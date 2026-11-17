@@ -17,8 +17,8 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 | process | 17 | 0 | 0 | 14 | 3 |
 | shell | 25 | 0 | 0 | 22 | 3 |
 | tty | 12 | 0 | 0 | 7 | 5 |
-| utilities | 217 | 38 | 1 | 173 | 5 |
-| **all** | **1800** | **128** | **17** | **1557** | **98** |
+| utilities | 217 | 37 | 1 | 174 | 5 |
+| **all** | **1800** | **127** | **17** | **1558** | **98** |
 
 Traceability rows: 1800; profile rows: 1800.
 
@@ -1651,7 +1651,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `util.more` | `more` | present | P4 | `test:tests/posix/utility/ttytools/more/test.sh` | none |
 | `util.mv` | `mv` | present | P4 | `test:tests/posix/utility/file/mv/test.sh` | none |
 | `util.neqn` | `neqn` | missing | P4 | `none` | none |
-| `util.newgrp` | `newgrp` | missing | P4 | `none` | none |
+| `util.newgrp` | `newgrp` | present | P4 | `test:tests/posix/utility/simple4/newgrp/test.sh` | none |
 | `util.nice` | `nice` | present | P4 | `qtest:posix-util-system` | none |
 | `util.nl` | `nl` | present | P4 | `test:tests/posix/utility/text/nl/test.sh` | none |
 | `util.nm` | `nm` | present | P4 | `test:tests/posix/utility/binutils/nm/test.sh` | none |
@@ -1888,9 +1888,9 @@ Traceability rows: 1800; profile rows: 1800.
 ## Current tree
 
 - frozen exported symbols: 1691
-- `userland/bin` directories: 95
+- `userland/bin` directories: 96
 - headers under `libc/ravenlibc/include`: 228
-- utility directories: adduser, ar, asa, at, awk, batch, bc, beep, cal, cat, cflow, cmp, compress, cp, crontab, ctags, cxref, date, df, diff, dmesg, dtrace, echo, ed, env, file, find, gencat, getconf, getty, grep, groupadd, hostname, iconv, id, ifconfig, kill, lex, locale, logger, login, ls, m4, mail, mailx, make, man, mesg, mixer, mkdir, more, mount, mv, nc, netstat, nice, nm, nohup, passwd, patch, pax, ping, play, ps, raven, renice, rm, rmdir, route, rsh, sed, sleep, stat, strings, strip, su, svcctl, talk, tar, touch, trace, umount, uname, uncompress, useradd, uucp, uudecode, uuencode, uustat, uux, whoami, write, xargs, yacc, zcat
+- utility directories: adduser, ar, asa, at, awk, batch, bc, beep, cal, cat, cflow, cmp, compress, cp, crontab, ctags, cxref, date, df, diff, dmesg, dtrace, echo, ed, env, file, find, gencat, getconf, getty, grep, groupadd, hostname, iconv, id, ifconfig, kill, lex, locale, logger, login, ls, m4, mail, mailx, make, man, mesg, mixer, mkdir, more, mount, mv, nc, netstat, newgrp, nice, nm, nohup, passwd, patch, pax, ping, play, ps, raven, renice, rm, rmdir, route, rsh, sed, sleep, stat, strings, strip, su, svcctl, talk, tar, touch, trace, umount, uname, uncompress, useradd, uucp, uudecode, uuencode, uustat, uux, whoami, write, xargs, yacc, zcat
 
 ## Top gaps
 
@@ -1977,4 +1977,4 @@ Traceability rows: 1800; profile rows: 1800.
 | interface | `fmodfNx` | `none` |
 | interface | `fpathconf` | `none` |
 
-243 gap rows are listed in full in the tables above; this short table is a review aid.
+242 gap rows are listed in full in the tables above; this short table is a review aid.
