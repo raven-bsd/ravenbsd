@@ -61,7 +61,11 @@ check_dynamic() {
         echo "dynamic-userland: $binary has no DT_NEEDED libc.so.1" >&2
         exit 1
     fi
-    echo "dynamic-userland: $binary PT_INTERP + DT_NEEDED libc.so.1 ok"
+    if "$readelf" -d "$path" | grep -q 'TEXTREL'; then
+        echo "dynamic-userland: $binary still carries DF_TEXTREL/DT_TEXTREL" >&2
+        exit 1
+    fi
+    echo "dynamic-userland: $binary PT_INTERP + DT_NEEDED libc.so.1, no textrel ok"
 }
 
 check_static() {
