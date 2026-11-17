@@ -176,6 +176,7 @@ link_dynamic() {
     if [ -n "$builtins" ]; then
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
             -nostdlib -nostartfiles -pie -Wl,-dynamic-linker,/libexec/ld-elf.so.1 \
+            -Wl,--image-base=0x400000 \
             -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
             "$sysroot/usr/lib/Scrt1.o" "$sysroot/usr/lib/crti.o" "$1" \
             -L"$sysroot/lib" -L"$sysroot/usr/lib" -lc -lclang_rt.builtins \
@@ -183,6 +184,7 @@ link_dynamic() {
     else
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
             -nostdlib -nostartfiles -pie -Wl,-dynamic-linker,/libexec/ld-elf.so.1 \
+            -Wl,--image-base=0x400000 \
             -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
             "$sysroot/usr/lib/Scrt1.o" "$sysroot/usr/lib/crti.o" "$1" \
             -L"$sysroot/lib" -L"$sysroot/usr/lib" -lc \
@@ -193,6 +195,7 @@ link_dynamic() {
 link_shared() {
     "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" -fuse-ld=lld \
         -shared -nostdlib -nostartfiles -Wl,-soname,libplug.so \
+        -Wl,--image-base=0x200000 \
         -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096 -Wl,--error-limit=0 \
         "$1" -o "$2"
 }

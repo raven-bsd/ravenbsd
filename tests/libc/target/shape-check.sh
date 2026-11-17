@@ -5,7 +5,9 @@
 # Interim 4 KiB ELF shape check for the C73 libc cases (PG-53). It reads the program headers
 # with llvm-readelf (or readelf) and rejects an ELF that the RavenBSD loader cannot map:
 # every PT_LOAD aligned to 0x1000, at most 16 PT_LOAD segments, no segment both writable and
-# executable, and matching file/virtual offsets modulo 0x1000.
+# executable, matching file/virtual offsets modulo 0x1000, and no segment whose file range runs
+# past EOF. `p_filesz` need not be page-rounded: the loader maps the file bytes and zero-fills
+# the rest of the page.
 
 set -eu
 
@@ -50,6 +52,12 @@ if [ "$loads" -gt 16 ]; then
     exit 1
 fi
 
+file_size=$(wc -c < "$elf" | tr -d ' ')
+if [ -z "$file_size" ]; then
+    printf 'shape: FAIL cannot size %s\n' "$elf"
+    exit 1
+fi
+
 awk '$1 == "LOAD" {
         flags = ""
         for (i = 7; i < NF; i++) {
@@ -76,9 +84,9 @@ while read -r offset virt size flags align; do
         printf 'shape: FAIL offset/vaddr mismatch at %s\n' "$virt"
         exit 1
     fi
-    if [ "$size_value" -ne 0 ] && [ $(((off_value + size_value) % 4096)) -ne 0 ]; then
-        printf 'shape: FAIL partial file tail at %s (offset %s + size %s)\n' \
-            "$virt" "$offset" "$size"
+    if [ "$size_value" -ne 0 ] && [ $((off_value + size_value)) -gt "$file_size" ]; then
+        printf 'shape: FAIL segment past EOF at %s (offset %s + size %s > %s)\n' \
+            "$virt" "$offset" "$size" "$file_size"
         exit 1
     fi
 done < "$loads_file"
