@@ -484,27 +484,48 @@ the concrete change and the acceptance it must satisfy; none may raise an S/F or
 | C74z-S14 | P2 `%d` float-path duplication | Split an integer-only vformat path; `%d` must not link `float_layout::emit_inner` 1,772-2,695 and the float hook | -2k S on P2; `INV-S-P2-P0` closer | carl/C43 | P2 S shrink, fmt oracle, invariant re-eval |
 | C74z-S15 | P0 floor dtoa over-link | Trace `raven_libc_dtoa::dtoa` 4,906-9,235 in P0 and remove the reference chain from start/platform/locale | -5-9k S on every row | carl/C42 + mel/C48 + dave/C55 | P0 S shrink, dtoa oracle |
 
-### C74z-S14 result (OBSERVED, `265b996a`)
+### C74z-S14 result (OBSERVED; split on `265b996a`, current base `1355d85c`)
 
-The tiny profile (`raven-libc` feature `tiny` -> `raven-libc-fmt/tiny`) now compiles the float
-call out of `vformat`: `%f` emits the R-13 `*float*` stub and never references
+The tiny profile (`raven-libc` feature `tiny` -> `raven-libc-fmt/tiny`) compiles the float call
+out of `vformat`: `%f` emits the R-13 `*float*` stub and never references
 `float_layout::emit_inner`/the float hook. The float module stays in the archive but is
-unreferenced, so the other tiny probes keep their link set. The float/server build is unchanged
-(`float_layout` still emits real digits).
+unreferenced, so the other tiny probes keep their link set. The float/server build keeps real
+digits. C74z-S14 is merged; the pre-split -> split delta on `265b996a` was:
 
 | Probe | S before -> after | State |
 |---|---|---|
 | P2 x86_64 tiny | 95,195 -> 91,027 (**-4,168**) | FAIL -> PASS |
 | P2 x86_64 server | 101,699 -> 101,293 (**-406**) | FAIL -> PASS |
-| P2 aarch64 tiny | 116,007 -> 109,891 (**-6,116**) | FAIL (gap still 31.6k) |
-| P2 aarch64 server | 107,213 -> 108,313 (+1,100) | FAIL (FloatConv move codegen) |
-| P2 riscv64 tiny/server | 59,510 / 57,432 -> 59,510 / 57,210 (0 / -222) | FAIL (C74z-S13) |
-| INV-S-P2-P0 x86_64 | 25,688 / 27,768 -> 21,936 / 27,712 | KNOWN |
+| P3 x86_64 tiny | 95,227 -> 91,059 (**-4,168**) | FAIL -> PASS |
+| P2 aarch64 tiny | 116,007 -> 109,891 (**-6,116**) | FAIL |
+| P2 aarch64 server | 107,213 -> 108,313 (+1,100, old-base codegen) | FAIL |
+| INV-S-P2-P0 aarch64 | 31,707 -> 26,523 | FAIL |
 
-3.1 count is 54 before and after: three x86 P2/P3 rows flip to pass, while the smaller tiny
-archive shifts layout and adds P5 x86_64 B +432 (9 over), P8 aarch64 B +936, and pulls an
-`iconv` allocator CGU into P7 aarch64 (R-14 rule). No budget is raised; those three need a
-follow-up measurement/link fix.
+Current `1355d85c` (S14 + S13 real riscv variadic + S15a dtoa floor + S6) is the S16 input:
+
+| Probe | S current / budget | Delta vs P0 | State |
+|---|---|---|---|
+| P2 x86_64 tiny | 73,899 / 92,803 | 22,048 / 5,120 (KNOWN) | PASS |
+| P2 x86_64 server | 78,237 / 101,684 | 27,832 / 5,120 (KNOWN) | PASS |
+| P3 x86_64 tiny | 91,059 / 92,853 | - | PASS |
+| P3 x86_64 server | 101,341 / 101,734 | - | PASS |
+| P2 aarch64 tiny | 93,003 / 78,235 | 26,671 / 5,120 | FAIL |
+| P2 aarch64 server | 90,101 / 73,143 | 29,179 / 5,120 | FAIL |
+| P3 aarch64 tiny | 109,967 / 78,248 | - | FAIL |
+| P3 aarch64 server | 108,373 / 73,155 | - | FAIL |
+| P2 riscv64 tiny / server | 67,799 / 68,227 (56,282 / 52,879) | 19,075 / 23,547 | FAIL |
+| P3 riscv64 tiny / server | 78,603 / 80,627 (56,302 / 52,899) | - | FAIL |
+
+The aarch64 P2/P3 residual is **real growth after the float shrink**, not printf duplication:
+P2 has no `float_layout`/`dtoa` symbol; its delta (26,671) is the aarch64 floor (P0 66,332,
+`BUILTIN_TLS`/`PLATFORM`/`streams`/allocator) plus the same stdio core x86 carries (22,048).
+The aarch64 P2/P3 budgets (78,235/78,248) are below P0+stdio; a reviewer budget decision is
+needed (not taken here). riscv P2/P3 carry the C74z-S13 real variadic path and are over too.
+
+3.1 on `1355d85c` has **43 static fails** with the dynamic `libc.so.1` rows skipped in a clean
+worktree (50 including the dynamic rows when `build/` has `libc.so.1`); the S14 collateral is
+still present in the merged base: P5 x86_64 server B, P8 aarch64 B (tiny/server), and the P7
+aarch64 R-14 `iconv` allocator-CGU pull. Those are S16 reconcile items, not new in this rework.
 
 The current largest clusters are the shared P0 floor `dtoa` (4,906-9,235 per probe), the
 P2/P3 printf core (`vformat_dyn` 3,148-5,646 plus float/pos/emit), the P7 time code
