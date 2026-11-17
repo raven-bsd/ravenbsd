@@ -2512,6 +2512,10 @@ name = "raven-proto-svc"
 version = "0.1.0"
 
 [[package]]
+name = "raven-proto-trace"
+version = "0.1.0"
+
+[[package]]
 name = "raven-proto-tty"
 version = "0.1.0"
 dependencies = [
