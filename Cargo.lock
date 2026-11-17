@@ -554,6 +554,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "make"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
 name = "man"
 version = "0.1.0"
 dependencies = [

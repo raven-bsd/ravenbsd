@@ -1,0 +1,89 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt MAKE 1
+.Os RavenBSD
+.Sh NAME
+.Nm make
+.Nd maintain program dependencies
+.Sh SYNOPSIS
+.Nm
+.Op Fl f Ar makefile
+.Op Fl nsk
+.Op Fl j1
+.Op Ar target ...
+.Sh DESCRIPTION
+The
+.Nm
+utility reads a makefile, updates the named targets (or the first target when none are named),
+and runs recipe lines whose prerequisites are newer.
+.Pp
+The supported language is a bounded POSIX subset:
+.Bl -tag -width Ds
+.It variable assignment
+Recursive
+.Pq Ql = ,
+immediate
+.Pq Ql := ,
+conditional
+.Pq Ql ?= ,
+and append
+.Pq Ql += .
+.It rules
+Explicit rules, pattern rules with
+.Ql % ,
+suffix rules such as
+.Ql .c.o ,
+and
+.Ql .PHONY .
+.It automatic variables
+.Ql $@ ,
+.Ql $< ,
+.Ql $^
+and
+.Ql $? .
+.It include
+.Ql include Ar file
+and
+.Ql -include Ar file .
+.El
+.Pp
+GNU make functions such as
+.Ql $(wildcard ...)
+and
+.Ql $(shell ...)
+are not implemented. Parallel jobs other than
+.Fl j1
+are an explicit unsupported error.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl f Ar makefile
+Read
+.Ar makefile
+instead of
+.Pa makefile
+or
+.Pa Makefile .
+.It Fl n
+Print recipes without running them.
+.It Fl s
+Do not echo recipes.
+.It Fl k
+Continue with other goals after a failure.
+.It Fl j1
+Accept one job; larger values are rejected.
+.El
+.Sh EXIT STATUS
+.Ex -std
+0 on success, 1 for a failed recipe or missing target, 2 for usage or a malformed makefile.
+.Sh SEE ALSO
+.Xr sh 1
+.Sh STANDARDS
+.Bl -tag -width Ds
+.It St -p1003.1-2024
+The default goal, explicit/pattern/suffix rules, variable expansion, automatic variables,
+.Ql .PHONY ,
+includes and the listed options follow POSIX make. GNU functions and parallel jobs are
+documented deviations.
+.El

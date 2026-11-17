@@ -131,6 +131,7 @@ members = [
     "userland/bin/dtrace",
     "userland/bin/rsh",
     "userland/bin/echo",
+    "userland/bin/make",
     "userland/bin/ifconfig",
     "userland/bin/nc",
     "userland/bin/ping",
