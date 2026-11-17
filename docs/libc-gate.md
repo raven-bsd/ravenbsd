@@ -23,6 +23,10 @@ cargo run -q -p libc-gate -- verdict
 table for `libc/ravenlibc/GATE-REPORT.md`; `verdict` exits 0 only when the gate is MET. The base
 gates are `cargo xtask libc-lint` and `make check-fast`.
 
+`libc-pack` stages `build/<arch>/sysroot` (crt objects, `libc.a`, stub archives, headers, and the
+dynamic `libc.so.1`/`ld-elf.so.1` once `libc-link` has built them), so the C target cases compile
+against a complete sysroot without a manual staging step.
+
 The seven on-target cases are:
 
 ```sh
@@ -41,10 +45,10 @@ The donor G1 suite is `cargo run -q -p raven-atf-run -- gate --g1`.
 
 **NOT MET.** `cargo run -q -p libc-gate -- verdict` exits 1.
 
-* MET: 1.1, 1.1.pack, 1.5, 4.1, 4.3, 6.1, 6.3, 6.4.
+* MET: 1.1, 1.1.pack, 1.5, 1.7, 4.1, 4.3, 6.1, 6.3, 6.4.
 * NOT MET: 1.1.audit (stale `expected.tsv`), 1.2 (G1 0/4), 1.4 (four `compat-*` oracle
-  features), 1.7 (one `sem_trywait.rs` SAFETY comment), 3.1 (size budgets), 4.2 (`inet_text`
-  soak), 5.1 (hello/stdio/time/threads/dynamic), 5.2 (core-servers and file-tools timeouts).
+  features), 3.1 (size budgets), 4.2 (`inet_text` soak), 5.1 (hello/stdio/time/threads/dynamic),
+  5.2 (core-servers and file-tools timeouts).
 * BLOCKED: 1.6 (Miri), 2.1/2.2 (`tools/libc-world` and C72 outputs), 6.2 (`mandoc`).
 
 The exact evidence and the seven-case matrix are in `libc/ravenlibc/GATE-REPORT.md` and under
