@@ -296,6 +296,10 @@ impl raven_spawn::Sys for CommandSys<'_> {
         self.inner.thread_create(proc, entry, stack_top, arg)
     }
 
+    fn handle_transfer(&mut self, dest: Handle, source: Handle) -> Result<Handle, AbiErrno> {
+        self.inner.handle_transfer(dest, source)
+    }
+
     fn exec_cred(&mut self, proc: Handle, file: Handle, nosuid: bool) -> Result<(), AbiErrno> {
         self.inner.exec_cred(proc, file, nosuid)
     }
