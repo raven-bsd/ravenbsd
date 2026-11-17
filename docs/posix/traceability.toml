@@ -1058,7 +1058,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.basename"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.bcmp"
@@ -1118,19 +1118,19 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.c16rtomb"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.c32rtomb"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.c8rtomb"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.cabs"
@@ -1346,19 +1346,19 @@ evidence = "none"
 id = "interface.catclose"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.catgets"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.catopen"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.cbrt"
@@ -1646,7 +1646,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.closelog"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.cnd_broadcast"
@@ -2072,7 +2072,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.dirname"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.div"
@@ -2930,7 +2930,7 @@ evidence = "test:tests/libc/posix/math/check-math.sh"
 id = "interface.fmtmsg"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.fnmatch"
@@ -3230,7 +3230,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.ftw64"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.funlockfile"
@@ -3752,25 +3752,25 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.hcreate"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.hcreate_r"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.hdestroy"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.hdestroy_r"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.herror"
@@ -3782,7 +3782,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.hsearch_r"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.htonl"
@@ -3824,43 +3824,43 @@ evidence = "test:tests/libc/posix/math/check-math.sh"
 id = "interface.iconv"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.iconv_close"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.iconv_open"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.if_freenameindex"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.if_indextoname"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.if_nameindex"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.if_nametoindex"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.ilogb"
@@ -4874,19 +4874,19 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.mbrtoc16"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.mbrtoc32"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.mbrtoc8"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.mbrtowc"
@@ -5360,7 +5360,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.nftw64"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.ngettext"
@@ -5438,7 +5438,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.openlog"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.pathconf"
@@ -6416,7 +6416,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.putgrent"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.putmsg"
@@ -6434,7 +6434,7 @@ evidence = "none"
 id = "interface.putpwent"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.puts"
@@ -6626,7 +6626,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.regasub"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.regcomp"
@@ -6656,7 +6656,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.regnsub"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.remainder"
@@ -7160,7 +7160,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.setlogmask"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.setnetent"
@@ -7772,13 +7772,13 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.strfmon"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.strfmon_l"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.strfromd"
@@ -8036,7 +8036,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.syslog"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.system"
@@ -8516,7 +8516,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.umaxabs"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.uname"
@@ -8600,7 +8600,7 @@ evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 id = "interface.utmpxname"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.va_arg"
@@ -8732,7 +8732,7 @@ evidence = "none"
 id = "interface.vsyslog"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.vwprintf"
@@ -8960,7 +8960,7 @@ evidence = "none"
 id = "interface.wcstoimax"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.wcstok"
@@ -9008,7 +9008,7 @@ evidence = "none"
 id = "interface.wcstoumax"
 ticket = "P1"
 test = "none"
-evidence = "none"
+evidence = "libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols"
 
 [[trace]]
 id = "interface.wcswidth"

@@ -66,7 +66,7 @@ struct utmpx *getutxline(const struct utmpx *);
 struct utmpx *pututxline(const struct utmpx *);
 void          setutxent(void);
 
-#if __BSD_VISIBLE
+#if __BSD_VISIBLE || __XSI_VISIBLE
 #define e_exit __e_exit
 #define e_termination __e_termination
 void updwtmpx(const char *, const struct utmpx *);

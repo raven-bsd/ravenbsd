@@ -45,6 +45,7 @@ pub(crate) mod herror;
 pub(crate) mod hstrerror;
 pub(crate) mod htonl;
 pub(crate) mod htons;
+pub(crate) mod if_names;
 pub(crate) mod in6addr_any;
 pub(crate) mod in6addr_loopback;
 pub(crate) mod inet_addr;

@@ -207,6 +207,7 @@ pub mod unlockpt;
 pub mod unvis;
 pub mod updwtmpx;
 pub mod usershell_state;
+pub mod utmpxname;
 pub mod uuid_compare;
 pub mod uuid_create;
 pub mod uuid_create_nil;

@@ -48,7 +48,7 @@ int hcreate (size_t);
 void hdestroy (void);
 ENTRY *hsearch (ENTRY, ACTION);
 
-#if __BSD_VISIBLE || defined(_GNU_SOURCE)
+#if __BSD_VISIBLE || __XSI_VISIBLE || defined(_GNU_SOURCE)
 struct hsearch_data {
 	void *__tab;
 	unsigned int __unused1;

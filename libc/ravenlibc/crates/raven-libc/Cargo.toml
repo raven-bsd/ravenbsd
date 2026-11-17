@@ -52,6 +52,7 @@ raven-libc-glob = { path = "../raven-libc-glob", default-features = false }
 raven-libc-fts = { path = "../raven-libc-fts", default-features = false }
 raven-libc-time = { path = "../raven-libc-time", default-features = false }
 raven-libc-locale = { path = "../raven-libc-locale", default-features = false }
+raven-libc-iconv = { path = "../raven-libc-iconv", default-features = false }
 raven-libc-m = { path = "../raven-libc-m", default-features = false }
 raven-libc-malloc = { path = "../raven-libc-malloc", default-features = false }
 raven-libc-stdio = { path = "../raven-libc-stdio", default-features = false }

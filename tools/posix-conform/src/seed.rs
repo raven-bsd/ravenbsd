@@ -377,6 +377,11 @@ fn fallback_header(name: &str, kind: &str) -> &'static str {
     if name.starts_with("shm") {
         return "sys/shm.h";
     }
+    // `catan`/`catanh` are complex math, not message catalogs: the `cat` prefix must not
+    // misclassify them into `<nl_types.h>` (the census assigns them to `m`/`complex.h`).
+    if name.starts_with("catan") {
+        return "complex.h";
+    }
     if name.starts_with("cat") {
         return "nl_types.h";
     }

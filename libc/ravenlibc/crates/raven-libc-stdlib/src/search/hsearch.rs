@@ -108,6 +108,15 @@ impl HTable {
         self.index_mask.wrapping_add(1)
     }
 
+    /// The entry stored in `slot`, if it is still live.
+    ///
+    /// The C-ABI shell needs the stored key/data words to answer `hsearch` after a hit; growth
+    /// invalidates the slot id exactly as in the donor.
+    #[must_use]
+    pub fn entry(&self, slot: SlotId) -> Option<Entry> {
+        self.entries.get(slot.0).copied().flatten()
+    }
+
     /// `hsearch(item, action)`.
     ///
     /// # Errors

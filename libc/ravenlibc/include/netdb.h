@@ -134,7 +134,7 @@ struct protoent *getprotoent (void);
 struct protoent *getprotobyname (const char *);
 struct protoent *getprotobynumber (int);
 
-#if __BSD_VISIBLE || __POSIX_VISIBLE \
+#if __BSD_VISIBLE || __XSI_VISIBLE || __POSIX_VISIBLE \
  || (__POSIX_VISIBLE && __POSIX_VISIBLE+0 < 200809L) \
  || (__XSI_VISIBLE && __XSI_VISIBLE+0 < 700)
 struct hostent *gethostbyname (const char *);
@@ -151,7 +151,7 @@ int *__h_errno_location(void);
 #define NO_ADDRESS     NO_DATA
 #endif
 
-#if __BSD_VISIBLE
+#if __BSD_VISIBLE || __XSI_VISIBLE
 void herror(const char *);
 const char *hstrerror(int);
 int gethostbyname_r(const char *, struct hostent *, char *, size_t, struct hostent **, int *);

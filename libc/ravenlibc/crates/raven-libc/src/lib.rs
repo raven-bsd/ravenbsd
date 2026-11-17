@@ -137,6 +137,8 @@ pub(crate) mod strings;
 #[cfg(target_os = "none")]
 pub(crate) mod symver;
 #[cfg(target_os = "none")]
+pub(crate) mod syslog;
+#[cfg(target_os = "none")]
 pub(crate) mod time;
 #[cfg(target_os = "none")]
 pub(crate) mod unistd;
