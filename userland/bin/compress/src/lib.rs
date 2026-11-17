@@ -191,10 +191,7 @@ pub fn decode(input: &[u8]) -> Result<Vec<u8>, Error> {
     }
     let mut output = Vec::new();
     let mut old: Option<u16> = None;
-    loop {
-        let Some(code) = reader.read(width) else {
-            break;
-        };
+    while let Some(code) = reader.read(width) {
         if code == CLEAR {
             width = 9;
             next = u32::from(FIRST);
