@@ -417,7 +417,7 @@ flsl F - all 1 -
 flsll F - all 1 -
 fma F - all 1 -
 fmaf F - all 1 -
-fmal F - x86_64 1 -
+fmal F - x86_64,aarch64 1 -
 fmax F - all 1 -
 fmaxf F - all 1 -
 fmaximum F - all 2 -
