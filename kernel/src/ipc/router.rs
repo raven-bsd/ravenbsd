@@ -1002,6 +1002,17 @@ pub(crate) fn defer_close(server: &Arc<Process>, id: u64, cookie: u64, count: u3
     server.scheme_waiters.wake_all();
 }
 
+/// Drop deferred last-close notices whose server is exiting.
+///
+/// A notice is the client's last word to a *live* server; once the server is gone there is no
+/// receiver for it, and keeping the pair of `Arc<Process>` values in the global queue would keep
+/// both dead processes (and their address spaces) alive forever.  Notices whose client died but
+/// whose server is still live stay queued so the server still sees the final `CLOSE`.
+pub(crate) fn on_process_exit(process: &Arc<Process>) {
+    let mut notices = CLOSE_NOTICES.lock();
+    notices.retain(|notice| notice.server.id != process.id);
+}
+
 /// Submit every queued last-close notification. Called at the top of the `RECV` loop.
 pub(crate) fn drain_close_notices() {
     let notices = {

@@ -161,6 +161,11 @@ static GLOBAL_LIMIT: AtomicU64 = AtomicU64::new(0);
 /// Currently allocated DMA bytes across all processes.
 static GLOBAL_USED: AtomicU64 = AtomicU64::new(0);
 
+/// Live DMA bytes across all processes (S69 cleanup evidence).
+pub fn dma_in_use() -> u64 {
+    GLOBAL_USED.load(Ordering::Acquire)
+}
+
 /// Size of one local APIC / IOAPIC window the kernel owns.
 const APIC_WINDOW: u64 = 0x1000;
 

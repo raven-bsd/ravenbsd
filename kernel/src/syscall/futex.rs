@@ -147,12 +147,12 @@ pub fn remove_thread(thread_id: u64) {
     FALLBACK.remove_thread(thread_id);
 }
 
-/// Drop every futex waiter owned by `process_id` (process teardown).
+/// Wake and remove every futex waiter owned by `process_id` (process teardown).
 pub fn remove_process(process_id: u64) {
     for queue in QUEUES.iter() {
-        queue.remove_process(process_id);
+        let _ = queue.wake_process(process_id);
     }
-    FALLBACK.remove_process(process_id);
+    let _ = FALLBACK.wake_process(process_id);
 }
 
 /// Wake private-key waiters in `[start, end)` after an unmap.
