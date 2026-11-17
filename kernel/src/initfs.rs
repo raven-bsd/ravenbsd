@@ -36,6 +36,8 @@ pub fn init() {
     // SAFETY: the range is the loader-provided initfs copy, remains mapped as KernelAndModules,
     // and the length was validated by the boot handoff.
     let bytes = unsafe { core::slice::from_raw_parts(pointer, length) };
+    // The loader passes the image through unvalidated, so this is the single full CRC pass.
+    // Userland (`rsh`) parses the structure only and re-checks each spawned entry's CRC.
     if let Ok(parsed) = Initfs::parse(bytes) {
         // SAFETY: the cell is written once during boot before any lookup.
         unsafe {

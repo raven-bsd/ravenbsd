@@ -17,9 +17,11 @@ expect_exit = "success"
 
 [[expect]]
 regex = '^svcd: all services up$'
+unordered = true
 
 [[expect]]
 regex = '^rsh: ready$'
+unordered = true
 
 [[expect]]
 regex = '^echo:ok$'
