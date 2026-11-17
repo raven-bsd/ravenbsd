@@ -148,6 +148,13 @@ pub(crate) fn rustflags_for(
                 flags.push("-C".to_string());
                 flags.push(format!("link-arg={arg}"));
             }
+            // The float plug-in is an optional member (R-13/M2): a dynamic program that uses
+            // `%f`/`strfrom*` must pull the strong `__rl_fmt_float_impl`, or the libc hook keeps
+            // the `*float*` dummy. A weak reference cannot pull it from `libc.so.1` by itself.
+            for arg in ["-u", "__rl_fmt_float_impl"] {
+                flags.push("-C".to_string());
+                flags.push(format!("link-arg={arg}"));
+            }
             flags.extend(["--cfg".to_string(), "sha2_backend=\"soft\"".to_string()]);
         }
         Component::User => {
