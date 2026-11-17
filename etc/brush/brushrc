@@ -5,10 +5,12 @@
 # `--rcfile /etc/brush/brushrc`; non-interactive `brush -c` does not load it.
 
 if [ -n "${NO_COLOR:-}" ] || [ "${TERM:-}" = "dumb" ]; then
-    PS1='root@raven:\w\$ '
+    # Plain prompt: user@host, cwd and the root/non-root marker, no escapes.
+    PS1='\u@\h:\w\$ '
 else
-    # Raven Violet: accent #b388ff (xterm 183), path #f8f8f2 (231).
-    PS1='\[\e[38;5;183m\]root@raven\[\e[0m\]:\[\e[38;5;231m\]\w\[\e[0m\]\[\e[38;5;183m\]\$\[\e[0m\] '
+    # Raven Violet (K80): user@host accent #b388ff (xterm 183), cwd path #f8f8f2 (231).
+    # `\$` is `#` for root and `$` otherwise, so the root prompt is distinct.
+    PS1='\[\e[38;5;183m\]\u@\h\[\e[0m\]:\[\e[38;5;231m\]\w\[\e[0m\]\[\e[38;5;183m\]\$\[\e[0m\] '
 fi
 
 # A writable, image-local history store; the initfs itself is read-only.
@@ -16,8 +18,8 @@ HISTFILE=/tmp/brush_history
 HISTCONTROL=ignoreboth
 HISTTIMEFORMAT='%F %T '
 HISTSIZE=1000
+HISTFILESIZE=1000
 
-# brush supplies command and path completion by default; this spec is the
-# contract probe used by the modern-shell qtest. Do not redirect to /dev/null:
-# the initfs has no /dev directory, only the mounted /dev/null scheme path.
+# Command and path completion are brush defaults. The probe below proves the completion
+# builtin and gives the qtest a stable spec; no foreign completion framework is loaded.
 complete -W 'help exit' raven-test || true

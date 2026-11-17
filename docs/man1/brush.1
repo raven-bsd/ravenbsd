@@ -1,6 +1,6 @@
 .\" SPDX-License-Identifier: BSD-3-Clause
 .\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
-.Dd November 16, 2026
+.Dd November 17, 2026
 .Dt BRUSH 1
 .Os RavenBSD
 .Sh NAME
@@ -27,6 +27,66 @@ The RavenBSD image also keeps
 as the rescue shell and
 .Pa /bin/sh
 as the POSIX shell.
+.Sh PROMPT
+The interactive prompt is
+.Ev PS1 .
+The RavenBSD
+.Pa /etc/brush/brushrc
+sets
+.Ql \eu@\eh:\ew\e$
+with the usual bash escapes:
+.Bl -tag -width Ds
+.It Li \eu
+The user name.
+.It Li \eh
+The host name.
+.It Li \ew
+The current working directory.
+.It Li \e$
+.Sq #
+for root and
+.Sq $
+for other users, so the root prompt is distinct.
+.El
+The user@host and the final marker use the Raven Violet accent
+.Pq #b388ff, xterm 183 ;
+the cwd uses the path role
+.Pq #f8f8f2, xterm 231 .
+With
+.Ev NO_COLOR
+set, or
+.Ev TERM=dumb ,
+the prompt is the plain
+.Ql user@host:cwd#/$
+form with no escape sequences.
+A non-interactive
+.Fl c
+command gets no prompt.
+.Sh COMPLETION
+Command and path completion are on by default through the bash-compatible
+.Ic complete
+and
+.Ic compgen
+builtins.
+The RavenBSD rc adds
+.Ql complete -W 'help exit' raven-test
+as a calibration probe.
+No foreign completion framework is loaded.
+.Sh SHELL HISTORY
+The rc sets
+.Ev HISTFILE=/tmp/brush_history
+(a writable ramfs path; the initfs is read-only),
+.Ev HISTCONTROL=ignoreboth
+(deduplicate entries and ignore leading-space commands),
+.Ev HISTTIMEFORMAT='%F \&%T '
+and
+.Ev HISTSIZE=1000 .
+The line editor's reverse search
+.Pq Ctrl-R
+searches the file.
+A non-interactive
+.Fl c
+command neither reads nor writes history.
 .Sh OPTIONS
 .Bl -tag -width Ds
 .It Fl c Ar command
@@ -63,14 +123,10 @@ on the read-only initfs.
 .Bl -tag -width HISTTIMEFORMAT -compact
 .It Ev PS1
 The prompt.
-The RavenBSD rc sets a Raven Violet
-.Sy root@host:cwd#
-prompt and a plain prompt when
-.Ev NO_COLOR
-is set or
-.Ev TERM
-is
-.Dq dumb .
+The RavenBSD rc sets the Raven Violet
+.Sy user@host:cwd#/$
+prompt described in
+.Sx PROMPT .
 .It Ev HISTFILE
 History file path.
 .It Ev HISTCONTROL
@@ -78,6 +134,8 @@ History deduplication policy; the RavenBSD rc sets
 .Dq ignoreboth .
 .It Ev HISTTIMEFORMAT
 Timestamp format written to the history file.
+.It Ev HISTSIZE
+The number of commands kept in memory; the rc sets 1000.
 .It Ev NO_COLOR
 Disable the prompt and tool colour.
 .It Ev TERM
@@ -107,3 +165,13 @@ The
 profile keeps
 .Xr rsh 1
 as the working console shell until that platform work lands.
+The
+.Ar modern-shell
+profile starts
+.Nm
+as the login shell; the rc, prompt, completion and history described here are
+the configuration it loads, and the non-interactive
+.Fl c
+path is exercised by the
+.Ar modern-shell
+qtest while the interactive input backend work lands.
