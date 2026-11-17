@@ -2835,6 +2835,7 @@ dependencies = [
  "raven-proto-fs",
  "raven-scheme",
  "raven-spawn",
+ "raven-trace-core",
 ]
 
 [[package]]
@@ -3225,6 +3226,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-smp-soak-aarch64"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
+name = "raven-smp-tlb"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-smp-user"
 version = "0.1.0"
 dependencies = [
@@ -3452,7 +3469,6 @@ dependencies = [
  "raven-rt",
  "raven-scheme",
  "raven-trace-core",
- "trace",
 ]
 
 [[package]]
@@ -3806,6 +3822,7 @@ name = "strip"
 version = "0.1.0"
 dependencies = [
  "raven-elf",
+ "raven-proto-fs",
  "raven-rt",
  "raven-tool-core",
 ]

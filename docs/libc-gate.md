@@ -41,7 +41,7 @@ cargo xtask qtest --case libc-spawn --arch x86_64
 
 The donor G1 suite is `cargo run -q -p raven-atf-run -- gate --g1`.
 
-## Current verdict (2026-11-17, C74c)
+## Current verdict (2026-11-17, C74d)
 
 **NOT MET.** `cargo run -q -p libc-gate -- verdict` exits 1.
 
@@ -52,9 +52,11 @@ The donor G1 suite is `cargo run -q -p raven-atf-run -- gate --g1`.
 * BLOCKED: 1.6 (Miri), 2.1/2.2 (`tools/libc-world` and C72 outputs), 6.2 (`mandoc`).
 
 The exact evidence and the seven-case matrix are in `libc/ravenlibc/GATE-REPORT.md` and under
-`build/libc-gate/`. `libc-signals`, `libc-spawn` and `libc-threads` pass. C74c makes
-`libc-hello`'s auxv check pass (only the P1b `string` check remains) and makes `libc-pack` skip
-the five compiler wrappers (`stddef.h`, `stdbool.h`, `stdatomic.h`, `stdarg.h`, `float.h`) that
-broke the target C build. `libc-dynamic` still fails the C test's interim `shape-check.sh`
-(`partial file tail at 0x0`), which is in the C test build script, not `libc_link`. `libc-time`
-needs P1b `sleep`/`usleep`/`tzname`; `libc-stdio` faults at `0x3` (P1b).
+`build/libc-gate/`. C74d refreshed the non-P1 rows on `bd1d1de1`: `libc-lint` is clean; the
+symbol audit has all 66 required symbols PRESENT but its frozen `expected.tsv` is stale (outside
+C74d's Owns); G1 is 0/4 (C2-C5 not run, C6 unvendored); 4 of 27 oracle families lack
+`oracle-*` features; the size check is 6 pass / 63 fail; the `inet_text` soak crashed before one
+hour; Miri, the world build and `mandoc` are UNAVAILABLE in this environment. On target,
+`libc-signals`, `libc-spawn` and `libc-threads` pass; `libc-hello` fails only the P1b `string`
+check (auxv ok); `libc-dynamic` passes the shape check but fails at runtime
+(`svcd: libc-test failed: invalid argument`); `libc-stdio` and `libc-time` remain P1b.

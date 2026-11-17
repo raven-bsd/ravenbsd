@@ -43,7 +43,7 @@ title = "target-case symbol audit (C64j)"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "libc-audit"]
-note = "66/66 required symbols present; expected.tsv snapshot is stale (matrix differs)"
+note = "all 66 required symbols PRESENT; expected.tsv is stale (13 C64i MISSING rows are now PRESENT); the snapshot is outside C74d's Owns"
 evidence = "build/libc-gate/1.1.audit.txt"
 source = "C64j, C64l"
 
@@ -54,7 +54,7 @@ title = "donor suites G1 (C2-C6)"
 required = true
 kind = "argv"
 argv = ["cargo", "run", "-q", "-p", "raven-atf-run", "--", "gate", "--g1"]
-note = "G1 runs on the merged tree: C2-C5 0% (not run), C6 unvendored; 0/4 measured rows"
+note = "G1 runs: C2-C5 0% (not run), C6 unvendored; 0/4 measured rows"
 evidence = "build/libc-gate/1.2.txt"
 source = "C71 4.9, 16 3.B.9 C2-C6"
 
@@ -76,6 +76,7 @@ required = true
 kind = "argv"
 argv = ["cargo", "xtask", "libc-oracle", "list"]
 child_argv = ["cargo", "xtask", "libc-oracle", "diff", "{family}"]
+note = "4 of 27 families lack an oracle-* feature: compat-crypt, compat-humanize, compat-setmode, compat-vis"
 expand = "oracle"
 blocked_on = { exit = [77] }
 evidence = "build/libc-gate/1.4.txt"
@@ -102,6 +103,7 @@ kind = "argv"
 preflight = ["cargo", "+nightly", "miri", "--version"]
 argv = ["cargo", "+nightly", "miri", "test", "-p", "raven-libc-str", "-p", "raven-libc-fmt", "-p", "raven-libc-dtoa", "-p", "raven-libc-regex", "-p", "raven-libc-glob"]
 blocked_on = { exit = [77] }
+note = "UNAVAILABLE: cargo-miri is not installed for the nightly toolchain"
 evidence = "build/libc-gate/1.6.txt"
 source = "16 3.B.2.1"
 
@@ -112,7 +114,7 @@ title = "lints (C16)"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "libc-lint", "all"]
-note = "1 violation: pthread/sem_trywait.rs:11 unsafe block lacks a SAFETY comment"
+note = "1 violation: pthread/sem_trywait.rs:11 -> fixed; libc-lint now reports 0 violations"
 evidence = "build/libc-gate/1.7.txt"
 source = "C34"
 
@@ -124,7 +126,7 @@ required = true
 kind = "argv"
 argv = ["cargo", "run", "-q", "-p", "libc-world", "--", "check"]
 blocked_on = { missing_files = ["tools/libc-world/Cargo.toml", "tools/libc-world/results/x86_64/world.json"] }
-note = "C72 outputs are not in origin/master and H-11 tarballs are absent"
+note = "UNAVAILABLE: tools/libc-world/Cargo.toml, C72 outputs and H-11 tarballs are absent"
 evidence = "build/libc-gate/2.1.txt"
 source = "C72"
 
@@ -136,7 +138,7 @@ required = true
 kind = "argv"
 argv = ["cargo", "run", "-q", "-p", "libc-world", "--", "gate", "--phase", "1", "--min-built", "100", "--results", "tools/libc-world/results/x86_64"]
 blocked_on = { missing_files = ["tools/libc-world/Cargo.toml", "tools/libc-world/results/x86_64/world.json"] }
-note = "C72 outputs are not in origin/master and H-11 tarballs are absent"
+note = "UNAVAILABLE: C72 outputs are not in origin/master and H-11 tarballs are absent"
 evidence = "build/libc-gate/2.2.txt"
 source = "C72 4.8, 16 3.B.9 C13"
 
@@ -147,6 +149,7 @@ title = "size budgets (C14)"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "libc-size", "--check"]
+note = "6 pass, 63 fail, 68 known, 102 skipped; budgets not lowered"
 evidence = "build/libc-gate/3.1.txt"
 source = "C69, 16 3.B.9 C14"
 
@@ -179,6 +182,7 @@ kind = "read"
 read = "soak"
 file = "tests/libc/fuzz/SOAK.md"
 min_seconds = 3600
+note = "SOAK.md: inet_text crashed before 1 h; the other 13 targets completed 3600 s with 0 crashes"
 evidence = "build/libc-gate/4.2.txt"
 source = "C70 4.7, 16 3.B.9 C10"
 
@@ -213,7 +217,7 @@ argv = ["cargo", "xtask", "qtest", "--case", "libc-hello", "--arch", "x86_64"]
 child_argv = ["cargo", "xtask", "qtest", "--case", "{case}", "--arch", "x86_64"]
 expand = "qtest"
 cases = ["libc-hello", "libc-stdio", "libc-time", "libc-threads", "libc-signals", "libc-dynamic", "libc-spawn"]
-note = "C74c 2026-11-17: threads, signals and spawn pass; hello string is P1b (auxv ok); stdio page fault 0x3 is P1b; time misses P1b sleep/usleep/tzname; dynamic fails the C test shape-check partial tail"
+note = "C74c 2026-11-17: threads, signals and spawn pass; hello string is P1b (auxv ok); stdio page fault 0x3 is P1b; time misses P1b sleep/usleep/tzname; dynamic shape ok, runtime invalid argument in ld-elf.so.1"
 evidence = "build/libc-gate/5.1.txt"
 source = "C73, 16 3.B.9 C12"
 
@@ -268,6 +272,7 @@ kind = "read"
 read = "mandoc"
 preflight = ["which", "mandoc"]
 cases = ["docs/man3/setlocale.3", "docs/man3/printf.3", "docs/man3/iconv.3", "docs/man3/assert.3", "docs/man3/fork.3", "docs/man3/posix_spawn.3", "docs/man3/issetugid.3", "docs/man3/arc4random.3", "docs/man3/malloc.3", "docs/man3/clock.3", "docs/man3/mmap.3", "docs/man3/open.3", "docs/man3/pledge.3", "docs/man3/pthread_create.3", "docs/man3/dlopen.3", "docs/man3/sysconf.3", "docs/man7/libc.7"]
+note = "UNAVAILABLE: mandoc is not installed in this environment"
 evidence = "build/libc-gate/6.2.txt"
 source = "K28 style, 4.6"
 

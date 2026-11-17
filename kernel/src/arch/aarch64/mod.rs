@@ -3,7 +3,9 @@
 
 //! aarch64 architecture support.
 
+pub mod ap_start;
 pub mod fdt;
+pub mod fpu;
 pub mod gic;
 /// The single kernel scheme-IPC module lives at the crate root on both architectures.
 ///
@@ -17,6 +19,7 @@ pub mod mmu;
 pub mod percpu;
 #[cfg(raven_pi4)]
 pub mod pi4;
+pub mod psci;
 pub mod selftest;
 pub mod serial;
 pub mod start;

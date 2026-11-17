@@ -153,3 +153,38 @@ order. One reader iterates the committed prefix.
 Host tests: wrap, gap detection, torn rejection, capacity bounds, interleaved reserve/write/publish
 commit order, a deterministic randomized model (no lost/duplicated record, monotonic per-producer
 sequence) and a 4-producer × 100,000-record volume run.
+
+## 12. Safe sink attach (`raven_rt::trace`, Q4d)
+
+`raven_rt::trace` turns the Q4a sink into a safe per-process producer handle. A server needs no
+`unsafe` block and no direct `raven-trace-core` dependency to record spans.
+
+| Item | Value |
+|---|---|
+| Sink handle | `raven_rt::trace::SINK_HANDLE` = 3 |
+| Address | `0x3000_0000` |
+| Capacity | 64 records |
+| Producers | 4 |
+| Attach | `Sink::attach(handle, producer)` |
+| Queries | `enabled()`, `emit(Span)` |
+
+`attach` maps the transferred memory object once at the fixed address, initialises the ring header
+when the page is still zero-filled, and validates it through `SpanRing::new`. A mapping or header
+failure returns a disabled sink: `enabled()` is false and `emit` is a no-op. The only `unsafe`
+block is the mapping/header split inside `userland/rt/src/trace.rs`, with a SAFETY comment; callers
+stay safe. `emit` records any valid span, including a zero trace id (the Q4b fixture's untraced
+proof); a probe that wants only traced traffic checks the id at the call site. The disabled path
+allocates nothing.
+
+### Spawn/transfer requirement (what Q4c still needs)
+
+The launcher must:
+
+1. create the sink memory object and call `Sink::attach` once to initialise the header;
+2. transfer that object to every producer as handle 3 before its first thread starts;
+3. keep the address fixed so `userland/bin/trace` reads the same header and records.
+
+The trace-demo fixture does this already (the controller attaches, then transfers handle 3 to the
+server and the `trace` command). Production `init`/`svcd` grants only manifest handles
+(`userland/init/src/grants.rs`), so a normal boot has no sink; Q4c still needs a launcher grant or a
+fixture-only transfer decision.

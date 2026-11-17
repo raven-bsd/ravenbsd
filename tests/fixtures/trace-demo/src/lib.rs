@@ -12,7 +12,6 @@ use raven_abi::syscall::Syscall;
 use raven_abi::types::{Handle, Rights, map, prot};
 use raven_elf::{Elf, LoadMode, Machine, StepKind, plan_load};
 use raven_initfs::Initfs;
-use raven_trace_core::{RingHeader, SpanRecord};
 
 #[cfg(target_arch = "aarch64")]
 use raven_abi::layout::aarch64 as layout;
@@ -252,37 +251,6 @@ pub fn start(staged: &Staged) -> Result<Handle, Errno> {
     let thread = thread_create(staged.process, staged.entry, staged.stack, 0)?;
     handle_close(thread);
     Ok(staged.process)
-}
-
-/// Map a sink memory object at the shared fixed address.
-pub fn map_sink(process: Handle, object: Handle) -> Result<usize, Errno> {
-    map_memory(
-        process,
-        object,
-        0,
-        trace::SINK_ADDR,
-        trace::SINK_PAGES * PAGE,
-        map::pack(prot::READ | prot::WRITE, map::FIXED | map::SHARED),
-    )
-}
-
-/// Construct the ring header and record slice over the mapped sink.
-///
-/// # Safety
-///
-/// The caller must have mapped the sink at [`trace::SINK_ADDR`] with at least
-/// [`trace::SINK_PAGES`] pages.
-pub unsafe fn sink_refs() -> (&'static RingHeader, &'static [SpanRecord]) {
-    let header = trace::SINK_ADDR as *const RingHeader;
-    let records = (trace::SINK_ADDR + core::mem::size_of::<RingHeader>()) as *const SpanRecord;
-    // SAFETY: the sink layout is the header followed by the record array; the mapping lives for
-    // the process.
-    unsafe {
-        (
-            &*header,
-            core::slice::from_raw_parts(records, trace::CAPACITY as usize),
-        )
-    }
 }
 
 fn build_stack(base: usize) -> usize {

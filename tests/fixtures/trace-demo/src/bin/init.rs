@@ -13,11 +13,9 @@ use raven_abi::types::{Handle, Rights};
 use raven_initfs::Initfs;
 use raven_rt::entry;
 use raven_rt::println;
-use raven_trace_core::RingHeader;
 use raven_trace_demo::{
-    PAGE, handle_close, map_sink, memobj_create, nanosleep, proc_wait, stage, start, transfer,
+    PAGE, handle_close, memobj_create, nanosleep, proc_wait, stage, start, transfer,
 };
-use trace::{CAPACITY, PRODUCERS, SINK_ADDR, SINK_PAGES};
 
 entry!(main);
 
@@ -74,18 +72,14 @@ fn main(_args: raven_rt::Args) -> i32 {
         Err(_) => return fail("initfs parse"),
     };
 
-    // Create and initialise the shared sink.
-    let sink = match memobj_create(SINK_PAGES * PAGE) {
+    // Create and initialise the shared sink through the runtime API.
+    let sink = match memobj_create(raven_rt::trace::SINK_PAGES * PAGE) {
         Ok(sink) => sink,
         Err(_) => return fail("sink memobj"),
     };
-    if map_sink(Handle::SELF_PROC, sink).is_err() {
-        return fail("sink map");
-    }
-    // SAFETY: the sink is mapped read-write at the shared fixed address; the header is the first
-    // field and the records behind it are already zero-filled by the anonymous memory object.
-    unsafe {
-        (SINK_ADDR as *mut RingHeader).write(RingHeader::new(CAPACITY, PRODUCERS));
+    let root = raven_rt::trace::Sink::attach(sink, 0);
+    if !root.enabled() {
+        return fail("sink attach");
     }
 
     // Stage and start the fixture server with the sink transferred.

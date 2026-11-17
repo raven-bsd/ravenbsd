@@ -36,6 +36,7 @@ pub mod sync;
 pub mod sys;
 #[cfg(feature = "alloc")]
 pub mod thread;
+pub mod trace;
 
 #[cfg(all(feature = "panic-handler", not(test)))]
 mod panic;

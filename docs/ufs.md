@@ -21,7 +21,7 @@ The wrapper rejects every out-of-range write with `IoError`; the UFS parser and 
 inside the test process, so a panic fails the test. No silent corruption is assumed: every cut
 is followed by a read-only check on the resulting image.
 
-## Fault matrix (golden `ufs2-b4096`, 157 writes, 158 cuts)
+## Non-journaled fault matrix (golden `ufs2-b4096`, 157 writes, 158 cuts)
 
 | Stage | Cuts | Recovered (clean or repaired) | Refused |
 |---|---:|---:|---:|
@@ -49,6 +49,20 @@ is followed by a read-only check on the resulting image.
   root link count it changes, and releases indirect data blocks by their true fragment count so
   the cylinder-group and superblock summaries reconcile.
 
+## Journaled fault matrix (`format_journaled`, 17 MiB = 16 MiB fs + 1 MiB log, 27 writes, 28 cuts)
+
+| Result | Cuts |
+|---|---:|
+| journal replayed, committed baseline readable, post-replay fsck clean | 22 |
+| mount refused (write budget too small for the journal start, or a typed replay error) | 6 |
+| failed data/allocation/fsck check | 0 |
+| **total** | **28** |
+
+Each journaled cut mounts the image read-write, replays the log, reads the committed `stable`
+file, verifies allocation, unmounts, and then passes a read-only `check`. A cut before the commit
+header does not expose the uncommitted transaction, while a committed prefix replays; the
+committed baseline is never lost. The counts are separate from the non-journaled 158-cut matrix.
+
 The on-target `fsd-ufs-rw` checkpoint reports:
 
 ```
@@ -57,6 +71,9 @@ fsd-ufs-rw: probe crash replay=mounted
 fsd-ufs-rw: probe crash ok
 fsd-ufs-rw: probe refuse ok
 fsd-ufs-rw: probe refuse-clean ok
+fsd-ufs: mode=rw journal=active
+fsd-ufs-rw: probe journal mount ok
+fsd-ufs-rw: probe ok
 ```
 
 ## Guarantees
@@ -66,18 +83,20 @@ fsd-ufs-rw: probe refuse-clean ok
   uninitialized inode; namespace operations remove the entry before freeing the target.
 * `check(Mode::ReadOnly)` detects the remaining inconsistencies in every non-clean cut; the
   matrix does not label a findings cut as clean.
-* `fsd-ufs` now runs the mount-time recovery policy in `ufs_core::check::recover`: read-only
-  check, then the preen repair, and it refuses to serve an image whose follow-up check is not
-  clean. A clean image still mounts.
-* WAPBL remains available as an existing on-disk journal; it is not enabled for the golden
-  image or the `fsd-ufs-rw` profile (`journal=none`).
+* `ufs_core::check::recover` replays a dirty WAPBL journal before the checker on a writable
+  mount (`Recovery::Replayed`), then runs the read-only check and the preen repair; it refuses
+  an image whose follow-up check is not clean. A dirty read-only mount is refused with
+  `Unsupported("dirty journal on read-only mount")`.
+* WAPBL is not enabled on the golden non-journaled image; the qtest formats a journaled image
+  for the `journal=active` transcript.
 
 ## Exact remaining recovery gap
 
-The only unresolved cuts are the three budget-0..2 cases that cannot even perform the initial
-writable mount; they fail closed and are refused. Every cut that produces a mountable image is
-now either clean after a read-only check or repaired to clean by `check(Mode::Repair)`, so
-`fsd-ufs` never serves a repair-incomplete image.
+The only unresolved non-journaled cuts are the three budget-0..2 cases that cannot even perform
+the initial writable mount; they fail closed and are refused. Every cut that produces a
+mountable image is either clean after a read-only check or repaired to clean by
+`check(Mode::Repair)`, so `fsd-ufs` never serves a repair-incomplete image.
 
-A journaled (WAPBL) image still needs automatic log replay on mount; that remains a later
-ticket, and `fsd-ufs` continues to refuse a read-only mount whose journal is dirty.
+A dirty journal is now replayed on a writable mount and refused on a read-only mount. Remaining
+work: the 158-cut matrix uses the non-journaled golden image, so the journaled counts are a
+separate 28-cut matrix, and hardware power-cut validation is out of scope for this ticket.

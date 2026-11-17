@@ -294,6 +294,9 @@ fn stage_sysroot(root: &Path, options: &Options) -> Result<()> {
         }
     }
 
+    // A rebuilt sysroot must not keep a wrapper from an older `libc-pack`: the compiler header
+    // is not staged, and a stale copy would still shadow the compiler's own header.
+    clean_compiler_headers(&usr_include);
     copy_headers(&root.join("libc/ravenlibc/include"), &usr_include)?;
     copy_headers(
         &root
@@ -371,6 +374,16 @@ const COMPILER_HEADERS: [&str; 5] = [
 
 fn is_compiler_header(name: &str) -> bool {
     COMPILER_HEADERS.contains(&name)
+}
+
+/// Remove a stale compiler wrapper from a previously staged sysroot.
+fn clean_compiler_headers(directory: &Path) {
+    for name in COMPILER_HEADERS {
+        let path = directory.join(name);
+        if path.is_file() {
+            let _ = std::fs::remove_file(path);
+        }
+    }
 }
 
 /// The exact `cargo rustc` command vector of step 1, without spawning it.

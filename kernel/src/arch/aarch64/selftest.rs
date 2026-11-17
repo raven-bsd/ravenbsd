@@ -14,6 +14,7 @@ pub fn run(cmdline: &CmdLine) {
         Some("heap") => crate::memory::heap::selftest(),
         Some("timer") => crate::time::selftest(),
         Some("sched") => crate::sched::selftest::run(),
+        Some("smp") => crate::sched::smp::selftest::run(),
         _ => {}
     }
 }

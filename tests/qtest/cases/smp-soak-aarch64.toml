@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S76c: sustained aarch64 four-core user-SMP soak. Eight user threads pass a futex token around a
+# ring for 60 s, each hop doing pipe traffic, FP/SIMD verification and (periodically) a user
+# map/unmap pair that forces a remote TLB shootdown. `smp_user=on` spreads the threads over the
+# four QEMU `virt` CPUs.
+name = "smp-soak-aarch64"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 300
+pre = ["sh tests/fixtures/smp-soak-aarch64/build.sh"]
+initfs = "build/fixtures/smp-soak-aarch64/smp-soak-aarch64.img"
+boot_cmdline = "console=ttyAMA0 test-exit=1 smp_user=on"
+qemu_extra = ["-smp", "4"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^smp: 4 cpus online$'
+
+[[expect]]
+regex = '^smp-soak-aarch64: workers=8 duration_s=60 cpus=4 mode=on$'
+
+[[expect]]
+regex = '^smp-soak-aarch64: thread \d tid=\d+ count=[1-9]\d* cpu~[0-3]$'
+
+# Every CPU carried user work: the ring cannot complete on one CPU with smp_user=on.
+[[expect]]
+regex = '^smp-soak-aarch64: per-cpu cpu0=[1-9]\d* cpu1=[1-9]\d* cpu2=[1-9]\d* cpu3=[1-9]\d*$'
+
+[[expect]]
+regex = '^smp-soak-aarch64: hops=[1-9]\d* total=[1-9]\d* churn=[1-9]\d* ops_per_s=\d+$'
+
+[[expect]]
+regex = '^smp-soak-aarch64: latency p50_ns=\d+ p99_ns=\d+ samples=[1-9]\d*$'
+
+[[expect]]
+regex = '^smp-soak-aarch64: complete workers=8$'
+
+[[expect]]
+regex = '^smp-soak-aarch64: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|smp-soak-aarch64: failed|smp-soak-aarch64: fp_bad|smp-soak-aarch64: map_bad'

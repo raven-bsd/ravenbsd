@@ -217,7 +217,7 @@ mod program {
                         Handle(packet.object),
                         page_offset,
                         PAGE,
-                        prot::READ as usize,
+                        prot::READ,
                         true,
                     )?;
                     let mut page = [0u8; PAGE];

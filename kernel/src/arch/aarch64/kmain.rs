@@ -102,6 +102,9 @@ pub extern "C" fn kmain(boot: *const BootInfo) -> ! {
         kprintln!("kernel: error: {error}");
         boot::exit_qemu(0x11);
     }
+    // Start the application processors after the GIC, timer and scheduler are ready. The BSP
+    // keeps interrupts masked until the APs have published their online state.
+    crate::sched::smp::platform_init();
     kprintln!("time: generic timer {} MHz", frequency / 1_000_000);
     kprintln!("timer: {} Hz", timer::HZ);
 

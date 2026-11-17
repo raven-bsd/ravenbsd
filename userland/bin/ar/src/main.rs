@@ -153,7 +153,7 @@ mod program {
     }
 
     fn selected(name: &str, filters: &[&str]) -> bool {
-        filters.is_empty() || filters.iter().any(|filter| *filter == name)
+        filters.is_empty() || filters.contains(&name)
     }
 
     fn safe_name(name: &str) -> bool {
