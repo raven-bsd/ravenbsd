@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P41 POSIX cflow/ctags/cxref evidence.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.cflow"
+status = "present"
+evidence = "test:tests/posix/utility/devtools/test.sh"
+notes = "P41: direct call graph in text and reverse order with -o; fixed C fixture; host evidence"
+
+[[row]]
+id = "util.ctags"
+status = "present"
+evidence = "test:tests/posix/utility/devtools/test.sh"
+notes = "P41: tags file for functions, globals, macros, structs and enums; -f and -x on a fixed C fixture"
+
+[[row]]
+id = "util.cxref"
+status = "present"
+evidence = "test:tests/posix/utility/devtools/test.sh"
+notes = "P41: cross-reference table with definition and reference lines; -o and -x on a fixed C fixture"

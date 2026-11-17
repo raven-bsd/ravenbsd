@@ -1,0 +1,59 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt CTAGS 1
+.Os RavenBSD
+.Sh NAME
+.Nm ctags
+.Nd build a tags file for C definitions
+.Sh SYNOPSIS
+.Nm
+.Op Fl x
+.Op Fl f Ar file
+.Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility scans C source files and writes functions, top-level globals,
+.Cm #define
+macros,
+.Cm struct
+tags and
+.Cm enum
+tags.
+The default output is
+.Pa tags
+with one
+.Ar name Ns \t Ns Ar file Ns \t Ns Ar line
+record per definition, sorted by name.
+.Pp
+The options are:
+.Bl -tag -width Ds
+.It Fl f Ar file
+Write the tags file to
+.Ar file .
+.Ar -
+writes to standard output.
+.It Fl x
+Write a cross-reference listing to standard output instead:
+.Ar name Ns \t Ns Ar line Ns \t Ns Ar file Ns \t Ns Ar source-line .
+.El
+.Pp
+The analyzer is lexical: it does not evaluate the preprocessor, types or expressions.
+.Fl t ,
+.Fl u ,
+.Fl v
+and
+.Fl w
+are unsupported.
+.Sh EXIT STATUS
+.Ex -std
+0 on success, 1 for a file or output error, 2 for usage.
+.Sh SEE ALSO
+.Xr cflow 1 ,
+.Xr cxref 1
+.Sh STANDARDS
+A documented subset of POSIX
+.Nm ctags .
+Standard input, C++, typedef aliases, struct members, enum constants and function-pointer
+declarators are unsupported.
