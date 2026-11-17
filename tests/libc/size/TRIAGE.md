@@ -39,8 +39,8 @@ follow-up harness ticket can annotate the artifact.
 
 ## Classification summary
 
-* **56 budget overruns**:
-  * 54 are real `S`/`F` growth since the C69 budget (small on x86_64, 3-12 percent on
+* **54 budget overruns**, **2 missing budgets** and **2 boot regressions** (58 fail rows):
+  * 52 overruns are real `S`/`F` growth since the C69 budget (small on x86_64, 3-12 percent on
     aarch64/riscv64); the aarch64/riscv64 P9 rows add +306k/+322k and +141k/+159k `S`.
   * 2 are x86_64 `P5` B-only growth (`+945`, `+1373`); S/F are under budget there.
   * The aarch64/riscv64 B figures are also over their old budgets by 1.9-9.5k. Those B budgets

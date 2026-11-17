@@ -71,8 +71,9 @@ and the missing Miri/world/mandoc tooling are resolved by their owners.
 (not the C74h `4/48/25/282/40`). The full 58-row table, deltas and per-row owners are in
 `tests/libc/size/TRIAGE.md`. The classification:
 
-* 56 budget overruns, 54 with real `S`/`F` growth since the C69 freeze (x86_64 small,
-  aarch64/riscv64 3-12 percent; P9 full link +306k/+322k and +141k/+159k `S`).
+* 54 budget overruns, 52 with real `S`/`F` growth since the C69 freeze (x86_64 small,
+  aarch64/riscv64 3-12 percent; P9 full link +306k/+322k and +141k/+159k `S`). Two x86_64 P5
+  rows are B-only. Two more fails are the missing x86_64 P9 budgets and two are boot rows.
 * The aarch64/riscv64 B budgets are stale: the old B budget is 6.9k/7.8k versus 14.3k on x86_64
   for the same source, while the current `.bss` section is 11,392 on all three. Re-freezing that
   baseline is a budget-owner decision, not a C74w edit.
