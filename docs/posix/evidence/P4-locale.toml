@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P48 POSIX iconv/gencat/locale evidence.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.iconv"
+status = "present"
+evidence = "test:tests/posix/utility/locale/test.sh"
+notes = "P48: UTF-8, ASCII and ISO-8859-1 conversion with -f/-t/-o, stdin/stdout, invalid-input rejection"
+
+[[row]]
+id = "util.gencat"
+status = "present"
+evidence = "test:tests/posix/utility/locale/test.sh"
+notes = "P48: $set/$delset/$transient/$comment and message lines compiled to the runtime catalog image; readable by raven-libc-locale"
+
+[[row]]
+id = "util.locale"
+status = "present"
+evidence = "test:tests/posix/utility/locale/test.sh"
+notes = "P48: LANG/LC_* report, category queries, -a/-m/-k; C, POSIX and C.UTF-8 through raven-libc-locale"

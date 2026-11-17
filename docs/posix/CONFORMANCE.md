@@ -6,20 +6,20 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-17T03:22:19Z
+- Date: 2026-11-17T04:23:51Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: target QEMU
 - Tool: `posix-conform 0.1.0`
 - Result: **FAIL (release blocked)**
-- Counts: 1142 pass, 658 fail, 10 skip
+- Counts: 1145 pass, 655 fail, 10 skip
 
 ## Summary
 
 | area | pass | fail | skip |
 |---|---:|---:|---:|
 | external | 0 | 0 | 3 |
-| filesystem | 19 | 1 | 0 |
+| filesystem | 14 | 6 | 0 |
 | header | 40 | 46 | 0 |
 | interface | 925 | 497 | 0 |
 | link | 1 | 0 | 0 |
@@ -27,8 +27,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | shell | 3 | 22 | 0 |
 | target | 0 | 0 | 7 |
 | tty | 12 | 0 | 0 |
-| utility | 126 | 91 | 0 |
-| **all** | **1142** | **658** | **10** |
+| utility | 134 | 83 | 0 |
+| **all** | **1145** | **655** | **10** |
 
 ## Rows
 
@@ -43,18 +43,18 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `filesystem.mkdir-rmdir` | filesystem | pass | `qtest:posix-fs` |  |
 | `filesystem.mmap-file` | filesystem | pass | `qtest:posix-fs` |  |
 | `filesystem.mount` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.ownership` | filesystem | pass | `qtest:fsd-ufs-rw` |  |
+| `filesystem.ownership` | filesystem | fail | `qtest:fsd-ufs-rw` | qtest `fsd-ufs-rw` was skipped: qtest skipped: timed out after 300 s (expected success); unmatched expectations: ^svcd: blockd up$, ^svcd: fsd-ufs up$, ^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$, ^fsd-ufs: mode=rw journal=none$, ^fsd-ufs-rw: probe mount ok$, ^fsd-ufs-rw: probe create/write ok$, ^fsd-ufs-rw: probe truncate/append ok$, ^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$, ^fsd-ufs-rw: probe posix operations ok$, ^fsd-ufs-rw: probe sparse ok$, ^fsd-ufs-rw: probe mmap ok$, ^fsd-ufs-rw: probe unlink/rmdir ok$, ^fsd-ufs-rw: probe fsync ok$, ^fsd-ufs-rw: probe umount ok$, ^fsd-ufs-rw: probe server stopped$, ^fsd-ufs-rw: ufs-fsck -n clean$, ^fsd-ufs-rw: probe server restarted$, ^fsd-ufs-rw: probe remount ok$, ^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true\|false)$, ^fsd-ufs-rw: probe crash replay=(mounted\|fail-closed)$, ^fsd-ufs-rw: probe crash ok$, ^fsd-ufs-rw: probe ok$, ^svcd: settled$, ^init exited \(0\)$ |
 | `filesystem.path-resolution` | filesystem | pass | `qtest:posix-fs` |  |
 | `filesystem.permission` | filesystem | pass | `qtest:perm` |  |
 | `filesystem.record-lock` | filesystem | fail | `none` | profile status missing; no executable POSIX behaviour test |
 | `filesystem.rename` | filesystem | pass | `qtest:posix-fs` |  |
 | `filesystem.sparse-file` | filesystem | pass | `test:tests/posix/fs/sparse-file/test.sh` |  |
-| `filesystem.special-file` | filesystem | pass | `qtest:fsd-ufs-rw` |  |
+| `filesystem.special-file` | filesystem | fail | `qtest:fsd-ufs-rw` | qtest `fsd-ufs-rw` was skipped: qtest skipped: timed out after 300 s (expected success); unmatched expectations: ^svcd: blockd up$, ^svcd: fsd-ufs up$, ^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$, ^fsd-ufs: mode=rw journal=none$, ^fsd-ufs-rw: probe mount ok$, ^fsd-ufs-rw: probe create/write ok$, ^fsd-ufs-rw: probe truncate/append ok$, ^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$, ^fsd-ufs-rw: probe posix operations ok$, ^fsd-ufs-rw: probe sparse ok$, ^fsd-ufs-rw: probe mmap ok$, ^fsd-ufs-rw: probe unlink/rmdir ok$, ^fsd-ufs-rw: probe fsync ok$, ^fsd-ufs-rw: probe umount ok$, ^fsd-ufs-rw: probe server stopped$, ^fsd-ufs-rw: ufs-fsck -n clean$, ^fsd-ufs-rw: probe server restarted$, ^fsd-ufs-rw: probe remount ok$, ^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true\|false)$, ^fsd-ufs-rw: probe crash replay=(mounted\|fail-closed)$, ^fsd-ufs-rw: probe crash ok$, ^fsd-ufs-rw: probe ok$, ^svcd: settled$, ^init exited \(0\)$ |
 | `filesystem.stat-family` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.statvfs` | filesystem | pass | `qtest:fsd-ufs-rw` |  |
+| `filesystem.statvfs` | filesystem | fail | `qtest:fsd-ufs-rw` | qtest `fsd-ufs-rw` was skipped: qtest skipped: timed out after 300 s (expected success); unmatched expectations: ^svcd: blockd up$, ^svcd: fsd-ufs up$, ^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$, ^fsd-ufs: mode=rw journal=none$, ^fsd-ufs-rw: probe mount ok$, ^fsd-ufs-rw: probe create/write ok$, ^fsd-ufs-rw: probe truncate/append ok$, ^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$, ^fsd-ufs-rw: probe posix operations ok$, ^fsd-ufs-rw: probe sparse ok$, ^fsd-ufs-rw: probe mmap ok$, ^fsd-ufs-rw: probe unlink/rmdir ok$, ^fsd-ufs-rw: probe fsync ok$, ^fsd-ufs-rw: probe umount ok$, ^fsd-ufs-rw: probe server stopped$, ^fsd-ufs-rw: ufs-fsck -n clean$, ^fsd-ufs-rw: probe server restarted$, ^fsd-ufs-rw: probe remount ok$, ^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true\|false)$, ^fsd-ufs-rw: probe crash replay=(mounted\|fail-closed)$, ^fsd-ufs-rw: probe crash ok$, ^fsd-ufs-rw: probe ok$, ^svcd: settled$, ^init exited \(0\)$ |
 | `filesystem.symlink` | filesystem | pass | `qtest:posix-fs` |  |
-| `filesystem.sync` | filesystem | pass | `qtest:fsd-ufs-rw` |  |
-| `filesystem.timestamp` | filesystem | pass | `qtest:fsd-ufs-rw` |  |
+| `filesystem.sync` | filesystem | fail | `qtest:fsd-ufs-rw` | qtest `fsd-ufs-rw` was skipped: qtest skipped: timed out after 300 s (expected success); unmatched expectations: ^svcd: blockd up$, ^svcd: fsd-ufs up$, ^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$, ^fsd-ufs: mode=rw journal=none$, ^fsd-ufs-rw: probe mount ok$, ^fsd-ufs-rw: probe create/write ok$, ^fsd-ufs-rw: probe truncate/append ok$, ^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$, ^fsd-ufs-rw: probe posix operations ok$, ^fsd-ufs-rw: probe sparse ok$, ^fsd-ufs-rw: probe mmap ok$, ^fsd-ufs-rw: probe unlink/rmdir ok$, ^fsd-ufs-rw: probe fsync ok$, ^fsd-ufs-rw: probe umount ok$, ^fsd-ufs-rw: probe server stopped$, ^fsd-ufs-rw: ufs-fsck -n clean$, ^fsd-ufs-rw: probe server restarted$, ^fsd-ufs-rw: probe remount ok$, ^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true\|false)$, ^fsd-ufs-rw: probe crash replay=(mounted\|fail-closed)$, ^fsd-ufs-rw: probe crash ok$, ^fsd-ufs-rw: probe ok$, ^svcd: settled$, ^init exited \(0\)$ |
+| `filesystem.timestamp` | filesystem | fail | `qtest:fsd-ufs-rw` | qtest `fsd-ufs-rw` was skipped: qtest skipped: timed out after 300 s (expected success); unmatched expectations: ^svcd: blockd up$, ^svcd: fsd-ufs up$, ^fsd-ufs: mounted block:0 partition 1 as ufs: \(16777216 bytes\)$, ^fsd-ufs: mode=rw journal=none$, ^fsd-ufs-rw: probe mount ok$, ^fsd-ufs-rw: probe create/write ok$, ^fsd-ufs-rw: probe truncate/append ok$, ^fsd-ufs-rw: probe mkdir/rename/symlink/chmod ok$, ^fsd-ufs-rw: probe posix operations ok$, ^fsd-ufs-rw: probe sparse ok$, ^fsd-ufs-rw: probe mmap ok$, ^fsd-ufs-rw: probe unlink/rmdir ok$, ^fsd-ufs-rw: probe fsync ok$, ^fsd-ufs-rw: probe umount ok$, ^fsd-ufs-rw: probe server stopped$, ^fsd-ufs-rw: ufs-fsck -n clean$, ^fsd-ufs-rw: probe server restarted$, ^fsd-ufs-rw: probe remount ok$, ^fsd-ufs-rw: probe crash findings=[0-9]+ clean=(true\|false)$, ^fsd-ufs-rw: probe crash replay=(mounted\|fail-closed)$, ^fsd-ufs-rw: probe crash ok$, ^fsd-ufs-rw: probe ok$, ^svcd: settled$, ^init exited \(0\)$ |
 | `filesystem.truncate` | filesystem | pass | `qtest:posix-fs` |  |
 | `filesystem.umask` | filesystem | pass | `test:tests/posix/fs/umask/test.sh` |  |
 | `header.aio.h` | header | fail | `profile` | profile status partial |
@@ -1693,7 +1693,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.fmt` | utility | pass | `test:tests/posix/utility/misc/fmt/test.sh` |  |
 | `util.fold` | utility | pass | `test:tests/posix/utility/text/fold/test.sh` |  |
 | `util.fort77` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.gencat` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.gencat` | utility | pass | `test:tests/posix/utility/locale/test.sh` |  |
 | `util.get` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.getconf` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
 | `util.getopts` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1702,7 +1702,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.hash` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.head` | utility | pass | `test:tests/posix/utility/text/head/test.sh` |  |
 | `util.hostid` | utility | pass | `test:tests/posix/utility/misc/hostid/test.sh` |  |
-| `util.iconv` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.iconv` | utility | pass | `test:tests/posix/utility/locale/test.sh` |  |
 | `util.id` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
 | `util.install` | utility | pass | `test:tests/posix/utility/misc/install/test.sh` |  |
 | `util.ipcrm` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1710,10 +1710,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.jobs` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.join` | utility | pass | `test:tests/posix/utility/text/join/test.sh` |  |
 | `util.kill` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
-| `util.lex` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.lex` | utility | pass | `test:tests/posix/utility/parsers/lex/test.sh` |  |
 | `util.link` | utility | pass | `test:tests/posix/utility/file/link/test.sh` |  |
 | `util.ln` | utility | pass | `test:tests/posix/utility/file/ln/test.sh` |  |
-| `util.locale` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.locale` | utility | pass | `test:tests/posix/utility/locale/test.sh` |  |
 | `util.localedef` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.logger` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
 | `util.logname` | utility | pass | `test:tests/posix/utility/misc/logname/test.sh` |  |
@@ -1750,7 +1750,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.printenv` | utility | pass | `test:tests/posix/utility/misc/printenv/test.sh` |  |
 | `util.printf` | utility | pass | `test:tests/posix/utility/text/printf/test.sh` |  |
 | `util.prs` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.ps` | utility | fail | `userland/bin/ps` | profile status partial; no POSIX utility test |
+| `util.ps` | utility | fail | `qtest:posix-util-system` | qtest: process: child exited (0) |
 | `util.ptx` | utility | pass | `test:tests/posix/utility/misc/ptx/test.sh` |  |
 | `util.pwd` | utility | pass | `test:tests/posix/utility/file/pwd/test.sh` |  |
 | `util.qalter` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1828,11 +1828,11 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.unset` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.uptime` | utility | pass | `test:tests/posix/utility/misc/uptime/test.sh` |  |
 | `util.users` | utility | pass | `test:tests/posix/utility/misc/users/test.sh` |  |
-| `util.uucp` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.uucp` | utility | pass | `test:tests/posix/utility/uucp/uucp/test.sh` |  |
 | `util.uudecode` | utility | pass | `test:tests/posix/utility/archive/uudecode/test.sh` |  |
 | `util.uuencode` | utility | pass | `test:tests/posix/utility/archive/uuencode/test.sh` |  |
-| `util.uustat` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.uux` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.uustat` | utility | pass | `test:tests/posix/utility/uucp/uustat/test.sh` |  |
+| `util.uux` | utility | pass | `test:tests/posix/utility/uucp/uux/test.sh` |  |
 | `util.val` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.vi` | utility | fail | `none` | profile status missing; no POSIX utility test |
 | `util.wait` | utility | fail | `none` | profile status missing; no POSIX utility test |
@@ -1841,6 +1841,6 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.who` | utility | pass | `test:tests/posix/utility/misc/who/test.sh` |  |
 | `util.write` | utility | pass | `test:tests/posix/utility/ttytools/write/test.sh` |  |
 | `util.xargs` | utility | pass | `test:tests/posix/utility/xargs/test.sh` |  |
-| `util.yacc` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.yacc` | utility | pass | `test:tests/posix/utility/parsers/yacc/test.sh` |  |
 | `util.yes` | utility | pass | `test:tests/posix/utility/misc/yes/test.sh` |  |
 | `util.zcat` | utility | pass | `test:tests/posix/utility/compress/zcat/test.sh` |  |
