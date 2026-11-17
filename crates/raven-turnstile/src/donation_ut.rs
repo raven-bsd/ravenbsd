@@ -192,3 +192,24 @@ fn donation_model_million_ops() {
         d.max_chain_depth()
     );
 }
+
+#[cfg(feature = "lockstat")]
+#[test]
+fn stats_and_objects_are_delegated() {
+    let mut d = Donation::new();
+    d.register(0, prio(10)).unwrap(); // owner
+    d.register(1, prio(2)).unwrap(); // waiter
+    d.acquire(7, 0).unwrap();
+    d.block(7, 1).unwrap();
+
+    let stats = d.stats(7);
+    assert_eq!(stats.wait_entries, 1);
+    assert_eq!(stats.max_queue_depth, 1);
+    assert!(stats.inherited_priority_changes >= 1);
+    assert_eq!(stats.timeouts, 0);
+
+    let objects: vec::Vec<ObjectId> = d.objects().collect();
+    assert_eq!(objects, vec![7]);
+    // An untouched object reports the default (all-zero) snapshot.
+    assert_eq!(d.stats(99), crate::LockStats::default());
+}
