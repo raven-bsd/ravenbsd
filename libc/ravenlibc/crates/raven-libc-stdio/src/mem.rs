@@ -624,7 +624,8 @@ pub fn open_memstream<E: Env>(
 ) -> R<*mut File<E>> {
     let cookie = MemCookie::mstream(bufp, sizep)?;
     let file = build(state, cookie, F_NORD, crate::buf::BUFSIZ, false);
-    file.st_mut().mode = -1;
+    // The stream stays unoriented: POSIX leaves the orientation to the first operation, and
+    // the C `libc-stdio` case mixes narrow `fprintf` and wide `fwprintf` on this stream.
     Ok((file as *const File<E>).cast_mut())
 }
 

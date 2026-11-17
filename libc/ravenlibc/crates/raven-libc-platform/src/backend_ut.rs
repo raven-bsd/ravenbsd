@@ -551,7 +551,8 @@ fn platform_pread_is_enosys_and_pipe_is_espipe() {
         .expect("open");
     let mut buffer = [0u8; 1];
     assert_eq!(platform.pread(fd, &mut buffer, 0), Err(Errno::ENOSYS));
-    assert_eq!(platform.lseek(fd, 0, 0), Err(Errno::ENOSYS));
+    // PG-22 `lseek` is wired through the backend; `pread` above remains the unsupported call.
+    assert_eq!(platform.lseek(fd, 0, 0), Ok(0));
     let pipe = platform
         .install(
             platform

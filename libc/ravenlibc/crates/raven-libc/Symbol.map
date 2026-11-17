@@ -486,6 +486,9 @@ RAVEN_1.0 {
 		optopt;
 		optreset;
 		suboptarg;
+		tzname;
+		timezone;
+		daylight;
 		# --- compat (C65; generic, x86_64 and aarch64) ---
 		addmntent;
 		utmpxname;

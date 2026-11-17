@@ -73,6 +73,12 @@ pub trait SysBackend {
     ) -> Result<(), Errno> {
         Err(Errno::ENOSYS)
     }
+    /// Move a file handle's cursor and return the new offset.
+    ///
+    /// The default answers `ENOSYS`; [`RealSys`] forwards to the kernel `SEEK` path.
+    fn seek(&self, _handle: Handle, _offset: i64, _whence: u32) -> Result<u64, Errno> {
+        Err(Errno::ENOSYS)
+    }
     /// Send a `CALL` request and return the response length.
     fn call(&self, handle: Handle, req: &[u8], resp: &mut [u8]) -> Result<usize, Errno>;
     /// Transfer a handle to another process.
@@ -178,6 +184,10 @@ impl SysBackend for RealSys {
         lock: &mut RecordLock,
     ) -> Result<(), Errno> {
         raven_libc_sys::sys::record_lock(handle, command, lock)
+    }
+
+    fn seek(&self, handle: Handle, offset: i64, whence: u32) -> Result<u64, Errno> {
+        raven_libc_sys::sys::seek(handle, offset, whence)
     }
 
     fn call(&self, handle: Handle, req: &[u8], resp: &mut [u8]) -> Result<usize, Errno> {
@@ -742,6 +752,29 @@ impl SysBackend for FakeSys {
             *lock = world.record_lock_reply;
         }
         Ok(())
+    }
+
+    fn seek(&self, handle: Handle, offset: i64, whence: u32) -> Result<u64, Errno> {
+        self.record(0x5345_454B);
+        let mut world = self.world.borrow_mut();
+        let file = *world.handles.get(&handle.0).ok_or(Errno::EBADF)?;
+        let open = world.open_files.get(&file).cloned().ok_or(Errno::EBADF)?;
+        let node = world.nodes.get(&open.path).cloned().ok_or(Errno::ENOENT)?;
+        let base = match whence {
+            0 => 0,
+            1 => i64::try_from(open.cursor).map_err(|_| Errno::EOVERFLOW)?,
+            2 => i64::try_from(node.data.len()).map_err(|_| Errno::EOVERFLOW)?,
+            _ => return Err(Errno::EINVAL),
+        };
+        let target = base.checked_add(offset).ok_or(Errno::EINVAL)?;
+        if target < 0 {
+            return Err(Errno::EINVAL);
+        }
+        let target = usize::try_from(target).map_err(|_| Errno::EOVERFLOW)?;
+        if let Some(entry) = world.open_files.get_mut(&file) {
+            entry.cursor = target;
+        }
+        u64::try_from(target).map_err(|_| Errno::EOVERFLOW)
     }
 
     fn call(&self, handle: Handle, req: &[u8], resp: &mut [u8]) -> Result<usize, Errno> {

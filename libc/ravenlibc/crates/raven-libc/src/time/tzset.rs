@@ -8,11 +8,13 @@ use core::ffi::{c_char, c_void};
 use raven_libc_abi::structs::Tm as AbiTm;
 use raven_libc_time::locale::CLocale;
 
-use super::{convert, read_abi_tm, utc};
+use super::{convert, read_abi_tm, zone};
 
-/// `tzset`: the RavenBSD shell runs on UTC, so there is no zone file to load.
+/// `tzset`: reload the process `TZ` cache and publish `tzname`/`timezone`/`daylight`.
 #[unsafe(no_mangle)]
-pub extern "C" fn tzset() {}
+pub extern "C" fn tzset() {
+    zone::reload();
+}
 
 /// `strftime_l`: `strftime` with a locale object (the object is accepted and ignored).
 ///
@@ -69,11 +71,24 @@ pub unsafe extern "C" fn wcsftime(
     // SAFETY: the caller granted `max` writable wide units.
     let buffer = unsafe { core::slice::from_raw_parts_mut(out, max) };
     // SAFETY: the caller granted a readable `tm`.
-    let value = read_abi_tm(unsafe { &*tm });
-    let state = utc();
-    let ctx = raven_libc_time::strftime::StrftimeCtx {
-        tzname: [b"UTC", b"UTC"],
-        localtime: Some(convert::localtime_r),
-    };
-    raven_libc_time::wcsftime::wcsftime(&state, &CLocale, buffer, fmt, &value, &ctx)
+    let source = unsafe { &*tm };
+    let value = read_abi_tm(source);
+    let gmt = source.tm_zone.is_null()
+        || source.tm_zone == zone::gmt_pointer().cast::<core::ffi::c_void>();
+    zone::with_cache(|cache| {
+        let state = cache.state();
+        let names = cache.tzname();
+        let ctx = if gmt {
+            raven_libc_time::strftime::StrftimeCtx {
+                tzname: [b"GMT", b"GMT"],
+                localtime: Some(convert::localtime_r),
+            }
+        } else {
+            raven_libc_time::strftime::StrftimeCtx {
+                tzname: names,
+                localtime: Some(convert::localtime_r),
+            }
+        };
+        raven_libc_time::wcsftime::wcsftime(state, &CLocale, buffer, fmt, &value, &ctx)
+    })
 }
