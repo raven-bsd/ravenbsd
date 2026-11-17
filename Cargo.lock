@@ -3,6 +3,10 @@
 version = 4
 
 [[package]]
+name = "abi-diff"
+version = "0.1.0"
+
+[[package]]
 name = "acpi"
 version = "5.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1545,6 +1549,14 @@ name = "raven-ipc"
 version = "0.1.0"
 dependencies = [
  "raven-abi",
+]
+
+[[package]]
+name = "raven-irq-dist"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
 ]
 
 [[package]]
@@ -3159,6 +3171,16 @@ dependencies = [
  "raven-libc-regex",
  "raven-rt",
  "raven-tool-core",
+]
+
+[[package]]
+name = "raven-service-restart"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-svc",
+ "raven-rt",
+ "raven-scheme",
 ]
 
 [[package]]

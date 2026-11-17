@@ -29,6 +29,7 @@ pub mod client;
 pub mod kernel;
 pub mod ofd;
 pub mod server;
+pub mod service;
 pub mod sync;
 
 #[cfg(any(test, feature = "testing"))]
