@@ -1,0 +1,40 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt ULIMIT 1
+.Os RavenBSD
+.Sh NAME
+.Nm ulimit
+.Nd POSIX resource-limit command surface
+.Sh SYNOPSIS
+.Nm
+.Op Fl HS
+.Op Fl a
+.Op Fl cdfnstv
+.Op Ar limit
+.Sh DESCRIPTION
+The
+.Nm
+utility reads and writes the calling process's soft and hard resource limits
+through the kernel
+.Fn proc_getrlimit
+and
+.Fn proc_setrlimit
+calls.
+.Pp
+The
+.Fl a
+form reports every resource. File and core sizes are shown in 512-byte
+blocks, data/stack/address space in kbytes, and CPU time in seconds; the
+value
+.Dq unlimited
+maps to the infinite limit. The
+.Fl H
+and
+.Fl S
+options select the hard or soft limit (the soft limit is the default).
+.Sh EXIT STATUS
+Returns 0 on success; a usage error exits with status 2 and a rejected limit
+with status 1.
+.Sh SEE ALSO
+.Xr sh 1

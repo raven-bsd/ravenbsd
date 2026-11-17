@@ -1,0 +1,24 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt TIMES 1
+.Os RavenBSD
+.Sh NAME
+.Nm times
+.Nd print POSIX process times
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+The
+.Nm
+utility writes the POSIX two-line process-times form:
+.Dl 0m0.00s 0m0.00s
+.Dl 0m0.00s 0m0.00s
+.Pp
+The values come from the kernel's
+.Fn proc_times
+process and reaped-child counters, rendered in POSIX hundredths.
+.Sh EXIT STATUS
+Returns 0; an operand or option is a usage error with status 2.
+.Sh SEE ALSO
+.Xr time 1

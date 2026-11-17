@@ -1,0 +1,34 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt TPUT 1
+.Os RavenBSD
+.Sh NAME
+.Nm tput
+.Nd query ANSI terminal capabilities
+.Sh SYNOPSIS
+.Nm
+.Op Fl T Ar type
+.Ar capname
+.Op Ar parameter ...
+.Sh DESCRIPTION
+The
+.Nm
+utility writes the terminal sequence or numeric value for
+.Ar capname .
+The
+.Fl T
+option overrides the
+.Ev TERM
+environment value.
+.Pp
+Supported capabilities are
+.Cm clear , cup , bold , sgr0 , smso , rmso , smul , rmul , el , ed ,
+.Cm bel , cols
+and
+.Cm lines .
+.Cm cup
+takes the row and column parameters.
+An unknown capability exits with status 1; usage errors exit with status 2.
+.Sh SEE ALSO
+.Xr tabs 1
