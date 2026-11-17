@@ -121,6 +121,8 @@ pub fn map_memory(
     len: usize,
     flags: usize,
 ) -> Result<usize, Errno> {
+    // SAFETY: the wrapper passes scalar register arguments to the syscall entry; the kernel
+    // validates the handles and mapping arguments before touching memory.
     result(unsafe {
         syscall6(
             Syscall::MAP as usize,
@@ -176,6 +178,8 @@ pub fn transfer(process: Handle, object: Handle, mask: Rights) -> Result<Handle,
 
 /// Add, remove or clear a namespace prefix.
 pub fn namespace(process: Handle, op: u32, prefix: &[u8]) -> Result<(), Errno> {
+    // SAFETY: `prefix` is a live slice for the call; the wrapper only passes its address and
+    // length to the syscall entry.
     result(unsafe {
         syscall6(
             Syscall::PROC_NAMESPACE as usize,
@@ -197,6 +201,8 @@ pub fn thread_create(
     stack: usize,
     arg: usize,
 ) -> Result<Handle, Errno> {
+    // SAFETY: the wrapper passes scalar register arguments to the syscall entry; the entry and
+    // stack are the caller's valid thread addresses.
     handle(unsafe {
         syscall6(
             Syscall::THREAD_CREATE as usize,
@@ -238,6 +244,8 @@ pub fn handle_close(handle: Handle) {
 
 /// Open a scheme path.
 pub fn open(path: &str, flags: u32) -> Result<Handle, Errno> {
+    // SAFETY: `path` is a live slice for the call; the wrapper only passes its address and length
+    // to the syscall entry.
     handle(unsafe {
         syscall6(
             Syscall::OPEN as usize,
@@ -304,14 +312,7 @@ pub fn nanosleep(ns: u64) {
 
 /// Map the boot initfs read-only and return its bytes.
 pub fn map_initfs_image() -> Result<&'static [u8], Errno> {
-    let page = map_memory(
-        Handle::SELF_PROC,
-        Handle::INITFS,
-        0,
-        0,
-        PAGE,
-        prot::READ as usize,
-    )?;
+    let page = map_memory(Handle::SELF_PROC, Handle::INITFS, 0, 0, PAGE, prot::READ)?;
     // SAFETY: the mapping is one readable page; the initfs header stores total_size at byte 40.
     let total = unsafe { ((page + 40) as *const u64).read_unaligned() as usize };
     let _ = unmap(Handle::SELF_PROC, page, PAGE);
