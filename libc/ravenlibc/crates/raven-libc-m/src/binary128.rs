@@ -377,6 +377,192 @@ impl LongDouble128 {
         }
     }
 
+    /// `e^x`.
+    ///
+    /// Range reduction: `x = k*ln2 + r` with `|r| <= ln2/2` and integer `k`; the reduction uses
+    /// the split constant `LN2_HI + LN2_LO` so `r` keeps its bits for large `|x|`, and `exp(r)`
+    /// is a 27-term Taylor series (the first omitted term is below `2^-118` for `|r| <= 0.35`).
+    /// The result is then scaled by `2^k` with the correctly-rounded `scalbn`.
+    #[allow(clippy::should_implement_trait)] // the C `expl` body; there is no trait here
+    pub fn exp(self) -> Self {
+        if self.is_nan() {
+            return self;
+        }
+        if self.is_infinite() {
+            return if self.sign_bit() {
+                Self::zero(false)
+            } else {
+                self
+            };
+        }
+        if self.is_zero() {
+            return Self::one();
+        }
+        let k = self.div(Self::ln2_hi()).round();
+        let Some(k) = k.to_i64() else {
+            return if self.sign_bit() {
+                Self::zero(false)
+            } else {
+                Self::infinity(false)
+            };
+        };
+        if k > 16400 {
+            return Self::infinity(false);
+        }
+        if k < -16500 {
+            return Self::zero(false);
+        }
+        let kf = Self::from_i64(k);
+        // r = x - k*ln2, split so the multiplication does not lose the low bits of ln2.
+        let r = self.sub(kf.mul(Self::ln2_hi())).sub(kf.mul(Self::ln2_lo()));
+        let scale = i32::try_from(k).unwrap_or(0);
+        Self::exp_series(r).scalbn(scale)
+    }
+
+    /// The natural logarithm.
+    ///
+    /// `x = m * 2^k` with `m` in `[1/sqrt2, sqrt2)` (exponent from `frexp`, one extra shift when
+    /// the mantissa exceeds `sqrt2`), then `ln x = k*ln2 + 2*atanh((m-1)/(m+1))`. The `atanh`
+    /// series is truncated after 26 odd terms, whose first omitted term is below `2^-125` for
+    /// `|s| <= 0.172`; `k*ln2` uses the split constant.
+    #[allow(clippy::should_implement_trait)]
+    pub fn ln(self) -> Self {
+        if self.is_nan() {
+            return self;
+        }
+        if self.is_zero() {
+            return Self::infinity(true);
+        }
+        if self.sign_bit() {
+            return Self::nan();
+        }
+        if self.is_infinite() {
+            return self;
+        }
+        if self.bits == Self::one().bits {
+            return Self::zero(false);
+        }
+        let (mantissa, exponent) = self.frexp();
+        // frexp gives [0.5, 1); shift to [1, 2).
+        let mut m = mantissa.scalbn(1);
+        let mut e = exponent.saturating_sub(1);
+        let sqrt2 = Self::from_f64(2.0).sqrt();
+        if m.total_cmp(sqrt2) == core::cmp::Ordering::Greater {
+            m = m.scalbn(-1);
+            e = e.saturating_add(1);
+        }
+        let s = m.sub(Self::one()).div(m.add(Self::one()));
+        let series = Self::atanh_series(s);
+        let ef = Self::from_i64(i64::from(e));
+        ef.mul(Self::ln2_hi())
+            .add(ef.mul(Self::ln2_lo()))
+            .add(series)
+    }
+
+    /// `2^x`: the integer part becomes an exact power-of-two scale and the fraction goes through
+    /// the `exp` series with `r*ln2`.
+    pub fn exp2(self) -> Self {
+        if self.is_nan() {
+            return self;
+        }
+        if self.is_infinite() {
+            return if self.sign_bit() {
+                Self::zero(false)
+            } else {
+                self
+            };
+        }
+        if self.is_zero() {
+            return Self::one();
+        }
+        let k = self.round();
+        let Some(k) = k.to_i64() else {
+            return if self.sign_bit() {
+                Self::zero(false)
+            } else {
+                Self::infinity(false)
+            };
+        };
+        if k > 16400 {
+            return Self::infinity(false);
+        }
+        if k < -16500 {
+            return Self::zero(false);
+        }
+        let kf = Self::from_i64(k);
+        let r = self.sub(kf);
+        // r*ln2 with the split constant; |r| <= 0.5 so the product keeps its accuracy.
+        let argument = r.mul(Self::ln2_hi()).add(r.mul(Self::ln2_lo()));
+        let scale = i32::try_from(k).unwrap_or(0);
+        Self::exp_series(argument).scalbn(scale)
+    }
+
+    /// The base-2 logarithm; an exact power of two returns its integer exponent exactly.
+    pub fn log2(self) -> Self {
+        if !self.is_finite() || self.is_zero() || self.sign_bit() {
+            return self.ln().div(Self::ln2_hi());
+        }
+        let (mantissa, exponent) = self.frexp();
+        if mantissa.bits == Self::from_f64(0.5).bits {
+            // x = 2^(exponent - 1) exactly.
+            return Self::from_i64(i64::from(exponent.saturating_sub(1)));
+        }
+        self.ln().div(Self::ln2_hi())
+    }
+
+    /// The base-10 logarithm.
+    pub fn log10(self) -> Self {
+        self.ln().div(Self::ln10())
+    }
+
+    /// `ln 2`, rounded to binary128 with its residual split so `LN2_HI + LN2_LO` is ln 2 to
+    /// ~2^-231. Computed with 200-digit decimal arithmetic (see the C47p report) and
+    /// round-to-nearest-even.
+    pub const fn ln2_hi() -> Self {
+        Self {
+            bits: 0x3ffe_62e4_2fef_a39e_f357_93c7_6730_07e6,
+        }
+    }
+
+    /// The residual `ln 2 - LN2_HI`.
+    pub const fn ln2_lo() -> Self {
+        Self {
+            bits: 0xbf8a_2a17_e197_9b31_ace9_3a4e_be5d_148f,
+        }
+    }
+
+    /// `ln 10`, rounded to binary128 (0.5 ULP).
+    pub const fn ln10() -> Self {
+        Self {
+            bits: 0x4000_26bb_1bbb_5551_582d_d4ad_ac57_05a6,
+        }
+    }
+
+    /// `sum_{n=0..27} r^n / n!`, evaluated backwards for stability.
+    fn exp_series(r: Self) -> Self {
+        let mut acc = Self::one();
+        let mut n: i64 = 27;
+        while n >= 1 {
+            acc = Self::one().add(acc.mul(r).div(Self::from_i64(n)));
+            n = n.saturating_sub(1);
+        }
+        acc
+    }
+
+    /// `2*(s + s^3/3 + s^5/5 + ... + s^51/51)` (26 odd terms).
+    fn atanh_series(s: Self) -> Self {
+        let s2 = s.mul(s);
+        let mut power = s;
+        let mut sum = s;
+        let mut denominator: i64 = 3;
+        while denominator <= 51 {
+            power = power.mul(s2);
+            sum = sum.add(power.div(Self::from_i64(denominator)));
+            denominator = denominator.saturating_add(2);
+        }
+        sum.add(sum)
+    }
+
     /// `x` with the sign of `sign`.
     pub fn copysign(self, sign: Self) -> Self {
         Self {
@@ -1018,7 +1204,11 @@ fn pack_binary128(negative: bool, exponent: i32, significand: u128) -> u128 {
         exponent += drop as i32;
         (kept, guard, round, rest, kept & 1 != 0)
     } else {
+        // The exact significand is narrower than 113 bits (a cancellation or a short sum):
+        // shift it up to the hidden bit and take the same amount off the scale, so the value
+        // `significand * 2^exponent` is preserved.
         let shift = (112 - highest) as i32;
+        exponent -= shift;
         ((significand << shift), false, false, false, false)
     };
     let mut mantissa = kept;

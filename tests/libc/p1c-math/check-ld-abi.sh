@@ -33,7 +33,8 @@ trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 
 names='fabsl floorl ceill truncl roundl rintl nearbyintl logbl significandl copysignl fdiml
 fmaxl fminl fmodl remainderl nextafterl nexttowardl scalbnl ldexpl scalblnl frexpl modfl
-remquol ilogbl llogbl lrintl llrintl lroundl llroundl nanl sqrtl cbrtl hypotl'
+remquol ilogbl llogbl lrintl llrintl lroundl llroundl nanl sqrtl cbrtl hypotl
+expl logl exp2l log2l log10l'
 
 flags="-std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Werror -Wno-unused-value -I $include -I $arch_include"
 

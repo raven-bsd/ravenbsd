@@ -173,6 +173,31 @@ pub fn hypotl(x: LongDouble, y: LongDouble) -> LongDouble {
     x.hypot(y)
 }
 
+/// `expl`.
+pub fn expl(x: LongDouble) -> LongDouble {
+    x.exp()
+}
+
+/// `logl`: the natural logarithm.
+pub fn logl(x: LongDouble) -> LongDouble {
+    x.ln()
+}
+
+/// `exp2l`.
+pub fn exp2l(x: LongDouble) -> LongDouble {
+    x.exp2()
+}
+
+/// `log2l`.
+pub fn log2l(x: LongDouble) -> LongDouble {
+    x.log2()
+}
+
+/// `log10l`.
+pub fn log10l(x: LongDouble) -> LongDouble {
+    x.log10()
+}
+
 /// `nanl`.
 pub fn nanl() -> LongDouble {
     LongDouble::nan()

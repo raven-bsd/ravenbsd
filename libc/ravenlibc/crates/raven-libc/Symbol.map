@@ -640,11 +640,11 @@ RAVEN_1.0 {
 		exp10m1f;
 		exp2;
 		exp2f;
-		exp2l; # x86_64
+		exp2l; # x86_64 aarch64
 		exp2m1;
 		exp2m1f;
 		expf;
-		expl; # x86_64
+		expl; # x86_64 aarch64
 		expm1;
 		expm1f;
 		expm1l; # x86_64
@@ -749,7 +749,7 @@ RAVEN_1.0 {
 		log;
 		log10;
 		log10f;
-		log10l; # x86_64
+		log10l; # x86_64 aarch64
 		log10p1;
 		log10p1f;
 		log1p;
@@ -757,14 +757,14 @@ RAVEN_1.0 {
 		log1pl; # x86_64
 		log2;
 		log2f;
-		log2l; # x86_64
+		log2l; # x86_64 aarch64
 		log2p1;
 		log2p1f;
 		logb;
 		logbf;
 		logbl; # x86_64 aarch64
 		logf;
-		logl; # x86_64
+		logl; # x86_64 aarch64
 		lrint;
 		lrintf;
 		lrintl; # x86_64 aarch64
