@@ -343,6 +343,8 @@ fn copy_headers(source: &Path, target: &Path) -> Result<()> {
         let name = entry.file_name();
         let destination = target.join(&name);
         if path.is_dir() {
+            std::fs::create_dir_all(&destination)
+                .with_context(|| format!("cannot create {}", destination.display()))?;
             copy_headers(&path, &destination)?;
         } else {
             copy_if_exists(&path, &destination)?;
