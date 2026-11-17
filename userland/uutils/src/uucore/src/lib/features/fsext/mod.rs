@@ -413,12 +413,16 @@ pub fn read_fs_list() -> UResult<Vec<MountInfo>> {
     {
         windows::read_fs_list()
     }
+    #[cfg(target_os = "ravenbsd")]
+    {
+        let text = std::fs::read_to_string("/etc/mounts")?;
+        Ok(parse_ravenbsd_mounts(&text))
+    }
     #[cfg(any(
         target_os = "aix",
         target_os = "redox",
         target_os = "illumos",
         target_os = "solaris",
-        target_os = "ravenbsd",
         target_os = "wasi"
     ))]
     {
@@ -426,6 +430,42 @@ pub fn read_fs_list() -> UResult<Vec<MountInfo>> {
         Ok(Vec::new())
     }
 }
+
+/// Parse the RavenBSD mount table.
+///
+/// Each non-comment line is `<mount point> <scheme>:`; the real source is `/etc/mounts`, the
+/// same table vfsd consumes. The mount point is used as the unique device id because `df`
+/// deduplicates rows by `dev_id`.
+#[cfg(any(target_os = "ravenbsd", test))]
+fn parse_ravenbsd_mounts(text: &str) -> Vec<MountInfo> {
+    let mut mounts = Vec::new();
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let mut fields = line.split_whitespace();
+        let (Some(mount_dir), Some(scheme)) = (fields.next(), fields.next()) else {
+            continue;
+        };
+        let fs_type = scheme.strip_suffix(':').unwrap_or(scheme);
+        mounts.push(MountInfo {
+            dev_id: mount_dir.to_string(),
+            dev_name: scheme.to_string(),
+            fs_type: fs_type.to_string(),
+            mount_root: OsString::new(),
+            mount_dir: OsString::from(mount_dir),
+            mount_option: String::new(),
+            remote: false,
+            dummy: false,
+        });
+    }
+    mounts
+}
+
+#[cfg(test)]
+#[path = "fsext_ravenbsd_ut.rs"]
+mod ravenbsd_mount_tests;
 
 #[derive(Debug, Clone)]
 pub struct FsUsage {
