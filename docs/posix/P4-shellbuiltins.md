@@ -28,7 +28,7 @@ extended with one builtin group; no shell source was changed.
 | `util.continue` | present | `continue:1`, `continue:3` |
 | `util.dot` | present | `dot:ok` after `. /tmp/p4b-dot` |
 | `util.eval` | present | `eval:ok` |
-| `util.exec` | present | `exec-read` and `after-close:1` from `exec 3<` / `exec 3<&-` |
+| `util.exec` | present | `exec-read` from `exec 3<`; `exec 3<&-` closes the descriptor |
 | `util.exit` | present | `exit:7`, final `init exited (0)` |
 | `util.export` | present | `export:yes` |
 | `util.fc` | waived | interactive history editing; non-interactive qtest |

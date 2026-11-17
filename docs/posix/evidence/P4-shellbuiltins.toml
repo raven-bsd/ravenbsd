@@ -52,7 +52,7 @@ notes = "P45: eval:ok marker from the existing brush group"
 id = "util.exec"
 status = "present"
 evidence = "qtest:posix-shell"
-notes = "P45: exec 3</etc/mounts and exec 3<&- produce exec-read and after-close markers"
+notes = "P45: exec 3</etc/mounts produces the exec-read marker; exec 3<&- then closes the descriptor"
 
 [[row]]
 id = "util.exit"
