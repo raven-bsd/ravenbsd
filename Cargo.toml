@@ -36,6 +36,7 @@ members = [
     "tests/fixtures/proc-registry",
     "tests/fixtures/proc-credentials",
     "tests/fixtures/proc-spawn-attrs",
+    "tests/fixtures/required-utils",
     "tests/fixtures/tty",
     "tests/fixtures/s11-echo",
     "tests/fixtures/s33-ipc",
