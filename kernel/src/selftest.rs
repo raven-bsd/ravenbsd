@@ -25,6 +25,7 @@ pub fn run(cmdline: &CmdLine) {
         Some(name @ ("heap" | "paging")) => memory(name),
         Some("timer") => timer_selftest(),
         Some("sched") => crate::sched::selftest::run(),
+        Some("locking") => crate::sync::selftest(),
         _ => {}
     }
 }
