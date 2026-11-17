@@ -1,7 +1,7 @@
 # node: RAVEN_1.0
 # status: candidate
 # census_rev: bionic=731631f300090436d7f5df80d50b6275c8c60a93,freebsd=133344405f532bd54ff3629a77d4c4e062f01fdb,musl=7813e9119eb5fe681b6750b8a033a0490bca0941,netbsd=36eddebcc36cb0775aa2962005b9c05419a6ff01,openbsd=4ce71f2817f675745b0596aaf04de4a122b1cc52
-# records: 1706
+# records: 1709
 _Exit F - all 0 stdlib.h
 _Fork F - all 0 unistd.h
 _Unwind_Backtrace F - all 2 -
@@ -144,7 +144,7 @@ catgets F - all 0 -
 catopen F - all 0 nl_types.h
 cbrt F - all 1 -
 cbrtf F - all 1 -
-cbrtl F - x86_64 1 -
+cbrtl F - x86_64,aarch64 1 -
 ccos F - all 0 -
 ccosf F - all 1 -
 ccosh F - all 0 -
@@ -258,6 +258,7 @@ ctermid F - all 0 stdio.h
 ctime F - all 0 time.h
 cuserid F - all 0 stdio.h
 daemon F - all 1 -
+daylight D 4 all 0 time.h
 dcgettext F - all 0 libintl.h
 dcngettext F - all 0 libintl.h
 devname F - all 2 -
@@ -338,12 +339,12 @@ exp10m1 F - all 0 -
 exp10m1f F - all 3 -
 exp2 F - all 1 -
 exp2f F - all 1 -
-exp2l F - x86_64 1 -
+exp2l F - x86_64,aarch64 1 -
 exp2m1 F - all 0 -
 exp2m1f F - all 3 -
 expand_number F - all 2 -
 expf F - all 1 -
-expl F - x86_64 1 -
+expl F - x86_64,aarch64 1 -
 explicit_bzero F - all 1 string.h
 expm1 F - all 1 -
 expm1f F - all 1 -
@@ -653,7 +654,7 @@ htons F - all 1 netinet/in.h
 humanize_number F - all 2 -
 hypot F - all 1 -
 hypotf F - all 1 -
-hypotl F - x86_64 1 -
+hypotl F - x86_64,aarch64 1 -
 iconv F - all 0 iconv.h
 iconv_close F - all 0 iconv.h
 iconv_open F - all 0 iconv.h
@@ -806,7 +807,7 @@ lockf F - all 0 -
 log F - all 1 -
 log10 F - all 1 -
 log10f F - all 1 -
-log10l F - x86_64 1 -
+log10l F - x86_64,aarch64 1 -
 log10p1 F - all 0 -
 log10p1f F - all 3 -
 log1p F - all 1 -
@@ -814,7 +815,7 @@ log1pf F - all 1 -
 log1pl F - x86_64 1 -
 log2 F - all 1 -
 log2f F - all 1 -
-log2l F - x86_64 1 -
+log2l F - x86_64,aarch64 1 -
 log2p1 F - all 0 -
 log2p1f F - all 3 -
 logb F - all 0 -
@@ -822,7 +823,7 @@ logbf F - all 1 -
 logbl F - x86_64,aarch64 1 -
 logf F - all 1 -
 login_tty F - all 1 utmp.h
-logl F - x86_64 1 -
+logl F - x86_64,aarch64 1 -
 longjmp F - all 0 setjmp.h
 lrand48 F - all 1 stdlib.h
 lrint F - all 0 -
@@ -1383,7 +1384,7 @@ socketpair F - all 1 sys/socket.h
 sprintf F - all 0 stdio.h
 sqrt F - all 1 -
 sqrtf F - all 1 -
-sqrtl F - x86_64 1 -
+sqrtl F - x86_64,aarch64 1 -
 srand F - all 0 stdlib.h
 srand48 F - all 1 stdlib.h
 srandom F - all 1 stdlib.h
@@ -1551,6 +1552,7 @@ timerfd_settime F - all 1 -
 times F - all 0 sys/times.h
 timespec_get F - all 0 time.h
 timespec_getres F - all 0 time.h
+timezone D 8 all 0 time.h
 timingsafe_bcmp F - all 2 -
 timingsafe_memcmp F - all 2 -
 tmpfile F - all 0 stdio.h
@@ -1584,6 +1586,7 @@ tss_set F - all 0 threads.h
 ttyname F - all 0 unistd.h
 ttyname_r F - all 0 unistd.h
 twalk F - all 1 search.h
+tzname D 16 all 0 time.h
 tzset F - all 0 time.h
 ufromfp F - all 0 -
 ufromfpx F - all 0 -

@@ -259,6 +259,7 @@ ctermid
 ctime
 cuserid
 daemon
+daylight
 dcgettext
 dcngettext
 devname
@@ -1552,6 +1553,7 @@ timerfd_settime
 times
 timespec_get
 timespec_getres
+timezone
 timingsafe_bcmp
 timingsafe_memcmp
 tmpfile
@@ -1585,6 +1587,7 @@ tss_set
 ttyname
 ttyname_r
 twalk
+tzname
 tzset
 ufromfp
 ufromfpx
