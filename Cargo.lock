@@ -765,6 +765,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "newgrp"
+version = "0.1.0"
+dependencies = [
+ "raven-initfs",
+ "raven-rt",
+ "raven-userdb",
+]
+
+[[package]]
 name = "nm"
 version = "0.1.0"
 dependencies = [

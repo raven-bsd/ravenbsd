@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P4a5 POSIX newgrp evidence.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.newgrp"
+status = "present"
+evidence = "test:tests/posix/utility/simple4/newgrp/test.sh"
+notes = "P4a5: no-operand/-l/name/numeric-gid parsing, group membership, documented non-member denial and the shell plan; the target credential/exec path is the existing proc/spawn path used by su"
