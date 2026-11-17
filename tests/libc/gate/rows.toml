@@ -239,7 +239,7 @@ title = "file-tools regression"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "qtest", "--case", "file-tools", "--arch", "x86_64"]
-note = "C74n: minimal `core-servers-files` profile stages and starts tooltest; tooltest fails at `df` (`no file systems processed`) because uutils read_fs_list is empty on RavenBSD. Owner: uutils/P1f."
+note = "C74v: minimal `core-servers-files` profile; df reads `/etc/mounts` via the RavenBSD read_fs_list and tooltest exits 0."
 evidence = "build/libc-gate/5.2.file-tools.txt"
 source = "LEAD-TICKET-CHECKLIST 8"
 
