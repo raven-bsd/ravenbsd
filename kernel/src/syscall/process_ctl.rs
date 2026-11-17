@@ -861,6 +861,7 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
             let code = target.exit_code.load(Ordering::Acquire);
             drop(state);
             copy_to_user(destination, &code.to_le_bytes())?;
+            let _ = process::reap_pid(&target);
             return Ok(0);
         }
         if *state == ProcessState::Created {
@@ -868,6 +869,7 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
             // it immediately (the terminal state and the one-shot teardown are the same).
             drop(state);
             let _ = process::reap_unstarted(&target);
+            let _ = process::reap_pid(&target);
             continue;
         }
         let token = sched::begin_block_interruptible()?;
