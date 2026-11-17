@@ -1,0 +1,155 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt LP 1
+.Os RavenBSD
+.Sh NAME
+.Nm lp
+.Nd send files to a printer
+.Sh SYNOPSIS
+.Nm
+.Op Fl c
+.Op Fl d Ar dest
+.Op Fl n Ar copies
+.Op Fl msw
+.Op Fl o Ar option
+.Op Fl t Ar title
+.Op Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility submits a POSIX print request.
+It parses the Issue 8 options, resolves the destination, and writes the input documents to a
+local output destination.
+.Pp
+RavenBSD has no print daemon and no network print service.
+A destination that is an absolute path or an explicit scheme path, such as
+.Pa /dev/lp0
+or
+.Pa tty:console ,
+is opened for writing and the request is written synchronously.
+The destination must already exist;
+.Nm
+never creates it.
+Every other destination is a logical printer name.
+No service exists behind such a name, so
+.Nm
+reports it as unavailable and exits 1.
+It never reports a successful print when no destination is available.
+.Pp
+If no
+.Ar file
+operand is given, or an operand is
+.Ql - ,
+standard input is read.
+In the target image standard input is the console.
+.Pp
+No request ID is written to standard output: there is no spooler and the local write is
+synchronous.
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl c
+Copy the input before writing.
+The client always reads each document fully into memory, so a successful completion means no
+further access to the input files is required.
+.It Fl d Ar dest
+Select the destination.
+This option takes precedence over
+.Ev LPDEST ,
+which takes precedence over
+.Ev PRINTER .
+An empty environment value is treated as unset.
+.It Fl n Ar copies
+Write
+.Ar copies
+complete document sequences.
+.Ar copies
+must be a positive decimal integer.
+Every file is written as an integral whole.
+.It Fl m
+Send mail after the files have been printed.
+The option is accepted, but this image has no mail transport and no mail is sent.
+.It Fl o Ar option
+Pass a printer-dependent option.
+The option is accepted and kept in request order.
+A local file or device has no device-dependent options.
+.It Fl s
+Suppress informative messages.
+Diagnostics still go to standard error.
+.It Fl t Ar title
+Use
+.Ar title
+on the banner page.
+The option is accepted, but no banner page is generated for a synchronous local write.
+.It Fl w
+After a successful write, print
+.Dq lp: request printed on '<dest>'
+to standard error unless
+.Fl s
+is also given.
+.El
+.Sh OPERANDS
+.Bl -tag -width Ds
+.It Ar file
+A pathname of a file to output.
+If no operands are specified, or an operand is
+.Ql - ,
+standard input is used.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width Ds
+.It Ev LPDEST
+The destination when
+.Fl d
+is not specified.
+.It Ev PRINTER
+The destination when neither
+.Fl d
+nor
+.Ev LPDEST
+is specified.
+.El
+.Pp
+The standard
+.Ev LANG ,
+.Ev LC_ALL ,
+.Ev LC_CTYPE ,
+.Ev LC_MESSAGES
+and
+.Ev LC_TIME
+variables affect the C-locale client in the usual way.
+The image currently provides the C locale only.
+.Sh EXIT STATUS
+.Ex -std
+The exit status is 0 only when a local destination accepted the complete request.
+It is 1 when no destination is configured, a destination is unavailable, or an input or write
+error occurs.
+A usage error exits 2.
+.Sh DIAGNOSTICS
+.Bd -literal -offset indent
+lp: no print destination configured
+lp: destination '<dest>' is not available
+lp: destination '<dest>' is not available: <reason>
+.Ed
+.Pp
+The first line is used when
+.Fl d ,
+.Ev LPDEST
+and
+.Ev PRINTER
+are all unset or empty.
+The second line is used for a logical printer name, and the third for a local path that cannot
+be opened or written.
+.Sh SEE ALSO
+.Xr mailx 1
+.Sh STANDARDS
+IEEE Std 1003.1-2024
+.Pq POSIX.1-2024 .
+.Sh CAVEATS
+No request ID is printed and no banner page is generated.
+The
+.Fl m
+option sends no mail, and
+.Fl o
+options have no effect on a plain local file or device.
+Input documents are held in memory.

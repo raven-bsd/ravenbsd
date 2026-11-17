@@ -247,6 +247,7 @@ members = [
     "userland/bin/newgrp",
     "userland/bin/id",
     "userland/bin/whoami",
+    "userland/bin/lp",
     "userland/bin/df",
     "userland/servers/logd",
     "userland/servers/sysd",
