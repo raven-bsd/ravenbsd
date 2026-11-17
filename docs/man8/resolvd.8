@@ -12,20 +12,24 @@
 .Nm
 registers the
 .Dq resolv:
-scheme.  A client opens the control file and sends one
+scheme.
+A client opens the control file and sends one
 .Sy CALL
 with a query; the reply carries A/AAAA records, NXDOMAIN, or an error.
 Each query uses a bounded UDP exchange through
 .Xr netd 8 :
 one retry per configured server, a 500 ms per-attempt timeout, and CNAME
-following bounded to eight links.  The service never invents an address and
+following bounded to eight links.
+The service never invents an address and
 does not cache across queries.
 .Pp
-Nameservers come from one of two sources.  A static
+Nameservers come from one of two sources.
+A static
 .Pa /etc/resolv.conf
 with at least one
 .Sy nameserver
-line wins and is never overwritten.  Otherwise
+line wins and is never overwritten.
+Otherwise
 .Nm
 reads the live DHCP lease through
 .Xr netd 8 Ns 's
@@ -35,7 +39,8 @@ control channel using
 takes the leased address, prefix, router, DNS list and the renewal,
 rebinding and expiry timers, writes the DNS list to the runtime
 .Pa /etc/resolv.conf ,
-and queries those servers.  The lease thread refreshes at the earliest live
+and queries those servers.
+The lease thread refreshes at the earliest live
 timer and applies a changed lease; it never creates a second network stack.
 .Pp
 Only the
@@ -66,9 +71,11 @@ Interface whose lease is read
 The control file is
 .Pa resolv: .
 A query is little-endian: version 1 (u16), query type (u8; 1 = A, 28 = AAAA),
-name length (u16), and the ASCII name.  A reply is version 1, status (0 =
+name length (u16), and the ASCII name.
+A reply is version 1, status (0 =
 answers, 1 = NXDOMAIN, 2 = error), query type, record count, then records of
-type (u8), TTL (u32), and 4 or 16 address bytes.  At most eight records fit.
+type (u8), TTL (u32), and 4 or 16 address bytes.
+At most eight records fit.
 .Sh FILES
 .Bl -tag -width /etc/services.d -compact
 .It Pa /etc/resolv.conf
@@ -78,7 +85,9 @@ The same file in a mounted root filesystem.
 .It Pa /etc/services.d/resolvd.toml
 Service manifest.
 .El
-.Sh ERRORS
+.Sh EXIT STATUS
+.Ex -std
+.Sh DIAGNOSTICS
 A malformed query or reply returns
 .Er EINVAL
 or
@@ -88,11 +97,9 @@ A timeout or transport failure is reported as an error reply, not an empty
 answer.
 A missing lease is logged and retried with bounded backoff; it is not reported
 as a successful empty answer.
-.Sh EXIT STATUS
-.Ex -std
 .Sh SEE ALSO
-.Xr netd 8 ,
-.Xr init 8
+.Xr init 8 ,
+.Xr netd 8
 .Sh STANDARDS
 RavenBSD.
 RFC 1035 and RFC 2131 are the DNS and DHCP references.

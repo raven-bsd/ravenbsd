@@ -25,7 +25,8 @@ The mount is read-write by default; setting
 .Ev FSD_UFS_READ_ONLY
 keeps it read-only.
 .Pp
-The server selects partition 1 by default.  The partition is read with the
+The server selects partition 1 by default.
+The partition is read with the
 24-byte
 .Dq block:
 protocol; the
@@ -72,7 +73,8 @@ A final symbolic link is not followed for
 .Sy READLINK ,
 so the target is returned instead of being resolved.
 .Pp
-Directory reads are sequential.  The server keeps the directory cursor in the
+Directory reads are sequential.
+The server keeps the directory cursor in the
 open-file description; a client that sends a nonzero wire offset gets
 .Er EINVAL .
 A buffer smaller than the next packed entry also returns
@@ -120,7 +122,9 @@ The default is read-write.
 .It Pa /etc/services.d/fsd-ufs.toml
 Service manifest.
 .El
-.Sh ERRORS
+.Sh EXIT STATUS
+.Ex -std
+.Sh DIAGNOSTICS
 A missing path returns
 .Er ENOENT ;
 a component that is not a directory returns
@@ -137,8 +141,6 @@ A full filesystem returns
 .Er ENOSPC .
 A protocol framing error returns
 .Er EPROTO .
-.Sh EXIT STATUS
-.Ex -std
 .Sh SEE ALSO
 .Xr blockd 8 ,
 .Xr init 8 ,

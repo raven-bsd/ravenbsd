@@ -15,7 +15,8 @@
 opens
 .Pa log:
 and reads the in-kernel log ring from its oldest retained record, writing the
-records to the debug console.  The ring is owned by
+records to the debug console.
+The ring is owned by
 .Xr logd 8 ; records older than the ring capacity are unavailable.
 .Pp
 .Fl -selftest

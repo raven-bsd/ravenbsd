@@ -24,21 +24,25 @@ initialises the BCM2711 EMMC2 SDHCI controller and serves the
 .Dq disk:
 scheme with the
 .Xr blockd 8
-framing.  It resets the controller, applies 3.3 V, runs the SD
+framing.
+It resets the controller, applies 3.3 V, runs the SD
 identification sequence at 400 kHz, selects the 25 MHz default clock and the
 four-bit bus, and then programs SDMA transfers on the mapped DMA buffer.
 .Pp
 In real mode the launcher passes the MMIO, DMA and interrupt handles and the
-DMA window and clock values.  The defaults are handles 3/4/5, a 256-byte
+DMA window and clock values.
+The defaults are handles 3/4/5, a 256-byte
 register window, a 64 KiB DMA buffer, and the Pi 4
 .Pa emmc2bus
 window bus
 .Li 0xc0000000 ,
 CPU
 .Li 0 ,
-size 1 GiB.  A buffer whose bus address does not fit the window is refused with
+size 1 GiB.
+A buffer whose bus address does not fit the window is refused with
 .Er EIO
-rather than truncated.  The command, transfer, ADMA/DMA and timeout errors are
+rather than truncated.
+The command, transfer, ADMA/DMA and timeout errors are
 mapped from the SDHCI status registers.
 .Pp
 The driver serves INFO, READ, WRITE and FLUSH on path
@@ -53,7 +57,8 @@ With
 the driver uses a host-backed memory disk instead of MMIO: it writes a
 sector-stamped pattern and an FNV-1a checksum marker, serves
 .Dq disk: ,
-and exits after a client flush.  This is the mode used by the
+and exits after a client flush.
+This is the mode used by the
 .Ql pi4-emmc2
 qtest.
 .Sh FILES
@@ -75,5 +80,6 @@ The
 driver first appeared in RavenBSD 0.1.
 .Sh CAVEATS
 The real MMIO, interrupt and SDMA path is UNVERIFIED until a Pi 4 board log
-exists.  The current data path uses SDMA; ADMA2 is modelled and tested but not
+exists.
+The current data path uses SDMA; ADMA2 is modelled and tested but not
 selected by the driver.

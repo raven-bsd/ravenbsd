@@ -11,14 +11,16 @@
 .Sh DESCRIPTION
 .Nm
 reads the ACPI boot blob, locates the MCFG table and maps the first 1 MiB of the
-ECAM window.  It scans bus 0, records the vendor, device, class, revision and six
+ECAM window.
+It scans bus 0, records the vendor, device, class, revision and six
 32-bit BAR values of every function, prints
 .Dq pcid: devices= Ns Ar count
 and registers the
 .Dq pci:
 scheme.
 .Pp
-Enumeration is limited to bus 0 in this milestone.  The server receives the
+Enumeration is limited to bus 0 in this milestone.
+The server receives the
 RootDevice capability through the
 .Ql root
 service grant; it is the only process allowed to create
@@ -38,10 +40,12 @@ line and the interrupt pin.
 .It Pa /bb:ss.f/bar Ns Ar n
 opens a fresh
 .Dv MmioRegion
-for that 32-bit or 64-bit memory BAR and returns it as an S25 attachment.  The
+for that 32-bit or 64-bit memory BAR and returns it as an S25 attachment.
+The
 region covers the whole BAR, sized by writing all ones into the BAR register
 and reading the mask back during enumeration (the original value is restored
-immediately).  I/O BARs and absent BARs return
+immediately).
+I/O BARs and absent BARs return
 .Er ENOENT .
 .It Pa /bb:ss.f/bars
 one
@@ -59,7 +63,8 @@ attachment, for capability discovery through
 allocates a fresh, zeroed 64 KiB
 .Dv DmaBuffer
 for that function through the root capability and returns it as an S25
-attachment.  The client reads the device-visible address with
+attachment.
+The client reads the device-visible address with
 .Dv DMA_INFO ;
 with no IOMMU it is the physical address, and the per-process budget and the
 64 MiB limit still apply.
@@ -69,7 +74,8 @@ creates a fresh
 for the function's legacy INTx line (the
 .Va interrupt-line
 byte of its configuration header) through the root capability and returns it as
-an S25 attachment.  The line is masked until the owner's first
+an S25 attachment.
+The line is masked until the owner's first
 .Dv IRQ_WAIT
 and is released when the client closes the handle; a function whose
 configuration header reports line 255 returns
@@ -98,9 +104,9 @@ grant
 .Xr devd 8 ,
 .Xr init 8 ,
 .Xr svcd 8
+.Sh STANDARDS
+RavenBSD ABI v1.
 .Sh HISTORY
 The
 .Nm
 server first appeared in RavenBSD 0.1.
-.Sh STANDARDS
-RavenBSD ABI v1.

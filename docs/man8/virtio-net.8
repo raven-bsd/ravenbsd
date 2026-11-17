@@ -16,7 +16,8 @@
 .Op Ar test
 .Sh DESCRIPTION
 .Nm
-is the userspace driver for a modern (virtio 1.0) PCI network function.  It is
+is the userspace driver for a modern (virtio 1.0) PCI network function.
+It is
 launched by
 .Xr devd 8
 for a function whose vendor and device ids match the driver table, and it
@@ -36,7 +37,8 @@ The driver resets the function, acknowledges it, negotiates
 plus the MAC, MTU and link-status features, programs the split RX and TX
 virtqueues and then serves the persistent
 .Dq nic:
-control scheme.  The B39
+control scheme.
+The B39
 .Xr raven-proto-net 3
 ring lives at a documented offset in the same DMA buffer:
 .Bl -tag -width "nic:ring" -compact
@@ -60,16 +62,20 @@ otherwise.
 .Pp
 The ring has 8 RX and 8 TX descriptors and an 11-buffer pool of 2 KiB buffers.
 RX pool buffers 0..7 are the device receive buffers; the virtio-net header lands
-before the frame, so the RX descriptor points past it.  A TX descriptor names a
+before the frame, so the RX descriptor points past it.
+A TX descriptor names a
 pool buffer holding a complete Ethernet frame; the driver submits a
 two-descriptor chain (a zero virtio header then the frame) and only advances the
-TX consumer index after the device completed the frame.  Every index, length,
-buffer offset and frame flag is checked.  Completion is driven by the ISR byte
+TX consumer index after the device completed the frame.
+Every index, length,
+buffer offset and frame flag is checked.
+Completion is driven by the ISR byte
 and the transferred interrupt with a bounded 10 ms wait; a timeout or a malformed
 ring resets the device and the driver reports the pump error.
 .Pp
 A pump thread owns the device so the control scheme stays responsive while
-frames flow.  When the driver exits it resets the function; the DMA buffer and
+frames flow.
+When the driver exits it resets the function; the DMA buffer and
 the interrupt line belong to
 .Xr devd 8 ,
 which closes its own copies after the child exits.
@@ -81,7 +87,8 @@ or
 the driver keeps the B13b one-shot behaviour (one ARP request and reply, then
 exit) for the old
 .Ql virtio-net
-qtest.  The production driver table uses
+qtest.
+The production driver table uses
 .Ar serve ;
 the net-b qtest uses
 .Ar test .
@@ -99,12 +106,12 @@ the driver table that launches
 .Sh EXIT STATUS
 .Ex -std
 .Sh SEE ALSO
+.Xr raven-proto-net 3 ,
 .Xr devd 8 ,
-.Xr pcid 8 ,
-.Xr raven-proto-net 3
+.Xr pcid 8
+.Sh STANDARDS
+Virtio 1.0 (OASIS), PCI Local Bus 3.0.
 .Sh HISTORY
 The
 .Nm
 driver first appeared in RavenBSD 0.1.
-.Sh STANDARDS
-Virtio 1.0 (OASIS), PCI Local Bus 3.0.

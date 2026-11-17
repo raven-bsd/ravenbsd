@@ -25,9 +25,11 @@ Each line of
 .Pa /etc/mounts
 is one
 .Dq Aq path Aq scheme
-pair.  Paths must be absolute and normalized; blank lines and
+pair.
+Paths must be absolute and normalized; blank lines and
 .Ql #
-comments are ignored.  The compiled-in defaults are:
+comments are ignored.
+The compiled-in defaults are:
 .Bd -literal -offset indent
 /          initfs:
 /tmp       ramfs:
@@ -44,7 +46,8 @@ For
 .Dv OPEN ,
 .Nm
 normalizes the path, chooses the longest whole-component mount prefix and opens
-the path on the owning server.  The owning server's handle is returned as an S25
+the path on the owning server.
+The owning server's handle is returned as an S25
 reply attachment, so subsequent reads and writes go directly to that server.
 Path operations
 .Pq Dv MKDIR , UNLINK , RMDIR , RENAME , TRUNCATE , SYMLINK , READLINK , CHMOD
@@ -73,7 +76,8 @@ merges the root server's entries with the names of mounts directly below
 .Pa /
 \(em for example
 .Pa /tmp
-\(em without duplicating a name.  Other opens are attachments.
+\(em without duplicating a name.
+Other opens are attachments.
 .Pp
 Limits: 32 mounts, paths no longer than 255 bytes, 256 open root-proxy descriptions, and one
 forwarded
