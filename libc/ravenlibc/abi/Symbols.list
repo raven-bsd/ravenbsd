@@ -950,6 +950,8 @@ printf
 prlimit
 program_invocation_name
 program_invocation_short_name
+psiginfo
+psignal
 pthread_atfork
 pthread_attr_destroy
 pthread_attr_getdetachstate

@@ -1416,6 +1416,8 @@ RAVEN_1.0 {
 		sigismember;
 		sigorset;
 		signal;
+		psignal;
+		psiginfo;
 		str2sig;
 		# --- C64a round 2: signal actions, setjmp, ucontext ---
 		__sigsetjmp;
