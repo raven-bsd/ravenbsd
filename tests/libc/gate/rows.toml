@@ -43,6 +43,7 @@ title = "target-case symbol audit (C64j)"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "libc-audit"]
+note = "66/66 required symbols present; expected.tsv snapshot is stale (matrix differs)"
 evidence = "build/libc-gate/1.1.audit.txt"
 source = "C64j, C64l"
 
@@ -53,8 +54,7 @@ title = "donor suites G1 (C2-C6)"
 required = true
 kind = "argv"
 argv = ["cargo", "run", "-q", "-p", "raven-atf-run", "--", "gate", "--g1"]
-blocked_on = { ticket = "C71a" }
-note = "PG-22 PG-23 PG-29 PG-49 PG-50; C71a is blocked"
+note = "G1 runs on the merged tree: C2-C5 0% (not run), C6 unvendored; 0/4 measured rows"
 evidence = "build/libc-gate/1.2.txt"
 source = "C71 4.9, 16 3.B.9 C2-C6"
 
@@ -112,6 +112,7 @@ title = "lints (C16)"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "libc-lint", "all"]
+note = "1 violation: pthread/sem_trywait.rs:11 unsafe block lacks a SAFETY comment"
 evidence = "build/libc-gate/1.7.txt"
 source = "C34"
 
@@ -212,8 +213,7 @@ argv = ["cargo", "xtask", "qtest", "--case", "libc-hello", "--arch", "x86_64"]
 child_argv = ["cargo", "xtask", "qtest", "--case", "{case}", "--arch", "x86_64"]
 expand = "qtest"
 cases = ["libc-hello", "libc-stdio", "libc-time", "libc-threads", "libc-signals", "libc-dynamic", "libc-spawn"]
-blocked_on = { ticket = "C73c" }
-note = "PG-22 PG-23 PG-29 PG-49 PG-50; PG-13 merged in S51"
+note = "C74a 2026-11-17: signals and spawn pass; hello auxv/string; stdio page fault 0x3 after printf; time build misses usleep/sleep/tzname (libc-pack sysroot); threads timeout after barrier; dynamic shape partial file tail"
 evidence = "build/libc-gate/5.1.txt"
 source = "C73, 16 3.B.9 C12"
 
@@ -224,6 +224,7 @@ title = "core-servers regression"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "qtest", "--case", "core-servers", "--arch", "x86_64"]
+note = "timeout after 120 s before init; serial stops at the loader"
 evidence = "build/libc-gate/5.2.core-servers.txt"
 source = "LEAD-TICKET-CHECKLIST 8"
 
@@ -234,6 +235,7 @@ title = "file-tools regression"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "qtest", "--case", "file-tools", "--arch", "x86_64"]
+note = "timeout after 240 s before init; serial stops at the loader"
 evidence = "build/libc-gate/5.2.file-tools.txt"
 source = "LEAD-TICKET-CHECKLIST 8"
 

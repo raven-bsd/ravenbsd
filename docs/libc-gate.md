@@ -1,0 +1,53 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
+# libc gate
+
+The libc gate is the six-row acceptance gate for ravenlibc: correctness, portability, size,
+hardening, on-target cases and documentation. The check definitions live in
+`tests/libc/gate/rows.toml`; the evaluator is the `libc-gate` crate. A row is MET only when every
+required check in it is MET; BLOCKED checks must be unblocked by their owning ticket, not by
+lowering the threshold or editing expected output.
+
+## Running it
+
+```sh
+cargo xtask libc-pack --arch x86_64
+cargo xtask libc-link --arch x86_64
+cargo run -q -p libc-gate -- eval
+cargo run -q -p libc-gate -- table
+cargo run -q -p libc-gate -- verdict
+```
+
+`eval` writes one evidence file per check under `build/libc-gate/`; `table` renders the markdown
+table for `libc/ravenlibc/GATE-REPORT.md`; `verdict` exits 0 only when the gate is MET. The base
+gates are `cargo xtask libc-lint` and `make check-fast`.
+
+The seven on-target cases are:
+
+```sh
+cargo xtask qtest --case libc-hello --arch x86_64
+cargo xtask qtest --case libc-stdio --arch x86_64
+cargo xtask qtest --case libc-time --arch x86_64
+cargo xtask qtest --case libc-threads --arch x86_64
+cargo xtask qtest --case libc-signals --arch x86_64
+cargo xtask qtest --case libc-dynamic --arch x86_64
+cargo xtask qtest --case libc-spawn --arch x86_64
+```
+
+The donor G1 suite is `cargo run -q -p raven-atf-run -- gate --g1`.
+
+## Current verdict (2026-11-17, C74a)
+
+**NOT MET.** `cargo run -q -p libc-gate -- verdict` exits 1.
+
+* MET: 1.1, 1.1.pack, 1.5, 4.1, 4.3, 6.1, 6.3, 6.4.
+* NOT MET: 1.1.audit (stale `expected.tsv`), 1.2 (G1 0/4), 1.4 (four `compat-*` oracle
+  features), 1.7 (one `sem_trywait.rs` SAFETY comment), 3.1 (size budgets), 4.2 (`inet_text`
+  soak), 5.1 (hello/stdio/time/threads/dynamic), 5.2 (core-servers and file-tools timeouts).
+* BLOCKED: 1.6 (Miri), 2.1/2.2 (`tools/libc-world` and C72 outputs), 6.2 (`mandoc`).
+
+The exact evidence and the seven-case matrix are in `libc/ravenlibc/GATE-REPORT.md` and under
+`build/libc-gate/`. `libc-signals` and `libc-spawn` pass; `libc-time` and `libc-dynamic` fail in
+their build/shape steps; `libc-hello` fails auxv/string; `libc-stdio` faults at `0x3`;
+`libc-threads` times out after `barrier ok`.
