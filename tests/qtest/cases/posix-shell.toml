@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# P4a/P4p: POSIX shell conformance on the target. rsh owns the console; brush runs the four
-# --posix groups, then rsh runs the pipeline, redirection, list and here-document group. The
-# fixture script under tests/fixtures/posix-shell/ is the host reference.
+# P4a/P4p/P45: POSIX shell conformance on the target. rsh owns the console; brush runs the four
+# --posix groups plus the P45 builtin group, then rsh runs the pipeline, redirection, list and
+# here-document group. The fixture script under tests/fixtures/posix-shell/ is the host reference.
 
 name = "posix-shell"
 arch = "x86_64"
@@ -64,6 +64,60 @@ regex = '^while:2$'
 
 [[expect]]
 regex = '^until:2$'
+
+[[expect]]
+regex = '^break-loop:1$'
+
+[[expect]]
+regex = '^break:done$'
+
+[[expect]]
+regex = '^continue:1$'
+
+[[expect]]
+regex = '^continue:3$'
+
+[[expect]]
+regex = '^cd:0$'
+
+[[expect]]
+regex = '^cmd:ok$'
+
+[[expect]]
+regex = '^command:0$'
+
+[[expect]]
+regex = '^export:yes$'
+
+[[expect]]
+regex = '^hash:0$'
+
+[[expect]]
+regex = '^shift:1:b$'
+
+[[expect]]
+regex = '^test:0$'
+
+[[expect]]
+regex = '^bracket:0$'
+
+[[expect]]
+regex = '^type:0$'
+
+[[expect]]
+regex = '^alias:0$'
+
+[[expect]]
+regex = '^unalias:0$'
+
+[[expect]]
+regex = '^return:7$'
+
+[[expect]]
+regex = '^dot:ok$'
+
+[[expect]]
+regex = '^exit:7$'
 
 [[expect]]
 regex = '^p1:abc:bc:ab:3$'
@@ -171,6 +225,38 @@ delay_ms = 100
 
 [[step]]
 wait = '^until:2$'
+timeout_secs = 600
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "echo 'echo dot:ok' > /tmp/p4b-dot\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/brush --posix -c 'for i in 1 2 3; do echo break-loop:$i; break; done; echo break:done; for i in 1 2 3; do if [ \"$i\" = 2 ]; then continue; fi; echo continue:$i; done; cd /tmp; echo cd:$?; cd /; command echo cmd:ok; echo command:$?; export P4B=yes; echo export:$P4B; hash; echo hash:$?; set -- a b; shift; echo shift:$#:$1; test -n x; echo test:$?; [ -n x ]; echo bracket:$?; type echo; echo type:$?; alias p4b=\"echo alias:ok\"; alias p4b; echo alias:$?; unalias p4b; echo unalias:$?; f() { return 7; }; f; echo return:$?; . /tmp/p4b-dot'\n"
+delay_ms = 100
+
+[[step]]
+wait = '^dot:ok$'
+timeout_secs = 600
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "/bin/brush --posix -c 'exit 7'; echo exit:$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^exit:7$'
 timeout_secs = 600
 
 [[step]]
