@@ -244,9 +244,7 @@ fn parse_text<F: FileSystem>(
                     makefile.vars.insert(name, value);
                 }
                 Assign::IfAbsent => {
-                    if !makefile.vars.contains_key(&name) {
-                        makefile.vars.insert(name, value);
-                    }
+                    makefile.vars.entry(name).or_insert(value);
                 }
                 Assign::Append => {
                     let entry = makefile.vars.entry(name).or_default();
