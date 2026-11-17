@@ -19,9 +19,8 @@ use core::sync::atomic::{AtomicU64, Ordering};
 use crate::backend::{EarlySpawn, WaitResult};
 #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 use crate::errors::{E2BIG, ENOENT, ENOEXEC};
-use crate::errors::{EAGAIN, ECHILD, EINVAL, ENOSYS, Errno};
+use crate::errors::{EAGAIN, EINVAL, Errno};
 use crate::request::SpawnRequest;
-use crate::wait_status::{WaitStatus, encode};
 
 /// Maximum number of children tracked at once.
 pub const MAX_CHILDREN: usize = 128;
