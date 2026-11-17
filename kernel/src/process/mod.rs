@@ -778,18 +778,16 @@ pub fn start_init(cmdline: &CmdLine) -> Result<(), ProcessError> {
     };
     let address_space = AddressSpace::new().map_err(ProcessError::Map)?;
     let mut user_address_space = UserAddressSpace::new(address_space);
-    load_segments(&mut user_address_space, &elf, data)?;
+    load_segments(&mut user_address_space, &elf, data, 0)?;
     let path_bytes = path.as_bytes();
     let argv: [&[u8]; 1] = [path_bytes];
-    let user_stack = build_stack(
-        &mut user_address_space,
-        path_bytes,
-        &argv,
-        &[],
-        &ids,
-        elf.entry(),
-        &elf,
-    )?;
+    let aux = StackAuxv {
+        phdr: elf.phdr_vaddr().unwrap_or(0),
+        base: 0,
+        entry: elf.entry(),
+        phnum: elf.phnum() as u64,
+    };
+    let user_stack = build_stack(&mut user_address_space, path_bytes, &argv, &[], &ids, aux)?;
 
     let process = Arc::new(Process {
         id,
@@ -853,8 +851,10 @@ fn load_segments(
     address_space: &mut UserAddressSpace,
     elf: &Elf<'_>,
     data: &[u8],
+    bias: u64,
 ) -> Result<(), ProcessError> {
-    let plan = raven_elf::plan_load(elf, PAGE, LoadMode::Copy).map_err(ProcessError::Elf)?;
+    let plan =
+        raven_elf::plan_load_biased(elf, PAGE, bias, LoadMode::Copy).map_err(ProcessError::Elf)?;
     for step in plan {
         address_space
             .vmas_mut()
@@ -949,14 +949,28 @@ fn prot_flags(bits: u8) -> Result<PageFlags, ProcessError> {
     })
 }
 
+/// The `AT_*` values the exec path has already resolved for [`build_stack`].
+///
+/// The static path supplies the image's own values with `base == 0`; a dynamic exec supplies the
+/// biased main-program header/entry and the interpreter load bias.
+pub(crate) struct StackAuxv {
+    /// `AT_PHDR`: the main image's program-header address.
+    pub(crate) phdr: u64,
+    /// `AT_BASE`: the interpreter load bias, or zero for a static image.
+    pub(crate) base: u64,
+    /// `AT_ENTRY`: the main image entry point.
+    pub(crate) entry: u64,
+    /// `AT_PHNUM`: the main image's program-header count.
+    pub(crate) phnum: u64,
+}
+
 fn build_stack(
     address_space: &mut UserAddressSpace,
     path: &[u8],
     argv: &[&[u8]],
     envp: &[&[u8]],
     ids: &ProcessIds,
-    entry: u64,
-    elf: &Elf<'_>,
+    aux: StackAuxv,
 ) -> Result<u64, ProcessError> {
     // PG-50: `rsp == sp0`, 16-byte aligned, with the C8 argv/envp/auxv block at `sp0`.
     const AT_PHDR: u64 = 3;
@@ -1082,13 +1096,13 @@ fn build_stack(
     }
     write_word(&mut buffer, &mut block_cursor, 0)?;
     for (key, value) in [
-        (AT_PHDR, elf.phdr_vaddr().unwrap_or(0)),
+        (AT_PHDR, aux.phdr),
         (AT_PHENT, PHENT),
-        (AT_PHNUM, elf.phnum() as u64),
+        (AT_PHNUM, aux.phnum),
         (AT_PAGESZ, PAGE),
-        (AT_BASE, 0),
+        (AT_BASE, aux.base),
         (AT_FLAGS, 0),
-        (AT_ENTRY, entry),
+        (AT_ENTRY, aux.entry),
         (AT_UID, u64::from(ids.uid)),
         (AT_EUID, u64::from(ids.euid)),
         (AT_GID, u64::from(ids.gid)),

@@ -81,7 +81,7 @@ mod plan;
 
 pub mod inspect;
 
-pub use plan::{LoadMode, MapStep, StepKind, plan_load};
+pub use plan::{LoadMode, MapStep, StepKind, plan_load, plan_load_biased};
 
 const EHDR_SIZE: usize = 64;
 const PHDR_SIZE: u16 = 56;

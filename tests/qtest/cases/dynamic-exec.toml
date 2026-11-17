@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S81: a static service binary execs a normally linked ET_DYN binary. The kernel must load the
+# main image and its PT_INTERP, build AT_PHDR/AT_BASE/AT_ENTRY and enter ld-elf.so.1; the loader
+# then resolves libc.so.1 through DT_NEEDED. The libc-test profile supplies the file service the
+# loader uses for /lib/libc.so.1. No `ld-elf.so.1 <program>` invocation is used.
+
+name = "dynamic-exec"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/fixtures/dynamic-exec/build.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^dynamic-exec: launching$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|dynamic-exec: exec failed|ld-elf.so.1: no direct target start|cannot load a needed library'
