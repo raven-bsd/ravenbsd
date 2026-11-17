@@ -15,7 +15,9 @@ extern crate alloc;
 #[cfg(target_os = "none")]
 mod program {
     use alloc::format;
+    use alloc::string::String;
     use alloc::vec;
+    use alloc::vec::Vec;
 
     use raven_abi::errno::Errno;
     use raven_abi::types::{Handle, Rights};
@@ -37,6 +39,8 @@ mod program {
     const SPAWN_SETSIGMASK: u32 = 8;
     const SPAWN_CLOEXEC_DEFAULT: u32 = 1 << 17;
     const PROC_SELF_INFO: usize = 0x35;
+    const PROC_PID_INFO: usize = 0x3A;
+    const INFO_WORDS: usize = 41;
     const SIGKILL: u32 = 9;
     const SIGUSR1: u32 = 10;
     const SIGUSR2: u32 = 12;
@@ -309,10 +313,26 @@ mod program {
         ];
         let pid = spawn_request(client, handle, seq, request)?;
         raven_rt::println!("procd-test: attrs spawn1={pid}");
+        let kernel_ok = kernel_command_is(pid, "procd-child");
+        let registry_ok = registry_has(client, pid)?;
+        raven_rt::println!(
+            "procd-test: command registry={} kernel={}",
+            u8::from(registry_ok),
+            u8::from(kernel_ok)
+        );
         let status = wait_child(client, handle, seq, pid)?;
         if exited(status) != Some(0) {
             return Err("attrs spawn1 exit");
         }
+
+        let mut request = base_spawn();
+        request.argv = vec![b"procd-child".to_vec(), b"exec-name".to_vec()];
+        let exec_pid = spawn_request(client, handle, seq, request)?;
+        let status = wait_child(client, handle, seq, exec_pid)?;
+        if exited(status) != Some(0) {
+            return Err("exec-name exit");
+        }
+        raven_rt::println!("procd-test: command exec=1");
 
         let pgid = self_pgid()?;
         raven_rt::sys::write(write, b"ok\n").map_err(|_| "pipe write 2")?;
@@ -411,6 +431,65 @@ mod program {
         };
         Errno::from_ret(raw).map_err(|_| "self info")?;
         i32::try_from(words[2]).map_err(|_| "pgid")
+    }
+
+    fn registry_has(client: &Client, pid: i32) -> Result<bool, &'static str> {
+        let registry = client
+            .open("proc:registry", u32::from(OpenFlags::READ.to_wire()))
+            .map_err(|_| "open registry")?;
+        let mut text = Vec::new();
+        let mut buffer = [0u8; 512];
+        let mut offset = 0u64;
+        loop {
+            let read = client
+                .read(registry, offset, &mut buffer)
+                .map_err(|_| "read registry")?;
+            if read == 0 {
+                break;
+            }
+            text.extend_from_slice(&buffer[..read]);
+            offset = offset.saturating_add(read as u64);
+            if text.len() > 64 * 1024 {
+                break;
+            }
+        }
+        let _ = client.close(registry);
+        let text = core::str::from_utf8(&text).map_err(|_| "registry utf8")?;
+        let pid_text = format!("{pid}");
+        Ok(text.lines().any(|line| {
+            let mut fields = line.split_whitespace();
+            fields.next() == Some(pid_text.as_str()) && fields.any(|field| field == "procd-child")
+        }))
+    }
+
+    fn kernel_command_is(pid: i32, expected: &str) -> bool {
+        let mut words = [0u64; INFO_WORDS];
+        // SAFETY: PROC_PID_INFO writes INFO_WORDS u64 words to the live caller-owned array.
+        let raw = unsafe {
+            raven_rt::sys::syscall3(
+                PROC_PID_INFO,
+                pid as isize as usize,
+                words.as_mut_ptr() as usize,
+                words.len(),
+            )
+        };
+        if Errno::from_ret(raw).is_err() {
+            return false;
+        }
+        command_from_words(&words).as_deref() == Some(expected)
+    }
+
+    fn command_from_words(words: &[u64; INFO_WORDS]) -> Option<String> {
+        let mut bytes = Vec::new();
+        for word in words.iter().skip(8) {
+            for byte in word.to_le_bytes() {
+                if byte == 0 {
+                    return core::str::from_utf8(&bytes).ok().map(String::from);
+                }
+                bytes.push(byte);
+            }
+        }
+        core::str::from_utf8(&bytes).ok().map(String::from)
     }
 
     fn spawn_child(

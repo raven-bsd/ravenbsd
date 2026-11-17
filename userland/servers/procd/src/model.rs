@@ -60,6 +60,8 @@ pub const MAX_CHILD_FD: i32 = 1024;
 pub const SIG_MAX: u32 = 64;
 /// POSIX SIGSTOP.
 pub const SIGSTOP: u32 = 19;
+/// Maximum command-name bytes stored in a procd record.
+pub const MAX_COMMAND: usize = 256;
 
 const SUPPORTED_SPAWN_FLAGS: u32 = POSIX_SPAWN_SETPGROUP
     | POSIX_SPAWN_SETSIGDEF
@@ -152,6 +154,8 @@ pub struct Child {
     pub sid: i32,
     /// The image path, for diagnostics.
     pub image: String,
+    /// The command name (`argv[0]`) shown to `ps`.
+    pub command: String,
     /// The umask requested by the spawn request; the current kernel has no child umask call.
     pub umask: u32,
     /// The descriptor map installed in the child.
@@ -162,6 +166,48 @@ pub struct Child {
     pub sigdefault: [u8; 128],
     /// Signals ignored by the parent.
     pub ignored: [u8; 128],
+}
+
+/// One child entry in the read-only `proc:registry` view.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RegistryEntry {
+    /// Process id.
+    pub pid: i32,
+    /// Parent process id (`procd`).
+    pub ppid: i32,
+    /// Process group id.
+    pub pgid: i32,
+    /// Session id.
+    pub sid: i32,
+    /// Spawning connection's effective uid.
+    pub uid: u32,
+    /// Command name (`argv[0]`).
+    pub command: String,
+}
+
+impl core::fmt::Display for RegistryEntry {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            formatter,
+            "{} {} {} {} {} {}",
+            self.pid, self.ppid, self.pgid, self.sid, self.uid, self.command
+        )
+    }
+}
+
+/// Choose and truncate the command name for a spawn request.
+#[must_use]
+pub fn command_name(argv: &[&str], path: &str) -> String {
+    let text = argv.first().copied().unwrap_or(path);
+    let mut end = 0usize;
+    for (index, character) in text.char_indices() {
+        let next = index.saturating_add(character.len_utf8());
+        if next > MAX_COMMAND {
+            break;
+        }
+        end = next;
+    }
+    String::from(&text[..end])
 }
 
 /// The `procd` process table.
@@ -192,6 +238,22 @@ impl<S: ProcSys> Procd<S> {
     #[must_use]
     pub const fn children(&self) -> &BTreeMap<i32, Child> {
         &self.children
+    }
+
+    /// A `ps`-consumable snapshot of the children, sorted by pid.
+    #[must_use]
+    pub fn registry(&self) -> Vec<RegistryEntry> {
+        self.children
+            .values()
+            .map(|child| RegistryEntry {
+                pid: child.pid,
+                ppid: self.pid,
+                pgid: child.pgid,
+                sid: child.sid,
+                uid: child.owner,
+                command: child.command.clone(),
+            })
+            .collect()
     }
 
     /// The kernel seam, exposed for host tests and diagnostics.
@@ -276,6 +338,7 @@ impl<S: ProcSys> Procd<S> {
             .iter()
             .map(|entry| (entry.fd, entry.handle))
             .collect();
+        let command = command_name(&argv, &path);
         let attributes = !fdmap.is_empty()
             || spawn.sigmask.iter().any(|byte| *byte != 0)
             || spawn.sigdefault.iter().any(|byte| *byte != 0)
@@ -349,6 +412,7 @@ impl<S: ProcSys> Procd<S> {
                 pgid: pgid.unwrap_or(info.pgid),
                 sid: info.sid,
                 image: path,
+                command,
                 umask: spawn.umask,
                 fdmap,
                 sigmask: spawn.sigmask,

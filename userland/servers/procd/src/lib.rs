@@ -16,6 +16,7 @@ extern crate alloc;
 pub mod model;
 
 pub use model::{
-    Child, KERNEL_P_ALL, KERNEL_WCONTINUED, P_ALL, P_PGID, P_PID, ProcInfo, ProcSys, Procd,
-    SIGKILL, SIGTERM, WCONTINUED, WNOHANG, WUNTRACED, WaitEvent,
+    Child, KERNEL_P_ALL, KERNEL_WCONTINUED, MAX_COMMAND, P_ALL, P_PGID, P_PID, ProcInfo, ProcSys,
+    Procd, RegistryEntry, SIGKILL, SIGTERM, WCONTINUED, WNOHANG, WUNTRACED, WaitEvent,
+    command_name,
 };

@@ -657,3 +657,44 @@ fn negative_pgroup_is_rejected_before_spawning() {
     assert_eq!(response.status, -(Errno::EINVAL.0 as i32));
     assert!(procd.sys().spawns.is_empty());
 }
+
+#[test]
+fn spawn_records_argv_zero_as_the_command() {
+    let mut procd = Procd::new(FakeSys::new(), 3);
+    let pid = spawn(&mut procd, 1000);
+    let child = procd.children().get(&pid).expect("child");
+    assert_eq!(child.command, "procd-child");
+    assert_eq!(
+        procd.registry()[0].to_string(),
+        format!("{pid} 3 3 3 1000 procd-child")
+    );
+}
+
+#[test]
+fn registry_lists_children_by_pid_and_drops_them_after_wait() {
+    let mut sys = FakeSys::new();
+    sys.wait_events.push_back(Ok(WaitEvent {
+        pid: 100,
+        status: 0,
+    }));
+    let mut procd = Procd::new(sys, 3);
+    let pid = spawn(&mut procd, 1000);
+    let entries = procd.registry();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].pid, pid);
+    assert_eq!(entries[0].ppid, 3);
+    assert_eq!(entries[0].uid, 1000);
+    assert_eq!(entries[0].command, "procd-child");
+    assert_eq!(wait(&mut procd, 1000, pid, 0).status, 0);
+    assert!(procd.registry().is_empty());
+}
+
+#[test]
+fn command_names_are_argv_zero_truncated_at_utf8_boundaries() {
+    assert_eq!(command_name(&["shell", "-c"], "/bin/sh"), "shell");
+    assert_eq!(command_name(&[], "/bin/sh"), "/bin/sh");
+    let long = "é".repeat(MAX_COMMAND);
+    let truncated = command_name(&[long.as_str()], "/bin/sh");
+    assert!(truncated.len() <= MAX_COMMAND);
+    assert!(truncated.is_char_boundary(truncated.len()));
+}

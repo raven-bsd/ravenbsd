@@ -26,3 +26,8 @@ fn a_word_larger_than_u32_falls_back_to_zero() {
 fn the_group_limit_matches_the_kernel() {
     assert_eq!(MAX_GROUPS, 16);
 }
+
+#[test]
+fn set_command_is_enosys_on_the_host() {
+    assert_eq!(set_command(Handle::SELF_PROC, "worker"), Err(Errno::ENOSYS));
+}

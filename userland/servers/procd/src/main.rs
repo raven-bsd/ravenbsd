@@ -17,13 +17,15 @@ extern crate alloc;
 
 #[cfg(target_os = "none")]
 mod program {
-    use alloc::collections::BTreeSet;
+    use alloc::collections::BTreeMap;
+    use alloc::string::String;
+    use core::fmt::Write as _;
 
     use raven_abi::errno::Errno;
     use raven_abi::types::{Handle, Rights};
     use raven_initfs::Initfs;
-    use raven_procd::{ProcInfo, ProcSys, Procd, WaitEvent};
-    use raven_proto_fs::OpenFlags;
+    use raven_procd::{ProcInfo, ProcSys, Procd, WaitEvent, command_name};
+    use raven_proto_fs::{OpenFlags, Stat};
     use raven_proto_proc::{decode_request, encode_response};
     use raven_rt::entry;
     use raven_rt::spawn::{SpawnError, SpawnOptions, spawn};
@@ -46,7 +48,10 @@ mod program {
 
     impl ProcSys for TargetSys {
         fn spawn(&mut self, path: &str, argv: &[&str], env: &[&str]) -> Result<Handle, Errno> {
-            spawn(&self.initfs, path, &SpawnOptions { args: argv, env }).map_err(spawn_error)
+            let handle = spawn(&self.initfs, path, &SpawnOptions { args: argv, env })
+                .map_err(spawn_error)?;
+            name_child(handle, argv, path)?;
+            Ok(handle)
         }
 
         fn spawn_with_attributes(
@@ -72,6 +77,10 @@ mod program {
                 &attributes,
             )
             .map_err(spawn_error)
+            .and_then(|handle| {
+                name_child(handle, argv, path)?;
+                Ok(handle)
+            })
         }
 
         fn validate_handle(&mut self, handle: Handle) -> Result<(), Errno> {
@@ -167,9 +176,15 @@ mod program {
         }
     }
 
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    enum FileKind {
+        Control,
+        Registry,
+    }
+
     struct HandlerImpl {
         procd: Procd<TargetSys>,
-        files: BTreeSet<u64>,
+        files: BTreeMap<u64, FileKind>,
         next_file: u64,
     }
 
@@ -177,9 +192,18 @@ mod program {
         fn new(procd: Procd<TargetSys>) -> Self {
             Self {
                 procd,
-                files: BTreeSet::new(),
+                files: BTreeMap::new(),
                 next_file: 1,
             }
+        }
+
+        /// One `pid ppid pgid sid uid command` line per child.
+        fn registry_text(&self) -> String {
+            let mut text = String::new();
+            for entry in self.procd.registry() {
+                let _ = writeln!(text, "{entry}");
+            }
+            text
         }
     }
 
@@ -191,16 +215,60 @@ mod program {
             _mode: u32,
             _ctx: &Ctx,
         ) -> HandlerResult<Opened> {
-            if !path.is_empty() && path != "control" {
-                return Err(Errno::ENOENT.into());
-            }
+            let path = path.strip_prefix('/').unwrap_or(path);
+            let kind = match path {
+                "" | "control" => FileKind::Control,
+                "registry" => FileKind::Registry,
+                _ => return Err(Errno::ENOENT.into()),
+            };
             if flags.create() || flags.directory() {
                 return Err(Errno::EINVAL.into());
             }
             let id = self.next_file;
             self.next_file = self.next_file.wrapping_add(1).max(1);
-            self.files.insert(id);
+            self.files.insert(id, kind);
             Ok(Opened::File(id))
+        }
+
+        fn read(&mut self, file: u64, offset: u64, buffer: &mut [u8]) -> HandlerResult<usize> {
+            if self.files.get(&file) != Some(&FileKind::Registry) {
+                return Err(Errno::EBADF.into());
+            }
+            let text = self.registry_text();
+            let bytes = text.as_bytes();
+            let start = usize::try_from(offset).unwrap_or(usize::MAX);
+            let Some(available) = bytes.get(start..) else {
+                return Ok(0);
+            };
+            let length = available.len().min(buffer.len());
+            if let Some(destination) = buffer.get_mut(..length) {
+                destination.copy_from_slice(&available[..length]);
+            }
+            Ok(length)
+        }
+
+        fn write(&mut self, _file: u64, _offset: u64, _buffer: &[u8]) -> HandlerResult<usize> {
+            Err(Errno::EBADF.into())
+        }
+
+        fn fstat(&mut self, file: u64) -> HandlerResult<Stat> {
+            let Some(kind) = self.files.get(&file).copied() else {
+                return Err(Errno::EBADF.into());
+            };
+            let (size, mode) = match kind {
+                FileKind::Control => (0, 0o020666),
+                FileKind::Registry => (
+                    u64::try_from(self.registry_text().len()).unwrap_or(0),
+                    0o100444,
+                ),
+            };
+            Ok(Stat {
+                ino: file,
+                size,
+                mode,
+                nlink: 1,
+                ..Stat::default()
+            })
         }
 
         fn call_with(
@@ -210,7 +278,7 @@ mod program {
             response: &mut [u8],
             ctx: &Ctx,
         ) -> HandlerResult<CallReply> {
-            if !self.files.contains(&file) {
+            if self.files.get(&file) != Some(&FileKind::Control) {
                 return Err(Errno::EBADF.into());
             }
             let (_header, request) = decode_request(request).map_err(HandlerError::Errno)?;
@@ -220,7 +288,7 @@ mod program {
         }
 
         fn close(&mut self, file: u64) -> HandlerResult<()> {
-            if self.files.remove(&file) {
+            if self.files.remove(&file).is_some() {
                 Ok(())
             } else {
                 Err(Errno::EBADF.into())
@@ -236,6 +304,17 @@ mod program {
             SpawnError::BadElf(_) => Errno::ENOEXEC,
             _ => Errno::EINVAL,
         }
+    }
+
+    /// Name the child before returning its handle to the model.
+    fn name_child(handle: Handle, argv: &[&str], path: &str) -> Result<(), Errno> {
+        let command = command_name(argv, path);
+        if let Err(error) = raven_rt::proc::set_command(handle, &command) {
+            let _ = raven_rt::sys::proc_terminate(handle, 1);
+            let _ = raven_rt::sys::handle_close(handle);
+            return Err(error);
+        }
+        Ok(())
     }
 
     fn self_pid() -> Result<i32, Errno> {

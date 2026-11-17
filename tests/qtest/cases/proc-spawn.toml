@@ -25,14 +25,26 @@ regex = '^procd-test: attrs invalid=6$'
 regex = '^procd-test: attrs spawn1=[0-9]+$'
 
 [[expect]]
-regex = '^procd-test: attrs spawn2=[0-9]+ pgid=[0-9]+$'
-
-[[expect]]
-regex = '^procd-child: attrs fd=1 cloexec=1 pgid=1 sig=1$'
+regex = '^procd-test: command registry=1 kernel=1$'
 unordered = true
 
 [[expect]]
-regex = '^procd-child: attrs fd=1 cloexec=1 pgid=1 sig=1$'
+regex = '^procd-test: command exec=1$'
+unordered = true
+
+[[expect]]
+regex = '^procd-test: attrs spawn2=[0-9]+ pgid=[0-9]+$'
+
+[[expect]]
+regex = '^procd-child: attrs fd=1 cloexec=1 pgid=1 sig=1 cmd=1 fork=1$'
+unordered = true
+
+[[expect]]
+regex = '^procd-child: attrs fd=1 cloexec=1 pgid=1 sig=1 cmd=1 fork=1$'
+unordered = true
+
+[[expect]]
+regex = '^procd-child: exec-cmd=1$'
 unordered = true
 
 [[expect]]
