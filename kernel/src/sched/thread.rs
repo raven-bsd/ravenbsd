@@ -192,6 +192,8 @@ pub struct Thread {
     pub signal_mask: AtomicU64,
     /// A `SIGRESEND` re-entry is waiting for the return-to-user path.
     pub resend: AtomicBool,
+    /// Current cross-process trace id (`R-OBS-6`); zero means "not traced".
+    pub trace_id: AtomicU64,
 }
 
 // SAFETY: all interior mutability is accessed from scheduler critical sections (interrupts off)
@@ -333,6 +335,7 @@ impl Thread {
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
             resend: AtomicBool::new(false),
+            trace_id: AtomicU64::new(0),
         });
         Ok(thread)
     }
@@ -429,6 +432,7 @@ impl Thread {
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
             resend: AtomicBool::new(false),
+            trace_id: AtomicU64::new(0),
         })
     }
 
@@ -481,6 +485,7 @@ impl Thread {
             signal_depth: AtomicU32::new(0),
             signal_mask: AtomicU64::new(0),
             resend: AtomicBool::new(false),
+            trace_id: AtomicU64::new(0),
         }))
     }
 }

@@ -86,7 +86,7 @@ decision are process-local and are not on the wire.
 | Encoded length | 8 bytes (fixed, always present) |
 | "not traced" | `0` (`raven_proto_trace::UNTRACED`) |
 | Native `MsgHeader` offset | 16 (`txid`@0, `ordinal`@8, `flags`@12, `trace_id`@16) — `R-IPC-4` |
-| Scheme packet | a `trace_id` field added in the kernel integration (S69 owns `kernel/src/ipc/**`) |
+| Scheme packet | `trace_id: u64` at offset 520 (`PACKET_SIZE` = 528); stamped from the caller thread on request, echoed on reply |
 
 `crates/raven-proto-trace` is the pure codec: `parse`/`parse_exact`/`encode`/`format` with a typed
 `TraceError` (`TooShort`, `TrailingBytes`) and no allocation and no panic. A zero field is *missing*
@@ -103,8 +103,11 @@ server's current `trace_id` becomes the caller's for the call (`R-OBS-6`).
 ### ABI the kernel integration will need (reviewer-owned, not edited here)
 
 * `TRACE_SET` (`R-OBS-6`): an unprivileged syscall to set the calling thread's current `trace_id`;
-  the number is unassigned and must be added to `crates/raven-abi/src/syscall.rs`.
-* The scheme-packet `trace_id` field lands in `kernel/src/ipc/protocol.rs` once S69 merges.
+  the number is unassigned and must be added to `crates/raven-abi/src/syscall.rs`. The propagation
+  wiring is complete (stamp on request, echo on reply) and dormant until this lands: without
+  `TRACE_SET` every thread's `trace_id` is zero, so no user-space path can observe a non-zero id.
+* The scheme-packet `trace_id` field and its propagation are landed in `kernel/src/ipc/` (this
+  ticket).
 
 ## 10. W3C `traceparent` conformance (Q3a)
 
