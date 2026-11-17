@@ -1841,7 +1841,9 @@ dependencies = [
 name = "raven-libc-proc"
 version = "0.1.0"
 dependencies = [
+ "raven-abi",
  "raven-libc-abi",
+ "raven-libc-sys",
  "raven-spawn",
 ]
 

@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# P2r: libc's native posix_spawn path names the child with PROC_SET_COMMAND before
+# THREAD_CREATE. The parent checks PROC_PID_INFO and the child checks PROC_SELF_INFO.
+
+name = "libc-spawn-cmd"
+arch = "x86_64"
+profile = "libc-test"
+timeout_secs = 300
+pre = ["sh tests/libc/target/build.sh spawn-std x86_64"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^libc-spawn-std: start$'
+
+[[expect]]
+regex = '^libc-spawn-std: parent cmd ok$'
+unordered = true
+
+[[expect]]
+regex = '^libc-spawn-std-child: cmd ok$'
+unordered = true
+
+[[expect]]
+regex = '^libc-spawn-std-child: done$'
+unordered = true
+
+[[expect]]
+regex = '^libc-spawn-std: wait ok$'
+unordered = true
+
+[[expect]]
+regex = '^libc-spawn-std: done$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|libc-spawn-std(-child)?: FAIL'

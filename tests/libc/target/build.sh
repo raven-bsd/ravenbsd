@@ -225,7 +225,10 @@ compile_pic() {
     fi
 }
 
-src=$root/libc/ravenlibc/tests/c/libc-$case_name.c
+src=$root/tests/libc/c/libc-$case_name.c
+if [ ! -f "$src" ]; then
+    src=$root/libc/ravenlibc/tests/c/libc-$case_name.c
+fi
 if [ ! -f "$src" ]; then
     printf 'error: missing source %s\n' "$src" >&2
     exit 1
@@ -240,7 +243,11 @@ fi
 
 case $binaries in
     *libc-child*)
-        compile_obj "$root/libc/ravenlibc/tests/c/libc-child.c" "$out/obj/libc-child.o"
+        child_src=$root/libc/ravenlibc/tests/c/libc-child.c
+        if [ "$case_name" = spawn-std ]; then
+            child_src=$root/tests/libc/c/libc-spawn-std-child.c
+        fi
+        compile_obj "$child_src" "$out/obj/libc-child.o"
         link_static "$out/obj/libc-child.o" "$out/libc-child"
         ;;
     *)
