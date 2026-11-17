@@ -44,10 +44,11 @@ here-doc groups until the target `>` write and script/source stdout findings in
 ## Target
 
 The QEMU case is `tests/qtest/cases/posix-shell.toml`. It boots the opt-in
-`modern-shell-test` image (rsh owns the console, brush is installed), runs four
+`modern-shell-test` image (rsh owns the console, brush is installed), runs five
 `/bin/brush --posix -c` groups and checks the same markers for grammar, expansions,
 input/exec redirection, functions, loops, `set -e/-u/-x`, EXIT traps, `eval`, `readonly`,
-`umask`, `getopts` and `$$`.
+`umask`, `getopts`, `$$` and the P45 builtin group (alias, break/continue, cd, command, dot,
+export, hash, return, shift, test, type and the builtin statuses).
 
 ```sh
 cargo xtask qtest --case posix-shell --arch x86_64

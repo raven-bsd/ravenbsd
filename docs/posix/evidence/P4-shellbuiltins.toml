@@ -1,0 +1,170 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P45 shell-builtin utility evidence. All present rows use the existing
+# posix-shell qtest; the builtin group was added to that case, not a new runner.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.alias"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: alias define/list and unalias remove markers (alias:0, unalias:0); substitution in one non-interactive parse unit is not claimed"
+
+[[row]]
+id = "util.break"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: for-loop break markers break-loop:1 and break:done"
+
+[[row]]
+id = "util.cd"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: cd /tmp and cd / return status marker cd:0"
+
+[[row]]
+id = "util.command"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: command echo cmd:ok and command:0 marker"
+
+[[row]]
+id = "util.continue"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: continue:1 and continue:3 loop markers"
+
+[[row]]
+id = "util.dot"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: . /tmp/p4b-dot sources a file and prints dot:ok"
+
+[[row]]
+id = "util.eval"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: eval:ok marker from the existing brush group"
+
+[[row]]
+id = "util.exec"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: exec 3</etc/mounts and exec 3<&- produce exec-read and after-close markers"
+
+[[row]]
+id = "util.exit"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: external brush exit 7 marker and the final rsh exit 0"
+
+[[row]]
+id = "util.export"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: export P4B=yes and export:yes marker"
+
+[[row]]
+id = "util.getopts"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: getopt:a:, getopt:b:val and optind:4 markers"
+
+[[row]]
+id = "util.hash"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: no-argument hash reset/list returns hash:0; command-name hashing on the target is not claimed"
+
+[[row]]
+id = "util.read"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: read marker from /etc/mounts and the exec-read second read"
+
+[[row]]
+id = "util.readonly"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: readonly ro=1 and ro:1 marker"
+
+[[row]]
+id = "util.return"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: function return 3 marker func-status:3 and return:7 marker"
+
+[[row]]
+id = "util.set"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: set -e/+e/-u/-x status markers and set -- positional reset"
+
+[[row]]
+id = "util.shift"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: set -- a b; shift prints shift:1:b"
+
+[[row]]
+id = "util.test"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: test -n x and [ -n x ] return test:0 and bracket:0"
+
+[[row]]
+id = "util.trap"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: EXIT trap marker trap:exit"
+
+[[row]]
+id = "util.type"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: type echo resolves a builtin and returns type:0"
+
+[[row]]
+id = "util.umask"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: umask 022 and umask:0022 marker"
+
+[[row]]
+id = "util.unalias"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: unalias p4b returns unalias:0"
+
+[[row]]
+id = "util.unset"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P45: unset u and unset IFS feed the p2:default and split markers"
+
+[[row]]
+id = "util.bg"
+status = "waived"
+notes = "P45: PG-56 job control; asynchronous lists and $! are not implemented"
+
+[[row]]
+id = "util.fg"
+status = "waived"
+notes = "P45: PG-56 job control; no foreground/background job model"
+
+[[row]]
+id = "util.jobs"
+status = "waived"
+notes = "P45: PG-56 job control; no job table or asynchronous list"
+
+[[row]]
+id = "util.wait"
+status = "waived"
+notes = "P45: PG-56 job control; no asynchronous child/job table"
+
+[[row]]
+id = "util.fc"
+status = "waived"
+notes = "P45: interactive history editing is outside the non-interactive posix-shell qtest (P9c login)"
