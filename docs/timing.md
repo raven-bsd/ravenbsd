@@ -51,3 +51,19 @@ keeps the backing vector within its existing capacity. `add` is the only allocat
 periodic behaviour, cancel safety/idempotence, backend reprogramming on add/fire/cancel, idle-tick
 (empty halts, far deadline armed once), coalesced ordered merge, a slack/level carry check, and a
 2000-step randomized insert/cancel/fire model compared against a reference min-heap.
+
+## Kernel integration (L4)
+
+`kernel/src/time.rs` includes `raven-cyclic` by `#[path]` (the S26/S27 pattern; `kernel/Cargo.toml`
+is not in this ticket's Owns) and drives it:
+
+* `time::cyclic_add` / `time::cyclic_cancel` schedule and cancel cyclics on the per-CPU registry.
+* `time::on_tick` calls `cyclic_fire`, which fires every due cyclic in deadline order and reprograms
+  the next deadline. The fire path does not allocate and runs in interrupt context.
+* The kernel `Backend` (`CyclicBackend`) records the next deadline in `CYCLIC_NEXT_DEADLINE`;
+  it does **not** reprogram the hardware yet — the LAPIC/generic timer stays periodic (1000 Hz) as
+  the fallback until the tickless work (L5) wires `program` to the real comparator.
+* A boot-time self-check in `time::init` schedules three one-shots 5 ms apart and proves they fire
+  in deadline order with no lost wake, printing `cyclic: ok fired=3 order=5ms,10ms,15ms`; the
+  `time-entropy-cyclic` qtest matches that line.
+
