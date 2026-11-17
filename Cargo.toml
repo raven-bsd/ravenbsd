@@ -65,6 +65,7 @@ members = [
     "tests/fixtures/proc-death-cleanup",
     "tests/fixtures/smp-user",
     "tests/fixtures/smp-tlb",
+    "tests/fixtures/smp-soak-aarch64",
     "tests/fixtures/irq-dist",
     "tests/fixtures/smp-soak",
     "tests/fixtures/s16-rights",
