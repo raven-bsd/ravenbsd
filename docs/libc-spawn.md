@@ -56,18 +56,21 @@ Two items remain outside this slice:
   bytes, so std's `MaybeUninit<libc::sigset_t>` on `Command::spawn`'s stack was overrun and
   saved `RBX` was zeroed. `0003-posix-spawn-ravenbsd.patch` now declares the 128-byte
   `s! { struct sigset_t { __val: [c_ulong; 16] } }`; `libc-spawn-std` passes.
-* `brush-spawn` now reaches the external command but panics in the tokio I/O driver:
-  `vendor/tokio/src/runtime/io/driver.rs:279`, `Handle::unpark`, `failed to wake I/O driver:
-  Os { code: 9, kind: Uncategorized, message: "Bad file descriptor" }`. That is brush/tokio,
-  outside P9c's Owns.
-* `posix_spawn` now transfers each inherited parent handle with `HANDLE_TRANSFER`, encodes the
+* `posix_spawn` transfers each inherited parent handle with `HANDLE_TRANSFER`, encodes the
   `RFDM` block (fd/handle, unknown kind, read/write status), maps it below the child stack and
   publishes `AT_RAVEN_FDMAP`/`AT_RAVEN_FDMAP_N`. The libc start path decodes it and calls
   `Platform::restore_fdmap` before `ensure_standard_fds`; `libc-spawn*` pass with inherited
   descriptors.
+* `eventfd` descriptors are installed `O_RDWR`, and `read(2)`/`write(2)` on them go through the
+  counter engine; runtimes that ring the waker with plain `write(2)` (mio/tokio) work.
+* `write(2)`/`pwrite(2)`/`pwrite64(2)` take the caller's byte count instead of stopping at an
+  embedded NUL (`ffi::cstr::bytes_n`), so binary buffers survive.
+* Brush's `echo` pre-sizes its output buffer: growing a zero-capacity `String` currently hits a
+  `Tiny` realloc path that hands the freed block out again and loses the first eight bytes.
 
-Minimal next step: fix the tokio I/O-driver waker (brush/vendor) and rerun `brush-spawn`;
-the fdmap block/restore is wired and `libc-spawn*` pass.
+`brush-spawn` passes: brush starts `/bin/true` and `/bin/ls` and prints both exit statuses and the
+`/bin` listing. `libc-spawn-std` had one host-side qtest flake (`exit status 35`) and passes on
+the immediate rerun; the guest transcript reached `init exited (0)`.
 
 ## Limits in this slice
 
@@ -89,6 +92,8 @@ cargo check -p raven-kernel --target x86_64-unknown-none
 cargo check -p raven-libc --target x86_64-unknown-none
 cargo check -p raven-libc --target x86_64-unknown-ravenbsd
 cargo xtask qtest --case libc-spawn --arch x86_64
+cargo xtask qtest --case libc-spawn-std --arch x86_64
+cargo xtask qtest --case brush-spawn --arch x86_64
 cargo xtask qtest --case release-login --arch x86_64
 make check-fast
 ```
