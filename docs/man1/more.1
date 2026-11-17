@@ -1,0 +1,32 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt MORE 1
+.Os RavenBSD
+.Sh NAME
+.Nm more
+.Nd page text to a terminal
+.Sh SYNOPSIS
+.Nm
+.Op Fl n Ar lines
+.Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility writes
+.Ar file
+contents to standard output, pausing after each page when the output is a
+terminal. Space advances one page, Enter advances one line and
+.Ql q
+quits. A non-terminal output streams everything without paging.
+.Fl n
+sets the page height (default 24).
+.Pp
+The target image has no generic standard-input stream; file operands are required.
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr cat 1 ,
+.Xr write 1
+.Sh STANDARDS
+RavenBSD implements the documented POSIX more subset.
