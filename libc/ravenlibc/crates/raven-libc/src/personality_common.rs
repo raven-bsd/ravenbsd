@@ -151,6 +151,32 @@ fn logical_kind(kind: OfdKind) -> raven_libc_personality_linux::seams::FdKind {
     }
 }
 
+/// The access mode of one personality-created descriptor.
+///
+/// `eventfd` descriptors are read/write: a runtime rings the doorbell with `write(2)` (mio's
+/// waker does exactly that), and `Platform::write` checks the cached access mode before the
+/// backend call. The other kinds are read-only or are driven through their own calls.
+fn install_status(kind: raven_libc_personality_linux::seams::FdKind) -> u32 {
+    use raven_libc_personality_linux::seams::FdKind;
+    match kind {
+        FdKind::EventFd => raven_libc_abi::fcntl::O_RDWR as u32,
+        _ => 0,
+    }
+}
+
+/// Whether a descriptor kind is an `eventfd`.
+pub(crate) fn is_eventfd_kind(kind: OfdKind) -> bool {
+    kind == OfdKind::EventFd
+}
+
+/// Whether `fd` is an `eventfd` so `read(2)`/`write(2)` use the counter engine.
+pub(crate) fn is_eventfd(fd: i32) -> bool {
+    platform()
+        .get(fd)
+        .map(|entry| is_eventfd_kind(entry.kind()))
+        .unwrap_or(false)
+}
+
 /// The real process fd table of the Linux personality.
 pub(crate) struct RealFdTable;
 
@@ -175,7 +201,13 @@ impl raven_libc_personality_linux::seams::FdTable for RealFdTable {
         cloexec: bool,
     ) -> Result<i32, raven_libc_personality_linux::seams::Errno> {
         let fd = platform()
-            .install(handle, platform_kind(kind), 0, None, cloexec)
+            .install(
+                handle,
+                platform_kind(kind),
+                install_status(kind),
+                None,
+                cloexec,
+            )
             .map_err(error)?;
         SIDE_KINDS.with(|side| {
             side.entries.insert(fd, (handle, kind));
@@ -918,3 +950,7 @@ pub(crate) unsafe fn timespec(pointer: *const Timespec) -> Option<Timespec> {
         Some(unsafe { core::ptr::read_unaligned(pointer) })
     }
 }
+
+#[cfg(test)]
+#[path = "personality_common_ut.rs"]
+mod tests;
