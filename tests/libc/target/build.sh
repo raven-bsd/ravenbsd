@@ -117,9 +117,10 @@ fi
 float=${RL_TEST_FLOAT:-}
 if [ -z "$float" ]; then
     if [ "$arch" = aarch64 ]; then
-        # The aarch64 userland is built for the soft-float target; the C cases use the base
-        # AAPCS64 integer/FP ABI and must not receive the x86 -mno-sse/-msoft-float vector.
-        float=hard
+        # The aarch64 libc is built for aarch64-unknown-none-softfloat. The C case must use the
+        # same general-register ABI: with the hard-float ABI a `double` return (difftime) is
+        # read from d0 while the libc writes it to x0.
+        float=soft
     else
         case $case_name in
             time) float=hard ;;
@@ -140,6 +141,17 @@ case $float in
     *) usage ;;
 esac
 
+# The soft-float flag is target-specific: x86_64 has no SSE in the none target, aarch64 is
+# built for aarch64-unknown-none-softfloat and must not allocate FP/SIMD registers.
+fp_flags=
+if [ "$float" = soft ]; then
+    if [ "$arch" = aarch64 ]; then
+        fp_flags=-mgeneral-regs-only
+    else
+        fp_flags="-mno-sse -mno-mmx -msoft-float"
+    fi
+fi
+
 out=$root/build/libc-test
 mkdir -p "$out/obj"
 if [ "$arch" = aarch64 ]; then
@@ -159,7 +171,7 @@ compile_obj() {
     if [ "$float" = soft ]; then
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" \
             -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
-            -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float \
+            -D__ravenbsd__=1 -D__unix__=1 $fp_flags \
             -I "$root/libc/ravenlibc/tests/c" -c "$1" -o "$2"
     else
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" \
@@ -219,7 +231,7 @@ compile_pie() {
     if [ "$float" = soft ]; then
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" \
             -std=gnu11 -O1 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
-            -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float -fPIE \
+            -D__ravenbsd__=1 -D__unix__=1 $fp_flags -fPIE \
             -I "$root/libc/ravenlibc/tests/c" -c "$1" -o "$2"
     else
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" \
@@ -236,7 +248,7 @@ compile_pic() {
     if [ "$float" = soft ]; then
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" \
             -std=gnu11 -O0 -g0 -Wall -Wextra -Werror=implicit-function-declaration \
-            -D__ravenbsd__=1 -D__unix__=1 -mno-sse -mno-mmx -msoft-float -fPIC \
+            -D__ravenbsd__=1 -D__unix__=1 $fp_flags -fPIC \
             -I "$root/libc/ravenlibc/tests/c" -c "$1" -o "$2"
     else
         "$CC" --target="$arch-unknown-ravenbsd" --sysroot="$sysroot" \
