@@ -10028,7 +10028,7 @@ evidence = "test:tests/posix/utility/locale/test.sh"
 id = "util.localedef"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/simple3/localedef/test.sh"
 
 [[trace]]
 id = "util.logger"
@@ -10046,7 +10046,7 @@ evidence = "test:tests/posix/utility/misc/logname/test.sh"
 id = "util.lp"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/simple5/lp/test.sh"
 
 [[trace]]
 id = "util.ls"
@@ -10568,7 +10568,7 @@ evidence = "qtest:posix-shell"
 id = "util.time"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/simple2/time/test.sh"
 
 [[trace]]
 id = "util.timeout"
@@ -10580,7 +10580,7 @@ evidence = "test:tests/posix/utility/misc/timeout/test.sh"
 id = "util.times"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/simple2/times/test.sh"
 
 [[trace]]
 id = "util.touch"
@@ -10592,7 +10592,7 @@ evidence = "test:tests/posix/utility/file/touch/test.sh"
 id = "util.tput"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/simple2/tput/test.sh"
 
 [[trace]]
 id = "util.tr"
@@ -10640,7 +10640,7 @@ evidence = "qtest:posix-shell"
 id = "util.ulimit"
 ticket = "P4"
 test = "none"
-evidence = "none"
+evidence = "test:tests/posix/utility/simple2/ulimit/test.sh"
 
 [[trace]]
 id = "util.umask"

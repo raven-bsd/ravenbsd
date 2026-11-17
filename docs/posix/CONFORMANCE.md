@@ -6,13 +6,13 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-17T12:51:06Z
+- Date: 2026-11-17T13:31:38Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: host-only
 - Tool: `posix-conform 0.1.0`
 - Result: **FAIL (release blocked)**
-- Counts: 1589 pass, 117 fail, 105 skip
+- Counts: 1626 pass, 80 fail, 105 skip
 
 ## Summary
 
@@ -27,8 +27,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | shell | 3 | 0 | 22 |
 | target | 0 | 0 | 7 |
 | tty | 5 | 0 | 7 |
-| utility | 145 | 38 | 34 |
-| **all** | **1589** | **117** | **105** |
+| utility | 182 | 1 | 34 |
+| **all** | **1626** | **80** | **105** |
 
 ## Rows
 
@@ -1628,7 +1628,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `tty.stty` | tty | pass | `waiver` | owner waiver: P3: no stty utility; the termios/pty CALL surface is present but the command-line front-end is a later utility ticket |
 | `tty.termios` | tty | pass | `waiver` | owner waiver: P3: the existing ravenlibc platform wrapper has host tests over GET_MODE/SET_MODE/FLUSH, but no target libc termios case covers the speed/flag fields; pty-session exercises the protocol only. Kept waived rather than claiming a false pass |
 | `tty.ttyname` | tty | pass | `waiver` | owner waiver: P3: isatty/ttyname wrappers exist but there is no target pty identity case; P3 keeps the row honest instead of claiming the libc path |
-| `util.admin` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.admin` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 lists admin only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
 | `util.alias` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.ar` | utility | pass | `test:tests/posix/utility/archive/ar/test.sh` |  |
 | `util.arch` | utility | pass | `test:tests/posix/utility/misc/arch/test.sh` |  |
@@ -1644,8 +1644,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.bc` | utility | pass | `test:tests/posix/utility/bc/test.sh` |  |
 | `util.bg` | utility | pass | `waiver` | owner waiver: P45: PG-56 job control; asynchronous lists and $! are not implemented |
 | `util.break` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
-| `util.c17` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.c99` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.c17` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 lists c17 only under the optional C-Language Development Utilities option ([ CD ]). RavenBSD has no C compiler; waived. |
+| `util.c99` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 (Issue 8) replaces c99 with c17 and omits c99 from the utility list. Removed; waived. |
 | `util.cal` | utility | pass | `test:tests/posix/utility/simple/cal/test.sh` |  |
 | `util.cat` | utility | pass | `test:tests/posix/utility/file/cat/test.sh` |  |
 | `util.cd` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
@@ -1655,7 +1655,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.chown` | utility | pass | `test:tests/posix/utility/file/chown/test.sh` |  |
 | `util.cksum` | utility | pass | `test:tests/posix/utility/file/cksum/test.sh` |  |
 | `util.cmp` | utility | pass | `test:tests/posix/utility/text2/cmp/test.sh` |  |
-| `util.cod` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.cod` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 omits cod from the Issue 8 utility list. Removed; waived. |
 | `util.comm` | utility | pass | `test:tests/posix/utility/text/comm/test.sh` |  |
 | `util.command` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.compress` | utility | pass | `test:tests/posix/utility/compress/compress/test.sh` |  |
@@ -1668,7 +1668,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.cxref` | utility | pass | `test:tests/posix/utility/devtools/test.sh` |  |
 | `util.date` | utility | pass | `test:tests/posix/utility/misc2/date/test.sh` |  |
 | `util.dd` | utility | pass | `test:tests/posix/utility/file/dd/test.sh` |  |
-| `util.delta` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.delta` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 lists delta only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
 | `util.df` | utility | pass | `test:tests/posix/utility/file/df/test.sh` |  |
 | `util.diff` | utility | pass | `test:tests/posix/utility/text2/diff/test.sh` |  |
 | `util.dircolors` | utility | pass | `test:tests/posix/utility/misc/dircolors/test.sh` |  |
@@ -1679,7 +1679,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.ed` | utility | pass | `test:tests/posix/utility/ed/ed/test.sh` |  |
 | `util.env` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
 | `util.eval` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
-| `util.ex` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.ex` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 lists ex only under the optional User Portability Utilities option ([ UP ]). Not supported; waived. |
 | `util.exec` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.exit` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.expand` | utility | pass | `test:tests/posix/utility/text/expand/test.sh` |  |
@@ -1693,9 +1693,9 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.find` | utility | pass | `test:tests/posix/utility/file/find/test.sh` |  |
 | `util.fmt` | utility | pass | `test:tests/posix/utility/misc/fmt/test.sh` |  |
 | `util.fold` | utility | pass | `test:tests/posix/utility/text/fold/test.sh` |  |
-| `util.fort77` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.fort77` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 omits fort77 from the Issue 8 utility list (FORTRAN dropped). Removed; waived. |
 | `util.gencat` | utility | pass | `test:tests/posix/utility/locale/test.sh` |  |
-| `util.get` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.get` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 lists get only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
 | `util.getconf` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
 | `util.getopts` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.grep` | utility | pass | `test:tests/posix/utility/text2/grep/test.sh` |  |
@@ -1706,8 +1706,8 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.iconv` | utility | pass | `test:tests/posix/utility/locale/test.sh` |  |
 | `util.id` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
 | `util.install` | utility | pass | `test:tests/posix/utility/misc/install/test.sh` |  |
-| `util.ipcrm` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.ipcs` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.ipcrm` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 lists ipcrm only under the optional XSI option ([ XSI ]). Not supported; waived. |
+| `util.ipcs` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 lists ipcs only under the optional XSI option ([ XSI ]). Not supported; waived. |
 | `util.jobs` | utility | pass | `waiver` | owner waiver: P45: PG-56 job control; no job table or asynchronous list |
 | `util.join` | utility | pass | `test:tests/posix/utility/text/join/test.sh` |  |
 | `util.kill` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
@@ -1715,10 +1715,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.link` | utility | pass | `test:tests/posix/utility/file/link/test.sh` |  |
 | `util.ln` | utility | pass | `test:tests/posix/utility/file/ln/test.sh` |  |
 | `util.locale` | utility | pass | `test:tests/posix/utility/locale/test.sh` |  |
-| `util.localedef` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.localedef` | utility | pass | `test:tests/posix/utility/simple3/localedef/test.sh` |  |
 | `util.logger` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
 | `util.logname` | utility | pass | `test:tests/posix/utility/misc/logname/test.sh` |  |
-| `util.lp` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.lp` | utility | pass | `test:tests/posix/utility/simple5/lp/test.sh` |  |
 | `util.ls` | utility | pass | `test:tests/posix/utility/file/ls/test.sh` |  |
 | `util.m4` | utility | pass | `test:tests/posix/utility/m4/test.sh` |  |
 | `util.mail` | utility | pass | `test:tests/posix/utility/mail/mail/test.sh` |  |
@@ -1733,7 +1733,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.mktemp` | utility | pass | `test:tests/posix/utility/misc/mktemp/test.sh` |  |
 | `util.more` | utility | pass | `test:tests/posix/utility/ttytools/more/test.sh` |  |
 | `util.mv` | utility | pass | `test:tests/posix/utility/file/mv/test.sh` |  |
-| `util.neqn` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.neqn` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 omits neqn from the Issue 8 utility list. Removed; waived. |
 | `util.newgrp` | utility | pass | `test:tests/posix/utility/simple4/newgrp/test.sh` |  |
 | `util.nice` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
 | `util.nl` | utility | pass | `test:tests/posix/utility/text/nl/test.sh` |  |
@@ -1750,21 +1750,21 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.pr` | utility | pass | `test:tests/posix/utility/text/pr/test.sh` |  |
 | `util.printenv` | utility | pass | `test:tests/posix/utility/misc/printenv/test.sh` |  |
 | `util.printf` | utility | pass | `test:tests/posix/utility/text/printf/test.sh` |  |
-| `util.prs` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.prs` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 lists prs only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
 | `util.ps` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
 | `util.ptx` | utility | pass | `test:tests/posix/utility/misc/ptx/test.sh` |  |
 | `util.pwd` | utility | pass | `test:tests/posix/utility/file/pwd/test.sh` |  |
-| `util.qalter` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.qdel` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.qhold` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.qmove` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.qmsg` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.qrerun` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.qrls` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.qselect` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.qsig` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.qstat` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.qsub` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.qalter` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qalter utility from the Issue 8 list. Removed; waived. |
+| `util.qdel` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qdel utility from the Issue 8 list. Removed; waived. |
+| `util.qhold` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qhold utility from the Issue 8 list. Removed; waived. |
+| `util.qmove` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qmove utility from the Issue 8 list. Removed; waived. |
+| `util.qmsg` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qmsg utility from the Issue 8 list. Removed; waived. |
+| `util.qrerun` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qrerun utility from the Issue 8 list. Removed; waived. |
+| `util.qrls` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qrls utility from the Issue 8 list. Removed; waived. |
+| `util.qselect` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qselect utility from the Issue 8 list. Removed; waived. |
+| `util.qsig` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qsig utility from the Issue 8 list. Removed; waived. |
+| `util.qstat` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qstat utility from the Issue 8 list. Removed; waived. |
+| `util.qsub` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 omits the Batch Environment Services qsub utility from the Issue 8 list. Removed; waived. |
 | `util.read` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.readlink` | utility | pass | `test:tests/posix/utility/file/readlink/test.sh` |  |
 | `util.readonly` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
@@ -1772,10 +1772,10 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.renice` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
 | `util.return` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.rm` | utility | pass | `test:tests/posix/utility/file/rm/test.sh` |  |
-| `util.rmdel` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.rmdel` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 lists rmdel only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
 | `util.rmdir` | utility | pass | `test:tests/posix/utility/file/rmdir/test.sh` |  |
-| `util.sact` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.sccs` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.sact` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 lists sact only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
+| `util.sccs` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 lists sccs only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
 | `util.sed` | utility | pass | `test:tests/posix/utility/text2/sed/test.sh` |  |
 | `util.seq` | utility | pass | `test:tests/posix/utility/misc/seq/test.sh` |  |
 | `util.set` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
@@ -1798,18 +1798,18 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.stty` | utility | pass | `test:tests/posix/utility/system/stty/test.sh` |  |
 | `util.sum` | utility | pass | `test:tests/posix/utility/misc/sum/test.sh` |  |
 | `util.sync` | utility | pass | `test:tests/posix/utility/misc/sync/test.sh` |  |
-| `util.tabs` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.tabs` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 lists tabs under the optional XSI option ([ XSI ]); it was removed from the User Portability Utilities option in Issue 7. Not supported; waived. |
 | `util.tac` | utility | pass | `test:tests/posix/utility/misc/tac/test.sh` |  |
 | `util.tail` | utility | pass | `test:tests/posix/utility/text/tail/test.sh` |  |
 | `util.talk` | utility | pass | `test:tests/posix/utility/talk/test.sh` |  |
 | `util.tar` | utility | pass | `test:tests/posix/utility/archive/tar/test.sh` |  |
 | `util.tee` | utility | pass | `test:tests/posix/utility/text/tee/test.sh` |  |
 | `util.test` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
-| `util.time` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.time` | utility | pass | `test:tests/posix/utility/simple2/time/test.sh` |  |
 | `util.timeout` | utility | pass | `test:tests/posix/utility/misc/timeout/test.sh` |  |
-| `util.times` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.times` | utility | pass | `test:tests/posix/utility/simple2/times/test.sh` |  |
 | `util.touch` | utility | pass | `test:tests/posix/utility/file/touch/test.sh` |  |
-| `util.tput` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.tput` | utility | pass | `test:tests/posix/utility/simple2/tput/test.sh` |  |
 | `util.tr` | utility | pass | `test:tests/posix/utility/text/tr/test.sh` |  |
 | `util.trap` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.true` | utility | pass | `test:tests/posix/utility/misc/true/test.sh` |  |
@@ -1817,13 +1817,13 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.tsort` | utility | pass | `test:tests/posix/utility/text/tsort/test.sh` |  |
 | `util.tty` | utility | pass | `test:tests/posix/utility/system/tty/test.sh` |  |
 | `util.type` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
-| `util.ulimit` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.ulimit` | utility | pass | `test:tests/posix/utility/simple2/ulimit/test.sh` |  |
 | `util.umask` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.unalias` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
 | `util.uname` | utility | skip | `qtest:posix-util-system` | host-only run; qtest evidence not executed |
 | `util.uncompress` | utility | pass | `test:tests/posix/utility/compress/uncompress/test.sh` |  |
 | `util.unexpand` | utility | pass | `test:tests/posix/utility/text/unexpand/test.sh` |  |
-| `util.unget` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.unget` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 lists unget only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
 | `util.uniq` | utility | pass | `test:tests/posix/utility/text/uniq/test.sh` |  |
 | `util.unlink` | utility | pass | `test:tests/posix/utility/file/unlink/test.sh` |  |
 | `util.unset` | utility | skip | `qtest:posix-shell` | host-only run; qtest evidence not executed |
@@ -1834,11 +1834,11 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `util.uuencode` | utility | pass | `test:tests/posix/utility/archive/uuencode/test.sh` |  |
 | `util.uustat` | utility | pass | `test:tests/posix/utility/uucp/uustat/test.sh` |  |
 | `util.uux` | utility | pass | `test:tests/posix/utility/uucp/uux/test.sh` |  |
-| `util.val` | utility | fail | `none` | profile status missing; no POSIX utility test |
-| `util.vi` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.val` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 lists val only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
+| `util.vi` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 lists vi only under the optional User Portability Utilities option ([ UP ]). Not supported; waived. |
 | `util.wait` | utility | pass | `waiver` | owner waiver: P45: PG-56 job control; no asynchronous child/job table |
 | `util.wc` | utility | pass | `test:tests/posix/utility/text/wc/test.sh` |  |
-| `util.what` | utility | fail | `none` | profile status missing; no POSIX utility test |
+| `util.what` | utility | pass | `waiver` | owner waiver: P4f: POSIX.1-2024 lists what only under the optional Software Development Utilities option (( DEVELOPMENT ), [ XSI ]). Not supported; waived. |
 | `util.who` | utility | pass | `test:tests/posix/utility/misc/who/test.sh` |  |
 | `util.write` | utility | pass | `test:tests/posix/utility/ttytools/write/test.sh` |  |
 | `util.xargs` | utility | pass | `test:tests/posix/utility/xargs/test.sh` |  |
