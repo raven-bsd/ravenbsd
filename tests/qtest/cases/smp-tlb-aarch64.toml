@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S76b: aarch64 remote user TLB shootdown. The controller remaps a shared user page 200 times
+# while a second user thread on an application processor samples the same virtual address; a
+# stale TLB entry would return the previous page's value. `smp_user=on` spreads the two threads
+# across CPUs and the kernel trace proves a user thread ran on an AP.
+name = "smp-tlb-aarch64"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 300
+pre = ["sh tests/fixtures/smp-tlb/build.sh"]
+initfs = "build/fixtures/smp-tlb/smp-tlb.img"
+boot_cmdline = "console=ttyAMA0 test-exit=1 smp_user=on smp-user-trace"
+qemu_extra = ["-smp", "4"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^smp: 4 cpus online$'
+
+# A user thread ran on an application processor: the two fixture threads are on different CPUs.
+[[expect]]
+regex = '^smp-user: cpu [1-9] first user thread pid=\d+ tid=\d+$'
+unordered = true
+
+[[expect]]
+regex = '^smp-tlb: map=0x[0-9a-f]+ alias=0x[0-9a-f]+$'
+unordered = true
+
+# 200 remaps, no stale read. Every unmap published a shootdown that the AP acknowledged before
+# the fixture continued; a lost IPI prints the kernel's timeout line, which is forbidden below.
+[[expect]]
+regex = '^smp-tlb: rounds=200 stale=0$'
+
+[[expect]]
+regex = '^smp-tlb: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|smp-tlb: fail|smp-tlb: stale|aarch64-smp: tlb .*(timeout|failed)'

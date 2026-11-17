@@ -17,6 +17,8 @@ use core::arch::asm;
 
 use raven_rmm::arch::aarch64::{MAIR_EL1, tcr_el1};
 
+use crate::memory::frame::PAGE_SIZE;
+
 /// Physical address width from `ID_AA64MMFR0_EL1.PARange`, capped at the 48-bit descriptor layout.
 pub fn physical_bits() -> u32 {
     let value: u64;
@@ -127,6 +129,41 @@ pub fn tlb_flush_page(virtual_address: u64) {
             in(reg) virtual_address >> 12,
             options(nostack, preserves_flags),
         );
+    }
+}
+
+/// Invalidate a page-aligned virtual range at every ASID (`tlbi vaae1is` per page).
+///
+/// The remote TLB shootdown handler and the local fast path both call this. One `dsb ishst`
+/// precedes the walk and one `dsb ish`/`isb` pair follows it, so the whole range is visible to
+/// the page-table walker before the caller reuses the frames. A range longer than the local
+/// 1M-page cap falls back to a full flush: the walk is linear, and a nonsense length must not
+/// stall the kernel.
+pub fn tlb_flush_range(start: u64, len: u64) {
+    const MAX_RANGE_PAGES: u64 = 1 << 20;
+    if len == 0 {
+        return;
+    }
+    let pages = len.div_ceil(PAGE_SIZE);
+    if pages > MAX_RANGE_PAGES {
+        tlb_flush_all();
+        return;
+    }
+    let mut address = start & !(PAGE_SIZE - 1);
+    let end = start.saturating_add(len);
+    // SAFETY: each `tlbi vaae1is` invalidates one VA at all ASIDs; the barriers are the ARMv8-A
+    // required sequence. `address` only feeds the register and never dereferences memory.
+    unsafe {
+        asm!("dsb ishst", options(nostack, preserves_flags));
+        while address < end {
+            asm!(
+                "tlbi vaae1is, {}",
+                in(reg) address >> 12,
+                options(nostack, preserves_flags),
+            );
+            address = address.saturating_add(PAGE_SIZE);
+        }
+        asm!("dsb ish", "isb", options(nostack, preserves_flags));
     }
 }
 

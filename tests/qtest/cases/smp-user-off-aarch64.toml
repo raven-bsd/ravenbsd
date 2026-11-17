@@ -34,6 +34,10 @@ unordered = true
 [[expect]]
 regex = '^aarch64-smp: fpu ok rounds=200$'
 
+# The kernel-thread TLB shootdown proof: 8 rounds, every AP acknowledged every SGI.
+[[expect]]
+regex = '^aarch64-smp: tlb shootdowns=8 ipis=[1-9][0-9]* acked=[1-9][0-9]* timeouts=0$'
+
 [[expect]]
 regex = '^aarch64-smp: ok cpus=4 counter=8000$'
 
