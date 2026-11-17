@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use super::{Arch, build_spec, copy_headers, parse};
+use super::{Arch, build_spec, copy_headers, is_compiler_header, parse};
 use crate::process::CommandSpec;
 
 fn args(values: &[&str]) -> Vec<String> {
@@ -207,6 +207,43 @@ fn copy_headers_creates_nested_destination_directories() {
     assert!(target.join("arpa/inet.h").is_file());
     assert!(target.join("top.h").is_file());
     let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn copy_headers_skips_compiler_provided_wrappers() {
+    let root = std::env::temp_dir().join(format!(
+        "c74c-copy-headers-{}-{}",
+        std::process::id(),
+        line!()
+    ));
+    let source = root.join("source");
+    let target = root.join("target");
+    std::fs::create_dir_all(&source).expect("source dir");
+    std::fs::write(source.join("stdatomic.h"), b"#include_next <stdatomic.h>\n").expect("wrapper");
+    std::fs::write(source.join("stdio.h"), b"#pragma once\n").expect("normal header");
+    std::fs::create_dir_all(&target).expect("target dir");
+
+    copy_headers(&source, &target).expect("copy headers");
+
+    assert!(!target.join("stdatomic.h").exists());
+    assert!(target.join("stdio.h").is_file());
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn only_the_compiler_wrappers_are_skipped() {
+    for name in [
+        "stddef.h",
+        "stdbool.h",
+        "stdatomic.h",
+        "stdarg.h",
+        "float.h",
+    ] {
+        assert!(is_compiler_header(name), "{name}");
+    }
+    for name in ["stdio.h", "stdlib.h", "time.h", "stdatomic_extra.h"] {
+        assert!(!is_compiler_header(name), "{name}");
+    }
 }
 
 #[test]

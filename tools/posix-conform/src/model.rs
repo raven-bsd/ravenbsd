@@ -546,32 +546,9 @@ pub fn validate(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<()>
         }
     }
 
-    // Every current POSIX utility directory must be classified consistently.
-    let bin = root.join("userland/bin");
-    let utility_names: BTreeSet<&str> = profile
-        .utility
-        .iter()
-        .map(|row| row.name.as_str())
-        .collect();
-    if let Ok(entries) = std::fs::read_dir(&bin) {
-        for entry in entries.flatten() {
-            if !entry.path().is_dir() {
-                continue;
-            }
-            let Some(name) = entry.file_name().to_str().map(str::to_string) else {
-                continue;
-            };
-            if utility_names.contains(name.as_str())
-                && profile
-                    .utility
-                    .iter()
-                    .find(|row| row.name == name)
-                    .is_some_and(|row| row.meta.status == Status::Missing)
-            {
-                errors.push(format!("utility `{name}` exists but is marked missing"));
-            }
-        }
-    }
+    // Utility status comes from the evidence overlays, not from the presence of a source
+    // directory: a directory can exist with a stub or a non-conforming subset. Present and
+    // partial rows must still name existing evidence, which is checked below.
     for row in &profile.utility {
         if !matches!(row.meta.status, Status::Present | Status::Partial)
             || row.meta.evidence == "none"

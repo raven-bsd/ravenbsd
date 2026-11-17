@@ -213,7 +213,7 @@ argv = ["cargo", "xtask", "qtest", "--case", "libc-hello", "--arch", "x86_64"]
 child_argv = ["cargo", "xtask", "qtest", "--case", "{case}", "--arch", "x86_64"]
 expand = "qtest"
 cases = ["libc-hello", "libc-stdio", "libc-time", "libc-threads", "libc-signals", "libc-dynamic", "libc-spawn"]
-note = "C74a 2026-11-17: signals and spawn pass; hello auxv/string; stdio page fault 0x3 after printf; time build misses usleep/sleep/tzname (libc-pack sysroot); threads timeout after barrier; dynamic shape partial file tail"
+note = "C74c 2026-11-17: threads, signals and spawn pass; hello string is P1b (auxv ok); stdio page fault 0x3 is P1b; time misses P1b sleep/usleep/tzname; dynamic fails the C test shape-check partial tail"
 evidence = "build/libc-gate/5.1.txt"
 source = "C73, 16 3.B.9 C12"
 

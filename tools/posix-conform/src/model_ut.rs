@@ -166,8 +166,8 @@ fn current_export_must_be_classified() {
 }
 
 #[test]
-fn current_utility_must_not_be_marked_missing() {
-    let path = root("utility");
+fn a_utility_source_directory_does_not_imply_present() {
+    let path = root("utility-status");
     std::fs::create_dir(path.join("userland/bin/cat")).unwrap();
     let mut profile = empty_profile();
     let mut row = meta("util.cat");
@@ -180,10 +180,43 @@ fn current_utility_must_not_be_marked_missing() {
         locale: String::new(),
         test: "none".to_string(),
     });
+    let trace = TraceFile {
+        schema: 1,
+        standard: STANDARD.to_string(),
+        trace: vec![TraceRow {
+            id: "util.cat".to_string(),
+            ticket: "P4".to_string(),
+            test: "none".to_string(),
+            evidence: "none".to_string(),
+        }],
+    };
+    // The source directory is not executable evidence; the evidence overlays own the status.
+    validate(&path, &profile, &trace).unwrap();
+    cleanup(&path);
+}
+
+#[test]
+fn present_utility_evidence_must_exist() {
+    let path = root("utility-evidence");
+    let mut profile = empty_profile();
+    let mut row = meta("util.cat");
+    row.status = Status::Present;
+    row.evidence = "test:tests/posix/utility/cat/test.sh".to_string();
+    profile.utility.push(crate::model::UtilityRow {
+        meta: row,
+        name: "cat".to_string(),
+        options: String::new(),
+        exit_status: String::new(),
+        locale: String::new(),
+        test: "none".to_string(),
+    });
     let error = validate(&path, &profile, &empty_trace())
         .unwrap_err()
         .to_string();
-    assert!(error.contains("exists but is marked missing"), "{error}");
+    assert!(
+        error.contains("evidence `test:tests/posix/utility/cat/test.sh` is absent"),
+        "{error}"
+    );
     cleanup(&path);
 }
 
