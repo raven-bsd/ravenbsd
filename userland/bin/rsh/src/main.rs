@@ -731,8 +731,7 @@ mod program {
                     }
                 }
             }
-            self.vars
-                .set(name, &String::from_utf8_lossy(&line).to_string());
+            self.vars.set(name, String::from_utf8_lossy(&line).as_ref());
             if line.is_empty() { 1 } else { 0 }
         }
 
