@@ -146,6 +146,27 @@ fn main(_args: raven_rt::Args) -> i32 {
         Err(message) => return fail(message),
     };
     nanosleep(300_000_000);
+    // Wait for fsd-ufs to register `ufs:` before forking vfsd: the child's namespace snapshot is
+    // taken at PROC_CREATE, so a late registration would be invisible to vfsd.
+    match open_retry("ufs:/ten.txt") {
+        Ok(handle) => {
+            let _ = raven_rt::sys::close(handle);
+        }
+        Err(_) => return fail("fsd-ufs ready"),
+    }
+
+    // vfsd serves the mounted `file:` namespace from /etc/mounts: `/` on initfs, `/mnt` on ufs.
+    let vfsd = match start_with_sink(&initfs, "/vfsd", sink) {
+        Ok(staged) => staged,
+        Err(message) => return fail(message),
+    };
+    nanosleep(300_000_000);
+    match open_retry("file:/") {
+        Ok(handle) => {
+            let _ = raven_rt::sys::close(handle);
+        }
+        Err(_) => return fail("vfsd ready"),
+    }
 
     // Fixture-server proof: one traced and one untraced request.
     if trace_set(TRACE_ID).is_err() {
@@ -158,6 +179,21 @@ fn main(_args: raven_rt::Args) -> i32 {
         return fail("trace_clear");
     }
     if let Err(message) = one_call("trace-demo:probe", b'R') {
+        return fail(message);
+    }
+
+    // Mounted read first, while the UFS blocks are cold: client -> vfsd -> fsd-ufs -> blockd,
+    // traced and then untraced. The direct `ufs:` read follows and stays part of the demo.
+    if trace_set(TRACE_ID).is_err() {
+        return fail("trace_set");
+    }
+    if let Err(message) = one_call("file:/mnt/ten.txt", b'0') {
+        return fail(message);
+    }
+    if trace_set(0).is_err() {
+        return fail("trace_clear");
+    }
+    if let Err(message) = one_call("file:/mnt/ten.txt", b'0') {
         return fail(message);
     }
 
@@ -198,7 +234,7 @@ fn main(_args: raven_rt::Args) -> i32 {
     }
     handle_close(tracer.process);
 
-    for server in [&fsd, &blockd, &initfsd] {
+    for server in [&vfsd, &fsd, &blockd, &initfsd] {
         let _ = raven_rt::proc_terminate(server.process, 0);
         let _ = proc_wait(server.process);
         handle_close(server.process);

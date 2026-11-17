@@ -1,11 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-# Q4c trace-demo: the Q4b fixture server proves the scheme -> sink path, and the controller then
-# starts initfsd, blockd and fsd-ufs with the sink transferred, reads ufs:/ten.txt on a traced and
-# an untraced call, and runs the trace command. The real spans (pid=0) share the caller trace id:
-# fsd-ufs records server open/read and blockd records the nested block I/O. Runs on x86_64 and
-# aarch64.
+# Q4e trace-demo: the Q4b fixture server proves the scheme -> sink path, and the controller then
+# starts initfsd, blockd, fsd-ufs and vfsd with the sink transferred. The mounted `file:` read is
+# cold: client -> vfsd -> fsd-ufs -> blockd all carry the caller trace id. The direct `ufs:` read
+# follows on the warm cache and stays part of the demo. Runs on x86_64 and aarch64.
 
 name = "trace-demo"
 arch = "x86_64"
@@ -20,30 +19,58 @@ expect_exit = "success"
 [[expect]]
 regex = '^demo: server ready$'
 
+# 13 spans: the 4 fixture spans (2 traced, 2 untraced), the mounted chain (7 traced) and the
+# direct `ufs:` read (2 traced). Every traced span carries the controller's trace id.
 [[expect]]
-regex = '^trace: spans=[0-9]+ gaps=0 traced=[0-9]+ untraced=2$'
+regex = '^trace: spans=13 gaps=0 traced=11 untraced=2$'
 
+# Fixture-server proof: one traced and one untraced open/read pair (pid=2).
 [[expect]]
 regex = '^trace: id=0xdeadbeefcafef00d span=0x1 parent=0x0 pid=2 ts=[0-9]+ kind=server op=1$'
 
 [[expect]]
+regex = '^trace: id=0xdeadbeefcafef00d span=0x2 parent=0x0 pid=2 ts=[0-9]+ kind=server op=2$'
+
+[[expect]]
 regex = '^trace: id=untraced span=0x3 parent=0x0 pid=2 ts=[0-9]+ kind=server op=1$'
+
+[[expect]]
+regex = '^trace: id=untraced span=0x4 parent=0x0 pid=2 ts=[0-9]+ kind=server op=2$'
+
+# Mounted read, cold cache: vfsd open (producer 1 span 1), the fsd-ufs opens behind it
+# (producer 2 spans 1-3), the vfsd read (span 2), the fsd-ufs read (span 4) and the nested
+# blockd I/O (producer 3 span 1). Each line must carry the same trace id; the order proves the
+# client -> vfsd -> fsd-ufs -> blockd chain.
+[[expect]]
+regex = '^trace: id=0xdeadbeefcafef00d span=0x1 parent=0x0 pid=0 ts=[0-9]+ kind=server op=1$'
+
+[[expect]]
+regex = '^trace: id=0xdeadbeefcafef00d span=0x1 parent=0x0 pid=0 ts=[0-9]+ kind=server op=1$'
+
+[[expect]]
+regex = '^trace: id=0xdeadbeefcafef00d span=0x2 parent=0x0 pid=0 ts=[0-9]+ kind=server op=1$'
+
+[[expect]]
+regex = '^trace: id=0xdeadbeefcafef00d span=0x3 parent=0x0 pid=0 ts=[0-9]+ kind=server op=1$'
+
+[[expect]]
+regex = '^trace: id=0xdeadbeefcafef00d span=0x2 parent=0x0 pid=0 ts=[0-9]+ kind=server op=2$'
+
+[[expect]]
+regex = '^trace: id=0xdeadbeefcafef00d span=0x4 parent=0x0 pid=0 ts=[0-9]+ kind=server op=2$'
+
+[[expect]]
+regex = '^trace: id=0xdeadbeefcafef00d span=0x1 parent=0x0 pid=0 ts=[0-9]+ kind=io op=[0-9]+$'
+
+# The direct `ufs:` read still works: fsd-ufs open/read on the warm cache (spans 5 and 6).
+[[expect]]
+regex = '^trace: id=0xdeadbeefcafef00d span=0x5 parent=0x0 pid=0 ts=[0-9]+ kind=server op=1$'
+
+[[expect]]
+regex = '^trace: id=0xdeadbeefcafef00d span=0x6 parent=0x0 pid=0 ts=[0-9]+ kind=server op=2$'
 
 [[expect]]
 regex = '^demo: ok$'
 
 [[forbid]]
 regex = '(?i)panic|EXCEPTION|demo: failed'
-
-# Q4c real-server spans: the fsd-ufs open/read and the nested blockd I/O inherit the same id.
-[[expect]]
-regex = '^trace: id=0xdeadbeefcafef00d span=0x[0-9a-f]+ parent=0x0 pid=0 ts=[0-9]+ kind=server op=1$'
-unordered = true
-
-[[expect]]
-regex = '^trace: id=0xdeadbeefcafef00d span=0x[0-9a-f]+ parent=0x0 pid=0 ts=[0-9]+ kind=server op=2$'
-unordered = true
-
-[[expect]]
-regex = '^trace: id=0xdeadbeefcafef00d span=0x[0-9a-f]+ parent=0x0 pid=0 ts=[0-9]+ kind=io op=[0-9]+$'
-unordered = true
