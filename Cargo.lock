@@ -3312,6 +3312,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-trace-context"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-ipc",
+ "raven-proto-trace",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-trace-core"
 version = "0.1.0"
 

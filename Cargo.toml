@@ -62,6 +62,7 @@ members = [
     "tests/fixtures/s40-teardown",
     "tests/fixtures/s16-rights",
     "tests/fixtures/cap-revoke",
+    "tests/fixtures/trace-context",
     "tests/fixtures/s17-pager",
     "tests/fixtures/s39-parity",
     "tests/fixtures/usercopy-cow",
