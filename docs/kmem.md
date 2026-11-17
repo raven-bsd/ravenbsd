@@ -171,7 +171,20 @@ range with orders `0..=top_order`, all metadata in fixed inline storage (no glob
 
 The per-CPU frame caches and the kernel wiring are A5b, after S75.
 
-## 8. What A1..A6 defer to A5b+
+## 8. Physical frames: per-CPU magazines (A5b, OBSERVED)
+
+`FrameCache<NCPUS, CACHE_CAP, REMOTE_CAP>` adds the per-CPU fast path over the A5a buddy: fixed
+order-0 caches with high/low watermarks, batch refill/drain to a [`FrameSource`] (the buddy), a
+bounded remote-free queue per CPU, and per-CPU stats (`hits`, `misses`, `refills`, `drains`,
+`remote_frees`, `evictions`). Every call takes an explicit CPU id and the source, so the layer reads
+no hardware or globals. The pager failure path is complete: a `Pager` that refuses to back surfaces
+`BuddyError::Pager` through `alloc`, and conservation (`free + cached + remote + live + reserved ==
+total`) is intact. The 4-CPU million-op model and a single-CPU baseline assert no frame lost or
+duplicated, no cache above its capacity, and full coalescing after a drain.
+
+Kernel wiring (A5c) remains, after S75 releases the SMP paths.
+
+## 9. What A1..A6 defer to A5c+
 
 The architecture names three allocation policies and a quantum/import hierarchy. A1 ships
 `FirstFit`, `BestFit` and `NextFit`; the `InstantFit` power-of-two freelists and quantum caches are
@@ -181,7 +194,7 @@ from the mapped heap range, and the wider kva/ID arenas (R-MEM-3) land with the 
 The R-MEM-10 debug bitmask (`REDZONE|POISON|AUDIT|LITE|LEAK`) remains a kernel-side runtime flag;
 A6 provides the mechanisms behind a compile-time host/test feature.
 
-## 9. kmem next steps (A5b, PROPOSED)
+## 10. kmem next steps (A5c, PROPOSED)
 
-* **A5b** per-CPU frame caches over the A5a buddy core, kernel wiring and pager integration
+* **A5c** wire the A5b per-CPU frame caches and the pager into the kernel frame path
   (R-MEM-13..15), after S75.
