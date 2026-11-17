@@ -158,6 +158,11 @@ pub trait RelocApplier {
     fn tls_module_id(&self, obj: ObjId) -> u64;
     /// The static TLS offset of an object, allocated lazily.
     fn tls_static_offset(&mut self, obj: ObjId) -> Result<i64, ApplyError>;
+    /// Record the static TLS offset the loader assigned to `obj`.
+    ///
+    /// `dlopen` assigns the block before relocating, so the applier can resolve a `TLSDESC`
+    /// or `TPOFF64` in the new object immediately.
+    fn set_tls_offset(&mut self, _obj: ObjId, _offset: usize) {}
     /// Allocate the descriptor for a `TLSDESC` relocation.
     fn tls_desc_alloc(
         &mut self,
