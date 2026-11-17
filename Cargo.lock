@@ -190,6 +190,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "crond"
+version = "0.1.0"
+dependencies = [
+ "crontab",
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+ "raven-scheme",
+]
+
+[[package]]
+name = "crontab"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-proto-fs",
+ "raven-rt",
+]
+
+[[package]]
 name = "crypto-common"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1048,6 +1068,15 @@ dependencies = [
  "raven-proto-fs",
  "raven-rt",
  "raven-tool-core",
+]
+
+[[package]]
+name = "raven-crontab-fixture"
+version = "0.1.0"
+dependencies = [
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
 ]
 
 [[package]]

@@ -25,6 +25,7 @@ mod program {
     const PROC_FORK: usize = 0x39;
     const PROC_HANDLE_INFO: usize = 0x3E;
     const PROC_PID_INFO: usize = 0x3A;
+    const PROC_SETSID: usize = 0x37;
     const INFO_WORDS: usize = 41;
     const FDMAP_MAGIC: &[u8; 4] = b"RFDM";
     const FDMAP_HEADER: usize = 8;
@@ -54,6 +55,9 @@ mod program {
                 }
             }
             "attrs" => attrs(&args),
+            "join" => join(args.get(2).and_then(|value| value.parse::<i32>().ok())),
+            "session" => session(),
+            "idle" => idle(),
             "exec-name" => exec_name(),
             "exec-check" => exec_check(),
             _ => {
@@ -96,6 +100,45 @@ mod program {
         } else {
             3
         }
+    }
+
+    fn join(expected: Option<i32>) -> i32 {
+        let Some(expected) = expected else {
+            return 3;
+        };
+        for _ in 0..100 {
+            if let Some((_, _, pgid, _)) = self_ids()
+                && pgid == expected
+            {
+                raven_rt::println!("proc-attrs-child: join=1");
+                let _ = raven_rt::nanosleep(100_000_000);
+                return 0;
+            }
+            let _ = raven_rt::nanosleep(10_000_000);
+        }
+        3
+    }
+
+    fn session() -> i32 {
+        // SAFETY: PROC_SETSID takes no arguments; the kernel validates the caller state.
+        let raw = unsafe { raven_rt::sys::syscall1(PROC_SETSID, 0) };
+        if raw < 0 {
+            return 3;
+        }
+        let ok = self_ids().is_some_and(|(pid, _, pgid, sid)| sid == pid && pgid == pid);
+        raven_rt::println!("proc-attrs-child: session={}", u8::from(ok));
+        if ok {
+            let _ = raven_rt::nanosleep(500_000_000);
+            0
+        } else {
+            3
+        }
+    }
+
+    fn idle() -> i32 {
+        raven_rt::println!("proc-attrs-child: idle");
+        let _ = raven_rt::nanosleep(500_000_000);
+        0
     }
 
     fn exec_name() -> i32 {

@@ -861,6 +861,7 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
             let code = target.exit_code.load(Ordering::Acquire);
             drop(state);
             copy_to_user(destination, &code.to_le_bytes())?;
+            let _ = process::reap_pid(&target);
             return Ok(0);
         }
         if *state == ProcessState::Created {
@@ -868,6 +869,7 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
             // it immediately (the terminal state and the one-shot teardown are the same).
             drop(state);
             let _ = process::reap_unstarted(&target);
+            let _ = process::reap_pid(&target);
             continue;
         }
         let token = sched::begin_block_interruptible()?;
@@ -1138,7 +1140,7 @@ pub fn signal(frame: &SyscallFrame) -> Result<usize, Errno> {
 ///
 /// Writes `[signo, sender_pid, 0]` as three little-endian u64 words. `WNOHANG`
 /// returns `EAGAIN` instead of blocking. The kernel queue does not interpret
-/// signal dispositions; libc/procd own the user pending set.
+/// signal dispositions; libc owns the user pending set.
 pub fn sigrecv(frame: &SyscallFrame) -> Result<usize, Errno> {
     let caller = process::current().ok_or(Errno::ESRCH)?;
     let destination = UserSlice::new(frame.rdi, 24)?;

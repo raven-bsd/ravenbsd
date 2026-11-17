@@ -19,6 +19,26 @@ regex = '^proc-attrs: cmd=1$'
 unordered = true
 
 [[expect]]
+regex = '^proc-attrs: join=1$'
+unordered = true
+
+[[expect]]
+regex = '^proc-attrs-child: join=1$'
+unordered = true
+
+[[expect]]
+regex = '^proc-attrs: session=1$'
+unordered = true
+
+[[expect]]
+regex = '^proc-attrs-child: session=1$'
+unordered = true
+
+[[expect]]
+regex = '^proc-attrs: cross-session=1$'
+unordered = true
+
+[[expect]]
 regex = '^proc-attrs: exec=1$'
 unordered = true
 

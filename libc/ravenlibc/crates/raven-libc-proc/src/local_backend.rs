@@ -1,17 +1,20 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! The early-boot `ProcBackend` used before `procd` exists.
+//! The early fallback `ProcBackend` for callers that have not wired the kernel path.
 
 use alloc::vec::Vec;
 
 use crate::backend::{EarlySpawn, ProcBackend, WaitResult};
 use crate::errors::{ECHILD, ENOSYS, ESRCH, Errno};
 use crate::ids::SetCred;
+use crate::request::{ExecRequest, ForkRequest, SpawnRequest};
 use crate::rlimit_model::RlimitTable;
-use crate::wire::{ExecRequest, ForkRequest, SpawnRequest};
 
-/// The pre-procd backend.
+/// The early fallback backend.
+///
+/// Identity is the init-process default. Spawn and wait go through the optional native spawner;
+/// operations that have no kernel path yet fail honestly with `ENOSYS`, `ESRCH` or `ECHILD`.
 #[derive(Default)]
 pub struct LocalBackend<'a> {
     /// Optional initfs spawner supplied by the shell.

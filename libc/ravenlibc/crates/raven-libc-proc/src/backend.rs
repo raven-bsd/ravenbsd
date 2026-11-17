@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! The `procd` client seam.
+//! The process backend seam.
 
 use alloc::vec::Vec;
 
 use crate::errors::Errno;
 use crate::ids::SetCred;
-use crate::wire::{ExecRequest, ForkRequest, SpawnRequest};
+use crate::request::{ExecRequest, ForkRequest, SpawnRequest};
 
-pub use crate::wire::FdMapEntry;
+pub use crate::request::FdMapEntry;
 
 /// One completed wait result.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,7 +24,7 @@ pub struct WaitResult {
     pub rusage: [u8; 144],
 }
 
-/// The native spawn seam used before `procd` exists.
+/// The native spawn seam used by the early kernel backend.
 ///
 /// P9a implements it with the shared `raven-spawn` loader and the pid -> handle table; host tests
 /// implement it with a fake.

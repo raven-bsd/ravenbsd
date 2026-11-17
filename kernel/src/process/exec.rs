@@ -61,7 +61,7 @@ pub fn replace_image(
     }
     // The current thread must be the only thread: this slice has no scheduler-side thread list
     // to suspend the siblings before the old address space is freed. Single-threaded exec is the
-    // common libc/procd path; a multi-threaded caller is refused without touching its image.
+    // common libc path; a multi-threaded caller is refused without touching its image.
     if caller.threads.load(Ordering::Acquire) != 1 {
         return Err(Errno::EBUSY);
     }
