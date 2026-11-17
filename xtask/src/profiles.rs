@@ -32,6 +32,12 @@ pub(crate) struct Initfs {
     /// resolved profile keeps it. `RAVEN_USER_RELEASE=1`/`0` can override the result.
     #[serde(default)]
     pub(crate) release: bool,
+    /// Link `/bin` user programs as dynamic PIEs against `libc.so.1`/`ld-elf.so.1`.
+    ///
+    /// `/sbin` services and `/init` stay static so early boot does not depend on the file
+    /// service; additive across `extends`/fragments like `release`.
+    #[serde(default)]
+    pub(crate) dynamic: bool,
 }
 
 /// One program entry in a profile.
@@ -157,13 +163,16 @@ struct EntrySet {
     files: Vec<File>,
     paths: BTreeMap<String, String>,
     release: bool,
+    dynamic: bool,
 }
 
 impl EntrySet {
     fn from_profile(profile: Profile, source: String) -> Self {
         let release = profile.initfs.release;
+        let dynamic = profile.initfs.dynamic;
         let mut entries = Self {
             release,
+            dynamic,
             ..Self::default()
         };
         for program in profile.initfs.programs {
@@ -179,6 +188,7 @@ impl EntrySet {
 
     fn add(&mut self, initfs: Initfs, source: String) -> Result<()> {
         self.release |= initfs.release;
+        self.dynamic |= initfs.dynamic;
         for program in initfs.programs {
             if program.package.is_empty() {
                 bail!("{source}: initfs program has an empty package");
@@ -233,6 +243,7 @@ impl EntrySet {
             programs: self.programs,
             files: self.files,
             release: self.release,
+            dynamic: self.dynamic,
         }
     }
 }

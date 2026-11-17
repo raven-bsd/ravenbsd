@@ -104,12 +104,12 @@ pub(crate) fn run_with_overrides(
 
     // The loader is always needed. A test kernel override replaces the real kernel, so there is
     // no reason to build it.
-    let code = build::run(&workspace, Component::Loader, arch, false, &[])?;
+    let code = build::run(&workspace, Component::Loader, arch, false, &[], false)?;
     if code != 0 {
         bail!("loader build failed with exit code {code}");
     }
     if overrides.kernel.is_none() {
-        let code = build::run(&workspace, Component::Kernel, arch, false, &[])?;
+        let code = build::run(&workspace, Component::Kernel, arch, false, &[], false)?;
         if code != 0 {
             bail!("kernel build failed with exit code {code}");
         }
@@ -226,7 +226,7 @@ fn build_release_initfs(
     packages.sort();
     packages.dedup();
     if !packages.is_empty() {
-        let code = build::run(workspace, Component::User, arch, true, &packages)?;
+        let code = build::run(workspace, Component::User, arch, true, &packages, false)?;
         if code != 0 {
             bail!("release user program build failed with exit code {code}");
         }

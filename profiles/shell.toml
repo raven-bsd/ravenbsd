@@ -4,6 +4,7 @@
 name = "shell"
 
 [initfs]
+dynamic = true
 programs = [
     { package = "raven-init", path = "/init" },
     { package = "raven-uname", path = "/bin/uname" },

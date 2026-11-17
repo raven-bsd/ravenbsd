@@ -22,6 +22,7 @@ fn profile(files: &[(&str, &str)]) -> Profile {
                 })
                 .collect(),
             release: false,
+            dynamic: false,
         },
         boot: Boot {
             cmdline: "console=ttyS0".to_string(),
@@ -137,7 +138,7 @@ fn non_uutils_profile_files_do_not_trigger_the_slice_build() {
 #[test]
 fn libc_outputs_are_arch_specific_and_ordered() {
     assert_eq!(
-        libc_missing(Arch::X86_64, |_| false),
+        libc_missing(Arch::X86_64, false, |_| false),
         [
             "build/x86_64/libc.a",
             "build/x86_64/crt1.o",
@@ -146,7 +147,7 @@ fn libc_outputs_are_arch_specific_and_ordered() {
         ]
     );
     assert_eq!(
-        libc_missing(Arch::Aarch64, |_| false),
+        libc_missing(Arch::Aarch64, false, |_| false),
         [
             "build/aarch64/libc.a",
             "build/aarch64/crt1.o",
@@ -154,13 +155,49 @@ fn libc_outputs_are_arch_specific_and_ordered() {
             "build/aarch64/crtn.o"
         ]
     );
-    assert!(libc_missing(Arch::X86_64, |_| true).is_empty());
+    assert!(libc_missing(Arch::X86_64, false, |_| true).is_empty());
 }
 
 #[test]
 fn a_partial_libc_pack_reports_only_the_missing_output() {
-    let missing = libc_missing(Arch::X86_64, |path| !path.ends_with("crt1.o"));
+    let missing = libc_missing(Arch::X86_64, false, |path| !path.ends_with("crt1.o"));
     assert_eq!(missing, ["build/x86_64/crt1.o"]);
+}
+
+#[test]
+fn dynamic_stage_files_are_x86_64_only_and_ordered() {
+    assert_eq!(
+        dynamic_stage_files(Arch::X86_64, true),
+        [
+            ("/lib/libc.so.1", "build/x86_64/libc.so.1".to_string()),
+            (
+                "/libexec/ld-elf.so.1",
+                "build/x86_64/ld-elf.so.1".to_string()
+            ),
+        ]
+    );
+    assert!(dynamic_stage_files(Arch::X86_64, false).is_empty());
+    assert!(dynamic_stage_files(Arch::Aarch64, true).is_empty());
+}
+
+#[test]
+fn a_dynamic_profile_requires_the_loader_and_libc_prerequisites() {
+    let mut profile = profile(&[]);
+    profile.initfs.dynamic = true;
+    let plan = prerequisite_plan(&profile, Arch::X86_64, |_| false);
+    assert_eq!(
+        plan.libc,
+        [
+            "build/x86_64/libc.a",
+            "build/x86_64/crt1.o",
+            "build/x86_64/crti.o",
+            "build/x86_64/crtn.o",
+            "build/x86_64/libc.so.1",
+            "build/x86_64/ld-elf.so.1",
+        ]
+    );
+    let aarch64 = prerequisite_plan(&profile, Arch::Aarch64, |_| false);
+    assert!(!aarch64.libc.iter().any(|path| path.ends_with(".so.1")));
 }
 
 #[test]
