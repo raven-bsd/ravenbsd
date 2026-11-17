@@ -3,10 +3,11 @@
 
 # ravenlibc libc gate report
 
-Evaluated by `libc-gate` on 2026-11-17 from commit `70f9b0f2` (origin/master `b854a1d8` merged into
-`carl/C74a`; branch-only spawn evidence removed). Every status below has an evidence file under
-`build/libc-gate/`; the table is `cargo run -q -p libc-gate -- table` from the full 90-check
-`eval` run.
+Evaluated by `libc-gate` on 2026-11-17 from the C74b tree (origin/master `1eed3518`). Every
+status below has an evidence file under `build/libc-gate/`; the table is
+`cargo run -q -p libc-gate -- table`. C74b closes the `libc-lint` row and makes `libc-pack`
+stage `build/<arch>/sysroot` repeatably; the remaining NOT MET rows are outside C74b's Owns and
+are listed with their owning lane.
 
 ## 1. Gate table
 
@@ -20,7 +21,7 @@ Evaluated by `libc-gate` on 2026-11-17 from commit `70f9b0f2` (origin/master `b8
 | 1 correctness | 1.4 differential tests (C9) | NOT MET | build/libc-gate/1.4.txt | 27 oracle families |
 | 1 correctness | 1.5 host unit tests | MET | build/libc-gate/1.5.txt | 31 host crates |
 | 1 correctness | 1.6 Miri (C11) | BLOCKED | build/libc-gate/1.6.txt | preflight command failed |
-| 1 correctness | 1.7 lints (C16) | NOT MET | build/libc-gate/1.7.txt | exit 1: expected 0 |
+| 1 correctness | 1.7 lints (C16) | MET | build/libc-gate/1.7.txt | exit 0 |
 | 2 portability | 2.1 world check | BLOCKED | build/libc-gate/2.1.txt | missing tools/libc-world/Cargo.toml; C72 outputs are not in origin/master and H-11 tarballs are absent |
 | 2 portability | 2.2 world build gate (C13) | BLOCKED | build/libc-gate/2.2.txt | missing tools/libc-world/Cargo.toml; C72 outputs are not in origin/master and H-11 tarballs are absent |
 | 3 size | 3.1 size budgets (C14) | NOT MET | build/libc-gate/3.1.txt | exit 1: expected 0 |
@@ -62,9 +63,8 @@ case now advances through `mutex/cond/once/tsd/tls/rwlock/sem/barrier` and times
   (not run) and C6 is unvendored; 0 of 4 measured rows (C71a/C71).
 * 1.4: 23 of 27 oracle families pass; `compat-crypt`, `compat-humanize`, `compat-setmode` and
   `compat-vis` fail because `raven-libc-oracle` has no `oracle-<family>` feature (C35/C71).
-* 1.7: one violation, down from the previous 43:
-  `libc/ravenlibc/crates/raven-libc/src/pthread/sem_trywait.rs:11: unsafe-scope: [missing-safety]`.
-  This is inside libc code, outside C74a's verdict-only scope; the owning libc lane must fix it.
+* 1.7: now MET, exit 0. The one `pthread/sem_trywait.rs` missing-safety violation was fixed by
+  adding the `// SAFETY:` comment in C74b.
 * 5.1: only `libc-signals` and `libc-spawn` pass; section 4 has the exact case output.
 * 5.2: both inherited qtests now fail with timeouts. `core-servers` times out after 120 s and
   `file-tools` after 240 s; both serial logs stop at `loader: RavenBSD loader 0.1 (x86_64)` and
@@ -79,7 +79,7 @@ Each row is a direct `cargo xtask qtest --case <case> --arch x86_64` run.
 |---|---|---|
 | libc-hello | FAIL | `libc-hello: FAIL auxv` (line 191) and `FAIL string` (line 195); the auxv check is the PG-50 startup block, the string check is the shell string routines. |
 | libc-stdio | FAIL | `libc-stdio: printf ok`, then `process: child killed by page fault at 0x3`; the first stdio file/stream check after printf. |
-| libc-time | ERROR (build) | The C fixture does not link: `rust-lld: undefined symbol: usleep`, `sleep`, `tzname`. This is the libc-pack sysroot gap, not a test expectation to edit. |
+| libc-time | ERROR (build) | The C fixture does not link: `rust-lld: undefined symbol: usleep`, `sleep`, `tzname`. These are genuinely absent from `libc.a` (`nm` shows only `nanosleep`); `sleep`/`usleep` are unistd and `tzname` is time (P1b), all outside C74b's Owns. C74b makes the sysroot repeatable but does not add these symbols. |
 | libc-threads | FAIL (timeout) | Last line `libc-threads: barrier ok`; `detach`, `stack`, `c11`, `exit value`, `timedwait` and `done` never print; the 300 s case timeout fires and `svcd: settled` / `init exited (0)` are absent. |
 | libc-signals | PASS | `cargo xtask qtest --case libc-signals --arch x86_64` exit 0. |
 | libc-dynamic | ERROR (build) | `shape: FAIL partial file tail at 0x0000000000000000 (offset 0x000000 + size 0x000ae4)`. The loader shape check rejects the produced file. |
@@ -89,14 +89,20 @@ Supporting acceptance:
 
 ```
 $ cargo xtask libc-lint
-libc/ravenlibc/crates/raven-libc/src/pthread/sem_trywait.rs:11: unsafe-scope: [missing-safety]
-libc-lint: 1 violation(s)
-exit 1
+libc-lint: ok (3989 files scanned)
+exit 0
 
 $ cargo run -q -p raven-atf-run -- gate --g1
 G1: NOT MET (0 of 4 measured rows)
 exit 3
 ```
+
+C74b also made `cargo xtask libc-pack` stage `build/<arch>/sysroot` (crt objects, `libc.a`, stub
+archives, base/arch/generated headers, and `libc.so.1`/`ld-elf.so.1` when produced by
+`libc-link`) and write the generated `Symbols.list` beside the archive instead of dirtying
+`libc/ravenlibc/abi/Symbols.list`. This removes the manual sysroot staging step; it does not
+change the missing `sleep`/`usleep`/`tzname` exports or the thread/dynamic/hello failures, which
+live in crates and linker paths outside C74b's Owns.
 
 ## 5. Other rows
 
