@@ -607,6 +607,38 @@ macro_rules! lda_lgamma_r {
 }
 
 #[cfg(target_arch = "aarch64")]
+macro_rules! lda_ternary {
+    ($name:ident, $inner:path) => {
+        /// `long double` ternary entry point (three `q` registers in, result in `q0`).
+        ///
+        /// # Safety
+        /// The compiler-generated C ABI contract applies.
+        #[unsafe(naked)]
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $name() -> ! {
+            core::arch::naked_asm!(
+                ".arch armv8-a+fp+simd",
+                "sub sp, sp, #80",
+                "str x30, [sp, #64]",
+                "str q0, [sp, #16]",
+                "str q1, [sp, #32]",
+                "str q2, [sp, #48]",
+                "mov x0, sp",
+                "add x1, sp, #16",
+                "add x2, sp, #32",
+                "add x3, sp, #48",
+                "bl {inner}",
+                "ldr q0, [sp, #0]",
+                "ldr x30, [sp, #64]",
+                "add sp, sp, #80",
+                "ret",
+                inner = sym $inner,
+            )
+        }
+    };
+}
+
+#[cfg(target_arch = "aarch64")]
 macro_rules! lda_scalbn_i32 {
     ($name:ident, $inner:path) => {
         /// `long double` scaling entry point with a C `int` exponent.

@@ -154,6 +154,53 @@ fn gamma_edges_exact_values_and_recurrence() {
         assert!(relative <= 1e-28, "Gamma recurrence at {value}: {relative:e}");
     }
 }
+
+#[test]
+fn fma_is_fused_and_handles_the_edges() {
+    // 3*0.5 - 1.5 is exactly zero only when fused; a mul/add fallback would leave the product's
+    // rounding behind.
+    assert_eq!(
+        ld(3.0)
+            .fma(ld(0.5), ld(-1.5))
+            .to_bits(),
+        0
+    );
+    assert_eq!(ld(1.0).fma(ld(2.0), ld(3.0)).to_f64(), 5.0);
+    assert_eq!(
+        ld(1024.0).fma(ld(1024.0), ld(-1048576.0)).to_f64(),
+        0.0
+    );
+    // Cancellation across a product that would overflow on its own.
+    let x = LD::from_bits(0x5ffe_8000_0000_0000_0000_0000_0000_0000);
+    let y = LD::from_bits(0x5fff_0000_0000_0000_0000_0000_0000_0000);
+    let z = LD::from_bits(0xfffe_ffff_ffff_ffff_ffff_ffff_ffff_ffff);
+    assert_eq!(
+        x.fma(y, z).to_bits(),
+        0xfffc_ffff_ffff_ffff_ffff_ffff_ffff_fffc
+    );
+    // Subnormal operands and result.
+    let smallest = LD::from_bits(1);
+    assert_eq!(smallest.fma(ld(2.0), smallest).to_bits(), 3);
+    assert_eq!(
+        LD::from_bits(3).fma(ld(2.0), LD::from_bits(3)).to_bits(),
+        9
+    );
+    // Special values and signed zeros.
+    assert!(ld(f64::INFINITY).fma(ld(0.0), ld(1.0)).is_nan());
+    assert!(ld(f64::NAN).fma(ld(1.0), ld(1.0)).is_nan());
+    assert!(ld(f64::INFINITY)
+        .fma(ld(1.0), ld(f64::NEG_INFINITY))
+        .is_nan());
+    assert_eq!(
+        ld(1.0).fma(ld(1.0), ld(f64::NEG_INFINITY)).to_f64(),
+        f64::NEG_INFINITY
+    );
+    assert_eq!(
+        ld(-0.0).fma(ld(1.0), ld(-0.0)).to_bits(),
+        1u128 << 127
+    );
+    assert_eq!(ld(0.0).fma(ld(1.0), ld(-0.0)).to_bits(), 0);
+}
 EOF
 
 if ! "$rustc" --edition 2021 --test -O -o "$tmp/harness" "$tmp/harness.rs" 2>"$tmp/build.err"; then
@@ -170,7 +217,7 @@ echo "check-ld-special: ok $(grep -c '^test .* ok$' "$tmp/run.log") edge tests"
 
 map=libc/ravenlibc/crates/raven-libc/Symbol.map
 missing=''
-for name in erfl erfcl gammal lgammal lgammal_r tgammal; do
+for name in erfl erfcl gammal lgammal lgammal_r tgammal fmal; do
     if ! grep -qE "^[[:space:]]*$name; # x86_64 aarch64$" "$map"; then
         missing="$missing $name"
     fi
@@ -179,5 +226,5 @@ if [ -n "$missing" ]; then
     echo "check-ld-special: FAIL Symbol.map rows missing aarch64:$missing" >&2
     exit 1
 fi
-echo "check-ld-special: ok Symbol.map carries the aarch64 tag for all 6 names"
+echo "check-ld-special: ok Symbol.map carries the aarch64 tag for all 7 names"
 echo "check-ld-special: PASS"

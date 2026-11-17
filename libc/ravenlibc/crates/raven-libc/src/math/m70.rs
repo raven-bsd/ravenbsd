@@ -610,7 +610,7 @@ pub mod g15 {
     lda_unary!(tgammal, tgammal_inner);
 }
 
-/// `lgammal_r`.
+/// `lgammal_r`, `fmal`.
 pub mod g16 {
     use raven_libc_m::LongDouble;
 
@@ -623,5 +623,18 @@ pub mod g16 {
         }
     }
 
+    extern "C" fn fmal_inner(
+        out: *mut LongDouble,
+        x: *const LongDouble,
+        y: *const LongDouble,
+        z: *const LongDouble,
+    ) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::fmal(*x, *y, *z);
+        }
+    }
+
     lda_lgamma_r!(lgammal_r, lgammal_r_inner);
+    lda_ternary!(fmal, fmal_inner);
 }
