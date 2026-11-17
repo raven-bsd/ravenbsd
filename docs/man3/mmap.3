@@ -4,10 +4,10 @@
 .Dt MMAP 3
 .Os RavenBSD
 .Sh NAME
-.Nm mmap
-.Nm munmap
-.Nm mprotect
-.Nm madvise
+.Nm mmap ,
+.Nm munmap ,
+.Nm mprotect ,
+.Nm madvise ,
 .Nm mincore
 .Nd map and protect memory
 .Sh SYNOPSIS
@@ -30,11 +30,12 @@ reports residency; .Fn madvise supplies usage advice.
 .Sh ERRORS
 .Er EINVAL is returned for an invalid length or advice. .Er ENOMEM is returned when the
 mapping cannot be created. .Er EACCES is returned for a protection conflict.
+.Sh SEE ALSO
+.Xr libc 7
 .Sh STANDARDS
 POSIX.1-2024; ring 0.
 .Sh CAVEATS
-MAP_FIXED replaces an existing mapping. Unsupported .Fn madvise advice is ignored. .Fn mincore
-reports the mappings the kernel can inspect. See document 08 and document 11.
-.Sh SEE ALSO
-.Xr mmap 2
-.Xr libc 7
+MAP_FIXED replaces an existing mapping.
+Unsupported .Fn madvise advice is ignored.
+.Fn mincore reports the mappings the kernel can inspect.
+See document 08 and document 11.

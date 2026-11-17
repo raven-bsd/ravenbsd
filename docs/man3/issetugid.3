@@ -4,7 +4,7 @@
 .Dt ISSETUGID 3
 .Os RavenBSD
 .Sh NAME
-.Nm issetugid
+.Nm issetugid ,
 .Nm getauxval
 .Nd query process security state
 .Sh SYNOPSIS
@@ -21,11 +21,10 @@ reads the auxiliary vector supplied by the loader.
 .Sh ERRORS
 .Fn getauxval sets .Er ENOENT when the entry is absent in some implementations; ravenlibc
 returns 0.
+.Sh SEE ALSO
+.Xr libc 7
 .Sh STANDARDS
 BSD and glibc extension; ring 1 and ring 2.
 .Sh CAVEATS
 .Fn issetugid is always 0 because RavenBSD has no setuid exec path. AT_SECURE is always 0.
 See H-7.
-.Sh SEE ALSO
-.Xr getauxval 3
-.Xr libc 7

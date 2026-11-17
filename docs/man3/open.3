@@ -4,9 +4,9 @@
 .Dt OPEN 3
 .Os RavenBSD
 .Sh NAME
-.Nm open
-.Nm openat
-.Nm fcntl
+.Nm open ,
+.Nm openat ,
+.Nm fcntl ,
 .Nm ioctl
 .Nd open files and control descriptors
 .Sh SYNOPSIS
@@ -28,11 +28,10 @@ value or -1.
 .Sh ERRORS
 .Er ENOENT, .Er EACCES, .Er EINVAL and .Er EBADF follow the POSIX rules for the descriptor
 and path.
+.Sh SEE ALSO
+.Xr libc 7
 .Sh STANDARDS
 POSIX.1-2024; ring 0 and ring 1.
 .Sh CAVEATS
-A path such as name:x is always a file name, never a scheme. The ioctl request set is the one
-ravenlibc implements; see document 11 section 3.4.
-.Sh SEE ALSO
-.Xr open 2
-.Xr libc 7
+A path such as name:x is always a file name, never a scheme.
+The ioctl request set is the one ravenlibc implements; see document 11 section 3.4.

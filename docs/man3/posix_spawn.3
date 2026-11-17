@@ -4,9 +4,9 @@
 .Dt POSIX_SPAWN 3
 .Os RavenBSD
 .Sh NAME
-.Nm posix_spawn
-.Nm posix_spawnp
-.Nm system
+.Nm posix_spawn ,
+.Nm posix_spawnp ,
+.Nm system ,
 .Nm popen
 .Nd spawn a process or run a command
 .Sh SYNOPSIS
@@ -20,19 +20,21 @@
 .Ft FILE *
 .Fn popen "const char *command" "const char *mode"
 .Sh DESCRIPTION
-The spawn family starts a program without replacing the caller. The convenience functions
-system and popen build on the same path.
+The spawn family starts a program without replacing the caller.
+The convenience functions system and popen build on the same path.
 .Sh RETURN VALUES
 The spawn functions return 0 on success and an errno value on failure. .Fn system returns the
 child status or -1. .Fn popen returns a stream or a null pointer.
 .Sh ERRORS
 .Er ENOENT is returned when the program is absent. .Er ENOSYS is returned for a file action or
 pipe that needs an external spawn backend.
+.Sh SEE ALSO
+.Xr fork 3 ,
+.Xr libc 7
 .Sh STANDARDS
 POSIX.1-2024; ring 0.
 .Sh CAVEATS
-Initfs binaries work first. File actions and pipes that need an external spawn backend are not
-implemented; the affected forms fail honestly. See C53 and document 10.
-.Sh SEE ALSO
-.Xr fork 3
-.Xr libc 7
+Initfs binaries work first.
+File actions and pipes that need an external spawn backend are not implemented; the affected
+forms fail honestly.
+See C53 and document 10.

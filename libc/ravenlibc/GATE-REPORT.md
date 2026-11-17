@@ -37,7 +37,7 @@ host tooling, and are listed with their owning lane.
 | 5 on-target | 5.2.file-tools file-tools regression | MET | build/libc-gate/5.2.file-tools.txt | exit 0: minimal `core-servers-files` profile; `df` reports `/`, `/tmp` and the device mounts from `/etc/mounts`; `tooltest: ok` |
 | 5 on-target | 5.3 second architecture | INFO | build/libc-gate/5.3.txt | aarch64: not delivered (C73 open item); owner decides whether G1 closes on x86_64 alone |
 | 6 documentation | 6.1 page coverage | MET | build/libc-gate/6.1.txt | exit 0 |
-| 6 documentation | 6.2 render lint | BLOCKED | build/libc-gate/6.2.txt | preflight command failed |
+| 6 documentation | 6.2 render lint | MET | build/libc-gate-c74ai/6.2.txt | exit 0; mandoc 1.14.6-1, 17 pages lint + utf8 render |
 | 6 documentation | 6.3 existing docs gate | MET | build/libc-gate/6.3.txt | exit 0 |
 | 6 documentation | 6.4 libc(7) | MET | build/libc-gate/6.4.txt | docs/man7/libc.7 exists |
 
@@ -47,13 +47,14 @@ Verdict: NOT MET
 
 **libc gate: NOT MET.**
 
-Rows 1 (correctness), 3 (size), 4 (hardening) and 5 (on-target) are NOT MET. Rows 2
-(portability) and 6 (documentation) are BLOCKED. MET checks: symbol coverage, the packed symbol
+Rows 1 (correctness), 3 (size), 4 (hardening) and 5 (on-target) are NOT MET. Row 2
+(portability) is BLOCKED; row 6 (documentation) is now MET, including the 6.2 render lint. MET
+checks: symbol coverage, the packed symbol
 list, the target-case symbol audit (now exit 0), the 31 host unit-test crates, fuzz replay, the
-hardened allocator default, page coverage, the existing docs gate and `libc(7)`. The gate cannot
+hardened allocator default, page coverage, the render lint, the existing docs gate and `libc(7)`.
+The gate cannot
 close because of the lint violations, missing G1/donor data, the size-budget lane, the
-`inet_text` soak, the three P1b target cases, the core-servers/file-tools regression and
-unavailable Miri/world/mandoc.
+`inet_text` soak, the three P1b target cases and the core-servers/file-tools regression.
 
 `libc-dynamic`, `libc-signals`, `libc-spawn` and `libc-threads` are green. The remaining target
 failures are P1b (`libc-hello` string, `libc-stdio`, `libc-time` sleep/usleep/tzname).
@@ -88,7 +89,8 @@ failures are P1b (`libc-hello` string, `libc-stdio`, `libc-time` sleep/usleep/tz
   `core-servers-files` profiles. C74v implemented the RavenBSD `read_fs_list` from the real
   `/etc/mounts` table, so `df` reports `/`, `/tmp` and the device schemes; `core-servers` and
   `file-tools` both exit 0 (`tooltest: ok`, `svcd: settled`, `init exited (0)`).
-* 6.2 mandoc: BLOCKED. `which mandoc` exits 1; the render lint cannot run.
+* 6.2 mandoc: **MET**. mandoc 1.14.6-1 lints and renders the 17 gate pages; the reproducible
+  command is `sh scripts/check-mandoc.sh` (lint at `-Wwarning` plus `-Tutf8`).
 
 ## 4. Seven-case matrix (OBSERVED, 2026-11-17, C74h)
 
@@ -147,7 +149,7 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
   C74z-S11 full three-arch rebuild + B-only/layout fix (44 S/F + 2 `INV-S-P2-P0` + 2 boot
   remain); table in `tests/libc/size/TRIAGE.md`.
 * 4.2: NOT MET, the `inet_text` soak has no duration, one crash and no executions.
-* 6.2: BLOCKED, `which mandoc` exits 1.
+* 6.2: MET, `sh scripts/check-mandoc.sh` and `libc-gate eval --only 6.2` exit 0.
 
 ## 6. C74h evidence refresh (OBSERVED, origin/master `beedfbbd`; 3.1 re-evaluated by C74z-S11 on `72c630bd`)
 
@@ -164,7 +166,7 @@ repairs the dynamic fixture's TLS constructor/build. The remaining libc failures
 | 4.2 soak | `tests/libc/fuzz/SOAK.md` | `inet_text` crashed before 1 h; 13 targets 3600 s/0 crashes → NOT MET |
 | 5.1 target | qtest JSON from `eval` | dynamic, signals, spawn, threads pass; hello, stdio, time fail (P1b) |
 | 5.2 kernel | `qtest core-servers` / `qtest file-tools` | both MET: minimal profiles; `df` reads `/etc/mounts`; `tooltest: ok`, `init exited (0)` |
-| 6.2 mandoc | `which mandoc` | exit 1; not installed → BLOCKED |
+| 6.2 mandoc | `scripts/check-mandoc.sh` + `libc-gate eval --only 6.2` | exit 0; 17 pages lint clean with mandoc 1.14.6-1 → MET |
 
 `cargo run -q -p libc-gate -- eval` evaluated 90 checks; `table` and `verdict` exit 1 with
 `NOT MET`. `scripts/libc-symbol-audit.sh` and `cargo xtask libc-audit` both exit 0. The only
