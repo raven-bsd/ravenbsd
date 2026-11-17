@@ -199,7 +199,11 @@ wait = '^PID PPID UID GID CMD$'
 timeout_secs = 30
 
 [[step]]
-wait = '^1 [0-9]+ 0 0 init$'
+wait = '^1 0 0 0 /init$'
+timeout_secs = 30
+
+[[step]]
+wait = '^[0-9]+ [0-9]+ 0 0 ps$'
 timeout_secs = 30
 
 [[step]]

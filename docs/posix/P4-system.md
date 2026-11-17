@@ -3,14 +3,12 @@
 
 # P4d/P4o: POSIX system and process utilities
 
-Status: PARTIAL. Twelve rows are present with executable evidence; one row remains a defect:
+Status: DONE. All thirteen system rows are present with executable evidence:
 
-* `util.ps` — `ps -e` exposes pid/ppid/uid/gid, but no pid-to-command source exists, so `cmd`
-  is `?`. `P4d-D2`.
+* `ps -e` now requests 41 `PROC_PID_INFO` words and prints the kernel command name after word 8.
+* `mesg`, `logger` and `renice` pass; the combined system family is **13/13**.
 
-The P4u three-row batch is complete: `mesg`, `logger` and `renice` all pass. The combined
-system family is 12/13, with only P4o's `util.ps` outstanding. No row is waived and no missing
-behavior is claimed present. The docs gate is green.
+No row is waived and no missing behavior is claimed present. The docs gate is green.
 
 This is a host/QEMU test result. It is not a board result and it does not change the release
 profile or the release gate.
@@ -27,9 +25,9 @@ The fixture builds user programs with `--release`: the kernel `PROC_EXEC` path c
 1 MiB, and debug builds of `whoami`/`nice` exceed it. Release builds are ~40–60 KiB and let
 `env`/`nice`/`nohup` exec commands through the P2k path.
 
-The rev 38 merge is `origin/master` `b75f0497` (includes `104022c7` and the kernel process
-model). `PROC_PID_INFO` still writes only eight words (pid, ppid, pgid, sid, uid, euid, gid,
-egid), so `ps -e` cannot fill `cmd`.
+The rev 40 merge is `origin/master` `39ffb945` (includes P2o/P2r command names). `PROC_PID_INFO`
+accepts 8..=41 words; count 41 appends the UTF-8 command name at byte offset 64. `ps -e`
+requests all 41 words and prints that command.
 The tty write-permission operation lives in `raven-proto-tty`, `consd` and `ttyd`; `fstat`
 reflects the persistent group-write bit, only root may change it, and `mesg` queries/sets
 through the same protocol.
@@ -54,7 +52,7 @@ test instead. A row with executable evidence is `PASS`; a row with a defect id i
 | `util.mesg` | `mesg` | **present** | `qtest:posix-util-system` — y/n via tty protocol, fstat bit, non-tty error |
 | `util.logger` | `logger` | **present** | `qtest:posix-util-system` — priority/tag record through `log:`, dmesg readback |
 | `util.renice` | `renice` | **present** | `qtest:posix-util-system` — set/query niceness, kernel permission rules |
-| `util.ps` | `ps` | **defect** | `P4d-D2` — pid/ppid/uid/gid work, `cmd` is `?` |
+| `util.ps` | `ps` | **present** | `qtest:posix-util-system` — 41-word `PROC_PID_INFO`, kernel command name after word 8 |
 
 `hostname` and `whoami` are exercised as adjacent first-party tools; they are not POSIX profile
 rows and are not claimed in the overlay.
@@ -96,19 +94,11 @@ serial is therefore treated as the non-terminal case: the utility execs the comm
 preserves its exit status with no redirect. The terminal-only `nohup.out` redirect is the
 waived part; the exact follow-up is a libc/tty output-handle API (`isatty`, `dup2`).
 
-## Remaining defect
+## Defect status
 
-| Defect | Row | Exact missing piece | Follow-up |
-|---|---|---|---|
-| `P4d-D2` | `util.ps` | no command-name/path source for a pid. The kernel keeps `Process.path`, but `PROC_PID_INFO` writes only identity, not the command. `svc:` status exposes a service-local handle, not a pid. `ps -e` therefore prints `?` for `cmd` | add a kernel pid-path query (P2o), then print the real `cmd` |
-
-`P4u-D1` is resolved by the tty write-permission operation in `raven-proto-tty`, `consd` and
-`ttyd`: the setting is persistent, `fstat` reflects the group-write bit, root is required to
-change it, and `mesg` queries/sets through the same protocol.
-
-`P4d-D1` (`id -r`) remains resolved by the uutils `id`. `P4d-D3`..`D8` are resolved by the
-first-party `env`, `getconf`, `kill` and `nice` implementations. `P4d-D9` is reduced to the
-terminal-only nohup redirect waiver above.
+All thirteen system rows are present; there is no remaining row defect. `P4d-D2` is resolved
+by the P2o/P2r 41-word `PROC_PID_INFO` command name. `P4u-D1` remains resolved by the tty
+write-permission operation, and the P4d/P4o/P4u follow-ups above are unchanged.
 
 ## Man pages
 
@@ -128,13 +118,12 @@ docs/man1/renice.1
 
 ## Evidence overlay
 
-`docs/posix/evidence/P4-system.toml` registers the twelve present rows:
+`docs/posix/evidence/P4-system.toml` registers the thirteen present rows:
 
 * `util.id`, `util.uname`, `util.env`, `util.getconf`, `util.kill`, `util.nice`,
-  `util.nohup`, `util.mesg`, `util.logger`, `util.renice` with `qtest:posix-util-system`.
+  `util.nohup`, `util.mesg`, `util.logger`, `util.renice`, `util.ps` with
+  `qtest:posix-util-system`.
 * `util.tty`, `util.stty` with their host test scripts.
-
-`util.ps` is not in the overlay.
 
 ## Acceptance
 
@@ -146,7 +135,7 @@ Exit code: **0**
 posix-util-system: qtest PASS (log build/posix/utility/system/qtest.log)
 row	tool	status	command	detail
 util.id	id	PASS	id	qtest
-util.ps	ps	DEFECT	ps -e	P4d-D2
+util.ps	ps	PASS	ps -e	qtest
 util.uname	uname	PASS	uname -a	qtest
 util.env	env	PASS	env	qtest
 util.getconf	getconf	PASS	getconf ARG_MAX	qtest
@@ -160,7 +149,7 @@ util.logger	logger	PASS	logger -t p4u hello	qtest
 util.renice	renice	PASS	renice -n 5 -p 1	qtest
 ```
 
-The QEMU case passed in 24378 ms with `exit_status: 33` and no unmatched expectation.
+The QEMU case passed in 23075 ms with `exit_status: 33` and no unmatched expectation.
 
 ### `cargo xtask qtest --case posix-util-system --arch x86_64`
 
@@ -171,10 +160,10 @@ Exit code: **0** — `posix-util-system: pass`.
 Exit code: **1** (global gate still release-blocked outside P4d/P4o)
 
 ```
-posix-check: 923 pass, 876 fail, 10 skip; FAIL (release blocked)
+posix-check: 938 pass, 862 fail, 10 skip; FAIL (release blocked)
 ```
 
-The twelve P4d/P4o/P4u present rows pass; `util.ps` stays fail as a defect.
+All thirteen P4d/P4o/P4u present rows pass; no system-family row is left failing.
 
 ### `make check-fast`
 
@@ -182,25 +171,18 @@ Exit code: **0** — **check-fast: PASSED**
 
 ```
 check-fast summary:
-  ok       guard (exit 0, 19.41s)
-  ok       fmt (exit 0, 31.80s)
-  ok       clippy (host) (exit 0, 2.09s)
-  ok       tests (host, parallel) (exit 0, 78.89s)
-  ok       tests (doc) (exit 0, 18.07s)
-  ok       profiles (exit 0, 0.13s)
-  ok       provenance (exit 0, 84.72s)
-  skipped  clippy kernel x86_64 (--fast)
-  skipped  clippy kernel aarch64 (--fast)
-  skipped  clippy user programs x86_64 (--fast)
-  skipped  clippy loader x86_64 (--fast)
-  ok       docs (exit 0, 0.13s)
+  ok       guard (exit 0, 5.20s)
+  ok       fmt (exit 0, 9.98s)
+  ok       clippy (changed) (exit 0, 0.49s)
+  ok       tests (changed, parallel) (exit 0, 3.50s)
+  ok       profiles (exit 0, 0.07s)
 check-fast: PASSED
 ```
 
 ## Limitations
 
 * The target is QEMU x86_64 only. No board log was produced and no release claim is made.
-* Twelve rows pass; `util.ps` remains the only exact defect. The system family is 12/13.
+* All thirteen rows pass; no system-family row defect remains.
 * `env`, `nice` and `nohup` copy a bounded set of well-known environment variables (`PATH`,
   `HOME`, `USER`, `LOGNAME`, `SHELL`, `PWD`, `TERM`) because `raven_rt::Args` exposes only
   `env_get`, not an environment iterator. Arbitrary exported variables are not inherited by
