@@ -17,7 +17,7 @@ use crate::types::FmtErr;
 pub(crate) const NULL_STRING: &[u8] = b"(null)";
 
 /// The narrow `%s` length: `min(strlen, prec)` bytes.
-pub(crate) fn cstr_size<A: FmtEnv>(args: &mut A, ptr: usize, prec: i32) -> usize {
+pub(crate) fn cstr_size<A: FmtEnv + ?Sized>(args: &mut A, ptr: usize, prec: i32) -> usize {
     let max = if prec < 0 { usize::MAX } else { prec as usize };
     args.cstr_len(ptr, max)
 }
@@ -25,7 +25,7 @@ pub(crate) fn cstr_size<A: FmtEnv>(args: &mut A, ptr: usize, prec: i32) -> usize
 /// Emit exactly `len` bytes of a narrow string as output units.
 ///
 /// The byte values are passed through unchanged; this is only used for narrow output.
-pub(crate) fn emit_cstr<C: CharUnit, S: Sink<C>, A: FmtEnv>(
+pub(crate) fn emit_cstr<C: CharUnit, S: Sink<C> + ?Sized, A: FmtEnv + ?Sized>(
     sink: &mut S,
     args: &mut A,
     ptr: usize,
@@ -52,7 +52,7 @@ pub(crate) fn emit_cstr<C: CharUnit, S: Sink<C>, A: FmtEnv>(
 ///
 /// # Errors
 /// [`FmtErr::Encoding`] for an invalid wide character or an incomplete multibyte state.
-pub(crate) fn wstr_mb_size<A: FmtEnv>(
+pub(crate) fn wstr_mb_size<A: FmtEnv + ?Sized>(
     args: &mut A,
     ptr: usize,
     prec: i32,
@@ -87,7 +87,7 @@ pub(crate) fn wstr_mb_size<A: FmtEnv>(
 ///
 /// # Errors
 /// [`FmtErr::Encoding`] for invalid wide input.
-pub(crate) fn emit_wstr_mb<C: CharUnit, S: Sink<C>, A: FmtEnv>(
+pub(crate) fn emit_wstr_mb<C: CharUnit, S: Sink<C> + ?Sized, A: FmtEnv + ?Sized>(
     sink: &mut S,
     args: &mut A,
     ptr: usize,
@@ -122,13 +122,13 @@ pub(crate) fn emit_wstr_mb<C: CharUnit, S: Sink<C>, A: FmtEnv>(
 }
 
 /// The wide `%ls` length in characters (`wstr_len`, cut by `prec` characters).
-pub(crate) fn wstr_size<A: FmtEnv>(args: &mut A, ptr: usize, prec: i32) -> usize {
+pub(crate) fn wstr_size<A: FmtEnv + ?Sized>(args: &mut A, ptr: usize, prec: i32) -> usize {
     let max = if prec < 0 { usize::MAX } else { prec as usize };
     args.wstr_len(ptr, max)
 }
 
 /// Emit exactly `len` wide characters.
-pub(crate) fn emit_wstr<C: CharUnit, S: Sink<C>, A: FmtEnv>(
+pub(crate) fn emit_wstr<C: CharUnit, S: Sink<C> + ?Sized, A: FmtEnv + ?Sized>(
     sink: &mut S,
     args: &mut A,
     ptr: usize,
@@ -153,7 +153,7 @@ pub(crate) fn emit_wstr<C: CharUnit, S: Sink<C>, A: FmtEnv>(
 /// Stream `total` bytes of multibyte input through a decoder, one character at a time.
 ///
 /// The closure returns `false` to stop before the next character.
-fn decode_mb<A: FmtEnv>(
+fn decode_mb<A: FmtEnv + ?Sized>(
     args: &mut A,
     ptr: usize,
     total: usize,
@@ -224,7 +224,7 @@ fn decode_mb<A: FmtEnv>(
 ///
 /// # Errors
 /// [`FmtErr::Encoding`] for invalid multibyte input.
-pub(crate) fn mb_wstr_size<A: FmtEnv>(
+pub(crate) fn mb_wstr_size<A: FmtEnv + ?Sized>(
     args: &mut A,
     ptr: usize,
     prec: i32,
@@ -247,7 +247,7 @@ pub(crate) fn mb_wstr_size<A: FmtEnv>(
 ///
 /// # Errors
 /// [`FmtErr::Encoding`] for invalid multibyte input.
-pub(crate) fn emit_mb_wstr<C: CharUnit, S: Sink<C>, A: FmtEnv>(
+pub(crate) fn emit_mb_wstr<C: CharUnit, S: Sink<C> + ?Sized, A: FmtEnv + ?Sized>(
     sink: &mut S,
     args: &mut A,
     ptr: usize,
@@ -280,7 +280,7 @@ pub(crate) fn wchar_size(wc: u32, mode: MbMode) -> Result<usize, FmtErr> {
 /// # Errors
 /// [`FmtErr::Encoding`] or [`FmtErr::Sink`].
 #[cfg(test)]
-pub(crate) fn emit_wchar<C: CharUnit, S: Sink<C>>(
+pub(crate) fn emit_wchar<C: CharUnit, S: Sink<C> + ?Sized>(
     sink: &mut S,
     wc: u32,
     mode: MbMode,

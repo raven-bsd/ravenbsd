@@ -126,7 +126,7 @@ impl<'a> Grouping<'a> {
     ///
     /// # Errors
     /// [`FmtErr::Sink`] when the sink fails.
-    pub(crate) fn print<C: CharUnit, S: Sink<C>>(
+    pub(crate) fn print<C: CharUnit, S: Sink<C> + ?Sized>(
         mut self,
         sink: &mut S,
         digits: &[u8],
@@ -155,7 +155,7 @@ impl<'a> Grouping<'a> {
     }
 }
 
-fn piece<C: CharUnit, S: Sink<C>>(
+fn piece<C: CharUnit, S: Sink<C> + ?Sized>(
     sink: &mut S,
     digits: &[u8],
     off: &mut usize,
@@ -180,7 +180,7 @@ fn piece<C: CharUnit, S: Sink<C>>(
 }
 
 /// Write ASCII bytes as output units (narrow: one unit per byte).
-pub(crate) fn write_ascii<C: CharUnit, S: Sink<C>>(
+pub(crate) fn write_ascii<C: CharUnit, S: Sink<C> + ?Sized>(
     sink: &mut S,
     bytes: &[u8],
 ) -> Result<(), FmtErr> {
@@ -191,7 +191,7 @@ pub(crate) fn write_ascii<C: CharUnit, S: Sink<C>>(
 }
 
 /// Write one multibyte string as output units (wide output decodes it).
-pub(crate) fn write_mb<C: CharUnit, S: Sink<C>>(
+pub(crate) fn write_mb<C: CharUnit, S: Sink<C> + ?Sized>(
     sink: &mut S,
     bytes: &[u8],
     mode: MbMode,
@@ -213,7 +213,7 @@ pub(crate) fn write_mb<C: CharUnit, S: Sink<C>>(
     Ok(())
 }
 
-fn write_sep<C: CharUnit, S: Sink<C>>(
+fn write_sep<C: CharUnit, S: Sink<C> + ?Sized>(
     sink: &mut S,
     sep: &[u8],
     mode: MbMode,

@@ -502,7 +502,7 @@ pub(crate) fn analyse<C: CharUnit>(fmt: &[C]) -> Result<Analysis, FmtErr> {
 ///
 /// # Errors
 /// [`FmtErr::Invalid`] for a gap or a table index outside [`NL_ARGMAX`].
-pub(crate) fn fetch<A: VaReader>(
+pub(crate) fn fetch<A: VaReader + ?Sized>(
     table: &TypeTable,
     reader: &mut A,
 ) -> Result<([ArgVal; NL_ARGMAX + 1], [ArgTag; NL_ARGMAX + 1]), FmtErr> {

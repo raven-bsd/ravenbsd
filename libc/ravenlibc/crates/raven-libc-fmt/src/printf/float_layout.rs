@@ -83,7 +83,7 @@ const INT_MAX: i64 = i32::MAX as i64;
 /// exhausted, [`FmtErr::Sink`] when the sink fails, and [`FmtErr::Overflow`] when the result
 /// would exceed `INT_MAX`.
 #[inline(never)]
-pub(crate) fn emit<C: CharUnit, S: Sink<C>, F: FloatFmt>(
+pub(crate) fn emit<C: CharUnit, S: Sink<C> + ?Sized, F: FloatFmt + ?Sized>(
     sink: &mut S,
     conv: &FloatConv,
     bits: FloatBits,
@@ -103,7 +103,7 @@ pub(crate) fn emit<C: CharUnit, S: Sink<C>, F: FloatFmt>(
     }
 }
 
-fn emit_inner<C: CharUnit, S: Sink<C>, F: FloatFmt>(
+fn emit_inner<C: CharUnit, S: Sink<C> + ?Sized, F: FloatFmt + ?Sized>(
     sink: &mut S,
     conv: &FloatConv,
     bits: FloatBits,
@@ -186,7 +186,6 @@ fn emit_inner<C: CharUnit, S: Sink<C>, F: FloatFmt>(
     } else {
         flags |= FPT;
         ndigits = out.len;
-        let digits = buf.get(..ndigits).unwrap_or(&[]);
         if ch == b'g' || ch == b'G' {
             if out.decpt > -4 && out.decpt <= prec {
                 expchar = 0;
@@ -225,7 +224,6 @@ fn emit_inner<C: CharUnit, S: Sink<C>, F: FloatFmt>(
                 gs = Some(g);
             }
         }
-        let _ = digits;
     }
 
     let mut realsz = size;
@@ -344,7 +342,11 @@ fn emit_inner<C: CharUnit, S: Sink<C>, F: FloatFmt>(
 }
 
 /// The R-13 dummy: print `*float*` (width and the generic field rules apply) and continue.
-fn stub<C: CharUnit, S: Sink<C>>(sink: &mut S, conv: &FloatConv, ret: i64) -> Result<i64, FmtErr> {
+fn stub<C: CharUnit, S: Sink<C> + ?Sized>(
+    sink: &mut S,
+    conv: &FloatConv,
+    ret: i64,
+) -> Result<i64, FmtErr> {
     let text = b"*float*";
     let size = text.len() as i64;
     let realsz = size;
@@ -382,7 +384,7 @@ fn stub<C: CharUnit, S: Sink<C>>(sink: &mut S, conv: &FloatConv, ret: i64) -> Re
 }
 
 /// The donor's `PRINTANDPAD(p, ep, len, zeroes)` at a digit offset.
-fn and_pad<C: CharUnit, S: Sink<C>>(
+fn and_pad<C: CharUnit, S: Sink<C> + ?Sized>(
     sink: &mut S,
     digits: &[u8],
     off: usize,
