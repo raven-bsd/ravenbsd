@@ -487,7 +487,7 @@ impl<F: FileSystem> Handler for FsHandler<F> {
         match decoded.call {
             Call::Readlink { path } => {
                 let path = bytes_to_string(path)?;
-                if let Err(error) = self.check_traverse(path, &credentials) {
+                if let Err(error) = self.check_traverse(parent_path(path), &credentials) {
                     return self.status(response, -i32::from(error.0));
                 }
                 let ino = match self.fs.resolve_nofollow(path) {

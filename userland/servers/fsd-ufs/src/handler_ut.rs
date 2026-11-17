@@ -78,10 +78,9 @@ impl FileSystem for FakeFs {
     }
 
     fn resolve_nofollow(&mut self, path: &str) -> Result<u32, Errno> {
-        if path == "/link" {
-            Ok(LINK)
-        } else {
-            self.resolve(path)
+        match path {
+            "/link" | "/dangling" | "dangling" => Ok(LINK),
+            _ => self.resolve(path),
         }
     }
 
@@ -153,6 +152,7 @@ fn ctx() -> Ctx {
         buffer_len: 0,
         response_len: 0,
         credentials: Credentials::ROOT,
+        trace_id: 0,
     }
 }
 
@@ -281,6 +281,24 @@ fn readlink_call_returns_the_target() {
     match CallResponse::decode(request.op(), &response[..length]).expect("response") {
         CallResponse::Readlink { status: 0, target } => assert_eq!(target, b"target"),
         other => panic!("unexpected response: {other:?}"),
+    }
+}
+
+#[test]
+fn readlink_does_not_follow_the_final_symlink() {
+    let mut handler = opened();
+    for path in [b"dangling".as_slice(), b"/dangling"] {
+        let request = CallRequest::new(Call::Readlink { path });
+        let mut encoded = [0u8; 64];
+        let length = request.encode(&mut encoded).expect("encode");
+        let mut response = [0u8; MAX_PATH + 8];
+        let length = handler
+            .call(7, &encoded[..length], &mut response)
+            .expect("call");
+        match CallResponse::decode(request.op(), &response[..length]).expect("response") {
+            CallResponse::Readlink { status: 0, target } => assert_eq!(target, b"target"),
+            other => panic!("readlink {path:?} returned {other:?}"),
+        }
     }
 }
 
