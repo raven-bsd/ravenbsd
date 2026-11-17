@@ -114,4 +114,6 @@ reported state/transition counts are printed by the test.
 
 Wire format and `MsgHeader` (`R-IPC-4..7`), syscall numbers (`0x110..0x11F`), handle movement in
 flight, rights, the idle-server list and direct handoff (`R-IPC-12..18`), rings, and the scheme
-compatibility façade. This crate must not depend on `raven-abi` or the kernel.
+compatibility façade. The `MsgHeader.trace_id` field (`R-IPC-4`) is likewise absent here: trace
+correlation belongs to Q2 `raven-trace-core` and Q3 trace-context-in-IPC, which layer the field on
+top of this state machine. This crate must not depend on `raven-abi` or the kernel.
