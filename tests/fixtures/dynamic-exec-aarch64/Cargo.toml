@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-dynamic-exec-aarch64"
+version = "0.1.0"
+description = "S82 aarch64 dynamic-exec fixture: a static /init that execs an ET_DYN + PT_INTERP image."
+edition = "2024"
+license = "BSD-3-Clause"
+authors = ["Bo Maryniuk and RavenBSD contributors"]
+rust-version = "1.97"
+
+# Standalone workspace: S82 owns this fixture but not the root workspace member list.
+[workspace]
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "raven-dynamic-exec-aarch64-init"
+path = "src/bin/init.rs"
+
+[dependencies]
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }

@@ -81,6 +81,10 @@ already-mapped main (do not re-map it), use `AT_BASE` as the loader's own load b
 `DT_NEEDED` closure through the file scheme, and transfer to `AT_ENTRY` on the original stack.
 The kernel does not map or resolve `libc.so.1`; that remains the loader's job.
 
+The aarch64 path uses the same generic exec code; its trap-frame installer writes the new
+`elr` and `sp` and clears `x0`-`x30`. The parity case is `dynamic-exec-aarch64`, with an
+`aarch64-unknown-none-softfloat` static launcher and the same auxv contract.
+
 ## Identity and handles
 
 The process id, parent, process group, session, credentials, namespace and handle table are
@@ -122,7 +126,8 @@ cargo xtask qtest --case dynamic-exec --arch x86_64
 in a static launcher, and runs the launcher as a `libc-test` service. The launcher replaces itself
 through `PROC_EXEC`; the expected serial is `dynamic-exec: launching`, `svcd: settled`,
 `init exited (0)`. The fixture's shape check fails if the target is not `ET_DYN`, has no
-`PT_INTERP /libexec/ld-elf.so.1`, or does not need `libc.so.1`.
+`PT_INTERP /libexec/ld-elf.so.1`, or does not need `libc.so.1`. `dynamic-exec-aarch64` is the
+same check for the aarch64 sysroot (`cargo xtask libc-pack/libc-link --arch aarch64`).
 
 The fixture creates a plain pipe, an `O_CLOEXEC` pipe and a pipe named in the explicit close
 list, records its identity in the environment, runs a bad image and an oversized raw request
