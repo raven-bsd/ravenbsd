@@ -23,8 +23,6 @@ use core::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, Ordering};
 
 use crate::sched::smp::percpu;
 use crate::sched::thread::{NO_BOOST, Thread};
-#[cfg(feature = "lockstat")]
-use crate::sched::wait::WaitQueue;
 
 #[cfg(target_arch = "x86_64")]
 const RFLAGS_IF: u64 = 1 << 9;
@@ -635,40 +633,30 @@ pub fn selftest() {
 pub fn selftest_lockstat() {
     static M: Mutex<u32> = Mutex::new(0);
     static OWNER_HELD: AtomicBool = AtomicBool::new(false);
-    static OWNER_WAIT: WaitQueue = WaitQueue::new();
     static OWNER_BOOST: AtomicU8 = AtomicU8::new(NO_BOOST);
     static OWNER_RESTORED: AtomicBool = AtomicBool::new(false);
+    static A_QUEUED: AtomicBool = AtomicBool::new(false);
     static WAITER_A_GOT: AtomicBool = AtomicBool::new(false);
     static WAITER_B_GOT: AtomicBool = AtomicBool::new(false);
 
-    /// Block until the owner has taken the mutex (works on one CPU and on SMP).
-    fn wait_for_owner() {
-        loop {
-            let token = crate::sched::begin_block().expect("lockstat: waiter block");
-            let queued = OWNER_WAIT
-                .enqueue_if(0, 0, || Ok(OWNER_HELD.load(Ordering::Acquire)))
-                .expect("lockstat: enqueue");
-            if queued {
-                let _ = crate::sched::block_current();
-            }
-            crate::sched::end_block(token);
-            if OWNER_HELD.load(Ordering::Acquire) {
-                return;
-            }
-        }
-    }
-
     fn owner() {
         let me = crate::sched::current_thread().expect("lockstat: owner thread");
-        me.priority.store(5, Ordering::Release);
+        me.priority.store(20, Ordering::Release); // low priority: the donee
         let guard = M.lock();
+        let object = M.object_id();
         OWNER_HELD.store(true, Ordering::Release);
-        OWNER_WAIT.wake_all();
-        // Sleep while holding the mutex so both waiters queue up; the orchestrator wakes us
-        // once the inherited boost is visible.
-        let token = crate::sched::begin_block().expect("lockstat: owner block");
-        let _ = crate::sched::block_current();
-        crate::sched::end_block(token);
+        // Hold the mutex until both waiters are queued, so the queue depth reaches 2 and the
+        // first waiter's turnstile edge has boosted us before we release.
+        loop {
+            let queued = lockstat()
+                .into_iter()
+                .find(|(id, _)| *id == object)
+                .is_some_and(|(_, stats)| stats.wait_entries >= 2);
+            if queued {
+                break;
+            }
+            core::hint::spin_loop();
+        }
         OWNER_BOOST.store(me.boost.load(Ordering::Acquire), Ordering::Release);
         drop(guard); // handoff to waiter A
         OWNER_RESTORED.store(
@@ -680,7 +668,9 @@ pub fn selftest_lockstat() {
     fn waiter_a() {
         let me = crate::sched::current_thread().expect("lockstat: waiter A");
         me.priority.store(0, Ordering::Release); // most urgent: the donor
-        wait_for_owner();
+        while !OWNER_HELD.load(Ordering::Acquire) {
+            core::hint::spin_loop();
+        }
         let guard = M.lock();
         WAITER_A_GOT.store(true, Ordering::Release);
         drop(guard); // handoff to waiter B
@@ -689,7 +679,11 @@ pub fn selftest_lockstat() {
     fn waiter_b() {
         let me = crate::sched::current_thread().expect("lockstat: waiter B");
         me.priority.store(1, Ordering::Release);
-        wait_for_owner();
+        // Arrive only after A is already in the turnstile, so the boost count is deterministic
+        // (A raises the owner; B has a lower priority and does not raise it again).
+        while !A_QUEUED.load(Ordering::Acquire) {
+            core::hint::spin_loop();
+        }
         let guard = M.lock();
         WAITER_B_GOT.store(true, Ordering::Release);
         drop(guard);
@@ -705,7 +699,7 @@ pub fn selftest_lockstat() {
     }
     let owner_thread =
         crate::sched::spawn_kernel("lockstat-owner", owner).expect("lockstat: spawn owner");
-    owner_thread.priority.store(5, Ordering::Release);
+    owner_thread.priority.store(20, Ordering::Release);
     let waiter_a_thread =
         crate::sched::spawn_kernel("lockstat-waiter-a", waiter_a).expect("lockstat: spawn A");
     waiter_a_thread.priority.store(0, Ordering::Release);
@@ -713,23 +707,22 @@ pub fn selftest_lockstat() {
         crate::sched::spawn_kernel("lockstat-waiter-b", waiter_b).expect("lockstat: spawn B");
     waiter_b_thread.priority.store(1, Ordering::Release);
 
-    let owner_tid = owner_thread.tid;
     let object = M.object_id();
-    let mut owner_woken = false;
+    let mut a_released = false;
     while !OWNER_RESTORED.load(Ordering::Acquire)
         || !WAITER_A_GOT.load(Ordering::Acquire)
         || !WAITER_B_GOT.load(Ordering::Acquire)
     {
-        // Wake the sleeping owner only once both waiters are in the turnstile and the boost is
-        // visible, so it reads the inherited priority instead of racing the wake.
-        if !owner_woken {
-            let both_queued = lockstat()
+        // Release B only after A is queued on the turnstile; the counters then have one
+        // deterministic inherited-priority change.
+        if !a_released {
+            let queued = lockstat()
                 .into_iter()
                 .find(|(id, _)| *id == object)
-                .is_some_and(|(_, stats)| stats.wait_entries == 2);
-            if both_queued && turnstile_effective_priority(owner_tid) == Some(0) {
-                owner_woken = true;
-                crate::sched::wake(Arc::clone(&owner_thread), None, 0);
+                .is_some_and(|(_, stats)| stats.wait_entries >= 1);
+            if queued {
+                A_QUEUED.store(true, Ordering::Release);
+                a_released = true;
             }
         }
         core::hint::spin_loop();
@@ -752,7 +745,7 @@ pub fn selftest_lockstat() {
         && stats.cancels == 0
         && stats.timeouts == 0
         && stats.max_queue_depth == 2
-        && stats.inherited_priority_changes >= 1
+        && stats.inherited_priority_changes == 1
         && owner_boost == 0
         && OWNER_RESTORED.load(Ordering::Acquire)
         && WAITER_A_GOT.load(Ordering::Acquire)
