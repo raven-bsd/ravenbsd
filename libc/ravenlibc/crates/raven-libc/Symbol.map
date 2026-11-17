@@ -664,7 +664,7 @@ RAVEN_1.0 {
 		floorl; # x86_64 aarch64
 		fma;
 		fmaf;
-		fmal; # x86_64
+		fmal; # x86_64 aarch64
 		fmax;
 		fmaxf;
 		fmaximum;

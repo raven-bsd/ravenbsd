@@ -298,6 +298,11 @@ pub fn tgammal(x: LongDouble) -> LongDouble {
     x.gamma()
 }
 
+/// `fmal`: fused multiply-add.
+pub fn fmal(x: LongDouble, y: LongDouble, z: LongDouble) -> LongDouble {
+    x.fma(y, z)
+}
+
 /// `nanl`.
 pub fn nanl() -> LongDouble {
     LongDouble::nan()
