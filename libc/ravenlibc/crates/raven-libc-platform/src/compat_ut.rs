@@ -7,7 +7,8 @@ use raven_libc_abi::fcntl;
 
 use crate::backend::FakeSys;
 use crate::compat::{
-    close_range, closefrom, getrlimit, getrlimit64, open64, posix_close, prlimit, setrlimit, umask,
+    close_range, closefrom, getrlimit, getrlimit64, open64, posix_close, prlimit, setrlimit,
+    setrlimit64, umask,
 };
 use crate::platform::Platform;
 
@@ -57,6 +58,17 @@ fn rlimits_round_trip() {
     setrlimit(&platform, 7, 256, 512).expect("setrlimit");
     assert_eq!(getrlimit64(&platform, 7), Ok((256, 512)));
     assert_eq!(prlimit(&platform, 0, 7, None), Ok((256, 512)));
+}
+
+#[test]
+fn setrlimit64_matches_setrlimit() {
+    let platform = platform();
+    setrlimit64(&platform, 7, 128, 256).expect("setrlimit64");
+    assert_eq!(getrlimit64(&platform, 7), Ok((128, 256)));
+    assert_eq!(
+        setrlimit64(&platform, 7, 256, 128),
+        Err(crate::Errno::EINVAL)
+    );
 }
 
 #[test]
