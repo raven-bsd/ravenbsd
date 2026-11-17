@@ -189,3 +189,91 @@ fn exhaustive_three_threads_one_object_two_priorities() {
         "expected a meaningful state space, got {states}"
     );
 }
+
+/// Deterministic xorshift64.
+fn next_random(state: &mut u64) -> u64 {
+    let mut s = *state;
+    s ^= s << 13;
+    s ^= s >> 7;
+    s ^= s << 17;
+    *state = s;
+    s
+}
+
+/// Multi-million-operation soak over mixed wait/wake/cancel/acquire/boost/unboost with object and
+/// thread reuse plus stale ids. Conservation (`blocks == wakes + cancels + queued`) proves no
+/// waiter is ever lost or double-counted, and the full invariant check runs periodically.
+#[test]
+fn storm_millions_of_mixed_operations() {
+    const THREADS: u64 = 16;
+    const OBJECTS: u64 = 8;
+    const OPS: u64 = 3_000_000;
+    const STALE: ThreadId = THREADS as ThreadId;
+
+    let mut t = Turnstiles::new();
+    for i in 0..THREADS {
+        t.register(i as ThreadId, Priority::new((i % 5) as u8))
+            .expect("register");
+    }
+
+    let mut rng = 0x9e37_79b9_7f4a_7c15u64;
+    let mut blocks = 0u64;
+    let mut wakes = 0u64;
+    let mut cancels = 0u64;
+
+    for step in 0..OPS {
+        let roll = next_random(&mut rng) % 100;
+        let object = (next_random(&mut rng) % OBJECTS) as ObjectId;
+        // A few stale (unregistered) ids prove stale-id paths never panic.
+        let thread = if next_random(&mut rng) % 100 < 5 {
+            STALE
+        } else {
+            (next_random(&mut rng) % THREADS) as ThreadId
+        };
+
+        match roll {
+            0..=24 => {
+                let _ = t.acquire(object, thread);
+            }
+            25..=49 => {
+                if t.block(object, thread).is_ok() {
+                    blocks += 1;
+                }
+            }
+            50..=61 => {
+                if t.wake_one(object).is_some() {
+                    wakes += 1;
+                }
+            }
+            62..=71 => {
+                wakes += t.wake_all(object).len() as u64;
+            }
+            72..=83 => {
+                if t.cancel(object, thread).removed {
+                    cancels += 1;
+                }
+            }
+            84..=91 => {
+                let _ = t.boost(object);
+            }
+            _ => {
+                let _ = t.unboost(object);
+            }
+        }
+
+        // No lost wake: every blocked thread is either still queued, woken, or cancelled.
+        let queued: usize = (0..OBJECTS)
+            .map(|object| t.waiter_count(object as ObjectId))
+            .sum();
+        assert_eq!(
+            blocks,
+            wakes + cancels + queued as u64,
+            "lost wake at step {step}"
+        );
+
+        if step.is_multiple_of(1024) {
+            t.check_invariants().expect("storm invariant violation");
+        }
+    }
+    t.check_invariants().expect("final invariant violation");
+}

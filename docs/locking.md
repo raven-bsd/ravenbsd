@@ -70,6 +70,14 @@ The search reports a reproducible state count and fails on the first violated in
 counterexample trace. Two seeded-bug tests prove the checker flags a planted `EffectiveMismatch`
 and a planted `WaiterOrdering` (R-ADD-28 style).
 
+A deterministic multi-million-operation soak (`storm_millions_of_mixed_operations`, 3M mixed
+wait/wake-one/wake-all/cancel/acquire/boost/unboost with object and thread reuse plus stale ids)
+asserts, at every step, the conservation invariant `blocks == wakes + cancels + queued` (no lost or
+double-counted wake) and re-runs the full invariant check periodically. Two targeted tests cover a
+32-owner deep inheritance chain (the deepest owner inherits the highest priority transitively, and
+every intermediate owner is boosted to the same value) and equal-priority fairness (64 waiters hand
+off in arrival order).
+
 ## Lock statistics (`lockstat` feature)
 
 `crates/raven-turnstile` has an off-by-default `lockstat` feature. When enabled, each turnstile
