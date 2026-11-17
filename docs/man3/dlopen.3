@@ -4,9 +4,9 @@
 .Dt DLOPEN 3
 .Os RavenBSD
 .Sh NAME
-.Nm dlopen
-.Nm dlsym
-.Nm dlerror
+.Nm dlopen ,
+.Nm dlsym ,
+.Nm dlerror ,
 .Nm dl_iterate_phdr
 .Nd dynamic loading
 .Sh SYNOPSIS
@@ -23,16 +23,22 @@
 The dynamic-loader interface opens a shared object, resolves a symbol, reports the last error
 and walks the loaded objects.
 .Sh RETURN VALUES
-.Fn dlopen and .Fn dlsym return a handle or symbol address, or a null pointer. .Fn dlerror
-returns a message or a null pointer. .Fn dl_iterate_phdr returns the callback result.
+.Fn dlopen
+and
+.Fn dlsym
+return a handle or symbol address, or a null pointer.
+.Fn dlerror
+returns a message or a null pointer.
+.Fn dl_iterate_phdr
+returns the callback result.
 .Sh ERRORS
 .Fn dlerror returns a human-readable message; the loader does not set errno for these calls.
+.Sh SEE ALSO
+.Xr libc 7 ,
+.Xr ld-elf.so.1 8
 .Sh STANDARDS
 POSIX.1-2024 and the ELF extension; ring 1.
 .Sh CAVEATS
 The loader uses no hints file, libc.so.1 is the only DT_NEEDED dependency and
-RTLD_DEEPBIND is not supported. See C62 and document 13.
-.Sh SEE ALSO
-.Xr dlopen 3
-.Xr ld-elf.so.1 8
-.Xr libc 7
+RTLD_DEEPBIND is not supported.
+See C62 and document 13.

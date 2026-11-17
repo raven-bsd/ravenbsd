@@ -4,10 +4,10 @@
 .Dt CLOCK 3
 .Os RavenBSD
 .Sh NAME
-.Nm clock
-.Nm times
-.Nm clock_settime
-.Nm clock_getcpuclockid
+.Nm clock ,
+.Nm times ,
+.Nm clock_settime ,
+.Nm clock_getcpuclockid ,
 .Nm adjtime
 .Nd process and system time
 .Sh SYNOPSIS
@@ -31,11 +31,12 @@ functions return 0 or -1.
 .Sh ERRORS
 .Er EINVAL is returned for an unknown clock id. .Er EPERM is returned for a clock that cannot
 be set.
+.Sh SEE ALSO
+.Xr clock_gettime 2 ,
+.Xr libc 7
 .Sh STANDARDS
 POSIX.1-2024; ring 0.
 .Sh CAVEATS
 .Fn clock returns -1 and .Fn times fails until CPU accounting exists. .Fn clock_settime
-returns .Er EPERM. See C44 and A-time-14.
-.Sh SEE ALSO
-.Xr clock_gettime 2
-.Xr libc 7
+returns .Er EPERM.
+See C44 and A-time-14.

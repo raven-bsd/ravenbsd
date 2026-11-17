@@ -4,8 +4,8 @@
 .Dt SYSCONF 3
 .Os RavenBSD
 .Sh NAME
-.Nm sysconf
-.Nm ARG_MAX
+.Nm sysconf ,
+.Nm ARG_MAX ,
 .Nm NGROUPS_MAX
 .Nd query system limits
 .Sh SYNOPSIS
@@ -22,11 +22,11 @@ limits visible to programs.
 .Fn sysconf returns the value or -1 when the name is unknown.
 .Sh ERRORS
 .Er EINVAL is returned for an unknown name; .Fn sysconf does not set errno for every query.
+.Sh SEE ALSO
+.Xr libc 7 ,
+.Xr limits 7
 .Sh STANDARDS
 POSIX.1-2024; ring 0.
 .Sh CAVEATS
-The fixed numbers are ARG_MAX 131072, NGROUPS_MAX 1023 and HOST_NAME_MAX 64. See H-19.
-.Sh SEE ALSO
-.Xr sysconf 3
-.Xr limits 7
-.Xr libc 7
+The fixed numbers are ARG_MAX 131072, NGROUPS_MAX 1023 and HOST_NAME_MAX 64.
+See H-19.
