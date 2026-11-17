@@ -52,7 +52,29 @@ it cannot literally `extends = "pi4"` without changing the profile loader.
   workspace; from `userland/brush` the `brush` package builds but has no tests (nextest "no tests
   to run"). The image build and `make check-fast` are the current gates.
 
-## 4. Board
+## 4. Rev 41 verification
+
+* The first aarch64 build reused a stale `build/cargo/brush-aarch64` from an older toolchain and
+  failed with a std/crate mismatch in the brush dependency graph. After removing
+  `build/cargo/brush-aarch64` (and the x86_64 cache for the control), the documented command
+  passes:
+
+  ```
+  $ cargo xtask build brush --arch aarch64
+      Finished `release` profile [optimized] target(s) in 2m 18s
+  $ file build/aarch64/brush
+  build/aarch64/brush: ELF 64-bit LSB executable, ARM aarch64, statically linked, stripped
+  ```
+
+* `tests/brush/check-aarch64-staging.sh` reports `PASS (16 aarch64 files)`: the release profile's
+  brush plus the 15-name uutils slice all have `e_machine` 0xb7.
+* `make check-fast` passes. The x86_64 libc archive was refreshed with
+  `cargo xtask libc-pack --arch x86_64` to clear a stale archive-export mismatch before the run.
+* The ticket's `cargo nextest run -p brush` spelling still cannot resolve the nested brush
+  workspace from the root; from `userland/brush` the `brush` package has no tests. This is the
+  exact K26b/brush test-harness follow-up; the image build and `make check-fast` are the gates.
+
+## 5. Board
 
 No Pi 4 board run was performed. The release login/brush/ping gate remains UNVERIFIED until the
 getty packaging and board transcript are available.
