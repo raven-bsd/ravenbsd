@@ -190,7 +190,6 @@ fn typed_getters_report_every_required_key() {
             (AT_RAVEN_ABI, 11),
             (AT_RAVEN_FDMAP, 12),
             (AT_RAVEN_PROCINFO, 13),
-            (AT_RAVEN_PROCD, 14),
         ],
     );
     let vector = stack.parse().unwrap();
@@ -207,7 +206,6 @@ fn typed_getters_report_every_required_key() {
     assert_eq!(vector.raven_abi(), Some(11));
     assert_eq!(vector.raven_fdmap(), Some(12));
     assert_eq!(vector.raven_procinfo(), Some(13));
-    assert_eq!(vector.raven_procd(), Some(14));
 }
 
 #[test]

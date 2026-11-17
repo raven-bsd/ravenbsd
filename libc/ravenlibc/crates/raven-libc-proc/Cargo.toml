@@ -4,7 +4,7 @@
 [package]
 name = "raven-libc-proc"
 version = "0.1.0"
-description = "ravenlibc process logic: exec/spawn/wait models, atfork and lock registries, startup parser, procd wire encoders and ProcBackend."
+description = "ravenlibc process logic: exec/spawn/wait models, atfork and lock registries, startup parser and ProcBackend."
 edition.workspace = true
 license.workspace = true
 authors.workspace = true

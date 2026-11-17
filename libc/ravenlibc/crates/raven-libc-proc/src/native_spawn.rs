@@ -21,8 +21,8 @@ use crate::consts::{P_PID, WNOHANG};
 #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 use crate::errors::{E2BIG, ENOENT, ENOEXEC};
 use crate::errors::{EAGAIN, ECHILD, EINVAL, ENOSYS, Errno};
+use crate::request::SpawnRequest;
 use crate::wait_status::{WaitStatus, encode};
-use crate::wire::SpawnRequest;
 
 /// Maximum number of children tracked at once.
 pub const MAX_CHILDREN: usize = 128;
@@ -200,7 +200,7 @@ fn resolve_image_path(path: &str, cwd: &[u8]) -> Result<String, Errno> {
     }
 }
 
-/// Convert the wire byte strings into the loader's UTF-8 argument view.
+/// Convert the request byte strings into the loader's UTF-8 argument view.
 fn strings(items: &[Vec<u8>]) -> Result<Vec<&str>, Errno> {
     let mut view = Vec::with_capacity(items.len());
     for item in items {
