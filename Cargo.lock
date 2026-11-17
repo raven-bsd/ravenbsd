@@ -655,6 +655,7 @@ version = "0.1.0"
 dependencies = [
  "gencat",
  "raven-libc-locale",
+ "raven-proto-fs",
  "raven-rt",
 ]
 
@@ -1997,6 +1998,7 @@ name = "raven-libc-oracle"
 version = "0.1.0"
 dependencies = [
  "raven-libc-abi",
+ "raven-libc-compat",
  "raven-libc-ctype",
  "raven-libc-dtoa",
  "raven-libc-fmt",
@@ -2788,6 +2790,7 @@ version = "0.1.0"
 dependencies = [
  "raven-abi",
  "raven-initfs",
+ "raven-libc-abi",
  "raven-proto-fs",
  "raven-rt",
  "raven-scheme",
@@ -3759,6 +3762,16 @@ name = "regex-syntax"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
+
+[[package]]
+name = "required-utils"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-initfs",
+ "raven-proto-fs",
+ "raven-rt",
+]
 
 [[package]]
 name = "resolvd"

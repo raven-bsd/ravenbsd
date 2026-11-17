@@ -4,13 +4,19 @@
 //!
 //! The stub entry plays the loader of `donor-map/13` 3.4 step 17: it stores the entry `rsp`,
 //! loads `0xfeed` into `rdx` (the loader's exit hook) and jumps into `Scrt1`'s `_start`. The
-//! test `__raven_libc_start` then sees `rsi == 0xfeed`, `rdx == 0`, `rcx == 0` and
-//! `rdi == entry rsp`.
+//! test `__raven_libc_start` then sees `rsi == 0xfeed`, `rdx == 0`, `rcx == 0`,
+//! `rdi == entry rsp` and `r8 == main`.
 
 #![no_std]
 
 #[unsafe(no_mangle)]
 pub static mut ENTRY_SP: usize = 0;
+
+/// The crt passes this address as the fifth argument.
+#[unsafe(no_mangle)]
+pub extern "C" fn main(_argc: i32, _argv: *const *const u8, _envp: *const *const u8) -> i32 {
+    0
+}
 
 core::arch::global_asm!(
     ".text",
@@ -36,6 +42,7 @@ pub unsafe extern "C" fn __raven_libc_start(
     rtld_fini: usize,
     iplt_start: usize,
     iplt_end: usize,
+    entry: usize,
 ) -> ! {
     if sp0 as usize != unsafe { ENTRY_SP } {
         exit(1);
@@ -45,6 +52,9 @@ pub unsafe extern "C" fn __raven_libc_start(
     }
     if iplt_start != 0 || iplt_end != 0 {
         exit(3);
+    }
+    if entry != main as usize {
+        exit(4);
     }
     exit(0)
 }

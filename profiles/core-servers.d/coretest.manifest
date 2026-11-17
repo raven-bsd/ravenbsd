@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "coretest"
+exec = "/sbin/coretest"
+needs = ["scheme:null", "scheme:zero", "scheme:rand", "scheme:sys", "scheme:log"]
+readiness = "exit"
+restart = "on-failure"
+max_restarts = 0

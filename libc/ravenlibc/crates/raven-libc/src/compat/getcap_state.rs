@@ -42,9 +42,9 @@ impl ReadFile for RealFiles {
         if path.len() >= super::MAX_NAME {
             return Err(raven_libc_abi::errno::Errno(super::ENAMETOOLONG as u16));
         }
-        let mut name = [0i8; 4096];
+        let mut name = [0 as c_char; 4096];
         for (slot, byte) in name.iter_mut().zip(path.iter()) {
-            *slot = *byte as i8;
+            *slot = *byte as c_char;
         }
         name[path.len()] = 0;
         // SAFETY: `name` is a NUL-terminated path and `open` returns a descriptor or -1.

@@ -3,11 +3,12 @@
 
 # P4 required utility acceptance
 
-Status: OBSERVED (P4a8, base `origin/master` `60ec32aa`). P4a7 leaves exactly seven required
-utilities. This note is the single acceptance surface for them; the utilities are implemented by
-P4a3-P4a6, not here.
+Status: OBSERVED (P4a11, base `origin/master` `1939ae69`). P4a7 leaves exactly seven required
+utilities. This note is the single acceptance surface for them; P4a10 added the booted-image
+target gate and P4a11 fixed the localedef target main. No profile, seed or evidence-toml code is
+changed here.
 
-## Runner
+## Host runner
 
 ```sh
 sh tests/posix/utility/required/runner.sh
@@ -20,46 +21,87 @@ The runner executes each tool's own per-tool host test and prints one line per r
 * `[FAIL] <tool>: exit <n>` - the test exists and failed; the log is indented under the line.
 * `[DEFECT] <tool>: missing ...` - the tool source or its per-tool test is absent.
 
-It prints `required-runner: <N> pass, <N> fail, <N> defect` and exits 0 only when all seven rows
-pass. A missing or failing row is never turned into a pass.
+Observed on `1939ae69`: `required-runner: 7 pass, 0 fail, 0 defect`, exit 0.
+
+## Target gate
+
+```sh
+cargo xtask qtest --case required-utils --arch x86_64
+```
+
+The fixture boots a minimal initfs with the seven tools, `initfsd`/`ramfsd`/`vfsd` (for
+`newgrp`'s account files and localedef's `file:` input/output), a `/bin/true` child for `time`, a
+`/bin/sh` credential probe for `newgrp`, and `/etc/passwd`, `/etc/group`, `/etc/shadow`,
+`/etc/locale` and `/etc/charmap`. Each case is bounded and non-interactive. All seven utilities
+pass, so the qtest declares `expect_exit = "success"`.
+
+Observed summary on `1939ae69`: `required-utils: 10 cases, 10 pass, 0 fail` (the ten cases are
+`time`, `times`, `tput`, three `ulimit` cases, `lp`, `localedef`, the localedef catalog check and
+`newgrp`).
 
 ## Seven required rows
 
-| Utility | Owner | Exact per-tool command | Current state at `60ec32aa` |
+| Utility | Host evidence | Target evidence | Notes |
 |---|---|---|---|
-| `localedef` | otto / P4a4 | `sh tests/posix/utility/simple3/localedef/test.sh` | DEFECT: tool and test absent |
-| `lp` | tim / P4a6 | `sh tests/posix/utility/simple5/lp/test.sh` | DEFECT: tool and test absent |
-| `newgrp` | mel / P4a5 | `sh tests/posix/utility/simple4/newgrp/test.sh` | DEFECT: tool and test absent |
-| `time` | bob / P4a3 | `sh tests/posix/utility/simple2/time/test.sh` | DEFECT: tool and test absent |
-| `times` | bob / P4a3 | `sh tests/posix/utility/simple2/times/test.sh` | DEFECT: tool and test absent |
-| `tput` | bob / P4a3 | `sh tests/posix/utility/simple2/tput/test.sh` | DEFECT: tool and test absent |
-| `ulimit` | bob / P4a3 | `sh tests/posix/utility/simple2/ulimit/test.sh` | DEFECT: tool and test absent; also blocked on the missing `getrlimit`/`setrlimit` ABI (P4a7 review) |
+| `localedef` | `sh tests/posix/utility/simple3/localedef/test.sh` - pass | `qtest:required-utils` - pass | otto/P4a4 + P4a11; target reads `file:` inputs and writes the `ff88ff89` catalog (211 bytes in the fixture); target stub removed |
+| `lp` | `sh tests/posix/utility/simple5/lp/test.sh` - pass | `qtest:required-utils` - pass | tim/P4a6; no-destination diagnostic and exit 1 asserted, no printer/network |
+| `newgrp` | `sh tests/posix/utility/simple4/newgrp/test.sh` - pass | `qtest:required-utils` - pass | mel/P4a5; `/bin/sh` probe reports `uid=0 gid=100` after the group switch |
+| `time` | `sh tests/posix/utility/simple2/time/test.sh` - pass | `qtest:required-utils` - pass | bob/P4a3; `real`/`user`/`sys` output, `real` is the observed monotonic time |
+| `times` | `sh tests/posix/utility/simple2/times/test.sh` - pass | `qtest:required-utils` - pass | bob/P4a3; two POSIX `XmY.ZZs` lines from the kernel process counters |
+| `tput` | `sh tests/posix/utility/simple2/tput/test.sh` - pass | `qtest:required-utils` - pass | bob/P4a3; `tput cols` prints `80` |
+| `ulimit` | `sh tests/posix/utility/simple2/ulimit/test.sh` - pass | `qtest:required-utils` - pass | bob/P4a3; `-n` query prints the default and `-n 128` exits 0 (the limit is per-process, so the next case is a fresh process) |
 
-Current observed transcript:
+All seven target rows have evidence. The `qtest:required-utils` case covers them in one booted
+image, including the localedef catalog-magic check.
+
+## Target transcript excerpt
 
 ```
-$ sh tests/posix/utility/required/runner.sh
-[DEFECT] localedef: missing userland/bin/localedef tests/posix/utility/simple3/localedef/test.sh
-[DEFECT] lp: missing userland/bin/lp tests/posix/utility/simple5/lp/test.sh
-[DEFECT] newgrp: missing userland/bin/newgrp tests/posix/utility/simple4/newgrp/test.sh
-[DEFECT] time: missing userland/bin/time tests/posix/utility/simple2/time/test.sh
-[DEFECT] times: missing userland/bin/times tests/posix/utility/simple2/times/test.sh
-[DEFECT] tput: missing userland/bin/tput tests/posix/utility/simple2/tput/test.sh
-[DEFECT] ulimit: missing userland/bin/ulimit tests/posix/utility/simple2/ulimit/test.sh
-required-runner: 0 pass, 0 fail, 7 defect
-exit 1
+required-utils: services ok
+required-utils: time start
+real 0.04
+user 0.00
+sys 0.00
+required-utils: time exit=0 PASS
+required-utils: times start
+0m0.00s 0m0.00s
+0m0.00s 0m0.00s
+required-utils: times exit=0 PASS
+required-utils: tput start
+80
+required-utils: tput exit=0 PASS
+required-utils: ulimit-default start
+256
+required-utils: ulimit-default exit=0 PASS
+required-utils: ulimit-set start
+required-utils: ulimit-set exit=0 PASS
+required-utils: ulimit-get start
+256
+required-utils: ulimit-get exit=0 PASS
+required-utils: lp start
+lp: no print destination configured
+required-utils: lp exit=1 PASS
+required-utils: localedef start
+required-utils: localedef exit=0 PASS
+required-utils: localedef catalog magic=ff88ff89 bytes=211 PASS
+required-utils: newgrp start
+required-utils: shell uid=0 gid=100
+required-utils: newgrp exit=0 PASS
+required-utils: 10 cases, 10 pass, 0 fail
 ```
 
-A green run is `required-runner: 7 pass, 0 fail, 0 defect` and exit 0. The per-tool tests are the
-inner commands of the owner runners (`run-simple2.sh` through `run-simple5.sh`); if an owner lands
-a different per-tool path, the runner reports DEFECT until the path is aligned, never PASS.
+The `tput` capability has no trailing newline in the serial log; the qtest matches the `80` prefix.
+The `ulimit` set case is accepted per process; a later `ulimit -n` in a new process correctly shows
+the inherited default, not the previous process's setting. `localedef` reads `/etc/locale` and
+`/etc/charmap` through `file:` and writes `/tmp/catalog`; the fixture checks the catalog starts
+with `ff88ff89` before it counts the row as PASS.
 
 ## Self-test
 
-`tests/posix/utility/required/test.sh` exercises the runner with a controlled temporary tree:
+`tests/posix/utility/required/test.sh` exercises the host runner with a controlled temporary tree:
 `time` passes, `times` fails and the remaining five are missing. It asserts the runner reports
 `1 pass, 1 fail, 5 defect`, exits non-zero, and never passes a missing row. It also checks the real
-tree has exactly seven row lines and an exit status consistent with its summary, so the test stays
-valid before and after the owner tickets merge.
+tree has exactly seven row lines and an exit status consistent with its summary.
 
-No utility, profile, evidence or generated POSIX document is changed by P4a8.
+P4a10 added the target gate; P4a11 fixed the localedef target main and the fixture catalog check.
+No profile, seed or generated POSIX document is changed.

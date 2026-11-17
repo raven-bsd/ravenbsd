@@ -83,6 +83,12 @@ impl<P: Platform, M: raven_libc_elf::MemView, A: raven_libc_elf::RelocApplier> L
             ));
             return Err(error);
         }
+        // Assign the new object's static TLS block before its relocations run; a `TLSDESC`
+        // or `TPOFF64` in the object needs the offset in the applier now.
+        if let Err(error) = self.assign_tls_offsets() {
+            self.error.set(format_args!("dlopen: TLS layout failed"));
+            return Err(error);
+        }
         if let Some(object) = self.object_mut(id) {
             object.refcount = 1;
             object.dl_open = true;

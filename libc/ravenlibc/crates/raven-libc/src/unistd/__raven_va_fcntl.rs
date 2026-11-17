@@ -4,6 +4,7 @@
 
 use core::ffi::c_int;
 
+use raven_libc_abi::fcntl::{F_GETLK, F_SETLK, F_SETLKW};
 use raven_libc_platform::Errno;
 
 use crate::stdio::va::{List, reader};
@@ -25,8 +26,11 @@ pub unsafe extern "C" fn __raven_va_fcntl(fd: c_int, command: c_int, list: *mut 
         Argument::Pointer => values.next_ptr() as i64,
         Argument::None => 0,
     };
-    let result = crate::ffi::platform::global()
-        .fcntl(fd, command, argument)
-        .and_then(|value| i32::try_from(value).map_err(|_| Errno::EOVERFLOW));
+    let result = match command {
+        F_GETLK | F_SETLK | F_SETLKW => crate::fcntl::record_lock(fd, command, argument as usize),
+        _ => crate::ffi::platform::global()
+            .fcntl(fd, command, argument)
+            .and_then(|value| i32::try_from(value).map_err(|_| Errno::EOVERFLOW)),
+    };
     crate::ffi::ret::platform_int(result)
 }

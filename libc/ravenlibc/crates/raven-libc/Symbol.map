@@ -486,179 +486,182 @@ RAVEN_1.0 {
 		optopt;
 		optreset;
 		suboptarg;
-		# --- compat (C65; x86_64 only until its c_char follow-up) ---
-		addmntent; # x86_64
-		utmpxname; # x86_64
-		backtrace; # x86_64
-		backtrace_symbols; # x86_64
-		backtrace_symbols_fd; # x86_64
-		cgetcap; # x86_64
-		cgetclose; # x86_64
-		cgetent; # x86_64
-		cgetfirst; # x86_64
-		cgetmatch; # x86_64
-		cgetnext; # x86_64
-		cgetnum; # x86_64
-		cgetset; # x86_64
-		cgetstr; # x86_64
-		cgetustr; # x86_64
-		crypt; # x86_64
-		crypt_r; # x86_64
-		devname; # x86_64
-		endmntent; # x86_64
-		endttyent; # x86_64
-		endusershell; # x86_64
-		endutxent; # x86_64
-		expand_number; # x86_64
-		fmt_scaled; # x86_64
-		forkpty; # x86_64
-		fparseln; # x86_64
-		getbsize; # x86_64
-		getmntent; # x86_64
-		getmntent_r; # x86_64
-		getmode; # x86_64
-		getttyent; # x86_64
-		getttynam; # x86_64
-		getusershell; # x86_64
-		getutxent; # x86_64
-		getutxid; # x86_64
-		getutxline; # x86_64
-		grantpt; # x86_64
-		hasmntopt; # x86_64
-		humanize_number; # x86_64
-		login_tty; # x86_64
-		nvis; # x86_64
-		openpty; # x86_64
-		pidfile; # x86_64
-		posix_openpt; # x86_64
-		ptsname_r; # x86_64
-		pututxline; # x86_64
-		readpassphrase; # x86_64
-		scan_scaled; # x86_64
-		setmntent; # x86_64
-		setmode; # x86_64
-		setttyent; # x86_64
-		setusershell; # x86_64
-		setutxent; # x86_64
-		sl_add; # x86_64
-		sl_find; # x86_64
-		sl_free; # x86_64
-		sl_init; # x86_64
-		snvis; # x86_64
-		strnunvis; # x86_64
-		strnunvisx; # x86_64
-		strnvis; # x86_64
-		strnvisx; # x86_64
-		strsnvis; # x86_64
-		strsnvisx; # x86_64
-		strsvis; # x86_64
-		strsvisx; # x86_64
-		strunvis; # x86_64
-		strunvisx; # x86_64
-		strvis; # x86_64
-		strvisx; # x86_64
-		svis; # x86_64
-		unlockpt; # x86_64
-		unvis; # x86_64
-		updwtmpx; # x86_64
-		uuid_compare; # x86_64
-		uuid_create; # x86_64
-		uuid_create_nil; # x86_64
-		uuid_dec_be; # x86_64
-		uuid_dec_le; # x86_64
-		uuid_enc_be; # x86_64
-		uuid_enc_le; # x86_64
-		uuid_equal; # x86_64
-		uuid_from_string; # x86_64
-		uuid_hash; # x86_64
-		uuid_is_nil; # x86_64
-		uuid_to_string; # x86_64
-		vis; # x86_64
+		# --- compat (C65; generic, x86_64 and aarch64) ---
+		addmntent;
+		utmpxname;
+		backtrace;
+		backtrace_symbols;
+		backtrace_symbols_fd;
+		cgetcap;
+		cgetclose;
+		cgetent;
+		cgetfirst;
+		cgetmatch;
+		cgetnext;
+		cgetnum;
+		cgetset;
+		cgetstr;
+		cgetustr;
+		crypt;
+		crypt_r;
+		devname;
+		endmntent;
+		endttyent;
+		endusershell;
+		endutxent;
+		expand_number;
+		fmt_scaled;
+		forkpty;
+		fparseln;
+		getbsize;
+		getmntent;
+		getmntent_r;
+		getmode;
+		getttyent;
+		getttynam;
+		getusershell;
+		getutxent;
+		getutxid;
+		getutxline;
+		grantpt;
+		hasmntopt;
+		humanize_number;
+		login_tty;
+		nvis;
+		openpty;
+		pidfile;
+		posix_openpt;
+		ptsname_r;
+		pututxline;
+		readpassphrase;
+		scan_scaled;
+		setmntent;
+		setmode;
+		setttyent;
+		setusershell;
+		setutxent;
+		sl_add;
+		sl_find;
+		sl_free;
+		sl_init;
+		snvis;
+		strnunvis;
+		strnunvisx;
+		strnvis;
+		strnvisx;
+		strsnvis;
+		strsnvisx;
+		strsvis;
+		strsvisx;
+		strunvis;
+		strunvisx;
+		strvis;
+		strvisx;
+		svis;
+		unlockpt;
+		unvis;
+		updwtmpx;
+		uuid_compare;
+		uuid_create;
+		uuid_create_nil;
+		uuid_dec_be;
+		uuid_dec_le;
+		uuid_enc_be;
+		uuid_enc_le;
+		uuid_equal;
+		uuid_from_string;
+		uuid_hash;
+		uuid_is_nil;
+		uuid_to_string;
+		vis;
 		# ---- C60b core families below ----
 		# --- math (C60b) ---
+		# `*l` long-double rows (`# x86_64`) have no aarch64 C exports yet; binary128
+		# long double is C47m's ticket. Until it lands they stay x86_64-only so the
+		# per-arch version script matches the archive.
 		acos;
 		acosf;
 		acosh;
 		acoshf;
-		acoshl;
-		acosl;
+		acoshl; # x86_64
+		acosl; # x86_64
 		acospi;
 		asin;
 		asinf;
 		asinh;
 		asinhf;
-		asinhl;
-		asinl;
+		asinhl; # x86_64
+		asinl; # x86_64
 		asinpi;
 		atan;
 		atan2;
 		atan2f;
-		atan2l;
+		atan2l; # x86_64
 		atan2pi;
 		atanf;
 		atanh;
 		atanhf;
-		atanhl;
-		atanl;
+		atanhl; # x86_64
+		atanl; # x86_64
 		atanpi;
 		canonicalize;
 		canonicalizef;
 		cbrt;
 		cbrtf;
-		cbrtl;
+		cbrtl; # x86_64
 		ceil;
 		ceilf;
-		ceill;
+		ceill; # x86_64 aarch64
 		compoundn;
 		compoundnf;
 		copysign;
 		copysignf;
-		copysignl;
+		copysignl; # x86_64 aarch64
 		cos;
 		cosf;
 		cosh;
 		coshf;
-		coshl;
-		cosl;
+		coshl; # x86_64
+		cosl; # x86_64
 		cospi;
 		drem;
 		dremf;
 		erf;
 		erfc;
 		erfcf;
-		erfcl;
+		erfcl; # x86_64
 		erff;
-		erfl;
+		erfl; # x86_64
 		exp;
 		exp10;
 		exp10f;
-		exp10l;
+		exp10l; # x86_64
 		exp10m1;
 		exp10m1f;
 		exp2;
 		exp2f;
-		exp2l;
+		exp2l; # x86_64
 		exp2m1;
 		exp2m1f;
 		expf;
-		expl;
+		expl; # x86_64
 		expm1;
 		expm1f;
-		expm1l;
+		expm1l; # x86_64
 		fabs;
 		fabsf;
-		fabsl;
+		fabsl; # x86_64 aarch64
 		fdim;
 		fdimf;
-		fdiml;
+		fdiml; # x86_64 aarch64
 		finite;
 		finitef;
 		floor;
 		floorf;
-		floorl;
+		floorl; # x86_64 aarch64
 		fma;
 		fmaf;
-		fmal;
+		fmal; # x86_64
 		fmax;
 		fmaxf;
 		fmaximum;
@@ -669,7 +672,7 @@ RAVEN_1.0 {
 		fmaximum_num;
 		fmaximum_numf;
 		fmaximumf;
-		fmaxl;
+		fmaxl; # x86_64 aarch64
 		fmaxmag;
 		fmaxmagf;
 		fmin;
@@ -682,29 +685,29 @@ RAVEN_1.0 {
 		fminimum_num;
 		fminimum_numf;
 		fminimumf;
-		fminl;
+		fminl; # x86_64 aarch64
 		fminmag;
 		fminmagf;
 		fmod;
 		fmodf;
-		fmodl;
+		fmodl; # x86_64 aarch64
 		fpclassify;
 		frexp;
 		frexpf;
-		frexpl;
+		frexpl; # x86_64 aarch64
 		fromfp;
 		fromfpx;
 		gamma;
 		gammaf;
-		gammal;
+		gammal; # x86_64
 		getpayload;
 		getpayloadf;
 		hypot;
 		hypotf;
-		hypotl;
+		hypotl; # x86_64
 		ilogb;
 		ilogbf;
-		ilogbl;
+		ilogbl; # x86_64 aarch64
 		iscanonical;
 		iseqsig;
 		isfinite;
@@ -728,118 +731,118 @@ RAVEN_1.0 {
 		jnf;
 		ldexp;
 		ldexpf;
-		ldexpl;
+		ldexpl; # x86_64 aarch64
 		lgamma;
 		lgamma_r;
 		lgammaf;
 		lgammaf_r;
-		lgammal;
-		lgammal_r;
+		lgammal; # x86_64
+		lgammal_r; # x86_64
 		llogb;
-		llogbl;
+		llogbl; # x86_64 aarch64
 		llrint;
 		llrintf;
-		llrintl;
+		llrintl; # x86_64 aarch64
 		llround;
 		llroundf;
-		llroundl;
+		llroundl; # x86_64 aarch64
 		log;
 		log10;
 		log10f;
-		log10l;
+		log10l; # x86_64
 		log10p1;
 		log10p1f;
 		log1p;
 		log1pf;
-		log1pl;
+		log1pl; # x86_64
 		log2;
 		log2f;
-		log2l;
+		log2l; # x86_64
 		log2p1;
 		log2p1f;
 		logb;
 		logbf;
-		logbl;
+		logbl; # x86_64 aarch64
 		logf;
-		logl;
+		logl; # x86_64
 		lrint;
 		lrintf;
-		lrintl;
+		lrintl; # x86_64 aarch64
 		lround;
 		lroundf;
-		lroundl;
+		lroundl; # x86_64 aarch64
 		modf;
 		modff;
-		modfl;
+		modfl; # x86_64 aarch64
 		nan;
 		nanf;
-		nanl;
+		nanl; # x86_64 aarch64
 		nearbyint;
 		nearbyintf;
-		nearbyintl;
+		nearbyintl; # x86_64 aarch64
 		nextafter;
 		nextafterf;
-		nextafterl;
+		nextafterl; # x86_64 aarch64
 		nextdown;
-		nexttoward;
-		nexttowardf;
-		nexttowardl;
+		nexttoward; # x86_64
+		nexttowardf; # x86_64
+		nexttowardl; # x86_64 aarch64
 		nextup;
 		pow;
 		pow10;
 		pow10f;
-		pow10l;
+		pow10l; # x86_64
 		powf;
-		powl;
+		powl; # x86_64
 		pown;
 		pownf;
 		powr;
 		powrf;
 		remainder;
 		remainderf;
-		remainderl;
+		remainderl; # x86_64 aarch64
 		remquo;
 		remquof;
-		remquol;
+		remquol; # x86_64 aarch64
 		rint;
 		rintf;
-		rintl;
+		rintl; # x86_64 aarch64
 		rootn;
 		rootnf;
 		round;
 		roundeven;
 		roundf;
-		roundl;
+		roundl; # x86_64 aarch64
 		rsqrt;
 		rsqrtf;
 		scalb;
 		scalbf;
 		scalbln;
 		scalblnf;
-		scalblnl;
+		scalblnl; # x86_64 aarch64
 		scalbn;
 		scalbnf;
-		scalbnl;
+		scalbnl; # x86_64 aarch64
 		setpayload;
 		setpayloadsig;
 		signbit;
 		significand;
 		significandf;
-		significandl;
+		significandl; # x86_64 aarch64
 		sin;
 		sincos;
 		sincosf;
-		sincosl;
+		sincosl; # x86_64
 		sinf;
 		sinh;
 		sinhf;
-		sinhl;
-		sinl;
+		sinhl; # x86_64
+		sinl; # x86_64
 		sinpi;
 		sinpif;
 		sqrt;
 		sqrtf;
-		sqrtl;
+		sqrtl; # x86_64
 		statvfs;
 		strfromd;
 		strfromf;
@@ -848,19 +851,19 @@ RAVEN_1.0 {
 		tanf;
 		tanh;
 		tanhf;
-		tanhl;
-		tanl;
+		tanhl; # x86_64
+		tanl; # x86_64
 		tanpi;
 		tgamma;
 		tgammaf;
-		tgammal;
+		tgammal; # x86_64
 		totalorder;
 		totalorderf;
 		totalordermag;
 		totalordermagf;
 		trunc;
 		truncf;
-		truncl;
+		truncl; # x86_64 aarch64
 		ufromfp;
 		ufromfpx;
 		y0;
@@ -872,70 +875,70 @@ RAVEN_1.0 {
 		# --- complex (P1e) ---
 		cabs;
 		cabsf;
-		cabsl;
+		cabsl; # x86_64
 		cacos;
 		cacosf;
 		cacosh;
 		cacoshf;
-		cacoshl;
-		cacosl;
+		cacoshl; # x86_64
+		cacosl; # x86_64
 		carg;
 		cargf;
-		cargl;
+		cargl; # x86_64
 		casin;
 		casinf;
 		casinh;
 		casinhf;
-		casinhl;
-		casinl;
+		casinhl; # x86_64
+		casinl; # x86_64
 		catan;
 		catanf;
 		catanh;
 		catanhf;
-		catanhl;
-		catanl;
+		catanhl; # x86_64
+		catanl; # x86_64
 		ccos;
 		ccosf;
 		ccosh;
 		ccoshf;
-		ccoshl;
-		ccosl;
+		ccoshl; # x86_64
+		ccosl; # x86_64
 		cexp;
 		cexpf;
-		cexpl;
+		cexpl; # x86_64
 		cimag;
 		cimagf;
-		cimagl;
+		cimagl; # x86_64
 		clog;
 		clogf;
-		clogl;
+		clogl; # x86_64
 		conj;
 		conjf;
-		conjl;
+		conjl; # x86_64
 		cpow;
 		cpowf;
-		cpowl;
+		cpowl; # x86_64
 		cproj;
 		cprojf;
-		cprojl;
+		cprojl; # x86_64
 		creal;
 		crealf;
-		creall;
+		creall; # x86_64
 		csin;
 		csinf;
 		csinh;
 		csinhf;
-		csinhl;
-		csinl;
+		csinhl; # x86_64
+		csinl; # x86_64
 		csqrt;
 		csqrtf;
-		csqrtl;
+		csqrtl; # x86_64
 		ctan;
 		ctanf;
 		ctanh;
 		ctanhf;
-		ctanhl;
-		ctanl;
+		ctanhl; # x86_64
+		ctanl; # x86_64
 		# --- fenv (P1e) ---
 		feclearexcept;
 		fegetenv;

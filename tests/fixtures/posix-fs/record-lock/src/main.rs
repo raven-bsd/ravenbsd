@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-//! P5c raw `RECORD_LOCK` qtest parent.
+//! P5c/P5c2 record-lock qtest parent.
 //!
 //! Starts the core file services, then coordinates one child process per case: conflict,
-//! `F_GETLK`, blocking, close-release and exit-release. The child reports through `/tmp/result`
-//! and the parent uses the raw `RECORD_LOCK` syscall on a `file:` descriptor.
+//! `F_GETLK`, blocking, close-release and exit-release. The child reports through `/tmp/result`.
+//! The raw cases use the `RECORD_LOCK` syscall on a `file:` descriptor; the libc cases call
+//! `fcntl(2)` on a libc descriptor over the same kernel lock table.
 
 #![no_std]
 #![no_main]
@@ -15,11 +16,15 @@ extern crate alloc;
 use alloc::format;
 use alloc::string::{String, ToString};
 
+use core::ffi::{c_char, c_int};
+
 use raven_abi::errno::Errno;
 use raven_abi::types::Handle;
 use raven_abi::types::fcntl::{GETLK, RecordLock, SETLK, UNLCK, WRLCK};
 use raven_initfs::Initfs;
-use raven_proto_fs::{O_CREAT, O_RDONLY, O_RDWR};
+use raven_libc_abi::fcntl::{F_GETLK, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, O_RDWR};
+use raven_libc_abi::structs::Flock;
+use raven_proto_fs::{O_CREAT, O_RDONLY, O_RDWR as RAW_RDWR};
 use raven_rt::entry;
 use raven_rt::fs;
 use raven_rt::println;
@@ -33,6 +38,16 @@ const LOCKFILE: &str = "/tmp/record-lock/lockfile";
 const RESULT: &str = "/tmp/record-lock/result";
 const PHASE: &str = "/tmp/record-lock/phase";
 const READ_WRITE: u32 = 3;
+const LIBC_PATH: &[u8] = b"/tmp/record-lock/lockfile\0";
+const LIBC_START: i64 = 20;
+const LIBC_LEN: i64 = 10;
+
+unsafe extern "C" {
+    fn open(path: *const c_char, flags: c_int, mode: c_int) -> c_int;
+    fn close(fd: c_int) -> c_int;
+    fn fcntl(fd: c_int, command: c_int, lock: *mut Flock) -> c_int;
+    fn __errno_location() -> *mut c_int;
+}
 
 fn main(_args: raven_rt::Args) -> i32 {
     match run() {
@@ -67,6 +82,13 @@ fn run() -> Result<(), String> {
         .open("file:/tmp/record-lock/lockfile", READ_WRITE)
         .map_err(|error| format!("reopen lockfile: {}", error.description()))?;
     exit_release(&initfs, &handle)?;
+    libc_getlk_free()?;
+    libc_getlk_conflict(&initfs)?;
+    libc_setlk_conflict(&initfs)?;
+    libc_conflict(&initfs)?;
+    libc_blocking(&initfs)?;
+    libc_close_release(&initfs)?;
+    libc_exit_release(&initfs)?;
     let _ = client.close(handle);
     Ok(())
 }
@@ -109,7 +131,7 @@ fn setup() -> Result<(), String> {
         Ok(()) | Err(Errno::EEXIST) => {}
         Err(error) => return Err(format!("mkdir root: {}", error.description())),
     }
-    let mut file = fs::open(&scheme(LOCKFILE), O_RDWR | O_CREAT)
+    let mut file = fs::open(&scheme(LOCKFILE), RAW_RDWR | O_CREAT)
         .map_err(|error| format!("create lockfile: {}", error.description()))?;
     file.write(&[0u8; 100])
         .map_err(|error| format!("write lockfile: {}", error.description()))?;
@@ -214,12 +236,172 @@ fn exit_release(initfs: &Initfs<'_>, handle: &Handle) -> Result<(), String> {
     Ok(())
 }
 
+fn libc_getlk_free() -> Result<(), String> {
+    let fd = libc_open()?;
+    let result = libc_fcntl(fd, F_GETLK, F_WRLCK as i16, LIBC_START, LIBC_LEN);
+    libc_close(fd)?;
+    let lock = result.map_err(|error| format!("libc getlk: {}", error.description()))?;
+    if lock.l_type != F_UNLCK as i16 {
+        return Err(format!("libc free range reported type {}", lock.l_type));
+    }
+    println!("record-lock: libc-getlk-free ok");
+    Ok(())
+}
+
+fn libc_getlk_conflict(initfs: &Initfs<'_>) -> Result<(), String> {
+    clear(RESULT);
+    let child = spawn_child(initfs, &hold_mode())?;
+    wait_for(RESULT, "locked")?;
+    let fd = libc_open()?;
+    let result = libc_fcntl(fd, F_GETLK, F_RDLCK as i16, LIBC_START, LIBC_LEN);
+    libc_close(fd)?;
+    wait_child(child)?;
+    let lock = result.map_err(|error| format!("libc getlk: {}", error.description()))?;
+    if lock.l_type != F_WRLCK as i16
+        || lock.l_start != LIBC_START
+        || lock.l_len != LIBC_LEN
+        || lock.l_pid == 0
+    {
+        return Err(format!(
+            "libc getlk reported type={} start={} len={} pid={}",
+            lock.l_type, lock.l_start, lock.l_len, lock.l_pid
+        ));
+    }
+    println!("record-lock: libc-getlk-conflict ok");
+    Ok(())
+}
+
+fn libc_setlk_conflict(initfs: &Initfs<'_>) -> Result<(), String> {
+    clear(RESULT);
+    let child = spawn_child(initfs, &hold_mode())?;
+    wait_for(RESULT, "locked")?;
+    let fd = libc_open()?;
+    let result = libc_fcntl(fd, F_SETLK, F_WRLCK as i16, LIBC_START, LIBC_LEN);
+    libc_close(fd)?;
+    wait_child(child)?;
+    match result {
+        Err(Errno::EAGAIN) => {}
+        Err(error) => return Err(format!("libc setlk: {}", error.description())),
+        Ok(_) => return Err("libc setlk granted while the child held the range".to_string()),
+    }
+    println!("record-lock: libc-setlk-conflict ok");
+    Ok(())
+}
+
+fn libc_conflict(initfs: &Initfs<'_>) -> Result<(), String> {
+    let fd = libc_open()?;
+    libc_fcntl(fd, F_SETLK, F_WRLCK as i16, LIBC_START, LIBC_LEN)
+        .map_err(|error| format!("libc setlk: {}", error.description()))?;
+    clear(RESULT);
+    let child = spawn_child(initfs, &format!("conflict {LIBC_START} {LIBC_LEN}"))?;
+    let text = wait_for(RESULT, "conflict")?;
+    wait_child(child)?;
+    let _ = libc_fcntl(fd, F_SETLK, F_UNLCK as i16, LIBC_START, LIBC_LEN);
+    libc_close(fd)?;
+    if text.trim() != "conflict" {
+        return Err(format!("libc conflict child reported {text}"));
+    }
+    println!("record-lock: libc-conflict ok");
+    Ok(())
+}
+
+fn libc_blocking(initfs: &Initfs<'_>) -> Result<(), String> {
+    clear(RESULT);
+    let child = spawn_child(initfs, &hold_mode())?;
+    wait_for(RESULT, "locked")?;
+    let fd = libc_open()?;
+    libc_fcntl(fd, F_SETLKW, F_WRLCK as i16, LIBC_START, LIBC_LEN)
+        .map_err(|error| format!("libc setlkw: {}", error.description()))?;
+    wait_child(child)?;
+    let _ = libc_fcntl(fd, F_SETLK, F_UNLCK as i16, LIBC_START, LIBC_LEN);
+    libc_close(fd)?;
+    println!("record-lock: libc-setlkw ok");
+    Ok(())
+}
+
+fn libc_close_release(initfs: &Initfs<'_>) -> Result<(), String> {
+    let fd = libc_open()?;
+    libc_fcntl(fd, F_SETLK, F_WRLCK as i16, LIBC_START, LIBC_LEN)
+        .map_err(|error| format!("libc setlk: {}", error.description()))?;
+    clear(RESULT);
+    clear(PHASE);
+    let child = spawn_child(initfs, &format!("try {LIBC_START} {LIBC_LEN}"))?;
+    libc_close(fd)?;
+    write_text(PHASE, "go")?;
+    let text = wait_for(RESULT, "granted")?;
+    wait_child(child)?;
+    if text.trim() != "granted" {
+        return Err(format!("libc close-release child reported {text}"));
+    }
+    println!("record-lock: libc-close ok");
+    Ok(())
+}
+
+fn libc_exit_release(initfs: &Initfs<'_>) -> Result<(), String> {
+    clear(RESULT);
+    let child = spawn_child(initfs, &format!("libc-exit {LIBC_START} {LIBC_LEN}"))?;
+    wait_for(RESULT, "locked")?;
+    wait_child(child)?;
+    let fd = libc_open()?;
+    let result = libc_fcntl(fd, F_SETLK, F_WRLCK as i16, LIBC_START, LIBC_LEN);
+    libc_close(fd)?;
+    result.map_err(|error| format!("libc exit release: {}", error.description()))?;
+    println!("record-lock: libc-exit ok");
+    Ok(())
+}
+
+fn hold_mode() -> String {
+    format!("hold {LIBC_START} {LIBC_LEN}")
+}
+
+fn libc_open() -> Result<c_int, String> {
+    // SAFETY: LIBC_PATH is NUL terminated and the libc open contract takes three arguments.
+    let fd = unsafe { open(LIBC_PATH.as_ptr().cast(), O_RDWR, 0) };
+    if fd < 0 {
+        return Err(format!("libc open: errno {}", libc_errno()));
+    }
+    Ok(fd)
+}
+
+fn libc_close(fd: c_int) -> Result<(), String> {
+    // SAFETY: fd came from the libc open above.
+    let result = unsafe { close(fd) };
+    if result < 0 {
+        return Err(format!("libc close: errno {}", libc_errno()));
+    }
+    Ok(())
+}
+
+fn libc_errno() -> i32 {
+    // SAFETY: libc returns the calling thread's errno slot.
+    unsafe { *__errno_location() }
+}
+
+fn libc_fcntl(fd: c_int, command: i32, kind: i16, start: i64, len: i64) -> Result<Flock, Errno> {
+    let mut lock = Flock {
+        l_type: kind,
+        l_whence: 0,
+        l_start: start,
+        l_len: len,
+        l_pid: 0,
+    };
+    // SAFETY: the pointer is a live struct flock for the duration of the call.
+    let result = unsafe { fcntl(fd, command, &mut lock) };
+    if result < 0 {
+        let code = u16::try_from(libc_errno()).unwrap_or(Errno::EIO.0);
+        return Err(Errno(code));
+    }
+    Ok(lock)
+}
+
 fn spawn_child(initfs: &Initfs<'_>, mode: &str) -> Result<Handle, String> {
+    let mut arguments = alloc::vec!["record-lock-child"];
+    arguments.extend(mode.split_whitespace());
     spawn(
         initfs,
         "/sbin/record-lock-child",
         &SpawnOptions {
-            args: &["record-lock-child", mode],
+            args: &arguments,
             env: &[],
         },
     )
@@ -288,7 +470,7 @@ fn clear(path: &str) {
 }
 
 fn write_text(path: &str, text: &str) -> Result<(), String> {
-    let mut file = fs::open(&scheme(path), O_RDWR | O_CREAT)
+    let mut file = fs::open(&scheme(path), RAW_RDWR | O_CREAT)
         .map_err(|error| format!("open {path}: {}", error.description()))?;
     file.write(text.as_bytes())
         .map_err(|error| format!("write {path}: {}", error.description()))?;

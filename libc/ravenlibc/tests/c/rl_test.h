@@ -98,7 +98,7 @@ static inline long rl_debug_write(const char *text, unsigned long length)
                      : "a"(3L), "D"(text), "S"(length)
                      : "rcx", "r11", "memory");
 #elif defined(__aarch64__)
-    /* S82: DEBUG_WRITE is x8=3, x0=text, x1=length on the aarch64 ABI. */
+    /* The aarch64 ABI carries DEBUG_WRITE as x8=3, x0=text, x1=length. */
     register long x8 __asm__("x8") = 3;
     register long x0 __asm__("x0") = (long)text;
     register long x1 __asm__("x1") = (long)length;

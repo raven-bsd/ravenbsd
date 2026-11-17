@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# P5c record-lock evidence: raw RECORD_LOCK conflict, F_GETLK, blocking,
-# close-release and exit-release.
+# P5c/P5c2 record-lock evidence: raw RECORD_LOCK and libc fcntl conflict,
+# F_GETLK, blocking, close-release and exit-release.
 #
-# Named nextest exception: the lock behaviour is exercised by the raw-syscall
+# Named nextest exception: the lock behaviour is exercised by the record-lock
 # qtest `posix-fs-record-lock` on the target, not by a host test.
 
 set -eu

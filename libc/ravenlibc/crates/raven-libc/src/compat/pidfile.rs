@@ -33,9 +33,9 @@ impl PidfileOps for RealPid {
         if path.len() >= super::MAX_NAME {
             return Err(raven_libc_abi::errno::Errno(super::ENAMETOOLONG as u16));
         }
-        let mut name = [0i8; 4096];
+        let mut name = [0 as c_char; 4096];
         for (slot, byte) in name.iter_mut().zip(path.iter()) {
-            *slot = *byte as i8;
+            *slot = *byte as c_char;
         }
         name[path.len()] = 0;
         // O_WRONLY|O_CREAT|O_EXCL|O_TRUNC, mode 0644.
@@ -55,12 +55,12 @@ impl PidfileOps for RealPid {
     }
 
     fn unlink(&mut self, path: &[u8]) {
-        let mut name = [0i8; 4096];
+        let mut name = [0 as c_char; 4096];
         if path.len() >= name.len() {
             return;
         }
         for (slot, byte) in name.iter_mut().zip(path.iter()) {
-            *slot = *byte as i8;
+            *slot = *byte as c_char;
         }
         name[path.len()] = 0;
         // SAFETY: `name` is NUL-terminated.
