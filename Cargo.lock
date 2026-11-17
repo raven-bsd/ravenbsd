@@ -2605,6 +2605,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-ring"
+version = "0.1.0"
+
+[[package]]
 name = "raven-ringbuf"
 version = "0.1.0"
 
