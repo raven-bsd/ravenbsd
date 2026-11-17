@@ -6,13 +6,13 @@
 
 This is the RavenBSD self-certification gate, not Open Group certification. A green `make check` with a red `posix-check` is not a release.
 
-- Date: 2026-11-17T19:39:06Z
+- Date: 2026-11-17T20:14:11Z
 - Profile: `posix`
 - Target: `x86_64`
 - Mode: host-only
 - Tool: `posix-conform 0.1.0`
 - Result: **FAIL (release blocked)**
-- Counts: 1678 pass, 30 fail, 105 skip
+- Counts: 1679 pass, 29 fail, 105 skip
 
 ## Summary
 
@@ -22,13 +22,13 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | filesystem | 2 | 0 | 18 |
 | header | 73 | 13 | 0 |
 | interface | 1410 | 15 | 0 |
-| link | 0 | 1 | 0 |
+| link | 1 | 0 | 0 |
 | process | 3 | 0 | 14 |
 | shell | 3 | 0 | 22 |
 | target | 0 | 0 | 7 |
 | tty | 5 | 0 | 7 |
 | utility | 182 | 1 | 34 |
-| **all** | **1678** | **30** | **105** |
+| **all** | **1679** | **29** | **105** |
 
 ## Rows
 
@@ -1568,7 +1568,7 @@ This is the RavenBSD self-certification gate, not Open Group certification. A gr
 | `interface.y1f` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1422.c` |  |
 | `interface.yn` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1423.c` |  |
 | `interface.ynf` | interface | pass | `cc -I ./libc/ravenlibc/include -I ./libc/ravenlibc/arch/x86_64/include -fsyntax-only -std=c17 -D_POSIX_C_SOURCE=202405L -D_XOPEN_SOURCE=800 -Wno-unused-value ./build/posix-gate/x86_64/interface_1424.c` |  |
-| `link.libc` | link | fail | `nm -g --defined-only ./build/x86_64/libc.a` | 59 required symbols absent from libc.a |
+| `link.libc` | link | pass | `nm -g --defined-only ./build/x86_64/libc.a` | 0 required symbols absent from libc.a |
 | `process.credential` | process | skip | `qtest:proc-credentials` | host-only run; qtest evidence not executed |
 | `process.exec` | process | skip | `qtest:proc-exec` | host-only run; qtest evidence not executed |
 | `process.fork` | process | skip | `qtest:proc-fork` | host-only run; qtest evidence not executed |
