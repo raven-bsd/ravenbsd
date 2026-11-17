@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 //! `strerror(3)`, `strerror_r(3)` (XSI) and `__xpg_strerror_r`'s strict sibling.
-use core::ffi::{c_char, c_int};
+use core::ffi::{c_char, c_int, c_void};
 
 /// The process-wide 64-byte message buffer (per-thread only after C57).
 static mut MESSAGE: [u8; 64] = [0; 64];
@@ -26,6 +26,16 @@ pub unsafe extern "C" fn strerror(e: c_int) -> *mut c_char {
         }
         None => buffer.as_mut_ptr().cast(),
     }
+}
+
+/// `strerror_l`: the C/UTF-8 byte order; the locale object is accepted and ignored.
+///
+/// # Safety
+/// The returned pointer is valid until the next `strerror` call in this thread.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn strerror_l(e: c_int, _locale: *mut c_void) -> *mut c_char {
+    // SAFETY: as `strerror`.
+    unsafe { strerror(e) }
 }
 
 /// The XSI `strerror_r`: `int` return, never writes `errno`.

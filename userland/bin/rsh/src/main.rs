@@ -7,6 +7,10 @@
 //! runs the builtins itself and spawns programs from the initfs (`raven_rt::spawn`), waiting for
 //! each child and keeping `$?`. It keeps its own working directory and passes it to children as
 //! `PWD=`, because the kernel has no process working directory.
+//!
+//! P4p adds shell pipelines and redirections: a pipeline stage runs in a child `rsh -c`, with its
+//! standard descriptors carried through the P2n fd map; `<`, `>`, `>>`, `2>`, `2>&1` and
+//! here-documents are applied by the shell that executes the command.
 
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
@@ -30,10 +34,10 @@ mod program {
     };
     use raven_rt::entry;
     use raven_rt::fs;
-    use raven_rt::spawn::{RtSys, SpawnError, SpawnOptions};
+    use raven_rt::spawn::{RtSys, SpawnAttributes, SpawnOptions, spawn_with_attributes};
     use raven_rt::sync::Mutex;
     use raven_scheme::Client;
-    use raven_shell_core::{Command, Connector, RedirKind, Table, Vars, parse};
+    use raven_shell_core::{Command, Connector, List, Pipeline, RedirKind, Table, Vars, parse};
 
     entry!(main);
 
@@ -41,6 +45,8 @@ mod program {
     const MAX_LINE: usize = 1024;
     /// Longest variable value kept before truncation.
     const MAX_VALUE: usize = 4096;
+    /// Largest here-document body accepted (the pipe capacity is 64 KiB).
+    const MAX_HEREDOC: usize = 16 * 1024;
     /// Commands searched for a bare program name.
     const PATH: [&str; 2] = ["/bin", "/sbin"];
     /// Prompt shown before every line.
@@ -60,27 +66,56 @@ mod program {
         Failed(Errno),
     }
 
-    struct Shell {
-        vars: Table,
-        exported: Vec<String>,
-        status: i32,
-        cwd: String,
-        tty: Handle,
-        running: bool,
+    /// One standard stream of a shell or command.
+    #[derive(Clone, Copy)]
+    enum Stream {
+        /// The shell's `tty:console` handle.
+        Console,
+        /// An explicit file or pipe handle.
+        Handle(Handle),
     }
 
-    /// One external command handed to the spawn thread.
-    struct Job {
-        path: String,
-        args: Vec<String>,
-        env: Vec<String>,
+    impl Stream {
+        fn handle(self, tty: Handle) -> Result<Handle, Errno> {
+            match self {
+                Self::Console if tty == Handle::NONE => Err(Errno::EBADF),
+                Self::Console => Ok(tty),
+                Self::Handle(handle) => Ok(handle),
+            }
+        }
+
+        fn is_console(self) -> bool {
+            matches!(self, Self::Console)
+        }
+
+        /// Write all bytes, retrying partial writes.
+        fn write_all(self, tty: Handle, bytes: &[u8]) -> Result<(), Errno> {
+            let handle = self.handle(tty)?;
+            let client = Client::new();
+            let mut offset = 0usize;
+            while offset < bytes.len() {
+                let written = client.write(handle, 0, &bytes[offset..])?;
+                if written == 0 {
+                    return Err(Errno::EIO);
+                }
+                offset = offset.saturating_add(written);
+            }
+            Ok(())
+        }
+
+        /// Read up to `buffer.len()` bytes.
+        fn read(self, tty: Handle, buffer: &mut [u8]) -> Result<usize, Errno> {
+            let handle = self.handle(tty)?;
+            Client::new().read(handle, 0, buffer)
+        }
     }
 
-    /// How a spawned child ended.
-    enum Child {
-        Exit(i32),
-        NotFound,
-        Failed(String),
+    /// The three standard streams of a command.
+    #[derive(Clone, Copy)]
+    struct Io {
+        stdin: Stream,
+        stdout: Stream,
+        stderr: Stream,
     }
 
     /// The session thread's state: the shell, its exit status and a done word.
@@ -88,6 +123,7 @@ mod program {
     /// `spawn` builds a 64 KiB stack image on the caller's stack, and this process is spawned
     /// with a 64 KiB stack, so the session runs on a thread with room for it.
     static SHELL: Mutex<Option<Shell>> = Mutex::new(None);
+    static COMMAND: Mutex<Option<String>> = Mutex::new(None);
     static EXIT_CODE: Mutex<Option<i32>> = Mutex::new(None);
     static SHELL_DONE: AtomicU32 = AtomicU32::new(0);
     /// The parsed initfs table, shared with the session thread.
@@ -95,14 +131,30 @@ mod program {
     /// Stack for the session thread.
     const SHELL_STACK: usize = 256 * 1024;
 
+    struct Shell {
+        vars: Table,
+        exported: Vec<String>,
+        status: i32,
+        cwd: String,
+        tty: Handle,
+        io: Io,
+        running: bool,
+        pending: Vec<u8>,
+    }
+
     impl Vars for Shell {
         fn get(&self, name: &str) -> Option<String> {
             self.vars.get(name)
         }
     }
 
-    fn main(_args: raven_rt::Args) -> i32 {
-        match run() {
+    fn main(args: raven_rt::Args) -> i32 {
+        let command = if args.get(1) == Some("-c") {
+            Some(args.get(2).unwrap_or("").to_string())
+        } else {
+            None
+        };
+        match run(args, command) {
             Ok(code) => code,
             Err(message) => {
                 raven_rt::eprintln!("rsh: {}", message);
@@ -111,15 +163,23 @@ mod program {
         }
     }
 
-    fn run() -> Result<i32, String> {
-        let image =
-            raven_rt::map_initfs().map_err(|error| format!("initfs: {}", error.description()))?;
-        let initfs = Initfs::parse(image).map_err(|error| format!("initfs: {error}"))?;
-        *INITFS.lock() = Some(initfs);
-        let client = Client::new();
-        let tty = client
-            .open("tty:console", flags(O_RDWR)?)
-            .map_err(|error| format!("tty:console: {}", error.description()))?;
+    fn run(args: raven_rt::Args, command: Option<String>) -> Result<i32, String> {
+        let interactive = command.is_none();
+        // The initfs is parsed on the first external command. A shell that only runs builtins
+        // (and every `-c` pipeline stage) avoids the expensive whole-archive CRC validation.
+        *INITFS.lock() = None;
+        let io = io_from_args(&args);
+        let needs_tty = interactive
+            || io.stdin.is_console()
+            || io.stdout.is_console()
+            || io.stderr.is_console();
+        let tty = if needs_tty {
+            Client::new()
+                .open("tty:console", flags(O_RDWR)?)
+                .map_err(|error| format!("tty:console: {}", error.description()))?
+        } else {
+            Handle::NONE
+        };
 
         let mut shell = Shell {
             vars: Table::new(),
@@ -127,7 +187,9 @@ mod program {
             status: 0,
             cwd: "/".to_string(),
             tty,
+            io,
             running: true,
+            pending: Vec::new(),
         };
         shell.vars.set("PATH", "/bin:/sbin");
         shell.vars.set("HOME", "/");
@@ -137,10 +199,11 @@ mod program {
         for name in ["PATH", "HOME", "USER", "SHELL", "PWD"] {
             shell.exported.push(name.to_string());
         }
-        raven_rt::println!("rsh: ready");
+        if interactive {
+            raven_rt::println!("rsh: ready");
+        }
         *SHELL.lock() = Some(shell);
-
-        // The whole session runs on a thread with room for `spawn`'s stack image.
+        *COMMAND.lock() = command;
         let thread = raven_rt::thread::spawn(shell_thread, 0, SHELL_STACK)
             .map_err(|error| format!("shell thread: {}", error.description()))?;
         // The thread owns the session; detaching it leaks its stack until exit, which is fine.
@@ -151,10 +214,29 @@ mod program {
         Ok(EXIT_CODE.lock().take().unwrap_or(1))
     }
 
+    /// Read the fd handles supplied by a pipeline parent.
+    fn io_from_args(args: &raven_rt::Args) -> Io {
+        let stream = |name: &str| {
+            args.env_get(name)
+                .and_then(|value| value.parse::<u32>().ok())
+                .map(|value| Stream::Handle(Handle(value)))
+                .unwrap_or(Stream::Console)
+        };
+        Io {
+            stdin: stream("RSH_FD0"),
+            stdout: stream("RSH_FD1"),
+            stderr: stream("RSH_FD2"),
+        }
+    }
+
     /// Entry of the session thread: run the shell loop and publish its status.
     fn shell_thread(_argument: usize) {
+        let command = COMMAND.lock().take();
         let code = match SHELL.lock().take() {
-            Some(mut shell) => shell.run_loop(),
+            Some(mut shell) => match command {
+                Some(text) => shell.run_text(&text),
+                None => shell.run_loop(),
+            },
             None => 1,
         };
         *EXIT_CODE.lock() = Some(code);
@@ -172,47 +254,99 @@ mod program {
             self.run_startup_script();
             while self.running {
                 self.prompt();
-                match self.read_line() {
-                    Line::Ok(text) => {
+                match self.read_command() {
+                    Some(text) => {
                         if text.trim().is_empty() {
                             continue;
                         }
-                        self.run_line(&text);
+                        self.run_text(&text);
                     }
-                    Line::Interrupted => {
-                        // consd already echoed `^C`; start a fresh line.
-                        self.status = 130;
-                    }
-                    Line::Eof => break,
-                    Line::Failed(error) => {
-                        raven_rt::eprintln!("rsh: console: {}", error.description());
-                        return 1;
-                    }
+                    None => break,
                 }
             }
-            let _ = Client::new().close(self.tty);
+            if self.tty != Handle::NONE {
+                let _ = raven_rt::handle_close(self.tty);
+            }
             self.status
         }
 
+        /// Read one logical line, including here-document body lines.
+        fn read_command(&mut self) -> Option<String> {
+            let mut text = match self.read_line() {
+                Line::Ok(text) => text,
+                Line::Interrupted => {
+                    // consd already echoed `^C`; start a fresh line.
+                    self.status = 130;
+                    return Some(String::new());
+                }
+                Line::Eof => return None,
+                Line::Failed(error) => {
+                    raven_rt::eprintln!("rsh: console: {}", error.description());
+                    self.status = 1;
+                    return None;
+                }
+            };
+            loop {
+                match parse(&text) {
+                    Err(raven_shell_core::ParseError::IncompleteHereDoc) => {
+                        match self.read_line() {
+                            Line::Ok(more) => {
+                                text.push('\n');
+                                text.push_str(&more);
+                            }
+                            Line::Interrupted => {
+                                self.status = 130;
+                                return Some(String::new());
+                            }
+                            Line::Eof => {
+                                raven_rt::eprintln!("rsh: here-document is not terminated");
+                                self.status = 2;
+                                return Some(String::new());
+                            }
+                            Line::Failed(error) => {
+                                raven_rt::eprintln!("rsh: console: {}", error.description());
+                                self.status = 1;
+                                return None;
+                            }
+                        }
+                    }
+                    _ => return Some(text),
+                }
+            }
+        }
+
         fn prompt(&self) {
-            let _ = Client::new().write(self.tty, 0, PROMPT);
+            let _ = self.io.stdout.write_all(self.tty, PROMPT);
         }
 
         fn read_line(&mut self) -> Line {
-            let client = Client::new();
             let mut line: Vec<u8> = Vec::new();
             let mut buffer = [0u8; CHUNK];
             loop {
-                match client.read(self.tty, 0, &mut buffer) {
-                    Ok(0) => return Line::Eof,
+                if let Some(index) = self.pending.iter().position(|byte| *byte == b'\n') {
+                    line.extend_from_slice(&self.pending[..index]);
+                    self.pending.drain(..=index);
+                    return Line::Ok(String::from_utf8_lossy(&line).to_string());
+                }
+                line.extend_from_slice(&self.pending);
+                self.pending.clear();
+                match self.io.stdin.read(self.tty, &mut buffer) {
+                    Ok(0) => {
+                        if line.is_empty() {
+                            return Line::Eof;
+                        }
+                        return Line::Ok(String::from_utf8_lossy(&line).to_string());
+                    }
                     Ok(count) => {
-                        for &byte in &buffer[..count] {
-                            if byte == b'\n' {
-                                return Line::Ok(String::from_utf8_lossy(&line).to_string());
-                            }
-                            if line.len() < MAX_LINE {
-                                line.push(byte);
-                            }
+                        let bytes = &buffer[..count];
+                        if let Some(index) = bytes.iter().position(|byte| *byte == b'\n') {
+                            line.extend_from_slice(&bytes[..index]);
+                            self.pending.extend_from_slice(&bytes[index + 1..]);
+                            return Line::Ok(String::from_utf8_lossy(&line).to_string());
+                        }
+                        line.extend_from_slice(bytes);
+                        if line.len() > MAX_LINE {
+                            line.truncate(MAX_LINE);
                         }
                     }
                     Err(Errno::EINTR) => return Line::Interrupted,
@@ -238,20 +372,26 @@ mod program {
             }
             let _ = file.close();
             for line in String::from_utf8_lossy(&text).lines() {
-                self.run_line(line);
+                self.run_text(line);
             }
         }
 
-        fn run_line(&mut self, line: &str) {
-            let list = match parse(line) {
-                Ok(list) => list,
+        /// Parse and run one complete command text (one interactive line or a `-c` script).
+        fn run_text(&mut self, text: &str) -> i32 {
+            match parse(text) {
+                Ok(list) => self.run_list(&list),
                 Err(error) => {
-                    raven_rt::eprintln!("rsh: {}", error.message());
-                    self.status = 2;
-                    return;
+                    if error != raven_shell_core::ParseError::Empty {
+                        raven_rt::eprintln!("rsh: {}", error.message());
+                        self.status = 2;
+                    }
+                    self.status
                 }
-            };
-            for item in list.items {
+            }
+        }
+
+        fn run_list(&mut self, list: &List) -> i32 {
+            for item in &list.items {
                 let run = match item.connector {
                     Connector::Next => true,
                     Connector::And => self.status == 0,
@@ -260,57 +400,221 @@ mod program {
                 if !run {
                     continue;
                 }
-                self.status = self.run_command(&item.command);
+                self.status = self.run_pipeline(&item.pipeline);
                 if !self.running {
-                    return;
+                    break;
                 }
             }
+            self.status
         }
 
-        fn run_command(&mut self, command: &Command) -> i32 {
+        fn run_pipeline(&mut self, pipeline: &Pipeline) -> i32 {
+            if pipeline.commands.len() == 1 {
+                return self.run_command(&pipeline.commands[0], self.io);
+            }
+            self.run_multi_pipeline(pipeline)
+        }
+
+        /// Run one command in this shell, with its redirections applied locally.
+        fn run_command(&mut self, command: &Command, base: Io) -> i32 {
+            let mut io = base;
+            let mut opened = Vec::new();
+            if self.apply_redirections(command, &mut io, &mut opened) != 0 {
+                for handle in opened {
+                    let _ = raven_rt::handle_close(handle);
+                }
+                return 2;
+            }
             let words: Vec<String> = command
                 .words
                 .iter()
                 .map(|word| raven_shell_core::expand(word, self, self.status))
                 .collect();
-            if words.is_empty() || words[0].is_empty() {
-                return self.status;
+            let status = if words.is_empty() || words[0].is_empty() {
+                self.status
+            } else if self.is_builtin(&words[0]) {
+                self.run_builtin(&words[0], &words, &mut io)
+            } else {
+                self.run_external(&words, &io)
+            };
+            for handle in opened {
+                let _ = raven_rt::handle_close(handle);
             }
-            let name = words[0].clone();
-            if self.is_builtin(&name) {
-                let target = match self.redirection_target(command) {
-                    Ok(target) => target,
-                    Err(status) => return status,
-                };
-                return match target {
-                    Some((kind, path)) => self.run_builtin_with_output(&name, &words, kind, &path),
-                    None => self.run_builtin(&name, &words),
-                };
-            }
-            if !command.redirs.is_empty() {
-                raven_rt::eprintln!("rsh: redirection is only supported for builtins");
-                return 2;
-            }
-            self.run_external(&words)
+            status
         }
 
-        /// The output redirection of a command, if any; `<` is not supported.
-        fn redirection_target(
-            &mut self,
-            command: &Command,
-        ) -> Result<Option<(RedirKind, String)>, i32> {
-            let mut target = None;
-            for redir in &command.redirs {
-                let path = raven_shell_core::expand(&redir.target, self, self.status);
-                match redir.kind {
-                    RedirKind::In => {
-                        raven_rt::eprintln!("rsh: input redirection is not supported");
-                        return Err(2);
+        /// Run every stage of a pipeline in a child `rsh -c`, connected by P2j pipes.
+        fn run_multi_pipeline(&mut self, pipeline: &Pipeline) -> i32 {
+            let count = pipeline.commands.len();
+            let mut pipes: Vec<(Handle, Handle)> = Vec::new();
+            for _ in 0..count - 1 {
+                match raven_rt::pipe::pipe() {
+                    Ok(pair) => pipes.push(pair),
+                    Err(error) => {
+                        raven_rt::eprintln!("rsh: pipe: {}", error.description());
+                        return 1;
                     }
-                    kind => target = Some((kind, path)),
                 }
             }
-            Ok(target)
+            let mut children: Vec<Handle> = Vec::new();
+            for (index, command) in pipeline.commands.iter().enumerate() {
+                let mut io = self.io;
+                if index > 0 {
+                    io.stdin = Stream::Handle(pipes[index - 1].0);
+                }
+                if index + 1 < count {
+                    io.stdout = Stream::Handle(pipes[index].1);
+                }
+                // The stage applies its own redirections in the child shell.
+                let source = command.render();
+                match self.spawn_program("/bin/rsh", &["/bin/rsh", "-c", &source], &io) {
+                    Ok(child) => children.push(child),
+                    Err(message) => {
+                        raven_rt::eprintln!("rsh: {}", message);
+                        for child in children {
+                            let mut code = 0;
+                            let _ = RtSys.proc_wait(child, &mut code);
+                            let _ = raven_rt::handle_close(child);
+                        }
+                        for (read, write) in pipes {
+                            let _ = raven_rt::handle_close(read);
+                            let _ = raven_rt::handle_close(write);
+                        }
+                        return 126;
+                    }
+                }
+                if index + 1 < count {
+                    let _ = raven_rt::handle_close(pipes[index].1);
+                }
+                if index > 0 {
+                    let _ = raven_rt::handle_close(pipes[index - 1].0);
+                }
+            }
+            let mut status = 0;
+            for child in children {
+                let mut code = 0;
+                if RtSys.proc_wait(child, &mut code).is_ok() {
+                    status = code;
+                }
+                let _ = raven_rt::handle_close(child);
+            }
+            status
+        }
+
+        /// Apply redirections in source order to `io`; opened handles go into `opened`.
+        fn apply_redirections(
+            &mut self,
+            command: &Command,
+            io: &mut Io,
+            opened: &mut Vec<Handle>,
+        ) -> i32 {
+            for redir in &command.redirs {
+                if redir.kind == RedirKind::Dup {
+                    let target = redir.dup.unwrap_or(1);
+                    let Some(stream) = stream_at(io, target) else {
+                        raven_rt::eprintln!(
+                            "rsh: {}>&{}: unsupported descriptor",
+                            redir.fd,
+                            target
+                        );
+                        return 2;
+                    };
+                    if set_stream(io, redir.fd, stream).is_err() {
+                        raven_rt::eprintln!(
+                            "rsh: {}>&{}: unsupported descriptor",
+                            redir.fd,
+                            target
+                        );
+                        return 2;
+                    }
+                    continue;
+                }
+                let target = raven_shell_core::expand(&redir.target, self, self.status);
+                match redir.kind {
+                    RedirKind::In => match self.open_file(&target, O_RDONLY) {
+                        Ok(handle) => {
+                            if set_stream(io, redir.fd, Stream::Handle(handle)).is_err() {
+                                let _ = raven_rt::handle_close(handle);
+                                return 2;
+                            }
+                            opened.push(handle);
+                        }
+                        Err(error) => {
+                            raven_rt::eprintln!("rsh: {}: {}", target, error.description());
+                            return 2;
+                        }
+                    },
+                    RedirKind::Out | RedirKind::Append => {
+                        let flags = if redir.kind == RedirKind::Append {
+                            O_WRONLY | O_CREAT | O_APPEND
+                        } else {
+                            O_WRONLY | O_CREAT | O_TRUNC
+                        };
+                        match self.open_file(&target, flags) {
+                            Ok(handle) => {
+                                if set_stream(io, redir.fd, Stream::Handle(handle)).is_err() {
+                                    let _ = raven_rt::handle_close(handle);
+                                    return 2;
+                                }
+                                opened.push(handle);
+                            }
+                            Err(error) => {
+                                raven_rt::eprintln!("rsh: {}: {}", target, error.description());
+                                return 2;
+                            }
+                        }
+                    }
+                    RedirKind::HereDoc => {
+                        let body = redir.body.as_deref().unwrap_or("");
+                        if body.len() > MAX_HEREDOC {
+                            raven_rt::eprintln!("rsh: here-document is too large");
+                            return 2;
+                        }
+                        let (read, write) = match raven_rt::pipe::pipe() {
+                            Ok(pair) => pair,
+                            Err(error) => {
+                                raven_rt::eprintln!("rsh: pipe: {}", error.description());
+                                return 2;
+                            }
+                        };
+                        let mut offset = 0usize;
+                        let bytes = body.as_bytes();
+                        while offset < bytes.len() {
+                            match Client::new().write(write, 0, &bytes[offset..]) {
+                                Ok(0) => {
+                                    let _ = raven_rt::handle_close(read);
+                                    let _ = raven_rt::handle_close(write);
+                                    raven_rt::eprintln!("rsh: here-document write failed");
+                                    return 2;
+                                }
+                                Ok(written) => offset = offset.saturating_add(written),
+                                Err(error) => {
+                                    let _ = raven_rt::handle_close(read);
+                                    let _ = raven_rt::handle_close(write);
+                                    raven_rt::eprintln!(
+                                        "rsh: here-document: {}",
+                                        error.description()
+                                    );
+                                    return 2;
+                                }
+                            }
+                        }
+                        let _ = raven_rt::handle_close(write);
+                        if set_stream(io, redir.fd, Stream::Handle(read)).is_err() {
+                            let _ = raven_rt::handle_close(read);
+                            return 2;
+                        }
+                        opened.push(read);
+                    }
+                    RedirKind::Dup => unreachable!(),
+                }
+            }
+            0
+        }
+
+        fn open_file(&mut self, path: &str, flags: u32) -> Result<Handle, Errno> {
+            let flags = fs::s11_flags(flags)?;
+            Client::new().open(&with_scheme(&self.absolute(path)), flags)
         }
 
         fn is_builtin(&self, name: &str) -> bool {
@@ -325,64 +629,27 @@ mod program {
                     | "env"
                     | "help"
                     | "type"
+                    | "cat"
+                    | "read"
+                    | "true"
+                    | "false"
+                    | ":"
             )
         }
 
-        fn run_builtin_with_output(
-            &mut self,
-            name: &str,
-            words: &[String],
-            kind: RedirKind,
-            path: &str,
-        ) -> i32 {
-            let text = match name {
+        fn run_builtin(&mut self, name: &str, words: &[String], io: &mut Io) -> i32 {
+            match name {
+                "cat" => self.builtin_cat(words, io),
+                "read" => self.builtin_read(words, io),
+                "cd" => self.builtin_cd(words),
+                "pwd" => {
+                    let text = format!("{}\n", self.cwd);
+                    write_status(io.stdout.write_all(self.tty, text.as_bytes()))
+                }
                 "echo" => {
                     let mut text = words.get(1..).unwrap_or(&[]).join(" ");
                     text.push('\n');
-                    text
-                }
-                "pwd" => format!("{}\n", self.cwd),
-                _ => {
-                    raven_rt::eprintln!(
-                        "rsh: {}: redirection is only supported for echo and pwd",
-                        name
-                    );
-                    return 2;
-                }
-            };
-            let flags = match kind {
-                RedirKind::Append => O_WRONLY | O_CREAT | O_APPEND,
-                _ => O_WRONLY | O_CREAT | O_TRUNC,
-            };
-            match fs::open(&with_scheme(&self.absolute(path)), flags) {
-                Ok(mut file) => match file.write(text.as_bytes()) {
-                    Ok(_) => {
-                        let _ = file.close();
-                        0
-                    }
-                    Err(error) => {
-                        let _ = file.close();
-                        raven_rt::eprintln!("rsh: {}: {}", path, error.description());
-                        1
-                    }
-                },
-                Err(error) => {
-                    raven_rt::eprintln!("rsh: {}: {}", path, error.description());
-                    1
-                }
-            }
-        }
-
-        fn run_builtin(&mut self, name: &str, words: &[String]) -> i32 {
-            match name {
-                "cd" => self.builtin_cd(words),
-                "pwd" => {
-                    raven_rt::println!("{}", self.cwd);
-                    0
-                }
-                "echo" => {
-                    raven_rt::println!("{}", words.get(1..).unwrap_or(&[]).join(" "));
-                    0
+                    write_status(io.stdout.write_all(self.tty, text.as_bytes()))
                 }
                 "exit" => {
                     let code = words
@@ -392,30 +659,80 @@ mod program {
                     self.running = false;
                     code
                 }
-                "set" => {
-                    self.print_variables();
-                    0
-                }
+                "true" | ":" => 0,
+                "false" => 1,
+                "set" => self.print_variables(io),
                 "export" => self.builtin_export(words),
                 "unset" => self.builtin_unset(words),
                 "env" => {
+                    let mut text = String::new();
                     for (key, value) in self.variables_in_order() {
                         if self.is_exported(&key) {
-                            raven_rt::println!("{}={}", key, value);
+                            text.push_str(&format!("{}={}\n", key, value));
                         }
                     }
-                    0
+                    write_status(io.stdout.write_all(self.tty, text.as_bytes()))
                 }
                 "help" => {
-                    raven_rt::println!("builtins: cd pwd echo exit set export unset env help type");
-                    0
+                    let text = "builtins: cd pwd echo cat read exit set export unset env help type true false\n";
+                    write_status(io.stdout.write_all(self.tty, text.as_bytes()))
                 }
-                "type" => self.builtin_type(words),
+                "type" => self.builtin_type(words, io),
                 other => {
                     raven_rt::eprintln!("rsh: {}: not a builtin", other);
                     1
                 }
             }
+        }
+
+        fn builtin_cat(&mut self, words: &[String], io: &mut Io) -> i32 {
+            if words.len() == 1 {
+                return copy_stream(io.stdin, io, self.tty);
+            }
+            let mut status = 0;
+            for path in &words[1..] {
+                match self.open_file(path, O_RDONLY) {
+                    Ok(handle) => {
+                        if copy_stream(Stream::Handle(handle), io, self.tty) != 0 {
+                            status = 1;
+                        }
+                        let _ = raven_rt::handle_close(handle);
+                    }
+                    Err(error) => {
+                        let text = format!("rsh: cat: {}: {}\n", path, error.description());
+                        let _ = io.stderr.write_all(self.tty, text.as_bytes());
+                        status = 1;
+                    }
+                }
+            }
+            status
+        }
+
+        fn builtin_read(&mut self, words: &[String], io: &mut Io) -> i32 {
+            let name = words.get(1).map(String::as_str).unwrap_or("REPLY");
+            let mut line = Vec::new();
+            let mut buffer = [0u8; 1];
+            loop {
+                match io.stdin.read(self.tty, &mut buffer) {
+                    Ok(0) => break,
+                    Ok(_) => {
+                        if buffer[0] == b'\n' {
+                            break;
+                        }
+                        if line.len() < MAX_VALUE {
+                            line.push(buffer[0]);
+                        }
+                    }
+                    Err(Errno::EINTR) => continue,
+                    Err(error) => {
+                        let text = format!("rsh: read: {}\n", error.description());
+                        let _ = io.stderr.write_all(self.tty, text.as_bytes());
+                        return 1;
+                    }
+                }
+            }
+            self.vars.set(name, String::from_utf8_lossy(&line).as_ref());
+            if line.is_empty() { 1 } else { 0 }
         }
 
         fn builtin_cd(&mut self, words: &[String]) -> i32 {
@@ -468,25 +785,25 @@ mod program {
         }
 
         fn builtin_unset(&mut self, words: &[String]) -> i32 {
-            for name in &words[1..] {
-                self.vars.unset(name);
-                self.exported.retain(|item| item != name);
+            for word in &words[1..] {
+                self.vars.unset(word);
+                self.exported.retain(|item| item != word);
             }
             0
         }
 
-        fn builtin_type(&mut self, words: &[String]) -> i32 {
+        fn builtin_type(&mut self, words: &[String], io: &mut Io) -> i32 {
             let Some(name) = words.get(1) else {
                 return 0;
             };
             if self.is_builtin(name) {
-                raven_rt::println!("{} is a shell builtin", name);
-                return 0;
+                let text = format!("{} is a shell builtin\n", name);
+                return write_status(io.stdout.write_all(self.tty, text.as_bytes()));
             }
             match self.resolve_program(name) {
                 Some(path) => {
-                    raven_rt::println!("{} is {}", name, path);
-                    0
+                    let text = format!("{} is {}\n", name, path);
+                    write_status(io.stdout.write_all(self.tty, text.as_bytes()))
                 }
                 None => {
                     raven_rt::eprintln!("rsh: type: {}: not found", name);
@@ -495,31 +812,72 @@ mod program {
             }
         }
 
-        fn run_external(&mut self, words: &[String]) -> i32 {
+        fn run_external(&mut self, words: &[String], io: &Io) -> i32 {
             let name = &words[0];
             let Some(path) = self.resolve_program(name) else {
                 raven_rt::eprintln!("rsh: {}: command not found", name);
                 return 127;
             };
-            let job = Job {
-                path,
-                args: words.to_vec(),
-                env: self.environment(),
-            };
-            match run_child(&job) {
-                Child::Exit(code) => code,
-                Child::NotFound => {
-                    raven_rt::eprintln!("rsh: {}: command not found", name);
-                    127
-                }
-                Child::Failed(message) => {
+            let args: Vec<&str> = words.iter().map(String::as_str).collect();
+            match self.spawn_program(&path, &args, io) {
+                Ok(child) => wait_child(child, name),
+                Err(message) => {
                     raven_rt::eprintln!("rsh: {}: {}", name, message);
                     126
                 }
             }
         }
 
-        /// Resolve a program name to its initfs path.
+        /// Parse the initfs on first use; `-c` children that run only builtins skip this.
+        fn initfs(&mut self) -> Option<Initfs<'static>> {
+            if let Some(initfs) = *INITFS.lock() {
+                return Some(initfs);
+            }
+            let image = raven_rt::map_initfs().ok()?;
+            let initfs = Initfs::parse(image).ok()?;
+            *INITFS.lock() = Some(initfs);
+            Some(initfs)
+        }
+
+        /// Spawn `path` with a child fd map for the non-console standard streams.
+        fn spawn_program(&mut self, path: &str, args: &[&str], io: &Io) -> Result<Handle, String> {
+            let initfs = match self.initfs() {
+                Some(initfs) => initfs,
+                None => return Err("initfs is not mapped".to_string()),
+            };
+            let mut env = self.environment();
+            let mut fdmap: Vec<(i32, u32)> = Vec::new();
+            for fd in [0u8, 1, 2] {
+                let stream = stream_at(io, fd).unwrap_or(Stream::Console);
+                if let Stream::Handle(handle) = stream {
+                    // `spawn` installs self/initfs/namespace as handles 0..2, so the first
+                    // transferred descriptor is handle 3.
+                    let child = 3u32
+                        .checked_add(
+                            u32::try_from(fdmap.len())
+                                .map_err(|_| "too many inherited descriptors".to_string())?,
+                        )
+                        .ok_or_else(|| "too many inherited descriptors".to_string())?;
+                    fdmap.push((i32::from(fd), handle.0));
+                    env.push(format!("RSH_FD{fd}={child}"));
+                }
+            }
+            let env_refs: Vec<&str> = env.iter().map(String::as_str).collect();
+            let options = SpawnOptions {
+                args,
+                env: &env_refs,
+            };
+            let zero = [0u8; 128];
+            let attributes = SpawnAttributes {
+                fdmap: &fdmap,
+                sigmask: &zero,
+                sigdefault: &zero,
+                ignored: &zero,
+            };
+            spawn_with_attributes(&initfs, path, &options, &attributes)
+                .map_err(|error| format!("{error:?}"))
+        }
+
         fn resolve_program(&mut self, name: &str) -> Option<String> {
             if name.contains('/') {
                 let path = self.absolute(name);
@@ -563,12 +921,14 @@ mod program {
             self.exported.iter().any(|item| item == name)
         }
 
-        fn print_variables(&self) {
+        fn print_variables(&mut self, io: &mut Io) -> i32 {
             let mut pairs = self.variables_in_order();
             pairs.sort_by(|left, right| left.0.cmp(&right.0));
+            let mut text = String::new();
             for (key, value) in pairs {
-                raven_rt::println!("{}={}", key, value);
+                text.push_str(&format!("{}={}\n", key, value));
             }
+            write_status(io.stdout.write_all(self.tty, text.as_bytes()))
         }
 
         /// Resolve `path` against the shell's working directory.
@@ -588,31 +948,70 @@ mod program {
         }
     }
 
-    /// Build the child's stack image, spawn it and wait for it.
-    fn run_child(job: &Job) -> Child {
-        let initfs = match *INITFS.lock() {
-            Some(initfs) => initfs,
-            None => return Child::Failed("initfs is not mapped".to_string()),
-        };
-        let arguments: Vec<&str> = job.args.iter().map(String::as_str).collect();
-        let environment: Vec<&str> = job.env.iter().map(String::as_str).collect();
-        let options = SpawnOptions {
-            args: &arguments,
-            env: &environment,
-        };
-        match raven_rt::spawn::spawn(&initfs, &job.path, &options) {
-            Ok(process) => {
-                let mut code = 0i32;
-                let waited = RtSys.proc_wait(process, &mut code);
-                let _ = raven_rt::handle_close(process);
-                match waited {
-                    Ok(()) => Child::Exit(code),
-                    Err(error) => Child::Failed(error.description().to_string()),
+    /// Wait for a child and return its exit status.
+    fn wait_child(child: Handle, name: &str) -> i32 {
+        let mut code = 0i32;
+        let waited = RtSys.proc_wait(child, &mut code);
+        let _ = raven_rt::handle_close(child);
+        match waited {
+            Ok(()) => code,
+            Err(error) => {
+                raven_rt::eprintln!("rsh: {}: {}", name, error.description());
+                126
+            }
+        }
+    }
+
+    /// Copy a stream to the command's stdout until EOF.
+    fn copy_stream(input: Stream, io: &mut Io, tty: Handle) -> i32 {
+        let mut buffer = [0u8; 512];
+        loop {
+            match input.read(tty, &mut buffer) {
+                Ok(0) => return 0,
+                Ok(count) => {
+                    if let Err(error) = io.stdout.write_all(tty, &buffer[..count]) {
+                        let text = format!("rsh: cat: {}\n", error.description());
+                        let _ = io.stderr.write_all(tty, text.as_bytes());
+                        return 1;
+                    }
+                }
+                Err(Errno::EINTR) => continue,
+                Err(error) => {
+                    let text = format!("rsh: cat: {}\n", error.description());
+                    let _ = io.stderr.write_all(tty, text.as_bytes());
+                    return 1;
                 }
             }
-            Err(SpawnError::NotFound) => Child::NotFound,
-            Err(error) => Child::Failed(format!("{error:?}")),
         }
+    }
+
+    fn write_status(result: Result<(), Errno>) -> i32 {
+        match result {
+            Ok(()) => 0,
+            Err(error) => {
+                raven_rt::eprintln!("rsh: {}", error.description());
+                1
+            }
+        }
+    }
+
+    fn stream_at(io: &Io, fd: u8) -> Option<Stream> {
+        match fd {
+            0 => Some(io.stdin),
+            1 => Some(io.stdout),
+            2 => Some(io.stderr),
+            _ => None,
+        }
+    }
+
+    fn set_stream(io: &mut Io, fd: u8, stream: Stream) -> Result<(), ()> {
+        match fd {
+            0 => io.stdin = stream,
+            1 => io.stdout = stream,
+            2 => io.stderr = stream,
+            _ => return Err(()),
+        }
+        Ok(())
     }
 
     /// Lexically normalise an absolute path.

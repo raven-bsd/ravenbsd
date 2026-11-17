@@ -663,11 +663,59 @@ wait = '^raven# $'
 timeout_secs = 30
 
 [[step]]
-send = "mesg n; echo status=$?\n"
+send = "mesg n\n"
 delay_ms = 100
 
 [[step]]
-wait = '^mesg: tty:console: .*$'
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mesg; echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^n$'
+timeout_secs = 30
+
+[[step]]
+wait = '^status=1$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mesg y\n"
+delay_ms = 100
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mesg; echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^y$'
+timeout_secs = 30
+
+[[step]]
+wait = '^status=0$'
+timeout_secs = 30
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 30
+
+[[step]]
+send = "mesg -t file:/etc/passwd; echo status=$?\n"
+delay_ms = 100
+
+[[step]]
+wait = '^mesg: file:/etc/passwd: not a tty$'
 timeout_secs = 30
 
 [[step]]

@@ -8,22 +8,34 @@
 .Nd control terminal write permission
 .Sh SYNOPSIS
 .Nm
+.Op Fl t Ar path
 .Op y | n
 .Sh DESCRIPTION
 .Nm
 reports whether other users may write to the current terminal.
 With
 .Ql y
-it attempts to allow writes and with
+it allows writes and with
 .Ql n
-to refuse them by changing the terminal's group-write bit.
+it refuses them by changing the terminal's group-write bit through the
+.Pa tty:
+control protocol.
+The setting is persistent for the console/session and only root may change it.
 .Pp
-The current
-.Pa tty:console
-server exposes a fixed mode and has no chmod operation, so the query works
-but a set request fails. That is the exact
-.Ql P4u-D1
-follow-up.
+The
+.Fl t
+option selects another terminal path; it is a RavenBSD extension for testing.
+A path that is not a character device reports
+.Dq not a tty
+and exits 1.
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl t Ar path
+Use
+.Ar path
+instead of
+.Pa tty:console .
+.El
 .Sh EXIT STATUS
 .Ex -std
 The query exits 0 when writes are allowed and 1 when they are refused.
@@ -33,5 +45,4 @@ A failed set or usage error exits non-zero.
 .Xr stty 1
 .Sh STANDARDS
 IEEE Std 1003.1-2024
-.Pq POSIX.1-2024 ,
-except the unavailable set path noted above.
+.Pq POSIX.1-2024 .

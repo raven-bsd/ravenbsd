@@ -41,13 +41,45 @@ supplies the kernel syscall, and the on-target `libc-spawn` case passes on maste
 `PROC_WAIT` returns the kernel's raw exit code; `native_spawn` encodes it with
 `wait_status::encode(WaitStatus::Exited(code))`, so `WIFEXITED`/`WEXITSTATUS` work.
 
+## P9c follow-up
+
+The Bytes loader is not the fault in the brush repro. A C caller with non-NULL
+`posix_spawnattr_t`/`posix_spawn_file_actions_t` and `posix_spawnp` starts the child and waits
+correctly (`libc-spawn-attr`). The spawner's file-action model previously saw an empty parent
+table, so std-style `adddup2` actions returned `EBADF`; `posix_spawn`/`posix_spawnp` now pass a
+snapshot of the platform fds.
+
+Two items remain outside this slice:
+
+* P9c found the `Command::status` sret corruption was a `sigset_t` ABI mismatch: the target
+  libc declared an 8-byte `sigset_t` while `sigemptyset`/`sigaddset` and the runtime use 128
+  bytes, so std's `MaybeUninit<libc::sigset_t>` on `Command::spawn`'s stack was overrun and
+  saved `RBX` was zeroed. `0003-posix-spawn-ravenbsd.patch` now declares the 128-byte
+  `s! { struct sigset_t { __val: [c_ulong; 16] } }`; `libc-spawn-std` passes.
+* `posix_spawn` transfers each inherited parent handle with `HANDLE_TRANSFER`, encodes the
+  `RFDM` block (fd/handle, unknown kind, read/write status), maps it below the child stack and
+  publishes `AT_RAVEN_FDMAP`/`AT_RAVEN_FDMAP_N`. The libc start path decodes it and calls
+  `Platform::restore_fdmap` before `ensure_standard_fds`; `libc-spawn*` pass with inherited
+  descriptors.
+* `eventfd` descriptors are installed `O_RDWR`, and `read(2)`/`write(2)` on them go through the
+  counter engine; runtimes that ring the waker with plain `write(2)` (mio/tokio) work.
+* `write(2)`/`pwrite(2)`/`pwrite64(2)` take the caller's byte count instead of stopping at an
+  embedded NUL (`ffi::cstr::bytes_n`), so binary buffers survive.
+* Brush's `echo` pre-sizes its output buffer: growing a zero-capacity `String` currently hits a
+  `Tiny` realloc path that hands the freed block out again and loses the first eight bytes.
+
+`brush-spawn` passes: brush starts `/bin/true` and `/bin/ls` and prints both exit statuses and the
+`/bin` listing. `libc-spawn-std` had one host-side qtest flake (`exit status 35`) and passes on
+the immediate rerun; the guest transcript reached `init exited (0)`.
+
 ## Limits in this slice
 
 - Only UTF-8 paths, arguments and environment strings are accepted; other bytes return `EINVAL`.
-- `waitpid` supports `P_PID` with blocking options. `wait(2)` (`P_ALL`) and `WNOHANG` return
-  `ENOSYS` until the kernel has a wait-any/non-blocking primitive.
-- The spawn request's `fdmap` and spawn attributes are not applied yet; the C73 `libc-child`
-  fixture opens the console itself. File-action and job-control tickets own those.
+- `waitpid` uses `PROC_WAIT_EX`: `P_PID`, `P_ALL`, `P_PGID` and `WNOHANG` work; stop/continue
+  events follow the kernel encoding.
+- The spawn request's `fdmap` is applied for static ET_EXEC images. Spawn attributes and an
+  interpreter plus fdmap combination are not implemented yet; the C73 `libc-child` fixture opens
+  the console itself, and job-control tickets own the rest.
 - Relative image paths are resolved against `SpawnRequest.cwd`; scheme paths pass unchanged, and
   bare absolute paths become `file:/...`.
 
@@ -60,6 +92,8 @@ cargo check -p raven-kernel --target x86_64-unknown-none
 cargo check -p raven-libc --target x86_64-unknown-none
 cargo check -p raven-libc --target x86_64-unknown-ravenbsd
 cargo xtask qtest --case libc-spawn --arch x86_64
+cargo xtask qtest --case libc-spawn-std --arch x86_64
+cargo xtask qtest --case brush-spawn --arch x86_64
 cargo xtask qtest --case release-login --arch x86_64
 make check-fast
 ```

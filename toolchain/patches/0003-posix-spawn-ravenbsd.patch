@@ -1,10 +1,9 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# K91: select std's posix_spawn path on x86_64-unknown-ravenbsd and declare the
-# target libc ABI it calls. Applies after 0001-add-ravenbsd-targets.patch and
-# 0002-libc-ravenbsd.patch.
-diff --git a/library/std/src/sys/process/unix/unix.rs b/library/std/src/sys/process/unix/unix.rs
+# K91/P9c: select std's posix_spawn path on x86_64-unknown-ravenbsd, declare the
+# target libc ABI it calls, and align sigset_t with the 128-byte runtime ABI.
+# Applies after 0001-add-ravenbsd-targets.patch and 0002-libc-ravenbsd.patch.
 --- a/library/std/src/sys/process/unix/unix.rs
 +++ b/library/std/src/sys/process/unix/unix.rs
 @@ -426,6 +426,7 @@
@@ -41,7 +40,6 @@ diff --git a/library/std/src/sys/process/unix/unix.rs b/library/std/src/sys/proc
          fn get_posix_spawn_addchdir() -> Option<PosixSpawnAddChdirFn> {
              // Our minimum required musl supports this function, so we can just use it.
              Some(libc::posix_spawn_file_actions_addchdir_np)
-diff --git a/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
 --- a/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
 +++ b/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs
 @@ -1,3 +1,4 @@
@@ -49,7 +47,23 @@ diff --git a/library/libc-ravenbsd/src/unix/ravenbsd/mod.rs b/library/libc-raven
  use crate::prelude::*;
  
  pub type wchar_t = i32;
-@@ -1512,3 +1513,70 @@
+@@ -21,7 +22,14 @@
+ pub type rlim_t = c_ulonglong;
+ pub type sa_family_t = u16;
+ pub type sem_t = *mut c_void;
+-pub type sigset_t = c_ulonglong;
++
++s! {
++    #[repr(C)]
++    pub struct sigset_t {
++        __val: [c_ulong; 16],
++    }
++}
++
+ pub type socklen_t = u32;
+ pub type speed_t = u32;
+ pub type suseconds_t = c_longlong;
+@@ -1512,3 +1520,70 @@
      // utmp.h
      pub fn login_tty(fd: c_int) -> c_int;
  }

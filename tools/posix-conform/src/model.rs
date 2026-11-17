@@ -573,10 +573,20 @@ pub fn validate(root: &Path, profile: &Profile, trace: &TraceFile) -> Result<()>
         }
     }
     for row in &profile.utility {
-        if matches!(row.meta.status, Status::Present | Status::Partial)
-            && row.meta.evidence != "none"
-            && !root.join(&row.meta.evidence).exists()
+        if !matches!(row.meta.status, Status::Present | Status::Partial)
+            || row.meta.evidence == "none"
         {
+            continue;
+        }
+        let evidence = row
+            .meta
+            .evidence
+            .strip_prefix("test:")
+            .unwrap_or(&row.meta.evidence);
+        if evidence.starts_with("qtest:") {
+            continue;
+        }
+        if !root.join(evidence).exists() {
             errors.push(format!(
                 "utility `{}` evidence `{}` is absent",
                 row.name, row.meta.evidence

@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 #
-# P4a POSIX shell evidence. The qtest runs brush --posix through the supported grammar,
-# expansion, redirection, function, loop, set-option, trap-EXIT and builtin groups. The seven
-# waived rows are the platform or target-stdio gaps named in docs/posix/P4-shell.md; they are
-# not claimed as passes.
+# P4a/P4p POSIX shell evidence. The qtest runs the 18 brush --posix groups and the rsh
+# pipeline, redirection, list and here-document group. Three waived rows (job control,
+# interactive login and signal traps) are the platform gaps named in docs/posix/P4-shell.md;
+# they are not claimed as passes.
 
 schema = 1
 standard = "posix-2024"
@@ -59,8 +59,9 @@ notes = "P4a: getopts/OPTARG/OPTIND markers in the posix-shell qtest"
 
 [[row]]
 id = "shell.here-document"
-status = "waived"
-notes = "P4a: target script/source stdout returns failed to write whole buffer; << and <<- are proven in the host fixture; follow-up target file-open/stdio"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4p: rsh cat <<EOF group prints rsh-here; host fixture also covers <<-"
 
 [[row]]
 id = "shell.interactive-shell"
@@ -74,8 +75,9 @@ notes = "P4a: PG-56 process groups/sessions/tty control is not implemented"
 
 [[row]]
 id = "shell.list"
-status = "waived"
-notes = "P4a: sequence lists pass; asynchronous $! and wait pid need the job model (PG-56)"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4p: rsh sequence/&&/|| lists (rshone, rshtwo, and:ok, or:ok); asynchronous $! stays under job-control (PG-56)"
 
 [[row]]
 id = "shell.loop"
@@ -97,8 +99,9 @@ notes = "P4a: glob marker in the posix-shell qtest"
 
 [[row]]
 id = "shell.pipeline"
-status = "waived"
-notes = "P4a: PG-35 pipe2 is ENOSYS"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4p: rsh builtin pipeline echo rshpiped | cat; P2j pipes and P2n fd maps; stage status 0/1 markers"
 
 [[row]]
 id = "shell.quote-removal"
@@ -108,8 +111,9 @@ notes = "P4a: quoted-argument marker in the posix-shell qtest"
 
 [[row]]
 id = "shell.redirection"
-status = "waived"
-notes = "P4a: input <, exec 3<, exec 3<&- and >&- pass; target > and >> to a file return failed to write whole buffer; follow-up target file-open/stdio"
+status = "present"
+evidence = "qtest:posix-shell"
+notes = "P4p: rsh <, >, >>, 2> and 2>&1 through file: handles (rshredir, rshappended, rsh: cat errors); brush stdio defect recorded in P4-shell.md"
 
 [[row]]
 id = "shell.regular-builtin"

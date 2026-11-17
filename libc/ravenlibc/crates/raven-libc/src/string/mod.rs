@@ -23,6 +23,7 @@ pub(crate) mod strcasecmp;
 pub(crate) mod strcat;
 pub(crate) mod strchr;
 pub(crate) mod strcmp;
+pub(crate) mod strcoll;
 pub(crate) mod strcpy;
 pub(crate) mod strdup;
 pub(crate) mod strerror;

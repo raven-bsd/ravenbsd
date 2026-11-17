@@ -40,6 +40,9 @@ K91 adds one patch after the existing target and libc patches:
 * `use crate::pid_t;`
 * `posix_spawnattr_t` (336-byte opaque data, 8-byte aligned) and
   `posix_spawn_file_actions_t` (80-byte opaque data, 8-byte aligned).
+* `sigset_t` as the 128-byte `s!` struct used by the runtime and the vendor libc. The previous
+  8-byte alias let `sigemptyset`/`sigaddset` overrun std's `MaybeUninit<libc::sigset_t>` in
+  `Command::spawn`; P9c found this as the `Command::status` sret corruption.
 * `POSIX_SPAWN_RESETIDS`, `SETPGROUP`, `SETSIGDEF`, `SETSIGMASK`, `SETSCHEDPARAM`,
   `SETSCHEDULER` and `SETSID`.
 * The `posix_spawn`, `posix_spawnp`, file-action init/destroy/adddup2/addclose/addchdir_np and
@@ -62,7 +65,7 @@ The patch contains no timestamps, host paths or temporary directory names. It ap
 `patch -p1` after 0001/0002; `patch --dry-run` was used before the build. SHA-256:
 
 ```
-c734f6bb2e05ed5137231300c54063979456cf5bed5f0d3f98245bcb47192e13  0003-posix-spawn-ravenbsd.patch
+2a8b4f6c493ffae5051a66e4af387b61bd6ebb08624e1b35191591cc3a7d40f5  0003-posix-spawn-ravenbsd.patch
 ```
 
 `toolchain/build.sh` includes every patch hash in its source and installed-prefix fingerprints.

@@ -17,12 +17,19 @@ use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use crate::backend::{EarlySpawn, WaitResult};
-use crate::consts::{P_PID, WNOHANG};
 #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 use crate::errors::{E2BIG, ENOENT, ENOEXEC};
-use crate::errors::{EAGAIN, ECHILD, EINVAL, ENOSYS, Errno};
+use crate::errors::{EAGAIN, EINVAL, Errno};
 use crate::request::SpawnRequest;
-use crate::wait_status::{WaitStatus, encode};
+
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+use raven_abi::errno::Errno as AbiErrno;
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+use raven_abi::types::Handle;
+
+/// Maximum command bytes accepted by the kernel `PROC_SET_COMMAND`.
+#[cfg(any(target_os = "none", target_os = "ravenbsd", test))]
+const MAX_COMMAND: usize = 256;
 
 /// Maximum number of children tracked at once.
 pub const MAX_CHILDREN: usize = 128;
@@ -46,9 +53,16 @@ pub trait Loader {
     /// Read one executable image into a bounded buffer.
     fn read_image(&self, path: &str) -> Result<Vec<u8>, Errno>;
     /// Load `image` and start the first thread; return the child process handle.
-    fn load(&self, image: &[u8], path: &str, argv: &[&str], env: &[&str]) -> Result<u32, Errno>;
-    /// Wait for `handle` and return the kernel's raw exit code.
-    fn wait(&self, handle: u32) -> Result<i32, Errno>;
+    fn load(
+        &self,
+        image: &[u8],
+        path: &str,
+        argv: &[&str],
+        env: &[&str],
+        fdmap: &[(i32, u32)],
+    ) -> Result<u32, Errno>;
+    /// Wait for a child; a `WNOHANG` miss returns pid 0.
+    fn wait_ex(&self, idtype: u32, id: i32, options: u32) -> Result<(i32, i32), Errno>;
     /// Close one process handle.
     fn close(&self, handle: u32) -> Result<(), Errno>;
 }
@@ -125,7 +139,12 @@ impl<L: Loader, H: HandleInfo> EarlySpawn for NativeSpawner<L, H> {
         let slot = self.reserve()?;
         let result = (|| {
             let image = self.loader.read_image(&resolved)?;
-            let handle = self.loader.load(&image, &resolved, &argv, &envp)?;
+            let fds: Vec<(i32, u32)> = request
+                .fdmap
+                .iter()
+                .map(|entry| (entry.fd, entry.handle))
+                .collect();
+            let handle = self.loader.load(&image, &resolved, &argv, &envp, &fds)?;
             let pid = match self.info.pid_for_handle(handle) {
                 Ok(pid) => pid,
                 Err(error) => {
@@ -148,35 +167,16 @@ impl<L: Loader, H: HandleInfo> EarlySpawn for NativeSpawner<L, H> {
     }
 
     fn wait(&self, idtype: u32, id: i64, options: u32) -> Result<WaitResult, Errno> {
-        if idtype != P_PID {
-            // Only `waitpid` is specified for P9a; `wait(2)` needs a kernel wait-any primitive.
-            return Err(ENOSYS);
+        let id = i32::try_from(id).map_err(|_| EINVAL)?;
+        let (pid, status) = self.loader.wait_ex(idtype, id, options)?;
+        if pid != 0
+            && let Some(handle) = self.take(pid)
+        {
+            let _ = self.loader.close(handle);
         }
-        if options & WNOHANG != 0 {
-            // `PROC_WAIT` is a blocking wait; there is no non-blocking probe yet.
-            return Err(ENOSYS);
-        }
-        if options != 0 {
-            return Err(EINVAL);
-        }
-        let pid = i32::try_from(id).map_err(|_| EINVAL)?;
-        let Some(handle) = self.take(pid) else {
-            return Err(ECHILD);
-        };
-        let code = match self.loader.wait(handle) {
-            Ok(code) => code,
-            Err(error) => {
-                // Restore the entry so a retry can wait again.
-                if let Ok(slot) = self.reserve() {
-                    Self::publish(slot, pid, handle);
-                }
-                return Err(error);
-            }
-        };
-        let _ = self.loader.close(handle);
         Ok(WaitResult {
             pid,
-            status: encode(WaitStatus::Exited(code as u8)),
+            status,
             siginfo: [0; 128],
             rusage: [0; 144],
         })
@@ -221,6 +221,98 @@ fn map_spawn_error(error: raven_spawn::SpawnError) -> Errno {
     }
 }
 
+/// Choose and truncate the kernel command name for a native spawn.
+///
+/// `argv[0]` wins; an empty/missing argument list uses the image path. The result is capped at
+/// [`MAX_COMMAND`] bytes at a UTF-8 boundary.
+#[cfg(any(target_os = "none", target_os = "ravenbsd", test))]
+fn command_name<'a>(argv: &[&'a str], path: &'a str) -> &'a str {
+    let mut text = argv.first().copied().unwrap_or(path);
+    if text.is_empty() {
+        text = path;
+    }
+    let mut end = 0usize;
+    for (index, character) in text.char_indices() {
+        let next = index.saturating_add(character.len_utf8());
+        if next > MAX_COMMAND {
+            break;
+        }
+        end = next;
+    }
+    &text[..end]
+}
+
+/// A syscall sink that names the child before its first thread starts.
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+struct CommandSys<'a> {
+    inner: raven_spawn::RtSys,
+    command: &'a str,
+}
+
+#[cfg(any(target_os = "none", target_os = "ravenbsd"))]
+impl raven_spawn::Sys for CommandSys<'_> {
+    fn proc_create(&mut self) -> Result<Handle, AbiErrno> {
+        self.inner.proc_create()
+    }
+
+    fn memobj_create(&mut self, len: usize) -> Result<Handle, AbiErrno> {
+        self.inner.memobj_create(len)
+    }
+
+    fn map(
+        &mut self,
+        proc: Handle,
+        memobj: Handle,
+        offset: usize,
+        addr: usize,
+        len: usize,
+        flags: usize,
+    ) -> Result<usize, AbiErrno> {
+        self.inner.map(proc, memobj, offset, addr, len, flags)
+    }
+
+    fn unmap(&mut self, proc: Handle, addr: usize, len: usize) -> Result<(), AbiErrno> {
+        self.inner.unmap(proc, addr, len)
+    }
+
+    fn protect(
+        &mut self,
+        proc: Handle,
+        addr: usize,
+        len: usize,
+        protection: u8,
+    ) -> Result<(), AbiErrno> {
+        self.inner.protect(proc, addr, len, protection)
+    }
+
+    fn thread_create(
+        &mut self,
+        proc: Handle,
+        entry: usize,
+        stack_top: usize,
+        arg: usize,
+    ) -> Result<Handle, AbiErrno> {
+        raven_libc_sys::sys::proc_set_command(proc, self.command.as_bytes())?;
+        self.inner.thread_create(proc, entry, stack_top, arg)
+    }
+
+    fn exec_cred(&mut self, proc: Handle, file: Handle, nosuid: bool) -> Result<(), AbiErrno> {
+        self.inner.exec_cred(proc, file, nosuid)
+    }
+
+    fn handle_close(&mut self, handle: Handle) -> Result<(), AbiErrno> {
+        self.inner.handle_close(handle)
+    }
+
+    fn write_parent_mem(&mut self, addr: usize, bytes: &[u8]) {
+        self.inner.write_parent_mem(addr, bytes);
+    }
+
+    fn copy_mapping(&mut self, destination: usize, source: usize, len: usize) {
+        self.inner.copy_mapping(destination, source, len);
+    }
+}
+
 /// The target loader: `raven-spawn` over the real syscalls.
 #[cfg(any(target_os = "none", target_os = "ravenbsd"))]
 #[derive(Clone, Copy, Debug, Default)]
@@ -232,15 +324,26 @@ impl Loader for RtLoader {
         raven_spawn::read_file_image(path).map_err(map_spawn_error)
     }
 
-    fn load(&self, image: &[u8], path: &str, argv: &[&str], env: &[&str]) -> Result<u32, Errno> {
+    fn load(
+        &self,
+        image: &[u8],
+        path: &str,
+        argv: &[&str],
+        env: &[&str],
+        fdmap: &[(i32, u32)],
+    ) -> Result<u32, Errno> {
         let options = raven_spawn::SpawnOptions { args: argv, env };
-        raven_spawn::spawn_image_with(image, path, &options, &mut raven_spawn::RtSys)
+        let mut sys = CommandSys {
+            inner: raven_spawn::RtSys,
+            command: command_name(argv, path),
+        };
+        raven_spawn::spawn_image_with_fdmap(image, path, &options, fdmap, &mut sys)
             .map(|handle| handle.0)
             .map_err(map_spawn_error)
     }
 
-    fn wait(&self, handle: u32) -> Result<i32, Errno> {
-        raven_spawn::wait_process(handle).map_err(|error| i32::from(error.0))
+    fn wait_ex(&self, idtype: u32, id: i32, options: u32) -> Result<(i32, i32), Errno> {
+        raven_spawn::wait_ex(idtype, id, options).map_err(|error| i32::from(error.0))
     }
 
     fn close(&self, handle: u32) -> Result<(), Errno> {

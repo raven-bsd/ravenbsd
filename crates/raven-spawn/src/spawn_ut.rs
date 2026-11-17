@@ -831,7 +831,7 @@ fn auxv_has_the_pg50_keys_and_at_base() {
     let interpreter = interp_elf();
     let main = child_elf(true, false);
     let main_elf = Elf::parse(&main, target_machine(), USER_MIN..USER_END).unwrap();
-    let (auxv, len) = build_auxv(&main_elf, 0, INTERP_BASE);
+    let (auxv, len) = build_auxv(&main_elf, 0, INTERP_BASE, None);
     let pairs = &auxv[..len];
     let has = |key: usize, value: Option<usize>| {
         pairs
@@ -848,6 +848,23 @@ fn auxv_has_the_pg50_keys_and_at_base() {
     let interp_elf = Elf::parse(&interpreter, target_machine(), USER_MIN..USER_END).unwrap();
     assert_eq!(main_elf.interp(), Some("/lib/ld.so"));
     assert_eq!(interp_elf.interp(), None);
+}
+
+#[test]
+fn fdmap_auxv_and_the_rfdm_block_are_encoded() {
+    let main = child_elf(false, false);
+    let elf = Elf::parse(&main, target_machine(), USER_MIN..USER_END).unwrap();
+    let (auxv, len) = build_auxv(&elf, 0, 0, Some((0x7fff_0000, 2)));
+    let pairs = &auxv[..len];
+    let has = |key: usize, value: usize| pairs.iter().any(|(k, v)| *k == key && *v == value);
+    assert!(has(0x7003, 0x7fff_0000));
+    assert!(has(0x7004, 2));
+    assert!(has(0x7006, raven_abi::ABI_VERSION as usize));
+
+    let block = encode_fdmap(&[(1, 7), (2, 8)]).unwrap();
+    assert_eq!(block.get(..4), Some(b"RFDM".as_slice()));
+    assert_eq!(block.get(6..8), Some(2u16.to_le_bytes().as_slice()));
+    assert_eq!(block.len(), 8 + 2 * 18);
 }
 
 #[test]
