@@ -92,10 +92,21 @@ static inline void rl_open_console(void)
 static inline long rl_debug_write(const char *text, unsigned long length)
 {
     long result;
+#if defined(__x86_64__)
     __asm__ volatile("syscall"
                      : "=a"(result)
                      : "a"(3L), "D"(text), "S"(length)
                      : "rcx", "r11", "memory");
+#elif defined(__aarch64__)
+    /* The aarch64 ABI carries DEBUG_WRITE as x8=3, x0=text, x1=length. */
+    register long x8 __asm__("x8") = 3;
+    register long x0 __asm__("x0") = (long)text;
+    register long x1 __asm__("x1") = (long)length;
+    __asm__ volatile("svc #0" : "+r"(x0) : "r"(x8), "r"(x1) : "memory");
+    result = x0;
+#else
+#error "rl_debug_write has no ABI for this architecture"
+#endif
     return result;
 }
 
