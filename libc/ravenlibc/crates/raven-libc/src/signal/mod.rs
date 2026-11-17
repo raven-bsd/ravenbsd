@@ -12,6 +12,8 @@ pub(crate) static DISP: DispTable = DispTable::new();
 mod kill;
 #[path = "killpg.rs"]
 mod killpg;
+#[path = "psignal.rs"]
+mod psignal;
 #[path = "raise.rs"]
 mod raise;
 #[path = "sig2str.rs"]

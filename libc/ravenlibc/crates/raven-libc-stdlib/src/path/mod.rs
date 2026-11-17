@@ -3,8 +3,10 @@
 //!
 //! `realpath` over a caller-supplied filesystem walker.
 
+pub mod mkstemp;
 pub mod realpath;
 
+pub use mkstemp::{SUFFIX_LEN, encode_suffix, is_template, substitute};
 pub use realpath::{FileKind, MAXSYMLINKS, Walker, realpath};
 
 #[cfg(test)]

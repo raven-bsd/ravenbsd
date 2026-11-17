@@ -74,7 +74,9 @@ struct ucred {
 	uid_t uid;
 	gid_t gid;
 };
+#endif
 
+#if __POSIX_VISIBLE || __XSI_VISIBLE || __BSD_VISIBLE
 struct mmsghdr {
 	struct msghdr msg_hdr;
 	unsigned int  msg_len;

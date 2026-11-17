@@ -205,6 +205,9 @@ int siginterrupt(int, int);
 int sigpause(int);
 int sigrelse(int);
 void (*sigset(int, void (*)(int)))(int);
+int sigisemptyset(const sigset_t *);
+int sigorset (sigset_t *, const sigset_t *, const sigset_t *);
+int sigandset(sigset_t *, const sigset_t *, const sigset_t *);
 #endif
 
 #if __BSD_VISIBLE
@@ -217,10 +220,6 @@ typedef void (*sig_t)(int);
 #if __BSD_VISIBLE
 typedef void (*sighandler_t)(int);
 void (*bsd_signal(int, void (*)(int)))(int);
-int sigisemptyset(const sigset_t *);
-int sigorset (sigset_t *, const sigset_t *, const sigset_t *);
-int sigandset(sigset_t *, const sigset_t *, const sigset_t *);
-
 #endif
 
 #define SIG_ERR  ((void (*)(int))-1)
