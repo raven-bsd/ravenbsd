@@ -15,7 +15,9 @@
 use core::mem::size_of;
 
 use raven_abi::types::{Handle, map, prot};
-use raven_trace_core::{RingHeader, Span, SpanRecord, SpanRing};
+use raven_trace_core::{RingHeader, SpanRecord, SpanRing};
+
+pub use raven_trace_core::{Span, SpanKind};
 
 /// The handle a launcher transfers the sink under.
 pub const SINK_HANDLE: Handle = Handle::new(3, 0);
