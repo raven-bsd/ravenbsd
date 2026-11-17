@@ -25,7 +25,8 @@
 .Nm
 reads and changes the live IPv4 route table through the
 .Dq net:
-control channel. With no command, or with
+control channel.
+With no command, or with
 .Cm show ,
 it lists every route with its destination, optional gateway, interface and flags.
 .Pp
@@ -33,14 +34,18 @@ The
 .Cm add
 forms install a default route (prefix 0) through
 .Ar gateway ,
-a host route (prefix 32), or a network route with an explicit prefix. A destination without a
-prefix is a host route. The address is masked to the prefix before the request is sent, so
+a host route (prefix 32), or a network route with an explicit prefix.
+A destination without a
+prefix is a host route.
+The address is masked to the prefix before the request is sent, so
 .Dq 198.51.100.5/24
 and
 .Dq 198.51.100.0/24
-name the same route. The
+name the same route.
+The
 .Cm delete
-forms remove the exact destination and prefix. When the interface is omitted,
+forms remove the exact destination and prefix.
+When the interface is omitted,
 .Dq lo
 is used.
 .Pp
@@ -49,9 +54,11 @@ The tool uses the
 .Dv RouteAddOn
 and
 .Dv RouteDelOn
-control requests. A malformed IPv4 address, a prefix outside
+control requests.
+A malformed IPv4 address, a prefix outside
 .Dv 0..=32
-or an invalid interface name is rejected before any request. An unknown interface, a failed
+or an invalid interface name is rejected before any request.
+An unknown interface, a failed
 delete or a server-side rejection is reported and the tool exits non-zero.
 .Pp
 No raw socket is opened and no routing daemon is required.

@@ -20,7 +20,8 @@ and writes the text with the first character of every line interpreted as
 a FORTRAN carriage-control character:
 .Bl -tag -width Ds
 .It space
-Advance one line. Any character other than the controls below is treated
+Advance one line.
+Any character other than the controls below is treated
 as a space.
 .It Ql 0
 Advance two lines.
@@ -30,8 +31,10 @@ Advance to the first line of the next page (form feed).
 Overstrike the previous line (carriage return).
 .El
 .Pp
-The control character is removed from the output. The first line of a file
-does not start with a blank line or carriage return. A non-empty input ends
+The control character is removed from the output.
+The first line of a file
+does not start with a blank line or carriage return.
+A non-empty input ends
 with a newline.
 .Pp
 The target image reads the standard input from the console.

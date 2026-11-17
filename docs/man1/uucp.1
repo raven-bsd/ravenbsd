@@ -33,7 +33,8 @@ Remote-to-remote copies are rejected.
 The options are:
 .Bl -tag -width Ds
 .It Fl c
-Accept the spool-copy compatibility flag. The queue always embeds the payload.
+Accept the spool-copy compatibility flag.
+The queue always embeds the payload.
 .It Fl C
 Same as
 .Fl c .
@@ -81,7 +82,8 @@ A file, peer or queue error exits with status 1; a usage error exits with status
 .Xr uustat 1 ,
 .Xr uux 1
 .Sh STANDARDS
-RavenBSD implements a bounded POSIX uucp file-transfer subset. No transport, modem or remote
+RavenBSD implements a bounded POSIX uucp file-transfer subset.
+No transport, modem or remote
 execution is claimed; the local queue is the durable surface.
 .Sh LIMITATIONS
 Remote-to-remote copies, mail notification, debug transcripts and actual peer transmission are

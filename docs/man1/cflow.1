@@ -17,10 +17,12 @@ The
 utility scans C source files and prints the direct call graph.
 A root function is printed as
 .Ql name: line ;
-direct callees are indented by four spaces and expanded recursively. A call back to a function
+direct callees are indented by four spaces and expanded recursively.
+A call back to a function
 already on the current path is printed with a
 .Dq (cycle)
-marker. Only calls to functions defined in the input are shown.
+marker.
+Only calls to functions defined in the input are shown.
 .Pp
 The options are:
 .Bl -tag -width Ds

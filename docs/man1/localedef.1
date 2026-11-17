@@ -38,7 +38,8 @@ followed by the category name.
 .Ic copy Ar \(dqC\(dq
 and
 .Ic copy Ar \(dqC.UTF-8\(dq
-are recorded. Values are quoted strings with
+are recorded.
+Values are quoted strings with
 .Sq \e\e ,
 .Sq \e\(dq ,
 .Sq \en ,
@@ -56,13 +57,15 @@ The charmap supports
 .Sm off
 .Ic <symbol> /xHH U+HHHH Op name ...
 .Sm on
-lines. Comments start with
+lines.
+Comments start with
 .Sq #
 or
 .Sq % ;
 at least one entry is required.
 .Pp
-Unsupported categories, keywords, charmap lines and malformed values are errors. The image is
+Unsupported categories, keywords, charmap lines and malformed values are errors.
+The image is
 built in memory and written only after the whole source and charmap parse, so a failure never
 leaves a partial catalog as a success.
 .Sh OPTIONS
@@ -80,7 +83,8 @@ Without
 .Fl o
 the image goes to standard output.
 .It Fl c
-Create the output. Accepted for POSIX compatibility; the tool always creates it.
+Create the output.
+Accepted for POSIX compatibility; the tool always creates it.
 .El
 .Sh EXIT STATUS
 .Ex -std

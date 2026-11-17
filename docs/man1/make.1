@@ -52,7 +52,8 @@ GNU make functions such as
 .Ql $(wildcard ...)
 and
 .Ql $(shell ...)
-are not implemented. Parallel jobs other than
+are not implemented.
+Parallel jobs other than
 .Fl j1
 are an explicit unsupported error.
 .Pp
@@ -81,9 +82,10 @@ Accept one job; larger values are rejected.
 .Xr sh 1
 .Sh STANDARDS
 .Bl -tag -width Ds
-.It St -p1003.1-2024
+.It POSIX.1-2024
 The default goal, explicit/pattern/suffix rules, variable expansion, automatic variables,
 .Ql .PHONY ,
-includes and the listed options follow POSIX make. GNU functions and parallel jobs are
+includes and the listed options follow POSIX make.
+GNU functions and parallel jobs are
 documented deviations.
 .El

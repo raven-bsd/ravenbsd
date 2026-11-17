@@ -15,13 +15,14 @@
 The
 .Nm
 utility scans C source files and prints one cross-reference row per definition:
-.Ar name Ns \t Ns Ar kind Ns \t Ns Ar file : Ns Ar line Ns \t Ns Ar refs .
+.Ar name Ns \ \ \ \ Ns Ar kind Ns \ \ \ \ Ns Ar file : Ns Ar line Ns \ \ \ \ Ns Ar refs .
 .Ar refs
 is a comma-separated list of
 .Ar file : Ns Ar line
 occurrences, or
 .Ar -
-when there are none. The definition line is not repeated.
+when there are none.
+The definition line is not repeated.
 .Pp
 Recognized kinds are
 .Cm function ,

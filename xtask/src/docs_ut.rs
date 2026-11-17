@@ -15,11 +15,8 @@ struct Tree {
 impl Tree {
     fn new(label: &str) -> Self {
         let id = NEXT_TREE.fetch_add(1, Ordering::Relaxed);
-        let root = std::env::temp_dir().join(format!(
-            "raven-docs-{}-{}-{label}",
-            std::process::id(),
-            id
-        ));
+        let root =
+            std::env::temp_dir().join(format!("raven-docs-{}-{}-{label}", std::process::id(), id));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).expect("create fixture root");
         Self { root }

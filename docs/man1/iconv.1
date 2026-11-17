@@ -23,11 +23,13 @@ The supported sets are UTF-8, ASCII and ISO-8859-1; the accepted aliases are lis
 .Pa docs/posix/P4-locale.md .
 With no file operand, or with
 .Ar - ,
-input is read from standard input. Output goes to standard output unless
+input is read from standard input.
+Output goes to standard output unless
 .Fl o
 names a file.
 .Pp
-Conversion is whole-input and produces no partial output on failure. A character that is not
+Conversion is whole-input and produces no partial output on failure.
+A character that is not
 representable in the target set is an error; there is no transliteration.
 .Sh EXIT STATUS
 .Ex -std
