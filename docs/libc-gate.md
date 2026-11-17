@@ -41,23 +41,21 @@ cargo xtask qtest --case libc-spawn --arch x86_64
 
 The donor G1 suite is `cargo run -q -p raven-atf-run -- gate --g1`.
 
-## Current verdict (2026-11-17, C74d)
+## Current verdict (2026-11-17, C74h)
 
 **NOT MET.** `cargo run -q -p libc-gate -- verdict` exits 1.
 
-* MET: 1.1, 1.1.pack, 1.5, 1.7, 4.1, 4.3, 6.1, 6.3, 6.4.
-* NOT MET: 1.1.audit (stale `expected.tsv`), 1.2 (G1 0/4), 1.4 (four `compat-*` oracle
-  features), 3.1 (size budgets), 4.2 (`inet_text` soak), 5.1 (hello/stdio/time/threads/dynamic),
-  5.2 (core-servers and file-tools timeouts).
+* MET: 1.1, 1.1.pack, 1.1.audit, 1.5, 4.1, 4.3, 6.1, 6.3, 6.4.
+* NOT MET: 1.2 (G1 0/4), 1.4 (26 families cannot find `ravenbsd-resources` in the minion
+  clone), 1.7 (17 lint violations), 3.1 (size budgets), 4.2 (`inet_text` soak), 5.1
+  (hello/stdio/time), 5.2 (core-servers and file-tools timeouts).
 * BLOCKED: 1.6 (Miri), 2.1/2.2 (`tools/libc-world` and C72 outputs), 6.2 (`mandoc`).
 
 The exact evidence and the seven-case matrix are in `libc/ravenlibc/GATE-REPORT.md` and under
-`build/libc-gate/`. C74d refreshed the non-P1 rows on `bd1d1de1`: `libc-lint` is clean; the
-symbol audit has all 66 required symbols PRESENT but its frozen `expected.tsv` is stale (outside
-C74d's Owns); G1 is 0/4 (C2-C5 not run, C6 unvendored); 4 of 27 oracle families lack
-`oracle-*` features; the size check is 6 pass / 63 fail; the `inet_text` soak crashed before one
-hour; Miri, the world build and `mandoc` are UNAVAILABLE in this environment. On target,
-`libc-signals`, `libc-spawn`, `libc-threads` pass; `libc-hello` fails only the P1b `string`
-check (auxv ok); `libc-dynamic` now passes: C74g implements the target rtld start path, so it
-reaches `done` with `init exited (0)` (C74f fixed the earlier private `copy_tail` source map);
-`libc-stdio` and `libc-time` remain P1b.
+`build/libc-gate/`. C74h re-ran the full gate on `beedfbbd`: the symbol audit is now MET (66/66,
+exit 0); the host-test row now runs through `cargo nextest run`; `libc-dynamic`, `libc-signals`,
+`libc-spawn` and `libc-threads` pass; `libc-hello` fails only the P1b `string` check (auxv ok);
+`libc-stdio` and `libc-time` remain P1b. The gate cannot close until the size-budget lane, the
+G1 donor data, the `inet_text` soak, the three P1b target cases, the core-servers/file-tools
+regression, the lint backlog, and the missing Miri/world/mandoc tooling are resolved by their
+owners.
