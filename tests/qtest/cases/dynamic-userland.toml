@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# K97: the dynamic userland gate. The pre step builds the `shell-test` initfs and asserts the
+# staged /bin programs carry PT_INTERP /libexec/ld-elf.so.1 and DT_NEEDED libc.so.1 while
+# /init and /sbin stay static. The boot then starts the dynamic /bin/rsh service and requires
+# its `rsh: ready` line, which can only print after the loader has entered its main.
+
+name = "dynamic-userland"
+arch = "x86_64"
+profile = "shell-test"
+timeout_secs = 420
+pre = ["sh tests/fixtures/dynamic-userland/check.sh"]
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: all services up$'
+
+[[expect]]
+regex = '^rsh: ready$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|relocation failed|undefined symbol|rsh: .*command not found'
+
+[[step]]
+wait = '^raven# $'
+timeout_secs = 300
+
+[[step]]
+send = "exit 0\n"
+delay_ms = 100
+
+[[step]]
+wait = '^init exited \(0\)$'
+timeout_secs = 60

@@ -10,6 +10,7 @@ extends = "shell"
 
 [initfs]
 release = true
+dynamic = true
 
 [boot]
 cmdline = "console=ttyS0 loglevel=info"

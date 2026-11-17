@@ -86,6 +86,14 @@ pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathB
         })?;
         builder.add_file(&program.path, &data, 0o755)?;
     }
+    for (path, source) in dynamic_stage_files(arch, profile.initfs.dynamic) {
+        let data = fs::read(root.join(&source)).with_context(|| {
+            format!(
+                "cannot read dynamic runtime {source} for initfs path {path}; libc-link must stage it"
+            )
+        })?;
+        builder.add_file(path, &data, 0o755)?;
+    }
     for file in &profile.initfs.files {
         let source = source_path(root, arch, &file.src);
         let data = fs::read(&source).with_context(|| {
@@ -136,6 +144,26 @@ pub(crate) struct PrerequisitePlan {
 /// The libc outputs every userland C/std build needs.
 const LIBC_OUTPUTS: [&str; 4] = ["libc.a", "crt1.o", "crti.o", "crtn.o"];
 const DYNAMIC_OUTPUTS: [&str; 2] = ["libc.so.1", "ld-elf.so.1"];
+
+/// The dynamic loader and libc an initfs stages for the `/bin` PIE userland.
+///
+/// Returns `(destination, source)` pairs. Empty when the profile is static or the arch has no
+/// dynamic user mode yet, so an aarch64 shell image never picks up x86_64 loader files.
+pub(crate) fn dynamic_stage_files(arch: Arch, dynamic: bool) -> Vec<(&'static str, String)> {
+    if !dynamic || !build::dynamic_supported(arch) {
+        return Vec::new();
+    }
+    vec![
+        (
+            "/lib/libc.so.1",
+            format!("build/{}/libc.so.1", arch.as_str()),
+        ),
+        (
+            "/libexec/ld-elf.so.1",
+            format!("build/{}/ld-elf.so.1", arch.as_str()),
+        ),
+    ]
+}
 
 fn libc_outputs(arch: Arch, dynamic: bool) -> Vec<String> {
     let mut names: Vec<&str> = LIBC_OUTPUTS.to_vec();
@@ -192,11 +220,11 @@ pub(crate) fn prerequisite_plan(
     arch: Arch,
     exists: impl Fn(&str) -> bool,
 ) -> PrerequisitePlan {
-    let needs_libc =
-        brush_requested(profile, arch) || uutils_requested(profile, arch) || profile.initfs.dynamic;
+    let dynamic = profile.initfs.dynamic && build::dynamic_supported(arch);
+    let needs_libc = brush_requested(profile, arch) || uutils_requested(profile, arch) || dynamic;
     PrerequisitePlan {
         libc: if needs_libc {
-            libc_missing(arch, profile.initfs.dynamic, &exists)
+            libc_missing(arch, dynamic, &exists)
         } else {
             Vec::new()
         },
@@ -212,7 +240,11 @@ pub(crate) fn prerequisite_plan(
 pub(crate) fn ensure_prerequisites(root: &Path, arch: Arch, profile: &Profile) -> Result<()> {
     let plan = prerequisite_plan(profile, arch, |source| root.join(source).is_file());
     if !plan.libc.is_empty() {
-        ensure_libc(root, arch, profile.initfs.dynamic)?;
+        ensure_libc(
+            root,
+            arch,
+            profile.initfs.dynamic && build::dynamic_supported(arch),
+        )?;
     }
     if plan.brush {
         ensure_brush(root, arch, profile)?;

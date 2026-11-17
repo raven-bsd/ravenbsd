@@ -3,7 +3,7 @@
 
 # Dynamic userland - build recipe and remaining integration
 
-Date: 2026-11-17.  Base: `origin/master` `33fd9653`.
+Date: 2026-11-17.  Base: `origin/master` `1939ae69`.
 
 ## What works
 
@@ -49,39 +49,41 @@ $ readelf -d .../raven-uname | grep NEEDED
 The existing `tests/fixtures/dynamic-exec` C binary shows the same `PT_INTERP` and
 `DT_NEEDED libc.so.1` with the established C recipe.
 
-## Remaining integration (not landed)
+## Integration landed (K97 rework on 1939ae69)
 
-The opt-in build mode is in `xtask` behind a profile's `initfs.dynamic` switch (off by default).
-Enabling the shell profile produced dynamic `/bin` programs with `PT_INTERP` and
-`DT_NEEDED libc.so.1`, and static `/sbin`/`init`. Boot then failed before `main`:
+The switch is on: `profiles/shell.toml` and `profiles/release.toml` set
+`[initfs] dynamic = true`. `xtask/src/initfs.rs` stages `build/<arch>/libc.so.1` at
+`/lib/libc.so.1` and `build/<arch>/ld-elf.so.1` at `/libexec/ld-elf.so.1` for every dynamic
+profile, and requires `cargo xtask libc-link` when either is missing. The Rust dynamic link mode
+stays x86_64-only (`build::dynamic_supported`); other arches remain static and stage nothing.
+
+`init` and `/sbin` stay static: the kernel enters `/init` before the file service, so the early
+bootstrap cannot resolve `/libexec/ld-elf.so.1` from the initfs. `/bin` programs are the dynamic
+userland.
+
+`tests/qtest/cases/dynamic-userland.toml` runs
+`tests/fixtures/dynamic-userland/check.sh` first. The pre script builds the `shell-test` initfs
+and asserts `raven-rsh`/`raven-uname` carry `PT_INTERP /libexec/ld-elf.so.1` and
+`DT_NEEDED libc.so.1`, `/init` and `/sbin/initfsd` stay static, and both runtime files exist.
+The boot then requires `rsh: ready`, i.e. the dynamic `/bin/rsh` reached `main`.
+
+## Current boot block (C74o)
+
+The image builds and the readelf/staging checks pass, but the boot still stops before `main`:
 
 ```
+svcd: all services up
 ld-elf.so.1: relocation failed
 process: child exited (127)
+init exited (127)
 ```
 
-The dynamic Rust binary has 1851 `R_X86_64_RELATIVE` entries. The loader's
-`libc/ravenlibc/crates/raven-libc-elf/src/reloc/mod.rs` `apply_one` computes
-`place = bias + r_offset` but `check_offset` (same file, lines 172-183) compares that absolute
-place against the object's relative segment `vaddr`. The C dynamic fixture has no RELATIVE
-entries, which is why `dynamic-exec` passes. The fix is in the C74g/S81 loader lane:
-compare the relocation offset in the same address space as the segments (or make the segment
-views absolute). `libc-dynamic` also regressed on this base with `AT_BASE == 0`; that is the same
-kernel/loader lane and must be fixed before the dynamic-userland qtest can pass.
+C74l traced this to the strong undefined `main` in `libc.so.1` (a `GLOB_DAT` the loader cannot
+resolve), not to the RELATIVE path; the C `rtld-relative` control passes. C74o owns the libc
+start-ABI fix. Until it merges, `dynamic-userland` and every dynamic image test (`release-login`,
+`base-tools`, `shell-session`) stop at the same line. The `check.sh` evidence above is the
+build-side proof that the switch, staging and `PT_INTERP`/`DT_NEEDED` are correct.
 
-The `dynamic-userland` qtest is therefore not added; the exact failing bound is the loader above,
-not the build flags.
+The K26h/C74p non-brush tool-runtime hang (`date`/`uname`/`mkdir`) is still open; with dynamic
+on, the loader block is reached first, so that hang is not re-measured here.
 
-1. `xtask/src/build.rs`: a dynamic-userland mode for `Component::User` (x86_64) that uses the
-   wrapper and flags above instead of `relocation-model=static` plus
-   `userland/linker/x86_64.ld`.
-2. `xtask/src/initfs.rs`: when the profile requests dynamic userland, require
-   `build/<arch>/{libc.so.1,ld-elf.so.1}` and run `cargo xtask libc-link`.
-3. Profiles `shell`/`release`: stage `/lib/libc.so.1` and `/libexec/ld-elf.so.1`, set the dynamic
-   switch, and verify boot; `init` may remain static only with a named reason if the kernel cannot
-   load its interpreter from initfs before the file service.
-4. `tests/qtest/cases/dynamic-userland.toml` + fixture: readelf `PT_INTERP`/`DT_NEEDED` on a
-   packaged program and boot the shell/release image to prove the loader reaches `main`.
-
-The base still has the K26h non-brush tool-runtime hang (`date`/`uname`/`mkdir`) which must be
-fixed before `base-tools`/`shell-session` can be used as dynamic-userland acceptance.

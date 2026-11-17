@@ -88,6 +88,8 @@ fn user_rustflags_include_small_code_model_on_x86_64() {
             "relocation-model=static",
             "-C",
             "force-frame-pointers=yes",
+            "--cfg",
+            "sha2_backend=\"soft\"",
             "-C",
             "link-arg=-T/r/userland/linker/x86_64.ld",
             "--remap-path-prefix=/r=/ravenbsd",

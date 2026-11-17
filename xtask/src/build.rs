@@ -81,6 +81,14 @@ pub(crate) fn target_for(component: Component, arch: Arch) -> Result<&'static st
 
 /// The RUSTFLAGS token list for a component (CONTRACTS C2).
 ///
+/// Whether `Component::User` has a dynamic (PIE) link mode for this arch.
+///
+/// K97 wires the Rust PIE path for x86_64; the other arches keep the static linker script until
+/// their loader/libc start ABI is ready.
+pub(crate) fn dynamic_supported(arch: Arch) -> bool {
+    arch == Arch::X86_64
+}
+
 /// `user_linker` is passed only when the linker script exists; K06 creates it later.
 pub(crate) fn rustflags_for(
     component: Component,
@@ -95,7 +103,7 @@ pub(crate) fn rustflags_for(
             flags.extend(["-C".to_string(), "relocation-model=static".to_string()]);
             flags.extend(["-C".to_string(), "force-frame-pointers=yes".to_string()]);
         }
-        Component::User if dynamic && arch == Arch::X86_64 => {
+        Component::User if dynamic && dynamic_supported(arch) => {
             let wrapper = root.join("userland/linker/rust-lld-dynamic.sh");
             flags.extend(["-C".to_string(), "code-model=small".to_string()]);
             flags.extend(["-C".to_string(), "relocation-model=pic".to_string()]);
