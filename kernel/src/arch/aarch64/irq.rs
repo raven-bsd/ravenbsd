@@ -26,6 +26,12 @@ pub fn set_timer(irq: u32) {
     TIMER_IRQ.store(irq, Ordering::Release);
 }
 
+/// The timer interrupt line recorded by [`set_timer`].
+#[must_use]
+pub fn timer_irq() -> u32 {
+    TIMER_IRQ.load(Ordering::Acquire)
+}
+
 /// Number of interrupts dispatched since boot.
 pub fn count() -> u64 {
     IRQ_COUNT.load(Ordering::Acquire)
@@ -61,8 +67,31 @@ pub fn dispatch(from_user: bool) {
     }
     IRQ_COUNT.fetch_add(1, Ordering::Relaxed);
 
+    if id < 16 {
+        match id {
+            0 => {
+                // Reschedule IPI: the sender already set this CPU's `need_resched`; the idle
+                // loop or the return-to-user path performs the switch.
+                gic::eoi(raw);
+                if sched::initialized() {
+                    sched::irq_return(from_user);
+                }
+                return;
+            }
+            1 => sched::smp::shootdown::handle_ipi(),
+            // SGI 2 is reserved for the cross-CPU probe; the first slice does not use it.
+            _ => {}
+        }
+        gic::eoi(raw);
+        return;
+    }
+
     if id == TIMER_IRQ.load(Ordering::Acquire) {
-        timer::handle();
+        if sched::smp::percpu::this_cpu() == 0 {
+            timer::handle();
+        } else {
+            timer::rearm();
+        }
     } else if gic::is_spi(id) {
         if !crate::driver::irq::handle_spi(id) {
             // An unclaimed line must not storm; masking it also makes the next `IRQ_CREATE`

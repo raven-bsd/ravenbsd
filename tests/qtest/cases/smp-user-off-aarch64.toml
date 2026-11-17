@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S76: `smp_user=off` must not disable kernel-thread SMP. The kernel still brings up the
+# application processors, runs the pinned kernel workers on every CPU and proves they resume
+# after their timer interrupts; only user-thread placement stays on CPU 0 in this slice.
+name = "smp-user-off-aarch64"
+arch = "aarch64"
+profile = "base"
+timeout_secs = 300
+pre = []
+boot_cmdline = "console=ttyAMA0 test-exit=1 smp_user=off selftest=smp"
+qemu_extra = ["-smp", "4"]
+expect_exit = "success"
+
+[[expect]]
+regex = '^smp: [1-9][0-9]* cpus online$'
+
+[[expect]]
+regex = '^aarch64-smp: online cpus=4$'
+
+[[expect]]
+regex = '^aarch64-smp: worker cpu=1 runs=[1-9][0-9]*$'
+unordered = true
+
+[[expect]]
+regex = '^aarch64-smp: worker cpu=2 runs=[1-9][0-9]*$'
+unordered = true
+
+[[expect]]
+regex = '^aarch64-smp: worker cpu=3 runs=[1-9][0-9]*$'
+unordered = true
+
+[[expect]]
+regex = '^aarch64-smp: fpu ok rounds=200$'
+
+[[expect]]
+regex = '^aarch64-smp: ok cpus=4 counter=8000$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|aarch64-smp: .*failed|aarch64-smp: timeout'
