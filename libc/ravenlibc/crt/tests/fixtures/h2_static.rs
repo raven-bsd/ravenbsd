@@ -29,6 +29,12 @@ unsafe extern "C" {
     fn __rl_test_iplt_end() -> usize;
 }
 
+/// The crt passes this address to `__raven_libc_start`; the fixture start does not call it.
+#[unsafe(no_mangle)]
+pub extern "C" fn main(_argc: i32, _argv: *const *const u8, _envp: *const *const u8) -> i32 {
+    0
+}
+
 fn exit(code: i32) -> ! {
     // SAFETY: Linux `exit_group` never returns.
     unsafe {
@@ -55,6 +61,7 @@ pub unsafe extern "C" fn __raven_libc_start(
     rtld_fini: usize,
     iplt_start: usize,
     iplt_end: usize,
+    _entry: usize,
 ) -> ! {
     if rtld_fini != 0 {
         exit(1);

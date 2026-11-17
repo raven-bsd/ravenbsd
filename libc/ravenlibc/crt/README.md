@@ -7,11 +7,15 @@ The start files of ravenlibc, built as Rust `global_asm!` objects without a C co
 (`donor-map/10` 3.12, `donor-map/14` 3.A.8). `xtask libc-pack` compiles the crate as a
 staticlib and extracts one archive member per object into `build/<arch>/`:
 
-| Object | Entry | `sp0` | `rtld_fini` | `iplt_start`, `iplt_end` |
-|---|---|---|---|---|
-| `crt1.o` | static, non-PIE | `rdi` = `rsp` | 0 | `__rela_iplt_start`, `__rela_iplt_end` |
-| `Scrt1.o` | dynamic PIE | `rdi` = `rsp` (loader jump) | x86-64 `rdx`, AArch64 `x1`, RISC-V `a1` | 0, 0 |
-| `rcrt1.o` | static-PIE | `rdi` = `rsp` | 0 | 0, 0 |
+| Object | Entry | `sp0` | `rtld_fini` | `iplt_start`, `iplt_end` | `main` |
+|---|---|---|---|---|---|
+| `crt1.o` | static, non-PIE | `rdi` = `rsp` | 0 | `__rela_iplt_start`, `__rela_iplt_end` | `r8`/`x4`/`a4` |
+| `Scrt1.o` | dynamic PIE | `rdi` = `rsp` (loader jump) | x86-64 `rdx`, AArch64 `x1`, RISC-V `a1` | 0, 0 | `r8`/`x4`/`a4` |
+| `rcrt1.o` | static-PIE | `rdi` = `rsp` | 0 | 0, 0 | `r8`/`x4`/`a4` |
+
+The fifth argument is the executable's `main` address. Passing it from the crt keeps the shared
+libc free of a strong undefined `main`, so a Rust PIE with its own `_start` loads without one;
+a C program's `main` still gets called.
 
 The other five objects are `crti.o`, `crtn.o` (empty by decision), `crtbegin.o`,
 `crtbeginS.o` (the `__dso_handle` fallbacks) and `crtend.o` (the `.eh_frame` terminator).

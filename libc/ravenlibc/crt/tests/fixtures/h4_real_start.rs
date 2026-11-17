@@ -10,7 +10,47 @@
 
 #![no_std]
 
+use core::alloc::{GlobalAlloc, Layout};
 use core::ffi::c_int;
+use core::sync::atomic::{AtomicUsize, Ordering};
+
+/// Host-run arena: the Raven page provider is not available on Linux, and the shell start path
+/// allocates its fd table. A bounded bump allocator keeps this start-path test independent of
+/// the target page provider.
+#[repr(align(16))]
+struct Arena([u8; 4 * 1024 * 1024]);
+
+static mut ARENA: Arena = Arena([0; 4 * 1024 * 1024]);
+static NEXT: AtomicUsize = AtomicUsize::new(0);
+
+struct Bump;
+
+// SAFETY: allocations are carved from one static arena; every range is bounds-checked and
+// deallocation is a no-op for this short-lived test process.
+unsafe impl GlobalAlloc for Bump {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        let base = core::ptr::addr_of_mut!(ARENA.0).cast::<u8>();
+        let align = layout.align().max(16);
+        let offset = NEXT.load(Ordering::Relaxed);
+        let Some(start) = offset.checked_add(align - 1).map(|value| value & !(align - 1)) else {
+            return core::ptr::null_mut();
+        };
+        let Some(end) = start.checked_add(layout.size()) else {
+            return core::ptr::null_mut();
+        };
+        if end > 4 * 1024 * 1024 {
+            return core::ptr::null_mut();
+        }
+        NEXT.store(end, Ordering::Relaxed);
+        // SAFETY: `start..end` is inside the static arena and `base` is its first byte.
+        unsafe { base.add(start) }
+    }
+
+    unsafe fn dealloc(&self, _pointer: *mut u8, _layout: Layout) {}
+}
+
+#[global_allocator]
+static GLOBAL: Bump = Bump;
 
 // The shell's guard word (C61 integration: `libc.a` provides it now).
 unsafe extern "C" {
