@@ -16,6 +16,6 @@ pub unsafe extern "C" fn pwrite64(
 ) -> isize {
     // SAFETY: forwarded from this function's contract.
     // SAFETY: the caller's buffer contract; a NULL with zero is the empty slice.
-    let slice = unsafe { crate::ffi::cstr::bytes_n(buffer.cast(), count) };
+    let slice = unsafe { crate::ffi::cstr::slice_n(buffer.cast(), count) };
     crate::ffi::ret::platform_ssize(crate::ffi::platform::global().pwrite(fd, slice, offset))
 }

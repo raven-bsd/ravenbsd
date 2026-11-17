@@ -58,28 +58,27 @@ Two items remain outside this slice:
   `s! { struct sigset_t { __val: [c_ulong; 16] } }`; `libc-spawn-std` passes.
 * `posix_spawn` transfers each inherited parent handle with `HANDLE_TRANSFER`, encodes the
   `RFDM` block (fd/handle, unknown kind, read/write status), maps it below the child stack and
-  publishes `AT_RAVEN_FDMAP`/`AT_RAVEN_FDMAP_N`. The libc start path decodes it and calls
-  `Platform::restore_fdmap` before `ensure_standard_fds`; `libc-spawn*` pass with inherited
-  descriptors.
-* `eventfd` descriptors are installed `O_RDWR`, and `read(2)`/`write(2)` on them go through the
-  counter engine; runtimes that ring the waker with plain `write(2)` (mio/tokio) work.
-* `write(2)`/`pwrite(2)`/`pwrite64(2)` take the caller's byte count instead of stopping at an
-  embedded NUL (`ffi::cstr::bytes_n`), so binary buffers survive.
-* Brush's `echo` pre-sizes its output buffer: growing a zero-capacity `String` currently hits a
-  `Tiny` realloc path that hands the freed block out again and loses the first eight bytes.
+  publishes `AT_RAVEN_FDMAP`/`AT_RAVEN_FDMAP_N`. Decoding the block in the child belongs to
+  `raven-libc/src/start.rs`, which is outside P9c's Owns; the fdmap is published but not yet
+  restored, and the spawn tests in this slice do not depend on fd inheritance.
 
-`brush-spawn` passes: brush starts `/bin/true` and `/bin/ls` and prints both exit statuses and the
-`/bin` listing. `libc-spawn-std` had one host-side qtest flake (`exit status 35`) and passes on
-the immediate rerun; the guest transcript reached `init exited (0)`.
+`brush-spawn` remains blocked: the tokio I/O driver wakes through an `eventfd` at
+`vendor/tokio/src/runtime/io/driver.rs:279` and gets `Os { code: 9, "Bad file descriptor" }`.
+That needs the eventfd `O_RDWR`/read-write routing in
+`raven-libc/src/personality_common.rs` and `unistd/{read,write}.rs`, the binary-safe `bytes_n`
+fix in `ffi/cstr.rs`/`unistd/{write,pwrite}.rs`, the start-path `restore_fdmap`, and the brush
+`echo` pre-sizing. All of those files are outside P9c's Owns, so this branch keeps only the
+loader/spawner changes and reports the blocker instead of carrying out-of-scope edits.
 
 ## Limits in this slice
 
 - Only UTF-8 paths, arguments and environment strings are accepted; other bytes return `EINVAL`.
 - `waitpid` uses `PROC_WAIT_EX`: `P_PID`, `P_ALL`, `P_PGID` and `WNOHANG` work; stop/continue
   events follow the kernel encoding.
-- The spawn request's `fdmap` is applied for static ET_EXEC images. Spawn attributes and an
-  interpreter plus fdmap combination are not implemented yet; the C73 `libc-child` fixture opens
-  the console itself, and job-control tickets own the rest.
+- The spawn request's `fdmap` is encoded for static ET_EXEC images but the child does not
+  restore it yet (`start.rs` is out of scope). Spawn attributes and an interpreter plus fdmap
+  combination are not implemented; the C73 `libc-child` fixture opens the console itself, and
+  job-control tickets own the rest.
 - Relative image paths are resolved against `SpawnRequest.cwd`; scheme paths pass unchanged, and
   bare absolute paths become `file:/...`.
 

@@ -59,18 +59,3 @@ fn slice_mut_exposes_the_buffer() {
     view[0] = 7;
     assert_eq!(buffer[0], 7);
 }
-
-#[test]
-fn bytes_n_keeps_embedded_nuls() {
-    let data = [b'a', 0, b'b', 0, 7];
-    // SAFETY: five readable bytes.
-    assert_eq!(unsafe { bytes_n(c(&data), 5) }, &data);
-}
-
-#[test]
-fn bytes_n_null_or_zero_is_empty() {
-    // SAFETY: a NULL pointer and a zero length are the documented empty cases.
-    assert!(unsafe { bytes_n(core::ptr::null(), 4) }.is_empty());
-    // SAFETY: a zero length needs no readable bytes.
-    assert!(unsafe { bytes_n(c(b"x"), 0) }.is_empty());
-}

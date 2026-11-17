@@ -22,7 +22,6 @@ use core::ffi::{c_int, c_void};
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use raven_libc_platform::fd::inherit::{ENTRY_LEN, FdMap, HEADER_LEN};
 use raven_libc_platform::{OfdKind, RealSys, SysBackend};
 
 /// Maximum accepted `argc`; a larger word is a malformed C8 stack.
@@ -42,10 +41,6 @@ const AT_RANDOM: usize = 25;
 const AT_HWCAP: usize = 16;
 /// `AT_HWCAP2`: the second CPU feature word (C67 `getisax`).
 const AT_HWCAP2: usize = 26;
-/// `AT_RAVEN_FDMAP`: the mapped `RFDM` inheritance block (`PG-50`).
-const AT_RAVEN_FDMAP: usize = 0x7003;
-/// `AT_RAVEN_FDMAP_N`: the number of entries in the inheritance block.
-const AT_RAVEN_FDMAP_N: usize = 0x7004;
 /// `AT_RAVEN_ABI`: the ABI revision the spawner wrote (`PG-50`).
 const AT_RAVEN_ABI: usize = 0x7006;
 /// First Raven-private key; the eight slots live at `key - 0x7000 + 56`.
@@ -296,11 +291,6 @@ pub unsafe extern "C" fn __raven_libc_start(
         raven_libc_sys::sys::exit(127)
     }
 
-    // STEP 9b: install the descriptors the spawner transferred into this process. The block is
-    // mapped before the first thread starts; decoding it here keeps the fd table construction in
-    // the ordinary libc state, before std/stdio can run.
-    restore_inherited_fds(&aux);
-
     // STEP 10: every child adopts the console for fds 0/1/2 (K06c). A process that already has
     // a descriptor keeps it; a child without a console falls back to `/dev/null`.
     ensure_standard_fds();
@@ -471,27 +461,6 @@ fn aux_value(table: &[usize; 64], key: usize) -> usize {
 /// The table slot of a Raven key (`0x7001..=0x7007` -> 57..=63).
 fn raven_slot(key: usize) -> usize {
     key.wrapping_sub(0x7000).wrapping_add(RAVEN_SLOT_BASE)
-}
-
-/// Install the `RFDM` block the spawner mapped into this process.
-fn restore_inherited_fds(aux: &[usize; 64]) {
-    let pointer = aux_value(aux, raven_slot(AT_RAVEN_FDMAP));
-    let count = aux_value(aux, raven_slot(AT_RAVEN_FDMAP_N));
-    if pointer == 0 || count == 0 || count > 1024 {
-        return;
-    }
-    let Some(len) = ENTRY_LEN
-        .checked_mul(count)
-        .and_then(|entries| entries.checked_add(HEADER_LEN))
-    else {
-        return;
-    };
-    // SAFETY: the spawner mapped exactly this header+entry block at `pointer` before the first
-    // thread started; the bounds are the decoded count, and the block has no string table.
-    let bytes = unsafe { core::slice::from_raw_parts(pointer as *const u8, len) };
-    if let Ok(block) = FdMap::decode(bytes) {
-        let _ = crate::ffi::platform::global().restore_fdmap(&block);
-    }
 }
 
 /// Set the five program-name aliases from `argv[0]`, else `AT_EXECFN`, else `""`.
