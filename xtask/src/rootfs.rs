@@ -215,7 +215,7 @@ pub fn build_for_profile(
         .map(|program| program.package.clone())
         .collect();
     if !packages.is_empty() {
-        let code = build::run(&workspace, Component::User, arch, release, &packages)?;
+        let code = build::run(&workspace, Component::User, arch, release, &packages, false)?;
         if code != 0 {
             bail!("rootfs user program build failed with exit code {code}");
         }

@@ -37,9 +37,40 @@ pub(crate) fn build(root: &Path, arch: Arch, profile_name: &str) -> Result<PathB
             profile.initfs.release,
             std::env::var("RAVEN_USER_RELEASE").ok().as_deref(),
         );
-        let code = build::run(&workspace, Component::User, arch, release, &packages)?;
-        if code != 0 {
-            bail!("user program build failed with exit code {code}");
+        let (static_packages, dynamic_packages): (Vec<String>, Vec<String>) =
+            packages.iter().cloned().partition(|package| {
+                profile
+                    .initfs
+                    .programs
+                    .iter()
+                    .find(|program| &program.package == package)
+                    .is_none_or(|program| !program.path.starts_with("/bin/"))
+            });
+        if !static_packages.is_empty() {
+            let code = build::run(
+                &workspace,
+                Component::User,
+                arch,
+                release,
+                &static_packages,
+                false,
+            )?;
+            if code != 0 {
+                bail!("user program build failed with exit code {code}");
+            }
+        }
+        if !dynamic_packages.is_empty() {
+            let code = build::run(
+                &workspace,
+                Component::User,
+                arch,
+                release,
+                &dynamic_packages,
+                profile.initfs.dynamic,
+            )?;
+            if code != 0 {
+                bail!("dynamic user program build failed with exit code {code}");
+            }
         }
     }
 
@@ -104,16 +135,21 @@ pub(crate) struct PrerequisitePlan {
 
 /// The libc outputs every userland C/std build needs.
 const LIBC_OUTPUTS: [&str; 4] = ["libc.a", "crt1.o", "crti.o", "crtn.o"];
+const DYNAMIC_OUTPUTS: [&str; 2] = ["libc.so.1", "ld-elf.so.1"];
 
-fn libc_outputs(arch: Arch) -> Vec<String> {
-    LIBC_OUTPUTS
-        .iter()
+fn libc_outputs(arch: Arch, dynamic: bool) -> Vec<String> {
+    let mut names: Vec<&str> = LIBC_OUTPUTS.to_vec();
+    if dynamic {
+        names.extend(DYNAMIC_OUTPUTS);
+    }
+    names
+        .into_iter()
         .map(|name| format!("build/{}/{}", arch.as_str(), name))
         .collect()
 }
 
-fn libc_missing(arch: Arch, exists: impl Fn(&str) -> bool) -> Vec<String> {
-    libc_outputs(arch)
+fn libc_missing(arch: Arch, dynamic: bool, exists: impl Fn(&str) -> bool) -> Vec<String> {
+    libc_outputs(arch, dynamic)
         .into_iter()
         .filter(|path| !exists(path))
         .collect()
@@ -156,10 +192,11 @@ pub(crate) fn prerequisite_plan(
     arch: Arch,
     exists: impl Fn(&str) -> bool,
 ) -> PrerequisitePlan {
-    let needs_libc = brush_requested(profile, arch) || uutils_requested(profile, arch);
+    let needs_libc =
+        brush_requested(profile, arch) || uutils_requested(profile, arch) || profile.initfs.dynamic;
     PrerequisitePlan {
         libc: if needs_libc {
-            libc_missing(arch, &exists)
+            libc_missing(arch, profile.initfs.dynamic, &exists)
         } else {
             Vec::new()
         },
@@ -175,7 +212,7 @@ pub(crate) fn prerequisite_plan(
 pub(crate) fn ensure_prerequisites(root: &Path, arch: Arch, profile: &Profile) -> Result<()> {
     let plan = prerequisite_plan(profile, arch, |source| root.join(source).is_file());
     if !plan.libc.is_empty() {
-        ensure_libc(root, arch)?;
+        ensure_libc(root, arch, profile.initfs.dynamic)?;
     }
     if plan.brush {
         ensure_brush(root, arch, profile)?;
@@ -237,8 +274,8 @@ where
 }
 
 /// Run the libc pack when the arch archive or a crt object is missing.
-pub(crate) fn ensure_libc(root: &Path, arch: Arch) -> Result<()> {
-    let missing = libc_missing(arch, |source| root.join(source).is_file());
+pub(crate) fn ensure_libc(root: &Path, arch: Arch, dynamic: bool) -> Result<()> {
+    let missing = libc_missing(arch, dynamic, |source| root.join(source).is_file());
     if missing.is_empty() {
         return Ok(());
     }
@@ -251,7 +288,17 @@ pub(crate) fn ensure_libc(root: &Path, arch: Arch) -> Result<()> {
     if code != 0 {
         bail!("libc-pack failed with exit code {code}");
     }
-    let missing = libc_missing(arch, |source| root.join(source).is_file());
+    if dynamic
+        && missing
+            .iter()
+            .any(|source| DYNAMIC_OUTPUTS.iter().any(|name| source.ends_with(name)))
+    {
+        let code = crate::libc_link::run(root, &["--arch".to_string(), arch.as_str().to_string()])?;
+        if code != 0 {
+            bail!("libc-link failed with exit code {code}");
+        }
+    }
+    let missing = libc_missing(arch, dynamic, |source| root.join(source).is_file());
     if !missing.is_empty() {
         bail!("libc-pack did not produce: {}", missing.join(", "));
     }

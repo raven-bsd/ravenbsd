@@ -22,6 +22,7 @@ fn profile(files: &[(&str, &str)]) -> Profile {
                 })
                 .collect(),
             release: false,
+            dynamic: false,
         },
         boot: Boot {
             cmdline: "console=ttyS0".to_string(),
@@ -137,7 +138,7 @@ fn non_uutils_profile_files_do_not_trigger_the_slice_build() {
 #[test]
 fn libc_outputs_are_arch_specific_and_ordered() {
     assert_eq!(
-        libc_missing(Arch::X86_64, |_| false),
+        libc_missing(Arch::X86_64, false, |_| false),
         [
             "build/x86_64/libc.a",
             "build/x86_64/crt1.o",
@@ -146,7 +147,7 @@ fn libc_outputs_are_arch_specific_and_ordered() {
         ]
     );
     assert_eq!(
-        libc_missing(Arch::Aarch64, |_| false),
+        libc_missing(Arch::Aarch64, false, |_| false),
         [
             "build/aarch64/libc.a",
             "build/aarch64/crt1.o",
@@ -154,12 +155,12 @@ fn libc_outputs_are_arch_specific_and_ordered() {
             "build/aarch64/crtn.o"
         ]
     );
-    assert!(libc_missing(Arch::X86_64, |_| true).is_empty());
+    assert!(libc_missing(Arch::X86_64, false, |_| true).is_empty());
 }
 
 #[test]
 fn a_partial_libc_pack_reports_only_the_missing_output() {
-    let missing = libc_missing(Arch::X86_64, |path| !path.ends_with("crt1.o"));
+    let missing = libc_missing(Arch::X86_64, false, |path| !path.ends_with("crt1.o"));
     assert_eq!(missing, ["build/x86_64/crt1.o"]);
 }
 

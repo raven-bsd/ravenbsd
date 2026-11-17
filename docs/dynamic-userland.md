@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: BSD-3-Clause -->
+<!-- Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors -->
+
 # Dynamic userland - build recipe and remaining integration
 
 Date: 2026-11-17.  Base: `origin/master` `33fd9653`.

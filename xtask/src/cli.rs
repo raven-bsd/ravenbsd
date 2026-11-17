@@ -339,7 +339,7 @@ fn execute(command: Command) -> Result<u8> {
         } => {
             let root = root()?;
             let workspace = repo::Workspace::load(&root)?;
-            build::run(&workspace, component, arch, release, &packages)
+            build::run(&workspace, component, arch, release, &packages, false)
         }
         Command::Initfs { arch, profile } => {
             let root = root()?;

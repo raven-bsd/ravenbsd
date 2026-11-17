@@ -50,7 +50,13 @@ fn loader_has_no_riscv64_target() {
 
 #[test]
 fn kernel_rustflags_match_c2() {
-    let flags = rustflags_for(Component::Kernel, Arch::X86_64, Path::new("/r"), None);
+    let flags = rustflags_for(
+        Component::Kernel,
+        Arch::X86_64,
+        Path::new("/r"),
+        None,
+        false,
+    );
     assert_eq!(
         flags,
         vec![
@@ -66,7 +72,13 @@ fn kernel_rustflags_match_c2() {
 #[test]
 fn user_rustflags_include_small_code_model_on_x86_64() {
     let linker = Path::new("/r/userland/linker/x86_64.ld");
-    let flags = rustflags_for(Component::User, Arch::X86_64, Path::new("/r"), Some(linker));
+    let flags = rustflags_for(
+        Component::User,
+        Arch::X86_64,
+        Path::new("/r"),
+        Some(linker),
+        false,
+    );
     assert_eq!(
         flags,
         vec![
@@ -85,14 +97,20 @@ fn user_rustflags_include_small_code_model_on_x86_64() {
 
 #[test]
 fn user_rustflags_omit_missing_linker() {
-    let flags = rustflags_for(Component::User, Arch::Aarch64, Path::new("/r"), None);
+    let flags = rustflags_for(Component::User, Arch::Aarch64, Path::new("/r"), None, false);
     assert!(!flags.iter().any(|flag| flag.contains("link-arg")));
     assert!(!flags.iter().any(|flag| flag == "code-model=small"));
 }
 
 #[test]
 fn loader_rustflags_only_remap() {
-    let flags = rustflags_for(Component::Loader, Arch::X86_64, Path::new("/r"), None);
+    let flags = rustflags_for(
+        Component::Loader,
+        Arch::X86_64,
+        Path::new("/r"),
+        None,
+        false,
+    );
     assert_eq!(flags, vec!["--remap-path-prefix=/r=/ravenbsd"]);
 }
 

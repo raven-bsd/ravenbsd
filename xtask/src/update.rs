@@ -422,7 +422,7 @@ fn update_image(root: &Path, options: &Options) -> Result<()> {
     }
 
     let workspace = Workspace::load(root)?;
-    let code = build::run(&workspace, Component::Loader, arch, false, &[])?;
+    let code = build::run(&workspace, Component::Loader, arch, false, &[], false)?;
     ensure!(code == 0, "loader build failed with exit code {code}");
     let loader_path_on_disk = build::artifact_path(root, arch, Component::Loader, "");
     let loader = fs::read(&loader_path_on_disk)
