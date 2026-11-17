@@ -937,8 +937,6 @@ RAVEN_1.0 {
 		syslog;
 		umaxabs;
 		vsyslog;
-		wcstoimax;
-		wcstoumax;
 		# --- wchar (C60b) ---
 		wcscasecmp;
 		wcscat;

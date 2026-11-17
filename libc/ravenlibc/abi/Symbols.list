@@ -85,6 +85,7 @@ atoll
 backtrace
 backtrace_symbols
 backtrace_symbols_fd
+basename
 bcmp
 bcopy
 bind
@@ -93,10 +94,16 @@ bindtextdomain
 bsearch
 btowc
 bzero
+c16rtomb
+c32rtomb
+c8rtomb
 call_once
 calloc
 canonicalize
 canonicalizef
+catclose
+catgets
+catopen
 cbrt
 cbrtf
 cbrtl
@@ -130,6 +137,7 @@ close
 close_range
 closedir
 closefrom
+closelog
 cnd_broadcast
 cnd_destroy
 cnd_init
@@ -171,6 +179,7 @@ devname
 dgettext
 difftime
 dirfd
+dirname
 div
 dl_iterate_phdr
 dladdr
@@ -331,6 +340,7 @@ fmod
 fmodf
 fmodl
 fmt_scaled
+fmtmsg
 fnmatch
 fopen
 fopen64
@@ -385,6 +395,7 @@ fts_openat
 fts_read
 fts_set
 ftw
+ftw64
 funlockfile
 futimens
 fwide
@@ -510,8 +521,14 @@ grantpt
 group_from_gid
 h_errno
 hasmntopt
+hcreate
+hcreate_r
+hdestroy
+hdestroy_r
 heapsort
 herror
+hsearch
+hsearch_r
 hstrerror
 htonl
 htons
@@ -519,6 +536,13 @@ humanize_number
 hypot
 hypotf
 hypotl
+iconv
+iconv_close
+iconv_open
+if_freenameindex
+if_indextoname
+if_nameindex
+if_nametoindex
 ilogb
 ilogbf
 ilogbl
@@ -694,6 +718,9 @@ malloc
 malloc_usable_size
 mblen
 mbrlen
+mbrtoc16
+mbrtoc32
+mbrtoc8
 mbrtowc
 mbsinit
 mbsnrtowcs
@@ -754,6 +781,7 @@ nexttowardf
 nexttowardl
 nextup
 nftw
+nftw64
 ngettext
 nice
 nl_langinfo
@@ -774,6 +802,7 @@ open_wmemstream
 openat
 openat64
 opendir
+openlog
 openpty
 optarg
 opterr
@@ -959,6 +988,8 @@ putc_unlocked
 putchar
 putchar_unlocked
 putenv
+putgrent
+putpwent
 puts
 putspent
 pututxline
@@ -991,10 +1022,12 @@ recv
 recvfrom
 recvmmsg
 recvmsg
+regasub
 regcomp
 regerror
 regexec
 regfree
+regnsub
 remainder
 remainderf
 remainderl
@@ -1090,6 +1123,7 @@ sethostent
 setjmp
 setlinebuf
 setlocale
+setlogmask
 setmntent
 setmode
 setnetent
@@ -1205,6 +1239,8 @@ strdup
 strerror
 strerror_l
 strerror_r
+strfmon
+strfmon_l
 strfromd
 strfromf
 strftime
@@ -1272,6 +1308,7 @@ sysctlbyname
 sysctlgetmibinfo
 sysctlnametomib
 sysinfo
+syslog
 system
 tan
 tanf
@@ -1367,6 +1404,7 @@ ufromfpx
 uid_from_user
 ulckpwdf
 umask
+umaxabs
 uname
 ungetc
 ungetwc
@@ -1381,6 +1419,7 @@ uselocale
 user_from_uid
 utimensat
 utimes
+utmpxname
 uuid_compare
 uuid_create
 uuid_create_nil
@@ -1409,6 +1448,7 @@ vsprintf
 vsscanf
 vswprintf
 vswscanf
+vsyslog
 vwprintf
 vwscanf
 wait
