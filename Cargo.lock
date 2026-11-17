@@ -3217,6 +3217,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "raven-smp-soak"
+version = "0.1.0"
+dependencies = [
+ "raven-abi",
+ "raven-rt",
+]
+
+[[package]]
 name = "raven-smp-user"
 version = "0.1.0"
 dependencies = [

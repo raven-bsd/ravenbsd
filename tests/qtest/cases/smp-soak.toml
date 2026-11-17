@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "smp-soak"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 240
+pre = ["sh tests/fixtures/smp-soak/build.sh"]
+initfs = "build/fixtures/smp-soak/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on"
+qemu_extra = []
+expect_exit = "success"
+
+# The controller reads the duration/CPU count/mode from this line and then runs the ring.
+[[step]]
+wait = '^smp-soak: ready$'
+send = "60 4 on\n"
+delay_ms = 50
+
+[[expect]]
+regex = '^smp-soak: workers=8 duration_s=60 cpus=4 mode=on$'
+
+[[expect]]
+regex = '^smp-soak: thread \d tid=\d+ count=\d+ cpu~[0-3]$'
+
+# All four CPUs carried user work (per-CPU counts inferred from the round-robin creation policy).
+[[expect]]
+regex = '^smp-soak: per-cpu cpu0=[1-9]\d* cpu1=[1-9]\d* cpu2=[1-9]\d* cpu3=[1-9]\d*$'
+
+[[expect]]
+regex = '^smp-soak: hops=\d+ total=\d+ ops_per_s=\d+$'
+
+[[expect]]
+regex = '^smp-soak: latency p50_ns=\d+ p99_ns=\d+ samples=[1-9]\d*$'
+
+[[expect]]
+regex = '^smp-soak: complete workers=8$'
+
+[[expect]]
+regex = '^smp-soak: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|smp-soak: failed'
