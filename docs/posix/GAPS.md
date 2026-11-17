@@ -12,13 +12,13 @@ Platform gate: x86_64 `gate`; aarch64 `pending`; riscv64 `pending`.
 | area | total | missing | partial | present | waived |
 |---|---:|---:|---:|---:|---:|
 | filesystem | 20 | 1 | 0 | 19 | 0 |
-| headers | 86 | 2 | 26 | 58 | 0 |
-| interfaces | 1423 | 231 | 0 | 1110 | 82 |
+| headers | 86 | 2 | 25 | 59 | 0 |
+| interfaces | 1423 | 149 | 0 | 1192 | 82 |
 | process | 17 | 0 | 0 | 14 | 3 |
 | shell | 25 | 0 | 0 | 22 | 3 |
 | tty | 12 | 0 | 0 | 7 | 5 |
 | utilities | 217 | 38 | 1 | 173 | 5 |
-| **all** | **1800** | **272** | **27** | **1403** | **98** |
+| **all** | **1800** | **190** | **26** | **1486** | **98** |
 
 Traceability rows: 1800; profile rows: 1800.
 
@@ -36,7 +36,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `header.dlfcn.h` | `dlfcn.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.errno.h` | `errno.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.fcntl.h` | `fcntl.h` | partial | P1 | `libc/ravenlibc/include` |  |
-| `header.fenv.h` | `fenv.h` | partial | P1 | `libc/ravenlibc/include` |  |
+| `header.fenv.h` | `fenv.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.float.h` | `float.h` | present | P1 | `test:tests/libc/posix/headers/check-missing-headers.sh` |  |
 | `header.fmtmsg.h` | `fmtmsg.h` | present | P1 | `libc/ravenlibc/include` |  |
 | `header.fnmatch.h` | `fnmatch.h` | present | P1 | `libc/ravenlibc/include` |  |
@@ -199,63 +199,63 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.c16rtomb` | `c16rtomb` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | uchar.h |
 | `interface.c32rtomb` | `c32rtomb` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | uchar.h |
 | `interface.c8rtomb` | `c8rtomb` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | uchar.h |
-| `interface.cabs` | `cabs` | missing | P1 | `none` | complex.h |
-| `interface.cabsf` | `cabsf` | missing | P1 | `none` | complex.h |
+| `interface.cabs` | `cabs` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.cabsf` | `cabsf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.cabsfNx` | `cabsfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.cabsl` | `cabsl` | missing | P1 | `none` | complex.h |
-| `interface.cacos` | `cacos` | missing | P1 | `none` | complex.h |
-| `interface.cacosf` | `cacosf` | missing | P1 | `none` | complex.h |
+| `interface.cabsl` | `cabsl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.cacos` | `cacos` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.cacosf` | `cacosf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.cacosfNx` | `cacosfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.cacosh` | `cacosh` | missing | P1 | `none` | complex.h |
-| `interface.cacoshf` | `cacoshf` | missing | P1 | `none` | complex.h |
+| `interface.cacosh` | `cacosh` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.cacoshf` | `cacoshf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.cacoshfNx` | `cacoshfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.cacoshl` | `cacoshl` | missing | P1 | `none` | complex.h |
-| `interface.cacosl` | `cacosl` | missing | P1 | `none` | complex.h |
+| `interface.cacoshl` | `cacoshl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.cacosl` | `cacosl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.call_once` | `call_once` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
 | `interface.calloc` | `calloc` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdlib.h |
 | `interface.canonicalizefNx` | `canonicalizefNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.carg` | `carg` | missing | P1 | `none` | complex.h |
-| `interface.cargf` | `cargf` | missing | P1 | `none` | complex.h |
+| `interface.carg` | `carg` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.cargf` | `cargf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.cargfNx` | `cargfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.cargl` | `cargl` | missing | P1 | `none` | complex.h |
-| `interface.casin` | `casin` | missing | P1 | `none` | complex.h |
-| `interface.casinf` | `casinf` | missing | P1 | `none` | complex.h |
+| `interface.cargl` | `cargl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.casin` | `casin` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.casinf` | `casinf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.casinfNx` | `casinfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.casinh` | `casinh` | missing | P1 | `none` | complex.h |
-| `interface.casinhf` | `casinhf` | missing | P1 | `none` | complex.h |
+| `interface.casinh` | `casinh` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.casinhf` | `casinhf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.casinhfNx` | `casinhfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.casinhl` | `casinhl` | missing | P1 | `none` | complex.h |
-| `interface.casinl` | `casinl` | missing | P1 | `none` | complex.h |
-| `interface.catan` | `catan` | missing | P1 | `none` | complex.h |
-| `interface.catanf` | `catanf` | missing | P1 | `none` | complex.h |
+| `interface.casinhl` | `casinhl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.casinl` | `casinl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.catan` | `catan` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.catanf` | `catanf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.catanfNx` | `catanfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.catanh` | `catanh` | missing | P1 | `none` | complex.h |
-| `interface.catanhf` | `catanhf` | missing | P1 | `none` | complex.h |
+| `interface.catanh` | `catanh` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.catanhf` | `catanhf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.catanhfNx` | `catanhfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.catanhl` | `catanhl` | missing | P1 | `none` | complex.h |
-| `interface.catanl` | `catanl` | missing | P1 | `none` | complex.h |
+| `interface.catanhl` | `catanhl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.catanl` | `catanl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.catclose` | `catclose` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | nl_types.h |
 | `interface.catgets` | `catgets` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | nl_types.h |
 | `interface.catopen` | `catopen` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | nl_types.h |
 | `interface.cbrt` | `cbrt` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.cbrtf` | `cbrtf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.cbrtl` | `cbrtl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
-| `interface.ccos` | `ccos` | missing | P1 | `none` | complex.h |
-| `interface.ccosf` | `ccosf` | missing | P1 | `none` | complex.h |
+| `interface.ccos` | `ccos` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.ccosf` | `ccosf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.ccosfNx` | `ccosfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.ccosh` | `ccosh` | missing | P1 | `none` | complex.h |
-| `interface.ccoshf` | `ccoshf` | missing | P1 | `none` | complex.h |
+| `interface.ccosh` | `ccosh` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.ccoshf` | `ccoshf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.ccoshfNx` | `ccoshfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.ccoshl` | `ccoshl` | missing | P1 | `none` | complex.h |
-| `interface.ccosl` | `ccosl` | missing | P1 | `none` | complex.h |
+| `interface.ccoshl` | `ccoshl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.ccosl` | `ccosl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.ceil` | `ceil` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.ceilf` | `ceilf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.ceilfNx` | `ceilfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.ceill` | `ceill` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
-| `interface.cexp` | `cexp` | missing | P1 | `none` | complex.h |
-| `interface.cexpf` | `cexpf` | missing | P1 | `none` | complex.h |
+| `interface.cexp` | `cexp` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.cexpf` | `cexpf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.cexpfNx` | `cexpfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.cexpl` | `cexpl` | missing | P1 | `none` | complex.h |
+| `interface.cexpl` | `cexpl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.cfgetispeed` | `cfgetispeed` | missing | P1 | `none` | termios.h |
 | `interface.cfgetospeed` | `cfgetospeed` | missing | P1 | `none` | termios.h |
 | `interface.cfmakeraw` | `cfmakeraw` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | termios.h |
@@ -266,10 +266,10 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.chmod` | `chmod` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/stat.h |
 | `interface.chown` | `chown` | missing | P1 | `none` | unistd.h |
 | `interface.chroot` | `chroot` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.cimag` | `cimag` | missing | P1 | `none` | complex.h |
-| `interface.cimagf` | `cimagf` | missing | P1 | `none` | complex.h |
+| `interface.cimag` | `cimag` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.cimagf` | `cimagf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.cimagfNx` | `cimagfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.cimagl` | `cimagl` | missing | P1 | `none` | complex.h |
+| `interface.cimagl` | `cimagl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.clearerr` | `clearerr` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.clearerr_unlocked` | `clearerr_unlocked` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.clock` | `clock` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | time.h |
@@ -278,10 +278,10 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.clock_gettime` | `clock_gettime` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | time.h |
 | `interface.clock_nanosleep` | `clock_nanosleep` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
 | `interface.clock_settime` | `clock_settime` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | time.h |
-| `interface.clog` | `clog` | missing | P1 | `none` | complex.h |
-| `interface.clogf` | `clogf` | missing | P1 | `none` | complex.h |
+| `interface.clog` | `clog` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.clogf` | `clogf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.clogfNx` | `clogfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.clogl` | `clogl` | missing | P1 | `none` | complex.h |
+| `interface.clogl` | `clogl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.close` | `close` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.closedir` | `closedir` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | dirent.h |
 | `interface.closelog` | `closelog` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | syslog.h |
@@ -293,10 +293,10 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.cnd_wait` | `cnd_wait` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | threads.h |
 | `interface.compoundn` | `compoundn` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.confstr` | `confstr` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
-| `interface.conj` | `conj` | missing | P1 | `none` | complex.h |
-| `interface.conjf` | `conjf` | missing | P1 | `none` | complex.h |
+| `interface.conj` | `conj` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.conjf` | `conjf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.conjfNx` | `conjfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.conjl` | `conjl` | missing | P1 | `none` | complex.h |
+| `interface.conjl` | `conjl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.connect` | `connect` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | sys/socket.h |
 | `interface.copy_file_range` | `copy_file_range` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.copysign` | `copysign` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
@@ -312,40 +312,40 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.coshl` | `coshl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.cosl` | `cosl` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.cospi` | `cospi` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
-| `interface.cpow` | `cpow` | missing | P1 | `none` | complex.h |
-| `interface.cpowf` | `cpowf` | missing | P1 | `none` | complex.h |
+| `interface.cpow` | `cpow` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.cpowf` | `cpowf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.cpowfNx` | `cpowfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.cpowl` | `cpowl` | missing | P1 | `none` | complex.h |
-| `interface.cproj` | `cproj` | missing | P1 | `none` | complex.h |
-| `interface.cprojf` | `cprojf` | missing | P1 | `none` | complex.h |
+| `interface.cpowl` | `cpowl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.cproj` | `cproj` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.cprojf` | `cprojf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.cprojfNx` | `cprojfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.cprojl` | `cprojl` | missing | P1 | `none` | complex.h |
-| `interface.creal` | `creal` | missing | P1 | `none` | complex.h |
-| `interface.crealf` | `crealf` | missing | P1 | `none` | complex.h |
+| `interface.cprojl` | `cprojl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.creal` | `creal` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.crealf` | `crealf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.crealfNx` | `crealfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.creall` | `creall` | missing | P1 | `none` | complex.h |
+| `interface.creall` | `creall` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.creat` | `creat` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fcntl.h |
 | `interface.creat64` | `creat64` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fcntl.h |
-| `interface.csin` | `csin` | missing | P1 | `none` | complex.h |
-| `interface.csinf` | `csinf` | missing | P1 | `none` | complex.h |
+| `interface.csin` | `csin` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.csinf` | `csinf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.csinfNx` | `csinfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.csinh` | `csinh` | missing | P1 | `none` | complex.h |
-| `interface.csinhf` | `csinhf` | missing | P1 | `none` | complex.h |
+| `interface.csinh` | `csinh` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.csinhf` | `csinhf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.csinhfNx` | `csinhfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.csinhl` | `csinhl` | missing | P1 | `none` | complex.h |
-| `interface.csinl` | `csinl` | missing | P1 | `none` | complex.h |
-| `interface.csqrt` | `csqrt` | missing | P1 | `none` | complex.h |
-| `interface.csqrtf` | `csqrtf` | missing | P1 | `none` | complex.h |
+| `interface.csinhl` | `csinhl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.csinl` | `csinl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.csqrt` | `csqrt` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.csqrtf` | `csqrtf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.csqrtfNx` | `csqrtfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.csqrtl` | `csqrtl` | missing | P1 | `none` | complex.h |
-| `interface.ctan` | `ctan` | missing | P1 | `none` | complex.h |
-| `interface.ctanf` | `ctanf` | missing | P1 | `none` | complex.h |
+| `interface.csqrtl` | `csqrtl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.ctan` | `ctan` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.ctanf` | `ctanf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.ctanfNx` | `ctanfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.ctanh` | `ctanh` | missing | P1 | `none` | complex.h |
-| `interface.ctanhf` | `ctanhf` | missing | P1 | `none` | complex.h |
+| `interface.ctanh` | `ctanh` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.ctanhf` | `ctanhf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.ctanhfNx` | `ctanhfNx` | waived | P1 | `none` | complex.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
-| `interface.ctanhl` | `ctanhl` | missing | P1 | `none` | complex.h |
-| `interface.ctanl` | `ctanl` | missing | P1 | `none` | complex.h |
+| `interface.ctanhl` | `ctanhl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
+| `interface.ctanl` | `ctanl` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | complex.h |
 | `interface.ctermid` | `ctermid` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
 | `interface.ctime` | `ctime` | present | P1 | `test:tests/libc/posix/time/check-time.sh` | time.h |
 | `interface.cuserid` | `cuserid` | present | P1 | `test:tests/libc/posix/stdio/check-stdio2.sh` | stdio.h |
@@ -433,25 +433,25 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.fdimfNx` | `fdimfNx` | waived | P1 | `none` | math.h; waiver: ISO C23 / TS 18661-3 writes the _FloatNx family as <name>fNx (acosf32x, acosf64x, acosf128x, ...). The census kept the placeholder literally; no literal fNx symbol exists in any C ABI. Waived until the _FloatNx ABI family lands. |
 | `interface.fdiml` | `fdiml` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.fdopen` | `fdopen` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
-| `interface.feclearexcept` | `feclearexcept` | missing | P1 | `none` | fenv.h |
-| `interface.fegetenv` | `fegetenv` | missing | P1 | `none` | fenv.h |
-| `interface.fegetexceptflag` | `fegetexceptflag` | missing | P1 | `none` | fenv.h |
-| `interface.fegetmode` | `fegetmode` | missing | P1 | `none` | fenv.h |
-| `interface.fegetround` | `fegetround` | missing | P1 | `none` | fenv.h |
-| `interface.feholdexcept` | `feholdexcept` | missing | P1 | `none` | fenv.h |
+| `interface.feclearexcept` | `feclearexcept` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fenv.h |
+| `interface.fegetenv` | `fegetenv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fenv.h |
+| `interface.fegetexceptflag` | `fegetexceptflag` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fenv.h |
+| `interface.fegetmode` | `fegetmode` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fenv.h |
+| `interface.fegetround` | `fegetround` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fenv.h |
+| `interface.feholdexcept` | `feholdexcept` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fenv.h |
 | `interface.feof` | `feof` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.feof_unlocked` | `feof_unlocked` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
-| `interface.feraiseexcept` | `feraiseexcept` | missing | P1 | `none` | fenv.h |
+| `interface.feraiseexcept` | `feraiseexcept` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fenv.h |
 | `interface.ferror` | `ferror` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.ferror_unlocked` | `ferror_unlocked` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
-| `interface.fesetenv` | `fesetenv` | missing | P1 | `none` | fenv.h |
-| `interface.fesetexcept` | `fesetexcept` | missing | P1 | `none` | fenv.h |
-| `interface.fesetexceptflag` | `fesetexceptflag` | missing | P1 | `none` | fenv.h |
-| `interface.fesetmode` | `fesetmode` | missing | P1 | `none` | fenv.h |
-| `interface.fesetround` | `fesetround` | missing | P1 | `none` | fenv.h |
-| `interface.fetestexcept` | `fetestexcept` | missing | P1 | `none` | fenv.h |
-| `interface.fetestexceptflag` | `fetestexceptflag` | missing | P1 | `none` | fenv.h |
-| `interface.feupdateenv` | `feupdateenv` | missing | P1 | `none` | fenv.h |
+| `interface.fesetenv` | `fesetenv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fenv.h |
+| `interface.fesetexcept` | `fesetexcept` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fenv.h |
+| `interface.fesetexceptflag` | `fesetexceptflag` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fenv.h |
+| `interface.fesetmode` | `fesetmode` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fenv.h |
+| `interface.fesetround` | `fesetround` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fenv.h |
+| `interface.fetestexcept` | `fetestexcept` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fenv.h |
+| `interface.fetestexceptflag` | `fetestexceptflag` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fenv.h |
+| `interface.feupdateenv` | `feupdateenv` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | fenv.h |
 | `interface.fexecve` | `fexecve` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | unistd.h |
 | `interface.fflush` | `fflush` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | stdio.h |
 | `interface.fflush_unlocked` | `fflush_unlocked` | present | P1 | `test:tests/libc/posix/stdio/check-stdio.sh` | stdio.h |
@@ -689,7 +689,7 @@ Traceability rows: 1800; profile rows: 1800.
 | `interface.isgraph_l` | `isgraph_l` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | ctype.h |
 | `interface.isgreater` | `isgreater` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.isgreaterequal` | `isgreaterequal` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
-| `interface.isinf` | `isinf` | missing | P1 | `none` | math.h |
+| `interface.isinf` | `isinf` | present | P1 | `libc/ravenlibc/abi/frozen/RAVEN_1.0.symbols` | math.h |
 | `interface.isless` | `isless` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.islessequal` | `islessequal` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
 | `interface.islessgreater` | `islessgreater` | present | P1 | `test:tests/libc/posix/math/check-math.sh` | math.h |
@@ -1887,7 +1887,7 @@ Traceability rows: 1800; profile rows: 1800.
 
 ## Current tree
 
-- frozen exported symbols: 1546
+- frozen exported symbols: 1628
 - `userland/bin` directories: 95
 - headers under `libc/ravenlibc/include`: 228
 - utility directories: adduser, ar, asa, at, awk, batch, bc, beep, cal, cat, cflow, cmp, compress, cp, crontab, ctags, cxref, date, df, diff, dmesg, dtrace, echo, ed, env, file, find, gencat, getconf, getty, grep, groupadd, hostname, iconv, id, ifconfig, kill, lex, locale, logger, login, ls, m4, mail, mailx, make, man, mesg, mixer, mkdir, more, mount, mv, nc, netstat, nice, nm, nohup, passwd, patch, pax, ping, play, ps, raven, renice, rm, rmdir, route, rsh, sed, sleep, stat, strings, strip, su, svcctl, talk, tar, touch, trace, umount, uname, uncompress, useradd, uucp, uudecode, uuencode, uustat, uux, whoami, write, xargs, yacc, zcat
@@ -1901,7 +1901,6 @@ Traceability rows: 1800; profile rows: 1800.
 | header | `complex.h` | `libc/ravenlibc/include` |
 | header | `dirent.h` | `libc/ravenlibc/include` |
 | header | `fcntl.h` | `libc/ravenlibc/include` |
-| header | `fenv.h` | `libc/ravenlibc/include` |
 | header | `math.h` | `libc/ravenlibc/include` |
 | header | `mqueue.h` | `libc/ravenlibc/include` |
 | header | `ndbm.h` | `none` |
@@ -1951,30 +1950,31 @@ Traceability rows: 1800; profile rows: 1800.
 | interface | `atanfNx` | `none` |
 | interface | `atanhfNx` | `none` |
 | interface | `brk` | `none` |
-| interface | `cabs` | `none` |
-| interface | `cabsf` | `none` |
 | interface | `cabsfNx` | `none` |
-| interface | `cabsl` | `none` |
-| interface | `cacos` | `none` |
-| interface | `cacosf` | `none` |
 | interface | `cacosfNx` | `none` |
-| interface | `cacosh` | `none` |
-| interface | `cacoshf` | `none` |
 | interface | `cacoshfNx` | `none` |
-| interface | `cacoshl` | `none` |
-| interface | `cacosl` | `none` |
 | interface | `canonicalizefNx` | `none` |
-| interface | `carg` | `none` |
-| interface | `cargf` | `none` |
 | interface | `cargfNx` | `none` |
-| interface | `cargl` | `none` |
-| interface | `casin` | `none` |
-| interface | `casinf` | `none` |
 | interface | `casinfNx` | `none` |
-| interface | `casinh` | `none` |
-| interface | `casinhf` | `none` |
 | interface | `casinhfNx` | `none` |
-| interface | `casinhl` | `none` |
-| interface | `casinl` | `none` |
+| interface | `catanfNx` | `none` |
+| interface | `catanhfNx` | `none` |
+| interface | `ccosfNx` | `none` |
+| interface | `ccoshfNx` | `none` |
+| interface | `ceilfNx` | `none` |
+| interface | `cexpfNx` | `none` |
+| interface | `cfgetispeed` | `none` |
+| interface | `cfgetospeed` | `none` |
+| interface | `cfsetispeed` | `none` |
+| interface | `cfsetospeed` | `none` |
+| interface | `cfsetspeed` | `none` |
+| interface | `chown` | `none` |
+| interface | `cimagfNx` | `none` |
+| interface | `clogfNx` | `none` |
+| interface | `conjfNx` | `none` |
+| interface | `copysignfNx` | `none` |
+| interface | `cosfNx` | `none` |
+| interface | `coshfNx` | `none` |
+| interface | `cpowfNx` | `none` |
 
-397 gap rows are listed in full in the tables above; this short table is a review aid.
+314 gap rows are listed in full in the tables above; this short table is a review aid.

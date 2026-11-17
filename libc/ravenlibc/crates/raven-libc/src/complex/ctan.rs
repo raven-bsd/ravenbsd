@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+/// `ctan`.
+#[unsafe(no_mangle)]
+pub extern "C" fn ctan(z: raven_libc_m::Complex<f64>) -> raven_libc_m::Complex<f64> {
+    raven_libc_m::ctan(z)
+}
+
+/// `ctanf`.
+#[unsafe(no_mangle)]
+pub extern "C" fn ctanf(z: raven_libc_m::Complex<f32>) -> raven_libc_m::Complex<f32> {
+    raven_libc_m::ctanf(z)
+}
+
+/// `ctanl`.
+#[cfg(target_arch = "x86_64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn ctanl(
+    z: raven_libc_m::Complex<raven_libc_m::LongDouble>,
+) -> raven_libc_m::Complex<raven_libc_m::LongDouble> {
+    raven_libc_m::ctanl(z)
+}

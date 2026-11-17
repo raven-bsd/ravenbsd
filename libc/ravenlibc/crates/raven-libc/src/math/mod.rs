@@ -489,6 +489,7 @@ macro_rules! nexttoward {
 mod fma;
 mod frexp;
 mod getpayload;
+mod isinf;
 mod lgamma_r;
 mod m01;
 mod m02;

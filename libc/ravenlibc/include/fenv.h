@@ -49,6 +49,9 @@ int feholdexcept(fenv_t *);
 int fesetenv(const fenv_t *);
 int feupdateenv(const fenv_t *);
 
+int fegetmode(femode_t *);
+int fesetmode(const femode_t *);
+
 __END_DECLS
 #endif
 
