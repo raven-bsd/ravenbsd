@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+#
+# P46 simple utility evidence: asa and cal.
+schema = 1
+standard = "posix-2024"
+
+[[row]]
+id = "util.asa"
+status = "present"
+evidence = "test:tests/posix/utility/simple/asa/test.sh"
+notes = "P46: FORTRAN carriage-control mapping, stdin/files, exit status and host tests"
+
+[[row]]
+id = "util.cal"
+status = "present"
+evidence = "test:tests/posix/utility/simple/cal/test.sh"
+notes = "P46: current/month-year/year/three-month Gregorian views and host tests"
