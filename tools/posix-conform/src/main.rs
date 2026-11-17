@@ -11,6 +11,7 @@ use posix_conform::gate;
 use posix_conform::model::{load_profile, load_trace, validate};
 use posix_conform::render::{check_current, generate};
 use posix_conform::seed;
+use posix_conform::sweep;
 
 fn main() -> std::process::ExitCode {
     match run(std::env::args().skip(1).collect()) {
@@ -29,6 +30,8 @@ fn run(args: Vec<String>) -> Result<u8> {
     let mut arch = "x86_64".to_string();
     let mut json = false;
     let mut host_only = false;
+    let mut extensions = PathBuf::from(sweep::DEFAULT_EXTENSIONS);
+    let mut strict = false;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
@@ -55,6 +58,14 @@ fn run(args: Vec<String>) -> Result<u8> {
             }
             "--json" => json = true,
             "--host-only" => host_only = true,
+            "--extensions" => {
+                index += 1;
+                extensions = PathBuf::from(
+                    args.get(index)
+                        .ok_or_else(|| anyhow::anyhow!("--extensions needs a value"))?,
+                );
+            }
+            "--strict" => strict = true,
             value if value.starts_with('-') => bail!("unknown option `{value}`"),
             value => {
                 if command.is_some() {
@@ -66,7 +77,7 @@ fn run(args: Vec<String>) -> Result<u8> {
         index += 1;
     }
     let command =
-        command.ok_or_else(|| anyhow::anyhow!("expected seed, generate, check or gate"))?;
+        command.ok_or_else(|| anyhow::anyhow!("expected seed, generate, check, gate or sweep"))?;
     match command.as_str() {
         "seed" => {
             seed::seed(&root)?;
@@ -124,6 +135,16 @@ fn run(args: Vec<String>) -> Result<u8> {
             }
             Ok(u8::from(report.release_blocked))
         }
-        other => bail!("unknown command `{other}` (expected seed, generate, check or gate)"),
+        "sweep" => {
+            let extensions = if extensions.is_absolute() {
+                extensions
+            } else {
+                root.join(extensions)
+            };
+            sweep::run(&root, &arch, &extensions, strict)
+        }
+        other => {
+            bail!("unknown command `{other}` (expected seed, generate, check, gate or sweep)")
+        }
     }
 }
