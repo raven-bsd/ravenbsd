@@ -37,10 +37,11 @@ two-peer transcript, plus the bounded `RVTALK/1` protocol and split-screen model
 |---|---|---:|
 | ttyd registry | register, user/terminal lookup, duplicate replacement, writable by record/session, session cleanup | 4 lib |
 | ptyd pairs | pair 0 compatibility, independent queues and settings for pair 1 | 1 lib |
-| talk parser | `user[@host]`, listener address, terminal, `-l`, usage and bounds | 5 lib |
+| talk parser | `user[@host]`, listener address, terminal, `-l`, usage and bounds | 4 lib |
 | talk wire | all frames, escaping, UTF-8, malformed and oversized input | 2 lib |
-| talk session | invite/accept/decline, both-way forwarding, alert, refresh, EOF/BYE, out-of-order events | 7 lib |
+| talk session | invite/accept/decline, both-way forwarding, alert, refresh, EOF/BYE, out-of-order events | 5 lib |
 | talk UI | invitation text, split panes, refresh, sanitisation | 3 lib |
+| talk transport | endpoint switching and the bounded frame reader | 2 lib |
 | loopback | full encoded two-endpoint transcript | 1 lib + 1 host |
 | two-peer path | ttyd registry lookup plus pair-1 pty transcript | 1 host |
 | CLI | usage, network rejection, missing registry, missing listener transport | 4 host |
