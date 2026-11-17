@@ -549,6 +549,203 @@ fn hypot_is_exact_for_f64_pythagorean_triples() {
 }
 
 #[test]
+fn subtraction_keeps_the_cancelled_result_scale() {
+    // `pack_binary128` must renormalise a cancelled significand and adjust the scale with it.
+    // These pairs cancelled to a result narrower than 113 bits and used to come back as 0.25.
+    let two = LongDouble128::from_f64(2.0);
+    for &(value, expected) in &[
+        (2.0625, -0.0625),
+        (2.125, -0.125),
+        (2.0009765625, -0.0009765625),
+        (3.0, -1.0),
+        (2.25, -0.25),
+        (2.5, -0.5),
+        (2.0000000000000004, -4.440892098500626e-16),
+    ] {
+        assert_eq!(
+            two.sub(LongDouble128::from_f64(value)).to_f64(),
+            expected,
+            "2 - {value}"
+        );
+        assert_eq!(
+            LongDouble128::from_f64(value).sub(two).to_f64(),
+            -expected,
+            "{value} - 2"
+        );
+    }
+    // A subtraction that cancels to exactly one ULP of the larger operand.
+    let one = LongDouble128::one();
+    let next = one.next_after(LongDouble128::from_f64(2.0));
+    assert_eq!(next.sub(one).to_f64(), 2f64.powi(-112));
+}
+
+#[test]
+fn exp_and_log_edges_and_exact_identities() {
+    // exp: NaN, ±inf, ±0.
+    assert!(LongDouble128::from_f64(f64::NAN).exp().is_nan());
+    assert_eq!(
+        LongDouble128::from_f64(f64::INFINITY).exp().to_f64(),
+        f64::INFINITY
+    );
+    assert!(LongDouble128::from_f64(f64::NEG_INFINITY).exp().is_zero());
+    assert_eq!(
+        LongDouble128::from_f64(0.0).exp().to_bits(),
+        LongDouble128::one().to_bits()
+    );
+    assert_eq!(
+        LongDouble128::from_f64(-0.0).exp().to_bits(),
+        LongDouble128::one().to_bits()
+    );
+    // log: NaN, ±0, negatives, +inf, 1.
+    assert!(LongDouble128::from_f64(f64::NAN).ln().is_nan());
+    let log_zero = LongDouble128::from_f64(0.0).ln();
+    assert!(log_zero.is_infinite() && log_zero.sign_bit());
+    assert!(LongDouble128::from_f64(-1.0).ln().is_nan());
+    assert_eq!(
+        LongDouble128::from_f64(f64::INFINITY).ln().to_f64(),
+        f64::INFINITY
+    );
+    assert!(LongDouble128::one().ln().is_zero());
+    // exp2 / log2 / log10 identities.
+    assert_eq!(
+        LongDouble128::from_f64(0.0).exp2().to_bits(),
+        LongDouble128::one().to_bits()
+    );
+    assert!(LongDouble128::from_f64(f64::NEG_INFINITY).exp2().is_zero());
+    assert!(LongDouble128::from_f64(f64::INFINITY).exp2().is_infinite());
+    for k in -40i64..=40 {
+        let value = LongDouble128::from_i64(k);
+        // exp2(k) is an exact power of two constructed through the series.
+        let got = value.exp2();
+        assert_eq!(got.to_f64(), 2f64.powi(i32::try_from(k).unwrap_or(0)));
+        // log2 of that power of two is the exact integer.
+        assert_eq!(got.log2().to_f64(), k as f64);
+    }
+    assert!(LongDouble128::from_f64(-2.0).log2().is_nan());
+    assert_eq!(
+        LongDouble128::from_f64(100.0).log10().to_f64(),
+        100.0f64.log10()
+    );
+}
+
+/// ULP distance between two `f64` values; negatives compare by magnitude, signs differ → far.
+fn f64_ulp(a: f64, b: f64) -> u64 {
+    if a == b {
+        return 0;
+    }
+    if a.is_nan() || b.is_nan() || a.is_sign_negative() != b.is_sign_negative() {
+        return u64::MAX;
+    }
+    a.abs().to_bits().abs_diff(b.abs().to_bits())
+}
+
+#[test]
+fn exp_and_log_match_the_f64_oracle_over_a_deterministic_sweep() {
+    let mut state: u64 = 0x2545_f491_4f6c_dd1d;
+    let mut checked = 0u32;
+    while checked < 2_000 {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        let x = f64::from_bits(state);
+        if !x.is_finite() || x == 0.0 {
+            continue;
+        }
+        // log of positive values only.
+        let positive = LongDouble128::from_f64(x.abs());
+        assert_eq!(positive.ln().to_f64(), x.abs().ln(), "ln({})", x.abs());
+        // `log2`/`log10` are `ln` divided by a constant, so allow two f64 ULP.
+        assert!(
+            f64_ulp(positive.log2().to_f64(), x.abs().log2()) <= 2,
+            "log2({})",
+            x.abs()
+        );
+        assert!(
+            f64_ulp(positive.log10().to_f64(), x.abs().log10()) <= 2,
+            "log10({})",
+            x.abs()
+        );
+        // exp of a moderate argument (the binary128 exp range is much wider than f64's).
+        let small = x % 100.0;
+        assert_eq!(
+            LongDouble128::from_f64(small).exp().to_f64(),
+            small.exp(),
+            "exp({small})"
+        );
+        assert!(
+            f64_ulp(
+                LongDouble128::from_f64(small / 100.0).exp2().to_f64(),
+                (small / 100.0).exp2()
+            ) <= 1,
+            "exp2({})",
+            small / 100.0
+        );
+        checked = checked.saturating_add(1);
+    }
+}
+
+#[test]
+fn exp_and_log_round_trip_within_a_few_ulp_of_the_log() {
+    // ULP distance on the positive binary128 line: the bit patterns are monotone there.
+    fn ulp_distance(a: LongDouble128, b: LongDouble128) -> u128 {
+        a.to_bits().abs_diff(b.to_bits())
+    }
+    let mut state: u64 = 0x9e37_79b9_7f4a_7c15;
+    let mut checked = 0u32;
+    while checked < 500 {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        let x = f64::from_bits(state);
+        if !x.is_finite() || x <= 0.0 {
+            continue;
+        }
+        let value = LongDouble128::from_f64(x);
+        // exp(ln(x)) carries ln's absolute error, so compare the relative error instead: the
+        // 113-bit log keeps it below 2^-100 even for |ln x| in the thousands.
+        let round_trip = value.ln().exp();
+        let relative = round_trip.sub(value).div(value).abs();
+        assert!(
+            relative.to_f64() <= 2f64.powi(-100),
+            "exp(ln({x})) relative error {}",
+            relative.to_f64()
+        );
+        // ln(exp(y)) for a moderate y: the round trip is absolute-accurate to a few ULP of 1
+        // (a tiny y has very few significant bits after exp rounds 1+y, so ULP-of-y is not the
+        // right yardstick). Values below 2^-90 are skipped: exp(y) is exactly 1 there.
+        let y = LongDouble128::from_f64(x.fract() * 40.0);
+        let tiny = y.abs().to_f64() < 2f64.powi(-90);
+        let back = y.exp().ln();
+        if !y.is_zero() && !tiny {
+            let absolute = back.sub(y).abs().to_f64();
+            assert!(
+                absolute <= 2f64.powi(-100),
+                "ln(exp({})) absolute error is {absolute:e}",
+                x.fract() * 40.0
+            );
+        }
+        checked = checked.saturating_add(1);
+    }
+}
+
+#[test]
+fn exp_log_constants_and_extremes() {
+    // ln2_hi + ln2_lo must exponentiate back to 2 within a few ULP.
+    let ln2 = LongDouble128::ln2_hi().add(LongDouble128::ln2_lo());
+    let two = LongDouble128::from_f64(2.0);
+    assert!(ln2.exp().to_bits().abs_diff(two.to_bits()) <= 4);
+    // ln10 rounds back to the f64 constant.
+    assert_eq!(LongDouble128::ln10().to_f64(), core::f64::consts::LN_10);
+    // Overflow and underflow edges of exp.
+    assert!(LongDouble128::from_f64(12000.0).exp().is_infinite());
+    assert!(LongDouble128::from_f64(-12000.0).exp().is_zero());
+    // A subnormal input still has a finite, negative log.
+    let tiny = LongDouble128::from_f64(f64::from_bits(1));
+    assert!(tiny.ln().to_f64() < -700.0);
+    assert!(tiny.ln().is_finite());
+}
+
+#[test]
 fn cbrt_and_hypot_match_the_f64_oracle_over_a_deterministic_sweep() {
     // The only in-tree reference for binary128 is the host f64 math; the binary128 result must
     // round to the same f64 for a spread of exponents and mantissas. Deterministic LCG, no

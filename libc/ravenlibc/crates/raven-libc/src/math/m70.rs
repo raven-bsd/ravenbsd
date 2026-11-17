@@ -375,3 +375,55 @@ pub mod g9 {
 
     lda_binary!(hypotl, hypotl_inner);
 }
+
+/// exp/log exports: `expl`, `logl`, `exp2l`, `log2l`.
+pub mod g10 {
+    use raven_libc_m::LongDouble;
+
+    extern "C" fn expl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::expl(*x);
+        }
+    }
+
+    extern "C" fn logl_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::logl(*x);
+        }
+    }
+
+    extern "C" fn exp2l_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::exp2l(*x);
+        }
+    }
+
+    extern "C" fn log2l_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::log2l(*x);
+        }
+    }
+
+    lda_unary!(expl, expl_inner);
+    lda_unary!(logl, logl_inner);
+    lda_unary!(exp2l, exp2l_inner);
+    lda_unary!(log2l, log2l_inner);
+}
+
+/// `log10l`.
+pub mod g11 {
+    use raven_libc_m::LongDouble;
+
+    extern "C" fn log10l_inner(out: *mut LongDouble, x: *const LongDouble) {
+        // SAFETY: the naked stub supplies writable and readable 16-byte slots.
+        unsafe {
+            *out = raven_libc_m::log10l(*x);
+        }
+    }
+
+    lda_unary!(log10l, log10l_inner);
+}
