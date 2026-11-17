@@ -233,6 +233,14 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     if number == raven_abi::signal::SIGRESEND {
         return thread::sigresend(frame);
     }
+    // S72: wall-clock and entropy syscalls, dispatched by reviewer-assigned raw numbers that are
+    // not yet `raven-abi` variants (see `basic::{GETRANDOM, CLOCK_SET}` for the required diff).
+    if number == basic::GETRANDOM {
+        return basic::getrandom(frame);
+    }
+    if number == basic::CLOCK_SET {
+        return basic::clock_set(frame);
+    }
     match Syscall::from_usize(number) {
         // EXIT is process-wide: every thread of the process terminates.
         Some(Syscall::EXIT) => process::exit_process(frame.rdi as i32),

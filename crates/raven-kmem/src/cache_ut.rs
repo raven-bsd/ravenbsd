@@ -7,13 +7,13 @@ use super::*;
 use raven_vmem::Vmem;
 
 fn arena(bytes: u64) -> Vmem {
-    Vmem::with_capacity(0x1000_0000, bytes, 256).expect("arena")
+    Vmem::new(0x1000_0000, bytes).expect("arena")
 }
 
 #[test]
 fn alloc_returns_aligned_distinct_objects() {
     let mut arena = arena(0x4000);
-    let mut cache = Cache::new("t", 100, 16);
+    let mut cache = Cache::<64>::new("t", 100, 16);
     let stride = cache.stride;
     assert_eq!(stride, 112, "100 rounded up to 16");
 
@@ -33,7 +33,7 @@ fn alloc_returns_aligned_distinct_objects() {
 #[test]
 fn free_reuses_the_same_slot() {
     let mut arena = arena(0x4000);
-    let mut cache = Cache::new("t", 32, 8);
+    let mut cache = Cache::<64>::new("t", 32, 8);
     let first = cache.alloc(&mut arena).expect("alloc");
     cache.free(first).expect("free");
     assert_eq!(cache.stats().in_use, 0);
@@ -44,7 +44,7 @@ fn free_reuses_the_same_slot() {
 #[test]
 fn growth_allocates_a_second_slab() {
     let mut arena = arena(0x20_0000);
-    let mut cache = Cache::new("t", 64, 8);
+    let mut cache = Cache::<64>::new("t", 64, 8);
     let per_slab = cache.objects_per_slab;
     for _ in 0..(per_slab + 3) {
         cache.alloc(&mut arena).expect("alloc");
@@ -56,7 +56,7 @@ fn growth_allocates_a_second_slab() {
 #[test]
 fn double_free_and_unknown_pointer_are_rejected() {
     let mut arena = arena(0x4000);
-    let mut cache = Cache::new("t", 32, 8);
+    let mut cache = Cache::<64>::new("t", 32, 8);
     let a = cache.alloc(&mut arena).expect("alloc");
     let _b = cache.alloc(&mut arena).expect("alloc");
     cache.free(a).expect("free");
@@ -68,7 +68,7 @@ fn double_free_and_unknown_pointer_are_rejected() {
 #[test]
 fn reap_returns_fully_free_slabs_to_the_arena() {
     let mut arena = arena(0x20_0000);
-    let mut cache = Cache::new("t", 64, 8);
+    let mut cache = Cache::<64>::new("t", 64, 8);
     let per_slab = cache.objects_per_slab;
     let mut objects = alloc::vec::Vec::new();
     for _ in 0..(per_slab * 2) {
@@ -99,7 +99,7 @@ fn reap_returns_fully_free_slabs_to_the_arena() {
 fn release_returns_every_slab() {
     let mut arena = arena(0x20_0000);
     let total_before = arena.total_free();
-    let mut cache = Cache::new("t", 256, 8);
+    let mut cache = Cache::<64>::new("t", 256, 8);
     for _ in 0..(cache.objects_per_slab * 2 + 1) {
         cache.alloc(&mut arena).expect("alloc");
     }

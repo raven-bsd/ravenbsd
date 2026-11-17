@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# S72: wall clock (CMOS RTC) and getrandom on x86-64.
+
+name = "time-entropy"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/time-entropy/build.sh"]
+initfs = "build/fixtures/time-entropy/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^rtc: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \(epoch \d+s\)$'
+
+[[expect]]
+regex = '^time-entropy: realtime ok sec=\d+$'
+
+[[expect]]
+regex = '^time-entropy: clock_set ok$'
+
+[[expect]]
+regex = '^entropy: source=(rdrand|rndr|jitter)$'
+
+[[expect]]
+regex = '^time-entropy: getrandom ok$'
+
+[[expect]]
+regex = '^time-entropy: ok$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|time-entropy: fail'

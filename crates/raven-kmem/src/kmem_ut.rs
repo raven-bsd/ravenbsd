@@ -8,7 +8,7 @@ use alloc::collections::BTreeSet;
 use raven_vmem::Vmem;
 
 fn kmem(bytes: u64) -> Kmem {
-    Kmem::new(Vmem::with_capacity(0x1000_0000, bytes, 256).expect("arena")).expect("kmem")
+    Kmem::new(Vmem::new(0x1000_0000, bytes).expect("arena")).expect("kmem")
 }
 
 #[test]
@@ -157,9 +157,8 @@ impl Rng {
 
 #[test]
 fn deterministic_hammer() {
-    const ARENA_BYTES: u64 = 0x80_0000;
-    let mut kmem = Kmem::new(Vmem::with_capacity(0x1000_0000, ARENA_BYTES, 8192).expect("arena"))
-        .expect("kmem");
+    const ARENA_BYTES: u64 = 0x8_0000;
+    let mut kmem = Kmem::new(Vmem::new(0x1000_0000, ARENA_BYTES).expect("arena")).expect("kmem");
     let mut rng = Rng(0x1234_5678_90ab_cdef);
     let mut live: Vec<(u64, usize, usize)> = Vec::new();
     let mut live_addrs: BTreeSet<u64> = BTreeSet::new();

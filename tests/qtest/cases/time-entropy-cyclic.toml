@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+# L4: the boot-time cyclic self-check proves arbitrary-resolution deadline ordering and no lost
+# wake (three one-shots fire in deadline order, not insertion order). Kernel-only: the self-check
+# runs from time::init before the banner.
+
+name = "time-entropy-cyclic"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 60
+boot_cmdline = "console=ttyS0 test-exit=1"
+expect_exit = "success"
+
+[[expect]]
+regex = '^cyclic: ok fired=3 order=5ms,10ms,15ms$'
+
+[[forbid]]
+regex = '(?i)cyclic: fail|panic'

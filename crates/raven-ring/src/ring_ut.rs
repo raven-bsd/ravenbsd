@@ -224,6 +224,112 @@ fn interleaved_operations_match_a_reference_model() {
     enumerate(6, &mut Vec::new());
 }
 
+// --- deterministic randomized model ------------------------------------------
+
+/// A deterministic 64-bit xorshift PRNG; the soak is reproducible run-to-run.
+struct XorShift(u64);
+
+impl XorShift {
+    const fn new(seed: u64) -> Self {
+        Self(seed)
+    }
+
+    fn next(&mut self) -> u64 {
+        let mut x = self.0;
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        self.0 = x;
+        x
+    }
+}
+
+#[test]
+fn deterministic_randomized_model_preserves_descriptors() {
+    // A seeded 1,000,000-operation random walk over submit/submit_batch/complete/cancel/poison,
+    // replayed against a `VecDeque` reference. It exercises wrap, full/empty, batch, cancellation,
+    // poison and descriptor exhaustion, and proves no descriptor is lost or duplicated: the number
+    // of completed descriptors equals the number accepted.
+    const CAPACITY: usize = 64;
+    const OPS: u64 = 1_000_000;
+
+    let storage = storage(CAPACITY);
+    let ring = Ring::new(&storage).unwrap();
+    let mut rng = XorShift::new(0x9E37_79B9_7F4A_7C15);
+    let mut reference: VecDeque<Descriptor> = VecDeque::new();
+    let mut accepted = 0u64;
+    let mut completed = 0u64;
+    let mut cancelled = 0u64;
+    let mut poisoned = false;
+
+    for _ in 0..OPS {
+        let op = rng.next() % 100;
+        let value = rng.next() % 256;
+        if op < 45 {
+            let result = ring.submit(Descriptor::new(value));
+            if poisoned {
+                assert_eq!(result, Err(Error::Poisoned));
+            } else if reference.len() >= CAPACITY {
+                assert_eq!(result, Err(Error::Full));
+            } else {
+                assert!(result.is_ok());
+                reference.push_back(Descriptor::new(value));
+                accepted += 1;
+            }
+        } else if op < 55 {
+            let batch = [
+                Descriptor::new(value),
+                Descriptor::new(value + 1),
+                Descriptor::new(value + 2),
+                Descriptor::new(value + 3),
+            ];
+            let count = ring.submit_batch(&batch);
+            let mut expected = 0usize;
+            while expected < batch.len() && !poisoned && reference.len() < CAPACITY {
+                reference.push_back(batch[expected]);
+                expected += 1;
+                accepted += 1;
+            }
+            assert_eq!(count, expected);
+        } else if op < 75 {
+            let count = ring.cancel(value);
+            let mut marked = 0usize;
+            for descriptor in reference.iter_mut() {
+                if !descriptor.is_cancelled() && descriptor.value() == value {
+                    *descriptor = Descriptor::cancelled(value);
+                    marked += 1;
+                }
+            }
+            assert_eq!(count, marked);
+            cancelled += marked as u64;
+        } else if op < 98 {
+            let got = ring.complete();
+            assert_eq!(got, reference.pop_front());
+            if got.is_some() {
+                completed += 1;
+            }
+        } else if !poisoned {
+            ring.poison();
+            poisoned = true;
+        }
+        assert_eq!(ring.len(), reference.len());
+        assert_eq!(ring.is_full(), reference.len() >= CAPACITY);
+        assert_eq!(ring.is_empty(), reference.is_empty());
+        assert_eq!(ring.is_poisoned(), poisoned);
+    }
+
+    while let Some(got) = ring.complete() {
+        assert_eq!(got, reference.pop_front().unwrap());
+        completed += 1;
+    }
+    assert!(reference.is_empty());
+    assert!(ring.is_empty());
+    // No lost or duplicated descriptor.
+    assert_eq!(accepted, completed);
+    // Cancellation only marks accepted entries; it never removes one.
+    assert!(cancelled <= accepted);
+}
+
 // --- million-operation model -------------------------------------------------
 
 #[test]

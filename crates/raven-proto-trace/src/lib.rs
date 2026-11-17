@@ -18,6 +18,8 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 
+pub mod traceparent;
+
 /// The encoded field length: one 64-bit little-endian trace id.
 pub const FIELD_LEN: usize = 8;
 

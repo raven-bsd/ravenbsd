@@ -5,13 +5,19 @@
 
 #![forbid(unsafe_code)]
 
-use alloc::vec::Vec;
-
-use raven_vmem::Vmem;
+use raven_vmem::{DEFAULT_TAG_CAPACITY, VmemGeneric};
 
 use crate::cache::{Cache, CacheStats};
 use crate::error::KmemError;
 use crate::size::{SIZE_CLASSES, class_align, classify};
+
+/// Number of named caches beyond the general size classes.
+const MAX_NAMED_CACHES: usize = 16;
+/// Total cache slots: the general classes plus the named pool.
+const TOTAL_CACHES: usize = SIZE_CLASSES.len() + MAX_NAMED_CACHES;
+
+/// Default number of slabs per cache for the host-tested [`Kmem`] alias.
+pub const DEFAULT_MAX_SLABS: usize = 128;
 
 /// Handle to a named object cache created with [`Kmem::cache_create`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -40,54 +46,57 @@ pub struct KmemStats {
     pub waste_bytes: u64,
 }
 
-/// The object allocator: general size classes plus named caches over one [`Vmem`] arena.
+/// The object allocator: general size classes plus named caches over one caller-owned arena.
 ///
-/// The arena is caller-supplied and owned by the [`Kmem`]. Allocations are address-based (`u64`);
-/// reconstructing a typed pointer from an address is the kernel-integration (A4) step, where
-/// `unsafe` is permitted. This crate hands out and reclaims raw addresses only.
-pub struct Kmem {
-    arena: Vmem,
-    caches: Vec<Option<Cache>>,
+/// The arena is a fixed-tag [`VmemGeneric`] owned by the allocator; `TAGS` bounds its boundary-tag
+/// slab and `MAX_SLABS` bounds the slab table of each cache. Allocations are address-based (`u64`);
+/// reconstructing a typed pointer from an address is the kernel-integration step, where `unsafe`
+/// is permitted. All metadata is fixed inline storage, so [`KmemGeneric::new`] and every allocation
+/// path are free of global-allocator calls.
+pub struct KmemGeneric<const MAX_SLABS: usize, const TAGS: usize> {
+    arena: VmemGeneric<TAGS>,
+    caches: [Option<Cache<MAX_SLABS>>; TOTAL_CACHES],
     allocs: u64,
     frees: u64,
     alloc_fail: u64,
     large_live: u64,
 }
 
-impl Kmem {
+/// The host-tested allocator: [`DEFAULT_MAX_SLABS`] slabs per cache over a default-capacity arena.
+pub type Kmem = KmemGeneric<DEFAULT_MAX_SLABS, DEFAULT_TAG_CAPACITY>;
+
+impl<const MAX_SLABS: usize, const TAGS: usize> KmemGeneric<MAX_SLABS, TAGS> {
     /// Build an allocator over `arena`, creating one cache per general size class.
-    pub fn new(arena: Vmem) -> Result<Self, KmemError> {
-        let mut caches: Vec<Option<Cache>> = Vec::new();
-        caches
-            .try_reserve_exact(SIZE_CLASSES.len())
-            .map_err(|_| KmemError::NoMemory)?;
-        for &class in &SIZE_CLASSES {
-            caches.push(Some(Cache::new(
-                class_name(class),
-                class,
-                class_align(class),
-            )));
-        }
-        Ok(Self {
+    pub fn new(arena: VmemGeneric<TAGS>) -> Result<Self, KmemError> {
+        let mut kmem = Self {
             arena,
-            caches,
+            caches: [None; TOTAL_CACHES],
             allocs: 0,
             frees: 0,
             alloc_fail: 0,
             large_live: 0,
-        })
+        };
+        for (index, &class) in SIZE_CLASSES.iter().enumerate() {
+            kmem.caches[index] = Some(Cache::new(class_name(class), class, class_align(class)));
+        }
+        Ok(kmem)
     }
 
     /// The source arena, read-only.
-    pub fn arena(&self) -> &Vmem {
+    pub fn arena(&self) -> &VmemGeneric<TAGS> {
         &self.arena
+    }
+
+    /// The source arena, mutable (used by the kernel to import a grown range).
+    pub fn arena_mut(&mut self) -> &mut VmemGeneric<TAGS> {
+        &mut self.arena
     }
 
     /// Allocate `size` bytes aligned to the power-of-two `align`.
     ///
     /// Requests that fit a general size class are served from its cache; everything else goes
-    /// straight to the arena. The returned address must be released with [`Kmem::free`] using the
-    /// same `size` and `align`.
+    /// straight to the arena. The returned address must be released with [`KmemGeneric::free`]
+    /// using the same `size` and `align`.
     ///
     /// # Errors
     ///
@@ -129,7 +138,7 @@ impl Kmem {
         }
     }
 
-    /// Release an address from [`Kmem::alloc`] with the same `size` and `align`.
+    /// Release an address from [`KmemGeneric::alloc`] with the same `size` and `align`.
     ///
     /// # Errors
     ///
@@ -167,6 +176,11 @@ impl Kmem {
     ///
     /// The first [`SIZE_CLASSES`] slots are the general classes; named caches start after them and
     /// reuse a destroyed cache's slot when one is free.
+    ///
+    /// # Errors
+    ///
+    /// [`KmemError::ZeroSize`], [`KmemError::Alignment`] and [`KmemError::Exhausted`] when the
+    /// named-cache pool is full.
     pub fn cache_create(
         &mut self,
         name: &'static str,
@@ -179,14 +193,13 @@ impl Kmem {
         if !align.is_power_of_two() {
             return Err(KmemError::Alignment);
         }
-        let cache = Cache::new(name, object_size, align);
-        if let Some(index) = self.caches.iter().position(Option::is_none) {
-            self.caches[index] = Some(cache);
-            Ok(CacheId(index))
-        } else {
-            self.caches.push(Some(cache));
-            Ok(CacheId(self.caches.len() - 1))
-        }
+        let slot = self.caches[SIZE_CLASSES.len()..]
+            .iter()
+            .position(Option::is_none)
+            .map(|offset| SIZE_CLASSES.len() + offset)
+            .ok_or(KmemError::Exhausted)?;
+        self.caches[slot] = Some(Cache::new(name, object_size, align));
+        Ok(CacheId(slot))
     }
 
     /// Allocate one object from the cache.
@@ -217,10 +230,10 @@ impl Kmem {
     ///
     /// The general size classes cannot be destroyed.
     pub fn cache_destroy(&mut self, id: CacheId) -> Result<(), KmemError> {
-        if id.0 < SIZE_CLASSES.len() {
+        if id.0 < SIZE_CLASSES.len() || id.0 >= self.caches.len() {
             return Err(KmemError::InvalidCache);
         }
-        let Some(cache) = self.caches.get_mut(id.0).and_then(Option::as_mut) else {
+        let Some(cache) = self.caches[id.0].as_mut() else {
             return Err(KmemError::InvalidCache);
         };
         cache.release(&mut self.arena);

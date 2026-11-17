@@ -1,0 +1,33 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-proc-death-cleanup"
+version = "0.1.0"
+description = "S69 process-death cleanup fixture: handles, IPC, IRQ, DMA, MMIO, mappings, futex/events, timers and waiters."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[lib]
+name = "raven_proc_death_cleanup"
+path = "src/lib.rs"
+
+[[bin]]
+name = "raven-s69-init"
+path = "src/bin/init.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-elf = { path = "../../../crates/raven-elf" }
+raven-initfs = { path = "../../../crates/raven-initfs" }
+raven-ipc = { path = "../../../crates/raven-ipc" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
+raven-scheme = { path = "../../../crates/raven-scheme" }
+
+[lints]
+workspace = true
