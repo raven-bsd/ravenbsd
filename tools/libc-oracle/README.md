@@ -28,7 +28,8 @@ libc-oracle vendor --donor D --from DIR --to DIR [--data] [--dry-run]
 ```
 
 Defaults: `--recipes tests/libc/oracle/recipes`, `--out build/libc-oracle`; `--resources` is the
-nearest `ravenbsd-resources` directory at or above the current directory.
+nearest `ravenbsd-resources` directory at or above the current directory. `RAVENBSD_RESOURCES`
+is used when `--resources` is absent; the flag wins over the environment.
 
 Exit codes: `0` success, `1` a gate refusal (licence, donor pin, export mismatch), `2` usage, I/O or
 recipe error, `77` a required tool (`cc`, `ld`, `nm`, `objcopy`) or `git` is missing. The `77` line
