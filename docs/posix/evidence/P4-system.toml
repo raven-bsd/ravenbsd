@@ -79,3 +79,9 @@ id = "util.mesg"
 status = "present"
 evidence = "qtest:posix-util-system"
 notes = "P4u: tty write permission via the tty protocol; y/n, fstat group-write bit and non-tty error"
+
+[[row]]
+id = "util.ps"
+status = "present"
+evidence = "qtest:posix-util-system"
+notes = "P4o: ps -e reads 41 PROC_PID_INFO words and prints the command name after word 8"
