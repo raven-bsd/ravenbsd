@@ -114,7 +114,7 @@ title = "lints (C16)"
 required = true
 kind = "argv"
 argv = ["cargo", "xtask", "libc-lint", "all"]
-note = "C74h: 17 violations (3 C74g SAFETY comments in ld/src/raw/exports.rs, 14 pre-existing)"
+note = "C74i: 26 violations remain; loader files are clean (3 C74g SAFETY comments fixed). Owners: P1f/phil 14, P1h/otto 8, P1i/tim 3, ABI/contract 1. Not edited here."
 evidence = "build/libc-gate/1.7.txt"
 source = "C34"
 
