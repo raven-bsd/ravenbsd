@@ -40,6 +40,13 @@ fn main(_args: raven_rt::Args) -> i32 {
         reply.status = 0;
         match reply.opcode {
             value if value == Opcode::Open.as_u16() => {
+                // Report the trace id inherited from the caller: non-zero means a traced request,
+                // zero means untraced.
+                if reply.trace_id != 0 {
+                    println!("trace: server id=0x{:x}", reply.trace_id);
+                } else {
+                    println!("trace: server untraced");
+                }
                 reply.server_cookie = 1;
                 reply.buffer_len = 0;
             }

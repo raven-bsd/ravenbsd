@@ -193,11 +193,9 @@ pub unsafe fn switch(from: &Thread, to: &Thread) {
 
     ap_start::set_kernel_rsp(to.kernel_stack_top);
     ap_start::set_current_thread(to as *const Thread as u64);
-    // The single TSS belongs to the boot processor; application processors only run kernel
-    // threads in S10 and never take a ring-3 to ring-0 transition.
-    if crate::sched::smp::percpu::this_cpu() == 0 {
-        gdt::set_rsp0(to.kernel_stack_top);
-    }
+    // Every CPU has its own TSS since S75; install the incoming thread's kernel stack in the
+    // ring-3 rsp0 slot of the CPU running the switch.
+    gdt::set_rsp0(crate::sched::smp::percpu::this_cpu(), to.kernel_stack_top);
 
     let current = read_cr3();
     if current != to.cr3 {

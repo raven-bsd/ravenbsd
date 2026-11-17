@@ -70,6 +70,58 @@ The search reports a reproducible state count and fails on the first violated in
 counterexample trace. Two seeded-bug tests prove the checker flags a planted `EffectiveMismatch`
 and a planted `WaiterOrdering` (R-ADD-28 style).
 
+A deterministic multi-million-operation soak (`storm_millions_of_mixed_operations`, 3M mixed
+wait/wake-one/wake-all/cancel/acquire/boost/unboost with object and thread reuse plus stale ids)
+asserts, at every step, the conservation invariant `blocks == wakes + cancels + queued` (no lost or
+double-counted wake) and re-runs the full invariant check periodically. Two targeted tests cover a
+32-owner deep inheritance chain (the deepest owner inherits the highest priority transitively, and
+every intermediate owner is boosted to the same value) and equal-priority fairness (64 waiters hand
+off in arrival order).
+
+## Lock statistics (`lockstat` feature)
+
+`crates/raven-turnstile` has an off-by-default `lockstat` feature. When enabled, each turnstile
+carries per-object counters (`Turnstiles::stats(object) -> LockStats`) that the kernel `lockstat`
+probes will publish (L5). The default build has no counters and no extra cost or layout.
+
+| Counter | Meaning |
+|---|---|
+| `wait_entries` | successful `block` calls |
+| `immediate_acquisitions` | successful `acquire` calls |
+| `wakes` | threads woken (`wake_one` + `wake_all`) |
+| `cancels` | waiters removed by `cancel` |
+| `timeouts` | reserved for the kernel timeout path; always `0` here |
+| `max_queue_depth` | largest number of simultaneous waiters |
+| `max_inheritance_depth` | longest inheritance chain observed (the block hop plus the owner's own wait-for chain) |
+| `inherited_priority_changes` | number of times an operation changed an owner's effective priority |
+
+Every counter is saturating (never wraps silently). Equality/hashing of the model state ignores the
+counters, so the exhaustive model check still deduplicates on the logical state; the same model
+additionally asserts `timeouts == 0`, `max_queue_depth >= current waiters` and
+`wait_entries >= current waiters` on every reachable state under the feature.
+
+## IPC priority donation (`Donation`)
+
+`Donation` (the `donation` module) layers IPC call edges (`client -> server`) on top of a
+`Turnstiles` registry. A client blocked on a server reply donates its priority to the server, and
+the boost flows through any lock the server then waits on. Each thread's effective priority is the
+least fixed point over three edge kinds:
+
+`eff(t) = min(base(t), { eff(w) | w waits on a lock owned by t }, { eff(c) | c has a call to t })`
+
+* `begin_call` / `end_call` / `cancel_call` / `client_death` / `server_death` manage the call
+  edges; completion, cancellation and death remove exactly the right edges with typed errors
+  (`UnknownThread`, `DuplicateCall`, `StaleCall`).
+* `effective_priority` is an allocation-free cached lookup; lock operations are delegated to the
+  turnstile and every mutation recomputes the fixed point.
+* `check_invariants` verifies: no dangling call edge, the cached effective priority equals the
+  least fixed point, and a thread with no donor (call or lock) is back at its base priority.
+
+The host model runs 1,000,000 mixed operations (3 servers, 64 clients, 16 locks) and asserts the
+invariants every 512 steps; a hand-built inversion case proves a low-priority lock owner runs at a
+high-priority client's priority while the server waits on its lock, and returns to base once the
+lock is released and the call completes.
+
 ## Kernel integration (later)
 
 The kernel hosts the real threads and calls these operations from the blocking mutex/rwlock/condvar

@@ -4,14 +4,14 @@
 //! Interrupt objects: legacy IOAPIC lines and MSI/MSI-X vectors.
 
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 use raven_abi::errno::Errno;
 use raven_abi::types::{Handle, Rights};
 use raven_usercopy::UserSlice;
 
 use crate::arch::x86_64::msi::{DELIVERY_FIXED, msi_address, msi_data};
-use crate::arch::x86_64::{apic, ioapic, vector};
+use crate::arch::x86_64::{ap_start, apic, ioapic, vector};
 use crate::event;
 use crate::process::{self, handle::Object};
 use crate::sched;
@@ -33,6 +33,35 @@ static LIVE_IRQS: AtomicU64 = AtomicU64::new(0);
 /// Number of live interrupt objects across all processes.
 pub fn live_objects() -> u64 {
     LIVE_IRQS.load(Ordering::Acquire)
+}
+
+/// True when the `irq-dist-trace` boot flag is set (S75a evidence only).
+fn dist_trace() -> bool {
+    crate::memory::paging::cmdline()
+        .split_ascii_whitespace()
+        .any(|token| token == "irq-dist-trace")
+}
+
+/// Choose the destination CPU for a new external IRQ.
+///
+/// With `smp_user=off` every external IRQ stays on the BSP (CPU 0). With `smp_user=on` the
+/// destination round-robins over the application processors, leaving the BSP to the kernel timer
+/// and the serial console.
+fn select_irq_cpu() -> u32 {
+    if !crate::sched::user_smp_enabled() {
+        return 0;
+    }
+    let online = crate::sched::smp::online_cpus();
+    if online <= 1 {
+        return 0;
+    }
+    static NEXT: AtomicU32 = AtomicU32::new(0);
+    let ap_count = u32::try_from(online.saturating_sub(1)).unwrap_or(1);
+    let slot = NEXT
+        .fetch_add(1, Ordering::Relaxed)
+        .checked_rem(ap_count)
+        .unwrap_or(0);
+    slot.saturating_add(1)
 }
 
 /// The user-visible `IrqInfo` record. Its layout is fixed by the ABI syscall documentation.
@@ -230,6 +259,10 @@ pub struct Irq {
     waiters: WaitQueue,
     /// Resource release already happened (explicit process-exit retire or `Drop`).
     retired: AtomicBool,
+    /// CPU that handled the most recent firing (S75a evidence).
+    last_cpu: AtomicU32,
+    /// One-shot "handler CPU" evidence print.
+    announced: AtomicBool,
 }
 
 impl Irq {
@@ -335,6 +368,7 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
     super::require_root(&caller, Handle(frame.rdi as u32))?;
     let kind = u32::try_from(frame.rsi).map_err(|_| Errno::EINVAL)?;
     let number = u32::try_from(frame.rdx).map_err(|_| Errno::EINVAL)?;
+    let cpu = select_irq_cpu();
 
     let (irq, fill) = match kind {
         IRQ_LEGACY => {
@@ -367,17 +401,27 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
                 pending: AtomicU64::new(0),
                 waiters: WaitQueue::new(),
                 retired: AtomicBool::new(false),
+                last_cpu: AtomicU32::new(0),
+                announced: AtomicBool::new(false),
             });
             LIVE_IRQS.fetch_add(1, Ordering::AcqRel);
             vector::install_owner(vector, Arc::as_ptr(&irq));
             // `route` programs the entry masked; only IRQ_WAIT/IRQ_ACK unmask it.
-            ioapic::route(gsi, vector, apic::id(), active_low, level).map_err(|_| Errno::EINVAL)?;
+            ioapic::route(
+                gsi,
+                vector,
+                ap_start::apic_id(cpu as usize),
+                active_low,
+                level,
+            )
+            .map_err(|_| Errno::EINVAL)?;
             probe_legacy_created(gsi, vector);
             (irq, None)
         }
         IRQ_MSI | IRQ_MSIX => {
             let info = frame.r10;
-            let (address_lo, address_hi) = msi_address(apic::id()).ok_or(Errno::EOPNOTSUPP)?;
+            let (address_lo, address_hi) =
+                msi_address(ap_start::apic_id(cpu as usize)).ok_or(Errno::EOPNOTSUPP)?;
             let vector = vector::allocate().ok_or(Errno::ENOSPC)?;
             let irq = Arc::new(Irq {
                 kind: if kind == IRQ_MSI {
@@ -395,6 +439,8 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
                 pending: AtomicU64::new(0),
                 waiters: WaitQueue::new(),
                 retired: AtomicBool::new(false),
+                last_cpu: AtomicU32::new(0),
+                announced: AtomicBool::new(false),
             });
             LIVE_IRQS.fetch_add(1, Ordering::AcqRel);
             vector::install_owner(vector, Arc::as_ptr(&irq));
@@ -414,6 +460,10 @@ pub fn create(frame: &SyscallFrame) -> Result<usize, Errno> {
         let destination = UserSlice::new(pointer, 16)?;
         let bytes = fill.as_bytes();
         copy_to_user(destination, &bytes)?;
+    }
+
+    if dist_trace() {
+        crate::kprintln!("irq-dist: vector {} -> cpu {}", irq.vector, cpu);
     }
 
     let rights = Rights::READ.union(Rights::DUP).union(Rights::TRANSFER);
@@ -455,6 +505,12 @@ pub fn wait(frame: &SyscallFrame) -> Result<usize, Errno> {
             return Err(Errno::EIO);
         }
         if let Some(count) = irq.take_pending() {
+            if dist_trace() && !irq.announced.swap(true, Ordering::AcqRel) {
+                let handled = irq.last_cpu.load(Ordering::Acquire);
+                if handled != 0 {
+                    crate::kprintln!("irq-dist: vector {} handled on cpu {}", irq.vector, handled);
+                }
+            }
             return Ok(count);
         }
         if let Some(deadline) = deadline
@@ -530,19 +586,19 @@ pub fn handle_interrupt(vector: u8) -> bool {
     if !vector::is_driver_vector(vector) {
         return false;
     }
-    let owner = vector::owner(vector);
-    if owner.is_null() {
+    let Some(irq) = vector::handle_owner(vector) else {
         // An interrupt for a retired pool vector (closed source or quarantine): there is no
         // object to charge, but the message was really delivered, so acknowledge it.
         note_unclaimed(vector);
         apic::eoi();
         return true;
-    }
-    // SAFETY: `install_owner` publishes the pointer before the source can fire, and `release`
-    // and `quarantine` clear the slot before the object is dropped; the delivery CPU is the boot
-    // CPU, where process-context close operations cannot run concurrently with this handler.
-    let irq = unsafe { &*owner };
+    };
+    let irq = &*irq;
     let _ = irq.pending.fetch_add(1, Ordering::AcqRel);
+    irq.last_cpu.store(
+        u32::try_from(ap_start::this_cpu()).unwrap_or(0),
+        Ordering::Release,
+    );
     if irq.kind != IrqKind::Legacy {
         // The source is live again, so the driver's last ack no longer quiesces it.
         irq.live.store(true, Ordering::Release);

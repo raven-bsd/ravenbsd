@@ -20,8 +20,12 @@ extern crate alloc;
 #[cfg(test)]
 extern crate std;
 
+mod donation;
 mod turnstile;
 
+pub use donation::{Donation, DonationError, DonationViolation};
+#[cfg(feature = "lockstat")]
+pub use turnstile::LockStats;
 pub use turnstile::{
     CancelOutcome, Error, InheritEffect, InvariantViolation, ObjectId, Priority, ThreadId,
     Turnstiles,

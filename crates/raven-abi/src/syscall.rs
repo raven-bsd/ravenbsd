@@ -181,6 +181,24 @@ syscalls! {
     IRQ_ACK = 0x76;
 }
 
+/// `trace_set(id: u64) -> 0`.
+///
+/// Sets the calling thread's current trace id (`R-OBS-6`); zero clears it. Unprivileged: a thread
+/// may only set its own context, and the kernel stamps that id on its scheme requests and lets a
+/// server inherit it for the duration of the call. A raw constant, not a [`Syscall`] variant, so
+/// existing exhaustive matches downstream stay intact. `0x08`/`0x09` are S72's `GETRANDOM` and
+/// `CLOCK_SET`; `TRACE_SET` is `0x0B`.
+pub const TRACE_SET: usize = 0x0B;
+
+/// `record_lock(file: Handle, cmd: u32, lock: *mut RecordLock) -> 0`.
+///
+/// POSIX advisory byte-range lock operations: `cmd` is `F_GETLK` (5), `F_SETLK` (6) or
+/// `F_SETLKW` (7); `lock` is a [`types::fcntl::RecordLock`]. The kernel resolves the file identity,
+/// enforces the range conflicts and blocks `F_SETLKW` until the range is free. Raw constant, not a
+/// [`Syscall`] variant; the lock table lives in the kernel so close and process-exit release are
+/// exact.
+pub const RECORD_LOCK: usize = 0x0C;
+
 /// `msync(proc: Handle, addr: usize, len: usize, flags: usize) -> 0`.
 ///
 /// Writes dirty pages of a shared file-backed mapping back through the pager without unmapping

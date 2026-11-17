@@ -1,0 +1,64 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt GENCAT 1
+.Os RavenBSD
+.Sh NAME
+.Nm gencat
+.Nd compile a message catalog
+.Sh SYNOPSIS
+.Nm
+.Ar catalog
+.Ar source ...
+.Sh DESCRIPTION
+The
+.Nm
+utility compiles one or more message-catalog source files into
+.Ar catalog ,
+the binary image read by the RavenBSD locale catalog runtime.
+The output catalog is replaced, not merged.
+.Pp
+Supported source lines are:
+.Bl -tag -width Ds -offset indent
+.It Cm $set Ar N
+Start or select set
+.Ar N .
+Set and message ids must be positive.
+.It Cm $delset Ar N
+Remove set
+.Ar N .
+.It Cm $transient
+Accepted and ignored.
+.It Cm $comment Ar text
+Accepted and ignored.
+.It Ar id Ar string
+Define message
+.Ar id
+in the current set; the string must be quoted.
+.El
+.Pp
+Strings are UTF-8 and support
+.Ql \e\e ,
+.Ql \e\&" ,
+.Ql \en ,
+.Ql \et
+and
+.Ql \er .
+Multiple source files share the current set. The image is limited to 8 MiB.
+.Ar catalog
+of
+.Ar -
+writes to standard output.
+.Sh EXIT STATUS
+.Ex -std
+0 on success, 1 for a source or output error, 2 for usage.
+.Sh SEE ALSO
+.Xr iconv 1 ,
+.Xr locale 1
+.Sh STANDARDS
+A documented subset of POSIX
+.Nm gencat .
+Merging, multi-line messages, adjacent string concatenation, octal/hex escapes, symbolic set
+names and
+.Cm $codeset
+are unsupported.

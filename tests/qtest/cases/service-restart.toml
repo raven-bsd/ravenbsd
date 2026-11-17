@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "service-restart"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 120
+pre = ["sh tests/fixtures/service-restart/build.sh"]
+initfs = "build/fixtures/service-restart/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1"
+qemu_extra = []
+expect_exit = "success"
+
+[[expect]]
+regex = '^svcd: rst up$'
+
+[[expect]]
+regex = '^service-restart: gen0=[0-9]+$'
+
+[[expect]]
+regex = '^service-restart: stale:[0-9]+$'
+
+[[expect]]
+regex = '^service-restart: reopened$'
+
+[[expect]]
+regex = '^service-restart: gen1=[0-9]+$'
+
+[[expect]]
+regex = '^service-restart: ok$'
+
+[[expect]]
+regex = '^svcd: settled$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION'

@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+name = "smp-user"
+arch = "x86_64"
+profile = "base"
+timeout_secs = 300
+pre = ["sh tests/fixtures/smp-user/build.sh"]
+initfs = "build/fixtures/smp-user/initfs.img"
+boot_cmdline = "console=ttyS0 test-exit=1 smp_user=on smp-user-trace"
+qemu_extra = []
+expect_exit = "success"
+
+# A user thread ran on at least one application processor.
+[[expect]]
+regex = '^smp-user: cpu [1-9] first user thread pid=\d+ tid=\d+$'
+
+# A second application processor also ran a user thread (two threads run concurrently).
+[[expect]]
+regex = '^smp-user: cpu [1-9] first user thread pid=\d+ tid=\d+$'
+
+[[expect]]
+regex = '^smp-user: progress 0=\d+ 1=\d+ 2=\d+ 3=\d+$'
+
+# A futex wake targeted a blocked thread on another CPU.
+[[expect]]
+regex = '^smp-user: wake tid \d+ -> cpu [1-9]$'
+
+[[expect]]
+regex = '^smp-user: fault child reaped$'
+
+[[expect]]
+regex = '^smp-user: exit child reaped$'
+
+[[expect]]
+regex = '^smp-user: done$'
+
+[[expect]]
+regex = '^init exited \(0\)$'
+
+[[forbid]]
+regex = '(?i)panic|EXCEPTION|smp-user: failed'

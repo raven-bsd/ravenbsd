@@ -1,0 +1,61 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+//! Named pty pairs.
+//!
+//! Pair `0` keeps the historical `pty:master` / `pty:slave` path. Higher ids let independent
+//! terminal sessions coexist, which `talk` uses for a second local peer. Each pair owns its own
+//! line discipline, queues and foreground group.
+
+use alloc::collections::BTreeMap;
+
+use crate::{Pty, SignalSink};
+
+/// The pty pair table.
+pub struct Pairs<S: SignalSink + Default> {
+    entries: BTreeMap<u64, Pty<S>>,
+}
+
+impl<S: SignalSink + Default> Default for Pairs<S> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<S: SignalSink + Default> Pairs<S> {
+    /// An empty pair table.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            entries: BTreeMap::new(),
+        }
+    }
+
+    /// Get or create pair `id`.
+    pub fn open(&mut self, id: u64) -> &mut Pty<S> {
+        self.entries
+            .entry(id)
+            .or_insert_with(|| Pty::new(S::default()))
+    }
+
+    /// Get an existing pair without creating it.
+    pub fn get_mut(&mut self, id: u64) -> Option<&mut Pty<S>> {
+        self.entries.get_mut(&id)
+    }
+
+    /// Number of live pairs.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// True when no pair exists.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+#[cfg(test)]
+#[path = "pairs_ut.rs"]
+mod tests;

@@ -1,0 +1,55 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt CAL 1
+.Os RavenBSD
+.Sh NAME
+.Nm cal
+.Nd print a Gregorian calendar
+.Sh SYNOPSIS
+.Nm
+.Op Fl 3 | Fl y
+.Op Ar month Op Ar year
+.Sh DESCRIPTION
+The
+.Nm
+utility prints a calendar for the C locale. With no operands it prints the
+current month; with one operand it prints the whole year; with two operands
+it prints the selected
+.Ar month
+and
+.Ar year .
+The
+.Fl y
+option selects the whole year (the current year when no operand is given),
+and
+.Fl 3
+prints the previous, selected and next month side by side.
+.Pp
+The calendar is proleptic Gregorian: leap years are divisible by four, except
+century years that are not divisible by four hundred. The 1752 reform gap and
+Julian dates are not modelled.
+.Pp
+Years are accepted from 1 through 9999. A three-month view also needs the
+neighbouring months, so its year must be between 2 and 9998. With operands,
+the month is 1 through 12 and the year includes the century.
+.Pp
+The protocol version 1 realtime clock returns zero, so the no-operand and
+no-year views currently show January 1970 until a wall clock exists. Explicit
+.Ar month
+and
+.Ar year
+operands do not depend on the clock.
+.Sh EXIT STATUS
+.Ex -std
+A usage error exits with status 2. A clock or output failure exits with
+status 1.
+.Sh SEE ALSO
+.Xr asa 1 ,
+.Xr date 1
+.Sh STANDARDS
+RavenBSD implements the POSIX cal subset plus the
+.Fl 3
+and
+.Fl y
+views, with C-locale names only.

@@ -20,7 +20,7 @@ fn sample() -> SchemePacket {
 
 #[test]
 fn packet_size_and_offsets_are_stable() {
-    assert_eq!(PACKET_SIZE, 520);
+    assert_eq!(PACKET_SIZE, 528);
     assert_eq!(size_of::<Opcode>(), 2);
 }
 

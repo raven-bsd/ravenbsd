@@ -23,6 +23,37 @@ n=0
 while [ "$n" -lt 2 ]; do n=$((n+1)); echo while:$n; done
 until [ "$n" -ge 2 ]; do n=$((n+1)); done
 echo until:$n
+for i in 1 2 3; do echo break-loop:$i; break; done
+echo break:done
+for i in 1 2 3; do if [ "$i" = 2 ]; then continue; fi; echo continue:$i; done
+cd /tmp
+echo cd:$?
+cd /
+command echo cmd:ok
+echo command:$?
+export P4B=yes
+echo export:$P4B
+hash
+echo hash:$?
+set -- a b
+shift
+echo shift:$#:$1
+test -n x
+echo test:$?
+[ -n x ]
+echo bracket:$?
+type echo
+echo type:$?
+alias p4b="echo alias:ok"
+alias p4b
+echo alias:$?
+unalias p4b
+echo unalias:$?
+f() { return 7; }
+f
+echo return:$?
+echo 'echo dot:ok' > /tmp/p4b-dot
+. /tmp/p4b-dot
 v=abc
 echo p1:${v:-x}:${v#a}:${v%c}:${#v}
 unset u

@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-3-Clause
+# Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+
+[package]
+name = "raven-irq-dist"
+version = "0.1.0"
+description = "S75a external IRQ distribution fixture: MSI to the edu device, handler CPU evidence."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[package.metadata.raven]
+target = "none"
+
+[[bin]]
+name = "raven-irq-dist-init"
+path = "src/bin/init.rs"
+
+[dependencies]
+raven-abi = { path = "../../../crates/raven-abi" }
+raven-rt = { path = "../../../userland/rt", default-features = false, features = ["alloc", "panic-handler"] }
+
+[lints]
+workspace = true

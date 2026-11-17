@@ -3,7 +3,8 @@
 SPDX-License-Identifier: BSD-3-Clause
 Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
 
-Status: OBSERVED for the code as of S34; PROPOSED where a future model is named.
+Status: OBSERVED for the code as of S75 (user SMP behind `smp_user=on`); PROPOSED where a
+future model is named.
 
 This document is the kernel's working concurrency model: what the code assumes,
 which objects rely on those assumptions, and what must be re-audited before the
@@ -14,25 +15,32 @@ It is not an architecture document; the lead owns `architecture/`.
 
 ### 1.1 CPU roles
 
-* **CPU 0 (BSP)** runs every user thread, every process-context syscall, process
-  creation and teardown, and the driver `Irq`/vector code.
-* **CPUs 1..N (APs)** run kernel threads only today: idle loops and the
-  `selftest=smp`/`selftest=sched` workers.  No AP enters ring 3.
-* Device interrupts are routed to the BSP.  MSI messages are encoded with the
-  BSP APIC id (`irq_create(2)`), and legacy IOAPIC entries use the BSP
-  destination.
+* **CPU 0 (BSP)** runs the driver `Irq`/vector code and the boot path.  With
+  `smp_user=off` (the default) it also runs every user thread; with
+  `smp_user=on` user threads spread across every online CPU.
+* **CPUs 1..N (APs)** run kernel threads and, when `smp_user=on`, user threads.
+  Every CPU has its own TSS, IST stacks, `syscall` MSRs, GS block and FP/SIMD
+  state (see `docs/user-smp.md`).
+* The kernel timer and serial console are routed to the BSP.  External device
+  interrupts (IOAPIC legacy and MSI/MSI-X) choose a destination CPU at creation:
+  with `smp_user=on` they round-robin over the application processors, with
+  `smp_user=off` they stay on the BSP (`irq_dist`).  The consequence below about
+  single-CPU `Irq` close therefore holds only for the BSP-owned sources; the
+  vector pool's atomic owner slots keep a distributed handler safe.
 * The timer LAPIC interrupt runs on the CPU whose timer was programmed; the BSP
-  keeps the S07 timer and APs may run their own timer for the scheduler self-test.
+  keeps the S07 timer and each AP runs its own timer (vector `0x21`).
 
-Consequences that the rest of this document relies on:
+Consequences the rest of this document relies on:
 
 1. A process-context close of an `Irq`, a vector slot or a GSI registry entry
-   cannot run concurrently with the interrupt handler that may dereference it.
-2. Two user threads never run at the same time on different CPUs, so process
-   page tables are only mutated by one CPU at a time.
-3. A user page-table shootdown is only needed for the APs' kernel mappings and
-   for TLB entries left by an earlier user thread on the BSP; APs never execute
-   user code.
+   cannot run concurrently with the interrupt handler that may dereference it,
+   because device interrupts stay on the BSP.
+2. With `smp_user=on`, two user threads of the same process can run on different
+   CPUs at the same time, so every user page-table mutation is serialised by the
+   address-space lock and followed by a broadcast TLB shootdown.
+3. A user page-table shootdown must reach every online CPU that may have the
+   mapping in its TLB; `smp::shootdown::flush_range` already broadcasts and waits
+   for acknowledgements.
 
 ### 1.2 Non-preemptible kernel
 
@@ -233,7 +241,8 @@ period and the test timed out.
 
 Re-open this document and audit every section above if any of these changes:
 
-1. User threads are scheduled on application processors.
+1. User threads are scheduled on application processors (S75: now supported behind
+   `smp_user=on`; the audit in this document reflects that state).
 2. Kernel preemption is enabled (`preempt_count` no longer blocks a switch).
 3. Device interrupts are routed to a CPU other than the BSP, or MSI destination
    selection becomes user-controlled.
@@ -247,9 +256,10 @@ Re-open this document and audit every section above if any of these changes:
 * `sync::IrqSpinLock`: the old “single CPU” wording is gone.  The lock is
   non-reentrant because the flag serialises and interrupts are masked on the
   holding CPU; a recursive acquisition deadlocks by contract.
-* `gdt`: there is one shared TSS today.  `rsp0` is architectural per-CPU state;
-  before user threads run on APs, every CPU needs its own TSS descriptor, `tr`
-  load, `rsp0` slot and IST stacks.  APs currently run kernel threads only.
+* `gdt`: every CPU has its own TSS descriptor, `tr` load, `rsp0` slot and IST
+  stacks (S75).  `context::switch` writes the incoming thread's stack into the
+  current CPU's `rsp0`.  `load_gdt` leaves FS/GS selectors untouched so the
+  per-CPU MSR-provided bases survive a GDT reload.
 * `usermode::PerCpu`: this is the BSP's legacy S08 GS block.  The scheduler
   installs the real per-CPU block from `ap_start` on every CPU; APs never use
   this structure because they never enter user mode.

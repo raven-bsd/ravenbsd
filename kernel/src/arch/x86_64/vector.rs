@@ -9,7 +9,7 @@
 //! because allocation, owner publication and release only happen in process context, while the
 //! interrupt handler only reads the owner table.
 //!
-//! Owner protocol (current execution model):
+//! Owner protocol (active readers):
 //!
 //! * [`allocate`] claims the bitmap bit.
 //! * [`install_owner`] publishes the typed owner pointer with `Release` before the interrupt
@@ -17,17 +17,18 @@
 //! * [`release`] and [`quarantine`] clear the owner with `Release` *before* the slot is made
 //!   available again.  A quarantined vector keeps its bitmap bit forever, so a still-enabled
 //!   device cannot deliver an old message to a new `Irq`.
-//! * The handler reads the owner with `Acquire` and only dereferences a non-null pointer.
+//! * The handler acquires a per-vector reader slot **before** loading the owner, then clones an
+//!   `Arc` from the pointer.  `release`/`quarantine` clear the owner and then wait for the reader
+//!   count to reach zero before returning, so the object can never be freed while a handler (on
+//!   the same or another CPU) still dereferences it.
 //!
-//! The slot does not own a reference to the object.  The lifetime argument is the execution
-//! model: the kernel is non-preemptible, user threads and process-context closes run on CPU 0,
-//! and device delivery is routed to that same CPU.  The handler therefore cannot run while
-//! `Irq::drop` clears the slot, and the object stays alive until `drop` returns.  Enabling
-//! user-thread SMP, kernel preemption or delivery on another CPU invalidates the argument and
-//! needs an owning reference or a different reclamation protocol.
+//! The slot itself does not own a reference: the `Irq` is kept alive by the process handle table
+//! and by each in-flight handler's cloned `Arc`.  This protocol is what makes external-IRQ
+//! delivery on an application processor (S75a) safe without a scheduler change.
 
+use alloc::sync::Arc;
 use core::ptr;
-use core::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicPtr, AtomicU32, AtomicU64, Ordering};
 
 use crate::arch::x86_64::msi::vector_in_pool;
 use crate::driver::irq::Irq;
@@ -43,6 +44,9 @@ static TAKEN: [AtomicU64; 2] = [const { AtomicU64::new(0) }; 2];
 /// Owner of one device vector: a typed pointer to the `Irq`, or null.
 static OWNERS: [AtomicPtr<Irq>; VECTOR_COUNT as usize] =
     [const { AtomicPtr::new(ptr::null_mut()) }; VECTOR_COUNT as usize];
+/// In-flight handlers per vector (active-reader protocol).
+static READERS: [AtomicU32; VECTOR_COUNT as usize] =
+    [const { AtomicU32::new(0) }; VECTOR_COUNT as usize];
 
 /// True when `vector` belongs to the device pool.
 pub fn is_driver_vector(vector: u8) -> bool {
@@ -93,6 +97,7 @@ pub fn release(vector: u8) -> bool {
         return false;
     };
     clear_owner(index);
+    wait_readers(index);
     let word = index / 64;
     let bit = (index % 64) as u32;
     let mask = 1u64 << bit;
@@ -113,6 +118,7 @@ pub fn quarantine(vector: u8) -> bool {
         return false;
     };
     clear_owner(index);
+    wait_readers(index);
     true
 }
 
@@ -122,16 +128,38 @@ fn clear_owner(index: usize) {
     }
 }
 
-/// The owner pointer of a device vector, or null when it is unowned or not in the pool.
+/// Spin until no handler is between its reader acquire and its reader release.
 ///
-/// Called from the interrupt handler, which never blocks.  The returned pointer must only be
-/// dereferenced while the execution model keeps `Irq::drop` from running on another CPU; see the
-/// module documentation.
-pub fn owner(vector: u8) -> *const Irq {
-    match slot(vector) {
-        Some(index) => OWNERS.get(index).map_or(ptr::null(), |slot| {
-            slot.load(Ordering::Acquire).cast_const()
-        }),
-        None => ptr::null(),
+/// `clear_owner` already ran, so no new handler can pass the owner load; only readers that
+/// incremented before the clear remain.  The handler never blocks, so this terminates.
+fn wait_readers(index: usize) {
+    if let Some(reader_slot) = READERS.get(index) {
+        while reader_slot.load(Ordering::Acquire) != 0 {
+            core::hint::spin_loop();
+        }
     }
+}
+
+/// Acquire an owning reference to the owner of a device vector, or `None`.
+///
+/// Called from the interrupt handler, which never blocks.  The reader slot is taken before the
+/// owner load, so [`release`]/[`quarantine`] wait for this handler before returning; the cloned
+/// `Arc` then keeps the `Irq` alive for the rest of the handler even if the slot is cleared.
+pub fn handle_owner(vector: u8) -> Option<Arc<Irq>> {
+    let index = slot(vector)?;
+    let owner_slot = OWNERS.get(index)?;
+    let reader_slot = READERS.get(index)?;
+    reader_slot.fetch_add(1, Ordering::AcqRel);
+    let raw = owner_slot.load(Ordering::Acquire);
+    if raw.is_null() {
+        reader_slot.fetch_sub(1, Ordering::AcqRel);
+        return None;
+    }
+    // SAFETY: the reader slot is held, so `release`/`quarantine` cannot free the object until
+    // this handler releases it; `raw` is therefore a live `Arc<Irq>` inner.  Clone one reference.
+    unsafe { Arc::increment_strong_count(raw) };
+    // SAFETY: `increment_strong_count` made this a valid owning reference.
+    let irq = unsafe { Arc::from_raw(raw) };
+    reader_slot.fetch_sub(1, Ordering::AcqRel);
+    Some(irq)
 }

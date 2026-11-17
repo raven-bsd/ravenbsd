@@ -12,5 +12,10 @@ rust-version.workspace = true
 
 [dependencies]
 
+[features]
+# Per-object lock statistics for the kernel `lockstat` probes (L5). Off by default so the default
+# build keeps the current cost and layout: no counters, no stats field.
+lockstat = []
+
 [lints]
 workspace = true

@@ -198,6 +198,47 @@ pub struct Timespec {
     pub tv_nsec: i64,
 }
 
+/// POSIX record-lock wire types and commands for [`crate::syscall::RECORD_LOCK`].
+pub mod fcntl {
+    /// Shared (read) lock type.
+    pub const RDLCK: i16 = 0;
+    /// Exclusive (write) lock type.
+    pub const WRLCK: i16 = 1;
+    /// Unlock.
+    pub const UNLCK: i16 = 2;
+
+    /// `F_GETLK`: report the first conflicting lock.
+    pub const GETLK: u32 = 5;
+    /// `F_SETLK`: set or clear a lock without blocking.
+    pub const SETLK: u32 = 6;
+    /// `F_SETLKW`: set or clear a lock, blocking on a conflict.
+    pub const SETLKW: u32 = 7;
+
+    /// The 32-byte `struct flock` layout shared with libc.
+    #[repr(C)]
+    #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+    pub struct RecordLock {
+        /// Lock type: [`RDLCK`], [`WRLCK`] or [`UNLCK`].
+        pub l_type: i16,
+        /// Origin: `SEEK_SET` (0), `SEEK_CUR` (1) or `SEEK_END` (2).
+        pub l_whence: i16,
+        /// Start offset relative to `l_whence`.
+        pub l_start: i64,
+        /// Length in bytes; zero means to EOF.
+        pub l_len: i64,
+        /// Conflicting owner pid for [`GETLK`]; ignored on input.
+        pub l_pid: i32,
+    }
+
+    const _: () = assert!(core::mem::size_of::<RecordLock>() == 32);
+    const _: () = assert!(core::mem::align_of::<RecordLock>() == 8);
+    const _: () = assert!(core::mem::offset_of!(RecordLock, l_type) == 0);
+    const _: () = assert!(core::mem::offset_of!(RecordLock, l_whence) == 2);
+    const _: () = assert!(core::mem::offset_of!(RecordLock, l_start) == 8);
+    const _: () = assert!(core::mem::offset_of!(RecordLock, l_len) == 16);
+    const _: () = assert!(core::mem::offset_of!(RecordLock, l_pid) == 24);
+}
+
 const _: () = assert!(core::mem::size_of::<Timespec>() == 16);
 const _: () = assert!(core::mem::size_of::<Handle>() == 4);
 

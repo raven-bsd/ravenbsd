@@ -154,6 +154,8 @@ pub struct SchemePacket {
     pub group_count: u32,
     /// Caller supplementary groups (version 2).
     pub groups: [u32; MAX_GROUPS],
+    /// Cross-process trace id (`R-OBS-6`); zero means "not traced".
+    pub trace_id: u64,
 }
 
 impl Default for SchemePacket {
@@ -182,6 +184,7 @@ impl Default for SchemePacket {
             egid: 0,
             group_count: 0,
             groups: [0; MAX_GROUPS],
+            trace_id: 0,
         }
     }
 }
@@ -190,7 +193,7 @@ impl Default for SchemePacket {
 pub const PACKET_SIZE: usize = size_of::<SchemePacket>();
 
 const _: () = {
-    assert!(PACKET_SIZE == 520);
+    assert!(PACKET_SIZE == 528);
     assert!(offset_of!(SchemePacket, version) == 0);
     assert!(offset_of!(SchemePacket, opcode) == 4);
     assert!(offset_of!(SchemePacket, flags) == 6);
@@ -214,6 +217,7 @@ const _: () = {
     assert!(offset_of!(SchemePacket, egid) == 448);
     assert!(offset_of!(SchemePacket, group_count) == 452);
     assert!(offset_of!(SchemePacket, groups) == 456);
+    assert!(offset_of!(SchemePacket, trace_id) == 520);
 };
 
 /// Why a reply's reported result length is not acceptable.
@@ -358,6 +362,7 @@ pub fn encode(packet: &SchemePacket, out: &mut [u8]) -> Result<(), PacketError> 
         put_u32(out, offset, group);
         index = index.saturating_add(1);
     }
+    put_u64(out, offset_of!(SchemePacket, trace_id), packet.trace_id);
     Ok(())
 }
 
@@ -420,6 +425,7 @@ pub fn decode(input: &[u8]) -> Result<SchemePacket, PacketError> {
         egid: get_u32(input, offset_of!(SchemePacket, egid))?,
         group_count: get_u32(input, offset_of!(SchemePacket, group_count))?,
         groups,
+        trace_id: get_u64(input, offset_of!(SchemePacket, trace_id))?,
     })
 }
 

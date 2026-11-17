@@ -29,6 +29,8 @@ pub mod pipe;
 pub mod priority;
 pub mod process_ctl;
 pub mod thread;
+/// `TRACE_SET` (R-OBS-6): the calling thread's current trace id.
+pub mod trace;
 pub mod tty;
 
 use core::sync::atomic::Ordering;
@@ -240,6 +242,10 @@ fn dispatch_inner(frame: &SyscallFrame) -> Result<usize, Errno> {
     }
     if number == basic::CLOCK_SET {
         return basic::clock_set(frame);
+    }
+    // Q3b: TRACE_SET (reviewer-assigned raw number 0x0B; not a Syscall variant).
+    if number == raven_abi::syscall::TRACE_SET {
+        return trace::trace_set(frame);
     }
     match Syscall::from_usize(number) {
         // EXIT is process-wide: every thread of the process terminates.

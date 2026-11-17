@@ -1,0 +1,48 @@
+.\" SPDX-License-Identifier: BSD-3-Clause
+.\" Copyright (c) 2026, Bo Maryniuk and RavenBSD contributors
+.Dd November 17, 2026
+.Dt ICONV 1
+.Os RavenBSD
+.Sh NAME
+.Nm iconv
+.Nd convert between supported character sets
+.Sh SYNOPSIS
+.Nm
+.Fl f Ar from
+.Fl t Ar to
+.Op Fl o Ar file
+.Op Ar file ...
+.Sh DESCRIPTION
+The
+.Nm
+utility converts the complete input from
+.Ar from
+to
+.Ar to .
+The supported sets are UTF-8, ASCII and ISO-8859-1; the accepted aliases are listed in
+.Pa docs/posix/P4-locale.md .
+With no file operand, or with
+.Ar - ,
+input is read from standard input. Output goes to standard output unless
+.Fl o
+names a file.
+.Pp
+Conversion is whole-input and produces no partial output on failure. A character that is not
+representable in the target set is an error; there is no transliteration.
+.Sh EXIT STATUS
+.Ex -std
+0 on success, 1 for an unsupported encoding or conversion failure, 2 for usage.
+.Sh SEE ALSO
+.Xr gencat 1 ,
+.Xr locale 1
+.Sh STANDARDS
+A documented subset of POSIX
+.Nm iconv .
+UTF-16, UTF-32, EUC, Shift-JIS, ISO-2022, stateful encodings,
+.Fl c ,
+.Fl s
+and the
+.Ql //TRANSLIT
+and
+.Ql //IGNORE
+suffixes are unsupported.

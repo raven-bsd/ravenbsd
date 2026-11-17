@@ -154,7 +154,37 @@ drives a million mixed alloc/free/realloc operations against a real backing buff
 patterns and asserting zero redzone/double-free detections on correct use; `failure_injection_*`
 pins a tiny arena and asserts `alloc` returns `Exhausted` rather than a bad or duplicate pointer.
 
-## 7. What A1..A6 defer to A5+
+## 7. Physical frames: buddy/zone core (A5a, OBSERVED)
+
+`crates/raven-frames` now carries a power-of-two buddy allocator beside the existing bitmap
+allocator: `BuddyAllocator<ORDERS, MAX_BLOCKS, P>` manages a caller-supplied power-of-two frame
+range with orders `0..=top_order`, all metadata in fixed inline storage (no global allocation).
+
+* **API**: `alloc(order)`, `alloc_at(frame, order)`, `free(frame, order)`, `reserve(frame, count)`,
+  `free_blocks(order)`, `free_frames()`, `stats()` and a `Pager` trait (`back`/`unback`) consulted on
+  every allocation/free, so the kernel can map/unmap and a host test can inject failure.
+* **Errors** (never a panic): `OrderTooLarge`, `OutOfFrames`, `OutOfRange`, `DoubleFree`,
+  `Occupied`, `Misaligned`, `Pager`, `ZeroSize`.
+* **Invariants** (tested): free + allocated + reserved = total; buddies coalesce on free; the
+  exhaustive small-frame model and a 20k-op random model assert conservation and full coalescing
+  back to a single top-order block; the OOM path reports `OutOfFrames`.
+
+The per-CPU frame caches and the kernel wiring are A5b, after S75.
+
+## 8. Physical frames: per-CPU magazines (A5b, OBSERVED)
+
+`FrameCache<NCPUS, CACHE_CAP, REMOTE_CAP>` adds the per-CPU fast path over the A5a buddy: fixed
+order-0 caches with high/low watermarks, batch refill/drain to a [`FrameSource`] (the buddy), a
+bounded remote-free queue per CPU, and per-CPU stats (`hits`, `misses`, `refills`, `drains`,
+`remote_frees`, `evictions`). Every call takes an explicit CPU id and the source, so the layer reads
+no hardware or globals. The pager failure path is complete: a `Pager` that refuses to back surfaces
+`BuddyError::Pager` through `alloc`, and conservation (`free + cached + remote + live + reserved ==
+total`) is intact. The 4-CPU million-op model and a single-CPU baseline assert no frame lost or
+duplicated, no cache above its capacity, and full coalescing after a drain.
+
+Kernel wiring (A5c) remains, after S75 releases the SMP paths.
+
+## 9. What A1..A6 defer to A5c+
 
 The architecture names three allocation policies and a quantum/import hierarchy. A1 ships
 `FirstFit`, `BestFit` and `NextFit`; the `InstantFit` power-of-two freelists and quantum caches are
@@ -164,6 +194,7 @@ from the mapped heap range, and the wider kva/ID arenas (R-MEM-3) land with the 
 The R-MEM-10 debug bitmask (`REDZONE|POISON|AUDIT|LITE|LEAK`) remains a kernel-side runtime flag;
 A6 provides the mechanisms behind a compile-time host/test feature.
 
-## 8. kmem next steps (A5, PROPOSED)
+## 10. kmem next steps (A5c, PROPOSED)
 
-* **A5** per-CPU frame caches, buddy/zones and pager hooks (R-MEM-13..15).
+* **A5c** wire the A5b per-CPU frame caches and the pager into the kernel frame path
+  (R-MEM-13..15), after S75.

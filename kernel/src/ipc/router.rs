@@ -31,6 +31,14 @@ use super::{next_file_id, next_request_id, registry};
 /// Maximum outstanding client requests one process may hold.
 const MAX_CLIENT_REQUESTS: usize = 1024;
 
+/// The current thread's trace id, or zero when there is no thread context.
+///
+/// The disabled (untraced) path is this one branch-free read: an id of zero is stamped unchanged,
+/// so a request that is not part of a trace pays no allocation and no extra work.
+fn current_trace_id() -> u64 {
+    crate::sched::current_thread().map_or(0, |thread| thread.trace_id.load(Ordering::Acquire))
+}
+
 /// K66 wire open-flag bits (`raven-proto-fs::WIRE_OPEN_*`). The kernel carries the set and
 /// rejects unknown bits; combination checks are the server's typed `OpenFlags` job.
 const WIRE_OPEN_MASK: u32 = 0xFF;
@@ -86,6 +94,7 @@ pub fn open(
         .lock()
         .insert(Object::SchemeFile(Arc::clone(&file)), rights)?;
     let mut packet = SchemePacket::request(Opcode::Open, next_request_id(), file.id);
+    packet.trace_id = current_trace_id();
     packet.flags = flags as u16;
     if packet.set_path(path.as_bytes()).is_err() {
         // The server never saw an OPEN, so no CLOSE is owed.
@@ -166,6 +175,7 @@ fn read_at(
     ensure_server(&file.server)?;
     let capture = capture::create(caller, &file.server, address, len, true)?;
     let mut packet = SchemePacket::request(Opcode::Read, next_request_id(), file.server_id());
+    packet.trace_id = current_trace_id();
     packet.buffer_len = len;
     packet.offset = positional.unwrap_or(0);
     packet.flags = if positional.is_some() {
@@ -226,6 +236,7 @@ fn write_at(
     ensure_server(&file.server)?;
     let capture = capture::create(caller, &file.server, address, len, false)?;
     let mut packet = SchemePacket::request(Opcode::Write, next_request_id(), file.server_id());
+    packet.trace_id = current_trace_id();
     packet.buffer_len = len;
     packet.offset = positional.unwrap_or(0);
     packet.flags = if positional.is_some() {
@@ -261,6 +272,7 @@ pub fn seek(
 ) -> Result<u64, Errno> {
     ensure_server(&file.server)?;
     let mut packet = SchemePacket::request(Opcode::Seek, next_request_id(), file.server_id());
+    packet.trace_id = current_trace_id();
     packet.offset = offset as u64;
     packet.flags = u16::try_from(whence).map_err(|_| Errno::EINVAL)?;
     packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
@@ -326,6 +338,7 @@ pub fn dup(caller: &Arc<Process>, handle: Handle, mask: u32) -> Result<Handle, E
         crate::process::handle::register_lineage(node);
     }
     let mut packet = SchemePacket::request(Opcode::Dup, next_request_id(), file.server_id());
+    packet.trace_id = current_trace_id();
     packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
     let request = PendingRequest::new(
         Arc::clone(caller),
@@ -359,6 +372,7 @@ pub fn fstat(
         None
     };
     let mut packet = SchemePacket::request(Opcode::Fstat, next_request_id(), file.server_id());
+    packet.trace_id = current_trace_id();
     packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
     packet.response_len = len;
     let request = PendingRequest::new(
@@ -386,6 +400,7 @@ pub fn fstat(
 pub fn fstat_kernel(caller: &Arc<Process>, file: &Arc<SchemeFile>) -> Result<[u8; 64], Errno> {
     ensure_server(&file.server)?;
     let mut packet = SchemePacket::request(Opcode::Fstat, next_request_id(), file.server_id());
+    packet.trace_id = current_trace_id();
     packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
     packet.response_len = 0;
     let request = PendingRequest::new(
@@ -441,6 +456,7 @@ pub fn call(
         None
     };
     let mut packet = SchemePacket::request(Opcode::Call, next_request_id(), file.server_id());
+    packet.trace_id = current_trace_id();
     packet.buffer_len = request_len;
     packet.response_len = response_len;
     packet.server_cookie = file.server_cookie.load(Ordering::Acquire);
@@ -488,6 +504,7 @@ pub fn pager_call(
     let mut bytes = [0u8; raven_pager::PACKET_SIZE];
     packet.encode(&mut bytes).map_err(|_| Errno::EINVAL)?;
     let mut scheme = SchemePacket::request(Opcode::Call, next_request_id(), 0);
+    scheme.trace_id = current_trace_id();
     scheme.data_len = raven_pager::PACKET_SIZE as u32;
     scheme
         .data
@@ -664,8 +681,16 @@ pub fn send(
             .store(packet.server_cookie, Ordering::Release);
     }
     let status = packet.status;
+    // The reply is part of the same trace as its request: carry the request's trace id back so
+    // the id survives the full call/reply cycle.
+    packet.trace_id = request.packet.lock().trace_id;
     request.complete(status, result, Some(packet));
     retire(caller, &request, request_handle);
+    // SEND finished: clear the inherited trace id so the server's later requests are untraced
+    // unless they adopt their own caller.
+    if let Some(thread) = sched::current_thread() {
+        thread.trace_id.store(0, Ordering::Release);
+    }
     Ok(())
 }
 
@@ -861,6 +886,11 @@ fn deliver(
     packet_address: u64,
 ) -> Result<Handle, Errno> {
     let packet = request.deliverable_packet();
+    // Adopt the caller's trace id for the duration of this call: a nested call the server makes
+    // while serving it inherits the caller's trace. Cleared when SEND finishes.
+    if let Some(thread) = sched::current_thread() {
+        thread.trace_id.store(packet.trace_id, Ordering::Release);
+    }
     let mut bytes = [0u8; PACKET_SIZE];
     if protocol::encode(&packet, &mut bytes).is_err() {
         request.fail(Errno::EPROTO);
