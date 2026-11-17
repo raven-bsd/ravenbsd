@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use super::{Arch, build_spec, copy_headers, is_compiler_header, parse};
+use super::{Arch, build_spec, clean_compiler_headers, copy_headers, is_compiler_header, parse};
 use crate::process::CommandSpec;
 
 fn args(values: &[&str]) -> Vec<String> {
@@ -227,6 +227,24 @@ fn copy_headers_skips_compiler_provided_wrappers() {
 
     assert!(!target.join("stdatomic.h").exists());
     assert!(target.join("stdio.h").is_file());
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn clean_compiler_headers_removes_stale_wrappers() {
+    let root = std::env::temp_dir().join(format!(
+        "c74c-clean-headers-{}-{}",
+        std::process::id(),
+        line!()
+    ));
+    std::fs::create_dir_all(&root).expect("dir");
+    std::fs::write(root.join("stdatomic.h"), b"#include_next <stdatomic.h>\n").expect("wrapper");
+    std::fs::write(root.join("stdio.h"), b"#pragma once\n").expect("normal header");
+
+    clean_compiler_headers(&root);
+
+    assert!(!root.join("stdatomic.h").exists());
+    assert!(root.join("stdio.h").is_file());
     let _ = std::fs::remove_dir_all(&root);
 }
 
