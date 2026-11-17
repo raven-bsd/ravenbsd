@@ -7,7 +7,7 @@ use core::ptr;
 use raven_libc_abi::errno::Errno;
 use raven_libc_abi::structs::{Timespec, Tm as AbiTm};
 
-use super::{convert, fill_abi_tm, platform, static_tm, utc};
+use super::{convert, fill_abi_tm, fill_abi_tm_zone, platform, static_tm, zone};
 
 /// `nanosleep`.
 ///
@@ -66,7 +66,7 @@ pub unsafe extern "C" fn gmtime_r(timep: *const c_longlong, out: *mut AbiTm) -> 
     }
 }
 
-/// `localtime_r`; the TZ environment hand-over is C61's, so this pass uses UTC.
+/// `localtime_r`: the zone comes from the process `TZ` cache.
 ///
 /// # Safety
 /// `timep` is readable and `out` is writable.
@@ -77,12 +77,15 @@ pub unsafe extern "C" fn localtime_r(timep: *const c_longlong, out: *mut AbiTm) 
     }
     // SAFETY: the C contract says `timep` is readable.
     let seconds = unsafe { *timep };
-    let state = utc();
-    match convert::localtime_r(&state, seconds) {
-        Ok(tm) => {
+    match zone::with_cache(|cache| {
+        let state = cache.state();
+        convert::localtime_r(state, seconds)
+            .map(|tm| (tm, zone::abbreviation(cache, tm.tm_isdst > 0)))
+    }) {
+        Ok((tm, zone_pointer)) => {
             // SAFETY: the C contract says `out` is writable.
             unsafe {
-                fill_abi_tm(&mut *out, &tm);
+                fill_abi_tm_zone(&mut *out, &tm, zone_pointer);
             }
             out
         }
